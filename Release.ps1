@@ -158,7 +158,7 @@ Step 'build and test'
 # writes files whose content changes, and cargo's own rewrite of Cargo.lock happens before the exe is produced.
 $stampFile=Join-Path $env:TEMP 'megulit-release-stamp.json';$exePath=Join-Path $Root 'MeguLit.exe'
 function NewestSource{
- $files=git ls-files --cached --others --exclude-standard web services core setup desktop/src desktop/Cargo.toml desktop/tauri.conf.json native
+ $files=git ls-files --cached --others --exclude-standard web services core setup 'The Seed' desktop/src desktop/Cargo.toml desktop/tauri.conf.json native
  $newest=$null;foreach($f in $files){if($f -match '\.(exe|dll|lib|obj|png|jpg|webp|ico)$'){continue};$p=Join-Path $Root $f;if(-not (Test-Path -LiteralPath $p)){continue};$t=(Get-Item -LiteralPath $p).LastWriteTimeUtc;if(-not $newest -or $t -gt $newest.Time){$newest=@{Time=$t;File=$f}}}
  $newest
 }
@@ -200,12 +200,13 @@ if(-not $got){Invoke-WebRequest -Uri $prevAsset.browser_download_url -OutFile $p
 $old=[IO.Compression.ZipFile]::OpenRead($prevZip)
 $names=New-Object 'System.Collections.Generic.SortedSet[string]' ([StringComparer]::Ordinal)
 # E-pkg: carry over only files the repository never tracked (prebuilt native helpers, fonts); a file git deleted stays deleted.
-function Get-DroppedPaths([string[]]$Paths){$gone=@{};foreach($f in (git log --diff-filter=D --name-only --format= -- core services web setup native)){if($f){$gone[$f]=1}};$live=@{};foreach($f in (git ls-files)){$live[$f]=1};@($Paths | Where-Object {$gone.ContainsKey($_) -and -not $live.ContainsKey($_) -and -not (Test-Path -LiteralPath (Join-Path $Root ($_ -replace '/','\')))})}
+function Get-DroppedPaths([string[]]$Paths){$gone=@{};foreach($f in (git log --diff-filter=D --name-only --format= -- core services web setup native 'The Seed')){if($f){$gone[$f]=1}};$live=@{};foreach($f in (git ls-files)){$live[$f]=1};@($Paths | Where-Object {$gone.ContainsKey($_) -and -not $live.ContainsKey($_) -and -not (Test-Path -LiteralPath (Join-Path $Root ($_ -replace '/','\')))})}
 $prevNames=@(foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and $e.FullName -ne 'MeguLit/build-shell.txt' -and -not $e.FullName.EndsWith('/') -and $e.FullName -notmatch '\.(lib|obj|pdb|exp|ilk|iobj|ipdb)$' -and $e.FullName -notmatch '/build/'){$e.FullName.Substring(8)}})
 $dropped=Get-DroppedPaths $prevNames
 foreach($n in $prevNames){if($dropped -contains $n){Write-Host "  dropped deleted $n"}else{[void]$names.Add($n)}}
 # --others: files added in this release are not tracked yet when the list is built (-IncludeWorkingChanges)
-foreach($f in (git ls-files --cached --others --exclude-standard core services web setup)){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
+<# 2026-11-21 The Seed/ (owner): the built-in game diffs ship with the code, one folder in MeguLit/ #>
+foreach($f in (git ls-files --cached --others --exclude-standard core services web setup 'The Seed')){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
 # Prebuilt native helpers added after the previous package (not tracked: *.dll is ignored); E293 scene capture.
 # E301 Ren'Py positions: the DLLs run native/MeguLitRenpy.py, which must ship next to them.
 # E297 cold run helpers (built by Build.ps1, *.exe is not tracked).
@@ -253,7 +254,7 @@ Write-Host "$Asset  $count files  $size bytes  sha256 $hash"
 # ---------- hot package ----------
 # Only the changed files, for installs running exactly the previous package (name carries its version and digest).
 # Offered when MeguLit.exe's own code is unchanged (build-shell.txt) and every changed file is under web/, services/,
-# core/ or setup/ and is not HTML. Betas are prereleases the updater never reads, so they get none.
+# core/, setup/ or The Seed/ and is not HTML. Betas are prereleases the updater never reads, so they get none.
 $HotPath=$null;$HotAsset=$null
 if(-not $Beta){
  $prevDigestHot=(Get-FileHash $prevZip -Algorithm SHA256).Hash.ToLower()
@@ -267,7 +268,7 @@ if(-not $Beta){
      counting them meant no release ever got a small package. A hot install simply keeps the previous copies. #>
   if(-not $why){foreach($e in $zb.Entries){$n=$e.FullName;if($n.EndsWith('/') -or $n -eq 'MeguLit/MeguLit.exe' -or $n -eq 'MeguLit/build-shell.txt' -or $n -match '^MeguLit/[^/]+\.md$'){continue}
    $h=EntryHash $e;$o=$za.GetEntry($n);if($o -and $o.Length -eq $e.Length -and (EntryHash $o) -eq $h){continue}
-   $rel=$n.Substring(8);if($rel -notmatch '^(web|services|core|setup)/' -or $rel -match '\.html?$'){$why="$rel changed";break}
+   $rel=$n.Substring(8);if($rel -notmatch '^(web|services|core|setup|The Seed)/' -or $rel -match '\.html?$'){$why="$rel changed";break}
    $changed+=[pscustomobject]@{path=$rel;sha256=$h;entry=$e}}}
   if(-not $why -and -not $changed.Count){$why='no file changed'}
   if(-not $why){

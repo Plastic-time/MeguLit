@@ -7,44 +7,32 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": null
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -57,9 +45,22 @@
   "title": "d24e24a3f79dda895040b1b3582a05e90be3ead757f66df6287941fb45e57791",
   "vndb": "v7771"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "white-album-2",
  "builds": [
   "c395d93f74695d2bb7a4fb2fe30486a5d37715b4c30bf20451883569bba3990b"
- ]
+ ],
+ "match": {
+  "exe": [
+   "WA2.exe"
+  ],
+  "titles": [
+   "WHITE ALBUM2"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
 }

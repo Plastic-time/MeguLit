@@ -7,44 +7,32 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": null
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -57,9 +45,23 @@
   "title": "515dfef091aed2bd8decfd1220808aae5101748f29a30e0ebe8a2dd534bdd500",
   "vndb": "v6589"
  },
+ "seedFormat": 1,
  "status": "owner-ok",
  "slug": "josou-sanmyaku",
  "builds": [
   "00f499857bd9190de75345880ea4b3ac4c56dbdd6cd924d5b20a1311440fade0"
- ]
+ ],
+ "match": {
+  "exe": [
+   "女装山脈.exe"
+  ],
+  "titles": [
+   "女装山脈",
+   "女装山脉"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
 }

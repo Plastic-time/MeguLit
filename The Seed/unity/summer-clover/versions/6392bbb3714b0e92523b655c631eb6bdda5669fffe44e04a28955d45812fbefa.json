@@ -5,14 +5,6 @@
  "layer": "version",
  "source": "official",
  "settings": {
-  "hide": {
-   "engineTrial": {
-    "enabled": null,
-    "unconfirmedLines": null,
-    "clickMs": null,
-    "skipAside": null
-   }
-  },
   "draw": {
    "embed": false,
    "embedTranslation": true
@@ -26,5 +18,6 @@
   "exe": "6392bbb3714b0e92523b655c631eb6bdda5669fffe44e04a28955d45812fbefa",
   "head": "c6c6e147b324de648df9816c03d0108f872e34975b7986afc322842453583662",
   "pe": "2020.3.34.19612@626e7ea1"
- }
+ },
+ "rev": 1
 }

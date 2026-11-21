@@ -17,7 +17,7 @@
      below the window only once it reaches a quarter glyph into the game's button strip, and comes back under its Japanese only
      once it fits with half a glyph to spare; between the two it stays where it is, so a slider moves it continuously. */
   let cnBelow = { key: null, below: false }; const UNMATCHED_MS = 400;
-  let on = false, line = null, frame = 0, lastGeom = '', boxBottom = 0, boxKey = '', anchor = null, anchorLine = '', anchorLimit = NaN, anchorMode = true, drawnByGame = '', drawnHiding = false, pageOwn = false, page = null; const clones = new Map();
+  let on = false, line = null, frame = 0, lastGeom = '', boxBottom = 0, boxKey = '', anchor = null, anchorLine = '', anchorLimit = NaN, anchorMode = true, drawnByGame = '', drawnHiding = false, drawnEmbedded = 0, pageOwn = false, page = null; const clones = new Map();
   const style = document.createElement('style');
   style.textContent = [
     'body.megulit-placed .sentence-window.megulit-place-window{left:0!important;top:0!important;right:auto!important;bottom:auto!important;width:100vw!important;height:100vh!important;max-height:none!important;margin:0!important;padding:0!important;background:none!important;border:0!important;box-shadow:none!important;outline:0!important;backdrop-filter:none!important;overflow:visible!important;transform:none!important;pointer-events:none}',
@@ -47,6 +47,7 @@
     'body.megulit-place-game-drawn.megulit-anchored .sentence-window.tomoyo-hook-reader .sentence-text:not(.megulit-old-line),body.megulit-place-game-drawn.megulit-placed .sentence-window.tomoyo-hook-reader .sentence-text:not(.megulit-old-line){visibility:hidden!important}',
     'body.megulit-place-game-drawn.megulit-game-line-brief .sentence-window.tomoyo-hook-reader .sentence-text:not(.megulit-old-line){visibility:hidden!important}',
     'body.megulit-place-game-drawn .sentence-window.tomoyo-hook-reader .tomoyo-cn-row{visibility:visible!important}',
+    'body.megulit-place-game-drawn.megulit-game-embedded .sentence-window.tomoyo-hook-reader .tomoyo-cn-row{visibility:hidden!important}',
     /* layer 4 page model: older lines of the page (their own .sentence-text, placed like the current one) */
     'body.megulit-place-asleep .sentence-window.tomoyo-hook-reader{visibility:hidden!important}',
     'body:not(.megulit-placed) .megulit-old-line{display:none!important}',
@@ -337,6 +338,8 @@
     if (document.body.classList.contains('megulit-place-game-drawn') !== drawn) { document.body.classList.toggle('megulit-place-game-drawn', drawn); window.__tomoyoHitRegionsRefresh?.(true); }
     /* the same line while MeguLit is hiding the game's text (core/overlay-placement.cjs `hiding`): the game's own line is there until the hide is back, wherever the reader's line sits */
     briefSync(drawn && drawnHiding);
+    /* engine-draw (docs/engine-draw-protocol.md): emb=2, the game drew this line's ruby and Chinese itself; the reader adds nothing */
+    const embedded = drawn && drawnEmbedded === 2; if (document.body.classList.contains('megulit-game-embedded') !== embedded) document.body.classList.toggle('megulit-game-embedded', embedded);
     return drawn;
   }
   let reveal = { id: 0, n: 0, t: 0 };
@@ -744,7 +747,7 @@
     /* 2026-11-20 (CHAOS;CHILD: the click that clears a page at a scene change makes the game draw the whole page once more as plain text,
        earlier lines and the placed one together, while its hidden line leaves the screen): the placed line goes with the page until the next line */
     if (m.hiding === true && cur && vis.length > cur.length && vis.endsWith(cur)) { document.body.classList.add('megulit-place-gone'); line = null; schedule(); return; }
-    drawnByGame = vis; drawnHiding = m.hiding === true; schedule(); return; } if (m && Array.isArray(m.rects) && m.text) drawnByGame = ''; { const nb = t => [...String(t || '')].filter(c => !blank(c)).join(''), cur = line && !line.fallback ? nb(line.text) : '', nt = m?.fallback && m.text ? nb(m.text) : '';
+    drawnByGame = vis; drawnHiding = m.hiding === true; drawnEmbedded = m.embedded === 1 || m.embedded === 2 ? m.embedded : 0; schedule(); return; } if (m && Array.isArray(m.rects) && m.text) drawnByGame = ''; { const nb = t => [...String(t || '')].filter(c => !blank(c)).join(''), cur = line && !line.fallback ? nb(line.text) : '', nt = m?.fallback && m.text ? nb(m.text) : '';
     /* the same page redraw seen first as an unplaced line of the whole page (earlier lines + the placed one) */
     if (cur && nt.length > cur.length && nt.endsWith(cur)) { document.body.classList.add('megulit-place-gone'); line = null; schedule(); return; } }
     document.body.classList.remove('megulit-place-gone'); if (m?.clear) line = null; else if (m?.fallback && m.text) line = { fallback: true, text: String(m.text) }; else if (m && Array.isArray(m.rects) && m.text) { if (line && !line.fallback && line.text !== String(m.text)) noteReplaced(line); } if (m?.clear) {} else if (m?.fallback && m.text) {} else if (m && Array.isArray(m.rects) && m.text) line = { text: String(m.text), rects: m.rects, client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] }; schedule(); };

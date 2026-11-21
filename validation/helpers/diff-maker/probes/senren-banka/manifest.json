@@ -1,0 +1,93 @@
+{
+ "schema": 1,
+ "note": "simulated probe from the owner test build logs (incr9) + original-text index",
+ "title": "千恋＊万花",
+ "identity": "27dd03c156e87597a0d5f5086789b8aeafa98a0ed2ad805bcfd637dcb5c7754f",
+ "detected": "kirikiri",
+ "exe": {
+  "name": "SenrenBanka.exe",
+  "sha256": "fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3"
+ },
+ "runtime": {
+  "from": "2026-11-20T22:53:42",
+  "to": ""
+ },
+ "steamAppId": "1144400",
+ "files": [
+  {
+   "path": "adult.xp3",
+   "size": 850752143,
+   "sha256": "76cf9d80ef69503c41b28e336f83f83ed1175b8f757bacac9b24e197bea2bdbf"
+  },
+  {
+   "path": "adult2.xp3",
+   "size": 1578705631,
+   "sha256": "bb8631f64c0ebee89b7363ad982ae7d2d271cc2202956c68090f596e456c94d7"
+  },
+  {
+   "path": "bgimage.xp3",
+   "size": 303776952,
+   "sha256": "cc799dde139a58c40d93a8eafb1c9226d5d0b90c855de87cc3dc0e5ccfb09504"
+  },
+  {
+   "path": "bgm.xp3",
+   "size": 263189917,
+   "sha256": "a00c5fe04433d5b134f2cbf3271610f26e1d5f865ff3cd803a5a003df5a8754d"
+  },
+  {
+   "path": "data.xp3",
+   "size": 1007284928,
+   "sha256": "36d19cf4e8696d82639ecee6ebd27e225ddf8816040734df574071a28a44fa42"
+  },
+  {
+   "path": "evimage.xp3",
+   "size": 789239689,
+   "sha256": "0a188ba8727b11417afd2e17695d615bc8cc060b9d12e911c18a59ee28ec3262"
+  },
+  {
+   "path": "fgimage.xp3",
+   "size": 352931287,
+   "sha256": "896df7aec4b321d1719df9020c304ac2c4b37cbacbe4984b28fc1b254c6bf0e0"
+  },
+  {
+   "path": "patch.xp3",
+   "size": 189665466,
+   "sha256": "0e09554ab07c6be8a08071aefef4f04668ac865c2633ddb41c7614dfee5d940a"
+  },
+  {
+   "path": "patch_extra.xp3",
+   "size": 53781663,
+   "sha256": "a7e8cf11db9752c1792d5dbb2b39d579dafe1f4ee57261fa4787d9d92c5b4e4a"
+  },
+  {
+   "path": "scn.xp3",
+   "size": 149262979,
+   "sha256": "6b6b65d62308a6e48ddb510b95cb13155458075e44e99f95cc332801bfdd1bf9"
+  },
+  {
+   "path": "SenrenBanka.exe",
+   "size": 4412928,
+   "sha256": "fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3"
+  },
+  {
+   "path": "steam.xp3",
+   "size": 15108,
+   "sha256": "daa4d069e4699c202f95bc3bdf6ddb4fe2d9b132538b2bc8482d2c5312ef9ee8"
+  },
+  {
+   "path": "video.xp3",
+   "size": 1819550428,
+   "sha256": "3fe5e1442f0a3ceddf71752b0fb28bb4d1a48d532a8cb06129b42250c118c90e"
+  },
+  {
+   "path": "video2.xp3",
+   "size": 1760103913,
+   "sha256": "ecf45d4270cd6fb83163ca7f36f1379f5b80402e1b02eafc01ac800dc9a6f2d6"
+  },
+  {
+   "path": "voice.xp3",
+   "size": 1292964454,
+   "sha256": "bdfed0ec6e9e8ed34e3954fe71dddd662e378ec9b1b2d7cbc664f3d80b71a2e9"
+  }
+ ]
+}

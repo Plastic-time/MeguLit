@@ -470,6 +470,10 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         else if(type=="maskAssist"){if(TextMask!=null)TextMask.Assist(Str(d,"source"));}
         else if(type=="hookVerifyCancel"){if(HookVerifier!=null)HookVerifier.Cancel();}
         else if(type=="gameAudio"){AudioWanted=Bool(d,"enabled");uint pid=0;if(AudioWanted&&Target!=IntPtr.Zero)GetWindowThreadProcessId(Target,out pid);if(AudioWanted&&pid!=0)Audio.Start(pid);else if(!AudioWanted)Audio.Stop();}
+        /* 2026-11-21 runtime sample: {type:"clientShot",id,maxEdge,maxBytes} -> the whole client area, full size + a scaled copy (GameAudio.ClientShot) */
+        else if(type=="clientShot"){string id=Str(d,"id");IntPtr target=Target;object me,mb;int maxEdge=d.TryGetValue("maxEdge",out me)?Math.Max(64,Math.Min(4096,Convert.ToInt32(me))):960,maxBytes=d.TryGetValue("maxBytes",out mb)?Math.Max(16*1024,Math.Min(2*1024*1024,Convert.ToInt32(mb))):150*1024;
+            ThreadPool.QueueUserWorkItem(delegate{string full="",small="";try{Rect rect;if(target!=IntPtr.Zero&&GetClientRect(target,out rect))GameAudio.ClientShot(target,rect.Right,rect.Bottom,maxEdge,maxBytes,out full,out small);}catch{}
+                try{Emit(new{type="clientShot",id=id,full=full,small=small});}catch{}});}
         else if(type=="sceneShot"){string id=Str(d,"id");IntPtr target=Target;
             ThreadPool.QueueUserWorkItem(delegate{string jpeg="",hash="";double score=0;try{Rect rect;if(target!=IntPtr.Zero&&GetClientRect(target,out rect))jpeg=GameAudio.SceneShot(target,rect.Right,rect.Bottom,out score,out hash);}catch{}
                 try{Emit(new{type="sceneShot",id=id,jpeg=jpeg,score=score,hash=hash});}catch{}});}
@@ -805,6 +809,7 @@ if(args.Length==2&&args[0]=="--art-scan-file"){Console.OutputEncoding=Encoding.U
         }
         if(args.Length>0&&args[0]=="--mode-self-test"){
             if(!GameSceneProbe.SelfTest())return 6;
+            if(!GameAudio.ClientShotSelfTest())return 9;
             Command(new Dictionary<string,object>{{"type","configure"},{"interfaceMode","translation"}});
             if(!TranslationMode)return 4;
             Command(new Dictionary<string,object>{{"type","configure"},{"interfaceMode","normal"}});

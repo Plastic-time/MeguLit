@@ -145,14 +145,17 @@ test('the KiriKiri script fits the compiler: every raw literal piece and the who
     Over the first the build fails with C2026 and the self-test then passes against the previous DLLs (67d07978). */
  const pieces=[...read('native/krkrtext/script.inc').matchAll(/LR"MGLT\(([\s\S]*?)\)MGLT"/g)].map(m=>m[1].length);
  assert.ok(pieces.length>=5);assert.ok(Math.max(...pieces)<=8190,'largest piece '+Math.max(...pieces)+' units');
- const total=pieces.reduce((a,b)=>a+b,0);assert.ok(total<32767,'whole script '+total+' units');});
+ const total=pieces.reduce((a,b)=>a+b,0);
+ /* engine-draw 2026-11-21: the pieces are separate literals joined at run time (KrkrText.cpp ScriptParts), so only a piece has a limit */
+ const cpp=read('native/krkrtext/KrkrText.cpp');assert.ok(cpp.includes('const wchar_t *const ScriptParts[] = {')&&cpp.includes('for (const wchar_t *p : ScriptParts) ScriptText += p;'),'pieces joined at run time');
+ assert.ok(!/\)MGLT" LR"MGLT\(/.test(read('native/krkrtext/script.inc')),'no piece concatenated at compile time');assert.ok(total<200000,'whole script '+total+' units');});
 test('an engine-side hidden confirmation keeps the line in the game: the glyph colour has something to read',()=>{const hb=read('native/HookBridge.cs');
  /* live 千恋＊万花 hide mode: lines were written back hidden (no GDI glyph proof), TextRender drew nothing, no colour; 死に逝く君 kept its lines and its colours */
  assert.ok(hb.includes('line.IndexOf(" hidden=1 ",StringComparison.Ordinal)>0)EngineHideProof(label);'),'ToMe_CHARS hidden=1 is the proof');
  const ok=hb.slice(hb.indexOf('public static bool GlyphAllOk(string text){'));assert.ok(ok.indexOf('if(EngineAllOk(text))return true;')>0&&ok.indexOf('if(EngineAllOk(text))return true;')<ok.indexOf('if(GlyphCached)'),'checked before the GDI-only reasons to write back');
  assert.ok(hb.includes('if(want)Interlocked.Increment(ref EngineHideOn);else Interlocked.Decrement(ref EngineHideOn);')&&hb.includes('if(!EngineAllSelfTest())'));});
 test('pass-through by engine confirmation can be taken back: unconfirmed lines return to write-back hidden, menus are not on this path',()=>{const hb=read('native/HookBridge.cs'),s=read('native/krkrtext/script.inc');
- assert.ok(hb.includes('if(++EngineUnconfirmed>=2){EngineHideProven=false;EngineTrialFailed=true;'),'two unconfirmed lines in a row end it for the run');
+ assert.ok(hb.includes('if(++EngineUnconfirmed>=ProfileUnconfirmed){EngineHideProven=false;EngineTrialFailed=true;')&&/ProfileUnconfirmed=2/.test(hb),'two unconfirmed lines in a row end it for the run (hide.engineTrial.unconfirmedLines, kernel 2)');
  assert.ok(hb.includes('if(Volatile.Read(ref EngineHideOn)>0&&!SkipHeld&&!EngineSameClick(text,now)){'),'counted only while the engine hide is on and the skip key is up; the texts of one click, their repeats and typewriter steps are one line');
  /* the dialogue-only ownership gate of the engine hide is untouched (4e2bd3f8 / E980): a renderer bound to no layer is the dialogue's only while KAG writes to that message layer */
  assert.ok(s.includes("return typeof inst.textLayer=='undefined' && L===this.kag.current;"));});
@@ -160,7 +163,7 @@ test('pass-through by engine confirmation can be taken back: unconfirmed lines r
    engine hide event reset, three sentences rendered by TextRender with lit glyphs, and still nothing on screen). The KiriKiri text layer
    functions are run as they are written in native/krkrtext/script.inc (TJS2 read as JavaScript: void -> undefined, isvalid -> true). */
 const trScript=()=>{const s=read('native/krkrtext/script.inc'),a=s.indexOf('st.trRestore=function(){'),b=s.indexOf('st.trDone=function(inst){');assert.ok(a>0&&b>a);
- const js=s.slice(a,b).replace(/ incontextof st;/g,';').replace(/isvalid this\.trT/g,'true').replace(/\bvoid\b/g,'undefined').replace(/%\[\]/g,'({})').replace(/\)MGLT" LR"MGLT\(/g,'');
+ const js=s.slice(a,b).replace(/ incontextof st;/g,';').replace(/isvalid this\.trT/g,'true').replace(/\bvoid\b/g,'undefined').replace(/%\[\]/g,'({})').replace(/\)MGLT",? LR"MGLT\(/g,'');
  return ()=>{const T={opacity:255},L={textLayer:T},sent=[],st={trOwner:L,trRec:[0,100001,' sw=1280 sh=720 text=あ'],trKey:'',on:false,trLayer:()=>L,hideOn(){return this.on;},report:l=>sent.push(l)};new Function('st',js)(st);return{T,L,st,sent,tick:()=>st.trHide()};};};
 test('preflight with the engine hide: the text layer is visible again whatever the game did to it while it was hidden',()=>{const rig=trScript();
  {const r=rig();r.st.on=true;r.tick();assert.equal(r.T.opacity,0);r.tick();r.st.on=false;r.tick();assert.equal(r.T.opacity,255,'plain case');assert.deepEqual(r.sent.map(l=>/hidden=(\d)/.exec(l)[1]),['1','0'],'the record follows the state');}
@@ -181,4 +184,4 @@ test('every layer that hides the game text gives way in one place, and the pass-
  assert.ok(hb.includes('if(!GiveWaySelfTest()){')&&hb.includes('if(LayersGiveWay("self-test")!="write-back=off engine=off glyph=off gpu=off"||ReplacementEnabled||ev.WaitOne(0))return false;'));
  /* live log: proven 05:55:15.50, taken back 05:55:16.35 by the scene label and the name of the same click */
  assert.ok(hb.includes('if(!EngineAllOk("■自動車（車内／走行）")||!EngineAllOk("【運転手】")||!EngineAllOk("【運転手】")||!EngineAllOk("台詞"+i+"。"))return false;EngineHideProof("self-test");'));
- assert.ok(hb.includes('if((now-EngineBatchAt).TotalMilliseconds<EngineBatchMs){'));});
+ assert.ok(hb.includes('if((now-EngineBatchAt).TotalMilliseconds<ProfileClickMs){')&&hb.includes('ProfileClickMs=EngineBatchMs;'));});

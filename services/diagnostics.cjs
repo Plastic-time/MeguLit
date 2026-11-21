@@ -8,7 +8,7 @@
    a screenshot already sits on disk. Every text file is scrubbed: Windows user name and profile paths become placeholders,
    e-mail addresses are removed. */
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),zlib=require('node:zlib');
-const LOGS=['hook-diagnostics.log','hook-events.log','reader-host.log','game-launch.log'];
+const LOGS=['hook-diagnostics.log','hook-events.log','reader-host.log','game-launch.log',/* engine-draw: every ToMe_CHARS record (roles, boxes, emb) */'engine-draw.log'];
 const MAX_LINES=2000,READ_BYTES=8*1024*1024,RUN_LEAD_MS=5000,RUN_MAX_MS=12*3600*1000;
 /* the library stores some times in seconds, some in ms */
 const ms=v=>{const n=Number(v);return Number.isFinite(n)&&n>0?(n<1e12?n*1000:n):null;};
@@ -106,8 +106,7 @@ function originalTextState(root,id){
 }
 /* 2026-11-21 the game diff calibrated on this PC and the self-check windows of the running game (docs/auto-profile.md): the
    upload format the server aggregates; no paths, the program name only */
-function autoProfile(root,executable,engine){try{const ap=require('../core/auto-profile.cjs');let gameKey='';try{const p=require('../core/profiles/index.cjs').profileFor({exe:executable,engine});if(p&&p.gameKey&&p.gameKey!=='none')gameKey=p.gameKey;}catch{}
- const key=ap.keyFor({gameKey,exe:executable});if(!key)return null;let windows=[];try{const cur=require('./self-check-live.cjs').current();if(cur&&cur.key===key)windows=cur.check.windows;}catch{}return ap.diagnostic(ap.load(root,key),windows);}catch{return null;}}
+function autoProfile(root,executable,engine){try{const ap=require('../core/auto-profile.cjs');const key=executable?ap.exeKeySync(root,executable):'';if(!key)return null;let windows=[];try{const cur=require('./self-check-live.cjs').current();if(cur&&cur.key===key)windows=cur.check.windows;}catch{}return ap.diagnostic(ap.load(root,key),windows);}catch{return null;}}
 function osInfo(){let version='';try{version=os.version();}catch{}return {platform:process.platform,release:os.release(),version,arch:process.arch,node:process.version,locale:Intl.DateTimeFormat().resolvedOptions().locale};}
 function findScreenshot(root,executable,maxAgeMs=6*3600*1000){
  const dirs=[path.join(root,'data','screenshots'),path.join(root,'logs','screenshots'),path.join(root,'logs')];const base=executable?path.basename(executable,path.extname(executable)).toLowerCase():'';let best=null;

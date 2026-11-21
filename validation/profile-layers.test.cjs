@@ -12,7 +12,7 @@ function hook(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-profile-
 test('hook-native starts on the kernel layer and takes the game profile',()=>{
  const {h,events,log}=hook();assert.equal(h.profile.layers,'core');
  const p=Profiles.profileFor({exe:'D:/g/SenrenBanka.exe'});h.setProfile(p);
- assert.equal(h.profile,p);assert.match(log(),/profile senren-banka engine=kirikiri layers=core\+engine\+game/);
+ assert.equal(h.profile,p);assert.match(log(),/profile senren-banka match=game:name exe=- layers=core\+engine\+seed-game engine=kirikiri/);
  assert.ok(events.some(e=>e.type==='hook'&&e.gameProfile?.gameKey==='senren-banka'));
 });
 
@@ -27,12 +27,12 @@ test('reader bootstrap keeps a frozen window.MeguLitProfile with get()',()=>{
  const s=fs.readFileSync(path.join(root,'web/reader/bootstrap.js'),'utf8');
  assert.match(s,/message\.gameProfile/);assert.match(s,/window\.MeguLitProfile=Object\.freeze/);assert.match(s,/megulit-profile/);
  const g=fs.readFileSync(path.join(root,'core/gal-native.cjs'),'utf8');assert.match(g,/setGameProfile\(profile,input\)/);
- const r=fs.readFileSync(path.join(root,'services/reader.cjs'),'utf8');assert.match(r,/this\.applyGameProfile\(exe,game\)/);assert.match(r,/let profile=P\.profileFor\(input\);/);/* 2026-11-21 this PC's auto layer (services/self-check-live.cjs) goes on top before the profile is handed over */assert.match(r,/profile=P\.profileFor\(\{\.\.\.input,auto:s\.stored\.settings\}\)/);assert.match(r,/setGameProfile\?\.\(profile,input\)/);
+ const r=fs.readFileSync(path.join(root,'services/reader.cjs'),'utf8');assert.match(r,/this\.applyGameProfile\(exe,game\)/);assert.match(r,/let profile=P\.profileFor\(input\);/);/* 2026-11-21 this PC's auto layer (services/self-check-live.cjs) goes on top before the profile is handed over */assert.match(r,/profile=P\.profileFor\(live\.inputOf\(s\)\)/);assert.match(r,/setGameProfile\?\.\(profile,input\)/);
 });
 
 test('a game without a library engine takes the engine diff from its first engine page record',()=>{
  const {h,log}=hook();const input={exe:'D:/g/Unknown.exe',title:'x'};h.setProfile(Profiles.profileFor(input),input);assert.equal(h.profile.layers,'core');
- h.learnEngine('krkr');assert.equal(h.profile.engine,'kirikiri');assert.equal(h.profile.layers,'core+engine');assert.match(log(),/engine=kirikiri layers=core\+engine/);
+ h.learnEngine('krkr');assert.equal(h.profile.engine,'kirikiri');assert.equal(h.profile.layers,'core+engine');assert.match(log(),/layers=core\+engine engine=kirikiri/);
  h.learnEngine('cs2');assert.equal(h.profile.engine,'kirikiri','a known engine is never replaced');
 });
 
@@ -46,9 +46,10 @@ test('page/hide knobs: null keeps the kernel rule, a diff value wins for that ga
  h.profile=withP('page',{flowPage:false});h.flowPage=true;assert.equal(h.flowPage,false);
 });
 
-test('auto layer (this PC measured) goes last, known keys only; apply() adds one layer',()=>{
- const p=Profiles.profileFor({exe:'D:/g/SenrenBanka.exe',auto:{calibrate:{hideMethod:'glyph',textBox:{x:1,y:2,w:3,h:4}},selfCheck:{window:30},bogus:{x:1}}});
- assert.equal(p.layers,'core+engine+game+auto');assert.equal(p.calibrate.hideMethod,'glyph');assert.deepEqual({...p.calibrate.textBox},{x:1,y:2,w:3,h:4});assert.equal(p.selfCheck.window,30);assert.equal(p.selfCheck.minLines,8);assert.ok(!('bogus' in p));
- const q=Profiles.apply(Profiles.profileFor({exe:'D:/g/SenrenBanka.exe'}),{page:{holdMs:900},nope:1},'auto');
- assert.equal(q.layers,'core+engine+game+auto');assert.equal(q.page.holdMs,900);assert.equal(q.gameKey,'senren-banka');assert.ok(Object.isFrozen(q.page));
+test('auto layer (this PC measured) stacks over the game diff, a bad key leaves it out whole; apply() adds one layer',()=>{
+ assert.equal(Profiles.profileFor({exe:'D:/g/Unknown.exe',engine:'kirikiri',auto:{selfCheck:{window:30},bogus:{x:1}}}).layers,'core+engine');
+ const p=Profiles.profileFor({exe:'D:/g/Unknown.exe',engine:'kirikiri',auto:{calibrate:{hideMethod:'glyph',textBox:{x:1,y:2,w:3,h:4}},selfCheck:{window:30}}});
+ assert.equal(p.layers,'core+engine+auto');assert.equal(p.calibrate.hideMethod,'glyph');assert.deepEqual({...p.calibrate.textBox},{x:1,y:2,w:3,h:4});assert.equal(p.selfCheck.window,30);assert.equal(p.selfCheck.minLines,8);assert.ok(!('bogus' in p));
+ const q=Profiles.apply(Profiles.profileFor({exe:'D:/g/Unknown.exe',engine:'kirikiri'}),{page:{holdMs:900},nope:1},'auto');
+ assert.equal(q.layers,'core+engine+auto');assert.equal(q.page.holdMs,900);assert.match(q.gameKey,/^auto-/);assert.ok(Object.isFrozen(q.page));
 });

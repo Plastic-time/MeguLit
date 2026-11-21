@@ -7,44 +7,32 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": null
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -58,9 +46,23 @@
   "steam": "880950",
   "vndb": "v18131"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "maitetsu-pure-station",
  "builds": [
   "7746c668c90c4a6bc4c50fceecb2be83fab4b7ad758b5d758267914cc220e76a"
- ]
+ ],
+ "match": {
+  "exe": [
+   "PureStation.exe"
+  ],
+  "titles": [
+   "Maitetsu:Pure Station",
+   "まいてつ"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
 }

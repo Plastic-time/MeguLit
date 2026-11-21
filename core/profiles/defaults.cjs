@@ -53,6 +53,11 @@ module.exports={
   preflight:null,
   /* the game itself draws the current line invisible, calibration waits for the next line: null = kernel (KiriKiri page DLL) */
   drawsHidden:null,
+  /* the engine side hides the text itself (KiriKiri / Ren'Py page DLL) and HookBridge passes lines unchanged once one line was
+     confirmed hidden (native/HookBridge.cs EngineAllOk, sent as MEGULIT_PROFILE / {type:'profile'}). null = kernel rule:
+     enabled (trial on), unconfirmedLines 2 (lines in a row without a hidden confirmation end the proof), clickMs 400 (texts of
+     one click), skipAside true (scene labels and name plates pass without starting a trial) */
+  engineTrial:{enabled:null,unconfirmedLines:null,clickMs:null,skipAside:null},
  },
  /* self-check thresholds of the auto-profile layer (feat/auto-profile): a window of lines whose hide/drop/repeat/pairing
     rates decide a fallback */
@@ -63,6 +68,21 @@ module.exports={
   textBox:null,/* {x,y,w,h} client px */
   hideMethod:null,/* 'engine' | 'glyph' | 'gpu' | 'read' */
  },
+ /* engine-draw (docs/engine-draw-protocol.md): the engine layer reads what it draws from inside the engine */
+ draw:{
+  /* report each drawn run with its role (name / choice / button / menu / system); false = the kernel: names are not
+     reported, link and choice text goes with the dialogue */
+  roles:false,
+  /* the game draws MeguLit's replacement of a dialogue line itself (Japanese + ruby [+ Chinese]); false = hide + overlay */
+  embed:false,
+  /* with embed on, the Chinese is drawn by the game too (false = ruby only, the reader draws the Chinese) */
+  embedTranslation:true,
+ },
+ /* 2026-11-21 (owner: 英文学习模式 + 多语言译文) settings that depend on the language of the game's text, one block per BCP 47 tag
+    ('ja', 'en', 'zh-Hans'): {annotation:'ruby'|'ipa'|'pinyin'|'none', pairing:'script'|'patch'|'machine'|'none', dictionary:<id>,
+    fontFallback:[font names]}. The client takes the block of the source language it reads (Profiles.forLang), else the
+    language-free settings around it. Empty = the kernel as before (Japanese: ruby, the script's pairing). */
+ lang:{},
  safeMode:{
   /* reader redraws per second while the game is in a page effect; null = kernel default */
   redrawRate:null,

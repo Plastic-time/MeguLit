@@ -24,6 +24,9 @@ class Reader{
   if(message.type==='readerContext'){this.immersion?.context(message.active);this.logVisibility({type:'readerContext',active:message.active});return;}
   if(message.type==='readerPointer'){this.runtime.emit('reader-pointer-input',message);return;}
   if(message.type==='hookEmbedRequest'){this.embedTranslate(message.id,message.text);return;}
+  /* engine-draw (docs/engine-draw-protocol.md): UI items drawn by the engine get the art-text treatment (copy + translation beside, clicks reach the game); a dialogue line asks for its in-game replacement */
+  if(message.type==='hookDrawUi'){const t=this.drawUi||(this.drawUi=new (require('../core/engine-draw.cjs').UiTracker)());for(const m of t.feed(message,gone=>{for(const g of gone)this.artText(g);}))this.artText(m);return;}
+  if(message.type==='hookDrawEmbed'){this.drawEmbed(message);return;}
   if(message.type==='artText'){this.artText(message);return;}
   /* A Chinese-patched game read in Japanese: the patch's line is the translation, cached before the page asks. */
   if(message.type==='hookPatchTranslation'){if(typeof message.japanese==='string'&&typeof message.chinese==='string'&&message.chinese.length<=4000){if(message.machine!==true&&message.chinese.trim())try{require('./self-check-live.cjs').feedReader({type:'patchLine',at:new Date().toISOString()});}catch{}this.embedCached(message.japanese,message.chinese.trim());/* 2026-11-21 (owner, 千恋＊万花 中文版, r26 21:40:06 / 21:40:10: the patch translation stored, the reader never asked for it): a stored patch line is offered to the line on screen at once; the reader fills it when that line shows no translation of its own */try{if(message.chinese.trim())this.runtime.emit('reader-event',{type:'call',method:'deliverBackfill',args:[message.japanese,message.chinese.trim(),'patch']});}catch{}/* learning: remember which lines carry a human translation (group patch / official Chinese) */if(message.machine!==true){const source=this.gal?.hooks?.originalText?.kind==='original'?'official':'group';this.humanLine(message.japanese,{text:message.chinese.trim(),source});if(this.gameId)this.stats.translation(this.gameId,message.japanese,message.chinese.trim(),source);}}return;}
@@ -211,7 +214,7 @@ class Reader{
  applyGameProfile(exe,game){try{const P=require('../core/profiles/index.cjs');let o={};try{o=JSON.parse(game?.original||'{}')||{};}catch{}const folder=exe?path.dirname(exe):'';
   let engine=String(o.library?.engine||o.engine||'');if(!engine&&folder)try{engine=require('../core/library.cjs').engineOf(folder)?.name||'';}catch{}
   let steamAppId='';if(folder)try{steamAppId=fs.readFileSync(path.join(folder,'steam_appid.txt'),'utf8').trim().slice(0,12);}catch{}
-  const title=String(game?.title||this.gal?.state?.gameTitle||'');const input={engine,exe,title,folder,steamAppId};let profile=P.profileFor(input);/* 2026-11-21 self-check gate + first-play calibration (services/self-check-live.cjs): this PC's stored auto layer goes on top */try{const live=require('./self-check-live.cjs');require('../core/hook-native.cjs').HookNative.traceTap=live.feedTrace;const s=live.start(this,exe,profile,input);if(s?.stored?.settings)profile=P.profileFor({...input,auto:s.stored.settings});}catch{}this.gal?.setGameProfile?.(profile,input);}catch(error){this.gal?.hooks?.trace?.('profile error '+(error?.message||error));}}
+  const title=String(game?.title||this.gal?.state?.gameTitle||'');const vndb=String(o.vndbManual||o.library?.vndbId||'');const input={engine,exe,title,folder,steamAppId,vndb};let profile=P.profileFor(input);/* 2026-11-21 self-check gate + first-play calibration (services/self-check-live.cjs): this PC's stored auto layer goes on top */try{const live=require('./self-check-live.cjs');require('../core/hook-native.cjs').HookNative.traceTap=live.feedTrace;const s=live.start(this,exe,profile,input);if(s)profile=P.profileFor(live.inputOf(s));}catch{}this.gal?.setGameProfile?.(profile,input);}catch(error){this.gal?.hooks?.trace?.('profile error '+(error?.message||error));}}
  adoptTextSource(exe,pid){const hooks=this.gal?.hooks,same=!!(hooks?.originalText&&hooks.textSourcePid===0&&String(this.textExe||'').toLowerCase()===String(exe||'').toLowerCase());this.textExe=exe;
   if(same){hooks.textSourcePid=pid;this.refreshTextSource({force:false,exe,pid});}else this.refreshTextSource({exe,pid});this.watchTextSource(exe);}
  watchTextSource(exe){for(const t of this.textSourceTimers||[])clearTimeout(t);this.textSourceTimers=[3000,15000,60000,180000].map(ms=>{const t=setTimeout(()=>{if(this.textExe===exe&&this.gal)this.refreshTextSource({force:false});},ms);t.unref?.();return t;});}
@@ -271,6 +274,12 @@ class Reader{
  /* E578: one translation per menu row (cached per row, so an item seen again costs nothing); an empty string where none came in time */
  async artRows(list){let options;try{options=this.baseOptions();}catch{return list.map(()=>'');}const until=Date.now()+4000;
   return Promise.all(list.map(async row=>{try{let t=this.embedCached(row)||'';if(!t){t=(await this.chainTranslate(row,options,{current:()=>Date.now()<until})).text;this.embedCached(row,t);}return t||'';}catch{return '';}}));}
+ /* engine-draw: ruby (game ruby, then dictionary-settled readings) and translation (script, then the fallback chain) for one dialogue line the engine will draw itself */
+ async drawEmbed(m){const text=String(m?.text||'');if(!text||text.length>600||notJapanese(text))return;let ruby=[],zh='';
+  try{const x=await require('./example-ruby.cjs').exampleRuby(null,this.runtime.learning(),[{text}]);const it=x?.items?.[0];if(it?.text===text&&Array.isArray(it.spans))ruby=it.spans.map(sp=>[sp.start,sp.end,String(sp.reading||'')]);}catch{}
+  try{zh=this.embedCached(text)||'';if(!zh&&this.displayLanguage()!=='en')zh=this.gal?.hooks?.scriptTranslation?.(text)||'';if(!zh){const until=Date.now()+4000;zh=(await this.chainTranslate(text,this.baseOptions(),{current:()=>Date.now()<until})).text||'';}if(zh)this.embedCached(text,zh);}catch{}
+  if(zh&&(/[\ufffd\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(zh)||require('../core/text-sanity.cjs').garbledSource(zh)))zh='';
+  this.gal?.hooks?.drawEmbedReply?.(m.key,{ruby,zh});}
  async embedTranslate(id,text){
   let trans='';
   /* E352: the engine's string still carries its ruby markup (HuneX <rふ>触</r>, ISLAND \x1d pairs): translate the text the player reads. */
@@ -347,7 +356,7 @@ class Reader{
    case 'galToggleCover':g?.send({type:'toggleCover'});break;
    case 'galToggleMode':g?.send({type:'toggleMode'});break;
    case 'galShutdown':this.stop();break;
-   case 'hookPrefs':if(r.settings?.hookHide===true&&this.gameExe){require('./text-effects.cjs').clear(this.root,this.gameExe);/* 重新校准: a stepped-down game records its first window again */try{const live=require('./self-check-live.cjs'),cur=live.current();if(cur?.stored?.mode==='read')live.recalibrate(this);}catch{}}g?.setHookPrefs(r.settings);break;
+   case 'hookPrefs':if(r.settings?.hookHide===true&&this.gameExe){require('./text-effects.cjs').clear(this.root,this.gameExe);/* 重新校准: a stepped-down game records its first window again */try{const live=require('./self-check-live.cjs'),cur=live.current();if(cur&&live.choose(cur)?.mode==='read')live.recalibrate(this);}catch{}}g?.setHookPrefs(r.settings);break;
    case 'galTextEffects':/* text-place.js: this game's text effect leaves most lines unpaired; read mode for this exe, remembered */if(this.gameExe&&g&&!g.textEffectsHold){require('./text-effects.cjs').set(this.root,this.gameExe,{paired:Number(r.paired)||0,orphan:Number(r.orphan)||0});this.logVisibility({type:'readMode',reason:'text-effects',paired:Number(r.paired)||0,orphan:Number(r.orphan)||0});g.textEffects(true);}break;case 'compositorRuby':g?.compositor?.ruby?.(String(r.text||''),Array.isArray(r.ruby)?r.ruby:[]);break;
    case 'hookStart':g?.userStart(r.profile,r.force===true,r.id);break;
    case 'hookReselect':g?.reselectStream?.(r.onlyIfBad===true);break;

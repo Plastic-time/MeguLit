@@ -7,44 +7,32 @@
  "mode": "read",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": true,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": "read"
+   "textEffectsRead": true
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -57,9 +45,23 @@
   "title": "664e5e48a0e9eb0bf0ac05b42928f548a585b2c77c2ef98cee99b621f5515189",
   "vndb": "v19233"
  },
+ "seedFormat": 1,
  "status": "read",
  "slug": "shiniyuku-kimi",
  "builds": [
   "0adf662a06220364c0407460e7b9e26a129b5203cb26b6f726be012ba2c99d54"
- ]
+ ],
+ "match": {
+  "exe": [
+   "bug02_yakata.exe"
+  ],
+  "titles": [
+   "死に逝く君、館に芽吹く憎悪",
+   "[160729][バグシステム]死に逝く君、館に芽吹く憎悪 [汉化硬盘版]"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
 }

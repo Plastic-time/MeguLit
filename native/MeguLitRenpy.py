@@ -17,7 +17,13 @@
 # While HookBridge asks for it (event Local\MeguLitRenpyHide-<pid> set, and the pipe to it connected) the say Text's own
 # Render is drawn at alpha 0: Ren'Py lays out, wraps and waits as always, only the pixels of that one Text are left out.
 # hidden=1 is sent only after a frame really rendered the sentence that way; when the event is reset the next frame
-# draws the text again. Nothing in the game's store, saves or files changes. Lines go to \\.\pipe\MeguLitRenpy-<pid> from a writer thread;
+# draws the text again. Nothing in the game's store, saves or files changes.
+# engine-draw (docs/engine-draw-protocol.md, 2026-11-21): MeguLit's control file %TEMP%\MeguLit\draw\<pid>.txt (UTF-16LE,
+# `#cfg roles= embed= zh=` then `<sentence without blanks> TAB <start:len:reading|...> TAB <Chinese>`; no file = as before):
+#   roles: the speaker's name Text (role=name) and the menu's caption Texts (role=choice) are reported with their boxes;
+#   embed: once the sentence's replacement is there its say Text gets new text through Text.set_text (ruby as {rb}{rt}
+#   tags, the Chinese as a smaller second paragraph) and Ren'Py lays it out and draws it itself; the record carries emb=1|2
+#   and the Japanese only. Nothing is hidden while embedding. Lines go to \\.\pipe\MeguLitRenpy-<pid> from a writer thread;
 # nothing in the game's store or saves is touched, and every wrapper falls back to the game's own function.
 def _megulit_renpy_main():
     import sys
@@ -55,6 +61,7 @@ def _megulit_renpy_main():
             self.hide_event = None
             self.hide_tried = 0.0
             self.page, self.want, self.hidden = [], False, []
+            self.cfg, self.emb, self.ctl_raw, self.ctl_at, self.ui, self.menu = {'roles': 0, 'embed': 0, 'zh': 1}, {}, None, 0.0, 0, None
             if self.sink is None:
                 t = threading.Thread(target=self.writer, name='MeguLitRenpy')
                 t.daemon = True
@@ -107,7 +114,48 @@ def _megulit_renpy_main():
                 self.status = value
                 self.send('ToMe_RENPY status ' + value)
 
+        # ---- engine-draw control ---------------------------------------------------------------------------------------
+        def ctl(self):
+            now = time.time()
+            if now - self.ctl_at < 0.3:
+                return
+            self.ctl_at = now
+            path = getattr(sys, '_megulit_renpy_ctl', None) or os.path.join(os.environ.get('TEMP') or os.environ.get('TMP') or '.', 'MeguLit', 'draw', '%d.txt' % os.getpid())
+            try:
+                with open(path, 'rb') as f:
+                    data = f.read()
+            except Exception:
+                data = b''
+            if data == self.ctl_raw:
+                return
+            self.ctl_raw = data
+            cfg, emb = {'roles': 0, 'embed': 0, 'zh': 1}, {}
+            try:
+                text = data.decode('utf-16') if data[:2] in (b'\xff\xfe', b'\xfe\xff') else data.decode('utf-8')
+            except Exception:
+                text = u''
+            for ln in text.splitlines():
+                ln = ln.lstrip(u'\ufeff')
+                if ln.startswith(u'#cfg'):
+                    cfg = {'roles': 1 if u'roles=1' in ln else 0, 'embed': 1 if u'embed=1' in ln else 0, 'zh': 0 if u'zh=0' in ln else 1}
+                    continue
+                parts = ln.split(u'\t')
+                if len(parts) < 2 or not parts[0] or ln.startswith(u'#'):
+                    continue
+                spans = []
+                for one in parts[1].split(u'|'):
+                    bits = one.split(u':', 2)
+                    try:
+                        if len(bits) == 3 and bits[2]:
+                            spans.append((int(bits[0]), int(bits[1]), bits[2]))
+                    except Exception:
+                        pass
+                emb[parts[0]] = (spans, (parts[2] if len(parts) > 2 else u'').replace(u'\x1f', u'\n'))
+            self.cfg, self.emb = cfg, emb
+
         def hide_wanted(self):
+            if self.cfg.get('embed'):
+                return False
             if not self.connected:
                 return False
             test = getattr(sys, '_megulit_renpy_hide', None)
@@ -173,9 +221,9 @@ def _megulit_renpy_main():
 
         def chars_text(self, c):
             v = c['view']
-            return 'ToMe_CHARS engine=renpy line=%d hidden=%d sw=%d sh=%d vx=%s vy=%s vw=%s vh=%s n=%d rects=%s text=%s' % (
+            return 'ToMe_CHARS engine=renpy line=%d hidden=%d sw=%d sh=%d vx=%s vy=%s vw=%s vh=%s n=%d rects=%s%s text=%s' % (
                 c['line'], 1 if c['hid'] else 0, c['sw'], c['sh'], v[0], v[1], v[2], v[3], len(c['rects']),
-                ';'.join(','.join(self.num(n) for n in r) for r in c['rects']), c['text'])
+                ';'.join(','.join(self.num(n) for n in r) for r in c['rects']), (' emb=%d' % c['emb']) if c.get('emb') else '', c['text'])
 
         def viewport(self):
             # where the virtual screen sits in the window (letterbox), drawable pixels = client pixels on Windows
@@ -218,7 +266,36 @@ def _megulit_renpy_main():
             r = m.get('renpy')
             if r is not None and hasattr(r, 'display_say') and not getattr(r.display_say, '_megulit', False):
                 r.display_say = ch.display_say if r.display_say is old else self.wrap_say(r.display_say)
+            for owner in (ex, r):
+                if owner is not None and hasattr(owner, 'display_menu') and not getattr(owner.display_menu, '_megulit', False):
+                    owner.display_menu = self.wrap_menu(owner.display_menu)
             self.set_status('ok')
+
+        def wrap_menu(self, orig):
+            core = self
+
+            def display_menu(items, *a, **k):
+                try:
+                    caps = []
+                    for it in items or ():
+                        label = it[0] if isinstance(it, (list, tuple)) and it else getattr(it, 'caption', None)
+                        value = it[1] if isinstance(it, (list, tuple)) and len(it) > 1 else True
+                        if isinstance(label, text_types) and value is not None:
+                            caps.append(label)
+                    core.menu = {'caps': caps, 'frames': 0, 'sent': None} if caps else None
+                except Exception:
+                    core.menu = None
+                try:
+                    return orig(items, *a, **k)
+                finally:
+                    try:
+                        if core.menu is not None and core.menu.get('sent'):
+                            core.ui_empty('choice', 'C:')
+                    except Exception:
+                        pass
+                    core.menu = None
+            display_menu._megulit = True
+            return display_menu
 
         def wrap_text_render(self, orig):
             core = self
@@ -243,6 +320,10 @@ def _megulit_renpy_main():
             core = self
 
             def render_screen(*a, **k):
+                try:
+                    core.ctl()
+                except Exception:
+                    pass
                 core.want = core.hide_wanted()
                 if not core.want and core.hidden:
                     core.unhide()
@@ -263,6 +344,11 @@ def _megulit_renpy_main():
                     if hid != c['hid']:
                         c['hid'] = hid
                         core.send(core.chars_text(c))
+                try:
+                    core.draw_roles(rv)
+                    core.draw_embed(c)
+                except Exception as e:
+                    core.set_status('error draw %s' % (e,))
                 return rv
             render_screen._megulit = True
             return render_screen
@@ -272,9 +358,12 @@ def _megulit_renpy_main():
 
             def display_say(*a, **k):
                 try:
+                    who = a[0] if len(a) > 0 else k.get('who')
                     what = a[1] if len(a) > 1 else k.get('what')
                     show = a[2] if len(a) > 2 else k.get('show_function')
                     core.say(what, show)
+                    if core.cur is not None:
+                        core.cur['who'] = who if isinstance(who, text_types) and who else None
                 except Exception as e:
                     core.set_status('error say %s' % (e,))
                 return orig(*a, **k)
@@ -299,7 +388,8 @@ def _megulit_renpy_main():
             except Exception:
                 pass
             c = {'line': self.line, 'same': same, 'nvl': nvl, 'wanted': wanted, 'flat': None, 'frames': 0, 'done': False,
-                 'd': None, 'rects': None, 'hid': False, 'text': '', 'view': None, 'sw': 0, 'sh': 0}
+                 'd': None, 'rects': None, 'hid': False, 'text': '', 'view': None, 'sw': 0, 'sh': 0, 'who': None, 'who_sent': False,
+                 'emb': 0, 'jp_n': 0, 'emb_tried': False}
             self.cur = c
             # what is hidden: the sentences of the page on screen (an NVL page keeps its earlier ones), else this one
             self.page = (self.page + [c])[-32:] if nvl and same else [c]
@@ -417,6 +507,18 @@ def _megulit_renpy_main():
             rows = rows if rows is not None else self.rows(d)
             if not rows:
                 return False
+            if c.get('jp_n'):
+                left, cut = c['jp_n'], []
+                for row in rows:
+                    if left <= 0:
+                        break
+                    keep = [i for i, ch in enumerate(row[1]) if not blank.match(ch)][:left]
+                    n = (keep[-1] + 1) if keep else 0
+                    cut.append((row[0], row[1][:n], row[2][:n], row[3], row[4][:n]))
+                    left -= len(keep)
+                rows = [r for r in cut if r[1]]
+                if not rows:
+                    return False
             pts, rects = [], []
             for top_y, chars, xs, h, ws in rows:
                 for gx, gw in zip(xs, ws):
@@ -446,6 +548,131 @@ def _megulit_renpy_main():
             c['hid'] = self.want and any(h is d and self.is_invisible(r) for h, r in self.hidden)
             self.send(self.chars_text(c))
             return True
+
+        # ---- engine-draw: roles ----------------------------------------------------------------------------------------
+        def walk(self, rv):
+            stack, seen = [(rv, 0.0, 0.0, None)], 0
+            while stack:
+                node, x, y, rev = stack.pop()
+                seen += 1
+                if seen > 20000:
+                    return
+                r = getattr(node, 'reverse', None)
+                if r is not None and r is not self.identity:
+                    rev = r if rev is None else rev * r
+                for d in (getattr(node, 'render_of', None) or ()):
+                    if isinstance(d, self.Text):
+                        yield d, x, y, rev
+                for e in reversed(getattr(node, 'children', None) or ()):
+                    child = e[0]
+                    if not isinstance(child, self.Render):
+                        continue
+                    xo, yo = e[1], e[2]
+                    if rev is not None:
+                        xo, yo = rev.transform(xo, yo)
+                    stack.append((child, x + xo, y + yo, rev))
+
+        def text_of(self, d):
+            for v in (getattr(d, 'text_parameter', None), getattr(d, 'text', None)):
+                if isinstance(v, (list, tuple)) and len(v) == 1:
+                    v = v[0]
+                if isinstance(v, text_types):
+                    return v
+            return None
+
+        def box(self, d, x, y, rev):
+            rows = self.rows(d)
+            if not rows:
+                return None
+            pts = []
+            for top_y, chars, xs, h, ws in rows:
+                for gx, gw in zip(xs, ws):
+                    for qx, qy in ((gx, top_y), (gx + gw, top_y + h)):
+                        px, py = rev.transform(qx, qy) if rev is not None else (qx, qy)
+                        pts.append((x + px, y + py))
+            x0, y0 = min(p[0] for p in pts), min(p[1] for p in pts)
+            return (x0, y0, max(p[0] for p in pts) - x0, max(p[1] for p in pts) - y0), blank.sub('', ''.join(''.join(r[1]) for r in rows))
+
+        def ui_send(self, role, uid, box, text, line):
+            config = sys.modules.get('renpy.config')
+            sw, sh, v = getattr(config, 'screen_width', 0) or 0, getattr(config, 'screen_height', 0) or 0, self.viewport()
+            self.send('ToMe_CHARS engine=renpy line=%d hidden=0 sw=%d sh=%d vx=%s vy=%s vw=%s vh=%s n=0 rects= role=%s id=%s box=%s text=%s' % (
+                line, int(sw), int(sh), v[0], v[1], v[2], v[3], role, uid, ','.join(self.num(n) for n in box), text))
+
+        def ui_empty(self, role, uid):
+            self.ui += 1
+            self.ui_send(role, uid, (0, 0, 0, 0), '', self.ui)
+
+        def draw_roles(self, rv):
+            if not self.cfg.get('roles'):
+                return
+            c = self.cur
+            if c is not None and c.get('who') and not c['who_sent']:
+                for d, x, y, rev in self.walk(rv):
+                    if self.text_of(d) == c['who'] and d is not c['d']:
+                        b = self.box(d, x, y, rev)
+                        if b:
+                            c['who_sent'] = True
+                            self.ui += 1
+                            self.ui_send('name', 'N:0', b[0], b[1], self.ui)
+                        break
+            m = self.menu
+            if m is not None and not m.get('sent'):
+                m['frames'] += 1
+                found = {}
+                for d, x, y, rev in self.walk(rv):
+                    t = self.text_of(d)
+                    if t in m['caps'] and t not in found:
+                        b = self.box(d, x, y, rev)
+                        if b:
+                            found[t] = b
+                if len(found) == len(m['caps']) or (found and m['frames'] > 30):
+                    m['sent'] = True
+                    self.ui += 1
+                    for i, cap in enumerate(m['caps']):
+                        if cap in found:
+                            self.ui_send('choice', 'C:%d' % i, found[cap][0], found[cap][1], self.ui)
+
+        # ---- engine-draw: embed ----------------------------------------------------------------------------------------
+        def esc(self, t):
+            return t.replace(u'{', u'{{').replace(u'[', u'[[')
+
+        def draw_embed(self, c):
+            if not self.cfg.get('embed') or c is None or c['d'] is None or c['emb_tried'] or not c['text']:
+                return
+            key = blank.sub('', c['text'].replace('\x1f', ''))
+            e = self.emb.get(key)
+            if e is None:
+                return
+            c['emb_tried'] = True
+            d, chars = c['d'], list(key)
+            if not hasattr(d, 'set_text'):
+                return
+            starts = dict((s[0], s) for s in e[0] if 0 <= s[0] and s[1] > 0 and s[0] + s[1] <= len(chars))
+            out, i = [], 0
+            while i < len(chars):
+                s = starts.get(i)
+                if s is not None:
+                    out.append(u'{rb}%s{/rb}{rt}%s{/rt}' % (self.esc(u''.join(chars[i:i + s[1]])), self.esc(s[2])))
+                    i += s[1]
+                else:
+                    out.append(self.esc(chars[i]))
+                    i += 1
+            text, lvl = u''.join(out), 1
+            if self.cfg.get('zh', 1) and e[1]:
+                size = getattr(getattr(d, 'style', None), 'size', None)
+                size = size if isinstance(size, (int, float)) and size > 0 else 24
+                text += u'\n{size=-%d}%s{/size}' % (max(2, int(size * 0.2)), self.esc(e[1]))
+                lvl = 2
+            d.set_text(text)
+            c['wanted'].add(text)
+            c['flat'], c['emb'], c['jp_n'], c['done'] = None, lvl, len(chars), False
+            ex = sys.modules.get('renpy.exports')
+            try:
+                if ex is not None and hasattr(ex, 'restart_interaction'):
+                    ex.restart_interaction()
+            except Exception:
+                pass
 
     core = Core()
     sys._megulit_renpy = core
