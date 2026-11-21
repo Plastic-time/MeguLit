@@ -138,3 +138,65 @@ test('Utage AdvImportScenarioBook: Chinese-only book classifies as chinese-build
 
  fs.rmSync(dir,{recursive:true,force:true});
 });
+
+function scenarioBundle(mono){
+ const data=serializedFile([mono]),block=Buffer.alloc(10),entry=Buffer.alloc(20);
+ block.writeUInt32BE(data.length,0);block.writeUInt32BE(data.length,4);
+ entry.writeBigUInt64BE(BigInt(data.length),8);
+ const be=n=>u32(n).swap32();
+ const info=Buffer.concat([Buffer.alloc(16),be(1),block,be(1),entry,Buffer.from('CAB-story\0')]);
+ const head=Buffer.concat([Buffer.from('UnityFS\0'),be(6),Buffer.from('5.x.x\0'),Buffer.from('2020.3.7f1\0'),Buffer.alloc(20)]);
+ head.writeBigUInt64BE(BigInt(head.length+info.length+data.length),head.length-20);
+ head.writeUInt32BE(info.length,head.length-12);head.writeUInt32BE(info.length,head.length-8);
+ return Buffer.concat([head,info,data]);
+}
+
+const scenarioRows=()=>[
+ ['Command','Arg1','Text','Chinese','Voice'],
+ ['','語り手','今から旅に出ます。','旧的译文','voice_001.ogg'],
+ ['Jump','*next','// 飛び先の注記','',''],
+ ['Selection','*next','一緒に行く','一起去',''],
+];
+
+test('Utage scenario patch replaces renamed compiled books after every source row matches, without duplicates',t=>{
+ const dir=tmp('utage-patch-');t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const rows=scenarioRows(),patch=scenarioRows();patch[1][3]='我们现在出发。';
+ put(dir,{
+  'Game.exe':'MZ','UnityPlayer.dll':'x',
+  'Game_Data/sharedassets0.assets':serializedFile([monoBook('old.book',[['Assets/old.xlsx:Start',rows]])]),
+  'Game_Data/StreamingAssets/story/Windows-patch/story.scenarios.asset':scenarioBundle(monoBook('new.book',[['Assets/new.xlsx:Start',patch]])),
+ });
+ const engine=scenes.ENGINES.utage,list=scenes.read('utage',dir);
+ assert.equal(scenes.detect(dir),'utage');
+ assert.deepEqual(list.map(s=>s.name),['Start']);
+ assert.deepEqual(list[0].lines,['今から旅に出ます。','一緒に行く']);
+ assert.deepEqual(list[0].zh,['我们现在出发。','一起去']);
+ assert.equal(engine.foreign(dir).get('我们现在出发'),'今から旅に出ます。');
+ assert.equal(engine.foreign(dir).has('旧的译文'),false);
+ assert.equal(engine.sources(dir).length,2);
+ const patchLines=engine.patchLines(list);
+ assert.deepEqual(patchLines[0].lines,['我们现在出发。','一起去']);
+});
+
+test('Utage patch overlay rejects changed source, speaker, command, headers and ambiguous patch books',()=>{
+ const {selectBooks}=scenes.ENGINES.utage._internal;
+ const base={name:'base.book',source:'Game_Data/sharedassets0.assets',sheets:[{name:'base.xlsx:Start',rows:scenarioRows()}]};
+ const makePatch=()=>({name:'patch.book',source:'Game_Data/StreamingAssets/story/Windows-patch/story.scenarios.asset',sheets:[{name:'patch.xlsx:Start',rows:scenarioRows()}]});
+ const edits=[p=>p.sheets[0].rows[1][2]='別の台詞です。',p=>p.sheets[0].rows[1][1]='別の人物',
+  p=>p.sheets[0].rows[1][0]='Jump',p=>p.sheets[0].rows[1][4]='other.ogg',
+  p=>p.sheets[0].rows[0][3]='English',p=>p.sheets[0].rows.pop()];
+ for(const edit of edits){const patch=makePatch();edit(patch);assert.deepEqual(selectBooks([base,patch]),[base]);}
+ const first=makePatch(),second=makePatch();second.source=second.source.replace('story.scenarios','other.scenarios');
+ assert.deepEqual(selectBooks([base,first,second]),[base]);
+ assert.deepEqual(selectBooks([first]),[first]);
+});
+
+test('Utage keeps untranslated slots empty after tag removal instead of pairing the next row',t=>{
+ const dir=tmp('utage-empty-');t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const rows=scenarioRows();rows.splice(2,0,['','','ぎゅっ。','<dash=2>','']);
+ put(dir,{'Game_Data/resources.assets':serializedFile([monoBook('story.book',[['story.xlsx:Start',rows]])])});
+ const list=scenes.read('utage',dir);
+ assert.deepEqual(list[0].lines,['今から旅に出ます。','ぎゅっ。','一緒に行く']);
+ assert.deepEqual(list[0].zh,['旧的译文','','一起去']);
+ assert.deepEqual(list[0].zhSource,['release','','release']);
+});
