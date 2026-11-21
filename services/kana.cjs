@@ -28,11 +28,26 @@ function gameWords(db,words){
  const list=[...new Set((Array.isArray(words)?words:[]).map(String).filter(w=>/^[ぁ-ゖァ-ヺー]{1,12}$/u.test(w)))].slice(0,150);
  if(!list.length)return {words:{}};
  const rows=db.prepare('SELECT e.text,e.read_at,g.title FROM reading_events e LEFT JOIN games g ON e.game_id=g.id ORDER BY e.read_at DESC,e.id DESC LIMIT 20000').all();
+ for(const row of rows){if(/[\u3099\u309a]/u.test(row.text))row.text=row.text.normalize('NFC');}
  const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
  const out={};
  for(const w of list){
-  const re=new RegExp('(?<![\\u3041-\\u3096])'+esc(w)+'(?![\\u3041-\\u3096])','u');let n=0,example=null;
-  let long=null;for(const row of rows){const text=String(row.text||'');if(!text.includes(w)||!re.test(text))continue;n++;if(!example&&[...text].length<=60)example={text,title:row.title||'',read_at:row.read_at};else if(!long){const i=text.indexOf(w),start=Math.max(0,i-20);long={text:(start?'…':'')+text.slice(start,i+w.length+24)+(i+w.length+24<text.length?'…':''),title:row.title||'',read_at:row.read_at};}}
+  const re=new RegExp('(?<![\\u3041-\\u3096])'+esc(w)+'(?![\\u3041-\\u3096])','gu');let n=0,example=null,long=null;
+  for(const row of rows){
+   const text=String(row.text||'');if(!text.includes(w))continue;
+   const hits=text.match(re);if(!hits)continue;n+=hits.length;
+   if(example)continue;
+   const short=text.length<=60||(text.length<=120&&[...text].length<=60);
+   if(!short&&long)continue;
+   const matches=[...text.matchAll(re)].map(m=>m.index);
+   const info={title:row.title||'',read_at:row.read_at};
+   if(short){example={...info,text,matches};continue;}
+   const i=matches[0],start=i-[...text.slice(0,i)].slice(-20).join('').length;
+   const end=i+w.length+[...text.slice(i+w.length)].slice(0,24).join('').length;
+   const prefix=start?'…':'';
+   long={...info,text:prefix+text.slice(start,end)+(end<text.length?'…':''),
+    matches:matches.filter(at=>at+w.length<=end).map(at=>at-start+prefix.length)};
+  }
   if(n)out[w]={count:n,example:example||long};
  }
  return {words:out,scanned:rows.length};

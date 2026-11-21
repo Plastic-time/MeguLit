@@ -1,5 +1,14 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
    MeguLit kana module · view: lesson (ported from the approved prototype) */
+export function exampleHTML(example,word,esc){
+ if(!example)return `<mark>${esc(word)}</mark>`;
+ let html='',end=0;
+ for(const at of example.matches||[]){
+  html+=esc(example.text.slice(end,at))+'<mark>'+esc(word)+'</mark>';
+  end=at+word.length;
+ }
+ return (html+esc(example.text.slice(end))).trim().replace(/^「/,'').replace(/」$/,'');
+}
 export function view(el,ctx){
 const go=ctx.go,params=ctx.params,D=ctx.data,S=ctx.store;
 const lesson=D.LESSONS.find(l=>l.id===params.id)||D.LESSONS[0],li=D.LESSONS.indexOf(lesson),nextLesson=D.LESSONS[li+1];
@@ -86,7 +95,7 @@ function foundHTML(x){
   for(const [w,v] of Object.entries(gameHits))if(w.includes(h)&&(!best||v.count>best[1].count))best=[w,v];
   if(!best)return `<p class="found-empty">${gameLoaded?`你读过的游戏文本里还没遇到含「${esc(x.k)}」的常用词`:'正在查找你读过的游戏文本…'}</p>`;
   const [w,v]=best,ex=v.example;
-  const line=ex?esc(ex.text.trim().replace(/^「/,'').replace(/」$/,'')).split(esc(w)).join(`<mark>${esc(w)}</mark>`):`<mark>${esc(w)}</mark>`;
+  const line=exampleHTML(ex,w,esc);
   const when=ex&&ex.read_at?new Date(ex.read_at*1000).toLocaleDateString('zh-CN',{month:'long',day:'numeric'}):'';
   return `<div class="found"><q>${line}</q><small><span>${esc(ex?.title||'')}</span>${when?`<span>·</span><span>${when}</span>`:''}<span>·</span><span>「${esc(w)}」共出现 ${v.count} 次</span></small></div>`;
 }
