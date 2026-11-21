@@ -78,3 +78,13 @@ test('placement: a line the game drew with MeguLit\'s replacement goes to the re
  const place=fs.readFileSync(path.join(__dirname,'..','web','reader','modules','text-place.js'),'utf8');
  assert.ok(place.includes("body.megulit-place-game-drawn.megulit-game-embedded .sentence-window.tomoyo-hook-reader .tomoyo-cn-row{visibility:hidden!important}"));
 });
+
+test('engine-draw.log: every record once, timestamped, for the probe and the offline diff maker',async()=>{
+ const {HookNative}=require('../core/hook-native.cjs');const dir=fs.mkdtempSync(path.join(process.env.MEGULIT_TEST_TMP||os.tmpdir(),'megulit-edlog-'));
+ const h=Object.create(HookNative.prototype);Object.assign(h,{emit:()=>{},now:()=>1,state:{gameProcessId:0},profile:Profiles.profileFor({}),layout:{logs:dir}});
+ const a='ToMe_CHARS engine=rpgm line=1 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=816 vh=624 n=0 rects= role=button id=W1:0 box=1,2,3,4 text=はい';
+ h.charRects(a);h.charRects(a);h.charRects(a.replace('はい','いいえ'));
+ const sink=require('../core/log-sink.cjs'),file=path.join(dir,'engine-draw.log');for(let i=0;i<100;i++){const q=sink.pending(file);if(q&&!q.busy&&!q.queued)break;await new Promise(r=>setTimeout(r,20));}
+ const lines=fs.readFileSync(path.join(dir,'engine-draw.log'),'utf8').trim().split('\n');
+ assert.equal(lines.length,2,'a repeat is left out');assert.match(lines[0],/^\d{4}-\d\d-\d\dT[\d:.]+Z ToMe_CHARS engine=rpgm .* text=はい$/);
+});

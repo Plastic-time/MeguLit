@@ -69,4 +69,7 @@ ToMe_CHARS engine=<e> line=N hidden=0|1 sw=W sh=H vx= vy= vw= vh= n=K rects=x,y,
 
 ## 和离线差分（diff-maker）的约定
 
+- 记录日志：内核把每条解析通过的 ToMe_CHARS 原样写进 `logs/engine-draw.log`（`<ISO 时间> <记录>`，同一条 64 条内只记一次，4 MB 轮换），探针从这里取
+- `text` 为空只出现在空快照（`box=0,0,0,0`，`id=<组>:`）；其他 UI 记录 text 必有，KiriKiri / RPG Maker 的 UI 记录都带 id
+
 差分制作读探针上传的 `ToMe_CHARS` 记录：按 `role` 分台词和 UI；UI 项按 `(role, id, text)` 去重；`box` 用来在截图上框出按钮。差分里给台词的替换数据就是上面的 `{k, ruby, zh}` 列表
