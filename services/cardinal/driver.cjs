@@ -148,7 +148,7 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
  }catch(e){out.errors.push('driver: '+String(e.stack||e).slice(0,800));}
  finally{
   try{runtime.reader?.gal?.stop?.();}catch{}try{runtime.reader?.stop?.();}catch{}
-  await browser?.close().catch(()=>{});
+  await browser?.close().catch(error=>out.errors.push('browser cleanup: '+String(error?.message||error).slice(0,400)));
   fs.writeFileSync(outFile,JSON.stringify(out,null,1));
   if(!process.env.MEGULIT_REPLAY_KEEP)try{fs.rmSync(work,{recursive:true,force:true});}catch{}
   process.exit(0);

@@ -21,6 +21,8 @@ Cardinal 回答一个问题：这份种子在玩家机器上到底好不好。�
 
 隐藏阅读层 = 无头 Microsoft Edge（`services/cardinal/cdp.cjs`，Node 自带 WebSocket 直接走 DevTools 协议，不用 Playwright，不下载任何东西），和 App 的 WebView2 是同一个 Chromium。不开窗口，用户资料目录是临时的，跑完整个进程树一起关、目录删掉。驱动进程（`services/cardinal/driver.cjs`）低于正常优先级，Edge 继承它。回放有自己的临时 MeguLit 根目录（只拷玩家的 `data/config`，不拷 secrets / 账号 / 学习库），relay 关掉，两个上传开关关掉，所以回放里发生的任何事（包括读模式切换）都只是被量的对象，碰不到玩家正在跑的阅读层、游戏和任何模式。
 
+连接和单次 CDP 请求都有超时；启动浏览器后若目标发现、WebSocket 连接或页面初始化失败，会关闭连接、终止该子进程树并等待子进程 close，再清本次创建的临时 profile。显式传入 userDataDir 的目录由调用方拥有，不删除。close 可重复调用，卡住的 Browser.close 会转为有界终止；进程没关掉或自有 profile 清理失败会明确报错，driver 将其记入 errors，不能作为可靠票上传
+
 ## 什么时候跑（services/cardinal.cjs）
 
 - 游戏会话结束（`gameClosed`）：一定跑

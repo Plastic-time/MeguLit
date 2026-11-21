@@ -11,17 +11,26 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function findBrowser(env=process.env){const list=[env.MEGULIT_CARDINAL_BROWSER];
  for(const base of [env['ProgramFiles(x86)'],env.ProgramFiles,env.LOCALAPPDATA].filter(Boolean)){list.push(path.join(base,'Microsoft','Edge','Application','msedge.exe'));list.push(path.join(base,'Google','Chrome','Application','chrome.exe'));}
  return list.find(f=>f&&fs.existsSync(f))||'';}
+function bounded(promise,ms,message){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),ms);})]).finally(()=>clearTimeout(timer));}
 class Conn{
- constructor(url){this.ws=new WebSocket(url);this.id=0;this.calls=new Map();this.handlers=new Map();this.closed=false;
-  this.ready=new Promise((res,rej)=>{this.ws.addEventListener('open',()=>res(),{once:true});this.ws.addEventListener('error',e=>rej(Error('cdp connect failed')),{once:true});});
+ constructor(url,{WebSocketCtor=globalThis.WebSocket,connectMs=10000,commandMs=15000}={}){this.id=0;this.calls=new Map();this.handlers=new Map();this.closed=false;this.commandMs=commandMs;this.ws=new WebSocketCtor(url);
+  this.ready=new Promise((resolve,reject)=>{let settled=false;const timer=setTimeout(()=>this.close(Error('cdp connect timeout')),connectMs);
+   this.settleReady=error=>{if(settled)return;settled=true;clearTimeout(timer);error?reject(error):resolve();};
+   this.ws.addEventListener('open',()=>this.settleReady(),{once:true});});
+  this.ready.catch(()=>{});
+  this.ws.addEventListener('error',()=>this.close(Error('cdp connect failed')),{once:true});
   this.ws.addEventListener('message',ev=>{let m;try{m=JSON.parse(String(ev.data));}catch{return;}
-   if(m.id&&this.calls.has(m.id)){const c=this.calls.get(m.id);this.calls.delete(m.id);m.error?c.rej(Error(m.error.message||'cdp error')):c.res(m.result||{});return;}
+   if(m.id&&this.calls.has(m.id)){const c=this.calls.get(m.id);this.calls.delete(m.id);clearTimeout(c.timer);m.error?c.rej(Error(m.error.message||'cdp error')):c.res(m.result||{});return;}
    for(const fn of this.handlers.get(m.method)||[])try{fn(m.params||{});}catch{}});
-  this.ws.addEventListener('close',()=>{this.closed=true;for(const c of this.calls.values())c.rej(Error('cdp closed'));this.calls.clear();});}
- send(method,params={}){if(this.closed)return Promise.reject(Error('cdp closed'));const id=++this.id;return new Promise((res,rej)=>{this.calls.set(id,{res,rej});this.ws.send(JSON.stringify({id,method,params}));});}
+  this.ws.addEventListener('close',()=>this.fail(Error('cdp closed')));}
+ fail(error){if(this.closed)return;this.closed=true;this.settleReady(error);for(const c of this.calls.values()){clearTimeout(c.timer);c.rej(error);}this.calls.clear();}
+ send(method,params={}){if(this.closed)return Promise.reject(Error('cdp closed'));const id=++this.id;return new Promise((res,rej)=>{
+  const timer=setTimeout(()=>{if(!this.calls.delete(id))return;rej(Error('cdp command timeout: '+method));},this.commandMs);this.calls.set(id,{res,rej,timer});
+  try{this.ws.send(JSON.stringify({id,method,params}));}catch(error){clearTimeout(timer);this.calls.delete(id);rej(error);}});}
  on(method,fn){if(!this.handlers.has(method))this.handlers.set(method,[]);this.handlers.get(method).push(fn);}
- close(){try{this.ws.close();}catch{}}
+ close(error=Error('cdp closed')){this.fail(error);try{this.ws.close();}catch{}}
 }
+
 class Page{
  constructor(conn){this.c=conn;this.bindings=new Map();this.listeners={console:[],pageerror:[],response:[]};this.router=null;this.loaded=null;
   conn.on('Fetch.requestPaused',p=>this.paused(p));
@@ -46,7 +55,7 @@ class Page{
  async binding(p){const fn=this.bindings.get(p.name);if(!fn)return;let call;try{call=JSON.parse(p.payload);}catch{return;}let ok=true,v;try{v=await fn(...call.args);}catch(e){ok=false;v=String(e&&e.message||e);}
   try{await this.c.send('Runtime.evaluate',{expression:'window.__cdpDone('+call.id+','+ok+','+JSON.stringify(v===undefined?null:v)+')',contextId:p.executionContextId});}catch{}}
  addInitScript(fnOrSource){const source=typeof fnOrSource==='function'?'('+fnOrSource+')();':String(fnOrSource);return this.c.send('Page.addScriptToEvaluateOnNewDocument',{source});}
- async goto(url,timeout=30000){const done=new Promise(res=>{this.loaded=res;});await this.c.send('Page.navigate',{url});await Promise.race([done,sleep(timeout)]);}
+ async goto(url,timeout=30000){const done=new Promise(res=>{this.loaded=res;});try{await this.c.send('Page.navigate',{url});await bounded(done,timeout,'cdp page navigation timeout');}finally{this.loaded=null;}}
  /* fn: a function (called with arg) or an expression string */
  async evaluate(fn,arg){const expression=typeof fn==='function'?'('+fn+')('+(arg===undefined?'':JSON.stringify(arg))+')':String(fn);
   const r=await this.c.send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text||'evaluate failed');return r.result?.value;}
@@ -54,19 +63,28 @@ class Page{
  addScriptTag({path:file}){return this.evaluate(fs.readFileSync(file,'utf8')+'\n;true');}
 }
 /* -> {page, close()} */
-async function launch({executable=findBrowser(),viewport={width:1920,height:1080},userDataDir}={}){if(!executable)throw Error('CARDINAL_NO_BROWSER');
- const dir=userDataDir||fs.mkdtempSync(path.join(os.tmpdir(),'megulit-cardinal-edge-'));
+async function launch({executable=findBrowser(),viewport={width:1920,height:1080},userDataDir,timeouts={}}={},dependencies={}){if(!executable)throw Error('CARDINAL_NO_BROWSER');
+ const io={fs,spawn,spawnSync,fetch:globalThis.fetch,sleep,...dependencies},limits={startup:30000,target:5000,connect:10000,command:15000,init:30000,close:2000,exit:2000,cleanupAttempts:20,...timeouts};
+ const owned=!userDataDir,dir=userDataDir||io.fs.mkdtempSync(path.join(os.tmpdir(),'megulit-cardinal-edge-'));const ownedPath=owned?path.resolve(dir):null;
  const args=['--headless=new','--remote-debugging-port=0','--user-data-dir='+dir,'--no-first-run','--no-default-browser-check','--disable-extensions','--disable-gpu','--mute-audio','--disable-sync','--disable-background-networking','--disable-component-update','--disable-default-apps','--disable-features=Translate,msEdgeSidebarV2,msImplicitSignin,EdgeCollections','--hide-scrollbars','--window-size='+viewport.width+','+viewport.height,'about:blank'];
- const child=spawn(executable,args,{stdio:'ignore',windowsHide:true});child.on('error',()=>{});
- let closed=false;const kill=()=>{if(child.exitCode===null&&child.pid)try{if(process.platform==='win32')spawnSync('taskkill',['/T','/F','/PID',String(child.pid)],{windowsHide:true,stdio:'ignore'});else child.kill('SIGKILL');}catch{}};
- const cleanup=async()=>{for(let i=0;i<20;i++){try{fs.rmSync(dir,{recursive:true,force:true});return;}catch{await sleep(250);}}};
- let port=0,browserPath='';const until=Date.now()+30000;
- while(Date.now()<until){try{const [p,b]=fs.readFileSync(path.join(dir,'DevToolsActivePort'),'utf8').split(/\r?\n/);if(+p){port=+p;browserPath=b;break;}}catch{}if(child.exitCode!==null)break;await sleep(100);}
- if(!port){kill();await cleanup();throw Error('CARDINAL_BROWSER_START');}
- let target=null;for(let i=0;i<50&&!target;i++){try{const list=await (await fetch('http://127.0.0.1:'+port+'/json/list')).json();target=list.find(t=>t.type==='page');}catch{}if(!target)await sleep(100);}
- if(!target){kill();await cleanup();throw Error('CARDINAL_BROWSER_TARGET');}
- const conn=new Conn(target.webSocketDebuggerUrl);await conn.ready;const page=new Page(conn);await page.init(viewport);
- return {page,pid:child.pid,async close(){if(closed)return;closed=true;conn.close();
-  try{const bc=new Conn('ws://127.0.0.1:'+port+browserPath);await Promise.race([bc.ready,sleep(2000)]);await Promise.race([bc.send('Browser.close'),sleep(2000)]).catch(()=>{});bc.close();}catch{}
-  const end=Date.now()+5000;while(child.exitCode===null&&Date.now()<end)await sleep(100);kill();await cleanup();}};}
-module.exports={launch,findBrowser};
+ let child=null,conn=null,port=0,browserPath='',ended=false,spawnError=null,disposal=null;let finishExit;const exited=new Promise(resolve=>finishExit=resolve);
+ const connect=url=>new Conn(url,{WebSocketCtor:io.WebSocket||globalThis.WebSocket,connectMs:limits.connect,commandMs:limits.command});
+ const kill=()=>{if(!child||ended||!child.pid)return;try{if(process.platform==='win32')io.spawnSync('taskkill',['/T','/F','/PID',String(child.pid)],{windowsHide:true,stdio:'ignore',timeout:limits.exit});else child.kill('SIGKILL');}catch{}};
+ const waitExit=async()=>{if(ended||!child)return true;try{await bounded(exited,limits.exit,'CARDINAL_BROWSER_EXIT_TIMEOUT');}catch{}return ended;};
+ const cleanup=async()=>{if(!owned)return;for(let i=0;i<limits.cleanupAttempts;i++){try{if(path.resolve(dir)!==ownedPath)throw Error('CARDINAL_PROFILE_PATH_CHANGED');io.fs.rmSync(dir,{recursive:true,force:true});return;}catch(error){if(i+1===limits.cleanupAttempts)throw Error('CARDINAL_PROFILE_CLEANUP: '+error.message);await io.sleep(250);}}};
+ const dispose=graceful=>{if(disposal)return disposal;disposal=(async()=>{conn?.close();
+  if(graceful&&port&&browserPath&&!ended){let browserConn;try{browserConn=connect('ws://127.0.0.1:'+port+browserPath);await bounded(browserConn.ready,limits.close,'cdp browser close connection timeout');await bounded(browserConn.send('Browser.close'),limits.close,'cdp browser close command timeout');}catch{}finally{browserConn?.close();}}
+  if(child&&!ended){if(!graceful||!await waitExit())kill();await waitExit();}
+  await cleanup();if(child&&!ended)throw Error('CARDINAL_BROWSER_EXIT_TIMEOUT');})();return disposal;};
+ try{
+  child=io.spawn(executable,args,{stdio:'ignore',windowsHide:true});ended=child.exitCode!==null;
+  child.once('close',()=>{ended=true;finishExit();});child.once('error',error=>{spawnError=error;if(!child.pid){ended=true;finishExit();}});
+  const until=Date.now()+limits.startup;while(Date.now()<until){try{const [p,b]=io.fs.readFileSync(path.join(dir,'DevToolsActivePort'),'utf8').split(/\r?\n/);if(+p){port=+p;browserPath=b;break;}}catch{}if(ended||spawnError)break;await io.sleep(100);}
+  if(!port)throw Error('CARDINAL_BROWSER_START'+(spawnError?': '+spawnError.message:''));
+  let target=null;const targetUntil=Date.now()+limits.target;while(Date.now()<targetUntil&&!target){try{const remaining=Math.max(1,Math.min(1000,targetUntil-Date.now()));const response=await bounded(io.fetch('http://127.0.0.1:'+port+'/json/list',{signal:AbortSignal.timeout(remaining)}),remaining,'cdp target timeout');const list=await bounded(response.json(),remaining,'cdp target JSON timeout');target=list.find(t=>t.type==='page');}catch{}if(!target)await io.sleep(100);}
+  if(!target)throw Error('CARDINAL_BROWSER_TARGET');
+  conn=connect(target.webSocketDebuggerUrl);await conn.ready;const page=new Page(conn);await bounded(page.init(viewport),limits.init,'CARDINAL_PAGE_INIT_TIMEOUT');
+  return {page,pid:child.pid,close:()=>dispose(true)};
+ }catch(error){try{await dispose(false);}catch(cleanupError){throw Error(error.message+'; cleanup: '+cleanupError.message,{cause:error});}throw error;}
+}
+module.exports={launch,findBrowser,Conn};
