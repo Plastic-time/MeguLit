@@ -1,3 +1,5 @@
+.jr-dialog:has(>[data-jr-folder-scan]){overflow-x:hidden;overflow-y:auto}
+.jr-dialog>[data-jr-folder-scan]{padding-inline:28px;min-width:0}
 .jr-folder-scan{margin-block:18px;padding-block-start:16px;border-top:1px solid var(--border,rgba(255,255,255,.12))}
 .jr-folder-scan-lead{white-space:pre-line;font-size:13px;line-height:1.7;color:var(--muted)}
 .jr-folder-scan-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-block:14px}
