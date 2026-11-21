@@ -110,3 +110,43 @@ test('the version table reaches the DLL as one control-file line; no table, no l
  /* off by default: the seeds keep draw.roles false, so no control file asks the DLL to hook */
  for(const slug of Object.keys(fx.snippets)){const g=JSON.parse(fs.readFileSync(path.join(__dirname,'..','The Seed','mages',slug,'game.json'),'utf8'));assert.equal(g.settings.draw.roles,false,slug);}
 });
+
+test('presentation: the back buffer size globals in each build (fixture snippet before Present)',()=>{
+ for(const [name,s] of Object.entries(fx.snippets)){
+  const b=Buffer.from(s.present.hex,'hex'),r=M.backbuffer(b);
+  assert.ok(r,name);assert.equal('0x'+r.w.toString(16),s.present.w,name);assert.equal(r.h,r.w+4,name);
+  assert.equal(s.table.backbuffer[0],'0x'+(r.w-parseInt(s.base,16)).toString(16),name+' version table');
+  const c=Buffer.from(b);for(let i=0;i+3<c.length;i++)if(c[i]===0xff&&c[i+1]===0x51&&c[i+2]===0x44)c[i+2]=0x48;
+  assert.equal(M.backbuffer(c),null,name+': no Present after it, not the presentation');
+ }
+});
+
+/* Ruby markers, static evidence (owner 2026-11-21: verify 0x8009-0x800B or keep calling it a guess). In every build the SC3 text
+   parser (the function that fills the layout buffer) writes 0x8000 + b for EVERY control byte b < 0x20 into the layout codes
+   before dispatching on b through a 32-entry jump table; the cases for 0x0A and 0x0B both advance the layout index (the marker
+   stays) and set / clear the same local flag, which the glyph path tests to leave those glyphs out of the line's character count.
+   So 0x8009 / 0x800A / 0x800B reach the commit as markers and the glyphs between 0x800A and 0x800B are laid-out ruby glyphs.
+   Still inferred: that 0x09 starts the ruby base (SC3 / impacto's STT_RubyBaseStart; the 0x09 case only keeps its marker). */
+for(const [name,s] of Object.entries(fx.snippets)){
+ const exe=STEAM+s.exe,here=fs.existsSync(exe);
+ test('owner\'s exe '+name+': SC3 controls 0x01 / 0x0A / 0x0B stay in the layout as markers; 0x0A / 0x0B switch one ruby flag',{skip:!here&&'not on this PC'},()=>{
+  const buf=fs.readFileSync(exe);if(crypto.createHash('sha256').update(buf).digest('hex')!==s.sha256)return;
+  const t=SS.plainText(buf),c=t.code,codes=parseInt(s.table.layoutCodes,16)+t.base;const cb=Buffer.alloc(4);cb.writeUInt32LE(codes);
+  let found=0;
+  for(let i=0;i+40<c.length;i++){
+   if(c[i]!==0x66||c[i+1]!==0x89||c[i+3]!==0x7d||!c.subarray(i+4,i+8).equals(cb))continue;
+   let j=-1;for(let k=i+8;k<i+24;k++)if(c[k]===0x83&&c[k+1]===0xf8&&c[k+2]===0x1f&&c[k+3]===0x0f&&c[k+4]===0x87&&c[k+9]===0xff&&c[k+10]===0x24&&c[k+11]===0x85){j=k;break;}
+   if(j<0)continue;found++;
+   /* the value written is 0x8000-based: add ax, word [ebp-X] right before, X loaded with 0x8000 at the function's start */
+   assert.equal(c[i-7],0x66);assert.equal(c[i-6],0x03);
+   /* the jump table sits in the code section right after the parser */
+   const tbl=c.readUInt32LE(j+12)-t.va,entry=k=>c.readUInt32LE(tbl+4*k)-t.va;
+   const head=k=>c.subarray(entry(k),entry(k)+24);
+   const flag=h=>{for(let q=0;q+10<=h.length;q++)if(h[q]===0xc7&&h[q+1]===0x85)return [h.readInt32LE(q+2),h.readUInt32LE(q+6)];return null;};
+   for(const k of [1,10,11]){const h=head(k);assert.equal(h[0],0x46,name+' case '+k+': inc esi');assert.ok(h.subarray(0,16).includes(0x47),name+' case '+k+': inc edi (the marker stays)');}
+   const fa=flag(head(10)),fb=flag(head(11));
+   assert.ok(fa&&fb,name+': 0x0A / 0x0B set a local');assert.equal(fa[0],fb[0],name+': the same local');assert.deepEqual([fa[1],fb[1]],[1,0],name+': 0x0A sets it, 0x0B clears it');
+  }
+  assert.equal(found,1,'one SC3 text parser');
+ });
+}

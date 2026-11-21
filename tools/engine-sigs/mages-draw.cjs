@@ -97,7 +97,39 @@ function find(b,va){
   if(b[f-1]===0xcc&&PROLOGUE(b,f)&&!out.clear.includes(va+f))out.clear.push(va+f);
  }
  if(!out.clear.length)out.problems.push('clear: none');
+ /* the presentation (static, every build): before Present(NULL, NULL, NULL, NULL) the 16:9 scene is drawn into the back buffer at
+    its full width and height (w >> 4) * 9, centred vertically ((h - that) * 0.5); Present then stretches the back buffer over the
+    client area. The back buffer size is two u16 globals:  movzx eax, word [W] ... shr eax, 4 ... lea eax, [eax+eax*8] ...
+    movzx eax, word [H = W+4] ... call [ecx+44h] (Present) within 0x90 bytes */
+ out.backbuffer=backbuffer(b); /* optional: without it the kernel takes the client size */
+ out.menu=menuSite(b,va,out);
  return out;
+}
+function backbuffer(b){const hits=[];
+ for(let i=0;i+0x90<b.length;i++){
+  if(b[i]!==0x0f||b[i+1]!==0xb7||b[i+2]!==0x05)continue;const W=u32(b,i+3);let k=i+7,end=i+0x40,s4=-1,l9=-1,h=-1;
+  for(let j=k;j<end;j++)if(b[j]===0xc1&&b[j+1]===0xe8&&b[j+2]===0x04){s4=j;break;}if(s4<0)continue;
+  for(let j=s4+3;j<s4+0x30;j++)if(b[j]===0x8d&&b[j+1]===0x04&&b[j+2]===0xc0){l9=j;break;}if(l9<0)continue;
+  for(let j=l9+3;j<l9+0x30;j++)if(b[j]===0x0f&&b[j+1]===0xb7&&b[j+2]===0x05&&u32(b,j+3)===((W+4)>>>0)){h=j;break;}if(h<0)continue;
+  let present=false;for(let j=h;j<i+0x90;j++)if(b[j]===0xff&&b[j+1]===0x51&&b[j+2]===0x44){present=true;break;}
+  if(present)hits.push({at:i,w:W,h:(W+4)>>>0});
+ }
+ return hits.length===1?hits[0]:null;
+}
+/* menu text: of the functions (other than the two drawDialogue) that call drawGlyph, the one with the most direct calls. In all
+   five builds it takes 9 arguments, LanguageBarrier's drawSingleTextLine(texture, x, y, a4, sc3string, maxLength, color, size,
+   opacity) used by the system menus: role menu. Every other caller (phone, mail, backlog, TIPS, link highlight) is role system.
+   Inferred from the argument count and the call count, not from a name in the game. */
+function menuSite(b,va,out){
+ const glyph=out.drawGlyph-va,dlg=out.dialogue.map(v=>v-va),callers=new Map();
+ /* a function start: push ebp; mov ebp,esp right after padding or a ret (int3 / nop / ret / ret n) */
+ const start=f=>PROLOGUE(b,f)&&[0xcc,0x90,0xc3,0xc2].includes(b[f-1]);
+ for(let i=0;i+5<b.length;i++){if(b[i]!==0xe8||i+5+i32(b,i+1)!==glyph)continue;let f=i;while(f>0&&!start(f)&&i-f<0x1000)f--;if(dlg.includes(f)||!start(f))continue;callers.set(f,0);}
+ if(!callers.size)return null;
+ for(let i=0;i+5<b.length;i++){if(b[i]!==0xe8)continue;const t=i+5+i32(b,i+1);if(callers.has(t))callers.set(t,callers.get(t)+1);}
+ const best=[...callers].sort((x,y)=>y[1]-x[1])[0];
+ let end=best[0]+3;while(end<b.length-3&&!start(end))end++;
+ return {at:va+best[0],end:va+end,calls:best[1]};
 }
 
 function scanFile(file){
@@ -106,7 +138,7 @@ function scanFile(file){
 }
 /* module offsets (RVAs) of what was found: the version layer's address table */
 function table(r){const rva=v=>v?'0x'+(v-r.base).toString(16):null;
- return {drawDialogue:r.dialogue.map(rva),drawGlyph:rva(r.drawGlyph),commit:r.commit&&rva(r.commit.at),clear:r.clear.map(rva),pages:rva(r.pages),stride:'0x'+r.stride.toString(16),chars:r.S,scale:rva(r.scale),layoutCount:r.commit&&rva(r.commit.count),layoutCodes:r.commit&&rva(r.commit.codes),layoutInfo:r.commit&&rva(r.commit.info)};}
+ return {drawDialogue:r.dialogue.map(rva),drawGlyph:rva(r.drawGlyph),commit:r.commit&&rva(r.commit.at),clear:r.clear.map(rva),pages:rva(r.pages),stride:'0x'+r.stride.toString(16),chars:r.S,scale:rva(r.scale),layoutCount:r.commit&&rva(r.commit.count),layoutCodes:r.commit&&rva(r.commit.codes),layoutInfo:r.commit&&rva(r.commit.info),backbuffer:r.backbuffer&&[rva(r.backbuffer.w),rva(r.backbuffer.h)],menuText:r.menu&&[rva(r.menu.at),rva(r.menu.end)]};}
 
-module.exports={find,scanFile,table,dialogueHeads,sizeOf};
+module.exports={find,scanFile,table,dialogueHeads,sizeOf,backbuffer};
 if(require.main===module)for(const f of process.argv.slice(2)){try{const r=scanFile(f);console.log(JSON.stringify({file:f,steamstub:r.steamstub,problems:r.problems,table:table(r)}));}catch(e){console.log(JSON.stringify({file:f,error:e.message}));}}

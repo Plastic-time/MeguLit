@@ -1,8 +1,9 @@
-ToMe_DRAWRUN engine=mages on: drawDialogue=3260,3320 drawGlyph=3340 commit=30f0 clear=30b0,0 pages=741040 stride=ea9c chars=2000 scale=1.5
+ToMe_DRAWRUN engine=mages on: drawDialogue=34a0,3560 drawGlyph=3580 commit=3330 clear=32f0,0 pages=fc0040 stride=ea9c chars=2000 scale=1.5
 ToMe_DRAWRUN engine=mages ev=add page=0 seq=1 role=line from=0 n=5 scale=1.5 codes=800103b003b18002025400f400e5
 ToMe_DRAWBOX engine=mages page=0 seq=1 at=0 rects=150,900,30,45;180,900,30,45;240,900,30,45;270,900,30,45;330,900,30,45 color=fffffe,fffffd,fffffb,fffffa,fffff8 flag=0,0,0,0,0
 ToMe_DRAWRUN engine=mages ev=add page=0 seq=1 role=line from=5 n=3 scale=1.5 codes=024e024e00c5
 ToMe_DRAWBOX engine=mages page=0 seq=1 at=5 rects=120,900,30,45;150,900,30,45;180,900,30,45 color=ffffff,fffffe,fffffd flag=0,0,0
+ToMe_DRAWRUN engine=mages ev=view bb=1920,1200 client=0,0
 ToMe_DRAWRUN engine=mages ev=show page=0 seq=1 opacity=255
 ToMe_DRAWRUN engine=mages ev=clear page=0 seq=1
 ToMe_DRAWRUN engine=mages ev=add page=0 seq=2 role=line from=0 n=3 scale=1.5 codes=0214021a021d
@@ -11,7 +12,7 @@ ToMe_DRAWRUN engine=mages ev=add page=7 seq=1 role=choice from=0 n=2 scale=1.5 c
 ToMe_DRAWBOX engine=mages page=7 seq=1 at=0 rects=120,900,30,45;150,900,30,45 color=ffffff,fffffe flag=0,0
 ToMe_DRAWRUN engine=mages ev=add page=7 seq=1 role=choice from=2 n=2 scale=1.5 codes=01de01e0
 ToMe_DRAWBOX engine=mages page=7 seq=1 at=2 rects=120,900,30,45;150,900,30,45 color=ffffff,fffffe flag=1,1
-ToMe_DRAWRUN engine=mages ev=glyph site=3414 n=4 box=500,200,120,30 size=30 color=80ff80
-ToMe_DRAWRUN engine=mages ev=glyph site=34aa n=1 box=10,10,30,30 size=30 color=ffffff
-ToMe_DRAWRUN engine=mages ev=glyph site=3414 n=4 box=500,200,120,30 size=30 color=80ff80
+ToMe_DRAWRUN engine=mages ev=glyph site=3654 n=4 box=500,200,120,30 size=30 color=80ff80
+ToMe_DRAWRUN engine=mages ev=glyph site=36ea n=1 box=10,10,30,30 size=30 color=ffffff
+ToMe_DRAWRUN engine=mages ev=glyph site=3654 n=4 box=500,200,120,30 size=30 color=80ff80
 ToMe_DRAWRUN engine=mages ev=show page=0 seq=2 opacity=9

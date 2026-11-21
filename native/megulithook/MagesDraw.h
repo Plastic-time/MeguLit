@@ -21,6 +21,8 @@
 //   ToMe_DRAWRUN engine=mages ev=more page=P seq=S codes=hhhh..
 //   ToMe_DRAWBOX engine=mages page=P seq=S at=I rects=x,y,w,h;.. color=rrggbb,.. flag=f,..  (12 characters a line, in order)
 //   ToMe_DRAWRUN engine=mages ev=clear page=P seq=S         ToMe_DRAWRUN engine=mages ev=show page=P seq=S opacity=O
+//   ToMe_DRAWRUN engine=mages ev=view bb=W,H client=W,H     (the back buffer the 16:9 scene is drawn into, width-fit and
+//     centred vertically, and the client area Present stretches it over: the kernel places the 1920x1080 canvas from these)
 //   ToMe_DRAWRUN engine=mages ev=glyph site=<rva> n=N box=x,y,w,h size=H color=rrggbb   (any other text the engine draws:
 //     menus, backlog, phone; one line when a caller's run changes; role from the version layer's site table)
 // The kernel side (tools/engine-sigs/mages-draw.cjs parse + PageTracker) decodes the codes and assembles the pages.
@@ -28,12 +30,18 @@
 // game's diff); when the version layer has this exe's address table (draw.engineTable, a "#table mages ..." line) it must
 // agree with the signature or nothing is hooked. Every hook calls the game's own function and changes nothing it sees.
 #pragma once
+#ifdef _WIN64
+// MAGES ships 32-bit only; a 64-bit build that includes this header gets a no-op
+#include <cstdint>
+namespace MagesDraw { inline void Arm(uintptr_t) {} }
+#else
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include "MinHook.h"
 #include "MagesDrawSig.h"
+#pragma comment(lib, "user32.lib") // the game window's client size (ev=view)
 namespace MagesDraw {
 static const int MaxPages = 10, SelPage = 7, SysSelPage = 5;
 static uintptr_t Base = 0, Dlg[2] = {0, 0}, DlgEnd[2] = {0, 0}, Glyph = 0, Commit = 0, Clear[4] = {0, 0, 0, 0}; static int Clears = 0;
@@ -41,6 +49,23 @@ static uintptr_t Pages = 0, Count = 0, Codes = 0, Info = 0, ScaleAt = 0; static 
 static void *CommitOrig = nullptr, *ClearOrig[4] = {}, *DlgOrig[2] = {}, *GlyphOrig = nullptr;
 static volatile LONG Armed = 0, Installed = 0;
 static unsigned Seq[MaxPages] = {}; static bool Shown[MaxPages] = {};
+static uintptr_t Backbuffer = 0; // u16 width, u16 at +4 height (0 = not found: the kernel takes the client size)
+static HWND GameWindow = nullptr; static int ViewSent[4] = {-1, -1, -1, -1};
+static BOOL CALLBACK FindWindowOfProcess(HWND h, LPARAM out) {
+  DWORD pid = 0; GetWindowThreadProcessId(h, &pid); RECT r;
+  if (pid == GetCurrentProcessId() && IsWindowVisible(h) && !GetWindow(h, GW_OWNER) && GetClientRect(h, &r) && r.right > 200 && r.bottom > 150) { *(HWND *)out = h; return FALSE; }
+  return TRUE;
+}
+// where the canvas ends up: the back buffer size (the game's) and the client size it is stretched over; a line when either changes
+static void View() {
+  int bw = 0, bh = 0, cw = 0, ch = 0;
+  __try { if (Backbuffer) { bw = *(const std::uint16_t *)Backbuffer; bh = *(const std::uint16_t *)(Backbuffer + 4); } } __except (EXCEPTION_EXECUTE_HANDLER) { bw = bh = 0; }
+  if (!GameWindow || !IsWindow(GameWindow)) { GameWindow = nullptr; EnumWindows(FindWindowOfProcess, (LPARAM)&GameWindow); }
+  RECT r; if (GameWindow && GetClientRect(GameWindow, &r)) { cw = r.right - r.left; ch = r.bottom - r.top; }
+  if (bw == ViewSent[0] && bh == ViewSent[1] && cw == ViewSent[2] && ch == ViewSent[3]) return;
+  ViewSent[0] = bw; ViewSent[1] = bh; ViewSent[2] = cw; ViewSent[3] = ch;
+  Msg::Log("ToMe_DRAWRUN engine=mages ev=view bb=%d,%d client=%d,%d", bw, bh, cw, ch);
+}
 static float Scale() { float s = 1.0f; __try { s = *(const float *)ScaleAt; } __except (EXCEPTION_EXECUTE_HANDLER) {} return s > 0.1f && s < 8.0f ? s : 1.0f; }
 static std::uint8_t *PageAt(int p) { return (std::uint8_t *)(Pages + (uintptr_t)p * Stride); }
 static int PageLength(int p) { int n = *(const int *)(PageAt(p) + 0xc); return n >= 0 && n <= Chars ? n : -1; }
@@ -103,8 +128,10 @@ static void OnClearLeave() {
   __try { for (int p = 0; p < MaxPages; p++) if (Before[p] > 0 && PageLength(p) == 0) { Msg::Log("ToMe_DRAWRUN engine=mages ev=clear page=%d seq=%u", p, Seq[p]); Shown[p] = false; } } __except (EXCEPTION_EXECUTE_HANDLER) {}
 }
 // ---- drawDialogue(font, page, opacity): the page's first frame on screen ----
+static unsigned DialogueCalls = 0;
 static void __cdecl OnDialogue(const std::uint32_t *callerEsp) {
-  __try { int page = (int)callerEsp[2]; if (page < 0 || page >= MaxPages || Shown[page] || PageLength(page) <= 0) return; Shown[page] = true;
+  if (++DialogueCalls % 120 == 1) View();
+  __try { int page = (int)callerEsp[2]; if (page < 0 || page >= MaxPages || Shown[page] || PageLength(page) <= 0) return; Shown[page] = true; View();
     Msg::Log("ToMe_DRAWRUN engine=mages ev=show page=%d seq=%u opacity=%u", page, Seq[page], callerEsp[3]); } __except (EXCEPTION_EXECUTE_HANDLER) {}
 }
 // ---- drawGlyph(tex, sx, sy, sw, sh, x0, y0, x1, y1, color, opacity) from anything but drawDialogue ----
@@ -219,6 +246,7 @@ static bool FindInImage(const Table &t) {
     Dlg[0] = at + r.dialogue[0]; Dlg[1] = at + r.dialogue[1]; DlgEnd[0] = at + r.dialogueEnd[0]; DlgEnd[1] = at + r.dialogueEnd[1]; Glyph = (uintptr_t)((std::int64_t)at + r.drawGlyphRel); Commit = at + r.commit;
     Clears = r.clears < 4 ? r.clears : 4; for (int k = 0; k < Clears; k++) Clear[k] = at + r.clear[k];
     Pages = r.pages; Stride = r.stride; Chars = r.chars; Count = r.count; Codes = r.codes; Info = r.info; ScaleAt = r.scale;
+    { std::uint32_t w = 0; if (MagesDrawSig::FindBackbuffer(code, n, w) == 1) Backbuffer = w; else Msg::Log("ToMe_DRAWRUN engine=mages note: no back buffer size (the client size is used)"); }
     if (t.has) { // the version layer's RVAs must be what the signature found
       bool same = t.dlg[0] == Dlg[0] - Base && t.dlg[1] == Dlg[1] - Base && t.glyph == Glyph - Base && t.commit == Commit - Base && t.stride == Stride && t.pages == Pages - Base;
       if (!same) { Msg::Log("ToMe_DRAWRUN engine=mages off: the version table disagrees with the signature (dlg %x/%x glyph %x commit %x)", (unsigned)(Dlg[0] - Base), (unsigned)(Dlg[1] - Base), (unsigned)(Glyph - Base), (unsigned)(Commit - Base)); return false; }
@@ -260,3 +288,4 @@ static void Arm(uintptr_t imageBase) {
   HANDLE t = CreateThread(nullptr, 0, Watch, nullptr, 0, nullptr); if (t) CloseHandle(t);
 }
 }
+#endif

@@ -25,6 +25,7 @@ static std::vector<std::uint8_t> PageMem(STRIDE * 10 + 64);
 static struct { int count; std::uint16_t codes[1024]; } Layout;
 static struct { std::uint32_t w, h, x, y; } LayoutInfo[1024];
 static float ScaleValue = 1.5f;
+static std::uint16_t BackbufferSize[4] = {1920, 0, 1200, 0}; /* u16 width, u16 at +4 height: a 16:10 back buffer */
 static std::uint8_t *Pg(int p) { return PageMem.data() + (size_t)p * STRIDE; }
 #pragma optimize("", off)
 extern "C" __declspec(noinline) int __cdecl FakeCommit(int page, int unused, int flag) {
@@ -54,7 +55,7 @@ int main(int argc, char **argv) {
   using namespace MagesDraw;
   if (MH_Initialize() != MH_OK) { printf("FAIL MinHook\n"); return 1; }
   Base = (uintptr_t)GetModuleHandleW(nullptr); Pages = (uintptr_t)PageMem.data(); Stride = STRIDE; Chars = S;
-  Count = (uintptr_t)&Layout.count; Codes = (uintptr_t)Layout.codes; Info = (uintptr_t)LayoutInfo; ScaleAt = (uintptr_t)&ScaleValue;
+  Count = (uintptr_t)&Layout.count; Codes = (uintptr_t)Layout.codes; Info = (uintptr_t)LayoutInfo; ScaleAt = (uintptr_t)&ScaleValue; Backbuffer = (uintptr_t)BackbufferSize;
   Commit = (uintptr_t)FakeCommit; Clear[0] = (uintptr_t)FakeClear; Clears = 1; Dlg[0] = (uintptr_t)FakeDialogue; Dlg[1] = (uintptr_t)FakeDialogue2; Glyph = (uintptr_t)FakeGlyph;
   { uintptr_t fns[] = {(uintptr_t)FakeCommit, (uintptr_t)FakeClear, (uintptr_t)FakeGlyph, (uintptr_t)FakeDialogue, (uintptr_t)FakeDialogue2, (uintptr_t)FakeMenu, (uintptr_t)FakeMenu2, (uintptr_t)main};
     for (int i = 0; i < 2; i++) { DlgEnd[i] = Dlg[i] + 0x1000; for (uintptr_t f : fns) if (f > Dlg[i] && f < DlgEnd[i]) DlgEnd[i] = f; } } /* the next function: the real end comes from the signature */
@@ -74,6 +75,8 @@ int main(int argc, char **argv) {
   // first frame of the page; drawDialogue's own glyphs are not UI
   FakeDialogue(0, 0, 255); FakeDialogue(0, 0, 255); FakeDialogue2(1, 0, 255);
   Check(CountOf("ev=show page=0 seq=1") == 1, "show once per page unit");
+  Check(Has("ev=view bb=1920,1200 client="), "view: the back buffer size the scene is drawn into (no window here: client 0,0)");
+  Check(CountOf("ev=view") == 1, "view only when it changes");
   // the page is cleared and the next sentence starts
   r = FakeClear(0);
   Check(r == 77, "clear returns the engine's value");

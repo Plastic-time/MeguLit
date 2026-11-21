@@ -52,6 +52,25 @@ inline int GlyphTarget(const unsigned char *b, size_t at, size_t end, std::int64
   int found = 0; for (int q = 0; q < k; q++) if (c[q] == 3) { found++; target = t[q]; }
   return found;
 }
+// the back buffer size (two u16 globals; tools/engine-sigs/mages-draw.cjs backbuffer() has the shape): before Present the
+// 16:9 scene is drawn at the back buffer's full width and height (w >> 4) * 9, centred vertically; Present stretches the back
+// buffer over the client area. Returns 1 when exactly one place matches, with the address of the width (height = width + 4)
+inline int FindBackbuffer(const unsigned char *b, size_t n, std::uint32_t &w) {
+  int hits = 0;
+  for (size_t i = 0; i + 0x90 < n; i++) {
+    if (b[i] != 0x0f || b[i + 1] != 0xb7 || b[i + 2] != 0x05) continue;
+    std::uint32_t W = U32(b + i + 3); size_t s4 = 0, l9 = 0, h = 0; bool present = false;
+    for (size_t j = i + 7; j < i + 0x40 && !s4; j++) if (b[j] == 0xc1 && b[j + 1] == 0xe8 && b[j + 2] == 0x04) s4 = j;
+    if (!s4) continue;
+    for (size_t j = s4 + 3; j < s4 + 0x30 && !l9; j++) if (b[j] == 0x8d && b[j + 1] == 0x04 && b[j + 2] == 0xc0) l9 = j;
+    if (!l9) continue;
+    for (size_t j = l9 + 3; j < l9 + 0x30 && !h; j++) if (b[j] == 0x0f && b[j + 1] == 0xb7 && b[j + 2] == 0x05 && U32(b + j + 3) == W + 4) h = j;
+    if (!h) continue;
+    for (size_t j = h; j < i + 0x90; j++) if (b[j] == 0xff && b[j + 1] == 0x51 && b[j + 2] == 0x44) { present = true; break; }
+    if (present) { if (!hits) w = W; hits++; }
+  }
+  return hits;
+}
 inline Result Find(const unsigned char *b, size_t n) {
   Result r; struct Head { size_t at, end; std::uint32_t stride, pages; int S; std::int64_t glyph; std::uint32_t scale; } h[8]; int nh = 0;
   for (size_t i = 0; i + 48 < n; i++) {

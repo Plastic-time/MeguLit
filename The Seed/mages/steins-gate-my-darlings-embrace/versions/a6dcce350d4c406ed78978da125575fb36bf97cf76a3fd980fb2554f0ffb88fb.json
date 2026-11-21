@@ -27,6 +27,14 @@
     "layoutCount": "0x1d50638",
     "layoutCodes": "0x1d50640",
     "layoutInfo": "0x1d5aa58",
+    "backbuffer": [
+     "0x31d6cd0",
+     "0x31d6cd4"
+    ],
+    "menuText": [
+     "0x699e0",
+     "0x6a190"
+    ],
     "selPage": 7,
     "sysSelPage": 5,
     "charset": "sgmde",

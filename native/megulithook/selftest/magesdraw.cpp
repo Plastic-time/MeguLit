@@ -33,6 +33,12 @@ int main() {
     auto d = b; for (size_t i = (size_t)s.commit; i + 6 < d.size() && i < (size_t)s.commit + 0x200; i++) if (d[i] == 0xff && (d[i + 1] & 0xf8) == 0x80 && MagesDrawSig::U32(&d[i + 2]) == s.pages + 0xc) { d[i] = 0x90; d[i + 1] = 0x90; }
     Check(MagesDrawSig::Find(d.data(), d.size()).commits == 0, n + ": no pageLength++, no commit");
   }
+  for (const auto &p : MagesPresents) {
+    auto b = Bytes(p.hex); std::uint32_t w = 0;
+    Check(MagesDrawSig::FindBackbuffer(b.data(), b.size(), w) == 1 && w == p.w, std::string(p.name) + ": the back buffer size before Present");
+    for (size_t i = 0; i + 3 < b.size(); i++) if (b[i] == 0xff && b[i + 1] == 0x51 && b[i + 2] == 0x44) b[i + 2] = 0x48;
+    Check(MagesDrawSig::FindBackbuffer(b.data(), b.size(), w) == 0, std::string(p.name) + ": no Present after it, no match");
+  }
   Check(MagesDrawSig::SizeOf(0xea9c) == 2000 && MagesDrawSig::SizeOf(0x3348c) == 7000 && MagesDrawSig::SizeOf(0xea9d) == 0 && MagesDrawSig::SizeOf(0x40) == 0, "page stride -> characters a page");
   printf("mages draw signature: %d failure(s)\n", Failures);
   return Failures;

@@ -61,13 +61,23 @@
   - commit 前后：前面抄排版缓冲（字码、跳过标记），后面读新加进页的字（字码、框 ×缩放、颜色、标志）→ `ToMe_DRAWRUN engine=mages ev=add page= seq= role=line|choice|system from= n= codes=`（字码含标记）+ `ToMe_DRAWBOX … rects= color= flag=`
   - 清页 → `ev=clear page= seq=`；drawDialogue 第一次画这页 → `ev=show`；drawDialogue 以外的 drawGlyph（菜单、回想、手机……）按调用点成段，内容变了才记一行 `ev=glyph site=<rva> box= size= color=`
   - 返回值、寄存器、栈原样（pre 门 + 返回跳板），游戏看不到区别
-- 内核读法（`core/mages-draw.cjs`）：`parse` + `PageTracker`（一页在两次清页之间 = 一个单位 page:seq；名字来自 0x8001/0x8002 标记；注音按 0x8009/0x800A/0x800B 解析——**推断**，日志里还没见过）+ `toChars` 出 ToMe_CHARS（line / name `N:<页>` / choice `C:<号>`、`Y<页>:<号>`）；`core/text-paths.cjs` 登记 `engine=mages`。接进 hook-native 的实时流是下一步（和 YU-RIS 一样，先用探针日志配「画布 → 屏幕」）
-- **CHAOS;CHILD「一句拆成两句、排版对不上」**：原因是**推断**（没开游戏验证）：串钩子挂在 SC3 解析器上，一句里有等待（SC3 0x03 / 0x0E 等）时会分几次送出，所以一句被拆。画字层上，这几次都是往同一页 commit，中间没有清页，`PageTracker` 把它们当同一单位（同一 page:seq，文字变长、框逐次补齐），从根上不会拆。按画字层接管 CC 后，配对 / 排版用 page:seq 当行标识即可（自检和夹具都覆盖了「两次 commit = 一句」）
+- 内核（`core/mages-draw.cjs`，第二批已接进实时流）：`parse` + `PageTracker`（一页在两次清页之间 = 一个单位 page:seq；名字来自 0x8001/0x8002 标记；注音见下）+ `MagesLive`（实时：DLL 记录 → ToMe_CHARS，每个 page:seq 一个固定行号，文字变长就是同一行再报一次；清页或页重新开始时同一行号报一次空记录（协议里的「离开」）；名字 role=name `N:<页>`；选项每页一个 UI 快照（`C:<号>` / `Y<页>:<号>`），清页时空快照）。链路：MagesDraw.h → hook-diagnostics 行 → HookBridge `EngineInfo`（`hookEngineDraw`，自检里有一条）→ `HookNative.magesDraw` → `charRects` → hookCharRects / hookDrawUi。`core/text-paths.cjs` 登记 `engine=mages`
+- **画布 → 窗口（静态，5 部一致）**：呈现函数在 Present(NULL,NULL,NULL,NULL) 前，把 16:9 的场景画进后备缓冲：宽铺满、高 = (宽 >> 4) × 9、垂直居中（(高 − 那个) × 0.5）；Present 再把后备缓冲整个拉伸到客户区。所以画布 1920×1080 在客户区的位置 = [0, (bh − h16)/2 × ch/bh, cw, h16 × ch/bh]（`viewport()`，写进 ToMe_CHARS 的 vx..vh）：16:10 全屏上下黑边、超宽屏上下被裁（vy < 0）、后备缓冲和窗口形状不同就被拉伸。后备缓冲尺寸是两个 u16 全局（签名：宽 → `shr 4` → `lea ×9` → 高 → `×0.5` → Present；JS `backbuffer()` / C++ `FindBackbuffer`），DLL 在每页第一帧和每 120 帧读一次，连同游戏窗口客户区报 `ev=view bb= client=`（变了才报）；读不到后备缓冲就按客户区，读不到客户区就交给内核按比例放
+- **菜单调用点角色表（推断）**：drawDialogue 以外调用 drawGlyph 的函数里，直接调用次数最多的那个（5 部都是 9 个参数：SG 0x45bc0、SG0 0x62f30、CC 0x73010、LBP 0x4b200、MDE 0x699e0）= LanguageBarrier 的 drawSingleTextLine（系统菜单用）→ role menu；其余（手机、邮件、回想、TIPS、链接高亮）→ role system。根据是参数个数 + 调用次数，不是游戏里的名字。版本层 `menuText: [起, 止]`，`MagesLive.glyphRole(site)`。`ev=glyph` 只有框没有字，所以暂不送进阅读层（只给探针 / diff-maker 用）
+- **注音标记（静态核实）**：5 部的 SC3 文本解析器（填排版缓冲的函数）对**每一个** < 0x20 的控制字节先写 `0x8000 + 字节` 进排版缓冲，再按 32 项跳转表分派；0x0A、0x0B 两个分支都推进排版下标（标记保留），并置 / 清同一个局部标志；字形路径看到这个标志为 1 时照样写字形，只是不计入这一行的字数。所以 0x8009 / 0x800A / 0x800B 会作为标记到达 commit，0x800A 和 0x800B 之间的字是排好的注音字（测试逐个 exe 核对）。仍是**推断**的只有一点：0x09 是「注音底字开始」（SC3 / impacto 的 STT_RubyBaseStart；0x09 分支只保留标记）
+- **CHAOS;CHILD「一句拆成两句、排版对不上」**：原因是**推断**（没开游戏验证）：串钩子挂在 SC3 解析器上，一句里有等待（SC3 0x03 / 0x0E 等）时会分几次送出，所以一句被拆。画字层上，这几次都是往同一页 commit，中间没有清页；`MagesLive` 给同一 page:seq 同一个行号，后面几段是同一行变长再报，清页时这一行报一次空。回放测试 `validation/engine-draw-mages-live.test.cjs`：三段 commit → 行号都是 1、文字依次变长、清页一次空记录、下一句是行 2；再喂给 OverlayPlacement，看到的是一行在变长，不是两句
 - 验证：
   - `validation/engine-draw-sig-mages.test.cjs`：5 个夹具片段、近似字节不命中、店主 5 个 exe（有就跑，SHA-256 对上）整段只命中一次且等于版本层表、Sel/SysSel 的 commit 调用形态、运行时日志回读、控制文件行
   - `native/megulithook/selftest/magesdraw.cpp`：同样的片段给 C++ 匹配器（41 项）
   - `native/megulithook/selftest/magesgate.cpp`：真 MinHook 挂在仿引擎函数上，跑 commit / 两段 commit / 清页 / 选项 / 菜单，检查返回值、栈、记录；输出就是 `validation/fixtures/engine-sigs/mages-draw-log.txt`
-- 没做：名字框之外的名字（手机、TIPS）角色表、`ev=glyph` 的调用点 → 角色映射（等探针日志）、内嵌（SC3 写回带注音 + 中文，需要字库补字，单独做）
+- 没做：内嵌（方案见下，未接）；`ev=glyph` 的文字解码（菜单字要从源坐标反推字码，描边和本体各画一遍，等探针日志再定）
+- **内嵌替换方案（只写方案，未接）**：
+  1. 位置：commit 之前（MagesDraw 已经在 commit 入口拿到排版缓冲）。台词那一页（Mes）在 commit 前把排版缓冲里这一句的字形换掉，不动 SC3 脚本、不动 VM
+  2. 做法 A（推荐）：在解析器入口（SG 的 0x4496a0，`sc3 串, 2, 8, 0, &out`）换输入串：日文本身不变，只在汉字后插 SC3 注音 `09 底字 0A 读音 0B`（引擎自己排注音），中文作为第二段追加在 `00`（换行）之后；串用 SC3 字码编码，**中文字形必须在字库图集里**：先用这一版的字码表查（没查过，不知道够不够），缺的字用 `core/mages-font.cjs` 补字库（替换 FONT 纹理里没用到的格子，并把这些格子写进字码表）
+  3. 做法 B（不补字库）：只插注音（日文字库够用），中文仍由阅读层画在对话框外（`emb=1`）
+  4. 行数上限：每页 S 个字、每个窗口的行数（排版参数表，SG 在 0x16f4bc4，按窗口号），放不下就降到只注音；写进版本层（`draw.embed*`）
+  5. 配对：commit 记录里报 `emb=1/2`（MagesLive 带上），阅读层按协议少画；回放测试照 KiriKiri 的做法加「替换后整句只画一次」
+  6. 风险：现有 SG 的 `EmbedMAGES_SteinsGate`（sgBlank）已经在同一解析器入口改串，两者必须二选一（按 seed 的 draw.embed 互斥），否则会重复改
 
 #### 店主测试清单（MAGES）
 1. 在 The Seed 里给 STEINS;GATE（或 CHAOS;CHILD / STEINS;GATE 0 / 两部外传）的游戏差分设 `"draw":{"roles":true}`（版本层的 engineTable 已经有了），或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，内容 `#cfg roles=1`）
@@ -77,6 +87,8 @@
    - 每句有 `ev=add page=0 …`（或别的窗口页）和 `ToMe_DRAWBOX`；有名字的句子 codes 里有 `8001…8002`
    - 推到下一句前有 `ev=clear page=…`；选项出现时有 `ev=add page=7 … role=choice`，DRAWBOX 的 flag 是 0、1、2…
    - CHAOS;CHILD：一句里有停顿的句子，同一 `seq` 下有多条 `ev=add`（from 递增），中间没有 clear
+   - 有 `ev=view bb=<后备缓冲> client=<客户区>`：窗口化 / 全屏各切一次，数值跟着变
+   - 阅读层：有停顿的句子在 MeguLit 里只出现一行（不再拆成两行），清字时跟着消失；名字和选项旁边有注音 / 中文，点选项照常
 4. 游戏照常显示、不卡、不崩 = 过
 5. 不过时发：`hook-diagnostics.log` 全文；没有 `on:` 只有 `off: …` 那行 = 这个版本签名或表没对上，连同 exe 路径发来
 

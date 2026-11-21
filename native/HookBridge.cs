@@ -881,6 +881,9 @@ static bool GdiProbeable(Candidate c){return c!=null&&!c.embed&&!ConversionHook(
   if(file.Success){Diagnostic("font probe "+file.Groups[1].Value+" font "+file.Groups[2].Value);return new{type="hookFontFile",kind=file.Groups[1].Value,path=file.Groups[2].Value};}
   return null;}
  static object EngineInfo(string s){
+    // engine-draw MAGES (native/megulithook/MagesDraw.h): the engine's dialogue page records go to the kernel as they are;
+    // core/mages-draw.cjs turns them into ToMe_CHARS (one line per page between clears)
+    if((s??"").StartsWith("ToMe_DRAWRUN engine=mages ",StringComparison.Ordinal)||(s??"").StartsWith("ToMe_DRAWBOX engine=mages ",StringComparison.Ordinal))return s.Length<=1000?new{type="hookEngineDraw",engine="mages",line=s}:null;
     var layout=System.Text.RegularExpressions.Regex.Match(s??"",@"^ToMe_CS2_LAYOUT line=(\d+) token=(\d+) x0=(-?\d+) y0=(-?\d+) x1=(-?\d+) y1=(-?\d+) size=(\d+) n=(\d+) hidden=([01])(?: color=([0-9a-f]{8}))?");
     if(layout.Success)return new{type="hookTextPos",engine="cs2_screen_v2",line=Int64.Parse(layout.Groups[1].Value),token=Int64.Parse(layout.Groups[2].Value),x0=Int64.Parse(layout.Groups[3].Value),y0=Int64.Parse(layout.Groups[4].Value),x1=Int64.Parse(layout.Groups[5].Value),y1=Int64.Parse(layout.Groups[6].Value),size=Int64.Parse(layout.Groups[7].Value),count=Int64.Parse(layout.Groups[8].Value),replacementRequested=layout.Groups[9].Value=="1",color=layout.Groups[10].Success?"#"+layout.Groups[10].Value.Substring(6,2)+layout.Groups[10].Value.Substring(4,2)+layout.Groups[10].Value.Substring(2,2):null,at=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()};
     var pos=System.Text.RegularExpressions.Regex.Match(s??"",@"^ToMe_TEXTPOS engine=(\w+) line=(-?\d+) x0=(-?\d+) y0=(-?\d+) x1=(-?\d+) y1=(-?\d+) size=(-?\d+) n=(\d+)(?: token=(\d+))?");
@@ -892,6 +895,8 @@ static bool GdiProbeable(Candidate c){return c!=null&&!c.embed&&!ConversionHook(
     if(dialog.Success)return new{type="hookDialog",engine=dialog.Groups[1].Value,visible=dialog.Groups[2].Value=="1"};return null;
  }
  static bool EngineInfoSelfTest(){
+  var mages=Json.Deserialize<Dictionary<string,object>>(Json.Serialize(EngineInfo("ToMe_DRAWRUN engine=mages ev=clear page=0 seq=1")));
+  if(Convert.ToString(mages["type"])!="hookEngineDraw"||Convert.ToString(mages["line"])!="ToMe_DRAWRUN engine=mages ev=clear page=0 seq=1"||EngineInfo("ToMe_DRAWRUN engine=yuris run=1")!=null)return false;
   var layout=Json.Deserialize<Dictionary<string,object>>(Json.Serialize(EngineInfo("ToMe_CS2_LAYOUT line=3 token=11 x0=230 y0=160 x1=800 y1=190 size=28 n=30 hidden=1 color=ffffe2b0")));
   var p=Json.Deserialize<Dictionary<string,object>>(Json.Serialize(EngineInfo("ToMe_TEXTPOS engine=cs2_screen_v1 line=2 x0=28 y0=43 x1=306 y1=74 size=28 n=20 token=4294967295")));
   var page=Json.Deserialize<Dictionary<string,object>>(Json.Serialize(EngineInfo("ToMe_PAGE engine=cs2 line=2 same=1 token=4294967295")));

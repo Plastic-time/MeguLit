@@ -17,7 +17,7 @@
    0x8009 ruby base start, 0x800A ruby text start, 0x800B ruby text end (impacto text.h; name markers verified in the
    exes' layout code, ruby markers inferred from SC3 and not yet seen in a log). */
 
-const RUN=/^ToMe_DRAWRUN engine=mages (?:ev=(add|more|clear|show|glyph) (.*)|(on|off): ?(.*))$/;
+const RUN=/^ToMe_DRAWRUN engine=mages (?:ev=(add|more|clear|show|glyph|view) (.*)|(on|off|note): ?(.*))$/;
 const BOX=/^ToMe_DRAWBOX engine=mages page=(\d+) seq=(\d+) at=(\d+) rects=([-\d,;]*) color=([0-9a-f,]*) flag=([\d,]*)$/;
 function fields(s){const o={};const m=/ codes=([0-9a-f]*)$/.exec(' '+s);let rest=' '+s;if(m){o.codes=m[1];rest=rest.slice(0,m.index);}
  for(const kv of rest.trim().split(/\s+/)){const i=kv.indexOf('=');if(i>0)o[kv.slice(0,i)]=kv.slice(i+1);}return o;}
@@ -33,6 +33,7 @@ function parse(line){
   else if(m[1]==='more')r.codes=hex4(f.codes||'');
   else if(m[1]==='show')r.opacity=num('opacity');
   else if(m[1]==='glyph')Object.assign(r,{site:parseInt(f.site,16),n:num('n'),box:(f.box||'').split(',').map(Number),size:num('size'),color:f.color});
+  else if(m[1]==='view'){const two=k=>(f[k]||'').split(',').map(Number);return {kind:'view',bb:two('bb'),client:two('client')};}
   if(m[1]!=='glyph'&&(!Number.isInteger(r.page)||!Number.isInteger(r.seq)))return null;
   return r;
  }
@@ -90,4 +91,62 @@ function toChars(tracker,page,{sw=1920,sh=1080,line=0}={}){
  return out;
 }
 
-module.exports={parse,PageTracker,toChars,SEL_PAGE,SYSSEL_PAGE};
+/* Where the canvas (1920 x 1080) sits in the client area, client pixels [vx, vy, vw, vh] (the ToMe_CHARS viewport), from the game's
+   own presentation (static, all five builds; tools/engine-sigs/mages-draw.cjs backbuffer()): the 16:9 scene is drawn into the
+   back buffer at its full width and height (bw >> 4) * 9, centred vertically ((bh - that) * 0.5), then Present stretches the
+   back buffer over the whole client area. So a 16:10 back buffer gets bars above and below, an ultrawide one is cut at the top
+   and bottom (the scene is wider than tall enough: vy < 0), and a back buffer of another shape than the window is stretched.
+   Unknown back buffer: the client size (the usual case: the game sizes them together). Unknown client: [0,0,0,0] (the kernel
+   fits the canvas itself). */
+function viewport({bb=[0,0],client=[0,0]}={}){
+ const [cw,ch]=client;if(!(cw>0&&ch>0))return [0,0,0,0];
+ let [bw,bh]=bb;if(!(bw>0&&bh>0)){bw=cw;bh=ch;}
+ const h16=(bw>>4)*9,sx=cw/bw,sy=ch/bh,r=v=>Math.round(v*100)/100;
+ return [0,r((bh-h16)*0.5*sy),r(bw*sx),r(h16*sy)];
+}
+/* The live side: hook-diagnostics records in (as HookBridge forwards them: hookEngineDraw), ToMe_CHARS records out, ready for
+   HookNative.charRects. One line number per page unit (page:seq), so a sentence the engine commits in pieces is the same line
+   reported again with more text (CHAOS;CHILD's split lines); a clear (or the page starting over) reports that line once more,
+   empty and not hidden (the protocol's "gone"); choices are one UI snapshot per page (group C / Y<page>) and an empty snapshot at
+   the clear; the speaker is role=name (group N). Only complete units go out (every character has its box). */
+class MagesLive{
+ constructor({table={},charset=null}={}){
+  const cs=charset!=null?charset:require('../services/original-engines/mages.cjs')._internal.charset(['sghd','default','sglbp','sgmde'].includes(table.charset)?table.charset:'sghd');
+  this.canvas=Array.isArray(table.canvas)&&table.canvas.length===2?table.canvas.map(Number):[1920,1080];
+  this.t=new PageTracker({charset:cs,sel:Number.isInteger(table.selPage)?table.selPage:SEL_PAGE,sysSel:Number.isInteger(table.sysSelPage)?table.sysSelPage:SYSSEL_PAGE});
+  const m=Array.isArray(table.menuText)?table.menuText.map(v=>parseInt(v,16)):[];this.menu=m.length===2&&m.every(Number.isFinite)?m:null;
+  this.view={bb:[0,0],client:[0,0]};this.lines=new Map();this.next=1;this.sent=new Map();this.current=new Map();
+ }
+ lineOf(key){if(!this.lines.has(key)){this.lines.set(key,this.next++);if(this.lines.size>256)this.lines.delete(this.lines.keys().next().value);}return this.lines.get(key);}
+ /* a drawGlyph run outside the dialogue pages: menu (LanguageBarrier's drawSingleTextLine, inferred) or system */
+ glyphRole(site){return this.menu&&site>=this.menu[0]&&site<this.menu[1]?'menu':'system';}
+ isChoice(page){return page===this.t.sel||(page>=this.t.sysSel&&page<this.t.sel);}
+ rec(o){const T=require('./text-paths.cjs');return T.formatChars({engine:'mages',hidden:false,sw:this.canvas[0],sh:this.canvas[1],viewport:viewport(this.view),...o});}
+ /* the page unit `key` left the screen: its line (and name / choices) once more, empty */
+ gone(page,key){const out=[],line=this.lineOf(key);
+  if(this.isChoice(page))out.push(this.rec({line,rects:[],text:'',role:'choice',id:(page===this.t.sel?'C':'Y'+page)+':',box:[0,0,0,0]}));
+  else{out.push(this.rec({line,rects:[],text:''}));if(this.sent.get(key+'/name'))out.push(this.rec({line,rects:[],text:'',role:'name',id:'N:',box:[0,0,0,0]}));}
+  for(const k of [...this.sent.keys()])if(k===key||k.startsWith(key+'/'))this.sent.delete(k);
+  return out;}
+ feed(raw){const r=typeof raw==='string'?parse(raw):raw;if(!r)return [];
+  if(r.kind==='view'){this.view={bb:r.bb,client:r.client};return [];}
+  if(r.kind==='glyph'||r.kind==='on'||r.kind==='off'||r.kind==='note'||r.kind==='show')return [];
+  const out=[];
+  if(r.kind==='add'){const key=r.page+':'+r.seq,was=this.current.get(r.page);
+   if(was&&was!==key&&!this.t.pages.get(r.page)?.cleared)out.push(...this.gone(r.page,was)); /* the page started over without a clear */
+   this.current.set(r.page,key);}
+  this.t.feed(r);
+  if(r.kind==='clear'){const key=r.page+':'+r.seq;if(this.current.get(r.page)===key){out.push(...this.gone(r.page,key));this.current.delete(r.page);}return out;}
+  if(r.kind!=='box'&&r.kind!=='more')return out;
+  const v=this.t.view(r.page);if(!v||v.key!==this.current.get(r.page))return out;
+  const all=[...v.nameGlyphs,...v.glyphs,...v.rubyGlyphs];if(!all.length||all.some(g=>!g.rect))return out; /* boxes still coming */
+  const line=this.lineOf(v.key),emit=(k,s)=>{if(this.sent.get(k)!==s){this.sent.set(k,s);out.push(s);}};
+  if(this.isChoice(r.page)){const cs=this.t.choices(r.page);for(const c of cs){const rs=c.glyphs.map(g=>g.rect);const x0=Math.min(...rs.map(q=>q[0])),y0=Math.min(...rs.map(q=>q[1])),x1=Math.max(...rs.map(q=>q[0]+q[2])),y1=Math.max(...rs.map(q=>q[1]+q[3]));
+    emit(v.key+'/'+c.id,this.rec({line,rects:rs,text:c.text,role:'choice',id:c.id,box:[x0,y0,x1-x0,y1-y0],color:c.glyphs[0].color}));}return out;}
+  if(v.nameGlyphs.length){const rs=v.nameGlyphs.map(g=>g.rect);const x0=Math.min(...rs.map(q=>q[0])),y0=Math.min(...rs.map(q=>q[1])),x1=Math.max(...rs.map(q=>q[0]+q[2])),y1=Math.max(...rs.map(q=>q[1]+q[3]));
+   emit(v.key+'/name',this.rec({line,rects:rs,text:v.name,role:'name',id:'N:'+r.page,box:[x0,y0,x1-x0,y1-y0],color:v.nameGlyphs[0].color}));}
+  if(v.glyphs.length)emit(v.key,this.rec({line,rects:v.glyphs.map(g=>g.rect),text:v.text,color:v.glyphs[0].color}));
+  return out;}
+}
+
+module.exports={parse,PageTracker,toChars,viewport,MagesLive,SEL_PAGE,SYSSEL_PAGE};
