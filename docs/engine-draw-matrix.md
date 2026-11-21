@@ -10,7 +10,7 @@
 |---|---|---|
 | ReaLive / AVG32（涙、Air） | DrawSites（GDI 画字点）签名 `avg32` | 已进 main，默认不挂 |
 | Softpal（レイライン 1 / 2） | DrawSites `softpal`、`softpal-2` | 已进 main，默认不挂 |
-| NScripter（月姬 v1.4 / v1.6） | DrawSites `nscripter` | 已进 main，默认不挂 |
+| NScripter（月姬 v1.4 / v1.6，同一 exe） | DrawSites `nscripter`（mode 1 字形点） | 默认不挂；页面坐标、角色、mode 0/2 和样本编码尚未验收 |
 | Innocent Grey（虚ノ少女，MFC） | DrawSites `mfc-textoutw` / `mfc-exttextoutw` / `mfc-drawtextw` | 已进 main，默认不挂 |
 | AdvHD / WillPlus（Under The Moon） | DrawSites `advhd` | 已进 main，默认不挂 |
 | CMVS（青い鳥） | DrawSites `cmvs` | 已进 main，默认不挂 |
@@ -105,7 +105,7 @@ GetGlyphOutline 类的签名（Softpal、AdvHD、CMVS、FVP、minori、Musica、
 | 引擎（seed 数） | 游戏 / 文件 | 画字所在模块 | 位数 | 文字 API 调用点 | 图形 | 壳 | LunaHook 现有 | 难度 |
 |---|---|---|---|---|---|---|---|---|
 | Spike Chunsoft（3） | ダンガンロンパ 1 / 2 / V3（Steam） | DR1_us.exe / DR2_us.exe / Dangan3Win.exe | x86 / x86 / x64 | 导入表里没有文字 API | D3D9（1/2）、D3D11（V3） | **SteamStub `.bind`**，V3 的 `.text` 熵 8.0 = 整段加密 | Chunsoft.cpp（x64，78 行） | 难：静态看不到代码，要先脱 SteamStub（Steamless 类工具，只读出一个解开的副本）再找自绘字库 |
-| NScripter（2） | 月姬 v1.4 / v1.6 | Tsukihime.exe（两版同一 exe，400 KB） | x86 | TextOutA ×8、CreateFontA ×13 | GDI DIB（BitBlt / StretchDIBits） | 无 | Onscripter 系（对 NScripter 本体只有通用 GDI） | 易：GDI 画进 DIB，8 个调用点按笔位分出台词 / 名字 / 选项 |
+| NScripter（2） | 月姬 v1.4 / v1.6 | Tsukihime.exe（两版同一 exe，400 KB） | x86 | TextOutA ×8、CreateFontA ×13 | GDI DIB（BitBlt / StretchDIBits） | 无 | Onscripter 系（对 NScripter 本体只有通用 GDI） | 只核实 mode 1 字形点和栈布局；页面笔位与台词 / 名字 / 选项角色未证明 |
 | FVP（2） | いろとりどりのヒカリ（中文版）/ HD | Hikari.exe（中文版启动器 五彩斑斓的曙光.exe 只是外壳）/ irohika_HD.exe | x86 | GetGlyphOutlineA ×3、CreateFontA ×1 | D3D9 | 无 | FVP.cpp | 中：3 个字形调用点，字形进 D3D9 纹理，坐标在上层排版 |
 | Nitroplus（2） | 沙耶の唄（Steam）/ みにくいモジカの子 | Mware.dll（Steam 版）/ 丑小鸭与文字祸.exe | x86 | Steam 版：Mware.dll 只有 D3D11，exe 只有 CreateFontW ×2；モジカ：没有可见导入 | D3D11 | モジカ：**Enigma Protector**（`.enigma1` 熵 7.91） | Nitroplus.cpp / Nitroplus2.cpp | 难：沙耶 Steam 是自绘字库（字形不走 GDI）；モジカ有壳，静态做不了 |
 | Softpal（1） | 時計仕掛けのレイライン | dll\PAL.dll | x86 | **GetGlyphOutlineA ×1**、CreateFontA ×1 | GDI DIB | 无 | Pal.cpp（本仓库已改：内嵌 + ruby + pal_sprite_v1） | 易：唯一一个字形调用点，和 YU-RIS 一样做锚 |
