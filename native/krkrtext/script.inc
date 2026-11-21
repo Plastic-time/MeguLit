@@ -74,14 +74,16 @@ LR"MGLT((function(){
     } catch(e) {return '';}
    } incontextof st;
 )MGLT", LR"MGLT(
-   st.track=function(rec,ch,lm,p0,oy){
+   st.track=function(rec,ch,lm,p0,oy,nativeRuby){
     var L=rec.target;
     if(L.vertical) return;
     var scr=this.screen(),sw=scr[0],sh=scr[1],role='line';
     if(!(sw>0) || !(sh>0)) return;
     /* engine-draw roles (draw.roles, docs/engine-draw-protocol.md): a layer under 20 % of the screen is a name plate, reported as
        role=name; without roles it is left out as before */
-    if(L.height<sh*0.2) {if(!this.cfg.roles) return;role='name';}
+    var il=-1;try {if(typeof L.inLink!='undefined') il=+L.inLink;} catch(e) {}
+    var choice=il>=0 || this.choicePage(L);if(choice && !this.cfg.roles) return;
+    if(!choice && L.height<sh*0.2) {if(!this.cfg.roles) return;role='name';}
     var size=+L.fontSize;
     if(!(size>0)) {size=+L.font.height;if(size<0) size=-size;} /* no Math here: in a function bound to the state dictionary a bare global name reads as void */
     if(!(size>0)) return;
@@ -97,10 +99,10 @@ LR"MGLT((function(){
     }
     var a=this.abs(L);cx+=a[0];cy+=a[1];
     /* engine-draw: a character drawn inside [link]...[endlink] (KAG MessageLayer.inLink >= 0) is a choice, never dialogue */
-    if(this.cfg.roles && role=='line') {var il=-1;try {if(typeof L.inLink!='undefined') il=+L.inLink;} catch(e) {}if(il>=0) {this.linkCh(rec,L,il,ch,cx,cy,size,sw,sh);return;}if(this.choicePage(L)) {this.linkCh(rec,L,'R'+int(cy),ch,cx,cy,size,sw,sh);return;}}
+    if(this.cfg.roles) {if(il>=0) {this.linkCh(rec,L,il,ch,cx,cy,size,sw,sh);return;}if(this.choicePage(L)) {this.linkCh(rec,L,'R'+int(cy),ch,cx,cy,size,sw,sh);return;}}
     if(rec.n==0) {
      if(role=='line') this.fontReport(L);
-     rec.role=role;rec.ra=[];rec.args=void;
+     rec.role=role;rec.ra=[];rec.rb=[];rec.args=void;
      rec.line=++this.line;this.active=rec;rec.x0=cx;rec.y0=cy;rec.x1=cx;rec.y1=cy;rec.size=size;rec.text='';rec.sw=sw;rec.sh=sh;
      rec.nvl=L.height>=sh*0.45?1:0;rec.same=rec.cleared?0:1;rec.cleared=false;rec.rs='';rec.cn=0;rec.hc=0;rec.ct='';
      rec.color=-1;rec.paint=''; /* a missing colour belongs to this sentence, never the previous draw */
@@ -115,7 +117,7 @@ LR"MGLT((function(){
      if(rec.n>0 && cy!=rec.ly) rec.text+='\n';rec.text+=ch;
      var cw=size;try {cw=+this.drawFont(L).getTextWidth(ch);} catch(e) {cw=size;}if(!(cw>0)) cw=size;
      /* blanks get no box (the record's text has none); a character counts as hidden when it was drawn while hiding was on */
-     if(ch!=' ' && ch!='　' && ch!="\t") {rec.rs+=(rec.cn>0?';':'')+int(cx)+','+int(cy)+','+int(cw)+','+int(size);rec.cn++;rec.ct+=ch;rec.ra.add([cx,cy,cw,size]);if(this.hideMsg()) rec.hc++;} else rec.ct+='';
+     if(ch!=' ' && ch!='　' && ch!="\t") {if(role=='line' && typeof nativeRuby=='String' && nativeRuby!='' && rec.rb.count<64) rec.rb.add([rec.cn,1,nativeRuby]);rec.rs+=(rec.cn>0?';':'')+int(cx)+','+int(cy)+','+int(cw)+','+int(size);rec.cn++;rec.ct+=ch;rec.ra.add([cx,cy,cw,size]);if(role=='line' && this.hideMsg()) rec.hc++;} else rec.ct+='';
      if(this.embArgs!==void) rec.args=this.embArgs;
     }
     rec.ly=cy;
@@ -130,12 +132,12 @@ LR"MGLT((function(){
    st.chars=function(rec){
     if(!(rec.cn>0)) return;
     /* the glyphs stay as drawn: a sentence is hidden when every one of its characters went through the opacity-0 draw */
-    var h=(rec.hc>=rec.cn)?1:0;this.charsSent++;
+    var h=(rec.role!='name' && rec.hc>=rec.cn)?1:0;this.charsSent++;
     var t='',row='',c;
     for(var j=0;j<rec.text.length;j++) {c=rec.text.charAt(j);if(c=="\n") {if(row!='') t+=(t!=''?"\n":'')+row;row='';} else if(c!=' ' && c!='　' && c!="\t") row+=c;}
     if(row!='') t+=(t!=''?"\n":'')+row;
     rec.head='ToMe_CHARS engine=krkr line='+rec.line+' hidden='+h+' sw='+int(rec.sw)+' sh='+int(rec.sh)+' vx=0 vy=0 vw=0 vh=0 n='+rec.cn+' rects='+rec.rs;rec.tt=t;
-    this.report(rec.head+(rec.role=='name'?' role=name':'')+' text='+t);
+    this.report(rec.head+(rec.role=='name'?' role=name':'')+this.rubyWire(rec.rb)+' text='+t);
     if(rec.role!='name') rec.sentLine=rec.line;
    } incontextof st;
    /* 2026-11-21 (owner's recording, ファタモルガーナの館 1.4.22 v3, 02:57Z: after every click the line just read came back for about
@@ -273,7 +275,8 @@ LR"MGLT((function(){
     rec.ch=function(ch){
      /* engine-draw: the Chinese drawn under the last sentence goes when the next sentence of the same page starts */
      try {var bk=this.st.embBk;if(bk!==void && bk.L===this.target) this.st.embRestore();} catch(e) {}
-     var L=this.target,lm=false,p0=0,oy=0;
+     var L=this.target,lm=false,p0=0,oy=0,nativeRuby='';
+     try {if(typeof L.currentRuby=='String') nativeRuby=''+L.currentRuby;} catch(e) {}
      try {
       var t=typeof L.lineLayerPos;
       if(typeof L.lineLayer=='Object' && L.lineLayer!==void && L.lineLayer!==null && (t=='Integer' || t=='Real')) {lm=true;p0=+L.lineLayerPos;oy=+L.lineLayerOriginY;}
@@ -281,7 +284,7 @@ LR"MGLT((function(){
      } catch(e) {}
      if(typeof this.oldCh!='Object') return (global.MessageLayer.processCh incontextof this)(...);
      var result=(this.oldCh incontextof L)(...);
-     try {this.st.track(this,ch,lm,p0,oy);} catch(e) {}
+     try {this.st.track(this,ch,lm,p0,oy,nativeRuby);} catch(e) {}
      return result;
     } incontextof rec;
     rec.clr=function(){
@@ -462,21 +465,58 @@ LR"MGLT((function(){
       sentence was drawn with; the sentence's record is then sent again with emb=1 (ruby) or emb=2 (ruby and Chinese). The
       Chinese is taken off again (the pixels under it put back) when the next sentence of the same page starts. */
    st.cfg=%['roles'=>0,'embed'=>0,'zh'=>1];st.embMap=%[];st.ctlRaw='';st.ctlTick=0;st.uiLine=0;st.btnKey='';st.embPend=void;st.embBk=void;st.embArgs=void;st.nameKey='';st.trLinkKey='';st.trAll=void;st.trAllL=void;
+   /* ruby-v1, shared with TextRender: [[rect codepoint start,length,reading],...]. No pixel/hide authority. */
+   st.rubyWire=function(spans){
+    if(typeof spans!='Object' || spans===void || spans===null || spans.count==0 || spans.count>64) return '';
+    var out='',end=0;
+    for(var i=0;i<spans.count;i++) {
+     var s=spans[i];if(typeof s!='Object' || s.count!=3) return '';
+     var start=+s[0],len=+s[1],rd=s[2];if(start!=int(start) || len!=int(len) || start<end || len<1 || len>80 || start+len>4000 || typeof rd!='String' || rd=='' || rd.length>320) return '';
+     var hex='',cp=0;
+     for(var j=0;j<rd.length;j++) {
+      var c=rd.charAt(j),u=#c;if(u<32 || (u>=127 && u<=159)) return '';
+      if(u>=0xd800 && u<=0xdbff) {if(j+1>=rd.length) return '';var next=rd.charAt(j+1),v=#next;if(v<0xdc00 || v>0xdfff) return '';}
+      else if(u>=0xdc00 && u<=0xdfff) {if(j==0) return '';var prev=rd.charAt(j-1),v=#prev;if(v<0xd800 || v>0xdbff) return '';}
+      if(!(u>=0xdc00 && u<=0xdfff)) cp++;if(cp>160) return '';
+      var h='';for(var k=0;k<4;k++) {h='0123456789abcdef'.charAt(u&15)+h;u=u>>4;}hex+=h;
+     }
+     out+=(i>0?'|':'')+int(start)+':'+int(len)+':'+hex;if(out.length>8192) return '';end=start+len;
+    }
+    return out!=''?' ruby='+out:'';
+   } incontextof st;
+)MGLT", LR"MGLT(
+   st.ctlOff=function(){this.cfg=%['roles'=>0,'embed'=>0,'zh'=>1];this.embMap=%[];this.embPend=void;try {this.embRestore();} catch(e) {}} incontextof st;
    st.ctl=function(){
-    var p=global.__megulitKrkrCtlPath;if(typeof p!='String' || p=='') return;
-    var a;try {a=[].load(p);} catch(e) {if(this.ctlRaw!='') {this.ctlRaw='';this.cfg=%['roles'=>0,'embed'=>0,'zh'=>1];this.embMap=%[];}return;}
+    var p=global.__megulitKrkrCtlPath;if(typeof p!='String' || p=='') {this.ctlOff();return;}
+    var a;try {a=[].load(p);} catch(e) {this.ctlRaw='';this.ctlOff();return;}
     var raw=a.join("\n");if(raw==this.ctlRaw) return;this.ctlRaw=raw;
-    var c=%['roles'=>0,'embed'=>0,'zh'=>1],m=%[];
-    for(var i=0;i<a.count && i<4000;i++) {
-     var t=''+a[i];if(t.length>0 && #t==0xfeff) t=t.substring(1);if(t=='') continue;
-     if(t.charAt(0)=='#') {if(t.indexOf('#cfg')==0) {c.roles=t.indexOf('roles=1')>=0?1:0;c.embed=t.indexOf('embed=1')>=0?1:0;c.zh=t.indexOf('zh=0')>=0?0:1;}
-      else if(t=='#clearline') c.clear=1;
-      else if(t.indexOf('#choiceframe ')==0) {try {if(typeof c.choiceFrames!='Object') c.choiceFrames=[];c.choiceFrames.add(new RegExp(t.substring(13)));} catch(e) {}}
-      continue;}
+    if(a.count<1 || a.count>4000 || raw.length>524288) {this.ctlOff();return;}
+    var t=''+a[0];if(t.length>0 && #t==0xfeff) t=t.substring(1);
+    if(t!='#cfg' && t.substring(0,5)!='#cfg ') {this.ctlOff();return;}
+    if(t.length>100) {this.ctlOff();return;}
+    var c=%['roles'=>0,'embed'=>0,'zh'=>1],m=%[],seen=0,tail=t.substring(4);
+    while(tail!='') {
+     if(tail.charAt(0)!=' ') {this.ctlOff();return;}tail=tail.substring(1);var cut=tail.indexOf(' '),one=cut<0?tail:tail.substring(0,cut);tail=cut<0?'':tail.substring(cut);
+     var bit=0;if(one=='roles=0' || one=='roles=1') {bit=1;c.roles=one=='roles=1'?1:0;}
+     else if(one=='embed=0' || one=='embed=1') {bit=2;c.embed=one=='embed=1'?1:0;}
+     else if(one=='zh=0' || one=='zh=1') {bit=4;c.zh=one=='zh=1'?1:0;}
+     else if(one=='advhdInput=0' || one=='advhdInput=1') bit=8;
+     else {this.ctlOff();return;}
+     if((seen&bit)!=0) {this.ctlOff();return;}seen=seen|bit;
+    }
+    for(var i=1;i<a.count;i++) {
+     t=''+a[i];if(t=='') continue;
+     if(t.indexOf('#cfg')==0) {this.ctlOff();return;}
+     if(t.charAt(0)=='#') {
+      if(t=='#clearline') c.clear=1;
+      else if(t.indexOf('#choiceframe ')==0) {try {if(typeof c.choiceFrames!='Object') c.choiceFrames=[];if(c.choiceFrames.count<20) c.choiceFrames.add(new RegExp(t.substring(13)));} catch(e) {}}
+      continue;
+     }
      var j=t.indexOf("\t");if(j<=0) continue;
      var k=t.substring(0,j),r=t.substring(j+1),z='',j2=r.indexOf("\t");if(j2>=0) {z=r.substring(j2+1);r=r.substring(0,j2);}
      m[k]=[r,z];
     }
+    if(!c.embed) {this.embPend=void;try {this.embRestore();} catch(e) {}}
     this.cfg=c;this.embMap=m;
    } incontextof st;
    /* ---- roles: [link] text ---- */
@@ -532,17 +572,17 @@ LR"MGLT((function(){
     if(!this.cfg.embed || rec.role=='name' || !(rec.cn>0) || rec.ra.count!=rec.cn) return void;
     var L=rec.target;if(L.vertical) return void;
     var x0=rec.ra[0][0];for(var i=1;i<rec.ra.count;i++) if(rec.ra[i][0]<x0) x0=rec.ra[i][0];
-    return %['rec'=>rec,'L'=>L,'k'=>rec.ct,'ra'=>rec.ra,'size'=>rec.size,'nvl'=>rec.nvl,'args'=>rec.args,'head'=>rec.head,'t'=>rec.tt,'x0'=>x0,'y1'=>rec.y1,'tries'=>0];
+    return %['rec'=>rec,'L'=>L,'k'=>rec.ct,'ra'=>rec.ra,'size'=>rec.size,'nvl'=>rec.nvl,'args'=>rec.args,'head'=>rec.head,'t'=>rec.tt,'nativeRuby'=>rec.rb,'rubyField'=>this.rubyWire(rec.rb),'x0'=>x0,'y1'=>rec.y1,'tries'=>0];
    } incontextof st;
    /* the replacement may come late (MeguLit looks it up when the sentence's record arrives): tried at the click wait and every
       tick after it until the page moves on */
    st.embTry=function(){
-    var p=this.embPend;if(p===void || p===null) return;
+    var p=this.embPend;if(p===void || p===null) return;if(!this.cfg.embed) {this.embPend=void;return;}
     var r=p.rec;if(!isvalid p.L || (p.tr?(p.line!=this.trLine):(r.cleared || r.n>0)) || ++p.tries>40) {this.embPend=void;return;}
     var e=this.embMap[p.k];if(e===void || e===null) return;
     this.embPend=void;
     var lvl=this.embDraw(p,e);
-    if(lvl>0) this.report(p.head+' emb='+lvl+' text='+p.t);
+    if(lvl>0) this.report(p.head+' emb='+lvl+(p.rubyField!==void?p.rubyField:'')+' text='+p.t);
    } incontextof st;
    st.embSpans=function(s){
     var out=[],t=''+s;
@@ -581,6 +621,7 @@ LR"MGLT((function(){
      var sp=this.embSpans(e[0]);f.height=rs;
      for(var i=0;i<sp.count;i++) {
       var s=sp[i],s0=int(s[0]),n=int(s[1]);if(s0<0 || n<1 || s0+n>p.ra.count) continue;
+      var native=false;if(p.nativeRuby!==void) for(var ri=0;ri<p.nativeRuby.count;ri++) {var nr=p.nativeRuby[ri];if(s0<nr[0]+nr[1] && nr[0]<s0+n) native=true;}if(native) continue;
       var r0=p.ra[s0],m=1;while(m<n && p.ra[s0+m][1]==r0[1]) m++;
       var r1=p.ra[s0+m-1],bw=r1[0]+r1[2]-r0[0],tw=+f.getTextWidth(s[2]);
       (dt incontextof L)(int(r0[0]+(bw-tw)/2-a[0]),int(r0[1]-rs-1-a[1]),s[2],col,255,aa,sl,sc,sw,ox,oy);

@@ -36,6 +36,7 @@ function toJs(src){
   .replace(/invalidate ([\w.]+);/g,'__inv($1);')
   .replace(/\((\w+) instanceof "(\w+)"\)/g,'__io($1,"$2")')
   .replace(/#t==0xfeff/g,'t.charCodeAt(0)==0xfeff')
+  .replace(/#(c|next|prev)\b/g,'$1.charCodeAt(0)')
   .replace(/\bint\(/g,'__int(')
   .replace(/\bvoid\b/g,'undefined');
 }
@@ -72,7 +73,7 @@ function harness({ctl=null}={}){
   abs(l){let ax=0,ay=0;for(let i=0;i<16&&l.parent;i++){ax+=l.left;ay+=l.top;l=l.parent;}return [ax,ay];},
   drawFont(l){return l.font;}};
  sandbox.st=st;vm.runInContext(toJs(block()),sandbox);
- return {st,L,kag,reports,draws,copies,ButtonLayer,Layer,base,ctx};
+ return {st,L,kag,reports,draws,copies,ButtonLayer,Layer,base,ctx,ctlFile,sandbox};
 }
 
 test('engine-draw block: control file sets roles / embed / zh and the replacement table; no file = everything off',()=>{
@@ -140,7 +141,7 @@ test('embed: no room under the sentence = ruby only (emb=1); no entry yet = wait
 });
 
 test('script wiring: name plates only with roles, links routed before the sentence starts, processCh path never hidden while embedding',()=>{
- assert.ok(script.includes("if(L.height<sh*0.2) {if(!this.cfg.roles) return;role='name';}"));
+ assert.ok(script.includes("if(!choice && L.height<sh*0.2) {if(!this.cfg.roles) return;role='name';}"));
  assert.ok(script.includes("if(il>=0) {this.linkCh(rec,L,il,ch,cx,cy,size,sw,sh);return;}"));
  assert.ok(script.indexOf("this.linkCh(rec,L,il")<script.indexOf("if(rec.n==0) {\n     if(role=='line') this.fontReport(L);"));
  assert.ok(script.includes("st.hideMsg=function(){return !this.cfg.embed && this.hideOn();}"));
