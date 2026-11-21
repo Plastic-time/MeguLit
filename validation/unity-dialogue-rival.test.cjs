@@ -18,7 +18,7 @@ test('a stream with three paced dialogue lines takes over a selected stream that
 test('a second writable stream that repeats the selected line is hidden with it',()=>{
  assert.match(s,/japanese twin embedding on/);
  assert.match(s,/japanese twin hidden/);
- assert.match(s,/\(sel\.code\?\?""\)!=\(c\.code\?\?""\)&&JaTwins\.Add\(key\)/,'contexts of the same setter stay with ManyUnityContexts');
+ assert.match(s,/\(\(sel\.code\?\?""\)!=\(c\.code\?\?""\)\|\|\(\(c\.code\?\?""\)\.EndsWith\(":JIT:UNITY"\)&&c\.name==sel\.name\)\)&&JaTwins\.Add\(key\)/,'another hook, or a context of the selected Unity setter itself (Aokana sets each line twice through TMP_Text.set_text)');
  assert.match(s,/if\(id!=Selected\)\{DialogueRivals\.Clear\(\);JaTwins\.Clear\(\);/);
 });
 
