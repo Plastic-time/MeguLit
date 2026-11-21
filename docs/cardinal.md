@@ -146,6 +146,8 @@ runner 不以 `exit` 代替 `close`。停止先请求 driver 通过 IPC 正常�
 
 DOM 薄接线使用 `cardinal-pair.js`，在普通单行与 island-page 实际节点上检查完整正文（不含 ruby 读音）、当前目标、开关、样式与视口、ready 译文；scope 回执仅更新对应当前 episode。节点变化与已有 reveal-progress 触发合并的单帧检查，没有新增常驻 interval 或动画循环。原生写回、compositor、隐藏/不可确认的正文不冒充 DOM 显示观测
 
+文字可见性使用每个有效文本节点的 Range client rects，要求每一段都完整落在视口与 overflow 祖先的 client 裁剪框内；只露出一部分的日文记未观测、译文记未配对。容器宽度超出视口但实际文字完全可见不因此失败，换行的多个文字 rect 分别检查。任何有意义的译文片段被裁掉都不能拿剩余片段去匹配另一份缓存译文。此为 DOM 几何证据，仍不是像素遮挡验收
+
 旧真实海馆坏录制只含缓存 Set 口径，没有逐次显示 ACK；原始 fixture 保留，rev7 总分保守为0.257、pair 为0且 unobserved，不能用于可靠上传或健康实机验收。新增 DOM 节点测试属于明确的合成单元边界，尚未在资源不足的本机启动浏览器或游戏验证这次接线
 
 待传文档必须为当前兼容 rev、`unreliable:false` 且显示、隐藏、投递时钟和选项观测均可靠；旧文档留在本地不补传、不改分。首次结果落盘失败只留错误 trace、不上传；网络失败的合格已落盘记录仍可按原 `record.at` 补传
