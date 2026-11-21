@@ -28,17 +28,22 @@ function repeatedQuestions(db,id){return new Set(db.prepare("SELECT text FROM re
 const storyOnly=(db,id)=>{const rq=repeatedQuestions(db,id);return t=>!systemLine(t)&&!rq.has(clean(t));};
 /* the automatic home lines: saved sentences, else the latest read, story lines only */
 function auto(db,id){id=String(id||'');const ok=storyOnly(db,id);
- const saved=db.prepare('SELECT text FROM saved_sentences WHERE game_id=? ORDER BY created_at DESC LIMIT 120').all(id).map(r=>clean(r.text)).filter(ok);
- if(saved.length)return [...new Set(saved)].slice(0,8);
- const read=db.prepare("SELECT text FROM reading_events WHERE game_id=? AND length(trim(text))>=6 ORDER BY read_at DESC,id DESC LIMIT 200").all(id).map(r=>clean(r.text)).filter(ok);
- return [...new Set(read)].slice(0,6).reverse();}
+ function take(sql,limit){const result=new Set();
+  for(const row of db.prepare(sql).iterate(id)){const t=clean(row.text);if(ok(t))result.add(t);if(result.size===limit)break;}
+  return [...result];}
+ const saved=take('SELECT text FROM saved_sentences WHERE game_id=? ORDER BY created_at DESC',8);
+ if(saved.length)return saved;
+ return take("SELECT text FROM reading_events WHERE game_id=? AND length(trim(text))>=6 ORDER BY read_at DESC,id DESC",6).reverse();}
 function chosen(root,id){const all=store.readJSON(file(root),{});return cleanList(all&&typeof all==='object'?all[String(id)]:[]);}
 function save(root,id,lines){id=String(id||'');if(!id)throw Error('GAME_NOT_FOUND');const f=file(root),all=store.readJSON(f,{}),next=all&&typeof all==='object'&&!Array.isArray(all)?all:{},list=cleanList(lines);
  if(list.length)next[id]=list;else delete next[id];fs.mkdirSync(path.dirname(f),{recursive:true});const tmp=f+'.tmp';fs.writeFileSync(tmp,JSON.stringify(next,null,1));fs.renameSync(tmp,f);return list;}
 function list(db,root,id,{query='',limit=400}={}){id=String(id||'');const q=clean(query),lim=Math.max(1,Math.min(5000,Number(limit)||400)),like='%'+q.replace(/[!%_]/g,c=>'!'+c)+'%';
- const saved=db.prepare("SELECT text,created_at at FROM saved_sentences WHERE game_id=? AND length(trim(text))>=2 AND text LIKE ? ESCAPE '!' ORDER BY created_at DESC LIMIT ?").all(id,like,lim);
- const read=db.prepare("SELECT text,MAX(read_at) at FROM reading_events WHERE game_id=? AND length(trim(text))>=2 AND text LIKE ? ESCAPE '!' GROUP BY text ORDER BY at DESC LIMIT ?").all(id,like,lim);
- const ok=storyOnly(db,id),ms=v=>{v=Number(v)||0;return v&&v<1e12?v*1000:v;},rows=new Map();for(const r of saved){const t=clean(r.text);if(t&&ok(t)&&!rows.has(t))rows.set(t,{text:t,at:ms(r.at),saved:true});}
- for(const r of read){const t=clean(r.text);if(!t||!ok(t))continue;const o=rows.get(t);if(o){o.at=Math.max(o.at,ms(r.at));}else rows.set(t,{text:t,at:ms(r.at),saved:false});}
+ const saved=db.prepare("SELECT text,created_at at FROM saved_sentences WHERE game_id=? AND length(trim(text))>=2 AND text LIKE ? ESCAPE '!'").iterate(id,like);
+ const ok=storyOnly(db,id),ms=v=>{v=Number(v)||0;return v&&v<1e12?v*1000:v;},rows=new Map();
+ for(const r of saved){const t=clean(r.text);if(t&&ok(t))rows.set(t,{text:t,at:Math.max(rows.get(t)?.at??0,ms(r.at)),saved:true});}
+ const read=db.prepare("SELECT text,MAX(CASE WHEN read_at<1000000000000 THEN read_at*1000 ELSE read_at END) at FROM reading_events WHERE game_id=? AND length(trim(text))>=2 AND text LIKE ? ESCAPE '!' GROUP BY text ORDER BY at DESC").iterate(id,like);
+ const seen=new Set();for(const r of read){const t=clean(r.text);if(seen.has(t)||!ok(t))continue;seen.add(t);
+  const old=rows.get(t);rows.set(t,{text:t,at:Math.max(old?.at??0,r.at),saved:!!old});
+  if(seen.size>=lim)break;}
  return {lines:[...rows.values()].sort((a,b)=>b.at-a.at).slice(0,lim),chosen:chosen(root,id)};}
 module.exports={MAX,cleanList,chosen,save,list,auto,systemLine};

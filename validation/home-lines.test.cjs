@@ -67,3 +67,23 @@ test('the background lines change with an opacity/transform stagger, not a glyph
  assert(fn.length>200);assert.doesNotMatch(src,/scrambleScript|GLYPHS|noise\(/);assert.match(fn,/\.animate\(/);
  for(const prop of fn.match(/\{opacity:[^}]*\}/g))assert.match(prop,/^\{opacity:[^,}]+(,transform:'translate3d\([^)]*\)')?\}$/,prop);
 });
+
+test('the picker limits distinct story lines after filtering and preserves older saved marks',t=>{
+ const {db,root}=fixture(t),ev=db.prepare("INSERT INTO reading_events(game_id,text,read_at) VALUES('g',?,?)"),sv=db.prepare("INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES('g',?,?,'{}')");
+ sv.run('風が吹いていた。',1);sv.run('家に帰ろう。',2);sv.run('明日まで待とう。',3);
+ ev.run('風が吹いていた。',8);ev.run('今日は晴れだね。',9);
+ ev.run('今日は晴れだね。 ',10);ev.run('ゲームを終了しますか？',11);
+ assert.deepEqual(lines.list(db,root,'g',{limit:2}).lines,[
+  {text:'今日は晴れだね。',at:10000,saved:false},{text:'風が吹いていた。',at:8000,saved:true}
+ ]);
+});
+
+test('automatic home lines find the saved story or recent dialogue behind menu prompts',t=>{
+ const {db}=fixture(t),ev=db.prepare('INSERT INTO reading_events(game_id,text,read_at) VALUES(?,?,?)'),sv=db.prepare("INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES(?,?,?,'{}')");
+ ev.run('read','風が吹いていた。',1);ev.run('read','今日は晴れだね。',2);
+ ev.run('saved','新しい台詞だよ。',400);
+ sv.run('saved','古いお気に入りだね。',1);
+ for(let i=0;i<205;i++){ev.run('read','ゲームを終了しますか？',i+10);sv.run('saved','ゲームを終了しますか？'+(i?' '.repeat(i):''),i+10);}
+ assert.deepEqual(lines.auto(db,'read'),['風が吹いていた。','今日は晴れだね。']);
+ assert.deepEqual(lines.auto(db,'saved'),['古いお気に入りだね。']);
+});
