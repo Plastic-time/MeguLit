@@ -351,6 +351,9 @@ async function dispatch(request,runtime=null) {
         runtime?.reader?.refreshTextSource?.();return off.run(root,'status',[id]);}
       case 'text_source_clear':{const ot=require('./original-text.cjs'),id=String(request.id);if(request.kind==='patch')ot.clearPatch(root,id);else ot.setMode(root,id,'off');runtime?.reader?.refreshTextSource?.();return ot.status(root,db,id);}
       /* 2026-11-12 Chinese-build guide on the game page: checks, then the one-click fixes the existing code can do */
+      case 'first_player':return await require('./first-player.cjs').state(db,root,String(request.id),{wait:request.poll===true?0:2500});
+      case 'first_player_credit':return await require('./first-player.cjs').setCredit(db,root,String(request.id),typeof request.name==='string'?request.name:null);
+      case 'first_player_share':return {on:require('./first-player.cjs').enableSharing(root)};
       case 'cn_version_guide':{const g=require('./cn-version-guide.cjs').guide(db,root,String(request.id));return g;}
       case 'cn_guide_fix':{const id=String(request.id),cg=require('./cn-version-guide.cjs'),row=db.prepare('SELECT executable,original FROM games WHERE id=? AND removed_at IS NULL').get(id);if(!row?.executable)throw Error('GAME_NOT_FOUND');const dir=require('./patch-swap.cjs').gameDirectory(root,id,row.executable,JSON.parse(row.original||'{}').library?.dir);
         if(request.kind==='swap')return require('./game-language.cjs').select(db,id,'ja',undefined,root);
@@ -432,6 +435,11 @@ async function dispatch(request,runtime=null) {
       case 'daily_open':{const url=String(request.url||'');if(!require('./daily.cjs').canOpen(url))throw Error('URL_NOT_ALLOWED');const child=spawn('explorer.exe',[new URL(url).href],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {opened:true};}
       /* E377 opt-in leaderboard (services/leaderboard.cjs) */
       case 'profile_chip':return require('./leaderboard.cjs').chip(root);
+      /* 2026-11-21 传火碑 (services/torch-monument.cjs, web/torch-monument.js) */
+      case 'torch_page':return await require('./torch-monument.cjs').page(root,{month:String(request.month||''),cursor:String(request.cursor||''),limit:Number(request.limit)||300});
+      case 'torch_months':return await require('./torch-monument.cjs').months(root);
+      case 'torch_find':return await require('./torch-monument.cjs').find(root,String(request.name||''));
+      case 'torch_me':return await require('./torch-monument.cjs').me(root);
       case 'leaderboard_view':return await require('./leaderboard.cjs').view(root,db,{period:String(request.period||''),metric:String(request.metric||''),game:typeof request.game==='string'?request.game:'',submit:request.submit===true,tab:String(request.tab||''),week:String(request.week||''),category:String(request.category||'')});
       /* E379 avatars (moderated on the relay) and reports */
       case 'leaderboard_avatar_set':return await require('./leaderboard.cjs').setAvatar(root,String(request.data||''));
