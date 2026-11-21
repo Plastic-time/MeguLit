@@ -45,6 +45,7 @@ const DOMAINS={
  'draw.embed':{bool:true,layer:'version'},
  'draw.embedTranslation':{bool:true,layer:'version'},
  'draw.engineTable':{engineTable:true,nullable:true,layer:'version'},
+ 'draw.viaRoles':{regexList:{max:16,chars:64},layer:'version'},
  'lang':{langMap:true},
  'library.partLabels':{partLabels:true,nullable:true},
  'safeMode.redrawRate':{number:[0,120],nullable:true},

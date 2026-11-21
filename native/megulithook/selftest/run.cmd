@@ -61,6 +61,9 @@ cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo
 rem engine-draw CatSystem2 signature (CS2DrawSig.h) on bytes of the known build (ISLAND)
 cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 cs2draw.cpp /Fe:"%TEMP%\megulit-gdihide32\cs2draw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
 "%TEMP%\megulit-gdihide32\cs2draw.exe"
+rem engine-draw BGI signature (BgiDrawSig.h) on bytes of the known builds
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 bgidraw.cpp /Fe:"%TEMP%\megulit-gdihide32\bgidraw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\bgidraw.exe"
  if errorlevel 1 exit /b 1
 rem one hook runtime (2026-11-19): the ISLAND, STEINS;GATE, euphoria HD adapters are part of MeguLitHook32
 for %%M in (ToMeCS2_DRAW ToMeSG_EMBED EmbedEuphoria474_DrawHide_TEST2) do (

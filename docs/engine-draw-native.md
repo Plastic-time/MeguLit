@@ -25,11 +25,48 @@
   3. 内嵌：现有写回已经让游戏画我们的字。要日文 + 注音 + 中文都由游戏画，写回串改成「日文（带 YU-RIS 的注音标记）+ 换行 + 中文」，行数上限由窗口行数决定（写进版本层差分，按 exe 哈希）
 - 验证：静态签名测试（对店主的 4 个 exe 各命中一次）+ 店主实机
 
-### BGI / Ethornell
-- 现有：`native/megulithook/BGI.cpp`（LunaHook，按 ctx2 报 台词 / 名字 / 其他，内嵌写回）
-- 画字：TextOutA/W ×5、GetGlyphOutlineA ×2；字形点（①）已经能在 GetGlyphOutlineA 拿到每个字的位置，但不知道角色
-- 方案：在 BGI 的「消息送字」函数（BGI.cpp 现在挂的那个，参数里有窗口对象）旁边同时记窗口编号，然后在 GetGlyphOutlineA 那条路线上把字形点按当前窗口打上角色（名字窗 / 消息窗 / 选项窗）。这是「从外面猜」的升级版：位置来自 API，角色来自引擎自己的窗口
-- 注意：ユースティア 的 BGI.exe 是壳，签名要在解壳后（运行时）找，只能实机验证；素晴日 HD 不是壳，先做它
+### BGI / Ethornell —— 素晴日 HD 已做（re-bgi，2026-11-21）
+- 现有：`native/megulithook/BGI.cpp`（LunaHook 字符串钩子 + 内嵌写回）
+- 画字（素晴日 HD，Ghidra 12.2 反编译 + capstone，只读）：TextOutA/W、GetGlyphOutlineA 全在字形缓存函数 0x4342b0 里（只把一个字画进缓存位图，没有屏幕坐标），不能当锚。真正的排版在 0x43b350：一次把整段文字（消息窗、名字、选项、菜单的文字精灵都走它）排成一条「字节点」链，0x43acd0 再把整条链画进文字精灵的位图，然后 0x43d590 释放整条链
+  - 字节点 0x48 字节：+0x10 x、+0x14 y（文字精灵画布像素）、+0x18/+0x1c 同一坐标、+0x20 字形图、+0x38 注音串、+0x40 标志（0x80000000 = 标记节点）、+0x44 下一个
+  - 每个字挂链时（0x43d3eb 起）先写 x/y，再 `call 0x43d550`（取字距）、再 `mov [prev+0x44], node`；这时 ebx = 节点，字码在 `[esp+0x30]`（BGI 自己的码：<0x100 单字节，否则 SJIS 双字节 hi<<8|lo），前一个节点在 `[esp+0xa0]`，文字颜色是排版函数的参数 `[ebp+0x2c]`
+  - 一段文字的第一个字挂在链头后面，链头在调用者（0x43acd0）的栈上，不是堆节点：靠这个判断「新的一段」，中间插的标记节点不会把一段拆开
+- 角色：这一层没有窗口对象。BGI 的消息窗、名字、选项都由系统脚本（sysprg.arc）通过同一组 VM 系统调用建文字精灵，再进同一个排版函数，所以在原生层只能拿到「是哪一条调用链排的」：记录带 `via=<排版的返回地址>,<上一层>,<再上一层>`（相对镜像的 RVA）。哪条 via 是台词 / 名字 / 选项是这部游戏版本层差分里的数据 `draw.viaRoles`（`"<rva>,<rva>=name"`，前缀匹配），内核写进控制文件的 `#role` 行，DLL 匹配上才带 `role=`。via 的实际值要店主实机跑一次 DRAWRUN 才知道（静态推不出哪个系统调用对应哪个脚本函数，这是猜测风险最大的一步，所以不猜）
+- 清屏 / 换页：BGI 每次排版都把整个文字精灵重画，所以「一段排完」= 这个精灵的内容被整体换掉；链释放时（0x43d590）报 `end`。精灵本身什么时候被隐藏 / 销毁（真正的清屏）没在这一层，没做（需要再往文字精灵对象上逆，静态没找到稳的锚）
+- 记录（hook-diagnostics.log，同 YU-RIS 一样是 DRAWRUN，不进 ToMe_CHARS、不改任何显示）：
+  ```
+  ToMe_DRAWRUN engine=bgi on: link <addr> node=3 ch=[esp+30] prev=[esp+a0] color=[ebp+2c] free=<addr>
+  ToMe_DRAWRUN engine=bgi run=N row=K n=<字数> x0= y0= x1= y1= size=<行内最大字距> color=aarrggbb via=<rva>,<rva>,<rva> [role=R] text=<UTF-8，120 字节截断>
+  ToMe_DRAWRUN engine=bgi end run=N rows=K
+  ```
+  一行一条（同一 y 为一行），x0 / x1 是这一行第一个 / 最后一个字的原点，size 是行内相邻字原点的最大间距（≈字号 + 字距，不是字体高度）
+- ユースティア：见下面「ユースティア 的壳」
+
+#### 6 件套（BGI）
+| 部分 | 文件 |
+|---|---|
+| 签名（参考实现） | `tools/engine-sigs/bgi-draw.cjs`：挂链调用点 = `call` 前紧挨着 `mov [N+0x18],r; mov [N+0x1c],r`，前 0x30 字节内有 `mov [N+0x10],r` 和 `mov [N+0x14],r`，之间正好一个 `push`；`call` 后 0x30 字节内 `mov r,[esp+P] … mov [r+0x44],N`；往前 0x1400 字节内最近的 `cmp dword [esp+S],0x8140` 给字码槽（+4 = 那个 push）、`mov r,[ebp+C] … or r,0xff000000` 给颜色参数。释放函数 = `mov r1,[r0+0x44]; test r1,r1; je; [push edi]; mov r2,r1; mov r3,[r2+0x38]; mov r1,[r1+0x44]`，前 8 字节内有 `push ebp; mov ebp,esp` |
+| 签名（原生） | `native/megulithook/BgiDrawSig.h`（同一个算法，纯字节） |
+| 夹具 | `validation/fixtures/engine-sigs/bgi-draw.json` + `native/megulithook/selftest/bgidraw-snippets.h`：调用点前 0x900 到后 0x40、释放函数头 0x30 字节；素晴日 HD 的 BGI.exe / BGI_patch.exe / BGI-CHS.exe 这三段字节完全一样，三个 SHA-256 都登记 |
+| 静态签名测试 | `validation/engine-draw-sig-bgi.test.cjs`（夹具命中 + 槽位；去掉 x 写入 / 多一个 push / 没有 0x8140 比较 / 没有挂链都不命中；本机三个 exe 整段代码各一处挂链、一处释放；draw.viaRoles 写进控制文件） |
+| 原生自检 | `native/megulithook/selftest/bgidraw.cpp`（`selftest/run.cmd` 里跑，同样的字节给 C++ 匹配器） |
+| 运行时钩子 | `native/megulithook/BgiDraw.h`（`BGI::attach_function` 找到 BGI 文字钩子后 `BgiDraw::Arm`）。默认不挂：控制文件 `roles=1` 才在挂链调用点和释放函数头装 MinHook；挂链点不是正好一处就不挂（`off: N glyph link matches`）。新键 `draw.viaRoles`（版本层，默认 `[]`）经 `core/engine-draw.cjs` 写成控制文件的 `#role` 行 |
+
+#### 店主测试清单（BGI，素晴日 HD）
+1. 在 `The Seed/bgi/subahibi/game.json` 把 `draw.roles` 改成 `true`（或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`，UTF-16LE，内容 `#cfg roles=1`）
+2. 开游戏，新游戏推 5 句（有名字的句子）、走到第一个选项、开一次系统菜单
+3. 看 `logs\hook-diagnostics.log`：
+   - 有一行 `ToMe_DRAWRUN engine=bgi on: link ... node=3 ch=[esp+30] prev=[esp+a0] color=[ebp+2c] free=...` = 钩子装上了
+   - 之后每句台词有 `run=N row=0..` 带这句每一行的文字，最后一行 `end run=N rows=K`；名字、选项、菜单文字各有自己的 run，`via=` 不同
+4. 游戏照常显示、不卡、不崩 = 过
+5. 把日志里 台词 / 名字 / 选项 各一条的 `via=` 发来：写进版本层差分 `draw.viaRoles`（如 `"via前两段=name"`），下一次同样的行就带 `role=`
+6. 不过时发：hook-diagnostics.log 全文（尤其 `ToMe_DRAWRUN engine=bgi` 开头的行）；有 `off: N glyph link matches` 说明这个 exe 版本签名没对上，把那行和 exe 的 SHA-256 发来
+
+#### ユースティア 的壳
+- 不是商业壳（没有 Themida / VMProtect / ASProtect / SecuROM / StarForce 等任何特征串）：入口 0x455fd3 是一段 Sleep 延时循环（100 次），然后跳到最后一节 0xc9a000 的自写多层自解密壳：每层先算一遍校验（rcl 混淆），再用常量 `xor [esi],k1; add [esi],k2` 逐 dword 解下一层（第一层 k1=0x163ead5 k2=0x30eee628，0x1000 字节），夹花指令。原 .text（0x401000 起 0x143000 字节）和 3.6 MB 的数据段都是解开后才有。导入表只有 17 个每库一个的假导入（真导入在运行时重建）。BGI.OLD 和 BGI.exe 只差密文里 3 个字节（汉化补丁改的）
+- 静态脱壳：用 speakeasy（Mandiant 的 Windows 模拟器，只模拟 CPU，不开游戏）从入口跑壳，停在第一次回到 .text 时转储。已确认壳会一层层解开（跑过校验层、进入 0x8f20xx 的大数据段解密），但纯 Python 回调太慢，截至本次提交还没跑到 OEP；转储出来以后同一个签名（`tools/engine-sigs/bgi-draw.cjs`）直接扫转储就能判断能不能命中
+- 运行时不受影响：`BgiDraw::Arm` 在 BGI 文字钩子装好之后扫的是**内存里已经解开**的镜像（各节都带可执行属性），所以 ユースティア 实机会照常找签名。ユースティア 是 2011 年的 BGI，排版代码和 2018 年的素晴日 HD 是否同一结构**没有验证（猜测：链表结构相同，寄存器 / 栈槽可能不同，签名按结构匹配能吸收这部分）**；对不上时 DRAWRUN 会报 `off: N glyph link matches`，不挂任何钩子
+- 需要实机做的：店主按下面清单开 ユースティア（`The Seed/bgi/aiyoku-no-eustia/game.json` 设 `draw.roles: true`），看 hook-diagnostics.log 有没有 `engine=bgi on:`；没有就把 `off:` 那行发来
 
 ### SiglusEngine（已做：签名 + 钩子 + 自检，2026-11-21，feat/re-siglus）
 - 现有：`native/megulithook/Siglus.cpp`（LunaHook，ctx2 1/2/3，内嵌写回 role=1 的流；CLANNAD 曾因写 role=3 的 VM 通用串崩，见 `native/EmbedTextPolicy.cs`）；`native/siglus/` 是旧的独立构建，不再用
