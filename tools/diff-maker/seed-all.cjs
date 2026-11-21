@@ -84,7 +84,8 @@ function pinned(profile){const out={};const walk=(v,dst,at)=>{for(const [k,x] of
  return out;}
 /* the measured values a seed carries: the kernel keys the search result stands for (calibrate.* is the auto layer's) */
 function seedMeasured(m){const out=JSON.parse(JSON.stringify(m||{}));delete out.calibrate;return out;}
-const sameJson=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+/* order-free comparison (a seed edited by hand or merged may list its fields in another order) */
+const sameJson=(a,b)=>require('../../core/game-diff.cjs').canonical(a)===require('../../core/game-diff.cjs').canonical(b);
 
 const STATUS=['verified','owner-ok','read','skeleton'];
 /* the language of the game's own text from the library (contentLanguage, what MeguLit detected when the game was added): en / ja /
@@ -138,7 +139,8 @@ async function seedOne(g,logs,wins,{out,seed,ownerOk,versionsWritten}){const eng
     (the languages of the game's own text, BCP 47) are written out; an existing seed's sourceLangs and ext are kept */
  const sourceLangs=old?.sourceLangs||langsOf(g);
  const game={...doc,key:old?.key||Probe.gameId(prints2),prints:prints2,seedFormat:1,status,slug,builds,match,sourceLangs,...(old?.ext?{ext:old.ext}:{})};
- const bump=(o,n)=>{if(!o)return n;const r=Number.isInteger(o.rev)?o.rev:0;return {...n,rev:Math.max(1,sameJson({...o,rev:0},{...n,rev:0})?r:r+1)};};
+ /* unchanged content: the file stays as it is (its field order and rev too); changed: rev + 1 (a first rev is 1) */
+ const bump=(o,n)=>{if(!o)return n;const r=Number.isInteger(o.rev)?o.rev:0;if(sameJson({...o,rev:0},{...n,rev:0})&&r>=1)return o;return {...n,rev:Math.max(1,r+1)};};
  const gameOut=bump(old,{...game,rev:1}),versionOut=bump(oldV,{...version,rev:1});
  for(const [n,d,w] of [['game',gameOut,{engine:gameOut.engine,slug}],['version',versionOut,{engine:versionOut.engine,file:exeSha+'.json'}]]){const r=SeedFormat.check(d,w);if(!r.ok)throw new Error(n+' seed: '+r.errors.join('; '));}
  const owner=versionsWritten.get(exeSha);if(owner&&owner!==engine+'/'+slug)row.look.push('版本层和 '+owner+' 共用（同一个 exe）');
