@@ -131,7 +131,15 @@ test('runtime sample: on by default, the switch turns it off; first lines, boxes
  assert.equal(rs.shotPolicy({pass:true,metrics:{pairRate:0.82},thresholds:{pairRate:0.8}}),'edge');assert.equal(rs.shotPolicy(null),'none');
  {const exe2=path.join(root,'G2','game.exe');fs.mkdirSync(path.dirname(exe2),{recursive:true});fs.writeFileSync(exe2,'MZ-runtime-2');const K2=await ap.exeKey(root,exe2);
   const again=new rs.RuntimeSample({exe:exe2,engine:'kirikiri',app:'1.4.21'});again.shot(jpg);const d2=again.save(root,K2,null,{pass:true,metrics:{dropRate:0},thresholds:{dropRate:0.15}});
-  assert.ok(!rs.files(d2).some(f=>f.kind==='shot'),'a passing window sends no picture');assert.equal(JSON.parse(fs.readFileSync(path.join(d2,'sample.json'),'utf8')).shotsTaken,1);}
+  assert.ok(!rs.files(d2).some(f=>f.kind==='shot'),'a passing window sends no picture');
+  /* full size stays local, the small copy is what goes up */
+  const exe3=path.join(root,'G3','game.exe');fs.mkdirSync(path.dirname(exe3),{recursive:true});fs.writeFileSync(exe3,'MZ-runtime-3');const K3=await ap.exeKey(root,exe3);
+  const big=Buffer.concat([Buffer.from([0xff,0xd8]),crypto.randomBytes(400*1024)]).toString('base64'),small=Buffer.concat([Buffer.from([0xff,0xd8]),crypto.randomBytes(50*1024)]).toString('base64');
+  const third=new rs.RuntimeSample({exe:exe3});assert.ok(third.shot(big,small));assert.ok(third.shot(big),'a big picture without a small copy is kept locally only');
+  const d3=third.save(root,K3,null,{pass:false,metrics:{},thresholds:{}});const sent=rs.files(d3).filter(f=>f.kind==='shot');assert.equal(sent.length,1);assert.equal(sent[0].data.length,Buffer.from(small,'base64').length);
+  assert.equal(fs.statSync(path.join(rs.localShots(K3),'shot-1.jpg')).size,Buffer.from(big,'base64').length);
+  const gal=fs.readFileSync(path.join(__dirname,'..','core','gal-native.cjs'),'utf8');assert.match(gal,/clientShot\(\{maxEdge=960,maxBytes=150\*1024\}=\{\}\)/);
+  const cs=fs.readFileSync(path.join(__dirname,'..','native','GalWindowBridge.cs'),'utf8');assert.match(cs,/type=="clientShot"/);assert.match(cs,/ClientShotSelfTest\(\)\)return 9;/);assert.equal(JSON.parse(fs.readFileSync(path.join(d2,'sample.json'),'utf8')).shotsTaken,1);}
  const src=fs.readFileSync(path.join(__dirname,'..','services','probe-full.cjs'),'latin1');assert.match(src,/runtime-sample\.cjs'\)\.files\(runtime\)/);assert.match(src,/kind!=='shot'&&isMediaBytes/);
  /* the full probe of this game is on the relay already: only the runtime bundle goes, once per sample */
  const pa=require('../services/probe-auto.cjs'),ident={id:H('9')};

@@ -40,7 +40,7 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 - `GET /api/game-profile?exe=&head=&pe=&pack=&script=&steam=&vndb=&title=&engine=&have=<版本层rev>&haveGame=<游戏层rev>` → `200 {schema:'megulit.game-diff-feed', version:2, key, match, versionLayer:{match,key,diff}|null, gameLayer:{match,key,diff}|null, diff}` / `304` 都最新 / `404` 都没有
 - `POST /api/game-profile/report {version:1, profile:{…}, prints?}`：校准和退档上报（`autoProfileShare` 默认开，用户设 false 才关，另需「共享适配」）；reason 以「同游戏新版本」开头的 gate 上报进修复队列 `kind=newVersion`，其余 `broken`
 - `POST /api/game-profile/runtime`：运行时样本（`runtimeSampleShare` 默认开，关掉就一份样本都不做、一张截图都不传）
-- **截图策略**（店主 2026-11-21）：所有打分都在本机做。首窗口的截图（第 3/10/18 句，只截游戏窗口客户区）先只存本机临时目录 `%TEMP%/megulit-runtime-shots/<exe>/` 用于打分；过线时只上传分数、指纹、差分，截图不出本机；没过线（`over`）或分数在边缘（`edge`：任一比率达到阈值的 75%，或配对率不到下限 +0.05）才附 2–3 张、每张 ≤ 300 KB 的截图（`services/runtime-sample.cjs shotPolicy`，`sample.json` 记 `shotPolicy` / `shotsTaken` / `shots`）。截图本身还没有在本机缩放，大于 300 KB 的不附
+- **截图策略**（店主 2026-11-21）：所有打分都在本机做。首窗口的截图（第 3/10/18 句，只截游戏窗口客户区）先只存本机临时目录 `%TEMP%/megulit-runtime-shots/<exe>/` 用于打分；过线时只上传分数、指纹、差分，截图不出本机；没过线（`over`）或分数在边缘（`edge`：任一比率达到阈值的 75%，或配对率不到下限 +0.05）才附 2–3 张缩小的截图：整个客户区，长边 960 px，JPEG 质量从 72 往下调到 ≤ 150 KB（GalWindowBridge `{type:'clientShot',maxEdge,maxBytes}` → `{full, small}`，原尺寸 `full` 只留本机打分，`small` 才可能上传；`services/runtime-sample.cjs shotPolicy`，`sample.json` 记 `shotPolicy` / `shotsTaken` / `shots`）
 - `POST /api/game-profile/signed {diff, …}`：我们本机签过的文档
 
 **签名**：Ed25519，签去掉 `signature` 的规范 JSON；只在我们本机签（`tools/sign-profile.cjs`，私钥走 `MEGULIT_PROFILE_KEY`），relay 不持私钥；客户端公钥 `services/profile-keys.json`（官方和自动同一组）。内置 The Seed 不签名

@@ -31,6 +31,7 @@ class GalNative {
       if(this.stopped)return;let message; try { message = JSON.parse(line); } catch { return; }
       if(message.type==='hookVisual'){this.controller.visual(message);return;}
       if(message.type==='readerPointer'||message.type==='hostFrame'||message.type==='readerContext'||message.type==='layerState'||message.type==='layerRaise'){this.onEvent(message);return;}
+      if(message.type==='clientShot'){const pending=this.mediaPending?.get('c'+message.id);if(pending){this.mediaPending.delete('c'+message.id);pending(message);}return;}
       if(message.type==='sceneShot'){const pending=this.mediaPending?.get('s'+message.id);if(pending){this.mediaPending.delete('s'+message.id);pending(message);}return;}
       if(message.type==='rawFrame'){const pending=this.mediaPending?.get('r'+message.id);if(pending){this.mediaPending.delete('r'+message.id);pending(message);}return;}if(message.type==='sceneFrame'||message.type==='sceneProbe'){const key=(message.type==='sceneFrame'?'f':'p')+message.id,pending=this.mediaPending?.get(key);if(pending){this.mediaPending.delete(key);pending(message);}return;}
       if(message.type==='mediaClip'){const pending=this.mediaPending?.get(String(message.id));if(pending){this.mediaPending.delete(String(message.id));pending(message);}return;}
@@ -125,6 +126,9 @@ class GalNative {
     this.send({type:'mediaClip',id,from,to,screenshot});});}
   // Frosted-glass panels: a single frame of the game window only (ToMe's overlay is a separate window, not captured).
   /* 2026-11-12 one clean capture of the game window with its looks score and difference hash (scene-shots.cjs) */
+  /* 2026-11-21 runtime sample (owner's screenshot policy): the whole client area, at its own size (kept on this PC) and scaled to a
+     long edge of maxEdge px under maxBytes (the copy that may be uploaded); GalWindowBridge GameAudio.ClientShot */
+  clientShot({maxEdge=960,maxBytes=150*1024}={}){const id=String(++this.mediaSerial||(this.mediaSerial=1));return new Promise(resolve=>{const map=this.mediaPending||(this.mediaPending=new Map());const timer=setTimeout(()=>{map.delete('c'+id);resolve(null);},5000);timer.unref?.();map.set('c'+id,m=>{clearTimeout(timer);resolve(m.full&&m.small?{full:m.full,small:m.small}:null);});this.send({type:'clientShot',id,maxEdge,maxBytes});});}
   sceneShot(){const id=String(++this.mediaSerial||(this.mediaSerial=1));return new Promise(resolve=>{const map=this.mediaPending||(this.mediaPending=new Map());const timer=setTimeout(()=>{map.delete('s'+id);resolve(null);},5000);timer.unref?.();map.set('s'+id,m=>{clearTimeout(timer);resolve(m.jpeg?{jpeg:m.jpeg,score:Number(m.score)||0,hash:String(m.hash||'')}:null);});this.send({type:'sceneShot',id});});}
   /* 2026-11-13 collected sentence pictures (services/sentence-scenes.cjs): sceneFrame = the whole clean frame as JPEG with the hash of
      its top 62% (asked only while the dialogue box is hidden); sceneProbe = that top hash of the frame on screen now, no picture */

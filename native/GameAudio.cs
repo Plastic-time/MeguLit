@@ -90,6 +90,22 @@ public sealed class GameAudio:IDisposable{
     One capture of the game window alone (never MeguLit's layer), with a looks score from the small copy: colourfulness
     (Hasler-Suesstrunk), contrast and detail; near-black, near-white or flat frames (fades, menus, loading) score 0.
     The 64-bit difference hash lets the caller keep only scenes that differ. */
+ /* 2026-11-21 runtime sample (services/runtime-sample.cjs, owner's screenshot policy): the whole client area of the game window,
+    once at its own size (kept on this PC, for scoring) and once scaled to a long edge of maxEdge px with the JPEG quality stepped
+    down until it fits maxBytes (the copy that may be uploaded). Not the card crop of SceneShot. */
+ public static bool ClientShot(IntPtr target,int width,int height,int maxEdge,int maxBytes,out string full,out string small){full="";small="";if(target==IntPtr.Zero||width<64||height<64)return false;
+  using(var image=new Bitmap(width,height,PixelFormat.Format32bppRgb)){if(!GameCapture.Picture(target,image))return false;full=Jpeg(image,86);small=EncodeScaled(image,maxEdge,maxBytes);return full!=""&&small!="";}}
+ static string Jpeg(Image image,long quality){var codec=Array.Find(ImageCodecInfo.GetImageEncoders(),c=>c.MimeType=="image/jpeg");var ps=new EncoderParameters(1);ps.Param[0]=new EncoderParameter(System.Drawing.Imaging.Encoder.Quality,quality);
+  using(var m=new MemoryStream()){image.Save(m,codec,ps);return Convert.ToBase64String(m.ToArray());}}
+ /* long edge <= maxEdge (never enlarged), JPEG quality 72 -> 60 -> 48 -> 36 until the bytes fit maxBytes (the last one otherwise) */
+ public static string EncodeScaled(Image image,int maxEdge,int maxBytes){int w=image.Width,h=image.Height;double k=Math.Min(1.0,(double)Math.Max(64,maxEdge)/Math.Max(w,h));int sw=Math.Max(1,(int)Math.Round(w*k)),sh=Math.Max(1,(int)Math.Round(h*k));
+  using(var scaled=new Bitmap(sw,sh,PixelFormat.Format24bppRgb)){using(var g=Graphics.FromImage(scaled)){g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.DrawImage(image,0,0,sw,sh);}
+   string last="";foreach(long q in new long[]{72,60,48,36}){last=Jpeg(scaled,q);if(last.Length/4*3<=maxBytes)break;}return last;}}
+ /// <summary>--mode-self-test: a 1920x1080 busy picture scales to a 960 px long edge under 150 KB; a small one is never enlarged.</summary>
+ public static bool ClientShotSelfTest(){try{var rnd=new Random(7);using(var b=new Bitmap(1920,1080,PixelFormat.Format24bppRgb)){using(var g=Graphics.FromImage(b)){for(int i=0;i<4000;i++)using(var br=new SolidBrush(Color.FromArgb(rnd.Next(256),rnd.Next(256),rnd.Next(256))))g.FillRectangle(br,rnd.Next(1920),rnd.Next(1080),rnd.Next(4,80),rnd.Next(4,80));}
+   string s=EncodeScaled(b,960,150*1024);byte[] bytes=Convert.FromBase64String(s);if(bytes.Length>150*1024||bytes[0]!=0xff||bytes[1]!=0xd8)return false;using(var m=new MemoryStream(bytes))using(var back=Image.FromStream(m)){if(back.Width!=960||back.Height!=540)return false;}}
+  using(var tiny=new Bitmap(320,240,PixelFormat.Format24bppRgb)){byte[] t=Convert.FromBase64String(EncodeScaled(tiny,960,150*1024));using(var m=new MemoryStream(t))using(var back=Image.FromStream(m)){if(back.Width!=320||back.Height!=240)return false;}}
+  return true;}catch{return false;}}
  public static string SceneShot(IntPtr target,int width,int height,out double score,out string hash){score=0;hash="";if(target==IntPtr.Zero||width<64||height<64)return "";
   using(var image=new Bitmap(width,height,PixelFormat.Format32bppRgb)){if(!GameCapture.Picture(target,image))return "";double k=Math.Min(1,1280.0/width);int w=Math.Max(1,(int)(width*k)),h=Math.Max(1,(int)(height*k));
    using(var small=new Bitmap(w,h,PixelFormat.Format24bppRgb)){using(var g=Graphics.FromImage(small)){g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.DrawImage(image,0,0,w,h);}
