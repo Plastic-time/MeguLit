@@ -485,7 +485,7 @@
      const st=document.createElement('style');st.id='megulit-translation-blur-style';const T=['.tomoyo-cn-output','.megulit-choice-cn'],on=T.map(t=>'html.megulit-translation-blur body '+t+',html.megulit-translation-blur body.tomoyo-gal-bound '+t).join(','),
      shown=T.map(t=>'html.megulit-translation-blur body '+t+'.megulit-reveal,html.megulit-translation-blur body.tomoyo-gal-bound '+t+'.megulit-reveal,html.megulit-translation-blur body.tomoyo-gal-bound '+t+':hover').join(',');
      st.textContent=on+'{filter:blur(7px)!important;transition:filter .18s ease!important}'+shown+'{filter:var(--tomoyo-gal-cn-filter,none)!important}';document.head.append(st);
-     let readingSent=0;/* #134 (user: reading a word card's context explanation, a long one, the embedded subtitles vanished): while a look-up card or the selection card is open the reader is reading, wherever the pointer is; without this the marker rule hid the layer 8 s after the game's wait marker went out of sight */setInterval(()=>{
+     let readingSent=0;/* #134 (user: reading a word card's context explanation, a long one, the embedded subtitles vanished): while a look-up card or the selection card is open the reader is reading, wherever the pointer is; without this the marker rule hid the layer 8 s after the game's wait marker went out of sight */(window.__megulitReaderIntervals?.set||setInterval)(()=>{
      if(document.hidden||!document.body.classList.contains('tomoyo-gal-bound')||Date.now()-readingSent<1200)return;for(const n of document.querySelectorAll('.tomoyo-selection-card,.tooltip-entries')){
      const r=n.getBoundingClientRect();if(r.width>0&&r.height>0&&getComputedStyle(n).visibility!=='hidden'){readingSent=Date.now();try{window.__tomoyoTranslateRequest(JSON.stringify({
      type:'readerReading'}));}catch{}break;}}},1000);document.addEventListener('mousemove',e=>{/* Issue 127: the pointer on MeguLit's own text keeps the layer up (core/immersion.cjs reading) */{
@@ -797,7 +797,7 @@
      fastMask:'galFastMask', maskStyle:'galMaskStyle', japaneseBold:'galJapaneseBold', chineseBold:'galChineseBold', translationBlur:'galTranslationBlur' };
     for(const [key] of fields)additional['english'+key[0].toLowerCase()+key.slice(1)]='galEnglish'+key;
     additional.scanAuto='galScanAuto';{const auto=f('galScanAuto'),sync=()=>{for(const n of ['galScanX','galScanY','galScanWidth','galScanHeight'])f(n).disabled=auto.checked;
-     };auto.addEventListener('change',sync);setInterval(sync,1000);}additional.relocateWaitMarker='galRelocateWaitMarker';additional.hideWaitMarker='galHideWaitMarker';
+     };auto.addEventListener('change',sync);(window.__megulitReaderIntervals?.set||setInterval)(sync,1000);}additional.relocateWaitMarker='galRelocateWaitMarker';additional.hideWaitMarker='galHideWaitMarker';
      const waitState=document.createElement('div');waitState.className='tomoyo-mask-state';waitState.setAttribute('data-gal-wait-state','');waitState.textContent='这两个开关一般不用开。只有像《素晴らしき日々》那样替换原文后，等待提示符一直在替换过的文字背景下面闪烁、影响阅读时，才推荐打开';
      f('galHideWaitMarker').closest('label').after(waitState);
     for (const [key,name] of Object.entries(additional)) {

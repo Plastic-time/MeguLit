@@ -1,3 +1,4 @@
+import {requestUiFrame,cancelUiFrame} from './idle-gate.js';
 import {driftMount} from './library-drift.js';
 import {fxPref} from './fx-prefs.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -154,7 +155,7 @@ export function closeDialog(locale){
    <p class="modal-hint">${w.rememberHint}</p>
    <div class="modal-actions"><button type="button" class="g-btn quiet" data-x="cancel">${w.cancel}</button><button type="button" class="g-btn primary" data-x="ok">${w.ok}</button></div>
   </div>`;
-  document.body.append(wrap);requestAnimationFrame(()=>wrap.classList.add('on'));
+  document.body.append(wrap);requestUiFrame(()=>wrap.classList.add('on'));
   const finish=value=>{removeEventListener('keydown',esc);wrap.classList.remove('on');setTimeout(()=>wrap.remove(),180);resolve(value);};
   const esc=e=>{if(e.key==='Escape')finish(null);};addEventListener('keydown',esc);
   wrap.addEventListener('mousedown',e=>{if(e.target===wrap)finish(null);});
@@ -221,7 +222,7 @@ export function matchJacket(root=document){
  const put=(el,prop,value)=>el.style.setProperty(prop,value,'important');
  const fit=(pass=0)=>{const kt=k.getBoundingClientRect().top,ab=a.getBoundingClientRect().bottom,h=Math.round(ab-kt);if(h<=40)return;
   put(jk,'height',h+'px');put(jk,'width',Math.round(h*2/3)+'px');put(jk,'align-self','start');if(today){put(today,'height',h+'px');put(today,'align-self','start');}
-  requestAnimationFrame(()=>{let off=0;for(const el of [jk,today]){if(!el)continue;const r=el.getBoundingClientRect(),dy=kt-r.top+(k.getBoundingClientRect().top-kt),cur=parseFloat(el.style.marginTop)||0;if(Math.abs(dy)>1){put(el,'margin-top',(cur+dy).toFixed(1)+'px');off++;}}
+  requestUiFrame(()=>{let off=0;for(const el of [jk,today]){if(!el)continue;const r=el.getBoundingClientRect(),dy=kt-r.top+(k.getBoundingClientRect().top-kt),cur=parseFloat(el.style.marginTop)||0;if(Math.abs(dy)>1){put(el,'margin-top',(cur+dy).toFixed(1)+'px');off++;}}
    const miss=Math.abs(a.getBoundingClientRect().bottom-jk.getBoundingClientRect().bottom)>1;if((off||miss)&&pass<3)fit(pass+1);});};
  jacketRO?.disconnect();jacketRO=new ResizeObserver(()=>fit());jacketRO.observe(hero.querySelector('.hero-copy'));/* E250.1: never observe the column it resizes (feedback loop froze startup) */fit();
 }
@@ -263,14 +264,14 @@ function orbit(host,main,plane,items,pod){
    node.style.opacity=((.62+.38*depth)*fade).toFixed(2);node.style.zIndex=String(Math.round(depth*100)-ring*10+100);}});
  };
  const still=reduceMotion.matches;
- const tick=now=>{raf=0;const dt=last?Math.min(64,now-last):0;last=now;if(!still)angle+=dt*2*Math.PI/60000;place();if(!still)raf=requestAnimationFrame(tick);};
+ const tick=now=>{raf=0;const dt=last?Math.min(64,now-last):0;last=now;if(!still)angle+=dt*2*Math.PI/60000;place();if(!still)raf=requestUiFrame(tick);};
  plane.addEventListener('pointerover',e=>{const n=e.target.closest('.field-plane > *');if(n&&n!==held){if(held)held._back=1;held=n;}},{signal});
  plane.addEventListener('pointerout',e=>{const to=e.relatedTarget&&plane.contains(e.relatedTarget)?e.relatedTarget.closest('.field-plane > *'):null;if(held&&to!==held){held._back=1;held=to||null;}},{signal});
  host.addEventListener('click',e=>{const hit=e.target.closest(fieldActions),source=hit&&sources.get(hit.closest('.field-plane > *'));if(!source)return;
   const action=[...hit.attributes].find(attr=>['data-game','data-edit','data-launch','data-series'].includes(attr.name));if(action){e.preventDefault();e.stopPropagation();source.querySelector('['+action.name+']')?.click();}},{capture:true,signal});
  const ro=new ResizeObserver(()=>{measure();place();});ro.observe(host);if(pod)ro.observe(pod);
- measure();place();if(!still)raf=requestAnimationFrame(tick);
- fieldStop=()=>{events.abort();ro.disconnect();cancelAnimationFrame(raf);host.classList.remove('field-orbit');fieldStop=()=>{};};
+ measure();place();if(!still)raf=requestUiFrame(tick);
+ fieldStop=()=>{events.abort();ro.disconnect();cancelUiFrame(raf);host.classList.remove('field-orbit');fieldStop=()=>{};};
 }
 /* 2026-11-13 judges round 2 (two versions of one game sat side by side with the same cover): games whose cover is the
    same picture are moved apart in the wall sequence, so they never land next to each other */
@@ -465,7 +466,7 @@ export function fieldify(grid,filtered=false,tracks=false){
   if(!coastEnd&&!drag?.active&&!zooming)moving(false);
   if(coastEnd||zooming||(drag?.active&&Math.hypot(vx,vy)>.75)||smear)queue();
  }
- const queue=()=>{if(!raf)raf=requestAnimationFrame(frame);};
+ const queue=()=>{if(!raf)raf=requestUiFrame(frame);};
  const measure=()=>{
   width=host.clientWidth;height=host.clientHeight;
   podWidth=pod?.offsetWidth||360;podHeight=pod?.offsetHeight||44;
@@ -551,7 +552,7 @@ export function fieldify(grid,filtered=false,tracks=false){
  let settle=requestAnimationFrame(()=>{settle=requestAnimationFrame(()=>{settle=0;measure();queue();});});
  pod?.addEventListener('transitionend',()=>{measure();queue();},{signal});
  fieldStop=()=>{
-  events.abort();ro.disconnect();cancelAnimationFrame(raf);cancelAnimationFrame(settle);clearTimeout(warmId);if(warmIdle)unidle(warmIdle);
+  events.abort();ro.disconnect();cancelUiFrame(raf);cancelAnimationFrame(settle);clearTimeout(warmId);if(warmIdle)unidle(warmIdle);
   host.classList.remove('dragging','field-moving');pod?.classList.remove('wall-moving');shield.remove();
   fieldStop=()=>{};
  };

@@ -44,9 +44,9 @@ async function rebuild(root,db,game){const ot=require('./original-text.cjs');try
 function gameKey(executable){try{return require('./shared-adaptation.cjs').fingerprint(executable)?.key||'';}catch{return '';}}
 
 /* apply(root,db,pack) → reports for the games it matches, rolling it back per game where it made things worse */
-async function apply(root,db,pack,{app}={}){
+async function apply(root,db,pack,{app,checkpoint=async()=>{}}={}){
  const out=[],tag=pack.id+'@'+pack.version,store=readJSON(resultsFile(root),{games:{}});
- for(const g of matching(db,pack)){const key=gameKey(g.executable),prev=store.games[g.id];if(prev?.tag===tag)continue;
+ for(const g of matching(db,pack)){await checkpoint();const key=gameKey(g.executable),prev=store.games[g.id];if(prev?.tag===tag)continue;
   /* before: how the game reads right now (with the version this one replaces, if any) */
   const before=numbers(root,g.id);
   packs.enableFor(root,g.dir,tag);let after=await rebuild(root,db,g),state='kept';
@@ -65,27 +65,28 @@ async function report(root,reports,fetcher){if(!reports.length||!sharing(root))r
  try{const r=await fetcher(b+'/api/adapters/report',{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body:JSON.stringify({version:1,reports:clean}),signal:AbortSignal.timeout(TIMEOUT)});return r.ok?{state:'ok',sent:clean.length}:{state:'error',error:'HTTP_'+r.status};}catch{return {state:'error',error:'NETWORK'};}}
 
 /* probe requests for games here: with consent they run now; the rest wait for the user */
-async function probeRequests(root,db,requests,{fetcher}){
+async function probeRequests(root,db,requests,{fetcher,automatic=false,checkpoint=async()=>{}}){
  const sample=require('./adapter-sample.cjs'),probe=require('./adapter-probe.cjs'),consent=sample.consent(root),pending=readJSON(pendingFile(root),{requests:{}});
  const games=probe.libraryGames(db).map(g=>({...g,key:gameKey(g.executable)}));const done=[];
  for(const q of (Array.isArray(requests)?requests:[]).slice(0,20)){if(!q||!/^[a-z0-9-]{3,64}$/.test(String(q.id||''))||!Array.isArray(q.keys))continue;
-  for(const g of games.filter(x=>x.key&&q.keys.includes(x.key))){if(pending.requests[q.id+':'+g.id]?.state==='sent')continue;
+  for(const g of games.filter(x=>x.key&&q.keys.includes(x.key))){await checkpoint();if(pending.requests[q.id+':'+g.id]?.state==='sent')continue;
    /* 2026-11-14 the automatic upload switch (on by default) counts as consent for follow-up probes */
    if(!consent[g.key]&&!require('./probe-auto.cjs').enabled(root)){pending.requests[q.id+':'+g.id]={state:'waiting',gameId:g.id,title:g.title,at:Date.now()};continue;}
-   await new Promise(res=>{probe.start(root,{prepare:()=>({all:()=>[{id:g.id,title:g.title,executable:g.executable}]})},{ids:[g.id],reason:'request',force:true,budgetMs:5*60000,emit:()=>{}});const t=setInterval(()=>{if(probe.status(root).state!=='running'){clearInterval(t);res();}},500);});
-   const prepared=await sample.prepare(root,{prepare:()=>({all:()=>[{id:g.id,title:g.title,executable:g.executable}]})},{ids:[g.id],sampler:probe.sampleInWorker});
+   await new Promise(res=>{probe.start(root,{prepare:()=>({all:()=>[{id:g.id,title:g.title,executable:g.executable}]})},{ids:[g.id],reason:'request',automatic,force:true,budgetMs:5*60000,emit:()=>{}});const t=setInterval(()=>{if(probe.status(root).state!=='running'){clearInterval(t);res();}},500);});
+   await checkpoint();const prepared=await sample.prepare(root,{prepare:()=>({all:()=>[{id:g.id,title:g.title,executable:g.executable}]})},{ids:[g.id],sampler:probe.sampleInWorker});
    if(prepared.hash){const u=await sample.upload(root,{hash:prepared.hash,fetcher});pending.requests[q.id+':'+g.id]={state:u.state==='uploaded'?'sent':'failed',gameId:g.id,title:g.title,at:Date.now()};done.push(g.id);}
    else pending.requests[q.id+':'+g.id]={state:prepared.empty?'nothing':'failed',gameId:g.id,title:g.title,at:Date.now()};}}
  writeJSON(pendingFile(root),pending);return done;}
 function pendingProbes(root){return Object.entries(readJSON(pendingFile(root),{requests:{}}).requests).filter(([,r])=>r.state==='waiting').map(([k,r])=>({request:k.split(':')[0],gameId:r.gameId,title:r.title,at:r.at}));}
 
 /* sync(root,{fetch,db}) → {state,installed:[...],skipped:[...],reports:n,probes:n} */
-async function sync(root,{fetch:fetcher=globalThis.fetch,db=null,openDb=null}={}){
+async function sync(root,{fetch:fetcher=globalThis.fetch,db=null,openDb=null,automatic=false,checkpoint=automatic?()=>require('./background-budget.cjs').wait(root):async()=>{}}={}){
+ await checkpoint();
  const b=base(root);if(!b)return {state:'not-configured'};const app=packs.appVersion(root),installed=[],skipped=[];let feed;
  try{feed=(await getJSON(b+'/api/adapters/feed?app='+encodeURIComponent(app)+'&format='+packs.FORMAT,fetcher)).json;}catch(e){return {state:'error',error:String(e?.message||e).slice(0,40)};}
  if(feed?.schema!=='megulit.adapter-feed'||!Array.isArray(feed.packs))return {state:'error',error:'BAD_FEED'};
  const st=packs.readState(root),fresh=[];
- for(const e of feed.packs.slice(0,MAX_PACKS)){if(!e||!/^[a-z0-9][a-z0-9-]{2,63}$/.test(String(e.id))||!Number.isSafeInteger(e.version))continue;
+ for(const e of feed.packs.slice(0,MAX_PACKS)){await checkpoint();if(!e||!/^[a-z0-9][a-z0-9-]{2,63}$/.test(String(e.id))||!Number.isSafeInteger(e.version))continue;
   const c=packs.compatible({format:e.format,requires:e.requires,minApp:e.minApp,maxApp:e.maxApp},{app});if(!c.ok){skipped.push({id:e.id,version:e.version,reason:c.reason});continue;}
   if(st.blocked[e.id+'@'+e.version]||packs.installedVersions(root,e.id).includes(e.version))continue;
   try{const {text}=await getJSON(b+'/api/adapters/pack/'+encodeURIComponent(e.id)+'/'+e.version,fetcher);const a=packs.admit(text,{app});
@@ -96,9 +97,9 @@ async function sync(root,{fetch:fetcher=globalThis.fetch,db=null,openDb=null}={}
  if(!db&&openDb){db=openDb();own=true;}
  /* versions the maintainer withdrew: blocked here too, the games they read are read again */
  const withdrawn=(Array.isArray(feed.withdrawn)?feed.withdrawn:[]).filter(w=>w&&/^[a-z0-9][a-z0-9-]{2,63}$/.test(String(w.id))&&Number.isSafeInteger(w.version)).slice(0,MAX_PACKS);
- try{if(db){for(const w of withdrawn){if(packs.readState(root).active[w.id]===w.version)try{await rollback(root,db,w.id,'withdrawn');}catch{}}
-  for(const p of fresh){if(packs.readState(root).active[p.id]!==p.version)continue;reports.push(...await apply(root,db,p,{app}));}
-   if(Array.isArray(feed.probes)&&feed.probes.length)probes=(await probeRequests(root,db,feed.probes,{fetcher})).length;}}
+ try{if(db){for(const w of withdrawn){if(packs.readState(root).active[w.id]===w.version)try{await rollback(root,db,w.id,'withdrawn',{checkpoint});}catch{}}
+  for(const p of fresh){if(packs.readState(root).active[p.id]!==p.version)continue;reports.push(...await apply(root,db,p,{app,checkpoint}));}
+   if(Array.isArray(feed.probes)&&feed.probes.length)probes=(await probeRequests(root,db,feed.probes,{fetcher,automatic,checkpoint})).length;}}
  finally{if(own)try{db.close();}catch{}}
  const sent=await report(root,reports,fetcher);
  try{packs.noteSync(root,{at:Date.now(),installed:installed.length,skipped:skipped.length,reported:sent.state==='ok'?sent.sent:0});}catch{}
@@ -108,19 +109,19 @@ async function sync(root,{fetch:fetcher=globalThis.fetch,db=null,openDb=null}={}
 function status(root){const s=packs.readState(root),res=readJSON(resultsFile(root),{games:{}});
  return {active:Object.entries(s.active).map(([id,version])=>({id,version,installed:packs.installedVersions(root,id)})),blocked:Object.keys(s.blocked),games:res.games,pending:pendingProbes(root),sync:s.sync||{}};}
 /* manual rollback from the UI: the pack version is blocked everywhere, the games it read are read again */
-async function rollback(root,db,id,reason='user'){const r=packs.rollback(root,id,{reason});if(!r.ok)return r;const res=readJSON(resultsFile(root),{games:{}}),games=require('./adapter-probe.cjs').libraryGames(db);
- for(const [gid,x] of Object.entries(res.games)){if(x.tag!==id+'@'+r.from)continue;const g=games.find(y=>y.id===gid);if(g){const after=await rebuild(root,db,g);res.games[gid]={...x,state:'rolled-back',after,at:Date.now()};}}
+async function rollback(root,db,id,reason='user',{checkpoint=async()=>{}}={}){const r=packs.rollback(root,id,{reason});if(!r.ok)return r;const res=readJSON(resultsFile(root),{games:{}}),games=require('./adapter-probe.cjs').libraryGames(db);
+ for(const [gid,x] of Object.entries(res.games)){if(x.tag!==id+'@'+r.from)continue;await checkpoint();const g=games.find(y=>y.id===gid);if(g){const after=await rebuild(root,db,g);res.games[gid]={...x,state:'rolled-back',after,at:Date.now()};}}
  writeJSON(resultsFile(root),res);return r;}
 
 /* one sync / rollback in a worker thread, so reading games again never blocks the service: resolves its answer */
-function inThread(root,mode,extra={},timeout=30*60000){return new Promise(resolve=>{let w;try{w=new Worker(__filename,{workerData:{root,mode,...extra}});}catch{return resolve({state:'error',error:'WORKER'});}
+function inThread(root,mode,extra={},timeout=30*60000){return new Promise(resolve=>{let w;try{w=new Worker(__filename,{workerData:{root,mode,...extra,backgroundBudget:extra.automatic===true}});if(extra.automatic)require('./background-budget.cjs').attach(w,root);}catch{return resolve({state:'error',error:'WORKER'});}
  const t=setTimeout(()=>{try{w.terminate();}catch{}resolve({state:'error',error:'TIMEOUT'});},timeout);t.unref?.();
- w.once('message',m=>{clearTimeout(t);resolve(m);});w.once('error',()=>{clearTimeout(t);resolve({state:'error',error:'WORKER'});});w.once('exit',()=>{clearTimeout(t);resolve({state:'error',error:'EXIT'});});});}
+ w.on('message',m=>{if(m?.type==='background-permission')return;clearTimeout(t);resolve(m);});w.once('error',()=>{clearTimeout(t);resolve({state:'error',error:'WORKER'});});w.once('exit',()=>{clearTimeout(t);resolve({state:'error',error:'EXIT'});});});}
 const syncNow=root=>inThread(root,'sync'),rollbackNow=(root,id)=>inThread(root,'rollback',{id});
 function start(root,{delay=180000,interval=INTERVAL}={}){
  if(process.env.MEGULIT_NO_ADAPTER_SYNC||process.env.NODE_TEST_CONTEXT)return null;
- const run=()=>{let w;try{w=new Worker(__filename,{workerData:{root,mode:'sync'}});}catch{return;}w.on('error',()=>{});w.unref();};
- const t=setTimeout(()=>{run();const i=setInterval(run,interval);i.unref?.();},delay);t.unref?.();return t;}
-if(!isMainThread&&workerData?.mode==='sync'){const store=require('./store.cjs');sync(workerData.root,{openDb:()=>store.openStore(workerData.root)}).then(r=>parentPort.postMessage(r),()=>parentPort.postMessage({state:'error'}));}
+ const run=()=>inThread(root,'sync',{automatic:true});
+ return require('./background-budget.cjs').schedule(root,run,{delay,repeat:interval});}
+if(!isMainThread&&workerData?.mode==='sync'){const store=require('./store.cjs');sync(workerData.root,{automatic:workerData.automatic===true,openDb:()=>store.openStore(workerData.root)}).then(r=>parentPort.postMessage(r),()=>parentPort.postMessage({state:'error'}));}
 if(!isMainThread&&workerData?.mode==='rollback'){const store=require('./store.cjs');let db;(async()=>{db=store.openStore(workerData.root);return rollback(workerData.root,db,String(workerData.id));})().then(r=>parentPort.postMessage(r),()=>parentPort.postMessage({ok:false,reason:'ERROR'})).finally(()=>{try{db?.close();}catch{}});}
 module.exports={syncNow,rollbackNow,inThread,sync,apply,report,worse,verdict,numbers,status,rollback,start,pendingProbes,probeRequests,matching};

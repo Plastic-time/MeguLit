@@ -1,3 +1,4 @@
+import {requestUiFrame,cancelUiFrame,onUiState,uiActive} from './idle-gate.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* 2026-11-13 multi-track view, resting state (user: 「我想要做成我们网站里和词典里的那种随机飘的感觉 一搜索再把关键词到的作品
    苹果动画上轨道 取消搜索了就苹果动画回复飘散」).
@@ -141,11 +142,14 @@ function frame(dt){
 }
 function tick(){const now=performance.now(),dt=S.last?(now-S.last)/1000:0;S.last=now;frame(dt);}
 function startLoop(){
- if(S.running)return;S.running=true;S.last=0;
+ if(S.running||!uiActive())return;S.running=true;S.last=0;
  if(S.gsap){S.gsap.ticker.add(tick);return;}
- const loop=()=>{if(!S.running||S.gsap)return;tick();S.raf=requestAnimationFrame(loop);};S.raf=requestAnimationFrame(loop);
+ const loop=()=>{if(!S.running||S.gsap)return;tick();S.raf=requestUiFrame(loop);};S.raf=requestUiFrame(loop);
 }
-function stopLoop(){S.running=false;cancelAnimationFrame(S.raf);S.gsap?.ticker.remove(tick);}
+const sleepingTweens=new Set();
+function pauseMotion(){for(const tween of S.gsap?.getTweensOf?.([...S.covers.values(),S.cam,S.rails].filter(Boolean))||[]){if(!tween.paused()){sleepingTweens.add(tween);tween.pause();}}}
+onUiState(state=>{if(state!=='active'){stopLoop();pauseMotion();}else{for(const tween of sleepingTweens)tween.resume();sleepingTweens.clear();if(S.host?.isConnected&&!calm())startLoop();}});
+function stopLoop(){S.running=false;cancelUiFrame(S.raf);S.gsap?.ticker.remove(tick);}
 
 /* search state -> per-cover weights, tweened from wherever they are now */
 function retarget(fresh){
@@ -165,6 +169,7 @@ function retarget(fresh){
  });
  if(S.rails){const show=S.ringCount>0;if(still||!g){S.rails.style.opacity=show?'1':'0';}
   else g.to(S.rails,{opacity:show?1:0,scale:show?1:.92,transformOrigin:S.cx+'px '+S.cy+'px',duration:show?.7:.45,ease:show?'expo.out':'power2.in',overwrite:'auto'});}
+ if(!uiActive())pauseMotion();
  S.busyUntil=performance.now()+1100;
 }
 
@@ -214,8 +219,8 @@ export function driftMount(host,grid,plane,items,filtered,pod){
  retarget(false);
  frame(0);
  if(!calm())startLoop();
- if(!S.gsap)loadGsap().then(g=>{S.gsap=g;if(S.running){cancelAnimationFrame(S.raf);g.ticker.add(tick);}if(S.host===host)retarget(true);}).catch(()=>{});
- return ()=>{stopLoop();S.events?.abort();S.ro?.disconnect();host.classList.remove('field-drift');S.hover=null;};
+ if(!S.gsap)loadGsap().then(g=>{S.gsap=g;if(S.running){cancelUiFrame(S.raf);g.ticker.add(tick);}if(S.host===host)retarget(true);}).catch(()=>{});
+ return ()=>{stopLoop();for(const tween of sleepingTweens)tween.kill();sleepingTweens.clear();S.events?.abort();S.ro?.disconnect();host.classList.remove('field-drift');S.host=null;S.hover=null;};
 }
 /* for the evidence harness: true while a search flight or return is still playing */
 Object.defineProperty(window,'__driftBusy',{configurable:true,get:()=>performance.now()<S.busyUntil});

@@ -8,6 +8,7 @@
    Kinds: enum (the listed values), bool, number [min,max] (nullable when listed), rect {x,y,w,h[,client]}, regexList (RegExp
    sources with flags 'u': no backreferences, no nested quantifiers, bounded size). */
 const DOMAINS={
+ 'source.artemisQuoteSpans':{bool:true,layer:'version'},
  'placement.firstLineAnchor':{enum:[null,'glyph','box','page']},
  'placement.lineOffsetY':{number:[-400,400]},
  'placement.drawWhileBlanking':{bool:true},

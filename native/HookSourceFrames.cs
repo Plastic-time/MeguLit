@@ -67,6 +67,47 @@ public sealed class EmbedSourceBatch{
   }
   return output;
  }
+ /* Artemis64x encodes each rt2 span separately. Only a complete quoted message reconstructed exactly from this flush
+    can replace the ordinary newest-line rule; unquoted pages and ambiguous buffers keep that rule. */
+ public string ArtemisQuoteLine(string output,DateTime now){
+  string fallback=LastLine(output,now),value=(output??"").Trim();
+  if(Lines.Count<2||(now-LastAt).TotalMilliseconds>1500)return fallback;
+  for(int end=Lines.Count-1;end>0;end--){int at=value.Length;var parts=new List<string>();
+   for(int i=end;i>=0&&at>0;i--){string part=Lines[i];if(part.Length>at||String.CompareOrdinal(value,at-part.Length,part,0,part.Length)!=0)break;
+    at-=part.Length;parts.Insert(0,part);if(at!=0)continue;
+    int start=-1;var quotes=new Stack<char>();
+    for(int p=0;p<parts.Count;p++){string s=parts[p];
+     if(quotes.Count==0){start=s.Length>0&&(s[0]=='「'||s[0]=='『')?p:-1;}
+     if(start<0)continue;
+     foreach(char ch in s){if(ch=='「'||ch=='『')quotes.Push(ch);else if(ch=='」'||ch=='』'){
+       if(quotes.Count==0||quotes.Pop()!=(ch=='」'?'「':'『'))return fallback;}}
+    }
+    if(start>=0&&start<parts.Count-1&&quotes.Count==0)return String.Concat(parts.GetRange(start,parts.Count-start));
+    return fallback;
+   }
+  }
+  return fallback;
+ }
+ public static bool ArtemisQuoteSelfTest(){
+  var now=DateTime.UtcNow;var batch=new EmbedSourceBatch();
+  string first="「鴻さん、男子の分の宿題は集め終わった。",tail="全員分あるはずだけど、気になるならもう一度確認して」";
+  batch.Add("義大",now);batch.Add(first,now);batch.Add(tail,now);
+  if(batch.ArtemisQuoteLine("義大"+first+tail,now)!=first+tail||batch.LastLine("義大"+first+tail,now)!=tail)return false;
+  var next=new EmbedSourceBatch();next.Add(first,now);next.Add(tail,now);next.Add("「次のページ。」",now);
+  if(next.ArtemisQuoteLine(first+tail+"「次のページ。」",now)!="「次のページ。」")return false;
+  if(batch.ArtemisQuoteLine("未記録"+first+tail,now)!=batch.LastLine("未記録"+first+tail,now))return false;
+  string[][] messages={
+   new[]{"鴻さん","「あっ、いつもありがとー♪","毎回手伝ってもらってるね」"},
+   new[]{"鴻さん","「そんなこと言って、忙しくてもやってくれてるでしょ？","今度ちゃんとお礼しないとね」"},
+   new[]{"鴻さん","「『本当』なの？","うん、本当だよ」"}
+  };
+  foreach(var parts in messages){var b=new EmbedSourceBatch();foreach(string s in parts)b.Add(s,now);
+   if(b.ArtemisQuoteLine(String.Concat(parts),now)!=parts[1]+parts[2])return false;}
+  string[][] unchanged={new[]{"一行目。","二行目。"},new[]{"設定","戻る"},new[]{"「はい。」","「はい。」"},new[]{first,tail,"メニュー"},new[]{"「閉じていない、","次の段。"}};
+  foreach(var parts in unchanged){var b=new EmbedSourceBatch();foreach(string s in parts)b.Add(s,now);string text=String.Concat(parts);
+   if(b.ArtemisQuoteLine(text,now)!=b.LastLine(text,now))return false;}
+  return batch.ArtemisQuoteLine("義大"+first+tail,now.AddSeconds(2))==batch.LastLine("義大"+first+tail,now.AddSeconds(2));
+ }
  // E262 (user: EmbedKrkrZ showed 「あんたこそ誰よ」 four times): engines that draw one line several times (shadow, edge,
  // backlog layers) reach the host as one string holding N copies. A bracketed line repeated twice or more, or any line
  // repeated three or more times, is one line. Real repeats inside a line (はい。はい。) stay.

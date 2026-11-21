@@ -28,7 +28,7 @@
  function update(){queued=false;text();for(const d of document.querySelectorAll('.tome-box-deco'))d.remove();}
  function schedule(){if(!queued){queued=true;requestAnimationFrame(update);}}
  new MutationObserver(records=>{if(records.every(r=>r.target?.classList?.contains?.('tome-box-deco')))return;schedule();}).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
- addEventListener('resize',schedule);addEventListener('tome-language-change',schedule);setInterval(schedule,700);schedule();
+ addEventListener('resize',schedule);addEventListener('tome-language-change',schedule);(window.__megulitReaderIntervals?.set||setInterval)(schedule,700);schedule();
  // Dragging the strip: past a 4 px threshold the native side takes over and moves the window with the cursor until the
  // button is released. A word under the pointer does not get the click that ends a drag.
  const floating=()=>document.body.classList.contains('tomoyo-ui-translation')&&!document.body.classList.contains('tomoyo-gal-bound');

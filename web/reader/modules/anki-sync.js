@@ -81,5 +81,5 @@
  addEventListener('popstate',paint);
  const prevSet=window.__tomeI18n?.set;if(prevSet)window.__tomeI18n.set=v=>{prevSet(v);paint();};
  window.__tomeAnkiSyncNow=sync;
- schedule(8000);setInterval(()=>sync().catch(()=>{}),10*60*1000);paint();
+ schedule(8000);(window.__megulitReaderIntervals?.set||setInterval)(()=>sync().catch(()=>{}),10*60*1000);paint();
 })();
