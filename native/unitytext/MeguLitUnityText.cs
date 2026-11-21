@@ -38,6 +38,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
   int port;
   string file = Path.Combine(dir, "MeguLitUnityText.port");
   if (!File.Exists(file) || !int.TryParse(File.ReadAllText(file).Trim(), out port)) { Logger.LogInfo("no MeguLit control port: idle"); enabled = false; return; }
+  KemcoOwner();
   net = new Thread(() => Net(port)) { IsBackground = true, Name = "MeguLitUnityText" };
   net.Start();
   StartCoroutine(EndOfFrame());
@@ -411,6 +412,8 @@ public class MeguLitUnityText : BaseUnityPlugin {
  volatile bool kemcoAsked, kemcoRoles;
  int kemcoEpoch, kemcoObservedEpoch=-1;
  string kemcoScope=""; long kemcoSequence;
+ int kemcoPid; long kemcoStarted;
+ void KemcoOwner() { try { using(var self=System.Diagnostics.Process.GetCurrentProcess()) { kemcoPid=self.Id; kemcoStarted=self.StartTime.ToUniversalTime().Ticks; } } catch { kemcoPid=0; kemcoStarted=0; } }
  bool kemcoTried, kemcoReady; float kemcoNext;
  Type kemcoMain, kemcoMessage, kemcoButton;
  FieldInfo kemcoBody, kemcoName, kemcoDialogs, kemcoRows, kemcoParent, kemcoLastMes, kemcoButtonText, kemcoButtonEnabled;
@@ -424,11 +427,11 @@ public class MeguLitUnityText : BaseUnityPlugin {
  }
  void KemcoSendSource(string kind,int page,string text) {
   lock(gate) {
-   if(!connected || !kemcoAsked || kemcoScope.Length!=32 || kemcoObservedEpoch!=kemcoEpoch) return;
+   if(!connected || !kemcoAsked || kemcoScope.Length!=32 || kemcoObservedEpoch!=kemcoEpoch || kemcoPid<=0 || kemcoStarted<=0) return;
    if(text.Length>4127 || Encoding.UTF8.GetByteCount(text)>8223) { kind="pending"; text=""; }
    if(kemcoSequence>=9007199254740991L) return;
    string encoded=Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
-   Send("ToMe_UNITY kemco1 "+kemcoScope+"\t"+(++kemcoSequence)+"\t"+page+"\t"+kind+"\tc4d74235dc06d19630d8b826e49bd3d047c09bc03e8d8badeb0d60dd71dd7314\t"+encoded);
+   Send("ToMe_UNITY kemco2 "+kemcoScope+"\t"+(++kemcoSequence).ToString(System.Globalization.CultureInfo.InvariantCulture)+"\t"+page.ToString(System.Globalization.CultureInfo.InvariantCulture)+"\t"+kind+"\tc4d74235dc06d19630d8b826e49bd3d047c09bc03e8d8badeb0d60dd71dd7314\t"+kemcoPid.ToString(System.Globalization.CultureInfo.InvariantCulture)+"\t"+kemcoStarted.ToString(System.Globalization.CultureInfo.InvariantCulture)+"\t"+encoded);
   }
  }
  void KemcoSource(Component message,int page,KemcoSpriteSnapshot.Page p) {

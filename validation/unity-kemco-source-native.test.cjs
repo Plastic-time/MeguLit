@@ -9,7 +9,8 @@ test('actual Mono source proof and encoder distinguish complete content from pre
   fs.writeFileSync(path.join(dir,'check.cs'),`using System;using System.Reflection;using System.Text;using System.Collections.Generic;
 class Component { public string LastMes; }
 class Check {
- readonly object gate=new object();bool connected=true,kemcoAsked,kemcoRoles;int kemcoEpoch,kemcoObservedEpoch=-1;string kemcoScope="";long kemcoSequence;FieldInfo kemcoLastMes=typeof(Component).GetField("LastMes");List<string> sent=new List<string>();void Send(string s){sent.Add(s);}
+ readonly object gate=new object();bool connected=true,kemcoAsked,kemcoRoles;int kemcoEpoch,kemcoObservedEpoch=-1;string kemcoScope="";long kemcoSequence;int kemcoPid=42;long kemcoStarted=638000000000000000L;FieldInfo kemcoLastMes=typeof(Component).GetField("LastMes");List<string> sent=new List<string>();void Send(string s){sent.Add(s);}
+ ${method('void KemcoOwner(')}
  ${method('void KemcoControl(')}
  ${method('void KemcoScope(')}
  ${method('void KemcoSendSource(')}
@@ -26,6 +27,7 @@ class Check {
   kemcoObservedEpoch=kemcoEpoch;KemcoSource(m,8,all);if(sent.Count!=6)throw new Exception("fresh scope");
   var large=new KemcoSpriteSnapshot.Page{text=new string('日',5000),complete=true};m.LastMes=large.text;KemcoSource(m,9,large);if(sent.Count!=7)throw new Exception("bound");
   kemcoSequence=9007199254740991L;KemcoSource(null,0,null);if(sent.Count!=7)throw new Exception("counter bound");
+  KemcoOwner();using(var self=System.Diagnostics.Process.GetCurrentProcess())if(kemcoPid!=self.Id||kemcoStarted!=self.StartTime.ToUniversalTime().Ticks)throw new Exception("actual self owner capture");
   foreach(var line in sent)Console.WriteLine(line);Console.WriteLine("PASS");
  }
  static void Main(){new Check().Run();}
@@ -34,9 +36,9 @@ class Check {
   let r=spawnSync(compiler,['/nologo','/codepage:65001','/out:'+path.join(dir,'check.exe'),path.join(base,'KemcoSpriteSnapshot.cs'),path.join(dir,'check.cs')],{windowsHide:true,encoding:'utf8',timeout:15000});assert.equal(r.status,0,r.stdout+r.stderr);
   r=spawnSync(path.join(dir,'check.exe'),[],{windowsHide:true,encoding:'utf8',timeout:5000});assert.equal(r.status,0,r.stdout+r.stderr);
   const lines=r.stdout.trim().split(/\r?\n/);assert.equal(lines.pop(),'PASS');assert.equal(lines.length,7);
-  const parts=lines.map(l=>l.slice('ToMe_UNITY kemco1 '.length).split('\t'));assert.deepEqual(parts.map(p=>p[3]),['full','pending','pending','pending','gone','full','pending']);
-  assert.equal(Buffer.from(parts[0][5],'base64').toString(),'日本');assert.equal(parts[4][2],'0');assert.equal(parts[5][0],'b'.repeat(32));
+  const parts=lines.map(l=>l.slice('ToMe_UNITY kemco2 '.length).split('\t'));assert.deepEqual(parts.map(p=>p[3]),['full','pending','pending','pending','gone','full','pending']);
+  assert.equal(Buffer.from(parts[0][7],'base64').toString(),'日本');assert.equal(parts[0][5],'42');assert.equal(parts[0][6],'638000000000000000');assert.equal(parts[4][2],'0');assert.equal(parts[5][0],'b'.repeat(32));
   const {UnityKemcoSource}=require('../core/unity-kemco-source.cjs'),events=[],h=new UnityKemcoSource({scope:()=> 'a'.repeat(32),onSource:m=>{events.push(m);return true;}});h.configure(true);
-  for(const line of lines.slice(0,5))h.accept(line);assert.equal(events.length,1);assert.equal(events[0].text,'日本');assert.equal(h.block({}),false,'actual gone packet releases the source gate');
+  for(const line of lines.slice(0,5))h.accept(line);assert.equal(events.length,1);assert.equal(events[0].text,'日本');assert.equal(h.block({},{pid:42,started:'638000000000000000'}),false,'actual gone packet releases the source gate');
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

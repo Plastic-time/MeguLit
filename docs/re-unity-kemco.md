@@ -118,28 +118,39 @@ The local UnityTextPath rotates scope on permission/config changes and reconnect
 An ordinary source WANT does not resend DRAW and thereby invalidate its own observer permission epoch
 Default-off control bytes remain unchanged
 
-The versioned wire has six tab-separated fields after ToMe_UNITY kemco1: scope, positive sequence, signed nonzero page for full, state, fixed original-assembly SHA and canonical base64 UTF-8 text
+The versioned wire has eight tab-separated fields after ToMe_UNITY kemco2: scope, positive sequence, signed nonzero page for full, state, fixed original-assembly SHA, actual process id, exact UTC start ticks and canonical base64 UTF-8 text
 No pickle, executable code, remote command or new hide request is carried
 The Mono sender binds it to the current permission epoch and the already verified exact assembly/schema
+Awake captures its own Process.GetCurrentProcess().Id and StartTime.ToUniversalTime().Ticks; missing identity makes the source sender inert
+This is the same start-time representation used by GalWindowBridge.cs Bind/process-status and HookNative.configure/start, not file time or a JavaScript floating-point timestamp
+Ticks remain an exact canonical decimal string in Node
+The first valid actual peer identity is fixed within a scope and cannot change without new negotiation
+It is never guessed from whichever HookNative target happened to exist when attach ran
 This is the plugin's own identity assertion over the existing loopback transport, not process attestation against a malicious local client
 Source bytes are limited to 8223, non-newline scalars to 2048 and row separators to 31
 Source messages are bounded to 12000 characters before parsing; unknown state, bad identity, invalid UTF-8, extra fields, aliases and invalid budgets cannot grant ownership
 Out-of-order sequences and old scopes cannot revive an old page
 
 UnityKemcoSource uses a monotonic timer-free 500ms lease, refreshed by a complete, identical current-page heartbeat
+This measures age since receipt in Node, not a proven maximum sender sample age
+Buffered IPC packets can contain older snapshots; a request/challenge and bounded response-age protocol would be needed for that stronger claim
+Pending/gone messages on the same ordered transport revoke the lease when processed, but no hard real-time or fresh-pixel guarantee is claimed
 Pending, gone, off, reconnect, changed page or expired heartbeat remove the previous authority
 The callback receives a private Symbol authority which survives internal object spread but not JSON serialization
 An owned callback with a revoked token stays rejected even after ordinary native input has been restored
 Only current owned proposals enter while pending; other native sources are suppressed only if onSource returns strict true
 Undefined, false or an exception does not grant a lease
+Scope regeneration clears authority and the old scope before calling the random generator; a generation exception cannot reactivate an old packet
+The transport records unavailable negotiation as a fixed status and keeps the original source path available
 The callback must establish actual current HookNative source acceptance, rather than assuming a call to source succeeded through its existing filters
 That acknowledgement concerns backend current text only, not visible DOM, translated text or native pixels
 
 Required shared integration, owned by the coordinating task:
 
-- attachTextPath installs a callback bound to the same currently attached path and actual game identity; a late old game's callback must return false
-- source checks the optional text-path blockSource before UnityBox or any deferred-source processing, so an old queued setter callback cannot overwrite the complete body
-- the callback returns true only after actual accepted current-source evidence; an asynchronous/filtered path without a definite receipt stays unsupported
+- attachTextPath installs a callback bound to the same currently attached path and compares message.unityOwner to the current target's pid/started; a late old game's callback must return false
+- source calls shouldBlock(textPath,message,target) before UnityBox or deferred-source processing; only matching actual owner authority can suppress ordinary body input
+- the shared gate also rejects a private tagged callback after moving to a different engine or removing the text path, rather than accidentally treating it as ordinary input
+- the callback returns true only after this proposal increases the actual hookSequence and the resulting origin/text match; an old same-text state or an asynchronous/filtered path without a definite receipt stays unsupported
 - UI/name/choice metadata continues through charRects and does not pass through this body-source gate
 
 No integration is inferred from the pure helper tests
@@ -148,6 +159,9 @@ The actual Mono complete-source predicate, scope/epoch guard and encoder are com
 Its output is consumed by the production Node source parser, including complete/prefix/mismatch/absence/revoke/budget cases
 The fixture's reflected LastMes holder is a neutral stand-in, not a running Unity object
 No source lease or callback is permission to hide the game
+
+The actual process-capture method is also run in the private console harness and compared with that same console's own pid/start ticks
+No game process was inspected or started by this check
 
 ## Small existing-plugin correction
 
