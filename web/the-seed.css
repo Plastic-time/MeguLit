@@ -1,0 +1,72 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* The Seed: home banner (three placements while the owner picks, chosen with data-seed on .tv-home), About section, intro dialog.
+   The plate is always dark so it reads the same in both themes; the picture's glow is the only colour. */
+.tv-home .seed-banner{--sd-gold:#f0c987;--sd-cream:#f7e6bf;position:relative;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:0 14px;padding:0 16px 0 0;overflow:hidden;text-align:left;color:var(--sd-cream);background:#0c0809;border:1px solid color-mix(in srgb,var(--sd-gold) 30%,transparent);cursor:pointer;transition:border-color .25s,transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s}
+.tv-home .seed-banner:hover{border-color:color-mix(in srgb,var(--sd-gold) 70%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--sd-gold) 22%,transparent)}
+.tv-home .seed-banner:active{transform:scale(.98)}
+.tv-home .seed-banner:focus-visible{outline:2px solid var(--sd-gold);outline-offset:2px}
+.seed-pic{display:block;align-self:stretch;overflow:hidden;position:relative}
+.seed-pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:35% 50%}
+.seed-pic::after{content:"";position:absolute;inset:0 0 0 40%;background:linear-gradient(90deg,transparent,#0c0809)}
+.seed-txt{display:grid;gap:2px;min-width:0}
+.seed-txt b{font-family:var(--g-serif);font-weight:400;font-size:20px;letter-spacing:.02em;line-height:1.1;color:var(--sd-cream);text-shadow:0 0 14px color-mix(in srgb,var(--sd-gold) 45%,transparent)}
+.seed-txt em{font-style:normal;font-size:11px;letter-spacing:.3em;color:color-mix(in srgb,var(--sd-gold) 85%,transparent)}
+.seed-txt small{font-size:12px;line-height:1.5;color:color-mix(in srgb,var(--sd-cream) 68%,transparent);text-wrap:pretty}
+.seed-go{font-style:normal;font-size:14px;color:var(--sd-gold);transition:transform .25s cubic-bezier(.16,1,.3,1)}
+.tv-home .tv-home .seed-banner:hover .seed-go{transform:translateX(4px)}
+/* A: a plaque on the right, above the recent-games rail, under the cover */
+.tv-home[data-seed="a"] .seed-banner{position:absolute;right:5vw;bottom:calc(8vh + 148px);z-index:7;width:min(330px,26vw);height:92px;padding-right:14px}
+.tv-home[data-seed="a"] .seed-pic{width:104px}
+.tv-home[data-seed="a"] .seed-txt small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11px}
+@media (max-height:760px){.tv-home[data-seed="a"] .seed-banner{display:none}}
+/* B: a slim ribbon under the top bar, centred in the free space between the left column and the figures */
+.tv-home[data-seed="b"] .seed-banner{position:absolute;left:50%;top:3.2vh;transform:translateX(-50%);z-index:7;width:min(440px,34vw);height:56px;border-radius:999px;padding-right:20px}
+.tv-home[data-seed="b"] .seed-banner:active{transform:translateX(-50%) scale(.98)}
+.tv-home[data-seed="b"] .seed-pic{width:84px}
+.tv-home[data-seed="b"] .seed-txt small{display:none}
+.tv-home[data-seed="b"] .seed-txt{grid-auto-flow:column;justify-content:start;align-items:baseline;gap:0 10px}
+.tv-home[data-seed="b"] .seed-txt b{font-size:17px}
+/* C: a quiet line at the right end of the bottom dialog row */
+.tv-home[data-seed="c"] .seed-banner{position:absolute;right:5vw;bottom:calc(2vh + 2px);z-index:8;width:min(430px,32vw);height:56px;border-color:color-mix(in srgb,var(--sd-gold) 20%,transparent)}
+.tv-home[data-seed="c"] .seed-pic{width:88px}
+.tv-home[data-seed="c"] .seed-txt em{display:none}
+.tv-home[data-seed="c"] .seed-txt b{font-size:16px}
+.tv-home[data-seed="c"] .seed-txt small{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:1100px){.tv-home[data-seed="b"] .seed-banner,.tv-home[data-seed="c"] .seed-banner{width:min(300px,40vw)}}
+@media (prefers-reduced-motion:reduce){.seed-banner,.seed-go{transition:none}}
+/* About section and dialog */
+.seed-hero{position:relative;overflow:hidden;border:1px solid color-mix(in srgb,#f0c987 22%,transparent);background:#0c0809}
+.seed-hero img{display:block;width:100%;height:auto}
+.ab-seed .seed-hero{margin:10px 0 12px}
+.seed-lead{margin:0 0 6px;font-size:14px;line-height:1.6;color:var(--g-t1);text-wrap:pretty}
+.seed-homage{margin:0 0 10px;font-size:12px;line-height:1.65;color:var(--g-t2);text-wrap:pretty}
+.seed-points{margin:0 0 10px;display:grid;gap:0}
+.seed-points>div{display:grid;gap:2px;padding:8px 0;border-top:1px solid color-mix(in srgb,var(--g-t1) 10%,transparent)}
+.seed-points dt{font-size:13px;color:var(--g-gold,#f0c987)}
+.seed-points dd{margin:0;font-size:12px;line-height:1.6;color:var(--g-t2);text-wrap:pretty}
+.seed-soon{margin:0 0 8px;padding:8px 10px;font-size:12px;line-height:1.6;color:var(--g-t1);border-left:2px solid var(--g-gold,#f0c987);background:color-mix(in srgb,var(--g-t1) 5%,transparent)}
+.seed-count{margin:0 0 8px;font-size:12px;color:var(--g-t2);font-variant-numeric:tabular-nums}
+.seed-count[hidden]{display:none}
+.seed-link{display:inline-flex;align-items:center;gap:6px;padding:0;background:none;border:0;border-bottom:1px solid color-mix(in srgb,var(--g-gold,#f0c987) 50%,transparent);font:inherit;font-size:13px;color:var(--g-gold,#f0c987);cursor:pointer}
+.seed-link:hover{color:var(--g-t1)}
+dialog.seed-panel{width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto}
+.seed-panel .seed-hero{border:0;border-bottom:1px solid color-mix(in srgb,#f0c987 22%,transparent)}
+.seed-panel-body{padding:18px 26px 22px}
+.seed-panel-body h2{margin:0 0 10px;font-size:20px;letter-spacing:.03em}
+.seed-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
+.ab-seed[data-mode="band"]{grid-column:1/-1;margin-top:34px}
+.seed-band{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:0 44px;align-items:start}
+.seed-band-r .seed-points{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px}
+.seed-band-r .seed-points>div:first-child{grid-column:1/-1}
+.seed-band-r .seed-soon{margin-top:4px}
+.seed-fold{margin:0 0 10px}
+.seed-fold summary{cursor:pointer;font-size:13px;color:var(--g-gold,#f0c987);list-style:none}
+.seed-fold summary::before{content:"+ ";font-family:var(--g-mono,monospace)}
+.seed-fold[open] summary::before{content:"− "}
+@media (max-width:1100px){.seed-band{grid-template-columns:minmax(0,1fr)}}
+/* the picture has the Chinese tagline baked in, so other languages get the egg with live text instead */
+.seed-hero.live{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:center;min-height:clamp(130px,16vw,210px)}
+.seed-hero.live img{position:absolute;left:0;top:0;width:56%;height:100%;object-fit:cover;object-position:left center;-webkit-mask-image:linear-gradient(90deg,#000 70%,transparent);mask-image:linear-gradient(90deg,#000 70%,transparent)}
+.seed-hero.live .seed-live{grid-column:2;position:relative;display:grid;gap:4px;padding-right:14px;color:#f7e6bf}
+.seed-hero.live b{font-family:var(--g-serif);font-weight:400;font-size:clamp(22px,3.4vw,34px);line-height:1.05;text-shadow:0 0 16px rgba(240,201,135,.4)}
+.seed-hero.live em{font-style:normal;font-size:11px;letter-spacing:.28em;color:#f0c987}

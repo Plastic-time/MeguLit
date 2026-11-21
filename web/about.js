@@ -8,6 +8,7 @@ import {checkForUpdates} from './update-notice.js';
 import {openFeedback} from './feedback-ui.js';
 import {fxPref} from './fx-prefs.js';
 import {mountSupportToy} from './about-toy.js';
+import {seedAboutHTML,fillSeedCount} from './the-seed.js';
 export const VERSION='1.4.20';
 const REPO='https://github.com/ilynthn/MeguLit';
 const SPONSOR='https://github.com/sponsors/ilynthn';
@@ -52,6 +53,7 @@ export function aboutHTML(locale,esc){
   </section>
   </div>
   <div class="ab-col">
+  ${window.__seedAbout==='col'?seedAboutHTML(L,esc,'col'):''}
   <section class="ab-sec ab-linksec"><h2>${esc(t.links)}<small>${esc(t.linksSub)}</small></h2>
     <ul class="ab-links">${link('https://megulit.com',t.site,'megulit.com')}${link(REPO+'#faq',t.faq,'GitHub · FAQ')}${link(REPO+'/releases',t.releases,'GitHub · Releases')}${link(REPO,t.source,'github.com/ilynthn/MeguLit')}<li><button type="button" data-feedback>${esc(t.report)}<small>${esc(t.reportSub)}<i aria-hidden="true">…</i></small></button></li></ul>
   </section>
@@ -82,6 +84,7 @@ export function aboutHTML(locale,esc){
   </section>
   <div class="ab-end"><span>${esc(un.hint)}</span><button type="button" class="ab-danger" data-uninstall>${esc(un.button)}…</button></div>
   </div>
+  ${window.__seedAbout==='col'?'':seedAboutHTML(L,esc,'band')}
  </section>`;
 }
 /* 2026-11-12 the uninstaller (setup/uninstall.ps1) lists what goes and can keep the account data on this PC */
@@ -129,6 +132,7 @@ export function mountAbout(main,api,toast,model){
  const locale=pickLocale(document.documentElement.lang),t=U[locale],page=main.querySelector('.ab');
  const button=main.querySelector('[data-update]'),state=main.querySelector('[data-update-state]');
  button?.addEventListener('click',async()=>{button.disabled=true;state.textContent=t.checking;const info=await checkForUpdates({api,invoke:(c,a)=>Promise.resolve(window.__TAURI_INTERNALS__?.invoke(c,a)),version:VERSION,toast,manual:true});state.textContent=info?(info.newer?t.found(info.latest):t.latest):'';button.disabled=false;});
+ fillSeedCount(main,locale);
  main.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>api('open_source',{url:b.dataset.open}).catch(()=>toast&&toast('…'))));
  /* E394 feedback and logs go through MeguLit's relay, not a GitHub page many users cannot open */
  const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
