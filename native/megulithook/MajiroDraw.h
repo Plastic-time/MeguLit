@@ -14,7 +14,7 @@ namespace MajiroDraw {
 using DrawFn=int(__cdecl *)(void *,void *,const char *,void *,int);
 static DrawFn Original=nullptr;
 static uintptr_t Image=0,ImageEnd=0,DrawAt=0;
-static volatile LONG Armed=0,Installed=0,Run=0;
+static volatile LONG Armed=0,Installed=0,Observing=0,Run=0;
 struct Snapshot { long x,y,size;unsigned paint;char text[4096];int bytes; };
 static bool Capture(void *font,const char *text,Snapshot *s){
  __try{
@@ -32,9 +32,10 @@ static std::string Utf8(const char *text,int bytes){
  if(m)WideCharToMultiByte(CP_UTF8,0,w.data(),n,&s[0],m,nullptr,nullptr);return s;
 }
 static int __cdecl Gate(void *font,void *destination,const char *text,void *output,int flags){
+ if(!InterlockedCompareExchange(&Observing,0,0))return Original(font,destination,text,output,flags);
  Snapshot s{};bool captured=Capture(font,text,&s);uintptr_t caller=(uintptr_t)_ReturnAddress();
  int width=Original(font,destination,text,output,flags);
- if(captured){try{
+ if(captured&&InterlockedCompareExchange(&Observing,0,0)){try{
   std::string u=Utf8(s.text,s.bytes);int chars=0;for(unsigned char c:u)if((c&0xc0)!=0x80)chars++;
   if(u.size()>240){size_t cut=240;while(cut&&((unsigned char)u[cut]&0xc0)==0x80)cut--;u.resize(cut);}
   for(char &c:u)if(c=='\r'||c=='\n')c=' ';
@@ -64,7 +65,12 @@ static bool Install(){
  if(MH_EnableHook((void *)DrawAt)!=MH_OK){MH_RemoveHook((void *)DrawAt);Original=nullptr;return false;}
  InterlockedExchange(&Installed,1);Msg::Log("ToMe_DRAWRUN engine=majiro on: complete string draw rva=%lx",(unsigned long)(DrawAt-Image));return true;
 }
-static DWORD WINAPI Watch(void *){for(int i=0;i<1800;i++){if(RolesAsked()){Install();if(Installed)break;}Sleep(2000);}return 0;}
+static void RefreshControl(){
+ if(RolesAsked()){if(Install())InterlockedExchange(&Observing,1);}
+ else InterlockedExchange(&Observing,0);
+}
+// The installed detour stays stable; only the atomic observation flag changes on each low-frequency poll.
+static DWORD WINAPI Watch(void *stop){for(;;){RefreshControl();if(stop){if(WaitForSingleObject((HANDLE)stop,2000)==WAIT_OBJECT_0)return 0;}else Sleep(2000);}}
 static void Arm(){
  if(InterlockedExchange(&Armed,1))return;
  __try{if(!FindInImage((uintptr_t)GetModuleHandleA(nullptr)))return;}__except(EXCEPTION_EXECUTE_HANDLER){return;}

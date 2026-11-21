@@ -7,3 +7,5 @@
 本机 Narci_himeko.exe SHA256 45c8a1b5ea39a552629e637e4435b9fa9639978f40f3c164a24867c739d70075，512 字节夹具来源为入口真实文件。22 个其他引擎程序负例未命中。真实 MinHook 仿引擎回放通过，未跑游戏，不代表正文/名字/选项/注音实测通过
 
 下一步按总指挥的游戏适配单队列排期，采集20句以上、缓存重复、角色/画布原点/paint语义，再补第二版本。保留 H:\MeguLit-Work\samples\majiro-himeko 直到后续 live owner 完成
+
+首版 Watch 装钩后退出，关闭 roles 后观察仍继续；审查发现后补持续两秒轮询、原子 Observing 缓存，关闭/删除控制文件透传原函数，重开恢复。真 watcher 回归覆盖文件 1→0→1→删除，不用手动 MH_DisableHook 代替产品关闭证据

@@ -403,7 +403,9 @@ e-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4
 
 运行时观察层 `native/megulithook/MajiroDraw.h` 读取整串、画布笔位、字号、原始 paint、返回宽度和调用者 RVA，写 `ToMe_DRAWRUN engine=majiro`，保留原函数参数、输出和返回值
 
-默认只扫描，不挂钩子。进程的 draw 控制文件精确包含 `#cfg ... roles=1` 才安装，`roles=0/10` 均不安装。`engine-draw-opt-in.test.cjs` 已包含这个新观察层，没有 seed 获准开启。它现在只输出诊断，不上报确定角色的 `ToMe_CHARS`，也不隐藏或替换原文
+默认只扫描，不挂钩子。进程的 draw 控制文件精确包含 `#cfg ... roles=1` 才安装，`roles=0/10` 均不安装。`engine-draw-opt-in.test.cjs` 已包含这个新观察层，没有 seed 获准开启。安装后 watcher 继续每两秒读取控制文件并原子缓存开关。改成 roles=0、删除或无法读取控制文件后，最迟下一次轮询停止捕获和上报，已装 detour 只调用原函数；roles=1 恢复后重新上报，无需反复移钩。绘制函数只读缓存，不访问文件。真实 watcher 门回放覆盖 1→0→1→删除文件，ABI 清理测试另算，不能用手动禁钩冒充产品关闭
+
+它现在只输出诊断，不上报确定角色的 `ToMe_CHARS`，也不隐藏或替换原文
 
 后续实机采集须经游戏适配单队列排期，先 MuteProc 再 HidDesk run，并在 finally 关闭自己启动的进程和恢复静音。临时允许名单和 seed 开关只为这一部游戏建立。推进至少 20 句，重复出现相同字验证缓存命中仍完整，分别记录正文、名字、选项、菜单和 ruby，截图与 DRAWRUN 对齐以确定画布原点和角色调用者。观察层开启、关闭都回放原始句序，确认其他游戏不受影响。补第二个 Majiro 版本后才谈泛化；现在不把原生 stand-in 回放当成游戏实测
 

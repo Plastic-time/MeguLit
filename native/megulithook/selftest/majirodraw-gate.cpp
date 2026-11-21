@@ -21,12 +21,14 @@ static __declspec(noinline) int CallA(void *font,void *dst,const char *text,void
 static __declspec(noinline) int CallB(void *font,void *dst,const char *text,void *out){int r=Fn(font,dst,text,out,18);return r;}
 static std::wstring ControlFile(){wchar_t tmp[MAX_PATH],file[MAX_PATH+64];GetTempPathW(MAX_PATH,tmp);std::wstring dir=std::wstring(tmp)+L"MeguLit";CreateDirectoryW(dir.c_str(),nullptr);dir+=L"\\draw";CreateDirectoryW(dir.c_str(),nullptr);swprintf_s(file,L"%s\\%lu.txt",dir.c_str(),GetCurrentProcessId());return file;}
 static void Control(const wchar_t *text){auto file=ControlFile();HANDLE h=CreateFileW(file.c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);DWORD written;WriteFile(h,text,(DWORD)(wcslen(text)*2),&written,nullptr);CloseHandle(h);}
+static bool WaitObserving(LONG wanted){for(int i=0;i<400;i++){if(InterlockedCompareExchange(&MajiroDraw::Observing,0,0)==wanted)return true;Sleep(10);}return false;}
 int main(){
  Check(!MajiroDraw::RolesAsked(),"absent control is off");Control(L"#cfg roles=0\r\n");Check(!MajiroDraw::RolesAsked(),"roles=0 is off");Control(L"#cfg roles=10\r\n");Check(!MajiroDraw::RolesAsked(),"roles=10 is not opt-in");Control(L"#cfg roles=1\r\n");Check(MajiroDraw::RolesAsked(),"exact UTF16 roles=1 opt-in");
  int font[32]={};font[0x28/4]=24;font[0x38/4]=0x123456;font[0x48/4]=100;font[0x4c/4]=200;int destination=5,output=0;const char *text="\x82\xa0\x82\xa2";
  Check(CallA(font,&destination,text,&output)==44&&Logs.empty(),"unhooked original draw runs without telemetry");
  Check(MH_Initialize()==MH_OK,"real MinHook initialized");MajiroDraw::Image=(uintptr_t)GetModuleHandleA(nullptr);auto nt=(IMAGE_NT_HEADERS *)(MajiroDraw::Image+((IMAGE_DOS_HEADER *)MajiroDraw::Image)->e_lfanew);MajiroDraw::ImageEnd=MajiroDraw::Image+nt->OptionalHeader.SizeOfImage;MajiroDraw::DrawAt=(uintptr_t)&Draw;
- Check(MajiroDraw::Install(),"actual complete-function MinHook detour installed");Logs.clear();int before=Calls;
+ HANDLE stop=CreateEventW(nullptr,TRUE,FALSE,nullptr);HANDLE watcher=CreateThread(nullptr,0,MajiroDraw::Watch,stop,0,nullptr);
+ Check(watcher&&WaitObserving(1)&&MajiroDraw::Installed,"product watcher installs the actual detour after roles=1");Logs.clear();int before=Calls;
  Check(CallA(font,&destination,text,&output)==44,"original width is returned");Check(Calls==before+1&&GotFont==font&&GotDst==&destination&&GotText==text&&GotOutput==&output&&GotFlags==17&&output==0x12345678,"all five arguments and output are unchanged");
  Check(Logs.size()==1&&Logs[0].find("n=2 x0=100 y0=200 width=44 size=24 paint=00123456")!=std::string::npos&&Logs[0].find("text=\xe3\x81\x82\xe3\x81\x84")!=std::string::npos,"one full Japanese run including a cache-hit draw with no GDI call");
  font[0x48/4]+=44;font[0x4c/4]+=30;CallB(font,&destination,text,&output);Check(Logs.size()==2&&Logs[1].find("x0=144 y0=230")!=std::string::npos,"pen changes follow the engine font record");
@@ -58,6 +60,11 @@ int main(){
  }
  Check(AfterEax==44&&AfterEbx==0x5151&&AfterEsi==0x7373&&AfterEdi==0x9393,"actual detour preserves cdecl nonvolatile registers and result");
  Logs.clear();CallA(nullptr,&destination,text,&output);Check(Logs.empty()&&GotFont==nullptr,"unreadable observation gives the original its arguments");
+ Control(L"#cfg roles=0\r\n");Check(WaitObserving(0),"product watcher notices roles=0 after installation");Logs.clear();before=Calls;
+ Check(CallA(font,&destination,text,&output)==44&&Calls==before+1&&output==0x12345678&&Logs.empty(),"roles=0 forwards original parameters/output/result without telemetry");
+ Control(L"#cfg roles=1\r\n");Check(WaitObserving(1),"same product watcher resumes after roles=1");Logs.clear();CallA(font,&destination,text,&output);Check(Logs.size()==1,"re-enabled observer records again without rebuilding a detour");
+ DeleteFileW(ControlFile().c_str());Check(WaitObserving(0),"removing control stops product observation");Logs.clear();Check(CallA(font,&destination,text,&output)==44&&Logs.empty(),"removed control leaves only the original draw");
+ SetEvent(stop);Check(WaitForSingleObject(watcher,4000)==WAIT_OBJECT_0,"test watcher exits before MinHook cleanup");CloseHandle(watcher);CloseHandle(stop);
  Check(MH_DisableHook((void *)&Draw)==MH_OK,"detour disables cleanly");Check(CallA(font,&destination,text,&output)==44&&Logs.empty(),"disabled observer leaves original draw untouched");MH_RemoveHook((void *)&Draw);MH_Uninitialize();DeleteFileW(ControlFile().c_str());printf("Majiro real gate: %d failure(s)\n",Failures);return Failures;
 }
 #endif
