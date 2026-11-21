@@ -60,7 +60,7 @@ async function translateList(root,runtime,list,goal,options={}){
  const cachedEngines=new Set(list.map(t=>val(cache.get(key(t))).e).filter(Boolean));
  const todo=list.map((t,i)=>i).filter(i=>list[i].trim()&&!out[i]);if(!todo.length)return {texts:out,engine:[...cachedEngines].join('+')||'cache'};
  let engine='',reason='';
- let reviews;try{const service=runtime?.reviews?.();if(service?.engine?.()!=='machine')reviews=service;}catch(e){reason=String(e?.message||e);}
+ let reviews;try{reviews=runtime?.reviews?.({daily:true});}catch(e){reason=String(e?.message||e);}
  if(reviews)for(let start=0;start<todo.length;start+=60){
   const batch=todo.slice(start,start+60);
   try{

@@ -7,17 +7,20 @@ test('daily reports the configured engine error when both translations are empty
  const daily=require('../services/daily.cjs'),runtime={reviews:()=>({translate:async()=>({texts:[''],error:'MODEL_BUSY'})})};
  await assert.rejects(daily.translate('',runtime,['空の応答'],'en',{translateFree:async()=>''}),/TRANSLATION_FAILED:MODEL_BUSY/);
 });
-test('the daily machine setting uses the reader fallback and keeps its source in cache',async()=>{
- const daily=require('../services/daily.cjs'),{GameReviews}=require('../services/game-reviews.cjs');
- let reviewCalls=0;
- const reviews=new GameReviews('',async()=>{reviewCalls++;throw Error('unexpected review request');});
- const calls=[],options={withEngine:true,translateFree:async(_,o)=>{calls.push(o.preferred);return '译文';}};
- const run=()=>daily.translate('',{reviews:()=>reviews},['機械翻訳の設定'],'zh',options);
- const expected={texts:['译文'],engine:'microsoft'};
- assert.deepEqual(await run(),expected);
- assert.deepEqual(await run(),expected);
- assert.equal(reviewCalls,0);
- assert.deepEqual(calls,['microsoft']);
+test('the daily machine settings use the reader fallback and keep its source in cache',async t=>{
+ const daily=require('../services/daily.cjs'),{Runtime}=require('../services/runtime.cjs');
+ const root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'megulit-daily-machine-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const runtime=Object.assign(Object.create(Runtime.prototype),{root,folder:root,gameReviews:{translate:async()=>({texts:['wrong']})}});
+ for(const reviewEngine of ['machine','follow']){
+  fs.writeFileSync(path.join(root,'preferences.json'),JSON.stringify({provider:'google',reviewEngine}));
+  const calls=[],options={withEngine:true,translateFree:async(_,o)=>{calls.push(o.preferred);return '译文';}};
+  const run=()=>daily.translate(root,runtime,['機械翻訳の設定 '+reviewEngine],'zh',options);
+  const expected={texts:['译文'],engine:'microsoft'};
+  assert.deepEqual(await run(),expected);
+  assert.deepEqual(await run(),expected);
+  assert.deepEqual(calls,['microsoft']);
+ }
 });
 test('English daily articles fall back when the selected local model is Chinese-only',async t=>{
  const daily=require('../services/daily.cjs'),{Runtime}=require('../services/runtime.cjs');

@@ -113,10 +113,9 @@ class GameReviews{
   if(platform==='egs'){const m=/^https:\/\/erogamescape\.dyndns\.org\/~ap2\/ero\/toukei_kaiseki\/memo\.php\?game=(\d+)&uid=([^&]+)$/.exec(url);if(!m)throw Error('INVALID_REVIEW_URL');const uid=decodeURIComponent(m[2]),sql=`select hitokoto,replace(replace(memo,chr(13),''),chr(10),'<br>') as memo from userreview where game=${Number(m[1])} and uid=${sqlString(uid)} limit 1`;
    const row=egsRows(await this.request(EGS_SQL,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'sql='+encodeURIComponent(sql)}))[0]||{};return {text:[row.hitokoto,htmlText(String(row.memo||'').replace(/&lt;br&gt;|<br>/g,'\n'))].filter(Boolean).join('\n\n')};}
   throw Error('INVALID_REVIEW_PLATFORM');}
- engine(){return this.translation.engine?.()||'machine';}
  async translate(texts,target,source='auto'){if(!LANGS.has(target)||target==='auto'||!LANGS.has(source))throw Error('INVALID_LANGUAGE');const list=(Array.isArray(texts)?texts:[]).slice(0,60).map(t=>String(t||'').slice(0,4000));
   // The app's API / model engines translate into Chinese or English only; other targets use machine translation.
-  const chosen=this.engine(),engine=chosen!=='machine'&&this.translation.translate&&['zh-CN','en'].includes(target)?chosen:'machine';
+  const chosen=this.translation.engine?.()||'machine',engine=chosen!=='machine'&&this.translation.translate&&['zh-CN','en'].includes(target)?chosen:'machine';
   const viaEngine=async text=>{const out=String(await this.translation.translate(text,target==='en'?'en':'zh',engine)||'').trim();if(!out)throw Error('TRANSLATION_EMPTY');return out;};
   const one=async text=>{if(!text.trim())return '';const key=engine+'|'+source+'>'+target+':'+text;if(this.translations.has(key))return this.translations.get(key);if(engine!=='machine'){const out=await viaEngine(text);if(this.translations.size>2000)this.translations.clear();this.translations.set(key,out);return out;}return require('../core/translate.cjs').translateFree(text,{fetcher:this.fetcher,source,target,signal:this.abort.signal});};
   // A rate limit stops the batch instead of hammering the service with the rest of the page.
