@@ -44,3 +44,20 @@ test('shared records reject private fields, foreign CGs, duplicate names and for
  assert.equal(validateRatings([row],{names:['other.png']}),false);assert.equal(validateRatings([row,{...row,name:'CG01.PNG'}]),false);
  assert.equal(validateRatings([{...row,reasons:[scene]}]),false);
 });
+
+test('callable JS records cannot hide facts in prototypes, accessors, holes or custom iterators',()=>{
+ const row=classify({name:'cg01.png',script:[scene,audio]});
+ assert.equal(validateRatings([Object.create(row)]),false);
+ assert.equal(validateRatings([{...row,reasons:[Object.create(scene),audio]}]),false);
+ const hidden={...row};Object.defineProperty(hidden,'privateContact',{value:'person@example.test'});assert.equal(validateRatings([hidden]),false);
+ const sparse=[scene];sparse.length=16;assert.equal(validateRatings([{...row,reasons:sparse}]),false);
+ let invoked=0;const getter={...scene};Object.defineProperty(getter,'marker',{enumerable:true,get(){invoked++;throw Error('GETTER_EXECUTED');}});assert.equal(validateRatings([{...row,reasons:[getter,audio]}]),false);assert.equal(invoked,0);
+ const forged=[];forged[Symbol.iterator]=function*(){invoked++;yield row;};assert.equal(validateRatings(forged),false);assert.equal(invoked,0);
+ const getterArray=[];Object.defineProperty(getterArray,'0',{enumerable:true,get(){invoked++;return row;}});assert.equal(validateRatings(getterArray),false);assert.equal(invoked,0);
+});
+
+test('one script observation cannot be relabeled to supply two independent feature kinds',()=>{
+ const disguised={...scene,kind:'adult-audio'};assert.throws(()=>classify({name:'cg01.png',script:[scene,disguised]}),/STORY_CONTENT_FACTS/);
+ assert.equal(validateRatings([{name:'cg01.png',adult:true,basis:'script',reasons:[scene,disguised]}]),false);
+ const distinct={...disguised,offset:120};assert.equal(classify({name:'cg01.png',script:[{...scene,offset:10},distinct]}).adult,true);
+});
