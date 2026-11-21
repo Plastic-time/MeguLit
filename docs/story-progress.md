@@ -37,6 +37,10 @@ node tools/story-seed.cjs <game.exe> <game.json> <draft.json>
 
 身份 worker 同时准备私有 CG 资源索引，避免首次可用响应在主服务同步扫描大型档案。索引和存档位置仅作进程内交接，不属于可分享的规则正文；主服务核对存档的 dev/ino/size/mtime/ctime，变化时立即用当前标记收窄旧集合，并由同一个 worker 队列刷新索引。索引交接前后存档不一致则丢弃；图片缓存与安全评级另行绑定当前源文件的 canonical 路径和 stat 身份，恢复旧 mtime 不能复用旧评级
 
+队列最多等待 8 项，相同 proof 或 CG 索引任务合并；进程可用内存不足 512MiB 时不启动 worker。每个 worker 设 V8 old/young/code/stack 上限 192/16/16/4MiB 和 120 秒超时，V8 限制不等于完整 RSS / 外部分配上限。所有结果、异常与超时均先请求终止，再由实际 exit 释放唯一活动槽位；`story-analysis.stop()` 清空自己的等待项、关闭入队并等待活动 worker 退出，供 Runtime.stop 的 allSettled 调用。资源拒绝不会改走主线程同步 CG 扫描
+
+规则正文的证据使用与 story.sources 相同的严格字段和值类型检查，全树拒绝个人状态键与地址等私有值。章节的原始全部边直接校验；无目标边或未知字段使整个正文无效，不经过过滤后再认证原件
+
 ## 更新方式
 
 作品 JSON 随现有安装包和 App hotbundle 分发；独立 loader 每次读取当前文档，并验证 schema、内容身份和所有边引用。profile domains / auto-profile-feed 不接收 story 字段。独立作品投稿和跨用户规则晋级必须由受审的 Cardinal 合同另行接入
