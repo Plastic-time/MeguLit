@@ -11,6 +11,7 @@
 | 引擎 / 本轮范围 | 一级状态 | 静态证据与回放 | 二级 |
 |---|---|---|---|
 | Softpal / 既有 Pal 输入回调的有界写回 | 静态完成、待实机 | 本机 LeyLine.exe SHA `9a502090…56ffb77`，既有 host 签名在可执行节唯一命中 RVA `0x25390`；`pal-text-bounds` 原生 27 项、相关 Node 回放与 opt-in 全过；无新增钩子、flag 或 seed | 同版本正文、名字、选项、隐藏十句、点读、译文、翻页与增长拒绝待核实 |
+| Unity Mono / KEMCO 原版消息组件诊断 | 静态完成、待实机 | 本机原版 Assembly-CSharp SHA `c4d74235…1dd7314`；八个字段类型及唯一 `Message.Mes(string,bool):string` 静态核对；44 项回放与 opt-in、完整 Mono 插件编译通过；`kemcoSprites:false`，无 seed 开启 | 补丁版 DLL 不在支持范围；完整页来源、名字选项、旧页退休及实际 Reader 待核实；不授予隐藏或 IL2CPP 能力 |
 
 实机步骤维护在本机 `H:/MeguLit-Work/night-1423/live-check-queue.md`，每次一级推送的完整 SHA 记入夜间进度
 
