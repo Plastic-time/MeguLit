@@ -45,6 +45,7 @@
   "steam": "2401970",
   "vndb": "v1719"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "ace-attorney-investigations-collection",
  "builds": [
@@ -59,9 +60,8 @@
    "逆転検事"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

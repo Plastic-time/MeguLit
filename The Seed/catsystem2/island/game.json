@@ -45,6 +45,7 @@
   "title": "28cd2c5c15d13978a6bc06d38092dbbafb31f5590aa3ac120f9f8d8c0e0708c4",
   "vndb": "v18498"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "island",
  "builds": [
@@ -58,9 +59,8 @@
    "ISLAND"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

@@ -45,6 +45,7 @@
   "title": "d24e24a3f79dda895040b1b3582a05e90be3ead757f66df6287941fb45e57791",
   "vndb": "v7771"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "white-album-2",
  "builds": [
@@ -58,9 +59,8 @@
    "WHITE ALBUM2"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

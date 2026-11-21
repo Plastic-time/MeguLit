@@ -45,6 +45,7 @@
   "title": "45ab8285c3d8be1d0cb781dc794b4cd63dbcd17d63a4da9287aeab06ad863b04",
   "vndb": "v16212"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "tokei-jikake-no-leyline-2",
  "builds": [
@@ -60,9 +61,8 @@
    "[210325][ユニゾンシフト：ブロッサム] 時計仕掛けのレイライン -陽炎に彷徨う魔女-"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

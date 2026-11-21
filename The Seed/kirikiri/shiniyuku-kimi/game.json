@@ -45,6 +45,7 @@
   "title": "664e5e48a0e9eb0bf0ac05b42928f548a585b2c77c2ef98cee99b621f5515189",
   "vndb": "v19233"
  },
+ "seedFormat": 1,
  "status": "read",
  "slug": "shiniyuku-kimi",
  "builds": [
@@ -59,9 +60,8 @@
    "[160729][バグシステム]死に逝く君、館に芽吹く憎悪 [汉化硬盘版]"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

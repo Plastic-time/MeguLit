@@ -44,6 +44,7 @@
   "title": "d62f73cb9c1efa12df929ba12f08f1b018e754860302bdd9d1c0c557696641c4",
   "vndb": "v45510"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "summer-clover",
  "builds": [
@@ -58,9 +59,8 @@
    "[ADV中文] 夏色四叶草 Summer Clover Ver1.10 官方中文无修版+全CG存档"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

@@ -22,7 +22,7 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 - `The Seed/<engine>/<slug>/game.json`：游戏层文档 + seed 字段 `seedFormat`（seed 格式版本，现为 1，不写 = 1）、`status`（`verified` / `owner-ok` / `read` / `skeleton`）、`slug`（= 目录名）、`builds`（exe SHA-256 列表，版本文件可以在别的游戏目录下：一个 exe 被几部共用时版本层只有一份）、`sourceLangs`（游戏原文的语言，BCP 47，默认 `["ja"]`，例如 `["en","zh-Hans"]`）、可选 `match {exe, titles, notTitles}`（可读的程序名和标题，汉化改名时用）、可选 `ext {<扩展名>: …}`（扩展区）
 - 向前兼容：客户端不认识的顶层字段、`ext` 里不认识的扩展、settings 里不认识的键都忽略（`seed.cjs check()` 的 `ignored`），认识的字段和键严格校验；`seedFormat` 比自己新也照样读
 - `The Seed/<engine>/<slug>/versions/<exe SHA-256>.json`：版本层文档，文件名 = key
-- settings 钉住非空的行为键的当前生效值：做好了就是做好了，内核默认改了它也不变。`null`、`calibrate.*`、`selfCheck.*` 不钉（verified seed 在本机校准之上，钉了会盖掉每台电脑的本机校准、共享层和闸门阈值）；`seed.cjs check()` 对钉了这些的 seed 报警（`warnings`），`validation/the-seed.test.cjs` 要求仓库里没有报警。The Seed 内容以 `tools/diff-maker/seed-all.cjs` 的输出为准
+- settings 钉住非空的行为键的当前生效值：做好了就是做好了，内核默认改了它也不变。`null`、`calibrate.*`、`selfCheck.*`、`hide.engineTrial.*` 不钉（verified seed 在本机校准之上，钉了会盖掉每台电脑的本机校准、共享层和闸门阈值）；`seed.cjs check()` 对钉了这些的 seed 报警（`warnings`），`validation/the-seed.test.cjs` 要求仓库里没有报警。The Seed 内容以 `tools/diff-maker/seed-all.cjs` 的输出为准
 - 客户端语义：`verified` / `owner-ok` 直接用（官方游戏层）；`read` 直接读模式（官方游戏层）；`skeleton` 只给身份 + 钉住值，放在本机校准下面，自检闸门照常把关（不过线退读模式）
 
 **语言**（2026-11-21，为英文学习模式和多语言译文留的接口）：

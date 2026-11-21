@@ -45,6 +45,7 @@
   "title": "065962dabf7819cd31e188b3de6569c4bb4af4f912ae33d93bd6fbdba66fed67",
   "vndb": "v6540"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "euphoria",
  "builds": [
@@ -58,9 +59,8 @@
    "euphoria"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

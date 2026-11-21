@@ -45,6 +45,7 @@
   "title": "643b799c1c9e561d02e7ca0f754baec7592507ec72ae73960b6fe28a5227cdaf",
   "vndb": "v16044"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "sanoba-witch",
  "builds": [
@@ -59,9 +60,8 @@
    "Sanoba Witch"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

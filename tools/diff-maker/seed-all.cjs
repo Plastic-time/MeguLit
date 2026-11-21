@@ -35,7 +35,7 @@ function library(root){const out=[];let rows=[];
  const ot=readJson(path.join(root,'data','config','original-text.json'))||{},rec=readJson(path.join(root,'data','config','game-reception.json'))||{};
  for(const r of rows){if(r.removed_at)continue;let lib={};try{lib=JSON.parse(r.original||'{}').library||{};}catch{}
   const vndb=lib.vndbId||(/vndb\.org\/(v\d+)/.exec(rec[r.id]?.vndb?.url||'')||[])[1]||'';
-  out.push({root,id:r.id,title:String(r.title||lib.title||''),names:(lib.names||[]).map(String),exe:String(r.executable||lib.exe||''),steam:String(lib.appid||lib.vndbSteamAppid||''),vndb,engine:String(lib.engine||ot[r.id]?.engine||''),ot:ot[r.id]||null});}
+  out.push({root,id:r.id,title:String(r.title||lib.title||''),names:(lib.names||[]).map(String),exe:String(r.executable||lib.exe||''),steam:String(lib.appid||lib.vndbSteamAppid||''),vndb,engine:String(lib.engine||ot[r.id]?.engine||''),lang:String(lib.contentLanguage||''),ot:ot[r.id]||null});}
  return out;}
 
 /* launches per game id: [{from,to}] from game-launch.log (a launch lasts until the next one) */
@@ -87,6 +87,9 @@ function seedMeasured(m){const out=JSON.parse(JSON.stringify(m||{}));delete out.
 const sameJson=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 
 const STATUS=['verified','owner-ok','read','skeleton'];
+/* the language of the game's own text from the library (contentLanguage, what MeguLit detected when the game was added): en / ja /
+   zh -> zh-Hans; anything else, or nothing, is Japanese (the format's default) */
+function langsOf(g){const l=String(g.lang||'').toLowerCase();return [l==='en'?'en':l==='zh'||l==='zh-hans'?'zh-Hans':'ja'];}
 /* one game -> its seed (always written to <seed> unless the program is missing) and its report row */
 async function seedOne(g,logs,wins,{out,seed,ownerOk,versionsWritten}){const engine=engineOf(g)||'unknown',name=nameOf(g);const row={name,engine,id:g.id,state:'',look:[]};
  if(!g.exe||!fs.existsSync(g.exe)){row.state='skip';row.look.push('程序不在本机');return row;}
@@ -113,6 +116,11 @@ async function seedOne(g,logs,wins,{out,seed,ownerOk,versionsWritten}){const eng
  row.state=status;row.mode=mode;row.suspect=sus;for(const x of sus)row.look.push('可疑量测值没写进 seed：'+x.key+' '+x.value.w+'x'+x.value.h+' @'+x.value.x+','+x.value.y+'（'+x.why+'）');
  /* the seed: today's values pinned, the measured ones over them; build() keeps each scope's keys */
  const settings=Emit.deepMerge(pinned(base),seedMeasured(measured));
+ /* settings.lang (per source language: annotation, pairing, dictionary, fontFallback) is the seed's own data, not a profile value
+    the kernel fills in: an existing seed's lang blocks are kept; a new seed of a Japanese game gets lang.ja.annotation 'ruby' (the
+    kernel's behaviour, as the 55 seeds were migrated in feat/diff-layers 4a1e5446) */
+ {const oldGame=seed?readJson(path.join(seed,engine,slug,'game.json')):null;const lang=oldGame?.settings?.lang;
+  settings.lang=lang&&Object.keys(lang).length?JSON.parse(JSON.stringify(lang)):(oldGame?.sourceLangs||langsOf(g)).includes('ja')?{ja:{annotation:'ruby'}}:{};if(!Object.keys(settings.lang).length)delete settings.lang;}
  const {version,game:doc}=Emit.docs({prints,exeSha,exeName,engine:engine==='unknown'?'':engine,mode,settings,gid});
  /* seed fields of The Seed (registered with diff-layers as part of the seed format): status, the readable slug, the exe builds
     whose version layer goes with this game. One exe shared by several games (one program, several releases) has one version file:
@@ -126,9 +134,11 @@ async function seedOne(g,logs,wins,{out,seed,ownerOk,versionsWritten}){const eng
  const exes=[...new Set([...(old?.match?.exe||gameFile?.match?.exe||[]),exeName])].filter(x=>x&&x.length<=80&&!/[\\/]/.test(x)).slice(0,20);
  const match={exe:exes,...(titles.length?{titles}:{}),...(old?.match?.notTitles?{notTitles:old.match.notTitles}:{})};
  const builds=[...new Set([...(old?.builds||[]),exeSha])].slice(0,64);
- /* the game key: an existing seed keeps its identity; a new one is the relay's gidFor of its prints */
- const game={...doc,key:old?.key||Probe.gameId(prints2),prints:prints2,status,slug,builds,match,...(old?.sourceLangs?{sourceLangs:old.sourceLangs}:{})};
- const bump=(o,n)=>{if(!o)return n;const r=Number.isInteger(o.rev)?o.rev:1;return {...n,rev:sameJson({...o,rev:0},{...n,rev:0})?r:r+1};};
+ /* the game key: an existing seed keeps its identity; a new one is the relay's gidFor of its prints. seedFormat 1 and sourceLangs
+    (the languages of the game's own text, BCP 47) are written out; an existing seed's sourceLangs and ext are kept */
+ const sourceLangs=old?.sourceLangs||langsOf(g);
+ const game={...doc,key:old?.key||Probe.gameId(prints2),prints:prints2,seedFormat:1,status,slug,builds,match,sourceLangs,...(old?.ext?{ext:old.ext}:{})};
+ const bump=(o,n)=>{if(!o)return n;const r=Number.isInteger(o.rev)?o.rev:0;return {...n,rev:Math.max(1,sameJson({...o,rev:0},{...n,rev:0})?r:r+1)};};
  const gameOut=bump(old,{...game,rev:1}),versionOut=bump(oldV,{...version,rev:1});
  for(const [n,d,w] of [['game',gameOut,{engine:gameOut.engine,slug}],['version',versionOut,{engine:versionOut.engine,file:exeSha+'.json'}]]){const r=SeedFormat.check(d,w);if(!r.ok)throw new Error(n+' seed: '+r.errors.join('; '));}
  const owner=versionsWritten.get(exeSha);if(owner&&owner!==engine+'/'+slug)row.look.push('版本层和 '+owner+' 共用（同一个 exe）');

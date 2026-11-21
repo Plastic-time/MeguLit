@@ -45,6 +45,7 @@
   "steam": "310360",
   "vndb": "v67"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "higurashi-hou-ch1-onikakushi",
  "builds": [
@@ -59,9 +60,8 @@
    "ひぐらしのなく頃に"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

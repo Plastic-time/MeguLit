@@ -45,6 +45,7 @@
   "title": "4b525a2afa65182e701a28b8d36c903328d75209e9a86eea5c9465ce3b9e476d",
   "vndb": "v11093"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "tokei-jikake-no-leyline-3",
  "builds": [
@@ -60,9 +61,8 @@
    "[130125][ユニゾンシフト：ブロッサム] 時計仕掛けのレイライン -残影の夜が明ける時-"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

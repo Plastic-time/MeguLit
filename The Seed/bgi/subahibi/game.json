@@ -45,6 +45,7 @@
   "title": "5ca1bb8c989b1df8b03e4a25c3970c6a4f9c90af4dd8fe0ef23d9b988e2b218b",
   "vndb": "v3144"
  },
+ "seedFormat": 1,
  "status": "verified",
  "slug": "subahibi",
  "builds": [
@@ -60,9 +61,8 @@
    "素晴日"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

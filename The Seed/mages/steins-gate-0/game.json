@@ -46,6 +46,7 @@
   "steam": "825630",
   "vndb": "v17102"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "steins-gate-0",
  "builds": [
@@ -59,9 +60,8 @@
    "STEINS;GATE 0"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

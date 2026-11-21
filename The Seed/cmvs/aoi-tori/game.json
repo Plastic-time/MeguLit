@@ -44,6 +44,7 @@
   "steam": "2741260",
   "vndb": "v21523"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "aoi-tori",
  "builds": [
@@ -58,9 +59,8 @@
    "アオイトリ"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

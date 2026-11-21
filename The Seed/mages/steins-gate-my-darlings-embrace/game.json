@@ -46,6 +46,7 @@
   "steam": "970560",
   "vndb": "v6618"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "steins-gate-my-darlings-embrace",
  "builds": [
@@ -60,9 +61,8 @@
    "STEINS;GATE 比翼恋理のだーりん"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

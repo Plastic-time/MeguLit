@@ -45,6 +45,7 @@
   "steam": "413420",
   "vndb": "v7679"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "danganronpa-2-goodbye-despair",
  "builds": [
@@ -59,9 +60,8 @@
    "スーパーダンガンロンパ2 さよなら絶望学園"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

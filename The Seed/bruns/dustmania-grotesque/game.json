@@ -44,6 +44,7 @@
   "title": "abb29c0dc5b1399e67a778addb4c0a8aa090dfdc914da1768524e413e1caa9b5",
   "vndb": "v3030"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "dustmania-grotesque",
  "builds": [
@@ -59,9 +60,8 @@
    "[090522][Belisama] ダストマニア・グロテスク～解体挿入新書～"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

@@ -45,6 +45,7 @@
   "title": "6ce4689035af8172a1f0bf2b9cecc6163c03e5d1f294cfb8d90b2dcfbb00c1b9",
   "vndb": "v16584"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "psychologic-love-comedy",
  "builds": [
@@ -60,9 +61,8 @@
    "[150828][initial] サイコロジック・ラブコメディ"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

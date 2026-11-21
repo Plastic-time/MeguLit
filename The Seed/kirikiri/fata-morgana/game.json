@@ -48,6 +48,7 @@
   "title": "b875bbc5bee84c5b84c550da5934f1115f680233162baf3120f30d9822940cb3",
   "vndb": "v12402"
  },
+ "seedFormat": 1,
  "status": "read",
  "slug": "fata-morgana",
  "builds": [
@@ -68,9 +69,8 @@
    "海市蜃楼之馆"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

@@ -44,6 +44,7 @@
   "title": "fdd585495af82bb56549e86c95a94e3564f70967886b31eb153c11cb9a779c16",
   "vndb": "v5922"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "utsuro-no-shoujo",
  "builds": [
@@ -59,9 +60,8 @@
    "[130208][Innocent Grey] 虚ノ少女"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

@@ -46,6 +46,7 @@
   "steam": "2258770",
   "vndb": "v810"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "the-shell-part-i-inferno",
  "builds": [
@@ -60,9 +61,8 @@
    "殻ノ少女"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

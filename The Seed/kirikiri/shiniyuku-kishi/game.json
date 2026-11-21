@@ -45,6 +45,7 @@
   "title": "7dc413e2147ff8d7349abd5df2368c210926d6414724357631a6c57b56575f34",
   "vndb": "v49274"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "shiniyuku-kishi",
  "builds": [
@@ -60,9 +61,8 @@
    "archive"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

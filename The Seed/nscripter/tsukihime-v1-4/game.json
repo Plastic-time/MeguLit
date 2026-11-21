@@ -45,6 +45,7 @@
   "title": "e5879fc06511d3e0eef479c2a41b24ce99a837213cd51b3e5e77273fd6abbe4b",
   "vndb": "v7"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "tsukihime-v1-4",
  "builds": [
@@ -58,9 +59,8 @@
    "月姬 v1.4"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

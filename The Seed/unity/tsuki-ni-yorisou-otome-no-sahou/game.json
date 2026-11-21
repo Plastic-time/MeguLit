@@ -46,6 +46,7 @@
   "steam": "1776970",
   "vndb": "v10680"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "tsuki-ni-yorisou-otome-no-sahou",
  "builds": [
@@ -60,9 +61,8 @@
    "月に寄りそう乙女の作法"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

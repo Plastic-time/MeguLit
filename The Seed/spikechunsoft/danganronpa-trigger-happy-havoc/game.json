@@ -45,6 +45,7 @@
   "steam": "413410",
   "vndb": "v7014"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "danganronpa-trigger-happy-havoc",
  "builds": [
@@ -59,9 +60,8 @@
    "ダンガンロンパ 希望の学園と絶望の高校生"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

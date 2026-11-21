@@ -45,6 +45,7 @@
   "title": "f05c4ced6245f97405e0437b553a4db954cfb6d96d9fd80e620fce3486a68b58",
   "vndb": "v7"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "tsukihime-v1-6",
  "builds": [
@@ -59,9 +60,8 @@
    "[001229][TYPE-MOON] 月姬 v1.6"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

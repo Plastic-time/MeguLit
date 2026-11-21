@@ -45,6 +45,7 @@
   "title": "4087e19946024f9f785566e3a1c7d845048c26782744d17f064d2608277bc10a",
   "vndb": "v49"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "tsukihime-plus-disc",
  "builds": [
@@ -58,9 +59,8 @@
    "月姬PLUS+DISC"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

@@ -45,6 +45,7 @@
   "steam": "1250760",
   "vndb": "v29371"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "haisha-fengyun-far-away",
  "builds": [
@@ -59,9 +60,8 @@
    "海沙风云"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

@@ -45,6 +45,7 @@
   "title": "952caa1ad5651bc6616e4dd9e6c484529eecc2f7e2802fb63d9b0b595815b6bc",
   "vndb": "v19434"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "discord-under-the-moon",
  "builds": [
@@ -61,9 +62,8 @@
    "Discord!"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

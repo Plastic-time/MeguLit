@@ -45,6 +45,7 @@
   "title": "e91960d9143f3488846b0eb7b517dc7c725874890859ecffa6db70fb0388936b",
   "vndb": "v1552"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "mashiroiro-symphony",
  "builds": [
@@ -60,9 +61,8 @@
    "[091030][ぱれっと] ましろ色シンフォニー -Love is pure white-"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

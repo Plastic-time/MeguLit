@@ -46,6 +46,7 @@
   "steam": "880950",
   "vndb": "v18131"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "maitetsu-pure-station",
  "builds": [
@@ -60,9 +61,8 @@
    "まいてつ"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

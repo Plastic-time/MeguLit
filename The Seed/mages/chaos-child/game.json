@@ -46,6 +46,7 @@
   "steam": "970570",
   "vndb": "v14018"
  },
+ "seedFormat": 1,
  "status": "verified",
  "slug": "chaos-child",
  "builds": [
@@ -59,9 +60,8 @@
    "CHAOS;CHILD"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

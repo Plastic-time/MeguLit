@@ -44,6 +44,7 @@
   "steam": "1173010",
   "vndb": "v30340"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "flowers-blooming-at-the-end-of-summer",
  "builds": [
@@ -58,9 +59,8 @@
    "여름의 끝에 피는 꽃"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

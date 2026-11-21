@@ -45,6 +45,7 @@
   "title": "515dfef091aed2bd8decfd1220808aae5101748f29a30e0ebe8a2dd534bdd500",
   "vndb": "v6589"
  },
+ "seedFormat": 1,
  "status": "owner-ok",
  "slug": "josou-sanmyaku",
  "builds": [
@@ -59,9 +60,8 @@
    "女装山脉"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

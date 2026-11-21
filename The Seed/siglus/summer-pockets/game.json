@@ -46,6 +46,7 @@
   "steam": "897220",
   "vndb": "v20424"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "summer-pockets",
  "builds": [
@@ -59,9 +60,8 @@
    "Summer Pockets"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

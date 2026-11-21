@@ -45,6 +45,7 @@
   "title": "b0b6a0347d2be0721599d57db3eb44d21c4e67da57e76f6e87b82f609147c8ac",
   "vndb": "v12852"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "jooubachi-no-oubou",
  "builds": [
@@ -60,9 +61,8 @@
    "女王蜂的王房 辉夜篇&房玛瑙篇"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

@@ -45,6 +45,7 @@
   "title": "5104697d08918fb528731df862b262727b77c7ed637f59bcda466ec8d8a33073",
   "vndb": "v10016"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "tokei-jikake-no-leyline-1",
  "builds": [
@@ -59,9 +60,8 @@
    "[120727][ユニゾンシフト：ブロッサム] 時計仕掛けのレイライン -黄昏時の境界線-"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

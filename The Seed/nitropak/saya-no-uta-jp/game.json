@@ -45,6 +45,7 @@
   "title": "1edfa8cba606567749430cdcf4cde0102caa048a5f0182a1a223c94f7fefcb7d",
   "vndb": "v97"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "saya-no-uta-jp",
  "builds": [
@@ -59,9 +60,8 @@
    "[031226][Nitro+] 沙耶の唄"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

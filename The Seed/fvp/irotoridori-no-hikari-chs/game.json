@@ -45,6 +45,7 @@
   "title": "ea6d9d756909167ece140bf9497fa9b8943eecca1a6165b93656c664db911f03",
   "vndb": "v10028"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "irotoridori-no-hikari-chs",
  "builds": [
@@ -60,9 +61,8 @@
    "[120831][FAVORITE] いろとりどりのヒカリ"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

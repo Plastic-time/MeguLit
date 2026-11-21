@@ -45,6 +45,7 @@
   "title": "8e2b52ccdab31fe5b3b4c72f4c79441d6e3f2fc02e6e8d561fc3127687d97e5c",
   "vndb": "v3770"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "aiyoku-no-eustia",
  "builds": [
@@ -59,9 +60,8 @@
    "秽翼的尤斯蒂娅"
   ]
  },
- "rev": 2,
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }
