@@ -24,7 +24,7 @@ import {loadBaked,bakedAO,computeVolumes,applyAO} from './torch-bake.js';
 import {VolumetricPass} from './torch-volumetric.js';
 import {loadGsap} from './gsap-loader.js';
 
-/* 2026-11-21 店主: 匿名的传火人用大写数字（传火人壹、贰、叁）；创始编号 #0 是店主 */
+/* 2026-11-21 店主: 匿名的传火人用大写数字（传火人壹、贰、叁）；#0 是店主 */
 const cnNo=n=>{n=Math.floor(Number(n)||0);if(n<=0)return "零";const D="零壹贰叁肆伍陆柒捌玖",U=["","拾","佰","仟"],B=["","万","亿","万亿"];const sec=p=>{let o="",z=false;for(let i=3;i>=0;i--){const x=Math.floor(p/10**i)%10;if(x){if(z&&o)o+="零";o+=D[x]+U[i];z=false;}else z=true;}return o;};const parts=[];for(let i=0;n>0;i++){parts.unshift([n%10000,i]);n=Math.floor(n/10000);}let out="",gap=false;for(const [p,i] of parts){if(!p){if(out)gap=true;continue;}if(out&&(gap||p<1000))out+="零";out+=sec(p)+B[i];gap=false;}return out;};
 const cnParse=q=>{const D="零壹贰叁肆伍陆柒捌玖",U={"拾":10,"佰":100,"仟":1000},B={"万":1e4,"亿":1e8};if(!/^[零壹贰叁肆伍陆柒捌玖拾佰仟万亿]+$/.test(q))return null;let total=0,sec=0,d=0;for(const c of q){const v=D.indexOf(c);if(v>=0){d=v;continue;}if(U[c]){sec+=(d||1)*U[c];d=0;continue;}if(B[c]){total=(total+sec+d)*B[c];sec=0;d=0;}}return total+sec+d;};
 const COPY={

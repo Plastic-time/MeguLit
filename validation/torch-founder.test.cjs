@@ -7,7 +7,7 @@ const src=fs.readFileSync(path.join(__dirname,'..','web','torch-monument.js'),'u
 const grab=name=>{const m=src.match(new RegExp('^const '+name+'=(.*);$','m'));assert.ok(m,name+' is defined');return eval('('+m[1]+')');};
 test('upper-case numerals both ways',()=>{const cnNo=grab('cnNo'),cnParse=grab('cnParse');
  for(const [n,s] of [[1,'壹'],[2,'贰'],[3,'叁'],[10,'壹拾'],[101,'壹佰零壹'],[1010,'壹仟零壹拾'],[10001,'壹万零壹'],[12345,'壹万贰仟叁佰肆拾伍']]){assert.equal(cnNo(n),s);assert.equal(cnParse(s),n);}});
-test('Chinese anonymous name and the founder label',()=>{assert.match(src,/anon:n=>'传火人'\+cnNo\(n\)/);assert.match(src,/nth:n=>n===0\?'创始'/);});
+test('Chinese anonymous name; #0 is just #0, no founder label',()=>{assert.match(src,/anon:n=>'传火人'\+cnNo\(n\)/);assert.match(src,/nth:n=>n===0\?'#0'/);assert.ok(!/创始|Founder|創始/.test(src),'no founder label');});
 test('paging keeps #0: no cursor 0, list starts below 0, the start is at 0',()=>{
  assert.ok(!/cursor:String\(Math\.max\(0,/.test(src),'no cursor clamped to 0');
  assert.match(src,/torchNo:-1;/);assert.match(src,/if\(first<=0\)\{state\.atStart=true;/);});
