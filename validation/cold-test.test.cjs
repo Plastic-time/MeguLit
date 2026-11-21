@@ -186,7 +186,7 @@ test('service: a stopped run is retried later; no save place blocks; a Steam bui
 test('service: tick waits on the conditions and takes the first candidate',async()=>{const svc=require('../services/cold-test.cjs');const P=pc();
  const test2=path.join(P.game,'TestGame.exe');fs.writeFileSync(test2,'MZ');/* 千恋＊万花 itself is verified in The Seed: never cold-tested */
  const w=await svc.tick(P.root,{deps:{reading:async()=>({...idle,idleMs:1000}),helper:true,platform:'win32'}});assert.deepEqual(w,{state:'waiting',reason:'active'});
- let ran=null;const t=await svc.tick(P.root,{deps:{reading:async()=>idle,helper:true,platform:'win32',playing:()=>false,retest:async()=>({keys:{},games:{}}),env:P.env,
+ let ran=null;const t=await svc.tick(P.root,{deps:{reading:async()=>idle,freeMb:()=>idle.freeMb,helper:true,platform:'win32',playing:()=>false,retest:async()=>({keys:{},games:{}}),env:P.env,
   games:()=>[{id:'1',title:'テストゲーム',exe:test2,engine:'kirikiri'}],report:async()=>({}),runner:async o=>{ran=o;fs.mkdirSync(o.runDir,{recursive:true});return {pid:1,shots:[]};}}});
  assert.equal(t.state,'tested',JSON.stringify(t));assert.equal(ran.exe,test2);assert.ok(ran.budgetMs<=6*60000);
  assert.equal((await svc.tick(P.root,{deps:{reading:async()=>idle,helper:true,platform:'win32',playing:()=>true}})).reason,'gameRunning');
