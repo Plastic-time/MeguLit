@@ -103,6 +103,7 @@ def install_fakes():
     class Text(object):
         def __init__(self, what, size, rows, ruby=None):
             self.text_parameter, self.text, self.style = what, [what], Style(size)
+            self.start, self.end = 0, len(what)
             lines = []
             for r, row in enumerate(rows):
                 glyphs = []
@@ -121,7 +122,8 @@ def install_fakes():
         def set_text(self, text):
             # engine-draw: Ren'Py lays the new text out again; here a row per paragraph, ruby readings and tags left out
             self.text_parameter, self.text = text, [text]
-            plain = re.sub(r'\{rt\}.*?\{/rt\}', '', text)
+            visible = text if self.start is None else text[self.start:self.end]
+            plain = re.sub(r'\{rt\}.*?\{/rt\}', '', visible)
             plain = re.sub(r'\{[^{}]*\}', '', plain.replace('{{', '\x00').replace('[[', '[')).replace('\x00', '{')
             size = self.style.size
             self._layout = Layout([Line(r * (size + 10) * 2, (size + 10) * 2, [Glyph(ch, i * size * 2, size * 2) for i, ch in enumerate(row)])
