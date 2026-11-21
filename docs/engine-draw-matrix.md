@@ -116,7 +116,18 @@
 | CIRCUS | 无 | MES VM，GDI 字形点 |
 | EntisGLS（Entis） | 无 | |
 | SystemNNN、ExHIBIT、Ikura GDL、rUGP（âge）、AGE System | 无 | |
-| RealLive / AVG32 新版（Air 的 avg32_cn.dll） | 有（Air） | TextOutA 不经 IAT 直接调用，要先找跳板 |
+| RealLive / AVG32 新版（Air） | 有（Air） | 已做（07c599da）：air_cn.exe 是 UPX 压缩，不是绕 IAT；解压副本上原有 avg32 签名正好命中一次，运行时按值找 IAT 槽 |
 | Leaf（WHITE ALBUM2）、Spike Chunsoft（ダンガンロンパ 1 / 2 / V3）、みにくいモジカの子 | 有 | 静态做不出，实机采集方案见 engine-draw-native.md |
 | Unity Naninovel（夏色四叶草）、Unity（デスマッチラブコメ！） | 有 | 归 Unity 组件路线（unitytext），不是原生画字 |
 | BGI、Siglus、MAGES、CatSystem2 | 有 | re-bgi / re-siglus / re-mages / re-cs2 在做 |
+
+## 两部 Unity 走 unitytext 还缺什么（静态，2026-11-21）
+
+unitytext（`native/unitytext/MeguLitUnityText.cs`，BepInEx 5 Mono 插件）看的是 TextMeshPro `TMP_Text` 和 uGUI `UnityEngine.UI.Text` 组件；隐藏 = 组件 alpha 0，内嵌 = 换组件的文字
+
+| 游戏 | Unity / 运行时 | 文字组件 | 缺什么 |
+|---|---|---|---|
+| 夏色四叶草 Summer Clover（官方中文版 1.10） | 2020.3.48f1，Mono（MonoBleedingEdge，Managed 齐全，可直接用 BepInEx 5 Mono 插件） | Naninovel：`NaninovelTMProText` / `RevealableTMProText`（都是 TMP_Text 的子类，插件现有的 TMP 路线能看到） | 1. 这是官方中文版：游戏画的是中文，要先看 Naninovel 的本地化里有没有日文（Naninovel 按 locale 切换脚本），没有就没有日文原文可读；2. Naninovel 的逐字显示是 `TextRevealer` 每帧改顶点颜色，不是 maxVisibleCharacters：插件的「打字机走完放开 maxVisibleCharacters」和「alpha 0 隐藏」可能被它每帧覆盖，要在实机里看一次；角色识别已有 Naninovel `ChoiceHandlerButton` / `AuthorNamePanel` |
+| デスマッチラブコメ！（KEMCO，Steam） | 2019.2.15f1，Mono | 没有 TextMeshPro；Assembly-CSharp 里是 `MESBOX_WINDOW`、`messageSprite`、`fontSprite`、`TextMesh`、`RUBY` / `rubyObject` / `CalculateRubysize`：对白很可能是引擎自己用字体精灵（或旧的 3D `TextMesh`）拼出来的，带自己的注音 | 1. 插件不认 `TextMesh`（旧 3D 文字）和精灵拼字，需要在 Build 里加 `UnityEngine.TextMesh` 一类，或者对精灵拼字的游戏走另一条（读 `MessageText` / `MessageBuffer` 的字符串 + 精灵的屏幕位置），哪一种要实机看对白挂的是什么组件；2. 目录里有「汉化补丁备份\DMLC汉化补丁.zip」：现在装的是中文补丁，要用备份恢复日文原版文件再测 |
+
+两部都不需要 IL2CPP，现有 Mono 插件能装；静态这一步没有可交的代码，缺的都要实机确认（组件类型、Naninovel 逐字显示和 alpha 的冲突）
