@@ -1,0 +1,1522 @@
+{
+ "schema": "megulit.story",
+ "version": 1,
+ "gameKey": "0e36cf22e7a8efd8e46590bc86bd8597ea90de0f14073eec1fa5b2306369773d",
+ "builds": [
+  "00f499857bd9190de75345880ea4b3ac4c56dbdd6cd924d5b20a1311440fade0"
+ ],
+ "scripts": [
+  {
+   "name": "ysbin.ypf",
+   "location": "pac",
+   "sha256": "a558c481fd02e29255556a78bdc0fe45f9513d564c673702bdbec042a5ced35e"
+  }
+ ],
+ "sources": [
+  {
+   "kind": "local-gallery",
+   "file": "ysbin.ypf",
+   "entry": "es.CGMODE.CG.SET/DEF.SET",
+   "notes": "Scene slots and variants from existing YU-RIS CG parser"
+  },
+  {
+   "kind": "local-script",
+   "file": "ysbin.ypf",
+   "entry": "yst00011.ybn:11 / yst00113.ybn:9508 / yst00114.ybn:8182 / yst00115.ybn:11446",
+   "notes": "GSD slot3 is global array1097; route completions write 101/102/103. No completion rule for bad/extra endings is asserted. Graph is a partial route summary, not a full script flowchart"
+  },
+  {
+   "kind": "local-script",
+   "file": "ysbin.ypf",
+   "entry": "yst00111.ybn:3,10,17,21,24",
+   "notes": "EXTRA requires flags101,102,103; replay counts are not completion flags"
+  },
+  {
+   "kind": "cross-check",
+   "url": "https://w.atwiki.jp/erogem/pages/521.html",
+   "notes": "Seven ending topology corroborated; choice texts checked against local script, no guide copied wholesale"
+  },
+  {
+   "kind": "local-script",
+   "file": "ysbin.ypf",
+   "entry": "yst00113.ybn:10005,10059 / yst00114.ybn:8562,8606 / yst00115.ybn:11813,11860",
+   "notes": "Last explicit MAC.EV image before the completed-route SCENARIO.END; actual image access additionally requires its current CG unlock and Safe CG source rating"
+  }
+ ],
+ "galleryComplete": true,
+ "gallery": [
+  {
+   "id": "8b5cc4df7eec7d32a781",
+   "variants": [
+    {
+     "name": "ev101"
+    },
+    {
+     "name": "ev101_1"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "449777124b1466a8ed66",
+   "variants": [
+    {
+     "name": "ev102"
+    },
+    {
+     "name": "ev102_1"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "f3e2e400523c506868ca",
+   "variants": [
+    {
+     "name": "ev103"
+    },
+    {
+     "name": "ev103_1"
+    },
+    {
+     "name": "ev103_2"
+    },
+    {
+     "name": "ev103_3"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "09c5ad78abd4846482f8",
+   "variants": [
+    {
+     "name": "ev104"
+    },
+    {
+     "name": "ev104_1"
+    },
+    {
+     "name": "ev104_2"
+    },
+    {
+     "name": "ev104_3"
+    },
+    {
+     "name": "ev104_4"
+    },
+    {
+     "name": "ev104_5"
+    },
+    {
+     "name": "ev104_6"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "5144ee6a9eb6566b84f5",
+   "variants": [
+    {
+     "name": "ev105"
+    },
+    {
+     "name": "ev105_1"
+    },
+    {
+     "name": "ev105_2"
+    },
+    {
+     "name": "ev105_3"
+    },
+    {
+     "name": "ev105_4"
+    },
+    {
+     "name": "ev105_5"
+    },
+    {
+     "name": "ev105_6"
+    },
+    {
+     "name": "ev105_7"
+    },
+    {
+     "name": "ev105_8"
+    },
+    {
+     "name": "ev105_9"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "d54285645efc34b7876f",
+   "variants": [
+    {
+     "name": "ev106"
+    },
+    {
+     "name": "ev106_1"
+    },
+    {
+     "name": "ev106_2"
+    },
+    {
+     "name": "ev106_3"
+    },
+    {
+     "name": "ev106_4"
+    },
+    {
+     "name": "ev106_7"
+    },
+    {
+     "name": "ev106_5"
+    },
+    {
+     "name": "ev106_6"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "b5c5e6fe2501ab841c4d",
+   "variants": [
+    {
+     "name": "ev107"
+    },
+    {
+     "name": "ev107_1"
+    },
+    {
+     "name": "ev107_2"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "c820b14281e8bf92264b",
+   "variants": [
+    {
+     "name": "ev108"
+    },
+    {
+     "name": "ev108_1"
+    },
+    {
+     "name": "ev108_2"
+    },
+    {
+     "name": "ev108_3"
+    },
+    {
+     "name": "ev108_4"
+    },
+    {
+     "name": "ev108_5"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "39f645c85e8b1da32cf6",
+   "variants": [
+    {
+     "name": "ev109"
+    },
+    {
+     "name": "ev109_1"
+    },
+    {
+     "name": "ev109_2"
+    },
+    {
+     "name": "ev109_3"
+    },
+    {
+     "name": "ev109_4"
+    },
+    {
+     "name": "ev109_5"
+    },
+    {
+     "name": "ev109_6"
+    },
+    {
+     "name": "ev109_7"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "17b8050617684160092d",
+   "variants": [
+    {
+     "name": "ev110_5"
+    },
+    {
+     "name": "ev110"
+    },
+    {
+     "name": "ev110_1"
+    },
+    {
+     "name": "ev110_2"
+    },
+    {
+     "name": "ev110_3"
+    },
+    {
+     "name": "ev110_4"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "1f252e2b3c7006862361",
+   "variants": [
+    {
+     "name": "ev111"
+    },
+    {
+     "name": "ev111_1"
+    },
+    {
+     "name": "ev111_2"
+    },
+    {
+     "name": "ev111_3"
+    },
+    {
+     "name": "ev111_4"
+    },
+    {
+     "name": "ev111_5"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "843ae3b64bb78bcd039c",
+   "variants": [
+    {
+     "name": "ev112_7"
+    },
+    {
+     "name": "ev112"
+    },
+    {
+     "name": "ev112_1"
+    },
+    {
+     "name": "ev112_2"
+    },
+    {
+     "name": "ev112_3"
+    },
+    {
+     "name": "ev112_4"
+    },
+    {
+     "name": "ev112_5"
+    },
+    {
+     "name": "ev112_6"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "3fd65699227171bda581",
+   "variants": [
+    {
+     "name": "ev201"
+    },
+    {
+     "name": "ev201_1"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "24a6967d6fd312bfef76",
+   "variants": [
+    {
+     "name": "ev202"
+    },
+    {
+     "name": "ev202_1"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "19618a373d4367c706c9",
+   "variants": [
+    {
+     "name": "ev203"
+    },
+    {
+     "name": "ev203_1"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "121b12acb65e1a9b9a54",
+   "variants": [
+    {
+     "name": "ev204"
+    },
+    {
+     "name": "ev204_1"
+    },
+    {
+     "name": "ev204_2"
+    },
+    {
+     "name": "ev204_3"
+    },
+    {
+     "name": "ev204_4"
+    },
+    {
+     "name": "ev204_5"
+    },
+    {
+     "name": "ev204_6"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "0cac877809926bcf3d6e",
+   "variants": [
+    {
+     "name": "ev205"
+    },
+    {
+     "name": "ev205_1"
+    },
+    {
+     "name": "ev205_2"
+    },
+    {
+     "name": "ev205_2a"
+    },
+    {
+     "name": "ev205_3"
+    },
+    {
+     "name": "ev205_4"
+    },
+    {
+     "name": "ev205_5"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "1064c0eab76c07558109",
+   "variants": [
+    {
+     "name": "ev206"
+    },
+    {
+     "name": "ev206_1"
+    },
+    {
+     "name": "ev206_2"
+    },
+    {
+     "name": "ev206_3"
+    },
+    {
+     "name": "ev206_4"
+    },
+    {
+     "name": "ev206_5"
+    },
+    {
+     "name": "ev206_6"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "1cc91ff0d675d1b1e20f",
+   "variants": [
+    {
+     "name": "ev207_5"
+    },
+    {
+     "name": "ev207"
+    },
+    {
+     "name": "ev207_1"
+    },
+    {
+     "name": "ev207_2"
+    },
+    {
+     "name": "ev207_3"
+    },
+    {
+     "name": "ev207_4"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "e263dfa0eec821411a63",
+   "variants": [
+    {
+     "name": "ev208_8"
+    },
+    {
+     "name": "ev208"
+    },
+    {
+     "name": "ev208_1"
+    },
+    {
+     "name": "ev208_2"
+    },
+    {
+     "name": "ev208_3"
+    },
+    {
+     "name": "ev208_4"
+    },
+    {
+     "name": "ev208_5"
+    },
+    {
+     "name": "ev208_6"
+    },
+    {
+     "name": "ev208_7"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "be36b488d8ccf80a4060",
+   "variants": [
+    {
+     "name": "ev209_7"
+    },
+    {
+     "name": "ev209"
+    },
+    {
+     "name": "ev209_1"
+    },
+    {
+     "name": "ev209_2"
+    },
+    {
+     "name": "ev209_3"
+    },
+    {
+     "name": "ev209_4"
+    },
+    {
+     "name": "ev209_5"
+    },
+    {
+     "name": "ev209_6"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "f0f66e6390ce10c48ebc",
+   "variants": [
+    {
+     "name": "ev210_5"
+    },
+    {
+     "name": "ev210"
+    },
+    {
+     "name": "ev210_1"
+    },
+    {
+     "name": "ev210_2"
+    },
+    {
+     "name": "ev210_3"
+    },
+    {
+     "name": "ev210_4"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "272c9ed59066a880adc8",
+   "variants": [
+    {
+     "name": "ev211a"
+    },
+    {
+     "name": "ev211_1a"
+    },
+    {
+     "name": "ev211"
+    },
+    {
+     "name": "ev211_1"
+    },
+    {
+     "name": "ev211_2"
+    },
+    {
+     "name": "ev211_3"
+    },
+    {
+     "name": "ev211_4"
+    },
+    {
+     "name": "ev211_1b"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "69f3bd2c30528c533897",
+   "variants": [
+    {
+     "name": "ev212"
+    },
+    {
+     "name": "ev212_1"
+    },
+    {
+     "name": "ev212_2"
+    },
+    {
+     "name": "ev212_3"
+    },
+    {
+     "name": "ev212_4"
+    },
+    {
+     "name": "ev212_5"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "1d3c7a5e77636c7aca97",
+   "variants": [
+    {
+     "name": "ev301"
+    },
+    {
+     "name": "ev301_1"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "d21d53f5550fcdc019d0",
+   "variants": [
+    {
+     "name": "ev302"
+    },
+    {
+     "name": "ev302_1"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "021ca42628950e99180b",
+   "variants": [
+    {
+     "name": "ev303"
+    },
+    {
+     "name": "ev303_1"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "2b807f84728a8b64ab9c",
+   "variants": [
+    {
+     "name": "ev304"
+    },
+    {
+     "name": "ev304_1"
+    },
+    {
+     "name": "ev304_2"
+    },
+    {
+     "name": "ev304_3"
+    },
+    {
+     "name": "ev304_4"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "2548804a0f9971870541",
+   "variants": [
+    {
+     "name": "ev305_6"
+    },
+    {
+     "name": "ev305"
+    },
+    {
+     "name": "ev305_1"
+    },
+    {
+     "name": "ev305_2"
+    },
+    {
+     "name": "ev305_3"
+    },
+    {
+     "name": "ev305_4"
+    },
+    {
+     "name": "ev305_5"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "923e19e9b10c3e3cbc30",
+   "variants": [
+    {
+     "name": "ev306"
+    },
+    {
+     "name": "ev306_1"
+    },
+    {
+     "name": "ev306_2"
+    },
+    {
+     "name": "ev306_3"
+    },
+    {
+     "name": "ev306_4"
+    },
+    {
+     "name": "ev306_5"
+    },
+    {
+     "name": "ev306_6"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "4dc9f3603afe3092db33",
+   "variants": [
+    {
+     "name": "ev307"
+    },
+    {
+     "name": "ev307_1"
+    },
+    {
+     "name": "ev307_2"
+    },
+    {
+     "name": "ev307_3"
+    },
+    {
+     "name": "ev307_4"
+    },
+    {
+     "name": "ev307_5"
+    },
+    {
+     "name": "ev307_6"
+    },
+    {
+     "name": "ev307_7"
+    },
+    {
+     "name": "ev307_8"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "d0e82b892322cf778f25",
+   "variants": [
+    {
+     "name": "ev313_2"
+    },
+    {
+     "name": "ev313"
+    },
+    {
+     "name": "ev313_1"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "e70821b265ec8916770a",
+   "variants": [
+    {
+     "name": "ev308"
+    },
+    {
+     "name": "ev308_1"
+    },
+    {
+     "name": "ev308_2"
+    },
+    {
+     "name": "ev308_3"
+    },
+    {
+     "name": "ev308_4"
+    },
+    {
+     "name": "ev308_5"
+    },
+    {
+     "name": "ev308_6"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "86030fd7dae1547082b7",
+   "variants": [
+    {
+     "name": "ev309_7"
+    },
+    {
+     "name": "ev309_5"
+    },
+    {
+     "name": "ev309_6"
+    },
+    {
+     "name": "ev309"
+    },
+    {
+     "name": "ev309_1"
+    },
+    {
+     "name": "ev309_2"
+    },
+    {
+     "name": "ev309_3"
+    },
+    {
+     "name": "ev309_4"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "e4afc0bc79a5b2922950",
+   "variants": [
+    {
+     "name": "ev310"
+    },
+    {
+     "name": "ev310_1"
+    },
+    {
+     "name": "ev310_2"
+    },
+    {
+     "name": "ev310_3"
+    },
+    {
+     "name": "ev310_4"
+    },
+    {
+     "name": "ev310_5"
+    },
+    {
+     "name": "ev310_6"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "1b1e368dcfa9f6f1cd37",
+   "variants": [
+    {
+     "name": "ev311"
+    },
+    {
+     "name": "ev311_1"
+    },
+    {
+     "name": "ev311_2"
+    },
+    {
+     "name": "ev311_3"
+    },
+    {
+     "name": "ev311_4"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "0739a9437eb694848639",
+   "variants": [
+    {
+     "name": "ev312"
+    },
+    {
+     "name": "ev312_1"
+    },
+    {
+     "name": "ev312_2"
+    },
+    {
+     "name": "ev312_3"
+    },
+    {
+     "name": "ev312_4"
+    },
+    {
+     "name": "ev312_5"
+    },
+    {
+     "name": "ev312_6"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "f877f677d9ec93253278",
+   "variants": [
+    {
+     "name": "ev401"
+    },
+    {
+     "name": "ev401_1"
+    },
+    {
+     "name": "ev401_2"
+    },
+    {
+     "name": "ev401_3"
+    },
+    {
+     "name": "ev401_4"
+    },
+    {
+     "name": "ev401_5"
+    },
+    {
+     "name": "ev401_6"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "37b7266ebb767b79b1cc",
+   "variants": [
+    {
+     "name": "ev402"
+    },
+    {
+     "name": "ev402_1"
+    },
+    {
+     "name": "ev402_2"
+    },
+    {
+     "name": "ev402_3"
+    },
+    {
+     "name": "ev402_4"
+    }
+   ],
+   "unlockComplete": true
+  },
+  {
+   "id": "0a047f2b3b389a074a47",
+   "variants": [
+    {
+     "name": "ev403"
+    },
+    {
+     "name": "ev403_1"
+    },
+    {
+     "name": "ev403_2"
+    },
+    {
+     "name": "ev403_3"
+    },
+    {
+     "name": "ev403_4"
+    },
+    {
+     "name": "ev403_5"
+    },
+    {
+     "name": "ev403_6"
+    },
+    {
+     "name": "ev403_7"
+    },
+    {
+     "name": "ev403_8"
+    },
+    {
+     "name": "ev403_9"
+    },
+    {
+     "name": "ev403_10"
+    },
+    {
+     "name": "ev403_11"
+    },
+    {
+     "name": "ev403_12"
+    },
+    {
+     "name": "ev403_13"
+    },
+    {
+     "name": "ev403_14"
+    },
+    {
+     "name": "ev403_15"
+    },
+    {
+     "name": "ev403_16"
+    }
+   ],
+   "unlockComplete": true
+  }
+ ],
+ "endingsComplete": true,
+ "endings": [
+  {
+   "id": "josou-0-end",
+   "node": "josou-0-end",
+   "type": "good",
+   "label": {
+    "ja": "史緒 END"
+   },
+   "unlock": {
+    "all": [
+     "yuris:3:101"
+    ]
+   },
+   "route": [
+    "josou-start",
+    "josou-choice",
+    "josou-0-route",
+    "josou-0-choice",
+    "josou-0-yes",
+    "josou-0-end"
+   ],
+   "image": "ev112_6"
+  },
+  {
+   "id": "josou-0-bad",
+   "node": "josou-0-bad",
+   "type": "bad",
+   "label": {
+    "ja": "史緒 BAD END"
+   }
+  },
+  {
+   "id": "josou-1-end",
+   "node": "josou-1-end",
+   "type": "good",
+   "label": {
+    "ja": "静樹 END"
+   },
+   "unlock": {
+    "all": [
+     "yuris:3:102"
+    ]
+   },
+   "route": [
+    "josou-start",
+    "josou-choice",
+    "josou-1-route",
+    "josou-1-choice",
+    "josou-1-yes",
+    "josou-1-end"
+   ],
+   "image": "ev212_2"
+  },
+  {
+   "id": "josou-1-bad",
+   "node": "josou-1-bad",
+   "type": "bad",
+   "label": {
+    "ja": "静樹 BAD END"
+   }
+  },
+  {
+   "id": "josou-2-end",
+   "node": "josou-2-end",
+   "type": "good",
+   "label": {
+    "ja": "由良 END"
+   },
+   "unlock": {
+    "all": [
+     "yuris:3:103"
+    ]
+   },
+   "route": [
+    "josou-start",
+    "josou-choice",
+    "josou-2-route",
+    "josou-2-choice",
+    "josou-2-yes",
+    "josou-2-end"
+   ],
+   "image": "ev312_6"
+  },
+  {
+   "id": "josou-2-bad",
+   "node": "josou-2-bad",
+   "type": "bad",
+   "label": {
+    "ja": "由良 BAD END"
+   }
+  },
+  {
+   "id": "josou-extra-end",
+   "node": "josou-extra-end",
+   "type": "extra",
+   "label": {
+    "ja": "ハーレム END",
+    "zh": "后宫结局"
+   },
+   "requires": [
+    "josou-0-end",
+    "josou-1-end",
+    "josou-2-end"
+   ],
+   "route": [
+    "josou-extra-entry",
+    "josou-extra-end"
+   ]
+  }
+ ],
+ "chapters": [
+  {
+   "id": "josou-common",
+   "label": {
+    "zh": "路线分歧",
+    "ja": "ルート分岐"
+   },
+   "partial": true,
+   "nodes": [
+    {
+     "id": "josou-start",
+     "kind": "scene",
+     "label": {
+      "zh": "共通剧情",
+      "ja": "共通シナリオ"
+     },
+     "read": {
+      "any": [
+       "yuris:3:101",
+       "yuris:3:102",
+       "yuris:3:103"
+      ]
+     }
+    },
+    {
+     "id": "josou-choice",
+     "kind": "choice",
+     "label": {
+      "zh": "路线分歧",
+      "ja": "ルート分岐"
+     },
+     "read": {
+      "any": [
+       "yuris:3:101",
+       "yuris:3:102",
+       "yuris:3:103"
+      ]
+     }
+    },
+    {
+     "id": "josou-0-route",
+     "kind": "scene",
+     "label": {
+      "ja": "史緒ルート",
+      "zh": "史緒线"
+     },
+     "read": {
+      "all": [
+       "yuris:3:101"
+      ]
+     }
+    },
+    {
+     "id": "josou-1-route",
+     "kind": "scene",
+     "label": {
+      "ja": "静樹ルート",
+      "zh": "静樹线"
+     },
+     "read": {
+      "all": [
+       "yuris:3:102"
+      ]
+     }
+    },
+    {
+     "id": "josou-2-route",
+     "kind": "scene",
+     "label": {
+      "ja": "由良ルート",
+      "zh": "由良线"
+     },
+     "read": {
+      "all": [
+       "yuris:3:103"
+      ]
+     }
+    }
+   ],
+   "edges": [
+    {
+     "from": "josou-start",
+     "to": "josou-choice"
+    },
+    {
+     "from": "josou-choice",
+     "to": "josou-0-route"
+    },
+    {
+     "from": "josou-choice",
+     "to": "josou-1-route"
+    },
+    {
+     "from": "josou-choice",
+     "to": "josou-2-route"
+    }
+   ]
+  },
+  {
+   "id": "josou-0",
+   "label": {
+    "ja": "史緒ルート",
+    "zh": "史緒线"
+   },
+   "partial": true,
+   "nodes": [
+    {
+     "id": "josou-0-choice",
+     "kind": "choice",
+     "label": {
+      "zh": "最后的选择",
+      "ja": "最後の選択"
+     },
+     "read": {
+      "all": [
+       "yuris:3:101"
+      ]
+     }
+    },
+    {
+     "id": "josou-0-yes",
+     "kind": "option",
+     "label": {
+      "ja": "一緒になる",
+      "zh": "和你在一起"
+     },
+     "read": {
+      "all": [
+       "yuris:3:101"
+      ]
+     }
+    },
+    {
+     "id": "josou-0-no",
+     "kind": "option",
+     "label": {
+      "ja": "答えられない",
+      "zh": "无法回答"
+     }
+    },
+    {
+     "id": "josou-0-end",
+     "kind": "ending",
+     "label": {
+      "ja": "史緒 END"
+     },
+     "read": {
+      "all": [
+       "yuris:3:101"
+      ]
+     }
+    },
+    {
+     "id": "josou-0-bad",
+     "kind": "ending",
+     "label": {
+      "ja": "史緒 BAD END"
+     }
+    }
+   ],
+   "edges": [
+    {
+     "from": "josou-0-route",
+     "to": "josou-0-choice"
+    },
+    {
+     "from": "josou-0-choice",
+     "to": "josou-0-yes"
+    },
+    {
+     "from": "josou-0-choice",
+     "to": "josou-0-no"
+    },
+    {
+     "from": "josou-0-yes",
+     "to": "josou-0-end"
+    },
+    {
+     "from": "josou-0-no",
+     "to": "josou-0-bad"
+    }
+   ]
+  },
+  {
+   "id": "josou-1",
+   "label": {
+    "ja": "静樹ルート",
+    "zh": "静樹线"
+   },
+   "partial": true,
+   "nodes": [
+    {
+     "id": "josou-1-choice",
+     "kind": "choice",
+     "label": {
+      "zh": "最后的选择",
+      "ja": "最後の選択"
+     },
+     "read": {
+      "all": [
+       "yuris:3:102"
+      ]
+     }
+    },
+    {
+     "id": "josou-1-yes",
+     "kind": "option",
+     "label": {
+      "ja": "気持ちを伝える",
+      "zh": "告诉他自己的心意"
+     },
+     "read": {
+      "all": [
+       "yuris:3:102"
+      ]
+     }
+    },
+    {
+     "id": "josou-1-no",
+     "kind": "option",
+     "label": {
+      "ja": "伝えない",
+      "zh": "不说出来"
+     }
+    },
+    {
+     "id": "josou-1-end",
+     "kind": "ending",
+     "label": {
+      "ja": "静樹 END"
+     },
+     "read": {
+      "all": [
+       "yuris:3:102"
+      ]
+     }
+    },
+    {
+     "id": "josou-1-bad",
+     "kind": "ending",
+     "label": {
+      "ja": "静樹 BAD END"
+     }
+    }
+   ],
+   "edges": [
+    {
+     "from": "josou-1-route",
+     "to": "josou-1-choice"
+    },
+    {
+     "from": "josou-1-choice",
+     "to": "josou-1-yes"
+    },
+    {
+     "from": "josou-1-choice",
+     "to": "josou-1-no"
+    },
+    {
+     "from": "josou-1-yes",
+     "to": "josou-1-end"
+    },
+    {
+     "from": "josou-1-no",
+     "to": "josou-1-bad"
+    }
+   ]
+  },
+  {
+   "id": "josou-2",
+   "label": {
+    "ja": "由良ルート",
+    "zh": "由良线"
+   },
+   "partial": true,
+   "nodes": [
+    {
+     "id": "josou-2-choice",
+     "kind": "choice",
+     "label": {
+      "zh": "最后的选择",
+      "ja": "最後の選択"
+     },
+     "read": {
+      "all": [
+       "yuris:3:103"
+      ]
+     }
+    },
+    {
+     "id": "josou-2-yes",
+     "kind": "option",
+     "label": {
+      "ja": "一緒に村を出る",
+      "zh": "一起离开村子"
+     },
+     "read": {
+      "all": [
+       "yuris:3:103"
+      ]
+     }
+    },
+    {
+     "id": "josou-2-no",
+     "kind": "option",
+     "label": {
+      "ja": "村に残る",
+      "zh": "留在村子"
+     }
+    },
+    {
+     "id": "josou-2-end",
+     "kind": "ending",
+     "label": {
+      "ja": "由良 END"
+     },
+     "read": {
+      "all": [
+       "yuris:3:103"
+      ]
+     }
+    },
+    {
+     "id": "josou-2-bad",
+     "kind": "ending",
+     "label": {
+      "ja": "由良 BAD END"
+     }
+    }
+   ],
+   "edges": [
+    {
+     "from": "josou-2-route",
+     "to": "josou-2-choice"
+    },
+    {
+     "from": "josou-2-choice",
+     "to": "josou-2-yes"
+    },
+    {
+     "from": "josou-2-choice",
+     "to": "josou-2-no"
+    },
+    {
+     "from": "josou-2-yes",
+     "to": "josou-2-end"
+    },
+    {
+     "from": "josou-2-no",
+     "to": "josou-2-bad"
+    }
+   ]
+  },
+  {
+   "id": "josou-extra",
+   "label": {
+    "ja": "EXTRA",
+    "zh": "后宫线"
+   },
+   "partial": true,
+   "nodes": [
+    {
+     "id": "josou-extra-entry",
+     "kind": "scene",
+     "label": {
+      "ja": "EXTRA",
+      "zh": "后宫线"
+     }
+    },
+    {
+     "id": "josou-extra-end",
+     "kind": "ending",
+     "label": {
+      "ja": "ハーレム END",
+      "zh": "后宫结局"
+     }
+    }
+   ],
+   "edges": [
+    {
+     "from": "josou-extra-entry",
+     "to": "josou-extra-end"
+    },
+    {
+     "from": "josou-0-end",
+     "to": "josou-extra-entry",
+     "dependency": true
+    },
+    {
+     "from": "josou-1-end",
+     "to": "josou-extra-entry",
+     "dependency": true
+    },
+    {
+     "from": "josou-2-end",
+     "to": "josou-extra-entry",
+     "dependency": true
+    }
+   ]
+  }
+ ],
+ "variantTotal": 240
+}

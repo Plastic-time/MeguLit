@@ -246,4 +246,4 @@ function restore(gameDir,options={}){
  if(!skipped.length)fs.rmSync(path.join(gameDir,BACKUP_DIR),{recursive:true,force:true});
  return {restored,skipped};
 }
-module.exports={detect,apply,restore,readManifest,ADAPTER,_internal:{decodeCf,readKrkr,writeKrkr,krkrChanges,jsonChanges,japaneseLike,prefPairs,setAcfLanguage,steamApp,japaneseAssets,hexText,textHex}};
+module.exports={detect,apply,restore,readManifest,ADAPTER,krkrSaveDirs:(dir,options={})=>krkrDataDirs(dir,environment(options)),_internal:{decodeCf,readKrkr,writeKrkr,krkrChanges,jsonChanges,japaneseLike,prefPairs,setAcfLanguage,steamApp,japaneseAssets,hexText,textHex}};
