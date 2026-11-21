@@ -51,7 +51,8 @@ const diag=ap.diagnostic(rec,fata.windows);assert.strictEqual(diag.profile.mode,
 const root=fs.mkdtempSync(path.join(process.env.MEGULIT_TMP||os.tmpdir(),'selfcheck-'));
 try{
  /* the diff key is the exe file's hash: two copies of one file share it, another version does not */
- const exe=path.join(root,'Fata','fata_jp.exe'),copy=path.join(root,'Copy','renamed.exe'),other=path.join(root,'Fata','fata_jp_v2.exe');
+ /* not Fata's program name: the gate and calibration mechanics are tested without the built-in seed (fixtures/games/fata-morgana covers the seed) */
+ const exe=path.join(root,'Fata','game_x.exe'),copy=path.join(root,'Copy','renamed.exe'),other=path.join(root,'Fata','fata_jp_v2.exe');
  for(const [f,b] of [[exe,'MZ-fata-1'],[copy,'MZ-fata-1'],[other,'MZ-fata-2']]){fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,b);}
  const key=await ap.exeKey(root,exe);assert.strictEqual(key,crypto.createHash('sha256').update('MZ-fata-1').digest('hex'));require('../services/runtime-sample.cjs').setEnabled(root,true);
  assert.strictEqual(await ap.exeKey(root,copy),key,'a renamed copy is the same diff');assert.notStrictEqual(await ap.exeKey(root,other),key,'another version is its own diff');
@@ -65,7 +66,7 @@ try{
  assert.ok(stored,'calibration stored');assert.strictEqual(stored.mode,'read');assert.strictEqual(calls.length,1);assert.strictEqual(calls[0][0],true);assert.ok(calls[0][1].length>0,'Alt+T shows why');
  assert.ok(traced.some(l=>l.startsWith('selfCheck window=1')),'window traced');const top=profiles[profiles.length-1];assert.ok(/\+auto(\+seed-game)?$/.test(top.layers),'the calibration is the top layer under a built-in seed: '+top.layers);assert.strictEqual(top.hide.textEffectsRead,true);assert.strictEqual(top.calibrate.hideMethod,'read');assert.ok(logged.some(e=>e.kind==='selfCheck'&&e.what==='calibrated'));
  /* the runtime sample of the first window */
- const sample=JSON.parse(fs.readFileSync(path.join(root,'data','runtime-samples',key,'sample.json'),'utf8'));assert.strictEqual(sample.schema,'megulit.runtime-sample');assert.ok(sample.lines.length>=20);assert.ok(sample.boxes.length>0);assert.ok(sample.drops.length>0);assert.strictEqual(sample.exe,'fata_jp.exe');
+ const sample=JSON.parse(fs.readFileSync(path.join(root,'data','runtime-samples',key,'sample.json'),'utf8'));assert.strictEqual(sample.schema,'megulit.runtime-sample');assert.ok(sample.lines.length>=20);assert.ok(sample.boxes.length>0);assert.ok(sample.drops.length>0);assert.strictEqual(sample.exe,'game_x.exe');
  live.stop();gal.textEffectsHold=null;calls.length=0;
  live.start(reader,reader.gameExe);assert.strictEqual(calls.length,1,'stored read mode applies at the next start');
  gal.textEffectsHold=null;live.recalibrate(reader);assert.strictEqual(ap.load(root,key),null,'重新校准 forgets the stored diff');assert.ok(live.current().check.recording,'and records again');

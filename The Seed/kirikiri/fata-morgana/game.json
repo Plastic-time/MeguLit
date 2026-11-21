@@ -4,7 +4,7 @@
  "key": "610c5f4de9d30efb2f9e95da17f894585dee00354f7075d73e07b28c86a77a55",
  "layer": "game",
  "source": "official",
- "mode": "read",
+ "mode": "hide",
  "settings": {
   "placement": {
    "lineOffsetY": 0,
@@ -24,7 +24,7 @@
    "dropEffectFrames": true
   },
   "hide": {
-   "textEffectsRead": true
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
@@ -49,7 +49,7 @@
   "vndb": "v12402"
  },
  "seedFormat": 1,
- "status": "read",
+ "status": "owner-ok",
  "slug": "fata-morgana",
  "builds": [
   "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42"
@@ -72,5 +72,5 @@
  "sourceLangs": [
   "ja"
  ],
- "rev": 1
+ "rev": 2
 }

@@ -24,6 +24,8 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 - `The Seed/<engine>/<slug>/versions/<exe SHA-256>.json`：版本层文档，文件名 = key
 - settings 钉住非空的行为键的当前生效值：做好了就是做好了，内核默认改了它也不变。`null`、`calibrate.*`、`selfCheck.*`、`hide.engineTrial.*` 不钉（verified seed 在本机校准之上，钉了会盖掉每台电脑的本机校准、共享层和闸门阈值）；`seed.cjs check()` 对钉了这些的 seed 报警（`warnings`），`validation/the-seed.test.cjs` 要求仓库里没有报警。The Seed 内容以 `tools/diff-maker/seed-all.cjs` 的输出为准
 - 客户端语义：`verified` / `owner-ok` 直接用（官方游戏层）；`read` 直接读模式（官方游戏层）；`skeleton` 只给身份 + 钉住值，放在本机校准下面，自检闸门照常把关（不过线退读模式）
+- `verified` / `owner-ok` / `read` 的 seed 在自检里也算官方：本机校准不再叠在它下面、也不会把它换成读模式；本机退档照样最高，但在这样的 seed 下闸门只为看得见的损坏退档（漏句 `dropRate`、原文露出 `hideVisible`、复读 `repeatRate`），配对率、选项数单独超线不退（1.4.22 ファタ：开场特效让第一个窗口 pair=0.05，其实每句都画了）
+- seed-all：店主名单 `tools/diff-maker/owner-ok.json` 里的游戏，即使样本离线判成 read 也写成 owner-ok + hide（样本可能早于让它能用的修复）
 
 **语言**（2026-11-21，为英文学习模式和多语言译文留的接口）：
 - 跟语言有关的设置放 `settings.lang.<bcp47>`：`{annotation: 'ruby'|'ipa'|'pinyin'|'none', pairing: 'script'|'patch'|'machine'|'none', dictionary: <id>, fontFallback: [字体名]}`（`core/profiles/domains.cjs langMap`，块里不认识的字段忽略）；游戏层键；各层按语言、按字段叠加

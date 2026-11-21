@@ -36,7 +36,7 @@ test('check() refuses what a seed must not carry',()=>{
 test('status: verified / owner-ok / read are the official game layer (read in read mode), skeleton sits under this PC calibration',()=>{
  const s=Profiles.profileFor({exe:'D:/g/SenrenBanka.exe'});assert.equal(s.gameKey,'senren-banka');assert.equal(s.seedStatus,'verified');assert.equal(s.layers,'core+engine+seed-game');
  const v=Profiles.profileFor({exe:'D:/x/renamed.exe',exeSha256:SENREN_EXE});assert.equal(v.gameKey,'senren-banka');assert.equal(v.match,'exe');assert.equal(v.layers,'core+engine+seed-game+seed');
- const f=Profiles.profileFor({exe:'D:/x/x.exe',exeSha256:FATA_EXE});assert.equal(f.seedStatus,'read');assert.equal(f.hide.textEffectsRead,true);assert.equal(f.choice.dropEffectFrames,true,'the Fata fixes live in its seed');
+ const f=Profiles.profileFor({exe:'D:/x/x.exe',exeSha256:FATA_EXE});assert.equal(f.seedStatus,'owner-ok');assert.equal(f.hide.textEffectsRead,false,'1.4.22: Fata is hidden, the reader draws its Japanese');assert.equal(f.choice.dropEffectFrames,true,'the Fata fixes live in its seed');
  const sk=Seed.seeds().games.find(g=>g.status==='skeleton');assert.ok(sk,'there are skeleton seeds');
  const k=Profiles.profileFor({exe:'D:/x/x.exe',exeSha256:sk.match.exeSha256[0],auto:{page:{holdMs:4321}}});assert.equal(k.gameKey,sk.key);assert.match(k.layers,/\+seed-skeleton\+auto/);assert.equal(k.page.holdMs,4321);
  const newer=Profiles.profileFor({exe:'D:/g/SenrenBanka.exe',officialGame:{page:{holdMs:9}},officialGameRev:1});assert.equal(newer.layers,'core+engine+official-game','a downloaded official diff with a rev replaces the built-in seed');

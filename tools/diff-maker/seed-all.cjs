@@ -114,6 +114,10 @@ async function seedOne(g,logs,wins,{out,seed,ownerOk,versionsWritten}){const eng
   row.metrics=b.metrics;row.over=result.hideBest?.over||[];
   const rpt=Emit.report(probe,slug,result,Emit.diffsOf(probe,slug,result,gameFile),base,lines);row.look.push(...rpt.look);fs.writeFileSync(path.join(work,'report.md'),rpt.md);}
  else{status=ownerOk.has(slug)?'owner-ok':'skeleton';row.look.push(status==='owner-ok'?'店主确认能用，本机没有样本':'待运行样本'+(smp?.lines?'（只有 '+smp.lines+' 句）':''));}
+ /* 2026-11-21 (owner, 1.4.22 test: ファタモルガーナの館 lost its Japanese in read mode; hide mode with the reader drawing the Japanese
+    works, incr12) a game on the owner's list is owner-ok and hidden even when a sample's offline verdict was read: the sample can be
+    older than the fixes that made it work, the owner's run is newer */
+ if(status==='read'&&ownerOk.has(slug)){status='owner-ok';mode='hide';if(measured.hide)measured.hide={...measured.hide,textEffectsRead:false};if(measured.calibrate&&measured.calibrate.hideMethod==='read')measured.calibrate={...measured.calibrate,hideMethod:'hide'};row.look.push('样本判读模式，但店主确认隐藏模式能用：owner-ok');}
  row.state=status;row.mode=mode;row.suspect=sus;for(const x of sus)row.look.push('可疑量测值没写进 seed：'+x.key+' '+x.value.w+'x'+x.value.h+' @'+x.value.x+','+x.value.y+'（'+x.why+'）');
  /* the seed: today's values pinned, the measured ones over them; build() keeps each scope's keys */
  const settings=Emit.deepMerge(pinned(base),seedMeasured(measured));

@@ -36,12 +36,19 @@ function inputOf(s){const st=s.stored,sh=s.shared,out={...(s.input||{})};for(con
  if(sh){const put=(p,field)=>{if(!p||!p.settings)return;const f=(p.source==='official'?'official':'shared')+field;out[f]=p.settings;out[f+'Rev']=p.rev|0;};put(sh.game,'Game');put(sh.version,'');if(sh.match)out.match=sh.match;}
  /* the game prints let a built-in seed (The Seed/) find its game by archive / script / VNDB / title */
  if(s.prints)out.prints=s.prints;
- if(st&&st.settings){if(st.source==='gate')out.stepDown=st.settings;else out.auto=st.settings;}return out;}
+ /* a verified / owner-ok built-in seed is official: this PC's calibration is not layered under it (its unpinned calibrate.* would
+    still say read); a gate step-down always is */
+ const seedOk=['verified','owner-ok'].includes(s.profile?.seedStatus);
+ if(st&&st.settings){if(st.source==='gate')out.stepDown=st.settings;else if(!seedOk)out.auto=st.settings;}return out;}
 function applyLayer(s){try{const p=Profiles.profileFor(inputOf(s));s.profile=p;s.reader.gal?.setGameProfile?.(p,s.input);}catch{}}
 /* which layer wins (see above) */
 function choose(s){const st=s.stored,sh=s.shared;
  if(st&&st.source==='gate')return {from:'local-gate',mode:'read',settings:st.settings,reason:st.reason||''};
  if(sh&&sh.source==='official')return {from:'official',mode:sh.mode,settings:sh.settings,reason:sh.mode==='read'?'官方差分：这部游戏只显示译文':''};
+ /* 2026-11-21 (1.4.22 test, ファタモルガーナの館: a calibration this PC stored as read mode took the game out of the hide mode the
+    owner confirmed) a built-in seed that is verified or owner-ok is official too: this PC's own calibration does not override it
+    (the gate's step-down above still does) */
+ {const ss=s.profile?.seedStatus;if(ss==='verified'||ss==='owner-ok'||ss==='read')return {from:'seed',mode:ss==='read'?'read':'hide',settings:null,reason:ss==='read'?'内置 seed：这部游戏只显示译文':''};}
  if(st)return {from:'local',mode:st.mode,settings:st.settings,reason:st.reason||''};
  if(sh)return {from:'shared',mode:sh.mode,settings:sh.settings,reason:sh.mode==='read'?'多数玩家在这部游戏上自检未过线':''};
  return null;}
@@ -50,7 +57,7 @@ function settle(s){const c=choose(s);const was=s.from;s.layer=c?.settings||null;
  /* nothing to record when the result is already decided for this exe */
  /* a candidate (the relay found it by the binary or the game, not this exe) does not stop the recording: if the gate refuses it
     the first window is this PC's calibration */
- if(!s.stored&&s.shared?.exact!==false&&(s.shared?.source==='official'||s.shared?.mode==='read')&&s.check.recording){s.check.recording=null;s.calibrated=true;}
+ if((!s.stored||s.stored.source!=='gate')&&(s.from==='seed'||!s.stored&&s.shared?.exact!==false&&(s.shared?.source==='official'||s.shared?.mode==='read'))&&s.check.recording){s.check.recording=null;s.calibrated=true;}
  if(was!==s.from||c)return c;return null;}
 
 /* profile: the game's layered profile without the auto layer; input: its profileFor input */
@@ -101,6 +108,10 @@ function windowDone(s,r){if(live!==s)return;const {reader}=s;
   reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'calibrated',key:s.key,mode:res.mode,reason:res.reason||'',cost:res.score.cost});
   settle(s);applyLayer(s);feed.report(reader.root,rec,{prints:s.prints}).catch(()=>{});return;}
  if(r.pass||s.from==='local-gate'||reader.gal?.textEffectsHold)return;
+ /* under a verified / owner-ok built-in seed the gate steps down only for damage the player sees (lines dropped, the original
+    visible, a line drawn twice); a low pairing or a choice count alone is the measurement's own limit on such a game (ファタ's
+    opening effects: pair=0.05 while every line was drawn), not a reason to leave the mode the seed was confirmed in */
+ if(s.from==='seed'&&!r.over.some(k=>['dropRate','hideVisible','repeatRate'].includes(k))){hookTrace(reader,'selfCheck seed kept key='+s.key+' over='+r.over.join(',')+' (no visible damage)');return;}
  const trip={window:r.window,over:r.over,metrics:r.metrics,reason:reasonText(r.over)};
  const rec=auto.stepDown(s.stored,{key:s.key,engine,exe:s.exe,version:s.ver,trip,window:r});try{auto.store(reader.root,s.key,rec);}catch{}s.stored=rec;
  hookTrace(reader,'selfCheck step down key='+s.key+' layer='+(s.from||'none')+' -> read: '+trip.reason);
