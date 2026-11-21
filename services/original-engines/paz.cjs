@@ -60,10 +60,12 @@ const voiceRef=require('./voice-ref.cjs');
 /* E452 a script is Japanese unless its messages have no kana and are either not plain ASCII (a Chinese patch in GBK
    over scr.paz, eden* on Steam) or many and all ASCII (an English release): those are not offered as originals. */
 const KANA=/[぀-ヿ]/;
-function japanese(data){const text=kit.SJIS.decode(data),rows=text.split(/\r?\n/).filter(r=>r.startsWith('.message'));
- if(rows.some(r=>KANA.test(r)))return text;const ascii=rows.every(r=>/^[\x00-\x7f]*$/.test(r));return ascii&&rows.length<20?text:null;}
-function parse(data){const lines=[],voices=[];const text=japanese(data);if(text==null)return {lines,anchors:[]};
- for(const row of text.split(/\r?\n/)){if(!row.startsWith('.message'))continue;const f=row.split('\t');const name=f[3]||'',text=(f.slice(4).join('\t')||'').replace(/\\#[0-9A-Fa-f]{6}/g,'').replace(/\\n/g,'').replace(/\\[-+*A-Za-z]/g,'').trim();/* \#RRGGBB colour, \n break, \+ etc. */
+const messageRows=data=>kit.SJIS.decode(data).split(/\r?\n/).filter(row=>/^\.message[\t ]/.test(row));
+function parse(data){const lines=[],voices=[],rows=messageRows(data);
+ if(!rows.some(r=>KANA.test(r))&&(rows.length>=20||rows.some(r=>/[^\x00-\x7f]/.test(r))))return {lines,anchors:[]};
+ for(const row of rows){
+  const separator=/^\.message *\t/.test(row)?'\t':' ',f=row.split(separator);
+  const name=f[3]||'',text=f.slice(4).join(separator).replace(/\\#[0-9A-Fa-f]{6}/g,'').replace(/\\n/g,'').replace(/\\[-+*A-Za-z]/g,'').trim();/* \#RRGGBB colour, \n break, \+ etc. */
   if(!text)continue;if(name){lines.push(name);voices.push(null);}lines.push(text);voices.push(voiceRef.clean(f[2]));}
  const v=voiceRef.keep(voices);return v?{lines,anchors:[],voices:v}:{lines,anchors:[]};}
 /* scr.dat (Musica) or scr.paz / pmscr.paz (minori) */
@@ -76,7 +78,7 @@ const engine=kit.engine({id:'paz',hint:'scr.dat 或 scr.paz',overlay:false,
   /* the language the scenario is in, so the answer is exact: minori's Steam eden* ships Chinese (eden_cn.dll) or English only, never the Japanese text;
      GBK bytes read as Shift-JIS are never plain ASCII, so a row that is not ASCII counts as Chinese */
   let han=0,ascii=0;
-  for(const e of sc){try{const rows=kit.SJIS.decode(e.read()).split(/\r?\n/).filter(r=>r.startsWith('.message'));if(rows.some(r=>KANA.test(r)))return '';
+  for(const e of sc){try{const rows=messageRows(e.read());if(rows.some(r=>KANA.test(r)))return '';
    for(const r of rows){if(/^[\x00-\x7f]*$/.test(r))ascii++;else han++;}}catch{}}
   return han>ascii?'PAZ_CHINESE_ONLY':ascii?'PAZ_ENGLISH_ONLY':'PAZ_NO_JAPANESE';},
  REASONS:{PAZ_CHINESE_ONLY:'这个版本的剧本是中文（Steam 中文版或汉化补丁），里面没有日文原文，需要日文版的 scr 文件',PAZ_ENGLISH_ONLY:'这个版本的剧本是英文（Steam 英文版），里面没有日文原文，需要日文版的 scr 文件',PAZ_NO_JAPANESE:'这个版本的剧本里没有日文原文（英文版或装了汉化补丁），需要日文版的 scr 文件'},

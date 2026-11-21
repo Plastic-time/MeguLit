@@ -43,6 +43,30 @@ test('PAZ: a Chinese patch (GBK) or a long English script is not offered as Japa
  fs.rmSync(dir,{recursive:true,force:true});
 });
 
+test('PAZ: space-delimited messages keep empty columns, speaker names, voices and dialogue spacing',()=>{
+ const script=Buffer.concat([
+  Buffer.from('.message 10   No  voice.\r\n.message 11 v001 A'),Buffer.from([0x81,0x40]), // full-width space in a name
+  Buffer.from('B '),Buffer.from([0x82,0xd0]), // ひ
+  Buffer.from('  OK\r\n.message 12  Speaker Quiet.\r\n.message\t13\tv002\tA B\tOne\ttwo\r\n.message 14 v003 Speaker \r\n.message 15\r\n'),
+ ]);
+ const result=paz.parse(script);
+ assert.deepStrictEqual(result.lines,['No  voice.','A　B','ひ  OK','Speaker','Quiet.','A B','One\ttwo']);
+ assert.deepStrictEqual(result.voices,[null,null,'v001',null,null,null,'v002']);
+});
+
+test('PAZ: a different command cannot turn an English script into a Japanese scene',()=>{
+ const english=Array(30).fill('.message 10   Hello there.').join('\n');
+ const other=Buffer.concat([Buffer.from('\n.messageColor\t1\t\t\t'),Buffer.from([0x82,0xd0])]);
+ assert.deepStrictEqual(paz.parse(Buffer.concat([Buffer.from(english),other])).lines,[]);
+});
+
+test('PAZ: padding before the first tab keeps a tab-delimited message intact',()=>{
+ const row=Buffer.from('.message  \t10\tv001\tA B\tOne  two\tthree');
+ assert.deepStrictEqual(paz.parse(row),{lines:['A B','One  two\tthree'],voices:[null,'v001'],anchors:[]});
+ const spaced=Buffer.from('.message 10   One\ttwo');
+ assert.deepStrictEqual(paz.parse(spaced).lines,['One\ttwo']);
+});
+
 test('Naninovel: "> Name: |#id|" gives the line its voice by text id; @choice and narration take none',()=>{
  const doc=['; 日本語 <ja> to 简体中文 <zh-Hans> localization document for \'A/B\' Naninovel scenario script','',
   '# 0101Adv31_Narrative001','; エマたちは食堂の調査にやってきた。','艾玛她们来到了食堂。','',
