@@ -2,6 +2,7 @@
 """Optional neutral fixture producer, never imports a real game or Ren'Py SDK."""
 import base64
 import collections
+import hashlib
 import json
 import pickle
 import pickletools
@@ -21,8 +22,45 @@ if sys.argv[1:] == ["--defaultdict"]:
                       "scope": "ordinary CPython defaultdict serializer with fixed neutral data, not RenPy compiler or game bytes",
                       "fixtures": fixtures}, indent=2))
     raise SystemExit(0)
+if sys.argv[1:] == ["--revertable-dict"]:
+    neutral_package = types.ModuleType("renpy")
+    neutral_package.__path__ = []
+    neutral_module = types.ModuleType("renpy.revertable")
+    neutral_package.revertable = neutral_module
+    sys.modules["renpy"] = neutral_package
+    sys.modules["renpy.revertable"] = neutral_module
+
+    class RevertableDict(dict):
+        __module__ = "renpy.revertable"
+
+    neutral_module.RevertableDict = RevertableDict
+    fixtures = []
+    for protocol in (2, 4, 5):
+        for shape in ("empty", "items", "attributes", "cycle"):
+            value = RevertableDict()
+            if shape == "items":
+                value.update({"alpha": [1, 2], 7: None, "empty": []})
+            elif shape == "attributes":
+                value["kind"] = "entry_only"
+                for key in ("kind", "className", "entries", "state", "stateShape", "_clean", "__proto__"):
+                    setattr(value, key, "attribute_only")
+            elif shape == "cycle":
+                shared = [1, 2]
+                value["self"] = value
+                value["first"] = shared
+                value["second"] = shared
+                value.link = value
+            data = pickle.dumps(value, protocol=protocol)
+            fixtures.append({"protocol": protocol, "shape": shape, "bytes": len(data),
+                             "sha256": hashlib.sha256(data).hexdigest(),
+                             "base64": base64.b64encode(data).decode("ascii"),
+                             "opcodes": sorted({op.name for op, _, _ in pickletools.genops(data)})})
+    print(json.dumps({"python": sys.version,
+                      "scope": "ordinary CPython neutral dict subclass, not an imported RenPy class, compiler or game bytes; dumps only, no loads",
+                      "fixtures": fixtures}, indent=2))
+    raise SystemExit(0)
 if sys.argv[1:] and sys.argv[1:] not in (["--pycode"], ["--pyexpr"]):
-    raise SystemExit("Only optional --defaultdict, --pycode or --pyexpr is supported")
+    raise SystemExit("Only optional --defaultdict, --pycode, --pyexpr or --revertable-dict is supported")
 
 package = types.ModuleType("renpy")
 package.__path__ = []

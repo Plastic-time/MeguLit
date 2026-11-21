@@ -8,10 +8,11 @@ const MARK=Symbol('pickle mark');
 function fail(code,offset){const error=Error('RENPY_PICKLE_'+code);error.code=error.message;error.offset=offset;throw error;}
 function decode(buffer,options={}){
  if(!options||typeof options!=='object'||Array.isArray(options))fail('OPTIONS',0);
- const {limits:overrides={},classes=CLASSES,allowDefaultDict=false,allowPyCodeState=false,allowPyExpr=false}=options;
+ const {limits:overrides={},classes=CLASSES,allowDefaultDict=false,allowPyCodeState=false,allowPyExpr=false,allowRevertableDict=false}=options;
  if(typeof allowDefaultDict!=='boolean')fail('DEFAULTDICT_OPTION',0);
  if(typeof allowPyCodeState!=='boolean')fail('PYCODE_OPTION',0);
  if(typeof allowPyExpr!=='boolean')fail('PYEXPR_OPTION',0);
+ if(typeof allowRevertableDict!=='boolean')fail('REVERTABLE_DICT_OPTION',0);
  const limits={...LIMITS};
  if(!overrides||typeof overrides!=='object'||Array.isArray(overrides))fail('LIMITS',0);
  for(const [key,value]of Object.entries(overrides)){
@@ -38,13 +39,14 @@ function decode(buffer,options={}){
  const list=items=>{spend('edges',items.length);return {kind:'list',items};};
  const mapping=()=>({kind:'dict',entries:new Map()});
  const put=(target,key,value)=>{
-  if(!['dict','defaultdict'].includes(target?.kind)||!(typeof key==='string'||typeof key==='number'&&Number.isSafeInteger(key)))fail('DICT',at);
+  if(!['dict','defaultdict','revertable-dict'].includes(target?.kind)||!(typeof key==='string'||typeof key==='number'&&Number.isSafeInteger(key)))fail('DICT',at);
   if(target.entries.has(key))fail('DUPLICATE_KEY',at);spend('edges',2);target.entries.set(key,value);
  };
  const pairs=(target,items)=>{if(items.length%2)fail('DICT',at);for(let index=0;index<items.length;index+=2)put(target,items[index],items[index+1]);};
  const remember=index=>{if(index>=limits.memo||memo.size>=limits.memo)fail('BUDGET_MEMO',at);if(memo.has(index))fail('DUPLICATE_MEMO',at);memo.set(index,peek());};
  const recall=index=>{if(!memo.has(index))fail('MEMO',at);push(memo.get(index));};
  const global=(module,name)=>{
+  if(allowRevertableDict&&module==='renpy.revertable'&&name==='RevertableDict')return Object.freeze({kind:'global',name:'renpy.revertable.RevertableDict'});
   if(allowPyExpr&&module==='renpy.astsupport'&&name==='PyExpr')return Object.freeze({kind:'global',name:'renpy.astsupport.PyExpr'});
   if(allowDefaultDict&&(module==='collections'&&name==='defaultdict'||(module==='builtins'||module==='__builtin__')&&name==='list'))return Object.freeze({kind:'global',name:module+'.'+name});
   if(module!=='renpy.ast'||typeof name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]{0,100}$/.test(name))fail('GLOBAL',at);
@@ -125,12 +127,21 @@ function decode(buffer,options={}){
     }
     push({kind:'defaultdict',factory,entries:new Map()});break;
    }
-   case 0x81:{const args=pop(),cls=pop();if(cls?.kind!=='global'||!allowed.has(cls.name)||args?.kind!=='tuple'||args.items.length)fail('NEWOBJ',at);push({kind:'instance',className:cls.name,state:null});break;}
+   case 0x81:{
+    const args=pop(),cls=pop();if(cls?.kind!=='global'||args?.kind!=='tuple'||args.items.length)fail('NEWOBJ',at);
+    if(allowRevertableDict&&cls.name==='renpy.revertable.RevertableDict'){
+     spend('nodes',1);spend('edges',2);
+     push({kind:'revertable-dict',className:cls.name,entries:new Map(),state:null});break;
+    }
+    if(!allowed.has(cls.name))fail('NEWOBJ',at);push({kind:'instance',className:cls.name,state:null});break;
+   }
    case 0x62:{
-    const state=pop(),target=peek();if(target?.kind!=='instance'||target.state!==null)fail('STATE',at);
+    const state=pop(),target=peek();if(!['instance','revertable-dict'].includes(target?.kind)||target.state!==null)fail('STATE',at);
+    if(target.kind==='revertable-dict'&&state?.kind!=='dict')fail('STATE',at);
     if(target.className==='renpy.ast.PyCode'){target.state=pyCodeState(state);target.stateKind='pycode-opaque';target.stateShape='pycode:tuple'+state.items.length;break;}
     let dict=state,slots=null;if(state?.kind==='tuple'){if(state.items.length!==2)fail('STATE',at);[dict,slots]=state.items;}
     if(![dict,slots].every(item=>item===null||item?.kind==='dict'))fail('STATE',at);
+    if(target.kind==='revertable-dict')spend('nodes',1);
     const merged=new Map();for(const item of [dict,slots])if(item)for(const [key,value]of item.entries){if(typeof key!=='string'||merged.has(key))fail('STATE_KEY',at);spend('edges',2);merged.set(key,value);}
     target.state=merged;target.stateShape=state?.kind==='tuple'?'tuple:'+(dict===null?'none':'dict')+','+(slots===null?'none':'dict'):state===null?'none':'dict';break;
    }
