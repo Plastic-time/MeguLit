@@ -5,11 +5,19 @@ const {readJSON}=require('./store.cjs');
 // Text sizes changed on the home settings page also apply to the work that is running: its saved settings would hide them (issue 119).
 const SIZE_KEYS=['japaneseSize','translationSize','englishSize'];
 class Runtime {
- constructor(root,emit=()=>{}){this.root=root;this.folder=path.join(root,'data','config');this.emit=emit;this.stopped=false;}
+ constructor(root,emit=()=>{}){this.root=root;this.folder=path.join(root,'data','config');this.emit=(event,data)=>{if(event==='reader-event'&&data?.type!=='libraryOnly'&&this.libraryOnly())return;emit(event,data);};this.stopped=false;}
+ libraryOnly(){return this.libraryOnlyState??=require('../core/library-mode.cjs').libraryOnly(this.root);}
+ trackTextPath(prepared){if(!prepared?.session)return;this.textPaths??=new Set();this.textPaths.add(prepared.session);}
+ forgetTextPath(session){this.textPaths?.delete(session);}
+ async stopReading(){this.bindGeneration=(this.bindGeneration||0)+1;this.pendingGame='';this.pendingExecutable='';this.readerReady=false;this.readerPhase='not-started';const reader=this.reader;
+  try{const paths=[...(this.textPaths||[])],results=await Promise.allSettled([()=>reader?.stop(),...paths.map(p=>()=>p.stop())].map(async stop=>stop()));
+   const failed=results.find(result=>result.status==='rejected');if(failed)throw failed.reason;
+   for(const p of paths)this.textPaths.delete(p);if(this.reader===reader)this.reader=null;this.readerError='';
+  }catch(error){this.readerError='READER_STOP_INCOMPLETE';throw error;}}
  config(){return require('../core/v4-config.cjs').cleanV4(readJSON(path.join(this.folder,'v4-preferences.json')));}
  // Bind the window of a game MeguLit just launched; retried a few times while the reader/bridge finishes starting.
- bindLaunched(pid){if(!Number.isInteger(Number(pid))||Number(pid)<=0)return;/* the game MeguLit started itself (its script is injected early) */let marks=0;const mark=()=>{const h=this.reader?.gal?.hooks;if(h)h.launchedPid=Number(pid);else if(++marks<40)setTimeout(mark,500).unref?.();};mark();let tries=0;const go=()=>{const g=this.reader?.gal;if(g){g.send({type:'bindProcess',pid:String(pid)});if(++tries<4)setTimeout(go,1500);}else if(++tries<20)setTimeout(go,500);};setTimeout(go,300);}
- prepareGame(executable,{enter=true}={}){this.pendingGameEnter=enter;this.pendingGame=path.basename(executable,path.extname(executable));this.pendingExecutable=executable;this.reader?.selectGame(this.pendingGame,enter,executable);}
+ bindLaunched(pid){if(this.libraryOnly())return;const generation=this.bindGeneration||0,current=()=>!this.stopped&&!this.libraryOnly()&&generation===(this.bindGeneration||0);if(!Number.isInteger(Number(pid))||Number(pid)<=0)return;/* the game MeguLit started itself (its script is injected early) */let marks=0;const mark=()=>{if(!current())return;const h=this.reader?.gal?.hooks;if(h)h.launchedPid=Number(pid);else if(++marks<40)setTimeout(mark,500).unref?.();};mark();let tries=0;const go=()=>{if(!current())return;const g=this.reader?.gal;if(g){g.send({type:'bindProcess',pid:String(pid)});if(++tries<4)setTimeout(go,1500);}else if(++tries<20)setTimeout(go,500);};setTimeout(go,300);}
+ prepareGame(executable,{enter=true}={}){if(this.libraryOnly())return;this.pendingGameEnter=enter;this.pendingGame=path.basename(executable,path.extname(executable));this.pendingExecutable=executable;this.reader?.selectGame(this.pendingGame,enter,executable);}
  // Point the hook at the Japanese original index for this executable, or clear it.
  learning(){return this.localLearning??=new(require('../core/learning-native.cjs').LocalLearning)(this.root,message=>this.emit('reader-event',message));}
  ankiProcess(){return this.ankiRunner??=new(require('../core/anki-process.cjs').AnkiProcess)({config:()=>this.config(),log:line=>{try{require('node:fs').appendFileSync(path.join(this.root,'logs','anki-process.log'),new Date().toISOString()+' '+line+'\n');}catch{}}});}
@@ -33,7 +41,7 @@ class Runtime {
   await this.local().ensure(options);return translator.translate(text,options);}
  // Synopses: free machine translation first, then the user's own translation engine (Chinese or English).
  metadata(){const {machine}=require('../core/library.cjs');return this.gameEnrichment??=new(require('./game-enrichment.cjs').GameEnrichment)(this.root,this.emit,fetch,async(text,lang)=>(await machine(text,lang))||(lang!=='ja'?String(await this.reviewTranslate(text,lang,'follow').catch(()=>'')||'').trim():''));}
- settingsSaved(request){if(request.scope==='library'){const db=require('./store.cjs').openStore(this.root);try{require('./series.cjs').autoGroup(db,this.root);}finally{db.close();}}const reader=this.reader,g=reader?.gal;if(!g)return;const settings=new(require('./settings.cjs').Settings)(this.root);
+ async settingsSaved(request){const before=request.libraryOnlyBefore??this.libraryOnlyState;if(request.scope==='library')this.libraryOnlyState=undefined;if(request.scope==='library'&&Object.hasOwn(request.values||{},'libraryOnly')&&((before!==this.libraryOnly()&&(before!==undefined||this.libraryOnly()))||(this.libraryOnly()&&this.readerError==='READER_STOP_INCOMPLETE'))){this.emit('reader-event',{type:'libraryOnly',enabled:this.libraryOnly()});await this.stopReading();this.emit('reader-health',this.readerStatus());}if(request.scope==='library'){const db=require('./store.cjs').openStore(this.root);try{require('./series.cjs').autoGroup(db,this.root);}finally{db.close();}}const reader=this.reader,g=reader?.gal;if(!g)return;const settings=new(require('./settings.cjs').Settings)(this.root);
   if(['background','panels'].includes(request.scope))this.emit('reader-event',{type:'panelAppearance',values:settings.ui()});
   if(['text','embedding','position'].includes(request.scope)&&(!request.profile||request.profile===g.styleSync.profileKey)){const active=g.styleSync.profileKey,entries=readJSON(path.join(this.folder,'game-style-profiles.json')).entries||{},sizes=Object.keys(request.values||{}).filter(k=>SIZE_KEYS.includes(k));if(request.scope==='text'&&!request.profile&&active&&entries[active]&&sizes.length)try{settings.save({scope:'text',profile:active,values:Object.fromEntries(sizes.map(k=>[k,request.values[k]]))});}catch{}const global=settings.read('text'),profile=readJSON(path.join(this.folder,'game-style-profiles.json')).entries?.[active]?.prefs||{};const effective={...global,...profile,gameProcess:g.preferences.gameProcess,gameExecutable:g.preferences.gameExecutable,bindEnabled:g.preferences.bindEnabled};g.preferences=require('../core/game-style.js').clean(effective);g.preview(g.preferences);this.emit('reader-event',{type:'call',method:'restoreGalSettings',args:[g.preferences]});}
   /* the profiles file was written outside the reader (reset, a game's style edited in Settings): its next save starts from the file */
@@ -41,11 +49,12 @@ class Runtime {
   /* E545 */if(request.scope==='translation')reader.refreshTextSource?.({force:false});reader.immersion?.configure(this.config());g.setGameAudio(this.config().ankiGameMedia!==false);this.emit('reader-event',{type:'call',method:'restoreSettings',args:[reader.prefs()]});this.emit('reader-event',{type:'word-status-changed'});
  }
  /* Antivirus quarantine shows up as missing native files: name it instead of a generic timeout */readerMissing(){const fs=require('node:fs');return ['GalWindowBridge.exe','HookBridge.exe','HookInjector32.exe','HookInjector64.exe'].filter(n=>!fs.existsSync(path.join(this.root,'native',n)));}
- readerStatus(){const status=this.readerStatusRaw();if(status.ready||status.error&&!/READER_NATIVE_EXITED/.test(status.error)||status.phase!=='not-started'&&!status.error)return status;const missing=this.readerMissing();return missing.length?{...status,error:'READER_NATIVE_MISSING: '+missing.join(', ')}:status;}
+ readerStatus(){if(this.libraryOnly())return {libraryOnly:true,ready:false,phase:this.reader?.stopping?'library-only-stopping':'library-only',error:this.readerError||'',game:false};const status=this.readerStatusRaw();if(status.ready||status.error&&!/READER_NATIVE_EXITED/.test(status.error)||status.phase!=='not-started'&&!status.error)return status;const missing=this.readerMissing();return missing.length?{...status,error:'READER_NATIVE_MISSING: '+missing.join(', ')}:status;}
  readerStatusRaw(){const native=this.reader?.gal,alive=native?.process?.exitCode===null,hotkey=native?.state?.hotkey;/* game: a game is attached right now (silent hot updates wait until it closes, update-notice.js) */const pid=this.reader?.gamePid;let game=false;if(pid){try{process.kill(pid,0);game=true;}catch(e){game=e?.code==='EPERM';}}
   return {ready:!!this.readerReady&&alive&&hotkey===true,hotkey,game,error:this.readerError||(this.readerReady&&alive&&hotkey===false?'READER_HOTKEY_IN_USE':''),phase:this.readerPhase||'not-started'};}
  async call(request){
   if(this.stopped)throw Error('RUNTIME_STOPPED');const config=this.config();
+  if(this.libraryOnly()&&['reader_attach','reader_message','reader_invoke'].includes(request.action))return {libraryOnly:true,attached:false,replies:[]};
   switch(request.action){
 case 'library_scan':{this.libraryScans??=new(require('./library-scan.cjs').LibraryScans)(async(options,state)=>{const library=this.library();library.state=state;await library.scan(progress=>this.emit('library-progress',progress),options);const result=require('./library.cjs').reconcile(this.root,library.load().games,{restoreRemoved:!options.incremental,confirmedFolderMatches:library.confirmedFolderMatches});const db=require('./store.cjs').openStore(this.root);try{this.metadata().enqueue(db.prepare('SELECT id FROM games WHERE removed_at IS NULL').all().map(g=>g.id),options?.incremental!==true);
      /* E297 Hxv4 KiriKiri games found: read their scripts once in the background (setting 后台准备加密剧本) */
@@ -58,10 +67,10 @@ case 'library_scan':{this.libraryScans??=new(require('./library-scan.cjs').Libra
     return this.libraryScans.run({startup:request.startup===true,readState:()=>this.library().read()});}
    case 'library_find_steam':return this.library().findSteam();
    case 'reader_status':return this.readerStatus();
-   case 'reader_health':{const phase=String(request.phase||'').slice(0,100),error=String(request.error||'').slice(0,3000);this.readerReady=phase==='ready'&&!error;this.readerPhase=phase;this.readerError=error;if(error)await this.reader?.stop();this.emit('reader-health',this.readerStatus());require('node:fs').appendFileSync(path.join(this.root,'logs','reader-startup.log'),new Date().toISOString()+' '+phase+' '+error+'\n');return {saved:true};}
+   case 'reader_health':{if(this.libraryOnly())return {saved:false,libraryOnly:true};const phase=String(request.phase||'').slice(0,100),error=String(request.error||'').slice(0,3000);this.readerReady=phase==='ready'&&!error;this.readerPhase=phase;this.readerError=error;if(error)await this.reader?.stop();this.emit('reader-health',this.readerStatus());require('node:fs').appendFileSync(path.join(this.root,'logs','reader-startup.log'),new Date().toISOString()+' '+phase+' '+error+'\n');return {saved:true};}
    case 'reader_bootstrap':return {native:{...require('./settings.cjs').nativeDefaults,...readJSON(path.join(this.folder,'native-preferences.json'))},engines:Object.fromEntries(Object.entries(require('../core/engines.cjs').ENGINES).map(([name,engine])=>[name,{label:engine.label,hidden:!!engine.hidden,group:engine.group,kind:engine.kind,keyless:!!engine.keyless,editable:!!engine.editable,pair:!!engine.pair,baseUrl:engine.baseUrl,model:engine.model||'',models:require('../core/engines.cjs').modelsFor(name),hint:engine.hint||''}])),models:{gpt:require('../core/engines.cjs').modelsFor('gpt'),deepseek:require('../core/engines.cjs').modelsFor('deepseek')}};
-   case 'reader_detach':this.readerReady=false;this.readerError='';await this.reader?.stop();return {stopped:true};
-   case 'reader_attach':{const reader=this.reader??=new(require('./reader.cjs').Reader)(this);if(reader.stopping)await reader.stopping;return reader.attach(request);}
+   case 'reader_detach':await this.stopReading();return {stopped:true};
+   case 'reader_attach':{if(this.reader?.stopping)await this.reader.stopping;if(this.libraryOnly())return {libraryOnly:true,attached:false};if(!this.reader||this.reader.closed)this.reader=new(require('./reader.cjs').Reader)(this);return this.reader.attach(request);}
    case 'reader_message':return (this.reader??=new(require('./reader.cjs').Reader)(this)).message(request.message);
    case 'reader_invoke':return (this.reader??=new(require('./reader.cjs').Reader)(this)).invoke(request.command,request.args);
    case 'model_status':return {...this.models().status(),runtime:this.local().status()};
@@ -108,6 +117,18 @@ case 'library_scan':{this.libraryScans??=new(require('./library-scan.cjs').Libra
    default:throw Error('UNKNOWN_RUNTIME_ACTION');
   }
  }
- async stop(){if(this.stopping)return this.stopping;this.stopped=true;this.gameEnrichment?.stop();this.gameReviews?.stop();this.stopping=(async()=>{await Promise.all([this.reader?.stop(),this.ankiRunner?.stop().catch(()=>{})]);this.localLearning?.stop();if(this.modelStore)for(const id of Object.keys(this.modelStore.jobs))this.modelStore.cancel(id);this.localEngine?.cancel();await Promise.allSettled([this.serviceManager?.stop(),this.localEngine?.stop()]);})();return this.stopping;}
+ async stop(){
+  if(this.stopping)return this.stopping;
+  this.stopped=true;
+  this.stopping=(async()=>{
+   let first,failed=false;
+   const settle=async tasks=>{const results=await Promise.allSettled(tasks.map(run=>Promise.resolve().then(run)));for(const r of results)if(r.status==='rejected'&&!failed){failed=true;first=r.reason;}};
+   await settle([()=>this.stopReading(),()=>this.ankiRunner?.stop(),()=>this.gameEnrichment?.stop(),()=>this.gameReviews?.stop()]);
+   await settle([()=>this.localLearning?.stop(),...Object.keys(this.modelStore?.jobs||{}).map(id=>()=>this.modelStore.cancel(id)),()=>this.localEngine?.cancel()]);
+   await settle([()=>this.serviceManager?.stop(),()=>this.localEngine?.stop()]);
+   if(failed)throw first;
+  })();
+  this.stopping.catch(()=>{});return this.stopping;
+ }
 }
 module.exports={Runtime};

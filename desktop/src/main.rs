@@ -150,6 +150,7 @@ fn app_exit_for_update(window:tauri::WebviewWindow){
 
 #[tauri::command]
 async fn reader_open(app:tauri::AppHandle,background:Option<bool>)->Result<(),String>{
+    if reader_library_only(&app).await?{if let Some(window)=app.get_webview_window("reader"){window.close().map_err(|e|e.to_string())?;}return Ok(());}
     reader_log(&app.state::<DesktopState>().root,"open-request","");
     if let Some(window)=app.get_webview_window("reader"){if background!=Some(true){app.state::<DesktopState>().reader_background.store(false,Ordering::SeqCst);window.show().map_err(|e|e.to_string())?;}return Ok(());}
     let state=app.state::<DesktopState>();
@@ -162,6 +163,8 @@ async fn reader_open(app:tauri::AppHandle,background:Option<bool>)->Result<(),St
         .map(|w|{window_policy::no_accent_border(&w);window_policy::chromeless(&w);})?;reader_log(&state.root,"window-created","");Ok(())
 }
 
+async fn reader_library_only(app:&tauri::AppHandle)->Result<bool,String>{let root=app.state::<DesktopState>().root.clone();let status=tauri::async_runtime::spawn_blocking(move||run_service(root,json!({"action":"reader_status"}))).await.map_err(|e|e.to_string())??;Ok(status.get("libraryOnly").and_then(Value::as_bool)==Some(true))}
+
 #[tauri::command]
 async fn reader_connect(window:tauri::WebviewWindow,state:State<'_,DesktopState>)->Result<Value,String>{
     if window.label()!="reader"{return Err("INVALID_READER_WINDOW".into());}
@@ -169,13 +172,14 @@ async fn reader_connect(window:tauri::WebviewWindow,state:State<'_,DesktopState>
     #[cfg(not(windows))] let hwnd=String::from("0");
     reader_log(&state.root,"connect-request","");
     let root=state.root.clone();let result=tauri::async_runtime::spawn_blocking(move||run_service(root,json!({"action":"reader_attach","pid":std::process::id(),"hwnd":hwnd}))).await.map_err(|e|e.to_string())??;
+    if result.get("libraryOnly").and_then(Value::as_bool)==Some(true){window.close().map_err(|e|e.to_string())?;return Ok(result);}
     reader_log(&state.root,"native-attached","");
     if !state.reader_background.load(Ordering::SeqCst){window.show().map_err(|e|e.to_string())?;}Ok(result)
 }
 
 fn reader_log(root:&std::path::Path,phase:&str,error:&str){use std::io::Write;let _=std::fs::create_dir_all(root.join("logs"));if let Ok(mut file)=std::fs::OpenOptions::new().create(true).append(true).open(root.join("logs/reader-native.log")){let _=writeln!(file,"{}",json!({"phase":phase,"error":error,"pid":std::process::id()}));}}
 #[tauri::command]
-async fn reader_restart(app:tauri::AppHandle)->Result<(),String>{let root=app.state::<DesktopState>().root.clone();tauri::async_runtime::spawn_blocking(move||run_service(root,json!({"action":"reader_detach"}))).await.map_err(|e|e.to_string())??;if let Some(window)=app.get_webview_window("reader"){window.eval("location.reload()").map_err(|e|e.to_string())?;Ok(())}else{reader_open(app,Some(true)).await}}
+async fn reader_restart(app:tauri::AppHandle)->Result<(),String>{if reader_library_only(&app).await?{if let Some(window)=app.get_webview_window("reader"){window.close().map_err(|e|e.to_string())?;}return Ok(());}let root=app.state::<DesktopState>().root.clone();tauri::async_runtime::spawn_blocking(move||run_service(root,json!({"action":"reader_detach"}))).await.map_err(|e|e.to_string())??;if let Some(window)=app.get_webview_window("reader"){window.eval("location.reload()").map_err(|e|e.to_string())?;Ok(())}else{reader_open(app,Some(true)).await}}
 
 #[tauri::command]
 async fn pick_executable(app:tauri::AppHandle,directory:Option<String>) -> Result<Option<String>,String> {
@@ -348,6 +352,7 @@ fn animate_home(handle:tauri::AppHandle,ticket:u64,leaving:bool){
 
 #[tauri::command]
 async fn window_action(action: String, window: tauri::WebviewWindow, state: State<'_, DesktopState>) -> Result<(), String> {
+    if (action=="enter_overlay"||window.label()=="reader"&&action=="ready")&&reader_library_only(window.app_handle()).await?{if window.label()=="reader"{window.close().map_err(|e|e.to_string())?;}return Ok(());}
     match action.as_str() {
         "ready" => {
             if window.label()=="main"&&!state.headless{state.window_memory.enable();}
@@ -366,6 +371,7 @@ async fn window_action(action: String, window: tauri::WebviewWindow, state: Stat
                     let _=std::fs::remove_file(&revealed);let _=app.emit("home-revealed","splash"); });
             } else { window.show().map_err(|e| e.to_string())?;let _=window.app_handle().emit("home-revealed","shown"); }
         },
+        "reader_disabled" => {if window.label()=="reader"&&reader_library_only(window.app_handle()).await?{window.close().map_err(|e|e.to_string())?;}},
         "enter_overlay" => begin_home_exit(window.app_handle())?,
         "hide_home" => {state.home_transition.cancel();hide_home(window.app_handle())?;},
         "show_home" => reveal(window.app_handle()),

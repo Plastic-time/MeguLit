@@ -74,24 +74,24 @@ function makeShadow({exe,shadowRoot,pack,port,steamAppId=null}){
 class UnityTextPath{
  constructor({onChars=()=>{},onStatus=()=>{},onAsk=()=>{},canary=null}={}){Object.assign(this,{onChars,onStatus,onAsk,canary});this.sock=null;this.on=false;this.wanted='';this.armed=false;this.drawCfg=null;this.embeds=new Map();}
  listen(){return new Promise((resolve,reject)=>{this.server=net.createServer(s=>this.accept(s));this.server.on('error',reject);this.server.listen(0,'127.0.0.1',()=>resolve(this.server.address().port));});}
- accept(s){if(this.sock)this.sock.destroy();this.sock=s;s.setEncoding('utf8');s.setNoDelay(true);let buf='';
+ accept(s){if(this.stopped){s.destroy();return;}if(this.sock)this.sock.destroy();this.sock=s;s.setEncoding('utf8');s.setNoDelay(true);let buf='';
   s.on('data',d=>{buf+=d;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).replace(/\r$/,'');buf=buf.slice(i+1);this.line(line);}if(buf.length>200000)buf='';});
   s.on('close',()=>{if(this.sock===s)this.sock=null;});s.on('error',()=>{});this.push();}
- line(l){if(l.startsWith('ToMe_UNITY status ')){this.onStatus(l.slice(18));return;}
+ line(l){if(this.stopped)return;if(l.startsWith('ToMe_UNITY status ')){this.onStatus(l.slice(18));return;}
   if(l.startsWith('ToMe_UNITY ask ')){const k=l.slice(15).trim();if(k)this.onAsk({key:k,text:k,engine:'unity'});return;}
   const r=parseChars(l);if(!r||r.engine!=='unity')return;
   if(r.hidden&&this.canary){if(!this.armed){this.canary.arm('unity');this.armed=true;}else this.canary.alive('unity');}
   this.onChars(l);}
- push(){if(!this.sock)return;this.sock.write('WANT '+this.wanted.replace(/\r?\n/g,'\x1f')+'\nHIDE '+(this.on?1:0)+'\n'+(this.drawCfg?this.drawLine():'')+[...this.embeds.values()].join(''));}
+ push(){if(this.stopped||!this.sock)return;this.sock.write('WANT '+this.wanted.replace(/\r?\n/g,'\x1f')+'\nHIDE '+(this.on?1:0)+'\n'+(this.drawCfg?this.drawLine():'')+[...this.embeds.values()].join(''));}
  drawLine(){const c=this.drawCfg;return 'DRAW roles='+(c.roles?1:0)+' embed='+(c.embed?1:0)+' zh='+(c.zh?1:0)+'\n';}
  /* engine-draw: the switches, and one sentence's replacement (kept for a reconnect, newest 64) */
- drawConfig(cfg){const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;if(this.sock)this.sock.write(this.drawLine());}
- drawEmbed(key,o={}){const {krkrControlText}=require('./engine-draw.cjs');const body=krkrControlText({roles:false,embed:true,zh:true},new Map([[String(key||''),{ruby:o.ruby||[],zh:o.zh||''}]])).split('\r\n')[1]||'';if(!body)return;
+ drawConfig(cfg){if(this.stopped)return;const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;if(this.sock)this.sock.write(this.drawLine());}
+ drawEmbed(key,o={}){if(this.stopped)return;const {krkrControlText}=require('./engine-draw.cjs');const body=krkrControlText({roles:false,embed:true,zh:true},new Map([[String(key||''),{ruby:o.ruby||[],zh:o.zh||''}]])).split('\r\n')[1]||'';if(!body)return;
   const l='EMB '+body+'\n';this.embeds.delete(key);this.embeds.set(key,l);while(this.embeds.size>64)this.embeds.delete(this.embeds.keys().next().value);if(this.sock)this.sock.write(l);}
- hide(on){this.on=!!on;if(this.on&&this.canary&&!this.canary.allowed('unity')){this.on=false;this.onStatus('unity invisible drawing off for this game (crash canary)');}this.push();}
- want(text){this.wanted=String(text||'');this.push();}
+ hide(on){if(this.stopped)return;this.on=!!on;if(this.on&&this.canary&&!this.canary.allowed('unity')){this.on=false;this.onStatus('unity invisible drawing off for this game (crash canary)');}this.push();}
+ want(text){if(this.stopped)return;this.wanted=String(text||'');this.push();}
  exited(code){if(this.canary&&this.armed)this.canary.exited('unity',code);}
- stop(){try{this.sock?.end('HIDE 0\n');}catch{}try{this.server?.close();}catch{}}
+ stop(){if(this.stopping)return this.stopping;this.stopped=true;this.on=false;this.drawCfg={roles:false,embed:false,zh:false};this.embeds.clear();const s=this.sock,server=this.server;this.stopping=new Promise((resolve,reject)=>{let timer;const finish=error=>{clearTimeout(timer);if(error)reject(error);else resolve();};timer=setTimeout(()=>{s?.destroy();finish(Error('READER_STOP_INCOMPLETE'));},2000);const close=()=>{if(!server?.listening){finish();return;}server.close(error=>finish(error));};if(s&&!s.destroyed){s.once('close',close);s.end('HIDE 0\nDRAW roles=0 embed=0 zh=0\n');}else close();});this.stopping.catch(()=>{});return this.stopping;}
 }
 
 module.exports={unityGame,modded,bits,mirror,makeShadow,UnityTextPath,formatChars};

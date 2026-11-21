@@ -16,12 +16,12 @@ const W=require('./text-paths-web.cjs'),U=require('./text-paths-unity.cjs');
 function unityPack(root){const dir=path.join(root,'runtime','unity-text');try{return require('node:fs').existsSync(path.join(dir,'MeguLitUnityText.dll'))?dir:null;}catch{return null;}}
 
 async function prepare({root,exe,profile={},enabled=false,shadowRoot=null,trace=()=>{}}){
- if(!enabled||!exe)return null;
+ if(!enabled||!exe||require('./library-mode.cjs').libraryOnly(root))return null;
  const canary=new Canary(root,exe);const off=canary.settle();if(Object.keys(off||{}).length)trace('text-paths-canary',{off:Object.keys(off)});
  const steam=require('./steam-owned.cjs').launchAppid(exe,profile)||null; /* E-SteamOwned */
  const steamEnv=steam?{SteamAppId:steam,SteamGameId:steam,SteamOverlayGameId:steam}:{};
  if(W.chromiumShell(exe)&&canary.allowed('web')){
-  const port=await W.freePort();const session=new W.WebTextPath({port,canary});
+  const port=await W.freePort();if(require('./library-mode.cjs').libraryOnly(root))return null;const session=new W.WebTextPath({port,canary});
   return {path:'web',exe,args:W.launchArgs(port),env:steamEnv,cwd:path.dirname(exe),session,
    connect:()=>session.attach().then(ok=>{trace('text-paths-web',{attached:ok,port});return ok;})};
  }
@@ -29,6 +29,7 @@ async function prepare({root,exe,profile={},enabled=false,shadowRoot=null,trace=
  const kind=pack&&U.unityGame(exe),il2cppReady=kind==='il2cpp'&&require('node:fs').existsSync(path.join(pack,'MeguLitUnityText.IL2CPP.dll'));
  if(pack&&(kind==='mono'||il2cppReady)&&!U.modded(exe)&&canary.allowed('unity')){
   const session=new U.UnityTextPath({canary});const port=await session.listen();
+  if(require('./library-mode.cjs').libraryOnly(root)){session.stop();return null;}
   let sh;try{sh=U.makeShadow({exe,shadowRoot:shadowRoot||path.join(root,'data','unity-shadow'),pack,port,steamAppId:steam});}catch(e){session.stop();trace('text-paths-unity-skipped',{error:e.message});return null;}
   trace('text-paths-unity',{shadow:sh.shadow,links:sh.links,copies:sh.copies,junctions:sh.junctions});
   return {path:'unity',exe:sh.exe,args:[],env:steamEnv,cwd:sh.shadow,session,connect:async()=>true};
@@ -47,6 +48,7 @@ function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepa
 function fontDot(root,exe,early,trace=()=>{}){
  /* 2026-11-21 (owner: 打点可以不要了，精度差、容易漏点) the dot font is retired: never loaded into a game. Kept as code only so an
     old install's canary record still reads; MEGULIT_FONTDOT_FORCE=1 (tests, research) is the one way in */
+ if(require('./library-mode.cjs').libraryOnly(root))return null;
  if(process.env.MEGULIT_FONTDOT_FORCE!=='1')return null;
  if(!early||process.env.MEGULIT_FONTDOT_OFF==='1')return null;/* dot font = marks: only with the capture compositor (off by default since 2026-11-14) */if(process.env.MEGULIT_CAPTURE_COMPOSITOR!=='1')return null;
  const bit=/MeguLitLaunch32\.exe$/i.test(early.file)?'32':'64',dll=path.join(root,'native','MeguLitFontDot'+bit+'.dll');
