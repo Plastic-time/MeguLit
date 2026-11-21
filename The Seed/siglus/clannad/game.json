@@ -1,0 +1,65 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "c327d2fe537036f8b87638198f0229bb5f79c99b61a0847e3e0eb6b3ecd54656",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "siglus",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "2cc757ebab3b65562f711bf00acd5cf7bcf5a6897b89367b838bf6d54bd257d2",
+  "script": "ebb8c064ffca40a57d36ff16c77307f26dd5e26518b563246efc4fa0576968d8",
+  "title": "6c3aeabc90e646347011dd94f50f916b914fb00e4591cc3954f46ab3ed2d3419",
+  "vndb": "v4"
+ },
+ "status": "skeleton",
+ "slug": "clannad",
+ "builds": [
+  "116a1b6ab5902bb6dc49e25086b1ef6f07d941dbb090b497fb7a158e997dea2d"
+ ]
+}

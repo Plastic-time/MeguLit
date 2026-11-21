@@ -1,0 +1,65 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "370050b637fe84c343ac160540c75c784fa0a1ccc8bb33f1c97e25e2cb11f18c",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "spikechunsoft",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "9df943cc71b43d207ce13ebdbf10403c514b2d1730c69e5c68fd21cf82d108a2",
+  "title": "8050a1467efede10ab4160a8b9fa3f593e538d91f7029d36670472ac4bedcea1",
+  "steam": "413410",
+  "vndb": "v7014"
+ },
+ "status": "skeleton",
+ "slug": "danganronpa-trigger-happy-havoc",
+ "builds": [
+  "9debd9f6aed2339e540aa9526ea3f16f38ad91c19ad9a842a5b0b2fab21303e3"
+ ]
+}

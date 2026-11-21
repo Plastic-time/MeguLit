@@ -1,0 +1,66 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "17050705ada2630179450ca93438c30d5cc9113f6171247c867d2214e5ec7554",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "623ca1fbfec2ae6049f85c112ffeed9193084f4403ecc0048882cb4fd012974a",
+  "script": "ac4e695f87757e04beea3800058ad015c176cd0f2fba95e91b0097a15c144577",
+  "title": "48476405533c57dfde665da5f1685d71fb0e6bb6c9c1f8167d5bbdecefea34a8",
+  "steam": "880950",
+  "vndb": "v18131"
+ },
+ "status": "skeleton",
+ "slug": "maitetsu-pure-station",
+ "builds": [
+  "7746c668c90c4a6bc4c50fceecb2be83fab4b7ad758b5d758267914cc220e76a"
+ ]
+}

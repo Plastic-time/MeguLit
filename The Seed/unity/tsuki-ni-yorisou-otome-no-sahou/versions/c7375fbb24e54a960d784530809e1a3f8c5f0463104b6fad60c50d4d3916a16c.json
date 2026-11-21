@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "c7375fbb24e54a960d784530809e1a3f8c5f0463104b6fad60c50d4d3916a16c",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "hide": {
+   "engineTrial": {
+    "enabled": null,
+    "unconfirmedLines": null,
+    "clickMs": null,
+    "skipAside": null
+   }
+  },
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "Tsukiniyorisou.exe",
+ "engine": "unity",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "c7375fbb24e54a960d784530809e1a3f8c5f0463104b6fad60c50d4d3916a16c",
+  "head": "52340ad01484d1d41d47c27e08a045c55a213fc1d3ff627586924cf965e70894",
+  "pe": "2020.3.29.49250@6209ac5b"
+ }
+}

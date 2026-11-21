@@ -1,0 +1,64 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "136aa57fb45400eeea9e898c20a5ee7a4985f50cbe4b160a4e613fcfba5fc390",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "innocentgrey",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "5a9c26b18db8f38c93b853edc07dbf90826ffe4e093fc86122be54c99054e5a2",
+  "title": "fdd585495af82bb56549e86c95a94e3564f70967886b31eb153c11cb9a779c16",
+  "vndb": "v5922"
+ },
+ "status": "skeleton",
+ "slug": "utsuro-no-shoujo",
+ "builds": [
+  "72caa0a0b105f972e1fe7b0ea1ff491d91107d5aa14ac562d4eeac81a163f188"
+ ]
+}

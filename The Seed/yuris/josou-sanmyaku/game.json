@@ -1,0 +1,65 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "0e36cf22e7a8efd8e46590bc86bd8597ea90de0f14073eec1fa5b2306369773d",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "yuris",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "9569cb485ae523d589c27d7feed622d5fee41f16fb7d9b7ef01f47747555ddd0",
+  "script": "1e1853ba508811452dfac3d3248d9d3bd5467ef05730ca25e8c220facd4a3417",
+  "title": "515dfef091aed2bd8decfd1220808aae5101748f29a30e0ebe8a2dd534bdd500",
+  "vndb": "v6589"
+ },
+ "status": "owner-ok",
+ "slug": "josou-sanmyaku",
+ "builds": [
+  "00f499857bd9190de75345880ea4b3ac4c56dbdd6cd924d5b20a1311440fade0"
+ ]
+}

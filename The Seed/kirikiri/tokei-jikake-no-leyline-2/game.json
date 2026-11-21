@@ -1,0 +1,65 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "aa49a24cde4cfda31249b4d2bc1d4974245a74f2799b459d0729cc8ce3c9b164",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "da051b03d9f08418f9f61e1cc4a814b29c2748e97634c1a5af4cc331e544c7a8",
+  "script": "0305409f209763d1210037fad34c72ea6a31ac7057f88bb5b134e609e73069e2",
+  "title": "45ab8285c3d8be1d0cb781dc794b4cd63dbcd17d63a4da9287aeab06ad863b04",
+  "vndb": "v16212"
+ },
+ "status": "skeleton",
+ "slug": "tokei-jikake-no-leyline-2",
+ "builds": [
+  "0ed5c0e3f718224f89f1a990d3dac604745bcf71e0912449aad83782dc95c142"
+ ]
+}

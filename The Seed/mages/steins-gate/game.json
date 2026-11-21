@@ -1,0 +1,66 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "10479f1c133589137f00cb0ef1832b75f31f6f75c2e4213d519bd4e9ee053a9c",
+ "layer": "game",
+ "source": "official",
+ "mode": "read",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": true,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": "read"
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "mages",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "28de66df3a608846f4a58a364b4284d9577585d745d916250e4421861d930628",
+  "script": "ccbf63a498c04fb2367f42a30b6ecc036dfdcc43c938a71596e72997128f5215",
+  "title": "4249a0499067f209e00ff0e185ad0c934005cda2834257afb0c8848b521ae83a",
+  "steam": "412830",
+  "vndb": "v2002"
+ },
+ "status": "read",
+ "slug": "steins-gate",
+ "builds": [
+  "cbbc5dab18edc344d05c01d4d08819fbc0a68a78741956831752986009b69e16"
+ ]
+}
