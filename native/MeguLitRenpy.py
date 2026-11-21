@@ -188,7 +188,7 @@ def _megulit_renpy_main():
             self.cfg, self.emb = cfg, emb
 
         def restore_embed(self):
-            pending = []
+            pending, restored = [], False
             for d, original, replacement, c, bounds in self.embedded:
                 try:
                     # Do not overwrite a newer value that the engine set independently.
@@ -199,11 +199,20 @@ def _megulit_renpy_main():
                         for attr, value in bounds.items():
                             setattr(d, attr, value)
                         self.redraw(d)
+                        restored = True
                     c['wanted'].discard(replacement)
                     c['flat'], c['emb'], c['jp_n'], c['emb_tried'], c['done'] = None, 0, 0, False, False
                 except Exception:
                     pending.append((d, original, replacement, c, bounds))
             self.embedded = pending
+            if restored:
+                # Redraw requested from inside render_screen may otherwise remain behind a cached screen Render.
+                # Let the interaction rebuild it before reporting the restored original's layout.
+                if self.cur is not None:
+                    self.cur['settle_frames'] = 2
+                ex = sys.modules.get('renpy.exports')
+                if ex is not None and hasattr(ex, 'restart_interaction'):
+                    ex.restart_interaction()
             if pending:
                 self.set_status('error embed restore pending')
             return not pending
@@ -390,7 +399,10 @@ def _megulit_renpy_main():
                 c = core.cur
                 if c is not None and not c['done']:
                     try:
-                        core.locate(rv, c)
+                        if c.get('settle_frames', 0):
+                            c['settle_frames'] -= 1
+                        else:
+                            core.locate(rv, c)
                     except Exception as e:
                         c['done'] = True
                         core.set_status('error locate %s' % (e,))
