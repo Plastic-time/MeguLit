@@ -131,16 +131,18 @@ static class ColdDesk{
  static int Run(string[] a){string exe=Path.GetFullPath(a[1]);int seconds=600;for(int i=2;i<a.Length-1;i++){if(a[i]=="--seconds")seconds=Math.Max(10,int.Parse(a[i+1]));}
   ImageName=Path.GetFileNameWithoutExtension(exe);
   Desk=OpenDesktop(DESK,0,false,0x10000000);if(Desk==IntPtr.Zero)Desk=CreateDesktop(DESK,IntPtr.Zero,IntPtr.Zero,0,0x10000000,IntPtr.Zero);if(Desk==IntPtr.Zero){Emit("{\"type\":\"ended\",\"why\":\"desktop\"}");return 1;}
-  Job=CreateJobObject(IntPtr.Zero,null);var lim=new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();lim.Basic.LimitFlags=0x2000;/* KILL_ON_JOB_CLOSE */SetInformationJobObject(Job,9,ref lim,(uint)Marshal.SizeOf(lim));
-  var si=new STARTUPINFO();si.cb=Marshal.SizeOf(si);si.lpDesktop="WinSta0\\"+DESK;PROCESS_INFORMATION pi;
+  PROCESS_INFORMATION pi=new PROCESS_INFORMATION();string why="";
+  try{
+  Job=CreateJobObject(IntPtr.Zero,null);var lim=new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();lim.Basic.LimitFlags=0x2000;/* KILL_ON_JOB_CLOSE */if(Job==IntPtr.Zero||!SetInformationJobObject(Job,9,ref lim,(uint)Marshal.SizeOf(lim)))throw new Exception("Job setup failed");
+  var si=new STARTUPINFO();si.cb=Marshal.SizeOf(si);si.lpDesktop="WinSta0\\"+DESK;
   if(!CreateProcess(exe,new StringBuilder("\""+exe+"\""),IntPtr.Zero,IntPtr.Zero,false,0x4/* CREATE_SUSPENDED */,IntPtr.Zero,Path.GetDirectoryName(exe),ref si,out pi)){Emit("{\"type\":\"ended\",\"why\":\"create "+Marshal.GetLastWin32Error()+"\"}");return 1;}
   if(!AssignProcessToJobObject(Job,pi.hProcess)){/* the game could escape the tree kill: never run it so */TerminateJobObject(Job,1);try{Process.GetProcessById(pi.dwProcessId).Kill();}catch{}Emit("{\"type\":\"ended\",\"why\":\"job\"}");return 1;}
-  ResumeThread(pi.hThread);CloseHandle(pi.hThread);StartedAt=DateTime.UtcNow;
+  ResumeThread(pi.hThread);CloseHandle(pi.hThread);pi.hThread=IntPtr.Zero;StartedAt=DateTime.UtcNow;
   string started="";try{started=Process.GetProcessById(pi.dwProcessId).StartTime.ToUniversalTime().Ticks.ToString();}catch{}
   Emit("{\"type\":\"started\",\"pid\":"+pi.dwProcessId+",\"started\":"+Q(started)+"}");
   var cmds=new Queue<string>();var reader=new Thread(()=>{string l;try{while((l=Console.In.ReadLine())!=null)lock(cmds)cmds.Enqueue(l);}catch{}lock(cmds)cmds.Enqueue("kill");});reader.IsBackground=true;reader.Start();
   uint baseInput=0;{var li=new LASTINPUTINFO();li.cbSize=(uint)Marshal.SizeOf(li);GetLastInputInfo(ref li);baseInput=li.dwTime;}
-  int lastW=0,lastH=0;IntPtr lastHwnd=IntPtr.Zero;DateTime lastMute=DateTime.MinValue,lastPower=DateTime.MinValue;string why="";bool everAlive=false;DateTime goneAt=DateTime.MinValue;bool wasFull=Quns()>=2&&Quns()<=4;
+  int lastW=0,lastH=0;IntPtr lastHwnd=IntPtr.Zero;DateTime lastMute=DateTime.MinValue,lastPower=DateTime.MinValue;bool everAlive=false;DateTime goneAt=DateTime.MinValue;bool wasFull=Quns()>=2&&Quns()<=4;
   var end=DateTime.UtcNow.AddSeconds(seconds);
   while(why==""){
    /* the user is back: end now, before anything else */
@@ -168,8 +170,9 @@ static class ColdDesk{
    if((DateTime.UtcNow-lastPower).TotalSeconds>5){lastPower=DateTime.UtcNow;if(Ac()=="false")Emit("{\"type\":\"power\",\"ac\":false}");int q=Quns();bool full=q>=2&&q<=4;if(full&&!wasFull)Emit("{\"type\":\"fullscreen\",\"on\":true}");wasFull=full;}
    if(DateTime.UtcNow>end){Emit("{\"type\":\"timeout\"}");why="timeout";break;}
    Thread.Sleep(100);}
-  StopAudioGuards();RestoreAudio();TerminateJobObject(Job,1);CloseHandle(Job);CloseHandle(pi.hProcess);
+  }finally{
+  StopAudioGuards();RestoreAudio();if(Job!=IntPtr.Zero){TerminateJobObject(Job,1);CloseHandle(Job);}if(pi.hThread!=IntPtr.Zero)CloseHandle(pi.hThread);if(pi.hProcess!=IntPtr.Zero)CloseHandle(pi.hProcess);
   /* the desktop goes away with its last handle once the game's windows are gone */
-  Thread.Sleep(300);CloseDesktop(Desk);
+  Thread.Sleep(300);CloseDesktop(Desk);}
   Emit("{\"type\":\"ended\",\"why\":"+Q(why)+"}");return 0;}
 }

@@ -59,6 +59,8 @@ function runOne(opts,deps={}){const {root='',exe,runDir,budgetMs=360000,profile=
     case 'error':res.errors.push(String(m.what||'')+': '+String(m.why||''));break;}});
   child.on?.('error',e=>{res.errors.push(String(e?.message||e));finish('helper-error');});
   child.on?.('exit',()=>finish('helper-exit'));
+  /* A failed spawn emits error then close, without exit. Release the foreground barrier on close too. */
+  child.on?.('close',()=>{finish('helper-close');resolve(res);});
   timer=setInterval(()=>{if(done)return;try{hooks?.tick?.();}catch{}
    const t=now()-t0;const acts=driver.next({t,deadline:budgetMs,window:res.window,lines:res.lines,choices:res.choices,menu,black:res.black});
    for(const a of acts){if(a.do==='end'){finish(a.why);return;}
