@@ -242,17 +242,25 @@ function yuris(dir){
 }
 
 const READERS=[{read:kirikiri,saves:dir=>[...kirikiriSaves(dir),...kirikiriCapture(dir)]},{read:hunex,saves:hunexSaves},{read:siglus,saves:siglusSaves},{read:yuris,saves:yurisSaves}];
+const recipesByExe=new Map();
+const recipeKey=exe=>path.resolve(exe).toLowerCase();
+function setRecipes(exe,rows=[]){if(!require('./story-pimg-recipes.cjs').validate(rows))throw Error('CG_RECIPE_SCHEMA');const k=recipeKey(exe),old=recipesByExe.get(k);if(JSON.stringify(old||[])!==JSON.stringify(rows))cache.delete(path.dirname(String(exe)).toLowerCase());recipesByExe.set(k,JSON.parse(JSON.stringify(rows)));if(recipesByExe.size>8)recipesByExe.delete(recipesByExe.keys().next().value);}
+function recipesFor(exe){return recipesByExe.get(recipeKey(exe))||[];}
+function fileStamp(file){try{const actual=fs.realpathSync(file),st=fs.statSync(actual);return actual+'|'+st.dev+'|'+st.ino+'|'+st.size+'|'+st.mtimeMs+'|'+st.ctimeMs;}catch{return null;}}
+function sourceStamp(result){return [...new Set([...(result?.items?.values()||[])].flatMap(v=>[v.file||v.archive,v.mappingFile]).filter(Boolean))].map(fileStamp).join(';');}
 const cache=new Map();
 function stamp(dir){let s='';for(const r of READERS)for(const f of r.saves(dir)){try{const st=fs.statSync(f);s+=f+'|'+st.dev+'|'+st.ino+'|'+st.size+'|'+st.mtimeMs+'|'+st.ctimeMs;}catch{}}return s;}
 function scan(executable){
  const dir=path.dirname(String(executable||''));if(!dir||!fs.existsSync(dir))return {supported:false,items:new Map()};
- const key=dir.toLowerCase(),st=stamp(dir),hit=cache.get(key);if(hit&&hit.stamp===st)return hit.result;
+ const key=dir.toLowerCase(),st=stamp(dir),hit=cache.get(key);const currentSources=hit?sourceStamp(hit.result):null;if(hit&&hit.stamp===st&&hit.sources===currentSources)return hit.result;
+ if(hit?.primed&&hit.sources!==currentSources){try{require('./story-analysis.cjs').refreshCg(String(executable),st+'|'+currentSources);}catch{}return {supported:false,items:new Map(),progressState:'unknown'};}
  if(hit?.primed){try{require('./story-analysis.cjs').refreshCg(String(executable),st);}catch{}
   const r=hit.result;if(r.engine==='KiriKiri'){const on=kirikiriMarked(executable)||new Set();return {...r,items:new Map([...r.items].filter(([n])=>on.has(n))),wanted:(r.wanted||[]).filter(n=>on.has(n))};}
   if(r.engine==='YU-RIS'){const unlocked=new Set();let valid=false;for(const f of yurisSaves(dir))try{const g=r.gallery,fit=yssdArrays(fs.readFileSync(f)).filter(a=>a.count>=g.size&&a.set.every(i=>g.slots.has(i))).sort((a,b)=>b.set.length-a.set.length)[0];if(fit){valid=true;for(const slot of fit.set)unlocked.add(base(g.slots.get(slot)));}}catch{}return {...r,items:new Map([...r.items].filter(([n])=>unlocked.has(n))),unlocked,progressState:valid?'valid':'unknown'};}
  }
  let result={supported:false,items:new Map()};for(const r of READERS){try{const got=r.read(dir,String(executable));if(got){result=got;break;}}catch{}}
- cache.delete(key);cache.set(key,{stamp:st,result});if(cache.size>8)cache.delete(cache.keys().next().value);return result;
+ if(result.engine==='KiriKiri'&&(!require('node:worker_threads').isMainThread||process.argv.includes('--warm'))){const marked=kirikiriMarked(executable)||new Set();for(const recipe of recipesFor(executable)){if(!marked.has(recipe.variant.toLowerCase()))continue;try{const prepared=require('./story-pimg-recipes.cjs').resolve(executable,recipe);result.items.set(prepared.item.name,prepared.item);}catch{}}}
+ cache.delete(key);cache.set(key,{stamp:st,result,sources:sourceStamp(result)});if(cache.size>8)cache.delete(cache.keys().next().value);return result;
 }
 const cacheDirOf=(root,executable)=>path.join(root,'data','cg-cache',crypto.createHash('sha1').update(path.dirname(String(executable)).toLowerCase()).digest('hex').slice(0,16));
 /* opts: root; cold (the cold-run setting: the game may be started in the background to read CGs only it can open);
@@ -282,6 +290,14 @@ function pictureFile(root,executable,name){
  const cached=cachedPicture(root,executable,name);if(cached)return cached;
  const buf=bytesOf(it),mime=mimeOf(buf);if(!mime||buf.length>24<<20)throw Error('CG_UNREADABLE');
  const ext=EXT[mime],f=path.join(dir,it.name+ext);fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(f,buf);fs.writeFileSync(path.join(dir,it.name+'.source.json'),JSON.stringify({key:pictureIdentity(it),ext}));return f;}
+async function pictureFileAsync(root,executable,name){
+ const item=scan(executable).items.get(String(name||'').toLowerCase());if(item?.decode!=='pimg')return pictureFile(root,executable,name);
+ if(require('node:worker_threads').isMainThread&&!process.argv.includes('--warm'))throw Error('CG_BACKGROUND_REQUIRED');
+ const cached=cachedPicture(root,executable,name);if(cached)return cached;if(require('node:os').freemem()<1024*1024*1024)throw Error('CG_RESOURCE_LIMIT');const before=pictureIdentity(item),prepared=require('./story-pimg-recipes.cjs').resolve(executable,item.composition);
+ const image=await require('./story-pimg.cjs').render(prepared.bytes,{layerIds:prepared.layerIds,limits:{inputBytes:32*1024*1024,pixels:4*1024*1024,decodedPixels:16*1024*1024}}),buf=require('./cg-decoders.cjs').png(image);
+ if(buf.length>24*1024*1024||before!==pictureIdentity(item)||!kirikiriMarked(executable)?.has(item.name))throw Error('CG_SOURCE_CHANGED');
+ const dir=cacheDirOf(root,executable),file=path.join(dir,item.name+'.png');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(file,buf);fs.writeFileSync(path.join(dir,item.name+'.source.json'),JSON.stringify({key:before,ext:'.png'}));return file;
+}
 function image(root,executable,name,opts={}){
  if(opts.safe&&!require('./cg-rating.cjs').isSafe(require('./cg-rating.cjs').ratings(cacheDirOf(root,executable))[String(name||'').toLowerCase()]))throw Error('CG_HIDDEN');
  const b=fs.readFileSync(pictureFile(root,executable,name));return {mime:mimeOf(b),data:b.toString('base64')};
@@ -289,7 +305,7 @@ function image(root,executable,name,opts={}){
 /* 2026-11-13 card wall (no spoilers): only explicit unlock marks of the KiriKiri system saves ("cg_<FILE>" set to a
    true value), never bare names that merely appear in the save; null when there is no KiriKiri save */
 function kirikiriMarked(executable){const p=progress(executable);if(p.state!=='valid')return null;const out=new Set();for(const [k,v] of p.flags){const m=/^cg_(.+)$/i.exec(k);if(m&&(v===true||typeof v==='number'&&v>0))out.add(base(m[1]));}return out;}
-function pictureIdentity(item){let source=item.file||item.archive,stamp='';try{source=fs.realpathSync(source);const st=fs.statSync(source);stamp=st.dev+'|'+st.ino+'|'+st.size+'|'+st.mtimeMs+'|'+st.ctimeMs;}catch{}return crypto.createHash('sha256').update(String(source)+'|'+stamp+'|'+String(item.entry?.name||'')+'|'+String(item.entry?.size||item.entry?.unpacked||'')+'|cg-v3').digest('hex');}
+function pictureIdentity(item){let source=item.file||item.archive,stamp='';try{source=fs.realpathSync(source);const st=fs.statSync(source);stamp=st.dev+'|'+st.ino+'|'+st.size+'|'+st.mtimeMs+'|'+st.ctimeMs;}catch{}return crypto.createHash('sha256').update(String(source)+'|'+stamp+'|'+String(item.entry?.name||'')+'|'+String(item.entry?.size||item.entry?.unpacked||'')+'|'+JSON.stringify(item.composition||null)+'|'+(item.mappingFile?fileStamp(item.mappingFile):'')+'|cg-v4').digest('hex');}
 function sourceKey(exe,name){try{const item=scan(exe).items.get(String(name||'').toLowerCase());if(!item||!fs.statSync(fs.realpathSync(item.file||item.archive)).isFile())return null;return pictureIdentity(item);}catch{return null;}}
 const cachedPicture=(root,executable,name)=>{const d=cacheDirOf(root,executable),n=String(name).toLowerCase(),item=scan(executable).items.get(n);if(!item)return null;try{const meta=JSON.parse(fs.readFileSync(path.join(d,n+'.source.json'),'utf8'));if(meta.key!==pictureIdentity(item)||!Object.values(EXT).includes(meta.ext))return null;const f=path.join(d,n+meta.ext);return fs.existsSync(f)?f:null;}catch{return null;}};
 function storyProgress(executable){const dir=path.dirname(String(executable||'')),r=scan(executable);if(r.engine!=='YU-RIS')return progress(executable);const flags=new Map(),galleryUnlocked=new Set();let valid=false,galleryValid=false;
@@ -299,6 +315,6 @@ function storyProgress(executable){const dir=path.dirname(String(executable||'')
  return {state:valid?'valid':'unknown',flags,galleryUnlocked,galleryState:galleryValid?'valid':'unknown'};}
 function ratingCurrent(root,exe,name){if(!cachedPicture(root,exe,name))return false;try{const dir=cacheDirOf(root,exe),n=String(name).toLowerCase(),meta=JSON.parse(fs.readFileSync(path.join(dir,n+'.source.json'),'utf8')),rating=JSON.parse(fs.readFileSync(path.join(dir,'ratings.json'),'utf8'))[n];return !!meta.key&&rating?.sourceKey===meta.key;}catch{return false;}}
 /* Private worker handoff: no image bytes or current values leave the process. Never a shared rules artifact. */
-function exportScan(exe){const dir=path.dirname(String(exe)),before=stamp(dir),r=scan(exe);if(before!==stamp(dir))return null;return {stamp:before,locations:saveLocations.get(dir),result:{...r,items:new Map([...r.items].map(([n,item])=>{const {cx,...plain}=item;return [n,plain];}))}};}
-function primeScan(exe,snapshot){if(!snapshot?.result||!(snapshot.result.items instanceof Map)||typeof snapshot.stamp!=='string')return false;const dir=path.dirname(String(exe));if(snapshot.locations)saveLocations.set(dir,snapshot.locations);if(snapshot.stamp!==stamp(dir))return false;cache.set(dir.toLowerCase(),{stamp:snapshot.stamp,result:snapshot.result,primed:true});if(cache.size>8)cache.delete(cache.keys().next().value);return true;}
-module.exports={list,image,scan,progress,storyProgress,systemVariables,galleryCsv,kirikiriSaveDirs,pictureFile,kirikiriMarked,cachedPicture,sourceKey,ratingCurrent,_exportScan:exportScan,_primeScan:primeScan,ksdText,tokens,kbad,esSlots,sdcUnpack,mzpNameSets,yssdArrays,siglusTable,siglusGlobalTables,SIGLUS_KEY};
+function exportScan(exe,recipes){if(recipes!==undefined)setRecipes(exe,recipes);const dir=path.dirname(String(exe)),before=stamp(dir),r=scan(exe);if(before!==stamp(dir))return null;return {stamp:before,sources:sourceStamp(r),recipes:recipesFor(exe),locations:saveLocations.get(dir),result:{...r,items:new Map([...r.items].map(([n,item])=>{const {cx,...plain}=item;return [n,plain];}))}};}
+function primeScan(exe,snapshot){if(!snapshot?.result||!(snapshot.result.items instanceof Map)||typeof snapshot.stamp!=='string')return false;const dir=path.dirname(String(exe));if(snapshot.locations)saveLocations.set(dir,snapshot.locations);if(snapshot.stamp!==stamp(dir)||snapshot.sources!==sourceStamp(snapshot.result)||!require('./story-pimg-recipes.cjs').validate(snapshot.recipes||[]))return false;setRecipes(exe,snapshot.recipes||[]);cache.set(dir.toLowerCase(),{stamp:snapshot.stamp,result:snapshot.result,sources:snapshot.sources,primed:true});if(cache.size>8)cache.delete(cache.keys().next().value);return true;}
+module.exports={list,image,scan,progress,storyProgress,systemVariables,galleryCsv,kirikiriSaveDirs,pictureFile,pictureFileAsync,setRecipes,_recipes:recipesFor,kirikiriMarked,cachedPicture,sourceKey,ratingCurrent,_exportScan:exportScan,_primeScan:primeScan,ksdText,tokens,kbad,esSlots,sdcUnpack,mzpNameSets,yssdArrays,siglusTable,siglusGlobalTables,SIGLUS_KEY};
