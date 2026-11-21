@@ -149,3 +149,12 @@
 .main .first-player-hint{margin-top:6px!important;padding-top:0;border-top:0;font-size:11.5px!important;line-height:1.6!important;color:var(--g-t3)!important}
 .main .first-player-link{display:inline;height:auto;min-height:0;padding:0;margin:0;border:0;border-radius:0;background:none;box-shadow:none;font:inherit;color:var(--g-gold);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .main .first-player-link:hover{color:var(--g-t1)}
+.main .first-player-credit{display:grid;gap:5px;margin-top:10px}
+.main .first-player-credit-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.main .first-player-credit input{box-sizing:border-box;width:min(260px,100%);height:30px;padding:0 10px;border-radius:0;font-size:12.5px}
+.main .first-player-credit button{height:30px;padding:0 14px;border-radius:0;font-size:12.5px}
+.main .first-player-who{font-size:12.5px;color:var(--g-t1)}
+.main .first-player-privacy{font-size:11.5px;color:var(--g-t3)}
+.main .first-player-from{margin:0!important;font-size:13px!important;color:var(--g-t1)!important;overflow-wrap:anywhere}
+.main .first-player[data-state="received"]{padding-top:11px;padding-bottom:11px}
+.main .first-player[data-state="received"] .first-player-head{margin:0}
