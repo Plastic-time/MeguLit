@@ -6,7 +6,7 @@
 
 下面各引擎的画字钩子都已合进 main。默认全部不挂：只有这部游戏的 seed 打开 `draw.roles`（MeguLit 写出控制文件 `#cfg roles=1`）才装钩子；现在没有任何游戏 seed 打开它。这一点由 `validation/engine-draw-opt-in.test.cjs` 钉住：钩子只在 `Install()` 里装，`Install()` 只在 roles=1 检查之后调，启动时 `Arm()` 从不挂钩；内核默认不写控制文件；seed 要开得先加进测试里的允许名单
 
-AdvHD 与 CMVS 的单版本输入诊断分别使用独立、默认 false 的 `draw.advhdInput` / `draw.cmvsInput`，不授予上段角色或渲染能力，也没有 seed 开启，详见下表及诊断文档
+AdvHD、CMVS 与 FVP 输入诊断分别使用独立、默认 false 的 `draw.advhdInput` / `draw.cmvsInput` / `draw.fvpInput`，不授予上段角色或渲染能力，也没有 seed 开启，详见下表及诊断文档
 
 | 引擎 | 部件（native/megulithook） | 状态 |
 |---|---|---|
@@ -16,6 +16,7 @@ AdvHD 与 CMVS 的单版本输入诊断分别使用独立、默认 false 的 `dr
 | Innocent Grey（虚ノ少女，MFC） | DrawSites `mfc-textoutw` / `mfc-exttextoutw` / `mfc-drawtextw` | 已进 main，默认不挂 |
 | AdvHD / WillPlus（Under The Moon） | DrawSites `advhd`；AdvhdDraw 输入诊断 | 默认不挂；诊断钉住单一 exe，仅完整原始输入，不授予正文角色、隐藏或嵌入能力 |
 | CMVS（青い鳥） | DrawSites `cmvs`；CmvsDraw 双入口输入诊断 | 默认不挂；两个全文绘制入口必须一起通过版本与签名校验，仅原始输入，不支持角色、屏幕坐标或渲染 |
+| FVP（いろとりどりのヒカリ / HD） | DrawSites `fvp`；FvpDraw 原始追加诊断 | 默认不挂；两个版本各自 exact pin 单入口，仅追加 raw bytes，不覆盖缓存重绘或正文角色，见 [FVP 诊断交付](re-fvp-input.md) |
 | FVP（ヒカリ 中文版 / HD） | DrawSites `fvp`、`fvp-bitmap` | 已进 main，默认不挂 |
 | minori（eden 英文版） | DrawSites `minori` | 已进 main，默认不挂 |
 | Musica（ましろ色シンフォニー） | DrawSites `musica` | 已进 main，默认不挂 |

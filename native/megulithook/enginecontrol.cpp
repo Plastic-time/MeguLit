@@ -79,12 +79,14 @@ bool safeattach(ENGINE *m, const char *enginename)
 #include "MajiroDraw.h" /* complete-string path: observe only after draw.roles opt-in */
 #include "AdvhdDraw.h" /* version-pinned diagnostic only, independent advhdInput opt-in */
 #include "CmvsDraw.h" /* both pinned full-input draw entries, diagnostics only */
+#include "FvpDraw.h" /* pinned raw append input, diagnostics only */
 bool checkengine()
 {
     DrawSites::Arm();
     MajiroDraw::Arm();
     AdvhdDraw::Arm();
     CmvsDraw::Arm();
+    FvpDraw::Arm();
 
     auto engines = check_engines();
     std::vector<const char *> infomations = {

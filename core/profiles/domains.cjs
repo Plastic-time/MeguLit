@@ -46,6 +46,7 @@ const DOMAINS={
  'draw.roles':{bool:true},
  'draw.advhdInput':{bool:true,layer:'version'},
  'draw.cmvsInput':{bool:true,layer:'version'},
+ 'draw.fvpInput':{bool:true,layer:'version'},
  'draw.embed':{bool:true,layer:'version'},
  'draw.embedTranslation':{bool:true,layer:'version'},
  'draw.engineTable':{engineTable:true,nullable:true,layer:'version'},

@@ -96,9 +96,10 @@ module.exports={
   /* report each drawn run with its role (name / choice / button / menu / system); false = the kernel: names are not
      reported, link and choice text goes with the dialogue */
   roles:false,
-  /* Version-pinned diagnostic full input only; does not grant roles, hide or embedding. */
+  /* Version-pinned diagnostic raw input only; does not grant roles, hide or embedding. */
   advhdInput:false,
   cmvsInput:false,
+  fvpInput:false,
   /* the game draws MeguLit's replacement of a dialogue line itself (Japanese + ruby [+ Chinese]); false = hide + overlay */
   embed:false,
   /* with embed on, the Chinese is drawn by the game too (false = ruby only, the reader draws the Chinese) */

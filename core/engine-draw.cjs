@@ -16,7 +16,7 @@ const MAX=64;
 /* draw.viaRoles entries the engine DLL understands: "<hex rva>[,<hex rva>...]=<role>" (BGI, native/megulithook/BgiDraw.h) */
 const VIA_ROLE=/^[0-9a-f]{1,8}(?:,[0-9a-f]{1,8}){0,5}=(?:line|name|choice|button|menu|system)$/;
 function viaRoles(v){const r=Array.isArray(v)?v.filter(s=>typeof s==='string'&&VIA_ROLE.test(s)).slice(0,16):[];return r.length?{viaRoles:r}:{};}/* none = the settings as before */
-function settings(profile){const frames=Profiles.get(profile,'choice.pageFrames',[]);return {clear:Profiles.get(profile,'page.reportClear',false)===true,choiceFrames:Array.isArray(frames)?frames.filter(f=>typeof f==='string'&&f&&!/[\r\n]/.test(f)).slice(0,20):[],roles:Profiles.get(profile,'draw.roles',false)===true,...(Profiles.get(profile,'draw.advhdInput',false)===true?{advhdInput:true}:{}),...(Profiles.get(profile,'draw.cmvsInput',false)===true?{cmvsInput:true}:{}),...viaRoles(Profiles.get(profile,'draw.viaRoles',[])),embed:Profiles.get(profile,'draw.embed',false)===true,zh:Profiles.get(profile,'draw.embedTranslation',true)!==false,...withTable(tableLine(Profiles.get(profile,'draw.engineTable',null)))};}
+function settings(profile){const frames=Profiles.get(profile,'choice.pageFrames',[]);return {clear:Profiles.get(profile,'page.reportClear',false)===true,choiceFrames:Array.isArray(frames)?frames.filter(f=>typeof f==='string'&&f&&!/[\r\n]/.test(f)).slice(0,20):[],roles:Profiles.get(profile,'draw.roles',false)===true,...(Profiles.get(profile,'draw.advhdInput',false)===true?{advhdInput:true}:{}),...(Profiles.get(profile,'draw.cmvsInput',false)===true?{cmvsInput:true}:{}),...(Profiles.get(profile,'draw.fvpInput',false)===true?{fvpInput:true}:{}),...viaRoles(Profiles.get(profile,'draw.viaRoles',[])),embed:Profiles.get(profile,'draw.embed',false)===true,zh:Profiles.get(profile,'draw.embedTranslation',true)!==false,...withTable(tableLine(Profiles.get(profile,'draw.engineTable',null)))};}
 const withTable=t=>t?{table:t}:{};
 /* draw.engineTable (the version layer: this exe's addresses for an engine DLL that finds its functions by signature and
    checks them against the table, e.g. MAGES) -> one control-file line "#table <engine> key=value ..."; '' = none */
@@ -36,7 +36,7 @@ const clean=t=>String(t||'').replace(/\t/g,' ').replace(/\r?\n/g,'\u001f');
 /* ---- KiriKiri transport: %TEMP%\MeguLit\draw\<pid>.txt, UTF-16LE with BOM (both KiriKiri 2 and Z read it) ---- */
 function krkrControlPath(pid,tmp=os.tmpdir()){return path.join(tmp,'MeguLit','draw',(Number(pid)|0)+'.txt');}
 function krkrControlText(cfg,entries){
- const lines=['#cfg roles='+(cfg.roles?1:0)+' embed='+(cfg.embed?1:0)+' zh='+(cfg.zh?1:0)+(cfg.advhdInput===true?' advhdInput=1':'')+(cfg.cmvsInput===true?' cmvsInput=1':'')];
+ const lines=['#cfg roles='+(cfg.roles?1:0)+' embed='+(cfg.embed?1:0)+' zh='+(cfg.zh?1:0)+(cfg.advhdInput===true?' advhdInput=1':'')+(cfg.cmvsInput===true?' cmvsInput=1':'')+(cfg.fvpInput===true?' fvpInput=1':'')];
  if(cfg.table)lines.push(cfg.table);
  if(cfg.clear)lines.push('#clearline');
  for(const f of cfg.choiceFrames||[])lines.push('#choiceframe '+f);
@@ -56,7 +56,7 @@ class KrkrTransport{
 class EngineDraw{
  constructor({profile,transport,onAsk=()=>{}}){this.cfg=settings(profile);this.transport=transport;this.onAsk=onAsk;this.entries=new Map();this.asked=new Set();this.sync();}
  setProfile(profile){const c=settings(profile);if(JSON.stringify(c)===JSON.stringify(this.cfg))return;this.cfg=c;this.sync();}
- get active(){return this.cfg.roles||this.cfg.embed||this.cfg.clear||this.cfg.advhdInput===true||this.cfg.cmvsInput===true||(this.cfg.choiceFrames||[]).length>0;}
+ get active(){return this.cfg.roles||this.cfg.embed||this.cfg.clear||this.cfg.advhdInput===true||this.cfg.cmvsInput===true||this.cfg.fvpInput===true||(this.cfg.choiceFrames||[]).length>0;}
  sync(){if(this.active)this.transport.write(this.cfg,this.entries);else this.transport.stop();}
  /* a dialogue record (role=line) without emb: ask the reader for its replacement once */
  line(rec){if(!this.cfg.embed||!rec||rec.emb)return false;const k=keyOf(rec.text);if(!k||this.entries.has(k)||this.asked.has(k))return false;

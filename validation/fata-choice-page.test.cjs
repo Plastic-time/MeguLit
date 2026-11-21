@@ -80,7 +80,7 @@ test('drawSync starts the choice control channel only with a game pid and keeps 
  assert.deepEqual(exercise(fata,4321),[['ensure',4321]],'the real Fata choice-frame seed starts its control channel');
  assert.deepEqual(exercise(fata,0),[['profile',fata]],'a seed alone cannot start a channel without a game');
  assert.deepEqual(exercise(off,4321),[['profile',off]],'all switches off updates the existing channel without starting one');
- for(const [section,key] of [['draw','roles'],['draw','embed'],['draw','advhdInput'],['draw','cmvsInput'],['page','reportClear']]){
+ for(const [section,key] of [['draw','roles'],['draw','embed'],['draw','advhdInput'],['draw','cmvsInput'],['draw','fvpInput'],['page','reportClear']]){
   const p=JSON.parse(JSON.stringify(off));p[section]={...p[section],[key]:true};
   assert.deepEqual(exercise(p,4321),[['ensure',4321]],section+'.'+key+' independently starts its channel');
   assert.deepEqual(exercise(p,0),[['profile',p]],section+'.'+key+' still requires a game pid');

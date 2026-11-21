@@ -83,3 +83,5 @@ rem AdvHD version-pinned diagnostic input, custom EAX + eleven-word ABI and x64 
 call "%~dp0run-advhd.cmd" || exit /b 1
 rem CMVS paired full-input diagnostics, real ECX/two-word callee-cleaned ABI.
 call "%~dp0run-cmvs.cmd" || exit /b 1
+rem FVP raw append diagnostics, real ECX/one-word ret4 ABI.
+call "%~dp0run-fvp.cmd" || exit /b 1
