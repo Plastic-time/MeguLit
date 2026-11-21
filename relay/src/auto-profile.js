@@ -23,6 +23,8 @@
                                      revs are the ones the app has; 404 when nothing matches (the app keeps engine + repo layers)
      GET  /api/game-profile/<exeHash> the same with exe only
      POST /api/game-profile/runtime  {version:1,key,identity?,prints?,sha256,data:<base64 gzip runtime bundle>}
+     GET  /api/game-profile/retest   {schema:'megulit.cold-retest',version:1,items:[{key,game,at}]} the open repair queue, hashes only
+                                     (the idle-time cold test takes these first); report source 'cold' = a cold-test result
    Ours (Authorization: Bearer ADAPTER_ADMIN_TOKEN), used by tools/sign-profile.cjs:
      GET  /api/game-profile/picks                  the agreed picks not signed yet (unsigned documents, both layers)
      POST /api/game-profile/signed      {diff}     a signed document; an auto one must be the current pick of its layer and key;
@@ -62,7 +64,7 @@ export function validateReport(body){const p=body?.profile;if(body?.version!==1|
  const metrics={};const m=p.score?.metrics;if(plain(m))for(const k of METRICS){const v=m[k];metrics[k]=v===null||v===undefined?null:num(v,-1,1e6);}
  const over=Array.isArray(p.gate?.over)?p.gate.over.filter(x=>METRICS.includes(x)):[];
  const prints={...gamePrint.check(body.prints||p.prints),exe:key};
- return {ok:true,value:{key,mode,settings,prints,source:p.source==='gate'?'gate':'calibration',reason:String(p.reason||'').replace(/[\u0000-\u001f]/g,' ').slice(0,200),cost:num(p.score?.cost,0,1e6)??0,metrics,over,
+ return {ok:true,value:{key,mode,settings,prints,source:p.source==='gate'?'gate':p.source==='cold'?'cold':'calibration',reason:String(p.reason||'').replace(/[\u0000-\u001f]/g,' ').slice(0,200),cost:num(p.score?.cost,0,1e6)??0,metrics,over,
   engine:String(p.engine||'').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,32),exe:String(p.exe||'').toLowerCase().replace(/[\\/:*?"<>|]/g,'').slice(0,80),app:SEMVER.test(String(p.version||''))?String(p.version):''}};}
 
 /* the agreed best result from report rows, or null */
@@ -163,6 +165,11 @@ async function queueGet(env,url,{json}){const all=url.searchParams.get('all')===
  const rows=(await env.DB.prepare('SELECT game_key,gid,prints,exe,engine,reasons,note,kind,reporters,app,first_at,last_at,closed_at FROM auto_profile_queue'+(all?'':' WHERE closed_at IS NULL')+' ORDER BY last_at DESC LIMIT ?').bind(PROFILE_LIMITS.queue).all()).results||[];
  const j=(s,f)=>{try{return JSON.parse(s);}catch{return f;}};
  return json({queue:rows.map(r=>({key:r.game_key,game:r.gid||null,kind:r.kind,prints:j(r.prints,{}),exe:r.exe,engine:r.engine,reasons:j(r.reasons,[]),note:r.note,reporters:r.reporters,app:r.app,firstAt:r.first_at,lastAt:r.last_at,closedAt:r.closed_at||null}))});}
+/* 2026-11-21 (owner: 闲时冷测试优先测修复队列里要求补测的) the open repair queue as the app needs it: hashes only (the exe key and
+   the game identity), no names, no reasons. Public and cached; the app's idle-time cold test (services/cold-test.cjs) takes these
+   games first. */
+async function retestGet(env,url,{json}){const rows=(await env.DB.prepare('SELECT game_key,gid,last_at FROM auto_profile_queue WHERE closed_at IS NULL ORDER BY last_at DESC LIMIT ?').bind(PROFILE_LIMITS.queue).all()).results||[];
+ return json({schema:'megulit.cold-retest',version:1,items:rows.map(r=>({key:r.game_key,game:r.gid||null,at:r.last_at}))},200,{'cache-control':'public, max-age=3600'});}
 async function queueClose(request,env,now,{json,fail,readJSON}){const body=await readJSON(request,4096);const key=String(body.value?.key||'');if(!KEY.test(key))return fail('INVALID_KEY');
  await env.DB.prepare('UPDATE auto_profile_queue SET closed_at=? WHERE game_key=?').bind(sec(now),key).run();return json({ok:true});}
 async function runtimeList(env,url,{json}){const rows=(await env.DB.prepare('SELECT game_key,identity,gid,prints,size,reporters,updated_at FROM profile_runtime ORDER BY updated_at DESC LIMIT 500').all()).results||[];
@@ -178,6 +185,7 @@ export async function profileRoute(request,env,ip,now,url,path,deps){const {fail
  if(path==='/api/game-profile/runtime')return m==='POST'?(await hit(env,'profile-runtime',ip,now.getTime())?runtimePost(request,env,ip,now,deps):fail('RATE_LIMITED',429)):fail('METHOD_NOT_ALLOWED',405);
  const o=OURS[path];if(o){if(!ours(request,env))return fail('UNAUTHORIZED',401);if(m!==o[0])return fail('METHOD_NOT_ALLOWED',405);return o[2]==='q'?o[1](env,url,deps):o[1](request,env,now,deps);}
  /* no rate-limit row on reads (D1 write budget): the global per-IP limiter covers them */
+ if(path==='/api/game-profile/retest')return m==='GET'?retestGet(env,url,deps):fail('METHOD_NOT_ALLOWED',405);
  if(path==='/api/game-profile'||path==='/api/game-profile/')return m==='GET'?lookup(env,url,'',deps):fail('METHOD_NOT_ALLOWED',405);
  const g=/^\/api\/game-profile\/([0-9a-f]{64})$/.exec(path);if(g)return m==='GET'?lookup(env,url,g[1],deps):fail('METHOD_NOT_ALLOWED',405);
  return null;}

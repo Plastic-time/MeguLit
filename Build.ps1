@@ -72,6 +72,9 @@ foreach ($taskHelper in @(@('HookInjector32.exe','/platform:x86','HookInjector.c
  & $taskCsc /nologo /target:exe /optimize+ $taskHelper[1] ('/out:' + (Join-Path $taskRoot ('native\' + $taskHelper[0]))) @($taskHelper[2..($taskHelper.Count-1)] | ForEach-Object { Join-Path $taskRoot ('native\' + $_) })
  if ($LASTEXITCODE -ne 0) { throw "Native helper build failed: $($taskHelper[0])" }
 }
+# 2026-11-21 idle-time cold test: the game on a hidden desktop, muted, PostMessage input, client-area pictures (docs/cold-test.md)
+& $taskCsc /nologo /target:exe /optimize+ /platform:x64 /reference:System.Drawing.dll ('/out:' + (Join-Path $taskRoot 'native\ColdDesk.exe')) (Join-Path $taskRoot 'native\ColdDesk.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Native helper build failed: ColdDesk.exe' }
 & $taskNode --check (Join-Path $taskRoot 'services\bridge.cjs')
 if ($LASTEXITCODE -ne 0) { throw 'Service syntax check failed' }
 foreach ($taskScript in @('web/app.js','web/primary-buttons.js','web/library-grid-fit.js','web/tray-menu.js','web/launch-feedback.js','web/reader/game-ui.js','web/home-motion.js','web/library-refresh.js','web/series-library.js','web/series-i18n.js','web/game-reception.js','web/settings-autosave.js','web/path-picker.js','web/game-language.js','web/cn-version-guide.js','web/grid-motion.js','web/game-detail.js','web/adaptation-overview.js','web/diagnostics-ui.js','web/settings.js','web/settings-layout.js','web/settings-search.js','web/settings-help.js','web/select-control.js','web/translation-settings.js','web/speech-settings.js','web/voice-style.js','web/background-crop.js','web/backup-ui.js','web/settings-reset.js','web/anki-review.js','web/anki-fit.js','web/anki-card.js','web/reader/host-transport.js','web/reader/bootstrap.js','web/reader/learning-notice.js','web/reader/host-startup.js','web/reader/host-regions.js','web/reader/module-list.js','web/reader/mode.js','web/reader/word-status.js')) {
