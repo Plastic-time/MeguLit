@@ -1,0 +1,289 @@
+{
+ "note": "Unity IL2CPP text roles: rule methods of each game (module offsets from Il2CppDumper 6.7.46 on the owner's GameAssembly.dll + global-metadata.dat, static), each from its start to the next method start; cases = frames (return addresses, innermost first) and the role they must give. The runtime builds the same ranges by enumerating methods through the il2cpp API.",
+ "games": {
+  "mahou-shoujo-no-majo-saiban": {
+   "framework": "Naninovel",
+   "gameAssembly": {
+    "file": "manosaba_game/GameAssembly.dll",
+    "sha256": "d19a9d98abe1f5d120588f23f7fe0645b8b94a2777517f90338d640e0e934506"
+   },
+   "metadata": {
+    "file": "manosaba_game/manosaba_Data/il2cpp_data/Metadata/global-metadata.dat",
+    "sha256": "2ad884295e77d94d40dfe134392ab69fd8b6a94ca6bbd3b27e84cd3aa2f90fe5",
+    "version": 31
+   },
+   "setters": [
+    {
+     "name": "TMPro.TMP_Text$$set_text",
+     "rva": "0x1f06630"
+    },
+    {
+     "name": "UnityEngine.UI.Text$$set_text",
+     "rva": "0x24a7260"
+    }
+   ],
+   "ranges": [
+    {
+     "from": "0x337f90",
+     "to": "0x337fd0",
+     "role": "choice",
+     "name": "Naninovel.UI.ChoiceHandlerButton$$.ctor"
+    },
+    {
+     "from": "0x4983c0",
+     "to": "0x4984f0",
+     "role": "name",
+     "name": "Naninovel.UI.AuthorNameTMProPanel$$set_Text"
+    },
+    {
+     "from": "0x49c860",
+     "to": "0x49cdf0",
+     "role": "line",
+     "name": "Naninovel.UI.RevealableTextPrinterPanel$$SetMessages"
+    },
+    {
+     "from": "0x49cdf0",
+     "to": "0x49d060",
+     "role": "line",
+     "name": "Naninovel.UI.RevealableTextPrinterPanel$$AddMessage"
+    },
+    {
+     "from": "0x49d060",
+     "to": "0x49d600",
+     "role": "line",
+     "name": "Naninovel.UI.RevealableTextPrinterPanel$$AppendText"
+    },
+    {
+     "from": "0x49d600",
+     "to": "0x49d7b0",
+     "role": "line",
+     "name": "Naninovel.UI.RevealableTextPrinterPanel$$RevealMessages"
+    },
+    {
+     "from": "0x49f520",
+     "to": "0x49f710",
+     "role": "name",
+     "name": "Naninovel.UI.RevealableTextPrinterPanel$$SetAuthorNameText"
+    },
+    {
+     "from": "0x4a6db0",
+     "to": "0x4a6dd0",
+     "role": "line",
+     "name": "Naninovel.UI.RevealableText$$set_Text"
+    },
+    {
+     "from": "0x4a7510",
+     "to": "0x4a7610",
+     "role": "line",
+     "name": "Naninovel.UI.RevealableText$$SetTextValue"
+    },
+    {
+     "from": "0x61aa50",
+     "to": "0x61ab70",
+     "role": "choice",
+     "name": "Naninovel.UI.ChoiceHandlerButton$$add_OnSummaryTextChanged"
+    },
+    {
+     "from": "0x61ab70",
+     "to": "0x61ac90",
+     "role": "choice",
+     "name": "Naninovel.UI.ChoiceHandlerButton$$remove_OnSummaryTextChanged"
+    },
+    {
+     "from": "0x61ac90",
+     "to": "0x61adb0",
+     "role": "choice",
+     "name": "Naninovel.UI.ChoiceHandlerButton$$add_OnLock"
+    },
+    {
+     "from": "0x61adb0",
+     "to": "0x61aed0",
+     "role": "choice",
+     "name": "Naninovel.UI.ChoiceHandlerButton$$remove_OnLock"
+    },
+    {
+     "from": "0x61aed0",
+     "to": "0x61af20",
+     "role": "choice",
+     "name": "Naninovel.UI.ChoiceHandlerButton$$get_ChoiceState"
+    },
+    {
+     "from": "0x61af20",
+     "to": "0x61afb0",
+     "role": "choice",
+     "name": "Naninovel.UI.ChoiceHandlerButton$$set_ChoiceState"
+    },
+    {
+     "from": "0x61afb0",
+     "to": "0x61b170",
+     "role": "choice",
+     "name": "Naninovel.UI.ChoiceHandlerButton$$Initialize"
+    },
+    {
+     "from": "0x61b170",
+     "to": "0x61b190",
+     "role": "choice",
+     "name": "Naninovel.UI.ChoiceHandlerButton$$HandleLockChanged"
+    }
+   ],
+   "decoy": {
+    "start": "0x61b190",
+    "name": "Naninovel.UI.ChoiceHandlerButton.SummaryTextChangedEvent$$.ctor"
+   },
+   "cases": [
+    {
+     "frames": [
+      "0x49c868"
+     ],
+     "role": "line",
+     "site": "0x49c860"
+    },
+    {
+     "frames": [
+      "0x4983c8"
+     ],
+     "role": "name",
+     "site": "0x4983c0"
+    },
+    {
+     "frames": [
+      "0x337f98"
+     ],
+     "role": "choice",
+     "site": "0x337f90"
+    },
+    {
+     "frames": [
+      "0x61b194",
+      "0x337fa0"
+     ],
+     "role": "choice",
+     "site": "0x337f90"
+    },
+    {
+     "frames": [
+      "0x61b194"
+     ],
+     "role": "system",
+     "site": "0x0"
+    },
+    {
+     "frames": [
+      "0x49c860"
+     ],
+     "role": "system",
+     "site": "0x0"
+    }
+   ]
+  },
+  "haisha-fengyun": {
+   "framework": "Fungus",
+   "gameAssembly": {
+    "file": "海沙风云/GameAssembly.dll",
+    "sha256": "a5dc4e0b82d8f76ebb8c3a7b92fbffb5d0c73f4db0b6e624c52213f982d2a27a"
+   },
+   "metadata": {
+    "file": "海沙风云/海沙风云_Data/il2cpp_data/Metadata/global-metadata.dat",
+    "sha256": "9b8b8a7c5f9fd00c1e8f1dbe6d52c3f4eda289c4cbd7b7cf22804c47faa65329",
+    "version": 24
+   },
+   "setters": [
+    {
+     "name": "UnityEngine.UI.Text$$set_text",
+     "rva": "0x1468ca0"
+    },
+    {
+     "name": "TMPro.TMP_Text$$set_text",
+     "rva": "0x2f4ea0"
+    }
+   ],
+   "ranges": [
+    {
+     "from": "0x4fe540",
+     "to": "0x4fe870",
+     "role": "line",
+     "name": "Fungus.Writer.<Write>d__81$$MoveNext"
+    },
+    {
+     "from": "0x5068f0",
+     "to": "0x5069b0",
+     "role": "line",
+     "name": "Fungus.Writer$$Write"
+    },
+    {
+     "from": "0x50d9b0",
+     "to": "0x50dab0",
+     "role": "name",
+     "name": "Fungus.SayDialog$$SetCharacterName"
+    },
+    {
+     "from": "0x857a10",
+     "to": "0x857f50",
+     "role": "choice",
+     "name": "Fungus.MenuDialog$$AddOption"
+    },
+    {
+     "from": "0x857f50",
+     "to": "0x858070",
+     "role": "choice",
+     "name": "Fungus.MenuDialog$$AddOption"
+    },
+    {
+     "from": "0x858070",
+     "to": "0x858140",
+     "role": "choice",
+     "name": "Fungus.MenuDialog$$AddOption"
+    }
+   ],
+   "decoy": {
+    "start": "0x858140",
+    "name": "Fungus.MenuDialog$$Awake"
+   },
+   "cases": [
+    {
+     "frames": [
+      "0x4fe548"
+     ],
+     "role": "line",
+     "site": "0x4fe540"
+    },
+    {
+     "frames": [
+      "0x50d9b8"
+     ],
+     "role": "name",
+     "site": "0x50d9b0"
+    },
+    {
+     "frames": [
+      "0x857a18"
+     ],
+     "role": "choice",
+     "site": "0x857a10"
+    },
+    {
+     "frames": [
+      "0x858144",
+      "0x857a20"
+     ],
+     "role": "choice",
+     "site": "0x857a10"
+    },
+    {
+     "frames": [
+      "0x858144"
+     ],
+     "role": "system",
+     "site": "0x0"
+    },
+    {
+     "frames": [
+      "0x4fe540"
+     ],
+     "role": "system",
+     "site": "0x0"
+    }
+   ]
+  }
+ }
+}

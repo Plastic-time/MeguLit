@@ -1,0 +1,5 @@
+ToMe_DRAWRUN engine=unity on: methods=6 ranges=2
+ToMe_DRAWRUN engine=unity ev=text role=line kind=tmp obj=00007FF6C1E3718C site=c9a0 n=4 text=私の名は
+ToMe_DRAWRUN engine=unity ev=text role=name kind=tmp obj=00007FF6C1E37208 site=c870 n=2 text=岡部
+ToMe_DRAWRUN engine=unity ev=text role=system kind=tmp obj=00007FF6C1E37208 site=0 n=2 text=はい
+ToMe_DRAWRUN engine=unity ev=clear role=line kind=tmp obj=00007FF6C1E3718C

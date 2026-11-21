@@ -184,6 +184,36 @@
 - 真编译（2026-11-21）：`Build-UnityText.ps1` 用官方 BepInEx 5.4.23.6 core（GitHub BepInEx/BepInEx release v5.4.23.6，总指挥经店主同意下载到 `H:MeguLit-Workdeps\bepinex-5.4.23.6`，不进仓库；zip SHA-256 x64 6c57a714…0755、x86 a4024daf…622d）+ ひぐらし 的 Managed，x86 / x64 两份 core 都编过；输出 24576 字节，SHA-256 C833BDE2…7F28（只是验证，正式包在发布构建里出）
 - 没做：IL2CPP 插件（`MeguLitUnityText.IL2CPP.cs`，逆転検事 1&2、魔法少女ノ魔女裁判）同样的改动——要 BepInEx 6 在游戏里跑一次生成 interop 程序集才能编，需要开游戏，等店主测试时一起做
 
+### Unity IL2CPP（原生钩子：角色 + 组件 + 清空，2026-11-21，feat/re-il2cpp）
+- 样本（店主本机，只读）：魔法少女ノ魔女裁判（manosaba，GameAssembly.dll x64，metadata v31，Naninovel：GIGA Creation 定制）、海沙风云（x64，metadata v24，Fungus）。逆転検事 1&2（GK12）的 IL2CPP 代码并进了 GK12.exe，整个 exe 加了壳（段名全空、熵 ≈ 8，没有 il2cpp 导出），按规矩不碰这类保护，**跳过**
+- 静态：官方 Il2CppDumper v6.7.46（Perfare，`H:\MeguLit-Work\deps\il2cppdumper`，zip SHA-256 f5fc60df…dea2）导出两部的 script.json / dump.cs（放在 `H:\MeguLit-Work\re-il2cpp\dump`，不进仓库）
+- 拿字：LunaHook 的 Unity 引擎本来就按名字（il2cpp API）挂了 TMP_Text / TextMeshPro set_text、TextMeshProUGUI.SetText、UI.Text set_text，文字已经是从引擎里读的，不需要地址，也不分版本
+- 缺的是角色。做法：在这几个 setter 的回调里，从入口沿 x64 展开信息（GameAssembly 的 .pdata，`RtlVirtualUnwind`）往上走调用帧，**第一帧落在某个框架方法里就按那个方法定角色**；方法范围 = 每个方法起点到下一个方法起点（运行时用 il2cpp API 列出所有类的所有方法指针；离线就是 Dumper 的 script.json）。规则按名字写，同一框架的游戏和版本通用（`native/megulithook/Il2cppDrawRoles.h` = `tools/engine-sigs/il2cpp-text.cjs` RULES，测试逐条比对）：
+  - Naninovel：`RevealableText.SetTextValue / set_Text`、打印面板 `SetMessages / AddMessage / AppendText / RevealMessages` → line；`AuthorName*Panel.set_Text`、`RevealableTextPrinterPanel.SetAuthorNameText` → name；`ChoiceHandlerButton.*` → choice
+  - Fungus：`Writer.Write` 和它的协程 `<Write>d__N.MoveNext` → line；`SayDialog.SetCharacterName` → name；`MenuDialog.AddOption` → choice
+  - 其他调用者 → system（菜单、回想、手机、调试）
+- 静态核实的细节：Naninovel 的 `RevealableText.set_Text` 和 `SetTextValue` 都以尾跳结束（`jmp rax`），所以 TMP setter 入口的返回地址已经在打印面板里，规则里加了面板方法；Fungus 的 `TextAdapter.set_Text` 也尾跳到 TMP / UI.Text，返回地址直接是 Writer 或 SayDialog
+- 运行时（`native/megulithook/Il2cppDraw.h`，LunaHook unity.cpp 的 MeguLit 副本 `UnityEngine.cpp` 里接入，build-x86/x64.cmd 覆盖拷贝）：
+  - 默认不挂：控制文件出现 `roles=1`（这部游戏 seed 里 `draw.roles: true`）才在看守线程里 attach IL2CPP 域、列方法、建范围；之后每次 setter 调用记一行
+  - `ToMe_DRAWRUN engine=unity ev=text role=line|name|choice|system kind=tmp|ugui obj=<组件> site=<规则方法 rva> n= text=` / `ev=clear role= kind= obj=`（空串 = 这个组件被清空）；同一组件同一文字只记一次
+  - 读串和内嵌写回都照旧（CSHARP_STRING 仍然设着，读法用 LunaHook 自己的 `commonsolvemonostring`）；32 位 IL2CPP 只用返回地址一帧
+- 验证：`validation/engine-draw-sig-il2cpp.test.cjs`（规则两边一致、两部夹具的范围和分类、店主 GameAssembly 的导出 / .pdata 函数起点 / metadata 版本、运行时日志解析）；`selftest/il2cppdraw.cpp`（规则和范围，x86 + x64）；`selftest/il2cppgate.cpp`（假 il2cpp API 列真函数，真 x64 回溯：Write → 适配器 → setter = line，SetCharacterName = name，直接调用 = system，清空一次）；私有树编过 LunaHook32/64.dll
+- 没做：框（TMP 字形位置要 canvas + 相机，走 BepInEx IL2CPP 插件更合适）；把记录接进内核（和 YU-RIS 一样先进诊断日志，等探针日志配好再接）；Utage 等其他框架的规则（本机没有样本）
+
+#### 店主测试清单（Unity IL2CPP）
+1. 在 The Seed 里给 魔法少女ノ魔女裁判（或 海沙风云）的游戏差分设 `"draw":{"roles":true}`，或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，内容 `#cfg roles=1`）
+2. 开游戏，新游戏推 5 句（有名字的句子至少 1 句），出一次选项，开一次系统菜单
+3. 看 `logs\hook-diagnostics.log`：
+   - 有 `ToMe_DRAWRUN engine=unity on: methods=<很多> ranges=<十几>`
+   - 台词是 `ev=text role=line`，名字是 `role=name`，选项是 `role=choice`，菜单是 `role=system`
+   - 换句时同一个 obj 有 `ev=clear` 或新的 `ev=text`
+4. 游戏照常、不卡、不崩，原来的取词 / 内嵌照常 = 过
+5. 不过时发：`hook-diagnostics.log` 全文；有 `off: …` 那行一起发
+
+### NeXAS（GIGA）——本机没有样本，跳过
+- 找过：E:\GAL、E:\Steam、D/F/H 盘、MeguLit 游戏库：没有 NeXAS 的 exe 或 `PAC\0` 封包（本机的 `PAC ` 封包是 Softpal / Amuse，不是 NeXAS）；H 盘只有一份 BALDR HEART 汉化工具说明，没有游戏本体
+- 缺：BALDR SKY（Steam 741140 或 GOG）、BALDR HEART、BALDR FORCE EXE、或其他 GIGA / NeXAS 作品任一部（要 exe + Script.pac / Visual.pac）
+
 ### Artemis（THE SHELL Part I–III）——游戏自己的双语排版，已做
 - 整个 ADV 层是 pfs 里的 Lua；MeguLit 已有的 E591（`core/artemis-language.cjs`）用「游戏最后读的 `.pfs.NNN` 覆盖 Lua 文件」把正文切成日文。THE SHELL 每个文本块同时带 ja / en / tw / cn，日文里有引擎自己的注音 `{"ruby", text=…}`，引擎本身就有双语排版：`message_control` 在 `init.game_sublangview == "on"` 且有副语言时，先在 adv 层画主语言，再在 `adv_sub` 层画副语言并放到主语言正下方
 - 做法：同一个补丁档里，在 `system/image/boot.lua`（它在 msg/message.lua、msg/lang.lua 之后读，所以包到的都是游戏自己的函数）末尾追加 `core/artemis-draw.lua`：
