@@ -38,4 +38,4 @@ function extract(html,url){
  const title=decode((String(html).match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']*)["']/i)||String(html).match(/<title>([^<]*)<\/title>/i)||[])[1]||'').trim().slice(0,200);
  return {title,paragraphs:paragraphs(region(String(html||''),host))};
 }
-module.exports={extract,paragraphs,region,SITES,MAX_PARAS};
+module.exports={extract,paragraphs,region,SITES,MAX_PARAS,MAX_CHARS};

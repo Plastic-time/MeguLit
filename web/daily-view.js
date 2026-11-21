@@ -109,9 +109,18 @@ export function openReader(item,{api,locale,esc,toast,lookup,openSettings}){
  const ink=()=>{const on=root.querySelector('[data-rd-mode][aria-selected=true]'),bar=root.querySelector('.rd-mode-ink');if(on&&bar){bar.style.width=on.offsetWidth+'px';bar.style.transform=`translateX(${on.offsetLeft}px)`;}};requestAnimationFrame(ink);
  const setMode=m=>{mode=m;root.querySelectorAll('[data-rd-mode]').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.rdMode===m)));ink();};
  const paint=()=>{if(!data)return;text.dataset.mode=mode;text.innerHTML=(machine&&mode!=='ja'&&!mtHidden?`<aside class="rd-mt" role="note"><span>${w.mtNote}</span><button type="button" class="rd-link" data-rd-mt-go>${w.mtGo}</button><button type="button" class="rd-mt-x" data-rd-mt-x aria-label="${w.mtClose}" title="${w.mtClose}">×</button></aside>`:'')+data.paragraphs.map((p,i)=>`<div class="rd-p" data-i="${i}">${mode!=='tr'?`<p class="rd-ja" lang="ja">${paragraphHTML(p,esc)}</p>`:''}${mode!=='ja'?`<p class="rd-tr">${tr?esc(tr[i]||''):'<span class="rd-shimmer"></span>'}</p>`:''}</div>`).join('');};
- let trBusy=false;const needTr=async()=>{if(tr||trBusy||mode==='ja'||!data)return;trBusy=true;try{const res=await api('daily_translate',{texts:data.paragraphs.map(p=>p.text),target:locale==='en'?'en':'zh'}),out=Array.isArray(res)?res:res?.texts;if(!Array.isArray(out)||!out.some(Boolean))throw Error('TRANSLATION_FAILED:other');tr=out;machine=/microsoft/.test(String(res?.engine||''));}catch(e){toast?.(w.rdTrFail+(locale==='en'?': ':'：')+trReason(e,w));setMode('ja');}trBusy=false;if(root.isConnected)paint();};
+ let trBusy=false;const needTr=async()=>{
+  if(trBusy||mode==='ja'||!data||tr&&data.paragraphs.every((p,i)=>!p.text.trim()||tr[i]))return;
+  trBusy=true;
+  try{const res=await api('daily_translate',{texts:data.paragraphs.map(p=>p.text),target:locale==='en'?'en':'zh'}),out=Array.isArray(res)?res:res?.texts;
+   if(!Array.isArray(out)||!out.some(Boolean))throw Error(res?.error||'TRANSLATION_FAILED:other');
+   tr=out;machine=/microsoft/.test(String(res?.engine||''));
+   if(res?.error)toast?.(w.rdTrFail+(locale==='en'?': ':'：')+trReason(res.error,w));
+  }catch(e){toast?.(w.rdTrFail+(locale==='en'?': ':'：')+trReason(e,w));setMode('ja');}
+  trBusy=false;if(root.isConnected)paint();
+ };
  text.addEventListener('click',e=>{if(e.target.closest('[data-rd-mt-x]')){mtHidden=true;e.target.closest('.rd-mt').remove();}else if(e.target.closest('[data-rd-mt-go]')){close();openSettings?.('translation');}});
- root.querySelectorAll('[data-rd-mode]').forEach(b=>b.onclick=()=>{if(b.dataset.rdMode===mode)return;setMode(b.dataset.rdMode);text.classList.add('rd-swap');setTimeout(()=>{paint();text.classList.remove('rd-swap');needTr();},140);});
+ root.querySelectorAll('[data-rd-mode]').forEach(b=>b.onclick=()=>{if(b.dataset.rdMode===mode)return;setMode(b.dataset.rdMode);needTr();text.classList.add('rd-swap');setTimeout(()=>{paint();text.classList.remove('rd-swap');},140);});
  const show=async(query,rect,sentence)=>{
   query=query.trim().slice(0,40);if(!query)return;const ticket=++popTicket,box=sheet.getBoundingClientRect();
   pop.hidden=false;pop.style.left=Math.max(12,Math.min(rect.left-box.left,box.width-344))+'px';pop.style.top=(rect.bottom-box.top+sheet.scrollTop+10)+'px';
@@ -133,6 +142,6 @@ export function openReader(item,{api,locale,esc,toast,lookup,openSettings}){
   const t=e.target.closest('.rd-t');if(t){text.querySelectorAll('.rd-t.on').forEach(x=>x.classList.remove('on'));t.classList.add('on');show(t.dataset.b||t.textContent,t.getBoundingClientRect(),sentenceOf(t));}});
  sheet.addEventListener('mousedown',e=>{if(!pop.contains(e.target)&&!e.target.closest('.rd-text'))pop.hidden=true;});
  const failed=()=>{text.innerHTML=`<p class="rd-wait">${w.rdFail}</p><button type="button" class="dl-btn" data-rd-orig2>${w.rdOrig}</button>`;text.querySelector('[data-rd-orig2]').onclick=()=>api('daily_open',{url:item.link}).catch(()=>{});};
- api('daily_article',{link:item.link}).then(r=>{if(!root.isConnected)return;if(r?.state!=='ok'||!r.paragraphs?.length)return failed();data=r;root.querySelector('.rd-via').textContent=' · '+(w.rdVia[r.via]||'');paint();}).catch(()=>{if(root.isConnected)failed();});
+ api('daily_article',{link:item.link}).then(r=>{if(!root.isConnected)return;if(r?.state!=='ok'||!r.paragraphs?.length)return failed();data=r;root.querySelector('.rd-via').textContent=' · '+(w.rdVia[r.via]||'');paint();needTr();}).catch(()=>{if(root.isConnected)failed();});
  return {close};
 }
