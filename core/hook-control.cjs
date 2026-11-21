@@ -21,7 +21,7 @@ class HookControl{
   if(profile==='euphoria474'&&h.state.hookExact474!==true){this.status({hookCheckState:'unsupported',hookCheckMessage:'此游戏版本不匹配，YU-RIS 0.474 隐藏没有启动'});return;}
   if(profile==='embed'&&!h.hooks.state.hookThreads.some(t=>t.embeddable)){this.status({hookCheckState:'unsupported',hookCheckMessage:'还没有支持内嵌的文本流，先启动通用读取并推进一句'});return;}
   if(this.styleCalibration&&this.styleTimer)this.finishStyleSync(false,true);
-  this.running=profile!=='off';this.plan=profile;this.baseline=false;this.baselineMisses=0;this.missSequence=null;this.seq=0;const styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleCalibration=!!(force&&!h.hooks.remembered/* E520 */&&h.preferences.autoGameStyle!==false&&h.styleSync&&!h.styleSync.latest&&this.styleCalibrationIdentity!==styleIdentity);if(this.styleCalibration)force=false;h.hooks.preflight=this.running&&profile!=='read'&&!force&&!h.hooks.remembered;
+  this.running=profile!=='off';this.plan=profile;this.baseline=false;this.baselineMisses=0;this.missSequence=null;this.seq=0;const styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleCalibration=!!(force&&!h.hooks.remembered/* E520 */&&h.preferences.autoGameStyle!==false&&h.styleSync&&!h.styleSync.latest&&this.styleCalibrationIdentity!==styleIdentity);if(this.styleCalibration)force=false;h.hooks.onGiveWayCapped=()=>this.giveWayCapped();h.hooks.preflight=this.running&&profile!=='read'&&!force&&!h.hooks.remembered;
   h.send({type:'hookVerifyCancel'});
   this.autoOcr=false;const userOcr=false;/* 2026-11-12 (user) OCR never covers the original */
   h.save({...h.preferences,bindEnabled:true,maskMode:userOcr?'local':'hook',maskModeSource:userOcr?'user':'',hookProfile:profile});
@@ -32,6 +32,11 @@ class HookControl{
  }
  beginStyleSync(manual=false,purpose='all',owner=''){
   const h=this.host;if(!h.styleSync||!h.state.bound){this.styleCalibration=false;h.styleSync?.status('waiting');return;}
+  /* 2026-11-21 (owner, test pack v5 ファタモルガーナの館): a game whose engine reports every character's box (KiriKiri page DLL,
+     ファタ / 千恋＊万花) is placed from those boxes: calibration never gives way to measure the original, it follows the engine */
+  {const cur=h.placement?.current,engineBoxes=!!(cur&&!cur.fallback&&Array.isArray(cur.rects)&&cur.rects.length)||h.hooks?.drawsHidden===true;
+   if(engineBoxes){clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');h.styleSync.calibrating=false;h.hooks.calibrating=false;if(h.hooks.preflight){h.hooks.preflight=false;h.hooks.configure?.(h.preferences,h.state);}try{h.hooks.trace?.('calibration: engine boxes, no give way (following the engine coordinates)');}catch{}h.styleSync.status('following');return;}}
+  h.hooks.onGiveWayCapped=()=>this.giveWayCapped();
   this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');clearTimeout(this.styleTimer);this.styleManual=manual;this.styleRetryLine=null;this.styleAwaitLive=false;this.styleCalibration=true;this.styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleRestore=['embed','euphoria474'].includes(this.plan)&&h.preferences.hookHide!==false;
   h.styleSync.calibrating=true;h.styleSync.waitNext=this.styleRestore||h.hooks.drawsHidden===true;h.hooks.calibrating=true; // E246.1: embedding cleared the current line, so measure the next original line
    h.hooks.preflight=true;h.hooks.configure?.(h.preferences,h.state);h.onEvent?.({gameStylePreview:false});h.styleSync.automatic=!manual;h.styleSync.owner=owner;if(!h.styleSync.source){const source=h.state.hookSource||h.hooks.lastSource;if(source?.trim()){h.styleSync.source=source;h.styleSync.sourceRead=h.state.hookSourceRead===true;}}h.styleSync.status('revealing');
@@ -55,11 +60,15 @@ class HookControl{
    this.finishStyleSync(false);this.styleRetryLine=identity;this.styleRetryAt=this.now()+30000;};
   arm(lineAt?deadline:1000); /* automatic calibration pauses embedding: keep that pause short once the line is there (user: ISLAND showed the original for 90 s after every launch) */
  }
+ /* HookNative capped a give way (GIVE_WAY_MS): a calibration ends with what it measured, or as timed out; the baseline goes on hidden */
+ giveWayCapped(){const h=this.host;if(this.styleCalibration){if(h.styleSync?.publish?.())return;this.finishStyleSync(false);h.styleSync?.status('timeout');return;}
+  if(this.running&&!this.baseline){this.stage='switching';this.status({hookCheckState:'switching',hookCheckMessage:'原文检查超过 2 秒，已恢复隐藏'});}}
  finishStyleSync(success,cancel=false){
   if(!this.styleCalibration)return;clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;const h=this.host;if(this.styleRevealed){this.styleRevealed=false;h.onEvent?.({gameStyleReveal:false});}h.hooks.calibrating=false;h.hooks.preflight=false;h.styleSync.calibrating=false;clearTimeout(h.styleSync.timer);if(cancel){h.styleSync.cancel?.();/* the calibration showed the original (hide paused): a cancelled one hides again at once, not at the next settings save */h.hooks.configure?.(h.preferences,h.state);}h.onEvent?.({gameStylePreview:false});
   const same=this.styleIdentity===String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleRetryAt=this.now()+15000;
   if(same&&!cancel){h.hooks.preflight=false;h.hooks.configure?.(h.preferences,h.state);this.styleAwaitLive=false;h.styleSync.status(success?'applied':'retrying');}
   if(!same||cancel||!this.styleRestore){this.styleAwaitLive=false;h.onEvent?.({gameStylePreview:false});}
+
  }
  check(){const h=this.host;if(!this.running){this.start(h.preferences.hookProfile==='off'?'read':h.preferences.hookProfile);return;}if(h.hooks.lastSource)this.source(h.hooks.lastSource);else this.status({hookCheckMessage:'还没有台词，请在游戏里推进一句'});}
  source(text){
