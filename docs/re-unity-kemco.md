@@ -25,6 +25,7 @@ The following offsets refer to methods in the exact original Assembly-CSharp.dll
 - A locked choice can destroy Button.Text and set Button.Enabled=false before its fade; do not report it as a visible clickable option based on script presence
 - Message.Mes IL_002c stores MessageText, IL_004c..0063 destroys old parentObject, IL_006e stores a new parent, IL_009a clears messageSprite, IL_00a5 clears rubyArray, then creates each character and finally IL_05a2 stores LastMes
 - Message.Mes IL_0416..0427 calls Game.NewText for one character and stores the root GameObject; IL_04cc..04d9 appends that exact root into the row's messageSprite list
+- Message.Mes(string,bool) returns string, not void: IL_059c..05a2 stores the builder string in LastMes, then IL_05a7..05ad returns the same builder string
 - Game.NewText IL_00ee obtains a legacy UnityEngine.TextMesh, IL_0105/0111 sets its text, IL_018f clones the TextMesh, IL_01a1 parents the clone and IL_01ac makes it black as an offset shadow
 - Therefore a general FindObjectsOfType<TextMesh> scan duplicates each body glyph and mixes text roles; read the exact root list, never concatenate descendants
 - Message.Script IL_0351..035d separately retains ruby TextMeshes in Ruby.fontSprite; the child shadow and ruby cannot be treated as body characters
@@ -94,6 +95,8 @@ Already published geometry is deduplicated, and the same sentence on a different
 
 Existing Tsuki/Higurashi recordings remain separate real-recording regressions, not KEMCO healthy baselines
 The Mono plugin compiles using real Unity 5 and BepInEx 5.4.23.6 reference assemblies
+The first observer candidate incorrectly required a void Mes return; a follow-up corrects it to the actual string return after a fresh metadata-only audit of every field/type gate
+The actual method predicate is compiled in the console harness with a matching string-return neutral class and void/static/wrong-parameter negative classes
 The six related suites pass 31/31 without skips; these are local pure/console/socket tests, not game or GUI tests
 The helper's synthetic visibility boxes do not certify the actual Unity camera/material implementation
 Before live work the current plugin must be supplied in the on-demand runtime pack and a fresh shadow, original assembly selected, actual audio snapshot guard completed, and a game slot acquired

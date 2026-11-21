@@ -425,6 +425,11 @@ public class MeguLitUnityText : BaseUnityPlugin {
   var f=t.GetField(name,BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance);
   return f!=null && f.FieldType==value ? f : null;
  }
+ internal static bool KemcoMethod(Type type) {
+  if (type==null) return false;
+  var mes=type.GetMethod("Mes",BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance,null,new[]{typeof(string),typeof(bool)},null);
+  return mes!=null && mes.ReturnType==typeof(string);
+ }
  bool KemcoSchema() {
   if (kemcoTried) return kemcoReady; kemcoTried=true;
   foreach (var a in AppDomain.CurrentDomain.GetAssemblies()) {
@@ -442,8 +447,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
    kemcoDialogs=KemcoField(kemcoMain,"dialogList",typeof(List<GameObject>));
    kemcoRows=KemcoField(kemcoMessage,"messageSprite",typeof(List<List<GameObject>>)); kemcoParent=KemcoField(kemcoMessage,"parentObject",typeof(GameObject));
    kemcoButtonText=KemcoField(kemcoButton,"Text",typeof(GameObject)); kemcoButtonEnabled=KemcoField(kemcoButton,"Enabled",typeof(bool));
-   var mes=kemcoMessage.GetMethod("Mes",BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance,null,new[]{typeof(string),typeof(bool)},null);
-   kemcoReady=kemcoBody!=null && kemcoName!=null && kemcoDialogs!=null && kemcoRows!=null && kemcoParent!=null && kemcoButtonText!=null && kemcoButtonEnabled!=null && mes!=null && mes.ReturnType==typeof(void);
+   kemcoReady=kemcoBody!=null && kemcoName!=null && kemcoDialogs!=null && kemcoRows!=null && kemcoParent!=null && kemcoButtonText!=null && kemcoButtonEnabled!=null && KemcoMethod(kemcoMessage);
    Send("ToMe_UNITY status kemco-sprites schema="+(kemcoReady?"original-readonly":"unsupported")); return kemcoReady;
   }
   return false;

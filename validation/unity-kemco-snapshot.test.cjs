@@ -5,17 +5,23 @@ function method(name){const start=source.indexOf(name);assert.ok(start>=0,name);
 test('actual bounded KEMCO helper rejects incomplete snapshots and keeps page, role and permission identities separate',()=>{
  const dir=fs.mkdtempSync(path.join(process.env.MEGULIT_TEST_TMP||os.tmpdir(),'megulit-kemco-'));
  try{
-  fs.writeFileSync(path.join(dir,'check.cs'),`using System;using System.Collections.Generic;
+  fs.writeFileSync(path.join(dir,'check.cs'),`using System;using System.Collections.Generic;using System.Reflection;
+class StringMes { public string Mes(string text,bool flag){return text;} }
+class VoidMes { public void Mes(string text,bool flag){} }
+class StaticMes { public static string Mes(string text,bool flag){return text;} }
+class WrongMes { public string Mes(string text,int flag){return text;} }
 class Check {
  static int checks; static void Is(bool ok,string why){checks++;if(!ok)throw new Exception(why);}
  readonly object gate=new object();bool connected=true,kemcoAsked,kemcoRoles;int kemcoEpoch,kemcoObservedEpoch=-1;List<string> sent=new List<string>();void Send(string s){sent.Add(s);}
  ${method('internal static bool KemcoFlag(')}
+ ${method('internal static bool KemcoMethod(')}
  ${method('void KemcoControl(')}
  ${method('void KemcoSend(')}
  static KemcoSpriteSnapshot.Glyph G(int id,string s="日",bool shown=true){return new KemcoSpriteSnapshot.Glyph{id=id,text=s,shown=shown,box=new float[]{2,4,10,20}};}
  static List<IList<KemcoSpriteSnapshot.Glyph>> R(params KemcoSpriteSnapshot.Glyph[] gs){return new List<IList<KemcoSpriteSnapshot.Glyph>>{new List<KemcoSpriteSnapshot.Glyph>(gs)};}
  static KemcoSpriteSnapshot.Page Read(IList<IList<KemcoSpriteSnapshot.Glyph>> r){return KemcoSpriteSnapshot.Read(r,4096,4096);}
  void Run(){
+  Is(KemcoMethod(typeof(StringMes)),"actual metadata ABI returns string");Is(!KemcoMethod(typeof(VoidMes))&&!KemcoMethod(typeof(StaticMes))&&!KemcoMethod(typeof(WrongMes))&&!KemcoMethod(null),"wrong Mes ABI rejected");
   var rows=R(G(1),G(2,"本"));rows.Add(new List<KemcoSpriteSnapshot.Glyph>{G(3,"語")});var p=Read(rows);Is(p!=null&&p.text=="日本\\n語"&&p.rects.Count==3,"ordered rows");
   Is(Read(R(G(1,"\\ud83d\\ude00"))).rects.Count==1,"one unicode scalar");
   Is(Read(R(G(1),G(2,"本",false)))?.text=="日","typewriter suffix");
