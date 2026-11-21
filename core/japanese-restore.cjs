@@ -182,7 +182,7 @@ function writeAtomic(file,data){const tmp=file+'.megulit-tmp';fs.writeFileSync(t
 function apply(gameDir,options={}){
  gameDir=path.resolve(String(gameDir||''));if(gameRunning(gameDir))throw Error('GAME_RUNNING');
  {const y=readManifest(gameDir)?null:yurisPlan(gameDir);if(y&&y.updates.length)return yurisApply(gameDir,y);}
- const plan=siglusPlan(gameDir);if(!plan||!plan.changes.length){if(!readManifest(gameDir)&&langSwitch().detect(gameDir,options).state==='restorable')return langSwitch().apply(gameDir,options);if(!readManifest(gameDir)&&artemis().detect(gameDir).state==='restorable')return artemis().apply(gameDir);throw Error('NOTHING_TO_RESTORE');}
+ const plan=siglusPlan(gameDir);if(!plan||!plan.changes.length){if(!readManifest(gameDir)&&langSwitch().detect(gameDir,options).state==='restorable')return langSwitch().apply(gameDir,options);if(!readManifest(gameDir)&&artemis().detect(gameDir).state==='restorable')return artemis().apply(gameDir,{bilingual:options.bilingual});throw Error('NOTHING_TO_RESTORE');}
  const backup=path.join(gameDir,BACKUP_DIR,'dat');fs.mkdirSync(backup,{recursive:true});
  const prior=readManifest(gameDir),entries=prior?prior.files:[],built=[];
  for(const c of plan.changes){ // build and verify every file before any write

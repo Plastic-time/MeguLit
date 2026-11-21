@@ -57,16 +57,26 @@
 - 真编译（2026-11-21）：`Build-UnityText.ps1` 用官方 BepInEx 5.4.23.6 core（GitHub BepInEx/BepInEx release v5.4.23.6，总指挥经店主同意下载到 `H:MeguLit-Workdeps\bepinex-5.4.23.6`，不进仓库；zip SHA-256 x64 6c57a714…0755、x86 a4024daf…622d）+ ひぐらし 的 Managed，x86 / x64 两份 core 都编过；输出 24576 字节，SHA-256 C833BDE2…7F28（只是验证，正式包在发布构建里出）
 - 没做：IL2CPP 插件（`MeguLitUnityText.IL2CPP.cs`，逆転検事 1&2、魔法少女ノ魔女裁判）同样的改动——要 BepInEx 6 在游戏里跑一次生成 interop 程序集才能编，需要开游戏，等店主测试时一起做
 
-### Artemis（THE SHELL Part I–III）——静态查清，未改
-- 整个 ADV 层是 pfs 里的 Lua（`system/msg/message.lua` / `line.lua` / `lang.lua`，`system/adv/select.lua` / `button.lua`），Lua 带 `io.open`；MeguLit 已有的 E591（`core/artemis-language.cjs`）就是靠「游戏读档最后读的那个 `.pfs.NNN` 覆盖一个 Lua 文件」生效的，同一条路能做画字层
-- 关键发现：THE SHELL 每个文本块同时带 ja / en / tw / cn，日文里有引擎自己的注音标记 `{"ruby", text=…}…{"/ruby"}`；引擎本身就有双语排版：`message_control` 在 `init.game_sublangview == "on"` 且设了副语言时，先在 adv 层画主语言，再在 `adv_sub` 层画副语言，并把副语言层放到主语言正下方（`lyprop top = get_message_layer_height`）。也就是「日文 + 游戏自己的注音在上、官方中文在下，全由游戏画」，不用翻译查表
-- 方案（一个覆盖 Lua 的追加段，和 E591 合在同一个补丁档里）：
-  1. 主语言 = ja（E591 已做）、副语言 = cn：包一层 `get_sub_lang` 返回这部作品有的中文轨（cn / tw）
-  2. 打开 `init.game_sublangview`
-  3. `mw_textloop` 不看传进来的 `p.lang`（这一版副语言那一遍会又画一次日文）：包 `mw_textloop` / `getTextBlockFloat`，副语言那一遍取 `p[p.lang]`
-  4. 这部游戏的字体表里没有 `sub01`：`setMWFont` 打开副语言后会去取 `sub01`，要包 `get_fontdata`，缺 `sub*` 时用 `adv*` 的定义缩小一号——这一步不做对，游戏开机就停（E598 黑屏的先例）
-- 阻塞：本机没有 Lua 解释器，覆盖段没法离线跑；拿一份官方 Lua 5.1 / LuaJIT 源码自己编来跑替身测试需要下载，要店主同意。没有它之前不往游戏补丁档里放任何新 Lua
-- 角色：Lua 里没有通往 MeguLit 的通道（不能像 KiriKiri 那样发记录），位置和角色仍走外面（字形点 / GPU）；名字是 `mw_name` / `message_name`，选项在 `select.lua`，以后要报角色可以让 Lua 用 `io.open` 追加写一个日志文件给 MeguLit 读
+### Artemis（THE SHELL Part I–III）——游戏自己的双语排版，已做
+- 整个 ADV 层是 pfs 里的 Lua；MeguLit 已有的 E591（`core/artemis-language.cjs`）用「游戏最后读的 `.pfs.NNN` 覆盖 Lua 文件」把正文切成日文。THE SHELL 每个文本块同时带 ja / en / tw / cn，日文里有引擎自己的注音 `{"ruby", text=…}`，引擎本身就有双语排版：`message_control` 在 `init.game_sublangview == "on"` 且有副语言时，先在 adv 层画主语言，再在 `adv_sub` 层画副语言并放到主语言正下方
+- 做法：同一个补丁档里，在 `system/image/boot.lua`（它在 msg/message.lua、msg/lang.lua 之后读，所以包到的都是游戏自己的函数）末尾追加 `core/artemis-draw.lua`：
+  1. 副语言 = 这一版的中文轨（cn，或 tw），打开 `game_sublangview`
+  2. `mw_textloop` 不看传进来的语言（这一版副语言那一遍会又画日文）：副语言那一遍 `getTextBlockFloat` 取 `p[cn]`
+  3. 游戏的字体表里没有 `sub01`，开机 `setMWFont` 就会 `sub01 は登録されていないfont設定です` 然后空指针停住：缺 `subNN` 时用 `advNN` 的中文那一份（cn = font06 Noto Serif SC），字号 80%，不带注音
+  - 每个包装都回落到游戏自己的函数；不写游戏存档、设置
+- 触发：这部游戏的差分 `draw.embed: true`（且 `draw.embedTranslation` 不为 false）时，「日文原版恢复」（`jp_restore_apply` → `core/japanese-restore.cjs` → `artemis-language.apply(dir,{bilingual:'cn'})`）生成的补丁档带上这段；这一版没有中文轨或没有 boot.lua 就只做原来的日文修正。撤销同 E591（删掉那个补丁档）
+- 测试 `validation/engine-draw-artemis.test.cjs`：用店主同意下载、总指挥编好的 Lua 5.1.5（`H:\MeguLit-Work\deps\lua\bin\lua51.exe`），把 THE SHELL Part I 自己的 msg/message.lua、msg/lang.lua、msg/ui.lua、image/boot.lua 和字体表（只读，从游戏的 pfs 里读，MeguLit 自己的补丁档跳过，不写游戏目录）加上 E591 修改和这段，在替身引擎里跑：
+  - 开机路径：`get_fontdata("sub01")` 得到 Noto Serif SC 30px、无注音；`adv01` 不变（思源宋体 38px、注音 14）；`set_textfont("sub01", …adv_sub, "adv")` 跑通并给 adv_sub 层设上中文字体
+  - 游戏真实的一句（0001_00006，带「櫻羽 / おうば」注音）：adv 层画日文 + 注音标签，adv_sub 层画中文，adv_sub 的 top = 主文本高度
+  - 对照：去掉这段，同样的游戏 Lua 在 `set_textfont("sub01")` 处报错停住
+- 没做：Lua 里没有通往 MeguLit 的通道，Artemis 的位置 / 角色仍走外面（字形点 / GPU）
+
+#### 店主测试清单（THE SHELL）
+1. 给 THE SHELL（Part I 先）的游戏差分（The Seed）设 `"draw":{"embed":true}`
+2. 如果之前做过「日文原版恢复」，先在同一处撤销（游戏目录里 MeguLit 加的 `TheShell.pfs.0NN` 会被删掉），再点一次「日文原版恢复」
+3. 开游戏：能正常开机进标题 = 第一关过（不过：开机停住或黑屏，发 `.megulit-japanese\manifest.json` 和游戏目录文件列表）
+4. 开新游戏推 5 句：对话框里日文（带游戏自己的注音）在上，官方中文在正下方，小一号；中文不缺字
+5. 长句看中文有没有超出对话框底部；超了把截图发来（字号 / 位置以后进版本层差分调）
 
 ## 样板：YU-RIS（已做，其他原生引擎照这个写）
 
