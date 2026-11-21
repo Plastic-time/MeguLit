@@ -16,10 +16,31 @@ test('long relay paragraphs keep Unicode characters intact across translation an
  let missing=true;
  const received=[],runtime={reviews:()=>({translate:async list=>{received.push(list);return {texts:list.map(t=>t===tail&&missing?'':t)};}})};
  const run=()=>daily.translate('',runtime,article.paragraphs.map(p=>p.text),'zh',{withEngine:true,translateFree:async()=>''});
- assert.deepEqual((await run()).texts,['','別の段落。']);
+ assert.deepEqual(await run(),{texts:['','別の段落。'],engine:'app',error:'ENGINE_EMPTY'});
  missing=false;
  assert.deepEqual((await run()).texts,[text,'別の段落。']);
  assert.deepEqual(received,[[start,tail,'別の段落。'],[tail]]);
+});
+test('an incomplete single paragraph preserves the last translation error',async()=>{
+ const daily=require('../services/daily.cjs');
+ const text='失'.repeat(2000)+'末尾';
+ const runtime={reviews:()=>({translate:async()=>({texts:['','ending'],error:'MODEL_BUSY'})})};
+ await assert.rejects(daily.translate('',runtime,[text],'en',{translateFree:async()=>{throw Error('TRANSLATION_HTTP_429');}}),/TRANSLATION_FAILED:TRANSLATION_HTTP_429/);
+});
+test('long article paragraphs keep their full dictionary tokens',async()=>{
+ const daily=require('../services/daily.cjs'),url='https://www.4gamer.net/games/92/',text='日'.repeat(3999)+'🌸本語';
+ const fetch=async address=>({ok:true,json:async()=>address.endsWith('/api/news')?{items:[{link:url,title:'Fixture',fulltext:true}]}:
+  address.includes('/article?')?{paragraphs:[text]}:{words:[]}});
+ const chunks=[],learning={installed:()=>true,readings:{resolve:tokens=>tokens},tokenize:async t=>{
+  if([...t].length>4000)throw Error('TOKENIZER_LIMIT');
+  chunks.push(t);return [{surface:t,reading:'ご',readingSource:'dictionary'}];
+ }};
+ const opts={env:{MEGULIT_RELAY_BASE:'https://relay.test'},fetch,runtime:{learning:()=>learning}};
+ await daily.view('',null,opts);
+ const [p]=(await daily.article('',url,opts)).paragraphs;
+ assert.deepEqual(chunks,['日'.repeat(3999),'🌸本語']);
+ assert.equal(p.tokens.map(t=>t.s).join(''),text);
+ assert.ok(p.tokens.every(t=>t.r==='ご'));
 });
 test('translation keeps the end of a long news paragraph and its position in the article',async()=>{
  const daily=require('../services/daily.cjs'),{GameReviews}=require('../services/game-reviews.cjs');
