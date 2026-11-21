@@ -45,7 +45,7 @@ static const Sig Sigs[] = {
   { "advhd", "", "GetGlyphOutlineA", "8d 44 24 ?? 50 6a 00 6a 00 8d 4c 24 ?? 51 6a 06 56 52", 1, 0xe4 },
   // CMVS (青い鳥, cmvs32.exe 0x46145e): the glyph routine 0x4613b0 (EBP frame, 2 callers) asks GetGlyphOutlineA(hdc, ch,
   // GGO_GRAY4, &gm, 0, NULL, &mat) for each character (0x4614b7 renders it: not signed); no pen, via / via2 = its callers
-  { "cmvs", "", "GetGlyphOutlineA", "8d 4d ?? 51 6a 00 6a 00 8d 4d ?? 0f b7 c6 51 6a 05 50 ff 75 08", 1, 1 },
+  { "cmvs", "", "GetGlyphOutlineA", "8d 4d ?? 51 6a 00 6a 00 8d 4d ?? 0f b7 c6 51 6a 05 50 ff 75 08 0f 11 45 ??", 1, 1 },
 };
 static const int SigCount = (int)(sizeof(Sigs) / sizeof(Sigs[0]));
 

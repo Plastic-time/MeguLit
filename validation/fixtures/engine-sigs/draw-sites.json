@@ -88,6 +88,17 @@
    "slot": "0x46b058",
    "call": "0x40f5d9",
    "hex": "0000008b54243c8b4424145250ff156cb046008b5424148d8c249000000051528944244cff1570b046008b5424148d442460506a006a008d4c2434516a065652ff1558b046008be883fdff0f84520400"
+  },
+  "aoi-tori/cmvs": {
+   "id": "cmvs",
+   "file": "cmvs32.exe",
+   "sha256": "3a2ec3af6a16a4f36d72faf9e7cb14e2bcc883fbf22fb31da5d69434cc53727e",
+   "api": "GetGlyphOutlineA",
+   "va": "0x46141e",
+   "callOffset": 64,
+   "slot": "0x4c7054",
+   "call": "0x46145e",
+   "hex": "8be55dc210008b750c8b4df4538b5d14535756e80affffff85c00f85290200000f2805b01a4d008d4db0516a006a008d4dc80fb7c6516a0550ff75080f1145b0ff1554704c008bf78945f80faff78d0c"
   }
  }
 }
