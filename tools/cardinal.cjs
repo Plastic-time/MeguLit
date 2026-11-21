@@ -29,7 +29,7 @@ const arg=(k,d)=>{const i=process.argv.indexOf('--'+k);return i>0?process.argv[i
  const o=await require(path.join(REPO,'services','cardinal','run.cjs')).replay(scenario,{data:arg('data',''),keep:flag('keep'),name:'cli'});
  if((o.errors||[]).length)console.log('# replay errors: '+JSON.stringify(o.errors).slice(0,800));
  const r=S.score({name:'session',steps,o},rules);
- console.log(JSON.stringify({lines:r.lines,scores:r.scores,total:r.total,applies:r.applies},null,1));
+ console.log(JSON.stringify({lines:r.lines,scores:r.scores,total:r.total,applies:r.applies,lag:o.lag},null,1));
  for(const [k,v] of Object.entries(r.detail))if(v.length)console.log('# '+k+': '+v.slice(0,4).join(' | ').slice(0,600));
  if(arg('out'))fs.writeFileSync(arg('out'),JSON.stringify({scenario,result:r,out:o},null,1));
 })();

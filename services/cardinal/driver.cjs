@@ -68,7 +68,8 @@ const {Runtime}=require(path.join(REPO,'services','runtime.cjs'));
 let page=null;const early=[];
 const runtime=new Runtime(root,(channel,payload)=>{if(channel!=='reader-event')return;events.push({at:Date.now(),m:payload});
  /* the options core offered the reader (hookChoices), once per new set */
- if(payload&&Array.isArray(payload.hookChoices)){const k=JSON.stringify(payload.hookChoices.map(c=>c?.text??c));if(payload.hookChoices.length&&k!==lastOffer)offers.push({at:Date.now(),n:payload.hookChoices.length});lastOffer=payload.hookChoices.length?k:'';}
+ /* core/hook-native.cjs notify({hookChoices:{items:[{text,x0,y0,x1,y1}],sw,sh,at,unboxed}}) or {hookChoices:null} */
+ if(payload&&Object.prototype.hasOwnProperty.call(payload,'hookChoices')){const c=payload.hookChoices,items=Array.isArray(c)?c:Array.isArray(c?.items)?c.items:[];const k=JSON.stringify(items.map(x=>x?.text??x));if(k!==lastOffer&&offers.length&&offers.at(-1).until==null)offers.at(-1).until=Date.now();if(items.length&&k!==lastOffer)offers.push({at:Date.now(),n:items.length,until:null});lastOffer=items.length?k:'';}
  if(page)page.evaluate(m=>window.__replayEvent(m),payload).catch(()=>{});else early.push(payload);});
 runtime.spawnReaderNative=()=>gwb;
 /* the tokenizer runtime is absent here and never installed (no pip / dictionary download from a replay): requests fail like an uninstalled one */
@@ -113,9 +114,11 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
   let prevT=null,sampling=!!scenario.sampleEvery;
   const hits=()=>(gwb.sent.filter(x=>x.m.type==='hitRegions').at(-1)?.m.regions)||[];
   /* a sampler beside the timeline: what the page shows every sampleEvery ms (flashes between two marks) */
-  const sampler=(async()=>{while(sampling){const s=await page.evaluate(()=>window.__replayProbe()).catch(()=>null);if(s){s.mark='tick';s.watch=true;s.at=Date.now()-t0;s.hitRegions=hits();s.src=s.hookSource;out.samples.push(s);}await sleep(scenario.sampleEvery);}})();
+  /* how late the replay ran (a busy PC stretches it and the scores would blame the reader): each step's start past its time, each sample's gap past sampleEvery */
+  const late={steps:[],samples:[]};let lastSample=0;
+  const sampler=(async()=>{while(sampling){const s=await page.evaluate(()=>window.__replayProbe()).catch(()=>null);{const now=Date.now();if(lastSample)late.samples.push(Math.max(0,now-lastSample-scenario.sampleEvery));lastSample=now;}if(s){s.mark='tick';s.watch=true;s.at=Date.now()-t0;s.hitRegions=hits();s.src=s.hookSource;out.samples.push(s);}await sleep(scenario.sampleEvery);}})();
   for(const step of scenario.steps){
-   if(step.t!=null){if(prevT!=null){const gap=Math.min(maxGap,Math.max(0,step.t-prevT));clock+=gap;}prevT=step.t;const wait=t0+clock-Date.now();if(wait>0)await sleep(wait);}
+   if(step.t!=null){if(prevT!=null){const gap=Math.min(maxGap,Math.max(0,step.t-prevT));clock+=gap;}prevT=step.t;const wait=t0+clock-Date.now();if(wait>0)await sleep(wait);late.steps.push(Math.max(0,Date.now()-(t0+clock)));}
    if(step.gwb){if(models&&step.gwb.type==='bound'&&!krkr&&fs.existsSync(path.join(REPO,'native','krkrtext','script.inc')))try{const {KrkrModel}=require(path.join(REPO,'tools','reader-replay','krkr-model.cjs'));krkr=new KrkrModel({pid:step.gwb.gameProcessId,tmp:process.env.TEMP});}catch(e){out.krkr.error=String(e.message||e);krkr=false;}
     /* MODEL (labelled): the game clears its message layer at the click ([cm]); the script's own clearSent reports it when the control file says #clearline */
     if(step.gwb.type==='readerInput'&&krkr&&lastLine&&step.pageClear!==false){krkr.tick();const n=krkr.reports.length;krkr.st.clearSent(lastLine);for(const r of krkr.reports.slice(n))hb.line({type:'hookChars',line:r});out.krkr.clears+=krkr.reports.length-n;}
@@ -134,7 +137,8 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
   if(krkr){krkr.tick();out.krkr.cfg=JSON.parse(JSON.stringify(krkr.st.cfg,(k,v)=>v instanceof RegExp?String(v):v));out.krkr.ctl=krkr.ctl;}
   out.hookSpawned=hookSpawned;out.gwbSent=gwb.sent.filter(x=>x.m.type!=='hitRegions').slice(-200).map(x=>x.m);out.hbSent=hb.sent.map(x=>({at:x.at-t0,...x.m})).filter(m=>m.type!=='source');
   out.events=events.map(e=>({at:e.at-t0,type:e.m.type,keys:Object.keys(e.m).slice(0,12)})).slice(-400);
-  out.choiceOffers=offers.map(c=>({at:c.at-t0,n:c.n}));out.hidden={lines:hidden.lines,visible:hidden.visible};
+  {const q=(a,p)=>{if(!a.length)return 0;const b=[...a].sort((x,y)=>x-y);return b[Math.min(b.length-1,Math.floor(b.length*p))];};out.lag={stepP95:q(late.steps,0.95),stepMax:q(late.steps,1),sampleP95:q(late.samples,0.95),sampleMax:q(late.samples,1)};}
+  out.choiceOffers=offers.map(c=>({at:c.at-t0,n:c.n,until:c.until==null?null:c.until-t0}));out.hidden={lines:hidden.lines,visible:hidden.visible};
   out.hookEvents=[];for(const f of ['hook-events.log.previous','hook-events.log.1','hook-events.log']){const x=path.join(root,'logs',f);if(fs.existsSync(x))out.hookEvents.push(...fs.readFileSync(x,'utf8').split(/\r?\n/).filter(l=>l&&!/Z (chain|translation|choice aux|art text located) /.test(l)));}
   out.readerHost=fs.existsSync(path.join(root,'logs','reader-host.log'))?fs.readFileSync(path.join(root,'logs','reader-host.log'),'utf8').split('\n').filter(l=>!/"hostFrame"/.test(l)).slice(-200):[];
  }catch(e){out.errors.push('driver: '+String(e.stack||e).slice(0,800));}

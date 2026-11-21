@@ -119,9 +119,10 @@ module.exports={
     PC replays the session's last lines through a hidden reader and scores what the player saw. Here so a signed diff can retune the
     rules per game (hot update): rev is the record's cardinalRev (raise it with any change of the rules below); lines = the last N
     dialogue lines replayed; maxGapMs / sampleMs = the replay clock (gaps longer than maxGapMs shortened, the page measured every
-    sampleMs); minIntervalMin = at most one run per exe in that time (a session's end always runs) */
+    sampleMs); minIntervalMin = at most one run per exe in that time (a session's end always runs); maxLagMs = a run whose steps started
+    later than this (95th percentile: a busy PC, the game running) is kept on this PC only, never uploaded */
  cardinal:{
-  rev:1,lines:60,maxGapMs:1500,sampleMs:90,minIntervalMin:30,
+  rev:1,lines:60,maxGapMs:1500,sampleMs:90,minIntervalMin:30,maxLagMs:80,
   /* the total = weighted mean of the scores that apply (a score with nothing to look at leaves the total) */
   weights:{row:3,stable:1,clean:2,clear:1,choice:1,pair:1,leak:2},
   /* core/cardinal/checks.cjs T0: a line is settled settleMs after it became the reader's line, the row counts as shown in shownRate of

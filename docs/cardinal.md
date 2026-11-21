@@ -27,6 +27,7 @@ Cardinal 回答一个问题：这份种子在玩家机器上到底好不好。�
 - 自动校准完成（self-check-live 第一个窗口记完校准）、或者已校准的游戏自检完成第一个窗口：最多每 `cardinal.minIntervalMin` 分钟一次
 - 一次只跑一个，后来的排队（只留最新一个）；回放进程里不会再触发 Cardinal（`MEGULIT_CARDINAL_REPLAY=1`）
 - 少于 10 句不跑
+- 机器忙（回放每步开始比预定晚，95 分位超过 `cardinal.maxLagMs`，默认 80ms）：这次量的是机器不是种子，只存本机、标 `unreliable`、不上传，以会话结束那次为准。实测单跑 p95 约 16ms，5 个回放同时跑 49–184ms
 
 磁带（`core/cardinal/tape.cjs`）：GalNative / HookNative 收到的每条桥记录（除了心跳、指针 / 层记账、截图，单条超 64 KB 不要）都记在内存里，保留 `cardinal.lines` + 20 句，冲出去的 attach 记录（ready / bound / layout / hookProcess / hookThreads）留作头。不落盘、不上传；回放时给子进程写一份临时副本，跑完删掉。新的游戏进程 = 新磁带。
 
@@ -38,9 +39,9 @@ Cardinal 回答一个问题：这份种子在玩家机器上到底好不好。�
 |---|---|---|
 | row (1) | 日文行在、可点（在 hitRegions 里、pointer 不是 none） | 合格句 / 句 |
 | stable (2) | 位置稳：日文行 y 不抖（≤ stablePx）、中文不压到日文上（≤ cnOverlapPx） | 合格句 / 句 |
-| clean (3) | 没有白字 / 不可点 / 非本行颜色的日文、没有补画层、离开的句子不回来、一句只有一个渲染者 | (1 − 坏样本率) × (1 − (回来 + 多渲染者) / 句) |
+| clean (3) | 没有白字 / 不可点 / 非本行颜色的日文、没有补画层、离开的句子不回来、一句只有一个渲染者、一句不画两遍 | (1 − 坏样本率) × (1 − (回来 + 多渲染者) / 句) |
 | clear (4) | 清屏 / 换页对：游戏清了页之后旧句不在；没清页时旧句只能在自己那一行（两行页），不能和当前句挤在同一行 | 合格换句 / 换句 |
-| choice (5) | core 给阅读层的选项在 choiceMs 内看得见、点得到（或者游戏自己画选项：KiriKiri 选项框） | 合格 / 选项次数 |
+| choice (5) | 窗口桥在画面上找到了选项（choice ocr found），阅读层在 choiceMs 内拿到并显示、点得到（或者游戏自己画选项：KiriKiri 选项框）；core 拿名字 / 旁白去找、什么都没找到的不算选项 | 合格 / 选项次数 |
 | pair (6) | 显示出来的日文句有中文行 | 有中文 / 显示的句 |
 | leak (7) | 原文漏出：桥自己的隐藏检查读到日文、隐藏开着时游戏把对白画成可见、隐藏被关 / 让开 / 读模式期间显示的句 | 1 − 最大比例 |
 
@@ -70,7 +71,7 @@ Cardinal 回答一个问题：这份种子在玩家机器上到底好不好。�
 | `services/cardinal/driver.cjs` | `node driver.cjs <scenario.json> <out.json>`；环境变量 `MEGULIT_REPLAY_DATA`（含 `config/` 的目录）、`MEGULIT_REPLAY_WORK`、`MEGULIT_REPLAY_KEEP`、`MEGULIT_CARDINAL_LOW`、`MEGULIT_CARDINAL_BROWSER`（指定浏览器） |
 | `core/cardinal/timeline.cjs` | `fromTape(rows, game)`；日志：`extract(logsDir, fromIso, toIso)`、`attachSteps(game, t)`、`timeline(ex, game, {actions})` |
 | `core/cardinal/checks.cjs` | 每部游戏都要过的断言（海馆验收 1 2 3 4 5 8 9 10 原样搬来）+ clear / choice / leak |
-| `web/reader/replay-probe.js` | 页面里量：每个可见日文字的位置 / 颜色 / pointer、中文行、各 `.sentence-window`、选项层、body class |
+| `web/reader/replay-probe.js` | 页面里量：每个可见日文字的位置 / 颜色 / pointer、中文行（盒子 + 文字实际范围 ink + 字号：中文字体内容区比字号高，压没压到日文按字身算）、各 `.sentence-window`、选项层、body class |
 | `tools/reader-replay/krkr-model.cjs` | 从日志重建时间轴时 KiriKiri 控制文件的脚本侧（只在仓库里，磁带用不到） |
 | `tools/cardinal.cjs` | 命令行：`--tape <jsonl>` 或 `--logs <dir> --from --to`，`--game <json>`、`--data <dir>`、`--out <file>` |
 | `validation/fixtures/games/<game>/acceptance.case.cjs` | 一部游戏的验收：通用断言用 checks.cjs，游戏专属断言留在这里 |
@@ -98,7 +99,7 @@ Cardinal 回答一个问题：这份种子在玩家机器上到底好不好。�
  "maxGap":1500,"sampleEvery":90,"models":true,"tailMs":0}
 ```
 
-`out.json`：`samples`（每个 mark 和每 `sampleEvery` 毫秒一份页面测量，带当时的 `hitRegions`）、`hookEvents`、`readerHost`、`hbSent`（core 发给 HookBridge 的）、`choiceOffers`（core 给阅读层的选项）、`hidden`（隐藏开着时对白记录可见的行数）、`control`（控制文件内容）、`krkr`、`errors`。
+`out.json`：`lag`（回放落后：stepP95 / stepMax / sampleP95 / sampleMax）、`samples`（每个 mark 和每 `sampleEvery` 毫秒一份页面测量，带当时的 `hitRegions`）、`hookEvents`、`readerHost`、`hbSent`（core 发给 HookBridge 的）、`choiceOffers`（core 给阅读层的选项，带撤下的时间 until）、`hidden`（隐藏开着时对白记录可见的行数）、`control`（控制文件内容）、`krkr`、`errors`。
 
 ## 两行页（page.engineRows）
 

@@ -5,6 +5,8 @@
    relay takes has exactly its fields and no identity, uploading follows the sharing switches, and a run in the background writes
    data/The Seed/cardinal/<sha>.json without touching the live reader or any mode. No browser, no network: the replay is injected
    here; the whole chain into the hidden reader runs in validation/fixtures/games/fata-morgana/acceptance.case.cjs. */
+/* never the real relay from a test, whatever a test forgets */
+process.env.MEGULIT_RELAY_BASE='https://relay.test';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const C=require('../core/cardinal/checks.cjs'),S=require('../core/cardinal/score.cjs'),Tape=require('../core/cardinal/tape.cjs'),L=require('../core/cardinal/timeline.cjs');
 const D=require('../core/profiles/defaults.cjs'),domains=require('../core/profiles/domains.cjs'),Profiles=require('../core/profiles/index.cjs');
@@ -36,6 +38,8 @@ test('each score sees its own fault',()=>{
  {const ls=clean3();ls[0].y=ms=>ms<600?700:680;const r=S.score(run({lines:ls}),D.cardinal);assert.ok(r.scores.stable<1,'stable '+r.scores.stable);assert.equal(r.scores.row,1);}
  /* 3 clean: the fallback layer draws an unclickable line */
  {const r=S.score(run({lines:clean3(),extra:[{text:'あいう',at:500}]}),D.cardinal);assert.ok(r.scores.clean<1,'clean '+r.scores.clean);}
+ /* 3 clean: the same line drawn twice (禁止复读) */
+ {const ls=clean3();ls[1].also=[{text:'かきくけこ',y:660}];const r=S.score(run({lines:ls}),D.cardinal);assert.ok(r.scores.clean<1,'clean '+r.scores.clean);assert.match(r.detail.dup[0],/drawn twice/);}
  /* 4 clear: the line before stays on the row of the line now shown */
  {const ls=clean3();ls[1].also=[{text:'あいうえお',y:700}];const r=S.score(run({lines:ls}),D.cardinal);assert.ok(r.scores.clear<1,'clear '+r.scores.clear);}
  /* 5 choice: options offered, none visible */
@@ -126,7 +130,7 @@ test('scores reach the relay only with sharing on, as the bare record',async()=>
 });
 
 test('a background run writes data/The Seed/cardinal/<sha>.json and never touches the live reader or a mode',async()=>{
- const root=tmp();const C2=require('../services/cardinal.cjs');C2._reset();Tape.clear();Tape.keep(60);let t=Date.now()-60000;
+ const root=tmp();fs.mkdirSync(path.join(root,'data','config'),{recursive:true});fs.writeFileSync(path.join(root,'data','config','library.json'),JSON.stringify({sharedAdaptation:false}));const net=[];const fetcher=async u=>{net.push(u);return {ok:true,status:200};};const C2=require('../services/cardinal.cjs');C2._reset();Tape.clear();Tape.keep(60);let t=Date.now()-60000;
  Tape.record('gwb',{type:'bound',gameProcessId:11,gameStarted:'3'},t);for(let i=0;i<12;i++)Tape.record('hb',{type:'hookSource',text:'台詞'+i},t+=1500);
  const touched=[];const gal=new Proxy({state:{gameProcessId:11},hooks:{trace:l=>touched.push('trace:'+l.split(' ')[1])}},{get(o,k){if(k in o)return o[k];return (...a)=>{touched.push(String(k));};}});
  const reader={root,gameExe:'C:/Games/x.exe',gal};
@@ -134,13 +138,26 @@ test('a background run writes data/The Seed/cardinal/<sha>.json and never touche
  const prev=process.env.MEGULIT_CARDINAL_REPLAY;process.env.MEGULIT_CARDINAL_REPLAY='1';assert.equal(C2.kick(reader,'session-end',{replay}).why,'inside a replay');if(prev===undefined)delete process.env.MEGULIT_CARDINAL_REPLAY;
  /* no exe key here: tell it through a stand-in self-check session */
  const live=require('../services/self-check-live.cjs');const orig=live.current;live.current=()=>({reader,key:SHA,from:'',profile:Profiles.profileFor({})});
- try{assert.equal(C2.kick(reader,'session-end',{replay}).state,'started');await C2.idle();}finally{live.current=orig;}
+ try{assert.equal(C2.kick(reader,'session-end',{replay,fetcher}).state,'started');await C2.idle();}finally{live.current=orig;}
+ assert.deepEqual(net,[],'sharing off: nothing leaves the PC');
  assert.equal(scenario.models,false,'a tape carries what the game did: no models');assert.equal(scenario.maxGap,D.cardinal.maxGapMs);
  const doc=C2.load(root,SHA);assert.ok(doc&&doc.record,'written');assert.equal(doc.record.key,SHA);assert.equal(doc.record.lines,12);assert.equal(doc.record.source,'none');assert.equal(doc.record.total,1);
  assert.deepEqual(touched.filter(k=>!k.startsWith('trace:')),[],'nothing but the trace was called on the live reader');
  /* a calibration right after a run waits for cardinal.minIntervalMin; a session's end does not */
- live.current=()=>({reader,key:SHA,from:'',profile:Profiles.profileFor({})});try{assert.equal(C2.kick(reader,'calibrated',{replay}).why,'ran lately');}finally{live.current=orig;}
+ live.current=()=>({reader,key:SHA,from:'',profile:Profiles.profileFor({})});try{assert.equal(C2.kick(reader,'calibrated',{replay,fetcher}).why,'ran lately');}finally{live.current=orig;}
  Tape.clear();C2._reset();
+});
+
+test('a replay the PC could not keep up with is kept on this PC and never uploaded',async()=>{
+ const root=tmp();fs.mkdirSync(path.join(root,'data','config'),{recursive:true});fs.writeFileSync(path.join(root,'data','config','library.json'),'{}');
+ const C2=require('../services/cardinal.cjs');C2._reset();Tape.clear();Tape.keep(60);let t=Date.now()-60000;
+ Tape.record('gwb',{type:'bound',gameProcessId:12,gameStarted:'4'},t);for(let i=0;i<12;i++)Tape.record('hb',{type:'hookSource',text:'台詞'+i},t+=1500);
+ const reader={root,gameExe:'C:/Games/x.exe',gal:{state:{},hooks:{trace(){}}}};const live=require('../services/self-check-live.cjs'),orig=live.current;live.current=()=>({reader,key:SHA,from:'',profile:Profiles.profileFor({})});
+ const net=[];const fetcher=async u=>{net.push(u);return {ok:true,status:200};};const prev=process.env.MEGULIT_RELAY_BASE;process.env.MEGULIT_RELAY_BASE='https://relay.test';
+ const replay=lag=>async sc=>{const o=run({lines:sc.steps.filter(s=>s.line).map((s,i)=>({text:s.text,at:i*1600}))}).o;o.lag={stepP95:lag,stepMax:lag};return o;};
+ try{C2.kick(reader,'session-end',{replay:replay(400),fetcher});await C2.idle();const doc=C2.load(root,SHA);assert.equal(doc.unreliable,true);assert.equal(doc.sent,false);assert.deepEqual(net,[]);
+  C2._reset();C2.kick(reader,'session-end',{replay:replay(10),fetcher});await C2.idle();assert.equal(C2.load(root,SHA).unreliable,false);assert.deepEqual(net,['https://relay.test/api/cardinal/score']);}
+ finally{live.current=orig;if(prev===undefined)delete process.env.MEGULIT_RELAY_BASE;else process.env.MEGULIT_RELAY_BASE=prev;Tape.clear();C2._reset();}
 });
 
 test('the seed the session ran with names the source and revision',()=>{

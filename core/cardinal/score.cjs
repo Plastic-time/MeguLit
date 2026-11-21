@@ -18,7 +18,7 @@ function score(run,rules={}){const t={...C.T0,...(rules.thresholds||{})},w=rules
  const wh=C.white(run),fl=C.flashes(run),cl=C.clears(run,t,ls),ch=C.choices(run,t),lk=C.leaks(run,t,ls);
  const applies={row:n>0,stable:n>0,clean:(wh.n||0)>0,clear:cl.n>0,choice:ch.n>0,pair:pl.pairs.shown>0||n>0,leak:true};
  const lineRate=(bad)=>n?(n-bad)/n:1;
- const ownerLines=new Set(pl.owner.map(m=>m.split(' drawn by ')[0])).size;
+ const ownerLines=new Set([...pl.owner.map(m=>m.split(' drawn by ')[0]),...ls.filter(l=>l.dupBad).map(l=>(run.name||'run')+' line '+l.line)]).size;
  const s={
   row:lineRate(ls.filter(l=>l.rowBad).length),
   stable:lineRate(ls.filter(l=>l.stableBad).length),
@@ -31,7 +31,7 @@ function score(run,rules={}){const t={...C.T0,...(rules.thresholds||{})},w=rules
  let sum=0,wsum=0;for(const k of KEYS){const wk=Number(w[k]);if(!applies[k]||!(wk>0))continue;sum+=wk*scores[k];wsum+=wk;}
  const total=wsum?r3(sum/wsum):0;
  const below=KEYS.filter(k=>applies[k]&&Number.isFinite(rules.floor?.[k])&&scores[k]<rules.floor[k]);
- return {scores,total,lines:n,applies,below,detail:{row:pl.row.slice(0,6),stable:pl.stable.slice(0,6),owner:pl.owner.slice(0,6),white:wh.bad.slice(0,6),flash:fl.bad.slice(0,6),clear:cl.bad,choice:ch.bad,leak:lk.bad}};}
+ return {scores,total,lines:n,applies,below,detail:{row:pl.row.slice(0,6),stable:pl.stable.slice(0,6),owner:pl.owner.slice(0,6),dup:pl.dup.slice(0,6),white:wh.bad.slice(0,6),flash:fl.bad.slice(0,6),clear:cl.bad,choice:ch.bad,leak:lk.bad}};}
 /* several runs of one game: the scores weighted by each run's lines */
 function combine(results,rules={}){const w=rules.weights||{};const tot=results.reduce((a,r)=>a+Math.max(1,r.lines),0)||1;const scores={},applies={};
  for(const k of KEYS){const rs=results.filter(r=>r.applies[k]);applies[k]=rs.length>0;const d=rs.reduce((a,r)=>a+Math.max(1,r.lines),0);scores[k]=rs.length?r3(rs.reduce((a,r)=>a+r.scores[k]*Math.max(1,r.lines),0)/d):1;}

@@ -33,17 +33,20 @@ function lines(run,t){t=opts(t);const o=run.o,out=[];const steps=fed(run).filter
 
 /* per line: 1 the Japanese row is there and clickable, 2 it keeps its place (the Chinese under it, the row's y does not move),
    9 one render owner, and the pairing (a Chinese row while the Japanese is shown) */
-function perLine(run,t){t=opts(t);const name=run.name||'run',row=[],stable=[],owner=[],pairs={shown:0,paired:0};const ls=lines(run,t);
+function perLine(run,t){t=opts(t);const name=run.name||'run',row=[],stable=[],owner=[],dup=[],pairs={shown:0,paired:0};const ls=lines(run,t);
  for(const l of ls){const want=norm(l.text);if(!want)continue;let rowBad=false,stableBad=false;
-  const settled=l.samples.filter(s=>s.at-l.samples[0].at>=t.settleMs);const shown=settled.filter(s=>norm(lineGlyphs(s).map(g=>g.text).join('')).length>=Math.min(want.length,2));
+  /* while options are on the reader the line gives way to them (not a missing row) */
+  const settled=l.samples.filter(s=>s.at-l.samples[0].at>=t.settleMs&&!(s.choices||[]).some(c=>c.shown));const shown=settled.filter(s=>norm(lineGlyphs(s).map(g=>g.text).join('')).length>=Math.min(want.length,2));
   if(settled.length&&shown.length<settled.length*t.shownRate){row.push(name+' line '+l.line+' 「'+l.text+'」 Japanese shown in '+shown.length+'/'+settled.length+' samples');rowBad=true;}
   for(const s of shown){const g=lineGlyphs(s);const out=g.filter(x=>!inside(x,s.hitRegions)||x.pointer==='none');if(out.length){row.push(name+' line '+l.line+' not clickable: '+out.map(x=>x.text).join(''));rowBad=true;break;}}
-  const withCn=shown.filter(s=>(s.cn||[]).length);if(withCn.length){const s=withCn[0],jpBottom=Math.max(...lineGlyphs(s).map(g=>g.rect.y+g.rect.h));if(s.cn[0].rect.y<jpBottom-t.cnOverlapPx){stable.push(name+' line '+l.line+' Chinese at '+s.cn[0].rect.y+' over the Japanese bottom '+jpBottom);stableBad=true;}}
+  const withCn=shown.filter(s=>(s.cn||[]).length);if(withCn.length){const s=withCn[0],jpBottom=Math.max(...lineGlyphs(s).map(g=>g.rect.y+g.rect.h));const c0=s.cn[0],cnTop=c0.ink&&c0.fontSize?c0.ink.y+Math.max(0,(c0.ink.h-c0.fontSize)/2):(c0.ink||c0.rect).y;/* the Chinese glyphs' em box (web/reader/replay-probe.js: the text's content area, centred em of fontSize; a CJK font's content area is taller than its em), the row's padded box when a probe has neither */if(cnTop<jpBottom-t.cnOverlapPx){stable.push(name+' line '+l.line+' Chinese at '+cnTop+' over the Japanese bottom '+jpBottom);stableBad=true;}}
   const ys=[...new Set(shown.map(s=>Math.round(Math.min(...lineGlyphs(s).map(g=>g.rect.y)))))];if(ys.length>1&&Math.max(...ys)-Math.min(...ys)>t.stablePx){stable.push(name+' line '+l.line+' Japanese y moved: '+ys.join(','));stableBad=true;}
   for(const s of settled){const kinds=new Set(jpGlyphs(s).filter(g=>norm(g.text)&&want.includes(norm(g.text))).map(g=>g.kind));if(kinds.size>1){owner.push(name+' line '+l.line+' drawn by '+[...kinds].join('+'));break;}}
+  /* drawn twice (owner: 禁止复读): the line's text appears more than once on the reader's rows */
+  if(want.length>=2)for(const s of shown){const all=norm(lineGlyphs(s).map(g=>g.text).join(''));if(all.split(want).length-1>1){dup.push(name+' line '+l.line+' drawn twice: '+all.slice(0,30));l.dupBad=true;break;}}
   if(shown.length){pairs.shown++;if(withCn.length)pairs.paired++;}
   l.rowBad=rowBad;l.stableBad=stableBad;}
- return {lines:ls,row,stable,owner,pairs};}
+ return {lines:ls,row,stable,owner,dup,pairs};}
 
 /* 10 (owner 2026-11-21): no Japanese that cannot be clicked and read (the placement fallback layer passes clicks to the game) or is not
    in the line's colour; -> bad sample messages (all of them counted, the first ones kept) */
@@ -108,6 +111,13 @@ function choices(run,t){t=opts(t);const name=run.name||'run',o=run.o,bad=[];let 
  for(const c of o.choiceOffers||[]){n++;const w=(o.samples||[]).filter(s=>s.at>=c.at&&s.at<=c.at+t.choiceMs);
   const good=w.some(s=>{const sh=(s.choices||[]).filter(x=>x.shown&&x.rect&&x.rect.w>0);return sh.length>=Math.min(c.n||1,1)&&sh.every(x=>inside({rect:x.rect},s.hitRegions));});
   if(good)ok++;else if(bad.length<6)bad.push(name+' @'+c.at+' '+(c.n||0)+' options offered, none visible and clickable');}
+ /* the game's options were on screen (the window bridge found them: hook-events 'choice ocr found found=<n>', n >= 1; one choice's
+    answers within choiceMs counted once) and the reader was never given any within choiceMs: options the player could not see.
+    A locate that found nothing is not counted: core also asks about candidates that were never options (names, narration) */
+ const offered=o.choiceOffers||[];let lastAsk=-Infinity;
+ for(const l of o.hookEvents||[]){const m=/ choice ocr found found=[1-9]\d* boxes=(\[.*?\]) missed=/.exec(l);if(!m)continue;const at=Date.parse(String(l).slice(0,24))-(o.t0||0);if(!Number.isFinite(at)||at-lastAsk<t.choiceMs)continue;lastAsk=at;
+  /* given to the reader within choiceMs, or still there from before (the bridge reports one choice again and again) */
+  if(offered.some(c=>c.at<=at+t.choiceMs&&(c.until==null||c.until>=at-200)))continue;n++;if(bad.length<6)bad.push(name+' @'+at+' options '+m[1].slice(0,60)+' never reached the reader');}
  for(const c of o.krkr?.choice||[]){n++;if(c.ui==='choice')ok++;else if(bad.length<6)bad.push(name+' '+c.mark+' choice frame not kept for the game');}
  return {bad,n,ok};}
 

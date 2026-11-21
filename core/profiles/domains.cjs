@@ -55,6 +55,7 @@ const DOMAINS={
  'cardinal.maxGapMs':{number:[200,10000],int:true},
  'cardinal.sampleMs':{number:[30,1000],int:true},
  'cardinal.minIntervalMin':{number:[0,1440]},
+ 'cardinal.maxLagMs':{number:[10,5000]},
  'cardinal.weights.row':{number:[0,100]},'cardinal.weights.stable':{number:[0,100]},'cardinal.weights.clean':{number:[0,100]},'cardinal.weights.clear':{number:[0,100]},
  'cardinal.weights.choice':{number:[0,100]},'cardinal.weights.pair':{number:[0,100]},'cardinal.weights.leak':{number:[0,100]},
  'cardinal.thresholds.settleMs':{number:[0,5000]},

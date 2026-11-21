@@ -70,7 +70,7 @@ function timeline(ex,game,{markEvery=true,side=true,actions=[]}={}){
  return steps;
 }
 /* GalWindowBridge's messages (core/gal-native.cjs reads them); every other record of a tape is HookBridge's */
-const GWB=new Set(['ready','bound','layout','readerInput','artText','hookVisual','hotkey','bindHotkey','modeRequest','backlogHotkey','regionApplied','waitMarkerFrame','hotkeyState','error','dialogScene','dialogAway','dialogVisibility','choiceBoxes','ocrChoices','choiceOcr']);
+const GWB=new Set(['ready','bound','layout','readerInput','hookChoiceBoxes','artText','hookVisual','hotkey','bindHotkey','modeRequest','backlogHotkey','regionApplied','waitMarkerFrame','hotkeyState','error','dialogScene','dialogAway','dialogVisibility','choiceBoxes','ocrChoices','choiceOcr']);
 const rowOf=r=>r&&(r.hb?{t:r.t,hb:r.hb}:r.gwb?{t:r.t,gwb:r.gwb}:r.m&&typeof r.m.type==='string'?(GWB.has(r.m.type)?{t:r.t,gwb:r.m}:{t:r.t,hb:r.m}):null);
 /* a tape -> steps. game: {pid, started, hwnd, sha, title, process, exe, layout, stream} for the attach when the tape has none (an older
    recording of the HookBridge alone); every hookSource is a dialogue line (line = its order, text = its text) */

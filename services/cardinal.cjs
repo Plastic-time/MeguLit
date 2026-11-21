@@ -31,7 +31,7 @@ function sourceOf(s,profile){const from=s?.from||'';const sh=s?.shared;const rel
 /* the game as the tape's attach records name it (for a tape that lost them: the bridge state) */
 function gameOf(reader,key){const st=reader?.gal?.state||{};return {pid:st.gameProcessId||4242,started:String(st.gameStarted||'638994190000000000'),hwnd:String(st.gameHwnd||'1234'),sha:key,title:String(st.gameTitle||''),process:String(st.processName||'game'),exe:String(reader?.gameExe||st.gameExecutable||'C:/Games/game.exe'),layout:st.clientWidth?{clientWidth:st.clientWidth,clientHeight:st.clientHeight,clientX:st.clientX,clientY:st.clientY}:undefined};}
 /* why: 'session-end' | 'calibrated' | 'self-check'; a session's end always runs, the others at most every cardinal.minIntervalMin */
-function kick(reader,why,{now=Date.now(),replay=null}={}){try{
+function kick(reader,why,{now=Date.now(),replay=null,fetcher=undefined}={}){try{
  /* never from inside a replay (the replay's own reader runs this same code) */
  if(process.env.MEGULIT_CARDINAL_REPLAY==='1')return {state:'skipped',why:'inside a replay'};
  if(!reader?.root)return {state:'skipped',why:'no reader'};const root=reader.root;
@@ -42,7 +42,7 @@ function kick(reader,why,{now=Date.now(),replay=null}={}){try{
  Tape.keep(rules.lines);
  if(why!=='session-end'&&now-(lastRun.get(key)||0)<rules.minIntervalMin*60000)return {state:'skipped',why:'ran lately'};
  const snap=Tape.snapshot(rules.lines);if(snap.lines<MIN_LINES)return {state:'skipped',why:'too few lines ('+snap.lines+')'};
- const job={root,key,why,rules,rows:snap.rows,lines:snap.lines,game:gameOf(reader,key),...sourceOf(s,profile),reader,replay};
+ const job={root,key,why,rules,rows:snap.rows,lines:snap.lines,game:gameOf(reader,key),...sourceOf(s,profile),reader,replay,fetcher};
  lastRun.set(key,now);
  if(running){pending=job;return {state:'queued'};}
  running=go(job).finally(()=>{running=null;const next=pending;pending=null;if(next)running=go(next).finally(()=>{running=null;});});
@@ -56,10 +56,13 @@ async function go(job){const {root,key,rules,reader}=job;const started=Date.now(
  if(errors.length&&!(o.samples||[]).length){trace(reader,'cardinal failed key='+key.slice(0,8)+' '+String(errors[0]).slice(0,200));save(root,key,{...(load(root,key)||{}),failed:{at:new Date().toISOString(),why:job.why,errors}});return null;}
  const result=Score.score({name:'session',steps,o},rules);
  const rec=Score.record({key,seedRev:job.seedRev,source:job.source,app:appVersion(root),result,cardinalRev:rules.rev});
- const doc={record:rec,why:job.why,applies:result.applies,below:result.below,detail:result.detail,ms:Date.now()-started,errors,sent:false};
+ /* a replay the PC could not keep up with (stepP95 over cardinal.maxLagMs) measured the PC, not the seed: kept here, never uploaded */
+ const lag=o.lag||null,unreliable=!!(lag&&lag.stepP95>(rules.maxLagMs??80));
+ const doc={record:rec,why:job.why,applies:result.applies,below:result.below,detail:result.detail,ms:Date.now()-started,lag,unreliable,errors,sent:false};
  try{save(root,key,doc);}catch{}
- trace(reader,'cardinal scored key='+key.slice(0,8)+' total='+rec.total+' lines='+rec.lines+' source='+rec.source+' seedRev='+(rec.seedRev||'-')+' '+Score.KEYS.map(k=>k+'='+rec.scores[k]).join(' '));
- try{const r=await require('./auto-profile-feed.cjs').reportScore(root,rec);if(r.state==='sent'){doc.sent=true;save(root,key,doc);}}catch{}
+ trace(reader,'cardinal scored key='+key.slice(0,8)+' total='+rec.total+' lines='+rec.lines+' source='+rec.source+' seedRev='+(rec.seedRev||'-')+' '+Score.KEYS.map(k=>k+'='+rec.scores[k]).join(' ')+(lag?' lagP95='+lag.stepP95:'')+(unreliable?' unreliable (busy PC): not uploaded':''));
+ if(unreliable)return doc;
+ try{const r=await require('./auto-profile-feed.cjs').reportScore(root,rec,job.fetcher?{fetcher:job.fetcher}:{});if(r.state==='sent'){doc.sent=true;save(root,key,doc);}}catch{}
  return doc;}
 const idle=()=>running||Promise.resolve();
 module.exports={kick,load,fileOf,dir,sourceOf,idle,_reset(){running=null;pending=null;lastRun.clear();}};
