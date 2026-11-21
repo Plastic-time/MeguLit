@@ -66,6 +66,9 @@ static const Sig Sigs[] = {
   // (CreateFontW) and draws a string with TextOutW into a bitmap; no EBP frame (SEH + 0x7c locals + 4 registers + the cookie:
   // depth 0x9c), the return address 0xb0 above the API's first argument
   { "bruns", "libscr.dll", "TextOutW", "8d 44 24 ?? 8b 94 24 ?? ?? 00 00 52 50 8b 84 24 ?? ?? 00 00 50 50 56", 1, 0xb0 },
+  // Nitroplus (沙耶の唄 Steam, Saya_Steam.exe 0x460f87): the glyph routine 0x460d90 (EBP frame, one caller) loads GetGlyphOutlineW
+  // into edi and calls it at once (push edi; mov edi, [slot]; call edi); the glyphs go into Mware.dll's D3D11 textures. No pen
+  { "nitroplus", "", "GetGlyphOutlineW", "50 ff 75 08 57 8b 3d SLOT", 1, 1 },
 };
 static const int SigCount = (int)(sizeof(Sigs) / sizeof(Sigs[0]));
 

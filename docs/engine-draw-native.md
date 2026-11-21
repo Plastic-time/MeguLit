@@ -175,3 +175,8 @@
 - 例程没有 EBP 帧（SEH + 0x7c 局部 + 4 个寄存器 + 安全 cookie，深 0x9c），返回地址在 API 第一个参数上方 0xb0。x / y 是位图里的位置，fargs 是例程参数
 - 本机这份带中文补丁（libchs.dll、解体插入新书中文版.exe），libscr.dll 是否原版自带要拿日文原版对一下；签名只认这个文件
 - 店主测试清单：同 AVG32，行里是 `engine=bruns`
+
+### Nitroplus（沙耶の唄 Steam 版）
+- 点：Saya_Steam.exe 0x460f87。普查时导入表看着只有 CreateFontW，其实 GetGlyphOutlineW 也在导入表里，只是经寄存器调用：字形例程 0x460d90（EBP 帧，1 个调用者）`push edi; mov edi, [IAT]; call edi`，全程序只此一处（SLOT 形式）。字形进 Mware.dll 的 D3D11 纹理，没有笔位
+- 2003 年原版（system.dll，GetGlyphOutlineA ×2、TextOutA ×7，seed 里归 nitropak）和 みにくいモジカの子（Enigma 壳）不在这一条里
+- 店主测试清单：同 AVG32，行里是 `engine=nitroplus`

@@ -16,7 +16,8 @@ const OTHERS=['E:/GAL/月姬 v1.4/Tsukihime.exe','E:/Steam/steamapps/common/Aoi 
  'E:/GAL/[120831][FAVORITE] いろとりどりのヒカリ/五彩斑斓的曙光/Hikari.exe','E:/GAL/[091030][ぱれっと] ましろ色シンフォニー -Love is pure white-/纯白交响曲/mashiroiro.exe',
  'E:/GAL/[061215][シュガービーンズ] Under The Moon～ (iso)/[NoDVD & Windows7起動 Patch] Under The Moon/utmoon.exe','E:/GAL/[130208][Innocent Grey] 虚ノ少女/虚之少女/Innocentsetup.exe',
  'E:/GAL/[971128][ZERO] 涙 ～流星のザドル～ (SD ccd)/AVG3216D.EXE','E:/GAL/[031226][Nitro+] 沙耶の唄/system.dll','E:/GAL/WHITE ALBUM2/WA2.exe',
- 'E:/GAL/[120727][ユニゾンシフト：ブロッサム] 時計仕掛けのレイライン -黄昏時の境界線-/dll/PAL.dll','E:/GAL/[090522][Belisama] ダストマニア・グロテスク～解体挿入新書～/解体插入新书/libscr.dll'];
+ 'E:/GAL/[120727][ユニゾンシフト：ブロッサム] 時計仕掛けのレイライン -黄昏時の境界線-/dll/PAL.dll','E:/GAL/[090522][Belisama] ダストマニア・グロテスク～解体挿入新書～/解体插入新书/libscr.dll',
+ 'E:/Steam/steamapps/common/The Song of Saya/Saya_Steam.exe','E:/GAL/[120831][FAVORITE] いろとりどりのヒカリ/五彩斑斓的曙光/Hikari.exe'];
 
 test('the table parses: ids unique, APIs known, patterns valid',()=>{
  const sigs=S.sigs();assert.ok(sigs.length>=1);assert.equal(new Set(sigs.map(g=>g.id+'|'+g.module+'|'+g.api+'|'+g.pre)).size,sigs.length);
