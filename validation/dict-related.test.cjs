@@ -15,6 +15,27 @@ test('related words: same kanji, same reading, near meaning from saved words, ea
  assert.ok(out.length<=16);assert.ok(tokens('to dream; 梦想').has('dream'));
 });
 
+test('dictionary lookup includes saved homophones outside the bundled list',async t=>{
+ const root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'megulit-related-'));
+ const previous=process.env.MEGULIT_ROOT;process.env.MEGULIT_ROOT=root;
+ t.after(()=>{if(previous===undefined)delete process.env.MEGULIT_ROOT;else process.env.MEGULIT_ROOT=previous;fs.rmSync(root,{recursive:true,force:true});});
+ const {dispatch}=require('../services/bridge.cjs'),db=require('../services/store.cjs').openStore(root);
+ try{
+  const insert=db.prepare("INSERT INTO vocabulary(spelling,reading,definitions,status,created_at,original) VALUES(?,?,'',2,1,'{}')");
+  insert.run('羽志','ﾊｼ');insert.run('羽志','はし');insert.run('別名','べつめい');
+  insert.run('上手','かみて');insert.run('上手','うわて');
+  db.exec("UPDATE vocabulary SET status=4,created_at=2 WHERE reading='うわて'");
+  insert.run('羽路','ﾊｼ');
+ }finally{db.close();}
+ const result=await dispatch({action:'dictionary_related',query:'橋',reading:'はし'});
+ assert.deepEqual(result.filter(x=>x.t==='羽志'),[{t:'羽志',why:'reading',status:2}]);
+ assert.ok(result.findIndex(x=>x.t==='羽志') < result.findIndex(x=>x.t==='箸'));
+ assert.ok(result.some(x=>x.t==='羽路'&&x.why==='reading'));
+ assert.ok(!result.some(x=>x.t==='別名'||x.t==='橋'));
+ const upper=await dispatch({action:'dictionary_related',query:'ｶﾐﾃ'});
+ assert.deepEqual(upper.find(x=>x.t==='上手'),{t:'上手',why:'reading',status:2});
+});
+
 test('the dictionary field colours glyphs by proficiency and takes related words after a search; the smear has no canvas filter',()=>{
  const s=fs.readFileSync(path.join(__dirname,'..','web','dict-idle.js'),'utf8');
  assert.match(s,/fresh:'#[0-9a-f]{6}',learning:'#[0-9a-f]{6}',known:'#[0-9a-f]{6}'/);
