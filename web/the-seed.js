@@ -2,6 +2,7 @@
 /* The Seed (传火计划): one pure-data seed per game version, shared by everyone who plays. One copy of the words, used by the
    home banner, the About section and the intro dialog. Reading seeds, the automatic upload and hot updates ship with the next
    big version, so the copy says "coming" and never "works now". The counts come from web/the-seed-stats.json (tools/gen-seed-stats.cjs). */
+import {catalogLinkHTML,bindSeedCatalog} from './seed-catalog.js';
 export const SEED_URL='https://github.com/ilynthn/MeguLit/tree/main/The%20Seed';
 const W={
  zh:{name:'The Seed · 传火计划',kicker:'传火计划',line:'每部游戏一份几 KB 的差分',
@@ -67,7 +68,7 @@ const countText=(locale,s)=>{if(!s||!s.games)return '';const t=seedWords(locale)
 export function seedAboutHTML(locale,esc){
  const t=seedWords(locale);
  const points=`<dl class="seed-points">${t.points.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`;
- const foot=`<div class="seed-foot"><span class="seed-soon">${esc(t.soon)}</span><span class="seed-count" data-seed-count></span><button type="button" class="seed-link" data-open="${SEED_URL}">${esc(t.github)}<i aria-hidden="true">↗</i></button></div>`;
+ const foot=`<div class="seed-foot"><span class="seed-soon">${esc(t.soon)}</span><span class="seed-count" data-seed-count></span>${catalogLinkHTML(locale,esc)}<button type="button" class="seed-link" data-open="${SEED_URL}">${esc(t.github)}<i aria-hidden="true">↗</i></button></div>`;
  return `<section class="ab-sec ab-seed"><h2>${esc(t.name)}</h2>
   <div class="seed-band"><div class="seed-band-l">${heroHTML()}</div><div class="seed-band-r"><p class="seed-lead">${esc(t.lead)}</p>${points}</div></div>
   ${foot}
@@ -93,12 +94,13 @@ export function openSeedDialog({api,locale,esc,toast}){
  document.querySelector('dialog.seed-panel')?.close();
  const t=seedWords(locale),dialog=document.createElement('dialog');
  dialog.className='game-dialog dev-notice seed-flow seed-panel';
- dialog.innerHTML=seedPageHTML(locale,esc,{left:`<button type="button" class="text-button" data-seed-github>${esc(t.github)} ↗</button>`,right:`<button type="button" class="secondary" data-ok>${esc(t.close)}</button>`});
+ dialog.innerHTML=seedPageHTML(locale,esc,{left:`<button type="button" class="text-button" data-seed-github>${esc(t.github)} ↗</button>${catalogLinkHTML(locale,esc,'text-button')}`,right:`<button type="button" class="secondary" data-ok>${esc(t.close)}</button>`});
  document.body.append(dialog);
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
  fillSeedCount(dialog,locale,api);markSeedSeen();
  dialog.querySelector('[data-ok]').onclick=()=>dialog.close();
  dialog.querySelector('[data-seed-github]').onclick=()=>api('open_source',{url:SEED_URL}).catch(()=>toast&&toast('…'));
+ bindSeedCatalog(dialog,{api,locale,esc,toast});
  dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
  dialog.showModal();
 }
