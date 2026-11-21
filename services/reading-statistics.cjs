@@ -8,21 +8,22 @@ class ReadingStatistics{
  line({gameId,text,sequence,active,recovering,origin}){
   if(!gameId||active===false||recovering||origin==='history'||typeof text!=='string'||!/[぀-ヿ㐀-鿿]/.test(text)||!Number.isSafeInteger(sequence))return false;
   if(readJSON(path.join(this.root,'data','config','native-preferences.json')).history_enabled===false)return false;
-  const key=gameId+':'+sequence;if(key===this.last)return false;this.last=key;
-  const ms=this.now(),at=Math.floor(ms/1000),clean=text.replace(/\s+/g,'');let s=this.session;
-  if(s&&(s.gameId!==gameId||at-s.lastAt>900||at<s.lastAt))s=this.session=null;
-  if(s?.recent.includes(clean))return false;const db=openStore(this.root);db.exec('BEGIN IMMEDIATE');
-  try{this.credit(db,ms);if(!db.prepare('SELECT 1 FROM games WHERE id=?').get(gameId)){db.exec('ROLLBACK');return false;}
+  const key=gameId+':'+sequence;if(key===this.last)return false;
+  const ms=this.retry?.key===key?this.retry.ms:this.now(),at=Math.floor(ms/1000),clean=text.replace(/\s+/g,'');let s=this.session;
+  if(s&&(s.gameId!==gameId||at-s.lastAt>900||at<s.lastAt))s=null;
+  if(s?.recent.includes(clean)){this.last=key;return false;}this.retry={key,ms};let db;
+  try{db=openStore(this.root);db.exec('BEGIN IMMEDIATE');if(!db.prepare('SELECT 1 FROM games WHERE id=?').get(gameId)){db.exec('ROLLBACK');this.retry=null;return false;}
+   this.credit(db,ms);
    if(s&&!db.prepare('SELECT 1 FROM reading_sessions WHERE id=? AND game_id=?').get(s.id,gameId))s=null;
    if(!s){const row=db.prepare('INSERT INTO reading_sessions(game_id,started_at,ended_at,active_seconds,characters,sentences) VALUES(?,?,?,0,0,1)').run(gameId,at,at);s={id:Number(row.lastInsertRowid),gameId,lastAt:at,recent:[]};}
    else db.prepare('UPDATE reading_sessions SET ended_at=?,active_seconds=active_seconds+?,sentences=sentences+1 WHERE id=?').run(at,Math.min(180,at-s.lastAt),s.id);
-   db.prepare('INSERT INTO reading_events(session_id,game_id,text,read_at,original) VALUES(?,?,?,?,?)').run(s.id,gameId,text.slice(0,4000),at,JSON.stringify((t=>t?{translation:t.value,translationSource:t.source}:{translation:''})(this.translations.get(gameId+':'+clean))));db.exec('COMMIT');s.lastAt=at;this.pending={sessionId:s.id,chars:[...clean].length,shownAt:ms};s.recent.push(clean);s.recent=s.recent.slice(-40);this.session=s;return true;
-  }catch(error){db.exec('ROLLBACK');throw error;}finally{db.close();}
+   db.prepare('INSERT INTO reading_events(session_id,game_id,text,read_at,original) VALUES(?,?,?,?,?)').run(s.id,gameId,text.slice(0,4000),at,JSON.stringify((t=>t?{translation:t.value,translationSource:t.source}:{translation:''})(this.translations.get(gameId+':'+clean))));db.exec('COMMIT');this.retry=null;this.last=key;s.lastAt=at;this.pending={sessionId:s.id,chars:[...clean].length,shownAt:ms};s.recent.push(clean);s.recent=s.recent.slice(-40);this.session=s;return true;
+  }catch(error){if(this.pending)this.pending.endedAt??=ms;if(db?.isTransaction)db.exec('ROLLBACK');throw error;}finally{db?.close();}
  }
  /* A line's characters are credited when the next line replaces it, capped by how long it was on screen
     (READ_RATE chars/s), so skipped or click-through lines no longer count as read (issue #79). */
- credit(db,ms){const p=this.pending;this.pending=null;if(!p)return;const credited=Math.min(p.chars,Math.floor(Math.max(0,ms-p.shownAt)/1000*READ_RATE));if(credited>0)db.prepare('UPDATE reading_sessions SET characters=characters+? WHERE id=?').run(credited,p.sessionId);}
- flush(){if(!this.pending)return;const db=openStore(this.root);try{this.credit(db,this.now());}finally{db.close();}}
- reset(){try{this.flush();}catch{}this.session=null;this.last=null;}
+ credit(db,ms){const p=this.pending;if(!p)return;p.endedAt??=ms;const credited=Math.min(p.chars,Math.floor(Math.max(0,p.endedAt-p.shownAt)/1000*READ_RATE));if(credited>0)db.prepare('UPDATE reading_sessions SET characters=characters+? WHERE id=?').run(credited,p.sessionId);}
+ flush(){if(!this.pending)return;const ms=this.pending.endedAt??=this.now(),db=openStore(this.root);try{this.credit(db,ms);this.pending=null;}finally{db.close();}}
+ reset(){try{this.flush();}catch{}this.session=null;this.last=null;this.retry=null;}
 }
 module.exports={ReadingStatistics};
