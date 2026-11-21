@@ -21,7 +21,12 @@ const runs=new Map();/* root → live run {child,timer,cancelled,emit} */
 
 function stampOf(executable){try{const st=fs.statSync(executable),dir=fs.statSync(path.dirname(executable));return st.size+'-'+Math.floor(st.mtimeMs)+'-'+Math.floor(dir.mtimeMs)+'-'+require('./adapter-probe-core.cjs').reader();}catch{return '';}}
 /* the library games to probe: [{id,title,executable}] */
-function libraryGames(db){try{return db.prepare("SELECT id,title,executable FROM games WHERE removed_at IS NULL AND executable<>''").all().map(r=>({id:String(r.id),title:String(r.title||''),executable:String(r.executable)}));}catch{return [];}}
+function libraryRows(db){try{
+ const rows=db.prepare("SELECT id,title,executable FROM games WHERE removed_at IS NULL AND executable<>''").all();
+ return rows.map(r=>({id:String(r.id),title:String(r.title||''),executable:String(r.executable)}));
+}catch{return [];}}
+const eligible=g=>!require('./adapter-probe-core.cjs').isWindowsDirectory(path.dirname(g.executable));
+const libraryGames=db=>libraryRows(db).filter(eligible);
 /* the zero-latency side of a game: pairing of the Chinese script against the Japanese one (counts only) */
 function pairingOf(root,id){try{const s=readJSON(path.join(root,'data','config','original-text.json'))?.[id];const p=s?.patchAlignment?.pairing;
  const out={brief:require('./original-text.cjs').brief(root,id),status:String(s?.status||''),patchStatus:String(s?.patchStatus||'')};
@@ -40,14 +45,14 @@ function spawnWorker(){const child=fork(path.join(__dirname,'adapter-probe-worke
  child.on('error',()=>{});try{os.setPriority(child.pid,os.constants.priority.PRIORITY_LOW);}catch{}return child;}
 function start(root,db,{ids=null,reason='manual',budgetMs=DEFAULT_BUDGET,perGameMs=PER_GAME,force=false,resume=false,emit=()=>{}}={}){
  const key=path.resolve(root);if(runs.has(key))return status(root);
- const s=load(root);
+ const s=load(root),rows=libraryRows(db),allGames=rows.filter(eligible);
  if(!(resume&&s.run?.queue?.length&&s.run.done.length<s.run.queue.length)){
-  let games=libraryGames(db);if(Array.isArray(ids)&&ids.length){const want=new Set(ids.map(String));games=games.filter(g=>want.has(g.id));}
+  let games=allGames;if(Array.isArray(ids)&&ids.length){const want=new Set(ids.map(String));games=games.filter(g=>want.has(g.id));}
   const fresh=Date.now()-FRESH_DAYS*86400000;
   const queue=games.filter(g=>force||!s.results[g.id]||s.results[g.id].stamp!==stampOf(g.executable)||s.results[g.id].step==='preparing'||(s.results[g.id].at||0)<fresh);
   s.run={reason:String(reason).slice(0,30),queue,done:[],state:'running',startedAt:Date.now(),updatedAt:Date.now(),budgetMs,perGameMs,usedMs:0};}
  else Object.assign(s.run,{state:'running',updatedAt:Date.now(),budgetMs:Math.max(budgetMs,s.run.budgetMs||0),usedMs:0});
- {const known=new Set(libraryGames(db).map(g=>g.id));if(known.size)for(const id of Object.keys(s.results))if(!known.has(id))delete s.results[id];}
+ if(rows.length){const known=new Set(allGames.map(g=>g.id));for(const id of Object.keys(s.results))if(!known.has(id))delete s.results[id];}
  if(!s.run.queue.length||s.run.done.length>=s.run.queue.length){s.run.state='done';save(root,s);return status(root);}
  save(root,s);
  const live={child:null,timer:null,cancelled:false,current:null,emit};runs.set(key,live);
@@ -103,7 +108,7 @@ function cancel(root){const key=path.resolve(root),live=runs.get(key);if(live){l
  const s=load(root);if(s.run&&s.run.state==='running'){s.run.state='cancelled';s.run.updatedAt=Date.now();save(root,s);}return {...status(root),state:'cancelled'};}
 /* a run the app was closed in the middle of goes on a while after the next start */
 function resumeLater(root,openDb,{delay=180000}={}){if(process.env.NODE_TEST_CONTEXT)return null;const s=load(root);if(!s.run||!['running','paused'].includes(s.run.state))return null;
- const t=setTimeout(()=>{let db;try{db=openDb();const games=libraryGames(db);try{db.close();}catch{}resume(root,{prepare:()=>({all:()=>games})});}catch{try{db?.close();}catch{}}},delay);t.unref?.();return t;}
+ const t=setTimeout(()=>{let db;try{db=openDb();const games=libraryRows(db);try{db.close();}catch{}resume(root,{prepare:()=>({all:()=>games})});}catch{try{db?.close();}catch{}}},delay);t.unref?.();return t;}
 /* the games whose probe found a problem: [{id,title,step,detail}] */
 /* #468 (ひぐらしのなく頃に解: the library probe found Unity and its script, step ok, while the reader fell back to OCR every few
    lines; nothing was ever uploaded). What the reader saw at runtime counts too: a game whose lines came from OCR is a problem

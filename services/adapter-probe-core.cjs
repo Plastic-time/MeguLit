@@ -146,7 +146,13 @@ function underlay(dir,id,executable){const scenes=require('./original-engines/sc
  if(eng?.originalLines){const lines=eng.originalLines(dir);if(Array.isArray(lines)&&lines.some(Boolean))return {kind:'layer',lines:lines.filter(Boolean)};}
  const ot=require('./original-text.cjs'),base=path.parse(String(executable||'')).name,b=ot.backupOriginal(dir,id,base);if(!b)return null;
  const loc=ot.ADAPTERS[id].locate(b,base);return loc?{kind:'backup',lines:ot.readScript(loc).lines.filter(Boolean)}:null;}
+function isWindowsDirectory(dir){
+ const system=process.env.SystemRoot||process.env.windir;
+ return !!(system&&dir&&path.isAbsolute(system)&&path.relative(path.toNamespacedPath(system),path.toNamespacedPath(dir))==='');
+}
 function probeGame({dir,executable,title},{budgetMs=60000,progress=null}={}){
+ if(isWindowsDirectory(dir))return {schema:'megulit.probe-result',version:1,step:'no-script',detail:'WINDOWS_DIRECTORY',fingerprint:null,
+  inventory:{files:0,bytes:0,ext:{},archives:[]},engines:[],lines:0,japaneseLines:0};
  const t=Date.now();let fingerprint=null,deadline=t+budgetMs;
  try{if(executable)fingerprint=require('./shared-adaptation.cjs').fingerprint(executable);}catch{}
  const inv=inventory(dir);let unsupported=null,preparing=null;
@@ -185,4 +191,4 @@ function probeGame({dir,executable,title},{budgetMs=60000,progress=null}={}){
   engines:engines.map(({sizes,...e})=>e),detected:c.detected,lines:best?.lines||0,japaneseLines:best?.japaneseLines||0,dialogueLines:best?.dialogueLines||0,chineseLines:best?.chineseLines||0,sizes:best?.sizes||[],
   tried:engines.filter(e=>e.routed||e.scenes!==0).map(e=>e.id).slice(0,24),budgetMs,...garbroNeed?{needs:'garbro'}:{},step:c.step,detail:c.detail,original,restore,unsupported:unsupported?{engine:unsupported.engine,code:unsupported.code}:null,preparing,_archives:inv.archives.map(a=>a._path)};
 }
-module.exports={probeGame,routedReaders,scaledBudget,classify,judgeLanguage,countLines,inventory,reader,MAGICS};
+module.exports={probeGame,isWindowsDirectory,routedReaders,scaledBudget,classify,judgeLanguage,countLines,inventory,reader,MAGICS};
