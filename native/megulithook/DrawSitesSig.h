@@ -25,6 +25,12 @@ static const Sig Sigs[] = {
   // 0, NULL, &mat) (the size query; a font of type 4 takes the engine's own rasteriser instead and never comes here). No pen:
   // the places come from Pal.cpp's pal_sprite_v1 sprites
   { "softpal", "PAL.dll", "GetGlyphOutlineA", "8d 8d ?? ?? ff ff 51 6a 00 6a 00 8d 95 ?? ?? ff ff 52 6a 06 57 50", 1, 1 },
+  // NScripter (月姬 v1.4 / v1.6, Tsukihime.exe: one build, 0x40eefe): the glyph routine 0x40eb20 (thiscall, first argument the
+  // string; five callers) draws each character with TextOutA(hdc, x, 0, ch, 2) into a glyph bitmap (0x40f061 / 0x40f085 are its
+  // conditional extra passes at 0,0 / 1,0, not signed); the pen on the page is one of the routine's own arguments (fargs).
+  // No EBP frame: 0xfe4 bytes of prologue (SEH + 0xfc4 locals + 4 registers) and the 5 API arguments put its return address
+  // 0xff8 above the first one
+  { "nscripter", "", "TextOutA", "be 02 00 00 00 56 8d 44 24 14 50 6a 00 57 51", 1, 0xff8 },
 };
 static const int SigCount = (int)(sizeof(Sigs) / sizeof(Sigs[0]));
 
