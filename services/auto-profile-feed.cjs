@@ -98,7 +98,19 @@ function keepLocal(root,key,want){const old=readSent(root,key)||{};writeSent(roo
 /* send a name that was kept here (the relay had no credit route then) */
 async function syncCredit(root,key,opts){const m=readSent(root,key);if(!m||m.localName===undefined)return null;return setCredit(root,key,m.localName,opts);}
 async function report(root,record,{fetcher=globalThis.fetch,prints=null,credit:creditName=null}={}){const credit=cleanName(creditName);if(!record||!sharing(root))return {state:'skipped'};const block=auto.diagnostic(record)?.profile;if(!block||!gameDiff.KEY.test(String(block.key||'')))return {state:'skipped'};
+ /* Cardinal's score of this exe goes with the calibration when it has not reached the relay yet */
+ pendingScore(root,block.key,fetcher);
  const pr=prints?require('../core/game-print.cjs').check(prints):null;const body=JSON.stringify({version:1,profile:block,...(credit?{credit:{name:credit}}:{}),...(pr&&Object.keys(pr).length?{prints:pr}:{})});
  for(const url of endpoints(root,'/api/game-profile/report')){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok){let j=null;try{j=await r.clone().json();}catch{}const c=cleanCredit(j&&(j.credit||j));markSent(root,block.key,c);return {state:'sent',...(c?{credit:c}:{})};}if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
  return {state:'failed'};}
-module.exports={sent,markSent,creditOf,setCredit,syncCredit,cleanName,cleanCredit,CREDIT_MAX,cached,refresh,report,layer,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};
+/* 2026-11-21 Cardinal (services/cardinal.cjs): POST /api/cardinal/score, the body is the record as core/cardinal/score.cjs record made it
+   (schema megulit.cardinal-score, relay/src/cardinal.js checks every field): the exe hash, the seed revision, the app version and
+   the scores, no identity. The same switch as the calibration (共享适配 + autoProfileShare) */
+const SCORE_FIELDS=['schema','version','key','seedRev','source','app','lines','scores','total','cardinalRev','at'];
+async function reportScore(root,record,{fetcher=globalThis.fetch}={}){if(!record||record.schema!=='megulit.cardinal-score'||!gameDiff.KEY.test(String(record.key||''))||!sharing(root)||!fetcher)return {state:'skipped'};
+ const body=JSON.stringify(Object.fromEntries(SCORE_FIELDS.map(k=>[k,record[k]])));
+ for(const url of endpoints(root,'/api/cardinal/score')){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok)return {state:'sent'};if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
+ return {state:'failed'};}
+function pendingScore(root,key,fetcher){let doc=null;try{doc=require('./cardinal.cjs').load(root,key);}catch{}if(!doc?.record||doc.sent)return;
+ reportScore(root,doc.record,{fetcher}).then(r=>{if(r.state!=='sent')return;try{const cur=require('./cardinal.cjs').load(root,key);if(cur?.record?.at===doc.record.at){const f=require('./cardinal.cjs').fileOf(root,key);fs.writeFileSync(f,JSON.stringify({...cur,sent:true},null,1));}}catch{}}).catch(()=>{});}
+module.exports={reportScore,sent,markSent,creditOf,setCredit,syncCredit,cleanName,cleanCredit,CREDIT_MAX,cached,refresh,report,layer,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};

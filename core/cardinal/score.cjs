@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+/* Cardinal scores (2026-11-21): one replay run of the reader -> seven scores 0..1 and their weighted total. Pure.
+     row     1 the Japanese row is there and can be clicked                      lines passing / lines
+     stable  2 the row keeps its place (y jitter, pushed by the translation)     lines passing / lines
+     clean   3 no white / unclickable Japanese, no fallback draw, a line never comes back, one render owner
+     clear   4 the page is cleared when the game clears it (no stale line)      line changes passing / line changes
+     choice  5 offered options are visible and clickable (or drawn by the game) choices passing / choices
+     pair    6 a shown Japanese line gets its Chinese row                        paired / shown
+     leak    7 no original text showing through (hide check, visible records, hide given up, read mode)   1 - rate
+   A score with nothing to look at (no choices, a single line) is 1 and leaves the total: its weight is not counted.
+   Weights and thresholds are the profile's cardinal.* (core/profiles/defaults.cjs), so a signed diff can retune them (hot update). */
+const C=require('./checks.cjs');
+const KEYS=['row','stable','clean','clear','choice','pair','leak'];
+const r3=x=>Math.round(Math.max(0,Math.min(1,x))*1000)/1000;
+function score(run,rules={}){const t={...C.T0,...(rules.thresholds||{})},w=rules.weights||{};
+ const pl=C.perLine(run,t),ls=pl.lines,n=ls.length;
+ const wh=C.white(run),fl=C.flashes(run),cl=C.clears(run,t,ls),ch=C.choices(run,t),lk=C.leaks(run,t,ls);
+ const applies={row:n>0,stable:n>0,clean:(wh.n||0)>0,clear:cl.n>0,choice:ch.n>0,pair:pl.pairs.shown>0||n>0,leak:true};
+ const lineRate=(bad)=>n?(n-bad)/n:1;
+ const ownerLines=new Set(pl.owner.map(m=>m.split(' drawn by ')[0])).size;
+ const s={
+  row:lineRate(ls.filter(l=>l.rowBad).length),
+  stable:lineRate(ls.filter(l=>l.stableBad).length),
+  clean:(wh.n?1-wh.badN/wh.n:1)*(n?1-Math.min(1,(fl.comebacks+ownerLines)/n):fl.comebacks+ownerLines?0:1),
+  clear:cl.n?1-cl.stale/cl.n:1,
+  choice:ch.n?ch.ok/ch.n:1,
+  pair:pl.pairs.shown?pl.pairs.paired/pl.pairs.shown:n?0:1,
+  leak:1-lk.rate};
+ const scores={};for(const k of KEYS)scores[k]=r3(s[k]);
+ let sum=0,wsum=0;for(const k of KEYS){const wk=Number(w[k]);if(!applies[k]||!(wk>0))continue;sum+=wk*scores[k];wsum+=wk;}
+ const total=wsum?r3(sum/wsum):0;
+ const below=KEYS.filter(k=>applies[k]&&Number.isFinite(rules.floor?.[k])&&scores[k]<rules.floor[k]);
+ return {scores,total,lines:n,applies,below,detail:{row:pl.row.slice(0,6),stable:pl.stable.slice(0,6),owner:pl.owner.slice(0,6),white:wh.bad.slice(0,6),flash:fl.bad.slice(0,6),clear:cl.bad,choice:ch.bad,leak:lk.bad}};}
+/* several runs of one game: the scores weighted by each run's lines */
+function combine(results,rules={}){const w=rules.weights||{};const tot=results.reduce((a,r)=>a+Math.max(1,r.lines),0)||1;const scores={},applies={};
+ for(const k of KEYS){const rs=results.filter(r=>r.applies[k]);applies[k]=rs.length>0;const d=rs.reduce((a,r)=>a+Math.max(1,r.lines),0);scores[k]=rs.length?r3(rs.reduce((a,r)=>a+r.scores[k]*Math.max(1,r.lines),0)/d):1;}
+ let sum=0,wsum=0;for(const k of KEYS){const wk=Number(w[k]);if(!applies[k]||!(wk>0))continue;sum+=wk*scores[k];wsum+=wk;}
+ return {scores,total:wsum?r3(sum/wsum):0,lines:results.reduce((a,r)=>a+r.lines,0),applies,runs:results.length};}
+/* the record the relay takes (POST /api/cardinal/score; relay/src/cardinal.js checks every field, never rename one). No identity:
+   the exe hash, the seed revision, the app version and the scores only */
+function record({key,seedRev=null,source='none',app,result,cardinalRev,at=new Date()}){
+ return {schema:'megulit.cardinal-score',version:1,key:String(key),seedRev:seedRev==null||seedRev===''?null:String(seedRev),source:['official','auto','none'].includes(source)?source:'none',
+  app:String(app||'0.0.0'),lines:result.lines|0,scores:Object.fromEntries(KEYS.map(k=>[k,result.scores[k]])),total:result.total,cardinalRev:String(cardinalRev||'1'),at:(at instanceof Date?at:new Date(at)).toISOString()};}
+module.exports={KEYS,score,combine,record};

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Loaded by tools/reader-replay/driver.cjs (headless Edge) and meant for the app's hidden reader (no Playwright, hot-updatable with web/). What the owner sees, measured on the reader page: every Japanese glyph drawn (where, colour, can it be clicked), the
+/* Cardinal (docs/cardinal.md): loaded into the hidden reader by services/cardinal/driver.cjs (headless Edge, no Playwright, hot-updatable with web/). What the owner sees, measured on the reader page: every Japanese glyph drawn (where, colour, can it be clicked), the
    translation rows, the choice layer, the body state. Japanese = a run with kana/kanji. */
 (function(){
  'use strict';

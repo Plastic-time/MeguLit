@@ -23,6 +23,7 @@ const {RuntimeSample}=require('./runtime-sample.cjs');
 let live=null;
 function version(root){try{return require('./hook-verdict.cjs').appVersion(root);}catch{return '';}}
 function engineOf(s){const h=s.reader.gal?.hooks;return String(h?.pageMode?.engine||s.profile?.engine||'');}
+function cardinal(reader,why){setImmediate(()=>{try{require('./cardinal.cjs').kick(reader,why);}catch{}});}
 function hookTrace(reader,line){try{reader.gal?.hooks?.trace?.(line);}catch{}}
 function readMode(reader,reason){try{const g=reader.gal;if(g&&!g.textEffectsHold)g.textEffects(true,reason);}catch{}}
 /* the profile with the chosen layer on top, handed to the kernel */
@@ -40,7 +41,7 @@ function inputOf(s){const st=s.stored,sh=s.shared,out={...(s.input||{})};for(con
     still say read); a gate step-down always is */
  const seedOk=['verified','owner-ok'].includes(s.profile?.seedStatus);
  if(st&&st.settings){if(st.source==='gate')out.stepDown=st.settings;else if(!seedOk)out.auto=st.settings;}return out;}
-function applyLayer(s){try{const p=Profiles.profileFor(inputOf(s));s.profile=p;s.reader.gal?.setGameProfile?.(p,s.input);}catch{}}
+function applyLayer(s){try{const p=Profiles.profileFor(inputOf(s));s.profile=p;/* Cardinal's tape keeps the lines this game's rules replay */require('../core/cardinal/tape.cjs').keep(p.cardinal?.lines);s.reader.gal?.setGameProfile?.(p,s.input);}catch{}}
 /* which layer wins (see above) */
 function choose(s){const st=s.stored,sh=s.shared;
  if(st&&st.source==='gate')return {from:'local-gate',mode:'read',settings:st.settings,reason:st.reason||''};
@@ -106,7 +107,9 @@ function windowDone(s,r){if(live!==s)return;const {reader}=s;
   const rec=auto.record({key:s.key,engine,exe:s.exe,version:s.ver,source:'calibration',result:res});try{auto.store(reader.root,s.key,rec);}catch{}s.stored=rec;s.check.recording=null;
   hookTrace(reader,'selfCheck calibrated key='+s.key+' mode='+res.mode+' settings='+JSON.stringify(rec.settings)+(res.reason?' reason='+res.reason:''));
   reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'calibrated',key:s.key,mode:res.mode,reason:res.reason||'',cost:res.score.cost});
-  settle(s);applyLayer(s);feed.report(reader.root,rec,{prints:s.prints}).catch(()=>{});return;}
+  settle(s);applyLayer(s);feed.report(reader.root,rec,{prints:s.prints}).catch(()=>{});cardinal(reader,'calibrated');return;}
+ /* Cardinal scores the seed once the self-check has its first window (services/cardinal.cjs: background, at most every cardinal.minIntervalMin) */
+ if(r.window===1)cardinal(reader,'self-check');
  if(r.pass||s.from==='local-gate'||reader.gal?.textEffectsHold||reader.gal?.readHint)return;
  /* under a verified / owner-ok built-in seed the gate steps down only for damage the player sees (lines dropped, the original
     visible, a line drawn twice); a low pairing or a choice count alone is the measurement's own limit on such a game (ファタ's
