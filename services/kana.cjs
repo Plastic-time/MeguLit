@@ -34,16 +34,18 @@ function gameWords(db,words){
   const re=new RegExp('(?<![\\u3041-\\u3096])'+esc(w)+'(?![\\u3041-\\u3096])','gu');let n=0,example=null,long=null;
   for(const row of rows){
    const text=String(row.text||'');if(!text.includes(w))continue;
-   const hits=[...text.matchAll(re)].map(m=>m.index);n+=hits.length;
-   if(!hits.length||example)continue;
+   const hits=text.match(re);if(!hits)continue;n+=hits.length;
+   if(example)continue;
+   const short=text.length<=60||(text.length<=120&&[...text].length<=60);
+   if(!short&&long)continue;
+   const matches=[...text.matchAll(re)].map(m=>m.index);
    const info={title:row.title||'',read_at:row.read_at};
-   if([...text].length<=60){example={...info,text,matches:hits};continue;}
-   if(long)continue;
-   const i=hits[0],start=i-[...text.slice(0,i)].slice(-20).join('').length;
+   if(short){example={...info,text,matches};continue;}
+   const i=matches[0],start=i-[...text.slice(0,i)].slice(-20).join('').length;
    const end=i+w.length+[...text.slice(i+w.length)].slice(0,24).join('').length;
    const prefix=start?'…':'';
    long={...info,text:prefix+text.slice(start,end)+(end<text.length?'…':''),
-    matches:hits.filter(at=>at+w.length<=end).map(at=>at-start+prefix.length)};
+    matches:matches.filter(at=>at+w.length<=end).map(at=>at-start+prefix.length)};
   }
   if(n)out[w]={count:n,example:example||long};
  }

@@ -47,7 +47,7 @@ test('kana examples count standalone occurrences and center long excerpts on a r
  const {exampleHTML}=await import('../web/kana/views/lesson.js');
  const esc=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;');
  assert.equal(exampleHTML(mixed.example,'うん',esc),'うんめい、<mark>うん</mark>。<mark>うん</mark>！');
- assert.equal(exampleHTML(hit.example,'うん',esc).match(/<mark>/g).length,2);
+ assert.equal(exampleHTML(hit.example,'うん',esc),'…'+'空'.repeat(19)+'「<mark>うん</mark>、<mark>うん</mark>。」'+'星'.repeat(19)+'…');
  const quoted='「<うん>&」',escaped=kana.gameWords(history([quoted]),['うん']).words['うん'];
  assert.equal(exampleHTML(escaped.example,'うん',esc),'&lt;<mark>うん</mark>>&amp;');
 });
