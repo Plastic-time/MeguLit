@@ -34,6 +34,7 @@ static const int MaxSites = 16;
 static Live Sites[MaxSites]; static int NSites = 0;
 extern "C" void *DrawSitesOriginal[MaxSites] = {};
 static volatile LONG Armed = 0, Installed = 0, Observing = 0;
+static const DWORD ObserverMxcsr = 0x1f80;
 static bool Looked[64]; // a signature whose module was there and was scanned (found or not)
 static CRITICAL_SECTION Lock;
 // the current run
@@ -123,13 +124,21 @@ static __declspec(naked) void Gate() {
   __asm {
     pushfd
     pushad
-    mov eax, esp
-    push dword ptr [eax + 8]     // EBP saved by pushad
-    lea ecx, [eax + 40]          // the API's arguments (past the 32 bytes of pushad, flags, k)
+    mov ebx, esp
+    sub esp, 527
+    and esp, 0xfffffff0
+    fxsave [esp]
+    fninit
+    ldmxcsr ObserverMxcsr
+    cld
+    push dword ptr [ebx + 8]     // EBP saved by pushad
+    lea ecx, [ebx + 40]          // the API's arguments (past the 32 bytes of pushad, flags, k)
     push ecx
-    push dword ptr [eax + 36]    // k
+    push dword ptr [ebx + 36]    // k
     call DrawSitesOnCall
     add esp, 12
+    fxrstor [esp]
+    mov esp, ebx
     popad
     popfd
     xchg eax, [esp]              // eax = k, the slot keeps the game's eax

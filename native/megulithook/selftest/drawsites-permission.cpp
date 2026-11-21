@@ -1,17 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Real MinHook patches this executable's own FF15 fake-API callsite; no game or injection.
 // Build x86 against native/shared/minhook/include and its buffer/hook/trampoline/hde32 C sources.
-// This tests permission/SEH/stack/GPR/CF boundaries, not complete FP/SIMD preservation or live engine acceptance.
+// Tests permission, SEH and selected ABI state on a fake API; not live engine acceptance.
 #include <windows.h>
 #include <cstdio>
 #include <cstdarg>
 #include <string>
 #include <vector>
 static std::vector<std::string> Logs;
-static volatile LONG ThrowLogger=0, ApiCalls=0, PauseLogger=0, Faults=0;
+static volatile LONG ThrowLogger=0, ApiCalls=0, PauseLogger=0, Faults=0, ClobberLogger=0, Clobbered=0;
+static const DWORD ClobberMxcsr=0x1f80;
+static void ClobberFx(){__asm{pxor xmm0,xmm0
+ pxor xmm7,xmm7
+ fninit
+ ldmxcsr ClobberMxcsr
+ }InterlockedIncrement(&Clobbered);}
 static HANDLE LogEntered,LogRelease,RevokeEntered;
 static LONG CALLBACK ObserveFault(EXCEPTION_POINTERS *p){if(p->ExceptionRecord->ExceptionCode==EXCEPTION_ACCESS_VIOLATION)InterlockedIncrement(&Faults);return EXCEPTION_CONTINUE_SEARCH;}
-namespace Msg { static void Log(const char *fmt,...){if(InterlockedExchange(&PauseLogger,0)){SetEvent(LogEntered);if(WaitForSingleObject(LogRelease,2000)!=WAIT_OBJECT_0)RaiseException(0xe0421002,0,0,nullptr);}if(InterlockedExchange(&ThrowLogger,0))RaiseException(0xe0421001,0,0,nullptr); char b[1024];va_list a;va_start(a,fmt);vsnprintf(b,sizeof b,fmt,a);va_end(a);Logs.emplace_back(b);} }
+namespace Msg { static void Log(const char *fmt,...){if(InterlockedExchange(&PauseLogger,0)){SetEvent(LogEntered);if(WaitForSingleObject(LogRelease,2000)!=WAIT_OBJECT_0)RaiseException(0xe0421002,0,0,nullptr);}if(InterlockedExchange(&ThrowLogger,0)){if(InterlockedExchange(&ClobberLogger,0))ClobberFx();RaiseException(0xe0421001,0,0,nullptr);} char b[1024];va_list a;va_start(a,fmt);vsnprintf(b,sizeof b,fmt,a);va_end(a);Logs.emplace_back(b);if(InterlockedExchange(&ClobberLogger,0))ClobberFx();} }
 #include "../DrawSites.h"
 static int Failed=0, Passed=0;
 static void Check(bool ok,const char *name){printf("%s %s\n",ok?"PASS":"FAIL",name);if(ok)Passed++;else Failed++;}
@@ -19,9 +25,23 @@ static DWORD GotHdc,GotX,GotY,GotN,GotFlags,GotEax,GotEcx,GotEdx,GotEbx,GotEsi,G
 static const char *GotText;
 static DWORD BeforeEsp,AfterEsp,AfterEax;
 static void *Site;
+static LONG FpMode=0;
+static __declspec(align(16)) unsigned char SavedFx[512];
+static __declspec(align(16)) DWORD XmmPattern[4]={0x12345678,0xabcdef01,0x99887766,0x11223344},GotXmm0[4],GotXmm7[4];
+static const WORD GameCw=0x0b7f;static const DWORD GameMxcsr=0x3f80;
+static WORD GotCw;static DWORD GotMxcsr;static double GotX87;
 static __declspec(naked) BOOL WINAPI FakeApi(HDC,int,int,LPCSTR,int){__asm {
  pushfd
  pop GotFlags
+ cmp FpMode,0
+ je noFx
+ movdqu GotXmm0,xmm0
+ movdqu GotXmm7,xmm7
+ fnstcw GotCw
+ stmxcsr GotMxcsr
+ fst qword ptr GotX87
+ noFx:
+ cld
  mov GotEax,eax
  mov GotEcx,ecx
  mov GotEdx,edx
@@ -42,6 +62,39 @@ static __declspec(naked) BOOL WINAPI FakeApi(HDC,int,int,LPCSTR,int){__asm {
  mov eax,77
  ret 20
 } }
+static void Draw(const char*,int,int,int);
+static __declspec(naked) void InvokeFx(const char*){__asm{
+ push ebp
+ push ebx
+ push esi
+ push edi
+ mov eax,[esp+20]
+ fxsave SavedFx
+ fninit
+ fldcw GameCw
+ ldmxcsr GameMxcsr
+ fld1
+ movdqu xmm0,XmmPattern
+ movdqu xmm7,XmmPattern
+ push 20
+ push 0
+ push 2
+ push eax
+ stc
+ std
+ call Draw
+ add esp,16
+ cld
+ fxrstor SavedFx
+ pop edi
+ pop esi
+ pop ebx
+ pop ebp
+ ret
+}}
+static void CheckFx(const char *text,const char *label){FpMode=1;InvokeFx(text);FpMode=0;
+ Check(!memcmp(GotXmm0,XmmPattern,sizeof XmmPattern)&&!memcmp(GotXmm7,XmmPattern,sizeof XmmPattern)&&GotCw==GameCw&&GotMxcsr==GameMxcsr&&GotX87==1.0&&(GotFlags&0x401)==0x401,label);
+}
 static void *Slot=(void*)&FakeApi;
 static __declspec(naked) void Draw(const char*,int,int,int){__asm {
  push ebp
@@ -115,6 +168,15 @@ int main(){
  size_t afterRevoke=Logs.size();DrawSites::RunTick=GetTickCount()-500;DrawSites::FlushIdle();Check(!DrawSites::Observing&&DrawSites::RunChars==0&&Logs.size()==afterRevoke,"after revocation returns no pending run is later published");
  CloseHandle(drawThread);CloseHandle(revokeThread);CloseHandle(LogEntered);CloseHandle(LogRelease);CloseHandle(RevokeEntered);RevokeEntered=nullptr;
  RemoveVectoredExceptionHandler(veh);
+ DrawSites::SetObserving(false);CheckFx(ai,"disabled real gate preserves XMM0/XMM7/x87/CW/MXCSR and incoming DF/CF");
+ DrawSites::SetObserving(true);Draw(ai,2,100,20);LONG clobbers=Clobbered;InterlockedExchange(&ClobberLogger,1);
+ CheckFx("\x82\xa2","enabled real gate restores FP/SIMD/DF after observer clobbers");
+ Check(Clobbered==clobbers+1,"observer actually changed XMM/x87/MXCSR before original API");
+ Draw(ai,2,100,20);clobbers=Clobbered;InterlockedExchange(&ClobberLogger,1);InterlockedExchange(&ThrowLogger,1);
+ CheckFx("\x82\xa2","enabled real gate restores FP/SIMD/DF after clobber then logger SEH");
+ Check(Clobbered==clobbers+1&&!ThrowLogger&&!ClobberLogger,"combined FP clobber and logger exception actually occurred");
+ Check(OtherThreadRevoke(),"combined FP/SEH observer releases lock for another thread");
+ DrawSites::SetObserving(false);
  Check(MH_DisableHook(Site)==MH_OK,"disable own fixture hook");Check(MH_RemoveHook(Site)==MH_OK,"remove own fixture hook");Check(MH_Uninitialize()==MH_OK,"uninitialize own fixture MinHook");
  printf("draw-permission real-MinHook: %d PASS %d FAIL\n",Passed,Failed);return Failed?1:0;
 }
