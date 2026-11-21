@@ -7,7 +7,8 @@
    Data: services/torch-monument.cjs through the bridge (torch_page / torch_months / torch_find / torch_me).
    Life cycle: the scene is built when the page opens and fully disposed when it closes (GPU context released). It stops
    drawing while the window is hidden or not focused, and closes itself when a game starts (event megulit-game-launch).
-   Quality: 'high' (mirror floor, MSAA, ambient occlusion, sun shadows, bloom, grading) or 'low' (none of those, lower resolution); auto picks low on weak
+   Baked ahead (web/torch-bake.js): the hall's textures and an ambient-occlusion volume; sun shadows are redrawn only when the sun moves.
+   Quality: 'high' (mirror floor, MSAA, clear coats, bloom, grading) or 'low' (none of those, lower resolution, smaller textures; baked AO and shadows on both); auto picks low on weak
    machines and drops to low when frames run slow. */
 import * as THREE from './vendor/three/three.module.min.js';
 import {Reflector} from './vendor/three/addons/objects/Reflector.js';
@@ -16,23 +17,23 @@ import {RenderPass} from './vendor/three/addons/postprocessing/RenderPass.js';
 import {UnrealBloomPass} from './vendor/three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from './vendor/three/addons/postprocessing/OutputPass.js';
 import {ShaderPass} from './vendor/three/addons/postprocessing/ShaderPass.js';
-import {GTAOPass} from './vendor/three/addons/postprocessing/GTAOPass.js';
-import {rng,canvas2d,basalt,marble,glowSprite} from './torch-textures.js';
-import {buildHall,HALL} from './torch-hall.js';
+import {rng,canvas2d,glowSprite} from './torch-textures.js';
+import {buildHall,buildStele,HALL} from './torch-hall.js';
+import {loadBaked,bakedAO,computeVolumes,applyAO} from './torch-bake.js';
 import {loadGsap} from './gsap-loader.js';
 
 const COPY={
  zh:{title:'传火碑',sub:'分享过校准结果的玩家，名字都刻在这里',count:n=>'已刻 '+n+' 人',monthCount:(m,n)=>m+' · '+n+' 人',range:(a,b)=>'第 '+a+'–'+b+' 位',all:'全部',
   anon:n=>'传火人 #'+n,empty:'还没有人刻下名字',find:'找名字',findGo:'查找',me:'我的名字',meNone:'这台电脑还没有传过火',quality:{high:'画质 标准',low:'画质 省电'},
-  close:'关闭',prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',loading:'正在读取…',nth:n=>'第 '+n+' 位',more:'只显示前 50 个',
+  close:'关闭',prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',loading:'正在读取…',preparing:'正在准备殿堂…',nth:n=>'第 '+n+' 位',more:'只显示前 50 个',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')},
  en:{title:'Monument',sub:'Everyone who shared a calibration is carved here',count:n=>n+' names',monthCount:(m,n)=>m+' · '+n,range:(a,b)=>'#'+a+'–'+b,all:'All',
   anon:n=>'Torch bearer #'+n,empty:'No names carved yet',find:'Find a name',findGo:'Find',me:'My name',meNone:'This PC has not shared yet',quality:{high:'Quality: full',low:'Quality: light'},
-  close:'Close',prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',loading:'Loading…',nth:n=>'#'+n,more:'First 50 only',
+  close:'Close',prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',loading:'Loading…',preparing:'Preparing the hall…',nth:n=>'#'+n,more:'First 50 only',
   ym:m=>m},
  ja:{title:'継火の碑',sub:'キャリブレーションを共有した人の名前が刻まれています',count:n=>n+' 名',monthCount:(m,n)=>m+' · '+n+' 名',range:(a,b)=>a+'–'+b+' 番目',all:'すべて',
   anon:n=>'火を継ぐ人 #'+n,empty:'まだ誰の名前も刻まれていません',find:'名前を探す',findGo:'探す',me:'自分の名前',meNone:'この PC からはまだ共有していません',quality:{high:'画質 標準',low:'画質 軽量'},
-  close:'閉じる',prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',loading:'読み込み中…',nth:n=>n+' 番目',more:'最初の 50 件のみ',
+  close:'閉じる',prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',loading:'読み込み中…',preparing:'聖堂を準備しています…',nth:n=>n+' 番目',more:'最初の 50 件のみ',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')}};
 const QUALITY_KEY='megulit-torch-quality';
 const FONT='"Torch Serif","Noto Serif SC","Source Han Serif SC","Noto Serif JP","Songti SC","SimSun","Yu Mincho",serif';
@@ -138,8 +139,9 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
  /* ---------- scene ---------- */
  await document.fonts.load('44px "Torch Serif"','传火碑人').catch(()=>{});
  gsap=await loadGsap().catch(()=>null);
+ const bake=await loadBaked(pickTier(quality())==='low');
  if(disposed)return null;
- scene=buildScene({host,canvas:$('.tm-canvas'),state,t,tier:pickTier(quality()),reduced,gsap,onTier:()=>updateChrome()});if(typeof window.__TORCH_HOUR==='number')host.__torch=scene;
+ scene=buildScene({host,canvas:$('.tm-canvas'),state,t,tier:pickTier(quality()),reduced,gsap,onTier:()=>updateChrome(),bakeInfo:bake});if(typeof window.__TORCH_HOUR==='number')host.__torch=scene;
  const ctl={close,focus:()=>$('.tm-close').focus()};current=ctl;
 
  /* first data: page 1, then the side routes (their buttons stay hidden until the relay has them) */
@@ -190,10 +192,12 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
 
  /* entrance */
  const veil=$('.tm-veil'),chrome=[...host.querySelectorAll('.tm-head,.tm-count,.tm-bar')];
- if(gsap&&!reduced){gsap.set(chrome,{autoAlpha:0,y:8});gsap.to(veil,{autoAlpha:0,duration:1.6,ease:'power2.out'});
-  gsap.to(chrome,{autoAlpha:1,y:0,duration:.9,ease:'power3.out',stagger:.12,delay:scene.introSeconds*0.62});}
- else veil.style.opacity='0';
- scene.intro();
+ if(gsap&&!reduced)gsap.set(chrome,{autoAlpha:0,y:8});
+ let preparing=true;setTimeout(()=>{if(preparing&&!disposed)status(t.preparing);},400);
+ scene.ready.then(()=>{preparing=false;if(disposed)return;if($('.tm-status').textContent===t.preparing)status(state.offline?t.offline:'');
+  if(gsap&&!reduced){gsap.to(veil,{autoAlpha:0,duration:1.6,ease:'power2.out'});gsap.to(chrome,{autoAlpha:1,y:0,duration:.9,ease:'power3.out',stagger:.12,delay:scene.introSeconds*0.62});}
+  else veil.style.opacity='0';
+  scene.intro();});
  $('.tm-close').focus({preventScroll:true});
 
  function close(now=false){if(disposed)return;disposed=true;current=null;
@@ -213,23 +217,16 @@ function pickTier(q){if(q!=='auto')return q;const cores=navigator.hardwareConcur
  return soft||cores<=2||mem<=2?'low':'high';}
 
 /* ================= the scene ================= */
-function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier}){
+function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}){
+ let aoInfo=null;
  const bag=new Set();const keep=o=>{bag.add(o);return o;};
  const tex=(c,srgb=true,rep=1)=>{const x=keep(new THREE.CanvasTexture(c));x.colorSpace=srgb?THREE.SRGBColorSpace:THREE.NoColorSpace;x.wrapS=x.wrapT=THREE.RepeatWrapping;x.repeat.set(rep,rep);x.anisotropy=8;return x;};
- let renderer,composer=null,bloom=null,gtao=null,grade=null,reflector=null,active=true,raf=0,last=performance.now(),slow=0,frames=0,introDone=false,dragMoved=false;
+ let renderer,composer=null,bloom=null,grade=null,reflector=null,active=true,raf=0,last=performance.now(),slow=0,frames=0,introDone=false,dragMoved=false;
  const scene=new THREE.Scene();scene.background=new THREE.Color(0x0e0c14);scene.fog=new THREE.FogExp2(0x16131f,0.015);
  const camera=new THREE.PerspectiveCamera(44,1,0.1,160);
  const START={pos:new THREE.Vector3(0,3.2,38.5),look:new THREE.Vector3(0,5.2,0)},END={pos:new THREE.Vector3(0,2.3,20.5),look:new THREE.Vector3(0,4.7,0)};
  const view={pos:START.pos.clone(),look:START.look.clone(),yaw:0,pitch:0,yawT:0,pitchT:0,dragYaw:0,dragPitch:0,px:0,pxT:0,read:null};
  camera.position.copy(view.pos);camera.lookAt(view.look);
-
- /* ---- stele materials: polished black basalt with a clear coat, cream marble stair, gilt nosing ---- */
- const bas=basalt(512,37),stoneW=marble(512,61,{base:[220,210,194],vein:[180,168,152],veinK:4,warp:2});
- const basaltBody=keep(new THREE.MeshPhysicalMaterial({map:tex(bas.map,true,2),normalMap:tex(bas.normal,false,2),normalScale:new THREE.Vector2(.12,.12),roughnessMap:tex(bas.rough,false,2),
-  roughness:1,metalness:0,clearcoat:tier==='low'?0:1,clearcoatRoughness:.05,envMapIntensity:1}));
- const stepMat=keep(new THREE.MeshPhysicalMaterial({map:tex(stoneW.map,true,1.5),roughnessMap:tex(stoneW.rough,false,1.5),roughness:1,metalness:0,clearcoat:tier==='low'?0:.5,clearcoatRoughness:.12,envMapIntensity:.5}));
- const inlayRed=keep(new THREE.MeshStandardMaterial({color:0x6e1222,roughness:.35,metalness:.05}));
- const inlayOrange=keep(new THREE.MeshStandardMaterial({color:0xb48a4a,roughness:.3,metalness:.9,envMapIntensity:1.2}));
 
  /* ---- environment for reflections: a dim stone room with a few bright windows (scaled with the daylight, see frame) ---- */
  function envMap(){const pm=new THREE.PMREMGenerator(renderer);const es=new THREE.Scene();es.background=new THREE.Color(0x2c2834);
@@ -241,20 +238,10 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier}){
   const rt=pm.fromScene(es,.02);es.traverse(o=>{o.geometry?.dispose();o.material?.dispose?.();});pm.dispose();return keep(rt);}
 
  /* ---- the hall (web/torch-hall.js) ---- */
- const H=buildHall({scene,keep,tex,tier,maxAniso:8});const {skipInMirror,floorMat,FL_W,FL_L,FL_Z}=H;
+ const tBuild=performance.now();const H=buildHall({scene,keep,tex,tier,maxAniso:8});const buildMs=performance.now()-tBuild;const {skipInMirror,floorMat,FL_W,FL_L,FL_Z}=H;
 
- /* ---- the stele: a long black slab on two square posts, a wide low stair in front ---- */
- const stele=new THREE.Group();scene.add(stele);
- const STEP_N=7,STEP_H=.085,SW=12.6,SH=3.2,SD=.44,POST_Y=STEP_N*STEP_H,BASE_Y=1.75;
- for(let i=0;i<STEP_N;i++){const w=15.6-i*.12,front=3.6-i*.36,back=-.9,d=front-back;const m=new THREE.Mesh(keep(new THREE.BoxGeometry(w,STEP_H,d)),stepMat);
-  m.position.set(0,STEP_H*i+STEP_H/2,back+d/2);m.receiveShadow=true;m.castShadow=i===STEP_N-1;stele.add(m);}
- { const nose=new THREE.Mesh(keep(new THREE.BoxGeometry(15.62,.02,.04)),inlayOrange);nose.position.set(0,STEP_H-.01,3.62);stele.add(nose);}
- for(const sx of [-1,1]){const p=new THREE.Mesh(keep(new THREE.BoxGeometry(1.35,BASE_Y-POST_Y,.78)),stepMat);p.position.set(sx*3.7,POST_Y+(BASE_Y-POST_Y)/2,0);p.castShadow=p.receiveShadow=true;stele.add(p);
-  const band=new THREE.Mesh(keep(new THREE.BoxGeometry(1.39,.06,.82)),inlayRed);band.position.set(sx*3.7,BASE_Y-.14,0);stele.add(band);}
- function slabGeo(w,h,d,b){const s=new THREE.Shape();s.moveTo(-w/2+b,-h/2);s.lineTo(w/2-b,-h/2);s.quadraticCurveTo(w/2,-h/2,w/2,-h/2+b);s.lineTo(w/2,h/2-b);s.quadraticCurveTo(w/2,h/2,w/2-b,h/2);
-  s.lineTo(-w/2+b,h/2);s.quadraticCurveTo(-w/2,h/2,-w/2,h/2-b);s.lineTo(-w/2,-h/2+b);s.quadraticCurveTo(-w/2,-h/2,-w/2+b,-h/2);
-  const g=new THREE.ExtrudeGeometry(s,{depth:d-.06,bevelEnabled:true,bevelThickness:.03,bevelSize:.03,bevelSegments:3,curveSegments:6});g.translate(0,0,-(d-.06)/2);return g;}
- const slab=new THREE.Mesh(keep(slabGeo(SW,SH,SD,.04)),basaltBody);slab.position.set(0,BASE_Y+SH/2,0);slab.castShadow=slab.receiveShadow=true;stele.add(slab);
+ /* ---- the stele (web/torch-hall.js) ---- */
+ const {stele,slab,SW,SH,SD,basaltBody,bas}=buildStele({scene,keep,tier});
  /* inscription surface: its own maps, redrawn per page */
  const LOW=tier==='low',FS=()=>tier==='low'?.5:1;
  const faceW=SW-.3,faceH=faceW*FH/FW,faceY=slab.position.y;
@@ -359,7 +346,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier}){
  /* ---- renderer & tiers ---- */
  function makeRenderer(){renderer=new THREE.WebGLRenderer({canvas,antialias:tier!=='low',powerPreference:tier==='low'?'low-power':'high-performance',stencil:false});
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.95;renderer.localClippingEnabled=true;renderer.outputColorSpace=THREE.SRGBColorSpace;
-  renderer.shadowMap.enabled=tier!=='low';renderer.shadowMap.type=THREE.PCFSoftShadowMap;}
+  renderer.shadowMap.enabled=true;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.type=tier==='low'?THREE.PCFShadowMap:THREE.PCFSoftShadowMap;}
  /* grading on the full tier: a soft vignette, a touch of saturation, fine grain against banding */
  const GRADE={uniforms:{tDiffuse:{value:null},uTime:{value:0},uVig:{value:.34}},vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
   fragmentShader:`uniform sampler2D tDiffuse;uniform float uTime;uniform float uVig;varying vec2 vUv;float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
@@ -368,10 +355,10 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier}){
  makeRenderer();
  let env=envMap();scene.environment=env.texture;
  function applyTier(){const low=tier==='low';
-  renderer.setPixelRatio(Math.min(devicePixelRatio||1,low?.75:1.75));renderer.shadowMap.enabled=!low;H.setShadows(!low,4096);
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,low?.75:1.75));renderer.shadowMap.type=low?THREE.PCFShadowMap:THREE.PCFSoftShadowMap;H.setShadows(true,low?1024:2048);host.classList.toggle('tm-lowfx',low);
   /* floor: mirror under the translucent polished marble (and the inlaid runner), or the marble alone */
   if(reflector){scene.remove(reflector);reflector.getRenderTarget().dispose();reflector.material.dispose();reflector=null;}
-  if(!low){const s=host.getBoundingClientRect();reflector=new Reflector(new THREE.PlaneGeometry(FL_W,FL_L),{clipBias:.003,textureWidth:Math.max(256,s.width*.75),textureHeight:Math.max(256,s.height*.75),color:0xb8b4c4,multisample:4});
+  if(!low){const s=host.getBoundingClientRect();reflector=new Reflector(new THREE.PlaneGeometry(FL_W,FL_L),{clipBias:.003,textureWidth:Math.max(256,s.width*.5),textureHeight:Math.max(256,s.height*.5),color:0xb8b4c4,multisample:0});
    keep(reflector.geometry);reflector.rotation.x=-Math.PI/2;reflector.position.set(0,-.001,FL_Z);reflector.renderOrder=-3;scene.add(reflector);
    const before=reflector.onBeforeRender;reflector.onBeforeRender=function(...a){if(scene.overrideMaterial)return;const v=skipInMirror.map(o=>o.visible);skipInMirror.forEach(o=>o.visible=false);
     before.apply(this,a);skipInMirror.forEach((o,i)=>o.visible=v[i]);};
@@ -379,21 +366,18 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier}){
   else{floorMat.transparent=false;floorMat.opacity=1;H.inlayMat.transparent=false;H.inlayMat.opacity=1;}
   floorMat.needsUpdate=true;H.inlayMat.needsUpdate=true;
   if(dust){scene.remove(dust);dust.geometry.dispose();dust.material.dispose();}dust=makeDust(low?700:2600);scene.add(dust);
-  if(composer){composer.passes.forEach(p=>p.dispose?.());composer.dispose();composer=null;bloom=null;gtao=null;grade=null;}
+  if(composer){composer.passes.forEach(p=>p.dispose?.());composer.dispose();composer=null;bloom=null;grade=null;}
   if(!low){const size=renderer.getDrawingBufferSize(new THREE.Vector2());
-   composer=new EffectComposer(renderer,new THREE.WebGLRenderTarget(size.x,size.y,{type:THREE.HalfFloatType,samples:4}));composer.addPass(new RenderPass(scene,camera));
-   /* ambient occlusion: everything solid; the light effects, the mirror and the dust stay out of it */
-   gtao=new GTAOPass(scene,camera,size.x,size.y);gtao.blendIntensity=.9;
-   gtao.updateGtaoMaterial({radius:.8,distanceExponent:1.5,thickness:1.4,scale:1.15,samples:16,distanceFallOff:1});gtao.updatePdMaterial({lumaPhi:10,depthPhi:2,normalPhi:3,radius:5,rings:2,samples:16});
-   const hide=[...H.noAO,glow,reflector].filter(Boolean),ov=gtao.overrideVisibility.bind(gtao);gtao.overrideVisibility=()=>{ov();for(const o of hide)o.visible=false;};
-   composer.addPass(gtao);bloom=new UnrealBloomPass(new THREE.Vector2(512,512),.5,.65,.85);composer.addPass(bloom);grade=new ShaderPass(GRADE);composer.addPass(grade);composer.addPass(new OutputPass());}
+   /* MSAA only where the scene is drawn: RenderPass writes into renderTarget2 (the composer's read buffer, two swaps per frame) */
+   composer=new EffectComposer(renderer,new THREE.WebGLRenderTarget(size.x,size.y,{type:THREE.HalfFloatType}));composer.renderTarget2.samples=4;composer.addPass(new RenderPass(scene,camera));
+   bloom=new UnrealBloomPass(new THREE.Vector2(512,512),.5,.65,.85);composer.addPass(bloom);grade=new ShaderPass(GRADE);composer.addPass(grade);composer.addPass(new OutputPass());}
   resize();queuePaint();}
 
  /* ---- view ---- */
  function resize(){const r=host.getBoundingClientRect();const w=Math.max(2,Math.round(r.width)),h=Math.max(2,Math.round(r.height));renderer.setSize(w,h,false);
   camera.aspect=w/h;camera.fov=w/h<1.45?52:44;camera.updateProjectionMatrix();
   if(composer){composer.setSize(w,h);}
-  if(reflector){const pr=renderer.getPixelRatio();reflector.getRenderTarget().setSize(Math.round(w*pr*.6),Math.round(h*pr*.6));}
+  if(reflector){const pr=renderer.getPixelRatio();reflector.getRenderTarget().setSize(Math.round(w*pr*.5),Math.round(h*pr*.5));}
   if(dust)dust.material.uniforms.uScale.value=h/700*renderer.getPixelRatio();if(!active)draw();}
  const pointer={x:0,y:0,down:false,sx:0,sy:0,yaw0:0,pitch0:0,moved:0};
  const onMove=e=>{const r=host.getBoundingClientRect();pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=((e.clientY-r.top)/r.height)*2-1;
@@ -432,7 +416,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier}){
  function draw(){if(composer)composer.render();else renderer.render(scene,camera);}
  function frame(now){raf=0;if(!active)return;const dt=Math.min(.1,(now-last)/1000);last=now;
   if(tier==='low'&&now-(frame.lastDraw||0)<31){raf=requestAnimationFrame(frame);return;}frame.lastDraw=now;
-  const time=now/1000;H.update(time,dt,renderer);const day=Math.min(1,H.state.skyI/1.1);scene.environmentIntensity=.2+.8*day;
+  const time=now/1000;H.update(time,dt,renderer);if(H.shadowDirty())renderer.shadowMap.needsUpdate=true;if(aoUni)aoUni.uTorchLevel.value=H.state.torch*(H.state.flicker||1);const day=Math.min(1,H.state.skyI/1.1);scene.environmentIntensity=.2+.8*day;
   if(dust){dust.material.uniforms.uTime.value=time;dust.material.uniforms.uBright.value=Math.max(.12,day*H.state.beam*.9,H.state.torch*.45);}if(grade)grade.uniforms.uTime.value=time%97;
   if(glow.userData.on){const p=(now-glow.userData.t0)/1000;const o=Math.min(1,p/1.2)*(.42+.1*Math.sin(p*1.6));glow.material.opacity=o;glowLight.intensity=o*2.2;}else{glow.material.opacity*=.9;glowLight.intensity*=.9;}
   updateCamera(dt);draw();
@@ -440,7 +424,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier}){
   if(introDone&&tier==='high'&&autoTier){frames++;if(dt>.045)slow++;if(frames>=180){if(slow>120){setTier('low',true);}frames=0;slow=0;}}
   raf=requestAnimationFrame(frame);}
  let autoTier=(()=>{try{return !localStorage.getItem(QUALITY_KEY)||localStorage.getItem(QUALITY_KEY)==='auto';}catch{return true;}})();
- function setActive(on){if(disposed)return;active=!!on;if(active&&!raf){last=performance.now();raf=requestAnimationFrame(frame);}if(!active&&raf){cancelAnimationFrame(raf);raf=0;}}
+ function setActive(on){if(disposed)return;active=!!on&&ready;if(active&&!raf){last=performance.now();raf=requestAnimationFrame(frame);}if(!active&&raf){cancelAnimationFrame(raf);raf=0;}}
  function setTier(next,auto=false){if(next===tier)return;tier=next;if(!auto)autoTier=false;applyTier();scene.traverse(o=>{const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];ms.forEach(m=>m.needsUpdate=true);});onTier?.();}
  let disposed=false;
  function dispose(){disposed=true;active=false;if(raf)cancelAnimationFrame(raf);raf=0;if(paintQueued)cancelAnimationFrame(paintQueued);
@@ -454,6 +438,11 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier}){
   for(const k of ['map','emissive','rough','mask','t1','t2']){faces[k].width=faces[k].height=1;}
   renderer.renderLists.dispose();renderer.dispose();renderer.forceContextLoss();}
 
- applyTier();paintFace();setActive(true);
- return {get tier(){return tier;},introSeconds:INTRO,intro,setActive,setTier,resize,pick,dispose,paintFace:()=>queuePaint(),lookAtFocus,setRead,reading:()=>!!view.read,dragged:()=>dragMoved,debug:{renderer,scene,camera}};
+ /* ambient occlusion from the baked volume (or worked out now when the bake does not match this build) */
+ let aoUni=null;{ const t0=performance.now(),vols=bakedAO()||(window.__TORCH_BAKE?null:computeVolumes(scene,H.torchPoints));if(vols){const r=applyAO(scene,vols);r.textures.forEach(keep);aoUni=r.uniforms;}
+  aoInfo={baked:!!bakedAO(),ms:Math.round(performance.now()-t0),bake:bakeInfo};}
+ applyTier();paintFace();
+ /* compile every shader before the first frame (in parallel where the driver allows), so the intro never starts with a stall */
+ let ready=false;const whenReady=(renderer.compileAsync?renderer.compileAsync(scene,camera):Promise.resolve()).catch(()=>{}).then(()=>{ready=true;if(!disposed)setActive(true);});
+ return {get tier(){return tier;},ready:whenReady,introSeconds:INTRO,intro,setActive,setTier,resize,pick,dispose,paintFace:()=>queuePaint(),lookAtFocus,setRead,reading:()=>!!view.read,dragged:()=>dragMoved,debug:{renderer,scene,camera,buildMs,torchPoints:H.torchPoints,get ao(){return aoInfo;}}};
 }

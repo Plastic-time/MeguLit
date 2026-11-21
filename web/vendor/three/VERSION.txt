@@ -1,3 +1,3 @@
 three.js r168 (npm three@0.168.0, MIT, see LICENSE)
 three.module.min.js = build/three.module.min.js
-addons/ = examples/jsm/{objects,postprocessing,shaders,math,utils}, only change: 'three' imports point at ../../three.module.min.js
+addons/ = examples/jsm/{objects,postprocessing,shaders,utils}, only change: 'three' imports point at ../../three.module.min.js

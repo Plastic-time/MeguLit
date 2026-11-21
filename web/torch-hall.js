@@ -10,7 +10,8 @@
    and the torches are lit from dusk to morning. Everything is interpolated, so the room changes as slowly as the day. */
 import * as THREE from './vendor/three/three.module.min.js';
 import {mergeGeometries} from './vendor/three/addons/utils/BufferGeometryUtils.js';
-import {ashlar,relief,coffers,rose,lancet,marble,floorMarble,inlay,glowSprite} from './torch-textures.js';
+import {ashlar,relief,coffers,rose,lancet,marble,floorMarble,inlay,glowSprite,basalt} from './torch-textures.js';
+import {maps} from './torch-bake.js';
 
 export const HALL={HX:10,BACK:-6.5,FRONT:14.5,SPRING:9.3,NZ1:40,AX:13.2};
 
@@ -54,18 +55,49 @@ const ARCHITRAVE=[[0,0],[.08,0],[.08,.22],[.12,.22],[.12,.46],[.16,.46],[.16,.62
 const BASEMOLD=[[0,0],[.3,0],[.3,.3],[.26,.3,.24,.44],[.18,.46],[.16,.52],[0,.52]];
 function run(profile,len){const g=new THREE.ExtrudeGeometry(profileShape(profile),{depth:len,bevelEnabled:false,curveSegments:8});return g;}
 
+/* textures: one GPU upload per image (repeats get clones of the same source); a drawn canvas is emptied once it is on the GPU,
+   unless it is marked keep (the stele face reuses the basalt as a pattern) */
+function textureMaker(keep,maxAniso=8){const seen=new Map();
+ return (c,srgb=true,rep=1,keepImage=false)=>{let base=seen.get(c);let x;
+  if(base){x=keep(base.clone());}else{x=keep(new THREE.Texture(c));x.needsUpdate=true;seen.set(c,x);
+   if(!keepImage&&!window.__TORCH_BAKE&&c instanceof HTMLCanvasElement)x.onUpdate=()=>{c.width=c.height=1;};}
+  x.colorSpace=srgb?THREE.SRGBColorSpace:THREE.NoColorSpace;x.wrapS=x.wrapT=THREE.RepeatWrapping;x.anisotropy=maxAniso;x.repeat.set(rep,rep);return x;};}
+
+/* ---------- the stele: a long black slab on two square posts, a wide low stair in front ---------- */
+export function buildStele({scene,keep,tier}){const low=tier==='low',Q=low?.5:1,T=textureMaker(keep);
+ const bas=maps('basalt',()=>basalt(512,37)),stoneW=maps('steleMarble',()=>marble(512*Q,62,{base:[220,210,194],vein:[180,168,152],veinK:4,warp:2}));
+ const basaltBody=keep(new THREE.MeshPhysicalMaterial({map:T(bas.map,true,2,true),normalMap:T(bas.normal,false,2),normalScale:new THREE.Vector2(.12,.12),roughnessMap:T(bas.rough,false,2,true),
+  roughness:1,metalness:0,clearcoat:low?0:1,clearcoatRoughness:.05,envMapIntensity:1}));
+ const stepMat=keep(new THREE.MeshPhysicalMaterial({map:T(stoneW.map,true,1.5),roughnessMap:T(stoneW.rough,false,1.5),roughness:1,metalness:0,clearcoat:low?0:.5,clearcoatRoughness:.12,envMapIntensity:.5}));
+ const inlayRed=keep(new THREE.MeshStandardMaterial({color:0x6e1222,roughness:.35,metalness:.05}));
+ const gilt=keep(new THREE.MeshStandardMaterial({color:0xb48a4a,roughness:.3,metalness:.9,envMapIntensity:1.2}));
+ const stele=new THREE.Group();scene.add(stele);
+ const STEP_N=7,STEP_H=.085,SW=12.6,SH=3.2,SD=.44,POST_Y=STEP_N*STEP_H,BASE_Y=1.75;
+ const mesh=(g,m,x,y,z,cast=true)=>{const o=new THREE.Mesh(keep(g),m);o.position.set(x,y,z);o.castShadow=cast;o.receiveShadow=true;stele.add(o);return o;};
+ for(let i=0;i<STEP_N;i++){const w=15.6-i*.12,front=3.6-i*.36,back=-.9,d=front-back;mesh(new THREE.BoxGeometry(w,STEP_H,d),stepMat,0,STEP_H*i+STEP_H/2,back+d/2,i===STEP_N-1);}
+ mesh(new THREE.BoxGeometry(15.62,.02,.04),gilt,0,STEP_H-.01,3.62,false);
+ for(const sx of [-1,1]){mesh(new THREE.BoxGeometry(1.35,BASE_Y-POST_Y,.78),stepMat,sx*3.7,POST_Y+(BASE_Y-POST_Y)/2,0);mesh(new THREE.BoxGeometry(1.39,.06,.82),inlayRed,sx*3.7,BASE_Y-.14,0,false);}
+ const s=new THREE.Shape(),w=SW,h=SH,b=.04;s.moveTo(-w/2+b,-h/2);s.lineTo(w/2-b,-h/2);s.quadraticCurveTo(w/2,-h/2,w/2,-h/2+b);s.lineTo(w/2,h/2-b);s.quadraticCurveTo(w/2,h/2,w/2-b,h/2);
+ s.lineTo(-w/2+b,h/2);s.quadraticCurveTo(-w/2,h/2,-w/2,h/2-b);s.lineTo(-w/2,-h/2+b);s.quadraticCurveTo(-w/2,-h/2,-w/2+b,-h/2);
+ const g=new THREE.ExtrudeGeometry(s,{depth:SD-.06,bevelEnabled:true,bevelThickness:.03,bevelSize:.03,bevelSegments:3,curveSegments:6});g.translate(0,0,-(SD-.06)/2);
+ const slab=mesh(g,basaltBody,0,BASE_Y+SH/2,0);
+ return {stele,slab,SW,SH,SD,basaltBody,bas};}
+
 /* ---------- the hall ---------- */
 export function buildHall({scene,keep,tex,tier,maxAniso=8}){
  const {HX,BACK,FRONT,SPRING,NZ1,AX}=HALL,R=HX,low=tier==='low',Q=low?.5:1,BAYZ=(BACK+FRONT)/2;
  const hall=new THREE.Group();scene.add(hall);
  const skipInMirror=[],noAO=[],castAll=[];
- const T=(c,srgb=true)=>{const x=keep(new THREE.CanvasTexture(c));x.colorSpace=srgb?THREE.SRGBColorSpace:THREE.NoColorSpace;x.wrapS=x.wrapT=THREE.RepeatWrapping;x.anisotropy=maxAniso;return x;};
+ const T=textureMaker(keep,maxAniso);
 
  /* ---- textures ---- */
- const ash=ashlar(1024*Q,31),ashDark=ashlar(512*Q,47,{base:[120,110,104]}),rel=relief(2048*Q,256*Q,5),
-  vault=coffers(2048*Q,1024*Q,{cols:32,rows:7,v0:.06,v1:.86}),half=coffers(1024*Q,512*Q,{cols:16,rows:4,v0:.04,v1:.8}),nave=coffers(1024*Q,1024*Q,{cols:6,rows:6,v0:0,v1:1}),
-  col=marble(512*Q,23,{base:[34,22,46],vein:[112,82,132],veinK:3,warp:2.4}),pale=marble(512*Q,61,{base:[214,204,188],vein:[176,164,150],veinK:4,warp:2}),
-  fl=floorMarble(2048*Q,11),roseTex=T(rose(1024*Q,3)),roseSmall=T(rose(512*Q,9,{petals:8})),lanTex=T(lancet(256*Q,640*Q,13));
+ /* baked images when web/assets/torch matches this source (torch-bake.js), else drawn here */
+ const ash=maps('ashlar',()=>ashlar(1024*Q,31)),ashDark=maps('ashlarDark',()=>ashlar(512*Q,47,{base:[120,110,104]})),rel=maps('relief',()=>relief(2048*Q,256*Q,5)),
+  vault=maps('vault',()=>coffers(2048*Q,1024*Q,{cols:32,rows:7,v0:.06,v1:.86})),half=maps('halfDome',()=>coffers(1024*Q,512*Q,{cols:16,rows:4,v0:.04,v1:.8})),
+  nave=maps('naveVault',()=>coffers(1024*Q,1024*Q,{cols:6,rows:6,v0:0,v1:1})),
+  col=maps('violetMarble',()=>marble(512*Q,23,{base:[34,22,46],vein:[112,82,132],veinK:3,warp:2.4})),pale=maps('paleMarble',()=>marble(512*Q,61,{base:[214,204,188],vein:[176,164,150],veinK:4,warp:2})),
+  fl=maps('floor',()=>floorMarble(2048*Q,11)),roseTex=T(maps('rose',()=>({map:rose(1024*Q,3)})).map),roseSmall=T(maps('roseSmall',()=>({map:rose(512*Q,9,{petals:8})})).map),
+  lanTex=T(maps('lancet',()=>({map:lancet(256*Q,640*Q,13)})).map);
  const stone=keep(new THREE.MeshStandardMaterial({map:T(ash.map),normalMap:T(ash.normal,false),roughnessMap:T(ash.rough,false),roughness:1,metalness:0,envMapIntensity:.35}));
  const stoneDark=keep(new THREE.MeshStandardMaterial({map:T(ashDark.map),normalMap:T(ashDark.normal,false),roughnessMap:T(ashDark.rough,false),roughness:1,metalness:0,envMapIntensity:.25}));
  const carved=keep(new THREE.MeshStandardMaterial({map:T(rel.map),normalMap:T(rel.normal,false),roughness:.82,metalness:0,envMapIntensity:.3}));
@@ -192,7 +224,7 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
  floorMat.map.repeat.set(FL_W/8,FL_L/8);floorMat.roughnessMap.repeat.set(FL_W/8,FL_L/8);
  const floor=add(new THREE.PlaneGeometry(FL_W,FL_L),floorMat,[0,0,FL_Z],[-Math.PI/2,0,0],{cast:false});floor.renderOrder=-2;skipInMirror.push(floor);
  const RUN_Z0=4.6,RUN_L=NZ1-1-RUN_Z0,units=Math.round(RUN_L/3.4);
- const inl=T(inlay(256*Q,512*Q,units,17));
+ const inl=T(maps('inlay',()=>({map:inlay(256*Q,512*Q,units,17)})).map);
  const inlayMat=keep(new THREE.MeshPhysicalMaterial({map:inl,roughness:.25,metalness:0,clearcoat:low?0:.6,clearcoatRoughness:.06,envMapIntensity:.5,transparent:!low,opacity:low?1:.86,
   polygonOffset:true,polygonOffsetFactor:-2}));
  const runner=add(new THREE.PlaneGeometry(3.4,RUN_L),inlayMat,[0,.003,RUN_Z0+RUN_L/2],[-Math.PI/2,0,0],{cast:false});runner.renderOrder=-1;skipInMirror.push(runner);
@@ -230,8 +262,9 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
  /* soft halo around each flame */
  const haloMat=keep(new THREE.SpriteMaterial({map:T(glowSprite(128,'rgba(255,170,90,.9)','rgba(255,120,50,.25)')),blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,fog:false}));
  const halos=flames.map(f=>{const s=new THREE.Sprite(haloMat);s.position.copy(f.p).add(new THREE.Vector3(0,f.s[1]*.35,0));const k=f.s[1]*2.6;s.scale.set(k,k,1);s.renderOrder=6;scene.add(s);noAO.push(s);return s;});
- /* real lights only for the torches that matter most (the light tier keeps the braziers and the bay piers) */
- const lightSpots=[...braziers.map(b=>({p:new THREE.Vector3(b[0],b[1]+2.9,b[2]),k:1.4})),...torchSpots.filter(t=>t.key).map(t=>({p:t.pos.clone().add(t.dir.clone().multiplyScalar(.25)).add(new THREE.Vector3(0,.5,0)),k:1}))].slice(0,low?4:10);
+ /* the wall torches' light is baked (torch-bake.js); the two braziers by the stair stay real lights */
+ const torchPoints=torchSpots.map(t=>t.pos.clone().add(t.dir.clone().multiplyScalar(.25)).add(new THREE.Vector3(0,.5,0)));
+ const lightSpots=braziers.map(b=>({p:new THREE.Vector3(b[0],b[1]+2.9,b[2]),k:1.4}));
  const torchLights=lightSpots.map((s,i)=>{const l=new THREE.PointLight(0xff9445,0,low?11:14,2);l.position.copy(s.p);l.userData={k:s.k,seed:i*1.7};scene.add(l);return l;});
 
  /* ---- sky, sun and moon ---- */
@@ -307,9 +340,9 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
   /* sun ↔ moon swap happens while the direct light is ~0 (elevation -2.5°), so the jump is invisible */
   if(s.moon!==hallState.moon){hallState.moon=s.moon;hallState.sunPos.copy(s.pos);}
   hallState.sunPos.lerp(s.pos,a).normalize();
-  hemi.color.copy(cur.sky);hemi.groundColor.copy(cur.gnd);hemi.intensity=hallState.skyI*(low?1.5:1);
+  hemi.color.copy(cur.sky);hemi.groundColor.copy(cur.gnd);hemi.intensity=hallState.skyI;
   /* the light tier has no shadows, so the sun would come through the roof: keep it to a soft key there */
-  sun.color.copy(cur.lc);sun.intensity=hallState.li*(low?.18:1);sun.position.copy(sun.target.position).addScaledVector(hallState.sunPos,90);
+  sun.color.copy(cur.lc);sun.intensity=hallState.li;sun.position.copy(sun.target.position).addScaledVector(hallState.sunPos,90);
   for(const m of glass)m.color.copy(cur.glass).multiplyScalar(hallState.gi);
   scene.fog.color.copy(cur.fog);scene.fog.density=hallState.fd;scene.background.copy(cur.fog);
   renderer.toneMappingExposure=hallState.exp;
@@ -324,10 +357,14 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
   /* torches */
   flameMat.uniforms.uOn.value=hallState.torch;haloMat.opacity=hallState.torch*.8;flameMesh.visible=hallState.torch>.01;halos.forEach(x=>x.visible=flameMesh.visible);}
  function update(time,dt,renderer){applyTime(dt,renderer);flameMat.uniforms.uTime.value=time;beams.children.forEach(b=>b.material.uniforms.uTime.value=time);
-  for(const l of torchLights){const f=.82+.12*Math.sin(time*7.3+l.userData.seed)+.06*Math.sin(time*17.1+l.userData.seed*3);l.intensity=hallState.torch*16*l.userData.k*f;}}
- function setShadows(on,size=4096){sun.castShadow=on;if(on){sun.shadow.mapSize.set(size,size);sun.shadow.map?.dispose();sun.shadow.map=null;}}
+  for(const l of torchLights){const f=.82+.12*Math.sin(time*7.3+l.userData.seed)+.06*Math.sin(time*17.1+l.userData.seed*3);l.intensity=hallState.torch*16*l.userData.k*f;}
+  hallState.flicker=.88+.07*Math.sin(time*6.1)+.05*Math.sin(time*13.7+1.3);}
+ /* the sun moves about 0.25° a minute: its shadow map is drawn again only after it has moved ~0.1° (or the moon took over) */
+ const shadowAt=new THREE.Vector3(),shadowState={dirty:true};
+ function setShadows(on,size=2048){sun.castShadow=on;if(on){sun.shadow.mapSize.set(size,size);sun.shadow.map?.dispose();sun.shadow.map=null;}shadowState.dirty=true;}
+ function shadowDirty(){if(shadowState.dirty||shadowAt.angleTo(hallState.sunPos)>.0018){shadowAt.copy(hallState.sunPos);shadowState.dirty=false;return true;}return false;}
  /* the glass and the flames must not throw shadows: daylight comes in through the windows */
  hall.traverse(o=>{if(o.isMesh&&glass.includes(o.material)){o.castShadow=false;}});
- return {hall,skipInMirror,noAO,floorMat,inlayMat,FL_W,FL_L,FL_Z,update,setShadows,sun,state:hallState,
+ return {hall,skipInMirror,noAO,floorMat,inlayMat,FL_W,FL_L,FL_Z,update,setShadows,shadowDirty,sun,state:hallState,torchPoints,
   shafts:Object.values(sets).flatMap(s=>s.beams),windows,colZ,hours:hoursNow};
 }
