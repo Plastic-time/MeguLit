@@ -166,7 +166,12 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
    /* 2026-11-15 (user: 石头门启动失败, Steam then asked to confirm 'mages_sgate'): a companion start with SteamAppId alone can still
       make steam_api call SteamAPI_RestartAppIfNecessary (exit 53), and Steam restarts it as steam://run/<id>//<args>, which always
       asks the user to confirm the arguments. The shadow folder with steam_appid.txt stops the restart, so companion starts use it too. */
-   let steamDirect=null;if(steamApp&&!textPath&&(companion||require('../core/glyph-dots.cjs').wanted(root))){try{steamDirect=require('../core/text-paths-launch.cjs').steamDirect({exe:game.executable,appid:steamAppid,trace});}catch(error){steamDirect=null;trace('steam-direct-failed',{error:String(error?.message||error).slice(0,160)});}}
+   /* 2026-11-21 (群友: BALDR SKY Steam 版打不开) a part of the work in a subfolder (Dive1\BaldrSky.exe, same name as the install
+      root's BaldrSky.exe): Steam's only launch option starts the root program, never the part, so steam:// started the other
+      game and the launch waited for a window that never came. A part is started directly from the install root (its folder
+      has neither steam_api.dll nor the shared archives), through the shadow with steam_appid.txt like a companion start. */
+   const part=steamApp&&!textPath?require('../core/steam-owned.cjs').partOf(game.executable):null;if(part)trace('steam-part',{folder:part.folder});
+   let steamDirect=null;if(steamApp&&!textPath&&(companion||part||require('../core/glyph-dots.cjs').wanted(root))){try{steamDirect=require('../core/text-paths-launch.cjs').steamDirect({exe:game.executable,appid:steamAppid,base:part?part.root:null,trace});}catch(error){steamDirect=null;trace('steam-direct-failed',{error:String(error?.message||error).slice(0,160)});}}
    const steam=steamApp&&!companion&&!textPath&&!steamDirect;
    const launchExe=steamDirect?steamDirect.exe:game.executable;
    const {startProcess,waitForVisibleGame}=require('./game-readiness.cjs');
@@ -184,7 +189,10 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
    /* Steam may start another program in the install folder than the one on record (Summer Pockets: the library has
       SummerPocketsRB.exe, Steam runs SiglusEngine_Steam.exe; user 2026-11-09: the game was up and MeguLit said the launch
       failed). For Steam launches a game process from any program in that folder counts. */
-   const siblings=steam?(()=>{try{return fs.readdirSync(path.dirname(game.executable)).filter(f=>/\.exe$/i.test(f)&&!/^(unins|setup|install|config|crash|unitycrash|vc_?redist|dxsetup|launcher)/i.test(f)).map(f=>path.join(path.dirname(game.executable),f)).filter(f=>f.toLowerCase()!==game.executable.toLowerCase()&&fs.statSync(f).size>200000).slice(0,8);}catch{return [];}})():[];
+   /* 2026-11-21 (BALDR SKY Steam) the whole install tree, not only the record's folder: the root program and the parts in its
+      subfolders, also for direct starts, since steam_api's restart (exit 53) runs Steam's own launch option
+      (core/steam-owned.cjs installPrograms; it replaces the same-folder list, which it contains). */
+   const siblings=steamApp&&!textPath?(()=>{try{return require('../core/steam-owned.cjs').installPrograms(game.executable);}catch{return [];}})():[];
    const anyProcess=async()=>{const own=await gameProcesses(root,game.executable);if(!own.length&&textPath&&textPath.exe!==game.executable){const shadow=await gameProcesses(root,textPath.exe).catch(()=>[]);if(shadow.length)return shadow;}if(!own.length&&steamDirect?.shadow){const shadow=await gameProcesses(root,steamDirect.exe).catch(()=>[]);if(shadow.length)return shadow;}if(own.length||!siblings.length)return own;for(const exe of siblings){const found=await gameProcesses(root,exe).catch(()=>[]);if(found.length){trace('steam-runs-other-program',{exe:path.basename(exe)});return found;}}return own;};
    /* E303: Steam may prepare a first start (cloud sync, install scripts) for longer than 15 s; wait up to 45 s for its window. */
    const startedAt=Date.now();

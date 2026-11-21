@@ -30,4 +30,20 @@ function launchAppid(exe,profile={}){
 function launcherExes(exe){const dir=path.dirname(path.resolve(String(exe||'')));let names=[];try{names=fs.readdirSync(dir);}catch{}
  return names.filter(n=>/\.exe$/i.test(n)&&/^(launcher|config|setting|startup|start)/i.test(n)&&n.toLowerCase()!==path.basename(String(exe)).toLowerCase()).map(n=>path.join(dir,n));}
 async function launchersRunning(exe,list){const out=[];for(const f of launcherExes(exe)){try{if((await list(f)).length)out.push(f);}catch{}}return out;}
-module.exports={steamOf,launchAppid,launcherExes,launchersRunning,_internal:{cache}};
+/* 2026-11-21 (BALDR SKY Steam: Dive1\BaldrSky.exe beside the root BaldrSky.exe) the install root of a Steam game:
+   <library>\steamapps\common\<installdir>, or '' when the program is not under one. */
+function installRoot(exe){const m=/^(.*[\\/]steamapps[\\/]common[\\/][^\\/]+)[\\/]/i.exec(path.resolve(String(exe||'')));return m?m[1]:'';}
+/* The program is a part of the work in a subfolder (same file name as the install root's program): Steam's launch option starts
+   the root one, so a part is started directly, from the install root (its folder has neither steam_api nor the archives). */
+function partOf(exe){const root=installRoot(exe);if(!root)return null;const file=path.resolve(String(exe)),dir=path.dirname(file);if(dir.toLowerCase()===root.toLowerCase())return null;
+ const main=path.join(root,path.basename(file));try{if(!fs.statSync(main).isFile())return null;}catch{return null;}return {root,main,folder:path.relative(root,dir)};}
+/* Every program a Steam start of this game may end in: the install root's and its subfolders' (one level) game programs.
+   Steam starts its own launch option, which can be another program or folder than the record (Summer Pockets, BALDR SKY
+   Dive1), and steam_api's restart (exit 53) starts that one too. */
+const NOT_GAME=/^(unins|setup|install|config|crash|unitycrash|vc_?redist|dxsetup|launcher|startuptool|steamerrorreporter|dotnet|redist)/i;
+const NOT_DIR=/^(_commonredist|redist|directx|dotnet|vcredist|save|savedata|manual|movie|ost|soundtrack)$/i;
+function installPrograms(exe,{limit=12}={}){const root=installRoot(exe)||path.dirname(path.resolve(String(exe||'')));const out=[],own=path.resolve(String(exe||'')).toLowerCase();
+ const add=dir=>{let names=[];try{names=fs.readdirSync(dir);}catch{return;}for(const f of names){if(out.length>=limit)return;const file=path.join(dir,f);if(!/\.exe$/i.test(f)||NOT_GAME.test(f)||file.toLowerCase()===own)continue;try{if(fs.statSync(file).size>200000)out.push(file);}catch{}}};
+ add(root);let subs=[];try{subs=fs.readdirSync(root,{withFileTypes:true}).filter(d=>d.isDirectory()&&!NOT_DIR.test(d.name)).map(d=>path.join(root,d.name));}catch{}for(const d of subs)add(d);
+ return out;}
+module.exports={steamOf,launchAppid,launcherExes,launchersRunning,installRoot,partOf,installPrograms,_internal:{cache}};

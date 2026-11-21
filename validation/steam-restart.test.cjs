@@ -43,7 +43,10 @@ test('companion start goes through the steam_appid.txt shadow; game folder untou
 });
 test('launch: companion uses the shadow, exit 53 waits for Steam instead of a locale retry, Steam prompts are named',()=>{
  const src=fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8');
- assert.match(src,/let steamDirect=null;if\(steamApp&&!textPath&&\(companion\|\|require\('\.\.\/core\/glyph-dots\.cjs'\)\.wanted\(root\)\)\)\{/);
+ assert.match(src,/let steamDirect=null;if\(steamApp&&!textPath&&\(companion\|\|part\|\|require\('\.\.\/core\/glyph-dots\.cjs'\)\.wanted\(root\)\)\)\{/);
+ /* 2026-11-21 a part of the work in a subfolder (BALDR SKY Dive1) starts from the install root, and the wait follows the whole install tree */
+ assert.match(src,/steamDirect\(\{exe:game\.executable,appid:steamAppid,base:part\?part\.root:null,trace\}\)/);
+ assert.match(src,/const siblings=steamApp&&!textPath\?\(\(\)=>\{try\{return require\('\.\.\/core\/steam-owned\.cjs'\)\.installPrograms\(game\.executable\)/);
  const i=src.indexOf("if(error.message==='GAME_PROCESS_EXITED'&&steamApp&&restart.restarted(child.exit)){"),j=src.indexOf("trace('locale-fallback'");
  assert.ok(i>0&&j>i,'restart branch before the locale retry');
  assert.match(src.slice(i,j),/waitForVisibleGame\(anyProcess,\{helper:true,indirect:true,exit:\(\)=>null,trace,attempts:480,timeout:120000\}\)/);
