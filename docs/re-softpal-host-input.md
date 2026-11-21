@@ -34,7 +34,8 @@ The old `strcpy` could write beyond the only known capacity, the original NUL-te
 
 `PalTextBounds.h` now owns the bounded split and replacement rules
 The Pal callback copies at most 32768 bytes plus one terminating-byte check into a per-thread fixed snapshot
-Malformed, unreadable, empty or over-limit inputs are rejected without exposing a partial source to embedding
+Unreadable, empty or over-limit spans are rejected without exposing a partial source to embedding
+Incomplete color tags remain ordinary bytes, preserving the previous parsing behavior; this helper does not validate a markup grammar
 The snapshot includes the original pointer, byte sequence and color-wrapper span
 After the embed wait, write-back consumes this snapshot once and requires the same pointer and unchanged original bytes
 It preserves the color prefix and suffix, rejects embedded NUL, overlap and growth beyond the original body, and terminates within the original span
