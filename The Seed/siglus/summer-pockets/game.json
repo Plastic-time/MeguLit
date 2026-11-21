@@ -1,0 +1,66 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "a3ad8f6593e88fb76280b06c1751a4c4d0dbc5a298eb3b3cc1a0d071857ca19f",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "siglus",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "bdf43cb0571e854968e18a8bf88c042b36c37d7c9d65b2f21f27681b34dee70c",
+  "script": "9bfa0e971183a646479082d6d9cdfa5f7e54c61c6bd4ae3bd0276d609b98299b",
+  "title": "3da6ccdfd752ee583eb9a0ce96697eb06266f43d3f1c5c2e54c37d2039206f93",
+  "steam": "897220",
+  "vndb": "v20424"
+ },
+ "status": "skeleton",
+ "slug": "summer-pockets",
+ "builds": [
+  "c9c5d963570f417620a445828c8c66a12718430726e81ad8b7e5d2f4fd0f392a"
+ ]
+}

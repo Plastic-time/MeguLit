@@ -1,0 +1,64 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "7e27e9fe3f3a8ba395b268036eb47ac62797de7ba6aeb22d8abab7ece997c989",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "bruns",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "31cfb428c04068aeef5ba1c5a3320fdd003d45be95d7869425326acde33b7389",
+  "title": "abb29c0dc5b1399e67a778addb4c0a8aa090dfdc914da1768524e413e1caa9b5",
+  "vndb": "v3030"
+ },
+ "status": "skeleton",
+ "slug": "dustmania-grotesque",
+ "builds": [
+  "3aa85167bbf9729e6db9cc73279dda8a3412c699b2f95fb97cce549e76e6418d"
+ ]
+}

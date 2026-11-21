@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "8bccd5415151accc86f2f6e093b45fac29da2a7bfdf06df953e62edf5b17c5be",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "hide": {
+   "engineTrial": {
+    "enabled": null,
+    "unconfirmedLines": null,
+    "clickMs": null,
+    "skipAside": null
+   }
+  },
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "manosaba.exe",
+ "engine": "unity",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "8bccd5415151accc86f2f6e093b45fac29da2a7bfdf06df953e62edf5b17c5be",
+  "head": "0d3559a0b67fb8674d9dc7a7ddc1c741b9238d5121480b3a0750bad8af3fa865",
+  "pe": "6000.0.48.3365@68092769"
+ }
+}

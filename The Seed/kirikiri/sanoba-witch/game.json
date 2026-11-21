@@ -1,0 +1,65 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "5feba0bf64297d8bdad6c7f9f1ef87611d4a7a2c069686d9606d41ab68e0312e",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "5f175023fb518cdd1ed14589345a059036d02b13646ae0563b278b7f8b6c545b",
+  "script": "52d7f8fe1430b00b7d4fbf290636a4ebec25c2d5c4c3216e38dcd89d080dc731",
+  "title": "643b799c1c9e561d02e7ca0f754baec7592507ec72ae73960b6fe28a5227cdaf",
+  "vndb": "v16044"
+ },
+ "status": "skeleton",
+ "slug": "sanoba-witch",
+ "builds": [
+  "dce3f8501c3f9cacd50cf39eb090a44207aedd8754f0aee1aa88c95c200fc2ba"
+ ]
+}

@@ -1,0 +1,64 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "78ce2c13a9bbbc29fbb40eb20a6c2b4ab991498daadbf0239c519667b73b9d13",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "cmvs",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "title": "24b322bff9ac68c5d201f8a053bbe3df8495a1fb5db984aafca57e5cfc931fc8",
+  "steam": "2741260",
+  "vndb": "v21523"
+ },
+ "status": "skeleton",
+ "slug": "aoi-tori",
+ "builds": [
+  "3a2ec3af6a16a4f36d72faf9e7cb14e2bcc883fbf22fb31da5d69434cc53727e"
+ ]
+}

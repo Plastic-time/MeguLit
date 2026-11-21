@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "116a1b6ab5902bb6dc49e25086b1ef6f07d941dbb090b497fb7a158e997dea2d",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "hide": {
+   "engineTrial": {
+    "enabled": null,
+    "unconfirmedLines": null,
+    "clickMs": null,
+    "skipAside": null
+   }
+  },
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "SiglusEngine_Steam.exe",
+ "engine": "siglus",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "116a1b6ab5902bb6dc49e25086b1ef6f07d941dbb090b497fb7a158e997dea2d",
+  "head": "27c87e4242516f33d2b85f686732880f351a442b905eda7cfd88fed46cd9c2e6",
+  "pe": "1.1.134.0@5b3ecb72"
+ }
+}
