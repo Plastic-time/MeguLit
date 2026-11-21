@@ -54,10 +54,14 @@ test('PAZ: space-delimited messages keep empty columns, speaker names, voices an
  assert.deepStrictEqual(result.voices,[null,null,'v001',null,null,null,'v002']);
 });
 
-test('PAZ: a different command cannot turn an English script into a Japanese scene',()=>{
+test('PAZ: a different command cannot turn an English script into a Japanese scene',t=>{
  const english=Array(30).fill('.message 10   Hello there.').join('\n');
  const other=Buffer.concat([Buffer.from('\n.messageColor\t1\t\t\t'),Buffer.from([0x82,0xd0])]);
- assert.deepStrictEqual(paz.parse(Buffer.concat([Buffer.from(english),other])).lines,[]);
+ const body=Buffer.concat([Buffer.from(english),other]);
+ assert.deepStrictEqual(paz.parse(body).lines,[]);
+ const dir=tmp('paz-language-');t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ fs.writeFileSync(path.join(dir,'scr.paz'),pazFile('some_build',schemes['eden* [English Steam]'],'scr',{'sample.sc':body}));
+ assert.strictEqual(paz.engine.unsupported(dir),'PAZ_ENGLISH_ONLY');
 });
 
 test('PAZ: padding before the first tab keeps a tab-delimited message intact',()=>{
