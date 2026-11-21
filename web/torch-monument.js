@@ -24,18 +24,21 @@ import {loadBaked,bakedAO,computeVolumes,applyAO} from './torch-bake.js';
 import {VolumetricPass} from './torch-volumetric.js';
 import {loadGsap} from './gsap-loader.js';
 
+/* 2026-11-21 店主: 匿名的传火人用大写数字（传火人壹、贰、叁）；创始编号 #0 是店主 */
+const cnNo=n=>{n=Math.floor(Number(n)||0);if(n<=0)return "零";const D="零壹贰叁肆伍陆柒捌玖",U=["","拾","佰","仟"],B=["","万","亿","万亿"];const sec=p=>{let o="",z=false;for(let i=3;i>=0;i--){const x=Math.floor(p/10**i)%10;if(x){if(z&&o)o+="零";o+=D[x]+U[i];z=false;}else z=true;}return o;};const parts=[];for(let i=0;n>0;i++){parts.unshift([n%10000,i]);n=Math.floor(n/10000);}let out="",gap=false;for(const [p,i] of parts){if(!p){if(out)gap=true;continue;}if(out&&(gap||p<1000))out+="零";out+=sec(p)+B[i];gap=false;}return out;};
+const cnParse=q=>{const D="零壹贰叁肆伍陆柒捌玖",U={"拾":10,"佰":100,"仟":1000},B={"万":1e4,"亿":1e8};if(!/^[零壹贰叁肆伍陆柒捌玖拾佰仟万亿]+$/.test(q))return null;let total=0,sec=0,d=0;for(const c of q){const v=D.indexOf(c);if(v>=0){d=v;continue;}if(U[c]){sec+=(d||1)*U[c];d=0;continue;}if(B[c]){total=(total+sec+d)*B[c];sec=0;d=0;}}return total+sec+d;};
 const COPY={
  zh:{title:'传火碑',sub:'分享过校准结果的玩家，名字都刻在这里',count:n=>'已刻 '+n+' 人',monthCount:(m,n)=>m+' · '+n+' 人',range:(a,b)=>'第 '+a+'–'+b+' 位',all:'全部',
-  anon:n=>'传火人 #'+n,empty:'还没有人刻下名字',find:'找名字',findGo:'查找',me:'我的名字',meNone:'这台电脑还没有传过火',quality:{high:'画质 标准',low:'画质 省电'},
-  close:'关闭',prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',loading:'正在读取…',preparing:'正在准备殿堂…',nth:n=>'第 '+n+' 位',more:'只显示前 50 个',
+  anon:n=>'传火人'+cnNo(n),empty:'还没有人刻下名字',find:'找名字',findGo:'查找',me:'我的名字',meNone:'这台电脑还没有传过火',quality:{high:'画质 标准',low:'画质 省电'},
+  close:'关闭',prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',loading:'正在读取…',preparing:'正在准备殿堂…',nth:n=>n===0?'创始':'第 '+n+' 位',more:'只显示前 50 个',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')},
  en:{title:'Monument',sub:'Everyone who shared a calibration is carved here',count:n=>n+' names',monthCount:(m,n)=>m+' · '+n,range:(a,b)=>'#'+a+'–'+b,all:'All',
   anon:n=>'Torch bearer #'+n,empty:'No names carved yet',find:'Find a name',findGo:'Find',me:'My name',meNone:'This PC has not shared yet',quality:{high:'Quality: full',low:'Quality: light'},
-  close:'Close',prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',loading:'Loading…',preparing:'Preparing the hall…',nth:n=>'#'+n,more:'First 50 only',
+  close:'Close',prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',loading:'Loading…',preparing:'Preparing the hall…',nth:n=>n===0?'Founder':'#'+n,more:'First 50 only',
   ym:m=>m},
  ja:{title:'継火の碑',sub:'キャリブレーションを共有した人の名前が刻まれています',count:n=>n+' 名',monthCount:(m,n)=>m+' · '+n+' 名',range:(a,b)=>a+'–'+b+' 番目',all:'すべて',
   anon:n=>'火を継ぐ人 #'+n,empty:'まだ誰の名前も刻まれていません',find:'名前を探す',findGo:'探す',me:'自分の名前',meNone:'この PC からはまだ共有していません',quality:{high:'画質 標準',low:'画質 軽量'},
-  close:'閉じる',prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',loading:'読み込み中…',preparing:'聖堂を準備しています…',nth:n=>n+' 番目',more:'最初の 50 件のみ',
+  close:'閉じる',prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',loading:'読み込み中…',preparing:'聖堂を準備しています…',nth:n=>n===0?'創始':n+' 番目',more:'最初の 50 件のみ',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')}};
 const QUALITY_KEY='megulit-torch-quality';
 const FONT='"Torch Serif","Noto Serif SC","Source Han Serif SC","Noto Serif JP","Songti SC","SimSun","Yu Mincho",serif';
@@ -83,16 +86,16 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
   state.atStart=!cursor||cursor==='0'||!state.items.length;return true;}
  async function ahead(){if(state.loading||!state.next||state.off+state.fit+60<state.items.length)return;state.loading=true;
   const r=await call('torch_page',{month:state.month,cursor:state.next,limit:PAGE});state.loading=false;if(disposed||!r?.ok)return;
-  const last=state.items.length?state.items[state.items.length-1].torchNo:0;state.items.push(...(r.items||[]).filter(i=>i.torchNo>last));state.next=r.next;
+  const last=state.items.length?state.items[state.items.length-1].torchNo:-1;state.items.push(...(r.items||[]).filter(i=>i.torchNo>last));state.next=r.next;
   if(state.items.length>KEEP&&state.off>PAGE){state.items.splice(0,PAGE);state.off-=PAGE;state.atStart=false;}}
- async function behind(){if(state.loading||state.atStart||!state.items.length)return 0;const first=state.items[0].torchNo;if(first<=1){state.atStart=true;return 0;}
-  state.loading=true;const r=await call('torch_page',{month:state.month,cursor:String(Math.max(0,first-1-PAGE)),limit:PAGE});state.loading=false;if(disposed||!r?.ok)return 0;
+ async function behind(){if(state.loading||state.atStart||!state.items.length)return 0;const first=state.items[0].torchNo;if(first<=0){state.atStart=true;return 0;}
+  state.loading=true;const r=await call('torch_page',{month:state.month,cursor:first-1-PAGE>0?String(first-1-PAGE):'',limit:PAGE});state.loading=false;if(disposed||!r?.ok)return 0;
   const add=(r.items||[]).filter(i=>i.torchNo<first);if(!add.length){state.atStart=true;return 0;}state.items.unshift(...add);state.off+=add.length;
   if(first-1-PAGE<=0)state.atStart=true;
   if(state.items.length>KEEP){const cut=state.items.length-KEEP;state.items.splice(KEEP,cut);state.next=String(state.items[state.items.length-1].torchNo);}
   return add.length;}
  async function jumpTo(item){if(!item)return;const month=state.monthsOn&&item.month?item.month:'';state.focusNo=item.torchNo;
-  const ok=await loadAt({month,cursor:String(Math.max(0,item.torchNo-80))});if(!ok)return;
+  const ok=await loadAt({month,cursor:item.torchNo-80>0?String(item.torchNo-80):''});if(!ok)return;
   if(state.items.length&&item.torchNo-80>0)state.atStart=false;
   const idx=state.items.findIndex(i=>i.torchNo===item.torchNo);
   if(idx<0){state.focusNo=0;}else{const half=Math.floor((state.fit||160)/2);state.off=Math.max(0,idx-half);layoutNow();
@@ -162,6 +165,7 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
  const results=$('.tm-results');
  $('.tm-find').addEventListener('submit',async e=>{e.preventDefault();const q=$('.tm-find input').value.trim();results.hidden=true;if(!q)return;
   const no=/^(?:传火人|火を継ぐ人|torch bearer)?\s*#?\s*(\d{1,12})$/i.exec(q);if(no){jumpTo({torchNo:Number(no[1]),month:''});return;}
+  const cn=/^(?:传火人)?\s*([零壹贰叁肆伍陆柒捌玖拾佰仟万亿]+)$/.exec(q),cnv=cn?cnParse(cn[1]):null;if(cnv!==null){jumpTo({torchNo:cnv,month:''});return;}
   const r=await call('torch_find',{name:q});if(disposed)return;const list=r?.items||[];
   if(!list.length){toast(t.none);return;}if(list.length===1){jumpTo(list[0]);return;}
   results.innerHTML=list.map((it,i)=>`<li><button type="button" data-i="${i}"><b>${esc(it.name||t.anon(it.torchNo))}</b><span>${esc(dateText(it.at,true))} · ${esc(t.nth(it.torchNo))}</span></button></li>`).join('')+(list.length>=50?`<li class="tm-results-more">${esc(t.more)}</li>`:'');
