@@ -38,17 +38,17 @@ async function moegirlIntro(fetcher,info,timeout){const names=[...new Set([info.
   const order=t=>{const k=names.findIndex(n=>n.toLowerCase()===String(t).toLowerCase());return k<0?99:k;};pages.sort((a,b)=>order(a.title)-order(b.title));
   const page=pages[0];if(!page)return null;const text=intro(page.extract);return text?{title:String(page.title).slice(0,120),intro:text,url:'https://zh.moegirl.org.cn/'+encodeURIComponent(String(page.title).replace(/ /g,'_'))}:null;}catch{return null;}}
 /* what the page gets: the VNDB answer, with Moegirlpedia's introduction and page link in the Chinese UI when it has one */
-function view(info,locale){if(!info)return null;if(locale!=='zh'||!info.zh)return info;
+function view(info,moegirl){if(!info)return null;if(!moegirl||!info.zh)return info;
  return {...info,intro:info.zh.intro,source:'moegirl',links:info.links.map(l=>l.kind==='moegirl'?{kind:'moegirl',url:info.zh.url}:l)};}
 /* -> {pid,name,original,intro,source,links:[{kind,url}]} or null; a stale answer is returned when the ask fails */
-async function producer(root,pid,{fetch:fetcher=globalThis.fetch,now=Date.now(),timeout=TIMEOUT,locale=''}={}){
+async function producer(root,pid,{fetch:fetcher=globalThis.fetch,now=Date.now(),timeout=TIMEOUT,locale='',moegirl=locale==='zh'}={}){
  if(!PID.test(String(pid||'')))return null;const c=readCache(root),e=c.p[pid];
- if(e&&now-e.at<(e.miss?MISS:FRESH)){if(e.miss)return null;if(locale==='zh'&&e.info.zh===undefined&&fetcher){e.info.zh=await moegirlIntro(fetcher,e.info,timeout);writeCache(root,c);}return view(e.info,locale);}
- if(!fetcher||now-c.failedAt<RETRY)return e&&!e.miss?view(e.info,locale):null;
+ if(e&&now-e.at<(e.miss?MISS:FRESH)){if(e.miss)return null;if(moegirl&&e.info.zh===undefined&&fetcher){e.info.zh=await moegirlIntro(fetcher,e.info,timeout);writeCache(root,c);}return view(e.info,moegirl);}
+ if(!fetcher||now-c.failedAt<RETRY)return e&&!e.miss?view(e.info,moegirl):null;
  try{const r=await fetcher('https://api.vndb.org/kana/producer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filters:['id','=',pid],fields:'name,original,aliases,description,extlinks.url,extlinks.name',results:1}),signal:AbortSignal.timeout(timeout)});
   if(!r.ok)throw Error('VNDB_HTTP_'+r.status);const j=await r.json();if(!Array.isArray(j?.results))throw Error('VNDB_BAD_ANSWER');
-  const x=j.results[0];c.failedAt=0;c.p[pid]=plain(x)?{at:now,info:build(pid,x)}:{at:now,miss:true};if(!c.p[pid].miss&&locale==='zh')c.p[pid].info.zh=await moegirlIntro(fetcher,c.p[pid].info,timeout);writeCache(root,c);return c.p[pid].miss?null:view(c.p[pid].info,locale);}
- catch{c.failedAt=now;try{writeCache(root,c);}catch{}return e&&!e.miss?view(e.info,locale):null;}}
+  const x=j.results[0];c.failedAt=0;c.p[pid]=plain(x)?{at:now,info:build(pid,x)}:{at:now,miss:true};if(!c.p[pid].miss&&moegirl)c.p[pid].info.zh=await moegirlIntro(fetcher,c.p[pid].info,timeout);writeCache(root,c);return c.p[pid].miss?null:view(c.p[pid].info,moegirl);}
+ catch{c.failedAt=now;try{writeCache(root,c);}catch{}return e&&!e.miss?view(e.info,moegirl):null;}}
 /* open one link of the cached answer in the system browser (never in the app) */
 function open(root,pid,kind,{spawnFn=spawn}={}){const e=PID.test(String(pid||''))&&readCache(root).p[pid];const link=e&&!e.miss&&e.info.links.find(l=>l.kind===kind);if(!link)throw Error('INVALID_LINK');
  const u=new URL(link.url);if(!/^https?:$/.test(u.protocol)||u.username||u.password)throw Error('INVALID_LINK');

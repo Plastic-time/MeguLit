@@ -412,7 +412,7 @@ async function dispatch(request,runtime=null) {
       case 'nsfw_state':return await require('./nsfw.cjs').state(db,root,{wait:request.wait===true});
       case 'seed_catalog':return await require('./seed-catalog.cjs').catalog(root); /* The Seed catalog page: the seeded games with VNDB names and developers */
       case 'seed_logo':return await require('./seed-logo.cjs').logo(root,String(request.pid||''));
-      case 'seed_producer':return await require('./seed-producer.cjs').producer(root,String(request.pid||''),{locale:String(request.locale||'')});
+      case 'seed_producer':return await require('./seed-producer.cjs').producer(root,String(request.pid||''),{moegirl:require('./info-source.cjs').forRoot(root,String(request.locale||''))});
       case 'seed_producer_open':return require('./seed-producer.cjs').open(root,String(request.pid||''),String(request.kind||''));
       case 'seed_cover':return await require('./seed-catalog.cjs').cover(root,String(request.vndb||''),{nsfw:request.nsfw===true});
       case 'feedback_send':return require('./feedback.cjs').send(root,{kind:String(request.kind||''),text:String(request.text||''),contact:String(request.contact||''),lang:String(request.lang||'zh'),version:String(request.version||'')}); /* E394 in-app feedback through the relay */

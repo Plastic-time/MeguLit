@@ -340,7 +340,7 @@ async function bangumi(titles){
 }
 async function vndbText(id,titles){
  let filters=id?['id','=',/^v/i.test(id)?id:'v'+id]:null;if(!filters){for(const t of titles){const vn=await vndb(t,true);if(vn){filters=['id','=',vn.id];break;}}}if(!filters)return '';
- try{const r=await fetch('https://api.vndb.org/kana/vn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filters,fields:'description,alttitle'}),signal:AbortSignal.timeout(9000)});if(!r.ok)return '';const v=(await r.json()).results?.[0];return {text:clean(v?.description||''),alttitle:v?.alttitle||''};}catch{return '';}
+ try{const r=await fetch('https://api.vndb.org/kana/vn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filters,fields:'description,alttitle,title,titles.title,aliases'}),signal:AbortSignal.timeout(9000)});if(!r.ok)return '';const v=(await r.json()).results?.[0];return {text:clean(v?.description||''),alttitle:v?.alttitle||'',names:[v?.title,v?.alttitle,...(v?.titles||[]).map(x=>x.title),...(v?.aliases||[])].filter(x=>typeof x==='string'&&x)};}catch{return '';}
 }
 // Machine translation for a language no source has (free Google endpoint, kept apart from the dialogue translator so
 // a synopsis never becomes context for the next game line).
@@ -351,8 +351,17 @@ async function machine(text,lang,source='auto'){
   return output.join('\n');
  }catch{return '';}
 }
+const MOEGIRL_SOURCE='萌娘百科 · CC BY-NC-SA 3.0';
+/* the opening of a Moegirlpedia page for one of the titles (the MediaWiki "extracts" API; redirects followed, a disambiguation page or a stub is no synopsis) */
+async function moegirlText(titles,{fetcher=globalThis.fetch,timeout=8000}={}){
+ const names=[...new Set((titles||[]).map(t=>String(t||'').replace(/^(\s*\[[^\]]*\])+\s*/,'').trim()).filter(t=>t&&t.length<=120))].slice(0,6);if(!names.length||!fetcher)return null;
+ try{const r=await fetcher('https://zh.moegirl.org.cn/api.php?action=query&format=json&prop=extracts&exintro=1&explaintext=1&redirects=1&titles='+names.map(encodeURIComponent).join('%7C'),{headers:{'user-agent':'MeguLit',accept:'application/json'},signal:AbortSignal.timeout(timeout)});
+  if(!r.ok)return null;const j=await r.json();const pages=Object.values(j?.query?.pages||{}).filter(p=>p&&p.ns===0&&typeof p.extract==='string'&&p.extract.trim().length>=40&&!/消歧义|可以指|可能指|可能是指/.test(p.extract.slice(0,200)));
+  const rank=p=>{const k=names.findIndex(n=>n.toLowerCase()===String(p.title).toLowerCase());return k<0?99:k;};pages.sort((x,y)=>rank(x)-rank(y));const page=pages[0];if(!page)return null;
+  const text=page.extract.split(String.fromCharCode(10)).map(x=>x.split(String.fromCharCode(9)).join(' ').trim()).filter(Boolean).slice(0,3).join(String.fromCharCode(10,10)).slice(0,1500).trim();return text.length>=40?{text,title:String(page.title)}:null;}catch{return null;}
+}
 class Synopses{
- constructor(layout,options={}){this.lookup=options.lookup||vndbText;this.translate=options.translate||machine;this.file=path.join(layout.config,'synopsis.json');try{this.cache=JSON.parse(fs.readFileSync(this.file,'utf8'))||{};}catch{this.cache={};}this.running=new Map();}
+ constructor(layout,options={}){this.lookup=options.lookup||vndbText;this.moegirl=options.moegirl||moegirlText;this.translate=options.translate||machine;this.file=path.join(layout.config,'synopsis.json');try{this.cache=JSON.parse(fs.readFileSync(this.file,'utf8'))||{};}catch{this.cache={};}this.running=new Map();}
  write(){try{fs.writeFileSync(this.file+'.tmp',JSON.stringify(this.cache,null,1));fs.renameSync(this.file+'.tmp',this.file);}catch{}}
  // {mediaId,titles[],vndbId,appid,lang,refresh} -> {text,lang,source,fresh}
  async get(a){
@@ -360,21 +369,26 @@ class Synopses{
    if(a.appid&&entry?.steamIdentity!==String(a.appid)+':'+(a.vndbId||''))entry=null;
   // A language that could not be translated last time (offline, rate limited) is retried after ten minutes, not a day.
   const missing=entry&&!entry[lang]&&Date.now()-(entry.at||0)>600000;
-  if(a.refresh||!entry||missing||entry.policy!==2||Date.now()-(entry.at||0)>86400000){if(!this.running.has(id))this.running.set(id,this.fetch(a).finally(()=>this.running.delete(id)));entry=await this.running.get(id)||entry;}
+  if(a.refresh||!entry||missing||entry.policy!==2||entry.mg!==1||Date.now()-(entry.at||0)>86400000){if(!this.running.has(id))this.running.set(id,this.fetch(a).finally(()=>this.running.delete(id)));entry=await this.running.get(id)||entry;}
   if(!entry)return {text:'',lang,source:''};
+   if(a.moegirl&&entry.moegirl?.text&&require('./synopsis-policy.cjs').approved(entry.moegirl.src))return {text:entry.moegirl.text,lang:'zh',source:entry.moegirl.src};
   const order={zh:['zh','ja','en'],en:['en','zh','ja'],ja:['ja','zh','en']}[lang];for(const l of order)if(entry[l]&&require('./synopsis-policy.cjs').approved(entry.src?.[l]))return {text:entry[l],lang:l,source:entry.src?.[l]||''};return {text:'',lang,source:''};
  }
  async fetch(a){
-   const titles=[...new Set((a.titles||[]).map(String).filter(Boolean))],out={at:Date.now(),policy:2,src:{}};
+   const titles=[...new Set((a.titles||[]).map(String).filter(Boolean))],out={at:Date.now(),policy:2,mg:1,src:{}};
    if(a.appid)out.steamIdentity=String(a.appid)+':'+(a.vndbId||'');
    const cached=this.cache[String(a.mediaId)]||{},old=a.appid&&cached.steamIdentity!==out.steamIdentity?{}:cached;
   const put=(l,text,src)=>{if(text&&!out[l]){out[l]=text;out.src[l]=src;}};
    const v=a.appid&&!a.vndbId?null:await this.lookup(a.vndbId,a.appid?[]:titles);if(v?.text){put('en',v.text.slice(0,20000),'VNDB');if(v.alttitle)titles.push(v.alttitle);}
+   /* 2026-11-21 (owner: 作品简介也用萌娘百科) the Chinese synopsis is the Moegirlpedia page's own opening when the work has one there (CC BY-NC-SA 3.0, source named); only then the machine translation below */
+   /* kept in its own slot (the UI language does not decide which source is shown: the info-source setting does) */
+   if(v?.names)titles.push(...v.names);const mg=await this.moegirl(titles);if(mg?.text)out.moegirl={text:mg.text,src:MOEGIRL_SOURCE,title:mg.title};
   // A language still missing is machine-translated from the best text found (the original Japanese first).
   await Promise.all([['zh',['ja','en']],['en',['ja','zh']],['ja',['zh','en']]].map(async([l,from])=>{if(out[l]||(old[l]&&require('./synopsis-policy.cjs').approved(old.src?.[l])&&!/机翻|MT/.test(old.src[l])))return;const f=from.find(x=>out[x]&&!/机翻/.test(out.src[x]||''));if(!f)return;const text=await this.translate(out[f],l,f);if(text&&text.trim()!==out[f].trim())put(l,text,out.src[f]+' · 机翻');}));
   // Keep what an earlier fetch found for a language this one could not reach (offline, rate limits).
+   if(!out.moegirl&&old.moegirl?.text)out.moegirl=old.moegirl;
   for(const l of ['zh','en','ja'])if(!out[l]&&old[l]&&require('./synopsis-policy.cjs').approved(old.src?.[l])){out[l]=old[l];out.src[l]=old.src?.[l]||'';}
-   if(!out.zh&&!out.en&&!out.ja&&!a.appid)return Object.keys(old.src||{}).some(l=>require('./synopsis-policy.cjs').approved(old.src[l]))?old:null;if(!fs.existsSync(this.file+'.pre-vndb.json')&&fs.existsSync(this.file))fs.copyFileSync(this.file,this.file+'.pre-vndb.json');this.cache[String(a.mediaId)]=out;this.write();return out;
+   if(!out.zh&&!out.en&&!out.ja&&!out.moegirl&&!a.appid)return Object.keys(old.src||{}).some(l=>require('./synopsis-policy.cjs').approved(old.src[l]))?old:null;if(!fs.existsSync(this.file+'.pre-vndb.json')&&fs.existsSync(this.file))fs.copyFileSync(this.file,this.file+'.pre-vndb.json');this.cache[String(a.mediaId)]=out;this.write();return out;
  }
 }
-module.exports={searchNames,machine,restoreTool,Library,Synopses,engineOf,findGame,steamGames,steamAppidFor,folderGames,findSteam,registryString,findVariants,steamParts,isTranslated,playableGame};
+module.exports={_moegirlText:moegirlText,searchNames,machine,restoreTool,Library,Synopses,engineOf,findGame,steamGames,steamAppidFor,folderGames,findSteam,registryString,findVariants,steamParts,isTranslated,playableGame};
