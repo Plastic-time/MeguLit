@@ -29,11 +29,12 @@ static Api ApiOf(const char *n) {
   for (int i = 0; i < 8; i++) if (!strcmp(n, names[i])) return (Api)i;
   return A_None;
 }
-struct Live { uintptr_t at, base; int sig; Api api; };
+struct Live { uintptr_t at, base; int sig; Api api; bool on; };
 static const int MaxSites = 16;
 static Live Sites[MaxSites]; static int NSites = 0;
 extern "C" void *DrawSitesOriginal[MaxSites] = {};
 static volatile LONG Armed = 0, Installed = 0;
+static bool Looked[64]; // a signature whose module was there and was scanned (found or not)
 static CRITICAL_SECTION Lock;
 // the current run
 static int RunSite = -1; static DWORD RunVia1 = 0, RunVia2 = 0, RunTick = 0; static long X0, Y0, X1, Y1, LastX, LastY, Size;
@@ -148,7 +149,9 @@ static int Slots(uintptr_t base, const char *api, std::uint32_t *out, int max) {
 }
 static void Look(int sig) {
   const auto &g = DrawSitesSig::Sigs[sig];
-  HMODULE m = g.module[0] ? GetModuleHandleA(g.module) : GetModuleHandleA(nullptr); if (!m) return;
+  if (sig >= 64 || Looked[sig]) return;
+  HMODULE m = g.module[0] ? GetModuleHandleA(g.module) : GetModuleHandleA(nullptr); if (!m) return; /* not loaded yet: looked for again */
+  Looked[sig] = true;
   uintptr_t base = (uintptr_t)m; std::uint32_t slots[8]; int ns = Slots(base, g.api, slots, 8); Api api = ApiOf(g.api);
   if (!ns || api == A_None) return;
   auto nt = (IMAGE_NT_HEADERS *)(base + ((IMAGE_DOS_HEADER *)base)->e_lfanew); auto sec = IMAGE_FIRST_SECTION(nt);
@@ -160,18 +163,22 @@ static void Look(int sig) {
     total += n;
   }
   if (total != g.count) { if (total) Msg::Log("ToMe_DRAWRUN engine=%s off: %d sites match (want %d)", g.id, total, g.count); return; }
-  for (int j = 0; j < total && NSites < MaxSites; j++) Sites[NSites++] = { found[j], base, sig, api };
+  for (int j = 0; j < total && NSites < MaxSites; j++) Sites[NSites++] = { found[j], base, sig, api, false };
   Msg::Log("ToMe_DRAWRUN engine=%s found: %d site(s) of %s", g.id, total, g.api);
 }
+// every found site not hooked yet (sites of a DLL loaded later come after the first ones)
 static void Install() {
-  if (InterlockedExchange(&Installed, 1)) return;
+  InterlockedExchange(&Installed, 1);
   for (int k = 0; k < NSites; k++) {
+    if (Sites[k].on) continue; Sites[k].on = true;
     void *stub = Stub(k);
     if (!stub || MH_CreateHook((void *)Sites[k].at, stub, &DrawSitesOriginal[k]) != MH_OK || MH_EnableHook((void *)Sites[k].at) != MH_OK) {
       Msg::Log("ToMe_DRAWRUN engine=%s off: hook failed at %p", DrawSitesSig::Sigs[Sites[k].sig].id, (void *)Sites[k].at); continue; }
     Msg::Log("ToMe_DRAWRUN engine=%s on: site %d call %p (rva %lx)", DrawSitesSig::Sigs[Sites[k].sig].id, k, (void *)Sites[k].at, (unsigned long)(Sites[k].at - Sites[k].base));
   }
 }
+static bool Pending() { for (int i = 0; i < DrawSitesSig::SigCount && i < 64; i++) if (!Looked[i]) return true; return false; }
+static void LookAll() { __try { for (int i = 0; i < DrawSitesSig::SigCount; i++) Look(i); } __except (EXCEPTION_EXECUTE_HANDLER) {} }
 static bool RolesAsked() {
   wchar_t tmp[MAX_PATH]; DWORD n = GetTempPathW(MAX_PATH, tmp); if (!n || n >= MAX_PATH) return false;
   wchar_t path[MAX_PATH + 64]; swprintf_s(path, L"%sMeguLit\\draw\\%lu.txt", tmp, GetCurrentProcessId());
@@ -183,7 +190,13 @@ static bool RolesAsked() {
   return false;
 }
 static DWORD WINAPI Watch(void *) {
-  for (int i = 0; i < 1800 && !Installed; i++) { if (RolesAsked()) Install(); Sleep(2000); }
+  // for an hour: the control file decides, and a signature whose DLL is not loaded yet is looked for again
+  for (int i = 0; i < 1800; i++) {
+    if (Pending()) LookAll();
+    if (NSites && RolesAsked()) Install();
+    if (Installed && !Pending()) break;
+    Sleep(2000);
+  }
   // the last run of a line is written when nothing more comes for a while
   for (;;) { Sleep(300); EnterCriticalSection(&Lock); if (RunChars && GetTickCount() - RunTick > 250) FlushLocked(); LeaveCriticalSection(&Lock); }
 }
@@ -191,8 +204,8 @@ static DWORD WINAPI Watch(void *) {
 static void Arm() {
   if (InterlockedExchange(&Armed, 1)) return;
   InitializeCriticalSection(&Lock);
-  __try { for (int i = 0; i < DrawSitesSig::SigCount; i++) Look(i); } __except (EXCEPTION_EXECUTE_HANDLER) { return; }
-  if (!NSites) return;
+  LookAll();
+  if (!NSites && !Pending()) return; /* nothing of this game, nothing to wait for */
   HANDLE t = CreateThread(nullptr, 0, Watch, nullptr, 0, nullptr); if (t) CloseHandle(t);
 }
 }
