@@ -39,8 +39,8 @@
   {
    "kind": "local-script",
    "file": "ysbin.ypf",
-   "entry": "yst00113.ybn:10005,10059 / yst00114.ybn:8562,8606 / yst00115.ybn:11813,11860",
-   "notes": "Last explicit MAC.EV image before the completed-route SCENARIO.END; actual image access additionally requires its current CG unlock and current source identity"
+   "entry": "yst00011.ybn:11 / yst00113.ybn:9490,9508,9511,9515 / yst00114.ybn:8164,8182,8185,8189 / yst00115.ybn:11440,11446,11449,11453",
+   "notes": "Ending CG is the last unconditional MAC.EV in the same label block as the unique persistent completion write, bounded by ES.SCENARIO.END and GO SCENARIO_TITLE. Later RP_112/RP_212/RP_312 scenes in the same files are separate and cannot supply the route ending image. Current save CG permission is still required independently."
   },
   {
    "kind": "static-content-rating",
@@ -1039,7 +1039,7 @@
     "josou-0-yes",
     "josou-0-end"
    ],
-   "image": "ev112_6"
+   "image": "ev103_3"
   },
   {
    "id": "josou-0-bad",
@@ -1069,7 +1069,7 @@
     "josou-1-yes",
     "josou-1-end"
    ],
-   "image": "ev212_2"
+   "image": "ev211_1b"
   },
   {
    "id": "josou-1-bad",
@@ -1099,7 +1099,7 @@
     "josou-2-yes",
     "josou-2-end"
    ],
-   "image": "ev312_6"
+   "image": "ev303_1"
   },
   {
    "id": "josou-2-bad",
@@ -1345,7 +1345,24 @@
       "all": [
        "yuris:3:101"
       ]
-     }
+     },
+     "source": {
+      "storage": "yst00113.ybn",
+      "at": "instructions[9508]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00113.ybn",
+      "sha256": "74fa3349f8620c602a993304355aa4933ff745c35846358ecb36ef34c6360ebe",
+      "firstLineAt": "instructions[9156].args[0]",
+      "imageAt": "instructions[9490].args[1]",
+      "label": "RP_111",
+      "startAt": "instructions[9150]",
+      "terminalAt": "instructions[9511]",
+      "jumpAt": "instructions[9515]"
+     },
+     "firstLine": {
+      "ja": "史緒「はあ……あああっ！、行人さんのオチ●ポ……ああ、私の尻マ●コに挿入されてるぅ！」"
+     },
+     "image": "ev103_3"
     },
     {
      "id": "josou-0-bad",
@@ -1449,7 +1466,24 @@
       "all": [
        "yuris:3:102"
       ]
-     }
+     },
+     "source": {
+      "storage": "yst00114.ybn",
+      "at": "instructions[8182]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00114.ybn",
+      "sha256": "7a915e99204f1abea8cfab3810f81e140ddd07210b33caa2da4ec9bc2a006f91",
+      "firstLineAt": "instructions[7741].args[0]",
+      "imageAt": "instructions[8164].args[1]",
+      "label": "RP_211",
+      "startAt": "instructions[7736]",
+      "terminalAt": "instructions[8185]",
+      "jumpAt": "instructions[8189]"
+     },
+     "firstLine": {
+      "ja": "そして、静樹と結ばれた俺は……"
+     },
+     "image": "ev211_1b"
     },
     {
      "id": "josou-1-bad",
@@ -1553,7 +1587,24 @@
       "all": [
        "yuris:3:103"
       ]
-     }
+     },
+     "source": {
+      "storage": "yst00115.ybn",
+      "at": "instructions[11446]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00115.ybn",
+      "sha256": "0ce9bc2dd7ce687d136e0e1a2a3b9c5286e280959a28addc5b05f61f1595ad82",
+      "firstLineAt": "instructions[11186].args[0]",
+      "imageAt": "instructions[11440].args[1]",
+      "label": "D8_04",
+      "startAt": "instructions[11181]",
+      "terminalAt": "instructions[11449]",
+      "jumpAt": "instructions[11453]"
+     },
+     "firstLine": {
+      "ja": "そして、俺と由良はいくつもの山を越え……"
+     },
+     "image": "ev303_1"
     },
     {
      "id": "josou-2-bad",

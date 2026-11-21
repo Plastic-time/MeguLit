@@ -1,0 +1,11 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),content=require('../services/story-content.cjs');
+const commands=[];Object.assign(commands,{28:'GO',29:'GOSUB',30:'IF',34:'IFEND',39:'LET',91:'WORD'});
+const literal=text=>{const s=Buffer.from('"'+text+'"'),h=Buffer.alloc(3);h[0]=0x4d;h.writeUInt16LE(s.length,1);return {type:3,data:Buffer.concat([h,s])};};
+const call=(fn,name)=>({op:29,args:[literal(fn),...(name?[literal(name)]:[])]}),go=name=>({op:28,args:[literal(name)]}),word=text=>({op:91,args:[{type:0,data:Buffer.from(text)}]});
+const marker=()=>({op:39,args:[{data:Buffer.from('5603004001004201006529010000','hex')},{data:Buffer.from('42010001','hex')}]});
+const program=()=>[word('The ending scene begins'),call('MAC.EV','end_cg'),marker(),call('ES.SCENARIO.END'),go('SCENARIO_TITLE'),call('MAC.EV','extra_cg'),word('A separate later scene')];
+const labels=[{index:0,label:'ending'},{index:5,label:'extra'}],names=new Map([['end_cg','end_cg'],['extra_cg','extra_cg']]);
+test('ending image is bounded by its completion marker, scenario end and title jump, never file tail',()=>{const r=content.yurisEnding(program(),commands,2,labels,names);assert.equal(r.image,'end_cg');assert.equal(r.imageAt,'instructions[1].args[1]');assert.equal(r.terminalAt,'instructions[3]');assert.equal(r.jumpAt,'instructions[4]');assert.equal(r.firstLine.ja,'The ending scene begins');assert.equal(content.yurisEnding(program(),commands,2,[labels[0]],names).image,'end_cg');});
+test('missing terminal/title, computed jump, nested completion or conditional CG stay unsupported',()=>{for(const mutate of [p=>p[3]=word('Not an ending command'),p=>p[4]=go('other_scene'),p=>p[4]={op:28,args:[{data:Buffer.from('expression')}]},p=>p[2]={op:39,args:[]}]){const p=program();mutate(p);assert.equal(content.yurisEnding(p,commands,2,labels,names),null);}const p=[{op:30,args:[]},call('MAC.EV','end_cg'),{op:34,args:[]},marker(),call('ES.SCENARIO.END'),go('SCENARIO_TITLE')];assert.equal(content.yurisEnding(p,commands,3,[labels[0]],names),null);});
+test('an unknown final image cannot be replaced by any other unlocked or declared CG',()=>{const p=program();p[1]=call('MAC.EV','unmapped');const r=content.yurisEnding(p,commands,2,labels,names);assert.equal(r.image,undefined);assert.equal(r.firstLine.ja,'The ending scene begins');});
