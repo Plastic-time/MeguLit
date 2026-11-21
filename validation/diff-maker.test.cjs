@@ -66,7 +66,7 @@ test('samples: the live gate verdicts (Fata read, Senren hide), the engine-draw 
  const f=Maker.make(path.join(PROBES,'fata-morgana')),s=Maker.make(path.join(PROBES,'senren-banka')),r=Maker.make(path.join(PROBES,'rpgm-sample'),{key:'rpgm-sample'});
  assert.ok(f.result.hideBest.over.includes('dropRate'),'Fata: lines drawn nowhere');assert.equal(f.diffs.game.settings.hide.textEffectsRead,true);
  assert.deepEqual(f.diffs.covers.map(c=>c.exe),['fata_jp.exe','fata_cn.exe','fata_en.exe'],'Fata: the language builds of the folder share the game layer');
- assert.equal(s.result.best.pass,true);assert.equal(s.diffs.game.settings.placement.drawWhileBlanking,true,'the hand-written game diff is carried into the game layer');
+ assert.equal(s.result.best.pass,true);assert.equal(s.diffs.game.settings.placement,undefined,'a draft carries the measured values only: seeds are not merged into it');
  assert.equal(s.diffs.game.prints.steam,'1144400');assert.equal(s.probe.game.archive.path,'scn.xp3');
  assert.ok(s.lines.length>0&&s.lines.every(l=>l.zh),'Senren: the aligned Chinese patch gives zh');assert.equal(f.lines.length,0,'Fata: the patch is not aligned (other line count), no zh');
  assert.ok(s.report.look.some(x=>/没有 engine-draw 记录/.test(x)),'old KiriKiri probes carry no roles: said in the report');

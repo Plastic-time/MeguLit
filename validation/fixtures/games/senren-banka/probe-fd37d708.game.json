@@ -6,13 +6,8 @@
  "source": "official",
  "mode": "hide",
  "settings": {
-  "placement": {
-   "drawWhileBlanking": true,
-   "translationGrowsDown": true
-  },
   "calibrate": {
    "positionSource": "engine",
-   "hideMethod": "hide",
    "textBox": {
     "x": 220,
     "y": 488,
@@ -22,12 +17,8 @@
      1535,
      863
     ]
-   }
-  },
-  "lang": {
-   "ja": {
-    "annotation": "ruby"
-   }
+   },
+   "hideMethod": "hide"
   },
   "hide": {
    "textEffectsRead": false

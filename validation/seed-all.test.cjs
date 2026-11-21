@@ -5,7 +5,7 @@
 'use strict';
 process.env.MEGULIT_RELAY_BASE??='off';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
-const Seed=require('../tools/diff-maker/seed-all.cjs'),GameDiff=require('../core/game-diff.cjs');
+const Seed=require('../tools/diff-maker/seed-all.cjs'),SeedFormat=require('../core/profiles/seed.cjs');
 const PROBE=path.join(__dirname,'helpers','diff-maker','probes','senren-banka');
 
 test('seed-all: every game a seed with status and the pinned values of today, readable slugs, nothing local in the repo files',{skip:!(()=>{try{require('node:sqlite');return true;}catch{return false;}})()},async()=>{
@@ -29,11 +29,12 @@ test('seed-all: every game a seed with status and the pinned values of today, re
   const files=[];const walk=d=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else files.push(path.relative(seed,p).replace(/\\/g,'/'));}};walk(seed);
   const sha=crypto.createHash('sha256').update('MZ fake senren').digest('hex');
   assert.deepEqual(files.sort(),['bgi/other/game.json','bgi/other/versions/'+crypto.createHash('sha256').update('MZ fake other').digest('hex')+'.json','kirikiri/senren-banka/game.json','kirikiri/senren-banka/versions/'+sha+'.json'].sort());
-  for(const f of files){const text=fs.readFileSync(path.join(seed,f),'utf8');const {status,slug,builds,...d}=JSON.parse(text);assert.deepEqual(GameDiff.validate(d),{ok:true},f);
-   assert.ok(!text.includes(tmp.slice(0,8))&&!/[A-Za-z]:\\\\|千恋|SenrenBanka\\.exe"?:/.test(text.replace(/"exe": "SenrenBanka.exe"/,'')),f+': no path, no title text');}
+  for(const f of files){const text=fs.readFileSync(path.join(seed,f),'utf8');const d=JSON.parse(text);const m=/^([^/]+)\/([^/]+)\/(game\.json|versions\/(.+))$/.exec(f);assert.deepEqual(SeedFormat.check(d,m[3]==='game.json'?{engine:m[1],slug:m[2]}:{engine:m[1],file:m[4]}).errors,[],f);
+   assert.ok(!text.includes(tmp)&&!text.includes(tmp.replace(/\\/g,'/'))&&!/[A-Za-z]:[\\/]/.test(text),f+': no path');}
   const game=JSON.parse(fs.readFileSync(path.join(seed,'kirikiri','senren-banka','game.json'),'utf8'));assert.equal(game.layer,'game');assert.equal(game.slug,'senren-banka');assert.equal(game.status,'verified');assert.deepEqual(game.builds,[sha]);assert.equal(game.prints.steam,'1144400');assert.ok(game.prints.pack,'main archive print');
   assert.equal(game.key,require('../tools/diff-maker/probe.cjs').gameId(game.prints),'game key = relay gidFor of its prints');assert.equal(game.settings.placement.drawWhileBlanking,true,'the game diff value is pinned');
-  assert.equal(game.settings.selfCheck.window,20,'kernel defaults are pinned too');assert.equal(game.settings.page.effectFrames,null);
+  assert.equal(game.settings.placement.lineOffsetY,0,'non-null kernel defaults are pinned too');assert.ok(!game.settings.selfCheck&&!game.settings.calibrate,'gate thresholds and calibration stay with their layers');assert.ok(!('effectFrames' in (game.settings.page||{})),'null (the kernel decides) is not pinned');
+  assert.ok(game.match.titles.includes('千恋＊万花'),'the library title is in match.titles');assert.ok(game.match.exe.includes('SenrenBanka.exe'));
   const other=JSON.parse(fs.readFileSync(path.join(seed,'bgi','other','game.json'),'utf8'));assert.equal(other.status,'skeleton');assert.equal(other.mode,'hide');assert.equal(other.settings.hide.textEffectsRead,false);
   const rpt=fs.readFileSync(path.join(out,'report.md'),'utf8');assert.match(rpt,/verified：有样本且自检全过线，直接用：1 部/);assert.match(rpt,/skeleton：.*：1 部/);assert.match(rpt,/千恋＊万花（千恋万花）/);
   assert.ok(rpt.indexOf('## verified')<rpt.indexOf('## skeleton'),'grouped by status');

@@ -19,7 +19,7 @@
    Everything else (reports, line data with the patch's Chinese, skeletons) stays under <out> (default H:\MeguLit-Work\The Seed),
    with the summary <out>/report.md. */
 const fs=require('node:fs'),path=require('node:path');
-const Profiles=require('../../core/profiles/index.cjs'),GamePrint=require('../../core/game-print.cjs'),crypto=require('node:crypto');
+const Profiles=require('../../core/profiles/index.cjs'),GamePrint=require('../../core/game-print.cjs'),Domains=require('../../core/profiles/domains.cjs'),SeedFormat=require('../../core/profiles/seed.cjs'),crypto=require('node:crypto');
 const GameDiff=require('../../core/game-diff.cjs'),Samples=require('./samples.cjs'),Scripts=require('./scripts.cjs'),Search=require('./search.cjs'),Emit=require('./emit.cjs'),Probe=require('./probe.cjs');
 const {REASONS}=require('../../core/self-check.cjs');
 const ROOT=path.join(__dirname,'..','..');
@@ -73,7 +73,18 @@ function slugOf(g,gameKey){const exe=path.basename(g.exe);for(const k of [g.titl
 
 /* the values this game runs with today (kernel defaults <- engine diff <- the hand-written game diff), every key of
    core/profiles/defaults.cjs written out: a later change of a kernel default does not move a game that works (做好了就是做好了) */
-function pinned(profile){const out={};for(const k of Object.keys(Profiles.DEFAULTS))out[k]=JSON.parse(JSON.stringify(profile[k]));return out;}
+/* Not pinned: null values (null means "the kernel decides": pinning it freezes nothing and would hide the layers under the seed),
+   calibrate.* (this PC's measurement, the auto layer) and selfCheck.* (the gate's thresholds): a verified seed sits above this PC's
+   calibration, pinning them would switch off every player's calibration and gate tuning (owner OK 2026-11-21) */
+const NOT_PINNED=new Set(['calibrate','selfCheck']);
+function pinned(profile){const out={};const walk=(v,dst,at)=>{for(const [k,x] of Object.entries(v)){const key=at?at+'.'+k:k;
+  if(x===null||x===undefined)continue;if(Domains.DOMAINS[key]){dst[k]=JSON.parse(JSON.stringify(x));continue;}
+  if(x&&typeof x==='object'&&!Array.isArray(x)){const o={};walk(x,o,key);if(Object.keys(o).length)dst[k]=o;}}};
+ for(const k of Object.keys(Profiles.DEFAULTS))if(!NOT_PINNED.has(k)&&profile[k]&&typeof profile[k]==='object'){const o={};walk(profile[k],o,k);if(Object.keys(o).length)out[k]=o;}
+ return out;}
+/* the measured values a seed carries: the kernel keys the search result stands for (calibrate.* is the auto layer's) */
+function seedMeasured(m){const out=JSON.parse(JSON.stringify(m||{}));delete out.calibrate;return out;}
+const sameJson=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 
 const STATUS=['verified','owner-ok','read','skeleton'];
 /* one game -> its seed (always written to <seed> unless the program is missing) and its report row */
@@ -84,7 +95,7 @@ async function seedOne(g,logs,wins,{out,seed,ownerOk,versionsWritten}){const eng
  const prints=GamePrint.prints(g.exe,{exe:exeSha,title:g.title,steamAppId:g.steam,vndb:g.vndb,script:sc.script,engine:engine==='unknown'?'':engine});
  const gid=Probe.gameId(prints);
  const exeName=path.basename(g.exe);const input={exe:exeName,title:g.title,engine,steamAppId:g.steam,folder:path.dirname(g.exe)};
- const base=Profiles.profileFor(input);const gameFile=Profiles.games().find(x=>x.key===base.gameKey)||null;
+ const base=Profiles.profileFor(input);const gameFile=Profiles.games().find(x=>x.key===base.gameKey&&!x.seed)||null;
  const slug=slugOf(g,base.gameKey);row.slug=slug;row.prints=prints;row.pairing=sc.pairing;row.layers=base.layers;
  row.fixture=fs.existsSync(path.join(ROOT,'validation','fixtures','games',base.gameKey))?base.gameKey:'';
  const minLines=Search.thresholdsOf(base).minLines;const smp=sampleOf(g,logs,wins,minLines);row.lines=smp?.lines||0;
@@ -101,15 +112,28 @@ async function seedOne(g,logs,wins,{out,seed,ownerOk,versionsWritten}){const eng
  else{status=ownerOk.has(slug)?'owner-ok':'skeleton';row.look.push(status==='owner-ok'?'店主确认能用，本机没有样本':'待运行样本'+(smp?.lines?'（只有 '+smp.lines+' 句）':''));}
  row.state=status;row.mode=mode;row.suspect=sus;for(const x of sus)row.look.push('可疑量测值没写进 seed：'+x.key+' '+x.value.w+'x'+x.value.h+' @'+x.value.x+','+x.value.y+'（'+x.why+'）');
  /* the seed: today's values pinned, the measured ones over them; build() keeps each scope's keys */
- const settings=Emit.deepMerge(pinned(base),measured);
+ const settings=Emit.deepMerge(pinned(base),seedMeasured(measured));
  const {version,game:doc}=Emit.docs({prints,exeSha,exeName,engine:engine==='unknown'?'':engine,mode,settings,gid});
  /* seed fields of The Seed (registered with diff-layers as part of the seed format): status, the readable slug, the exe builds
     whose version layer goes with this game. One exe shared by several games (one program, several releases) has one version file:
     the first game (by slug) holds it, the others name it in builds */
- const game={...doc,status,slug,builds:[exeSha]};
+ /* a seed already in the repository keeps the prints and match it was given (curated) and its sourceLangs; rev goes up when the
+    seed changes */
+ const old=seed?readJson(path.join(seed,engine,slug,'game.json')):null,oldV=seed?readJson(path.join(seed,engine,slug,'versions',exeSha+'.json')):null;
+ const prints2={...(doc.prints||{}),...(old?.prints||{})};
+ /* the titles the game is known by (the document has no title field: the library title goes here too) */
+ const titles=[...new Set([...(old?.match?.titles||[]),g.title,...g.names])].filter(t=>t&&t.length<=120&&!/[\\/]/.test(t)).slice(0,20);
+ const exes=[...new Set([...(old?.match?.exe||gameFile?.match?.exe||[]),exeName])].filter(x=>x&&x.length<=80&&!/[\\/]/.test(x)).slice(0,20);
+ const match={exe:exes,...(titles.length?{titles}:{}),...(old?.match?.notTitles?{notTitles:old.match.notTitles}:{})};
+ const builds=[...new Set([...(old?.builds||[]),exeSha])].slice(0,64);
+ /* the game key: an existing seed keeps its identity; a new one is the relay's gidFor of its prints */
+ const game={...doc,key:old?.key||Probe.gameId(prints2),prints:prints2,status,slug,builds,match,...(old?.sourceLangs?{sourceLangs:old.sourceLangs}:{})};
+ const bump=(o,n)=>{if(!o)return n;const r=Number.isInteger(o.rev)?o.rev:1;return {...n,rev:sameJson({...o,rev:0},{...n,rev:0})?r:r+1};};
+ const gameOut=bump(old,{...game,rev:1}),versionOut=bump(oldV,{...version,rev:1});
+ for(const [n,d,w] of [['game',gameOut,{engine:gameOut.engine,slug}],['version',versionOut,{engine:versionOut.engine,file:exeSha+'.json'}]]){const r=SeedFormat.check(d,w);if(!r.ok)throw new Error(n+' seed: '+r.errors.join('; '));}
  const owner=versionsWritten.get(exeSha);if(owner&&owner!==engine+'/'+slug)row.look.push('版本层和 '+owner+' 共用（同一个 exe）');
- const files=[[path.join(work,'game.json'),game]];if(!owner)files.push([path.join(work,'versions',exeSha+'.json'),version]);
- if(seed){files.push([path.join(seed,engine,slug,'game.json'),game]);if(!owner)files.push([path.join(seed,engine,slug,'versions',exeSha+'.json'),version]);}
+ const files=[[path.join(work,'game.json'),gameOut]];if(!owner)files.push([path.join(work,'versions',exeSha+'.json'),versionOut]);
+ if(seed){files.push([path.join(seed,engine,slug,'game.json'),gameOut]);if(!owner)files.push([path.join(seed,engine,slug,'versions',exeSha+'.json'),versionOut]);}
  if(!owner)versionsWritten.set(exeSha,engine+'/'+slug);
  for(const [f,v] of files)writeJson(f,v);
  if(lines.length)writeJson(path.join(work,'lines.json'),Emit.linesOf(probe,slug,lines,gid));
@@ -132,7 +156,7 @@ function summary(rows,out){const by=s=>rows.filter(r=>r.state===s);const eng={};
 
 async function main(argv){const args=argv.slice(2);const all=n=>{const out=[];for(let i=args.indexOf(n);i>=0;i=args.indexOf(n)){out.push(args[i+1]);args.splice(i,2);}return out;};
  const roots=all('--root');if(!roots.length)roots.push('E:\\MeguLit-Test-1421','E:\\MeguLit');
- const out=all('--out')[0]||'H:\\MeguLit-Work\\The Seed',seed=all('--seed')[0]||path.join(ROOT,'The Seed'),only=all('--only')[0]||'';
+ const seedArg=all('--seed')[0]||'',out=all('--out')[0]||'H:\\MeguLit-Work\\The Seed',seed=seedArg||path.join(ROOT,'The Seed'),only=all('--only')[0]||'';
  const ownerOk=new Set((readJson(all('--owner-ok')[0]||path.join(__dirname,'owner-ok.json'))||[]).map(String));
  fs.mkdirSync(out,{recursive:true});
  const logs=new Map(),games=new Map();

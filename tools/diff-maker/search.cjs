@@ -39,10 +39,11 @@ const changes=p=>(p.effectFrames!==null)+(p.filters!=='kernel');
 
 function textBox(events){const b=events.filter(e=>e.kind==='box');if(b.length<3)return null;const x=Math.min(...b.map(e=>e.x)),y=Math.min(...b.map(e=>e.y)),r=Math.max(...b.map(e=>e.x+e.w)),bt=Math.max(...b.map(e=>e.y+e.h));return {x,y,w:r-x,h:bt-y,client:[b[0].cw,b[0].ch]};}
 
-/* candidate params a diff's settings stand for (the fixture replays a diff with these) */
+/* candidate params a diff's settings stand for (the fixture replays a diff with these); choice.filters [] is 'none' only when the
+   kernel default is not [] already (a seed pins the default list) */
 function paramsOf(settings){const s=settings||{};const hide=s.calibrate?.hideMethod==='read'||s.hide?.textEffectsRead===true?'read':'hide';
  const anchor=s.placement?.firstLineAnchor;const positionSource=s.calibrate?.positionSource??(anchor==='glyph'?'glyph':anchor==='box'?'ocr':null);
- return {hideMethod:hide,positionSource:hide==='read'?null:positionSource,effectFrames:hide==='read'?null:(s.page?.effectFrames??null),filters:hide!=='read'&&Array.isArray(s.choice?.filters)&&s.choice.filters.length===0?'none':'kernel'};}
+ return {hideMethod:hide,positionSource:hide==='read'?null:positionSource,effectFrames:hide==='read'?null:(s.page?.effectFrames??null),filters:hide!=='read'&&Array.isArray(s.choice?.filters)&&s.choice.filters.length===0&&(require('../../core/profiles/defaults.cjs').choice?.filters||[]).length>0?'none':'kernel'};}
 
 /* the engine-draw roles of the replay (tools/diff-maker/roles.cjs) and, per role, where its unique texts sit in the script:
    a line role whose texts are script choices, or a UI role whose texts are script dialogue, is a misclassification to look at */

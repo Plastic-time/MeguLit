@@ -6,22 +6,8 @@
  "source": "official",
  "mode": "read",
  "settings": {
-  "page": {
-   "pairByDrawn": true,
-   "keepHeld": true
-  },
-  "choice": {
-   "filters": [
-    "^(選択肢|選択ライン)",
-    "のテーマ"
-   ],
-   "contentInterleave": true,
-   "dropEffectFrames": true
-  },
-  "hide": {
-   "textEffectsRead": true
-  },
   "calibrate": {
+   "positionSource": null,
    "textBox": {
     "x": 70,
     "y": 488,
@@ -32,16 +18,10 @@
      604
     ]
    },
-   "hideMethod": "read",
-   "positionSource": null
+   "hideMethod": "read"
   },
-  "safeMode": {
-   "effectJudge": true
-  },
-  "lang": {
-   "ja": {
-    "annotation": "ruby"
-   }
+  "hide": {
+   "textEffectsRead": true
   }
  },
  "exe": "",
