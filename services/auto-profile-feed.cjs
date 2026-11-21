@@ -40,8 +40,8 @@ function verify(doc,list){const s=doc?.signature;if(!s||s.alg!=='ed25519'||typeo
 const VERSION_MATCH=['exe','head','pe'],GAME_MATCH=['exe','head','pe','pack','script','steam','vndb','title'];
 const docOk=d=>gameDiff.validate(d).ok&&verify(d,keys());
 const part=d=>({source:d.source,mode:d.mode||'hide',settings:d.settings||{},rev:d.rev|0,issuedAt:d.issuedAt||'',agree:d.agree|0,reporters:d.reporters|0});
-const torchLayers=new WeakMap();
-function forExe(value,key,exe){if(!value?.torchBound)return value;const binding=torchLayers.get(value);return binding&&binding.key===key?layer(binding.answer,key,{exe,torchTrust:binding.torchTrust}):null;}
+const torchLayers=new WeakMap(),cachedRoots=new WeakMap();
+function forExe(value,key,exe){if(!value?.torchBound)return value;const binding=torchLayers.get(value);if(!binding||binding.key!==key)return null;const answer=binding.root?cached(binding.root,key):binding.answer;return answer?.torchRelease?layer(answer,key,{exe,torchTrust:binding.torchTrust}):null;}
 function layer(answer,key,{torchTrust,exe}={}){if(!answer||answer.schema!=='megulit.game-diff-feed'||answer.key!==key)return null;
  if(answer.torchRelease&&!require('./torch-receive.cjs').compatibleCached(answer,key,torchTrust,{exe}))return null;
  let v=null,g=null,vm='',gm='';
@@ -54,7 +54,7 @@ function layer(answer,key,{torchTrust,exe}={}){if(!answer||answer.schema!=='megu
  const merged=JSON.parse(JSON.stringify(P.game?.settings||{}));const deep=(a,b)=>{for(const [k,x] of Object.entries(b||{}))a[k]=x&&typeof x==='object'&&!Array.isArray(x)&&a[k]&&typeof a[k]==='object'?deep(a[k],x):x;return a;};deep(merged,P.version?.settings);
  const mode=(P.version&&P.version.mode==='read')||(P.game&&P.game.mode==='read')?'read':'hide';
  const result={source:lead.source,mode,match:v?vm:VERSION_MATCH.includes(gm)?gm:'game:'+gm,exact:vm==='exe'||!v&&gm==='exe',settings:merged,version:P.version,game:P.game,agree:lead.agree,reporters:lead.reporters,issuedAt:lead.issuedAt,
-  stamp:(v?v.key+'@'+(v.rev|0)+'@'+(v.issuedAt||''):'-')+'|'+(g?g.key+'@'+(g.rev|0)+'@'+(g.issuedAt||''):'-')};if(answer.torchRelease){result.torchBound=true;torchLayers.set(result,{answer,key,torchTrust});}return result;}
+  stamp:(v?v.key+'@'+(v.rev|0)+'@'+(v.issuedAt||''):'-')+'|'+(g?g.key+'@'+(g.rev|0)+'@'+(g.issuedAt||''):'-')};if(answer.torchRelease){result.torchBound=true;torchLayers.set(result,{answer,key,torchTrust,root:cachedRoots.get(answer)});}return result;}
 /* a candidate (not this exe's own hash) the self-check gate refused on this PC: not applied again until the relay hands out another */
 const rejectFile=(root,key)=>path.join(dir(root),key+'.rejected.json');
 function rejected(root,key,l){if(!l||l.exact)return false;try{return JSON.parse(fs.readFileSync(rejectFile(root,key),'utf8')).stamp===l.stamp;}catch{return false;}}
@@ -62,7 +62,7 @@ function reject(root,key,l,why=''){if(!l||l.exact)return;try{fs.mkdirSync(dir(ro
 /* the query of GET /api/game-profile: every print (core/game-print.cjs check) + the revisions this PC has */
 function query(key,prints,old,{exe}={}){const p={...require('../core/game-print.cjs').check(prints||{}),exe:key};const q=new URLSearchParams();for(const k of ['exe','head','pe','pack','script','steam','vndb','title','engine'])if(p[k])q.set(k,p[k]);
  const l=old&&!old.none?layer(old,key,{exe}):null;if(l?.version)q.set('have',String(l.version.rev));if(l?.game)q.set('haveGame',String(l.game.rev));return '?'+q.toString();}
-function cached(root,key){if(!gameDiff.KEY.test(String(key||'')))return null;try{const v=JSON.parse(fs.readFileSync(path.join(dir(root),key+'.json'),'utf8'));return v&&typeof v==='object'?v:null;}catch{return null;}}
+function cached(root,key){if(!gameDiff.KEY.test(String(key||'')))return null;try{const v=JSON.parse(fs.readFileSync(path.join(dir(root),key+'.json'),'utf8'));if(!v||typeof v!=='object')return null;cachedRoots.set(v,path.resolve(root));return v;}catch{return null;}}
 function keep(root,key,v){const old=cached(root,key),protectedRelease=old?.torchRelease||old?.torchQuarantined?.release;if(protectedRelease&&docOk(protectedRelease.profile)&&verify(protectedRelease,keys())&&!v.torchRelease)return old;
  const exact=a=>a?.version===2&&a.versionLayer?.match==='exe'&&a.versionLayer.diff?.key===key?a.versionLayer.diff:a?.diff?.key===key?a.diff:null,prev=exact(old),next=exact(v);
  if(prev&&next&&docOk(prev)&&docOk(next)&&(next.rev<prev.rev||next.rev===prev.rev&&gameDiff.canonical(next)!==gameDiff.canonical(prev)))return old;

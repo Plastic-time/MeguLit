@@ -90,6 +90,7 @@ bulk 复用 `background-budget.wait` 的真实 idle gate，运行中每两秒复
 安装时真正散列内容；后续 loader 每次重验签名、审核 revision、内置版本及本地文件 stat/路径，不把 stat 快速检查说成持续全量散列
 新协议 `layer(answer,key,{exe})` 和 `installed(root,key,{exe})` 必须携带当前调用方的 exe；缺少上下文拒绝，canonical exe 必须等于本次安装绑定路径，不能借另一目录中相同 EXE 的缓存核验脚本
 运行中再次消费 layer 前由 `forExe(layer,key,exe)` 重验当前上下文；新协议 layer 的私有 WeakMap 来源丢失或被复制时拒绝，旧 legacy layer 合同保持
+由 `cached` 取得的 layer 另保存私有 root 来源，每次运行时消费重读当前原子 cache；410 隔离、缺失/损坏文件或退成 legacy 时不能复活旧 snapshot，新 winner 也重验后才生效
 当前仍按 EXE key 共用一份安装 cache；同 EXE 的另一副本需要独立完成接收并覆盖绑定，未做多安装并存的复合 cache，不会自动假定脚本相同
 
 请求回来后重新读游戏行、确认未移除/换 exe、核对本地文件未变，再用一个临时文件原子替换 cache
@@ -100,7 +101,7 @@ profile、release、来源和本地身份在同一个 JSON 内，不会出现新
 只有三重验证和本地精确身份通过的已发布自动 profile，才派生为现有 `official` 优先级
 原签名 `profile.source` 保持不动，未审核 legacy auto 不升级权限
 每次 loader 都检查派生权限，不接受 cache receipt 布尔值代替审核
-不同于更高内置版本的旧配置不能安装；用户偏好和原有 opt-in gate 保留，任何新 `draw.roles/embed/*Input=true` 都拒绝分发
+不同于更高内置版本的旧配置不能安装；用户偏好和原有 opt-in gate 保留，任何新 `draw.roles/embed/kemcoSprites/*Input=true` 都拒绝分发
 安装数据不会自动启动游戏、挂钩、切 read 模式或执行代码
 
 旧协议 exact exe 的签名 profile 仍能自动接收，非 exact 仍是待 self-check 的候选
