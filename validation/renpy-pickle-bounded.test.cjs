@@ -13,6 +13,14 @@ const namedGlobal=(module,name)=>Buffer.from('c'+module+'\n'+name+'\n','ascii');
 const ddGlobal=()=>namedGlobal('collections','defaultdict');
 const ddOptions={classes:[],allowDefaultDict:true};
 const dd=(args=b(0x29))=>Buffer.concat([ddGlobal(),args,b(0x52)]);
+const pyOptions={classes:['renpy.ast.PyCode'],allowPyCodeState:true};
+const pyInstance=()=>Buffer.concat([namedGlobal('renpy.ast','PyCode'),b(0x29,0x81)]);
+const tuple=(...parts)=>Buffer.concat([b(0x28),...parts,b(0x74)]);
+const integer=n=>{if(n>=0&&n<=255)return b(0x4b,n);const out=Buffer.alloc(5);out[0]=0x4a;out.writeInt32LE(n,1);return out;};
+const pyState=(fields={})=>{
+ const {tag=integer(1),source=string('neutral_value = 1'),location=tuple(string('synthetic.rpy'),integer(12)),mode=string('exec'),tail=[]}=fields;
+ return tuple(tag,source,location,mode,...tail);
+};
 test('ordinary CPython serializer fixtures retain slot-state graphs under protocols 2, 4 and 5',()=>{
  const fixture=require('./fixtures/renpy-bounded-cpython.json');
  for(const input of fixture.fixtures){
@@ -157,4 +165,59 @@ test('defaultdict SETITEM/SETITEMS preserve duplicates and edge budgets without 
  assert.equal(decode(many,{...ddOptions,limits:{edges:4}}).counts.edges,4);
  const cyclic=decode(stream(dd(),b(0x71,0),string('self'),b(0x68,0,0x73)),ddOptions).value;
  assert.equal(cyclic.entries.get('self'),cyclic);
+});
+
+test('explicit PyCode state reads ordinary CPython neutral tuple lengths 4 through 7',()=>{
+ const fixture=require('./fixtures/renpy-pycode-cpython.json');assert.equal(fixture.fixtures.length,12);
+ for(const input of fixture.fixtures){
+  const buffer=Buffer.from(input.base64,'base64'),out=decode(buffer,pyOptions),value=out.value,state=value.state;
+  assert.equal(out.protocol,input.protocol);assert.equal(out.bytesRead,input.bytes);assert.equal(buffer.length,input.bytes);
+  assert.equal(value.kind,'instance');assert.equal(value.className,'renpy.ast.PyCode');assert.equal(value.stateKind,'pycode-opaque');assert.ok(state instanceof Map);assert.equal(state.size,8);
+  assert.equal(state.get('writerTag'),1);assert.equal(state.get('source'),'neutral_value = 1');assert.equal(state.get('filename'),'synthetic.rpy');assert.equal(state.get('linenumber'),12);
+  assert.equal(state.get('mode'),['exec','eval','single','exec'][input.stateLength-4]);assert.equal(state.get('py'),input.stateLength>=5?3:2);
+  assert.equal(state.get('hashcode'),input.stateLength>=6?0xffffffff:null);assert.equal(state.get('col_offset'),input.stateLength>=7?17:0);
+  assert.equal(state.has('bytecode'),false);assert.equal(Object.getPrototypeOf(value),Object.prototype);
+ }
+});
+
+test('PyCode state requires boolean opt-in plus an independent explicit class identity',()=>{
+ const buffer=stream(pyInstance(),pyState(),b(0x62));
+ for(const allowPyCodeState of [null,0,1,'true','false',{},[]])reject(buffer,'PYCODE_OPTION',{...pyOptions,allowPyCodeState});
+ reject(buffer,'GLOBAL');reject(buffer,'GLOBAL',{allowPyCodeState:true});reject(buffer,'GLOBAL',{classes:[],allowPyCodeState:true});
+ reject(buffer,'PYCODE_STATE_DISABLED',{classes:['renpy.ast.PyCode']});reject(buffer,'PYCODE_STATE_DISABLED',{...pyOptions,allowPyCodeState:false});
+ reject(stream(pyInstance(),b(0x7d,0x62)),'PYCODE_STATE_DISABLED',{classes:['renpy.ast.PyCode']});
+ reject(stream(instance(),pyState(),b(0x62)),'STATE',{allowPyCodeState:true});
+ const ordinary=decode(stream(instance(),b(0x7d,0x62)),{allowPyCodeState:true}).value;
+ assert.equal(ordinary.stateKind,undefined);assert.equal(ordinary.className,'renpy.ast.Say');
+});
+
+test('PyCode BUILD rejects unproved tags, shapes, source types and repeat state',()=>{
+ for(const state of [b(0x4e),b(0x7d),b(0x5d),tuple(integer(1),string('opaque'),tuple(string('f'),integer(0))),tuple(integer(1),string('opaque'),tuple(string('f'),integer(0)),string('exec'),integer(2),b(0x4e),integer(0),b(0x4e))])reject(stream(pyInstance(),state,b(0x62)),'PYCODE_STATE',pyOptions);
+ for(const tag of [integer(0),integer(2),b(0x88),string('1')])reject(stream(pyInstance(),pyState({tag}),b(0x62)),'PYCODE_TAG',pyOptions);
+ for(const source of [b(0x4e),b(0x55,1,0x61),b(0x5d),b(0x7d)])reject(stream(pyInstance(),pyState({source}),b(0x62)),'PYCODE_SOURCE',pyOptions);
+ const pyExpr=Buffer.concat([namedGlobal('renpy.ast','PyExpr'),b(0x29,0x81)]);
+ reject(stream(pyInstance(),pyState({source:pyExpr}),b(0x62)),'PYCODE_SOURCE',{classes:['renpy.ast.PyCode','renpy.ast.PyExpr'],allowPyCodeState:true});
+ reject(stream(pyInstance(),pyState(),b(0x62),pyState(),b(0x62)),'STATE',pyOptions);
+});
+
+test('PyCode location, mode, py version, hash and offset use a conservative fixed subset',()=>{
+ for(const location of [b(0x4e),b(0x5d),tuple(string('f')),tuple(string('f'),integer(0),integer(0)),tuple(b(0x4e),integer(0)),tuple(string('f'),integer(-1)),tuple(string('f'),b(0x88))])reject(stream(pyInstance(),pyState({location}),b(0x62)),'PYCODE_LOCATION',pyOptions);
+ for(const mode of [string('unknown'),string('EXEC'),integer(0),b(0x4e)])reject(stream(pyInstance(),pyState({mode}),b(0x62)),'PYCODE_MODE',pyOptions);
+ for(const py of [integer(0),integer(1),integer(4),string('3'),b(0x88),b(0x4e)])reject(stream(pyInstance(),pyState({tail:[py]}),b(0x62)),'PYCODE_PY',pyOptions);
+ for(const hash of [integer(-1),string('hash'),b(0x88),b(0x5d)])reject(stream(pyInstance(),pyState({tail:[integer(3),hash]}),b(0x62)),'PYCODE_HASH',pyOptions);
+ const large=Buffer.alloc(9);large[0]=0x47;large.writeDoubleBE(0x100000000,1);reject(stream(pyInstance(),pyState({tail:[integer(3),large]}),b(0x62)),'PYCODE_HASH',pyOptions);
+ const fraction=Buffer.alloc(9);fraction[0]=0x47;fraction.writeDoubleBE(0.5,1);
+ for(const offset of [integer(-1),string('0'),b(0x89),fraction])reject(stream(pyInstance(),pyState({tail:[integer(2),b(0x4e),offset]}),b(0x62)),'PYCODE_OFFSET',pyOptions);
+ const value=decode(stream(pyInstance(),pyState({source:string(''),location:tuple(string(''),integer(0)),mode:string('single'),tail:[integer(2),integer(0),integer(0)]}),b(0x62)),pyOptions).value;
+ assert.equal(value.state.get('hashcode'),0);assert.equal(value.state.get('linenumber'),0);assert.equal(value.state.get('source'),'');
+});
+
+test('PyCode opaque state accounts for its new Map node and all sixteen stored edges',()=>{
+ const buffer=stream(pyInstance(),pyState(),b(0x62)),out=decode(buffer,pyOptions);
+ // Input tuples contribute six edges; the eight-field stored Map adds sixteen.
+ assert.equal(out.counts.edges,22);assert.equal(out.counts.nodes,13);
+ assert.equal(out.counts.stringBytes,Buffer.byteLength('renpy.astPyCode'+'neutral_value = 1'+'synthetic.rpy'+'exec'));
+ reject(buffer,'BUDGET_EDGES',{...pyOptions,limits:{edges:21}});assert.equal(decode(buffer,{...pyOptions,limits:{edges:22}}).counts.edges,22);
+ reject(buffer,'BUDGET_NODES',{...pyOptions,limits:{nodes:12}});assert.equal(decode(buffer,{...pyOptions,limits:{nodes:13}}).counts.nodes,13);
+ reject(buffer,'BUDGET_STRINGBYTES',{...pyOptions,limits:{stringBytes:out.counts.stringBytes-1}});
 });

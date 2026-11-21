@@ -21,8 +21,8 @@ if sys.argv[1:] == ["--defaultdict"]:
                       "scope": "ordinary CPython defaultdict serializer with fixed neutral data, not RenPy compiler or game bytes",
                       "fixtures": fixtures}, indent=2))
     raise SystemExit(0)
-if sys.argv[1:]:
-    raise SystemExit("Only optional --defaultdict is supported")
+if sys.argv[1:] and sys.argv[1:] != ["--pycode"]:
+    raise SystemExit("Only optional --defaultdict or --pycode is supported")
 
 package = types.ModuleType("renpy")
 package.__path__ = []
@@ -30,6 +30,23 @@ ast = types.ModuleType("renpy.ast")
 package.ast = ast
 sys.modules["renpy"] = package
 sys.modules["renpy.ast"] = ast
+if sys.argv[1:] == ["--pycode"]:
+    PyCode = type("PyCode", (), {"__module__": "renpy.ast", "__getstate__": lambda self: self._fixture_state})
+    ast.PyCode = PyCode
+    fixtures = []
+    for protocol in (2, 4, 5):
+        for length in (4, 5, 6, 7):
+            state = (1, "neutral_value = 1", ("synthetic.rpy", 12), ("exec", "eval", "single", "exec")[length - 4], 3, 0xffffffff, 17)[:length]
+            value = PyCode()
+            value._fixture_state = state
+            data = pickle.dumps(value, protocol=protocol)
+            fixtures.append({"protocol": protocol, "stateLength": length, "bytes": len(data),
+                             "base64": base64.b64encode(data).decode("ascii"),
+                             "opcodes": sorted({op.name for op, _, _ in pickletools.genops(data)})})
+    print(json.dumps({"python": sys.version,
+                      "scope": "ordinary CPython serializer with neutral fake PyCode __getstate__ tuples, not RenPy compiler or game bytes",
+                      "fixtures": fixtures}, indent=2))
+    raise SystemExit(0)
 Say = type("Say", (), {"__module__": "renpy.ast", "__slots__": ("who", "what")})
 Translate = type("Translate", (), {"__module__": "renpy.ast", "__slots__": ("identifier", "language", "block")})
 ast.Say = Say
