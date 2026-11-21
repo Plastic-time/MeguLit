@@ -12,7 +12,8 @@ module.exports=async({assert,root})=>{
  const Profiles=require(path.join(root,'core/profiles/index.cjs')),live=require(path.join(root,'services/self-check-live.cjs')),auto=require(path.join(root,'core/auto-profile.cjs'));
  const KEY='17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42',input={exe:'D:/Games/Fata/fata_jp.exe',engine:'KiriKiri',title:'ファタモルガーナの館'};
  const base=Profiles.profileFor(input);assert.equal(base.gameKey,'fata-morgana');assert.equal(base.seedStatus,'owner-ok');assert.equal(base.hide.textEffectsRead,false,'the seed is hide mode');
- for(const k of [['page','pairByDrawn'],['page','keepHeld'],['choice','contentInterleave'],['choice','dropEffectFrames'],['safeMode','effectJudge']])assert.equal(base[k[0]][k[1]],true,k.join('.'));
+ for(const k of [['page','pairByDrawn'],['page','keepHeld'],['choice','contentInterleave'],['choice','dropEffectFrames']])assert.equal(base[k[0]][k[1]],true,k.join('.'));
+ assert.equal(base.safeMode.effectJudge,false,'test pack v2 02:45Z: no effect verdict switches the seed to read mode');
  /* this PC's calibration as the owner's log stored it */
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-fata-seed-'));
  auto.store(dir,KEY,{schema:auto.SCHEMA,key:KEY,engine:'kirikiri',exe:'fata_jp.exe',version:'1.4.22',at:new Date().toISOString(),source:'calibration',mode:'read',reason:'游戏原文和阅读层的句子对不上（配对率低）',

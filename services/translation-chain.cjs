@@ -35,9 +35,16 @@ const sourceOf=o=>isLocal(o.provider)?'local':isMt(o.provider)?'mt':'api';
    2026-11-21 (owner, 千恋＊万花 r34: fallback answers came 1 to 8 s late, after the line was gone): every attempt is timed (trace); with a
    budget, machine translation is started alongside once the budget is spent, its answer is shown first, and a better source that answers
    later replaces it (onLate). */
+/* 2026-11-21 (owner, Fata 02:45Z: every line spent 0.5-0.7 s on deepseek "API 账户余额不足" before microsoft answered, the reader
+   ran two or three lines behind): a provider whose account is out of balance, quota or key fails the same way on every line, so it
+   is left out for PAUSE_MS after such an error; when every provider of the list is paused they are all tried as before. */
+const PAUSE_MS=10*60*1000,paused=new Map();
+const ACCOUNT=/余额不足|欠费|insufficient[ _-]?(balance|quota|funds)|quota|billing|balance|credit|invalid[ _-]?api[ _-]?key|unauthori[sz]ed|40[123]/i;
+function pausedNow(provider,now=Date.now()){const t=paused.get(provider);if(t&&t>now)return true;if(t)paused.delete(provider);return false;}
 async function translate(text,list,attempt,{isCurrent=()=>true,budgetMs=0,trace=null,onLate=null}={}){
  const errors=[];
- const timed=async options=>{const t0=Date.now();try{const t=String(await attempt(options)||'').trim();try{trace?.('chain '+options.provider+' '+(Date.now()-t0)+' ms '+(t?'ok':'empty'));}catch{}if(!t)errors.push(options.provider+': empty');return t;}catch(e){try{trace?.('chain '+options.provider+' '+(Date.now()-t0)+' ms failed '+String(e?.message||e).slice(0,60));}catch{}errors.push(options.provider+': '+(e?.message||e));return '';}};
+ {const open=list.filter(o=>!pausedNow(o.provider));if(open.length&&open.length<list.length){try{trace?.('chain skipped '+list.filter(o=>pausedNow(o.provider)).map(o=>o.provider).join(',')+' (account error, paused)');}catch{}list=open;}}
+ const timed=async options=>{const t0=Date.now();try{const t=String(await attempt(options)||'').trim();try{trace?.('chain '+options.provider+' '+(Date.now()-t0)+' ms '+(t?'ok':'empty'));}catch{}if(!t)errors.push(options.provider+': empty');return t;}catch(e){try{trace?.('chain '+options.provider+' '+(Date.now()-t0)+' ms failed '+String(e?.message||e).slice(0,60));}catch{}errors.push(options.provider+': '+(e?.message||e));if(ACCOUNT.test(String(e?.message||e)))paused.set(options.provider,Date.now()+PAUSE_MS);return '';}};
  const run=async items=>{for(const options of items){if(!isCurrent())break;const t=await timed(options);if(t)return {text:t,provider:options.provider,source:sourceOf(options),errors};}return null;};
  const fail=()=>{const e=Error('TRANSLATION_UNAVAILABLE');e.errors=errors;throw e;};
  const mt=list.filter(o=>isMt(o.provider));
@@ -59,4 +66,4 @@ class Retries{
  clear(){for(const j of this.jobs.values())this.timers.clear(j.timer);this.jobs.clear();}
  get size(){return this.jobs.size;}
 }
-module.exports={candidates,translate,Retries,sourceOf,isLocal,isMt,isApi};
+module.exports={candidates,translate,Retries,paused,PAUSE_MS,sourceOf,isLocal,isMt,isApi};

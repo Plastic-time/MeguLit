@@ -114,11 +114,15 @@ test('ファタ incr11 23:33:41: labels and the music title are no options; the 
  assert.ok(!f.events.slice(f.events.indexOf(shown)+1).some(m=>m&&m.hookChoices===null),'the choice stays up');
 });
 
-test('core read-mode judge: ファタ\'s lines broken by the effect switch once; clean lines (千恋＊万花) never',t=>{
- const f=fixture(t);prologue(f);kirikiri2(f);
- const fx=f.events.filter(m=>m.type==='hookTextEffects');
- assert.equal(fx.length,1,JSON.stringify(f.traces.filter(s=>/text effects/.test(s))));
- assert.ok(fx[0].orphan/(fx[0].orphan+fx[0].paired)>.3);
+/* test pack v2 02:45Z: the Fata seed (owner-ok, hide) turns the judge off: no verdict, the hide stays; the judge itself, on, still
+   counts ファタ's broken lines once */
+test('core read-mode judge: off in the Fata seed; on, ファタ\'s lines broken by the effect switch once',t=>{
+ {const f=fixture(t);prologue(f);kirikiri2(f);assert.equal(f.events.filter(m=>m.type==='hookTextEffects').length,0,'the seed keeps hide mode');}
+ const save=PROFILE;PROFILE={...PROFILE,safeMode:{...PROFILE.safeMode,effectJudge:true}};try{
+  const f=fixture(t);prologue(f);kirikiri2(f);
+  const fx=f.events.filter(m=>m.type==='hookTextEffects');
+  assert.equal(fx.length,1,JSON.stringify(f.traces.filter(s=>/text effects/.test(s))));
+  assert.ok(fx[0].orphan/(fx[0].orphan+fx[0].paired)>.3);}finally{PROFILE=save;}
 });
 
 test('core read-mode judge: clean lines (千恋＊万花 22:53:50Z on: ADV lines, side streams only carry the name plate) never switch',t=>{

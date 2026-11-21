@@ -33,7 +33,7 @@
    "roles": false
   },
   "safeMode": {
-   "effectJudge": true
+   "effectJudge": false
   },
   "lang": {
    "ja": {
@@ -75,5 +75,5 @@
  "sourceLangs": [
   "ja"
  ],
- "rev": 3
+ "rev": 4
 }
