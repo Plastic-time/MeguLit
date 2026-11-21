@@ -46,6 +46,36 @@ function twoBlockBundle({classId,payload,textObj=null,block1Flags=35}){
 
 const tmp=p=>fs.mkdtempSync(path.join(os.tmpdir(),p));
 
+test('binary image and model TextAssets cannot supply dialogue, even when their payload contains Japanese',t=>{
+ const dir=tmp('ua-binary-');t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const root=path.join(dir,'Game_Data','StreamingAssets');
+ fs.mkdirSync(root,{recursive:true});
+ const sentence=Buffer.from('今日は晴れです。\nまた明日。');
+ const payloads=[Buffer.from('89504e470d0a1a0a','hex'),Buffer.from('RIFF\x20\0\0\0WEBP','latin1'),Buffer.from('PSB\0','latin1')];
+ for(const [i,signature] of payloads.entries()){
+  const bytes=Buffer.concat([signature,sentence]),object=Buffer.concat([str('model'+i),u32(bytes.length),align(bytes)]);
+  fs.writeFileSync(path.join(root,'entry'+i+'.bundle'),twoBlockBundle({classId:49,payload:Buffer.alloc(64),textObj:object}));
+  fs.writeFileSync(path.join(root,'raw'+i+'.bytes'),bytes);
+ }
+ fs.writeFileSync(path.join(root,'scenario.bytes'),Buffer.from('RIFFという名前です。\nPSBの話です。'));
+ assert.deepEqual(ua.scenes(dir).map(s=>s.name),['scenario']);
+ assert.deepEqual(ua.parse(ua.scenes(dir)[0].read()).lines,['RIFFという名前です。','PSBの話です。']);
+});
+
+test('a protected hybrid excludes a line-breaking table from bundles and keeps an authored TextAsset with the same name',t=>{
+ const dir=tmp('ua-linebreak-');t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const d=path.join(dir,'Game_Data'),stream=path.join(d,'StreamingAssets');
+ fs.mkdirSync(stream,{recursive:true});
+ const cat=path.join(dir,'CatSystem');fs.mkdirSync(cat);
+ const zip=require('./helpers/engine-fixtures.cjs').zip({'scene/story.cstx':''},{flagged:['scene/story.cstx']});
+ fs.writeFileSync(path.join(cat,'data_01.dat'),zip);
+ for(const [file,text] of [['layout','〕〉》ぁぃぅぇぉっゃゅょ'],['story','また会いましょう。\nまた明日。']]){
+  const obj=Buffer.concat([str('LineBreaking Following Characters'),str(text)]);
+  fs.writeFileSync(path.join(stream,file+'.bundle'),twoBlockBundle({classId:49,payload:Buffer.alloc(64),textObj:obj}));
+ }
+ assert.deepEqual(ua.scenes(dir).flatMap(s=>ua.parse(s.read()).lines),['また会いましょう。','また明日。']);
+});
+
 test('unityfs.readMatchingNodes skips trailing blocks for media-only bundles and TextAsset prefix reads',()=>{
  const dir=tmp('ua-perf-');
  try{

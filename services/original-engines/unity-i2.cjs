@@ -57,30 +57,34 @@ function readSource(raw){
  return lines.length?{lines,anchors:[],zh}:null;
 }
 
-function scriptIds(buf){
- if(!buf.includes(Buffer.from('I2.Loc')))return new Set();
+const i2Class=new Map([['LanguageSource','I2.Loc']]);
+function scriptIds(buf,classes=i2Class){
+ if(classes===i2Class&&!buf.includes(Buffer.from('I2.Loc')))return new Set();
  const parsed=ser.parse(buf),ids=new Set();
  if(!parsed?.little||parsed.version<17)return ids;
  for(const o of parsed.objects){
   if(o.type!==115)continue;
   const r=reader(buf.subarray(o.offset,o.offset+o.size));
   try{
-   if(r.string()!=='LanguageSource')continue;
+   const name=r.string();if(!classes.has(name))continue;
    r.take(20); // execution order and serialized properties hash
-   if(r.string()==='LanguageSource'&&r.string()==='I2.Loc')ids.add(o.id);
+   if(r.string()===name&&r.string()===classes.get(name))ids.add(o.id);
   }catch{}
  }
  return ids;
 }
 
+function references(buf,o,file,ids){
+ if(!ids?.size||o.size<32||o.offset+o.size>buf.length)return false;
+ const external=file.externals?.[buf.readInt32LE(o.offset+16)-1];
+ return external?.toLowerCase()==='globalgamemanagers.assets'&&ids.has(Number(buf.readBigInt64LE(o.offset+20)));
+}
+
 function entry(buf,o,file,ids){
- if(o.size<32||o.offset+o.size>buf.length)return null;
- const raw=buf.subarray(o.offset,o.offset+o.size);
- const external=file.externals?.[raw.readInt32LE(16)-1];
- if(external?.toLowerCase()!=='globalgamemanagers.assets'||!ids.has(Number(raw.readBigInt64LE(20))))return null;
+ if(!references(buf,o,file,ids))return null;
  try{
-  const doc=readSource(raw);
+  const doc=readSource(buf.subarray(o.offset,o.offset+o.size));
   return doc?{name:'I2-LanguageSource-'+o.id,kind:'i2',bytes:Buffer.from('\u0001I2\n'+JSON.stringify(doc))}:null;
  }catch{return null;}
 }
-module.exports={scriptIds,entry};
+module.exports={scriptIds,entry,references};
