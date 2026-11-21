@@ -37,7 +37,7 @@ test('a folder with nothing running is not reported as running',()=>{
 test('the pre-launch repair leaves folders without a MeguLit restore untouched and is wired into launch',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-repair-'));
  try{assert.deepEqual(jr.repairShared(root),{repaired:false});}finally{fs.rmSync(root,{recursive:true,force:true});}
- assert.match(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),/japanese-restore\.cjs'\)\.repairShared\(path\.dirname\(game\.executable\)\)/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),/japanese-restore\.cjs'\)\.repairShared\(path\.dirname\(game\.executable\),japaneseRestoreOptions\)/);
 });
 test('a Steam launch accepts a game process from another program in the install folder',()=>{
  const src=fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8');
