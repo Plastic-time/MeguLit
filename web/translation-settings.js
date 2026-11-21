@@ -22,7 +22,9 @@ export function configureTranslation({content,form,data,locale,api,esc,toast}){
   content.append(panel);let status=null,busy=false,timer;
  const row=name=>form.elements.namedItem(name)?.closest('.settings-row');const addressNote=document.createElement('small');addressNote.className='settings-help';
   row('baseUrl').querySelector('.setting-description').append(addressNote);
- function apply(reset){const meta=data.providers?.[provider.value]||{};if(reset){const draft=drafts.get(provider.value);base.value=draft?.baseUrl??meta.baseUrl??'';
+ /* 2026-11-21 模型名: known names of the engine as a datalist; the field stays free text and a saved name is kept */
+ const modelList=document.createElement('datalist');modelList.id='megulit-model-list';model.after(modelList);model.setAttribute('list',modelList.id);
+ function apply(reset){const meta=data.providers?.[provider.value]||{};modelList.replaceChildren(...(Array.isArray(meta.models)?meta.models:[]).map(name=>Object.assign(document.createElement('option'),{value:name})));if(reset){const draft=drafts.get(provider.value);base.value=draft?.baseUrl??meta.baseUrl??'';
   model.value=draft?.model??meta.model??'';}
   base.readOnly=!meta.editable;const isDefault=base.value===(meta.defaultBaseUrl||meta.baseUrl);addressNote.textContent=isDefault?({zh:'默认地址，已自动填写，通常无需修改',en:'Default URL, filled automatically; usually no changes needed',
    ja:'既定の URL を自動入力しています。通常は変更不要です'})[locale]:({zh:'当前使用自定义地址',en:'Using a custom URL',ja:'カスタム URL を使用中'})[locale];const mt=['google','microsoft','bing','deepl',

@@ -64,7 +64,7 @@ function event(message){if(!loaded){queued.push(message);return;}if(message.type
  // interface-mode-host owns mode navigation, avoiding a duplicate home reveal/focus.
 }
 try{
- const home=await api('home'),saved=await api('ui_state'),bootstrap=await api('reader_bootstrap');uiState=saved;window.__tomoyoEngines=bootstrap.engines;window.__tomoyoNativePreferences=bootstrap.native;
+ const home=await api('home'),saved=await api('ui_state'),bootstrap=await api('reader_bootstrap');uiState=saved;window.__tomoyoEngines=bootstrap.engines;window.__tomoyoModelLists=bootstrap.models||{};window.__tomoyoNativePreferences=bootstrap.native;
  for(const[key,value]of Object.entries(saved))localStorage.setItem(key,value);
  for(const[key,value]of Object.entries(saved))if(key.startsWith('tome-')&&legacyKey(key.replace(/^tome-/,'tomoyo-')))localStorage.setItem(key.replace(/^tome-/,'tomoyo-'),value);
  window.__tomoyoUiState=snapshot();localStorage.setItem('tome-ui-language',home.preferences.language);localStorage.setItem('tomoyo-ui-language',home.preferences.language);appearance(home.preferences);

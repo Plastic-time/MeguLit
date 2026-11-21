@@ -18,7 +18,7 @@ const ENGINES={
  yandexapi:{label:'Yandex 翻译 API',group:'api',kind:'mt',baseUrl:'https://translate.api.cloud.yandex.net',hint:'填 Yandex Cloud 服务账号的 API Key'},
  // LLMs (OpenAI-compatible)
  gemini:{label:'Google Gemini',group:'llm',kind:'llm',baseUrl:'https://generativelanguage.googleapis.com/v1beta/openai',model:'gemini-2.5-flash',hint:'填 Google AI Studio 的 API Key'},
- claude:{label:'Anthropic Claude',group:'llm',kind:'llm',baseUrl:'https://api.anthropic.com/v1',model:'claude-haiku-4-5',hint:'填 Anthropic Console 的 API Key（使用官方 OpenAI 兼容接口）'},
+ claude:{label:'Anthropic Claude',group:'llm',kind:'llm',baseUrl:'https://api.anthropic.com/v1',model:'claude-haiku-5-5',hint:'填 Anthropic Console 的 API Key（使用官方 OpenAI 兼容接口）'},
  qwen:{label:'通义千问（阿里云百炼）',group:'llm',kind:'llm',baseUrl:'https://dashscope.aliyuncs.com/compatible-mode/v1',model:'qwen-plus',hint:'填阿里云百炼的 API Key'},
  kimi:{label:'Kimi（月之暗面）',group:'llm',kind:'llm',baseUrl:'https://api.moonshot.cn/v1',model:'kimi-latest',hint:'填 Moonshot 开放平台的 API Key'},
  glm:{label:'智谱 GLM',group:'llm',kind:'llm',baseUrl:'https://open.bigmodel.cn/api/paas/v4',model:'glm-4-flash',hint:'填智谱开放平台的 API Key；glm-4-flash 免费'},
@@ -33,6 +33,21 @@ const ENGINES={
  ollama:{label:'Ollama 本地模型',group:'local',kind:'llm',baseUrl:'http://127.0.0.1:11434/v1',model:'qwen2.5:7b',keyless:true,editable:true,hint:'先运行 Ollama 并拉取模型，模型名与 ollama list 一致'},
  lmstudio:{label:'LM Studio 本地模型',group:'local',kind:'llm',baseUrl:'http://127.0.0.1:1234/v1',model:'',keyless:true,editable:true,hint:'在 LM Studio 里加载模型并开启本地服务，模型名填加载的模型'},
 };
+/* 2026-11-21 known model names per engine: the 模型名 field offers them as a datalist (it stays free text); a saved model name is
+   never changed. Only names the provider documents; the first one is the engine's default. */
+const MODELS={
+ gpt:['gpt-4.1-mini','gpt-4.1','gpt-4o-mini'],
+ deepseek:['deepseek-flash','deepseek-chat','deepseek-reasoner'],
+ gemini:['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.5-pro'],
+ claude:['claude-haiku-5-5','claude-sonnet-5-5','claude-opus-5-5'],
+ qwen:['qwen-plus','qwen-turbo','qwen-max'],
+ kimi:['kimi-latest','moonshot-v1-8k','moonshot-v1-32k'],
+ glm:['glm-4-flash','glm-4-plus','glm-4-air'],
+ grok:['grok-3-mini','grok-3'],
+ mistral:['mistral-small-latest','mistral-medium-latest','mistral-large-latest'],
+ openrouter:['google/gemini-2.5-flash','anthropic/claude-haiku-5-5','deepseek/deepseek-chat'],
+};
+function modelsFor(provider){const list=[...(MODELS[provider]||[])],def=ENGINES[provider]?.model;if(def&&!list.includes(def))list.unshift(def);return list;}
 const GROUPS={free:'免费',api:'翻译 API',llm:'大模型',local:'本地 / 离线'};
 const SAKURA_SYSTEM='你是一个轻小说翻译模型，可以流畅通顺地以日本轻小说的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，不擅自添加原文中没有的代词。';
 
@@ -84,4 +99,4 @@ async function machineTranslate(id,text,apiKey,fetcher,signal,lang='zh'){
  }
  throw Error('未知翻译引擎');
 }
-module.exports={ENGINES,GROUPS,SAKURA_SYSTEM,machineTranslate,splitPair};
+module.exports={ENGINES,MODELS,modelsFor,GROUPS,SAKURA_SYSTEM,machineTranslate,splitPair};
