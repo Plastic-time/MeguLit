@@ -42,14 +42,16 @@ export function initLibraryDevelopers({api,locale,esc=s=>String(s)}){
  load();setInterval(load,60000);addEventListener('megulit-covers-changed',()=>setTimeout(load,1500));
  return {reload:load};
 }
-/* the game page: the developer line under the title; a click opens a popover with the panel (it floats, so nothing moves) */
-export async function mountDetailDeveloper({main,id,api,locale,esc,toast,isCurrent=()=>true}){
- let d=null;try{d=await api('game_developer',{id});}catch{}if(!d||!isCurrent())return;
- const host=main.querySelector('.detail-title');if(!host)return;const t=devWords(locale),name=d.original||d.name;
- host.classList.add('has-dev');
- host.insertAdjacentHTML('beforeend',`<div class="detail-dev"><button type="button" class="detail-dev-btn" aria-expanded="false" title="${esc(t.dev)}">${logoChip(name,d.pid,esc)}<span>${esc(name)}</span><b aria-hidden="true">▾</b></button><div class="dev-pop" hidden></div></div>`);
- const wrap=host.querySelector('.detail-dev'),btn=wrap.querySelector('.detail-dev-btn'),pop=wrap.querySelector('.dev-pop');fillLogo(wrap.querySelector('.dev-logo'),api,d.pid);
- const close=()=>{pop.hidden=true;btn.setAttribute('aria-expanded','false');document.removeEventListener('click',outside,true);document.removeEventListener('keydown',key);};
- const outside=e=>{if(!wrap.contains(e.target))close();},key=e=>{if(e.key==='Escape')close();};
- btn.onclick=()=>{if(!pop.hidden){close();return;}pop.hidden=false;btn.setAttribute('aria-expanded','true');openPanel({panel:pop,pid:d.pid,api,t,esc,toast,locale});document.addEventListener('click',outside,true);document.addEventListener('keydown',key);};
+/* the game page: a developer card at the top of the right-hand info column of the overview (logo, name, VNDB / Moegirlpedia introduction,
+   links), shown at once, no click. The card is kept apart from the page's own markup (the overview is drawn again on every tab switch)
+   and put back by place(tab). */
+export function mountDetailDeveloper({main,id,api,locale,esc,toast,isCurrent=()=>true}){
+ const t=devWords(locale),card=document.createElement('section');card.className='dev-card';card.hidden=true;let ready=false;
+ const place=(tab='overview')=>{if(!ready)return;const aside=tab==='overview'?main.querySelector('.detail-aside'):null;if(aside){if(card.parentNode!==aside||aside.firstChild!==card)aside.prepend(card);card.hidden=false;}else{card.remove();}};
+ (async()=>{let d=null;try{d=await api('game_developer',{id});}catch{}if(!d||!isCurrent())return;
+  const name=d.original||d.name;
+  card.innerHTML=`<header class="dev-card-head">${logoChip(name,d.pid,esc)}<div><small>${esc(t.dev)}</small><b>${esc(name)}</b></div></header><div class="dev-card-body" data-body></div>`;
+  fillLogo(card.querySelector('.dev-logo'),api,d.pid);ready=true;place(main.querySelector('.detail-tabs [aria-selected="true"]')?.dataset.detailTab||'overview');
+  openPanel({panel:card.querySelector('[data-body]'),pid:d.pid,api,t,esc,toast,locale});})();
+ return {place};
 }
