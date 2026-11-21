@@ -47,7 +47,7 @@ export async function mountStatistics(root,{api,env,selection,onSelection}){
  </div>`;
  const el=p=>root.querySelector(`[data-p="${p}"]`);
 
- const duration=s=>{const h=Math.floor((s||0)/3600),m=Math.round(((s||0)%3600)/60);return {h,m};};
+ const duration=s=>{const minutes=Math.round((s||0)/60);return {h:Math.floor(minutes/60),m:minutes%60};};
  const slot=(day,range)=>range==='day'?Number(day.slice(-2))+':00':range==='year'?Number(day.slice(5,7))+(locale==='en'?'':'月'):day.slice(5).replace('-','/');
  const level=(v,max)=>!v?0:v<max*.1?1:v<max*.3?2:v<max*.65?3:4;
  const short=v=>v>=10000&&locale!=='en'?(v/10000).toFixed(1)+(locale==='ja'?'万':' 万'):num(v);
