@@ -13,7 +13,13 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const Profiles=require('./profiles/index.cjs');
 const MAX=64;
 
-function settings(profile){const frames=Profiles.get(profile,'choice.pageFrames',[]);return {clear:Profiles.get(profile,'page.reportClear',false)===true,choiceFrames:Array.isArray(frames)?frames.filter(f=>typeof f==='string'&&f&&!/[\r\n]/.test(f)).slice(0,20):[],roles:Profiles.get(profile,'draw.roles',false)===true,embed:Profiles.get(profile,'draw.embed',false)===true,zh:Profiles.get(profile,'draw.embedTranslation',true)!==false};}
+function settings(profile){const frames=Profiles.get(profile,'choice.pageFrames',[]);return {clear:Profiles.get(profile,'page.reportClear',false)===true,choiceFrames:Array.isArray(frames)?frames.filter(f=>typeof f==='string'&&f&&!/[\r\n]/.test(f)).slice(0,20):[],roles:Profiles.get(profile,'draw.roles',false)===true,embed:Profiles.get(profile,'draw.embed',false)===true,zh:Profiles.get(profile,'draw.embedTranslation',true)!==false,...withTable(tableLine(Profiles.get(profile,'draw.engineTable',null)))};}
+const withTable=t=>t?{table:t}:{};
+/* draw.engineTable (the version layer: this exe's addresses for an engine DLL that finds its functions by signature and
+   checks them against the table, e.g. MAGES) -> one control-file line "#table <engine> key=value ..."; '' = none */
+function tableLine(t){if(!t||typeof t!=='object'||Array.isArray(t)||!/^[a-z0-9]{1,16}$/.test(String(t.engine||'')))return '';
+ const parts=[];for(const [k,v] of Object.entries(t)){if(k==='engine'||!/^[A-Za-z][A-Za-z0-9]{0,31}$/.test(k))continue;const val=Array.isArray(v)?v.join(','):v;if((typeof val==='string'||typeof val==='number')&&/^[\w.,-]{1,200}$/.test(String(val)))parts.push(k+'='+val);}
+ return parts.length?'#table '+t.engine+' '+parts.join(' '):'';}
 /* the key both sides use: the sentence's characters without blanks or line breaks */
 const keyOf=t=>String(t||'').replace(/[\s　\u001f]/g,'');
 /* reader spans [start, end, reading] (end exclusive, code points of the key) -> start:len:reading|... */
@@ -28,6 +34,7 @@ const clean=t=>String(t||'').replace(/\t/g,' ').replace(/\r?\n/g,'\u001f');
 function krkrControlPath(pid,tmp=os.tmpdir()){return path.join(tmp,'MeguLit','draw',(Number(pid)|0)+'.txt');}
 function krkrControlText(cfg,entries){
  const lines=['#cfg roles='+(cfg.roles?1:0)+' embed='+(cfg.embed?1:0)+' zh='+(cfg.zh?1:0)];
+ if(cfg.table)lines.push(cfg.table);
  if(cfg.clear)lines.push('#clearline');
  for(const f of cfg.choiceFrames||[])lines.push('#choiceframe '+f);
  for(const [k,e] of entries)if(k&&!/[\t\r\n]/.test(k))lines.push(k+'\t'+rubyField(e.ruby)+'\t'+(cfg.zh?clean(e.zh):''));
@@ -89,4 +96,4 @@ class UiTracker{
 /* the kernel's routing of one parsed ToMe_CHARS record: 'ui' for every role but line */
 const routeOf=rec=>rec&&rec.role&&rec.role!=='line'?'ui':'line';
 
-module.exports={EngineDraw,UiTracker,rowsOf,KrkrTransport,krkrControlPath,krkrControlText,rubyField,keyOf,routeOf,settings,MAX};
+module.exports={tableLine,EngineDraw,UiTracker,rowsOf,KrkrTransport,krkrControlPath,krkrControlText,rubyField,keyOf,routeOf,settings,MAX};

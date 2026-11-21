@@ -19,7 +19,7 @@ rem the changed engine files go to engine32 (copied by hand before; the YU-RIS i
 for %%F in (BGI.cpp Siglus.cpp Yuris.cpp YurisDraw.h YurisDrawSig.h Pal.cpp ToMeIslandDraw.h ToMeIslandFlow.h ToMeTextPos.h MeguLitSg.cpp EuphoriaHD474Draw.h EuphoriaDrawFlow.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engine32\%%F" >nul || exit /b 1
 rem one hook runtime (2026-11-19): the exact-program adapters (ISLAND, STEINS;GATE) are engines our enginecollection32.cpp lists first, euphoria HD sits in Yuris.cpp;
 rem the STEINS;GATE adapter is compiled from native\mages under its own namespaces (MeguLitSg.cpp), upstream engines\mages untouched
-for %%F in (enginecollection32.cpp MeguLitEngines.h MeguLitMatch.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
+for %%F in (enginecollection32.cpp MeguLitEngines.h MeguLitMatch.h MagesDraw.h MagesDrawSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
 copy /y "%~dp0..\mages\readString.cpp" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engine32\MeguLitSg_readString.inc" >nul || exit /b 1
 copy /y "%~dp0..\mages\mages.cpp" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engine32\MeguLitSg_mages.inc" >nul || exit /b 1
 copy /y "%~dp0..\mages\sgBlank.h" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\mages\sgBlank.h" >nul || exit /b 1
@@ -28,6 +28,8 @@ rem MinHook's instruction decoder for the MAGES register scan (native\mages\mage
 for %%F in (hde32.h pstdint.h) do copy /y "%~dp0..\shared\minhook\src\hde\%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engine32\%%F" >nul || exit /b 1
 rem the upstream MAGES engine (5pb games: CHAOS;CHILD, STEINS;GATE 0, ...) with the same instruction-aligned register scan
 copy /y "%~dp0MagesEngine.cpp" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\mages\mages.cpp" >nul || exit /b 1
+rem engine-draw MAGES (MagesDraw.h) next to the upstream MAGES engine that arms it
+for %%F in (MagesDraw.h MagesDrawSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\mages\%%F" >nul || exit /b 1
 for %%F in (hde32.h pstdint.h) do copy /y "%~dp0..\shared\minhook\src\hde\%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\mages\%%F" >nul || exit /b 1
 cmake -S "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook" -B "%MEGULIT_HOOK_TREE%\build-x86-vs" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_HOST=OFF -DBUILD_HOOK=ON -DWIN10ABOVE=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DFETCHCONTENT_SOURCE_DIR_MINHOOK="%~dp0..\shared\minhook" -DFETCHCONTENT_FULLY_DISCONNECTED=ON || exit /b 1
 cmake --build "%MEGULIT_HOOK_TREE%\build-x86-vs" --target LunaHook --parallel 8

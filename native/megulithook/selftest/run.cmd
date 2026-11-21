@@ -34,6 +34,14 @@ rem engine-draw YU-RIS signature (YurisDrawSig.h) on bytes of the four known bui
 cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 yurisdraw.cpp /Fe:"%TEMP%\megulit-gdihide32\yurisdraw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
 "%TEMP%\megulit-gdihide32\yurisdraw.exe"
  if errorlevel 1 exit /b 1
+rem engine-draw MAGES signature (MagesDrawSig.h) on the decrypted code of the five known Steam builds
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 magesdraw.cpp /Fe:"%TEMP%\megulit-gdihide32\magesdraw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\magesdraw.exe"
+ if errorlevel 1 exit /b 1
+rem engine-draw MAGES runtime (MagesDraw.h): real MinHook detours on a stand-in engine, the whole commit / clear / show / glyph chain
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 /I..\..\shared\minhook\include magesgate.cpp ..\..\shared\minhook\src\hook.c ..\..\shared\minhook\src\buffer.c ..\..\shared\minhook\src\trampoline.c ..\..\shared\minhook\src\hde\hde32.c /Fe:"%TEMP%\megulit-gdihide32\magesgate.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\magesgate.exe"
+ if errorlevel 1 exit /b 1
 rem one hook runtime (2026-11-19): the ISLAND, STEINS;GATE, euphoria HD adapters are part of MeguLitHook32
 for %%M in (ToMeCS2_DRAW ToMeSG_EMBED EmbedEuphoria474_DrawHide_TEST2) do (
  findstr /m /c:"%%M" "%~dp0..\MeguLitHook32.dll" >nul && (echo PASS MeguLitHook32.dll carries %%M) || (echo FAIL MeguLitHook32.dll lacks %%M & exit /b 1)

@@ -45,7 +45,7 @@
 | QLIE | LunaHook | 外 | 外（字形点） | 外 | 外 | 无 | 外 | 无 | Delphi 引擎，画字在 TQLIE 文本对象里；要按版本找 | L | QLIE 解包（qlie-tools）、LunaHook |
 | Malie | LunaHook（内嵌） | 外 | 外（GPU 四边形） | 外 | 外 | 无 | 外 | 无 | Malie 自绘字体，画字函数在 exe 内；Camellia 密钥已有 | L | MalieTools、LunaHook Malie |
 | Softpal / Pal | megulithook Pal.cpp（内嵌 + ruby + pal_sprite_v1 坐标通道） | 外（流） | 内（pal_sprite_v1 文字精灵） | 外 | 外 | 无 | 外（写回） | 外 | 精灵通道加角色字段；选项精灵 | M | SoftpalTools、LunaHook Pal |
-| MAGES. | MagesEngine.cpp + mages/（SC3 解码含 ruby）；STEINS;GATE 精确匹配 | 内（SC3 串）| 内（SG）/ 外 | 外 | 外 | 无 | 内（SG） | 内（SC3 ruby） | 把 SG 的画字钩子泛化到其他 MAGES 作（按 exe 版本表）；选项是 SC3 SELECT | M | Committee of Zero 的 LanguageBarrier（MAGES 画字 + 字体 DLL 钩子，开源）、sc3tools |
+| MAGES. | MagesEngine.cpp + mages/（SC3 解码含 ruby）；STEINS;GATE 精确匹配；**MagesDraw.h（对话页 + 提交函数，5 部 Steam 版，签名 + 版本层表，默认不挂）** | 内（对话页字码）| 内（页数组 ×缩放，1920×1080 画布）| 内（0x8001/0x8002 标记）| 内（Sel 第 7 页 / SysSel 第 5+w 页，标志字节 = 选项号）| 外（菜单走 drawGlyph 调用点，角色表待探针）| 内（SG）| 内（SC3 ruby；画字层注音标记为推断）| 画布 → 屏幕偏移、接进 hook-native 实时流、内嵌 | M | Committee of Zero 的 LanguageBarrier、impacto（opcode 表、页结构）|
 | NScripter / ONScripter | LunaHook | 外 | 外（NScripter GDI 字形点；ONScripter 是 SDL_ttf → 无） | 无 | 外 | 无 | 外 | 无 | ONScripter-jh 是开源引擎，可按源码定位画字；原版 NScripter 闭源 | M（ONS）/ L（NS） | ONScripter-jh 源码、nscripter 解包 |
 | LiveMaker | LunaHook | 外 | 外（GDI 字形点） | 无 | 外 | 无 | 外 | 无 | LSB 二进制 + Delphi 画字；pylivemaker 能读 LSB 定位文本节点 | L | pylivemaker |
 | Escude | LunaHook | 外 | 外（字形点） | 外 | 外 | 无 | 外 | 无 | ESCR VM 文本函数 | L | EscudeTools、escude.cjs（本仓库读剧本） |
