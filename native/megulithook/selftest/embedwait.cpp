@@ -101,7 +101,8 @@ static Result Hooked(const std::wstring &text, bool selected)
 {
   Result res{0, false, L""};
   double start = Now();
-  UINT64 key = Hash(text), gen = SharedGen;
+  UINT64 eventKey = Hash(text), gen = SharedGen;
+  const std::string key(reinterpret_cast<const char *>(text.data()), text.size() * sizeof(wchar_t));
   int armed = -1;
   if (Old)
   {
@@ -115,7 +116,7 @@ static Result Hooked(const std::wstring &text, bool selected)
     else
     {
       ZeroMemory(SharedText, sizeof(SharedText));
-      MeguLitEmbed::Arm(Format, GetCurrentProcessId(), key);
+      MeguLitEmbed::Arm(Format, GetCurrentProcessId(), eventKey);
       armed = 0;
     }
   }
@@ -132,7 +133,7 @@ static Result Hooked(const std::wstring &text, bool selected)
   if (hit == MeguLitEmbed::Miss)
   {
     res.waitedAtAll = true;
-    HANDLE ev = Old ? MeguLitEmbed::Open(Format, GetCurrentProcessId(), key) : MeguLitEmbed::Take(Format, GetCurrentProcessId(), key);
+    HANDLE ev = Old ? MeguLitEmbed::Open(Format, GetCurrentProcessId(), eventKey) : MeguLitEmbed::Take(Format, GetCurrentProcessId(), eventKey);
     double w = Now();
     bool ok = MeguLitEmbed::Wait(ev, WaitMs, []
                                  { return true; });
@@ -165,9 +166,45 @@ static double P95(std::vector<double> v)
   return v[(size_t)(v.size() * 0.95)];
 }
 
+static UINT64 OldTextHash(const std::string &bytes)
+{
+  UINT64 sum = 0;
+  for (unsigned char byte : bytes)
+    sum = (sum + byte) << 1;
+  return sum;
+}
+
+static void CheckCacheIdentity()
+{
+  MeguLitEmbed::Cache cache;
+  const std::wstring suffix(35, L'あ');
+  const std::wstring first = L"違う前文甲" + suffix, second = L"別の前文乙" + suffix;
+  const std::string a(reinterpret_cast<const char *>(first.data()), first.size() * sizeof(wchar_t));
+  const std::string b(reinterpret_cast<const char *>(second.data()), second.size() * sizeof(wchar_t));
+  Check(a != b && OldTextHash(a) == OldTextHash(b), "regression fixture: different Japanese with same 70-byte suffix collided in old hash");
+  cache.Put(a, 1, 1000, L"first answer");
+  std::wstring out;
+  Check(cache.Find(b, 1, 1001, &out) == MeguLitEmbed::Miss, "different Japanese never borrows the first answer");
+  cache.Put(b, 1, 1002, L"second answer");
+  Check(cache.Find(a, 1, 1003, &out) == MeguLitEmbed::Replace && out == L"first answer", "first sentence retains its own cached answer");
+  Check(cache.Find(b, 1, 1003, &out) == MeguLitEmbed::Replace && out == L"second answer", "second sentence retains its own cached answer");
+  const std::string nulA("a\0b", 3), nulB("a\0c", 3), shortKey("a", 1);
+  cache.Put(nulA, 1, 1000, L"embedded NUL answer");
+  Check(cache.Find(nulB, 1, 1001, nullptr) == MeguLitEmbed::Miss && cache.Find(shortKey, 1, 1001, nullptr) == MeguLitEmbed::Miss, "binary key compares bytes after NUL and the complete length");
+  Check(cache.Find(nulA, 1, 1001, &out) == MeguLitEmbed::Replace && out == L"embedded NUL answer", "binary key preserves UTF16-like NUL bytes");
+  const std::string cpA("\x82\xa0", 2), cpB("\x82\xa2", 2);
+  cache.Put(cpA, 1, 1000, L"CP932 answer");
+  Check(cache.Find(cpB, 1, 1001, nullptr) == MeguLitEmbed::Miss, "different CP932 bytes remain different cache entries");
+  cache.Put(b, 1, 1000, L"");
+  Check(cache.Find(b, 1, 1499, nullptr) == MeguLitEmbed::Unchanged && cache.Find(a, 1, 1499, &out) == MeguLitEmbed::Replace && out == L"first answer", "empty answer affects only its exact sentence");
+  Check(cache.Find(b, 1, 1500, nullptr) == MeguLitEmbed::Miss, "empty answer keeps the 500ms expiry");
+  Check(cache.Find(a, 2, 1501, nullptr) == MeguLitEmbed::Miss, "generation changes still invalidate binary-key answers");
+}
+
 int main(int argc, char **argv)
 {
   Old = argc > 1 && !strcmp(argv[1], "--old");
+  CheckCacheIdentity();
   timeBeginPeriod(1);
   std::thread host(Host);
   std::atomic<bool> noise{true};
