@@ -39,19 +39,24 @@ const SCRIPTY=/script|scenario|scene|scn|story|text|txt|msg|data|sys|main|game/i
 const packedSize=s=>s?d.sampleSizes(s).packed:0;
 function fitted(make,window){for(let w=window;w>=MIN_WINDOW;w=Math.floor(w/4)){const s=make(w);if(!s)return null;if(packedSize(s)<=SAMPLE_PACKED_MAX)return s;}return null;}
 const sized=(entry,s)=>{if(s){const z=d.sampleSizes(s);entry.raw=z.raw;entry.packed=z.packed;}return entry;};
+function sampleAttempt(bytes,options,state){const result=d.sampleResult(bytes,options);if(result.structure)state.structure=result.structure;if(!result.sample)state.reason=result.reason;return result.sample;}
+const droppedSample=(name,role,size,state)=>({name,role,size,dropped:state.reason||'VERIFY'});
 /* an archive: whole when head + tail cover it, else its head and its tail (indexes live at either end) */
 function archiveSample(file,dir,budget){
  const st=fs.statSync(file),name=d.maskString(path.relative(dir,file).replace(/\\/g,'/')).slice(0,120);
+ const state={reason:'VERIFY',structure:null};
  const s=fitted(w=>{const head=Math.min(w,SAMPLE_HEAD),tail=Math.min(w,SAMPLE_TAIL);
-  if(st.size<=head+tail){budget.raw+=st.size;return d.sample(fs.readFileSync(file),{max:st.size,compress:true});}
-  budget.raw+=head+tail;const h=d.sample(readRange(file,0,head),{max:head,compress:true});if(!h)return null;
-  const t=d.sample(readRange(file,st.size-tail,tail),{max:tail,compress:true});if(t){for(const p of t.parts)p.at+=st.size-tail;for(const o of t.opaque)o.at+=st.size-tail;}
+  if(st.size<=head+tail){budget.raw+=st.size;return sampleAttempt(fs.readFileSync(file),{max:st.size,compress:true},state);}
+  budget.raw+=head+tail;const h=sampleAttempt(readRange(file,0,head),{max:head,compress:true},state);if(!h)return null;
+  const t=sampleAttempt(readRange(file,st.size-tail,tail),{max:tail,compress:true},state);if(!t&&state.structure)return null;if(t){for(const p of t.parts)p.at+=st.size-tail;for(const o of t.opaque)o.at+=st.size-tail;}
   return {size:st.size,parts:[...h.parts,...(t?.parts||[])],opaque:[...h.opaque,...(t?.opaque||[])],entropy:h.entropy};},Math.max(SAMPLE_HEAD,SAMPLE_TAIL));
+ if(!s&&state.structure)return droppedSample(name,'archive',st.size,state);
  /* S5 a window with one block of text in it used to drop the whole archive (Stand by you root.pfs, リビドー Script2.arc: dropped VERIFY, index lost):
     keep every 64 KiB block that passes on its own, plus the regions the header points into (directories in the middle: rio, npa) */
- const kept=s?{...s,parts:[...s.parts],opaque:[...s.opaque]}:blockSample(file,st.size,[[0,Math.min(st.size,SAMPLE_HEAD)],...st.size>SAMPLE_HEAD?[[Math.max(SAMPLE_HEAD,st.size-SAMPLE_TAIL),st.size]]:[]],budget);
- if(kept&&st.size>SAMPLE_HEAD+SAMPLE_TAIL){const more=blockSample(file,st.size,headerPointers(file,st.size,SAMPLE_HEAD,st.size-SAMPLE_TAIL).map(at=>[at,Math.min(st.size-SAMPLE_TAIL,at+POINTER_SPAN)]),budget,SAMPLE_PACKED_MAX-packedSize(kept));if(more){kept.parts.push(...more.parts);kept.opaque.push(...more.opaque);}}
- if(!kept||!kept.parts.length)return {name,role:'archive',size:st.size,dropped:'VERIFY'};
+ const kept=s?{...s,parts:[...s.parts],opaque:[...s.opaque]}:blockSample(file,st.size,[[0,Math.min(st.size,SAMPLE_HEAD)],...st.size>SAMPLE_HEAD?[[Math.max(SAMPLE_HEAD,st.size-SAMPLE_TAIL),st.size]]:[]],budget,SAMPLE_PACKED_MAX,state);
+ if(!kept&&state.structure)return droppedSample(name,'archive',st.size,state);
+ if(kept&&st.size>SAMPLE_HEAD+SAMPLE_TAIL){const more=blockSample(file,st.size,headerPointers(file,st.size,SAMPLE_HEAD,st.size-SAMPLE_TAIL).map(at=>[at,Math.min(st.size-SAMPLE_TAIL,at+POINTER_SPAN)]),budget,SAMPLE_PACKED_MAX-packedSize(kept),state);if(!more&&state.structure)return droppedSample(name,'archive',st.size,state);if(more){kept.parts.push(...more.parts);kept.opaque.push(...more.opaque);}}
+ if(!kept||!kept.parts.length)return droppedSample(name,'archive',st.size,state);
  const s2=kept;
  return sized({name,role:'archive',size:st.size,head:sha(readHead(file,1<<20)),sample:{parts:s2.parts,opaque:s2.opaque,entropy:s2.entropy},...s2.droppedBlocks?{droppedBlocks:s2.droppedBlocks}:{}},s2);}
 /* S5 offsets a header names: u32 / u64 little-endian values in the first 64 bytes that land between lo and hi (at most 3) */
@@ -60,13 +65,14 @@ function headerPointers(file,size,lo,hi){let h;try{h=readRange(file,0,64);}catch
  for(let o=0;o+4<=h.length&&out.length<3;o+=4){const x=h.readUInt32LE(o);if(x>=lo&&x<hi&&!out.some(y=>Math.abs(y-x)<POINTER_SPAN))out.push(x);}
  return out.sort((a,b)=>a-b);}
 /* the 64 KiB blocks of the given ranges that pass desensitize.verify on their own, up to maxPacked compressed */
-function blockSample(file,size,ranges,budget,maxPacked=SAMPLE_PACKED_MAX){const parts=[],opaque=[];let packed=0,dropped=0;
+function blockSample(file,size,ranges,budget,maxPacked=SAMPLE_PACKED_MAX,state={reason:'VERIFY',structure:null}){const parts=[],opaque=[];let packed=0,dropped=0;
  for(const [a,b] of ranges)for(let at=a;at<b;at+=BLOCK_SPAN){const len=Math.min(BLOCK_SPAN,b-at);let buf;try{buf=readRange(file,at,len);}catch{continue;}budget.raw+=len;
-  const s=d.sample(buf,{max:len,compress:true});if(!s){dropped++;continue;}const p=packedSize(s);if(packed+p>maxPacked)return parts.length?{size,parts,opaque,entropy:0,droppedBlocks:dropped}:null;packed+=p;
+  const s=sampleAttempt(buf,{max:len,compress:true},state);if(!s){dropped++;if(state.structure)return null;continue;}const p=packedSize(s);if(packed+p>maxPacked)return parts.length?{size,parts,opaque,entropy:0,droppedBlocks:dropped}:null;packed+=p;
   for(const x of s.parts){x.at+=at;parts.push(x);}for(const o of s.opaque){o.at+=at;opaque.push(o);}}
  return parts.length?{size,parts,opaque,entropy:0,droppedBlocks:dropped}:null;}
 /* a script: the whole file up to SCRIPT_MAX */
-function scriptSample(bytes,max=SCRIPT_MAX){return fitted(w=>d.sample(bytes.subarray(0,Math.min(w,bytes.length)),{max:Math.min(w,bytes.length),compress:true}),Math.min(max,bytes.length));}
+function scriptSampleResult(bytes,max=SCRIPT_MAX){const state={reason:'VERIFY',structure:null};const sample=fitted(w=>sampleAttempt(bytes.subarray(0,Math.min(w,bytes.length)),{max:Math.min(w,bytes.length),compress:true},state),Math.min(max,bytes.length));return {sample,reason:sample?null:state.reason,structure:state.structure};}
+function scriptSample(bytes,max=SCRIPT_MAX){return scriptSampleResult(bytes,max).sample;}
 /* encrypted entries of an XP3 archive, for known-plaintext key candidates: [{data,ext}] */
 function xp3Entries(file){try{const xp3=require('./original-engines/xp3.cjs'),t=xp3.list(file);if(!t)return [];return t.files.filter(e=>e.encrypted&&e.size>=16).slice(0,24).map(e=>{try{return {data:xp3.read(file,e).subarray(0,256),ext:path.extname(e.name).slice(1)};}catch{return null;}}).filter(Boolean);}catch{return [];}}
 function opaqueBlocks(file){try{const st=fs.statSync(file),out=[];for(const at of [0,4096,65536,1<<20,st.size>>1].filter(x=>x+4096<=st.size)){const b=readRange(file,at,4096);if(d.entropy(b)>7.2)out.push({data:b,ext:''});}return out;}catch{return [];}}
@@ -80,11 +86,11 @@ function sampleGame({dir,executable,result}){
  if(step==='parse-failed'){
   /* the scenes a reader opened but could not cut into lines */
   try{const scenes=require('./original-engines/scenes.cjs'),opened=(result.engines||[]).filter(e=>e.scenes>0&&!e.lines).map(e=>e.id);
-   for(const id of opened){const list=scenes.ENGINES[id]?.scenes(dir)||[];for(const s of list.slice(0,PER_GAME_SAMPLES-samples.length>0?PER_GAME_SAMPLES-samples.length:0)){if(!room())break;let b;try{b=s.read();}catch{continue;}budget.raw+=Math.min(b.length,SCRIPT_MAX);const sm=scriptSample(b);
-     samples.push(sm?sized({name:d.maskString(String(s.name)).slice(0,120),role:'script:'+id,size:b.length,head:sha(b.subarray(0,1<<20)),sample:sm},sm):{name:d.maskString(String(s.name)).slice(0,120),role:'script:'+id,size:b.length,dropped:'VERIFY'});}}}catch{}
+   for(const id of opened){const list=scenes.ENGINES[id]?.scenes(dir)||[];for(const s of list.slice(0,PER_GAME_SAMPLES-samples.length>0?PER_GAME_SAMPLES-samples.length:0)){if(!room())break;let b;try{b=s.read();}catch{continue;}budget.raw+=Math.min(b.length,SCRIPT_MAX);const sampled=scriptSampleResult(b),sm=sampled.sample;
+     samples.push(sm?sized({name:d.maskString(String(s.name)).slice(0,120),role:'script:'+id,size:b.length,head:sha(b.subarray(0,1<<20)),sample:sm},sm):droppedSample(d.maskString(String(s.name)).slice(0,120),'script:'+id,b.length,sampled));}}}catch{}
   /* loose script-looking files no reader took */
   if(samples.length<PER_GAME_SAMPLES)try{const list=fs.readdirSync(dir).filter(n=>/\.(ks|scr|ss|s|sc|txt|ws2|bsc|asb|mjo|hcb)$/i.test(n)).slice(0,PER_GAME_SAMPLES-samples.length);
-   for(const n of list){if(!room())break;const f=path.join(dir,n),b=readHead(f,SCRIPT_MAX);budget.raw+=b.length;const sm=scriptSample(b);samples.push(sm?sized({name:d.maskString(n),role:'script',size:fs.statSync(f).size,head:sha(readHead(f,1<<20)),sample:sm},sm):{name:d.maskString(n),role:'script',size:fs.statSync(f).size,dropped:'VERIFY'});}}catch{}}
+   for(const n of list){if(!room())break;const f=path.join(dir,n),b=readHead(f,SCRIPT_MAX);budget.raw+=b.length;const sampled=scriptSampleResult(b),sm=sampled.sample;samples.push(sm?sized({name:d.maskString(n),role:'script',size:fs.statSync(f).size,head:sha(readHead(f,1<<20)),sample:sm},sm):droppedSample(d.maskString(n),'script',fs.statSync(f).size,sampled));}}catch{}}
  const keys=entries.length?d.keyCandidates(entries):[];
  return {samples:samples.slice(0,PER_GAME_SAMPLES+3),keys};}
 
@@ -134,7 +140,7 @@ function completeness(g){const rt=g.runtime||null,rtItems=rt?['keys','indexes','
  const complete=!g.trimmed&&!(g.samples||[]).some(x=>x.dropped)&&(!RUNTIME_STEPS.includes(g.step)||rtItems>0);
  return {items,state:complete?'complete':items<=1?'failed':'partial'};}
 function manifestOf(bundle){return bundle.games.map(g=>({key:g.key.slice(0,12),title:g.title,step:g.step,detail:g.detail,...(c=>({probeItems:c.items,probeState:c.state}))(completeness(g)),
- items:[{kind:'result',bytes:Buffer.byteLength(JSON.stringify({...g,samples:undefined,keys:undefined,runtime:undefined}))},...g.samples.map(s=>({kind:s.dropped?'dropped':'sample',name:s.name,role:s.role,size:s.size,bytes:s.sample?Buffer.byteLength(JSON.stringify(s.sample)):0,...(s.sample?d.sampleSizes(s.sample):{raw:0,packed:0}),opaque:s.sample?.opaque?.length||0})),...(g.keys.length?[{kind:'keys',count:g.keys.length,algos:[...new Set(g.keys.map(k=>k.algo))]}]:[]),...runtimeItems(g.runtime)]}));}
+ items:[{kind:'result',bytes:Buffer.byteLength(JSON.stringify({...g,samples:undefined,keys:undefined,runtime:undefined}))},...g.samples.map(s=>({kind:s.dropped?'dropped':'sample',...(s.dropped?{reason:['VERIFY','STRUCTURE_CHANGED','STRUCTURE_BUDGET','STRUCTURE_UNSUPPORTED'].includes(s.dropped)?s.dropped:'VERIFY'}:{}),name:s.name,role:s.role,size:s.size,bytes:s.sample?Buffer.byteLength(JSON.stringify(s.sample)):0,...(s.sample?d.sampleSizes(s.sample):{raw:0,packed:0}),opaque:s.sample?.opaque?.length||0})),...(g.keys.length?[{kind:'keys',count:g.keys.length,algos:[...new Set(g.keys.map(k=>k.algo))]}]:[]),...runtimeItems(g.runtime)]}));}
 /* every runtime finding as its own manifest row: what it is, how it was checked, its size (name is shown as is) */
 function runtimeItems(rt){if(!rt)return [];const size=x=>Buffer.byteLength(JSON.stringify(x)),out=[];
  for(const k of rt.keys||[])out.push({kind:'runtime-key',name:'runtime · '+k.algo+' '+(k.form==='state'?'key schedule':k.form==='params'?'parameters':'key')+' · '+k.verified,role:'runtime',algo:k.algo,bytes:size(k)});
@@ -166,4 +172,4 @@ async function upload(root,{hash,followUp=false,fetcher=globalThis.fetch,endpoin
  if(followUp){try{grant(root,JSON.parse(body).games.map(g=>g.key));}catch{}}
  try{fs.writeFileSync(path.join(outbox(root),hash+'.sent'),JSON.stringify({at:Date.now(),id:last.id||''}));}catch{}
  return {state:'uploaded',id:String(last.id||''),issueUrl:/^https:\/\//.test(String(last.issueUrl||''))?String(last.issueUrl):''};}
-module.exports={sampleGame,prepare,manifest,upload,completeness,consent,grant,revoke,publicResult,clean,runtimeItems,archiveSample,scriptSample,MAX_BUNDLE,CHUNK,SAMPLE_HEAD,SAMPLE_TAIL,SCRIPT_MAX,SAMPLE_PACKED_MAX};
+module.exports={sampleGame,prepare,manifest,upload,completeness,consent,grant,revoke,publicResult,clean,runtimeItems,archiveSample,scriptSample,scriptSampleResult,MAX_BUNDLE,CHUNK,SAMPLE_HEAD,SAMPLE_TAIL,SCRIPT_MAX,SAMPLE_PACKED_MAX};
