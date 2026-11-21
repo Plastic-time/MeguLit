@@ -57,9 +57,10 @@ var msg=new Window_Message(),layer={children:[msg]},SceneManager={_scene:null};
 `;
 function rig(){
  const ctx={};vm.createContext(ctx);vm.runInContext(STANDIN,ctx);
+ ctx.originals={draw:ctx.Bitmap.prototype.drawText,start:ctx.Window_Message.prototype.startMessage,update:ctx.Window_Message.prototype.updateMessage};
  ctx.window=ctx;ctx.__megulitReport=s=>ctx.reports.push(JSON.parse(s));
  vm.runInContext(RPGM_SCRIPT,ctx);
- const boot=()=>{ctx.SceneManager._scene={children:[ctx.layer]};ctx.timers.shift()();};
+ const boot=(cfg={roles:true,embed:false})=>{ctx.SceneManager._scene={children:[ctx.layer]};ctx.__megulitRpgm.config(cfg);};
  const say=(t)=>{ctx.$gameMessage._t=t;ctx.msg.startMessage();return ctx.msg.updateMessage();};
  return {ctx,boot,say,api:ctx.__megulitRpgm,run:js=>vm.runInContext(js,ctx)};
 }
@@ -68,7 +69,7 @@ const recs=r=>{const out=[],p=new W.WebTextPath({port:1,onChars:l=>out.push(TP.p
 
 test('patches only once the game booted (plugins loaded), then reports each message with its characters on screen',()=>{
  const r=rig();assert.equal(r.api.state().patched,false);
- r.ctx.timers[0]();assert.equal(r.api.state().patched,false,'no scene yet');
+ r.api.config({roles:true});r.ctx.timers[0]();assert.equal(r.api.state().patched,false,'no scene yet');
  r.boot();assert.equal(r.api.state().patched,true);assert.deepEqual(r.ctx.reports.find(o=>o.status),{status:'rpgm ok MV',engine:'rpgm'});
  r.say('今日は\\c[2]晴れ\n二行目');
  const [line]=recs(r);
@@ -105,13 +106,13 @@ test('embed: the message waits for its replacement, then draws ruby above the ba
  const line=recs(r).at(-1);assert.deepEqual([line.text,line.emb,line.rects.length],['今日は晴れ',2,5],'the line is the Japanese only, emb=2');
 });
 
-test('embed: no replacement in time = the game\'s own message, no emb; a box with no room keeps the Chinese out (emb=1)',()=>{
+test('embed: timeout or no applied ruby/Chinese keeps the original message and reader fallback, without emb',()=>{
  const r=rig();r.boot();r.api.config({embed:true});
  r.ctx.$gameMessage._t='遅い';r.ctx.msg.startMessage();r.ctx.now=1300;r.ctx.msg.updateMessage();
  assert.equal(r.ctx.draws.length,2);assert.equal(recs(r).at(-1).emb,undefined);
  r.api.embed('一\n二\n三\n四'.replace(/\n/g,''),{ruby:[],zh:'很长'});
  r.ctx.$gameMessage._t='一\n二\n三\n四';r.ctx.msg.startMessage();r.ctx.msg.updateMessage();
- assert.equal(recs(r).at(-1).emb,1,'four rows fill the box');assert.ok(!r.ctx.draws.some(x=>x.t==='很'));
+ assert.equal(recs(r).at(-1).emb,undefined,'four rows leave no room and no ruby was applied');assert.ok(!r.ctx.draws.some(x=>x.t==='很'));
 });
 
 test('web path wiring: the RPG Maker reader rides along, asks go to onAsk, config and replacements go to the page',async()=>{
@@ -123,8 +124,8 @@ test('web path wiring: the RPG Maker reader rides along, asks go to onAsk, confi
  await p.drawConfig({roles:true,embed:true,zh:true});await p.drawConfig({roles:true,embed:true,zh:true});
  assert.equal(evals.filter(j=>j.includes('__megulitRpgm.config({"roles":true,"embed":true,"zh":true})')).length,1,'sent once per change');
  await p.drawEmbed('今日は',{ruby:[[0,2,'きょう']],zh:'今天'});assert.ok(evals.at(-1).includes('__megulitRpgm.embed("今日は",{"ruby":[[0,2,"きょう"]],"zh":"今天"})'));
- const prof=require('../core/profiles/index.cjs');assert.deepEqual(prof.profileFor({engine:'RPG Maker MV/MZ'}).draw,{roles:true,advhdInput:false,embed:true,embedTranslation:true,engineTable:null,viaRoles:[]},'RPG Maker enables its existing rendering only; AdvHD diagnostics remain off');
- assert.deepEqual(prof.profileFor({engine:'KiriKiri'}).draw,{roles:false,advhdInput:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]});
+ const prof=require('../core/profiles/index.cjs');assert.deepEqual(prof.profileFor({engine:'RPG Maker MV/MZ'}).draw,{roles:false,advhdInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]},'RPG Maker canvas detection does not grant wrapper or embed permission');
+ assert.deepEqual(prof.profileFor({engine:'KiriKiri'}).draw,{roles:false,advhdInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]});
 });
 
 test('MZ: text drawn in buffered runs (flushTextState) still gives one box per character; rows use the window line height',()=>{
@@ -136,4 +137,133 @@ test('MZ: text drawn in buffered runs (flushTextState) still gives one box per c
  const line=recs(r).at(-1);assert.equal(line.text,'ルビ付き文\n次');assert.equal(line.rects.length,6);
  assert.deepEqual(line.rects.slice(0,2).map(q=>q[0]),[18,46],'each character of a run at its own x');
  assert.equal(r.ctx.reports.find(o=>o.status).status,'rpgm ok MZ');
+});
+
+test('default off leaves original methods, message timing, fields and output untouched; unknown engines never install',()=>{
+ const r=rig();r.boot({});
+ assert.equal(r.api.state().patched,false);assert.equal(r.ctx.timers.length,0);
+ assert.equal(r.ctx.Bitmap.prototype.drawText,r.ctx.originals.draw);
+ assert.equal(r.ctx.Window_Message.prototype.startMessage,r.ctx.originals.start);
+ assert.equal(r.ctx.Window_Message.prototype.updateMessage,r.ctx.originals.update);
+ r.say('原文');assert.equal(r.ctx.draws.length,2);assert.equal(r.ctx.reports.length,0);
+ assert.equal(Object.keys(r.ctx.msg).some(k=>k.startsWith('_mg')),false);
+ r.api.config({roles:'true',embed:1});assert.equal(r.api.state().patched,false,'permission requires booleans');
+ r.ctx.Utils.RPGMAKER_NAME='Other';r.api.config({roles:true,embed:true});
+ for(const f of [...r.ctx.timers])f();
+ assert.equal(r.api.state().patched,false);assert.equal(r.ctx.Bitmap.prototype.drawText,r.ctx.originals.draw);
+ r.ctx.Utils.RPGMAKER_NAME='MV';r.api.config({roles:true});assert.equal(r.api.state().patched,true);
+ const draw=r.ctx.Bitmap.prototype.drawText,count=r.ctx.timers.length;r.run(RPGM_SCRIPT);r.api.config({roles:true});
+ assert.equal(r.ctx.Bitmap.prototype.drawText,draw);assert.equal(r.ctx.timers.length,count,'reinjection does not wrap again');
+});
+
+test('missing required API installs no partial wrappers; host return values and exceptions are preserved after opt-in/off',()=>{
+ const missing=rig();missing.ctx.Window_Message.prototype.updateMessage=null;missing.boot();
+ assert.equal(missing.api.state().patched,false);assert.equal(missing.ctx.Bitmap.prototype.drawText,missing.ctx.originals.draw);
+ const r=rig();r.ctx.sentinel={host:true};r.ctx.hostError=new Error('game error');
+ r.run(`Bitmap.prototype.drawText=function(){return sentinel;};Window_Message.prototype.startPause=function(){return sentinel;};Window_Message.prototype.terminateMessage=function(){return sentinel;};`);
+ r.boot();assert.equal(r.ctx.msg.contents.drawText('字',0,0,28,36),r.ctx.sentinel);
+ assert.equal(r.ctx.msg.startPause(),r.ctx.sentinel);assert.equal(r.ctx.msg.terminateMessage(),r.ctx.sentinel);
+ r.api.config({});assert.equal(r.ctx.msg.startPause(),r.ctx.sentinel);
+ const e=rig();e.ctx.hostError=r.ctx.hostError;e.run('Bitmap.prototype.drawText=function(){throw hostError;};');e.boot();
+ assert.throws(()=>e.ctx.msg.contents.drawText('字',0,0,28,36),error=>error===r.ctx.hostError);
+ const start=rig();start.ctx.hostError=r.ctx.hostError;start.run('Window_Message.prototype.startMessage=function(){throw hostError;};');start.boot();
+ assert.throws(()=>start.ctx.msg.startMessage(),error=>error===r.ctx.hostError);
+});
+
+test('affine contents transform uses all four corners, MV source frame, canvas CSS offset and DPR',()=>{
+ const r=rig();r.boot();r.ctx.msg.startMessage();
+ Object.assign(r.ctx.msg._windowContentsSprite,{_frame:{x:5,y:7},worldTransform:{a:0,b:2,c:-3,d:0,tx:300,ty:100}});
+ r.ctx.Graphics._canvas.getBoundingClientRect=()=>({left:10,top:20,width:408,height:312});r.ctx.devicePixelRatio=2;
+ r.ctx.msg.contents.drawText('字',10,20,28,36);r.ctx.msg.startPause();
+ assert.deepEqual(recs(r).at(-1).rects,[[185,150,84,56]]);
+ assert.deepEqual([recs(r).at(-1).sw,recs(r).at(-1).sh],[1632,1248]);
+});
+
+test('MZ already-scrolled client transform is not offset a second time; condensed buffered runs use prefix advances',()=>{
+ const r=rig();r.ctx.Utils.RPGMAKER_NAME='MZ';r.boot();
+ r.ctx.msg._contentsSprite={_frame:{x:0,y:0},worldTransform:{a:1,b:0,c:0,d:1,tx:9,ty:426}};delete r.ctx.msg._windowContentsSprite;
+ r.ctx.msg.origin={x:9,y:36};r.say('字');assert.deepEqual(recs(r).at(-1).rects,[[9,430,28,28]]);
+ const q=rig();q.boot();q.ctx.msg.startMessage();q.ctx.msg.contents.measureTextWidth=t=>t==='A'?30:t==='AV'?50:28;
+ q.ctx.msg.contents.drawText('AV',10,0,25,36,'center');q.ctx.msg.startPause();
+ assert.deepEqual(recs(q).at(-1).rects,[[28,466,15,28],[43,466,10,28]],'Canvas maxWidth shrinks the run before alignment');
+});
+
+test('twelve message pages keep independent text/rects and clear the exact preceding line, including unpaused pages',()=>{
+ const r=rig();r.boot();r.ctx.msg.startMessage();const pageChars=Array.from('一二三四五六七八九十百千');
+ pageChars.forEach((ch,i)=>{r.ctx.msg.contents.drawText(ch,0,0,28,36);if(i%2===0)r.ctx.msg.startPause();if(i<11)r.ctx.msg.newPage(r.ctx.msg._textState);});
+ r.ctx.msg.terminateMessage();r.ctx.msg.terminateMessage();
+ const lines=recs(r).filter(x=>!x.role),body=lines.filter(x=>x.text),clear=lines.filter(x=>!x.text);
+ assert.deepEqual(body.map(x=>x.text),pageChars);assert.deepEqual(body.map(x=>x.line),Array.from({length:12},(_,i)=>i+1));
+ assert.equal(body.every(x=>x.rects.length===1),true);assert.deepEqual(clear.map(x=>x.line),body.map(x=>x.line));
+ assert.equal(clear.every(x=>x.hidden===false&&x.rects.length===0),true);
+});
+
+test('ruby positions continue from the preceding Japanese page rather than restarting at character zero',()=>{
+ const r=rig();r.boot({embed:true});r.api.embed('春夏秋冬',{ruby:[[2,4,'あきふゆ']]});r.ctx.$gameMessage._t='春夏秋冬';r.ctx.msg.startMessage();
+ const w=r.ctx.msg;w.contents.drawText('春夏',0,0,48,32);w.startPause();w.newPage(w._textState);w.contents.drawText('秋冬',0,0,48,32);w.startPause();
+ assert.equal(r.ctx.draws.filter(x=>x.t==='あきふゆ').length,1);
+ assert.deepEqual(recs(r).filter(x=>x.text).map(x=>x.text),['春夏','秋冬']);
+});
+
+test('revoking embed immediately releases the hold and removes pending Chinese/ruby changes before native drawing',()=>{
+ const r=rig();r.boot({embed:true});r.ctx.$gameMessage._t='待つ';r.ctx.msg.startMessage();assert.equal(r.ctx.msg.updateMessage(),true);assert.equal(r.ctx.draws.length,0);
+ r.api.config({});assert.equal(r.ctx.msg._mgHold,0);r.ctx.msg.updateMessage();assert.equal(r.ctx.draws.length,2);assert.equal(recs(r).length,0);
+ const q=rig();q.boot({embed:true});q.api.embed('今日',{ruby:[[0,2,'きょう']],zh:'今天'});q.ctx.$gameMessage._t='今日';q.ctx.msg.startMessage();
+ assert.ok(q.ctx.msg._textState.text.includes('MGZ'));assert.equal(q.ctx.msg.contents.fontSize,24);
+ q.api.config({roles:true});assert.equal(q.ctx.msg._textState.text,'今日');assert.equal(q.ctx.msg.contents.fontSize,28);assert.equal(q.ctx.msg._textState.y,0);
+ q.ctx.msg.updateMessage();assert.deepEqual(Array.from(q.ctx.draws,x=>x.t),['今','日']);assert.equal(recs(q).at(-1).emb,undefined,'revoked replacement must not claim embedded');
+});
+
+test('roles revoke, hidden parents, scene replacement and shrinking choices clear only their own UI groups',()=>{
+ const r=rig();r.boot();const ch=new r.ctx.Window_ChoiceList(['はい','いいえ']),name=new r.ctx.Window_NameBox('ミナ');r.ctx.layer.children.push(ch,name);
+ const scan=()=>r.ctx.timers.at(-1)();scan();
+ const {UiTracker}=require('../core/engine-draw.cjs'),deferred=[],removed=[],tracker=new UiTracker({defer:f=>deferred.push(f)});let n=0;
+ const feed=()=>{const lines=recs(r).filter(x=>x.role);for(const rec of lines.slice(n))tracker.feed(rec,items=>removed.push(...items));n=lines.length;while(deferred.length)deferred.shift()();};
+ feed();assert.equal(tracker.items.size,3);ch._list.pop();scan();feed();assert.equal(tracker.items.size,2);assert.equal(removed.length,1);
+ name._name='';scan();feed();assert.equal(tracker.items.size,1);
+ r.ctx.layer.visible=false;scan();feed();assert.equal(tracker.items.size,0);
+ r.ctx.layer.visible=true;scan();feed();assert.equal(tracker.items.size,1);
+ r.api.config({});feed();assert.equal(tracker.items.size,0);const before=r.ctx.reports.length;scan();assert.equal(r.ctx.reports.length,before);
+ r.api.config({roles:true});scan();feed();assert.equal(tracker.items.size,1);r.ctx.SceneManager._scene={children:[]};scan();feed();assert.equal(tracker.items.size,0);
+});
+
+test('a paused line follows transform changes and clears on visibility/scene loss; invalid geometry never escapes to the host',()=>{
+ const r=rig();r.boot();r.say('本文');const first=recs(r).at(-1),scan=()=>r.ctx.timers.at(-1)();
+ r.ctx.msg._windowContentsSprite.worldTransform.tx+=10;scan();assert.equal(recs(r).at(-1).line,first.line);assert.equal(recs(r).at(-1).rects[0][0],28);
+ r.ctx.layer.visible=false;scan();assert.equal(recs(r).at(-1).text,'');const count=recs(r).length;scan();assert.equal(recs(r).length,count);
+ r.ctx.layer.visible=true;scan();assert.equal(recs(r).at(-1).text,'本文');
+ r.ctx.SceneManager._scene={children:[]};scan();assert.equal(recs(r).at(-1).text,'');
+ const q=rig();q.boot();q.ctx.msg._windowContentsSprite.worldTransform.tx=NaN;assert.doesNotThrow(()=>q.say('本文'));
+ assert.equal(recs(q).length,0);assert.equal(q.ctx.draws.length,2);assert.ok(q.ctx.reports.some(x=>x.status==='rpgm observation failed'));
+ const bad=new q.ctx.Window_ChoiceList(['壊れた']),good=new q.ctx.Window_NameBox('正常');bad._windowContentsSprite.worldTransform.tx=NaN;q.ctx.layer.children.push(bad,good);
+ q.ctx.timers.at(-1)();assert.equal(recs(q).find(x=>x.role==='name').text,'正常','one malformed plugin window cannot block other windows');
+});
+
+test('replacement input is bounded, rejects invalid/overlapping ruby and cannot inject engine control codes',()=>{
+ const r=rig();r.boot({embed:true});r.api.embed('今日',{ruby:[[0.5,1,'bad'],[0,3,'bad'],[0,1,'いま'],[0,2,'overlap'],[1,2,'ひ\x1bMGZ']],zh:'今天\x1bMGZ'});
+ r.ctx.$gameMessage._t='今日';r.ctx.msg.startMessage();r.ctx.msg.updateMessage();
+ assert.equal(r.ctx.draws.filter(x=>x.t==='いま').length,1);assert.ok(!r.ctx.draws.some(x=>x.t==='bad'||x.t==='overlap'||x.t.includes('\x1b')));
+ for(let i=0;i<70;i++)r.api.embed('鍵'+i,{ruby:[],zh:''});assert.equal(r.api.state().emb,64);
+ r.api.embed('字'.repeat(4001),{ruby:[],zh:'無効'});assert.equal(r.api.state().emb,64);
+ const q=rig();q.boot({embed:true});q.api.embed('constructor',{ruby:[],zh:''});q.ctx.$gameMessage._t='constructor';q.ctx.msg.startMessage();q.ctx.msg.updateMessage();
+ assert.equal(recs(q).at(-1).emb,undefined,'empty replacement does not claim internal ruby or translation');
+});
+
+test('large drawn pages remain valid protocol records, including newline and supplementary character budgets',()=>{
+ const r=rig();r.boot();r.ctx.msg.startMessage();const b=r.ctx.msg.contents;
+ for(let i=0;i<4100;i++)b.drawText('字',0,i*36,28,36);r.ctx.msg.startPause();
+ const line=recs(r).at(-1);assert.ok(line);assert.equal(line.rects.length,2000);assert.equal(line.text.length,3999);assert.equal(line.rects.length,Array.from(line.text.replace(/\n/g,'')).length);
+ const q=rig();q.ctx.Utils.RPGMAKER_NAME='MZ';q.boot();q.ctx.msg.startMessage();q.ctx.msg.contents.drawText('𠮷野',0,0,56,36);q.ctx.msg.startPause();
+ assert.equal(recs(q).at(-1).text,'𠮷野');assert.equal(recs(q).at(-1).rects.length,2);
+});
+
+test('every engine profile consumes the full default-off draw contract, including kemcoSprites, without cross-profile permission leaks',()=>{
+ const fs=require('node:fs'),path=require('node:path'),P=require('../core/profiles/index.cjs');
+ const expected={roles:false,advhdInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]};
+ const engines=fs.readdirSync(P.ENGINE_DIR).filter(f=>f.endsWith('.cjs')).map(f=>require(path.join(P.ENGINE_DIR,f)).engine);
+ assert.ok(engines.includes('rpgmaker'));
+ for(const engine of engines)assert.deepEqual(P.profileFor({engine}).draw,expected,engine+' must not inherit another renderer permission');
+ const on=P.profileFor({engine:'rpgmaker',official:{draw:{roles:true,embed:true}}});assert.equal(on.draw.roles,true);assert.equal(on.draw.embed,true);assert.equal(on.draw.kemcoSprites,false);
+ assert.deepEqual(P.profileFor({engine:'rpgmaker'}).draw,expected,'an opted-in profile does not change the engine default');
+ const bad=P.profileFor({engine:'rpgmaker',official:{draw:{roles:'true',embed:1}}});assert.deepEqual(bad.draw,expected,'invalid permission values cannot enable observation or embedding');
 });

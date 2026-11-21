@@ -8,3 +8,5 @@ Original reports are preserved without replacing each other
 The integration checkpoint and its consumer regression are recorded in docs/kag-renpy-ruby-integration.md
 
 - [TextRender lifetime and role report](side-session-notes/TextRender-roles-result-ec6a304b.md)
+
+- [RPG Maker CDP and page-state report](side-session-notes/RPGMaker-cdp-result-ff1063a0.md)
