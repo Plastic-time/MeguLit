@@ -12,4 +12,15 @@ function dimensions(b){
  return null;
 }
 function check(file){const stat=fs.statSync(file);if(!stat.isFile()||stat.size>24*1024*1024)return false;const fd=fs.openSync(file,'r'),buf=Buffer.alloc(Math.min(stat.size,128*1024));try{fs.readSync(fd,buf,0,buf.length,0);}finally{fs.closeSync(fd);}const d=dimensions(buf);return !!d&&d.every(n=>Number.isSafeInteger(n)&&n>0&&n<=8192)&&d[0]*d[1]<=16*1024*1024;}
-module.exports={dimensions,check};
+// Read one bounded snapshot through one handle; no unbounded readFile after a size check
+function read(file,{maxBytes=24*1024*1024}={}){
+ if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>24*1024*1024)throw Error('MEMORIES_IMAGE_LIMIT');
+ const fd=fs.openSync(file,'r');try{const before=fs.fstatSync(fd);if(!before.isFile()||before.size<1||before.size>maxBytes)throw Error('MEMORIES_IMAGE_TOO_LARGE');
+  const buffer=Buffer.alloc(before.size);let offset=0;while(offset<buffer.length){const n=fs.readSync(fd,buffer,offset,Math.min(128*1024,buffer.length-offset),offset);if(!n)throw Error('CARD_SOURCE_CHANGED');offset+=n;}
+  const after=fs.fstatSync(fd);if(['dev','ino','size','mtimeMs','ctimeMs'].some(k=>before[k]!==after[k]))throw Error('CARD_SOURCE_CHANGED');const shape=dimensions(buffer.subarray(0,128*1024));
+  if(!shape||shape.some(n=>!Number.isSafeInteger(n)||n<1||n>8192)||shape[0]*shape[1]>16*1024*1024)throw Error('CARD_SOURCE_UNREADABLE');
+  const mime=buffer[0]===0x89?'image/png':buffer[0]===0xff?'image/jpeg':buffer[0]===0x42?'image/bmp':buffer.toString('latin1',8,12)==='WEBP'?'image/webp':null;if(!mime)throw Error('CARD_SOURCE_UNREADABLE');
+  return {src:'data:'+mime+';base64,'+buffer.toString('base64'),w:shape[0],h:shape[1]};
+ }finally{fs.closeSync(fd);}
+}
+module.exports={dimensions,check,read};

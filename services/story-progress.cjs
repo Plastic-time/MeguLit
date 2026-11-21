@@ -49,14 +49,15 @@ function createService({cg=require('./game-cg.cjs'),cards=require('./card-wall.c
   return {status:s.progressKnown?'ready':'unknown',revision:s.revision,chapter:chapter.id,partial:!!chapter.partial,chapters:chapterList(s,locale),nodes,edges,routeAvailable:!!goal?.route?.length,goal:goal?.id||'',revealed:reveal,goals:s.story.endings.filter(e=>e.route?.length).map((e,i)=>({id:e.id,label:s.endingStates.get(e.id)==='done'?label(e.label,locale):'',position:i+1}))};
  }
  const fullQueue=new Map();
+ const tag=(src,adult)=>String(src).replace(/(?:#r18)+$/g,'')+(adult?'#r18':'');
  const MAX_RESPONSE=4*Math.ceil(24*1024*1024/3)+128;
  async function image(db,root,r){const initial=snapshot(db,root,r.gameId);if(r.revision!==initial.revision)return {status:'changed'};const item=initial.variants.get(r.id);if(!initial.progressKnown||!item?.renderable)return {status:'unavailable'};
   const classified=current=>({adult:current.adult,basis:current.basis,reasons:current.reasons});
   const current=()=>{const s=snapshot(db,root,r.gameId),v=s.variants.get(r.id);return s.revision===r.revision&&s.progressKnown&&v?.renderable&&v.sourceKey===item.sourceKey?{s,v}:null;};
-  if(!r.full){let t;try{t=cards.memoriesThumb(root,initial.game.executable,item.name);}catch{}if(!current())return {status:'changed'};if(t)return {status:'ready',...t,...classified(item)};return {status:'pending',...cards.memoriesQueue(root,initial.game.executable,[item.name])};}
+  if(!r.full){let t;try{t=cards.memoriesThumb(root,initial.game.executable,item.name);}catch{}if(!current())return {status:'changed'};if(t)return {status:'ready',...t,src:tag(t.src,item.adult),...classified(item)};return {status:'pending',...cards.memoriesQueue(root,initial.game.executable,[item.name])};}
   const key=path.resolve(root)+'|'+String(r.gameId),prior=fullQueue.get(key)||Promise.resolve();const job=prior.catch(()=>{}).then(()=>{const checked=current();if(!checked)return {status:'changed'};const {s,v}=checked;if(require('node:os').freemem()<512*1024*1024)return {status:'resource-limited'};
    const file=cg.cachedPicture(root,s.game.executable,v.name);if(!file)return {status:'pending',...cards.memoriesQueue(root,s.game.executable,[v.name])};
-   try{if(!require('./story-image.cjs').check(file))return {status:'unavailable'};const result=cards.memoriesImage(db,root,r.gameId,v.name,{sourceKey:v.sourceKey});if(!current())return {status:'changed'};if(typeof result.src!=='string'||result.src.length>MAX_RESPONSE)return {status:'unavailable'};return {status:'ready',src:result.src,w:result.w,h:result.h,...classified(v)};}catch{return {status:'unavailable'};}});
+   try{if(!require('./story-image.cjs').check(file))return {status:'unavailable'};const result=cards.memoriesImage(db,root,r.gameId,v.name,{sourceKey:v.sourceKey});if(!current())return {status:'changed'};if(typeof result.src!=='string'||result.src.length>MAX_RESPONSE)return {status:'unavailable'};return {status:'ready',src:tag(result.src,v.adult),w:result.w,h:result.h,...classified(v)};}catch{return {status:'unavailable'};}});
   fullQueue.set(key,job);try{return await job;}finally{if(fullQueue.get(key)===job)fullQueue.delete(key);}
  }
  return {list,graph,image,async handle(db,root,r){if(r.action==='story_list')return list(db,root,r);if(r.action==='story_graph')return graph(db,root,r);if(r.action==='story_image')return image(db,root,r);throw Error('UNKNOWN_ACTION');}};
