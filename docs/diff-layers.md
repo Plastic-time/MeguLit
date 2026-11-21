@@ -16,7 +16,7 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 
 **文档**（`core/game-diff.cjs`）：`{schema:'megulit.game-diff', version:1, key, layer:'version'|'game', prints, rev, source:'official'|'auto', mode:'hide'|'read', settings, exe, engine, app, issuedAt, agree?, reporters?, cost?, signature?}`
 - 版本层 key = exe SHA-256，可以放任何键，`mode` 可省；游戏层 key = 游戏身份（relay `gidFor`），只能放游戏层键
-- `mode:'read'` 必须带 `hide.textEffectsRead:true`；`rev` 只增
+- `mode:'read'` 必须带 `hide.textEffectsRead:true`；`rev` 只增：同一层同一个 key 的官方和自动共用一条 rev 线（自动挑选取已下发最大 +1，官方上传必须大于已下发和待签的最大值，否则 409 `REV_NOT_NEWER`）；要盖内置 seed 的官方差分，rev 至少是内置 seed 的 rev（没写算 0）+1
 
 **The Seed 文件**（仓库内置，官方，不签名）：
 - `The Seed/<engine>/<slug>/game.json`：游戏层文档 + seed 字段 `seedFormat`（seed 格式版本，现为 1，不写 = 1）、`status`（`verified` / `owner-ok` / `read` / `skeleton`）、`slug`（= 目录名）、`builds`（exe SHA-256 列表，版本文件可以在别的游戏目录下：一个 exe 被几部共用时版本层只有一份）、`sourceLangs`（游戏原文的语言，BCP 47，默认 `["ja"]`，例如 `["en","zh-Hans"]`）、可选 `match {exe, titles, notTitles}`（可读的程序名和标题，汉化改名时用）、可选 `ext {<扩展名>: …}`（扩展区）
