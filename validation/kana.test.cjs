@@ -34,6 +34,24 @@ test('kana game words: a word inside a longer hiragana run does not count',()=>{
  assert.equal('漢字' in out,false);
 });
 
+test('kana examples count standalone occurrences and center long excerpts on a real match',async()=>{
+ const history=lines=>({prepare:()=>({all:()=>lines.map(text=>({text,title:'Fixture',read_at:1}))})});
+ const long='うんめい。'+'空'.repeat(75)+'「うん、うん。」'+'星'.repeat(40);
+ const hit=kana.gameWords(history([long]),['うん']).words['うん'];
+ assert.deepEqual([hit.count,hit.example.text],[2,'…'+'空'.repeat(19)+'「うん、うん。」'+'星'.repeat(19)+'…']);
+ const short='「うんめい、うん。うん！」';
+ const mixed=kana.gameWords(history([long,short]),['うん']).words['うん'];
+ assert.equal(mixed.count,4);
+ assert.equal(mixed.example.text,short);
+ assert.deepEqual(mixed.example.matches,[short.indexOf('、')+1,short.indexOf('。')+1]);
+ const {exampleHTML}=await import('../web/kana/views/lesson.js');
+ const esc=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;');
+ assert.equal(exampleHTML(mixed.example,'うん',esc),'うんめい、<mark>うん</mark>。<mark>うん</mark>！');
+ assert.equal(exampleHTML(hit.example,'うん',esc).match(/<mark>/g).length,2);
+ const quoted='「<うん>&」',escaped=kana.gameWords(history([quoted]),['うん']).words['うん'];
+ assert.equal(exampleHTML(escaped.example,'うん',esc),'&lt;<mark>うん</mark>>&amp;');
+});
+
 test('achievement: all CRITICAL PERFECT shows 101.0% with AP and no letter rank',async()=>{
  const D=await import('../web/kana/data.js');
  const fast=['か','シ','き'].map(show=>({show,ok:true,t:1,limit:10}));

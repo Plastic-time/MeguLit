@@ -31,8 +31,20 @@ function gameWords(db,words){
  const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
  const out={};
  for(const w of list){
-  const re=new RegExp('(?<![\\u3041-\\u3096])'+esc(w)+'(?![\\u3041-\\u3096])','u');let n=0,example=null;
-  let long=null;for(const row of rows){const text=String(row.text||'');if(!text.includes(w)||!re.test(text))continue;n++;if(!example&&[...text].length<=60)example={text,title:row.title||'',read_at:row.read_at};else if(!long){const i=text.indexOf(w),start=Math.max(0,i-20);long={text:(start?'…':'')+text.slice(start,i+w.length+24)+(i+w.length+24<text.length?'…':''),title:row.title||'',read_at:row.read_at};}}
+  const re=new RegExp('(?<![\\u3041-\\u3096])'+esc(w)+'(?![\\u3041-\\u3096])','gu');let n=0,example=null,long=null;
+  for(const row of rows){
+   const text=String(row.text||'');if(!text.includes(w))continue;
+   const hits=[...text.matchAll(re)].map(m=>m.index);n+=hits.length;
+   if(!hits.length||example)continue;
+   const info={title:row.title||'',read_at:row.read_at};
+   if([...text].length<=60){example={...info,text,matches:hits};continue;}
+   if(long)continue;
+   const i=hits[0],start=i-[...text.slice(0,i)].slice(-20).join('').length;
+   const end=i+w.length+[...text.slice(i+w.length)].slice(0,24).join('').length;
+   const prefix=start?'…':'';
+   long={...info,text:prefix+text.slice(start,end)+(end<text.length?'…':''),
+    matches:hits.filter(at=>at+w.length<=end).map(at=>at-start+prefix.length)};
+  }
   if(n)out[w]={count:n,example:example||long};
  }
  return {words:out,scanned:rows.length};
