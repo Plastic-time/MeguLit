@@ -328,7 +328,8 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
  const torchSpots=[];
  for(const [px,pz] of piers){const sx=Math.sign(px),inZ=pz<BAYZ?1:-1;torchSpots.push({pos:new THREE.Vector3(px-sx*1.34,4.6,pz+inZ*1.34),dir:new THREE.Vector3(-sx,0,inZ).normalize(),big:false,key:true});}
  colZ.forEach((z,i)=>{if(z>FRONT+1&&i%3===1)for(const sx of [-1,1])torchSpots.push({pos:new THREE.Vector3(sx*(HX-.36),3.9,z),dir:new THREE.Vector3(-sx,0,0),big:false,key:z<FRONT+12});});
- const braziers=[[-8.2,0,4.4],[8.2,0,4.4]];
+ /* no free-standing braziers by the stair (removed 2026-11-21): the wall torches are the only fire */
+ const braziers=[];
  let torchHeadMat=null;
  const bracketG=mergeGeometries([new THREE.BoxGeometry(.06,.06,.5).translate(0,0,.25),new THREE.BoxGeometry(.05,.34,.05).translate(0,-.16,.08).rotateX(-.6),
   new THREE.TorusGeometry(.1,.02,6,16).rotateX(Math.PI/2).translate(0,.02,.5),new THREE.LatheGeometry([[0,0],[.04,0],[.07,.12],[.13,.24],[.14,.28],[0,.28]].map(([x,y])=>new THREE.Vector2(x,y)),16).translate(0,-.1,.5)].map(g=>g.index?g.toNonIndexed():g));
@@ -337,7 +338,7 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
    const handle=new THREE.CylinderGeometry(.03,.024,.62,10).translate(0,-.17,0),head=mergeGeometries([new THREE.CylinderGeometry(.055,.045,.17,12).translate(0,.2,0),new THREE.TorusGeometry(.052,.012,6,14).rotateX(Math.PI/2).translate(0,.15,0),new THREE.TorusGeometry(.055,.012,6,14).rotateX(Math.PI/2).translate(0,.24,0)].map(g=>g.index?g.toNonIndexed():g));
    const at=torchSpots.map(t=>[t.pos.x,t.pos.y-.16,t.pos.z,0]);inst(handle,wood,at);inst(head,char,at);torchHeadMat=char;}
  const standG=mergeGeometries([new THREE.LatheGeometry([[0,0],[.42,0],[.42,.06],[.16,.14],[.1,.3],[.08,1.6],[.1,1.65],[.06,1.75],[.1,2.0],[.3,2.08],[.5,2.3],[.52,2.36],[0,2.36]].map(([x,y])=>new THREE.Vector2(x,y)),32)].map(g=>g.toNonIndexed()));
- inst(standG,iron,braziers.map(b=>[b[0],b[1],b[2]]));
+ if(braziers.length)inst(standG,iron,braziers.map(b=>[b[0],b[1],b[2]]));
  /* fire: a volume, not a picture. Each flame is a box; the shader marches the view ray through it and accumulates emission from a
     turbulent density (3D noise flowing upward) shaped like a flame, coloured by temperature (deep red at the edges and top, orange,
     a yellow-white core near the fuel). Sparks rise from every flame. */
