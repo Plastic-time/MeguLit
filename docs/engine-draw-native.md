@@ -281,10 +281,19 @@ watcher 安装后继续每两秒刷新；撤权、控制文件缺失或读取失
 坐标是窗口文字画布上的像素，不是屏幕：下一步由探针 / diff-maker 用 DRAWRUN 和已有的字形点 / GPU 位置配出每部游戏「画布 → 屏幕」的偏移写进版本层差分，角色由 DRAWRUN 的文字和 hook 流的 ctx2（台词 / 名字 / 其他）对上。内嵌仍走现有写回
 
 ### 店主测试清单（YU-RIS）
-1. 在 The Seed 里给 euphoria（或 女装山脈 / サイコロジック）的游戏差分设 `"draw":{"roles":true}`，或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，内容 `#cfg roles=1`）
+
+权限回归：运行时只接受 UTF-16LE 首条完整 ASCII `#cfg` 行，支持 transport 的 BOM，且必须只有一个精确的 `roles=1` token
+安装与观察分开；安装后仍每 2 秒检查控制文件，关闭、缺失、读失败或畸形授权会在同一把锁内清空未输出文字、连续指针和坐标状态
+恢复权限会开启新 epoch，日志回调中的重入 off-on 不能使旧缓冲复活；原 blitter 始终透传，观察器保存 GPR、flags、ESP 和 FXSAVE 状态
+已经交给 logger 的记录无法收回，2 秒轮询及临界区完成前也不算同步撤权 ACK；这里没有增加这样的 ACK 协议
+`selftest/run-yuris-permission.cmd` 用真实 JS transport 文件、生产读取函数和实际 MinHook CALL 点回放验证这些边界，两架构签名仍用原有实字节夹具
+它已接入手动 `selftest/run.cmd`，普通 CI 不编译这份 Windows 原生 gate；上述自检不代表真实游戏验收，也没有新增 seed 或允许名单
+
+1. 获得该游戏版本的实测授权后，才临时开启版本差分中的 `draw.roles`，或写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，首行 `#cfg roles=1`，必须以换行结束）
 2. 开游戏推 5 句、出一次选项
 3. 看 `logs\hook-diagnostics.log`：有一行 `ToMe_DRAWRUN engine=yuris on: call ...`，之后每句有 `ToMe_DRAWRUN engine=yuris run=` 带这句的文字；名字和选项也各有自己的 run
 4. 游戏照常显示、不卡、不崩 = 过。没有 `on:` 行而有 `off: N dialogue loop matches` = 这个版本签名没对上，把那行和 exe 发来
+5. 在一段文字尚未输出时关闭 roles，等待轮询确认日志不再新增；恢复后只应看到新文字，不能带回关闭前的半句，再检查锁定或暂时移走控制文件时同样停止观察
 
 ## 建议的推进方式
 
