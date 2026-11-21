@@ -88,8 +88,8 @@ function drawerHTML(state,w,esc){
 export function receptionHTML(value,locale,esc,id=''){
  const w=receptionMessages[locale],state=id?stateFor(id,locale):null,platforms=state?.summary||fromEnrichment(value);
  if(!platforms)return `<section class="panel game-reception" data-reception="${esc(id)}"><h2 class="panel-title">${w.title}</h2><p class="settings-help">${w.loading}</p></section>`;
- if(platforms.length&&platforms.every(p=>!p.available&&!p.pending&&p.error))return `<section class="panel game-reception" data-reception="${esc(id)}"><h2 class="panel-title">${w.title}</h2><p class="u-status" data-state="error">${w.failed}</p></section>`;
-  return `<section class="panel game-reception" data-reception="${esc(id)}"><h2 class="panel-title">${w.title}</h2><div class="review-platforms" role="tablist">${platforms.map(p=>`<button type="button" role="tab" class="review-platform${p.pending?' is-pending':p.available?'':' is-unavailable'}" data-review-platform="${p.key}" aria-expanded="${state?.open===p.key}" aria-selected="${state?.open===p.key}" ${p.available||p.pending?'':'aria-disabled="true"'}><span class="review-region">${w.regions[p.region]}</span><span class="review-name">${esc(p.name)}</span>${scoreHTML(p,w,esc)}</button>`).join('')}</div>${state?.open?drawerHTML(state,w,esc):''}${value?.at?`<small class="settings-help review-fetched">${w.fetched} · ${esc(new Date(value.at).toLocaleDateString({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale]))}</small>`:''}</section>`;
+ if(!state?.open&&platforms.length&&platforms.every(p=>!p.available&&!p.pending&&p.error))return `<section class="panel game-reception" data-reception="${esc(id)}"><h2 class="panel-title">${w.title}</h2><p class="u-status" data-state="error">${w.failed}</p></section>`;
+  return `<section class="panel game-reception" data-reception="${esc(id)}"><h2 class="panel-title">${w.title}</h2><div class="review-platforms" role="tablist">${platforms.map(p=>`<button type="button" role="tab" class="review-platform${p.pending?' is-pending':p.available?'':' is-unavailable'}" data-review-platform="${p.key}" aria-expanded="${state?.open===p.key}" aria-selected="${state?.open===p.key}" ${p.available||p.pending||state?.open===p.key?'':'aria-disabled="true"'}><span class="review-region">${w.regions[p.region]}</span><span class="review-name">${esc(p.name)}</span>${scoreHTML(p,w,esc)}</button>`).join('')}</div>${state?.open?drawerHTML(state,w,esc):''}${value?.at?`<small class="settings-help review-fetched">${w.fetched} · ${esc(new Date(value.at).toLocaleDateString({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale]))}</small>`:''}</section>`;
 }
 export function bindReception(target,{api,id,locale,esc,value}){
  const w=receptionMessages[locale],state=stateFor(id,locale);
@@ -110,7 +110,7 @@ export function bindReception(target,{api,id,locale,esc,value}){
   block:'nearest',behavior:'smooth'});translatePage();};
  const wire=root=>{
   root.querySelectorAll('[data-review-platform]').forEach(button=>button.onclick=()=>{const key=button.dataset.reviewPlatform,p=(state.summary||fromEnrichment(value)||[]).find(x=>x.key===key);
-   if(!p?.available&&!p?.pending)return;if(state.open===key){state.open='';state.data=null;render();return;}state.open=key;state.data=null;state.page=1;load(1);
+   if(state.open===key){state.open='';state.data=null;render();return;}if(!p?.available&&!p?.pending)return;state.open=key;state.data=null;state.page=1;load(1);
    });
   root.querySelectorAll('[data-rv-page]').forEach(button=>button.onclick=()=>load(Number(button.dataset.rvPage)));
   const jump=root.querySelector('[data-review-jump]'),go=()=>{const n=Math.round(Number(jump.value));if(n>=1&&n<=(state.data?.pages||1))load(n);else jump.value=state.page;

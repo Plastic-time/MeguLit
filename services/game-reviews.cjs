@@ -46,7 +46,7 @@ class GameReviews{
    const steamMatches=key!=='vndb'||!game.appid||saved?.appid===game.appid&&(!game.vndb||saved.id===game.vndb);
    const staleMiss=key==='steam'&&saved&&!saved.id&&saved.v!==2;
    if(saved&&!staleMiss&&steamMatches&&!(key==='vndb'&&game.vndbManual&&saved.id!==game.vndbManual)&&(saved.id||Date.now()-saved.at<86400000))return saved.id?saved:null;
-   let found=null;try{found=await this['find_'+key](game);}catch(error){if(error.message==='RUNTIME_STOPPED')throw error;return null;}
+   const found=await this['find_'+key](game);
    this.saveSource(game.id,key,{...(found||{id:null}),...(key==='vndb'&&game.appid?{appid:game.appid}:{}),...(key==='steam'?{v:2}:{}),at:Date.now()});return found;
   }
  async find_bangumi(game){for(const title of game.titles.slice(0,5)){const r=await this.request('https://api.bgm.tv/v0/search/subjects?limit=10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keyword:title,filter:{type:[4]}})},'json');const hit=bestMatch(r.data||[],game.titles,s=>[s.name,s.name_cn]);if(hit)return {id:String(hit.id),title:hit.name_cn||hit.name};}return null;}
