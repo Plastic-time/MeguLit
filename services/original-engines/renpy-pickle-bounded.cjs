@@ -8,9 +8,10 @@ const MARK=Symbol('pickle mark');
 function fail(code,offset){const error=Error('RENPY_PICKLE_'+code);error.code=error.message;error.offset=offset;throw error;}
 function decode(buffer,options={}){
  if(!options||typeof options!=='object'||Array.isArray(options))fail('OPTIONS',0);
- const {limits:overrides={},classes=CLASSES,allowDefaultDict=false,allowPyCodeState=false}=options;
+ const {limits:overrides={},classes=CLASSES,allowDefaultDict=false,allowPyCodeState=false,allowPyExpr=false}=options;
  if(typeof allowDefaultDict!=='boolean')fail('DEFAULTDICT_OPTION',0);
  if(typeof allowPyCodeState!=='boolean')fail('PYCODE_OPTION',0);
+ if(typeof allowPyExpr!=='boolean')fail('PYEXPR_OPTION',0);
  const limits={...LIMITS};
  if(!overrides||typeof overrides!=='object'||Array.isArray(overrides))fail('LIMITS',0);
  for(const [key,value]of Object.entries(overrides)){
@@ -44,18 +45,31 @@ function decode(buffer,options={}){
  const remember=index=>{if(index>=limits.memo||memo.size>=limits.memo)fail('BUDGET_MEMO',at);if(memo.has(index))fail('DUPLICATE_MEMO',at);memo.set(index,peek());};
  const recall=index=>{if(!memo.has(index))fail('MEMO',at);push(memo.get(index));};
  const global=(module,name)=>{
+  if(allowPyExpr&&module==='renpy.astsupport'&&name==='PyExpr')return Object.freeze({kind:'global',name:'renpy.astsupport.PyExpr'});
   if(allowDefaultDict&&(module==='collections'&&name==='defaultdict'||(module==='builtins'||module==='__builtin__')&&name==='list'))return Object.freeze({kind:'global',name:module+'.'+name});
   if(module!=='renpy.ast'||typeof name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]{0,100}$/.test(name))fail('GLOBAL',at);
   const identity=module+'.'+name;if(!allowed.has(identity))fail('GLOBAL',at);return Object.freeze({kind:'global',name:identity});
+ };
+ const pyExpr=args=>{
+  if(args?.kind!=='tuple'||args.items.length<3||args.items.length>6)fail('PYEXPR_ARGS',at);
+  const [text,filename,linenumber,py=2,hashcode=null,column=0]=args.items;
+  if(typeof text!=='string')fail('PYEXPR_TEXT',at);
+  if(typeof filename!=='string')fail('PYEXPR_FILENAME',at);
+  if(!Number.isSafeInteger(linenumber)||linenumber<0||linenumber>0xffffffff)fail('PYEXPR_LINE',at);
+  if(py!==2&&py!==3)fail('PYEXPR_PY',at);
+  if(hashcode!==null&&(!Number.isSafeInteger(hashcode)||hashcode<0||hashcode>0xffffffff))fail('PYEXPR_HASH',at);
+  if(!Number.isSafeInteger(column)||column<0||column>0xffff)fail('PYEXPR_COLUMN',at);
+  spend('edges',12);
+  return {kind:'pyexpr',className:'renpy.astsupport.PyExpr',text,filename,linenumber,py,hashcode,column};
  };
  const pyCodeState=state=>{
   if(!allowPyCodeState)fail('PYCODE_STATE_DISABLED',at);
   if(state?.kind!=='tuple'||state.items.length<4||state.items.length>7)fail('PYCODE_STATE',at);
   const [tag,source,location,mode,py=2,hashcode=null,colOffset=0]=state.items;
   if(tag!==1)fail('PYCODE_TAG',at);
-  if(typeof source!=='string')fail('PYCODE_SOURCE',at);
+  if(typeof source!=='string'&&!(allowPyExpr&&source?.kind==='pyexpr'&&source.className==='renpy.astsupport.PyExpr'))fail('PYCODE_SOURCE',at);
   if(location?.kind!=='tuple'||location.items.length!==2||typeof location.items[0]!=='string'||!Number.isSafeInteger(location.items[1])||location.items[1]<0)fail('PYCODE_LOCATION',at);
-  if(!['exec','eval','single'].includes(mode))fail('PYCODE_MODE',at);
+  if(!['exec','eval','single','hide'].includes(mode))fail('PYCODE_MODE',at);
   if(py!==2&&py!==3)fail('PYCODE_PY',at);
   if(hashcode!==null&&(!Number.isSafeInteger(hashcode)||hashcode<0||hashcode>0xffffffff))fail('PYCODE_HASH',at);
   if(!Number.isSafeInteger(colOffset)||colOffset<0)fail('PYCODE_OFFSET',at);
@@ -99,8 +113,10 @@ function decode(buffer,options={}){
    case 0x63:{const module=line(),name=line();push(global(module,name));break;}
    case 0x93:{const name=pop(),module=pop();push(global(module,name));break;}
    case 0x52:{
-    if(!allowDefaultDict)fail('UNSUPPORTED_OPCODE',at-1);
-    const args=pop(),cls=pop();if(cls?.kind!=='global'||cls.name!=='collections.defaultdict'||args?.kind!=='tuple')fail('REDUCE',at);
+    if(!allowDefaultDict&&!allowPyExpr)fail('UNSUPPORTED_OPCODE',at-1);
+    const args=pop(),cls=pop();
+    if(allowPyExpr&&cls?.kind==='global'&&cls.name==='renpy.astsupport.PyExpr'){push(pyExpr(args));break;}
+    if(!allowDefaultDict||cls?.kind!=='global'||cls.name!=='collections.defaultdict'||args?.kind!=='tuple')fail('REDUCE',at);
     if(args.items.length>1)fail('REDUCE_ARGS',at);
     let factory=null;
     if(args.items.length&&args.items[0]!==null){

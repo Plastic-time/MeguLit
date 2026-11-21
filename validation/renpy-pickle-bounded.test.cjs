@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {decode,LIMITS}=require('../services/original-engines/renpy-pickle-bounded.cjs');
+const {decode,LIMITS,CLASSES}=require('../services/original-engines/renpy-pickle-bounded.cjs');
 const b=(...values)=>Buffer.from(values),u32=n=>{const out=Buffer.alloc(4);out.writeUInt32LE(n);return out;};
 const string=text=>{const bytes=Buffer.from(text);return Buffer.concat([b(0x58),u32(bytes.length),bytes]);};
 const stream=(...parts)=>Buffer.concat([b(0x80,2),...parts,b(0x2e)]);
@@ -21,6 +21,14 @@ const pyState=(fields={})=>{
  const {tag=integer(1),source=string('neutral_value = 1'),location=tuple(string('synthetic.rpy'),integer(12)),mode=string('exec'),tail=[]}=fields;
  return tuple(tag,source,location,mode,...tail);
 };
+const exprOptions={classes:[],allowPyExpr:true};
+const exprGlobal=()=>namedGlobal('renpy.astsupport','PyExpr');
+const exprArgs=(fields={})=>{
+ const {text=string('neutral_condition'),filename=string('synthetic.rpy'),line=integer(12),tail=[]}=fields;
+ return tuple(text,filename,line,...tail);
+};
+const expr=(args=exprArgs())=>Buffer.concat([exprGlobal(),args,b(0x52)]);
+const number=n=>{const out=Buffer.alloc(9);out[0]=0x47;out.writeDoubleBE(n,1);return out;};
 test('ordinary CPython serializer fixtures retain slot-state graphs under protocols 2, 4 and 5',()=>{
  const fixture=require('./fixtures/renpy-bounded-cpython.json');
  for(const input of fixture.fixtures){
@@ -220,4 +228,94 @@ test('PyCode opaque state accounts for its new Map node and all sixteen stored e
  reject(buffer,'BUDGET_EDGES',{...pyOptions,limits:{edges:21}});assert.equal(decode(buffer,{...pyOptions,limits:{edges:22}}).counts.edges,22);
  reject(buffer,'BUDGET_NODES',{...pyOptions,limits:{nodes:12}});assert.equal(decode(buffer,{...pyOptions,limits:{nodes:13}}).counts.nodes,13);
  reject(buffer,'BUDGET_STRINGBYTES',{...pyOptions,limits:{stringBytes:out.counts.stringBytes-1}});
+});
+
+test('explicit PyExpr reduction reads neutral CPython str-subclass fixtures without invoking a constructor',()=>{
+ const fixture=require('./fixtures/renpy-pyexpr-cpython.json');assert.equal(fixture.fixtures.length,12);
+ for(const input of fixture.fixtures){
+  const buffer=Buffer.from(input.base64,'base64'),parsed=decode(buffer,exprOptions),value=parsed.value;
+  assert.equal(buffer.length,input.bytes);assert.equal(parsed.bytesRead,input.bytes);assert.equal(parsed.protocol,input.protocol);
+  assert.deepEqual(value,{kind:'pyexpr',className:'renpy.astsupport.PyExpr',text:'neutral_condition',filename:'synthetic.rpy',linenumber:12,py:input.argsLength>=4?3:2,hashcode:input.argsLength>=5?0xffffffff:null,column:input.argsLength===6?17:0});
+  assert.equal(typeof value,'object');assert.equal(value instanceof String,false);assert.equal(value.state,undefined);
+ }
+});
+
+test('PyExpr global permission is an exact default-off boolean independent of other grants',()=>{
+ const buffer=stream(expr());reject(buffer,'GLOBAL');reject(buffer,'GLOBAL',{allowPyExpr:false});
+ reject(buffer,'GLOBAL',{allowDefaultDict:true,allowPyCodeState:true,classes:['renpy.ast.PyExpr']});
+ for(const allowPyExpr of [null,0,1,'true','false',{},[],new Boolean(true)])reject(buffer,'PYEXPR_OPTION',{allowPyExpr});
+ reject(buffer,'CLASSES',{classes:['renpy.astsupport.PyExpr'],allowPyExpr:true});
+ assert.equal(CLASSES.includes('renpy.ast.PyExpr'),false);assert.equal(CLASSES.includes('renpy.astsupport.PyExpr'),false);
+ const metadata=decode(stream(exprGlobal()),exprOptions).value;assert.deepEqual(metadata,{kind:'global',name:'renpy.astsupport.PyExpr'});assert.equal(Object.isFrozen(metadata),true);
+});
+
+test('PyExpr admits only the observed exact module and name under either global opcode',()=>{
+ for(const [module,name]of [['renpy.ast','PyExpr'],['renpy','astsupport.PyExpr'],['renpy.astsupport','PyExpr.extra'],['renpy.astsupport','pyexpr'],['renpy.astsupport.extra','PyExpr'],['renpy.astsupport','hash32'],['builtins','eval']])reject(stream(namedGlobal(module,name)),'GLOBAL',exprOptions);
+ const stack=(module,name)=>Buffer.concat([b(0x80,4),string(module),string(name),b(0x93),exprArgs(),b(0x52,0x2e)]);
+ assert.equal(decode(stack('renpy.astsupport','PyExpr'),exprOptions).value.kind,'pyexpr');
+ for(const [module,name]of [['renpy','astsupport.PyExpr'],['\ufeffrenpy.astsupport','PyExpr'],['renpy.astsupport','\ufeffPyExpr']])reject(stack(module,name),'GLOBAL',exprOptions);
+});
+
+test('PyExpr reducer cannot widen other callables, NEWOBJ, BUILD or container mutation',()=>{
+ for(const args of [b(0x4e),b(0x5d),b(0x7d),tuple(),tuple(string('a')),tuple(string('a'),string('b')),exprArgs({tail:[integer(2),b(0x4e),integer(0),b(0x4e)]})])reject(stream(expr(args)),'PYEXPR_ARGS',exprOptions);
+ reject(stream(global(),exprArgs(),b(0x52)),'REDUCE',{allowPyExpr:true});
+ reject(stream(b(0x4e),exprArgs(),b(0x52)),'REDUCE',exprOptions);
+ reject(stream(exprGlobal(),b(0x29,0x81)),'NEWOBJ',exprOptions);
+ for(const state of [b(0x4e),b(0x7d),tuple()])reject(stream(expr(),state,b(0x62)),'STATE',exprOptions);
+ reject(stream(expr(),b(0x4e,0x61)),'LIST',exprOptions);reject(stream(expr(),string('text'),string('changed'),b(0x73)),'DICT',exprOptions);
+ const ordinary=decode(stream(instance(),b(0x7d,0x62)),{allowPyExpr:true}).value;assert.equal(ordinary.className,'renpy.ast.Say');assert.equal(ordinary.stateKind,undefined);
+ assert.equal(decode(stream(dd()),{...ddOptions,allowPyExpr:true}).value.kind,'defaultdict');
+ reject(stream(dd()),'GLOBAL',exprOptions);
+});
+
+test('PyExpr source and filename stay strings and never coerce opaque objects or bytes',()=>{
+ for(const text of [b(0x4e),integer(1),b(0x5d),b(0x7d),b(0x55,1,0x61),expr()])reject(stream(expr(exprArgs({text}))),'PYEXPR_TEXT',exprOptions);
+ for(const filename of [b(0x4e),integer(1),b(0x5d),b(0x55,1,0x61)])reject(stream(expr(exprArgs({filename}))),'PYEXPR_FILENAME',exprOptions);
+ const value=decode(stream(expr(exprArgs({text:string(''),filename:string('')}))),exprOptions).value;assert.equal(value.text,'');assert.equal(value.filename,'');
+ const opaque='__neutral_never_execute__()';assert.equal(decode(stream(expr(exprArgs({text:string(opaque)}))),exprOptions).value.text,opaque);
+});
+
+test('PyExpr integer metadata follows the bounded uint32 and uint16 subset with null hash preserved',()=>{
+ for(const line of [integer(-1),number(0x100000000),number(0.5),b(0x88),string('1'),b(0x4e)])reject(stream(expr(exprArgs({line}))),'PYEXPR_LINE',exprOptions);
+ for(const py of [integer(0),integer(1),integer(4),b(0x88),string('3'),b(0x4e)])reject(stream(expr(exprArgs({tail:[py]}))),'PYEXPR_PY',exprOptions);
+ for(const hash of [integer(-1),number(0x100000000),number(0.5),b(0x89),string('0')])reject(stream(expr(exprArgs({tail:[integer(3),hash]}))),'PYEXPR_HASH',exprOptions);
+ for(const column of [integer(-1),integer(65536),number(0.5),b(0x88),b(0x4e),string('0')])reject(stream(expr(exprArgs({tail:[integer(3),b(0x4e),column]}))),'PYEXPR_COLUMN',exprOptions);
+ const max=decode(stream(expr(exprArgs({line:number(0xffffffff),tail:[integer(3),number(0xffffffff),integer(65535)]}))),exprOptions).value;
+ assert.equal(max.linenumber,0xffffffff);assert.equal(max.hashcode,0xffffffff);assert.equal(max.column,65535);
+ const missing=decode(stream(expr(exprArgs({tail:[integer(2),b(0x4e)]}))),exprOptions).value;assert.equal(missing.hashcode,null);assert.equal(missing.column,0);
+});
+
+test('PyExpr memo aliases remain inert and PyCode accepts only that wrapper with all explicit grants',()=>{
+ const options={...pyOptions,allowPyExpr:true};
+ const buffer=stream(b(0x28),expr(exprArgs({tail:[integer(3),integer(123)]})),b(0x71,0),pyInstance(),pyState({source:b(0x68,0)}),b(0x62,0x74));
+ const [wrapper,code]=decode(buffer,options).value.items;assert.equal(code.state.get('source'),wrapper);assert.equal(wrapper.hashcode,123);assert.equal(code.state.get('hashcode'),null);
+ reject(stream(pyInstance(),pyState({source:expr()}),b(0x62)),'GLOBAL',pyOptions);
+ reject(stream(pyInstance(),pyState({source:expr()}),b(0x62)),'PYCODE_STATE_DISABLED',{classes:['renpy.ast.PyCode'],allowPyExpr:true});
+ reject(stream(pyInstance(),pyState({source:expr()}),b(0x62)),'GLOBAL',exprOptions);
+ const fake=Buffer.concat([namedGlobal('renpy.ast','PyExpr'),b(0x29,0x81)]);
+ reject(stream(pyInstance(),pyState({source:fake}),b(0x62)),'PYCODE_SOURCE',{...options,classes:['renpy.ast.PyCode','renpy.ast.PyExpr']});
+ reject(stream(pyInstance(),pyState({source:expr()}),b(0x62),pyState(),b(0x62)),'STATE',options);
+});
+
+test('verified PyCode hide mode is only opaque metadata, with all other state restrictions retained',()=>{
+ const value=decode(stream(pyInstance(),pyState({mode:string('hide')}),b(0x62)),pyOptions).value;assert.equal(value.state.get('mode'),'hide');
+ for(const mode of ['HIDE','hide ','execute'])reject(stream(pyInstance(),pyState({mode:string(mode)}),b(0x62)),'PYCODE_MODE',pyOptions);
+ reject(stream(pyInstance(),pyState({mode:string('hide')}),b(0x62)),'PYCODE_STATE_DISABLED',{classes:['renpy.ast.PyCode']});
+});
+
+test('PyExpr wrapper charges its logical object and all twelve stored field edges',()=>{
+ const buffer=stream(expr()),parsed=decode(buffer,exprOptions);
+ // Global, MARK, three arguments, tuple and wrapper: seven pushes. Three tuple edges plus twelve stored edges.
+ assert.equal(parsed.counts.nodes,7);assert.equal(parsed.counts.edges,15);assert.equal(parsed.counts.operations,8);
+ assert.equal(parsed.counts.stringBytes,Buffer.byteLength('renpy.astsupportPyExpr'+'neutral_condition'+'synthetic.rpy'));
+ const exact=decode(buffer,{...exprOptions,limits:{nodes:7,edges:15,operations:8,stringBytes:parsed.counts.stringBytes}});assert.equal(exact.value.kind,'pyexpr');
+ for(const [key,value,code]of [['nodes',6,'BUDGET_NODES'],['edges',14,'BUDGET_EDGES'],['operations',7,'BUDGET_OPERATIONS'],['stringBytes',parsed.counts.stringBytes-1,'BUDGET_STRINGBYTES']])reject(buffer,code,{...exprOptions,limits:{[key]:value}});
+ reject(stream(b(0x28),expr(),expr(),b(0x74)),'BUDGET_EDGES',{...exprOptions,limits:{edges:31}});
+});
+
+test('all synthetic PyExpr prefixes and framed operand splits reject with fixed bounded errors',()=>{
+ const buffer=stream(expr());for(let end=0;end<buffer.length;end++)assert.throws(()=>decode(buffer.subarray(0,end),exprOptions),error=>typeof error.code==='string'&&error.code.startsWith('RENPY_PICKLE_')&&Number.isSafeInteger(error.offset));
+ const payload=Buffer.concat([exprGlobal(),exprArgs(),b(0x52,0x2e)]),size=Buffer.alloc(8);size.writeBigUInt64LE(BigInt(payload.length));
+ const framed=Buffer.concat([b(0x80,4,0x95),size,payload]);assert.equal(decode(framed,exprOptions).value.kind,'pyexpr');
+ const split=Buffer.from(framed);split.writeBigUInt64LE(BigInt(Buffer.byteLength('crenpy.astsupport\nPyExpr\n')+2),3);reject(split,'TRUNCATED',exprOptions);
 });
