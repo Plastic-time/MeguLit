@@ -106,7 +106,7 @@ function separatePlan(gameDir,source,info){
   if(launcher){const name=path.basename(source).replace(/\.(zip|7z|rar|iso|cue|bin|img)$/i,'').replace(/\s*\((?:bin|iso|img)[^)]*\)\s*$/i,'').replace(/[<>:"|?*]/g,'').trim()||'Japanese';
    return {root:path.dirname(hdr),cab:hdr,exe:path.join(launcher.dir.replace(/^[\\/]+/,''),launcher.name),target:freeFolder(path.join(path.dirname(path.resolve(source)),name)),move:true};}}}
  if(!exe&&info.image){const installer=fs.readdirSync(info.base).some(n=>/^(setup|install|autorun)\.(exe|inf)$/i.test(n))||walk(info.base,5000).some(r=>/\.(cab|msi)$/i.test(r));
-  if(installer)return {installer:true,image:info.image,iso:/\.iso$/i.test(info.image)?info.image:path.join(path.dirname(path.resolve(source)),path.basename(info.image).replace(/\.(cue|bin|img)$/i,'')+'.iso'),from:require('./disc-image.cjs').imageOf(info.image)};}
+  if(installer)return {installer:true,image:info.image};}
  if(!exe){const disc=(()=>{const stack=[[info.base,2]];while(stack.length){const [d,depth]=stack.pop();let list;try{list=fs.readdirSync(d,{withFileTypes:true});}catch{continue;}for(const e of list){if(e.isFile()&&/\.(bin|cue|iso|mdf|mds|ccd|img|nrg)$/i.test(e.name)&&(e.name.match(/\.(cue|iso|mds|ccd|nrg)$/i)||(stat(path.join(d,e.name))?.size||0)>50e6))return true;if(e.isDirectory()&&depth>0)stack.push([path.join(d,e.name),depth-1]);}}return false;})();throw Error(disc?'IMPORT_DISC_IMAGE':'IMPORT_SOURCE_NO_MATCH');}
  const root=path.dirname(exe);
  const target=info.staged?freeFolder(path.join(path.dirname(path.resolve(source)),path.basename(source).replace(/\.(zip|7z|rar)$/i,'').replace(/[<>:"|?*]/g,'').trim()||'Japanese')):root;
@@ -134,7 +134,7 @@ async function plan(gameDir,source){
 
 async function preview(gameDir,source){
  const p=await plan(gameDir,source),list=a=>a.map(({file,size})=>({file,size}));
- if(p.separate?.installer){const s=p.separate;if(!fs.existsSync(s.iso))await require('./disc-image.cjs').toIso(s.from,s.iso);return {state:'installer',iso:s.iso};}
+ if(p.separate?.installer)return {state:'installer',image:p.separate.image};
  if(p.port){const r=require('./saya-script-port.cjs').build(fs.readFileSync(p.port.steam),fs.readFileSync(p.port.pak)).report;return {state:'port',textLines:r.textLines,matched:r.matched,rate:r.rate,joined:r.joined,cut:r.originalUnused.length,unmatched:r.unmatched.slice(0,50)};}
  if(p.separate)return {state:'separate',exe:p.separate.exe,target:p.separate.target,copy:p.separate.move};
  return {state:'preview',root:p.root,replace:list(p.replace),add:list(p.add),remove:list(p.remove),exe:p.exe,changes:p.replace.length+p.add.length+p.remove.length};}

@@ -1,4 +1,5 @@
 import './idle-gate.js';
+import {openDiscInstall,discImagePaths,bindDiscDrop} from './disc-install.js';
 import {fitLibraryGrid} from './library-grid-fit.js';
 import {formatDefinition} from './dictionary-format.js';
 import './primary-buttons.js';
@@ -718,7 +719,7 @@ function japaneseRestore(only){
   list:'查看文件列表',confirm:'确认导入',cancel:'取消',done:n=>'已导入：替换 '+n.replaced+' 个，新增 '+n.added+' 个，移走 '+n.removed+' 个',kinds:{replace:'替换',add:'新增',remove:'移到备份'},errs:{
   IMPORT_SOURCE_NO_MATCH:'没在里面找到这个游戏的文件，请确认选的是同一部作品的日文原版',IMPORT_SAYA_NEEDS_PAK:'Steam 版沙耶之歌要从 2003 年日文原版移植剧本：请选原版文件夹（里面有 script.pak 和 saya.exe）或它的压缩包',SAYA_VERIFY_HASH:'生成的日文剧本校验失败，游戏文件没有改动',
   RESTORE_HASH_MISMATCH:'还原后的 script.npk 和备份的原文件不一致，请勿启动游戏并反馈',IMPORT_DISC_UNREADABLE:'读不出这个光盘镜像的内容，可以先用虚拟光驱挂载后选里面的文件夹',IMPORT_DISC_INSTALLER:'这张光盘里是安装程序，请先安装游戏再选安装好的文件夹',
-  IMPORT_DISC_IMAGE:'这是光盘镜像（bin / cue / iso 等），里面是安装程序，不是游戏本体。请先用虚拟光驱挂载（iso 可以直接双击）并安装游戏，再在这里选安装好的文件夹或游戏程序',IMPORT_SOURCE_TYPE:'请选择压缩包（zip / 7z / rar）、游戏程序或文件夹',
+  IMPORT_DISC_IMAGE:'这是光盘镜像，请选择镜像文件进入挂载安装流程，装好后再选择游戏目录',IMPORT_SOURCE_TYPE:'请选择压缩包（zip / 7z / rar）、游戏程序或文件夹',
   IMPORT_SOURCE_MISSING:'找不到选择的文件',IMPORT_EXTRACT_FAILED:'解压失败（可能有密码或文件损坏），可以先自己解压，再选解压后的文件夹',IMPORT_TOO_LARGE:'需要新增的文件超过 4 GB，看起来不是同一个游戏，没有导入',IMPORT_TOO_MANY_FILES:'文件太多，看起来选的不是单个游戏',
   NOTHING_TO_IMPORT:'日文原版和现在的文件一样，不需要导入',ALREADY_IMPORTED:'已经导入过，先还原再重新导入'}},
   en:{lead:'Pick the Japanese release you have: a downloaded archive (zip / 7z / rar), its game program, or its unpacked folder. MeguLit lists the files to swap first and only replaces them after you confirm; every replaced file is backed up and can be undone'+jpSourceNote(),
@@ -728,7 +729,7 @@ function japaneseRestore(only){
    add:'add',remove:'move aside'},errs:{IMPORT_SOURCE_NO_MATCH:'No files of this game were found there; pick the Japanese release of the same title',IMPORT_SAYA_NEEDS_PAK:'Steam The Song of Saya takes its Japanese script from the 2003 release: pick that folder (with script.pak and saya.exe) or its archive',
    SAYA_VERIFY_HASH:'The generated Japanese script failed its check; game files were not changed',RESTORE_HASH_MISMATCH:'The restored script.npk does not match the backed-up original; do not start the game and report this',
    IMPORT_DISC_UNREADABLE:'This disc image could not be read; mount it with a virtual drive and pick the folder inside',IMPORT_DISC_INSTALLER:'This disc holds an installer; install the game first and pick the installed folder',
-   IMPORT_DISC_IMAGE:'This is a disc image (bin / cue / iso and similar) holding an installer, not the game. Mount it with a virtual drive (an iso opens with a double-click), install the game, then pick the installed folder or game program here',
+   IMPORT_DISC_IMAGE:'Choose the disc image to mount it and open its installer, then select the installed game folder',
    IMPORT_SOURCE_TYPE:'Pick an archive (zip / 7z / rar), the game program or a folder',IMPORT_SOURCE_MISSING:'The selected file was not found',IMPORT_EXTRACT_FAILED:'Could not unpack (password or damaged archive); unpack it yourself and pick the folder',
    IMPORT_TOO_LARGE:'More than 4 GB would be added, which does not look like the same game; nothing imported',IMPORT_TOO_MANY_FILES:'Too many files; that does not look like a single game',
    NOTHING_TO_IMPORT:'The Japanese release matches the current files; nothing to import',ALREADY_IMPORTED:'Already imported; undo first to import again'}},
@@ -737,25 +738,17 @@ function japaneseRestore(only){
    list:'ファイル一覧',confirm:'取り込む',cancel:'キャンセル',done:n=>'取り込み完了：置き換え '+n.replaced+'、追加 '+n.added+'、移動 '+n.removed,kinds:{replace:'置き換え',add:'追加',remove:'移動'},errs:{
    IMPORT_SOURCE_NO_MATCH:'このゲームのファイルが見つかりません。同じ作品の日本語版を選んでください',IMPORT_SAYA_NEEDS_PAK:'Steam 版『沙耶の唄』は 2003 年の日本語版からシナリオを移植します。script.pak と saya.exe のあるフォルダかその圧縮ファイルを選んでください',
    SAYA_VERIFY_HASH:'生成した日本語シナリオの検証に失敗しました。ゲームファイルは変更していません',RESTORE_HASH_MISMATCH:'復元した script.npk がバックアップの元ファイルと一致しません。ゲームを起動せず報告してください',IMPORT_DISC_UNREADABLE:'このディスクイメージを読めません。仮想ドライブでマウントして中のフォルダを選んでください',
-   IMPORT_DISC_INSTALLER:'このディスクはインストーラーです。先にインストールしてからインストール先のフォルダを選んでください',IMPORT_DISC_IMAGE:'これはディスクイメージ（bin / cue / iso など）で、中身はインストーラーです。仮想ドライブでマウントして（iso はダブルクリックで開けます）インストールしてから、インストール先のフォルダか実行ファイルを選んでください',
+   IMPORT_DISC_INSTALLER:'このディスクはインストーラーです。先にインストールしてからインストール先のフォルダを選んでください',IMPORT_DISC_IMAGE:'ディスクイメージを選んでマウントとインストールを進め、完了後にゲームのフォルダーを選んでください',
    IMPORT_SOURCE_TYPE:'圧縮ファイル（zip / 7z / rar）、実行ファイル、フォルダのいずれかを選んでください',IMPORT_SOURCE_MISSING:'選択したファイルが見つかりません',IMPORT_EXTRACT_FAILED:'展開できませんでした（パスワード付きか破損）。先に展開してフォルダを選んでください',
    IMPORT_TOO_LARGE:'追加が 4 GB を超えるため、同じゲームではなさそうです。取り込みませんでした',IMPORT_TOO_MANY_FILES:'ファイルが多すぎます。単体のゲームではなさそうです',NOTHING_TO_IMPORT:'日本語版と現在のファイルが同じため、取り込む必要はありません',
    ALREADY_IMPORTED:'取り込み済みです。元に戻してから再度取り込んでください'}}})[locale]||null;
  const IWD=iw||{};Object.assign(t.errs,IWD.errs||{});
  const panel=()=>body.querySelector('[data-jr-import-panel]');
  const closePanel=()=>{const el=panel();if(el){el.hidden=true;el.innerHTML='';}};
- const previewFrom=async source=>{const el=panel();if(!source||!el)return;el.innerHTML=`<p class="settings-help">${IWD.reading}</p>`;
+ const previewFrom=async source=>{const el=panel();if(!source||!el)return;if(discImagePaths([source]).length){await installDisc([source],'japanese');return;}el.innerHTML=`<p class="settings-help">${IWD.reading}</p>`;
   try{const p=await api('jp_import_preview',{id,source});
    /* E338: a Japanese release of another build (Steam Saya vs the 2003 disc) shares no files: set it up as its own copy */
-   /* E339: the disc holds an installer: it was turned into an .iso the user mounts and installs from */
-   if(p.state==='installer'){const IT=({zh:{text:x=>'这张光盘里是安装程序（游戏本体装在安装包里），不能直接拿来用。已经转换成「'+x.iso+'」：双击它就能像光盘一样打开，运行里面的 Setup.exe 安装游戏，装好后回到这里点「选文件夹」，选安装好的游戏文件夹',
-    show:'在文件夹中显示'},en:{text:x=>'This disc holds an installer (the game is packed inside it), so it cannot be used directly. It has been turned into "'+x.iso+'": double-click it to open it like a disc, run Setup.exe inside to install the game, then come back, choose Folder and pick the installed game folder',
-    show:'Show in folder'},ja:{text:x=>'このディスクの中身はインストーラーで（ゲーム本体はパッケージ内）、そのままでは使えません。「'+x.iso+'」に変換しました。ダブルクリックでディスクとして開けるので、中の Setup.exe でインストールしてから、ここで「フォルダ」を選びインストール先を指定してください',
-    show:'フォルダで表示'}})[locale]||null;
-    el.innerHTML=`<p class="jr-import-sum">${esc(IT.text(p))}</p><div class="jr-import-actions"><button type="button" class="secondary" data-jr-cancel>${IWD.cancel}</button><button type="button" class="primary" data-jr-reveal>${IT.show}</button></div>`;
-    el.querySelector('[data-jr-cancel]').onclick=()=>{api('jp_import_cancel',{id}).catch(()=>{});closePanel();};
-    el.querySelector('[data-jr-reveal]').onclick=()=>api('jp_import_reveal',{id,path:p.iso}).catch(fail);
-    return;}
+   if(p.state==='installer'){if(!p.image)throw Error('IMPORT_DISC_UNREADABLE');await installDisc([p.image],'japanese');closePanel();return;}
    /* E409: Steam Saya + the 2003 Japanese script.pak: the Japanese script is ported into the Steam script.npk (HD kept) */
    if(p.state==='port'){const pct=x=>(Math.round((x.rate||0)*1000)/10)+'%',PT=({zh:{text:x=>'识别到 Steam 版《沙耶之歌》和 2003 年日文原版：可以把原版的日文剧本移植进 Steam 版的 script.npk，保留高清画面和现在的启动程序。Steam 版 '+x.textLines+' 句里对上了 '+x.matched+' 句（'+pct(x)+'）'+(x.cut?'；原版另有 '+x.cut+' 句是 Steam 版删减的内容，无法加入':'')+'。原来的 script.npk 会先备份，随时可以还原',
     ok:'移植日文剧本',done:x=>'已移植日文剧本（对齐 '+pct(x)+'）'},en:{text:x=>'Steam The Song of Saya and the 2003 Japanese release found: the Japanese script can be ported into the Steam script.npk, keeping the HD pictures and the current program. '+x.matched+' of '+x.textLines+' Steam lines matched ('+pct(x)+')'+(x.cut?'; '+x.cut+' Japanese lines belong to scenes the Steam release cut and cannot be added':'')+'. The current script.npk is backed up and can be restored any time',
@@ -869,6 +862,9 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape')closeContext
  const buttons=[...contextMenu.querySelectorAll('button')];let index=buttons.indexOf(document.activeElement);buttons[(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length].focus();
  }});
 addEventListener('blur',closeContextMenu);addEventListener('resize',closeContextMenu);addEventListener('scroll',closeContextMenu,true);
+async function installDisc(paths=[],context='library'){
+ return openDiscInstall({paths,api,invoke,locale,esc,context,onLibraryChanged:async()=>{model=await api('home');await renderRoute();}});
+}
 function editGame(id){
   const game=model.games.find(g=>g.id===id);
   /* E281 (user: polish the add game dialog): the program comes first as one large card that shows the file name and its
@@ -886,17 +882,17 @@ function editGame(id){
    dialog.querySelector('[data-exe-name]').textContent=value?parts.at(-1):words.pick;dialog.querySelector('[data-exe-dir]').textContent=value?parts.slice(0,-1).join('\\'):words.pickSub;
    dialog.querySelector('[data-exe-action]').textContent=value?words.change:({zh:'浏览…',en:'Browse…',ja:'参照…'})[locale];};
   const folderName=value=>{const parts=String(value).split(/[\\/]+/).filter(Boolean);return (parts.at(-2)||'').trim();};
-  exeInput.addEventListener('input',showExe);showExe();
+  exeInput.addEventListener('input',()=>{titleInput.required=!discImagePaths([exeInput.value.trim()]).length;showExe();});showExe();
   dialog.querySelector('#cancel-game').addEventListener('click',()=>dialog.close());
   // A picked cover is saved at once, like a series cover; automatic metadata refresh keeps it.
   dialog.querySelector('#pick-cover')?.addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{const path=await invoke('pick_image');
    if(!path)return;const result=await api('game_cover',{id,path});const preview=dialog.querySelector('#game-cover-preview');preview.src=result.cover;preview.hidden=!result.cover;
    model=await api('home');renderRoute();toast(text.saved);}catch(error){toast(errorMessage(error));}finally{button.disabled=false;}});
   dialog.querySelector('#pick-exe').addEventListener('click',async()=>{try{const directory=game?(await api('game_original_executable',{id})).directory:undefined;
-   const file=await invoke('pick_executable',{directory});if(file){exeInput.value=file;showExe();if(!titleInput.value.trim()){titleInput.value=folderName(file);
+   const file=await invoke(game?'pick_executable':'pick_patch_file',{directory,title:({zh:'选择游戏程序或光盘镜像',en:'Choose a game program or disc image',ja:'実行ファイルまたはディスクイメージを選択'})[locale]});if(file){if(!game&&discImagePaths([file]).length){dialog.close();await installDisc([file]);return;}exeInput.value=file;showExe();if(!titleInput.value.trim()){titleInput.value=folderName(file);
    }}}catch{toast(text.serviceFailed);}});
   // The VNDB entry is sent only when it was edited; a new entry refreshes the game's metadata right away.
-  dialog.querySelector('#game-form').addEventListener('submit',async event=>{event.preventDefault();try{const vndbInput=dialog.querySelector('#game-vndb'),vndb=vndbInput&&vndbInput.value.trim()!==(game?.vndbId||'')?vndbInput.value:undefined;
+  dialog.querySelector('#game-form').addEventListener('submit',async event=>{event.preventDefault();try{const paths=discImagePaths([exeInput.value.trim()]);if(!game&&paths.length){dialog.close();await installDisc(paths);return;}const vndbInput=dialog.querySelector('#game-vndb'),vndb=vndbInput&&vndbInput.value.trim()!==(game?.vndbId||'')?vndbInput.value:undefined;
    const saved=await api('save_game',{id,title:dialog.querySelector('#game-title').value,executable:dialog.querySelector('#game-exe').value,vndb});dialog.close();
    model=await api('home');renderRoute();toast(text.gameSaved);if(saved?.vndbChanged)api('game_enrich',{id,locale,refresh:true}).then(async()=>{model=await api('home');
    renderRoute();}).catch(()=>{});}catch(error){toast(errorMessage(error));}});
@@ -1319,6 +1315,7 @@ async function navigate(next,tab='',replay=false){if(next!=='learning'||tab!=='k
  'page');else button.removeAttribute('aria-current');});renderRoute();}
 async function start(){
   app.innerHTML=loading();
+  if(!window.__megulitDiscDropBound){window.__megulitDiscDropBound=true;bindDiscDrop({invoke,internals:window.__TAURI_INTERNALS__,onImages:paths=>{installDisc(paths).catch(error=>toast(errorMessage(error)));}}).catch(()=>{window.__megulitDiscDropBound=false;});}
   try{
     const saved=await api('ui_state');
     for(const[key,value]of Object.entries(saved))if(localStorage.getItem(key)===null)localStorage.setItem(key,value);
