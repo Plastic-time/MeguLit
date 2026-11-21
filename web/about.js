@@ -131,7 +131,7 @@ export function mountAbout(main,api,toast,model){
  const locale=pickLocale(document.documentElement.lang),t=U[locale],page=main.querySelector('.ab');
  const button=main.querySelector('[data-update]'),state=main.querySelector('[data-update-state]');
  button?.addEventListener('click',async()=>{button.disabled=true;state.textContent=t.checking;const info=await checkForUpdates({api,invoke:(c,a)=>Promise.resolve(window.__TAURI_INTERNALS__?.invoke(c,a)),version:VERSION,toast,manual:true});state.textContent=info?(info.newer?t.found(info.latest):t.latest):'';button.disabled=false;});
- fillSeedCount(main,locale);
+ fillSeedCount(main,locale,api);
  main.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>api('open_source',{url:b.dataset.open}).catch(()=>toast&&toast('…'))));
  /* E394 feedback and logs go through MeguLit's relay, not a GitHub page many users cannot open */
  const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);

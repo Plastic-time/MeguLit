@@ -184,7 +184,7 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
     if (n === 2) two.querySelector('[data-page-no]').textContent = total === 3 ? '3 / 3' : '2 / 2';
     shown.querySelector('.secondary, .primary').focus();
   };
-  fillSeedCount(seed, locale);
+  fillSeedCount(seed, locale, api);
   dialog.querySelector('[data-next]').onclick = () => { if (seedSeen()) { trail.push(2); page(2); } else { markSeedSeen(); trail.push('seed'); page('seed'); } };
   dialog.querySelector('[data-next-guide]').onclick = () => { trail.push(2); page(2); };
   dialog.querySelectorAll('[data-back]').forEach(b => { b.onclick = () => { trail.pop(); page(trail[trail.length - 1] || 1); }; });

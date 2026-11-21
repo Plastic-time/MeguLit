@@ -13,7 +13,7 @@ const W={
    ['坏了先退一步','退回读模式并上报，修好后热更新送到大家手上'],
    ['共享运行样本','默认开，只用来修差分，可以在设置里关']],
   soon:'读取、自动回传、热更新下一个大版本上线',next:'下一步：The Seed',tag:'megulit · the seed',
-  count:(g,v)=>`已种下 ${g} 部游戏、${v} 个版本`,github:'去 GitHub 看看',close:'关闭',openAria:'打开 The Seed 介绍'},
+  count:(g,v)=>`已种下 ${g} 部游戏、${v} 个版本`,live:(c,w)=>`已确认 ${c} 部 · 等传火 ${w} 部`,github:'去 GitHub 看看',close:'关闭',openAria:'打开 The Seed 介绍'},
  en:{name:'The Seed',kicker:'Project Spark',line:'One small diff per game',
   lead:"We used to try fitting every game with one universal spell: fix one game and another one's magic circuit blew up. So now every game, every version gets its own diff. That is The Seed",
   homage:'The name is a nod to The Seed in Sword Art Online; the sharing idea is a nod to the Textractor hook codes people used to post for each other on forums',
@@ -23,7 +23,7 @@ const W={
    ['Breaks, steps back','Falls back to reading mode and reports; a hot update brings the fix'],
    ['Shared run samples','On by default, used only to fix diffs, can be turned off in Settings']],
   soon:'Reading, automatic upload and hot updates arrive with the next big version',next:'Next: The Seed',tag:'megulit · the seed',
-  count:(g,v)=>`${g} games, ${v} versions planted`,github:'See it on GitHub',close:'Close',openAria:'Open the introduction to The Seed'},
+  count:(g,v)=>`${g} games, ${v} versions planted`,live:(c,w)=>`${c} confirmed · ${w} waiting for a spark`,github:'See it on GitHub',close:'Close',openAria:'Open the introduction to The Seed'},
  ja:{name:'The Seed · 伝火計画',kicker:'伝火計画',line:'ゲームごとの数 KB の差分',
   lead:'以前は一つの汎用の術式で全部のゲームに合わせようとして、一本直すと別の一本の魔力回路が吹き飛んでいました。そこで、ゲームごと・バージョンごとに差分を一つ持つ形にしました。これが The Seed です',
   homage:'名前は『ソードアート・オンライン』の The Seed から。共有の発想は、かつて皆が掲示板で貼り合った Textractor のフックコードへのオマージュです',
@@ -33,11 +33,17 @@ const W={
    ['壊れたら一歩退く','読み取りモードに戻って報告し、直したらホットアップデートで届けます'],
    ['実行サンプルの共有','既定でオン。差分の修正にだけ使い、設定でオフにできます']],
   soon:'読み込み・自動送信・ホットアップデートは次の大型バージョンで公開',next:'次へ：The Seed',tag:'megulit · the seed',
-  count:(g,v)=>`${g} 本のゲーム、${v} バージョン分を種まき済み`,github:'GitHub で見る',close:'閉じる',openAria:'The Seed の紹介を開く'}
+  count:(g,v)=>`${g} 本のゲーム、${v} バージョン分を種まき済み`,live:(c,w)=>`確認済み ${c} 本 · 伝火待ち ${w} 本`,github:'GitHub で見る',close:'閉じる',openAria:'The Seed の紹介を開く'}
 };
 export const seedWords=locale=>W[locale]||W.zh;
-let stats=null;
-export const seedStats=()=>stats||(stats=fetch('the-seed-stats.json').then(r=>r.json()).catch(()=>({games:0,versions:0})));
+/* counts: the file made at build time answers at once; the live numbers come through the app's service layer (GET /api/seed/stats on the relay,
+   3 s per host, nothing about the user is sent) and replace it when they arrive; if that fails the file stays */
+let bundled=null;
+const bundledStats=()=>bundled||(bundled=fetch('the-seed-stats.json').then(r=>r.json()).catch(()=>null));
+export const seedStats=(api,onLive)=>{
+ if(api)Promise.resolve().then(()=>api('seed_stats',{})).then(v=>{if(v&&Number.isInteger(v.games)&&onLive)onLive(v);}).catch(()=>{});
+ return bundledStats();
+};
 const ASSET='assets/the-seed-egg.webp';
 const heroHTML=()=>`<div class="seed-hero"><img src="assets/the-seed-banner.webp" alt="" loading="lazy"></div>`;
 /* the home entry: a small pill under the top bar, the egg, the name, one line and an arrow; the whole pill is one button */
@@ -52,7 +58,7 @@ export function seedBodyHTML(locale,esc){
   <dl class="seed-points">${t.points.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
   <p class="seed-soon">${esc(t.soon)}</p>`;
 }
-const countText=(locale,s)=>s&&s.games?seedWords(locale).count(s.games,s.versions):'';
+const countText=(locale,s)=>{if(!s||!s.games)return '';const t=seedWords(locale);return t.count(s.games,s.versions)+(Number.isInteger(s.confirmed)&&Number.isInteger(s.waiting)?' · '+t.live(s.confirmed,s.waiting):'');};
 /* the About section: a full-width band under the three columns; the nod sits last, small */
 export function seedAboutHTML(locale,esc){
  const t=seedWords(locale);
@@ -63,9 +69,10 @@ export function seedAboutHTML(locale,esc){
   ${foot}
   <p class="seed-homage">${esc(t.homage)}</p></section>`;
 }
-export function fillSeedCount(root,locale){
+export function fillSeedCount(root,locale,api){
  const el=root.querySelector('[data-seed-count]');if(!el)return;
- seedStats().then(s=>{const text=countText(locale,s);el.textContent=text;el.hidden=!text;});
+ const show=s=>{const text=countText(locale,s);el.textContent=text;el.hidden=!text;};
+ seedStats(api,s=>{if(el.isConnected)show(s);}).then(s=>{if(s&&!el.textContent)show(s);});
 }
 /* one page of the start flow (notice, The Seed, tutorial): the same top line, title, scrolling body and button row as the other two */
 export function seedPageHTML(locale,esc,{kicker='传火计划',tag='',left='',right=''}={}){
@@ -85,7 +92,7 @@ export function openSeedDialog({api,locale,esc,toast}){
  dialog.innerHTML=seedPageHTML(locale,esc,{left:`<button type="button" class="text-button" data-seed-github>${esc(t.github)} ↗</button>`,right:`<button type="button" class="secondary" data-ok>${esc(t.close)}</button>`});
  document.body.append(dialog);
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
- fillSeedCount(dialog,locale);markSeedSeen();
+ fillSeedCount(dialog,locale,api);markSeedSeen();
  dialog.querySelector('[data-ok]').onclick=()=>dialog.close();
  dialog.querySelector('[data-seed-github]').onclick=()=>api('open_source',{url:SEED_URL}).catch(()=>toast&&toast('…'));
  dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
