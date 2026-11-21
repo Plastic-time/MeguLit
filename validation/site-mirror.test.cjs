@@ -82,3 +82,15 @@ test('site helpers: language pick and safe Markdown',async()=>{
  assert.match(html,/<h4>New<\/h4><ul><li><strong>bold<\/strong> &lt;script&gt;/);
  assert.match(html,/<a href="https:\/\/a\.b"/);assert.doesNotMatch(html,/href="javascript/);
 });
+
+
+test('mutable mirror metadata and latest redirects cannot be stored by downstream CDNs',async()=>{
+ const worker=(await load('site/mirror/src/index.mjs')).default;
+ const latest={key:'files/'+SHA_A+'/MeguLit-v1.2.8-win-x64.zip'};
+ const env={BUCKET:{get:async()=>({body:JSON.stringify(latest),httpEtag:'"metadata"',json:async()=>latest})}};
+ for(const route of ['/latest.json','/latest.json/','/releases.json','/latest','/MeguLit-v1.2.8-win-x64.zip']){
+  const response=await worker.fetch(new Request('https://dl.megulit.com'+route),env,{});
+  assert.match(response.headers.get('cache-control'),/no-store/,route);
+  assert.equal(response.status,route.includes('.json')?200:302,route);
+ }
+});

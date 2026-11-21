@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
     inputs:
@@ -114,7 +115,7 @@ jobs:
       - name: Unit and integration tests
         shell: pwsh
         run: |
-          $tests = @(Get-ChildItem validation -Filter *.test.cjs -File | ForEach-Object FullName)
+          $tests = @(Get-ChildItem validation -Filter *.test.cjs -File | ForEach-Object { Join-Path 'validation' $_.Name })
           if (-not $tests.Count) { throw 'No tests found' }
           # --test-force-exit: a test file that leaves a handle open (a browser, a server) still ends when its tests have finished
           node --test --test-force-exit @tests 2>&1 | Tee-Object -FilePath test-output.txt
