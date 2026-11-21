@@ -25,6 +25,7 @@ import {contribRoute,cleanupContrib} from './contrib.js';
 import {profileRoute} from './auto-profile.js';
 /* 2026-11-21 Cardinal replay scores in, auto diffs verified / sent to the repair queue (relay/src/cardinal.js) */
 import {cardinalRoute} from './cardinal.js';
+import {torchReleaseRoute} from './torch-release.js';
 import {monumentGet,monthsGet,findGet,meGet} from './torch-credit.js';
 
 /* requests per window; key prefix → [limit, seconds] */
@@ -306,6 +307,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
   else if(path==='/api/torch/find')response=request.method==='GET'?await findGet(env,url,{json,fail},ctx):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/torch/me')response=request.method==='GET'?await meGet(env,url,ip,{json,fail},/^[0-9a-f]{64}$/):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/torch/monument')response=request.method==='GET'?await monumentGet(env,url,{json,fail},ctx):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/torch-release'||path.startsWith('/api/torch-release/'))response=await torchReleaseRoute(request,env,now,url,path,{json,fail})||fail('NOT_FOUND',404);
   else if(path.startsWith('/api/cardinal/'))response=await cardinalRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else if(path==='/api/game-profile'||path.startsWith('/api/game-profile/'))response=await profileRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else if(path.startsWith('/api/adapters/')||path==='/api/probe'||path.startsWith('/api/probe/'))response=await adaptersRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);

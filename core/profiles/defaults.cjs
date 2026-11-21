@@ -126,4 +126,23 @@ module.exports={
      the line) and switches read mode over 30 % (hookTextEffects); false = the kernel: only the reader's own pairing count */
   effectJudge:false,
  },
+ /* 2026-11-21 Cardinal (core/cardinal/, services/cardinal.cjs, docs/cardinal.md): after a session, a calibration or a self-check this
+    PC replays the session's last lines through a hidden reader and scores what the player saw. Here so a signed diff can retune the
+    rules per game (hot update): rev is the record's cardinalRev (raise it with any change of the rules below); lines = the last N
+    dialogue lines replayed; maxGapMs / sampleMs = the replay clock (gaps longer than maxGapMs shortened, the page measured every
+     sampleMs); minIntervalMin = at most one run per exe in that time (a session's end always runs); maxLagMs bounds step/sample lateness
+     P95 and every sampler gap beyond sampleMs. Missing/invalid monotonic timing, failed probes, fewer than four probes or a DOM sample
+     count/clock mismatch stays on this PC and is never uploaded */
+ cardinal:{
+  rev:8,lines:60,maxGapMs:1500,sampleMs:90,minIntervalMin:30,maxLagMs:80,
+  /* the total = applicable-score weighted mean, capped by visible expected dialogue coverage */
+  weights:{row:3,stable:1,clean:2,clear:1,choice:1,pair:1,leak:2},
+  /* core/cardinal/checks.cjs T0: a line is settled settleMs after it became the reader's line, the row counts as shown in shownRate of
+     its settled samples; stablePx: the Japanese row may move this much; cnOverlapPx: the Chinese may reach this far over the Japanese;
+     lineMs: a line counts once shown that long; burstMs: lines closer than this are a skip burst; calibGapMs / calibWatchMs: the
+     Japanese may be gone at most calibGapMs within calibWatchMs of a calibration; choiceMs: options visible within this; staleChars:
+     an earlier line's row of at least this many characters left on the page is stale; preflightMs: the kernel's preflight (the original
+     shown once and checked before the hide) may keep the hide off this long without counting as a leak */
+  thresholds:{settleMs:300,shownRate:0.9,stablePx:0,cnOverlapPx:2,lineMs:700,burstMs:300,calibGapMs:1000,calibWatchMs:2500,choiceMs:3000,staleChars:4,preflightMs:1500},
+ },
 };

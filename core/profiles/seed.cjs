@@ -79,7 +79,7 @@ function load(dir=SEED_DIR){const games=[],versions=new Map(),errors=[];
    const g0=read(path.join(base,'game.json'));if(!g0)continue;const r=check(g0,{engine,slug});if(!r.ok){errors.push(engine+'/'+slug+'/game.json: '+r.errors.join('; '));continue;}const g=r.doc;
    /* builds: its own version files and the shared ones it lists; their exe names also name the game (a generic name only weakly) */
    const builds=[...new Set([...(g.builds||[]),...files.map(f=>f.slice(0,-5))])];
-   games.push({key:slug,engine:g.engine,seed:true,status:g.status,sourceLangs:g.sourceLangs||['ja'],mode:g.mode,gameId:g.key,prints:g.prints||{},settings:g.settings||{},
+   games.push({key:slug,engine:g.engine,seed:true,status:g.status,seedRev:Number.isInteger(g.rev)?g.rev:null,sourceLangs:g.sourceLangs||['ja'],mode:g.mode,gameId:g.key,prints:g.prints||{},settings:g.settings||{},
     match:{exeSha256:builds,exe:[...new Set([...builds.map(b=>versions.get(b)?.exe).filter(Boolean),...(g.match?.exe||[])])],titles:g.match?.titles||[],notTitles:g.match?.notTitles||[],steamAppId:g.prints?.steam||undefined,prints:g.prints||{}}});}}
  /* a version file filed under one game may serve others (builds): its game is the one that lists it */
  for(const g of games)for(const b of g.match.exeSha256){const v=versions.get(b);if(v&&!v.game)v.game=g.key;}

@@ -5,7 +5,7 @@ const {readJSON}=require('./store.cjs');
 // Text sizes changed on the home settings page also apply to the work that is running: its saved settings would hide them (issue 119).
 const SIZE_KEYS=['japaneseSize','translationSize','englishSize'];
 class Runtime {
- constructor(root,emit=()=>{}){this.root=root;this.folder=path.join(root,'data','config');this.emit=(event,data)=>{if(event==='reader-event'&&data?.type!=='libraryOnly'&&this.libraryOnly())return;emit(event,data);};this.stopped=false;}
+ constructor(root,emit=()=>{}){require('./torch-receive.cjs').resume(root);this.root=root;this.folder=path.join(root,'data','config');this.emit=(event,data)=>{if(event==='reader-event'&&data?.type!=='libraryOnly'&&this.libraryOnly())return;emit(event,data);};this.stopped=false;}
  libraryOnly(){return this.libraryOnlyState??=require('../core/library-mode.cjs').libraryOnly(this.root);}
  trackTextPath(prepared){if(!prepared?.session)return;this.textPaths??=new Set();this.textPaths.add(prepared.session);}
  forgetTextPath(session){this.textPaths?.delete(session);}
@@ -61,7 +61,7 @@ class Runtime {
   if(this.stopped)throw Error('RUNTIME_STOPPED');const config=this.config();
   if(this.libraryOnly()&&['reader_attach','reader_message','reader_invoke'].includes(request.action))return {libraryOnly:true,attached:false,replies:[]};
   switch(request.action){
-case 'library_scan':{this.libraryScans??=new(require('./library-scan.cjs').LibraryScans)(async(options,state)=>{const library=this.library();library.state=state;await library.scan(progress=>this.emit('library-progress',progress),options);const result=require('./library.cjs').reconcile(this.root,library.load().games,{restoreRemoved:!options.incremental,confirmedFolderMatches:library.confirmedFolderMatches});const db=require('./store.cjs').openStore(this.root);try{this.metadata().enqueue(db.prepare('SELECT id FROM games WHERE removed_at IS NULL').all().map(g=>g.id),options?.incremental!==true);
+case 'library_scan':{this.libraryScans??=new(require('./library-scan.cjs').LibraryScans)(async(options,state)=>{const library=this.library();library.state=state;await library.scan(progress=>this.emit('library-progress',progress),options);const result=require('./library.cjs').reconcile(this.root,library.load().games,{restoreRemoved:!options.incremental,confirmedFolderMatches:library.confirmedFolderMatches});const db=require('./store.cjs').openStore(this.root);try{this.metadata().enqueue(db.prepare('SELECT id FROM games WHERE removed_at IS NULL').all().map(g=>g.id),options?.incremental!==true);require('./torch-receive.cjs').enqueue(this.root,db.prepare("SELECT id FROM games WHERE removed_at IS NULL AND executable!=''").all().map(g=>g.id));
      /* E297 Hxv4 KiriKiri games found: read their scripts once in the background (setting 后台准备加密剧本) */
      try{const cold=require('./kirikiri-cold.cjs');this.coldWatch??=cold.onDone(()=>this.reader?.refreshTextSource?.());cold.considerLibrary(this.root,db.prepare('SELECT id,executable FROM games WHERE removed_at IS NULL').all(),{enabled:require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json'))).scriptColdRun!==false});}catch{}
      /* E590 localized builds with Japanese data in the folder switch to Japanese by themselves, one game at a time */
@@ -128,7 +128,7 @@ case 'library_scan':{this.libraryScans??=new(require('./library-scan.cjs').Libra
   this.stopping=(async()=>{
    let first,failed=false;
    const settle=async tasks=>{const results=await Promise.allSettled(tasks.map(run=>Promise.resolve().then(run)));for(const r of results)if(r.status==='rejected'&&!failed){failed=true;first=r.reason;}};
-   await settle([()=>this.stopReading(),()=>this.ankiRunner?.stop(),()=>this.gameEnrichment?.stop(),()=>this.gameReviews?.stop()]);
+   await settle([()=>require('./torch-receive.cjs').stop(this.root),()=>this.stopReading(),()=>this.ankiRunner?.stop(),()=>this.gameEnrichment?.stop(),()=>this.gameReviews?.stop()]);
    await settle([()=>this.localLearning?.stop(),...Object.keys(this.modelStore?.jobs||{}).map(id=>()=>this.modelStore.cancel(id)),()=>this.localEngine?.cancel()]);
    await settle([()=>this.serviceManager?.stop(),()=>this.localEngine?.stop()]);
    if(failed)throw first;

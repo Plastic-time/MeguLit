@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { createInterface } = require('node:readline');
+const cardinalTape=require('./cardinal/tape.cjs');
 
 const { clean: cleanGal } = require('./game-style.js');
 const { HookNative } = require('./hook-native.cjs');
@@ -29,6 +30,8 @@ class GalNative {
     this.process.stdin.on('error', () => {});
     createInterface({ input: this.process.stdout }).on('line', line => {
       if(this.stopped)return;let message; try { message = JSON.parse(line); } catch { return; }
+      /* Cardinal's tape: the session's bridge records, in memory, for the replay after the session (core/cardinal/tape.cjs) */
+      cardinalTape.record('gwb',message);
       if(message.type==='hookVisual'){this.controller.visual(message);return;}
       if(message.type==='readerPointer'||message.type==='hostFrame'||message.type==='readerContext'||message.type==='layerState'||message.type==='layerRaise'){this.onEvent(message);return;}
       if(message.type==='clientShot'){const pending=this.mediaPending?.get('c'+message.id);if(pending){this.mediaPending.delete('c'+message.id);pending(message);}return;}

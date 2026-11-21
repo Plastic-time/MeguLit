@@ -521,6 +521,7 @@
     document.body.classList.toggle('tomoyo-gal-none', preferences.interfaceMode==='translation' && preferences.display === 'none');
     bridge.quietTranslation = preferences.style !== 'custom';
     bridge.setTranslationVisible(preferences.display !== 'japanese' && preferences.display !== 'none');
+    bridge.cardinalPair?.refresh();
     document.body.classList.toggle('tomoyo-gal-bound', bound);
     document.body.classList.toggle('tomoyo-gal-mask', bound && preferences.maskMode === 'full');bridge.islandPage?.refresh();
     markReader();
@@ -586,6 +587,7 @@
    tip.style.cssText='position:fixed;left:50%;top:9%;transform:translateX(-50%);z-index:2147483000;max-width:min(560px,86vw);padding:10px 18px;border-radius:12px;background:rgba(18,12,14,.92);color:#f3e6da;font:500 14px/1.6 "Microsoft YaHei",sans-serif;box-shadow:0 12px 32px rgba(0,0,0,.45);pointer-events:none;transition:opacity .3s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
    document.body.append(tip); setTimeout(()=>{tip.style.opacity='0';setTimeout(()=>tip.remove(),350);},message.ok===true?2600:4500); };
   bridge.galStatus = message => {
+    bridge.cardinalPair?.source(message);
     if(message?.type==='modeRequest'){if(window.__tomoyoMode?.requestToggle)window.__tomoyoMode.requestToggle();else send({type:'galToggleMode'});return;}
     if(message?.type==='regionApplied'){window.dispatchEvent(new CustomEvent('tome-region-applied',{detail:message}));return;}
     if(typeof message.hookActive==='boolean'){bridge.hookActive=message.hookActive;if(!message.hookActive)bridge.hookSourceText='';}

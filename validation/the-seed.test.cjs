@@ -9,10 +9,11 @@ const Seed=require('../core/profiles/seed.cjs'),Profiles=require('../core/profil
 const root=path.join(__dirname,'..'),DIR=path.join(root,'The Seed');
 const SENREN_EXE='fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3',FATA_EXE='17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42';
 
-test('every file of The Seed passes: format, keys and values, prints, folder names, no private data',()=>{
+test('every file of The Seed passes: format, keys and values, prints, folder names, no private data',async()=>{
+ const feed=require('../services/auto-profile-feed.cjs');await require('../tools/torch-release.cjs').checkRepositoryHistory(DIR,{keys:{profileKeys:feed.keys(),releaseKeys:feed.keys(),reviewKeys:require('../services/torch-review-keys.json').keys}});
  const files=[];const walk=d=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else files.push(path.relative(DIR,p).replace(/\\/g,'/'));}};walk(DIR);
  assert.ok(files.includes('README.md'));
- for(const f of files){if(f==='README.md')continue;
+ for(const f of files){if(f==='README.md'||f.startsWith('history/'))continue;
   const m=/^([a-z0-9]{2,40})\/([a-z0-9][a-z0-9-]{1,62})\/(game\.json|versions\/[0-9a-f]{64}\.json)$/.exec(f);assert.ok(m,'unexpected file '+f+' (The Seed/<engine>/<slug>/game.json or versions/<exe SHA-256>.json)');
   const text=fs.readFileSync(path.join(DIR,f),'utf8');assert.ok(Buffer.byteLength(text)<=16*1024,f+': a seed stays small');
   const doc=JSON.parse(text);const r=Seed.check(doc,m[3]==='game.json'?{engine:m[1],slug:m[2]}:{engine:m[1],file:path.basename(f)});assert.deepEqual(r.errors,[],f);

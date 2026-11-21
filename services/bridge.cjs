@@ -359,7 +359,7 @@ async function dispatch(request,runtime=null) {
         runtime?.reader?.refreshTextSource?.();return off.run(root,'status',[id]);}
       case 'text_source_clear':{const ot=require('./original-text.cjs'),id=String(request.id);if(request.kind==='patch')ot.clearPatch(root,id);else ot.setMode(root,id,'off');runtime?.reader?.refreshTextSource?.();return ot.status(root,db,id);}
       /* 2026-11-12 Chinese-build guide on the game page: checks, then the one-click fixes the existing code can do */
-      case 'first_player':return await require('./first-player.cjs').state(db,root,String(request.id),{wait:request.poll===true?0:2500});
+      case 'first_player':require('./torch-receive.cjs').enqueue(root,[String(request.id)],{priority:'user'});return await require('./first-player.cjs').state(db,root,String(request.id),{wait:request.poll===true?0:2500});
       case 'first_player_credit':return await require('./first-player.cjs').setCredit(db,root,String(request.id),typeof request.name==='string'?request.name:null);
       case 'first_player_share':return {on:require('./first-player.cjs').enableSharing(root)};
       case 'cn_version_guide':{const g=require('./cn-version-guide.cjs').guide(db,root,String(request.id));return g;}
@@ -367,7 +367,7 @@ async function dispatch(request,runtime=null) {
         if(request.kind==='swap')return require('./game-language.cjs').select(db,id,'ja',undefined,root);
         if(request.kind==='reveal'){const file=require('node:path').resolve(String(request.path||''));if(!cg.revealable(dir,file))throw Error('CN_GUIDE_PATH');const child=spawn('explorer.exe',['/select,'+file],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {ok:true};}
         throw Error('CN_GUIDE_FIX');}
-      case 'game_original_executable':{const result=require('./game-language.cjs').originalExecutable(db,String(request.id),root,request.mode,request.executable);const row=db.prepare('SELECT original FROM games WHERE id=?').get(String(request.id));return {...result,localeJapanese:JSON.parse(row?.original||'{}').library?.localeMode==='japanese'};}
+      case 'game_original_executable':{const result=require('./game-language.cjs').originalExecutable(db,String(request.id),root,request.mode,request.executable);require('./torch-receive.cjs').enqueue(root,[String(request.id)],{force:true,priority:'user'});const row=db.prepare('SELECT original FROM games WHERE id=?').get(String(request.id));return {...result,localeJapanese:JSON.parse(row?.original||'{}').library?.localeMode==='japanese'};}
       // E237 Japanese restore (Tools page): list library games that ship Japanese data, then apply or undo per game.
       /* E590 automatic Japanese: notices, global and per-game switch, status, undo */
       case 'jp_auto_notices':{const ja=require('../core/japanese-auto.cjs');return ja.takeNotices(root).map(n=>({...n,title:db.prepare('SELECT title FROM games WHERE id=?').get(n.id)?.title||''}));}
@@ -555,7 +555,7 @@ async function dispatch(request,runtime=null) {
             }}
           original.library={...original.library,exe:executable,executableSignature:require('./library.cjs').signature(executable)};
           db.prepare('UPDATE games SET title=?,executable=?,original=? WHERE id=?').run(title,executable,JSON.stringify(original),existing.id);
-          require('./series.cjs').autoGroup(db,root);runtime?.metadata().enqueue([existing.id],vndbChanged);return {id:existing.id,vndbChanged};
+          require('./series.cjs').autoGroup(db,root);runtime?.metadata().enqueue([existing.id],vndbChanged);require('./torch-receive.cjs').enqueue(root,[existing.id],{force:true,priority:'user'});return {id:existing.id,vndbChanged};
         }
         const library=require('./library.cjs'),match=library.matchGame(db,{title,exe:executable},{manual:true});
         const id=match?.id||'game-'+crypto.randomUUID(),original=match?JSON.parse(match.original):{};
@@ -566,7 +566,7 @@ async function dispatch(request,runtime=null) {
         original.library={...original.library,source,steamRejected:false,dir:path.dirname(executable),exe:executable,executableSignature:library.signature(executable)};
         if(match)db.prepare("UPDATE games SET title=?,executable=?,source=?,removed_at=NULL,original=? WHERE id=?").run(title,executable,source,JSON.stringify(original),id);
         else db.prepare('INSERT INTO games(id,title,executable,source,original) VALUES (?,?,?,?,?)').run(id,title,executable,'manual',JSON.stringify(original));
-        require('./series.cjs').autoGroup(db,root);runtime?.metadata().enqueue([id]);return {id};
+        require('./series.cjs').autoGroup(db,root);runtime?.metadata().enqueue([id]);require('./torch-receive.cjs').enqueue(root,[id],{force:true,priority:'user'});return {id};
       }
       case 'hidden_games':return db.prepare('SELECT id,title FROM games WHERE hidden_at IS NOT NULL AND removed_at IS NULL ORDER BY title').all();
       case 'set_game_hidden':{

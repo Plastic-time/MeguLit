@@ -40,14 +40,15 @@ function verify(doc,list){const s=doc?.signature;if(!s||s.alg!=='ed25519'||typeo
 const VERSION_MATCH=['exe','head','pe'],GAME_MATCH=['exe','head','pe','pack','script','steam','vndb','title'];
 const docOk=d=>gameDiff.validate(d).ok&&verify(d,keys());
 const part=d=>({source:d.source,mode:d.mode||'hide',settings:d.settings||{},rev:d.rev|0,issuedAt:d.issuedAt||'',agree:d.agree|0,reporters:d.reporters|0});
-function layer(answer,key){if(!answer||answer.schema!=='megulit.game-diff-feed'||answer.key!==key)return null;
+function layer(answer,key,{torchTrust}={}){if(!answer||answer.schema!=='megulit.game-diff-feed'||answer.key!==key)return null;
+ if(answer.torchRelease&&!require('./torch-receive.cjs').compatibleCached(answer,key,torchTrust))return null;
  let v=null,g=null,vm='',gm='';
  if(answer.version===2){const V=answer.versionLayer,G=answer.gameLayer;
   if(V&&V.diff&&VERSION_MATCH.includes(V.match)&&V.diff.layer!=='game'&&(V.match!=='exe'||V.diff.key===key)&&docOk(V.diff)){v=V.diff;vm=V.match;}
   if(G&&G.diff&&GAME_MATCH.includes(G.match)&&G.diff.layer==='game'&&docOk(G.diff)){const {split}=require('../core/profiles/domains.cjs');if(!Object.keys(split(G.diff.settings).version).length){g=G.diff;gm=G.match;}}}
  if(!v&&!g&&answer.diff){const d=answer.diff;if(d.layer==='game'){if(docOk(d)){g=d;gm='title';}}else if(d.key===key&&docOk(d)){v=d;vm='exe';}}
  if(!v&&!g)return null;
- const P={version:v?part(v):null,game:g?part(g):null};const lead=P.version||P.game;
+ const P={version:v?{...part(v),...(answer.torchRelease?{source:'official'}:{})}:null,game:g?part(g):null};const lead=P.version||P.game;
  const merged=JSON.parse(JSON.stringify(P.game?.settings||{}));const deep=(a,b)=>{for(const [k,x] of Object.entries(b||{}))a[k]=x&&typeof x==='object'&&!Array.isArray(x)&&a[k]&&typeof a[k]==='object'?deep(a[k],x):x;return a;};deep(merged,P.version?.settings);
  const mode=(P.version&&P.version.mode==='read')||(P.game&&P.game.mode==='read')?'read':'hide';
  return {source:lead.source,mode,match:v?vm:VERSION_MATCH.includes(gm)?gm:'game:'+gm,exact:vm==='exe'||!v&&gm==='exe',settings:merged,version:P.version,game:P.game,agree:lead.agree,reporters:lead.reporters,issuedAt:lead.issuedAt,
@@ -60,13 +61,16 @@ function reject(root,key,l,why=''){if(!l||l.exact)return;try{fs.mkdirSync(dir(ro
 function query(key,prints,old){const p={...require('../core/game-print.cjs').check(prints||{}),exe:key};const q=new URLSearchParams();for(const k of ['exe','head','pe','pack','script','steam','vndb','title','engine'])if(p[k])q.set(k,p[k]);
  const l=old&&!old.none?layer(old,key):null;if(l?.version)q.set('have',String(l.version.rev));if(l?.game)q.set('haveGame',String(l.game.rev));return '?'+q.toString();}
 function cached(root,key){if(!gameDiff.KEY.test(String(key||'')))return null;try{const v=JSON.parse(fs.readFileSync(path.join(dir(root),key+'.json'),'utf8'));return v&&typeof v==='object'?v:null;}catch{return null;}}
-function keep(root,key,v){fs.mkdirSync(dir(root),{recursive:true});const f=path.join(dir(root),key+'.json'),tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(v));fs.renameSync(tmp,f);}
+function keep(root,key,v){const old=cached(root,key),protectedRelease=old?.torchRelease||old?.torchQuarantined?.release;if(protectedRelease&&docOk(protectedRelease.profile)&&verify(protectedRelease,keys())&&!v.torchRelease)return old;
+ const exact=a=>a?.version===2&&a.versionLayer?.match==='exe'&&a.versionLayer.diff?.key===key?a.versionLayer.diff:a?.diff?.key===key?a.diff:null,prev=exact(old),next=exact(v);
+ if(prev&&next&&docOk(prev)&&docOk(next)&&(next.rev<prev.rev||next.rev===prev.rev&&gameDiff.canonical(next)!==gameDiff.canonical(prev)))return old;
+ fs.mkdirSync(dir(root),{recursive:true});const f=path.join(dir(root),key+'.json'),tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(v));fs.renameSync(tmp,f);return v;}
 async function refresh(root,key,{fetcher=globalThis.fetch,now=Date.now(),force=false,prints=null}={}){if(!gameDiff.KEY.test(String(key||''))||!fetcher)return null;
  const old=cached(root,key);if(!force&&old&&now-(old.fetchedAt||0)<(old.none?NONE_MS:FRESH_MS))return old;
  for(const url of endpoints(root,'/api/game-profile'+query(key,prints,old))){try{const r=await fetcher(url,{headers:{'user-agent':'MeguLit',accept:'application/json'},signal:AbortSignal.timeout(TIMEOUT)});
-   if(r.status===304&&old&&!old.none){const v={...old,fetchedAt:now};keep(root,key,v);return v;}
-   if(r.status===404){const v={none:true,key,fetchedAt:now};keep(root,key,v);return v;}
-   if(!r.ok)continue;const text=await r.text();if(text.length>64*1024)continue;const v=JSON.parse(text);if(!layer(v,key))continue;v.fetchedAt=now;keep(root,key,v);return v;}catch{}}
+   if(r.status===304&&old&&!old.none){const v={...old,fetchedAt:now};return keep(root,key,v);}
+   if(r.status===404){const v={none:true,key,fetchedAt:now};return keep(root,key,v);}
+   if(!r.ok)continue;const text=await r.text();if(text.length>64*1024)continue;const v=JSON.parse(text);if(Object.keys(v).some(k=>k.startsWith('torch'))||!layer(v,key))continue;v.fetchedAt=now;return keep(root,key,v);}catch{}}
  return old;}
 /* 2026-11-21 this PC's calibration of the exe reached the relay: data/The Seed/<key>.sent.json (the game page's first-player card turns into its thank-you) */
 const sentFile=(root,key)=>path.join(dir(root),key+'.sent.json');
@@ -98,7 +102,19 @@ function keepLocal(root,key,want){const old=readSent(root,key)||{};writeSent(roo
 /* send a name that was kept here (the relay had no credit route then) */
 async function syncCredit(root,key,opts){const m=readSent(root,key);if(!m||m.localName===undefined)return null;return setCredit(root,key,m.localName,opts);}
 async function report(root,record,{fetcher=globalThis.fetch,prints=null,credit:creditName=null}={}){const credit=cleanName(creditName);if(!record||!sharing(root))return {state:'skipped'};const block=auto.diagnostic(record)?.profile;if(!block||!gameDiff.KEY.test(String(block.key||'')))return {state:'skipped'};
+ /* Cardinal's score of this exe goes with the calibration when it has not reached the relay yet */
+ pendingScore(root,block.key,fetcher);
  const pr=prints?require('../core/game-print.cjs').check(prints):null;const body=JSON.stringify({version:1,profile:block,...(credit?{credit:{name:credit}}:{}),...(pr&&Object.keys(pr).length?{prints:pr}:{})});
  for(const url of endpoints(root,'/api/game-profile/report')){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok){let j=null;try{j=await r.clone().json();}catch{}const c=cleanCredit(j&&(j.credit||j));markSent(root,block.key,c);return {state:'sent',...(c?{credit:c}:{})};}if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
  return {state:'failed'};}
-module.exports={sent,markSent,creditOf,setCredit,syncCredit,cleanName,cleanCredit,CREDIT_MAX,cached,refresh,report,layer,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};
+/* 2026-11-21 Cardinal (services/cardinal.cjs): POST /api/cardinal/score, the body is the record as core/cardinal/score.cjs record made it
+   (schema megulit.cardinal-score, relay/src/cardinal.js checks every field): the exe hash, the seed revision, the app version and
+   the scores, no identity. The same switch as the calibration (共享适配 + autoProfileShare) */
+const SCORE_FIELDS=['schema','version','key','seedRev','source','app','lines','scores','total','cardinalRev','at'];
+async function reportScore(root,record,{fetcher=globalThis.fetch}={}){if(!record||record.schema!=='megulit.cardinal-score'||!gameDiff.KEY.test(String(record.key||''))||!sharing(root)||!fetcher)return {state:'skipped'};
+ const body=JSON.stringify(Object.fromEntries(SCORE_FIELDS.map(k=>[k,record[k]])));
+ for(const url of endpoints(root,'/api/cardinal/score')){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok)return {state:'sent'};if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
+ return {state:'failed'};}
+function pendingScore(root,key,fetcher){let doc=null;try{doc=require('./cardinal.cjs').load(root,key);}catch{}if(doc?.sent||!require('../core/cardinal/upload.cjs').eligible(doc))return;
+ reportScore(root,doc.record,{fetcher}).then(r=>{if(r.state!=='sent')return;try{const cur=require('./cardinal.cjs').load(root,key);if(cur?.record?.at===doc.record.at){const f=require('./cardinal.cjs').fileOf(root,key);fs.writeFileSync(f,JSON.stringify({...cur,sent:true,upload:{state:'sent'}},null,1));}}catch{}}).catch(()=>{});}
+module.exports={reportScore,sent,markSent,creditOf,setCredit,syncCredit,cleanName,cleanCredit,CREDIT_MAX,cached,refresh,report,layer,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};
