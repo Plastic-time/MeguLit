@@ -2,6 +2,11 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const layoutSource=fs.readFileSync(path.join(__dirname,'../web/story-layout.js'),'utf8'),storySource=fs.readFileSync(path.join(__dirname,'../web/detail-story.js'),'utf8');
+test('a removed focused veil restores the open viewer focus without stealing another control or blurred window',()=>{
+ const actual=storySource.split(/\r?\n/).find(line=>line.startsWith('function restoreViewerFocus('));assert(actual);let focused=0,inDialog=false,windowFocused=true;
+ const context={document:{activeElement:{},hasFocus:()=>windowFocused}},dialog={open:true,contains:()=>inDialog,querySelector:()=>({focus:()=>focused++})},veil={isConnected:false};vm.runInNewContext(actual+'\nglobalThis.restore=restoreViewerFocus;',context);
+ context.restore(dialog,veil);assert.equal(focused,1);inDialog=true;context.restore(dialog,veil);assert.equal(focused,1);inDialog=false;veil.isConnected=true;context.restore(dialog,veil);assert.equal(focused,1);veil.isConnected=false;dialog.open=false;context.restore(dialog,veil);assert.equal(focused,1);dialog.open=true;windowFocused=false;context.restore(dialog,veil);assert.equal(focused,1);
+});
 test('partial pages distinguish loaded scene metadata from whole-gallery counts in all three languages',()=>{
  const copySource=storySource.slice(storySource.indexOf('const copy='),storySource.indexOf('const lock=')),sections=storySource.slice(storySource.indexOf(' function gallerySections()'),storySource.indexOf(' function renderGallery()')),render=storySource.slice(storySource.indexOf(' function renderGallery()'),storySource.indexOf(' function watchImages()'));
  for(const locale of ['zh','ja','en']){
