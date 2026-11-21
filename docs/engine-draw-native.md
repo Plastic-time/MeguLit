@@ -137,3 +137,8 @@
 - 点：Tsukihime.exe 0x40eefe，字形例程 0x40eb20（thiscall，第一个参数是字串，5 个调用者）每个字 `TextOutA(hdc, x, 0, 字, 2)` 画进字形小图；0x40f061 / 0x40f085 是它带条件的额外描边 / 阴影遍，不签。另外 5 个 TextOutA（0x41878a、0x41cb2e、0x41d28d、0x430b31、0x43fad3）在别的例程里，等实机记录看清是什么再签
 - 例程没有 EBP 帧：序言 0xfe4 字节（SEH + 0xfc4 局部 + 4 个寄存器）加 5 个 API 参数，返回地址在 API 第一个参数上方 0xff8（签名 frame=0xff8）。x / y 是字形小图里的位置，页面上的笔位是例程自己的参数之一，看 `fargs=`
 - 店主测试清单：同 AVG32，行里是 `engine=nscripter`；看 `fargs=` 里哪一项随每个字递增（那就是笔位 x）
+
+### Innocent Grey（虚ノ少女）：MFC 的 CDC 文字包装
+- 点：Innocentsetup.exe 里 MFC 的 CDC::TextOutW（0x41adc7）、CDC::ExtTextOutW（0x41a849）、CDC::DrawTextW（0x41a808），三个都是把参数原样转给 GDI、DC 取 `[ecx+4]` 的薄包装，有 EBP 帧
+- 程序经 CDC 画的字都从这里过（游戏自己的界面也是），via 是调用 CDC 的那个游戏例程，用它分台词 / 名字 / 菜单。这段是 MFC 自带代码，别的 MFC 程序也会命中，所以签名名叫 mfc-*，不叫游戏名
+- 店主测试清单：同 AVG32，行里是 `engine=mfc-textoutw` / `mfc-exttextoutw` / `mfc-drawtextw`；推一句后看哪个 via 带着台词

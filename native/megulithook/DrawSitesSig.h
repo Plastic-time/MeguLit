@@ -31,6 +31,13 @@ static const Sig Sigs[] = {
   // No EBP frame: 0xfe4 bytes of prologue (SEH + 0xfc4 locals + 4 registers) and the 5 API arguments put its return address
   // 0xff8 above the first one
   { "nscripter", "", "TextOutA", "be 02 00 00 00 56 8d 44 24 14 50 6a 00 57 51", 1, 0xff8 },
+  // MFC's CDC text wrappers (Innocent Grey, 虚ノ少女: Innocentsetup.exe 0x41adc7 / 0x41a849 / 0x41a808): CDC::TextOutW,
+  // CDC::ExtTextOutW, CDC::DrawTextW forward their arguments with the DC's m_hDC ([ecx+4]). Every text the program draws through
+  // CDC passes here, its own UI too; via (EBP frame) is the program's routine that called CDC, which tells them apart. Any MFC
+  // program with this code matches: the ids say MFC, not the game
+  { "mfc-textoutw", "", "TextOutW", "55 8b ec ff 75 14 ff 75 10 ff 75 0c ff 75 08 ff 71 04", 1, 1 },
+  { "mfc-exttextoutw", "", "ExtTextOutW", "55 8b ec ff 75 20 ff 75 1c ff 75 18 ff 75 14 ff 75 10 ff 75 0c ff 75 08 ff 71 04", 1, 1 },
+  { "mfc-drawtextw", "", "DrawTextW", "55 8b ec ff 75 14 ff 75 10 ff 75 0c ff 75 08 ff 71 04", 1, 1 },
 };
 static const int SigCount = (int)(sizeof(Sigs) / sizeof(Sigs[0]));
 
