@@ -174,7 +174,10 @@ else{
  # stderr from the child (vswhere...) is not a failure; only its exit code is. One automatic retry: the timing-sensitive
  # self-tests (D2D and friends) flake now and then, and a second run is cheap (cargo is incremental).
  $ea=$ErrorActionPreference;$ErrorActionPreference='Continue'
- try{for($try=1;$try -le 2;$try++){& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'Build.ps1') -Check;if($LASTEXITCODE -eq 0){break};if($try -eq 1){Write-Host '  build/tests failed; retrying once (unstable self-test?)' -ForegroundColor Yellow}}}finally{$ErrorActionPreference=$ea}
+ # Test resume (user 2026-11-21): one state file per tag. Build.ps1 exits 3 when the build was good and only tests failed;
+ # the retry then reruns just the failed test files (-TestsOnly), never the build. Any other failure retries the whole build.
+ $env:MEGULIT_TEST_STATE=Join-Path $env:TEMP "megulit-release-tests-$Tag.json"
+ try{$args1=@('-Check');for($try=1;$try -le 2;$try++){& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'Build.ps1') @args1;if($LASTEXITCODE -eq 0){break};if($try -eq 1){if($LASTEXITCODE -eq 3){$args1=@('-TestsOnly');Write-Host '  tests failed; rerunning only the failed test files (no rebuild)' -ForegroundColor Yellow}else{Write-Host '  build failed; retrying once (unstable self-test?)' -ForegroundColor Yellow}}}}finally{$ErrorActionPreference=$ea}
  if($LASTEXITCODE -ne 0){throw 'Build or tests failed (twice)'}
  @{version=$Version;exe=(Get-FileHash $exePath -Algorithm SHA256).Hash} | ConvertTo-Json | Set-Content $stampFile
 }
