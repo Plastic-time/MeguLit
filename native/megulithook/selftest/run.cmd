@@ -92,3 +92,6 @@ rem BGI trusted UTF16 control and reversible observation, real link-call/free de
 call "%~dp0run-bgi-permission.cmd" || exit /b 1
 rem YU-RIS trusted UTF16 control and reversible observation, real glyph-call detour.
 call "%~dp0run-yuris-permission.cmd" || exit /b 1
+
+rem minori exact English-build byte-string input observer, default off; no game execution.
+call "%~dp0run-minori.cmd" || exit /b 1

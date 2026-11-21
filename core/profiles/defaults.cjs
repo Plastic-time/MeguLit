@@ -100,6 +100,7 @@ module.exports={
   advhdInput:false,
   cmvsInput:false,
   fvpInput:false,
+  minoriInput:false,
   /* the game draws MeguLit's replacement of a dialogue line itself (Japanese + ruby [+ Chinese]); false = hide + overlay */
   embed:false,
   /* with embed on, the Chinese is drawn by the game too (false = ruby only, the reader draws the Chinese) */
