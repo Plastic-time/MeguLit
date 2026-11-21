@@ -33,22 +33,35 @@ export async function refreshSeedStats(env,now=new Date(),{branch='main'}={}){
  let old=null;try{old=prev?JSON.parse(prev.data):null;}catch{}
  const rev=String(tree?.sha||'');
  if(old&&old.rev&&old.rev===rev&&old.games===games.length){await putSeedStats(env,'github',old,now);return clean(old);}
- const status=Object.fromEntries(SEED_STATUSES.map(k=>[k,0]));let other=0;
+ const status=Object.fromEntries(SEED_STATUSES.map(k=>[k,0]));let other=0,gqlError='';
  if(env.GITHUB_TOKEN&&games.length){const [owner,name]=repo.split('/');
   /* GraphQL: every game.json by blob oid in one query (≤100 per query keeps it small) */
   for(let i=0;i<games.length;i+=100){const part=games.slice(i,i+100);
    const q='query{repository(owner:'+JSON.stringify(owner)+',name:'+JSON.stringify(name)+'){'+part.map((g,k)=>'g'+k+':object(oid:'+JSON.stringify(g.sha)+'){...on Blob{text}}').join(' ')+'}}';
    const r=await f('https://api.github.com/graphql',{method:'POST',headers:{...ghHeaders(env),'content-type':'application/json'},body:JSON.stringify({query:q})});
-   const j=await r.json().catch(()=>null);const repoData=j?.data?.repository;if(!repoData)throw new Error('graphql '+String(j?.errors?.[0]?.message||'HTTP '+r.status).slice(0,80));
+   const j=await r.json().catch(()=>null);const repoData=j?.data?.repository;
+   if(!repoData){gqlError='graphql '+String(j?.errors?.[0]?.message||'HTTP '+r.status).slice(0,100);other+=part.length;continue;}
    part.forEach((g,k)=>{let s='';try{s=String(JSON.parse(repoData['g'+k]?.text||'{}').status||'');}catch{}if(s in status)status[s]++;else other++;});}}
- else other=games.length;
- const data={games:games.length,versions,status,other,rev};await putSeedStats(env,'github',data,now);return clean(data);}
+ else{other=games.length;if(games.length)gqlError='no GITHUB_TOKEN: statuses need the GraphQL API';}
+ /* a GraphQL failure keeps the counts but not the rev, so the next run tries the statuses again */
+ const data={games:games.length,versions,status,other,rev:gqlError?'':rev};await putSeedStats(env,'github',data,now);
+ await noteError(env,'github',gqlError,now);return clean(data);}
+
+/* the last refresh problem per source, shown on the panel (rows "x-<source>", never summed) */
+async function noteError(env,source,error,now){try{
+ if(!error){await env.DB.prepare('DELETE FROM seed_stats WHERE source=?').bind('x-'+source).run();return;}
+ console.error('seed-stats',source,error);
+ await env.DB.prepare('INSERT INTO seed_stats(source,data,at) VALUES(?,?,?) ON CONFLICT(source) DO UPDATE SET data=excluded.data, at=excluded.at')
+  .bind('x-'+source,JSON.stringify({error:String(error).slice(0,160)}),Math.floor(now.getTime()/1000)).run();}catch{}}
+/* cron / first-request entry: never throws, records why it failed */
+export async function refreshSeedStatsSafe(env,now=new Date()){try{return await refreshSeedStats(env,now);}catch(e){await noteError(env,'github',String(e?.message||e),now);return null;}}
 
 /* every source summed; {games,versions,status,other,confirmed,waiting,sources:[{source,games,at}],at} */
 export async function seedSummary(env){
  const rows=((await env.DB.prepare('SELECT source,data,at FROM seed_stats ORDER BY source').all())?.results)||[];
  const out={games:0,versions:0,status:Object.fromEntries(SEED_STATUSES.map(k=>[k,0])),other:0,sources:[],at:0};
- for(const r of rows){let d;try{d=clean(JSON.parse(r.data));}catch{continue;}
+ for(const r of rows){if(String(r.source).startsWith('x-')){try{(out.errors??={})[String(r.source).slice(2)]=String(JSON.parse(r.data).error||'').slice(0,160);}catch{}continue;}
+  let d;try{d=clean(JSON.parse(r.data));}catch{continue;}
   out.games+=d.games;out.versions+=d.versions;out.other+=d.other;for(const k of SEED_STATUSES)out.status[k]+=d.status[k];
   out.sources.push({source:String(r.source),games:d.games,versions:d.versions,at:r.at|0});out.at=Math.max(out.at,r.at|0);}
  out.confirmed=out.status.verified+out.status['owner-ok'];out.waiting=out.status.read+out.status.skeleton;

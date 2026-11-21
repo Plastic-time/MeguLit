@@ -10,7 +10,7 @@
                            diagnostics,bundles,lookups,at}}
    D1 free tier counts rows read: the live part is cached 10 s and the wide aggregates (ext) 5 min in the Cache API, so
    many open dashboards cost about the same as one. Cleanup (cleanupProbeStats, cron): pulse rows older than a day go. */
-import {seedSummary,refreshSeedStats} from './seed-stats.js';
+import {seedSummary,refreshSeedStatsSafe} from './seed-stats.js';
 const BUCKET=600;/* seconds: a 10-minute activity bucket */
 export const nowBucket=now=>Math.floor(now.getTime()/1000/BUCKET);
 
@@ -141,7 +141,7 @@ export async function probeStats(env,now,{json,fail},ctx=null){
  const got=await Promise.allSettled(parts.map(([k,ttl,fn])=>cached(k,ttl,fn))),errors={};
  const val=i=>{if(got[i].status==='fulfilled')return got[i].value;errors[parts[i][0]]=String(got[i].reason?.message||got[i].reason).slice(0,120);return null;};
  const base=val(0)||{ok:true,now:Math.floor(now.getTime()/1000)},ext=val(1),q=val(2),seed=val(3);
- if(seed&&!seed.sources.length&&ctx?.waitUntil)ctx.waitUntil(refreshSeedStats(env,now).catch(()=>null));
+ if(seed&&!seed.sources.length&&ctx?.waitUntil)ctx.waitUntil(refreshSeedStatsSafe(env,now));
  return json({...base,ext,quota:q,seed,errors},200,{'access-control-allow-origin':'*','cache-control':'public, max-age=10'});}
 
 export async function cleanupProbeStats(env,now=new Date()){if(!env.DB)return {removed:0};

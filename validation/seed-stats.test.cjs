@@ -63,7 +63,7 @@ test('THE SEED: empty table → first stats call kicks a background refresh; the
  const s=await (await stats(ENV,tasks)).json();assert.equal(s.seed.games,0);assert.ok(tasks.length>=1);await Promise.all(tasks);
  assert.equal(gh.calls.tree,1);
  const {seedSummary}=await mod('seed-stats.js');assert.equal((await seedSummary(ENV)).confirmed,1);
- assert.match(fs.readFileSync(path.join(relayDir,'src','worker.js'),'utf8'),/refreshSeedStats\(env/);
+ assert.match(fs.readFileSync(path.join(relayDir,'src','worker.js'),'utf8'),/refreshSeedStatsSafe\(env/);
 });
 
 test('dashboard: gold THE SEED pane takes the full dumps slot; full dumps moved next to relay.log; meter clamps; panels render isolated',async()=>{
@@ -72,4 +72,17 @@ test('dashboard: gold THE SEED pane takes the full dumps slot; full dumps moved 
  /* full dumps keeps its name (owner 2026-11-21), only moved below THE SEED, next to relay.log */
  assert.ok(h.indexOf('>the seed<')<h.indexOf('>full dumps<')&&h.indexOf('>full dumps<')<h.indexOf('>relay.log<'));
  assert.match(h,/function safe\(name,fn\)/);assert.match(h,/n=Math\.max\(0,Math\.min\(w,n\|0\)\)/);
+});
+
+test('THE SEED: GraphQL refused → tree counts still shown, the error reaches the panel, next run retries',async()=>{
+ const gh=fakeGitHub([{status:'verified',versions:['a']},{status:'skeleton'}]);let deny=true;
+ const fetch=async(url,init)=>String(url).endsWith('/graphql')&&deny?new Response(JSON.stringify({errors:[{message:'Resource not accessible by personal access token'}]}),{status:200}):gh.fetch(url,init);
+ const ENV=env({fetch,GITHUB_TOKEN:'t'});const {refreshSeedStatsSafe,seedSummary}=await mod('seed-stats.js');
+ await refreshSeedStatsSafe(ENV,new Date());let s=await seedSummary(ENV);
+ assert.equal(s.games,2);assert.equal(s.versions,1);assert.equal(s.other,2);assert.match(s.errors.github,/not accessible/);assert.equal(s.sources.length,1,'error row is not a source');
+ deny=false;await refreshSeedStatsSafe(ENV,new Date());s=await seedSummary(ENV);
+ assert.equal(s.confirmed,1);assert.equal(s.waiting,1);assert.equal(s.errors,undefined,'error cleared');
+ /* tree down → no throw, error recorded */
+ const ENV2=env({fetch:async()=>new Response('x',{status:500}),GITHUB_TOKEN:'t'});assert.equal(await refreshSeedStatsSafe(ENV2,new Date()),null);
+ assert.match((await seedSummary(ENV2)).errors.github,/tree HTTP 500/);
 });

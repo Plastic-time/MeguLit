@@ -96,7 +96,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--mono);font-size:13px
 .kv{display:grid;grid-template-columns:8em 1fr;gap:2px 10px;font-size:12px}
 .kv .k{color:var(--dim)}
 /* THE SEED: the one gold pane */
-.pane.gold{border-color:var(--gold2)}
+.pane.gold{border-color:var(--gold2);align-self:start}
 .pane.gold .ti{color:var(--gold)}.pane.gold .ti b{color:var(--gold)}
 .pane.gold .bar i{color:var(--gold)}
 .seed-top{display:flex;align-items:flex-end;gap:14px;margin-bottom:8px}
@@ -480,8 +480,8 @@ function renderPacks(j){var f=j.full||{};
  $("fMB").innerHTML=mb(f.storedMB||0)+' <span class="d">/ '+mb(f.limitMB||8192)+'</span>';
  $("fAvg").textContent=f.ready?mb((f.storedMB||0)/f.ready):"--";$("fLast").textContent=ago(f.lastAt);}
 /* THE SEED: games + versions, confirmed (verified / owner-ok) vs waiting for more players (skeleton / read) */
-function renderSeed(s){var el=$("seed");
- if(!s||!s.sources||!s.sources.length){el.innerHTML='<div class="empty">-- counting The Seed/ (first count runs in the background)</div>';return;}
+function renderSeed(s){var el=$("seed"),se=(s&&s.errors)||{},errH=Object.keys(se).map(function(k){return '<div class="sub"><span class="r">'+esc(k)+'</span> '+esc(se[k])+'</div>';}).join("");
+ if(!s||!s.sources||!s.sources.length){el.innerHTML='<div class="empty">-- counting The Seed/ (first count runs in the background)</div>'+errH;return;}
  var st=s.status||{},tot=Math.max(1,s.games|0),ok=s.confirmed|0,wait=s.waiting|0;
  var html='<div class="seed-top"><span class="seed-n">'+(s.games|0)+'</span><span class="seed-u">部游戏的 seed<br><b>'+(s.versions|0)+'</b> 个 exe 版本</span></div>'+
   '<div class="m m4 seed-ok"><span class="k">已确认</span><span class="bar" id="sdOk"></span><span class="v">'+ok+'</span><span class="pc">'+Math.round(ok/tot*100)+'%</span></div>'+
@@ -489,7 +489,7 @@ function renderSeed(s){var el=$("seed");
   '<div class="chips gold">'+[["verified",st.verified],["owner-ok",st["owner-ok"]],["read",st.read],["skeleton",st.skeleton]].map(function(c){return '<span>'+c[0]+' <b>'+(c[1]|0)+'</b></span>';}).join("")+
   (s.other?'<span>other <b>'+s.other+'</b></span>':'')+'</div>'+
   '<div class="sub" style="margin-top:6px">已确认 = verified + owner-ok · 等传火 = read + skeleton</div>'+
-  '<div class="sub">'+s.sources.map(function(x){return esc(x.source)+' '+x.games;}).join(" · ")+' · 更新 '+ago(s.at)+'</div>';
+  '<div class="sub">'+s.sources.map(function(x){return esc(x.source)+' '+x.games;}).join(" · ")+' · 更新 '+ago(s.at)+'</div>'+errH;
  el.innerHTML=html;meter($("sdOk"),ok,tot);meter($("sdWait"),wait,tot);}
 function nodesLine(){$("node").innerHTML=NODES.map(function(n){var v=lat[n[0]];return n[0]+" "+(v==null?"--":v<0?'<span class="r">down</span>':v+"ms");}).join(" · ");
  var ok=NODES.filter(function(n){return lat[n[0]]>0;}).map(function(n){return lat[n[0]];});$("latT").textContent=ok.length?"latency "+Math.min.apply(null,ok)+"ms":"latency";}
