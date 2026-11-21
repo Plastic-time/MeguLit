@@ -1,32 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* The Seed catalog: every game that has a seed, grouped by developer, with its cover (services/seed-catalog.cjs).
-   Two modes. Normal shows only the covers VNDB rates safe; NSFW shows every cover and asks once before it first turns on.
-   The mode stays on this PC (localStorage). Opened from The Seed dialog and the About section (web/the-seed.js). */
+   Covers follow the global NSFW setting (Settings, off by default; web/nsfw.js): off, a cover VNDB rates adult is a veil card
+   (one line of text) and a click shows that one cover; on, every cover. Opened from The Seed dialog and the About section (web/the-seed.js). */
+import {nsfwOn} from './nsfw.js';
 const W={
- zh:{title:'已种下的游戏',sub:(g,s,b)=>`${g} 部游戏 · ${s} 颗种子 · ${b} 个游戏社`,seeds:n=>`${n} 颗种子`,partly:(a,b)=>`${a}/${b} 已确认`,locked:'设置里开着「卡背过滤 R18 图片」，这里只显示普通模式',search:'搜索游戏名或游戏社',mode:'封面',normal:'普通',nsfw:'NSFW',
-  ask:'NSFW 模式会显示成人向封面。确认你已满 18 岁？',yes:'确认并显示',no:'取消',count:n=>`${n} 部`,other:'其他',
-  status:{verified:'已确认','owner-ok':'已确认',read:'只读模式',skeleton:'等传火'},hidden:'普通模式不显示这张封面',
+ zh:{title:'已种下的游戏',sub:(g,s,b)=>`${g} 部游戏 · ${s} 颗种子 · ${b} 个游戏社`,seeds:n=>`${n} 颗种子`,partly:(a,b)=>`${a}/${b} 已确认`,locked:'设置里开着「卡背过滤 R18 图片」，成人封面不能显示',search:'搜索游戏名或游戏社',
+  count:n=>`${n} 部`,other:'其他',
+  status:{verified:'已确认','owner-ok':'已确认',read:'只读模式',skeleton:'等传火'},hidden:'成人内容 · 在设置里开启后显示',reveal:'点击只临时查看这一张',devNone:'暂时读不到这个游戏社的介绍',devSource:'简介来自 VNDB',devOpen:'在浏览器中打开',links:{vndb:'VNDB 游戏社页',site:'官网',moegirl:'萌娘百科',jawiki:'日文维基'},
   offline:'连不上 VNDB，部分游戏名和封面暂时显示不了',empty:'没有找到',close:'关闭',loading:'正在读取…',failed:'读取失败，稍后再试',link:'看看都有哪些游戏'},
- en:{title:'Seeded games',sub:(g,s,b)=>`${g} games · ${s} seeds · ${b} developers`,seeds:n=>`${n} seeds`,partly:(a,b)=>`${a}/${b} confirmed`,locked:'"Keep R18 pictures off the card back" is on in Settings, so only normal mode is shown',search:'Search a game or developer',mode:'Covers',normal:'Normal',nsfw:'NSFW',
-  ask:'NSFW mode shows adult covers. Confirm that you are 18 or older?',yes:'Confirm and show',no:'Cancel',count:n=>`${n} ${n===1?'game':'games'}`,other:'Other',
-  status:{verified:'Confirmed','owner-ok':'Confirmed',read:'Read mode',skeleton:'Waiting for a spark'},hidden:'Hidden in normal mode',
+ en:{title:'Seeded games',sub:(g,s,b)=>`${g} games · ${s} seeds · ${b} developers`,seeds:n=>`${n} seeds`,partly:(a,b)=>`${a}/${b} confirmed`,locked:'"Keep R18 pictures off the card back" is on in Settings, so only normal mode is shown',search:'Search a game or developer',
+  count:n=>`${n} ${n===1?'game':'games'}`,other:'Other',
+  status:{verified:'Confirmed','owner-ok':'Confirmed',read:'Read mode',skeleton:'Waiting for a spark'},hidden:'Adult content · shown when enabled in Settings',reveal:'Click to see only this one for now',devNone:'No introduction could be loaded for this developer for now',devSource:'Introduction from VNDB',devOpen:'Open in the browser',links:{vndb:'VNDB developer page',site:'Official site',moegirl:'Moegirlpedia',jawiki:'Japanese Wikipedia'},
   offline:'VNDB cannot be reached, so some names and covers are missing for now',empty:'Nothing found',close:'Close',loading:'Loading…',failed:'Could not load the list, try again later',link:'See which games'},
- ja:{title:'種まき済みのゲーム',sub:(g,s,b)=>`${g} 本 · 種 ${s} 個 · ${b} ブランド`,seeds:n=>`種 ${n} 個`,partly:(a,b)=>`${a}/${b} 確認済み`,locked:'設定で「カード裏の R18 画像を除外」がオンのため、通常モードのみ表示します',search:'ゲーム名・ブランドで検索',mode:'表紙',normal:'通常',nsfw:'NSFW',
-  ask:'NSFW モードでは成人向けの表紙を表示します。18 歳以上ですか？',yes:'確認して表示',no:'キャンセル',count:n=>`${n} 本`,other:'その他',
-  status:{verified:'確認済み','owner-ok':'確認済み',read:'読み取りモード',skeleton:'伝火待ち'},hidden:'通常モードでは表示しません',
+ ja:{title:'種まき済みのゲーム',sub:(g,s,b)=>`${g} 本 · 種 ${s} 個 · ${b} ブランド`,seeds:n=>`種 ${n} 個`,partly:(a,b)=>`${a}/${b} 確認済み`,locked:'設定で「カード裏の R18 画像を除外」がオンのため、通常モードのみ表示します',search:'ゲーム名・ブランドで検索',
+  count:n=>`${n} 本`,other:'その他',
+  status:{verified:'確認済み','owner-ok':'確認済み',read:'読み取りモード',skeleton:'伝火待ち'},hidden:'成人向け · 設定でオンにすると表示',reveal:'クリックでこの 1 枚だけ一時的に表示',devNone:'このブランドの紹介は今は読み込めません',devSource:'紹介文の出典：VNDB',devOpen:'ブラウザで開く',links:{vndb:'VNDB のブランドページ',site:'公式サイト',moegirl:'萌娘百科（中国語）',jawiki:'日本語版ウィキペディア'},
   offline:'VNDB に接続できないため、一部の名前と表紙を表示できません',empty:'見つかりません',close:'閉じる',loading:'読み込み中…',failed:'読み込めませんでした。後でもう一度お試しください',link:'収録ゲームを見る'}
 };
 export const catalogWords=locale=>W[locale]||W.zh;
-const MODE_KEY='megulit.seedCatalogMode',ADULT_KEY='megulit.seedCatalogAdult';
-const read=k=>{try{return localStorage.getItem(k);}catch{return null;}};
-const write=(k,v)=>{try{localStorage.setItem(k,v);}catch{}};
-export const savedMode=()=>read(MODE_KEY)==='nsfw'&&read(ADULT_KEY)==='1'?'nsfw':'normal';
-/* a click on a mode button: {mode} to switch to, or {ask:true} when NSFW is asked for the first time */
-export function modeStep(current,wanted,{adult=false,safeOnly=false}={}){
- if(wanted!=='nsfw')return {mode:'normal'};
- if(safeOnly)return {mode:current==='nsfw'?'normal':current};
- return adult?{mode:'nsfw'}:{ask:true,mode:current};
-}
+/* the covers' mode is the global NSFW setting */
+export const savedMode=()=>nsfwOn()?'nsfw':'normal';
 
 /* names: Japanese (or Chinese) users get the original script, English users the romanised title; a game VNDB does not know
    shows its seed slug */
@@ -68,14 +61,14 @@ export const coverState=(g,mode)=>g.cover==='safe'||(g.cover==='nsfw'&&mode==='n
 const STATUS_CLASS={verified:'ok','owner-ok':'ok',read:'read',skeleton:'wait'};
 function cardHTML(g,locale,mode,esc){
  const t=catalogWords(locale),title=gameTitle(g,locale),st=coverState(g,mode),dev=g.developers?.[0]?developerName(g.developers[0],locale):'';
- const ph=`<span class="sc-ph" aria-hidden="true">${esc(Array.from(dev||title)[0]||'?')}</span>${st==='hidden'?`<small class="sc-veil">${esc(t.hidden)}</small>`:''}`;
+ const ph=`<span class="sc-ph" aria-hidden="true">${esc(Array.from(dev||title)[0]||'?')}</span>${st==='hidden'?`<button type="button" class="sc-veil" data-reveal="${esc(g.vndb)}" title="${esc(t.reveal)}">${esc(t.hidden)}</button>`:''}`;
  return `<li class="sc-card"><div class="sc-cover" data-state="${st}"${st==='load'?` data-vndb="${esc(g.vndb)}"`:''}>${ph}</div>
   <div class="sc-meta"><b title="${esc(title)}">${esc(title)}</b><span class="sc-tags"><span class="sc-engine">${esc((g.engines||[g.engine]).join(' / '))}</span>${g.seeds>1?`<span class="sc-builds">${esc(t.seeds(g.seeds))}</span>`:''}<span class="sc-st sc-st-${g.seeds>1&&g.ok>0&&g.ok<g.seeds?'part':STATUS_CLASS[g.status]||'wait'}">${esc(statusText(g,locale))}</span></span></div></li>`;
 }
 export function catalogHTML(games,locale,mode,esc,query=''){
  const t=catalogWords(locale),groups=groupGames(games,locale,query);
  if(!groups.length)return `<p class="sc-empty">${esc(t.empty)}</p>`;
- return groups.map(gr=>`<section class="sc-group"><h3><span>${esc(gr.name||t.other)}</span><small>${esc(t.count(gr.games.length))}</small></h3>
+ return groups.map(gr=>`<section class="sc-group"><h3><span class="sc-logo" aria-hidden="true"${gr.id?` data-pid="${esc(gr.id)}"`:''}>${esc(Array.from(gr.name||t.other)[0]||'?')}</span>${gr.id?`<button type="button" class="sc-dev" data-dev="${esc(gr.id)}" aria-expanded="false">${esc(gr.name||t.other)}</button>`:`<span>${esc(gr.name||t.other)}</span>`}<small>${esc(t.count(gr.games.length))}</small></h3>${gr.id?'<div class="sc-panel" data-panel hidden></div>':''}
   <ul class="sc-grid">${gr.games.map(g=>cardHTML(g,locale,mode,esc)).join('')}</ul></section>`).join('');
 }
 
@@ -93,37 +86,45 @@ export function loadCovers(root,api,mode,live=()=>root.isConnected,{cache=covers
 }
 function showCover(el,url){const img=new Image();img.alt='';img.decoding='async';img.onload=()=>img.classList.add('is-in');img.src=url;el.prepend(img);el.dataset.loaded='1';}
 
+import {devPanelHTML,openPanel,devWords} from './developer.js';
+export {devPanelHTML};
+/* developer logos: the small icon of the developer's own site (services/seed-logo.cjs), three at a time; no icon = the letter badge stays */
+const logos=new Map();
+export function loadLogos(root,api,live=()=>root.isConnected,{cache=logos}={}){
+ const todo=[...root.querySelectorAll('.sc-logo[data-pid]')];let at=0;
+ const next=async()=>{while(at<todo.length&&live()){const el=todo[at++],pid=el.dataset.pid;if(!el.isConnected)continue;
+  let p=cache.get(pid);if(!p){p=Promise.resolve().then(()=>api('seed_logo',{pid})).catch(()=>null).then(u=>{if(!isCover(u))cache.set(pid,Promise.resolve(null));return u;});cache.set(pid,p);}
+  const url=await p;if(isCover(url)&&live()&&el.isConnected){const img=new Image();img.alt='';img.decoding='async';img.onload=()=>{el.textContent='';el.append(img);el.classList.add('has-img');};img.src=url;}}};
+ return Promise.all([next(),next(),next()]);
+}
 export function openSeedCatalog({api,locale,esc,toast}){
  document.querySelector('dialog.seed-catalog')?.close();
- const t=catalogWords(locale),dialog=document.createElement('dialog');let mode=savedMode(),games=[],query='';
+ const t=catalogWords(locale),dialog=document.createElement('dialog');let mode=savedMode(),games=[],query='',safeOnly=false;
  dialog.className='game-dialog seed-catalog';
  /* the app's dialog parts: game-dialog head, a bar like the lines picker, the list, the action row */
  dialog.innerHTML=`<div class="game-dialog-head"><h2>${esc(t.title)}</h2><p data-sub>${esc(t.loading)}</p></div>
-  <div class="sc-bar"><label class="sc-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><input type="search" data-search placeholder="${esc(t.search)}" aria-label="${esc(t.search)}" autocomplete="off" spellcheck="false"></label>
-  <div class="sc-mode-wrap"><span aria-hidden="true">${esc(t.mode)}</span><div class="sc-mode" role="radiogroup" aria-label="${esc(t.mode)}"><button type="button" role="radio" data-mode="normal">${esc(t.normal)}</button><button type="button" role="radio" data-mode="nsfw">${esc(t.nsfw)}</button></div></div></div>
-  <div class="sc-ask" data-ask hidden><span>${esc(t.ask)}</span><button type="button" class="secondary" data-yes>${esc(t.yes)}</button><button type="button" class="secondary" data-no>${esc(t.no)}</button></div>
+  <div class="sc-bar"><label class="sc-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><input type="search" data-search placeholder="${esc(t.search)}" aria-label="${esc(t.search)}" autocomplete="off" spellcheck="false"></label></div>
   <p class="sc-offline" data-offline hidden>${esc(t.offline)}</p>
   <div class="sc-body" data-body></div>
   <div class="dialog-actions"><button type="button" class="text-button" data-close>${esc(t.close)}</button></div>`;
  document.body.append(dialog);
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
- const $=s=>dialog.querySelector(s),body=$('[data-body]'),ask=$('[data-ask]');
- let safeOnly=false,run=0;
- const showMode=()=>{for(const b of dialog.querySelectorAll('[data-mode]')){const on=b.dataset.mode===mode;b.setAttribute('aria-checked',String(on));b.classList.toggle('on',on);
-  if(b.dataset.mode==='nsfw'){b.disabled=safeOnly;b.title=safeOnly?t.locked:'';}}dialog.dataset.mode=mode;};
- const render=()=>{const mine=++run;body.innerHTML=catalogHTML(games,locale,mode,esc,query);loadCovers(body,api,mode,()=>mine===run&&dialog.isConnected);};
- const setMode=m=>{mode=m;write(MODE_KEY,m);ask.hidden=true;showMode();render();};
- dialog.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{const s=modeStep(mode,b.dataset.mode,{adult:read(ADULT_KEY)==='1',safeOnly});if(s.ask){ask.hidden=false;$('[data-yes]').focus();return;}if(s.mode!==mode)setMode(s.mode);});
- $('[data-yes]').onclick=()=>{if(safeOnly)return;write(ADULT_KEY,'1');setMode('nsfw');};
- $('[data-no]').onclick=()=>{ask.hidden=true;};
+ const $=s=>dialog.querySelector(s),body=$('[data-body]');
+ let run=0;
+ const render=()=>{const mine=++run;dialog.dataset.mode=mode;body.innerHTML=catalogHTML(games,locale,mode,esc,query);loadCovers(body,api,mode,()=>mine===run&&dialog.isConnected);loadLogos(body,api,()=>mine===run&&dialog.isConnected);};
+ /* a veil card: a click shows that one cover for now (the setting stays off; the app's R18 filter still refuses it) */
+ body.addEventListener('click',async e=>{const b=e.target.closest('[data-reveal]');if(!b||b.disabled)return;const el=b.closest('.sc-cover');b.disabled=true;let u=null;try{u=await api('seed_cover',{vndb:b.dataset.reveal,nsfw:true});}catch{}
+  if(isCover(u)&&el.isConnected){b.remove();el.querySelector('.sc-ph')?.remove();showCover(el,u);el.dataset.state='load';}else{b.disabled=false;b.title=safeOnly?t.locked:t.failed;}});
+ /* a developer's name opens a small panel: VNDB's introduction (cut short, source named) and links; links open in the system browser */
+ body.addEventListener('click',async e=>{const b=e.target.closest('[data-dev]');if(!b)return;const panel=b.closest('.sc-group').querySelector('[data-panel]'),open=panel.hidden;panel.hidden=!open;b.setAttribute('aria-expanded',String(open));if(open)openPanel({panel,pid:b.dataset.dev,api,t:{...t,...devWords(locale)},esc,toast,locale});});
  $('[data-search]').addEventListener('input',e=>{query=e.target.value;render();});
  $('[data-close]').onclick=()=>dialog.close();
  dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
- showMode();dialog.showModal();
+ dialog.showModal();
  Promise.resolve().then(()=>api('seed_catalog',{})).then(r=>{
   if(!dialog.isConnected)return;games=Array.isArray(r?.games)?r.games:[];
   /* the app's R18 filter (卡背过滤 R18 图片) is on: normal mode only, the NSFW button off with a hint */
-  if(r?.safeOnly===true){safeOnly=true;mode='normal';ask.hidden=true;showMode();}
+  if(r?.safeOnly===true){safeOnly=true;mode='normal';render();}
   $('[data-sub]').textContent=t.sub(mergeGames(games).length,games.length,new Set(games.map(g=>g.developers?.[0]?.id).filter(Boolean)).size);
   $('[data-offline]').hidden=!r?.offline;render();
  }).catch(()=>{if(dialog.isConnected){$('[data-sub]').textContent=t.failed;toast&&toast(t.failed);}});

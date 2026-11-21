@@ -410,7 +410,13 @@ async function dispatch(request,runtime=null) {
         const fresh=(async()=>{try{/* megulit.com or its EdgeOne copy cn.megulit.com (mainland China), whichever answers first */const one=async u=>{const r=await fetch(u,{cache:'no-store',signal:AbortSignal.timeout(10000)});const v=r.ok?await r.json():null;if(!Array.isArray(v))throw new Error('BAD');return v;};const j=await Promise.any(['https://megulit.com/assets/updates.json','https://cn.megulit.com/assets/updates.json'].map(one)).catch(()=>null);if(!Array.isArray(j))return null;const list=j.slice(0,300);try{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(list));fs.renameSync(file+'.tmp',file);}catch{}return list;}catch{return null;}})();
         if(cached){fresh.catch(()=>{});return cached;}return (await fresh)||[];})();
       case 'seed_stats':return require('./seed-stats.cjs').stats(root); /* The Seed live counts for the About page, null when the relay does not answer */
+      case 'library_developers':return require('./nsfw.cjs').developers(db,root);
+      case 'game_developer':return await require('./nsfw.cjs').developerOf(db,root,String(request.id||''));
+      case 'nsfw_state':return await require('./nsfw.cjs').state(db,root,{wait:request.wait===true});
       case 'seed_catalog':return await require('./seed-catalog.cjs').catalog(root); /* The Seed catalog page: the seeded games with VNDB names and developers */
+      case 'seed_logo':return await require('./seed-logo.cjs').logo(root,String(request.pid||''));
+      case 'seed_producer':return await require('./seed-producer.cjs').producer(root,String(request.pid||''),{moegirl:require('./info-source.cjs').forRoot(root,String(request.locale||''))});
+      case 'seed_producer_open':return require('./seed-producer.cjs').open(root,String(request.pid||''),String(request.kind||''));
       case 'seed_cover':return await require('./seed-catalog.cjs').cover(root,String(request.vndb||''),{nsfw:request.nsfw===true});
       case 'feedback_send':return require('./feedback.cjs').send(root,{kind:String(request.kind||''),text:String(request.text||''),contact:String(request.contact||''),lang:String(request.lang||'zh'),version:String(request.version||'')}); /* E394 in-app feedback through the relay */
       case 'diagnostics_upload':{const file=require('./diagnostics.cjs').ownPackage(root,request.path),m=request.meta||{};return require('./diagnostics-upload.cjs').upload(file,{version:m.version,game:m.game,note:m.note},{root});}

@@ -215,13 +215,9 @@ test('page: which covers each mode loads',async()=>{
  assert.equal(coverState({cover:'none'},'nsfw'),'none');
 });
 
-test('page: NSFW asks first, needs the confirmation, and the R18 filter keeps normal mode',async()=>{
- const {modeStep}=await import('../web/seed-catalog.js');
- assert.deepEqual(modeStep('normal','nsfw',{}),{ask:true,mode:'normal'});
- assert.deepEqual(modeStep('normal','nsfw',{adult:true}),{mode:'nsfw'});
- assert.deepEqual(modeStep('normal','nsfw',{adult:true,safeOnly:true}),{mode:'normal'});
- assert.deepEqual(modeStep('nsfw','nsfw',{adult:true,safeOnly:true}),{mode:'normal'});
- assert.deepEqual(modeStep('nsfw','normal',{adult:true}),{mode:'normal'});
+test('page: the mode of the covers is the global NSFW setting',async()=>{
+ const {savedMode}=await import('../web/seed-catalog.js');
+ assert.equal(savedMode(),'normal','off by default');
 });
 
 test('page: the cover queue stops when the list is drawn again, keeps covers per mode and asks again after a miss',async()=>{

@@ -28,7 +28,7 @@ test('this PC uploaded its calibration -> thanks, whatever the relay says now',a
 const json=(status,body)=>async()=>({status,ok:status>=200&&status<300,json:async()=>body,text:async()=>JSON.stringify(body)});
 test('credit: PUT sends {key,name}, the answer is kept and shown; null withdraws',async()=>{const {root,db,exe}=setup();const key=await auto.exeKey(root,exe);feed.markSent(root,key,{torchNo:7,name:null,at:'2026-11-21T01:00:00Z'});
  let seen=null;const f=async(url,init)=>{seen={url,method:init.method,body:JSON.parse(init.body)};return {status:200,ok:true,json:async()=>({torchNo:7,name:seen.body.name,at:'2026-11-21T01:00:00Z'})};};
- let r=await fp.setCredit(db,root,'7','  Megu  '.padEnd(40,'x'),{fetcher:f});assert.equal(r.state,'saved');assert.equal(seen.method,'PUT');assert.match(seen.url,/\/api\/game-profile\/credit$/);assert.equal(seen.body.key,key);assert.equal([...seen.body.name].length,20);
+ let r=await fp.setCredit(db,root,'7','  Megu  '.padEnd(50,'x'),{fetcher:f});assert.equal(r.state,'saved');assert.equal(seen.method,'PUT');assert.match(seen.url,/\/api\/game-profile\/credit$/);assert.equal(seen.body.key,key);assert.equal([...seen.body.name].length,30);
  assert.equal(r.credit.torchNo,7);assert.equal(r.credit.synced,true);assert.equal((await fp.state(db,root,'7',{wait:0})).credit.name,r.credit.name);
  r=await fp.setCredit(db,root,'7',null,{fetcher:f});assert.equal(seen.body.name,null);assert.equal(r.credit.name,null);assert.equal(r.credit.torchNo,7);});
 test('credit: a relay without the route keeps the name here and retries at the next ask',async()=>{const {root,db,exe}=setup();const key=await auto.exeKey(root,exe);feed.markSent(root,key,{torchNo:2,name:null,at:'x'});
