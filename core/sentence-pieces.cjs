@@ -10,8 +10,9 @@
    and the piece does not open a new line (indent, bracket, a name before a bracket). */
 const flat=s=>String(s||'').replace(/[\s　]+/g,'');
 const NEW_LINE=/^[　 「『（(【［[]/,NAMED_QUOTE=/^[^「『」』。、\s]{1,16}[「『]/;
-function unfinished(text){const t=String(text||'').replace(/\s+$/,'');if(!t||/[。．！？!?」』）)】]$/.test(t))return false;
- const o=Math.max(t.lastIndexOf('「'),t.lastIndexOf('『')),c=Math.max(t.lastIndexOf('」'),t.lastIndexOf('』'));return o>c;}
+function unfinished(text){const t=String(text||'').trimEnd();if(!t||/[。．！？!?）)】]$/.test(t))return false;
+ let depth=0;for(const c of t){if(c==='「'||c==='『')depth++;else if(c==='」'||c==='』')depth=Math.max(0,depth-1);}
+ return depth>0;}
 function continues(piece){const t=String(piece||'').replace(/^\n+/,'');return !!t.trim()&&!NEW_LINE.test(t)&&!NAMED_QUOTE.test(t);}
 class SentencePieces{
  constructor(now=()=>Date.now(),{within=60000,max=400}={}){this.now=now;this.within=within;this.max=max;this.last=null;}

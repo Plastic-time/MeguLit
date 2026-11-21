@@ -12,6 +12,7 @@
    - a line shown a moment ago that comes back alone, while it is no longer the current line, is a redraw (dropped);
    - a line that follows one ending in a comma (、，,) is the rest of that sentence: the reader shows both parts as one
      sentence (`continues`: how many characters of the shown text came before). */
+const { unfinished } = require('./sentence-pieces.cjs');
 const key = s => String(s || '').replace(/【[^【】\n]{1,16}】/g, '').replace(/[\s　]+/g, '');
 const COMMA = /[、，,]$/, ENDED = /[。．！？!?」』）)】…‥―－ー〜～♪]$/;
 const RECENT = 12, RECENT_MS = 30 * 60 * 1000, REDRAW_MS = 3 * 60 * 1000;
@@ -63,7 +64,7 @@ class PageText {
     /* the page so far, then the new part: a page of at least one whole earlier line of some length */
     if (best < 6) return { text: raw };
     /* the shown line grown (a sentence the game adds to piece by piece, core/sentence-pieces.cjs): the whole of it is the line */
-    if (parts === 1 && newest && !ENDED.test(this.recent[lastPart].key)) return { text: raw };
+    if (parts === 1 && newest && (!ENDED.test(this.recent[lastPart].key) || unfinished(this.recent[lastPart].key))) return { text: raw };
     /* the page came whole with its new part (skipping): the lines shown before it are no longer what the reader stacks above
        it (live, Ctrl-skip piled every skipped line into one wall); the new part starts the stack again */
     this.ended = true; this.paging = true;
@@ -79,7 +80,7 @@ class PageText {
     if (key(t).startsWith(key(this.display))) return null;
     const before = this.display.replace(/[\s　]+$/, '');
     /* inside an open 「『 the engine's pieces are core/sentence-pieces.cjs's (it knows the speakers and streams) */
-    if (Math.max(before.lastIndexOf('「'), before.lastIndexOf('『')) > Math.max(before.lastIndexOf('」'), before.lastIndexOf('』'))) return null;
+    if (unfinished(before)) return null;
     return { text: before + t.replace(/^[\s　]+/, ''), continues: before.length };
   }
   /* a line was shown: `part` is what the stream added, `shown` the whole text the reader shows */
