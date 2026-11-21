@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdarg>
 #include <string>
+#include "siglusdraw-control-write.h"
 #include <vector>
 #include <stdexcept>
 static std::vector<std::string> Logs;static bool ThrowLog=false,FaultLog=false;static void (*LogTap)()=nullptr;
@@ -115,7 +116,7 @@ static __declspec(naked) void Layout(){__asm{
 }}
 static bool Abi(){return GotEax==(DWORD)Input&&GotX==CoordX&&GotY==CoordY&&AfterEax==Result&&GotEcx==0x11112222&&AfterEcx==GotEcx&&GotEdx==0x33334444&&AfterEdx==GotEdx&&GotEbx==0x55556666&&AfterEbx==GotEbx&&GotEbp==0x77778888&&AfterEbp==GotEbp&&GotEsi==0x73737373&&AfterEsi==GotEsi&&GotEdi==0x93939393&&AfterEdi==GotEdi&&(GotFlags&StatusMask)==StatusBits&&(AfterFlags&StatusMask)==StatusBits&&BeforeEsp==AfterEsp&&!memcmp(XmmPattern,AfterXmm,sizeof XmmPattern)&&!memcmp(XmmPattern,AfterXmm7,sizeof XmmPattern)&&AfterX87==1.0&&AfterMxcsr==Mxcsr&&AfterControlWord==ControlWord;}
 static std::wstring ControlFile(){wchar_t tmp[MAX_PATH],file[MAX_PATH+64];GetTempPathW(MAX_PATH,tmp);std::wstring dir=std::wstring(tmp)+L"MeguLit";CreateDirectoryW(dir.c_str(),nullptr);dir+=L"\\draw";CreateDirectoryW(dir.c_str(),nullptr);swprintf_s(file,L"%s\\%lu.txt",dir.c_str(),GetCurrentProcessId());return file;}
-static void Control(const wchar_t *s){HANDLE h=CreateFileW(ControlFile().c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);DWORD written;WriteFile(h,s,(DWORD)(wcslen(s)*2),&written,nullptr);CloseHandle(h);}
+static void Control(const wchar_t *s){WriteControlFixture(ControlFile(),s,(DWORD)(wcslen(s)*2));}
 static void Refresh(){
 #ifdef YURIS_PERMISSION_FIXED
  YurisDraw::RefreshControl();
