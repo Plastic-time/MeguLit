@@ -38,6 +38,9 @@ validation/*
 validation/fixtures/*
 !validation/fixtures/games/
 !validation/fixtures/games/**
+# engine-draw signature fixtures: a few hundred bytes of code around each matched call + the exe SHA-256 (no script text)
+!validation/fixtures/engine-sigs/
+!validation/fixtures/engine-sigs/**
 validation/**/results*/
 validation/**/*-profile-*/
 
