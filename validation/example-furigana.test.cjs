@@ -176,3 +176,18 @@ test('inline readings stay with their own occurrence in study examples and histo
  const mismatched=await shown({text:'本と花。',ruby:[['花','はな',0],['花','はな',99],['花','はな',2],['花','か',2]]});
  assert.deepEqual(mismatched.spans.map(s=>[s.start,s.reading]),[[2,'はな']]);
 });
+
+test('hydrating a saved sentence uses the same text as the returned reading spans',{timeout:2500},async t=>{
+ const {installExampleRuby}=await import('../web/example-ruby.js?saved-markup'),{exampleRuby}=require('../services/example-ruby.cjs');
+ const raw='<br>見上げると花が揺れた。',doc=new Doc0(),el=h(doc,'p',{},raw);
+ el.dataset={exr:raw,exrRuby:JSON.stringify([['花','はな']])};el.isConnected=true;
+ Object.assign(doc,{head:{append(){}},documentElement:{style:{setProperty(){}},classList:{toggle(){}}},querySelectorAll:()=>[el],addEventListener(){}});
+ for(const [name,value] of Object.entries({document:doc,MutationObserver:class{observe(){}}})){
+  const old=Object.getOwnPropertyDescriptor(globalThis,name);Object.defineProperty(globalThis,name,{value,configurable:true});
+  t.after(()=>{if(old)Object.defineProperty(globalThis,name,old);else delete globalThis[name];});
+ }
+ let received;const called=new Promise(r=>{received=r;});
+ installExampleRuby({api:async(action,args)=>{if(action==='settings_get')return {};const result=await exampleRuby(null,null,args.items);received();return result;}});
+ await called;await new Promise(r=>setImmediate(r));
+ assert.match(el.html(),/見上げると<ruby>花<rt>はな<\/rt><\/ruby>が揺れた/);
+});

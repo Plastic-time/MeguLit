@@ -78,12 +78,12 @@ async function flush(){
   if(!list.length)return;const p=await readPrefs();if(!p.on)return;
   const need=[];for(const el of list){const k=keyOf(el.dataset.exr,el.dataset.exrRuby);if(!cache.has(k)&&!waiting.has(k)){waiting.set(k,true);let ruby=[];if(el.dataset.exrRuby==='none')ruby=false;else try{ruby=JSON.parse(el.dataset.exrRuby||'[]');}catch{}need.push({k,text:el.dataset.exr,ruby});}}
   if(need.length&&api){try{const r=await api('example_ruby',{items:need.map(x=>({text:x.text,ruby:x.ruby}))});
-      need.forEach((x,i)=>{const it=r?.items?.[i];if(it&&!it.retry&&(r.ready||it.spans?.length))cache.set(x.k,it.spans||[]);});}catch{}
+      need.forEach((x,i)=>{const it=r?.items?.[i];if(it&&!it.retry&&(r.ready||it.spans?.length))cache.set(x.k,{text:it.text??x.text,spans:it.spans||[]});});}catch{}
     /* the tokenizer was still starting (or busy): ask again a little later, a few times at most */
     const again=need.filter(x=>!cache.has(x.k)&&(tries.set(x.k,(tries.get(x.k)||0)+1).get(x.k))<4);if(again.length)setTimeout(hydrateExamples,4000);
     need.forEach(x=>waiting.delete(x.k));}
   for(const el of list){const k=keyOf(el.dataset.exr,el.dataset.exrRuby);if(!cache.has(k)||!el.isConnected)continue;
-    if(el.dataset.exrDone===el.dataset.exr)continue;el.dataset.exrDone=el.dataset.exr;if(applySpans(el,el.dataset.exr,cache.get(k)))roomForRuby(el);}
+    if(el.dataset.exrDone===el.dataset.exr)continue;const result=cache.get(k);el.dataset.exrDone=el.dataset.exr;if(applySpans(el,result.text,result.spans))roomForRuby(el);}
 }
 /* hydrate now (pages that build off-document can call it after attaching) */
 export function hydrateExamples(){if(!queued)queued=setTimeout(()=>flush().catch(()=>{}),30);}
