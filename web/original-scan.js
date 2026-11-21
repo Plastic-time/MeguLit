@@ -41,7 +41,7 @@ export function originalScanPresentation(state={},locale='zh'){
  return {phase,lead:t.lead,status:phase==='error'?(t.errors[ERROR_ALIASES[state.error]||state.error]||t.unknown):phase==='idle'&&!hasGame?t.pick:phase==='applying'&&state.operation==='undo'?t.undoing:t[phase]||t.unknown,
   showCounts:showResult,counts:valid?[p.japanese,p.local,p.missing]:[],
   localNote:showResult&&p.local>0?t.localNote:showResult?t.noLocal:'',missingNote:showResult&&p.missing>0?t.missingNote:'',
-  canScan:hasGame&&!['scanning','cancelling','applying'].includes(phase)&&!(writing&&state.pendingJob),canCancel:!writing&&(state.pendingJob||['scanning','cancelling'].includes(phase))&&state.cancellable!==false,
+  canScan:hasGame&&(phase==='error'&&state.pendingJob?state.recoverable===true:!['scanning','cancelling','applying'].includes(phase)&&!(writing&&state.pendingJob)),canCancel:!writing&&(state.pendingJob||['scanning','cancelling'].includes(phase))&&state.cancellable!==false,
   cancelPending:phase==='cancelling',showRestore:phase==='preview',canRestore:hasGame&&ready&&phase==='preview',
   showConfirm:phase==='confirm',canConfirm:hasGame&&ready&&phase==='confirm',
   blockedNote:phase==='preview'&&!ready?(valid&&p.local===0?t.noLocal:t.notReady):'',
@@ -50,8 +50,8 @@ export function originalScanPresentation(state={},locale='zh'){
   closeAllowed:phase!=='applying'&&!(writing&&state.pendingJob)};
 }
 
-export function createOriginalScanController({api,onChange=()=>{},onApplied=()=>{},onRefreshError=()=>{},schedule=setTimeout,unschedule=clearTimeout,pollMs=400}={}){
- if(typeof api!=='function'||!Number.isInteger(pollMs)||pollMs<300||pollMs>500)throw Error('ORIGINAL_SCAN_OPTIONS');
+export function createOriginalScanController({api,recoverJob,onChange=()=>{},onApplied=()=>{},onRefreshError=()=>{},schedule=setTimeout,unschedule=clearTimeout,pollMs=400}={}){
+ if(typeof api!=='function'||recoverJob!==undefined&&typeof recoverJob!=='function'||!Number.isInteger(pollMs)||pollMs<300||pollMs>500)throw Error('ORIGINAL_SCAN_OPTIONS');
  let state=Object.freeze({phase:'idle',gameId:'',preview:null,progress:null,error:'',pendingJob:false,operation:'',cancellable:false});
  let current=null,serial=0,disposed=false,cleanupIncomplete=false;
  const publish=patch=>{state=Object.freeze({...state,...patch});if(!disposed)try{onChange(state);}catch{onRefreshError('ORIGINAL_SCAN_VIEW_FAILED');}};
@@ -61,19 +61,18 @@ export function createOriginalScanController({api,onChange=()=>{},onApplied=()=>
  const closeAllowed=()=>!current||current.operation==='scan';
  function finish(c,{phase,result,error,preview=null}){
   if(!active(c))return;clear(c);current=null;
-  publish({phase,preview,progress:null,pendingJob:false,cancellable:false,error:error||'',operation:''});
+  publish({phase,preview,progress:null,pendingJob:false,cancellable:false,recoverable:false,error:error||'',operation:''});
+  c.resolveCleanup(c.terminal||!error||['GAME_RUNNING','SCAN_STALE','EMBEDDED_UNSUPPORTED','EMBEDDED_CONFLICT','NOT_APPLIED','NOTHING_TO_RESTORE'].includes(error));
   if(error)c.reject(Error(error));else c.resolve(result);
   if(!error&&c.notifyApplied&&!disposed)Promise.resolve().then(()=>onApplied(result)).catch(()=>onRefreshError('ORIGINAL_SCAN_REFRESH_FAILED'));
  }
- function queue(c){if(!active(c))return;clear(c);c.timer=schedule(()=>{c.timer=null;void call(c,'jp_restore_scan_status',{id:c.id,jobId:c.jobId});},pollMs);}
+ function queue(c){if(!active(c))return;clear(c);c.timer=schedule(()=>{c.timer=null;void query(c);},pollMs);}
  function failed(c,error){
   if(!active(c))return;clear(c);
-  if(!c.jobId&&!c.terminal&&c.operation!=='scan'&&!['GAME_RUNNING','SCAN_STALE','EMBEDDED_UNSUPPORTED','EMBEDDED_CONFLICT','NOT_APPLIED','NOTHING_TO_RESTORE'].includes(errorCode(error))){
-   publish({phase:'error',error:errorCode(error),pendingJob:true,cancellable:false,preview:null});c.reject(Error(errorCode(error)));return;
-  }
-  if(!c.jobId||c.terminal){finish(c,{phase:'error',error:errorCode(error)});return;}
-  publish({phase:'error',error:errorCode(error),pendingJob:true,cancellable:c.operation==='scan'&&c.cancellable,preview:null});
-  if(disposed){if(++c.cleanupFailures<3)queue(c);else{cleanupIncomplete=true;current=null;c.reject(Error('ORIGINAL_SCAN_CLEANUP_INCOMPLETE'));onRefreshError('ORIGINAL_SCAN_CLEANUP_INCOMPLETE');}}
+  if(c.terminal||!c.jobId&&['GAME_RUNNING','SCAN_STALE','EMBEDDED_UNSUPPORTED','EMBEDDED_CONFLICT','NOT_APPLIED','NOTHING_TO_RESTORE'].includes(errorCode(error))){finish(c,{phase:'error',error:errorCode(error)});return;}
+  publish({phase:'error',error:errorCode(error),pendingJob:true,cancellable:c.operation==='scan'&&!!c.jobId&&c.cancellable,recoverable:!!c.jobId||typeof recoverJob==='function',preview:null});
+  if(!c.jobId&&!disposed)c.reject(Error(errorCode(error)));
+  if(disposed){if(++c.cleanupFailures<3)queue(c);else{cleanupIncomplete=true;current=null;c.resolveCleanup(false);c.reject(Error('ORIGINAL_SCAN_CLEANUP_INCOMPLETE'));onRefreshError('ORIGINAL_SCAN_CLEANUP_INCOMPLETE');}}
  }
  function accept(c,dto){
   if(!active(c))return;
@@ -83,8 +82,9 @@ export function createOriginalScanController({api,onChange=()=>{},onApplied=()=>
    finish(c,{phase:'idle',result:dto});return;
   }
   if(!dto||typeof dto.jobId!=='string'||!dto.jobId||dto.jobId.length>512||c.jobId&&c.jobId!==dto.jobId)throw Error('ORIGINAL_SCAN_PROTOCOL');
+  if(dto.operation!==c.operation)throw Error('ORIGINAL_SCAN_PROTOCOL');
   c.jobId=dto.jobId;
-  if(dto.operation!==c.operation||!['running','cancelling','cancelled','done','failed'].includes(dto.state)||typeof dto.cancellable!=='boolean')throw Error('ORIGINAL_SCAN_PROTOCOL');
+  if(!['running','cancelling','cancelled','done','failed'].includes(dto.state)||typeof dto.cancellable!=='boolean')throw Error('ORIGINAL_SCAN_PROTOCOL');
   c.terminal=['done','failed','cancelled'].includes(dto.state);
   if(dto.state==='failed'){finish(c,{phase:'error',error:typeof dto.error==='string'?dto.error:'ORIGINAL_SCAN_FAILED'});return;}
   if(dto.state==='cancelled'){
@@ -104,17 +104,18 @@ export function createOriginalScanController({api,onChange=()=>{},onApplied=()=>
   if(c.operation!=='scan'&&dto.cancellable)throw Error('ORIGINAL_SCAN_PROTOCOL');
   const p=dto.progress,progress=p&&typeof p==='object'?Object.freeze({phase:typeof p.phase==='string'?p.phase.slice(0,80):'',file:typeof p.file==='string'?p.file.slice(0,4096):'',...(byteCount(p.bytes)?{bytes:p.bytes}:{})}):null;
   c.cancellable=dto.cancellable&&p?.cancellable!==false;
-  publish({phase:c.operation==='scan'?(c.cancelRequested||dto.state==='cancelling'?'cancelling':'scanning'):'applying',progress,pendingJob:true,cancellable:c.cancellable,error:''});
+  publish({phase:c.operation==='scan'?(c.cancelRequested||dto.state==='cancelling'?'cancelling':'scanning'):'applying',progress,pendingJob:true,cancellable:c.cancellable,recoverable:true,error:''});
   if(c.cancelRequested&&c.cancellable&&!c.cancelSent){c.cancelSent=true;void call(c,'jp_restore_scan_cancel',{id:c.id,jobId:c.jobId});}else queue(c);
  }
  async function call(c,action,params){
   if(!active(c)||c.inFlight)return;clear(c);c.inFlight=true;
-  try{const dto=await api(action,params);c.inFlight=false;accept(c,dto);}catch(error){c.inFlight=false;if(action==='jp_restore_scan_cancel')c.cancelSent=false;failed(c,error);}
+  try{const dto=await (action?api(action,params):recoverJob(Object.freeze({id:c.id,operation:c.operation,attempt:c.serial})));c.inFlight=false;accept(c,dto);}catch(error){c.inFlight=false;if(action==='jp_restore_scan_cancel')c.cancelSent=false;failed(c,error);}
  }
+ function query(c){if(c.jobId)return call(c,'jp_restore_scan_status',{id:c.id,jobId:c.jobId});if(typeof recoverJob==='function')return call(c,null);failed(c,Error('ORIGINAL_SCAN_STATUS_UNKNOWN'));}
  function begin(operation,action,params,{allowDirect=false,notifyApplied=false}={}){
   if(disposed||current||!state.gameId)return Promise.resolve(false);
-  let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});
-  const c={serial:++serial,id:state.gameId,operation,jobId:'',timer:null,inFlight:false,cancelRequested:false,cancelSent:false,cancellable:true,terminal:false,cleanupFailures:0,allowDirect,notifyApplied,resolve,reject,promise};current=c;
+  let resolve,reject,resolveCleanup;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;}),cleanupPromise=new Promise(yes=>{resolveCleanup=yes;});
+  const c={serial:++serial,id:state.gameId,operation,jobId:'',timer:null,inFlight:false,cancelRequested:false,cancelSent:false,cancellable:true,terminal:false,cleanupFailures:0,allowDirect,notifyApplied,resolve,reject,promise,cleanupPromise,resolveCleanup};current=c;
   publish({phase:operation==='scan'?'scanning':'applying',operation,preview:operation==='scan'?null:state.preview,progress:null,error:'',pendingJob:true,cancellable:operation==='scan'});
   void call(c,action,params);return promise;
  }
@@ -122,13 +123,13 @@ export function createOriginalScanController({api,onChange=()=>{},onApplied=()=>
   state:()=>state,busy:()=>!!current,canClose:closeAllowed,
   selectGame(id){if(disposed||current||typeof id!=='string'||!id||id.length>512)return false;++serial;publish({phase:'idle',gameId:id,preview:null,progress:null,error:'',pendingJob:false,operation:'',cancellable:false});return true;},
   scan(){if(current){if(state.phase==='error')return controller.refresh();return Promise.resolve(false);}return begin('scan','jp_restore_scan',{id:state.gameId});},
-  refresh(){const c=current;if(!c||c.inFlight||!c.jobId||disposed)return Promise.resolve(false);void call(c,'jp_restore_scan_status',{id:c.id,jobId:c.jobId});return Promise.resolve(true);},
+  refresh(){const c=current;if(!c||c.inFlight||!c.jobId&&typeof recoverJob!=='function'||disposed)return Promise.resolve(false);void query(c);return Promise.resolve(true);},
   cancel(){const c=current;if(disposed||!c||c.operation!=='scan'||!c.cancellable)return false;c.cancelRequested=true;publish({phase:'cancelling'});if(c.jobId&&!c.inFlight&&!c.cancelSent){c.cancelSent=true;void call(c,'jp_restore_scan_cancel',{id:c.id,jobId:c.jobId});}return true;},
   requestRestore(){if(disposed||current||!originalScanPresentation(state).canRestore)return false;publish({phase:'confirm'});return true;},
   back(){if(disposed||current||state.phase!=='confirm')return false;publish({phase:'preview'});return true;},
   confirm(){if(disposed||current||!originalScanPresentation(state).canConfirm||!state.preview?.scanToken)return Promise.resolve(false);return begin('restore','jp_restore_apply',{id:state.gameId,embedded:true,scanToken:state.preview.scanToken},{notifyApplied:true});},
-  runExisting(action,params={}){if(disposed||current)return Promise.reject(Error('ORIGINAL_SCAN_BUSY'));if(!['jp_restore_apply','jp_restore_undo'].includes(action)||!state.gameId||params.id!==state.gameId)return Promise.reject(Error('ORIGINAL_SCAN_OPTIONS'));return begin(action==='jp_restore_undo'?'undo':'restore',action,{id:state.gameId},{allowDirect:true});},
-  dispose(){if(!closeAllowed()||cleanupIncomplete)return Promise.resolve(false);disposed=true;const c=current;if(!c){++serial;return Promise.resolve(true);}c.cancelRequested=true;if(c.jobId&&!c.inFlight){if(c.cancellable){c.cancelSent=true;void call(c,'jp_restore_scan_cancel',{id:c.id,jobId:c.jobId});}else queue(c);}return c.promise.then(()=>true,()=>false);}
+  runExisting(action,params={}){if(disposed||current)return Promise.reject(Error('ORIGINAL_SCAN_BUSY'));if(!['jp_restore_apply','jp_restore_undo'].includes(action)||!state.gameId||params.id!==state.gameId)return Promise.reject(Error('ORIGINAL_SCAN_OPTIONS'));return begin(action==='jp_restore_undo'?'undo':'restore',action,{id:state.gameId},{allowDirect:true,notifyApplied:true});},
+  dispose(){if(!closeAllowed()||cleanupIncomplete)return Promise.resolve(false);disposed=true;const c=current;if(!c){++serial;return Promise.resolve(true);}c.cancelRequested=true;if(!c.inFlight){if(c.jobId&&c.cancellable){c.cancelSent=true;void call(c,'jp_restore_scan_cancel',{id:c.id,jobId:c.jobId});}else queue(c);}return c.cleanupPromise;}
  };
  publish({});return controller;
 }
@@ -160,9 +161,9 @@ export function mountOriginalScanView(container,{locale='zh',actions={}}={}){
  return {render,dispose(){disposed=true;section.remove();}};
 }
 
-export function mountOriginalScan(container,{api,locale='zh',onApplied,onRefreshError,onState}={}){
+export function mountOriginalScan(container,{api,recoverJob,locale='zh',onApplied,onRefreshError,onState}={}){
  let controller;
  const view=mountOriginalScanView(container,{locale,actions:{scan:()=>controller.scan(),cancel:()=>controller.cancel(),restore:()=>controller.requestRestore(),back:()=>controller.back(),confirm:()=>controller.confirm()}});
- controller=createOriginalScanController({api,onApplied,onRefreshError,onChange:state=>{view.render(state);onState?.(state);}});
+ controller=createOriginalScanController({api,recoverJob,onApplied,onRefreshError,onChange:state=>{view.render(state);onState?.(state);}});
  return {...controller,async dispose(){const complete=await controller.dispose();if(complete)view.dispose();return complete;}};
 }

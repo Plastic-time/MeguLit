@@ -6,7 +6,7 @@ The shared Japanese-restore modal owns the detail-page and Tools entries
 
 ## Controller contract
 
-`createOriginalScanController({api,onChange,onApplied,onRefreshError,schedule,unschedule,pollMs})`
+`createOriginalScanController({api,recoverJob,onChange,onApplied,onRefreshError,schedule,unschedule,pollMs})`
 uses the documented `jp_restore_scan`, `jp_restore_scan_status`, `jp_restore_scan_cancel`,
 `jp_restore_apply` and `jp_restore_undo` commands
 Polling defaults to400ms and accepts integer300–500ms
@@ -27,7 +27,13 @@ Restore and undo do not expose cancel and `canClose()` remains false until a ter
 Incomplete scan cleanup returns false and reports a fixed error rather than claiming the child stopped
 If a write-start response is lost before a job id arrives, an unknown error preserves the write lock
 Only documented rejection codes release that lock without a job
-The current backend contract has no lookup for a dispatched job with an unknown id, so recovery from that transport ambiguity remains a protocol gap
+An optional `recoverJob({id,operation,attempt})` seam can recover an authoritative Job DTO
+The local attempt counter is not server correlation proof: the owner must bind the query to this actual dispatched request/session
+Absent or mismatched responses never prove that a worker stopped, and do not release a write lock
+The visible progress-retry button uses that seam for an unknown id, then resumes ordinary status polling
+Scan disposal uses it too, requests real cancellation after recovering identity, and awaits terminal status
+Without a proof it explicitly reports incomplete cleanup rather than reporting a stopped child
+The current backend contract still needs to define the recovery command and reliable request/session correlation
 The UI must not label it an ended transaction or allow a second write
 
 `mountOriginalScan(container,options)` combines the real controller and DOM view
