@@ -50,6 +50,7 @@ const MODELS={
 function modelsFor(provider){const list=[...(MODELS[provider]||[])],def=ENGINES[provider]?.model;if(def&&!list.includes(def))list.unshift(def);return list;}
 const GROUPS={free:'免费',api:'翻译 API',llm:'大模型',local:'本地 / 离线'};
 const SAKURA_SYSTEM='你是一个轻小说翻译模型，可以流畅通顺地以日本轻小说的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，不擅自添加原文中没有的代词。';
+const supportsTranslationTarget=(provider,target)=>provider!=='sakura'||target!=='en';
 
 function splitPair(key){const m=/^\s*([^:：|\s]+)\s*[:：|]\s*(\S+)\s*$/.exec(key||'');if(!m)throw Error('密钥格式应为「ID:密钥」（中间用英文冒号）');return [m[1],m[2]];}
 const md5=v=>createHash('md5').update(v,'utf8').digest('hex'),sha256=v=>createHash('sha256').update(v,'utf8').digest('hex');
@@ -99,4 +100,4 @@ async function machineTranslate(id,text,apiKey,fetcher,signal,lang='zh'){
  }
  throw Error('未知翻译引擎');
 }
-module.exports={ENGINES,MODELS,modelsFor,GROUPS,SAKURA_SYSTEM,machineTranslate,splitPair};
+module.exports={ENGINES,MODELS,modelsFor,GROUPS,SAKURA_SYSTEM,machineTranslate,splitPair,supportsTranslationTarget};
