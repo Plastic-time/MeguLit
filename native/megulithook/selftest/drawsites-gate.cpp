@@ -114,6 +114,15 @@ int main() {
     Check(Logged.size() == 1 && Logged[0].find(args) != std::string::npos, std::string("no frame: fargs = the routine's arguments (") + args + ")");
     Check(GotX == 0x111 && GotY == 0x222 && GotStr == ai, "no frame: the API gets the game's arguments");
   }
+  /* slots by value (a packed module, its header lists only the packer's imports): this program calls GetTextMetricsW through
+     its import table (DrawSites' FontHeight); the slots found by value are the ones the header names */
+  {
+    uintptr_t base = (uintptr_t)GetModuleHandleA(nullptr); std::uint32_t byName[8], byValue[8];
+    int a = DrawSites::Slots(base, "GetTextMetricsW", byName, 8), b = DrawSites::SlotsByValue(base, "GetTextMetricsW", byValue, 8);
+    bool same = a >= 1 && b >= 1; for (int i = 0; i < b && same; i++) { bool in = false; for (int j = 0; j < a; j++) if (byValue[i] == byName[j]) in = true; same = in; }
+    Check(same, "slots by value = the import table's slots (" + std::to_string(a) + " by name, " + std::to_string(b) + " by value)");
+    Check(DrawSites::SlotsByValue(base, "TextOutW", byValue, 8) == 0, "slots by value: an API never called through the import table has none");
+  }
   printf("draw sites gate: %d failure(s)\n", Failures);
   return Failures;
 }

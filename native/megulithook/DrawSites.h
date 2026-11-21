@@ -147,12 +147,35 @@ static int Slots(uintptr_t base, const char *api, std::uint32_t *out, int max) {
   }
   return n;
 }
+// a packed module (UPX: Air, AVG32 in avg32_cn) describes only the packer's own imports in its header; the real import table is
+// rebuilt in memory at the same place. Its slots are found by value: every call dword ptr [X] (FF 15) with X inside the module
+// whose dword is the API's address
+static int SlotsByValue(uintptr_t base, const char *api, std::uint32_t *out, int max) {
+  FARPROC f = nullptr; const char *dlls[] = { "gdi32.dll", "user32.dll" };
+  for (const char *d : dlls) { HMODULE h = GetModuleHandleA(d); if (h && (f = GetProcAddress(h, api))) break; }
+  if (!f) return 0;
+  auto nt = (IMAGE_NT_HEADERS *)(base + ((IMAGE_DOS_HEADER *)base)->e_lfanew); uintptr_t end = base + nt->OptionalHeader.SizeOfImage;
+  auto sec = IMAGE_FIRST_SECTION(nt); int n = 0;
+  for (int i = 0; i < nt->FileHeader.NumberOfSections; i++, sec++) {
+    if (!(sec->Characteristics & IMAGE_SCN_MEM_EXECUTE)) continue;
+    const unsigned char *c = (const unsigned char *)(base + sec->VirtualAddress); size_t size = sec->Misc.VirtualSize;
+    for (size_t k = 0; k + 6 <= size; k++) {
+      if (c[k] != 0xff || c[k + 1] != 0x15) continue;
+      std::uint32_t x; memcpy(&x, c + k + 2, 4); if (x < base || x + 4 > end) continue;
+      if (Peek(x) != (DWORD)(uintptr_t)f) continue;
+      bool seen = false; for (int j = 0; j < n; j++) if (out[j] == x) seen = true;
+      if (!seen && n < max) out[n++] = x;
+    }
+  }
+  return n;
+}
 static void Look(int sig) {
   const auto &g = DrawSitesSig::Sigs[sig];
   if (sig >= 64 || Looked[sig]) return;
   HMODULE m = g.module[0] ? GetModuleHandleA(g.module) : GetModuleHandleA(nullptr); if (!m) return; /* not loaded yet: looked for again */
   Looked[sig] = true;
   uintptr_t base = (uintptr_t)m; std::uint32_t slots[8]; int ns = Slots(base, g.api, slots, 8); Api api = ApiOf(g.api);
+  if (!ns) ns = SlotsByValue(base, g.api, slots, 8); /* a packed module: its header lists the packer's imports only */
   if (!ns || api == A_None) return;
   auto nt = (IMAGE_NT_HEADERS *)(base + ((IMAGE_DOS_HEADER *)base)->e_lfanew); auto sec = IMAGE_FIRST_SECTION(nt);
   size_t at[MaxSites]; uintptr_t found[MaxSites]; int total = 0;

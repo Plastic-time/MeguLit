@@ -231,6 +231,17 @@
    "slot": "0x100dd01c",
    "call": "0x10008ad0",
    "hex": "83c40485ff0f84b0040000a1247111156683b8c8010000040f84860000008b95b0feffff8b351cd00d108d85c8feffff506a006a008d8dd8feffff516a065752ffd68b0d287111158bd88d85c8feffff"
+  },
+  "air-cn-upx-unpacked/avg32": {
+   "id": "avg32",
+   "file": "air_cn.upx-unpacked.exe",
+   "sha256": "fbb984d41b1e8c688b0a73c731e83de87f47accc6ce9e7b4b67daeee15e4d6a7",
+   "api": "TextOutA",
+   "va": "0x418664",
+   "callOffset": 64,
+   "slot": "0x444060",
+   "call": "0x4186a4",
+   "hex": "8b4d108b45f8688600ee00578b51188b4dfc535250508b4514505156e84b96feff8b5dfc8b7d0c83c424eb1a8b55188b4514525750a134c44c008bcb2bc85156ff15604044008b4d188b550803f903da"
   }
  }
 }

@@ -136,6 +136,7 @@ BGI、Siglus 等只要画字最终经过 TextOut / ExtTextOut / DrawText / GetGl
 ### ReaLive / AVG32（涙 ～流星のザドル～）
 - 点：AVG3216D.EXE 0x413880，例程 0x413730（把一串字画进文字 DIB，一字一次 `TextOutA(hdc, x - 滚动, y, 字, 1|2)`，有 EBP 帧，5 个调用者）。x / y 就是画布笔位
 - 另一个 TextOutA（0x41f888）在设置对话框里，不签
+- 新版 AVG32（Air 中文版 air_cn.exe）：exe 是 UPX 压缩的，所以普查里看着「导入了 TextOutA 却没有引用」；用官方 UPX 4.2.4（H:\MeguLit-Work\deps）只读解出一个副本（H:\MeguLit-Worke-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4186a4 正好命中一次，是同一个例程。运行时 UPX 会把真正的导入表在内存里原样重建，但 PE 头只列 UPX 自己的几个导入，所以 DrawSites 在头里找不到槽时改按值找（`call [X]` 里 X 的内容等于 TextOutA 的真实地址）。旁边 7 KB 的 avg32_cn.dll 是中文补丁（另一种压缩壳），不画字
 - 店主测试清单：
   1. 写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，内容 `#cfg roles=1`），或在 The Seed 里给这部游戏的差分设 `"draw":{"roles":true}`
   2. 开游戏推 5 句、出一次选项
