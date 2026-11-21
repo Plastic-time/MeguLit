@@ -88,7 +88,7 @@ CMVS 本机版本同样确认字形、度量与节点缓存会绕过旧点；双
 | KiriKiri 2 / Z（KAG3 processCh 路线） | krkrtext script.inc | 内 | 内（逐字） | 无（<20% 屏高的层直接丢） | 无（link 里的字混进台词） | 无 | 无（只有 opacity 0 隐藏 + 叠加层） | 无（KAG [ruby] 被一起隐藏，不上报） | 名字层按角色报；`inLink` 期间的字按 link 分组报 choice；ButtonLayer.caption 报 button；用 MessageLayer 自己的 drawText + rubySize/rubyOffset 画注音和中文（本分支做） | M | KAG3 源码（MessageLayer/KAGWindow 公开）、KirikiriTools（arcusmaximus，补丁 xp3 加载）、KrkrExtract、krkrz 源码 |
 | KiriKiri Z（TextRender 插件，柚子社等） | krkrtext trDone | 内 | 内（getCharacters） | 无 | 无 | 无 | 无 | 无 | TextRender 自己栅格化：内嵌要在 render 前改字符串（包 TextRender.render 的参数）或改 textLayer；名字在另一个 TextRender 实例 | L | textrender.dll 无源码；参考 柚子社 汉化补丁的 TJS 覆盖做法 |
 | Ren'Py | MeguLitRenpy.py | 内 | 内（Layout 字形） | 内（实际 say/who widget，仅隔离 8.4 fixture） | 内（store.menu 与 action 身份，仅隔离 fixture） | 未验证 | 内（Text.set_text，撤权恢复原切片；隔离 fixture） | 内（替换 ruby 标签；非原游戏 ruby 全覆盖） | 真实 Reader 已收 10 句、译文和本地词卡 DOM，但隐藏桌面 front=Foreign 阻止屏上显示，物理点读/选项译文/用户真实游戏仍待验；默认关闭，详见 [实测边界](re-renpy-live.md) | S | Ren'Py 自带翻译框架、unrpyc |
-| RPG Maker MV / MZ | 只有 LunaHook `lunajspatch.js`（V8 字符串）；CDP 路线遇 canvas 关闭 | 外（字符串流） | 无 | 无 | 无 | 无 | 无（lunajspatch 能改 drawText 的字符串，但不分角色） | 无 | JS 层直接包 Window_Message（台词替换）/ Window_NameBox / Window_ChoiceList / Window_Command 系（只报 rect）；坐标 = PIXI worldTransform → canvas CSS → client px（本分支做） | S | rpg_windows.js / rmmz_windows.js（官方源码随游戏发布）、Translator++、MV/MZ 插件生态、lunajspatch.js |
+| RPG Maker MV / MZ | CDP实际注入 `core/text-paths-rpgm.cjs`；默认不包函数，明确draw.roles/embed才安装；**候选，缺本机真实正文，未达一级** | 内（Window_Message内容Bitmap，VM回放） | 内（字体格四角、PIXI仿射/frame、CSS/DPR；非字形墨迹，待实机） | 内（标准MZ Window_NameBox）；无（MV非标准名字插件） | 内（Window_ChoiceList文字项/选中态，VM回放） | 内（Window_Command的_list及数据项name；图片按钮/自绘菜单无） | 内（本窗口追加中文/注音，超时或未实际应用回阅读层；VM回放） | 无（游戏原有ruby未读）；内（生成读音绘制，VM回放） | 找到真实本机MV/MZ正文后才能满足一级；二级核分页、缩放滚动、点读、名字与选项及插件兼容；原生lunajspatch资源未改/未重编译 | S | 有序审计版本及许可见分支result.md；MV官方corescript和MZ官方Window.js仅参考API，未复制第三方代码 |
 | RPG Maker VX Ace / VX / XP | rgss.cjs 只读剧本 | 外（LunaHook RGSS 流） | 外（字形点） | 无 | 无 | 无 | 无 | 无 | RGSS30x.dll 导出 `RGSSEval`：注入 Ruby 包 Window_Message#process_normal_character / Window_ChoiceList，和 MV 同一套角色逻辑 | M | RGSS 默认脚本（Scripts.rvdata2 里）、rvpacker、MTool 的做法 |
 | TyranoScript | text-paths-web（DOM） | 内 | 内（getClientRects） | 无（`.chara_name_area` 没按名字报） | 无（`.glink_button` 没报） | 无 | 无（CSS 透明隐藏） | 无（<ruby> 被跳过） | 名字容器、glink/button 按角色报 rect；内嵌 = 改 `.message_inner` 的 DOM（加 <ruby> 和中文行），浏览器就是游戏自己的渲染 | S | TyranoScript 源码（MIT）、tyrano 翻译插件 |
 | Artemis | LunaHook（Artemis 钩子 + 内嵌） | 外（流） | 外（GPU 四边形 / 字形点） | 外（ctx2） | 外 | 无 | 外（LunaHook 写回字符串） | 无 | 引擎是 Lua：找到 lua_State 后调 Lua 包 `e:tag` 文本函数；或按 Artemis「散文件优先于 pfs」的加载规则放影子目录脚本（不碰游戏目录） | L | artemis 解包工具、LunaHook Artemis 钩子 |
@@ -118,7 +118,7 @@ CMVS 本机版本同样确认字形、度量与节点缓存会绕过旧点；双
 收益 = 发行量 × 现在缺的程度 ÷ 难度
 
 1. **KiriKiri processCh 路线**（7285 日文发行，已经在引擎内部，只差角色和内嵌）：已做（ecc1e0b7），默认关，等实机
-2. **RPG Maker MV/MZ**（JS 层源码公开，现在坐标和角色全无，S）：已做（core/text-paths-rpgm.cjs），引擎差分默认开，等实机
+2. **RPG Maker MV/MZ**（S）：CDP候选实现见core/text-paths-rpgm.cjs，默认关；VM回放覆盖坐标、角色、分页和撤权，但缺本机真实正文，不能标一级完成；游戏原有ruby读取也未完成
 3. TyranoScript（S，DOM 已在，只差角色和 DOM 内嵌）、Ren'Py（S，有官方翻译钩子）：同一套协议，下一批
 4. Unity（M，组件已在内部，角色靠框架）
 5. 其余（Siglus / BGI / YU-RIS / AdvHD / Majiro / QLIE / Malie / Escude / CIRCUS / LiveMaker / NScripter / Artemis）是 L：每个要逆向二进制画字函数、按版本签名。共同的捷径是 GDI 引擎走 VNTextProxy 那条「代理 GDI + 写回字符串」的路，角色继续用 LunaHook 的 ctx2，坐标继续用字形点；真正的「内」要一个引擎一个会话

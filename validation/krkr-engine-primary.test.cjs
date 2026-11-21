@@ -12,7 +12,7 @@ assert.match(bridge, /static bool EngineAside\(string text\)\{return text\.Lengt
 assert.match(bridge, /static bool EngineAllOk\(string text\)\{text=text\?\?"";DateTime now=DateTime\.UtcNow;\r?\n  if\(ProfileTrial==0\)return false;[^\r\n]*\r?\n  if\(ProfileSkipAside&&Volatile\.Read\(ref EngineHideOn\)>0&&!EngineTrialFailed&&EngineAside\(text\)\)return true;/, 'a label or name passes before any trial or click is counted');
 assert.match(bridge, /EngineAllOk\("■自動車（車内／走行）"\)\|\|EngineTrialText!=null\)return false;/, 'self-test: the label alone starts no trial');
 const tjs = fs.readFileSync(path.join(root, 'native', 'krkrtext', 'script.inc'), 'utf8');
-assert.match(tjs, /if\(n==0\) \{this\.trNote\('blank'\);return;\}/);
+assert.match(tjs, /if\(n==0\) \{this\.trClear\(L\);this\.trNote\('blank'\);return;\}/);
 assert.match(tjs, /'\/blank'\+\(\+this\.trWhy\.blank\)/);
 
 const { OverlayPlacement } = require('../core/overlay-placement.cjs');

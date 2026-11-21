@@ -36,7 +36,7 @@ def _megulit_renpy_main():
         return
     if 'renpy' not in sys.modules:
         return
-    import os, re, threading, time
+    import os, re, threading, time, binascii
     try:
         unichr_ = unichr  # noqa: F821 (Python 2, Ren'Py 7 and older)
         text_types = (str, unicode)  # noqa: F821
@@ -63,6 +63,7 @@ def _megulit_renpy_main():
             self.page, self.want, self.hidden = [], False, []
             self.embedded = []
             self.restart_pending = False
+            self.name_visible = False
             self.cfg, self.emb, self.ctl_raw, self.ctl_at, self.ui, self.menu = {'roles': 0, 'embed': 0, 'zh': 1}, {}, None, 0.0, 0, None
             if self.sink is None:
                 t = threading.Thread(target=self.writer, name='MeguLitRenpy')
@@ -182,6 +183,7 @@ def _megulit_renpy_main():
             if self.cfg.get('roles') and not cfg.get('roles'):
                 self.ui_empty('name', 'N:')
                 self.ui_empty('choice', 'C:')
+                self.name_visible = False
             if self.cur is not None:
                 self.cur['who_sent'] = False
             if self.menu is not None:
@@ -286,7 +288,22 @@ def _megulit_renpy_main():
             v = c['view']
             return 'ToMe_CHARS engine=renpy line=%d hidden=%d sw=%d sh=%d vx=%s vy=%s vw=%s vh=%s n=%d rects=%s%s text=%s' % (
                 c['line'], 1 if c['hid'] else 0, c['sw'], c['sh'], v[0], v[1], v[2], v[3], len(c['rects']),
-                ';'.join(','.join(self.num(n) for n in r) for r in c['rects']), (' emb=%d' % c['emb']) if c.get('emb') else '', c['text'])
+                ';'.join(','.join(self.num(n) for n in r) for r in c['rects']),
+                ((' emb=%d' % c['emb']) if c.get('emb') else '') + c.get('ruby', ''), c['text'])
+
+        def ruby_wire(self, spans, count):
+            if not spans or len(spans) > 64:
+                return ''
+            fields, end = [], 0
+            for start, length, reading in spans:
+                if start < end or length < 1 or length > 80 or start + length > count:
+                    return ''
+                if not reading or len(reading) > 160 or any(ord(ch) < 32 or 0x7f <= ord(ch) <= 0x9f or 0xd800 <= ord(ch) <= 0xdfff for ch in reading):
+                    return ''
+                fields.append('%d:%d:%s' % (start, length, binascii.hexlify(reading.encode('utf-16-be')).decode('ascii')))
+                end = start + length
+            token = '|'.join(fields)
+            return (' ruby=' + token) if len(token) <= 8192 else ''
 
         def viewport(self):
             # where the virtual screen sits in the window (letterbox), drawable pixels = client pixels on Windows
@@ -347,7 +364,7 @@ def _megulit_renpy_main():
                     for it in items or ():
                         label = it[0] if isinstance(it, (list, tuple)) and it else getattr(it, 'caption', None)
                         value = it[1] if isinstance(it, (list, tuple)) and len(it) > 1 else True
-                        if isinstance(label, text_types) and value is not None:
+                        if isinstance(label, text_types) and label and value is not None:
                             caps.append(label)
                     core.menu = {'caps': caps, 'screen': k.get('screen', 'choice'), 'frames': 0, 'sent': None} if caps else None
                 except Exception:
@@ -530,12 +547,64 @@ def _megulit_renpy_main():
             # No Text holds the string as given (a screen that rebuilt it): compare what is drawn, ruby left out.
             flat = self.flat_wanted(c)
             for d, x, y, rev in loose[:64]:
-                rows = self.rows(d)
-                if rows and blank.sub('', ''.join(''.join(r[1]) for r in rows)) in flat:
+                rows = self.rows(d, with_ruby=True)
+                if rows and rows[0] and blank.sub('', ''.join(''.join(r[1]) for r in rows[0])) in flat:
                     if self.report(d, c, x, y, rev, rows):
                         return
 
-        def rows(self, d):
+        def native_ruby(self, d, layout, positions, shown):
+            # 8.4.0.25071206: Text.Layout keeps the same glyph objects before and after line breaking.
+            # Read the original sequence, then map identities to emitted rectangles. Never search for base text.
+            r = sys.modules.get('renpy')
+            config = sys.modules.get('renpy.config')
+            if tuple(getattr(r, 'version_tuple', ()))[:4] != (8, 4, 0, 25071206):
+                return []
+            if getattr(getattr(d, 'style', None), 'vertical', False) or getattr(config, 'rtl', False):
+                return []
+            paragraphs = getattr(layout, 'paragraph_glyphs', None)
+            if not paragraphs:
+                return []
+            glyphs = []
+            for paragraph in paragraphs:
+                if len(glyphs) + len(paragraph) > 20000:
+                    return []
+                glyphs.extend(paragraph)
+            if any(getattr(g, 'rtl', False) for g in glyphs):
+                return []
+            spans, base, last, i = [], [], -1, 0
+            while i < len(glyphs):
+                g = glyphs[i]
+                kind = getattr(g, 'ruby', 0)
+                # ruby_t in textsupport.pxd: NONE=0, BOTTOM=1, TOP=2, ALT=3.
+                if kind in (0, 1):
+                    if kind == 1 and last == 1:
+                        base.append(g)
+                    else:
+                        base = [g]
+                    last, i = kind, i + 1
+                    continue
+                if kind not in (2, 3):
+                    return []
+                reading, visible = [], True
+                while i < len(glyphs) and getattr(glyphs[i], 'ruby', 0) == kind:
+                    g = glyphs[i]
+                    code = getattr(g, 'character', 0)
+                    if code < 32 or code > 0x10ffff or 0x7f <= code <= 0x9f or 0xd800 <= code <= 0xdfff or code in skip:
+                        return []
+                    reading.append(unichr_(code))
+                    if len(reading) > 160:
+                        return []
+                    visible = visible and id(g) in shown
+                    i += 1
+                indices = [positions.get(id(g), -1) for g in base]
+                if visible and indices and indices[0] >= 0 and indices == list(range(indices[0], indices[0] + len(indices))):
+                    spans.append((indices[0], len(indices), u''.join(reading)))
+                    if len(spans) > 64:
+                        return []
+                last = kind
+            return spans
+
+        def rows(self, d, with_ruby=False):
             get = getattr(d, 'get_layout', None)
             layout = get() if get is not None else None
             lines = getattr(layout, 'lines', None) if layout is not None else None
@@ -543,28 +612,18 @@ def _megulit_renpy_main():
                 return None
             ox, oy = getattr(layout, 'xoffset', 0) or 0, getattr(layout, 'yoffset', 0) or 0
             unscale = getattr(layout, 'unscale_pair', None) or (lambda a, b: (a, b))
-            glyphs = [g for ln in lines for g in ln.glyphs]
-            base = 0
-            kinds = set(getattr(g, 'ruby', 0) for g in glyphs)
-            if len(kinds) > 1:
-                # Ruby: of the marked glyphs, the base text is the group drawn larger (ruby_t's numbering is not public).
-                sizes = {}
-                for g in glyphs:
-                    k = getattr(g, 'ruby', 0)
-                    a = sizes.setdefault(k, [0, 0])
-                    a[0] += getattr(g, 'ascent', 0) or 0
-                    a[1] += 1
-                marked = [k for k in sizes if k]
-                top = set(marked) - set([max(marked, key=lambda k: sizes[k][0] / float(sizes[k][1]))]) if len(marked) > 1 else set()
-            else:
-                top = set()
-            out = []
+            out, positions, shown, count = [], {}, set(), 0
             for ln in lines:
                 chars, xs, ws = [], [], []
                 for g in ln.glyphs:
                     code = getattr(g, 'character', 0)
-                    if code < 32 or code in skip or getattr(g, 'ruby', 0) in top:
+                    shown.add(id(g))
+                    if code < 32 or code in skip or getattr(g, 'ruby', 0) in (2, 3):
                         continue
+                    if code > 0x10ffff or 0xd800 <= code <= 0xdfff or id(g) in positions or count >= 4000:
+                        return None
+                    positions[id(g)] = count
+                    count += 1
                     gx, gy = unscale(g.x + ox, ln.y + oy)
                     chars.append(unichr_(code))
                     xs.append(gx)
@@ -576,12 +635,13 @@ def _megulit_renpy_main():
                             ws[i] = (xs[i + 1] - xs[i]) if i + 1 < len(xs) and xs[i + 1] > xs[i] else (ws[i - 1] if i else unscale(0, ln.height)[1])
                     top_y = unscale(0, ln.y + oy)[1]
                     out.append((top_y, chars, xs, unscale(0, ln.height)[1], ws))
-            return out
+            return (out, self.native_ruby(d, layout, positions, shown)) if with_ruby else out
 
         def report(self, d, c, x, y, rev, rows=None):
-            rows = rows if rows is not None else self.rows(d)
-            if not rows:
+            drawn = rows if rows is not None else self.rows(d, with_ruby=True)
+            if not drawn or not drawn[0]:
                 return False
+            rows, ruby = drawn
             if c.get('jp_n'):
                 left, cut = c['jp_n'], []
                 for row in rows:
@@ -611,6 +671,11 @@ def _megulit_renpy_main():
             sw, sh = getattr(config, 'screen_width', 0) or 0, getattr(config, 'screen_height', 0) or 0
             text = '\n'.join(''.join(r[1]) for r in rows)
             n = sum(len(r[1]) for r in rows)
+            if c.get('emb'):
+                ruby = c.get('embedded_native_ruby', [])
+            else:
+                c['native_ruby'], c['native_text'] = ruby, text
+            c['ruby'] = self.ruby_wire(ruby, n)
             xs0 = [p[0] for p in pts]
             first_y, last_y = pts[0][1], pts[-1][1]
             box = (int(round(min(xs0))), int(round(first_y)), int(round(max(xs0))), int(round(max(last_y, first_y))),
@@ -685,6 +750,11 @@ def _megulit_renpy_main():
             if not self.cfg.get('roles'):
                 return
             c = self.cur
+            if c is not None and not c.get('who') and not c['who_sent']:
+                c['who_sent'] = True
+                if self.name_visible:
+                    self.ui_empty('name', 'N:')
+                    self.name_visible = False
             if c is not None and c.get('who') and not c['who_sent']:
                 screens = sys.modules.get('renpy.display.screen')
                 get_widget = getattr(screens, 'get_widget', None)
@@ -694,6 +764,7 @@ def _megulit_renpy_main():
                         b = self.box(d, x, y, rev)
                         if b:
                             c['who_sent'] = True
+                            self.name_visible = True
                             self.ui += 1
                             self.ui_send('name', 'N:0', b[0], b[1], self.ui)
                         break
@@ -774,6 +845,12 @@ def _megulit_renpy_main():
                     setattr(d, attr, value)
                 raise
             self.embedded.append((d, original, text, c, bounds))
+            # Replacing removes whitespace. Keep only the game's original readings, mapped to the new base indices.
+            prefix = [0]
+            for ch in c.get('native_text', '').replace('\n', ''):
+                prefix.append(prefix[-1] + (0 if blank.match(ch) else 1))
+            c['embedded_native_ruby'] = [(prefix[s], prefix[s + n] - prefix[s], reading)
+                                         for s, n, reading in c.get('native_ruby', []) if s + n < len(prefix) and prefix[s + n] > prefix[s]]
             c['wanted'].add(text)
             c['flat'], c['emb'], c['jp_n'], c['done'] = None, lvl, len(chars), False
             ex = sys.modules.get('renpy.exports')

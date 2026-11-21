@@ -16,6 +16,18 @@ The wrappers preserve the original engine calls and keep the existing body/glyph
 Custom screens without these identities remain unclassified
 The control file and writer queue are not a synchronous native drain or render acknowledgement
 
+## Native ruby producer, 2026-11-22
+
+The producer now excludes both TOP and ALT glyphs by their audited enum roles, replacing the ascent heuristic
+For Ren'Py 8.4.0.25071206 it follows the original `paragraph_glyphs` order and maps glyph identities to emitted rectangle indices
+It emits bounded optional `ruby=start:len:UTF16hex` spans after emb and before text, preserving repeated bases and codepoint offsets
+Missing glyph identity, RTL, vertical layout and other versions do not produce native ruby metadata
+The standard say route clears a previous name on narration, and the standard menu route excludes empty captions
+
+This change has inert producer/control tests only, with no new engine or Reader run
+The shared ruby-v1 parser must be merged before the new producer can pass the existing `text-paths` consumer replay
+The exact audit sources, limits, commands, dependency failure and seven capability cells are in `result.md` at the repository root
+
 ## Evidence layers
 
 | Layer | Observed result | Limit |

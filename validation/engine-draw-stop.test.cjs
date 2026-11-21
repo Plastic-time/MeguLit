@@ -60,9 +60,9 @@ test('failed control stop awaits the actual owned Node helper, shares pending wo
   const d=new ED.EngineDraw({profile:on,transport:f.tr});clearTimeout(f.tr.timer);
   child=spawn(process.execPath,['-e',"process.stdin.resume();process.stdout.write('ready\\n');process.stdin.on('end',()=>setTimeout(()=>process.exit(0),100));"],{windowsHide:true,stdio:['pipe','pipe','pipe']});
   await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('helper ready timeout')),2000);child.stdout.once('data',()=>{clearTimeout(t);resolve();});child.once('error',e=>{clearTimeout(t);reject(e);});});
-  const h=hook(d);h.process=child;const messages=[];h.send=m=>{messages.push(m);child.stdin.write(JSON.stringify(m)+'\n');};
+  const h=hook(d);const nativePairs=[['日','ひ',0]];h.sourceRuby=new Map([['日',nativePairs]]);h.nativeRuby={keys:['日'],pairs:nativePairs,pid:987,started:'owned'};h.process=child;const messages=[];h.send=m=>{messages.push(m);child.stdin.write(JSON.stringify(m)+'\n');};
   await injected(f.tr.file,{unlinkSync(){throw denied();},writeFileSync(){throw denied();}},async()=>{
-   let settled=false;const p=h.stop(false);assert.equal(p,h.stop(true));p.finally(()=>{settled=true;}).catch(()=>{});
+   let settled=false;const p=h.stop(false);assert.equal(h.sourceRuby.has('日'),false,'native readings retire before an async helper or control stop can settle');assert.equal(h.nativeRuby,null);assert.equal(p,h.stop(true));p.finally(()=>{settled=true;}).catch(()=>{});
    await tick();assert.equal(settled,false);assert.equal(h.disposed,true);assert.equal(child.exitCode,null);
    assert.doesNotThrow(()=>h.start({pid:1,hwnd:'1',name:'a',started:'1234567890'}));
    await assert.rejects(p,e=>stopped(e)&&stopped(e.cause));

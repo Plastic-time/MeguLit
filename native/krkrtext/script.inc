@@ -74,14 +74,16 @@ LR"MGLT((function(){
     } catch(e) {return '';}
    } incontextof st;
 )MGLT", LR"MGLT(
-   st.track=function(rec,ch,lm,p0,oy){
+   st.track=function(rec,ch,lm,p0,oy,nativeRuby){
     var L=rec.target;
     if(L.vertical) return;
     var scr=this.screen(),sw=scr[0],sh=scr[1],role='line';
     if(!(sw>0) || !(sh>0)) return;
     /* engine-draw roles (draw.roles, docs/engine-draw-protocol.md): a layer under 20 % of the screen is a name plate, reported as
        role=name; without roles it is left out as before */
-    if(L.height<sh*0.2) {if(!this.cfg.roles) return;role='name';}
+    var il=-1;try {if(typeof L.inLink!='undefined') il=+L.inLink;} catch(e) {}
+    var choice=il>=0 || this.choicePage(L);if(choice && !this.cfg.roles) return;
+    if(!choice && L.height<sh*0.2) {if(!this.cfg.roles) return;role='name';}
     var size=+L.fontSize;
     if(!(size>0)) {size=+L.font.height;if(size<0) size=-size;} /* no Math here: in a function bound to the state dictionary a bare global name reads as void */
     if(!(size>0)) return;
@@ -97,10 +99,10 @@ LR"MGLT((function(){
     }
     var a=this.abs(L);cx+=a[0];cy+=a[1];
     /* engine-draw: a character drawn inside [link]...[endlink] (KAG MessageLayer.inLink >= 0) is a choice, never dialogue */
-    if(this.cfg.roles && role=='line') {var il=-1;try {if(typeof L.inLink!='undefined') il=+L.inLink;} catch(e) {}if(il>=0) {this.linkCh(rec,L,il,ch,cx,cy,size,sw,sh);return;}if(this.choicePage(L)) {this.linkCh(rec,L,'R'+int(cy),ch,cx,cy,size,sw,sh);return;}}
+    if(this.cfg.roles) {if(il>=0) {this.linkCh(rec,L,il,ch,cx,cy,size,sw,sh);return;}if(this.choicePage(L)) {this.linkCh(rec,L,'R'+int(cy),ch,cx,cy,size,sw,sh);return;}}
     if(rec.n==0) {
      if(role=='line') this.fontReport(L);
-     rec.role=role;rec.ra=[];rec.args=void;
+     rec.role=role;rec.ra=[];rec.rb=[];rec.args=void;
      rec.line=++this.line;this.active=rec;rec.x0=cx;rec.y0=cy;rec.x1=cx;rec.y1=cy;rec.size=size;rec.text='';rec.sw=sw;rec.sh=sh;
      rec.nvl=L.height>=sh*0.45?1:0;rec.same=rec.cleared?0:1;rec.cleared=false;rec.rs='';rec.cn=0;rec.hc=0;rec.ct='';
      rec.color=-1;rec.paint=''; /* a missing colour belongs to this sentence, never the previous draw */
@@ -115,7 +117,7 @@ LR"MGLT((function(){
      if(rec.n>0 && cy!=rec.ly) rec.text+='\n';rec.text+=ch;
      var cw=size;try {cw=+this.drawFont(L).getTextWidth(ch);} catch(e) {cw=size;}if(!(cw>0)) cw=size;
      /* blanks get no box (the record's text has none); a character counts as hidden when it was drawn while hiding was on */
-     if(ch!=' ' && ch!='　' && ch!="\t") {rec.rs+=(rec.cn>0?';':'')+int(cx)+','+int(cy)+','+int(cw)+','+int(size);rec.cn++;rec.ct+=ch;rec.ra.add([cx,cy,cw,size]);if(this.hideMsg()) rec.hc++;} else rec.ct+='';
+     if(ch!=' ' && ch!='　' && ch!="\t") {if(role=='line' && typeof nativeRuby=='String' && nativeRuby!='' && rec.rb.count<64) rec.rb.add([rec.cn,1,nativeRuby]);rec.rs+=(rec.cn>0?';':'')+int(cx)+','+int(cy)+','+int(cw)+','+int(size);rec.cn++;rec.ct+=ch;rec.ra.add([cx,cy,cw,size]);if(role=='line' && this.hideMsg()) rec.hc++;} else rec.ct+='';
      if(this.embArgs!==void) rec.args=this.embArgs;
     }
     rec.ly=cy;
@@ -130,12 +132,14 @@ LR"MGLT((function(){
    st.chars=function(rec){
     if(!(rec.cn>0)) return;
     /* the glyphs stay as drawn: a sentence is hidden when every one of its characters went through the opacity-0 draw */
-    var h=(rec.hc>=rec.cn)?1:0;this.charsSent++;
+    var h=(rec.role!='name' && rec.hc>=rec.cn)?1:0;this.charsSent++;
     var t='',row='',c;
     for(var j=0;j<rec.text.length;j++) {c=rec.text.charAt(j);if(c=="\n") {if(row!='') t+=(t!=''?"\n":'')+row;row='';} else if(c!=' ' && c!='　' && c!="\t") row+=c;}
     if(row!='') t+=(t!=''?"\n":'')+row;
     rec.head='ToMe_CHARS engine=krkr line='+rec.line+' hidden='+h+' sw='+int(rec.sw)+' sh='+int(rec.sh)+' vx=0 vy=0 vw=0 vh=0 n='+rec.cn+' rects='+rec.rs;rec.tt=t;
-    this.report(rec.head+(rec.role=='name'?' role=name':'')+' text='+t);
+    var prefix=rec.head+(rec.role=='name'?' role=name':'');rec.rubyField=this.rubyWire(rec.rb);
+    if((prefix+rec.rubyField+' text='+t).length>=28000) rec.rubyField='';
+    this.report(prefix+rec.rubyField+' text='+t);
     if(rec.role!='name') rec.sentLine=rec.line;
    } incontextof st;
    /* 2026-11-21 (owner's recording, ファタモルガーナの館 1.4.22 v3, 02:57Z: after every click the line just read came back for about
@@ -273,7 +277,8 @@ LR"MGLT((function(){
     rec.ch=function(ch){
      /* engine-draw: the Chinese drawn under the last sentence goes when the next sentence of the same page starts */
      try {var bk=this.st.embBk;if(bk!==void && bk.L===this.target) this.st.embRestore();} catch(e) {}
-     var L=this.target,lm=false,p0=0,oy=0;
+     var L=this.target,lm=false,p0=0,oy=0,nativeRuby='';
+     try {if(typeof L.currentRuby=='String') nativeRuby=''+L.currentRuby;} catch(e) {}
      try {
       var t=typeof L.lineLayerPos;
       if(typeof L.lineLayer=='Object' && L.lineLayer!==void && L.lineLayer!==null && (t=='Integer' || t=='Real')) {lm=true;p0=+L.lineLayerPos;oy=+L.lineLayerOriginY;}
@@ -281,7 +286,7 @@ LR"MGLT((function(){
      } catch(e) {}
      if(typeof this.oldCh!='Object') return (global.MessageLayer.processCh incontextof this)(...);
      var result=(this.oldCh incontextof L)(...);
-     try {this.st.track(this,ch,lm,p0,oy);} catch(e) {}
+     try {this.st.track(this,ch,lm,p0,oy,nativeRuby);} catch(e) {}
      return result;
     } incontextof rec;
     rec.clr=function(){
@@ -336,11 +341,18 @@ LR"MGLT((function(){
     try {if(this.trOp!==void && isvalid this.trT) {if(this.trT.opacity==0) this.trT.opacity=this.trOp;}} catch(e) {}
     this.trOp=void;this.trT=void;
    } incontextof st;
+   /* A TextRender buffer can hold both dialogue and clickable link text. Keep that buffer visible while
+      the engine owns links; opacity zero would erase choices together with the dialogue. */
+   st.trUi=function(L){try {return typeof L.numLinks!='undefined' && +L.numLinks>0;} catch(e) {return false;}} incontextof st;
    st.trHide=function(){
     try {
+     if(typeof this.trRolesOff=='Object') this.trRolesOff();
      var L=this.trLayer();
+     if(this.trRec!==void && (L===void || this.trOwner!==L || !this.shown(L))) {this.trClear(this.trOwner);return;}
      if(L===void || this.trOwner!==L || this.trRec===void) {this.trRestore();return;}
+     if(this.trUi(L)) {this.trClear(L);return;}
      var T=L.textLayer,on=this.hideOn() && !(typeof this.cfg=='Object' && this.cfg.embed);
+     if(this.trUi(L)) on=false;
      if(this.trT!==void && this.trT!==T) this.trRestore();
      if(on) {if(this.trOp===void || this.trT!==T) {this.trT=T;this.trOp=T.opacity;}
       /* a value other than 0 was set by the game since the last tick (its text window came back after a scene change): that is the game's own opacity now */
@@ -356,13 +368,23 @@ LR"MGLT((function(){
      if(n==1 || n==2 || n==4 || n==8 || n==16 || n==64 || n==256) this.report('ToMe_KRKR status trwhy '+k+'='+n+' sent='+(+this.charsSent));} catch(e) {}
    } incontextof st;
 )MGLT", LR"MGLT(
+   st.trClear=function(L){
+    try {L.__mgTrAll=void;} catch(e) {}
+    if(this.trOwner!==L) return;
+    var line=this.trRec!==void?this.trRec[1]:0,scr=this.screen();this.trRestore();
+    if(typeof this.embTrOff=='Object') this.embTrOff();this.embPend=void;
+    this.trRec=void;this.trText='';this.trKey='';this.trPts=void;this.trCol=void;this.trAll=void;this.trAllL=void;
+    if(line>0) this.report('ToMe_CHARS engine=krkr line='+line+' hidden=0 sw='+int(scr[0])+' sh='+int(scr[1])+' vx=0 vy=0 vw=0 vh=0 n=0 rects= text=');
+   } incontextof st;
    st.trDone=function(inst){
     try {
      /* 2026-11-19 why a TextRender line was not reported (live 千恋＊万花: no record at all, the reader stayed in its own box): counted per reason, on the status line */
      if(typeof this.trWhy!='Object' || this.trWhy===void) this.trWhy=%[];
      var L=this.trLayer();if(L===void) {this.trNote('layer');return;}if(!this.trOwn(inst,L)) {this.trNote('own');return;}
-     var scr=this.screen();if(!(scr[1]>0)) {this.trNote('scr');return;}if(L.height<scr[1]*0.2) {this.trNote('small');return;}if(!this.shown(L)) {this.trNote('hid');return;}
-     var cs=(inst.getCharacters incontextof inst)(0,100000);if(typeof cs!='Object' || cs===null || cs.count==0) {this.trNote('empty');return;}
+     var scr=this.screen();if(!(scr[1]>0)) {this.trNote('scr');return;}if(L.height<scr[1]*0.2) {this.trNote('small');return;}if(!this.shown(L)) {this.trClear(L);this.trNote('hid');return;}
+     var cs=(inst.getCharacters incontextof inst)(0,100000);if(typeof cs!='Object' || cs===null) {this.trClear(L);this.trNote('empty');return;}
+     if(cs.count==0) {this.trClear(L);this.trNote('empty');return;}
+     if(cs.count>4000) {this.trClear(L);this.trNote('limit');return;}
      var a=this.abs(L),ox=a[0]+(+L.marginL),oy=a[1]+(+L.marginT),pad=0;
      try {var pf=L.textLayer._preRenderFontEx;if(typeof pf=='Object' && pf!==void && typeof pf.resizePadding=='Integer') pad=pf.resizePadding;} catch(e) {}
      var rs='',n=0,t='',ly=void,all=[],pts=[];
@@ -370,11 +392,13 @@ LR"MGLT((function(){
       var c=cs[i],ch=''+c.text;if(ch=='' || ch==' ' || ch=='　' || ch=="\t" || ch=="\n") continue;
       var y=+c.y;if(ly!==void && y!=ly) t+="\n";ly=y;t+=ch;
       rs+=(n>0?';':'')+int(ox+(+c.x))+','+int(oy+y+pad)+','+int(+c.cw)+','+int(+c.size);n++;
-      if(all.count<400) all.add([ox+(+c.x),oy+y+pad,+c.cw,+c.size,ch]);
+      if(all.count<4000) all.add([ox+(+c.x),oy+y+pad,+c.cw,+c.size,ch]);
      }
      /* 2026-11-21 (owner incr9, 千恋＊万花): a line written back blank (the hide fell back to write-back) lays out only spaces: counted, so the status line says so */
-     if(n==0) {this.trNote('blank');return;}
-     if(this.trOwner!==L) {this.trRestore();this.trRec=void;this.trOwner=L;this.trText='';this.trKey='';}
+     if(n==0) {this.trClear(L);this.trNote('blank');return;}
+     /* A mixed link buffer stays native. Retire its dialogue proof and retain glyphs only for the choice producer. */
+     if(this.trUi(L)) {if(this.trOwner!==void) this.trClear(this.trOwner);this.trRestore();this.trAll=all;this.trAllL=L;L.__mgTrAll=all;return;}
+     if(this.trOwner!==L) {if(this.trOwner!==void) this.trClear(this.trOwner);this.trRestore();this.trRec=void;this.trOwner=L;this.trText='';this.trKey='';}
      var flat=t.replace(/\n/g,'');
      var from=0;
      if(!(this.trText!='' && (flat.indexOf(this.trText)==0 || this.trText.indexOf(flat)==0))) {this.trLine++;this.trCol=void;this.trTry=0;if(typeof this.embTrOff=='Object') this.embTrOff();}
@@ -382,15 +406,20 @@ LR"MGLT((function(){
      else if(flat.length>this.trText.length+1 && flat.indexOf(this.trText)==0) {from=this.trText.length;this.trCol=void;this.trTry=0;}
      for(var i=from;i<all.count && pts.count<6;i++) pts.add(all[i]);
      var T=L.textLayer,h=(this.hideOn() && T.opacity==0)?1:0,scr=this.screen();
-     var key=this.trLine+'|'+h+'|'+rs;if(key==this.trKey) return;this.trKey=key;this.trText=flat;this.charsSent++;
+     var key=this.trLine+'|'+h+'|'+rs+'|'+t;if(key==this.trKey) return;this.trKey=key;this.trText=flat;this.charsSent++;
      this.trPts=pts;this.trAbsL=a;this.trTailA=' sw='+int(scr[0])+' sh='+int(scr[1])+' vx=0 vy=0 vw=0 vh=0 n='+n+' rects='+rs;this.trTailB=' text='+t;
      var tail=this.trTailA+(this.trCol!==void?' color='+this.trCol:'')+this.trTailB;
+      var record='ToMe_CHARS engine=krkr line='+(100000+this.trLine)+' hidden='+h+tail;
+      /* The native report function drops records at 28000 UTF-16 units. Never hide a snapshot it cannot forward. */
+      if(record.length>=28000) {this.trClear(L);this.trNote('wire');return;}
      this.trRec=[h,100000+this.trLine,tail];
-     this.report('ToMe_CHARS engine=krkr line='+(100000+this.trLine)+' hidden='+h+tail);
+      this.report(record);
      this.trAll=all;this.trAllL=L;
+     /* Keep link characters with their actual message-layer owner, not whichever layer rendered last. */
+     L.__mgTrAll=all;
      try {if(typeof this.cfg=='Object' && this.cfg.embed) {this.embPend=this.embTrQueue(L,all,flat,from,t,h);this.embTry();}} catch(e) {this.charsErr='trEmb '+e.message;}
      this.trHide();
-    } catch(e) {this.charsErr='tr '+e.message;}
+    } catch(e) {try {if(L!==void && this.trOwner===L) this.trClear(L);} catch(ignored) {}this.charsErr='tr '+e.message;}
    } incontextof st;
 )MGLT", LR"MGLT(
    /* 2026-11-19 live 死に逝く君、館に芽吹く憎悪: a TextRender game paints read lines yellow and new ones white without touching
@@ -462,21 +491,58 @@ LR"MGLT((function(){
       sentence was drawn with; the sentence's record is then sent again with emb=1 (ruby) or emb=2 (ruby and Chinese). The
       Chinese is taken off again (the pixels under it put back) when the next sentence of the same page starts. */
    st.cfg=%['roles'=>0,'embed'=>0,'zh'=>1];st.embMap=%[];st.ctlRaw='';st.ctlTick=0;st.uiLine=0;st.btnKey='';st.embPend=void;st.embBk=void;st.embArgs=void;st.nameKey='';st.trLinkKey='';st.trAll=void;st.trAllL=void;
+   /* ruby-v1, shared with TextRender: [[rect codepoint start,length,reading],...]. No pixel/hide authority. */
+   st.rubyWire=function(spans){
+    if(typeof spans!='Object' || spans===void || spans===null || spans.count==0 || spans.count>64) return '';
+    var out='',end=0;
+    for(var i=0;i<spans.count;i++) {
+     var s=spans[i];if(typeof s!='Object' || s.count!=3) return '';
+     var start=+s[0],len=+s[1],rd=s[2];if(start!=int(start) || len!=int(len) || start<end || len<1 || len>80 || start+len>4000 || typeof rd!='String' || rd=='' || rd.length>320) return '';
+     var hex='',cp=0;
+     for(var j=0;j<rd.length;j++) {
+      var c=rd.charAt(j),u=#c;if(u<32 || (u>=127 && u<=159)) return '';
+      if(u>=0xd800 && u<=0xdbff) {if(j+1>=rd.length) return '';var next=rd.charAt(j+1),v=#next;if(v<0xdc00 || v>0xdfff) return '';}
+      else if(u>=0xdc00 && u<=0xdfff) {if(j==0) return '';var prev=rd.charAt(j-1),v=#prev;if(v<0xd800 || v>0xdbff) return '';}
+      if(!(u>=0xdc00 && u<=0xdfff)) cp++;if(cp>160) return '';
+      var h='';for(var k=0;k<4;k++) {h='0123456789abcdef'.charAt(u&15)+h;u=u>>4;}hex+=h;
+     }
+     out+=(i>0?'|':'')+int(start)+':'+int(len)+':'+hex;if(out.length>8192) return '';end=start+len;
+    }
+    return out!=''?' ruby='+out:'';
+   } incontextof st;
+)MGLT", LR"MGLT(
+   st.ctlOff=function(){this.cfg=%['roles'=>0,'embed'=>0,'zh'=>1];this.embMap=%[];this.embPend=void;try {this.embRestore();} catch(e) {}} incontextof st;
    st.ctl=function(){
-    var p=global.__megulitKrkrCtlPath;if(typeof p!='String' || p=='') return;
-    var a;try {a=[].load(p);} catch(e) {if(this.ctlRaw!='') {this.ctlRaw='';this.cfg=%['roles'=>0,'embed'=>0,'zh'=>1];this.embMap=%[];}return;}
+    var p=global.__megulitKrkrCtlPath;if(typeof p!='String' || p=='') {this.ctlOff();return;}
+    var a;try {a=[].load(p);} catch(e) {this.ctlRaw='';this.ctlOff();return;}
     var raw=a.join("\n");if(raw==this.ctlRaw) return;this.ctlRaw=raw;
-    var c=%['roles'=>0,'embed'=>0,'zh'=>1],m=%[];
-    for(var i=0;i<a.count && i<4000;i++) {
-     var t=''+a[i];if(t.length>0 && #t==0xfeff) t=t.substring(1);if(t=='') continue;
-     if(t.charAt(0)=='#') {if(t.indexOf('#cfg')==0) {c.roles=t.indexOf('roles=1')>=0?1:0;c.embed=t.indexOf('embed=1')>=0?1:0;c.zh=t.indexOf('zh=0')>=0?0:1;}
-      else if(t=='#clearline') c.clear=1;
-      else if(t.indexOf('#choiceframe ')==0) {try {if(typeof c.choiceFrames!='Object') c.choiceFrames=[];c.choiceFrames.add(new RegExp(t.substring(13)));} catch(e) {}}
-      continue;}
+    if(a.count<1 || a.count>4000 || raw.length>524288) {this.ctlOff();return;}
+    var t=''+a[0];if(t.length>0 && #t==0xfeff) t=t.substring(1);
+    if(t!='#cfg' && t.substring(0,5)!='#cfg ') {this.ctlOff();return;}
+    if(t.length>100) {this.ctlOff();return;}
+    var c=%['roles'=>0,'embed'=>0,'zh'=>1],m=%[],seen=0,tail=t.substring(4);
+    while(tail!='') {
+     if(tail.charAt(0)!=' ') {this.ctlOff();return;}tail=tail.substring(1);var cut=tail.indexOf(' '),one=cut<0?tail:tail.substring(0,cut);tail=cut<0?'':tail.substring(cut);
+     var bit=0;if(one=='roles=0' || one=='roles=1') {bit=1;c.roles=one=='roles=1'?1:0;}
+     else if(one=='embed=0' || one=='embed=1') {bit=2;c.embed=one=='embed=1'?1:0;}
+     else if(one=='zh=0' || one=='zh=1') {bit=4;c.zh=one=='zh=1'?1:0;}
+     else if(one=='advhdInput=0' || one=='advhdInput=1') bit=8;
+     else {this.ctlOff();return;}
+     if((seen&bit)!=0) {this.ctlOff();return;}seen=seen|bit;
+    }
+    for(var i=1;i<a.count;i++) {
+     t=''+a[i];if(t=='') continue;
+     if(t.indexOf('#cfg')==0) {this.ctlOff();return;}
+     if(t.charAt(0)=='#') {
+      if(t=='#clearline') c.clear=1;
+      else if(t.indexOf('#choiceframe ')==0) {try {if(typeof c.choiceFrames!='Object') c.choiceFrames=[];if(c.choiceFrames.count<20) c.choiceFrames.add(new RegExp(t.substring(13)));} catch(e) {}}
+      continue;
+     }
      var j=t.indexOf("\t");if(j<=0) continue;
      var k=t.substring(0,j),r=t.substring(j+1),z='',j2=r.indexOf("\t");if(j2>=0) {z=r.substring(j2+1);r=r.substring(0,j2);}
      m[k]=[r,z];
     }
+    if(!c.embed) {this.embPend=void;try {this.embRestore();} catch(e) {}}
     this.cfg=c;this.embMap=m;
    } incontextof st;
    /* ---- roles: [link] text ---- */
@@ -532,17 +598,17 @@ LR"MGLT((function(){
     if(!this.cfg.embed || rec.role=='name' || !(rec.cn>0) || rec.ra.count!=rec.cn) return void;
     var L=rec.target;if(L.vertical) return void;
     var x0=rec.ra[0][0];for(var i=1;i<rec.ra.count;i++) if(rec.ra[i][0]<x0) x0=rec.ra[i][0];
-    return %['rec'=>rec,'L'=>L,'k'=>rec.ct,'ra'=>rec.ra,'size'=>rec.size,'nvl'=>rec.nvl,'args'=>rec.args,'head'=>rec.head,'t'=>rec.tt,'x0'=>x0,'y1'=>rec.y1,'tries'=>0];
+    return %['rec'=>rec,'L'=>L,'k'=>rec.ct,'ra'=>rec.ra,'size'=>rec.size,'nvl'=>rec.nvl,'args'=>rec.args,'head'=>rec.head,'t'=>rec.tt,'nativeRuby'=>rec.rb,'rubyField'=>(rec.rubyField!==void?rec.rubyField:this.rubyWire(rec.rb)),'x0'=>x0,'y1'=>rec.y1,'tries'=>0];
    } incontextof st;
    /* the replacement may come late (MeguLit looks it up when the sentence's record arrives): tried at the click wait and every
       tick after it until the page moves on */
    st.embTry=function(){
-    var p=this.embPend;if(p===void || p===null) return;
+    var p=this.embPend;if(p===void || p===null) return;if(!this.cfg.embed) {this.embPend=void;return;}
     var r=p.rec;if(!isvalid p.L || (p.tr?(p.line!=this.trLine):(r.cleared || r.n>0)) || ++p.tries>40) {this.embPend=void;return;}
     var e=this.embMap[p.k];if(e===void || e===null) return;
     this.embPend=void;
     var lvl=this.embDraw(p,e);
-    if(lvl>0) this.report(p.head+' emb='+lvl+' text='+p.t);
+    if(lvl>0) {var head=p.head+' emb='+lvl,field=p.rubyField!==void?p.rubyField:'';if((head+field+' text='+p.t).length>=28000) field='';this.report(head+field+' text='+p.t);}
    } incontextof st;
    st.embSpans=function(s){
     var out=[],t=''+s;
@@ -581,6 +647,7 @@ LR"MGLT((function(){
      var sp=this.embSpans(e[0]);f.height=rs;
      for(var i=0;i<sp.count;i++) {
       var s=sp[i],s0=int(s[0]),n=int(s[1]);if(s0<0 || n<1 || s0+n>p.ra.count) continue;
+      var native=false;if(p.nativeRuby!==void) for(var ri=0;ri<p.nativeRuby.count;ri++) {var nr=p.nativeRuby[ri];if(s0<nr[0]+nr[1] && nr[0]<s0+n) native=true;}if(native) continue;
       var r0=p.ra[s0],m=1;while(m<n && p.ra[s0+m][1]==r0[1]) m++;
       var r1=p.ra[s0+m-1],bw=r1[0]+r1[2]-r0[0],tw=+f.getTextWidth(s[2]);
       (dt incontextof L)(int(r0[0]+(bw-tw)/2-a[0]),int(r0[1]-rs-1-a[1]),s[2],col,255,aa,sl,sc,sw,ox,oy);
@@ -644,7 +711,7 @@ LR"MGLT((function(){
      for(var i=0;i<names.count;i++) {
       var n=names[i];if(typeof L[n]!='Object') continue;
       var old=L[n],o=%['L'=>L,'old'=>old];
-      o.fn=function(args*){try {var a=args.count>0?args[0]:void;var s=(typeof a=='String')?a:((typeof a=='Object' && a!==void && a!==null && typeof a.text=='String')?a.text:'');if(s!='') this.L.__mgName=s;} catch(e) {}return (this.old incontextof this.L)(args*);} incontextof o;
+      o.fn=function(args*){try {var a=args.count>0?args[0]:void;var s=(typeof a=='String')?a:((typeof a=='Object' && a!==void && a!==null && typeof a.text=='String')?a.text:'');if(typeof a=='String' || (typeof a=='Object' && a!==void && a!==null && typeof a.text=='String')) this.L.__mgName=s;} catch(e) {}return (this.old incontextof this.L)(args*);} incontextof o;
       L[n]=o.fn;
      }
     } catch(e) {}
@@ -661,9 +728,19 @@ LR"MGLT((function(){
     var head='ToMe_CHARS engine=krkr line='+(++this.uiLine)+' hidden=0 sw='+int(scr[0])+' sh='+int(scr[1])+' vx=0 vy=0 vw=0 vh=0 n=0 rects= role=name';
     this.report(head+(out==''?' id=N: box=0,0,0,0 text=':' id=N:'+ix+' '+out));
    } incontextof st;
+   /* Retire only TextRender-owned UI groups on permission loss. KAG's L groups and buttons have their own producers. */
+   st.trRolesOff=function(){
+    if(typeof this.cfg!='Object' || this.cfg.roles) return;
+    var prev=this.trLinkGroups,named=typeof this.nameKey=='String' && this.nameKey!='';
+    if(!named && (typeof prev!='Object' || prev===void || prev.count==0)) return;
+    var scr=this.screen(),head='ToMe_CHARS engine=krkr line='+(++this.uiLine)+' hidden=0 sw='+int(scr[0])+' sh='+int(scr[1])+' vx=0 vy=0 vw=0 vh=0 n=0 rects=';
+    this.nameKey='';this.trLinkKey='';this.trLinkGroups=[];
+    if(named) this.report(head+' role=name id=N: box=0,0,0,0 text=');
+    if(typeof prev=='Object' && prev!==void) for(var i=0;i<prev.count;i++) this.report(head+' role=choice id=K'+prev[i]+': box=0,0,0,0 text=');
+   } incontextof st;
    /* KAG links on a TextRender layer: the hot spots (links[i].x / y / w / h, one entry a row) and the characters inside them */
    st.trLinkScan=function(){
-    var scr=this.screen(),ms=this.kag.fore.messages,items=[],key='';
+    var scr=this.screen(),ms=this.kag.fore.messages,items=[],groups=[],key='';
     for(var i=0;i<ms.count && i<8;i++) {
      var L=ms[i];if(!isvalid L || typeof L.textLayer!='Object' || !this.shown(L)) continue;
      var n=0;try {n=+L.numLinks;} catch(e) {n=0;}if(!(n>0) || typeof L.links!='Object') continue;
@@ -673,14 +750,22 @@ LR"MGLT((function(){
       var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
       for(var r=0;r<lk.x.count;r++) {var x=a[0]+(+lk.x[r]),y=a[1]+(+lk.y[r]),w=+lk.w[r],hh=+lk.h[r];if(x<x0) x0=x;if(y<y0) y0=y;if(x+w>x1) x1=x+w;if(y+hh>y1) y1=y+hh;}
       if(!(x1>x0)) continue;
-      var t='';if(this.trAllL===L && this.trAll!==void) for(var c=0;c<this.trAll.count;c++) {var q=this.trAll[c],cx=q[0]+q[2]/2,cy=q[1]+q[3]/2;if(cx>=x0 && cx<=x1 && cy>=y0 && cy<=y1) t+=q[4];}
+      var all=void;try {if(typeof L.__mgTrAll=='Object') all=L.__mgTrAll;} catch(e) {}
+      if(all===void && this.trAllL===L) all=this.trAll;
+      /* Test each engine hot-spot row separately. Its union box can contain unrelated text between rows. */
+      var t='',rs='',cn=0,ly=void;if(all!==void) for(var c=0;c<all.count;c++) {var q=all[c],cx=q[0]+q[2]/2,cy=q[1]+q[3]/2,inside=false;
+       for(var r=0;r<lk.x.count;r++) {var x=a[0]+(+lk.x[r]),y=a[1]+(+lk.y[r]);if(cx>=x && cx<x+(+lk.w[r]) && cy>=y && cy<y+(+lk.h[r])) {inside=true;break;}}
+       if(inside) {if(ly!==void && q[1]!=ly) t+="\n";ly=q[1];t+=q[4];rs+=(cn>0?';':'')+int(q[0])+','+int(q[1])+','+int(q[2])+','+int(q[3]);cn++;}}
       if(t=='') continue;
-      var rec=' role=choice id=K'+i+':'+j+' box='+int(x0)+','+int(y0)+','+int(x1-x0)+','+int(y1-y0)+(kl>=0?' sel='+(kl==j?1:0):'')+' text='+t;items.add(rec);key+=rec;
+      var seen=false;for(var g=0;g<groups.count;g++) if(groups[g]==i) seen=true;if(!seen) groups.add(i);
+      var rec='n='+cn+' rects='+rs+' role=choice id=K'+i+':'+j+' box='+int(x0)+','+int(y0)+','+int(x1-x0)+','+int(y1-y0)+(kl>=0?' sel='+(kl==j?1:0):'')+' text='+t;items.add(rec);key+=rec;
      }
     }
     if(key==this.trLinkKey) return;this.trLinkKey=key;
-    var head='ToMe_CHARS engine=krkr line='+(++this.uiLine)+' hidden=0 sw='+int(scr[0])+' sh='+int(scr[1])+' vx=0 vy=0 vw=0 vh=0 n=0 rects=';
-    if(items.count==0) {this.report(head+' role=choice id=K: box=0,0,0,0 text=');return;}
+    var prev=this.trLinkGroups;this.trLinkGroups=groups;
+    var head='ToMe_CHARS engine=krkr line='+(++this.uiLine)+' hidden=0 sw='+int(scr[0])+' sh='+int(scr[1])+' vx=0 vy=0 vw=0 vh=0 ';
+    if(typeof prev=='Object' && prev!==void) for(var p=0;p<prev.count;p++) {var seen=false;for(var g=0;g<groups.count;g++) if(groups[g]==prev[p]) seen=true;if(!seen) this.report(head+'n=0 rects= role=choice id=K'+prev[p]+': box=0,0,0,0 text=');}
+    if(items.count==0) return;
     for(var i=0;i<items.count;i++) this.report(head+items[i]);
    } incontextof st;
 )MGLT", LR"MGLT(
