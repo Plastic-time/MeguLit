@@ -41,7 +41,7 @@ const VERSION_MATCH=['exe','head','pe'],GAME_MATCH=['exe','head','pe','pack','sc
 const docOk=d=>gameDiff.validate(d).ok&&verify(d,keys());
 const part=d=>({source:d.source,mode:d.mode||'hide',settings:d.settings||{},rev:d.rev|0,issuedAt:d.issuedAt||'',agree:d.agree|0,reporters:d.reporters|0});
 const torchLayers=new WeakMap(),cachedRoots=new WeakMap();
-function forExe(value,key,exe){if(!value?.torchBound)return value;const binding=torchLayers.get(value);if(!binding||binding.key!==key)return null;const answer=binding.root?cached(binding.root,key):binding.answer;return answer?.torchRelease?layer(answer,key,{exe,torchTrust:binding.torchTrust}):null;}
+function forExe(value,key,exe){if(!value?.torchBound)return value;const binding=torchLayers.get(value);if(!binding||binding.key!==key||!binding.root)return null;const answer=cached(binding.root,key);return answer?.torchRelease?layer(answer,key,{exe,torchTrust:binding.torchTrust}):null;}
 function layer(answer,key,{torchTrust,exe}={}){if(!answer||answer.schema!=='megulit.game-diff-feed'||answer.key!==key)return null;
  if(answer.torchRelease&&!require('./torch-receive.cjs').compatibleCached(answer,key,torchTrust,{exe}))return null;
  let v=null,g=null,vm='',gm='';
