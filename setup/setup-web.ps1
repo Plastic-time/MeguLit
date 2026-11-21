@@ -24,10 +24,13 @@ function Web-Wanted {
 }
 function Web-Post($obj) { try { if ($script:win -and $script:win.Web.CoreWebView2) { $script:win.Web.CoreWebView2.PostWebMessageAsJson((ConvertTo-Json -Compress -Depth 6 $obj)) } } catch {} }
 function Web-Writable([string]$p) {
+  try { Assert-SetupPath $p 'installed' -Tree } catch { return $false }
+  if ($script:setupTestScope) { return (Writable $p) }
   try { $q = [IO.Path]::GetFullPath($p); while ($q -and -not (Test-Path $q)) { $q = Split-Path $q }; if (-not $q) { return $false }
     $t = Join-Path $q ('.w-' + $PID); [IO.File]::WriteAllText($t, 'ok'); Remove-Item $t -Force; $true } catch { $false }
 }
 function Web-Check([string]$p) {
+  try { Assert-SetupPath $p 'installed' -Tree } catch { return @{ state = 'readonly'; free = 0; need = 0 } }
   $ok = $true; try { [void][IO.Path]::GetFullPath($p); if (-not [IO.Path]::IsPathRooted($p)) { $ok = $false } } catch { $ok = $false }
   if (-not $ok) { return @{ state = 'readonly'; free = 0; need = (Need-Bytes $pathBox.Text) } }
   try { $need = Need-Bytes $p } catch { return @{ state = 'readonly'; free = 0; need = (Need-Bytes $pathBox.Text) } }   # e.g. a drive letter that does not exist
@@ -38,6 +41,14 @@ function Web-RecentFile { Join-Path $env:LOCALAPPDATA 'MeguLit\setup-recent.json
 function Web-Recent { try { $f = Web-RecentFile; if (Test-Path $f) { return @((Get-Content -Raw -Encoding UTF8 $f | ConvertFrom-Json) | Where-Object { $_ } | Select-Object -First 6 | ForEach-Object { [string]$_ }) } } catch {}; @() }
 function Web-AddRecent([string]$p) { try { $l = @($p) + @(Web-Recent | Where-Object { $_ -ine $p }); [IO.Directory]::CreateDirectory((Split-Path (Web-RecentFile))) | Out-Null; [IO.File]::WriteAllText((Web-RecentFile), (ConvertTo-Json -Compress @($l | Select-Object -First 6)), [Text.Encoding]::UTF8) } catch {} }
 function Web-List([string]$p) {
+  if ($script:setupTestScope) {
+    $base = $script:setupTestScope.installed
+    if (-not $p) { $p = $base }
+    Assert-SetupPath $p 'installed' -Tree
+    $cur = Get-SetupLocalPath $p; $parent = if ($cur -ieq $base) { '' } else { Split-Path $cur -Parent }
+    $dirs = @(); if ([IO.Directory]::Exists($cur)) { $dirs = @([IO.Directory]::EnumerateDirectories($cur) | ForEach-Object { Split-Path $_ -Leaf } | Sort-Object | Select-Object -First 400) }
+    return @{ path = $cur; parent = $parent; dirs = $dirs; drives = @(@{ path = $base; label = '隔离安装测试'; free = (Drive-Free $base); total = 0 }); places = @(); recent = @(Web-Recent | Where-Object { try { Assert-SetupPath $_ 'installed'; $true } catch { $false } }) }
+  }
   $t0 = [DateTime]::Now
   $drives = @(); foreach ($d in [IO.DriveInfo]::GetDrives()) { try { if (($d.DriveType -eq 'Fixed' -or $d.DriveType -eq 'Removable') -and $d.IsReady) { $drives += @{ path = $d.RootDirectory.FullName; label = [string]$d.VolumeLabel; free = [long]$d.AvailableFreeSpace; total = [long]$d.TotalSize } } } catch {} }
   $places = @(); foreach ($pl in @(@('桌面|Desktop', [Environment]::GetFolderPath('Desktop')), @('文档|Documents', [Environment]::GetFolderPath('MyDocuments')), @('下载|Downloads', (Join-Path $env:USERPROFILE 'Downloads')), @('用户文件夹|Home', $env:USERPROFILE))) { if ($pl[1] -and (Test-Path $pl[1])) { $places += @{ name = $pl[0]; path = [string]$pl[1] } } }
@@ -51,6 +62,7 @@ function Web-List([string]$p) {
   @{ path = $cur; parent = [string]$parent; dirs = $dirs; drives = $drives; places = $places; recent = @(Web-Recent) }
 }
 function Web-Info {
+  if ($script:setupTestScope) { return @{ defaultTarget = $pathBox.Text; drives = @(@{ path = $script:setupTestScope.installed; free = (Drive-Free $script:setupTestScope.installed) }); need = (Need-Bytes $pathBox.Text) } }
   $dr = @(); foreach ($d in [IO.DriveInfo]::GetDrives()) { if ($d.DriveType -eq 'Fixed' -and $d.IsReady -and $d.AvailableFreeSpace -gt (Need-Bytes $pathBox.Text)) { $dr += @{ path = (Join-Path $d.RootDirectory.FullName 'MeguLit'); free = $d.AvailableFreeSpace } } }
   @{ defaultTarget = $pathBox.Text; drives = @($dr | Select-Object -First 3); need = (Need-Bytes $pathBox.Text) }
 }
@@ -106,13 +118,14 @@ function Web-Act($m) {
       'minimize' { $script:win.WindowState = 'Minimized'; Web-Log ('minimized: state=' + $script:win.WindowState) }
       'close' { Web-Close }
       'listdir' { if ($shim) { Web-Post @{ t = 'reply'; id = $m.id; r = (Web-List ([string]$m.path)) } } }
-      'mkdir' { if ($shim) { $ok = $false; $err = ''; try { $n = ([string]$m.name).Trim(); if ($n -and $n -notmatch '[\\/:*?"<>|]' -and $n -ne '.' -and $n -ne '..') { [IO.Directory]::CreateDirectory((Join-Path ([string]$m.path) $n)) | Out-Null; $ok = $true } else { $err = 'bad name' } } catch { $err = [string]$_.Exception.Message }
+      'mkdir' { if ($shim) { $ok = $false; $err = ''; try { $n = ([string]$m.name).Trim(); if ($n -and $n -notmatch '[\\/:*?"<>|]' -and $n -ne '.' -and $n -ne '..') { $newDir = Join-Path ([string]$m.path) $n; Assert-SetupPath $newDir 'installed'; [IO.Directory]::CreateDirectory($newDir) | Out-Null; $ok = $true } else { $err = 'bad name' } } catch { $err = [string]$_.Exception.Message }
           Web-Log ('picker: mkdir ' + $m.path + ' \ ' + $m.name + ' ok=' + $ok + ' ' + $err); Web-Post @{ t = 'reply'; id = $m.id; r = @{ ok = $ok; err = $err } } } }
-      'pickfolder' { if ($shim) { $r = ''; try { $r = [FolderPick]::Pick($script:win.Handle, [string]$m.path, '选择 MeguLit 的安装位置') } catch { Web-Log ('picker: IFileOpenDialog failed ' + $_) }
+      'pickfolder' { if ($shim) { $r = ''; try { if ($script:setupTestScope) { $r = $script:setupTestScope.installed } else { $r = [FolderPick]::Pick($script:win.Handle, [string]$m.path, '选择 MeguLit 的安装位置') } } catch { Web-Log ('picker: IFileOpenDialog failed ' + $_) }
           Web-Log ('picker: modern dialog -> ' + $r); Web-Post @{ t = 'reply'; id = $m.id; r = @{ path = [string]$r } } } }
       'checkpath' { if ($shim) { Web-Post @{ t = 'reply'; id = $m.id; r = (Web-Check ([string]$m.path)) } } }
       'browse' {
         if ($shim) {
+          if ($script:setupTestScope) { Web-Post @{ t = 'reply'; id = $m.id; r = @{ path = $script:setupTestScope.installed } }; return }
           $d = New-Object Windows.Forms.FolderBrowserDialog; $d.Description = '选择 MeguLit 的安装位置（会在里面建 MeguLit 文件夹）'; $d.ShowNewFolderButton = $true
           if ($d.ShowDialog($script:win) -eq 'OK') { $p = $d.SelectedPath; if ((Split-Path $p -Leaf) -ne 'MeguLit' -and -not (Test-Path (Join-Path $p 'MeguLit.exe'))) { $p = Join-Path $p 'MeguLit' }; $pathBox.Text = $p }
           Web-Post @{ t = 'reply'; id = $m.id; r = @{ path = $pathBox.Text } }
@@ -297,7 +310,7 @@ public class SetupWin : Form {
     $form.ShowInTaskbar = $false; $form.StartPosition = 'Manual'; $form.Location = New-Object Drawing.Point(-32000, -32000); $form.Opacity = 0
     $form.add_Shown({ try { [SetupWin]::ToolWindow($form.Handle, $true) } catch {}; Web-Log ('window: control surface (classic form) shown, invisible: opacity=' + $form.Opacity + ' pos=' + $form.Location + ' taskbar=' + $form.ShowInTaskbar) })
     $form.add_FormClosing({ Web-Log ('classic window closing: ' + $_.CloseReason + ', hold=' + $script:webHold + ', done=' + $script:done + ' ' + ((Get-PSCallStack | ForEach-Object { $_.FunctionName + ':' + $_.ScriptLineNumber }) -join ' < ')); if ($script:webHold) { $_.Cancel = $true } })
-    $form.add_FormClosed({ try { if ($script:webData -and $script:webData -like '*setup-webview2\*') { Start-Process -WindowStyle Hidden -FilePath "$env:SystemRoot\System32\cmd.exe" -ArgumentList ('/c ping -n 8 127.0.0.1 >nul & rmdir /s /q "' + $script:webData + '"') } } catch {}; try { if ($script:win) { $script:win.AllowClose = $true; $script:win.Close() } } catch {} })
+    $form.add_FormClosed({ try { if (-not $script:setupTestScope -and $script:webData -and $script:webData -like '*setup-webview2\*') { Start-Process -WindowStyle Hidden -FilePath "$env:SystemRoot\System32\cmd.exe" -ArgumentList ('/c ping -n 8 127.0.0.1 >nul & rmdir /s /q "' + $script:webData + '"') } } catch {}; try { if ($script:win) { $script:win.AllowClose = $true; $script:win.Close() } } catch {} })
     $script:webTimer = New-Object Windows.Forms.Timer; $script:webTimer.Interval = 150
     $script:webTimer.add_Tick({
       if (-not $script:webActive) { return }

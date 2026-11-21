@@ -13,6 +13,14 @@
 # Packs, URLs, SHA-256 and sizes come from setup\runtime.json. Exit 0 = runtime ready.
 param([Parameter(Mandatory=$true)][string]$Root)
 $ErrorActionPreference = 'Stop'
+# Scoped tests validate every configured path before logs, splash or WebView2 can write anything.
+$script:setupTestScope = $null
+function Assert-SetupPath([string]$Path, [string]$Area = 'root', [switch]$Tree) {}
+function Assert-SetupArchive([string]$Part, [string]$Unpack) {}
+if ($env:MEGULIT_SETUP_TEST_ROOT) {
+  . (Join-Path $PSScriptRoot 'setup-test-scope.ps1')
+  Initialize-SetupTestScope $Root
+}
 # Boot timing (setup-ui.log, one line per step): where the time between the double click and the first window goes.
 $script:bootLog = $(if ($env:MEGULIT_SETUP_UILOG) { $env:MEGULIT_SETUP_UILOG } else { Join-Path $env:LOCALAPPDATA 'MeguLit\setup-ui.log' })
 $script:procStart = try { [Diagnostics.Process]::GetCurrentProcess().StartTime } catch { [DateTime]::Now }
@@ -152,6 +160,7 @@ $sourceRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\')
 $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
 $fromArchive = ($sourceRoot + '\').StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -or $sourceRoot -match '\\(Rar\$|7z[A-Z0-9]|wz[A-Z0-9])'
 function Default-Target {
+  if ($script:setupTestScope) { return $env:MEGULIT_SETUP_TARGET }
   if (-not $fromArchive) { return $sourceRoot }
   # Opened from inside an archive: suggest the roomiest non-system fixed drive, else the per-user Programs folder.
   $sys = $env:SystemDrive.TrimEnd('\').ToUpper()
@@ -179,9 +188,12 @@ function Missing($dir) { @($full | Where-Object { $id = $_; @($markers[$id] | Wh
 $stageName = '.megulit-download'
 $pointer = Join-Path $env:LOCALAPPDATA 'MeguLit\setup-staging.txt'
 function Writable($dir) {
+  Assert-SetupPath $dir
+  if ($script:setupTestScope) { Assert-SetupPath (Join-Path $dir ('.w-' + $PID)) }
   try { New-Item -ItemType Directory -Force $dir -ErrorAction Stop | Out-Null; $p = Join-Path $dir ('.w-' + $PID); [IO.File]::WriteAllText($p, 'ok'); Remove-Item $p -Force; $true } catch { $false }
 }
 function Pick-Staging($bytes) {
+  if ($script:setupTestScope) { Assert-SetupPath $env:MEGULIT_SETUP_STAGING 'staging' -Tree; if (-not (Writable $env:MEGULIT_SETUP_STAGING)) { throw 'SETUP_TEST_STAGING_NOT_WRITABLE' }; return $env:MEGULIT_SETUP_STAGING }
   if ($env:MEGULIT_SETUP_STAGING) { $d = $env:MEGULIT_SETUP_STAGING; [void](Writable $d); return $d }
   try { $old = (Get-Content -Raw -Encoding UTF8 $pointer -ErrorAction Stop).Trim(); if ($old -and (Test-Path $old) -and (Writable $old)) { return $old } } catch {}
   $pick = $null
@@ -284,7 +296,9 @@ function Need-Bytes($path) {
   $n = (Sum $ids 'unpacked')
   try { if ([IO.Path]::GetFullPath($path).TrimEnd('\') -ine $sourceRoot) { $n += $appSize } } catch {}
   if ((Drive-Of $path) -eq (Drive-Of $stageDir)) { $n += [math]::Max(0, (Sum $want 'size') - (Stage-Bytes)) }
-  [long]($n * 1.1)
+  $required = [long]($n * 1.1)
+  if ($script:setupTestScope) { $required += 10GB }
+  $required
 }
 function Update-Free {
   $f = Drive-Free $pathBox.Text; $need = Need-Bytes $pathBox.Text
@@ -292,6 +306,7 @@ function Update-Free {
 }
 $pathBox.add_TextChanged({ Update-Free })
 $browse.add_Click({
+  if ($script:setupTestScope) { $pathBox.Text = $script:setupTestScope.installed; return }
   $d = New-Object Windows.Forms.FolderBrowserDialog; $d.Description = '选择 MeguLit 的安装位置（会在里面建 MeguLit 文件夹）'; $d.ShowNewFolderButton = $true
   if ($d.ShowDialog($form) -eq 'OK') {
     $picked = $d.SelectedPath
@@ -957,7 +972,7 @@ function Ensure-Engine {
 $script:dl = New-Object Collections.ArrayList; foreach ($id in $want) { [void]$script:dl.Add($id) }
 $script:dlPos = 0; $script:fetchId = ''; $script:ready = New-Object Collections.ArrayList; $script:fetched = 0L
 $script:confirmed = $false; $script:busy = $false; $script:copying = $false; $script:failKind = ''; $script:installLine = ''
-function Part($id) { Join-Path $stageDir ("runtime-$id.setup.part") }
+function Part($id) { $p = Join-Path $stageDir ("runtime-$id.setup.part"); Assert-SetupPath $stageDir 'staging' -Tree; Assert-SetupPath $p 'staging'; $p }
 function Ok-Part($id) {
   $p = Part $id
   try { (Test-Path ($p + '.ok')) -and (Test-Path $p) -and (Get-Item $p).Length -eq [long]$packs.$id.size -and (Get-Content -Raw ($p + '.ok')).Trim() -eq ([string]$packs.$id.sha256).ToUpperInvariant() } catch { $false }
@@ -1036,6 +1051,7 @@ $poll.add_Tick({
 })
 # Probe results and every dropped connection go to logs\setup-download.log, so a "slow download" report can be read.
 function Save-FetchLog($f, $id) {
+  Assert-SetupPath $Root 'payload'
   try { $d = Join-Path $Root 'logs'; New-Item -ItemType Directory -Force $d | Out-Null; Add-Content -Encoding UTF8 (Join-Path $d 'setup-download.log') ("== " + (Get-Date -Format s) + " " + $id + " " + $f.Phase + "`r`n" + $f.LogText()) } catch {}
 }
 
@@ -1044,19 +1060,23 @@ function Save-FetchLog($f, $id) {
 $script:moved = $false
 function Use-Target {
   $raw = $pathBox.Text.Trim().Trim('"')
+  try { Assert-SetupPath $raw 'installed' -Tree } catch { Say ('隔离测试只能安装到测试目录：' + $_.Exception.Message); return $false }
   try { $target = [IO.Path]::GetFullPath($raw).TrimEnd('\') } catch { $target = $null }
   if (-not $raw -or -not $target -or -not [IO.Path]::IsPathRooted($raw)) { Say '请填写完整的安装位置，例如 D:\MeguLit'; return $false }
   if ($target -ieq $sourceRoot) { return $true }
   if ($target.StartsWith($sourceRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { Say '安装位置不能放在当前 MeguLit 文件夹里面，换一个位置吧'; return $false }
   # The staging folder may already live in the suggested folder; it does not make that folder "taken".
   if ((Test-Path $target) -and -not (Test-Path (Join-Path $target 'MeguLit.exe')) -and @(Get-ChildItem -Force $target -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne $stageName }).Count -gt 0) { $target = Join-Path $target 'MeguLit' }
+  try { Assert-SetupPath $sourceRoot 'source' -Tree; Assert-SetupPath $target 'installed' -Tree } catch { Say ('隔离测试路径不安全：' + $_.Exception.Message); return $false }
   if (-not (Writable $target)) { Say ('这个位置不能写入：' + $target + "`n换一个位置吧，例如 D:\MeguLit（Program Files 需要管理员权限）"); return $false }
   $script:copying = $true; Show-State; Note 'copy-start' @{ target = $target }
   $copyArgs = @("`"$sourceRoot`"", "`"$target`"", '/E', '/R:2', '/W:1', '/NP', '/NFL', '/NDL', '/NJH', '/NJS', '/XD', "`"$sourceRoot\logs`"", "`"$sourceRoot\cache`"", "`"$stageDir`"", $stageName, 'runtime-*.unpack', '/XF', 'runtime-*.part*')
+  if ($script:setupTestScope) { $copyArgs += '/XJ' }
   $copy = Start-Process -FilePath "$env:SystemRoot\System32\robocopy.exe" -ArgumentList $copyArgs -WindowStyle Hidden -PassThru
   $null = $copy.Handle
   while (-not $copy.HasExited) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
   $copy.WaitForExit(); $script:copying = $false; Show-State
+  Assert-SetupPath $target 'installed' -Tree
   if ($copy.ExitCode -ge 8 -or -not (Test-Path (Join-Path $target 'MeguLit.exe'))) {
     Say ('复制到 ' + $target + ' 没成功（robocopy ' + $copy.ExitCode + '），检查磁盘空间后再试一次'); return $false
   }
@@ -1064,6 +1084,7 @@ function Use-Target {
   return $true
 }
 function Make-Shortcuts {
+  if ($testLog) { return }
   $exePath = Join-Path $Root 'MeguLit.exe'
   if (-not (Test-Path $exePath)) { return }
   $places = @(); if ($deskCheck.Checked) { $places += [Environment]::GetFolderPath('Desktop') }; if ($menuCheck.Checked) { $places += [Environment]::GetFolderPath('Programs') }
@@ -1087,6 +1108,7 @@ function Make-Shortcuts {
 }
 # Apps & features entry (HKCU, no admin). setup\uninstall.ps1 removes it again; MeguLit refreshes it after a move or update.
 function Register-Uninstall {
+  if ($testLog) { return }
   $un = Join-Path $Root 'setup\uninstall.ps1'; $exePath = Join-Path $Root 'MeguLit.exe'
   if (-not (Test-Path $un) -or -not (Test-Path $exePath)) { return }
   try {
@@ -1103,6 +1125,7 @@ function Register-Uninstall {
 function Lock-Choice([bool]$locked) { foreach ($ctl in $pathBox, $browse, $deskCheck, $menuCheck, $confirm) { $ctl.Enabled = -not $locked } }
 function Confirm-Install {
   if ($script:confirmed) { return }
+  try { Assert-SetupPath $pathBox.Text.Trim().Trim('"') 'installed' -Tree } catch { Say ('隔离测试只能安装到测试目录：' + $_.Exception.Message); return }
   $f = Drive-Free $pathBox.Text; $need = Need-Bytes $pathBox.Text
   if ($f -lt $need) { Say ('「' + $pathBox.Text + '」所在的磁盘空间不够：需要约 ' + (MB $need) + '，只剩 ' + (MB $f) + "`n换一个空间大一点的盘吧"); return }
   Lock-Choice $true
@@ -1135,6 +1158,7 @@ function With-Retry([scriptblock]$op) {
 # Processes started from this install's own runtime folder (node / aivis from an earlier MeguLit run)
 # lock the files we are about to replace. Only processes inside $runtimeDir are touched.
 function Stop-RuntimeProcesses {
+  Assert-SetupPath $runtimeDir 'installed' -Tree
   $prefix = [IO.Path]::GetFullPath($runtimeDir).TrimEnd('\') + '\'
   Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { try { $_.Kill(); $_.WaitForExit(3000) | Out-Null } catch {} }
 }
@@ -1154,10 +1178,12 @@ function Pump {
     else { Fail 'install' ('安装后仍缺少：' + ((Missing $Root | ForEach-Object { $names[$_] }) -join '、')) }
   } else { Show-State }
 }
-function Remove-Staged($part) { foreach ($p in $part, ($part + '.json'), ($part + '.ok')) { if (Test-Path $p) { try { Remove-Item $p -Force -ErrorAction Stop } catch {} } } }
+function Remove-Staged($part) { foreach ($p in $part, ($part + '.json'), ($part + '.ok')) { Assert-SetupPath $p 'staging'; if (Test-Path $p) { try { Remove-Item $p -Force -ErrorAction Stop } catch {} } } }
 function Install-Pack([string]$id, [string]$part) {
   try {
     $script:attempt++; $unpack = Join-Path $Root ('runtime-' + $id + '-' + $script:attempt + '.unpack')
+    Assert-SetupPath $Root 'installed' -Tree; Assert-SetupPath $runtimeDir 'installed' -Tree
+    Assert-SetupArchive $part $unpack
     $script:installLine = "`n" + ('正在解压{0}到 {1}… / Unpacking' -f $names[$id], $runtimeDir); Show-State
     if (-not $script:fetch) { $status.Text = $script:installLine.Trim(); Set-Busy }
     UI-Progress @{ phase = 'unpack'; count = $script:dl.Count; name = $names[$id]; dir = $runtimeDir; total = (Total-Bytes); totalGot = (Total-Bytes) }
@@ -1169,11 +1195,13 @@ function Install-Pack([string]$id, [string]$part) {
     $null = $tar.Handle  # keep the handle so ExitCode is readable after exit
     while (-not $tar.HasExited) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
     $tar.WaitForExit()
+    Assert-SetupPath $unpack 'installed' -Tree
     if ($tar.ExitCode -ne 0 -or -not (Test-Path (Join-Path $unpack 'runtime'))) { throw '解压失败' }
     New-Item -ItemType Directory -Force $runtimeDir | Out-Null
     Stop-RuntimeProcesses
     Get-ChildItem (Join-Path $unpack 'runtime') | ForEach-Object {
       $src = $_.FullName; $dest = Join-Path $runtimeDir $_.Name
+      Assert-SetupPath $src 'installed' -Tree; Assert-SetupPath $dest 'installed' -Tree
       if (Test-Path $dest) { With-Retry { Remove-Item $dest -Recurse -Force -ErrorAction Stop } }
       With-Retry { Move-Item $src $dest -ErrorAction Stop }
     }
@@ -1222,6 +1250,7 @@ if ($env:MEGULIT_SETUP_PREVIEW) {
 if ($script:webActive) { [Windows.Forms.Application]::Run($form) } else { [void]$form.ShowDialog() }
 if ($script:fetch) { $script:fetch.Cancel(); [void]$script:fetch.Wait(3000) }
 # Staged packs stay for resuming until the install is through; only per-attempt leftovers are swept.
+Assert-SetupPath $Root 'payload' -Tree; Assert-SetupPath $stageDir 'staging' -Tree
 Get-ChildItem $Root -Filter 'runtime-*.part' -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^runtime-[a-z]+-\d+\.part$' } | Remove-Item -Force -ErrorAction SilentlyContinue
 Get-ChildItem $Root -Directory -Filter 'runtime-*.unpack' -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 if ($script:done -and (Test-Path (Join-Path $Root 'runtime\node.exe'))) {
