@@ -51,7 +51,13 @@ test('a saved sitting keeps its year after New Year, editing and account sync',a
   const edited=G.set(root,{...chosen.goal,jlpt:{...chosen.goal.jlpt,level:'N1'}},january);
   assert.equal(edited.goal.jlpt.year,year);
   assert.equal(G.get(root,january).goal.eju.year,year);
+  assert.equal(G.applySynced(other,edited.goal),true);
+  assert.equal(G.get(other,january).goal.jlpt.year,year);
+  assert.equal(G.set(other,{goals:['jlpt'],jlpt:{year,month:7}},january).goal.jlpt.year,year+1);
   assert.equal(G.set(other,{goals:['jlpt'],jlpt:{year:1999}},january).goal.jlpt.year,year+1);
+  const recent={goals:['jlpt'],jlpt:{year:1999,month:12},savedAt:january+1};
+  assert.equal(G.applySynced(other,recent),true);
+  assert.equal(G.get(other,january+1).goal.jlpt.year,year+1);
 });
 test('plan: goals decide which grammar categories come first and where review weighs',()=>{
   const jl=G.plan(G.normalize({goals:['jlpt'],jlpt:{level:'N2',full:true}},NOW));
