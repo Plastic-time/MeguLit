@@ -24,13 +24,28 @@ function profile(dir){try{const xml=fs.readFileSync(path.join(dir,'LEConfig.xml'
   if(guid&&/<Location>\s*ja-JP\s*<\/Location>/i.test(body)&&!/<RunAsAdmin>\s*true\s*</i.test(body)&&!/<RunWithSuspend>\s*true\s*</i.test(body)&&!/<Parameter>\s*[^<\s]/i.test(body))return guid;}
  }catch{}return '';}
 function complete(dir){return REQUIRED.every(n=>{try{return fs.statSync(path.join(dir,n)).isFile();}catch{return false;}});}
-function x86(exe){try{const fd=fs.openSync(exe,'r');try{const head=Buffer.alloc(64);fs.readSync(fd,head,0,64,0);if(head.readUInt16LE(0)!==0x5a4d)return false;const pe=Buffer.alloc(6);fs.readSync(fd,pe,0,6,head.readUInt32LE(60));return pe.readUInt32LE(0)===0x4550&&pe.readUInt16LE(4)===0x14c;}finally{fs.closeSync(fd);}}catch{return false;}}
+function peInfo(file){try{const fd=fs.openSync(file,'r');try{
+ const head=Buffer.alloc(64);if(fs.readSync(fd,head,0,64,0)!==64||head.readUInt16LE(0)!==0x5a4d)return {};
+ const pe=Buffer.alloc(24);if(fs.readSync(fd,pe,0,24,head.readUInt32LE(60))!==24||pe.readUInt32LE(0)!==0x4550)return {};
+ return {machine:pe.readUInt16LE(4),dll:(pe.readUInt16LE(22)&0x2000)!==0};
+}finally{fs.closeSync(fd);}}catch{return {};}}
+function x86(exe){return peInfo(exe).machine===0x14c;}
 // Siglus is Unicode internally and needs no Japanese locale; under the emulator it could not see fonts installed
 // for the current user only (CLANNAD HD: "未发现字体 Noto Sans Mono CJK SC", E215.2), so it is not recommended there.
 /* #376 (CLANNAD HD, 2026-11-17): a program with Steam's steam_api beside it is started by Steam or with its app id; under the
    Japanese-environment helper its Steam start fails (「Steam の初期化に失敗しました」, no window). Such a folder is never
    started through the helper, whatever the record says (Steam builds are Unicode). */
-function steamApi(exe){try{const dir=path.dirname(String(exe||''));return fs.readdirSync(dir).some(n=>/^steam_api(64)?\.dll$/i.test(n));}catch{return false;}}
+function steamApi(exe){try{
+ const dir=path.dirname(String(exe||''));
+ if(fs.readdirSync(dir).some(n=>/^steam_api(64)?\.dll$/i.test(n)))return true;
+ /* Unity keeps Steam's native plugin under its matching player data folder, rather than beside the executable.
+    A restored Japanese launch must keep the same no-emulator rule for these builds (星空列车: Plugins/x86). */
+ const data=path.join(dir,path.basename(exe,path.extname(exe))+'_Data');
+ if(!fs.statSync(path.join(data,'globalgamemanagers'),{throwIfNoEntry:false})?.isFile())return false;
+ const {machine}=peInfo(exe);if(machine!==0x14c&&machine!==0x8664)return false;
+ const is32=machine===0x14c,plugin=peInfo(path.join(data,'Plugins',is32?'x86':'x86_64',is32?'steam_api.dll':'steam_api64.dll'));
+ return plugin.machine===machine&&plugin.dll===true;
+}catch{return false;}}
 function recommended(game,exe){return game.source!=='steam'&&!steamApi(exe)&&!require('./locale-policy.cjs').chineseSystem4Patch(exe)&&/YU-RIS|BGI|KiriKiri|RealLive|CatSystem|AdvHD|WillPlus|Majiro|QLIE|SoftPal|NeXAS|System4|ShiinaRio|Entis|Cotopha|NScripter|LiveMaker/i.test(game.engine||'')&&x86(exe);}
 class LocaleEmulator{
  constructor(root,fetcher=(...a)=>fetch(...a)){this.fetch=fetcher;this.root=root;this.dir=path.join(root,'runtime','locale-emulator');this.job=null;this.cached=null;}
