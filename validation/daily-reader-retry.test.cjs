@@ -19,13 +19,14 @@ test('switching back to translation retries an incomplete article without reopen
   const mode=m=>document.querySelector('[data-rd-mode="'+m+'"]').click();
   const wait=async predicate=>{for(let i=0;i<200;i++){if(predicate())return;await new Promise(r=>setTimeout(r,10));}throw Error('reader state timed out');};
   mode('tr');
-  await wait(()=>!document.querySelector('.rd-text').classList.contains('rd-swap'));
   loaded({state:'ok',via:'direct',paragraphs:[{text:'一。'},{text:'二。'}]});
   await wait(()=>notices.length);
+  await wait(()=>!document.querySelector('.rd-text').classList.contains('rd-swap'));
+  const initialCalls=calls;
   mode('ja');await wait(()=>document.querySelector('.rd-text').dataset.mode==='ja');
   mode('tr');await wait(()=>document.querySelector('.rd-tr')?.textContent==='First');
   const lines=[...document.querySelectorAll('.rd-tr')].map(p=>p.textContent);
-  close();return {lines,calls,notices:notices.length};
+  close();return {lines,calls,initialCalls,notices:notices.length};
  })()`);
- assert.deepEqual(result,{lines:['First','Second'],calls:2,notices:1});
+ assert.deepEqual(result,{lines:['First','Second'],calls:2,initialCalls:1,notices:1});
 });

@@ -120,7 +120,7 @@ export function openReader(item,{api,locale,esc,toast,lookup,openSettings}){
   trBusy=false;if(root.isConnected)paint();
  };
  text.addEventListener('click',e=>{if(e.target.closest('[data-rd-mt-x]')){mtHidden=true;e.target.closest('.rd-mt').remove();}else if(e.target.closest('[data-rd-mt-go]')){close();openSettings?.('translation');}});
- root.querySelectorAll('[data-rd-mode]').forEach(b=>b.onclick=()=>{if(b.dataset.rdMode===mode)return;setMode(b.dataset.rdMode);text.classList.add('rd-swap');setTimeout(()=>{paint();text.classList.remove('rd-swap');needTr();},140);});
+ root.querySelectorAll('[data-rd-mode]').forEach(b=>b.onclick=()=>{if(b.dataset.rdMode===mode)return;setMode(b.dataset.rdMode);needTr();text.classList.add('rd-swap');setTimeout(()=>{paint();text.classList.remove('rd-swap');},140);});
  const show=async(query,rect,sentence)=>{
   query=query.trim().slice(0,40);if(!query)return;const ticket=++popTicket,box=sheet.getBoundingClientRect();
   pop.hidden=false;pop.style.left=Math.max(12,Math.min(rect.left-box.left,box.width-344))+'px';pop.style.top=(rect.bottom-box.top+sheet.scrollTop+10)+'px';
