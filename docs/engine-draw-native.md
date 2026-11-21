@@ -137,7 +137,7 @@ BGI、Siglus 等只要画字最终经过 TextOut / ExtTextOut / DrawText / GetGl
 - 点：AVG3216D.EXE 0x413880，例程 0x413730（把一串字画进文字 DIB，一字一次 `TextOutA(hdc, x - 滚动, y, 字, 1|2)`，有 EBP 帧，5 个调用者）。x / y 就是画布笔位
 - 另一个 TextOutA（0x41f888）在设置对话框里，不签
 - 店主测试清单：
-  1. 在 The Seed 里给这部游戏的差分设 `"draw":{"roles":true}`，hook-native 会写出控制文件（c7601aa8 起 pid 取对了）。手写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，内容 `#cfg roles=1`）只是兜底
+  1. 写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，内容 `#cfg roles=1`），或在 The Seed 里给这部游戏的差分设 `"draw":{"roles":true}`
   2. 开游戏推 5 句、出一次选项
   3. `logs\hook-diagnostics.log` 里先有 `ToMe_DRAWRUN engine=avg32 found: 1 site(s) of TextOutA` 和 `on: site 0`，之后每句有 `ToMe_DRAWRUN engine=avg32 site=0 ... text=` 带这句的文字；名字和选项各自 via 不同
   4. 游戏照常显示、不卡、不崩 = 过。只有 `off: N sites match` = 这个版本签名没对上，把那行和 exe 发来
@@ -146,6 +146,7 @@ BGI、Siglus 等只要画字最终经过 TextOut / ExtTextOut / DrawText / GetGl
 - 点：dll\PAL.dll 0x10008295（`call [IAT]`）和 0x1000897c（另一个字形例程，先 `mov esi, [IAT]` 再 `call esi`），都是 `GetGlyphOutlineA(hdc, 字, GGO_GRAY8, &gm, 0, NULL, &mat)` 量尺寸那次，两条签名 `softpal` / `softpal-2`。都有 EBP 帧（第一次提交时漏了第二个，以为字体类型 4 不走 GDI）
 - 没有笔位：位置已经由 Pal.cpp 的 pal_sprite_v1 文字精灵给出，这里补的是「哪段字从哪个例程画出来」（via）
 - 店主测试清单：同 AVG32，行里是 `engine=softpal`，`x0=-1`
+- 第二部（時計仕掛けのレイライン -残影の夜が明ける時-）的 PAL.dll 两条签名也各正好命中一次，已进夹具；第三部（陽炎に彷徨う魔女）是 KiriKiri，不归这里
 
 ### NScripter（月姬 v1.4 / v1.6，两版是同一个 exe）
 - 点：Tsukihime.exe 0x40eefe，字形例程 0x40eb20（thiscall，第一个参数是字串，5 个调用者）每个字 `TextOutA(hdc, x, 0, 字, 2)` 画进字形小图；0x40f061 / 0x40f085 是它带条件的额外描边 / 阴影遍，不签。另外 5 个 TextOutA（0x41878a、0x41cb2e、0x41d28d、0x430b31、0x43fad3）在别的例程里，等实机记录看清是什么再签

@@ -209,6 +209,28 @@
    "slot": "0x100a3064",
    "call": "0x100350cf",
    "hex": "ff15f4310a105068e0e00a108d74241ce8ec5301008b44242083c4083bc3740950e81dae020083c4048b7424288d44245c5053538d8c248c000000516a055655ff1564300a1083f8ff894424300f8593"
+  },
+  "leyline-2/softpal": {
+   "id": "softpal",
+   "file": "PAL.dll",
+   "sha256": "df283001253314b4da52dee265667067830263102169705e8673144c00fb95f9",
+   "api": "GetGlyphOutlineA",
+   "va": "0x100083b5",
+   "callOffset": 64,
+   "slot": "0x100dd01c",
+   "call": "0x100083f5",
+   "hex": "4604e82b5b02008bf883c40485ff0f844c0200008b1d247111156683bbc801000004742a8b85b4feffff8d8de0feffff516a006a008d95ccfeffff526a065750ff151cd00d108b1d24711115eb216a00"
+  },
+  "leyline-2/softpal-2": {
+   "id": "softpal-2",
+   "file": "PAL.dll",
+   "sha256": "df283001253314b4da52dee265667067830263102169705e8673144c00fb95f9",
+   "api": "GetGlyphOutlineA",
+   "va": "0x10008a90",
+   "callOffset": 64,
+   "slot": "0x100dd01c",
+   "call": "0x10008ad0",
+   "hex": "83c40485ff0f84b0040000a1247111156683b8c8010000040f84860000008b95b0feffff8b351cd00d108d85c8feffff506a006a008d8dd8feffff516a065752ffd68b0d287111158bd88d85c8feffff"
   }
  }
 }
