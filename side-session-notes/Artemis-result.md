@@ -94,11 +94,12 @@ The previously successful fixed `engine.cc` read supplies the listed hook eviden
 
 - Seven relevant suites: 40 passed, 0 failed, 0 skipped, including engine-draw default/seed opt-in checks
 - Every tracked JS/CJS/MJS file checked freshly with the current Node executable: 1549 checked, 0 errors, no syntax cache reused
+- One test file changed while the sequential whole-repository scan was running, its final bytes were checked again successfully, `syntax-final.json` contains the final file hashes and the one refresh
 - The Lua 5.1 module and generated chunks execute in the synthetic and actual-function CLI replays
 - Fresh `fetch origin main` still resolves to `7a41ff9a9c3632c9f143f01b455085c1d6e4a854`, already the branch parent, followed by the combined regression
 - No native source changed and no DLL build or game host was run
 - No production loader, game archive, seed, save, live database, release asset, main branch or remote branch was changed
 
 Small local evidence is under `H:/MeguLit-Work/night-1423/artemis-research/`
-`bilingual-before.json` and `role-source-before.json` preserve before evidence, `final-tests.log` and `syntax.json` record the final checks
-The syntax receipt is rechecked against current file hashes before sealing the candidate
+`bilingual-before.json` and `role-source-before.json` preserve before evidence, `final-tests.log`, `syntax.json` and `syntax-final.json` record the checks
+The final syntax receipt is checked against current source hashes
