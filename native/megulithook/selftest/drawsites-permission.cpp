@@ -92,8 +92,8 @@ static __declspec(naked) void InvokeFx(const char*){__asm{
  pop ebp
  ret
 }}
-static void CheckFx(const char *text,const char *label){FpMode=1;InvokeFx(text);FpMode=0;
- Check(!memcmp(GotXmm0,XmmPattern,sizeof XmmPattern)&&!memcmp(GotXmm7,XmmPattern,sizeof XmmPattern)&&GotCw==GameCw&&GotMxcsr==GameMxcsr&&GotX87==1.0&&(GotFlags&0x401)==0x401,label);
+static void CheckFx(const char *text,const char *label){LONG before=ApiCalls;GotX87=-1;memset(GotXmm0,0,sizeof GotXmm0);memset(GotXmm7,0,sizeof GotXmm7);FpMode=1;InvokeFx(text);FpMode=0;
+ Check(ApiCalls==before+1&&!memcmp(GotXmm0,XmmPattern,sizeof XmmPattern)&&!memcmp(GotXmm7,XmmPattern,sizeof XmmPattern)&&GotCw==GameCw&&GotMxcsr==GameMxcsr&&GotX87==1.0&&(GotFlags&0x401)==0x401,label);
 }
 static void *Slot=(void*)&FakeApi;
 static __declspec(naked) void Draw(const char*,int,int,int){__asm {
