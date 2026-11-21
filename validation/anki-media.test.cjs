@@ -42,6 +42,24 @@ test('Anki card tracks retain the recorded source across direct and legacy marku
  const html=await reviewer.withMedia('[sound:tomoyo_abcd_1234.wav] [sound:tomoyo_s_5678.wav] [sound:other.wav]');
  assert.deepEqual([...html.matchAll(/data-anki-channel="([^"]*)"/g)].map(m=>m[1]),['word','sentence','']);
 });
+test('a clip at the cache size limit plays on the first retrieval and from disk',async t=>{
+ const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+ const cache=require('../core/anki-media-cache.cjs'),{reviewer}=fixture(t);
+ reviewer.mediaDir=fs.mkdtempSync(path.join(os.tmpdir(),'anki-media-limit-'));
+ t.after(()=>fs.rmSync(reviewer.mediaDir,{recursive:true,force:true}));
+ const limit=12*1024*1024,name='tomoyo_g_test.wav';
+ let data=Buffer.alloc(limit).toString('base64'),calls=0;
+ reviewer.call=async action=>{assert.equal(action,'retrieveMediaFile');calls++;return data;};
+ assert.equal((await reviewer.mediaFile(name))?.length,data.length);
+ assert.equal(fs.statSync(path.join(reviewer.mediaDir,name)).size,limit);
+ assert.equal((await reviewer.mediaFile(name))?.length,data.length);
+ assert.equal(calls,1);
+ data=Buffer.alloc(limit+1).toString('base64');
+ const other='tomoyo_g_over.wav';
+ assert.equal(await reviewer.mediaFile(other),null);
+ assert.equal(cache.write(reviewer.mediaDir,other,data),false);
+ assert.equal(fs.existsSync(path.join(reviewer.mediaDir,other)),false);
+});
 test('fit keeps an ordinary card within its viewport and bounds the reduction for long illustrated notes',()=>{
  assert.equal(fitScale(900,400,900,600),2/3);assert.equal(fitScale(900,700,900,600),1);assert.equal(fitScale(900,300,900,1200),.6);assert.equal(fitScale(900,400,900,600,false),1);assert.equal(fitScale(0,0,0,0),1);
 });
