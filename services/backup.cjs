@@ -22,9 +22,27 @@ function previewBackup(root,source){
   const id=path.basename(folder);fs.writeFileSync(path.join(folder,'preview.json'),JSON.stringify({id,createdAt:document.createdAt,counts}));return {id,createdAt:document.createdAt,counts};
  }catch(error){safeRemove(path.join(root,'cache'),folder);throw error;}
 }
-function applyBackup(root,id){
- if(typeof id!=='string'||!/^backup-import-[A-Za-z0-9]+$/.test(id))throw Error('INVALID_BACKUP_ID');const folder=path.join(root,'cache',id);if(!fs.existsSync(path.join(folder,'preview.json')))throw Error('INVALID_BACKUP_ID');
- const data=path.join(root,'data'),checkpoint=path.join(root,'migration','checkpoints','before-import-'+Date.now()+'-'+crypto.randomUUID());fs.mkdirSync(checkpoint,{recursive:true});fs.renameSync(data,path.join(checkpoint,'data'));
- try{fs.renameSync(path.join(folder,'data'),data);}catch(error){fs.renameSync(path.join(checkpoint,'data'),data);throw error;}safeRemove(path.join(root,'cache'),folder);return {restored:true,rollback:path.join(checkpoint,'data')};
+function previewFolder(root,id){
+ if(typeof id!=='string'||!/^backup-import-[A-Za-z0-9]+$/.test(id))throw Error('INVALID_BACKUP_ID');
+ return path.join(root,'cache',id);
 }
-module.exports={exportBackup,previewBackup,applyBackup};
+function discardBackup(root,id){
+ const folder=previewFolder(root,id);
+ const discarded=folder+'.discarding';
+ if(fs.existsSync(path.join(folder,'preview.json')))fs.renameSync(folder,discarded);
+ if(fs.existsSync(discarded))safeRemove(path.join(root,'cache'),discarded);
+}
+function applyBackup(root,id){
+ const folder=previewFolder(root,id);if(!fs.existsSync(path.join(folder,'preview.json'))||!fs.existsSync(path.join(folder,'data','megulit.sqlite')))throw Error('INVALID_BACKUP_ID');
+ const data=path.join(root,'data'),checkpoint=path.join(root,'migration','checkpoints','before-import-'+Date.now()+'-'+crypto.randomUUID());
+ const previous=path.join(checkpoint,'data');fs.mkdirSync(checkpoint,{recursive:true});
+ try{fs.renameSync(data,previous);fs.renameSync(path.join(folder,'data'),data);}
+ catch(error){
+  if(fs.existsSync(previous))fs.renameSync(previous,data);
+  try{fs.rmdirSync(checkpoint);}catch{}
+  throw error;
+ }
+ try{safeRemove(path.join(root,'cache'),folder);}catch(error){console.warn('Backup restored; preview cleanup failed',error.code);}
+ return {restored:true,rollback:path.join(checkpoint,'data')};
+}
+module.exports={exportBackup,previewBackup,discardBackup,applyBackup};
