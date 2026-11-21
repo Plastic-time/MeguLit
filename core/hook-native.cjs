@@ -346,7 +346,8 @@ class HookNative{
   if(m.visible!==true||typeof m.text!=='string'){O.shown.delete(m.id);return;}
   /* a group is taken once, when its reading has stopped changing (a fade in or out reads as garble); later readings of the same group are ignored */
   if(O.done.has(m.id))return;const was=O.shown.get(m.id),now=this.now();
-  O.shown.set(m.id,{id:m.id,text:m.text,rows:Array.isArray(m.rows)?m.rows:[],sw:+m.sw||0,sh:+m.sh||0,dialogSeen:m.dialogSeen===true,others:+m.others||0,once:m.once===true,seenAt:now,changedAt:m.once===true?now-OCR_LINE_SETTLE_MS:was&&was.text===m.text?was.changedAt:now});/* once: read a single time and already gone (a card that faded within a second): taken at once, under the stricter once rule */
+  const rowTexts=Array.isArray(m.rows)&&m.rows.length?m.rows.map(r=>String(r?.text||'')):[m.text];
+  O.shown.set(m.id,{id:m.id,text:m.text,reads:[...(was?.reads||[]),rowTexts].slice(-8),firstSeen:was?.firstSeen??now,rows:Array.isArray(m.rows)?m.rows:[],sw:+m.sw||0,sh:+m.sh||0,dialogSeen:m.dialogSeen===true,others:+m.others||0,once:m.once===true,seenAt:now,changedAt:m.once===true?now-OCR_LINE_SETTLE_MS:was&&was.text===m.text?was.changedAt:now});/* once: read a single time and already gone (a card that faded within a second): taken at once, under the stricter once rule */
   this.ocrSchedule(OCR_LINE_SETTLE_MS);}catch{}}
  ocrSchedule(ms){const O=this.ocr;clearTimeout(O.timer);O.timer=setTimeout(()=>this.ocrFlush(),ms);O.timer.unref?.();}
  ocrFlush(){const O=this.ocr;if(!O)return;const now=this.now();
@@ -357,6 +358,14 @@ class HookNative{
   if(items.length>=OCR_LINE_MAX_BLOCKS){this.trace('ocr lines skipped: '+items.length+' text groups at once (menu or settings page)');for(const it of items)if(it.once){O.done.add(it.id);O.shown.delete(it.id);}return;}
   let wait=0;const take=[];
   for(const it of items){const age=now-it.changedAt;if(age<OCR_LINE_SETTLE_MS){wait=Math.max(wait,OCR_LINE_SETTLE_MS-age);continue;}
+   /* 2026-11-21 (ファタモルガーナの館 opening 「聖なるかな」, core/ocr-vote.cjs): a newer group over the same place with more rows is this text still
+      fading in: this one is left to it; the group's readings (and its rows, when they are one phrase) vote the text; readings that
+      disagree and cannot be voted are not shown (no translation of a misread); a line of the script near the reading replaces it */
+   {const V=require('./ocr-vote.cjs');const newer=items.find(o=>o!==it&&!O.done.has(o.id)&&(o.firstSeen||0)>=(it.firstSeen||0)&&V.supersedes(o,it));
+    if(newer){O.done.add(it.id);this.trace('ocr line superseded (still fading in) '+JSON.stringify(String(it.text).slice(0,40)));continue;}
+    const v=V.vote(it.reads||[[it.text]]);if(!V.confident(it.reads||[[it.text]],v)){O.done.add(it.id);this.trace('ocr line refused (readings disagree) '+JSON.stringify(String(it.text).slice(0,40)));continue;}
+    if(v.text&&v.text!==HookNative.flat(it.text)){this.trace('ocr line voted '+JSON.stringify(String(it.text).slice(0,40))+' -> '+JSON.stringify(v.text.slice(0,40)));it.text=v.text;}it.repeated=v.repeated;
+    const near=this.ocrSnap(it.text);if(near){this.trace('ocr line snapped to the script '+JSON.stringify(near.slice(0,40)));it.text=near;}}
    O.done.add(it.id);if(O.done.size>400)O.done.delete(O.done.values().next().value);if(it.once)O.shown.delete(it.id);
    const why=this.ocrLineRefused(it,now);if(why){this.trace('ocr line refused ('+why+') '+JSON.stringify(it.text.slice(0,40)));continue;}
    const flat=HookNative.flat(it.text);O.said.set(flat,now);if(O.said.size>200)O.said.delete(O.said.keys().next().value);take.push(it);}
@@ -376,7 +385,7 @@ class HookNative{
      translated): a whole Japanese sentence among the other rows is a notice the player reads; it is taken like a line */
   if(it.others>=3&&!HookNative.ocrSentence(flat))return 'a title or menu screen';
   if(it.once&&(!kana||n<4))return 'read once, too short or without kana';
-  if(n<2||n>120)return 'length';if(f.artJunk(t,it.rows,it.sh))return 'logo or OCR noise';if(f.artList(it.rows))return 'a list';
+  if(n<2||n>120)return 'length';if(f.artJunk(t,it.rows,it.sh))return 'logo or OCR noise';if(!it.repeated&&f.artList(it.rows))return 'a list'; /* rows of one phrase (a litany fading in) are that phrase, not a list */
   if(require('./text-sanity.cjs').garbledSource(t,{controls:false}))return 'unreadable';
   /* radicals the OCR guesses inside a logo (Novectacle read as 「ノベクタク丿レ」): no word uses them alone */
   if(/[丨丶丿乀乁亅冂冖冫凵勹匚匸卩厂厶廴弋彡彳⺀-⻿⼀-⿟]/u.test(flat))return 'OCR noise';
