@@ -7,7 +7,7 @@ const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:chil
 
 /* E383 a mirror template may use {url} (whole GitHub URL), or {tag} and {file} (release tag and file name) for our own mirror dl.megulit.com */
 const mirrorUrl=(template,url)=>require('./download-sources.cjs').fill(typeof template==='string'?template:template.url,url);
-const MARKERS={base:'runtime/node.exe',reading:'runtime/reading/sudachidict_full/resources/system.dic',voice:'runtime/aivis/run.exe',archives:'runtime/garbro/ArcFormats.dll','runtime-dump':'runtime/runtime-dump/MeguLitDump64.dll','unity-text':'runtime/unity-text/MeguLitUnityText.dll'};
+const MARKERS={base:'runtime/node.exe',reading:'runtime/reading/sudachidict_full/resources/system.dic',voice:'runtime/aivis/run.exe',archives:'runtime/garbro/ArcFormats.dll','runtime-dump':'runtime/runtime-dump/MeguLitDump64.dll','unity-text':'runtime/unity-text/MeguLitUnityText.dll','disc-mount':'runtime/wincdemu/batchmnt.exe'};
 /* E470 "archives": GARbro (morkt, MIT) downloaded only when a game's scripts sit in an archive MeguLit's own readers cannot open.
    onDemand packs are left out of "download full", unpack into their own dest folder (the upstream release is not laid out as runtime/...)
    and can be removed again in Settings. */
@@ -19,6 +19,15 @@ const ON_DEMAND_FILES=['GameRes.dll','ArcFormats.dll','GameData/Formats.dat'];
 /* contract of an installed pack (its pack.json), 0 when there is none */
 const packContract=dir=>{try{return +JSON.parse(fs.readFileSync(path.join(dir,'pack.json'),'utf8').replace(/^﻿/,'')).contract||0;}catch{return 0;}};
 const packFiles=pack=>Array.isArray(pack?.files)&&pack.files.length?pack.files:ON_DEMAND_FILES;
+/* This pack publishes content-addressed mirrors explicitly; expanding a release tag would fetch a different path. */
+function packSources(id,pack,{china=false,mirrors=[]}={}){
+ if(id==='disc-mount'){
+  const rank=u=>{const h=new URL(u).hostname;return h==='cn-dl.megulit.com'?(china?0:1):h==='dl.megulit.com'?(china?1:0):2;};
+  return [...new Set(pack.urls||[])].sort((a,b)=>rank(a)-rank(b));
+ }
+ const sources=require('./download-sources.cjs');
+ return (pack.urls||[]).flatMap(u=>sources.expand(u,{china,list:sources.normalize(mirrors)}));
+}
 
 const SHARED=new Map();
 class RuntimePacks{
@@ -57,8 +66,8 @@ class RuntimePacks{
      another source, finished pieces survive a retry (runtime-<id>.zip.part.json). Mainland China (time zone / locale, no IP
      lookup) still lists the mirrors first; SHA-256 has to match. */
   /* 2026-11-20: sources and their order from the same setup/runtime.json "mirrors" list setup uses (core/download-sources.cjs) */
-  const china=require('./fast-download.cjs').inChina(),list=require('./download-sources.cjs').normalize(this.manifest().mirrors||[]);
-  const all=(pack.urls||[]).flatMap(u=>require('./download-sources.cjs').expand(u,{china,list}));
+  const china=require('./fast-download.cjs').inChina();
+  const all=packSources(id,pack,{china,mirrors:this.manifest().mirrors||[]});
   if(!all.length)throw Error('没有下载地址');
   job.state='downloading';job.stage='download';job.received=0;job.controller=new AbortController();
   try{
@@ -83,4 +92,4 @@ class RuntimePacks{
   if(!this.installed(id))throw Error('安装不完整');
  }
 }
-module.exports={RuntimePacks,packContract,MARKERS,ON_DEMAND_FILES,mirrorUrl};
+module.exports={RuntimePacks,packContract,MARKERS,ON_DEMAND_FILES,mirrorUrl,packSources};
