@@ -1,5 +1,5 @@
 {
- "hash": "8fde43578e10ca0b9deda47d",
+ "hash": "dee1edaf66ae419188f9a6d4",
  "textures": {
   "ashlar": {
    "map": "ashlar.map.webp",
@@ -15,9 +15,9 @@
    "map": "relief.map.webp",
    "normal": "relief.normal.webp"
   },
-  "vault": {
-   "map": "vault.map.webp",
-   "normal": "vault.normal.webp"
+  "domeCoffers": {
+   "map": "domeCoffers.map.webp",
+   "normal": "domeCoffers.normal.webp"
   },
   "halfDome": {
    "map": "halfDome.map.webp",
@@ -29,21 +29,24 @@
   },
   "violetMarble": {
    "map": "violetMarble.map.webp",
-   "rough": "violetMarble.rough.webp"
+   "rough": "violetMarble.rough.webp",
+   "normal": "violetMarble.normal.webp"
   },
   "paleMarble": {
    "map": "paleMarble.map.webp",
-   "rough": "paleMarble.rough.webp"
+   "rough": "paleMarble.rough.webp",
+   "normal": "paleMarble.normal.webp"
   },
   "floor": {
    "map": "floor.map.webp",
-   "rough": "floor.rough.webp"
+   "rough": "floor.rough.webp",
+   "normal": "floor.normal.webp"
   },
   "rose": {
    "map": "rose.map.webp"
   },
-  "roseSmall": {
-   "map": "roseSmall.map.webp"
+  "quarries": {
+   "map": "quarries.map.webp"
   },
   "lancet": {
    "map": "lancet.map.webp"
@@ -58,14 +61,15 @@
   },
   "steleMarble": {
    "map": "steleMarble.map.webp",
-   "rough": "steleMarble.rough.webp"
+   "rough": "steleMarble.rough.webp",
+   "normal": "steleMarble.normal.webp"
   }
  },
  "ao": {
   "file": "ao.bin",
   "dims": [
    98,
-   90,
+   135,
    200
   ],
   "box": {
@@ -76,7 +80,7 @@
    ],
    "max": [
     14.7,
-    26.7,
+    40.2,
     41.4
    ]
   },
@@ -86,7 +90,7 @@
   "file": "torch.bin",
   "dims": [
    49,
-   45,
+   68,
    100
   ],
   "box": {
@@ -97,7 +101,7 @@
    ],
    "max": [
     14.7,
-    26.7,
+    40.2,
     41.4
    ]
   },

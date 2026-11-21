@@ -13,7 +13,7 @@ import * as THREE from './vendor/three/three.module.min.js';
 const BASE=new URL('./assets/torch/',import.meta.url);
 export const BAKE_SOURCES=['torch-hall.js','torch-textures.js','torch-bake.js'];
 /* the volume covers the whole church (x ±14.7, floor to vault crown, apse to the west wall) */
-export const AO_BOX={min:[-14.7,-.3,-18.3],max:[14.7,26.7,41.4],res:.3};
+export const AO_BOX={min:[-14.7,-.3,-18.3],max:[14.7,40.2,41.4],res:.3};
 export const TORCH_RES=.6;
 
 let baked=null,record=null;
@@ -36,7 +36,7 @@ export async function loadBaked(low){baked=null;record=window.__TORCH_BAKE?new M
   baked={tex,ao:{data:ao,dims:man.ao.dims,box:man.ao.box},torch:{data:tl,dims:man.torch.dims,box:man.torch.box}};return {ok:true};}
  catch(e){return {ok:false,reason:String(e&&e.message||e)};}}
 /* a set of maps by name: the baked images when there are some, else drawn now (and noted when baking) */
-export function maps(key,make){if(baked&&baked.tex[key])return baked.tex[key];const o=make();if(record)record.set(key,o);return o;}
+export function maps(key,make){if(baked&&baked.tex[key])return baked.tex[key];const t0=performance.now();const o=make();if(record){record.set(key,o);console.log('BAKESTEP texture',key,Math.round(performance.now()-t0),'ms');}return o;}
 export function bakedAO(){return baked?{ao:baked.ao,torch:baked.torch}:null;}
 export function recorded(){return record;}
 
@@ -60,8 +60,9 @@ export function computeVolumes(scene,torches=[]){const {min,max,res}=AO_BOX,nx=M
  const blur=(src,r)=>{let cur=src;for(const [len,stride,lines] of [[nx,1,(f)=>{for(let k=0;k<nz;k++)for(let j=0;j<ny;j++)f((k*ny+j)*nx);}],[ny,nx,(f)=>{for(let k=0;k<nz;k++)for(let i=0;i<nx;i++)f(k*ny*nx+i);}],[nz,nx*ny,(f)=>{for(let j=0;j<ny;j++)for(let i=0;i<nx;i++)f(j*nx+i);}]]){
    const out=new Float32Array(N),w=2*r+1;lines(base=>{let s=0;for(let q=0;q<=r&&q<len;q++)s+=cur[base+q*stride];
     for(let q=0;q<len;q++){out[base+q*stride]=s/w;const add=q+r+1,rem=q-r;if(add<len)s+=cur[base+add*stride];if(rem>=0)s-=cur[base+rem*stride];}});cur=out;}return cur;};
- const b1=blur(occ,1),b3=blur(occ,3),out=new Uint8Array(N);
+ console.log('BAKESTEP voxelized');const b1=blur(occ,1),b3=blur(occ,3),out=new Uint8Array(N);
  for(let i=0;i<N;i++){const e1=Math.max(0,(b1[i]-1/3)*3),e3=Math.max(0,(b3[i]-1/7)*7);out[i]=Math.round((1-Math.min(.8,.2*e1+.3*e3))*255);}
+ console.log('BAKESTEP ao done');
  /* torch light: for every 60 cm cell, each torch's 1/d² seen through the solid cells (each solid cell crossed lets 20% through);
     stored as sqrt(min(1, I/2)) so the dim far light keeps some precision (the shader squares it back) */
  const tr=TORCH_RES,tx=Math.ceil((max[0]-min[0])/tr),ty=Math.ceil((max[1]-min[1])/tr),tz=Math.ceil((max[2]-min[2])/tr),tl=new Uint8Array(tx*ty*tz);
@@ -106,9 +107,11 @@ function patch(m,uni){m.onBeforeCompile=sh=>{Object.assign(sh.uniforms,uni);
 const b64=u8=>{let bin='';for(let i=0;i<u8.length;i+=8192)bin+=String.fromCharCode(...u8.subarray(i,i+8192));return btoa(bin);};
 /* used by tools/torch-bake.cjs inside a headless browser: every recorded canvas as webp, the volume deflated, and the manifest */
 export async function exportBake(scene,torches){const out={files:{},textures:{}};
- for(const [key,o] of record||[]){out.textures[key]={};for(const [f,c] of Object.entries(o)){if(!c||!c.toBlob)continue;
-  const name=key+'.'+f+'.webp',q=f==='normal'?.96:.9;const blob=await new Promise(r=>c.toBlob(r,'image/webp',q));
-  out.files[name]=b64(new Uint8Array(await blob.arrayBuffer()));out.textures[key][f]=name;}}
- const vols=computeVolumes(scene,torches),zip=async u8=>new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+ /* encode every canvas at once (the browser encodes off the main thread, in parallel) */
+ const jobs=[];for(const [key,o] of record||[]){out.textures[key]={};for(const [f,c] of Object.entries(o)){if(!c||!c.toBlob)continue;
+  const name=key+'.'+f+'.webp',q=f==='normal'?.96:.9;out.textures[key][f]=name;
+  jobs.push(new Promise(r=>c.toBlob(r,'image/webp',q)).then(async blob=>{out.files[name]=b64(new Uint8Array(await blob.arrayBuffer()));}));}}
+ const te=performance.now();await Promise.all(jobs);console.log('BAKESTEP encoded',jobs.length,'images',Math.round(performance.now()-te),'ms');
+ const tv=performance.now();const vols=computeVolumes(scene,torches);console.log('BAKESTEP volumes',Math.round(performance.now()-tv),'ms');const zip=async u8=>new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
  out.files['ao.bin']=b64(await zip(vols.ao.data));out.files['torch.bin']=b64(await zip(vols.torch.data));
  out.manifest={hash:await sourceHash(),textures:out.textures,ao:{file:'ao.bin',dims:vols.ao.dims,box:vols.ao.box,res:AO_BOX.res},torch:{file:'torch.bin',dims:vols.torch.dims,box:vols.torch.box,res:TORCH_RES}};return out;}

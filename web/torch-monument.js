@@ -20,6 +20,7 @@ import {ShaderPass} from './vendor/three/addons/postprocessing/ShaderPass.js';
 import {rng,canvas2d,glowSprite} from './torch-textures.js';
 import {buildHall,buildStele,HALL} from './torch-hall.js';
 import {loadBaked,bakedAO,computeVolumes,applyAO} from './torch-bake.js';
+import {VolumetricPass} from './torch-volumetric.js';
 import {loadGsap} from './gsap-loader.js';
 
 const COPY={
@@ -221,10 +222,10 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
  let aoInfo=null;
  const bag=new Set();const keep=o=>{bag.add(o);return o;};
  const tex=(c,srgb=true,rep=1)=>{const x=keep(new THREE.CanvasTexture(c));x.colorSpace=srgb?THREE.SRGBColorSpace:THREE.NoColorSpace;x.wrapS=x.wrapT=THREE.RepeatWrapping;x.repeat.set(rep,rep);x.anisotropy=8;return x;};
- let renderer,composer=null,bloom=null,grade=null,reflector=null,active=true,raf=0,last=performance.now(),slow=0,frames=0,introDone=false,dragMoved=false;
+ let renderer,composer=null,bloom=null,grade=null,vol=null,reflector=null,active=true,raf=0,last=performance.now(),slow=0,frames=0,introDone=false,dragMoved=false;
  const scene=new THREE.Scene();scene.background=new THREE.Color(0x0e0c14);scene.fog=new THREE.FogExp2(0x16131f,0.015);
  const camera=new THREE.PerspectiveCamera(44,1,0.1,160);
- const START={pos:new THREE.Vector3(0,3.2,38.5),look:new THREE.Vector3(0,5.2,0)},END={pos:new THREE.Vector3(0,2.3,20.5),look:new THREE.Vector3(0,4.7,0)};
+ const START={pos:new THREE.Vector3(0,2.6,37),look:new THREE.Vector3(0,27,3)},END={pos:new THREE.Vector3(0,2.3,20.5),look:new THREE.Vector3(0,4.7,0)};
  const view={pos:START.pos.clone(),look:START.look.clone(),yaw:0,pitch:0,yawT:0,pitchT:0,dragYaw:0,dragPitch:0,px:0,pxT:0,read:null};
  camera.position.copy(view.pos);camera.lookAt(view.look);
 
@@ -366,11 +367,17 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
   else{floorMat.transparent=false;floorMat.opacity=1;H.inlayMat.transparent=false;H.inlayMat.opacity=1;}
   floorMat.needsUpdate=true;H.inlayMat.needsUpdate=true;
   if(dust){scene.remove(dust);dust.geometry.dispose();dust.material.dispose();}dust=makeDust(low?700:2600);scene.add(dust);
-  if(composer){composer.passes.forEach(p=>p.dispose?.());composer.dispose();composer=null;bloom=null;grade=null;}
-  if(!low){const size=renderer.getDrawingBufferSize(new THREE.Vector2());
-   /* MSAA only where the scene is drawn: RenderPass writes into renderTarget2 (the composer's read buffer, two swaps per frame) */
-   composer=new EffectComposer(renderer,new THREE.WebGLRenderTarget(size.x,size.y,{type:THREE.HalfFloatType}));composer.renderTarget2.samples=4;composer.addPass(new RenderPass(scene,camera));
-   bloom=new UnrealBloomPass(new THREE.Vector2(512,512),.5,.65,.85);composer.addPass(bloom);grade=new ShaderPass(GRADE);composer.addPass(grade);composer.addPass(new OutputPass());}
+  if(composer){composer.passes.forEach(p=>p.dispose?.());composer.dispose();composer=null;bloom=null;grade=null;vol=null;}
+  /* both tiers go through the composer: the scene (MSAA on the full tier), light in the air, then bloom and grading on the full tier */
+  { const size=renderer.getDrawingBufferSize(new THREE.Vector2());
+   composer=new EffectComposer(renderer,new THREE.WebGLRenderTarget(size.x,size.y,{type:THREE.HalfFloatType}));
+   for(const t of [composer.renderTarget1,composer.renderTarget2])t.depthTexture=new THREE.DepthTexture(size.x,size.y);
+   /* RenderPass writes into renderTarget2 (the read buffer; an even number of swaps per frame on the full tier) */
+   if(!low)composer.renderTarget2.samples=4;
+   composer.addPass(new RenderPass(scene,camera));
+   vol=new VolumetricPass({camera,light:H.sun,box:{min:[-14.5,0,-17.4],max:[14.5,38,40]},scale:low?.25:.5,steps:low?24:48});composer.addPass(vol);
+   if(!low){bloom=new UnrealBloomPass(new THREE.Vector2(512,512),.5,.65,.85);composer.addPass(bloom);grade=new ShaderPass(GRADE);composer.addPass(grade);}
+   composer.addPass(new OutputPass());}
   resize();queuePaint();}
 
  /* ---- view ---- */
@@ -382,7 +389,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
  const pointer={x:0,y:0,down:false,sx:0,sy:0,yaw0:0,pitch0:0,moved:0};
  const onMove=e=>{const r=host.getBoundingClientRect();pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=((e.clientY-r.top)/r.height)*2-1;
   if(pointer.down){const dx=(e.clientX-pointer.sx)/r.width,dy=(e.clientY-pointer.sy)/r.height;pointer.moved=Math.max(pointer.moved,Math.abs(dx)+Math.abs(dy));
-   view.dragYaw=THREE.MathUtils.clamp(pointer.yaw0+dx*.9,-.26,.26);view.dragPitch=THREE.MathUtils.clamp(pointer.pitch0+dy*.5,-.09,.12);}};
+   view.dragYaw=THREE.MathUtils.clamp(pointer.yaw0+dx*.9,-.26,.26);view.dragPitch=THREE.MathUtils.clamp(pointer.pitch0+dy*1.1,-.62,.12);}};
  const onDown=e=>{if(e.button!==0)return;pointer.down=true;pointer.moved=0;pointer.sx=e.clientX;pointer.sy=e.clientY;pointer.yaw0=view.dragYaw;pointer.pitch0=view.dragPitch;dragMoved=false;canvas.setPointerCapture?.(e.pointerId);};
  const onUp=e=>{pointer.down=false;dragMoved=pointer.moved>.012;canvas.releasePointerCapture?.(e.pointerId);};
  canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointerup',onUp);canvas.addEventListener('pointercancel',onUp);
@@ -393,7 +400,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
   if(lastHoverKey){lastHoverKey='';state.hoverMonth=null;queuePaint();}
   const e=state.layout?.entries.find(e=>lx>=e.x&&lx<e.x+COL_W&&ly>=e.y-6&&ly<e.y+e.box.h);return {entry:e||null,point};}
 
- /* intro: a slow push from the far end of the nave to the foot of the stone */
+ /* intro: from the far end of the nave looking up into the dome, a slow push that tilts down to the stone */
  const INTRO=reduced?0:7.2;let introT=reduced?1:0,introStart=0;
  function intro(){if(reduced){introT=1;introDone=true;return;}introStart=performance.now();
   if(gsap){const o={t:0};gsap.to(o,{t:1,duration:INTRO,ease:'power2.inOut',onUpdate:()=>{introT=o.t;},onComplete:()=>{introDone=true;}});}}
@@ -416,7 +423,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
  function draw(){if(composer)composer.render();else renderer.render(scene,camera);}
  function frame(now){raf=0;if(!active)return;const dt=Math.min(.1,(now-last)/1000);last=now;
   if(tier==='low'&&now-(frame.lastDraw||0)<31){raf=requestAnimationFrame(frame);return;}frame.lastDraw=now;
-  const time=now/1000;H.update(time,dt,renderer);if(H.shadowDirty())renderer.shadowMap.needsUpdate=true;if(aoUni)aoUni.uTorchLevel.value=H.state.torch*(H.state.flicker||1);const day=Math.min(1,H.state.skyI/1.1);scene.environmentIntensity=.2+.8*day;
+  const time=now/1000;H.update(time,dt,renderer);if(H.shadowDirty())renderer.shadowMap.needsUpdate=true;if(aoUni)aoUni.uTorchLevel.value=H.state.torch*(H.state.flicker||1);if(vol)vol.strength=H.state.beam*(H.state.moon?.8:1);const day=Math.min(1,H.state.skyI/1.1);scene.environmentIntensity=.2+.8*day;
   if(dust){dust.material.uniforms.uTime.value=time;dust.material.uniforms.uBright.value=Math.max(.12,day*H.state.beam*.9,H.state.torch*.45);}if(grade)grade.uniforms.uTime.value=time%97;
   if(glow.userData.on){const p=(now-glow.userData.t0)/1000;const o=Math.min(1,p/1.2)*(.42+.1*Math.sin(p*1.6));glow.material.opacity=o;glowLight.intensity=o*2.2;}else{glow.material.opacity*=.9;glowLight.intensity*=.9;}
   updateCamera(dt);draw();
@@ -443,6 +450,8 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
   aoInfo={baked:!!bakedAO(),ms:Math.round(performance.now()-t0),bake:bakeInfo};}
  applyTier();paintFace();
  /* compile every shader before the first frame (in parallel where the driver allows), so the intro never starts with a stall */
- let ready=false;const whenReady=(renderer.compileAsync?renderer.compileAsync(scene,camera):Promise.resolve()).catch(()=>{}).then(()=>{ready=true;if(!disposed)setActive(true);});
+ let ready=false;
+ /* the bake (tools/torch-bake.cjs) only needs the scene built: no shaders, no frames */
+ const whenReady=window.__TORCH_BAKE?Promise.resolve():(renderer.compileAsync?renderer.compileAsync(scene,camera):Promise.resolve()).catch(()=>{}).then(()=>{ready=true;if(!disposed)setActive(true);});
  return {get tier(){return tier;},ready:whenReady,introSeconds:INTRO,intro,setActive,setTier,resize,pick,dispose,paintFace:()=>queuePaint(),lookAtFocus,setRead,reading:()=>!!view.read,dragged:()=>dragMoved,debug:{renderer,scene,camera,buildMs,torchPoints:H.torchPoints,get ao(){return aoInfo;}}};
 }

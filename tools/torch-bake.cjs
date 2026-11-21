@@ -34,11 +34,14 @@ async function main(){const browser=BROWSERS.find(b=>fs.existsSync(b));if(!brows
  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  try{let tabs;for(let i=0;i<100;i++){try{tabs=await (await fetch('http://127.0.0.1:'+dport+'/json')).json();break;}catch{await sleep(200);}}
   const ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j;});
-  let id=0;const pend=new Map();ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.method==='Runtime.exceptionThrown')console.error('page error:',JSON.stringify(m.params.exceptionDetails).slice(0,400));if(pend.has(m.id)){pend.get(m.id)(m);pend.delete(m.id);}};
+  let id=0;const pend=new Map();ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.method==='Inspector.targetCrashed')console.error('renderer crashed');if(m.method==='Runtime.consoleAPICalled'){const t=m.params.args.map(x=>x.value).join(' ');if(/BAKESTEP/.test(t))console.log(t);}if(m.method==='Runtime.exceptionThrown')console.error('page error:',JSON.stringify(m.params.exceptionDetails).slice(0,400));if(pend.has(m.id)){pend.get(m.id)(m);pend.delete(m.id);}};
   const send=(method,params={})=>new Promise(r=>{const i=++id;pend.set(i,r);ws.send(JSON.stringify({id:i,method,params}));});
-  await send('Runtime.enable');await send('Page.navigate',{url:'http://127.0.0.1:'+port+'/bake.html'});
-  let res=null;for(let i=0;i<900;i++){await sleep(500);const r=await send('Runtime.evaluate',{expression:'window.__bake?JSON.stringify(window.__bake):""',returnByValue:true});const v=r.result?.result?.value;if(v){res=JSON.parse(v);break;}}
-  if(!res)throw Error('bake timed out');
+  await send('Runtime.enable');await send('Inspector.enable');await send('Page.navigate',{url:'http://127.0.0.1:'+port+'/bake.html'});
+  /* wait for the page, then take the files one by one (one huge string at once can bring the renderer down) */
+  let names=null;for(let i=0;i<900;i++){await sleep(500);const r=await send('Runtime.evaluate',{expression:'window.__bake?JSON.stringify(Object.keys(window.__bake.files)):""',returnByValue:true});const v=r.result?.result?.value;if(v){names=JSON.parse(v);break;}}
+  if(!names)throw Error('bake timed out');
+  const res={files:{},manifest:(await send('Runtime.evaluate',{expression:'window.__bake.manifest',returnByValue:true})).result.result.value};
+  for(const n of names){const r=await send('Runtime.evaluate',{expression:'window.__bake.files['+JSON.stringify(n)+']',returnByValue:true});res.files[n]=r.result.result.value;}
   const hash=sourceHash();if(res.manifest.hash!==hash)throw Error('hash mismatch: page '+res.manifest.hash+' vs node '+hash);
   fs.rmSync(OUT,{recursive:true,force:true});fs.mkdirSync(OUT,{recursive:true});let bytes=0;
   for(const [name,b64] of Object.entries(res.files)){const buf=Buffer.from(b64,'base64');bytes+=buf.length;fs.writeFileSync(path.join(OUT,name),buf);}

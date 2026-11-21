@@ -121,6 +121,12 @@ export function rose(size,seed,{petals=12}={}){const c=canvas2d(size,size),g=c.g
  /* glass grain */
  const img=g.getImageData(0,0,size,size),d=img.data,fb=makeNoise(seed+3);for(let y=0;y<size;y++)for(let x=0;x<size;x++){const o=(y*size+x)*4,k=.8+.4*fb(x/size,y/size,12,3);d[o]*=k;d[o+1]*=k;d[o+2]*=k;}
  g.putImageData(img,0,0);return c;}
+/* clear glass in small diamond quarries (leaded), faintly tinted: the drum and the lantern let the daylight in nearly white */
+export function quarries(w,h,seed){const c=canvas2d(w,h),g=c.getContext('2d'),r=rng(seed);
+ const cell=w/4;for(let y=-cell;y<h+cell;y+=cell/2)for(let x=-cell;x<w+cell;x+=cell){const ox=(Math.round(y/(cell/2))%2)*cell/2,k=.86+r()*.14;
+  g.fillStyle=`rgb(${226*k|0},${222*k|0},${232*k|0})`;g.beginPath();g.moveTo(x+ox,y-cell/2);g.lineTo(x+ox+cell/2,y);g.lineTo(x+ox,y+cell/2);g.lineTo(x+ox-cell/2,y);g.closePath();g.fill();}
+ g.strokeStyle='#2a2630';g.lineWidth=w/90;for(let d=-h;d<w+h;d+=cell){g.beginPath();g.moveTo(d,0);g.lineTo(d+h*.5,h);g.stroke();g.beginPath();g.moveTo(d,0);g.lineTo(d-h*.5,h);g.stroke();}
+ g.lineWidth=w/18;g.strokeRect(0,0,w,h);return c;}
 export function lancet(w,h,seed){const c=canvas2d(w,h),g=c.getContext('2d'),r=rng(seed);g.fillStyle='#000';g.fillRect(0,0,w,h);
  const cols=3,rowsN=9,cw=w/cols,rh=h/rowsN;
  for(let i=0;i<rowsN;i++)for(let j=0;j<cols;j++){const col=GLASS[(i*2+j*3+(r()*2|0))%GLASS.length],k=.75+r()*.35;g.fillStyle=`rgb(${col[0]*k|0},${col[1]*k|0},${col[2]*k|0})`;g.fillRect(j*cw,i*rh,cw,rh);}
@@ -171,3 +177,42 @@ export function inlay(w,unit,count,seed){const h=unit*count,c=canvas2d(w,h),g=c.
  return c;}
 export function glowSprite(size,inner='rgba(210,232,255,1)',mid='rgba(190,180,240,.45)'){const c=canvas2d(size,size),g=c.getContext('2d'),gr=g.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);
  gr.addColorStop(0,inner);gr.addColorStop(.25,mid);gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.fillRect(0,0,size,size);return c;}
+
+/* ---- high-quality marble (baked, so it can afford the work) ----
+   A tileable field: two levels of domain warp drive the main veins (thin, bright, branching), ridged noise gives hairline veins,
+   low-frequency clouds vary the ground, fine crystals glint. Returns colour, a polished roughness with faint scratches, and a very
+   subtle normal (veins sit a hair lower). `palette`: ground, vein, hair, (optional) warm tint in the veins. */
+export function marbleField(size,seed,{ground,vein,hair,tint=null,k=2,warp=3.4,veinPow=26,hairAmt=.45}){
+ const A=makeNoise(seed),B=makeNoise(seed+1),Cn=makeNoise(seed+2),D=makeNoise(seed+3),N=size*size;
+ const col=new Float32Array(N*3),h=new Float32Array(N),rough=new Float32Array(N),r=rng(seed+9);
+ for(let y=0;y<size;y++){const v=y/size;for(let x=0;x<size;x++){const u=x/size,i=y*size+x;
+  const qx=A(u,v,2,5),qy=A(u+.37,v+.71,2,5),rx=B(u+1.6*qx,v+1.6*qy,3,5),ry=B(u+.53+1.6*qx,v+.29+1.6*qy,3,4);
+  const t=u*k+v*k+warp*rx,main=Math.pow(1-Math.abs(Math.sin(t*Math.PI)),veinPow),branch=Math.pow(1-Math.abs(Math.sin((u*k*2-v*k+warp*1.3*ry)*Math.PI)),veinPow*1.8)*.6;
+  const ridged=1-Math.abs(2*Cn(u+.2*qx,v+.2*qy,7,4)-1),hl=Math.pow(ridged,22)*hairAmt;
+  const cloud=D(u,v,2,4),cloud2=D(u+.5,v+.5,6,3),crystal=r()<.0025?.5+r()*.5:0;
+  const vm=Math.min(1,main*.95+branch),g=.82+.28*cloud+.06*(cloud2-.5);
+  for(let c=0;c<3;c++){let base=ground[c]*g;base+=(hair[c]-base)*Math.min(1,hl);base+=(vein[c]-base)*vm;if(tint)base+=(tint[c]-base)*vm*.35*cloud2;col[i*3+c]=base+crystal*40;}
+  h[i]=.5-vm*.25-hl*.08+(cloud2-.5)*.04;rough[i]=.07+.05*cloud+vm*.08+hl*.04;}}
+ return {col,h,rough,size};}
+function fieldCanvas(f,w=f.size,hgt=f.size,sample){return pixels(w,hgt,(u,v,x,y)=>sample(x,y));}
+/* the field as textures, the roughness carrying fine polishing scratches */
+export function marbleHQ(size,seed,palette){const f=marbleField(size,seed,palette),S=f.size;
+ const map=pixels(S,S,(u,v,x,y)=>{const i=(y*S+x)*3;return [f.col[i],f.col[i+1],f.col[i+2]];});
+ const rc=pixels(S,S,(u,v,x,y)=>{const g=f.rough[y*S+x]*255;return [g,g,g];}),g=rc.getContext('2d'),r=rng(seed+31);
+ g.globalAlpha=.06;g.strokeStyle='#fff';for(let i=0;i<S*.6;i++){const x=r()*S,y=r()*S,a=r()*Math.PI,l=S*(.01+r()*.05);g.lineWidth=.6+r();g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);g.stroke();}
+ return {map,rough:rc,normal:heightToNormal(f.h,S,S,1.6)};}
+/* floor: an 8 m tile of polished slabs in running courses, each slab cut from a different place of one marble field (so no two
+   match), with a slight tone shift; thin dark joints with a small bevel. `size` px for 8 m; the field is half as big and tiles. */
+export function floorHQ(size,seed,palette){const f=marbleField(size>>1,seed,palette),F=f.size,r=rng(seed+5),rows=8,rh=size/rows,slabs=[];
+ for(let row=0;row<rows;row++){let x=-r()*rh*1.4;while(x<size){const w=rh*(1.2+r()*1.3);slabs.push({x,y:row*rh,w,h:rh,ox:(r()*F)|0,oy:(r()*F)|0,flip:r()<.5,tone:.93+r()*.12});x+=w;}}
+ const byRow=[];for(const s of slabs){(byRow[Math.floor(s.y/rh)]||(byRow[Math.floor(s.y/rh)]=[])).push(s);}
+ const find=(x,y)=>{const row=byRow[Math.min(rows-1,Math.floor(y/rh))];for(const s of row){let xx=x;if(xx<s.x)xx+=size;if(xx>=s.x&&xx<s.x+s.w)return [s,xx];}return [row[row.length-1],x];};
+ const H=new Float32Array(size*size),R=new Float32Array(size*size),JOINT=Math.max(1.5,size/2400),BEV=JOINT*2.5;
+ const map=pixels(size,size,(u,v,x,y)=>{const [s,xx]=find(x,y),lx=xx-s.x,ly=y-s.y,e=Math.min(lx,s.w-lx,ly,s.h-ly);
+  let fx=((s.flip?(s.w-lx):lx)+s.ox)%F|0,fy=(ly+s.oy)%F|0;const fi=fy*F+fx,i=y*size+x;
+  const bev=e<JOINT?0:Math.min(1,(e-JOINT)/BEV);H[i]=e<JOINT?0:(.6+.4*Math.sqrt(bev))+f.h[fi]*.2;R[i]=e<JOINT?.8:f.rough[fi];
+  if(e<JOINT)return [44,40,50];const k=s.tone*(.9+.1*bev);return [f.col[fi*3]*k,f.col[fi*3+1]*k,f.col[fi*3+2]*k];});
+ const half=size>>1,rough=pixels(half,half,(u,v,x,y)=>{const g=R[(y*2)*size+x*2]*255;return [g,g,g];});
+ const gr=rough.getContext('2d'),rr=rng(seed+77);gr.globalAlpha=.05;gr.strokeStyle='#fff';for(let i=0;i<half*.5;i++){const x=rr()*half,y=rr()*half,a=rr()*Math.PI,l=half*(.01+rr()*.04);gr.lineWidth=.6+rr();gr.beginPath();gr.moveTo(x,y);gr.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);gr.stroke();}
+ const Hh=new Float32Array(half*half);for(let y=0;y<half;y++)for(let x=0;x<half;x++)Hh[y*half+x]=H[(y*2)*size+x*2];
+ return {map,rough,normal:heightToNormal(Hh,half,half,3)};}
