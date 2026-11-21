@@ -25,7 +25,7 @@ async function run(sim, until, ms) {
   const t0 = Date.now(); let text = '';
   while (Date.now() - t0 < ms) { text = read(ui) + '\n' + read(ev); if (until(text)) break; await sleep(250); }
   await sleep(500); text = read(ui) + '\n' + read(ev);
-  try { execFileSync('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore' }); } catch { /* gone */ }
+  try { execFileSync('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore', windowsHide: true }); } catch { /* gone */ }
   await sleep(800); try { fs.rmSync(work, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }); } catch { /* WebView2 still closing */ }
   return text;
 }

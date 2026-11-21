@@ -12,7 +12,7 @@ test('art-text copy is left out of the hit region and takes no pointer',()=>{
 test('art translations are painted through pass regions that the pointer gate ignores',()=>{
  const interaction=read('web/reader/modules/interaction.js'),bridge=read('native/GalWindowBridge.cs');
  assert.match(interaction,/\.megulit-art-item \.megulit-art-cn[\s\S]{0,600}pass:true/);
- assert.match(bridge,/class HitRegion\{public Rect Bounds;public bool Pass;\}/);
+ assert.match(bridge,/class HitRegion\{public Rect Bounds;public bool Pass;(?:public bool \w+;)*\}/);
  assert.match(bridge,/Pass=Bool\(rect,"pass"\)/);
  const gates=bridge.match(/new ReaderPointerGate\.Context\([^;]*;/g)||[];
  assert.ok(gates.length>=2&&gates.every(g=>g.includes('FindAll(h=>!h.Pass)')));

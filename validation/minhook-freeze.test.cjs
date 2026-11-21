@@ -27,7 +27,7 @@ test('hook search frees its hooks only through the shared quiet check',()=>{
  assert.doesNotMatch(end.slice(0,end.indexOf('VirtualFree')).replace(/\/\*[\s\S]*?\*\//g,''),/Sleep\(1000\)/);
  assert.ok(end.indexOf('MeguLitUnhook::WaitQuiet(')<end.indexOf('MH_RemoveHook('),'quiet check before the free');
  assert.match(end,/memory is kept, not freed/);
- for(const b of ['native/megulithook/build-x86.cmd','native/megulithook/build-x64.cmd'])assert.match(read(b),/veh_hook\.cpp hookfinder\.cc\)/);
+ for(const b of ['native/megulithook/build-x86.cmd','native/megulithook/build-x64.cmd'])assert.match(read(b),/veh_hook\.cpp hookfinder\.cc[ )]/);
 });
 test('the shared native self-test runs 100 rounds unless MEGULIT_SELFTEST_FULL=1, and guards the freeze time',()=>{
  const s=read('native/shared/selftest/unhook-stress.cpp');assert.match(s,/MEGULIT_SELFTEST_FULL[^\n]*\? 1000 : 100;/);

@@ -23,7 +23,7 @@ test.before(async () => {
   /* broken copy: valid manifest, the welcome clip is garbage */
   fs.cpSync(fixture, path.join(work, 'broken'), { recursive: true }); fs.writeFileSync(path.join(work, 'broken', 'light', 'intro.mp4'), Buffer.alloc(4096, 7));
   const port = 9300 + Math.floor(Math.random() * 400);
-  chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=' + port, '--user-data-dir=' + path.join(work, 'profile'), '--allow-file-access-from-files', '--autoplay-policy=no-user-gesture-required', '--mute-audio', '--no-first-run', '--window-size=1000,640', 'about:blank'], { stdio: 'ignore' });
+  chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=' + port, '--user-data-dir=' + path.join(work, 'profile'), '--allow-file-access-from-files', '--autoplay-policy=no-user-gesture-required', '--mute-audio', '--no-first-run', '--window-size=1000,640', 'about:blank'], { windowsHide: true, stdio: 'ignore' });
   let list; for (let i = 0; i < 100; i++) { try { list = JSON.parse(await get(`http://127.0.0.1:${port}/json/list`)); if (list.find((x) => x.type === 'page')) break; } catch { /* starting */ } await sleep(150); }
   ws = new WebSocket(list.find((x) => x.type === 'page').webSocketDebuggerUrl); await new Promise((r) => ws.onopen = r);
   let id = 0; const pend = new Map(); ws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id && pend.has(d.id)) { pend.get(d.id)(d); pend.delete(d.id); } };

@@ -27,7 +27,7 @@ $r.tooSmall = Lock 100 100 300 200 8 480 1800
 $r.tooBig = Lock 0 0 3000 2000 8 480 1800
 $r | ConvertTo-Json -Compress
 `);
-  out = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps], { encoding: 'utf8' }).trim().split(/\r?\n/).pop());
+  out = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps], { encoding: 'utf8', windowsHide: true }).trim().split(/\r?\n/).pop());
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -53,7 +53,7 @@ test('WM_SIZING keeps 1000:640 and clamps the width to [min, max]', () => {
 
 test('the scripts still parse', () => {
   for (const f of ['setup/setup-web.ps1', 'setup/setup-runtime.ps1']) {
-    const r = execFileSync('powershell.exe', ['-NoProfile', '-Command', `$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('${path.join(repo, f).replace(/'/g, "''")}',[ref]$null,[ref]$e);if($e){$e|%{$_.Message};exit 1}`], { encoding: 'utf8' });
+    const r = execFileSync('powershell.exe', ['-NoProfile', '-Command', `$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('${path.join(repo, f).replace(/'/g, "''")}',[ref]$null,[ref]$e);if($e){$e|%{$_.Message};exit 1}`], { encoding: 'utf8', windowsHide: true });
     assert.equal(r.trim(), '', f);
   }
 });
