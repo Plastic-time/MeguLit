@@ -300,7 +300,7 @@
 
 现在的签名（每个都在店主本机文件上正好命中 count 次，在其他引擎的文件里不命中）：
 
-**注意：字形缓存（re-bgi 在素晴日 BGI 上确认的情况）**：很多引擎的 GetGlyphOutline / TextOut 调用点在「字形缓存」函数里，一个字只在第一次进缓存时画一次（画在缓存位图的 0,0），之后再显示同一个字不再调用。这种点的记录只有「这次新进缓存的字」，拼不出整句，也没有画布坐标。DrawSites 适合的是每次显示都调用、带笔位的点（AVG32 的 TextOutA 每个字都画进文字 DIB）。AdvHD 本机版本已静态确认缓存命中绕过旧点，输入诊断见下节。其余 GetGlyphOutline 签名（Softpal、CMVS、FVP、minori、Musica、沙耶两版）以及 NScripter 的字形小图都还没确认是不是缓存：实机看同一个字在第二句里还出不出现就知道。是缓存的，就要像 re-bgi 那样往上找排版函数（BGI 的字节点链）再签，GDI 点只留作「字形 → 例程」的旁证
+**注意：字形缓存（re-bgi 在素晴日 BGI 上确认的情况）**：很多引擎的 GetGlyphOutline / TextOut 调用点在「字形缓存」函数里，一个字只在第一次进缓存时画一次（画在缓存位图的 0,0），之后再显示同一个字不再调用。这种点的记录只有「这次新进缓存的字」，拼不出整句，也没有画布坐标。DrawSites 适合的是每次显示都调用、带笔位的点（AVG32 的 TextOutA 每个字都画进文字 DIB）。AdvHD 与 CMVS 的本机版本已静态确认缓存命中绕过旧点，输入诊断见下节。其余 GetGlyphOutline 签名（Softpal、FVP、minori、Musica、沙耶两版）以及 NScripter 的字形小图都还没确认是不是缓存：实机看同一个字在第二句里还出不出现就知道。是缓存的，就要像 re-bgi 那样往上找排版函数（BGI 的字节点链）再签，GDI 点只留作「字形 → 例程」的旁证
 
 ### 给其他逆向会话：GDI 类引擎直接加签名，不要各写一套钩子
 BGI、Siglus 等只要画字最终经过 TextOut / ExtTextOut / DrawText / GetGlyphOutline（A 或 W），就复用 DrawSites：
@@ -352,6 +352,8 @@ e-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4
 ### CMVS（青い鳥，Steam）
 - 点：cmvs32.exe 0x46145e，字形例程 0x4613b0（EBP 帧，2 个调用者）里每个字一次 `GetGlyphOutlineA(hdc, 字, GGO_GRAY4, &gm, 0, NULL, &mat)`（0x4614b7 是栅格化那次，不签）。字形进 D3D11 纹理，没有笔位，via / via2 是调用者
 - 店主测试清单：同 AVG32，行里是 `engine=cmvs`
+- 缓存限制已静态确认：0x414010 命中时绕过上述 GDI 点，0x461b20 的度量缓存、0x461bb0 的已有字形参数、0x43abb0 的节点位图也存在复用路径，不能据旧点重组完整画面文字
+- 新增 `CmvsDraw.h` 只诊断两个全文绘制入口 0x464850 / 0x465720，二者均为 ECX=this、arg1 完整串、arg2 结构、callee ret8。SHA256 `3a2ec3af6a16a4f36d72faf9e7cb14e2bcc883fbf22fb31da5d69434cc53727e`、1061728 字节、两个唯一 RVA 必须全部验证；`draw.cmvsInput=false` 默认关闭，不授予角色、屏幕坐标、隐藏、嵌入或 reader 原文能力，没有 seed 开启。0x463810 测量入口是负例，不能当作绘制。详见 [re-cmvs-input.md](re-cmvs-input.md)
 
 ### FVP（いろとりどりのヒカリ 中文版 Hikari.exe / HD 版 irohika_HD.exe，两个是同一套布局）
 - 点：字形例程（Hikari 0x430d10 / HD 0x432790 附近）按第三个参数走两条路：只要 `GetGlyphOutlineA(.., GGO_METRICS, ..)`（Hikari 0x430d6f），或 GGO_BITMAP 先量再画（画那次 Hikari 0x430e2c）。各签一条：`fvp` 和 `fvp-bitmap`

@@ -81,3 +81,5 @@ rem Majiro complete-string observer: signatures and real MinHook gate, x86 and x
 call "%~dp0run-majiro.cmd" || exit /b 1
 rem AdvHD version-pinned diagnostic input, custom EAX + eleven-word ABI and x64 no-op.
 call "%~dp0run-advhd.cmd" || exit /b 1
+rem CMVS paired full-input diagnostics, real ECX/two-word callee-cleaned ABI.
+call "%~dp0run-cmvs.cmd" || exit /b 1

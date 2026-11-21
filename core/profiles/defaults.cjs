@@ -98,6 +98,7 @@ module.exports={
   roles:false,
   /* Version-pinned diagnostic full input only; does not grant roles, hide or embedding. */
   advhdInput:false,
+  cmvsInput:false,
   /* the game draws MeguLit's replacement of a dialogue line itself (Japanese + ruby [+ Chinese]); false = hide + overlay */
   embed:false,
   /* with embed on, the Chinese is drawn by the game too (false = ruby only, the reader draws the Chinese) */
