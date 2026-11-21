@@ -11,7 +11,7 @@
      per game after a live check). */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const root=path.join(__dirname,'..'),hook=path.join(root,'native','megulithook');
-const RUNTIMES=['DrawSites.h','YurisDraw.h','SiglusDraw.h','MagesDraw.h','CS2Draw.h','BgiDraw.h'];
+const RUNTIMES=['DrawSites.h','YurisDraw.h','SiglusDraw.h','MagesDraw.h','CS2Draw.h','BgiDraw.h','MajiroDraw.h'];
 const SEEDS_ON=[]; /* seed folders (engine/game) allowed to turn draw.roles or draw.embed on */
 
 const strip=s=>s.replace(/\/\*[\s\S]*?\*\//g,m=>m.replace(/[^\n]/g,' ')).replace(/\/\/[^\n]*/g,m=>' '.repeat(m.length)).replace(/"(?:[^"\\\n]|\\.)*"/g,m=>'"'+' '.repeat(m.length-2)+'"');

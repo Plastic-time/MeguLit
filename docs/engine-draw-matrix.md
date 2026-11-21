@@ -30,6 +30,10 @@
 
 GetGlyphOutline 类的签名（Softpal、AdvHD、CMVS、FVP、minori、Musica、沙耶两版）以及 NScripter 的字形小图，是不是字形缓存（只有第一次出现的字）还要实机确认，见 engine-draw-native.md「注意：字形缓存」
 
+## Majiro 本轮分支交付
+
+`codex/night-engine-majiro` 补齐旧版 Majiro 六件套，尚待总指挥合并。`MajiroDraw.h` 在字体缓存判断之前观察完整字符串，签名只在本机姫子样本命中一次，22 个其他引擎程序均未命中。默认不挂，没有游戏 seed 开启。真实游戏坐标、角色、注音和译文效果尚未验收，不能据此写“适配完成”。详细证据及下一步见 [engine-draw-native.md](engine-draw-native.md) 的 Majiro 节
+
 ## 图例
 
 - **内**：引擎内部读。在引擎自己的脚本层 / 画字函数里拿到（KAG 的 processCh、Ren'Py 的 Layout、RPG Maker 的 Window_Message、TMP 的 characterInfo、ISLAND 的画字调用）。知道是谁在画、画的是什么角色
@@ -72,7 +76,7 @@ GetGlyphOutline 类的签名（Softpal、AdvHD、CMVS、FVP、minori、Musica、
 | CatSystem2 | ISLAND 精确匹配画字钩子（ToMeIslandDraw.h，含 ruby）；其他 CS2 走 LunaHook + cs2 屏幕协议 | 内（ISLAND）/ 外 | 内（ISLAND）/ 外 | 外 | 外 | 无 | 无 | 内（ISLAND） | 把 ISLAND 的画字钩子按特征码泛化到其他 cs2.exe 版本 | L | CatSystem2 工具（cstl / cst 解包）、LunaHook CS2 |
 | YU-RIS | megulithook Yuris.cpp（内嵌 + 选项） | 外（流） | 外（字形点） | 外 | 外（独立选项流） | 无 | 外（写回） | 外（Yuris ruby 串） | YU-RIS 画字（ESC 码解析后的字形函数）签名；按钮多是图片 | L | YurisTools、yu-ris 解包 |
 | AdvHD / WillPlus | LunaHook（只读流 + flush 延迟）；Euphoria HD 474 精确匹配画字 | 外 / 内（474） | 外（字形点）/ 内（474） | 外 | 外 | 无 | 无（只读） | 无 | 泛化 474 的画字钩子；AdvHD 的 .ws2 VM 文本函数 | L | AdvHDTools、ArcUnpacker、LunaHook WillPlus |
-| Majiro | LunaHook | 外 | 外（GDI 字形点，Majiro 走 GetGlyphOutline） | 外 | 外 | 无 | 外（LunaHook 写回） | 无 | mjo VM 的文本操作码处理函数 | L | majiro-tools / mjotool |
+| Majiro | LunaHook + MajiroDraw.h（旧版完整字符串画字观察层） | 内（传入画字函数的 CP932 整串，静态与回放） | 内（font 笔位，画布坐标，待实机） | 外 | 外 | 无 | 外（既有 LunaHook 写回） | 无 | 真机区分角色、坐标原点和 paint 含义；第二版本；接入实时角色协议 | L | LunaHook Majiro、majiro-tools / mjotool、VNTranslationTools |
 | QLIE | LunaHook | 外 | 外（字形点） | 外 | 外 | 无 | 外 | 无 | Delphi 引擎，画字在 TQLIE 文本对象里；要按版本找 | L | QLIE 解包（qlie-tools）、LunaHook |
 | Malie | LunaHook（内嵌） | 外 | 外（GPU 四边形） | 外 | 外 | 无 | 外 | 无 | Malie 自绘字体，画字函数在 exe 内；Camellia 密钥已有 | L | MalieTools、LunaHook Malie |
 | Softpal / Pal | megulithook Pal.cpp（内嵌 + ruby + pal_sprite_v1 坐标通道） | 外（流） | 内（pal_sprite_v1 文字精灵） | 外 | 外 | 无 | 外（写回） | 外 | 精灵通道加角色字段；选项精灵 | M | SoftpalTools、LunaHook Pal |
@@ -141,7 +145,7 @@ GetGlyphOutline 类的签名（Softpal、AdvHD、CMVS、FVP、minori、Musica、
 | 引擎 | 本机样本 | 备注 |
 |---|---|---|
 | Silky's AI5WIN / AI6WIN、LiveMaker、AliceSoft System4、Escu:de、Kaguya | 无 | 见上表 |
-| Majiro | 无 | GetGlyphOutline 路线，适合 DrawSites |
+| Majiro | ナルキッソス 姫子エピローグ，Narci_himeko.exe，MajiroArcV3.000 | 完整字符串画字 0x41a660 的结构签名 + 默认关闭观察层 + 32/64 位独立回放已完成；只有一版样本，未实机，不开 seed |
 | QLIE | 无 | Delphi，画字在 TQLIE 文本对象 |
 | Malie | 无 | 自绘字库，类似 MAGES |
 | CIRCUS | 无 | MES VM，GDI 字形点 |

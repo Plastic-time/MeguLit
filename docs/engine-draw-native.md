@@ -317,7 +317,8 @@ BGI、Siglus 等只要画字最终经过 TextOut / ExtTextOut / DrawText / GetGl
 ### ReaLive / AVG32（涙 ～流星のザドル～）
 - 点：AVG3216D.EXE 0x413880，例程 0x413730（把一串字画进文字 DIB，一字一次 `TextOutA(hdc, x - 滚动, y, 字, 1|2)`，有 EBP 帧，5 个调用者）。x / y 就是画布笔位
 - 另一个 TextOutA（0x41f888）在设置对话框里，不签
-- 新版 AVG32（Air 中文版 air_cn.exe）：exe 是 UPX 压缩的，所以普查里看着「导入了 TextOutA 却没有引用」；用官方 UPX 4.2.4（H:\MeguLit-Work\deps）只读解出一个副本（H:\MeguLit-Worke-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4186a4 正好命中一次，是同一个例程。运行时 UPX 会把真正的导入表在内存里原样重建，但 PE 头只列 UPX 自己的几个导入，所以 DrawSites 在头里找不到槽时改按值找（`call [X]` 里 X 的内容等于 TextOutA 的真实地址）。旁边 7 KB 的 avg32_cn.dll 是中文补丁（另一种压缩壳），不画字
+- 新版 AVG32（Air 中文版 air_cn.exe）：exe 是 UPX 压缩的，所以普查里看着「导入了 TextOutA 却没有引用」；用官方 UPX 4.2.4（H:\MeguLit-Work\deps）只读解出一个副本（H:\MeguLit-Work
+e-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4186a4 正好命中一次，是同一个例程。运行时 UPX 会把真正的导入表在内存里原样重建，但 PE 头只列 UPX 自己的几个导入，所以 DrawSites 在头里找不到槽时改按值找（`call [X]` 里 X 的内容等于 TextOutA 的真实地址）。旁边 7 KB 的 avg32_cn.dll 是中文补丁（另一种压缩壳），不画字
 - 店主测试清单：
   1. 写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，内容 `#cfg roles=1`），或在 The Seed 里给这部游戏的差分设 `"draw":{"roles":true}`
   2. 开游戏推 5 句、出一次选项
@@ -382,6 +383,29 @@ BGI、Siglus 等只要画字最终经过 TextOut / ExtTextOut / DrawText / GetGl
 - 点：system.dll 0x100350cf（saya.exe 只有 44 KB，引擎在 system.dll），字形例程 0x10034fc0 每个字一次 `GetGlyphOutlineA(hdc, 字, GGO_GRAY4, &gm, 0, NULL, &mat)`（0x100351cf 是栅格化那次，不签）
 - 例程没有 EBP 帧（SEH + 0xbc 局部 + 4 个寄存器，深 0xd8），返回地址在 API 第一个参数上方 0xf4。system.dll 里另外 7 个 TextOutA（0x100355c0、0x1003a892…）是别的例程，先不签
 - 店主测试清单：同 AVG32，行里是 `engine=nitropak`
+
+### Majiro 旧版（ナルキッソス 姫子エピローグ）
+
+本轮是静态逆向与独立原生回放，未启动游戏，未开启任何 seed。样本来自店主授权的浮士德生肉来源，`Narci_himeko.exe` 的 SHA256 是 `45c8a1b5ea39a552629e637e4435b9fa9639978f40f3c164a24867c739d70075`，`scenario.arc` 是 MajiroArcV3.000。当前只有一个版本，不能宣称跨版本覆盖
+
+完整字符串画字函数在 `0x41a660`，cdecl 五参数依次为字体对象、目标、CP932 字符串、输出框和标志。字体对象的 `+0x48/+0x4c` 是画布笔位，`+0x28` 是字号，`+0x38` 只记录为原始 paint 值，其颜色语义还没证明。函数把笔位写入输出框，调用者再按返回宽度推进 x。已定位调用点 `0x41a1b5`、`0x41a29b`、`0x41f554`
+
+这个函数内部有六个 TextOutA 调用，分别处于字形缓存未命中、描边等路径。缓存命中会绕过它们，所以观察完整函数入口。签名要求序言局部栈尺寸、第三参数文本偏移、第一参数字体偏移、字号和输出框笔位写入同时相符，运行时整个映像必须恰好命中一次，否则不装钩子。地址只用于证据，运行时不用固定 RVA
+
+六件套如下
+
+1. `tools/engine-sigs/majiro-draw.cjs`，只读 PE 可执行节，报告候选入口和布局
+2. `native/megulithook/MajiroDrawSig.h`，同一套纯结构匹配
+3. `validation/fixtures/engine-sigs/majiro-draw.json` 和原生 `majirodraw-snippet.h`，原 exe 的 512 字节、SHA256、入口和参数证据
+4. `validation/engine-draw-sig-majiro.test.cjs`，原 exe 唯一命中、损坏布局拒绝、重复命中保留给运行时拒绝、22 个本机其他引擎程序不命中
+5. `native/megulithook/selftest/majirodraw.cpp` 与 `run-majiro.cmd`，32/64 位原生签名自检，完整 selftest 入口会调用它
+6. `native/megulithook/selftest/majirodraw-gate.cpp`，32 位真实 MinHook 门回放和 64 位空实现，检查五参数、输出副作用、返回宽度、EBX/ESI/EDI、缓存命中也上报、实际调用者和笔位变化
+
+运行时观察层 `native/megulithook/MajiroDraw.h` 读取整串、画布笔位、字号、原始 paint、返回宽度和调用者 RVA，写 `ToMe_DRAWRUN engine=majiro`，保留原函数参数、输出和返回值
+
+默认只扫描，不挂钩子。进程的 draw 控制文件精确包含 `#cfg ... roles=1` 才安装，`roles=0/10` 均不安装。`engine-draw-opt-in.test.cjs` 已包含这个新观察层，没有 seed 获准开启。它现在只输出诊断，不上报确定角色的 `ToMe_CHARS`，也不隐藏或替换原文
+
+后续实机采集须经游戏适配单队列排期，先 MuteProc 再 HidDesk run，并在 finally 关闭自己启动的进程和恢复静音。临时允许名单和 seed 开关只为这一部游戏建立。推进至少 20 句，重复出现相同字验证缓存命中仍完整，分别记录正文、名字、选项、菜单和 ruby，截图与 DRAWRUN 对齐以确定画布原点和角色调用者。观察层开启、关闭都回放原始句序，确认其他游戏不受影响。补第二个 Majiro 版本后才谈泛化；现在不把原生 stand-in 回放当成游戏实测
 
 ### 静态做不出签名的（写清缺什么，不硬交）
 | 引擎 / 游戏 | 静态看到的 | 缺什么 | 下一步 |
