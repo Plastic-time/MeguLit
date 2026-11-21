@@ -10,6 +10,7 @@ module.exports={
  source:{
   /* Artemis64x: retain a quoted message split across one callback batch; only a measured version opts in. */
   artemisQuoteSpans:false,
+  siglusDbsNameColumn:null,
  },
  placement:{
   /* where the first line of a page is anchored: null = kernel (glyph records, then the text box); 'glyph' | 'box' | 'page' */
