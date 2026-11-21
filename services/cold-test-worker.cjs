@@ -20,3 +20,4 @@ process.on('message',async m=>{
  try{process.send({type:'cold-result',result:r},()=>process.exit(0));}catch{process.exit(1);}
 });
 process.on('disconnect',()=>process.exit(0));
+send({type:'cold-worker-ready',protocol:1});

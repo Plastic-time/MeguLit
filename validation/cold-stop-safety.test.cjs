@@ -8,7 +8,7 @@ function fixture({exitOnStop=true,key=async()=> '1'.repeat(64)}={}){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'cold-stop-')),app=path.join(dir,'app'),game=path.join(dir,'game'),exe=path.join(game,'Safety.exe');
  fs.mkdirSync(path.join(game,'savedata'),{recursive:true});fs.mkdirSync(path.join(app,'native'),{recursive:true});fs.writeFileSync(exe,'MZ');fs.writeFileSync(path.join(game,'savedata','save.dat'),'original');fs.writeFileSync(path.join(app,'native','ColdDesk.exe'),'');
  const helper=new EventEmitter();helper.stdout=new PassThrough();helper.pid=7001;helper.stdin={write:()=>true,end:()=>{helper.stopRequested=true;}};
- let workerExited=false;const worker=new EventEmitter();worker.send=(m,cb)=>{cb?.(null);if(m?.exe)queueMicrotask(()=>worker.emit('message',{type:'cold-native-spawn'}));if((m?.stop&&exitOnStop)||m?.type==='cold-native-error')queueMicrotask(()=>exitWorker());return true;};worker.kill=()=>assert.fail('must not kill the worker to assume native cleanup');
+ let workerExited=false;const worker=new EventEmitter();worker.pid=6001;worker.send=(m,cb)=>{cb?.(null);if(m?.exe)queueMicrotask(()=>{worker.emit('message',{type:'cold-worker-ready',protocol:1});worker.emit('message',{type:'cold-native-spawn'});});if((m?.stop&&exitOnStop)||m?.type==='cold-native-error')queueMicrotask(()=>exitWorker());return true;};worker.kill=()=>assert.fail('must not kill the worker to assume native cleanup');
  const exitWorker=()=>{if(workerExited)return;workerExited=true;worker.emit('exit',0);worker.emit('close',0);};
  for(const id of ['./background-games.cjs','./cold-native-session.cjs'])delete require.cache[requireSvc.resolve(id)];
  const bg=requireSvc('./background-games.cjs'),session=requireSvc('./cold-native-session.cjs');
@@ -91,5 +91,9 @@ test('idle may ignore only its own registered release function and keeps every r
 });
 test('cold tick re-reads real idle conditions after network and hashing before any snapshot or spawn',async()=>{
  const f=fixture();let reads=0,runs=0;try{const out=await f.svc.tick(f.app,{deps:{platform:'win32',helper:true,reading:async()=>({idleMs:reads++?0:1200000,cpu:.01,ac:true,fullscreen:false}),playing:()=>false,games:()=>[{id:'safety',title:'Safety',exe:f.exe,engine:'kirikiri'}],env:{},retest:async()=>({keys:{},games:{}}),runner:async()=>{runs++;return {shots:[]};}}});assert.equal(reads,2);assert.equal(runs,0);assert.equal(out.result.why,'not-idle');assert.equal(require('../core/cold-test/saves.cjs').failed(f.app).length,0);}
+ finally{f.cleanup();}
+});
+test('an old worker without the parent-owned native protocol cannot claim safe cleanup',async()=>{
+ const f=fixture();try{f.worker.send=(m,cb)=>{cb?.(null);if(m?.exe)queueMicrotask(()=>f.exitWorker());return true;};const r=await f.svc.runInWorker({root:f.app,exe:f.exe,budgetMs:1000});assert.equal(r.cleanupConfirmed,false);assert.match(r.errors.join(' '),/PROTOCOL_UNCONFIRMED/);await assert.rejects(f.bg.foreground(),{code:'COLD_CLEANUP_UNCONFIRMED'});}
  finally{f.cleanup();}
 });

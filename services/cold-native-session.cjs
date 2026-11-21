@@ -5,7 +5,7 @@ const background=require('./background-games.cjs');
 
 /* The main process owns ColdDesk. A worker exit cannot release the save/launch barrier. */
 function runInWorker(opts,{forker=fork,spawner=spawn,stopTimeoutMs=12000,onState=()=>{}}={}){
- let worker=null,helper=null,workerClosed=false,helperClosed=true,cleanupSafe=true,finished=false,stopping=false,nativeStopSent=false,result=null,failure=null;
+ let worker=null,helper=null,workerReady=false,workerClosed=false,helperClosed=true,cleanupSafe=true,finished=false,stopping=false,nativeStopSent=false,result=null,failure=null;
  let resolveRun,resolveClosed,reapWorker=null;const run=new Promise(r=>resolveRun=r),closed=new Promise(r=>resolveClosed=r);
  const error=code=>Object.assign(Error(code),{code});
  const send=m=>{if(worker&&!workerClosed)try{const ready=worker.send(m,e=>{helper?.stdout?.resume?.();if(e&&!workerClosed){failure=String(e.message||e);nativeStop();}});if(ready===false)helper?.stdout?.pause?.();}catch(e){failure=String(e.message||e);nativeStop();}};
@@ -14,6 +14,7 @@ function runInWorker(opts,{forker=fork,spawner=spawn,stopTimeoutMs=12000,onState
  function finish(){
   if(finished||!workerClosed||!helperClosed)return;
   finished=true;clearTimeout(budget);clearTimeout(reapWorker);
+  if(worker?.pid&&!workerReady){cleanupSafe=false;failure=failure||'COLD_WORKER_PROTOCOL_UNCONFIRMED';}
   const safe=cleanupSafe;
   if(safe)untrack();
   resolveClosed(safe&&!failure);resolveRun({...result,end:result?.end||(failure?'helper-error':'worker-exit'),cleanupConfirmed:safe,stopped:result?.stopped||(stopping?'foreground':''),errors:[...(result?.errors||[]),...(failure?[failure]:[])]});
@@ -29,7 +30,9 @@ function runInWorker(opts,{forker=fork,spawner=spawn,stopTimeoutMs=12000,onState
  try{worker=forker(path.join(__dirname,'cold-test-worker.cjs'),[],{stdio:['ignore','ignore','ignore','ipc'],windowsHide:true});}
  catch(e){failure=String(e?.message||e);workerClosed=true;finish();return run;}
  worker.on('message',m=>{
+  if(m?.type==='cold-worker-ready'&&m.protocol===1){workerReady=true;return;}
   if(m?.type==='cold-native-spawn'){
+   if(!workerReady){failure='COLD_WORKER_PROTOCOL_UNCONFIRMED';requestStop();return;}
    if(helper||stopping){send({type:'cold-native-error',error:'cold run cancelled before spawn'});return;}
    helperClosed=false;cleanupSafe=false;
    try{const file=require('./cold-test-run.cjs').helperPath(opts.root);if(!file)throw Error('ColdDesk unavailable');
