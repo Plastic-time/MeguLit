@@ -1,0 +1,221 @@
+{
+  "python": "3.13.15 (tags/v3.13.15:4061bc4, Aug  5 2026, 13:05:39) [MSC v.1944 64 bit (AMD64)]",
+  "scope": "ordinary CPython fake str-subclass reductions, not RenPy compiler or game bytes",
+  "fixtures": [
+    {
+      "protocol": 2,
+      "argsLength": 3,
+      "bytes": 82,
+      "base64": "gAJjcmVucHkuYXN0c3VwcG9ydApQeUV4cHIKcQBYEQAAAG5ldXRyYWxfY29uZGl0aW9ucQFYDQAAAHN5bnRoZXRpYy5ycHlxAksMh3EDUnEELg==",
+      "opcodes": [
+        "BININT1",
+        "BINPUT",
+        "BINUNICODE",
+        "GLOBAL",
+        "PROTO",
+        "REDUCE",
+        "STOP",
+        "TUPLE3"
+      ]
+    },
+    {
+      "protocol": 2,
+      "argsLength": 4,
+      "bytes": 85,
+      "base64": "gAJjcmVucHkuYXN0c3VwcG9ydApQeUV4cHIKcQAoWBEAAABuZXV0cmFsX2NvbmRpdGlvbnEBWA0AAABzeW50aGV0aWMucnB5cQJLDEsDdHEDUnEELg==",
+      "opcodes": [
+        "BININT1",
+        "BINPUT",
+        "BINUNICODE",
+        "GLOBAL",
+        "MARK",
+        "PROTO",
+        "REDUCE",
+        "STOP",
+        "TUPLE"
+      ]
+    },
+    {
+      "protocol": 2,
+      "argsLength": 5,
+      "bytes": 92,
+      "base64": "gAJjcmVucHkuYXN0c3VwcG9ydApQeUV4cHIKcQAoWBEAAABuZXV0cmFsX2NvbmRpdGlvbnEBWA0AAABzeW50aGV0aWMucnB5cQJLDEsDigX/////AHRxA1JxBC4=",
+      "opcodes": [
+        "BININT1",
+        "BINPUT",
+        "BINUNICODE",
+        "GLOBAL",
+        "LONG1",
+        "MARK",
+        "PROTO",
+        "REDUCE",
+        "STOP",
+        "TUPLE"
+      ]
+    },
+    {
+      "protocol": 2,
+      "argsLength": 6,
+      "bytes": 94,
+      "base64": "gAJjcmVucHkuYXN0c3VwcG9ydApQeUV4cHIKcQAoWBEAAABuZXV0cmFsX2NvbmRpdGlvbnEBWA0AAABzeW50aGV0aWMucnB5cQJLDEsDigX/////AEsRdHEDUnEELg==",
+      "opcodes": [
+        "BININT1",
+        "BINPUT",
+        "BINUNICODE",
+        "GLOBAL",
+        "LONG1",
+        "MARK",
+        "PROTO",
+        "REDUCE",
+        "STOP",
+        "TUPLE"
+      ]
+    },
+    {
+      "protocol": 4,
+      "argsLength": 3,
+      "bytes": 84,
+      "base64": "gASVSQAAAAAAAACMEHJlbnB5LmFzdHN1cHBvcnSUjAZQeUV4cHKUk5SMEW5ldXRyYWxfY29uZGl0aW9ulIwNc3ludGhldGljLnJweZRLDIeUUpQu",
+      "opcodes": [
+        "BININT1",
+        "FRAME",
+        "MEMOIZE",
+        "PROTO",
+        "REDUCE",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE3"
+      ]
+    },
+    {
+      "protocol": 4,
+      "argsLength": 4,
+      "bytes": 87,
+      "base64": "gASVTAAAAAAAAACMEHJlbnB5LmFzdHN1cHBvcnSUjAZQeUV4cHKUk5QojBFuZXV0cmFsX2NvbmRpdGlvbpSMDXN5bnRoZXRpYy5ycHmUSwxLA3SUUpQu",
+      "opcodes": [
+        "BININT1",
+        "FRAME",
+        "MARK",
+        "MEMOIZE",
+        "PROTO",
+        "REDUCE",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE"
+      ]
+    },
+    {
+      "protocol": 4,
+      "argsLength": 5,
+      "bytes": 94,
+      "base64": "gASVUwAAAAAAAACMEHJlbnB5LmFzdHN1cHBvcnSUjAZQeUV4cHKUk5QojBFuZXV0cmFsX2NvbmRpdGlvbpSMDXN5bnRoZXRpYy5ycHmUSwxLA4oF/////wB0lFKULg==",
+      "opcodes": [
+        "BININT1",
+        "FRAME",
+        "LONG1",
+        "MARK",
+        "MEMOIZE",
+        "PROTO",
+        "REDUCE",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE"
+      ]
+    },
+    {
+      "protocol": 4,
+      "argsLength": 6,
+      "bytes": 96,
+      "base64": "gASVVQAAAAAAAACMEHJlbnB5LmFzdHN1cHBvcnSUjAZQeUV4cHKUk5QojBFuZXV0cmFsX2NvbmRpdGlvbpSMDXN5bnRoZXRpYy5ycHmUSwxLA4oF/////wBLEXSUUpQu",
+      "opcodes": [
+        "BININT1",
+        "FRAME",
+        "LONG1",
+        "MARK",
+        "MEMOIZE",
+        "PROTO",
+        "REDUCE",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE"
+      ]
+    },
+    {
+      "protocol": 5,
+      "argsLength": 3,
+      "bytes": 84,
+      "base64": "gAWVSQAAAAAAAACMEHJlbnB5LmFzdHN1cHBvcnSUjAZQeUV4cHKUk5SMEW5ldXRyYWxfY29uZGl0aW9ulIwNc3ludGhldGljLnJweZRLDIeUUpQu",
+      "opcodes": [
+        "BININT1",
+        "FRAME",
+        "MEMOIZE",
+        "PROTO",
+        "REDUCE",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE3"
+      ]
+    },
+    {
+      "protocol": 5,
+      "argsLength": 4,
+      "bytes": 87,
+      "base64": "gAWVTAAAAAAAAACMEHJlbnB5LmFzdHN1cHBvcnSUjAZQeUV4cHKUk5QojBFuZXV0cmFsX2NvbmRpdGlvbpSMDXN5bnRoZXRpYy5ycHmUSwxLA3SUUpQu",
+      "opcodes": [
+        "BININT1",
+        "FRAME",
+        "MARK",
+        "MEMOIZE",
+        "PROTO",
+        "REDUCE",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE"
+      ]
+    },
+    {
+      "protocol": 5,
+      "argsLength": 5,
+      "bytes": 94,
+      "base64": "gAWVUwAAAAAAAACMEHJlbnB5LmFzdHN1cHBvcnSUjAZQeUV4cHKUk5QojBFuZXV0cmFsX2NvbmRpdGlvbpSMDXN5bnRoZXRpYy5ycHmUSwxLA4oF/////wB0lFKULg==",
+      "opcodes": [
+        "BININT1",
+        "FRAME",
+        "LONG1",
+        "MARK",
+        "MEMOIZE",
+        "PROTO",
+        "REDUCE",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE"
+      ]
+    },
+    {
+      "protocol": 5,
+      "argsLength": 6,
+      "bytes": 96,
+      "base64": "gAWVVQAAAAAAAACMEHJlbnB5LmFzdHN1cHBvcnSUjAZQeUV4cHKUk5QojBFuZXV0cmFsX2NvbmRpdGlvbpSMDXN5bnRoZXRpYy5ycHmUSwxLA4oF/////wBLEXSUUpQu",
+      "opcodes": [
+        "BININT1",
+        "FRAME",
+        "LONG1",
+        "MARK",
+        "MEMOIZE",
+        "PROTO",
+        "REDUCE",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE"
+      ]
+    }
+  ]
+}
