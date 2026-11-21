@@ -152,5 +152,5 @@ while($true){Get-Process MeguLit,node,GalWindowBridge,msedgewebview2 -ErrorActio
 - GalWindowBridge 无目标250ms；绑定16ms、拖动8ms不变。无实测温度/整机 CPU 降幅数字
 - 自动预热、延后语音扫描、适配包同步与自动探针使用真实闲置许可；每游戏/适配包/上传收集阶段复查。worker 通过 IPC 向持有玩家状态的主服务申请许可，自动恢复也走相同门槛。手动发起的扫描/同步仍立即处理
 - 当前正在执行的一个读档/重建/网络请求会完成再检查下一项，未引入强制中断以免损坏索引；本轮没有改冷测试默认开关或 Anki 自启默认值
-- 自动化验收：`validation/cpu-idle.test.cjs` 与 `cpu-background-budget.test.cjs`，加原有 reader/适配/语音回归；可选真实 DOM 复查复用 `tools/reader-replay/driver.cjs tools/reader-replay/scenarios/cpu-idle-smoke.json <H盘输出.json>`，输出 errors 必须为空且 console 包含 CPU_READER_PASS、CPU_DRIFT_PASS（3次失焦/回焦）
+- 自动化验收：`validation/cpu-idle.test.cjs` 与 `cpu-background-budget.test.cjs`，加原有 reader/适配/语音回归；可选真实 DOM 复查复用 `node services/cardinal/driver.cjs tools/reader-replay/scenarios/cpu-idle-smoke.json <H盘输出.json>`，输出 errors 必须为空且 console 包含 CPU_READER_PASS、CPU_DRIFT_PASS（3次失焦/回焦）
 - 5分钟测量清单和只读脚本见 `H:\MeguLit-Work\night-1423\cpu-5min-checklist.md`、`measure-cpu-5min.ps1`；必须同库同画质做前后对照，不能把DOM调度通过当成温度改善已测

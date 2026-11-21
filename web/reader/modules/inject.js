@@ -6,7 +6,7 @@
   }
   if (window.__tomoyoChinese) return;
   const bridge = window.__tomoyoChinese = { current: '', serial: 0, timer: null };
-  bridge.refresh = () => { if(bridge.refreshPageTranslations?.())return;bridge.current = ''; bridge.serial++; clearTimeout(bridge.timer); schedule(); };
+  bridge.refresh = () => { bridge.cardinalPair?.refresh();if(bridge.refreshPageTranslations?.())return;bridge.current = ''; bridge.serial++; clearTimeout(bridge.timer); schedule(); };
   bridge.sourceText = '';
   let row, output, parent;
   let translationVisible = true;
@@ -14,6 +14,7 @@
   bridge.setTranslationVisible = value => {
     if (translationVisible === !!value) return;
     translationVisible = !!value;
+    bridge.cardinalPair?.refresh();
     bridge.refresh();
     if (output) output.hidden = !enabled || !translationVisible;
     try { window.__tomoyoTranslateRequest(JSON.stringify({ id: bridge.serial, disabled: !translationVisible })); } catch {}
@@ -24,6 +25,7 @@
     const next = !!value;
     if (next === enabled) return;
     enabled = next;
+    bridge.cardinalPair?.refresh();
     localStorage.setItem('tomoyo-chinese-enabled', String(enabled));
     bridge.current = '';
     bridge.serial++;
@@ -73,6 +75,7 @@
     if (!output) return;
     const was = output.dataset.state === 'ready' ? [...output.textContent] : [];
     output.dataset.state = error ? 'error' : 'ready';
+    bridge.cardinalPair?.notify();
     if (output.textContent === text) return;
     if (animate && window.TomeTypewriter) { const now = [...text]; let from = 0; while (from < was.length && from < now.length && was[from] === now[from]) from++; window.TomeTypewriter.text(output, text, { from }); }
     else {
@@ -130,6 +133,7 @@
     if (!ensureRow(sentence)) { skip('no sentence window'); return; }
     const chars = sentence.querySelectorAll('.char-token');
     const text = (chars.length ? Array.from(chars, c => c.textContent).join('') : sentence.textContent).trim();
+    bridge.cardinalPair?.bind(null, sentence, output);
     if (text !== bridge.sourceText) { bridge.sourceText = text; bridge.onSourceText?.(text); }
     if (!enabled || !translationVisible || !text || text === bridge.current) { skip(!enabled ? 'translation off' : !translationVisible ? 'translation hidden' : !text ? 'empty line' : 'already asked', text); return; }
     const growing = grown(bridge.current, text) && output.dataset.state === 'ready' && !!output.textContent;

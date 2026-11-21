@@ -143,3 +143,9 @@ runner 不以 `exit` 代替 `close`。停止先请求 driver 通过 IPC 正常�
 评分规则 rev7 将实际显示配对与缓存可用性分开：每个 source occurrence 有 session/episode、scope、target 和 sourceKey；同序列重绘保留同一次，重复原文的新序列另计。reader_message 的 cardinalPairPolicy / cardinalPair 合同负责开关和目标变更、逐次观测与过期拒收，只有具备对应可用译文且通过该次显示观测才能 paired。快照是固定计数，不被之后同文缓存回填
 
 无显示 ACK 为 unobserved，确实观察到无译文为 unpaired，用户明确关闭则 excluded；全 excluded 时 pair 不适用，记录值0，不伪造满分。缺观测不作可靠上传。缓存 store/hit/near 只登记 availability，不证明DOM已显示。后端合同与实际DOM接线分开验，协议单元中的ACK均明确为 synthetic transport 输入，不是健康实机
+
+DOM 薄接线使用 `cardinal-pair.js`，在普通单行与 island-page 实际节点上检查完整正文（不含 ruby 读音）、当前目标、开关、样式与视口、ready 译文；scope 回执仅更新对应当前 episode。节点变化与已有 reveal-progress 触发合并的单帧检查，没有新增常驻 interval 或动画循环。原生写回、compositor、隐藏/不可确认的正文不冒充 DOM 显示观测
+
+旧真实海馆坏录制只含缓存 Set 口径，没有逐次显示 ACK；原始 fixture 保留，rev7 总分保守为0.257、pair 为0且 unobserved，不能用于可靠上传或健康实机验收。新增 DOM 节点测试属于明确的合成单元边界，尚未在资源不足的本机启动浏览器或游戏验证这次接线
+
+待传文档必须为当前兼容 rev、`unreliable:false` 且显示、隐藏、投递时钟和选项观测均可靠；旧文档留在本地不补传、不改分。首次结果落盘失败只留错误 trace、不上传；网络失败的合格已落盘记录仍可按原 `record.at` 补传
