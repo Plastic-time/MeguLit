@@ -2,7 +2,7 @@
 'use strict';
 
 // Inert data only. This explicit primitive is not used by game discovery.
-const LIMITS=Object.freeze({inputBytes:4<<20,operations:200000,stack:10000,memo:50000,nodes:100000,edges:200000,stringBytes:4<<20,itemBytes:1<<20});
+const LIMITS=Object.freeze({inputBytes:4<<20,operations:200000,stack:10000,memo:50000,nodes:150000,edges:200000,stringBytes:4<<20,itemBytes:1<<20});
 const CLASSES=Object.freeze(['renpy.ast.Say','renpy.ast.Translate','renpy.ast.TranslateSay']);
 const MARK=Symbol('pickle mark');
 function fail(code,offset){const error=Error('RENPY_PICKLE_'+code);error.code=error.message;error.offset=offset;throw error;}

@@ -87,3 +87,9 @@ The wrapper's normal push charges one node, and its entries Map charges one addi
 `validation/fixtures/renpy-revertable-dict-cpython.json` contains twelve controls: protocols 2/4/5 crossed with empty, entries, instance attributes and memo-cycle shapes. Their producer uses an ordinary neutral dict subclass in a synthetic module, only `pickle.dumps` and `pickletools`; it does not import or construct the engine class, call pickle.loads or read game bytes. These controls establish the NEWOBJ/SETITEM(S)/dict-BUILD subset for that serializer, not RenPy compiler compatibility or complete AST support. The adjacent optional producer accepts `--revertable-dict`
 
 Validation: `node --test validation/renpy-revertable-dict.test.cjs`
+
+## Finite graph capacity
+
+The hard node ceiling is 150,000; operations and stored edges remain 200,000, with every other ceiling unchanged. Callers can only lower these limits. A private instrumented measurement of one existing RPYC payload required 115,909 charged nodes, 125,924 operations and 166,472 stored edges, so only the node ceiling needed adjustment. That measurement used a private higher-budget copy and does not establish that the production decoder, a compiler profile or narrative extraction accepts the file
+
+The capacity controls build neutral flat lists in memory, using batches below the existing stack ceiling. They check a graph above the former 100,000-node ceiling, an exact 150,000-node boundary, rejection at 150,001, and caller-lowered limits. They do not execute Python, load a game or enlarge the accepted opcode/class subset
