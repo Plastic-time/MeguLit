@@ -47,3 +47,15 @@ test('wrapped text and short complete sentences use text ranges instead of overs
 test('a clipped fragment cannot masquerade as another complete cached translation',()=>{
  const h=harness(),jp=node('本文です'),cn=node(null),first=node('正文',{parent:cn}),tail=node('补充',{parent:cn});cn.childNodes=[first,tail];first.inkRects=[rect(0,0,40,20)];tail.inkRects=[rect(950,0,100,20)];h.pairs.availability('本文です','正文');h.pairs.availability('本文です','正文补充');h.b.cardinalPair.bind(h.source('本文です',1),jp,cn);h.flush();assert.equal(h.pairs.snapshot(1).paired,0);assert.equal(h.pairs.snapshot(1).unpaired,1,'any clipped meaningful child invalidates the whole translation observation');
 });
+
+test('unknown, missing and throwing flag APIs cannot publish policy or observations, and can recover',()=>{
+ for(const api of ['isEnabled','isTranslationVisible'])for(const kind of ['missing','undefined','string','throw']){const h=harness(),jp=node('本文です'),cn=node('正文');h.pairs.availability('本文です','正文');if(kind==='missing')delete h.b[api];if(kind==='undefined')h.b[api]=()=>undefined;if(kind==='string')h.b[api]=()=>'false';if(kind==='throw')h.b[api]=()=>{throw Error('injected API failure');};
+  const meta=h.source('本文です',1);h.b.cardinalPair.bind(meta,jp,cn);assert.doesNotThrow(()=>h.flush());h.change();assert.deepEqual(h.messages,[],api+':'+kind);assert.equal(h.pairs.snapshot(1).unobserved,1);assert.equal(h.pairs.snapshot(1).reliable,false);
+  h.b[api]=()=>true;h.b.cardinalPair.refresh();h.flush();assert.equal(h.pairs.snapshot(1).paired,1,api+':'+kind+' true recovery');assert.equal(h.pairs.snapshot(1).reliable,true);assert.equal(h.frames.length,0);
+  h.b[api]=()=>false;h.b.cardinalPair.refresh();h.flush();assert.equal(h.pairs.snapshot(1).excluded,1,api+':'+kind+' false recovery');assert.equal(h.pairs.snapshot(1).shown,0);assert.equal(h.pairs.snapshot(1).reliable,true);
+ }
+});
+test('flag API failure after policy negotiation suppresses measurements until event-driven recovery',()=>{
+ const h=harness(),jp=node('本文です'),cn=node('正文'),meta=h.source('本文です',1);h.pairs.availability('本文です','正文');const policies=h.messages.length;h.b.isEnabled=()=>{throw Error('late API failure');};h.b.cardinalPair.bind(meta,jp,cn);h.flush();assert.equal(h.messages.length,policies);assert.equal(h.pairs.snapshot(1).unobserved,1);
+ h.b.isEnabled=()=>true;h.b.cardinalPair.bind(null,jp,cn);h.flush();assert.equal(h.pairs.snapshot(1).paired,1);assert.equal(h.messages.filter(m=>m.type==='cardinalPairPolicy').length,2,'a valid existing event renegotiates instead of remaining locked');
+});
