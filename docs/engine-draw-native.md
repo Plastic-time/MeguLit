@@ -343,10 +343,11 @@ e-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4
 - 店主测试清单：同 AVG32，行里是 `engine=mfc-textoutw` / `mfc-exttextoutw` / `mfc-drawtextw`；推一句后看哪个 via 带着台词
 
 ### AdvHD / WillPlus（Under The Moon；seed 里的 ディスコード！ 同引擎，本机没有它的 exe）
-- 点：utmoon.exe 0x40f5d9，通用字形例程 0x40f2a0（23 个调用者，引擎画的所有字都经过它）里每个字一次 `GetGlyphOutlineA(hdc, 字, GGO_GRAY8, &gm, 0, NULL, &mat)`；0x40f613 是真正栅格化那次，0x40ff0b / 0x40ff3a / 0x40fff0 是 TextOutA 描边，不签
+- 旧点：utmoon.exe 0x40f5d9，只记录完整字符串例程 0x40f2a0 内的缓存未命中字形；0x40f613 是真正栅格化那次，0x40ff0b / 0x40ff3a / 0x40fff0 是 TextOutA 描边。已有 23 个直接调用点，尚未证明涵盖全部文字路径或区分正文、名字、菜单
 - 例程没有 EBP 帧：sub esp,0xb8 + 4 个寄存器 + 7 个 API 参数，返回地址在第一个参数上方 0xe4（frame=0xe4）。via = 调用者（台词 / 名字 / 选项 / 菜单各是不同的调用点），没有笔位（x=-1），fargs 里有例程的参数
 - ディスコード！ 的 exe 版本不同，签名对不上时会写 `off:`，拿到 exe 再补一条
 - 店主测试清单：同 AVG32，行里是 `engine=advhd`
+- 输入诊断：`AdvhdDraw.h` 在 0x40f2a0 入口记录 EAX 高度、11 个原始栈参数及 arg7 完整 NUL 字节串。只认可 SHA256 `688b22b4619338fe6db648183e38582e17063e6706c7c11b132124f039ce1dda`、598016 字节、唯一入口及 RVA 0xf2a0；`draw.advhdInput` 默认 false、属于版本层，不依赖 `draw.roles`。它只写 `ToMe_ADVHD_INPUT` 诊断日志，不向 reader 交付正文，不隐藏、不嵌入，保留旧 GDI 路径。ABI、测试命令与六件套剩余门槛见 [re-advhd-input.md](re-advhd-input.md)
 
 ### CMVS（青い鳥，Steam）
 - 点：cmvs32.exe 0x46145e，字形例程 0x4613b0（EBP 帧，2 个调用者）里每个字一次 `GetGlyphOutlineA(hdc, 字, GGO_GRAY4, &gm, 0, NULL, &mat)`（0x4614b7 是栅格化那次，不签）。字形进 D3D11 纹理，没有笔位，via / via2 是调用者
