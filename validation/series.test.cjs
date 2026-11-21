@@ -15,16 +15,18 @@ test('moving a uniquely fingerprinted installation retains its ID and collection
 test('collection cover survives reopening and a missing image falls back without breaking the collection',t=>{const f=fixture(t),a=f.game('Rance 01'),id=f.call({action:'series_create',name:'Mine',gameIds:[a]}).id,p=path.join(f.root,'cover.png');fs.writeFileSync(p,Buffer.from('89504e470d0a1a0a0000000d49484452','hex'));f.call({action:'series_cover',id,path:p});assert(f.state().series[0].cover.startsWith('data:image/png'));const file=f.db.prepare('SELECT cover FROM series WHERE id=?').get(id).cover;fs.unlinkSync(path.join(f.root,'data/assets/series',file));assert.equal(f.state().series[0].cover,'');assert.equal(f.state().series[0].count,1);});
 test('library search finds grouped games and aliases, and story and release orders are independent',async()=>{const {libraryEntries,sortMembers}=await import('../web/series-library.js'),games=[{id:'original',title:'Rance I',aliases:['兰斯原版']},{id:'remake',title:'Rance 01'}],members=[{gameId:'original',seriesId:'s',customOrder:1,storyOrder:2,releasedOn:'1989-07-15',releaseOrder:1},{gameId:'remake',seriesId:'s',customOrder:2,storyOrder:1,releasedOn:'2013-09-27',releaseOrder:2}],model={games,collections:{series:[{id:'s',name:'Rance',originalName:'ランス',aliases:[]}],memberships:members,suggestions:[]}};assert.equal(libraryEntries(model).games.length,0);assert.equal(libraryEntries(model).series.length,1);assert.equal(libraryEntries(model,'原版').games[0].id,'original');assert.deepEqual(sortMembers(games,members,'story','en').map(g=>g.id),['remake','original']);assert.deepEqual(sortMembers(games,members,'release','en').map(g=>g.id),['original','remake']);});
 
-test('series suggestions follow corrected game titles and dissolved user series',t=>{
+for(const recognized of [false,true])test('series suggestions follow corrected titles and dissolved '+(recognized?'recognized':'manual')+' series',t=>{
  const f=fixture(t),id=f.game('Shared title'),a=f.call({action:'series_create',name:'A',gameIds:[f.game('First')]}).id,b=f.call({action:'series_create',name:'B',gameIds:[f.game('Second')]}).id;
+ const target=recognized?'work:vndb:v123':a;
+ if(recognized)f.db.prepare('UPDATE series SET recognition_key=? WHERE id=?').run(target,a);
  for(const key of [a,b])f.call({action:'series_update',id:key,values:{aliases:['Shared title']}});
  const scan=()=>series.autoGroup(f.db,f.root),keys=()=>f.state().suggestions.filter(s=>s.gameId===id).map(s=>s.key).sort();
- scan();assert.deepEqual(keys(),[a,b].sort());
+ scan();assert.deepEqual(keys(),[target,b].sort());
  f.db.prepare('UPDATE games SET title=? WHERE id=?').run('Unrelated title',id);
  scan();assert.deepEqual(keys(),[]);
- assert.throws(()=>f.call({action:'series_suggestion',gameId:id,key:a,accept:true}),/SERIES_NOT_FOUND/);
+ assert.throws(()=>f.call({action:'series_suggestion',gameId:id,key:target,accept:true}),/SERIES_NOT_FOUND/);
  f.db.prepare('UPDATE games SET title=? WHERE id=?').run('Shared title',id);
- scan();assert.deepEqual(keys(),[a,b].sort());
+ scan();assert.deepEqual(keys(),[target,b].sort());
  f.call({action:'series_dissolve',id:a});assert.deepEqual(keys(),[b]);
  scan();assert.equal(f.state().memberships.find(m=>m.gameId===id).seriesId,b);
 });

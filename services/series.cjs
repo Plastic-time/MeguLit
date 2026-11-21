@@ -44,8 +44,8 @@ function handle(db,root,r){if(r.action==='series_state')return snapshot(db,root)
   if(r.action==='series_assign')return assign(db,String(r.id),r.gameIds);
   if(r.action==='series_remove'){seriesRow(db,r.id);const games=gameRows(db,r.gameIds);for(const game of games){const removed=db.prepare('DELETE FROM series_memberships WHERE game_id=? AND series_id=?').run(game.id,
    String(r.id));if(removed.changes)db.prepare('INSERT OR REPLACE INTO series_overrides VALUES(?,1)').run(game.id);}return {id:r.id};}
-  if(r.action==='series_dissolve'){seriesRow(db,r.id);for(const m of db.prepare('SELECT game_id FROM series_memberships WHERE series_id=?').all(r.id))db.prepare('INSERT OR REPLACE INTO series_overrides VALUES(?,1)').run(m.game_id);
-   db.prepare('DELETE FROM series_suggestions WHERE series_key=?').run(r.id);
+  if(r.action==='series_dissolve'){const row=seriesRow(db,r.id);for(const m of db.prepare('SELECT game_id FROM series_memberships WHERE series_id=?').all(r.id))db.prepare('INSERT OR REPLACE INTO series_overrides VALUES(?,1)').run(m.game_id);
+   db.prepare('DELETE FROM series_suggestions WHERE series_key IN(?,?)').run(row.id,row.recognition_key);
    db.prepare('DELETE FROM series WHERE id=?').run(r.id);return {dissolved:r.id};}
   if(r.action==='series_update'){seriesRow(db,r.id);const v=r.values||{},allowed={name:'name',originalName:'original_name',developer:'developer',aliases:'aliases',
    sortMode:'sort_mode'};for(const [key,value]of Object.entries(v)){if(!allowed[key])throw Error('SERIES_INVALID');let clean=key==='aliases'?JSON.stringify(Array.isArray(value)?value.map(x=>text(x)):[]):text(value);
