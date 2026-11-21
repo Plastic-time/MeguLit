@@ -5,7 +5,7 @@ function checkLayoutProfile(profile){
  if(fs.existsSync(path.join(profile,'DevToolsActivePort')))throw Error('EDGE_PROFILE_ALREADY_HAS_DEBUG_PORT');
 }
 
-// Edge can leave the process that spawn() returned and continue under its own browser PID.
+// Edge can leave its launcher and continue under a separate browser PID.
 function stopLayoutBrowser(socket,launcher){
  let stopping;
  return ()=>stopping??=new Promise(resolve=>{
