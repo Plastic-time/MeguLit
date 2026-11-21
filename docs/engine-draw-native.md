@@ -64,7 +64,7 @@
 
 #### ユースティア 的壳
 - 不是商业壳（没有 Themida / VMProtect / ASProtect / SecuROM / StarForce 等任何特征串）：入口 0x455fd3 是一段 Sleep 延时循环（100 次），然后跳到最后一节 0xc9a000 的自写多层自解密壳：每层先算一遍校验（rcl 混淆），再用常量 `xor [esi],k1; add [esi],k2` 逐 dword 解下一层（第一层 k1=0x163ead5 k2=0x30eee628，0x1000 字节），夹花指令。原 .text（0x401000 起 0x143000 字节）和 3.6 MB 的数据段都是解开后才有。导入表只有 17 个每库一个的假导入（真导入在运行时重建）。BGI.OLD 和 BGI.exe 只差密文里 3 个字节（汉化补丁改的）
-- 静态脱壳：用 speakeasy（Mandiant 的 Windows 模拟器，只模拟 CPU，不开游戏）从入口跑壳，停在第一次回到 .text 时转储。已确认壳会一层层解开（跑过校验层、进入 0x8f20xx 的大数据段解密），但纯 Python 回调太慢，截至本次提交还没跑到 OEP；转储出来以后同一个签名（`tools/engine-sigs/bgi-draw.cjs`）直接扫转储就能判断能不能命中
+- 静态脱壳（没做成）：用 speakeasy（Mandiant 的 Windows 模拟器，只模拟 CPU，不开游戏，脚本 `H:\MeguLit-Work\re-bgi\unpack2.py`）从入口跑壳，停在第一次回到 .text 时转储。第一层（延时 + 校验 + 0x1000 字节 xor/add）跑通，接着进入解开的 0x63f91f 一带：第二层是混淆寻址的代码（`mov edi,[ebp+0x7a2b6b0]`，ebp 是算出来的 0xf8bf1014），unicorn 在这里写宿主内存出错（19 次，都在 0x5d1a3b / 0x63f91f），1500 秒内没回到 .text。结论：第二层像带反模拟的变形壳，继续静态硬脱要一层层写模拟补丁，成本远大于收益
 - 运行时不受影响：`BgiDraw::Arm` 在 BGI 文字钩子装好之后扫的是**内存里已经解开**的镜像（各节都带可执行属性），所以 ユースティア 实机会照常找签名。ユースティア 是 2011 年的 BGI，排版代码和 2018 年的素晴日 HD 是否同一结构**没有验证（猜测：链表结构相同，寄存器 / 栈槽可能不同，签名按结构匹配能吸收这部分）**；对不上时 DRAWRUN 会报 `off: N glyph link matches`，不挂任何钩子
 - 需要实机做的：店主按下面清单开 ユースティア（`The Seed/bgi/aiyoku-no-eustia/game.json` 设 `draw.roles: true`），看 hook-diagnostics.log 有没有 `engine=bgi on:`；没有就把 `off:` 那行发来
 
