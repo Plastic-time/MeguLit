@@ -33,7 +33,8 @@ test('a Steam game with a companion launcher is started with the launcher own co
  assert.equal(argsIn(Buffer.from('\0Game.exe\0nothing here','latin1'),'C:/g/Game.exe'),null,'no command line: keep the Steam path');
  const s=fs.readFileSync(path.join(__dirname,'../services/bridge.cjs'),'utf8');assert.match(s,/companion\?companionArgs:\[\]/);
  assert.match(s,/SteamAppId:String\(steamAppid\)/);assert.match(s,/launchAppid\(game\.executable,profile\)/); /* E-SteamOwned: steamAppid = the record's appid (source steam) or Steam's install manifest */assert.match(s,/const steam=steamApp&&!companion/);
- assert.match(s,/vc_\?redist\|dxsetup\|launcher\)\/i/,'Launcher.exe is never taken for the game');
+ /* fix/baldr-steam moved the sibling list to core/steam-owned.cjs installPrograms (NOT_GAME), parts of the install included */
+ assert.match(s,/installPrograms\(game\.executable\)/);assert.match(fs.readFileSync(path.join(__dirname,'../core/steam-owned.cjs'),'utf8'),/const NOT_GAME=\/\^\([^)]*vc_\?redist\|dxsetup\|launcher\|/,'Launcher.exe is never taken for the game');
 });
 
 test('no stream selected and the game in English: the stream whose sample maps back to Japanese is picked',()=>{

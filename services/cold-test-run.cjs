@@ -23,7 +23,8 @@ function menuItem(raw,win){let rec=null;try{rec=require('../core/text-paths.cjs'
 function runOne(opts,deps={}){const {root='',exe,runDir,budgetMs=360000,profile=null,shotWidth=960}=opts;
  const spawn=deps.spawn||nodeSpawn,now=deps.now||Date.now,TICK=deps.tick||250;
  fs.mkdirSync(runDir,{recursive:true});
- const helper=deps.helper||helperPath(root);
+ /* an explicit helper (even '' = none) wins over the installed ColdDesk.exe: a test asking for no helper must never start the real one */
+ const helper='helper' in deps?deps.helper:helperPath(root);
  return new Promise(resolve=>{
   const t0=now();const res={exe:path.basename(String(exe||'')),startedAt:new Date(t0).toISOString(),stopped:'',black:false,relaunched:false,exited:false,lines:0,choices:0,shots:[],end:'',window:null,pid:0,errors:[]};
   if(!helper){res.end='no-helper';return resolve(res);}

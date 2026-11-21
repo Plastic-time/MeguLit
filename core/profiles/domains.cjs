@@ -43,6 +43,7 @@ const DOMAINS={
  'draw.embed':{bool:true,layer:'version'},
  'draw.embedTranslation':{bool:true,layer:'version'},
  'lang':{langMap:true},
+ 'library.partLabels':{partLabels:true,nullable:true},
  'safeMode.redrawRate':{number:[0,120],nullable:true},
 };
 /* lang.<bcp47>.{annotation, pairing, dictionary, fontFallback}: known fields are checked strictly, unknown fields of a block are
@@ -66,6 +67,8 @@ function okValue(d,v){
   if(!['x','y','w','h'].every(k=>typeof v[k]==='number'&&Number.isFinite(v[k])&&Math.abs(v[k])<=100000))return false;
   return v.client===undefined||Array.isArray(v.client)&&v.client.length===2&&v.client.every(n=>typeof n==='number'&&n>0&&n<=100000);}
  if(d.langMap)return langMap(v)!==null;
+ /* library.partLabels (core/library.cjs steamParts): {'.': root label, '<folder>': part label}, a folder name, never a path */
+ if(d.partLabels)return plain(v)&&Object.keys(v).length>=1&&Object.keys(v).length<=16&&Object.entries(v).every(([k,x])=>(k==='.'||/^[^\/:*?"<>|]{1,64}$/.test(k)&&k!=='..')&&typeof x==='string'&&x.trim()&&x.length<=40);
  if(d.regexList)return Array.isArray(v)&&v.length<=d.regexList.max&&v.every(s=>safeRegex(s,d.regexList.chars));
  return false;}
 /* settings (a nested layer) -> {value, rejected}: only domain keys with in-domain values survive (any depth: hide.engineTrial.*) */

@@ -39,5 +39,5 @@ test('the wall measures again after layout settles and after the switch glide', 
 
 test('the service exits on its own when the host is gone, even if stopping hangs', () => {
   const server = fs.readFileSync(path.join(__dirname, '..', 'services', 'server.cjs'), 'utf8');
-  assert.match(server, /input\.on\('close',\(\)=>\{closing=true;setTimeout\(\(\)=>process\.exit\(0\),6000\)\.unref\(\);runtime\.stop\(\)/);
+  assert.match(server, /input\.on\('close',\(\)=>\{closing=true;setTimeout\(\(\)=>process\.exit\(0\),6000\)\.unref\(\);(?:try\{require\('\.\/cold-test\.cjs'\)\.stop\(\);\}catch\{\})?runtime\.stop\(\)/);
 });
