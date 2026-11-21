@@ -10,6 +10,7 @@
                            diagnostics,bundles,lookups,at}}
    D1 free tier counts rows read: the live part is cached 10 s and the wide aggregates (ext) 5 min in the Cache API, so
    many open dashboards cost about the same as one. Cleanup (cleanupProbeStats, cron): pulse rows older than a day go. */
+import {seedSummary,refreshSeedStats} from './seed-stats.js';
 const BUCKET=600;/* seconds: a 10-minute activity bucket */
 export const nowBucket=now=>Math.floor(now.getTime()/1000/BUCKET);
 
@@ -58,7 +59,7 @@ async function live(env,now){
  const playing=(await all(env,'SELECT MAX(title) title, COUNT(*) readers, COALESCE(SUM(characters),0) characters, COALESCE(SUM(seconds),0) seconds, MAX(updated_at) at FROM leaderboard_games WHERE updated_at>? GROUP BY game_key ORDER BY at DESC LIMIT 10',t-7*86400))
   .map(r=>({title:String(r.title||'').slice(0,80),readers:r.readers|0,characters:Number(r.characters)||0,seconds:Number(r.seconds)||0,at:r.at|0}));
  return {ok:true,now:t,online,active1h,today,series:s6,active24h:d24,peak10:pk10,avgMinToday:Math.round((Number(ss.avg)||0)*10),longToday:ss.long|0,probedGames:pg.games|0,reporters:pg.reporters|0,
-  full:{minMB:mb(fx.mn),maxMB:mb(fx.mx),reporters:fx.rep|0,d1:fx.d1|0,d7:fx.d7|0,expiring:fx.expiring|0,oldestAt:fx.oldest|0,vndb:fx.vndb|0,inflight,apps,lastAt:recent.length?recent[0].at:0,games:pf.games|0,ready:pf.ready|0,uploading:pf.uploading|0,done:pf.done|0,storedMB:Math.round((pf.bytes|0)/1048576*10)/10,limitMB:8192},
+  full:{minMB:mb(fx.mn),maxMB:mb(fx.mx),reporters:fx.rep|0,d1:fx.d1|0,d7:fx.d7|0,expiring:fx.expiring|0,oldestAt:fx.oldest|0,vndb:fx.vndb|0,inflight,apps,lastAt:recent.length?recent[0].at:0,games:pf.games|0,ready:pf.ready|0,uploading:pf.uploading|0,done:pf.done|0,storedMB:Math.round((Number(pf.bytes)||0)/1048576*10)/10,limitMB:8192},
   probeStates:pstates,vndbMatched:pv.vndb|0,issues:pv.issues|0,playing,recent,steps,top:top.sort((a,c)=>c.reporters-a.reporters).slice(0,24)};}
 
 /* everything else the relay can count, aggregate only */
@@ -131,10 +132,17 @@ async function quota(env,now){
   if(c){out.items.ghUsed=c.used|0;out.items.ghLimit=c.limit|0;out.items.ghReset=c.reset|0;}}catch(e){out.errors.github=String(e?.message||e).slice(0,90);}}
  return out;}
 
-export async function probeStats(env,now,{json,fail}){
+/* 2026-11-21 each section stands alone: one failing (D1 hiccup, GitHub down) leaves the others and reports itself in
+   errors{}, instead of failing the whole response. seed = THE SEED panel (seed-stats.js), cached 60 s; when no source
+   has been counted yet the first stats call kicks a refresh in the background. */
+export async function probeStats(env,now,{json,fail},ctx=null){
  if(!env.DB)return fail('NOT_CONFIGURED',503);
- const [base,ext,q]=await Promise.all([cached('live',10,()=>live(env,now)),cached('wide',300,()=>wide(env,now)),cached('quota-v2',600,()=>quota(env,now))]);
- return json({...base,ext,quota:q},200,{'access-control-allow-origin':'*','cache-control':'public, max-age=10'});}
+ const parts=[['live',10,()=>live(env,now)],['wide',300,()=>wide(env,now)],['quota-v2',600,()=>quota(env,now)],['seed',60,()=>seedSummary(env)]];
+ const got=await Promise.allSettled(parts.map(([k,ttl,fn])=>cached(k,ttl,fn))),errors={};
+ const val=i=>{if(got[i].status==='fulfilled')return got[i].value;errors[parts[i][0]]=String(got[i].reason?.message||got[i].reason).slice(0,120);return null;};
+ const base=val(0)||{ok:true,now:Math.floor(now.getTime()/1000)},ext=val(1),q=val(2),seed=val(3);
+ if(seed&&!seed.sources.length&&ctx?.waitUntil)ctx.waitUntil(refreshSeedStats(env,now).catch(()=>null));
+ return json({...base,ext,quota:q,seed,errors},200,{'access-control-allow-origin':'*','cache-control':'public, max-age=10'});}
 
 export async function cleanupProbeStats(env,now=new Date()){if(!env.DB)return {removed:0};
  try{const r=await env.DB.prepare('DELETE FROM probe_pulse WHERE bucket<?').bind(nowBucket(now)-144).run();return {removed:r?.meta?.changes|0};}catch{return {removed:0};}}
