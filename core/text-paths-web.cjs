@@ -130,8 +130,8 @@ class Cdp{
  constructor(url){this.ws=new WebSocket(url);this.id=0;this.pending=new Map();this.handlers=new Set();
   this.ready=new Promise((resolve,reject)=>{this.ws.onopen=resolve;this.ws.onerror=()=>reject(Error('CDP_CONNECT'));});
   this.ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data);}catch{return;}if(m.id&&this.pending.has(m.id)){const p=this.pending.get(m.id);this.pending.delete(m.id);m.error?p.reject(Error(m.error.message)):p.resolve(m.result);}else if(m.method)for(const h of this.handlers)h(m);};
-  this.closed=new Promise(r=>{this.ws.onclose=r;});}
- send(method,params={}){const id=++this.id;return new Promise((resolve,reject)=>{this.pending.set(id,{resolve,reject});try{this.ws.send(JSON.stringify({id,method,params}));}catch(e){this.pending.delete(id);reject(e);}});}
+  this.closed=new Promise(r=>{this.ws.onclose=()=>{this.isClosed=true;for(const p of this.pending.values())p.reject(Error('CDP_CLOSED'));this.pending.clear();r();};});}
+ send(method,params={}){if(this.isClosed)return Promise.reject(Error('CDP_CLOSED'));const id=++this.id;return new Promise((resolve,reject)=>{this.pending.set(id,{resolve,reject});try{this.ws.send(JSON.stringify({id,method,params}));}catch(e){this.pending.delete(id);reject(e);}});}
  close(){try{this.ws.close();}catch{}}
 }
 
@@ -143,28 +143,44 @@ class WebTextPath{
    for(const t of list)if(t.type==='page'&&t.webSocketDebuggerUrl&&!/^(devtools|chrome|chrome-extension):/i.test(t.url||'')&&!this.pages.has(t.id))await this.attachPage(t).catch(e=>this.onStatus('attach '+e.message));
    if(this.pages.size)return true;await new Promise(r=>setTimeout(r,500));}
   return false;}
- async attachPage(t){const c=new Cdp(t.webSocketDebuggerUrl);await c.ready;this.pages.set(t.id,c);c.closed.then(()=>this.pages.delete(t.id));
+ attachPage(t){this.attaching??=new Set();const p=this.attachPageInner(t);this.attaching.add(p);p.then(()=>this.attaching.delete(p),()=>this.attaching.delete(p));return p;}
+ async attachPageInner(t){if(this.stopped)return;const c=new Cdp(t.webSocketDebuggerUrl);this.connections??=new Set();this.connections.add(c);const current=()=>{if(this.stopped)throw Error('READER_DISABLED');};try{await c.ready;current();this.pages.set(t.id,c);c.closed.then(()=>this.pages.delete(t.id));
   c.handlers.add(m=>{if(m.method==='Runtime.bindingCalled'&&m.params?.name==='__megulitReport')this.report(m.params.payload);});
-  await c.send('Runtime.enable');await c.send('Runtime.addBinding',{name:'__megulitReport'});
-  await c.send('Page.enable').catch(()=>{});await c.send('Page.addScriptToEvaluateOnNewDocument',{source:PAGE_SCRIPT}).catch(()=>{});await c.send('Page.addScriptToEvaluateOnNewDocument',{source:RPGM_SCRIPT}).catch(()=>{});
-  await this.evaluate(c,PAGE_SCRIPT);await this.evaluate(c,RPGM_SCRIPT);await this.sync(c);
+  await c.send('Runtime.enable');current();await c.send('Runtime.addBinding',{name:'__megulitReport'});current();
+  await c.send('Page.enable').catch(()=>{});current();c.scriptIds=[];for(const source of [PAGE_SCRIPT,RPGM_SCRIPT]){const result=await c.send('Page.addScriptToEvaluateOnNewDocument',{source}).catch(()=>null);if(result?.identifier)c.scriptIds.push(result.identifier);current();}
+  current();await this.evaluate(c,PAGE_SCRIPT);current();await this.evaluate(c,RPGM_SCRIPT);current();await this.sync(c);
   /* a reload or new document: the page script runs again; give it the current state */
-  c.handlers.add(m=>{if(m.method==='Runtime.executionContextCreated')setTimeout(()=>this.sync(c).catch(()=>{}),300);});}
+  c.handlers.add(m=>{if(m.method==='Runtime.executionContextCreated')setTimeout(()=>this.sync(c).catch(()=>{}),300);});}catch(error){if(!this.stopped)c.close();throw error;}finally{if(!this.pages.has(t.id)&&!this.stopped)this.connections.delete(c);}}
  evaluate(c,expression){return c.send('Runtime.evaluate',{expression,returnByValue:true}).catch(()=>null);}
- sync(c){return this.evaluate(c,'window.__megulitText&&(window.__megulitText.want('+JSON.stringify(this.wanted)+'),window.__megulitText.hide('+(this.on?'true':'false')+'));'+(this.drawCfg?'window.__megulitRpgm&&window.__megulitRpgm.config('+JSON.stringify(this.drawCfg)+');window.__megulitText&&window.__megulitText.config&&window.__megulitText.config('+JSON.stringify(this.drawCfg)+')':''));}
+ sync(c){if(this.stopped)return Promise.resolve();return this.evaluate(c,'window.__megulitText&&(window.__megulitText.want('+JSON.stringify(this.wanted)+'),window.__megulitText.hide('+(this.on?'true':'false')+'));'+(this.drawCfg?'window.__megulitRpgm&&window.__megulitRpgm.config('+JSON.stringify(this.drawCfg)+');window.__megulitText&&window.__megulitText.config&&window.__megulitText.config('+JSON.stringify(this.drawCfg)+')':''));}
  /* engine-draw (core/engine-draw.cjs): roles / embed switches and one sentence's replacement for the RPG Maker reader */
  async drawConfig(cfg){const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;for(const p of this.pages.values())await this.sync(p);}
- async drawEmbed(key,o={}){const e={ruby:Array.isArray(o.ruby)?o.ruby:[],zh:String(o.zh||'')},js='window.__megulitRpgm&&window.__megulitRpgm.embed('+JSON.stringify(String(key||''))+','+JSON.stringify(e)+');window.__megulitText&&window.__megulitText.embed&&window.__megulitText.embed('+JSON.stringify(String(key||''))+','+JSON.stringify(e)+')';for(const p of this.pages.values())await this.evaluate(p,js);}
+ async drawEmbed(key,o={}){if(this.stopped)return;const e={ruby:Array.isArray(o.ruby)?o.ruby:[],zh:String(o.zh||'')},js='window.__megulitRpgm&&window.__megulitRpgm.embed('+JSON.stringify(String(key||''))+','+JSON.stringify(e)+');window.__megulitText&&window.__megulitText.embed&&window.__megulitText.embed('+JSON.stringify(String(key||''))+','+JSON.stringify(e)+')';for(const p of this.pages.values())await this.evaluate(p,js);}
  async hide(on){this.on=!!on;if(this.on&&this.canary&&!this.canary.allowed('web')){this.on=false;this.onStatus('web invisible drawing off for this game (crash canary)');}
   for(const c of this.pages.values())await this.sync(c);}
  async want(text){this.wanted=String(text||'');for(const c of this.pages.values())await this.sync(c);}
- report(payload){let o;try{o=JSON.parse(payload);}catch{return;}if(o.status){this.onStatus(o.status);return;}
+ report(payload){if(this.stopped)return;let o;try{o=JSON.parse(payload);}catch{return;}if(o.status){this.onStatus(o.status);return;}
   if(typeof o.ask==='string'&&o.ask){this.onAsk({key:o.ask,text:String(o.text||o.ask),engine:o.engine==='rpgm'?'rpgm':'web'});return;}
   if(!Array.isArray(o.rects))return;
   if(o.hidden&&this.canary){if(!this.armed){this.canary.arm('web');this.armed=true;}else this.canary.alive('web');}
   this.onChars(formatChars({engine:o.engine==='rpgm'?'rpgm':'web',line:o.line,hidden:o.hidden,sw:o.sw,sh:o.sh,viewport:[0,0,o.sw,o.sh],rects:o.rects,text:o.text,color:o.color,role:o.role,id:o.id,box:o.box,sel:o.sel,emb:o.emb}));}
  exited(code){if(this.canary&&this.armed)this.canary.exited('web',code);}
- stop(){this.stopped=true;for(const c of this.pages.values()){this.evaluate(c,'window.__megulitText&&window.__megulitText.hide(false)').finally(()=>c.close());}this.pages.clear();}
+ stop(){
+  if(this.stopping)return this.stopping;
+  this.stopped=true;this.on=false;
+  const all=this.connections||new Set(this.pages.values());let timer;
+  const work=(async()=>{
+   await Promise.allSettled([...(this.attaching||[])]);
+   const results=await Promise.allSettled([...all].map(async c=>{
+    const result=await c.send('Runtime.evaluate',{expression:'window.__megulitText&&window.__megulitText.hide(false);window.__megulitRpgm&&window.__megulitRpgm.config({roles:false,embed:false,zh:false});window.__megulitText&&window.__megulitText.config&&window.__megulitText.config({roles:false,embed:false,zh:false});',returnByValue:true});
+    if(result?.exceptionDetails)throw Error('READER_STOP_INCOMPLETE');
+    for(const identifier of c.scriptIds||[])await c.send('Page.removeScriptToEvaluateOnNewDocument',{identifier});
+   }));
+   if(results.some(r=>r.status==='rejected'))throw Error('READER_STOP_INCOMPLETE');
+  })();
+  this.stopping=Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('READER_STOP_INCOMPLETE')),2000);})]).finally(()=>{clearTimeout(timer);for(const c of all)c.close();all.clear();this.pages.clear();});
+  this.stopping.catch(()=>{});return this.stopping;
+ }
 }
 
 module.exports={chromiumShell,freePort,launchArgs,PAGE_SCRIPT,WebTextPath,getJson};

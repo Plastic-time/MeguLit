@@ -1,3 +1,4 @@
+import {openPlayReader} from './library-mode.js';
 import './idle-gate.js';
 import {fitLibraryGrid} from './library-grid-fit.js';
 import {formatDefinition} from './dictionary-format.js';
@@ -235,7 +236,7 @@ function readerNotice(error){const panel=document.querySelector('#reader-notice'
   copy.textContent={zh:'已复制，可粘贴到反馈里',en:'Copied',ja:'コピーしました'}[locale];}catch{}};panel.querySelector('.reader-notice-actions').append(copy);}
 }
 let readerWaits=0;
-async function waitReader(){let state;const deadline=Date.now()+(readerWaits++?20000:45000);do{state=await api('reader_status');if(state.error)throw Error(state.error);
+async function waitReader(){let state;const deadline=Date.now()+(readerWaits++?20000:45000);do{state=await api('reader_status');if(state.libraryOnly)return state;if(state.error)throw Error(state.error);
  if(state.ready){readerNotice('');return state;}await new Promise(resolve=>setTimeout(resolve,120));}while(Date.now()<deadline);throw Error('READER_START_TIMEOUT');
  }
 async function retryReader(button){button.disabled=true;try{await invoke('reader_restart');await waitReader();}catch(error){readerFailures++;readerNotice(error.message||error);
@@ -388,7 +389,7 @@ async function startGame(id,button){
  launchInFlight=true;if(button)button.disabled=true;markLaunching(button,true);const tracker=trackLaunch(button,id);
  let started=false,failed=false;
  try{
-  await invoke('reader_open',{background:true});
+  await openPlayReader({api,invoke});
   const result=await api('launch',{id});started=true;await waitReader();
   toast(result.action==='focused'?text.focusDone:result.action==='running'?text.runningDone:text.launchDone);
   /* v1.1.6 (user): launching a game no longer hides the home window; the game is just brought to the front */
@@ -1340,8 +1341,7 @@ async function start(){
      ja:'ゲームウィンドウを待機中です。Alt+T で手動選択できます'})[locale]);});if(pendingCallback)await invoke('plugin:event|listen',{event:'reader-event',target:{kind:'Any'},handler:pendingCallback});
      await invoke('window_action',{action:'ready'});const metadataCallback=window.__TAURI_INTERNALS__?.transformCallback(async()=>{try{model=await api('home');if(route==='library')renderGames();
      else if(route==='home')home();else if(route==='series')seriesUI.renderDetail(document.querySelector('#main'),selectedSeriesId);}catch{}});if(metadataCallback)await invoke('plugin:event|listen',
-     {event:'library-updated',target:{kind:'Any'},handler:metadataCallback});window.__TOME_READY__=true;refreshLibrary({startup:true}).catch(()=>{});invoke('reader_open',
-     {background:true}).then(()=>waitReader()).catch(error=>readerNotice(error.message||error)); 
+     {event:'library-updated',target:{kind:'Any'},handler:metadataCallback});window.__TOME_READY__=true;refreshLibrary({startup:true}).catch(()=>{});openPlayReader({api,invoke,wait:waitReader}).catch(error=>readerNotice(error.message||error));
   }
   catch(error){app.innerHTML=`<div class="loading-screen"><div>${text.loadingFailed}<button class="primary" id="startup-retry">${text.retry}</button></div></div>`;
    document.querySelector('#startup-retry').addEventListener('click',start);await invoke('window_action',{action:'ready'}).catch(()=>{});}
