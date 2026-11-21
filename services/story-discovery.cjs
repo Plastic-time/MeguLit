@@ -2,7 +2,7 @@
 'use strict';
 /* Read-only engine discovery. Nothing from a player's save is included in the returned rule artifact. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const cg=require('./game-cg.cjs'),structure=require('./story-structure.cjs'),storyData=require('./story-data.cjs');
+const cg=require('./game-cg.cjs'),structure=require('./story-structure.cjs'),storyData=require('./story-data.cjs'),content=require('./story-content.cjs');
 const list=dir=>{try{return fs.readdirSync(dir,{withFileTypes:true});}catch{return [];}};
 const textDecoder=new TextDecoder('shift_jis');
 function literal(arg){const b=arg?.data;if(!b||b.length<3||b[0]!==0x4d)return '';const n=b.readUInt16LE(1);if(n!==b.length-3)return '';const t=textDecoder.decode(b.subarray(3));return /^(["']).*\1$/s.test(t)?t.slice(1,-1):'';}
@@ -15,13 +15,13 @@ function yurisSources(b){if(!Buffer.isBuffer(b)||b.length<12||b.length>2*1024*10
  const candidates=[16,20].map(parse).filter(Boolean);return candidates.length===1?candidates[0]:[];}
 function yuris(dir,budget){const y=require('./original-engines/yuris.cjs')._internal,archives=[];for(const rel of ['', 'pac'])for(const e of list(path.join(dir,rel)))if(e.isFile()&&/^(?:ysbin|update\d*)\.ypf$/i.test(e.name))archives.push({file:path.join(dir,rel,e.name),name:e.name,location:rel||undefined});
  const rules={locators:[{base:'game',relative:'save/gsd.sd',format:'yuris-yssd-v1'},{base:'game',relative:'savedata/gsd.sd',format:'yuris-yssd-v1'}],scripts:[],gallery:[],chapters:[],candidates:[],evidence:[],partial:true};
- let labels=[],sources=[];const scenes=new Map();
+ let labels=[],sources=[],commands=[];const scenes=new Map();
  for(const a of archives){rules.scripts.push({name:a.name,...(a.location?{location:a.location}:{}),sha256:storyData.digest(a.file)});const files=y.ypfList(a.file)||[];
-  for(const e of files){if(/(?:^|[\\/])ysl\.ybn$/i.test(e.name))labels=yurisLabels(y.ypfRead(a.file,e));if(/yst_list\.ybn$/i.test(e.name))sources=yurisSources(y.ypfRead(a.file,e));}
-  for(const s of y.ypfScenes(a.file)){if(scenes.size>=budget.maxDocuments)break;scenes.set(s.name,s);}
+  for(const e of files){if(/(?:^|[\\/])ysl\.ybn$/i.test(e.name))labels=yurisLabels(content.readYpf(a.file,e));if(/yst_list\.ybn$/i.test(e.name))sources=yurisSources(content.readYpf(a.file,e));if(/(?:^|[\\/])ysc\.ybn$/i.test(e.name))commands=content.yurisCommands(content.readYpf(a.file,e));}
+  const seen=new Set();for(const e of files){const name=path.basename(e.name.replace(/\\/g,'/'));if(!/^yst\d+\.ybn$/i.test(name)||seen.has(name.toLowerCase()))continue;seen.add(name.toLowerCase());if(scenes.size>=budget.maxDocuments)break;if(e.packed>budget.maxDocumentBytes||e.unpacked>budget.maxDocumentBytes)continue;scenes.set(name,{name,file:a.name,entry:e.name.replace(/\\/g,'/'),size:e.unpacked,read:()=>content.readYpf(a.file,e)});}
  }
- const persistence=new Map(),parsed=[];let galleryCalls=[];
- for(const s of scenes.values()){const b=s.read();if(b.length>budget.maxDocumentBytes)continue;const instructions=y.ystb(b);if(!instructions)continue;parsed.push({name:s.name,instructions});const calls=[];
+ const persistence=new Map(),parsed=[];let galleryCalls=[],parsedBytes=0;
+ for(const s of scenes.values()){if(parsedBytes+s.size>64*1024*1024)break;const b=s.read();if(b.length>budget.maxDocumentBytes)continue;parsedBytes+=b.length;const instructions=y.ystb(b);if(!instructions)continue;parsed.push({name:s.name,instructions,proof:{file:s.file,entry:s.entry,sha256:content.digest(b)}});const calls=[];
   for(const x of instructions){const fn=literal(x.args[0]);if(/^es\.CGMODE\.(?:CG|DEF)\.SET$/i.test(fn))calls.push(/\.CG\.SET$/i.test(fn)?literal(x.args[1]):null);
    if(x.op===40&&literal(x.args[0])==='gsd.sd'){const section=integer(x.args[1]?.data),ref=x.args[2]?.data;if(section!==null&&ref?.length===6&&ref.subarray(0,4).toString('hex')==='76030040')persistence.set(ref.readUInt16LE(4),section);}
   }
@@ -30,7 +30,7 @@ function yuris(dir,budget){const y=require('./original-engines/yuris.cjs')._inte
  if(galleryCalls.length){const slots=cg.esSlots(galleryCalls),groups=new Map();for(const [slot,n] of slots.slots){const name=path.basename(n.replace(/\\/g,'/')).replace(/\.[^.]+$/,'').toLowerCase(),gid='e'+slots.entry.get(slot);if(!groups.has(gid))groups.set(gid,{id:structure.id(gid),variants:[],unlockComplete:true});const group=groups.get(gid);if(!group.variants.some(v=>v.name===name))group.variants.push({name});}rules.gallery=[...groups.values()];rules.galleryComplete=true;}
  for(const s of parsed){const number=Number(s.name.match(/\d+/)?.[0]),localLabels=labels.filter(l=>l.script===number&&!l.label.includes('.')).sort((a,b)=>a.index-b.index);if(!localLabels.length)continue;
   const source=sources.find(x=>x.id===number)?.name||s.name;if(!/SCENARIO_MAIN|^[A-E]\d_/i.test(localLabels.map(l=>l.label).join(' ')))continue;
-  const nodes=[],edges=[];for(let i=0;i<localLabels.length;i++){const l=localLabels[i],id=structure.id(s.name+':'+l.index);if(nodes.some(n=>n.id===id))continue;nodes.push({id,kind:'scene',label:{ja:l.label},source:{storage:s.name,label:l.label}});}
+  const names=new Map(rules.gallery.flatMap(g=>g.variants.map(v=>[v.name.toLowerCase(),v.name]))),nodes=[],edges=[];for(let i=0;i<localLabels.length;i++){const l=localLabels[i],id=structure.id(s.name+':'+l.index);if(nodes.some(n=>n.id===id))continue;const end=localLabels.find(next=>next.index>l.index)?.index??s.instructions.length,first=content.yurisFirstLine(s.instructions,commands,l.index,end),image=content.yurisImage(s.instructions,l.index,end,names);nodes.push({id,kind:'scene',label:{ja:l.label},...(first?{firstLine:first.firstLine}:{}),...(image?{image:image.image}:{}),source:{storage:s.name,label:l.label,...s.proof,at:'instructions['+l.index+']',...(first?{firstLineAt:first.firstLineAt}:{}),...(image?{imageAt:image.imageAt}:{})}});}
   /* All straight-line and conditional successors remain candidates until the command definition has been verified. */
   rules.chapters.push({id:structure.id(s.name),label:{ja:source.replace(/\.yst$/i,'')},nodes,edges,partial:true});
   for(let i=0;i<s.instructions.length;i++){const assignment=arrayWrite(s.instructions[i]);if(!assignment||!persistence.has(assignment.variable))continue;
@@ -44,7 +44,7 @@ function kirikiri(dir,budget){const xp=require('./original-engines/xp3.cjs'),sc=
  for(const a of archives){const file=path.join(dir,a.name),entries=xp.list(file)?.files||[],cx=entries.some(e=>e.encrypted)?require('./original-engines/cx-filter.cjs').forArchive(file):null;let used=false;
   for(const e of entries){if(documents>=budget.maxDocuments)break;if((e.size||0)>budget.maxDocumentBytes)continue;
    if(/cglist\.csv$/i.test(e.name)){try{rules.gallery=cg.galleryCsv(sc.decode(xp.read(file,e,cx))).map(s=>({id:structure.id(s.id),variants:s.names.map(name=>({name})),unlockComplete:true}));rules.galleryComplete=rules.gallery.length>0;used=true;}catch{}}
-   else if(/\.scn$/i.test(e.name)){let doc;try{const raw=xp.read(file,e,cx);try{doc=psb.parse(raw);}catch{doc=psb.openCx(raw);}}catch{continue;}if(!doc?.root?.scenes)continue;rules.chapters.push(structure.psbGraph(doc.root));documents++;used=true;}
+   else if(/\.scn$/i.test(e.name)){let doc,raw;try{raw=xp.read(file,e,cx);doc=content.psbDocument(raw);}catch{continue;}if(!doc?.root?.scenes)continue;rules.chapters.push(structure.psbGraph(doc.root,{file:a.name,entry:e.name,sha256:content.digest(raw)},rules.gallery.flatMap(g=>g.variants.map(v=>v.name))));documents++;used=true;}
    else if(/^scenario[\\/](?!.*(?:macro|config|system|picture|saveload|title))[^\\/]+\.ks$/i.test(e.name)){try{const t=sc.decode(xp.read(file,e,cx)),graph=structure.kagGraph(path.basename(e.name),t);if(graph.nodes.length){rules.chapters.push(graph);documents++;used=true;}
     for(const m of t.matchAll(/\bsf\.([a-zA-Z_]\w*)\s*=\s*(?:true|1)\b/g))rules.candidates.push({id:structure.id(e.name+':'+m.index),kind:'persistent-marker',read:{all:[m[1]]},confidence:'candidate',evidence:{file:e.name,offset:m.index}});
    }catch{}}

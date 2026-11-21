@@ -46,6 +46,12 @@
    "kind": "static-content-rating",
    "url": "https://api.vndb.org/kana/release",
    "notes": "VNDB release metadata for v6589: Japanese package r13143 and download r70695 are minage18/has_ero=true. Whole-game fallback only; no individual H/general scene classification is asserted."
+  },
+  {
+   "kind": "local-node-content",
+   "file": "ysbin.ypf",
+   "entry": "ysc.ybn WORD; yst00111..115.ybn",
+   "notes": "Five exact instruction-span first lines, including EXTRA narrative label E1_01 at instruction62. Six option strings verified at ES.SEL.SET instructions7980/6466/9875; no unpaired Chinese option translation is asserted. Node sources include decoded entry SHA256 and instruction positions."
   }
  ],
  "galleryComplete": true,
@@ -1144,6 +1150,18 @@
        "yuris:3:102",
        "yuris:3:103"
       ]
+     },
+     "source": {
+      "storage": "yst00112.ybn",
+      "label": "A1_01",
+      "at": "instructions[0]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00112.ybn",
+      "sha256": "4f261edc3053d1c084deeac8d5d5f1418279fe5c544c894185538764c89a6148",
+      "firstLineAt": "instructions[5].args[0]"
+     },
+     "firstLine": {
+      "ja": "ザッザッザ……"
      }
     },
     {
@@ -1172,6 +1190,18 @@
       "all": [
        "yuris:3:101"
       ]
+     },
+     "source": {
+      "storage": "yst00113.ybn",
+      "label": "B1_01",
+      "at": "instructions[0]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00113.ybn",
+      "sha256": "74fa3349f8620c602a993304355aa4933ff745c35846358ecb36ef34c6360ebe",
+      "firstLineAt": "instructions[11].args[0]"
+     },
+     "firstLine": {
+      "ja": "俺がこの村に来て数日……今日も暑い日が続いていた。"
      }
     },
     {
@@ -1185,6 +1215,18 @@
       "all": [
        "yuris:3:102"
       ]
+     },
+     "source": {
+      "storage": "yst00114.ybn",
+      "label": "C1_01",
+      "at": "instructions[0]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00114.ybn",
+      "sha256": "7a915e99204f1abea8cfab3810f81e140ddd07210b33caa2da4ec9bc2a006f91",
+      "firstLineAt": "instructions[11].args[0]"
+     },
+     "firstLine": {
+      "ja": "行人「………………」"
      }
     },
     {
@@ -1198,6 +1240,18 @@
       "all": [
        "yuris:3:103"
       ]
+     },
+     "source": {
+      "storage": "yst00115.ybn",
+      "label": "D1_01",
+      "at": "instructions[0]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00115.ybn",
+      "sha256": "0ce9bc2dd7ce687d136e0e1a2a3b9c5286e280959a28addc5b05f61f1595ad82",
+      "firstLineAt": "instructions[10].args[0]"
+     },
+     "firstLine": {
+      "ja": "行人「よし、あと少しだな……」"
      }
     }
    ],
@@ -1239,27 +1293,46 @@
       "all": [
        "yuris:3:101"
       ]
+     },
+     "source": {
+      "storage": "yst00113.ybn",
+      "at": "instructions[7980]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00113.ybn",
+      "sha256": "74fa3349f8620c602a993304355aa4933ff745c35846358ecb36ef34c6360ebe"
      }
     },
     {
      "id": "josou-0-yes",
      "kind": "option",
      "label": {
-      "ja": "一緒になる",
-      "zh": "和你在一起"
+      "ja": "一緒になる"
      },
      "read": {
       "all": [
        "yuris:3:101"
       ]
+     },
+     "source": {
+      "storage": "yst00113.ybn",
+      "at": "instructions[7980]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00113.ybn",
+      "sha256": "74fa3349f8620c602a993304355aa4933ff745c35846358ecb36ef34c6360ebe"
      }
     },
     {
      "id": "josou-0-no",
      "kind": "option",
      "label": {
-      "ja": "答えられない",
-      "zh": "无法回答"
+      "ja": "答えられない"
+     },
+     "source": {
+      "storage": "yst00113.ybn",
+      "at": "instructions[7980]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00113.ybn",
+      "sha256": "74fa3349f8620c602a993304355aa4933ff745c35846358ecb36ef34c6360ebe"
      }
     },
     {
@@ -1324,27 +1397,46 @@
       "all": [
        "yuris:3:102"
       ]
+     },
+     "source": {
+      "storage": "yst00114.ybn",
+      "at": "instructions[6466]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00114.ybn",
+      "sha256": "7a915e99204f1abea8cfab3810f81e140ddd07210b33caa2da4ec9bc2a006f91"
      }
     },
     {
      "id": "josou-1-yes",
      "kind": "option",
      "label": {
-      "ja": "気持ちを伝える",
-      "zh": "告诉他自己的心意"
+      "ja": "気持ちを伝える"
      },
      "read": {
       "all": [
        "yuris:3:102"
       ]
+     },
+     "source": {
+      "storage": "yst00114.ybn",
+      "at": "instructions[6466]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00114.ybn",
+      "sha256": "7a915e99204f1abea8cfab3810f81e140ddd07210b33caa2da4ec9bc2a006f91"
      }
     },
     {
      "id": "josou-1-no",
      "kind": "option",
      "label": {
-      "ja": "伝えない",
-      "zh": "不说出来"
+      "ja": "伝えない"
+     },
+     "source": {
+      "storage": "yst00114.ybn",
+      "at": "instructions[6466]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00114.ybn",
+      "sha256": "7a915e99204f1abea8cfab3810f81e140ddd07210b33caa2da4ec9bc2a006f91"
      }
     },
     {
@@ -1409,27 +1501,46 @@
       "all": [
        "yuris:3:103"
       ]
+     },
+     "source": {
+      "storage": "yst00115.ybn",
+      "at": "instructions[9875]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00115.ybn",
+      "sha256": "0ce9bc2dd7ce687d136e0e1a2a3b9c5286e280959a28addc5b05f61f1595ad82"
      }
     },
     {
      "id": "josou-2-yes",
      "kind": "option",
      "label": {
-      "ja": "一緒に村を出る",
-      "zh": "一起离开村子"
+      "ja": "一緒に村を出る"
      },
      "read": {
       "all": [
        "yuris:3:103"
       ]
+     },
+     "source": {
+      "storage": "yst00115.ybn",
+      "at": "instructions[9875]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00115.ybn",
+      "sha256": "0ce9bc2dd7ce687d136e0e1a2a3b9c5286e280959a28addc5b05f61f1595ad82"
      }
     },
     {
      "id": "josou-2-no",
      "kind": "option",
      "label": {
-      "ja": "村に残る",
-      "zh": "留在村子"
+      "ja": "村に残る"
+     },
+     "source": {
+      "storage": "yst00115.ybn",
+      "at": "instructions[9875]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00115.ybn",
+      "sha256": "0ce9bc2dd7ce687d136e0e1a2a3b9c5286e280959a28addc5b05f61f1595ad82"
      }
     },
     {
@@ -1489,6 +1600,18 @@
      "label": {
       "ja": "EXTRA",
       "zh": "后宫线"
+     },
+     "source": {
+      "storage": "yst00111.ybn",
+      "label": "E1_01",
+      "at": "instructions[62]",
+      "file": "ysbin.ypf",
+      "entry": "ysbin/yst00111.ybn",
+      "sha256": "738aa8fe55298169189eac0f35e955fa85f1a245c006469bb6ea3274fc4ee45b",
+      "firstLineAt": "instructions[74].args[0]"
+     },
+     "firstLine": {
+      "ja": "村に残る事を決めてから、早幾日。"
      }
     },
     {
