@@ -41,6 +41,14 @@ validation/fixtures/*
 # engine-draw signature fixtures: a few hundred bytes of code around each matched call + the exe SHA-256 (no script text)
 !validation/fixtures/engine-sigs/
 !validation/fixtures/engine-sigs/**
+# Small GPL upstream LiveMaker format fixtures, individually pinned in manifest.json
+!validation/fixtures/livemaker/
+!validation/fixtures/livemaker/test.dat
+!validation/fixtures/livemaker/test.exe
+!validation/fixtures/livemaker/00000001.lsb
+!validation/fixtures/livemaker/gamemain.lsb
+!validation/fixtures/livemaker/COPYING
+!validation/fixtures/livemaker/manifest.json
 validation/**/results*/
 validation/**/*-profile-*/
 
