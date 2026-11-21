@@ -42,6 +42,7 @@ static int __cdecl Gate(void *font,void *destination,const char *text,void *outp
   if(u.size()>240){size_t cut=240;while(cut&&((unsigned char)u[cut]&0xc0)==0x80)cut--;u.resize(cut);}
   for(char &c:u)if(c=='\r'||c=='\n')c=' ';
   uintptr_t via=caller>=Image&&caller<ImageEnd?caller-Image:0;
+  if(!InterlockedCompareExchange(&Observing,0,0)||epoch!=InterlockedCompareExchange(&PermissionEpoch,0,0))return width;
   Msg::Log("ToMe_DRAWRUN engine=majiro run=%lu n=%d x0=%ld y0=%ld width=%d size=%ld paint=%08x via=%lx text=%s",(unsigned long)InterlockedIncrement(&Run),chars,s.x,s.y,width,s.size,s.paint,(unsigned long)via,u.c_str());
  }catch(...){/* Observation must never prevent the game from receiving its own draw result. */}}
  return width;
