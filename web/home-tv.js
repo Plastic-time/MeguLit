@@ -327,8 +327,8 @@ export function renderHomeTV(main,ctx){
   <div class="tv-rail"></div>
   <div class="tv-dialog"><span class="tv-who"></span><span class="tv-line"></span><div class="tv-act"></div></div></div>`;
  const root=main.querySelector('.tv-home'),$=s=>root.querySelector(s);
- /* The Seed banner: a placement is picked with window.__seedVariant (a right plaque, b top ribbon, c bottom-row line) */
- {const v=['a','b','c'].includes(window.__seedVariant)?window.__seedVariant:'a';root.dataset.seed=v;root.insertAdjacentHTML('beforeend',seedBannerHTML(locale,esc));
+ /* The Seed banner: a plaque on the right, above the recent-games rail */
+ {root.dataset.seed='a';root.insertAdjacentHTML('beforeend',seedBannerHTML(locale,esc));
   const b=root.querySelector('.seed-banner');b.addEventListener('click',()=>openSeedDialog({api,locale,esc}));}
  live={root,timer:0,beat:0,typer:0,depth:null};loadGsap().catch(()=>{});
  const art=(g,p)=>g.cover?`url("${String(g.cover).replace(/"/g,'%22')}") center/cover`:`linear-gradient(160deg,${p[0]},${p[2]} 70%)`;

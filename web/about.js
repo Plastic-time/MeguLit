@@ -53,7 +53,6 @@ export function aboutHTML(locale,esc){
   </section>
   </div>
   <div class="ab-col">
-  ${window.__seedAbout==='col'?seedAboutHTML(L,esc,'col'):''}
   <section class="ab-sec ab-linksec"><h2>${esc(t.links)}<small>${esc(t.linksSub)}</small></h2>
     <ul class="ab-links">${link('https://megulit.com',t.site,'megulit.com')}${link(REPO+'#faq',t.faq,'GitHub · FAQ')}${link(REPO+'/releases',t.releases,'GitHub · Releases')}${link(REPO,t.source,'github.com/ilynthn/MeguLit')}<li><button type="button" data-feedback>${esc(t.report)}<small>${esc(t.reportSub)}<i aria-hidden="true">…</i></small></button></li></ul>
   </section>
@@ -84,7 +83,7 @@ export function aboutHTML(locale,esc){
   </section>
   <div class="ab-end"><span>${esc(un.hint)}</span><button type="button" class="ab-danger" data-uninstall>${esc(un.button)}…</button></div>
   </div>
-  ${window.__seedAbout==='col'?'':seedAboutHTML(L,esc,'band')}
+  ${seedAboutHTML(L,esc)}
  </section>`;
 }
 /* 2026-11-12 the uninstaller (setup/uninstall.ps1) lists what goes and can keep the account data on this PC */
