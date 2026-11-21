@@ -135,7 +135,7 @@ test('scores reach the relay only with sharing on, as the bare record',async()=>
 
 test('a background run writes data/The Seed/cardinal/<sha>.json and never touches the live reader or a mode',async()=>{
  const root=tmp();fs.mkdirSync(path.join(root,'data','config'),{recursive:true});fs.writeFileSync(path.join(root,'data','config','library.json'),JSON.stringify({sharedAdaptation:false}));const net=[];const fetcher=async u=>{net.push(u);return {ok:true,status:200};};const C2=require('../services/cardinal.cjs');C2._reset();Tape.clear();Tape.keep(60);let t=Date.now()-60000;
- Tape.record('gwb',{type:'bound',gameProcessId:11,gameStarted:'3'},t);for(let i=0;i<12;i++)Tape.record('hb',{type:'hookSource',text:'台詞'+i},t+=1500);
+ Tape.record('gwb',{type:'bound',gameProcessId:11,gameStarted:'3'},t);for(let i=0;i<12;i++){Tape.record('hb',{type:'hookSource',text:'台詞'+i},t+=1500);Tape.liveSource('台詞'+i);Tape.liveTranslation('台詞'+i,'真实会话译文'+i);}
  const touched=[];const gal=new Proxy({state:{gameProcessId:11},hooks:{trace:l=>touched.push('trace:'+l.split(' ')[1])}},{get(o,k){if(k in o)return o[k];return (...a)=>{touched.push(String(k));};}});
  const reader={root,gameExe:'C:/Games/x.exe',gal};
  let scenario=null;const replay=async sc=>{scenario=sc;const lines=sc.steps.filter(s=>s.line);return run({lines:lines.map((s,i)=>({text:s.text,at:i*1600}))}).o;};
@@ -155,7 +155,7 @@ test('a background run writes data/The Seed/cardinal/<sha>.json and never touche
 test('a replay the PC could not keep up with is kept on this PC and never uploaded',async()=>{
  const root=tmp();fs.mkdirSync(path.join(root,'data','config'),{recursive:true});fs.writeFileSync(path.join(root,'data','config','library.json'),'{}');
  const C2=require('../services/cardinal.cjs');C2._reset();Tape.clear();Tape.keep(60);let t=Date.now()-60000;
- Tape.record('gwb',{type:'bound',gameProcessId:12,gameStarted:'4'},t);for(let i=0;i<12;i++)Tape.record('hb',{type:'hookSource',text:'台詞'+i},t+=1500);
+ Tape.record('gwb',{type:'bound',gameProcessId:12,gameStarted:'4'},t);for(let i=0;i<12;i++){Tape.record('hb',{type:'hookSource',text:'台詞'+i},t+=1500);Tape.liveSource('台詞'+i);Tape.liveTranslation('台詞'+i,'真实会话译文'+i);}
  const reader={root,gameExe:'C:/Games/x.exe',gal:{state:{},hooks:{trace(){}}}};const live=require('../services/self-check-live.cjs'),orig=live.current;live.current=()=>({reader,key:SHA,from:'',profile:Profiles.profileFor({})});
  const net=[];const fetcher=async u=>{net.push(u);return {ok:true,status:200};};const prev=process.env.MEGULIT_RELAY_BASE;process.env.MEGULIT_RELAY_BASE='https://relay.test';
  const replay=lag=>async sc=>{const o=run({lines:sc.steps.filter(s=>s.line).map((s,i)=>({text:s.text,at:i*1600}))}).o;o.lag={stepP95:lag,stepMax:lag};return o;};
@@ -172,4 +172,14 @@ test('the seed the session ran with names the source and revision',()=>{
  assert.deepEqual(C2.sourceOf({from:''},{layers:'core'}),{source:'none',seedRev:null});
  const fata=Profiles.profileFor({exeSha256:'17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42',exe:'fata_jp.exe',title:'ファタモルガーナの館'});
  const s=C2.sourceOf({from:'seed',key:fata.exeSha256,profile:fata});assert.equal(s.source,'official');assert.match(s.seedRev,/^v\d+\.g\d+$/);
+});
+test('session pairing counts actual live translations, never the replay provider placeholders',()=>{
+ Tape.clear();Tape.liveSource('あいうえお');Tape.liveSource('かきくけこ');Tape.liveSource('さしすせそ');
+ Tape.liveTranslation('あいうえお','真实译文');Tape.liveTranslation('かきくけこ','');
+ const run1=run({lines:clean3()});run1.livePairing=Tape.pairing(60);
+ const result=S.score(run1,D.cardinal);assert.equal(result.scores.pair,.333);assert.equal(result.detail.pair.source,'live');assert.equal(result.detail.pair.shown,3);
+ Tape.liveTranslation('かきくけこ','迟到译文');assert.equal(Tape.pairing(60).paired,2);
+ process.env.MEGULIT_CARDINAL_REPLAY='1';try{Tape.liveTranslation('さしすせそ','回放假译文');Tape.liveSource('回放假日文');}finally{delete process.env.MEGULIT_CARDINAL_REPLAY;}
+ assert.deepEqual(Tape.pairing(60),{source:'live',shown:3,paired:2});
+ Tape.clear();assert.deepEqual(Tape.pairing(60),{source:'live',shown:0,paired:0});
 });

@@ -108,3 +108,5 @@ core/overlay-placement.cjs `rows()`：引擎按行报坐标的游戏，一句在
 ## 海馆（第一个用户）
 
 店主 2026-11-21 日志（`validation/fixtures/games/fata-morgana/owner-20261121/`）三段并行：dialogue 03:35:30–03:36:45（20+ 句、校准、女仆选项页）、art 03:31:50–03:32:32（聖なるかな）、advance 02:56:30–02:58:20（02:57 录屏那段推进）。12 条验收用 Cardinal 跑（`MEGULIT_FATA_ACCEPT_OUT=<file>` 写逐条结果和三段的 Cardinal 分数）。
+
+真实会话的 pair 分数使用 Reader 已输出的日文与实际缓存成功的译文计数，允许迟到译文回填；回放提供者的固定译文只用于布局，不作为实际配对证据。此计数留在本机，上传仍只有七项分数。

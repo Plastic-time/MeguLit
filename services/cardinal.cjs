@@ -42,7 +42,7 @@ function kick(reader,why,{now=Date.now(),replay=null,fetcher=undefined}={}){try{
  Tape.keep(rules.lines);
  if(why!=='session-end'&&now-(lastRun.get(key)||0)<rules.minIntervalMin*60000)return {state:'skipped',why:'ran lately'};
  const snap=Tape.snapshot(rules.lines);if(snap.lines<MIN_LINES)return {state:'skipped',why:'too few lines ('+snap.lines+')'};
- const job={root,key,why,rules,rows:snap.rows,lines:snap.lines,game:gameOf(reader,key),...sourceOf(s,profile),reader,replay,fetcher};
+ const job={root,key,why,rules,pairing:snap.pairing,rows:snap.rows,lines:snap.lines,game:gameOf(reader,key),...sourceOf(s,profile),reader,replay,fetcher};
  lastRun.set(key,now);
  if(running){pending=job;return {state:'queued'};}
  running=go(job).finally(()=>{running=null;const next=pending;pending=null;if(next)running=go(next).finally(()=>{running=null;});});
@@ -54,7 +54,7 @@ async function go(job){const {root,key,rules,reader}=job;const started=Date.now(
  const o=await (job.replay||require('./cardinal/run.cjs').replay)(scenario,{data:path.join(root,'data'),work:path.join(os.tmpdir(),'megulit-cardinal'),low:true,timeoutMs:15*60000,name:'cardinal'});
  const errors=(o.errors||[]).slice(0,4);
  if(errors.length&&!(o.samples||[]).length){trace(reader,'cardinal failed key='+key.slice(0,8)+' '+String(errors[0]).slice(0,200));save(root,key,{...(load(root,key)||{}),failed:{at:new Date().toISOString(),why:job.why,errors}});return null;}
- const result=Score.score({name:'session',steps,o},rules);
+ const result=Score.score({name:'session',steps,o,livePairing:job.pairing},rules);
  const rec=Score.record({key,seedRev:job.seedRev,source:job.source,app:appVersion(root),result,cardinalRev:rules.rev});
  /* a replay the PC could not keep up with (stepP95 over cardinal.maxLagMs) measured the PC, not the seed: kept here, never uploaded */
  const lag=o.lag||null,unreliable=!!(lag&&lag.stepP95>(rules.maxLagMs??80));

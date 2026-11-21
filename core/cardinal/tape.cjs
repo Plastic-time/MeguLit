@@ -12,7 +12,11 @@ const HEAD=['gwb:ready','gwb:bound','gwb:layout','hb:hookProcess','hb:hookThread
 const MAX_ROWS=30000,MAX_BYTES=12*1024*1024,ROW_MAX=64*1024,MARGIN=20;
 let keepLines=60+MARGIN;
 let tape=fresh();
-function fresh(){return {rows:[],sizes:[],head:new Map(),bytes:0,lines:0,game:'',since:0};}
+const pairKey=text=>String(text||'').normalize('NFKC').replace(/\s+/g,'');
+function liveSource(text){if(process.env.MEGULIT_CARDINAL_REPLAY==='1')return;const key=pairKey(text);if(!key)return;tape.live.push(key);if(tape.live.length>420)tape.live.shift();}
+function liveTranslation(text,translation){if(process.env.MEGULIT_CARDINAL_REPLAY==='1'||!String(translation||'').trim())return;const key=pairKey(text);if(!key)return;tape.translations.add(key);if(tape.translations.size>800)tape.translations.delete(tape.translations.values().next().value);}
+function pairing(n){const live=tape.live.slice(-n);return {source:'live',shown:live.length,paired:live.filter(k=>tape.translations.has(k)).length};}
+function fresh(){return {rows:[],sizes:[],head:new Map(),bytes:0,lines:0,game:'',since:0,live:[],translations:new Set()};}
 const kindOf=row=>(row.gwb?'gwb:':'hb:')+(row.gwb||row.hb).type;
 function trim(){const t=tape;while(t.rows.length&&(t.lines>keepLines||t.rows.length>MAX_ROWS||t.bytes>MAX_BYTES)){const row=t.rows.shift(),size=t.sizes.shift();t.bytes-=size;const k=kindOf(row);if(HEAD.includes(k))t.head.set(k,row);if(k==='hb:hookSource')t.lines--;}}
 /* side: 'gwb' | 'hb'; m: the parsed record */
@@ -28,7 +32,7 @@ function snapshot(n=keepLines-MARGIN){const t=tape;if(!t.rows.length)return {row
  const head=new Map(t.head);for(let i=0;i<cut;i++){const k=kindOf(t.rows[i]);if(HEAD.includes(k))head.set(k,t.rows[i]);}
  const body=t.rows.slice(cut);const first=body[0]?.t??Date.now();
  const pre=HEAD.filter(k=>head.has(k)&&!body.some(r=>kindOf(r)===k&&k!=='gwb:layout')).map((k,i)=>({...head.get(k),t:first-300+i*20}));
- return {rows:[...pre,...body],lines:body.filter(r=>r.hb?.type==='hookSource').length,game:t.game,since:t.since};}
+ return {pairing:pairing(n),rows:[...pre,...body],lines:body.filter(r=>r.hb?.type==='hookSource').length,game:t.game,since:t.since};}
 function clear(){tape=fresh();}
 const stats=()=>({rows:tape.rows.length,lines:tape.lines,bytes:tape.bytes,game:tape.game});
-module.exports={record,keep,snapshot,clear,stats};
+module.exports={record,keep,snapshot,clear,stats,liveSource,liveTranslation,pairing};

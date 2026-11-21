@@ -15,8 +15,10 @@ const KEYS=['row','stable','clean','clear','choice','pair','leak'];
 const r3=x=>Math.round(Math.max(0,Math.min(1,x))*1000)/1000;
 function score(run,rules={}){const t={...C.T0,...(rules.thresholds||{})},w=rules.weights||{};
  const pl=C.perLine(run,t),ls=pl.lines,n=ls.length;
+ /* Replay providers are synthetic; session pairing comes only from the live reader's actual translations. */
+ const pairs=run.livePairing?.source==='live'?run.livePairing:pl.pairs;
  const wh=C.white(run),fl=C.flashes(run),cl=C.clears(run,t,ls),ch=C.choices(run,t),lk=C.leaks(run,t,ls);
- const applies={row:n>0,stable:n>0,clean:(wh.n||0)>0,clear:cl.n>0,choice:ch.n>0,pair:pl.pairs.shown>0||n>0,leak:true};
+ const applies={row:n>0,stable:n>0,clean:(wh.n||0)>0,clear:cl.n>0,choice:ch.n>0,pair:pairs.shown>0||n>0,leak:true};
  const lineRate=(bad)=>n?(n-bad)/n:1;
  const ownerLines=new Set([...pl.owner.map(m=>m.split(' drawn by ')[0]),...ls.filter(l=>l.dupBad).map(l=>(run.name||'run')+' line '+l.line)]).size;
  const s={
@@ -25,13 +27,13 @@ function score(run,rules={}){const t={...C.T0,...(rules.thresholds||{})},w=rules
   clean:(wh.n?1-wh.badN/wh.n:1)*(n?1-Math.min(1,(fl.comebacks+ownerLines)/n):fl.comebacks+ownerLines?0:1),
   clear:cl.n?1-cl.stale/cl.n:1,
   choice:ch.n?ch.ok/ch.n:1,
-  pair:pl.pairs.shown?pl.pairs.paired/pl.pairs.shown:n?0:1,
+  pair:pairs.shown?pairs.paired/pairs.shown:n?0:1,
   leak:1-lk.rate};
  const scores={};for(const k of KEYS)scores[k]=r3(s[k]);
  let sum=0,wsum=0;for(const k of KEYS){const wk=Number(w[k]);if(!applies[k]||!(wk>0))continue;sum+=wk*scores[k];wsum+=wk;}
  const total=wsum?r3(sum/wsum):0;
  const below=KEYS.filter(k=>applies[k]&&Number.isFinite(rules.floor?.[k])&&scores[k]<rules.floor[k]);
- return {scores,total,lines:n,applies,below,detail:{row:pl.row.slice(0,6),stable:pl.stable.slice(0,6),owner:pl.owner.slice(0,6),dup:pl.dup.slice(0,6),white:wh.bad.slice(0,6),flash:fl.bad.slice(0,6),clear:cl.bad,choice:ch.bad,leak:lk.bad}};}
+ return {scores,total,lines:n,applies,below,detail:{pair:{...pairs},row:pl.row.slice(0,6),stable:pl.stable.slice(0,6),owner:pl.owner.slice(0,6),dup:pl.dup.slice(0,6),white:wh.bad.slice(0,6),flash:fl.bad.slice(0,6),clear:cl.bad,choice:ch.bad,leak:lk.bad}};}
 /* several runs of one game: the scores weighted by each run's lines */
 function combine(results,rules={}){const w=rules.weights||{};const tot=results.reduce((a,r)=>a+Math.max(1,r.lines),0)||1;const scores={},applies={};
  for(const k of KEYS){const rs=results.filter(r=>r.applies[k]);applies[k]=rs.length>0;const d=rs.reduce((a,r)=>a+Math.max(1,r.lines),0);scores[k]=rs.length?r3(rs.reduce((a,r)=>a+r.scores[k]*Math.max(1,r.lines),0)/d):1;}
