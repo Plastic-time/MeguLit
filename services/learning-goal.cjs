@@ -15,12 +15,23 @@ const FILE=root=>path.join(root,'data','config','learning-goal.json');
 const pick=(list,v,d)=>list.includes(v)?v:d;
 const some=(list,v)=>[...new Set((Array.isArray(v)?v:[]).filter(x=>list.includes(x)))];
 const yearOf=(v,now)=>{const y=Number(v),t=new Date(now).getFullYear();return Number.isInteger(y)&&y>=t&&y<=t+5?y:t;};
-function normalize(o={},now=Date.now()){
+function normalize(o={},now=Date.now(),previous={}){
   const goals=some(GOALS,o.goals),out={goals,savedAt:Number(o.savedAt)||0};
   if(goals.includes('jlpt')){const j=o.jlpt||{};out.jlpt={level:pick(JLPT_LEVELS,j.level,'N3'),score:Math.max(80,Math.min(180,Math.round(Number(j.score)||120))),full:j.full===true,month:pick([7,12],Number(j.month),7),year:yearOf(j.year,now)};if(out.jlpt.full)out.jlpt.score=180;}
   if(goals.includes('eju')){const e=o.eju||{},subjects=some(EJU_SUBJECTS,e.subjects);out.eju={subjects:subjects.includes('ja')?subjects:['ja',...subjects],band:pick(EJU_BANDS,Number(e.band),300),parts:some(EJU_PARTS,e.parts).length?some(EJU_PARTS,e.parts):[...EJU_PARTS],month:pick([6,11],Number(e.month),6),year:yearOf(e.year,now)};if(out.eju.subjects.includes('sci')&&out.eju.subjects.includes('hum'))out.eju.subjects=out.eju.subjects.filter(x=>x!=='hum');}
   if(goals.includes('fun'))out.fun={focus:some(FUN_FOCUS,o.fun?.focus)};
   if(goals.includes('talk'))out.talk={focus:some(TALK_FOCUS,o.talk?.focus)};
+  for(const kind of ['jlpt','eju']){
+    const exam=out[kind],old=previous[kind],year=Number(o[kind]?.year);
+    if(!exam||!old||year>=new Date(now).getFullYear()||year!==old.year||exam.month!==old.month)continue;
+    const chosenAt=old.sittingSetAt??previous.savedAt;
+    if(!Number.isFinite(chosenAt)||chosenAt<=0||chosenAt>previous.savedAt||!Number.isInteger(year))continue;
+    /* A synced timestamp can fall on January 1 here and December 31 on the PC that chose the sitting. */
+    const firstYear=new Date(chosenAt-12*3600000).getUTCFullYear(),lastYear=new Date(chosenAt+14*3600000).getUTCFullYear();
+    if(!(year>=firstYear&&year<=lastYear+5))continue;
+    exam.year=year;
+    if(chosenAt!==out.savedAt)exam.sittingSetAt=chosenAt;
+  }
   return out;
 }
 /* the n-th Sunday of a month (JLPT: first Sunday of July / December; EJU: third Sunday of June, second of November) */
@@ -44,10 +55,11 @@ function plan(goal,userLevel=null){
   if(g.talk){add(['speech','ending','net','trend','slang','give','perm'],1);tabs.push('grammar');if(!level&&!g.jlpt&&!g.eju&&userLevel&&/^N[1-3]$/.test(userLevel))level='N0';}
   return {level,groups,review,tabs:[...new Set(tabs)]};
 }
-function get(root,now=Date.now()){let o={};try{o=JSON.parse(fs.readFileSync(FILE(root),'utf8'));}catch{}const goal=normalize(o,now);return {goal,countdown:countdown(goal,now),plan:plan(goal)};}
+function read(root){try{return JSON.parse(fs.readFileSync(FILE(root),'utf8'))||{};}catch{return {};}}
+function get(root,now=Date.now()){const o=read(root),goal=normalize(o,now,o);return {goal,countdown:countdown(goal,now),plan:plan(goal)};}
 function save(root,goal){const file=FILE(root);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(goal));fs.renameSync(file+'.tmp',file);}
-function set(root,input,now=Date.now()){const goal=normalize({...input,savedAt:now},now);save(root,goal);return {goal,countdown:countdown(goal,now),plan:plan(goal)};}
+function set(root,input,now=Date.now()){const goal=normalize({...input,savedAt:now},now,read(root));save(root,goal);return {goal,countdown:countdown(goal,now),plan:plan(goal)};}
 /* account sync: a cloud copy only replaces this PC's goal when it was saved later */
-function applySynced(root,data){if(!data||typeof data!=='object')return false;let local={};try{local=JSON.parse(fs.readFileSync(FILE(root),'utf8'));}catch{}if((Number(local.savedAt)||0)>=(Number(data.savedAt)||0))return false;save(root,normalize(data));return true;}
-function synced(root){try{const o=JSON.parse(fs.readFileSync(FILE(root),'utf8'));const g=normalize(o);return g.goals.length?g:null;}catch{return null;}}
+function applySynced(root,data){if(!data||typeof data!=='object')return false;if((Number(read(root).savedAt)||0)>=(Number(data.savedAt)||0))return false;save(root,normalize(data,Date.now(),data));return true;}
+function synced(root){const o=read(root),g=normalize(o,Date.now(),o);return g.goals.length?g:null;}
 module.exports={GOALS,JLPT_LEVELS,EJU_SUBJECTS,EJU_BANDS,EJU_PARTS,FUN_FOCUS,TALK_FOCUS,FILE,normalize,countdown,examDay,plan,get,set,applySynced,synced};

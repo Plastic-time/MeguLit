@@ -193,3 +193,69 @@ test('动手玩 picks the natural line (no cutting lines into pieces), and dragg
  const src=fs.readFileSync(path.join(__dirname,'..','web','grammar.js'),'utf8');assert.doesNotMatch(src,/dataTransfer|ondragstart|draggable="true"|data-find/);assert.match(src,/pointerDrag\(b,\{over:'\[data-drop\]'/);assert.match(src,/pointerDrag\(t,\{over:'\[data-slot\]'/);
  const d=fs.readFileSync(path.join(__dirname,'..','web','drag.js'),'utf8');for(const k of ['pointerdown','pointermove','pointerup','setPointerCapture','elementFromPoint'])assert.ok(d.includes(k),k);
 });
+
+test('Blue Book examples follow replaced lines, edited card forms and the requested limit',async()=>{
+ const B=require('../services/bluebook.cjs');
+ const cards=[{id:'bb-101',hits:['から']}],lines=[{text:'空から見えた。'},{text:'家から来た。',title:'Old',translation:'old'}];
+ const first=await B.examplesForAsync(cards,lines);
+ assert.equal(first['bb-101'].length,2);
+ assert.strictEqual(await B.examplesForAsync([{id:'bb-101',hits:['から']}],lines),first);
+ const fresh=[lines[0],{text:'駅から来た。',title:'New',translation:'new'}];
+ const changed=await B.examplesForAsync(cards,fresh);
+ assert.deepEqual(changed['bb-101'].map(x=>[x.text,x.title,x.translation]),[['駅から来た。','New','new'],['空から見えた。',undefined,undefined]]);
+ assert.equal((await B.examplesForAsync(cards,fresh,{max:1}))['bb-101'].length,1);
+ const edited=[{id:'bb-101',hits:['駅']}];
+ assert.deepEqual((await B.examplesForAsync(edited,fresh))['bb-101'].map(x=>[x.text,x.start,x.end]),[['駅から来た。',0,1]]);
+ assert.deepEqual(await B.examplesForAsync([{id:'bb-101',hits:['まで']}],fresh),{});
+});
+
+test('editing a recorded translation refreshes the examples in an open collection',async t=>{
+ const B=require('../services/bluebook.cjs'),{ReadingStatistics}=require('../services/reading-statistics.cjs');
+ const root=temp(),db=openStore(root);t.after(()=>{db.close();fs.rmSync(root,{recursive:true,force:true});});
+ const text='駅から帰りました。',points=[{id:'bb-25',hits:['から']}];
+ db.prepare("INSERT INTO games(id,title) VALUES('g','Example')").run();
+ db.prepare("INSERT INTO reading_events(game_id,text,read_at,original) VALUES('g',?,1,?)").run(text,JSON.stringify({translation:'旧译'}));
+ const example=async()=>(await B.examplesForAsync(points,await G.candidatesCached(db,{root})))['bb-25'][0];
+ assert.equal((await example()).translation,'旧译');
+ new ReadingStatistics(root).translation('g',text,'修订译文','official');
+ assert.equal((await example()).translation,'修订译文');
+});
+
+test('revisiting grammar refreshes imported examples without replacing built-in ones',async t=>{
+ const {pathToFileURL}=require('node:url'),g=await import(pathToFileURL(path.join(__dirname,'../web/grammar.js')).href+'?revisit');
+ let now=Date.now(),blue=0,reports=0,available=true,locked=false;t.mock.method(Date,'now',()=>now);
+ const buttons=new Set(['[data-back]','[data-prev]','[data-nextstep]','[data-stepof]','[data-learned]','[data-quiz]']);
+ const element=()=>({style:{},dataset:{},isConnected:true,addEventListener(){},querySelector:q=>buttons.has(q)?element():null,querySelectorAll:()=>[],closest:()=>null});
+ const doc={scrollingElement:{scrollTop:0},createElement:element};
+ for(const [name,value] of Object.entries({document:doc,matchMedia:()=>({matches:true})})){
+  const old=Object.getOwnPropertyDescriptor(globalThis,name);Object.defineProperty(globalThis,name,{value,configurable:true});
+  t.after(()=>{if(old)Object.defineProperty(globalThis,name,old);else delete globalThis[name];});
+ }
+ const B=require('../services/bluebook.cjs'),fields={Word:'試験句',Level:'N5',Explain1:'说明'},card=B.cardOf(k=>fields[k]||'',25,'Fixture');
+ const {pageNav}=await import('../web/page-nav.js');
+ const api=async action=>{
+  if(action==='grammar_bluebook'){blue++;if(locked)return {available:false,incomplete:true,errors:['EBUSY'],points:[]};return {available,points:[card],examples:{'bb-25':[{text:'今の試験句です。',translation:'entry-'+blue,origin:'history',start:2,end:5}],shared:[]}};}
+  if(action==='grammar_report'){reports++;return {progress:{},examples:{shared:[{text:'built-in'}]}};}
+  return action==='learning_level'?{level:'none'}:{};
+ };
+ let root;const visit=async(open=false)=>{const close=await g.mountGrammar({replaceChildren(el){root=el;}},{api,locale:'zh',esc:String});
+  try{await new Promise(resolve=>setImmediate(resolve));if(open){g.keepStep(card.id,4);assert.ok(pageNav.apply({view:'lesson',level:'N5',point:card.id}));}
+   return g.grammarMemo().data.examples;}finally{close();}};
+ assert.equal((await visit(true))['bb-25'][0].translation,'entry-1');assert.match(root.innerHTML,/entry-1/);
+ await visit();assert.equal(blue,1);
+ now+=6*60000;const updated=await visit();assert.equal(updated['bb-25'][0].translation,'entry-2');assert.equal(updated.shared[0].text,'built-in');assert.equal(reports,2);
+ assert.match(root.innerHTML,/entry-2/);assert.doesNotMatch(root.innerHTML,/entry-1/);
+ locked=true;now+=6*60000;assert.equal((await visit())['bb-25'][0].translation,'entry-2');
+ locked=false;assert.equal((await visit())['bb-25'][0].translation,'entry-4');
+ available=false;now+=6*60000;assert.equal((await visit())['bb-25'],undefined);
+});
+
+test('an offline AnkiConnect distinguishes an empty local collection from an unreadable profile',async t=>{
+ const B=require('../services/bluebook.cjs'),{DatabaseSync}=require('node:sqlite'),root=temp(),profile=path.join(root,'Anki2','Fixture');
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));fs.mkdirSync(profile,{recursive:true});
+ const file=path.join(profile,'collection.anki2'),opts={env:{APPDATA:root},anki:{call:async()=>{throw Error('offline');}},config:{}};
+ const db=new DatabaseSync(file);try{db.exec('CREATE TABLE notetypes(id INTEGER,name TEXT);');}finally{db.close();}
+ const empty=await B.readAll(root,opts);assert.equal(empty.available,false);assert.ok(!empty.incomplete);
+ fs.writeFileSync(file,'unreadable collection');
+ const failed=await B.readAll(root,opts);assert.equal(failed.incomplete,true);assert.equal(failed.available,false);
+});

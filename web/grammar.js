@@ -389,7 +389,7 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
  if(view==='lesson'&&!point)view='list';
  const save=()=>Object.assign(memo,{data,level,view,point:point?.id||'',openNode,scene,piece,step});
  const root=document.createElement('div');root.className='gm-page';target.replaceChildren(root);
- const load=async(count=true)=>{clearTimeout(timer);const had=!!data?.progress;try{const next=await api('grammar_report',{count});if(!isCurrent())return;data=memo.anki?.examples?{
+ const load=async(count=true)=>{clearTimeout(timer);const had=!!data?.progress;try{const next=await api('grammar_report',{count});if(!isCurrent())return;memo.reportExamples=next.examples||{};data=memo.anki?.examples?{
   ...next,examples:{...memo.anki.examples,...next.examples}}:next;memo.at=Date.now();save();if(view==='list'||view==='map'||!had)render();if(next.pending&&next.counting&&count)timer=setTimeout(()=>{
   if(isCurrent())load(true);},2000);}catch(error){if(isCurrent()&&!data){data={};render();toast?.(String(error?.message||error));}}};
  const enter=()=>{if(!motion())return;root.animate([{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],{duration:220,easing:'cubic-bezier(.2,.7,.2,1)'});
@@ -595,10 +595,23 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
     if(!r.found){setTimeout(tick,2000);return;}if(!r.ready){size=r.size;say(`正在下载 ${r.file} ……`);setTimeout(tick,1500);return;}
     if(r.imported){say(`已导入 ${r.file}，正在读取……`);setTimeout(()=>loadAnki(true),2500);return;}
     say(`已用 Anki 打开 ${r.file}，在 Anki 里确认导入后点「我已导入，刷新」`);}catch{setTimeout(tick,3000);}};tick();}
- function loadAnki(tell){memo.anki=null;api('grammar_bluebook').then(r=>{memo.anki=r?.available?r:{available:false,points:[]};if(!r?.available){if(tell)toast?.('还没在你的 Anki 里找到蓝宝书语法牌组：导入后先关掉再打开一次 Anki 试试');
-  if(isCurrent()&&view==='list')render();return;}if(tell)toast?.(`读到 ${r.points.length} 条语法卡，已并进课程`);useAnkiCards(r.points);if(data)data={...data,examples:{...(r.examples||{
-  }),...(data.examples||{})}};memo.data=data;if(isCurrent()&&view!=='lesson')render();}).catch(()=>{memo.anki={available:false,points:[]};});}
- if(memo.anki===undefined)loadAnki(false);
+ async function loadAnki(tell){const job=memo.ankiJob||=api('grammar_bluebook');
+  try{const r=await job;if(!isCurrent())return;
+   if(r?.incomplete&&memo.anki?.available){if(tell)toast?.(r.errors?.join('、'));return;}
+   const lessonSnapshot=()=>JSON.stringify([point,data?.examples?.[point?.id]]);
+   const before=view==='lesson'?lessonSnapshot():null;
+   memo.anki=r?.available?r:{...r,available:false,points:[],examples:{}};memo.ankiAt=r?.incomplete?0:Date.now();useAnkiCards(memo.anki.points);
+   if(data){data={...data,examples:{...memo.anki.examples,...memo.reportExamples}};memo.data=data;}
+   if(tell)toast?.(r?.available?`读到 ${r.points.length} 条语法卡，已并进课程`:'还没在你的 Anki 里找到蓝宝书语法牌组：导入后先关掉再打开一次 Anki 试试');
+   if(view==='lesson'&&point){
+    point=pointById(point.id);
+    if(!point){go('list');return;}
+    if(before===lessonSnapshot())return;
+   }
+   render();
+  }catch{if(isCurrent()&&!memo.anki){memo.anki={available:false,points:[]};if(view==='list')render();}}
+  finally{if(memo.ankiJob===job)memo.ankiJob=null;}}
+ if(!memo.anki||Date.now()-(memo.ankiAt||0)>FRESH_MS)loadAnki(false);
  if(memo.rewards===undefined){memo.rewards=null;api('learning_rewards').then(r=>{memo.rewards=r;if(isCurrent()&&view==='list')render();}).catch(()=>{});}
  else if(memo.anki?.points)useAnkiCards(memo.anki.points);
  if(memo.goal===undefined){memo.goal=null;api('learning_goal').then(g=>{memo.goal=g;if(isCurrent()&&view==='list')render();}).catch(()=>{});}

@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS word_trash (
 );
 CREATE INDEX IF NOT EXISTS reading_by_game ON reading_sessions(game_id,started_at);
 CREATE INDEX IF NOT EXISTS events_by_time ON reading_events(read_at);
+CREATE TRIGGER IF NOT EXISTS grammar_reading_edit AFTER UPDATE OF text,game_id,original,read_at ON reading_events
+ WHEN OLD.text IS NOT NEW.text OR OLD.game_id IS NOT NEW.game_id OR OLD.original IS NOT NEW.original OR OLD.read_at IS NOT NEW.read_at
+ BEGIN INSERT INTO meta(key,value) VALUES('grammar-reading-revision',1)
+ ON CONFLICT(key) DO UPDATE SET value=value+1; END;
 CREATE INDEX IF NOT EXISTS lookups_by_time ON lookup_events(occurred_at);
 CREATE TABLE IF NOT EXISTS dictionary_entries (id INTEGER PRIMARY KEY, spelling TEXT NOT NULL, reading TEXT NOT NULL, definition TEXT NOT NULL, frequency INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS dictionary_forms (form TEXT NOT NULL, entry_id INTEGER NOT NULL, PRIMARY KEY(form,entry_id));
