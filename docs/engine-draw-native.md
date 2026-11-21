@@ -57,6 +57,17 @@
 - 真编译（2026-11-21）：`Build-UnityText.ps1` 用官方 BepInEx 5.4.23.6 core（GitHub BepInEx/BepInEx release v5.4.23.6，总指挥经店主同意下载到 `H:MeguLit-Workdeps\bepinex-5.4.23.6`，不进仓库；zip SHA-256 x64 6c57a714…0755、x86 a4024daf…622d）+ ひぐらし 的 Managed，x86 / x64 两份 core 都编过；输出 24576 字节，SHA-256 C833BDE2…7F28（只是验证，正式包在发布构建里出）
 - 没做：IL2CPP 插件（`MeguLitUnityText.IL2CPP.cs`，逆転検事 1&2、魔法少女ノ魔女裁判）同样的改动——要 BepInEx 6 在游戏里跑一次生成 interop 程序集才能编，需要开游戏，等店主测试时一起做
 
+### Artemis（THE SHELL Part I–III）——静态查清，未改
+- 整个 ADV 层是 pfs 里的 Lua（`system/msg/message.lua` / `line.lua` / `lang.lua`，`system/adv/select.lua` / `button.lua`），Lua 带 `io.open`；MeguLit 已有的 E591（`core/artemis-language.cjs`）就是靠「游戏读档最后读的那个 `.pfs.NNN` 覆盖一个 Lua 文件」生效的，同一条路能做画字层
+- 关键发现：THE SHELL 每个文本块同时带 ja / en / tw / cn，日文里有引擎自己的注音标记 `{"ruby", text=…}…{"/ruby"}`；引擎本身就有双语排版：`message_control` 在 `init.game_sublangview == "on"` 且设了副语言时，先在 adv 层画主语言，再在 `adv_sub` 层画副语言，并把副语言层放到主语言正下方（`lyprop top = get_message_layer_height`）。也就是「日文 + 游戏自己的注音在上、官方中文在下，全由游戏画」，不用翻译查表
+- 方案（一个覆盖 Lua 的追加段，和 E591 合在同一个补丁档里）：
+  1. 主语言 = ja（E591 已做）、副语言 = cn：包一层 `get_sub_lang` 返回这部作品有的中文轨（cn / tw）
+  2. 打开 `init.game_sublangview`
+  3. `mw_textloop` 不看传进来的 `p.lang`（这一版副语言那一遍会又画一次日文）：包 `mw_textloop` / `getTextBlockFloat`，副语言那一遍取 `p[p.lang]`
+  4. 这部游戏的字体表里没有 `sub01`：`setMWFont` 打开副语言后会去取 `sub01`，要包 `get_fontdata`，缺 `sub*` 时用 `adv*` 的定义缩小一号——这一步不做对，游戏开机就停（E598 黑屏的先例）
+- 阻塞：本机没有 Lua 解释器，覆盖段没法离线跑；拿一份官方 Lua 5.1 / LuaJIT 源码自己编来跑替身测试需要下载，要店主同意。没有它之前不往游戏补丁档里放任何新 Lua
+- 角色：Lua 里没有通往 MeguLit 的通道（不能像 KiriKiri 那样发记录），位置和角色仍走外面（字形点 / GPU）；名字是 `mw_name` / `message_name`，选项在 `select.lua`，以后要报角色可以让 Lua 用 `io.open` 追加写一个日志文件给 MeguLit 读
+
 ## 样板：YU-RIS（已做，其他原生引擎照这个写）
 
 | 部分 | 文件 | 写法 |
