@@ -68,8 +68,12 @@ async function refresh(root,key,{fetcher=globalThis.fetch,now=Date.now(),force=f
    if(r.status===404){const v={none:true,key,fetchedAt:now};keep(root,key,v);return v;}
    if(!r.ok)continue;const text=await r.text();if(text.length>64*1024)continue;const v=JSON.parse(text);if(!layer(v,key))continue;v.fetchedAt=now;keep(root,key,v);return v;}catch{}}
  return old;}
+/* 2026-11-21 this PC's calibration of the exe reached the relay: data/The Seed/<key>.sent.json (the game page's first-player card turns into its thank-you) */
+const sentFile=(root,key)=>path.join(dir(root),key+'.sent.json');
+function markSent(root,key){try{fs.mkdirSync(dir(root),{recursive:true});fs.writeFileSync(sentFile(root,key),JSON.stringify({key,at:new Date().toISOString()}));}catch{}}
+function sent(root,key){return gameDiff.KEY.test(String(key||''))&&fs.existsSync(sentFile(root,key));}
 async function report(root,record,{fetcher=globalThis.fetch,prints=null}={}){if(!record||!sharing(root))return {state:'skipped'};const block=auto.diagnostic(record)?.profile;if(!block||!gameDiff.KEY.test(String(block.key||'')))return {state:'skipped'};
  const pr=prints?require('../core/game-print.cjs').check(prints):null;const body=JSON.stringify({version:1,profile:block,...(pr&&Object.keys(pr).length?{prints:pr}:{})});
- for(const url of endpoints(root,'/api/game-profile/report')){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok)return {state:'sent'};if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
+ for(const url of endpoints(root,'/api/game-profile/report')){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok){markSent(root,block.key);return {state:'sent'};}if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
  return {state:'failed'};}
-module.exports={cached,refresh,report,layer,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};
+module.exports={sent,markSent,cached,refresh,report,layer,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};
