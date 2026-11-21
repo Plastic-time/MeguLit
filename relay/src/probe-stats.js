@@ -11,6 +11,7 @@
    D1 free tier counts rows read: the live part is cached 10 s and the wide aggregates (ext) 5 min in the Cache API, so
    many open dashboards cost about the same as one. Cleanup (cleanupProbeStats, cron): pulse rows older than a day go. */
 import {seedSummary,refreshSeedStatsSafe} from './seed-stats.js';
+import {cardinalSummary} from './cardinal.js';
 const BUCKET=600;
 export const LIVE_TTL=120,WIDE_TTL=600;/* seconds: a 10-minute activity bucket */
 export const nowBucket=now=>Math.floor(now.getTime()/1000/BUCKET);
@@ -154,12 +155,12 @@ async function quota(env,now){
 export async function probeStats(env,now,{json,fail},ctx=null){
  if(!env.DB)return fail('NOT_CONFIGURED',503);
  /* live: 120 s globally (pulse buckets are 10 min anyway), wide: 10 min; ~1.9k + ~2.5k rows per compute */
- const parts=[['live',10,()=>snap(env,'live',LIVE_TTL,()=>live(env,now),now)],['wide',300,()=>snap(env,'wide',WIDE_TTL,()=>wide(env,now),now)],['quota-v2',600,()=>quota(env,now)],['seed',60,()=>seedSummary(env)]];
+ const parts=[['live',10,()=>snap(env,'live',LIVE_TTL,()=>live(env,now),now)],['wide',300,()=>snap(env,'wide',WIDE_TTL,()=>wide(env,now),now)],['quota-v2',600,()=>quota(env,now)],['seed',60,()=>seedSummary(env)],['cardinal',60,()=>cardinalSummary(env,now)]];
  const got=await Promise.allSettled(parts.map(([k,ttl,fn])=>cached(k,ttl,fn))),errors={};
  const val=i=>{if(got[i].status==='fulfilled')return got[i].value;errors[parts[i][0]]=String(got[i].reason?.message||got[i].reason).slice(0,120);return null;};
- const base=val(0)||{ok:true,now:Math.floor(now.getTime()/1000)},ext=val(1),q=val(2),seed=val(3);
+ const base=val(0)||{ok:true,now:Math.floor(now.getTime()/1000)},ext=val(1),q=val(2),seed=val(3),cardinal=val(4);
  if(seed&&!seed.sources.length&&ctx?.waitUntil)ctx.waitUntil(refreshSeedStatsSafe(env,now));
- return json({...base,ext,quota:q,seed,errors},200,{'access-control-allow-origin':'*','cache-control':'public, max-age=10'});}
+ return json({...base,ext,quota:q,seed,cardinal,errors},200,{'access-control-allow-origin':'*','cache-control':'public, max-age=10'});}
 
 export async function cleanupProbeStats(env,now=new Date()){if(!env.DB)return {removed:0};
  try{const r=await env.DB.prepare('DELETE FROM probe_pulse WHERE bucket<?').bind(nowBucket(now)-144).run();return {removed:r?.meta?.changes|0};}catch{return {removed:0};}}

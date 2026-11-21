@@ -7,6 +7,7 @@
    last run, 1 GraphQL call reads every game.json blob by oid (aliases, so one subrequest for all of them) → status.
    Stored per source in D1 seed_stats; seedSummary(env) sums all sources. putSeedStats(env,source,data) is the hook for
    seeds the relay keeps itself later (source 'community'): same data shape, summed into the panel automatically. */
+import {cardinalVerifiedCount} from './cardinal.js';
 export const SEED_STATUSES=['verified','owner-ok','read','skeleton'];
 const repoOf=env=>/^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPO||'')?env.GITHUB_REPO:'ilynthn/MeguLit';
 const ghHeaders=env=>({...(env.GITHUB_TOKEN?{authorization:'Bearer '+env.GITHUB_TOKEN}:{}),accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'megulit-relay'});
@@ -64,7 +65,9 @@ export async function seedSummary(env){
   let d;try{d=clean(JSON.parse(r.data));}catch{continue;}
   out.games+=d.games;out.versions+=d.versions;out.other+=d.other;for(const k of SEED_STATUSES)out.status[k]+=d.status[k];
   out.sources.push({source:String(r.source),games:d.games,versions:d.versions,at:r.at|0});out.at=Math.max(out.at,r.at|0);}
- out.confirmed=out.status.verified+out.status['owner-ok'];out.waiting=out.status.read+out.status.skeleton;
+ /* 2026-11-21 auto diffs Cardinal verified count as confirmed too (relay/src/cardinal.js) */
+ out.cardinal=await cardinalVerifiedCount(env);
+ out.confirmed=out.status.verified+out.status['owner-ok']+out.cardinal;out.waiting=out.status.read+out.status.skeleton;
  return out;}
 
 /* 2026-11-21 GET /api/seed/stats: the App's about page line (已种下 N 部游戏、M 个版本) live. Public, read-only, aggregate:

@@ -23,6 +23,8 @@ import {adaptersRoute} from './adapters.js';
 import {contribRoute,cleanupContrib} from './contrib.js';
 /* 2026-11-21 game diffs per exe hash: calibration reports in, our signed diffs out (relay/src/auto-profile.js) */
 import {profileRoute} from './auto-profile.js';
+/* 2026-11-21 Cardinal replay scores in, auto diffs verified / sent to the repair queue (relay/src/cardinal.js) */
+import {cardinalRoute} from './cardinal.js';
 
 /* requests per window; key prefix → [limit, seconds] */
 /* 2026-11-13 (user: 限制太大了; api.megulit.com answered 429 to a whole IP for over a minute): reads are loosened, writes,
@@ -30,7 +32,7 @@ import {profileRoute} from './auto-profile.js';
    internet café or a school behind one IP no longer share 120 a minute; 'ip-shared' still caps one IP as a whole.
    Old: ip 120/60 s, lb-get 60, adapt-get 120/h, avatar-get 600, hot 60, daily 60, daily-img 240, release 30,
    social-get 120, forum-get 120. */
-export const RATE={ip:[600,60],user:[600,60],'ip-shared':[3000,60],'adapt-feed':[60,3600],'adapt-pack':[1200,3600],'adapt-report':[30,3600],'autoprof-report':[30,3600],'profile-runtime':[6,3600],probe:[64,3600],contrib:[96,3600],'probe-full':[300,3600],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[300,60],'adapt-post':[30,3600],'adapt-get':[600,3600],diag:[20,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[1200,60],report:[20,3600],hot:[300,60],daily:[300,60],'daily-img':[900,60],release:[120,60],appeal:[3,86400],profile:[30,3600],'social-get':[600,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400],'forum-get':[600,60],'forum-post':[5,3600],'forum-reply':[30,3600],'forum-day':[60,86400],'forum-ip':[40,3600],'forum-img':[60,3600]};
+export const RATE={ip:[600,60],user:[600,60],'ip-shared':[3000,60],'adapt-feed':[60,3600],'adapt-pack':[1200,3600],'adapt-report':[30,3600],'autoprof-report':[30,3600],'cardinal-score':[60,3600],'profile-runtime':[6,3600],probe:[64,3600],contrib:[96,3600],'probe-full':[300,3600],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[300,60],'adapt-post':[30,3600],'adapt-get':[600,3600],diag:[20,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[1200,60],report:[20,3600],hot:[300,60],daily:[300,60],'daily-img':[900,60],release:[120,60],appeal:[3,86400],profile:[30,3600],'social-get':[600,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400],'forum-get':[600,60],'forum-post':[5,3600],'forum-reply':[30,3600],'forum-day':[60,86400],'forum-ip':[40,3600],'forum-img':[60,3600]};
 const encoder=new TextEncoder();
 const hex=buffer=>[...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');
 export async function sha256(value){return hex(await crypto.subtle.digest('SHA-256',typeof value==='string'?encoder.encode(value):value));}
@@ -299,6 +301,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
   else if((path==='/dashboard'||path==='/probe/dashboard')&&request.method==='GET')response=new Response(DASHBOARD_HTML,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'public, max-age=60','x-content-type-options':'nosniff'}});
   else if(path==='/api/seed/stats'&&(request.method==='GET'||request.method==='HEAD')){const r=await seedStatsGet(env,{json,fail},ctx,now);response=request.method==='HEAD'?new Response(null,{status:r.status,headers:r.headers}):r;}
   else if(path==='/api/probe/stats'&&request.method==='GET')response=await probeStats(env,now,{json,fail},ctx);
+  else if(path.startsWith('/api/cardinal/'))response=await cardinalRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else if(path==='/api/game-profile'||path.startsWith('/api/game-profile/'))response=await profileRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else if(path.startsWith('/api/adapters/')||path==='/api/probe'||path.startsWith('/api/probe/'))response=await adaptersRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else response=fail('NOT_FOUND',404);
