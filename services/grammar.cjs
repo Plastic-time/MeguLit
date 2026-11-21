@@ -6,6 +6,7 @@
    lines; the tokenizer confirms the point and gives its position. Results are cached per line (grammar_lines);
    progress per point is kept in grammar_progress. Lesson text lives in web/grammar-n5.js. */
 const insights=require('./learning-insights.cjs');
+const {plainWithRuby}=require('../core/example-ruby.cjs');
 const POINTS=['wa','ga','wo','ni','de','he','to','mo','no','desu','masu','te','nai','ta','iadj','naadj','kosoado','tai','teiru','tekudasai','mashou'];
 const KOSOADO=new Set(['これ','それ','あれ','どれ','この','その','あの','どの','ここ','そこ','あそこ','どこ','こっち','そっち','あっち','どっち','こちら','そちら','あちら','どちら','こんな','そんな','あんな','どんな']);
 /* に after these is an adverb ending (本当に, 一緒に), not the particle に */
@@ -56,7 +57,7 @@ function matchPoints(tokens){
   return out;
 }
 /* Ruby pairs the game wrote into a recorded line (<rしも>霜</r>), for furigana on cards. */
-function rubyPairs(text){const out=[];String(text||'').replace(/<r([^>]+)>([^<]+)<\/r>/g,(_,r,base)=>{out.push([base,r]);return '';});return out;}
+function rubyPairs(text){return plainWithRuby(text,true).ruby;}
 /* ---- database ---- */
 function ensure(db){
   db.exec(`CREATE TABLE IF NOT EXISTS grammar_lines(text TEXT PRIMARY KEY,hits TEXT NOT NULL,checked_at INTEGER NOT NULL);
@@ -71,9 +72,9 @@ async function candidatesAsync(db,opts={}){const it=candidateSteps(db,opts),brea
 function* candidateSteps(db,{root=null,scriptPairs=null,limitScript=4000}={}){
   const titles=new Map(db.prepare('SELECT id,title,executable FROM games').all().map(g=>[g.id,g]));const out=[],seen=new Set();
   const rows=db.prepare('SELECT id,game_id,text,original,read_at FROM reading_events ORDER BY id DESC LIMIT 5000').all();
-  let n=0;for(const r of rows){if(++n%200===0)yield;const text=insights.plainLine(r.text);if(!fitLength(text)||!insights.readableLine(text)||seen.has(text))continue;seen.add(text);let o={};try{o=JSON.parse(r.original||'{}');}catch{}
+  let n=0;for(const r of rows){if(++n%200===0)yield;const captured=plainWithRuby(r.text,true),text=insights.plainLine(captured.text);if(!fitLength(text)||!insights.readableLine(text)||seen.has(text))continue;seen.add(text);let o={};try{o=JSON.parse(r.original||'{}');}catch{}
     const human=insights.isHuman(o.translationSource),picked=insights.pickTranslation({human:human?{text:o.translation,source:o.translationSource}:null,machine:human?'':o.translation});
-    out.push({text,origin:'history',gameId:r.game_id,title:titles.get(r.game_id)?.title||'',ruby:rubyPairs(r.text),readAt:r.read_at,readBy:false,...picked});}
+    out.push({text,origin:'history',gameId:r.game_id,title:titles.get(r.game_id)?.title||'',ruby:captured.ruby,readAt:r.read_at,readBy:false,...picked});}
   if(root&&scriptPairs){
     const byGame=new Map();for(const r of rows)if(r.game_id){if(!byGame.has(r.game_id))byGame.set(r.game_id,[]);byGame.get(r.game_id).push({text:insights.plainLine(r.text),at:r.read_at});}
     for(const [gameId,read] of byGame){yield;const game=titles.get(gameId);if(!game?.executable)continue;let pairs=null;try{pairs=scriptPairs(root,game.executable);}catch{}if(!pairs?.ja?.length)continue;
