@@ -185,6 +185,11 @@ test('Gameexe.dat with exe angou decrypts with the scene key', () => withDir(dir
  const e = scenes.ENGINES['siglus-pck'], sc = e.scenes(dir);
  assert.equal(e.parse(sc[1].read()).speakers[0], 'しずる');
  assert.equal(e.parse(sc[0].read()).speakers[0], 'ことり');
+ const install = path.join(dir, 'game');
+ fs.mkdirSync(install);
+ fs.writeFileSync(path.join(dir, 'SiglusEngine.exe'), 'MZ');
+ for (const name of ['Scene.pck','Gameexe.dat']) fs.renameSync(path.join(dir,name),path.join(install,name));
+ assert.match(e.gameexe(dir), /#GAMENAME = "Synthetic"/);
 }));
 
 test('a partial Scene.pck (zeroed scenes) still reports SIGLUS_EXE_KEY instead of hanging', () => withDir(dir => {
