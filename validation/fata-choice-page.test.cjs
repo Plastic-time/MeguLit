@@ -59,9 +59,9 @@ test('wiring: the key, the seed, the control file, the script',()=>{
  assert.deepEqual(SEED,['^選択肢$']);
  const fata=P.profileFor({exe:'E:/GAL/海市蜃楼之馆/fata_jp.exe',engine:'KiriKiri'}),senren=P.profileFor({exe:'D:/Games/SenrenBanka/SenrenBanka.exe',engine:'KiriKiri'});
  assert.deepEqual(E.settings(fata).choiceFrames,['^選択肢$']);assert.deepEqual(E.settings(senren).choiceFrames,[]);
- assert.equal(E.krkrControlText(E.settings(fata),new Map()),'#cfg roles=0 embed=0 zh=1\r\n#choiceframe ^選択肢$\r\n');
+ assert.equal(E.krkrControlText(E.settings(fata),new Map()),'#cfg roles=0 embed=0 zh=1\r\n#clearline\r\n#choiceframe ^選択肢$\r\n');
  const t=require('../core/engine-draw.cjs');const ed=new t.EngineDraw({profile:fata,transport:{write(){},stop(){}}});assert.equal(ed.active,true,'the control file is written for ファタ');
- assert.ok(require('node:fs').readFileSync(path.join(root,'core','hook-native.cjs'),'utf8').includes('if(pid&&(cfg.roles||cfg.embed||(cfg.choiceFrames||[]).length))this.ensureEngineDraw(pid)'));
+ assert.ok(require('node:fs').readFileSync(path.join(root,'core','hook-native.cjs'),'utf8').includes('if(pid&&(cfg.roles||cfg.embed||cfg.clear||(cfg.choiceFrames||[]).length))this.ensureEngineDraw(pid)'));
  assert.ok(script.includes("else if(t.indexOf('#choiceframe ')==0) {try {if(typeof c.choiceFrames!='Object') c.choiceFrames=[];c.choiceFrames.add(new RegExp(t.substring(13)));} catch(e) {}}"));
  assert.ok(script.includes("var ui=st.uiDraw(self);if(ui=='link') st.link++;else if(ui=='choice') st.choiceDraws++;")&&script.includes("if(st.hideMsg() && ui=='') {"));
  assert.ok(!/historyWriteEnabled/.test(fn('st.choicePage=function(P)')),'no layout guess left');

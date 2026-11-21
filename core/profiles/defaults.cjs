@@ -20,6 +20,9 @@ module.exports={
   translationGrowsDown:false,
  },
  page:{
+  /* KiriKiri: a message layer cleared by the game (KAG [cm], MessageLayer.clear) after its line was reported takes that line off the
+     placement (the reader never redraws a line the game has cleared); false = kernel: nothing is said at a clear */
+  reportClear:false,
   /* the game draws one line over several frames (fade, wipe, per-character effects): null = kernel heuristics; true = every
      repaint of the same line is one line (never a new line, never a skip); false = frames are not effects */
   effectFrames:null,

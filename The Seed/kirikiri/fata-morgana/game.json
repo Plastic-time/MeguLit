@@ -13,6 +13,7 @@
   },
   "page": {
    "pairByDrawn": true,
+   "reportClear": true,
    "keepHeld": true
   },
   "choice": {

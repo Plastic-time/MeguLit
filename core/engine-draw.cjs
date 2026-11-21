@@ -13,7 +13,7 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const Profiles=require('./profiles/index.cjs');
 const MAX=64;
 
-function settings(profile){const frames=Profiles.get(profile,'choice.pageFrames',[]);return {choiceFrames:Array.isArray(frames)?frames.filter(f=>typeof f==='string'&&f&&!/[\r\n]/.test(f)).slice(0,20):[],roles:Profiles.get(profile,'draw.roles',false)===true,embed:Profiles.get(profile,'draw.embed',false)===true,zh:Profiles.get(profile,'draw.embedTranslation',true)!==false};}
+function settings(profile){const frames=Profiles.get(profile,'choice.pageFrames',[]);return {clear:Profiles.get(profile,'page.reportClear',false)===true,choiceFrames:Array.isArray(frames)?frames.filter(f=>typeof f==='string'&&f&&!/[\r\n]/.test(f)).slice(0,20):[],roles:Profiles.get(profile,'draw.roles',false)===true,embed:Profiles.get(profile,'draw.embed',false)===true,zh:Profiles.get(profile,'draw.embedTranslation',true)!==false};}
 /* the key both sides use: the sentence's characters without blanks or line breaks */
 const keyOf=t=>String(t||'').replace(/[\s　\u001f]/g,'');
 /* reader spans [start, end, reading] (end exclusive, code points of the key) -> start:len:reading|... */
@@ -28,6 +28,7 @@ const clean=t=>String(t||'').replace(/\t/g,' ').replace(/\r?\n/g,'\u001f');
 function krkrControlPath(pid,tmp=os.tmpdir()){return path.join(tmp,'MeguLit','draw',(Number(pid)|0)+'.txt');}
 function krkrControlText(cfg,entries){
  const lines=['#cfg roles='+(cfg.roles?1:0)+' embed='+(cfg.embed?1:0)+' zh='+(cfg.zh?1:0)];
+ if(cfg.clear)lines.push('#clearline');
  for(const f of cfg.choiceFrames||[])lines.push('#choiceframe '+f);
  for(const [k,e] of entries)if(k&&!/[\t\r\n]/.test(k))lines.push(k+'\t'+rubyField(e.ruby)+'\t'+(cfg.zh?clean(e.zh):''));
  return lines.join('\r\n')+'\r\n';
@@ -44,7 +45,7 @@ class KrkrTransport{
 class EngineDraw{
  constructor({profile,transport,onAsk=()=>{}}){this.cfg=settings(profile);this.transport=transport;this.onAsk=onAsk;this.entries=new Map();this.asked=new Set();this.sync();}
  setProfile(profile){const c=settings(profile);if(JSON.stringify(c)===JSON.stringify(this.cfg))return;this.cfg=c;this.sync();}
- get active(){return this.cfg.roles||this.cfg.embed||(this.cfg.choiceFrames||[]).length>0;}
+ get active(){return this.cfg.roles||this.cfg.embed||this.cfg.clear||(this.cfg.choiceFrames||[]).length>0;}
  sync(){if(this.active)this.transport.write(this.cfg,this.entries);else this.transport.stop();}
  /* a dialogue record (role=line) without emb: ask the reader for its replacement once */
  line(rec){if(!this.cfg.embed||!rec||rec.emb)return false;const k=keyOf(rec.text);if(!k||this.entries.has(k)||this.asked.has(k))return false;

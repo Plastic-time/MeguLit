@@ -947,7 +947,7 @@ class HookNative{
  /* engine-draw: the profile's draw.* switches go to the engine paths that read them (web / RPG Maker now, KiriKiri with its next line) */
  drawSync(){const ED=require('./engine-draw.cjs'),cfg=ED.settings(this.profile);try{this.textPath?.drawConfig?.(cfg);}catch{}
   /* a game whose diff turns draw.* on gets its control file at once (YU-RIS arms its glyph loop hook from it before any line) */
-  try{const pid=Number(this.state?.gameProcessId)||0;if(pid&&(cfg.roles||cfg.embed||(cfg.choiceFrames||[]).length))this.ensureEngineDraw(pid);else this.engineDraw?.setProfile(this.profile);}catch{}}
+  try{const pid=Number(this.state?.gameProcessId)||0;if(pid&&(cfg.roles||cfg.embed||cfg.clear||(cfg.choiceFrames||[]).length))this.ensureEngineDraw(pid);else this.engineDraw?.setProfile(this.profile);}catch{}}
  send(v){if(v&&(v.type==='enable'||v.type==='disable'))try{this.textPath?.hide(v.type==='enable');}catch{}if(this.process?.stdin.writable)this.process.stdin.write(JSON.stringify(v)+'\n');}
  /* engine-draw: one replacement table per game process, handed to the engine's transport (KiriKiri: control file) */
  /* the control file of this game process (every engine DLL that reads draw.* reads it: KiriKiri, Ren'Py, YU-RIS) */

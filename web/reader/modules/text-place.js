@@ -240,6 +240,12 @@
      has not drawn within ORPHAN_MS is drawn from the placement itself: its own text on its own boxes, like a name or a choice.
      Whatever the game hides is on screen. It stays until the game draws over its place or starts a new page. */
   const ORPHAN_MS = 450;
+  /* 2026-11-21 (ファタモルガーナの館, owner's recording 02:57Z: after each click the line just read came back in white without ruby for
+     0.7 s): the game had cleared its page at the click ([cm]) while the placement still held the line, and this path drew it from
+     its boxes. textPlace {gone} (core/overlay-placement.cjs, from an engine that reports its cleared line): that line, the lines
+     waiting and the orphans of the page are gone with it; the line stays the anchor for the next one */
+  let goneText = '';
+  function pageCleared(text) { goneText = [...String(text || '')].filter(c => !blank(c)).join(''); waits.clear(); orphanWait = null; if (orphans.length) { orphans = []; extraKey = ''; } schedule(); }
   let orphans = [], orphanWait = null;
   /* 2026-11-21 (owner, ファタモルガーナの館 r30: the choice screen showed its frames and nothing in them): the game draws its options one right
      after the other, each a hidden line of its own; only the last one stayed current for ORPHAN_MS, the others never became orphans. Every
@@ -281,6 +287,7 @@
     if (!l || l.fallback || !Array.isArray(l.rects) || !l.text) return;
     const chars = [...l.text], rects = []; chars.forEach((c, i) => { if (!blank(c)) rects.push(l.rects[i]); });
     const text = chars.filter(c => !blank(c)).join('');
+    if (text && text === goneText) return; /* the game cleared it (textPlace gone) */
     if (!text || !rects.length || !rects.every(r => Array.isArray(r) && r[2] > 0 && r[3] > 0)) { giveWay(); return; } /* cannot be drawn here: the game draws it */
     if (orphans.some(o => o.text === text)) return;
     /* 2026-11-21 (owner, ファタモルガーナの館 r33: a clump of characters in the middle of the screen; two lines on top of each other):
@@ -743,7 +750,7 @@
     if (key !== lastGeom) { lastGeom = key; dispatchEvent(new CustomEvent('megulit-reveal-progress', { detail: { typing: false } })); window.__tomoyoHitRegionsRefresh?.(true); }
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(apply); };
-  b.textPlace = m => { if (m && m.text && typeof m.read === 'boolean') b.lineReadDrawn?.(m.text, m.read); if (m && m.text && typeof m.color === 'string') b.lineColorDrawn?.(m.text, m.color); if (m?.visible === true) { const vis = [...String(m.text || '')].filter(c => !blank(c)).join(''), cur = line && !line.fallback ? [...String(line.text || '')].filter(c => !blank(c)).join('') : '';
+  b.textPlace = m => { if (m?.gone === true) { pageCleared(m.text); return; } if (m && Array.isArray(m.rects) && m.text && [...String(m.text)].filter(c => !blank(c)).join('') !== goneText) goneText = ''; if (m && m.text && typeof m.read === 'boolean') b.lineReadDrawn?.(m.text, m.read); if (m && m.text && typeof m.color === 'string') b.lineColorDrawn?.(m.text, m.color); if (m?.visible === true) { const vis = [...String(m.text || '')].filter(c => !blank(c)).join(''), cur = line && !line.fallback ? [...String(line.text || '')].filter(c => !blank(c)).join('') : '';
     /* 2026-11-20 (CHAOS;CHILD: the click that clears a page at a scene change makes the game draw the whole page once more as plain text,
        earlier lines and the placed one together, while its hidden line leaves the screen): the placed line goes with the page until the next line */
     if (m.hiding === true && cur && vis.length > cur.length && vis.endsWith(cur)) { document.body.classList.add('megulit-place-gone'); line = null; schedule(); return; }

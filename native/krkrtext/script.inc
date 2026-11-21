@@ -26,7 +26,7 @@ LR"MGLT((function(){
      KiriKiri builds; typeof does not */
   var st=(typeof global.__megulitKrkrState=='Object')?global.__megulitKrkrState:void;
   if(st===void) {
-   st=%['skipped'=>0,'drawArgs'=>void,'drawOp'=>0,'drawLo'=>256,'drawQuiet'=>0,'lastEnd'=>void,'charsSent'=>0,'charsErr'=>'','trWrapped'=>0,'trLine'=>0,'trText'=>'','trKey'=>'','trOp'=>void,'trT'=>void,'trOwner'=>void,'trRec'=>void,'skippedCls'=>'','lastFont'=>'','pfontName'=>void,'art'=>0,'artText'=>'','artSeen'=>[],'calls'=>0,'hid'=>0,'link'=>0,'choiceDraws'=>0,'wrapped'=>[],'recs'=>[],'active'=>void,'lastVis'=>-1,'timer'=>void,'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
+   st=%['skipped'=>0,'drawArgs'=>void,'drawOp'=>0,'drawLo'=>256,'drawQuiet'=>0,'lastEnd'=>void,'charsSent'=>0,'charsErr'=>'','trWrapped'=>0,'trLine'=>0,'trText'=>'','trKey'=>'','trOp'=>void,'trT'=>void,'trOwner'=>void,'trRec'=>void,'skippedCls'=>'','lastFont'=>'','pfontName'=>void,'art'=>0,'artText'=>'','artSeen'=>[],'calls'=>0,'hid'=>0,'link'=>0,'choiceDraws'=>0,'clears'=>0,'wrapped'=>[],'recs'=>[],'active'=>void,'lastVis'=>-1,'timer'=>void,'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
    st.screen=function(){
     var sw=+this.kag.scWidth,sh=+this.kag.scHeight;
     if(!(sw>0) || !(sh>0)) {sw=+this.kag.primaryLayer.width;sh=+this.kag.primaryLayer.height;}
@@ -136,6 +136,18 @@ LR"MGLT((function(){
     if(row!='') t+=(t!=''?"\n":'')+row;
     rec.head='ToMe_CHARS engine=krkr line='+rec.line+' hidden='+h+' sw='+int(rec.sw)+' sh='+int(rec.sh)+' vx=0 vy=0 vw=0 vh=0 n='+rec.cn+' rects='+rec.rs;rec.tt=t;
     this.report(rec.head+(rec.role=='name'?' role=name':'')+' text='+t);
+    if(rec.role!='name') rec.sentLine=rec.line;
+   } incontextof st;
+   /* 2026-11-21 (owner's recording, ファタモルガーナの館 1.4.22 v3, 02:57Z: after every click the line just read came back for about
+      0.7 s in white without ruby, and now and then the game's own text took over): the game clears its message layer at the click
+      ([cm] -> MessageLayer.clear) after the sentence was already reported (its end came at the click wait), so nothing said the
+      line had left the screen. The placement kept it as the current line while the reader moved on, and the reader's orphan path
+      drew that hidden line from its boxes after 450 ms (or gave way to the game when it could not). With page.reportClear (the
+      game's diff, control file #clearline) the cleared line is reported once more, empty and not hidden: it leaves the placement */
+   st.clearSent=function(rec){
+    if(!this.cfg.clear || !(rec.sentLine>0) || rec.sentLine!=rec.line) return;
+    rec.sentLine=0;this.clears++;
+    this.report('ToMe_CHARS engine=krkr line='+rec.line+' hidden=0 sw='+int(rec.sw)+' sh='+int(rec.sh)+' vx=0 vy=0 vw=0 vh=0 n=0 rects= text=');
    } incontextof st;
 )MGLT", LR"MGLT(
    st.flush=function(rec,clearing){
@@ -257,7 +269,7 @@ LR"MGLT((function(){
     try {if(typeof L.lineLayer=='Object') this.wrapDraw(L.lineLayer);} catch(e) {}
     for(var i=0;i<this.recs.count;i++) if(this.recs[i].target===L) return;
     if(typeof L.processCh!='Object') return;
-    var rec=%['target'=>L,'st'=>this,'oldCh'=>L.processCh,'oldClear'=>void,'n'=>0,'text'=>'','line'=>0,'same'=>0,'cleared'=>true,'nvl'=>0,'x0'=>0,'y0'=>0,'x1'=>0,'y1'=>0,'size'=>0,'sw'=>0,'sh'=>0,'ly'=>0,'color'=>-1,'paint'=>'','role'=>'line','ra'=>[],'args'=>void,'lk'=>void,'lkDirty'=>0,'lkQuiet'=>0,'lkSw'=>0,'lkSh'=>0,'head'=>'','tt'=>''];
+    var rec=%['target'=>L,'st'=>this,'oldCh'=>L.processCh,'oldClear'=>void,'n'=>0,'text'=>'','line'=>0,'same'=>0,'cleared'=>true,'nvl'=>0,'x0'=>0,'y0'=>0,'x1'=>0,'y1'=>0,'size'=>0,'sw'=>0,'sh'=>0,'ly'=>0,'color'=>-1,'paint'=>'','role'=>'line','ra'=>[],'args'=>void,'lk'=>void,'lkDirty'=>0,'lkQuiet'=>0,'lkSw'=>0,'lkSh'=>0,'head'=>'','tt'=>'','sentLine'=>0];
     rec.ch=function(ch){
      /* engine-draw: the Chinese drawn under the last sentence goes when the next sentence of the same page starts */
      try {var bk=this.st.embBk;if(bk!==void && bk.L===this.target) this.st.embRestore();} catch(e) {}
@@ -273,7 +285,7 @@ LR"MGLT((function(){
      return result;
     } incontextof rec;
     rec.clr=function(){
-     try {this.st.flush(this,true);this.cleared=true;this.st.linkClear(this);var bk=this.st.embBk;if(bk!==void && bk.L===this.target) {if(bk.tr) this.st.embRestore(); else this.st.embDrop();}} catch(e) {}
+     try {this.st.flush(this,true);this.st.clearSent(this);this.cleared=true;this.st.linkClear(this);var bk=this.st.embBk;if(bk!==void && bk.L===this.target) {if(bk.tr) this.st.embRestore(); else this.st.embDrop();}} catch(e) {}
      if(typeof this.oldClear!='Object') return (global.MessageLayer.clear incontextof this)(...);
      return (this.oldClear incontextof this.target)(...);
     } incontextof rec;
@@ -458,6 +470,7 @@ LR"MGLT((function(){
     for(var i=0;i<a.count && i<4000;i++) {
      var t=''+a[i];if(t.length>0 && #t==0xfeff) t=t.substring(1);if(t=='') continue;
      if(t.charAt(0)=='#') {if(t.indexOf('#cfg')==0) {c.roles=t.indexOf('roles=1')>=0?1:0;c.embed=t.indexOf('embed=1')>=0?1:0;c.zh=t.indexOf('zh=0')>=0?0:1;}
+      else if(t=='#clearline') c.clear=1;
       else if(t.indexOf('#choiceframe ')==0) {try {if(typeof c.choiceFrames!='Object') c.choiceFrames=[];c.choiceFrames.add(new RegExp(t.substring(13)));} catch(e) {}}
       continue;}
      var j=t.indexOf("\t");if(j<=0) continue;
@@ -719,7 +732,7 @@ LR"MGLT((function(){
       if(typeof ms!='Object' || ms===void || ms===null) continue;
       for(var j=0;j<ms.count && j<32;j++) this.install(ms[j]);
      }
-     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0)+' wrapped='+this.wrapped.count+' tr='+(this.trWrapped?1:0)+(typeof this.trWhy=='Object' && this.trWhy!==void?'/layer'+(+this.trWhy.layer)+'/own'+(+this.trWhy.own)+'/scr'+(+this.trWhy.scr)+'/small'+(+this.trWhy.small)+'/hid'+(+this.trWhy.hid)+'/empty'+(+this.trWhy.empty)+'/blank'+(+this.trWhy.blank):'')+'/sent'+(+this.charsSent)+(this.charsErr!==void?'/err:'+this.charsErr:'')+' draws='+this.calls+' hidden='+this.hid+' link='+this.link+' choice='+(+this.choiceDraws)+' art='+this.art+' artLayers='+this.artSeen.count+' font='+this.fontNow()+' chars='+this.charsSent+(this.charsErr!=''?' charsErr='+this.charsErr:'')+' skipped='+this.skipped+(this.skippedCls!=''?'('+this.skippedCls+')':'');
+     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0)+' wrapped='+this.wrapped.count+' tr='+(this.trWrapped?1:0)+(typeof this.trWhy=='Object' && this.trWhy!==void?'/layer'+(+this.trWhy.layer)+'/own'+(+this.trWhy.own)+'/scr'+(+this.trWhy.scr)+'/small'+(+this.trWhy.small)+'/hid'+(+this.trWhy.hid)+'/empty'+(+this.trWhy.empty)+'/blank'+(+this.trWhy.blank):'')+'/sent'+(+this.charsSent)+(this.charsErr!==void?'/err:'+this.charsErr:'')+' draws='+this.calls+' hidden='+this.hid+' link='+this.link+' choice='+(+this.choiceDraws)+' clr='+(+this.clears)+' art='+this.art+' artLayers='+this.artSeen.count+' font='+this.fontNow()+' chars='+this.charsSent+(this.charsErr!=''?' charsErr='+this.charsErr:'')+' skipped='+this.skipped+(this.skippedCls!=''?'('+this.skippedCls+')':'');
     } catch(e) {return 'error '+e.message;}
    } incontextof st;
    global.__megulitKrkrState=st;
