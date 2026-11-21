@@ -129,3 +129,32 @@
 .main .cn-guide-actions button{border-radius:0}
 .main .cn-guide-actions [data-cn-status]{flex:1;margin:0;min-width:160px}
 @media (max-width:720px){.main .cn-guide-item{flex-direction:column;align-items:stretch}}
+/* 2026-11-21 首位玩家 card: a compact strip of the Chinese-build guide's family (gold bar, glass); sits under the tab bar or at the top of a
+   column of the overview, never over the cover */
+.main .first-player{box-sizing:border-box;width:100%;max-width:1400px;position:relative;margin:14px auto 18px;padding:13px 18px 13px 20px;border:0;border-radius:2px;background:rgba(16,13,17,.62);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-t1) 12%,transparent),inset 3px 0 0 var(--g-gold);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.main .first-player[hidden]{display:none}
+.main .detail-main>.first-player,.main .detail-aside>.first-player{margin:0 0 16px}
+.main .first-player-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:5px}
+.main .first-player-eyebrow{flex:none;font:500 10.5px/1 "IBM Plex Mono",Consolas,"Microsoft YaHei UI","Microsoft YaHei",monospace;letter-spacing:.26em;color:var(--g-gold)}
+.main .first-player h2{margin:0;font-size:16px;line-height:1.4;letter-spacing:.02em;color:var(--g-t1)}
+.main .first-player p{margin:0;max-width:none;font-size:12.5px;line-height:1.7;color:var(--g-t2);text-wrap:pretty}
+.main .first-player-note{display:block;margin-top:6px;font-size:11.5px;letter-spacing:.05em;color:var(--g-t3)}
+.main .first-player-act{display:flex;align-items:center;gap:12px;margin-top:9px;flex-wrap:wrap}
+.main .first-player-act button{height:30px;padding:0 16px;border-radius:0;font-size:12.5px}
+.main .first-player-fail{font-size:12px;color:var(--g-t3)}
+.main .first-player[data-state="thanks"]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 30%,transparent),inset 3px 0 0 var(--g-gold)}
+.main .first-player-tags{display:flex;flex-wrap:wrap;gap:5px;list-style:none;margin:8px 0 0;padding:7px 0 0;border-top:1px solid color-mix(in srgb,var(--g-t1) 10%,transparent)}
+.main .first-player-tags li{padding:2px 8px;font-size:11px;line-height:1.5;color:var(--g-t2);background:color-mix(in srgb,var(--g-t1) 6%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-t1) 10%,transparent)}
+.main .first-player-tags li.is-key{color:var(--g-gold);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)}
+.main .first-player-hint{margin-top:6px!important;padding-top:0;border-top:0;font-size:11.5px!important;line-height:1.6!important;color:var(--g-t3)!important}
+.main .first-player-link{display:inline;height:auto;min-height:0;padding:0;margin:0;border:0;border-radius:0;background:none;box-shadow:none;font:inherit;color:var(--g-gold);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.main .first-player-link:hover{color:var(--g-t1)}
+.main .first-player-credit{display:grid;gap:5px;margin-top:10px}
+.main .first-player-credit-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.main .first-player-credit input{box-sizing:border-box;width:min(260px,100%);height:30px;padding:0 10px;border-radius:0;font-size:12.5px}
+.main .first-player-credit button{height:30px;padding:0 14px;border-radius:0;font-size:12.5px}
+.main .first-player-who{font-size:12.5px;color:var(--g-t1)}
+.main .first-player-privacy{font-size:11.5px;color:var(--g-t3)}
+.main .first-player-from{margin:0!important;font-size:13px!important;color:var(--g-t1)!important;overflow-wrap:anywhere}
+.main .first-player[data-state="received"]{padding-top:11px;padding-bottom:11px}
+.main .first-player[data-state="received"] .first-player-head{margin:0}
