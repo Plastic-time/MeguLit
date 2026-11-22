@@ -1,4 +1,5 @@
 import {receiptView} from './seed-receipt.js';
+import {chineseProfileLayer,chineseProfileSetting} from './profile-summary.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* The game detail card polls the existing receiver and exposes sharing controls only in ordinary calibration states. */
 const W={
@@ -34,9 +35,15 @@ export function mountFirstPlayer({host,id,api,locale,esc,isCurrent=()=>true,plac
   /* a poll never replaces a box the player is typing in */
   if(box.contains(document.activeElement)&&shown){pendingRender=true;return;}pendingRender=false;if(state==='hidden'){box.hidden=true;box.innerHTML='';shown='';return;}shown=sig;box.dataset.state=state;
   const application=r.application;
+  const chinese=locale!=='en'&&locale!=='ja';
   const labels=({en:['Applied this session','Retained local settings','None'],ja:['今回適用','保持したローカル設定','なし']})[locale]||['本次应用','保留的本机设置','无'];
-  const settings=keys=>keys.map(key=>{const value=application.values?.[key];return typeof value==='boolean'||typeof value==='number'||typeof value==='string'?key+' = '+value:key;}).join(', ')||labels[2];
-  const applied=application?application.layers.map(x=>'<p>'+esc(labels[0])+' · '+esc(x.layer)+' rev '+esc(String(x.revision??'？'))+' · '+esc(settings(x.keys))+'</p>').join('')+'<p>'+esc(labels[1])+' · '+esc(settings(application.personal))+'</p>':'';
+  const settings=keys=>keys.map(key=>{const value=application.values?.[key];
+   if(chinese)return chineseProfileSetting(key,value);
+   return typeof value==='boolean'||typeof value==='number'||typeof value==='string'?key+' = '+value:key;
+  }).join(chinese?'；':', ')||labels[2];
+  const applied=application?application.layers.map(x=>'<p>'+esc(labels[0])+' · '+
+   (chinese?esc(chineseProfileLayer(x.layer,x.revision)):esc(x.layer)+' rev '+esc(String(x.revision??'？')))+
+   ' · '+esc(settings(x.keys))+'</p>').join('')+'<p>'+esc(labels[1])+' · '+esc(settings(application.personal))+'</p>':'';
   if(state==='applied'){box.innerHTML=applied;box.hidden=false;return;}
   if(received){box.innerHTML=`<div class="first-player-copy">${receipt.html}${applied}</div>`;box.hidden=false;return;}
   const lower=state==='off'?`<div class="first-player-act"><button type="button" class="primary" data-fp-share ${busy?'disabled':''}>${esc(busy?t.busy:t.button)}</button>${failed?`<span class="first-player-fail">${esc(t.failed)}</span>`:''}</div>`:state==='thanks'?(r.isolated?'':creditHTML(cr)):`<span class="first-player-note">${esc(t.note)}</span>`;
