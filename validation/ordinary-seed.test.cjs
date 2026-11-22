@@ -50,8 +50,9 @@ async function setup(t,{live=false}={}) {
   if(process.env.MEGULIT_TEST_WORKER_BUNDLE){
     const {Miniflare,convertV4MiniflareOptions}=require('../relay/node_modules/miniflare');
     const mf=new Miniflare(convertV4MiniflareOptions({modules:[{type:'ESModule',path:'worker.mjs',contents:fs.readFileSync(process.env.MEGULIT_TEST_WORKER_BUNDLE,'utf8')}],compatibilityDate:'2026-10-01',
-      bindings:env,d1Databases:['DB'],durableObjects:{SEED_NOTIFICATIONS:{className:'SeedNotifications',useSQLite:true}},outboundService:async r=>{
-        assert.equal(r.url,gateway);return fetch(gateway,{method:r.method,body:await r.arrayBuffer(),headers:{
+      bindings:{...env,ORDINARY_SCAN_URL:'https://scan.test/scan'},d1Databases:['DB'],durableObjects:{SEED_NOTIFICATIONS:{className:'SeedNotifications',useSQLite:true}},outboundService:async r=>{
+        if(r.url==='https://scan.test/health'&&r.method==='GET')return fetch(new URL('health',gateway),{headers:{authorization:r.headers.get('authorization')}});
+        assert.equal(r.url,'https://scan.test/scan');return fetch(gateway,{method:r.method,body:await r.arrayBuffer(),headers:{
           authorization:r.headers.get('authorization'),'content-type':r.headers.get('content-type')}});
       }}));
     t.after(()=>mf.dispose());store=await mf.getD1Database('DB');
@@ -89,6 +90,8 @@ async function setup(t,{live=false}={}) {
 test('player upload, scanner retry, quarantine, signature, offline install and signed revocation',async t=>{
   const {root,config,publicKey,request,fetcher,submit,find,store,retry,f,gateway}=await setup(t);
   if(process.env.MEGULIT_TEST_WORKER_BUNDLE){
+    const policy=await request('/api/seed-admin/ordinary-policy',{headers:{authorization:'Bearer '+f.env.ADAPTER_ADMIN_TOKEN}});
+    assert.equal(policy.status,200);assert.equal((await policy.json()).scanner,'online');
     const {checkGateway}=await import('../relay/check-ordinary.mjs');
     const vars={ORDINARY_SCAN_URL:gateway,ORDINARY_PUBLIC_KEYS:JSON.stringify([publicKey])};
     const receipt=await checkGateway(vars,[publicKey],config.ORDINARY_SCAN_TOKEN);

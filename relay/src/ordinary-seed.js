@@ -106,7 +106,7 @@ async function scannerState(env){
   try{
     const url=new URL('health',env.ORDINARY_SCAN_URL);
     if(url.protocol!=='https:'||url.username||url.password)return 'unknown';
-    const response=await fetch(url,{headers:{authorization:'Bearer '+env.ORDINARY_SCAN_TOKEN},redirect:'error',signal:AbortSignal.timeout(4500)});
+    const response=await fetch(url,{headers:{authorization:'Bearer '+env.ORDINARY_SCAN_TOKEN},redirect:'manual',signal:AbortSignal.timeout(4500)});
     if(!response.ok){await response.body?.cancel();return 'unknown';}
     const {value}=await boundedJSON(response,256);
     return ['online','offline','busy','unready'].includes(value?.scanner)?value.scanner:'unknown';
