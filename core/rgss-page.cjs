@@ -5,7 +5,7 @@ const SCRIPT=String.raw`
 # MEGULIT_RGSS_BOOTSTRAP
 unless defined?(MeguLitRGSS)
  module MeguLitRGSS
-  @windows={}; @owners={}; @serial=0; @ui=0; @generation=0; @roles=true; @ready=false; @out=''; @input=''; @socket=nil; @attempt=0
+  @variant=__VARIANT__; @windows={}; @owners={}; @serial=0; @ui=0; @generation=0; @roles=true; @ready=false; @out=''; @input=''; @socket=nil; @attempt=0
   class << self
    def observe
     yield
@@ -16,6 +16,8 @@ unless defined?(MeguLitRGSS)
    def binary(s); s=s.dup; s.force_encoding('BINARY') if s.respond_to?(:force_encoding); s; end
    def api(name,args); Win32API.new('ws2_32',name,args,'i'); end
    def start
+    raise 'RGSS Ruby family mismatch' unless @variant==2 || @variant==1 && RUBY_VERSION =~ /\A1\.8\./ || @variant==3 && RUBY_VERSION =~ /\A1\.9\./
+    @out=binary(''); @input=binary('')
     @wsa=api('WSAStartup','ip'); @open=api('socket','iii'); @nonblock=api('ioctlsocket','ilp'); @connect=api('connect','ipi')
     @send=api('send','ipii'); @recv=api('recv','ipii'); @close=api('closesocket','i'); @error=api('WSAGetLastError',''); @select=api('select','ipppp')
     @pid=Win32API.new('kernel32','GetCurrentProcessId','','i').call
@@ -28,7 +30,7 @@ unless defined?(MeguLitRGSS)
     @out << s; true
    end
    def disconnect
-    @close.call(@socket) if @socket; @socket=nil; @ready=false; @roles=false; @out=''; @input=''
+    @close.call(@socket) if @socket; @socket=nil; @ready=false; @roles=false; @out=binary(''); @input=binary('')
     forget
    end
    def transport
@@ -89,10 +91,30 @@ unless defined?(MeguLitRGSS)
    end
    def role(w)
     return 'line' if w.is_a?(Window_Message)
+    return nil unless @variant==2
     return 'choice' if defined?(Window_Choice) && w.is_a?(Window_Choice)
     return 'menu' if w.is_a?(Window_Selectable)
     return 'system' if defined?(Window_Help) && w.is_a?(Window_Help)
     nil
+   end
+   def xp_choices
+    return nil unless defined?($game_temp) && $game_temp && $game_temp.respond_to?(:choice_max) && $game_temp.respond_to?(:choice_start)
+    count=$game_temp.choice_max;start=$game_temp.choice_start
+    return [0,0] if count.is_a?(Integer) && count==0
+    return nil unless count.is_a?(Integer) && start.is_a?(Integer) && count>0 && count<=4 && start>=0 && start+count<=4
+    [start,count]
+   end
+   def source_ready?(w)
+    return false if @variant==1 && !xp_choices
+    return true if w.respond_to?(:pause) && w.pause
+    if @variant==1
+     choices=xp_choices;return choices && choices[1]>0 && w.respond_to?(:active) && w.active
+    end
+    if @variant==3 && defined?(Window_ChoiceList)
+     choice=w.instance_variable_get(:@choice_window)
+     return choice && choice.is_a?(Window_ChoiceList) && choice.instance_variable_get(:@message_window).equal?(w) && choice.respond_to?(:active) && choice.active && visible?(choice)
+    end
+    false
    end
    def number(n); n.is_a?(Numeric) && n==n && n.abs<100000; end
    def draw(bmp,args)
@@ -111,6 +133,13 @@ unless defined?(MeguLitRGSS)
      c[:items][key]=[text,[x,y,width,height],w.instance_variable_get(:@__mg_item)]
      return
     end
+    if @variant==1
+     choices=xp_choices
+     unless choices;c[:overflow]=true;return;end
+     if c[:glyphs].empty?;c[:xp_choices]=choices
+     elsif c[:xp_choices]!=choices;c[:overflow]=true;return;end
+     return if choices[1]>0 && y+height>choices[0]*32
+    end
     font=bmp.font.size;return unless number(font) && font>0
     points=text.unpack('U*');if points.size+c[:glyphs].size>1000;c[:overflow]=true;return;end
     return if c[:overflow]
@@ -127,8 +156,8 @@ unless defined?(MeguLitRGSS)
     end
    end
    def screen
-    return nil unless Graphics.respond_to?(:width) && Graphics.respond_to?(:height)
-    [Graphics.width,Graphics.height]
+    return [Graphics.width,Graphics.height] if Graphics.respond_to?(:width) && Graphics.respond_to?(:height)
+    @variant==1 ? [640,480] : nil
    end
    def visible?(w)
     return false if w.disposed? || !w.visible || w.contents_opacity==0
@@ -138,7 +167,9 @@ unless defined?(MeguLitRGSS)
     true
    end
    def origin(w)
-    x=w.x+16-w.ox;y=w.y+16-w.oy;v=w.viewport
+    padding=@variant==3 && w.respond_to?(:padding) ? w.padding : 16
+    return nil if @variant==3 && (!w.respond_to?(:padding) || !number(padding) || padding<0)
+    x=w.x+padding-w.ox;y=w.y+padding-w.oy;v=w.viewport
     if v;x+=v.rect.x-v.ox;y+=v.rect.y-v.oy;end
     [x,y]
    end
@@ -173,8 +204,10 @@ unless defined?(MeguLitRGSS)
    end
    def publish(c)
     w=c[:window];return clear(c) unless visible?(w)
-    r=role(w);return unless r;o=origin(w)
+    r=role(w);return unless r;o=origin(w);return clear(c) unless o
     if r=='line'
+     return clear(c) if @variant==1 && !xp_choices
+     c[:overflow]=true if @variant==1 && !c[:glyphs].empty? && c[:xp_choices]!=xp_choices
      return clear(c) if c[:glyphs].empty? || c[:overflow]
      rects=[];text='';last_y=nil
      c[:glyphs].each do |g|
@@ -185,7 +218,7 @@ unless defined?(MeguLitRGSS)
      unless c[:shown] && c[:signature]==signature
       if record(c,text,rects);c[:signature]=signature;c[:shown]=true;end
      end
-     if c[:shown] && c[:signature]==signature && w.respond_to?(:pause) && w.pause && c[:source_signature]!=signature
+     if c[:shown] && c[:signature]==signature && source_ready?(w) && c[:source_signature]!=signature
       c[:source_signature]=signature if queue("S #{@generation} #{c[:line]} #{[text].pack('m').delete("\r\n")}\n")
      end
     else
@@ -219,10 +252,12 @@ unless defined?(MeguLitRGSS)
      def draw_text(*args);r=__megulit_rgss_draw_text(*args);MeguLitRGSS.observe{MeguLitRGSS.draw(self,args)};r;end
      alias_method :__megulit_rgss_clear,:clear
      def clear(*args);r=__megulit_rgss_clear(*args);MeguLitRGSS.observe{MeguLitRGSS.erase(self)};r;end
-     alias_method :__megulit_rgss_clear_rect,:clear_rect
-     def clear_rect(*args);r=__megulit_rgss_clear_rect(*args);MeguLitRGSS.observe{a=args[0].is_a?(Rect) ? [args[0].x,args[0].y,args[0].width,args[0].height] : args;MeguLitRGSS.erase(self,a)};r;end
+     if method_defined?(:clear_rect)
+      alias_method :__megulit_rgss_clear_rect,:clear_rect
+      def clear_rect(*args);r=__megulit_rgss_clear_rect(*args);MeguLitRGSS.observe{a=args[0].is_a?(Rect) ? [args[0].x,args[0].y,args[0].width,args[0].height] : args;MeguLitRGSS.erase(self,a)};r;end
+     end
     end
-    [Window_Command,(defined?(Window_Choice) ? Window_Choice : nil)].compact.each do |klass|
+    (@variant==2 ? [Window_Command,(defined?(Window_Choice) ? Window_Choice : nil)].compact : []).each do |klass|
      next unless klass.method_defined?(:draw_item)
      klass.class_eval do
       alias_method :__megulit_rgss_draw_item,:draw_item
@@ -243,5 +278,8 @@ unless defined?(MeguLitRGSS)
  end
 end
 `;
-function pageScript({port,token}){if(!Number.isInteger(port)||port<1||port>65535||!/^[a-f0-9]{32}$/.test(token))throw Error('RGSS_SESSION_ARGUMENTS');return SCRIPT.replace('__PORT__',String(port)).replace('__TOKEN__',token);}
-module.exports={pageScript};
+function render({port,token},generation){if(!Number.isInteger(port)||port<1||port>65535||!/^[a-f0-9]{32}$/.test(token))throw Error('RGSS_SESSION_ARGUMENTS');return SCRIPT.replace('__VARIANT__',String(generation)).replace('__PORT__',String(port)).replace('__TOKEN__',token);}
+function pageScript(options){return render(options,2);}
+/* No launch path selects these candidates until complete games and original Ruby runtimes are verified. */
+function candidatePageScript({generation,...options}){if(![1,3].includes(generation))throw Error('RGSS_CANDIDATE_GENERATION');return (generation===3?'# encoding: UTF-8\n':'')+render(options,generation);}
+module.exports={pageScript,candidatePageScript};

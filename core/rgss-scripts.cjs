@@ -56,4 +56,35 @@ function patchArchiveV1(buffer,entry,replacement){
  return Buffer.concat([buffer.subarray(0,entry.offset-4),size,encrypted,buffer.subarray(entry.offset+entry.size)]);
 }
 
-module.exports={scriptTable,patchMain,patchArchiveV1,marshalInteger};
+function archiveV3Index(buffer){
+ if(!Buffer.isBuffer(buffer)||buffer.length<28||buffer.length>64<<20||buffer.subarray(0,8).toString('hex')!=='5247535341440003')throw Error('RGSS_ARCHIVE_V3_SCOPE');
+ const key=(Math.imul(buffer.readUInt32LE(8),9)+3)>>>0,entries=[];let at=12,ended=false;
+ while(at+16<=buffer.length&&at<16<<20){
+  const index=at,offset=(buffer.readUInt32LE(at)^key)>>>0,size=(buffer.readUInt32LE(at+4)^key)>>>0,fileKey=(buffer.readUInt32LE(at+8)^key)>>>0,length=(buffer.readUInt32LE(at+12)^key)>>>0;at+=16;
+  if(offset===0){ended=true;break;}
+  if(length<1||length>1024||at+length>buffer.length||entries.length>=20000||offset+size>buffer.length)throw Error('RGSS_ARCHIVE_V3_INDEX');
+  entries.push({index,offset,size,key:fileKey});at+=length;
+ }
+ if(!ended)throw Error('RGSS_ARCHIVE_V3_TERMINATOR');
+ const ordered=[...entries].sort((a,b)=>a.offset-b.offset);let end=at;
+ for(const entry of ordered){if(entry.offset<end)throw Error('RGSS_ARCHIVE_V3_OVERLAP');end=entry.offset+entry.size;}
+ return {key,entries};
+}
+
+/* Candidate writer: splice one payload and retarget index offsets, preserving all names and unrelated encrypted bytes. */
+function patchArchiveV3(buffer,entry,replacement){
+ if(!entry||!Buffer.isBuffer(replacement)||replacement.length>MAX||![entry.offset,entry.size,entry.key].every(n=>Number.isSafeInteger(n)&&n>=0&&n<=0xffffffff))throw Error('RGSS_ARCHIVE_PATCH_SCOPE');
+ const {key,entries}=archiveV3Index(buffer),matches=entries.filter(e=>e.offset===entry.offset&&e.size===entry.size&&e.key===entry.key);
+ if(matches.length!==1)throw Error('RGSS_ARCHIVE_PATCH_ENTRY');const target=matches[0],delta=replacement.length-target.size;
+ if(buffer.length+delta>64<<20)throw Error('RGSS_ARCHIVE_PATCH_BUDGET');
+ const encrypted=Buffer.from(replacement);let payloadKey=target.key;
+ for(let i=0;i<encrypted.length;i++){if(i&&!(i&3))payloadKey=(Math.imul(payloadKey,7)+3)>>>0;encrypted[i]^=payloadKey>>>((i&3)*8)&255;}
+ const out=Buffer.concat([buffer.subarray(0,target.offset),encrypted,buffer.subarray(target.offset+target.size)]);
+ for(const item of entries){
+  const offset=item===target||item.offset<target.offset+target.size?item.offset:item.offset+delta;
+  out.writeUInt32LE((offset^key)>>>0,item.index);
+ }
+ out.writeUInt32LE((replacement.length^key)>>>0,target.index+4);return out;
+}
+
+module.exports={scriptTable,patchMain,patchArchiveV1,patchArchiveV3,marshalInteger};

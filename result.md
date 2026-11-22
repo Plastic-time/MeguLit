@@ -21,3 +21,4 @@ Artemis remains default off and requires an isolated, exact-build local owner-te
 Its optional source transport does not implement glyph coordinates, hiding or new translation drawing
 No live pass or engine-complete result is claimed
 - [RGSS opaque grant and actual-path Reader integration](side-session-notes/RGSS-vx-grant-result.md)
+- [XP/Ace body candidates and explicit runtime/sample gaps](side-session-notes/RGSS-xp-ace-candidate-result.md)

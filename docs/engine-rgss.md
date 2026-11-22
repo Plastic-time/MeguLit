@@ -54,7 +54,7 @@ $env:MEGULIT_RGSS_SAMPLE='H:/MeguLit-Work/samples/rgss-majonoie-vx-20261122/game
 node --test validation/engine-draw-rgss.test.cjs
 ```
 
-本机 16 项通过，无跳过，包含实际 HookNative、生产 launch 聚焦旧副本的无进程回放，以及超预算页面拒绝。完整样本检查遍历 446 个归档成员，核对 129 段脚本，确认只有 Main 增加前缀；复用保留新存档和设置；原目录 441 个文件前后哈希一致。既有只读剧本解析得到 118 个场景、1324 条文本
+本机 VX 17 项通过，无跳过，包含实际 HookNative、生产 launch 聚焦旧副本、正常库启动经 opaque grant 准备副本并绑定 Reader 的无进程回放，以及超预算页面拒绝。完整样本检查遍历 446 个归档成员，核对 129 段脚本，确认只有 Main 增加前缀；复用保留新存档和设置；原目录 441 个文件前后哈希一致。既有只读剧本解析得到 118 个场景、1324 条文本
 
 Ruby 回放使用私有 RubyInstaller 4.0.10 和合成 RGSS API，没有执行游戏脚本。这证明包装和协议逻辑，不证明 RGSS 的 Ruby 1.8、Win32API、DirectX 或真实画面已经通过
 
@@ -77,3 +77,25 @@ Ruby 回放使用私有 RubyInstaller 4.0.10 和合成 RGSS API，没有执行�
 审计顺序为 LunaTranslator/LunaHook、Dangetsu/vnr、Textractor、dreamsavior/rpgmakertrans、仓库 preserved lunajspatch。前四者按 GPL3 仅作概念与边界参考，没有复制新代码；lunajspatch 属于 JS MV/MZ，不能用于 Ruby RGSS
 
 VNR 的 RGSS 实现在 vnragent，vnrhook 忽略 rgss3a 不代表整个项目不支持。Textractor 的 VX H 码说明位于 WolfRPG 注释内，不能当坐标实现。导出 RGSSEval 也不能证明任意线程调用安全
+
+## XP / VX Ace 正文候选
+
+第二轮新增 `candidatePageScript({generation:1|3,...})`、只做声明核对的 `declaredVariant` 和有界 `patchArchiveV3`。生产启动仍只调用默认 VX `pageScript`，没有新增 XP/Ace exe、DLL、脚本表 allowlist，也不会据文件名启动候选。现有只读剧本解析继续独立工作
+
+| 世代 | 原运行时 | 候选处理 | 当前证据 |
+|---|---|---|---|
+| XP / RGSS1 | Ruby 1.8 | 缺少 clear_rect 时不包装它；没有 Graphics 尺寸接口时只按标准 640×480；正文剔除 choice_start 后的 32 像素选项行，异常或页中改变的选项状态拒绝整页；pause 或有效选项激活时提交正文 | 无完整游戏，无原版 Ruby，只有 Ruby 4 合成接口与生产消费链回放 |
+| VX / RGSS2 | Ruby 1.8 | 固定完整样本走上文的副本与 opaque grant 路线 | 完整文件静态核对和回放，原版 Ruby 与游戏 UI 仍待验 |
+| VX Ace / RGSS3 | Ruby 1.9.2 | 读取实际 padding，正文完成信号可来自本 Window_Message 所有且可见、激活的 Window_ChoiceList；显式 UTF-8 候选前缀，有界 RGSSAD v3 脚本替换保留其他成员的加密字节与编码元数据 | 无完整游戏，无原版 Ruby，只有 Ruby 4 合成接口、Marshal 消费与生产消费链回放 |
+
+XP/Ace 只观察正文，不输出选择项、菜单、名字、内嵌或游戏 ruby。非标准 XP 分辨率且无可查询尺寸、修改行高/页数的插件、不同文本编码和其他自定义绘制仍未验证。Ace 前缀只面向 UTF-8 脚本，不能宣称支持任意 Main 编码
+
+候选在安装包装或调用 Win32API 前检查 Ruby 世代，Ruby 4 会拒绝自动安装。测试没有改写 `RUBY_VERSION`：先断言拒绝，再显式调用单独方法，在合成 API 上回放，不能把这一步写成“原版 VM 通过”
+
+```powershell
+node --test validation/rgss-candidates.test.cjs
+```
+
+显式设置上述私有 `MEGULIT_RUBY` 后新增 9 项通过，包含两页正文到实际 RgssTextPath/HookNative、XP 选项排除和状态改变拒绝、Ace 实际 padding/选项所有权、v3 增长/缩短/异常归档，以及 Marshal 编码 ivar 和 symbol link 保留。合成归档到 Main 的数据链还核对了错误 Ruby 世代拒绝安装后，原 Main 仍执行。缺失该环境时 Ruby 检查会明确跳过，不算游戏通过
+
+固定源码、阅读时间门与剩余缺口见 [候选报告](../side-session-notes/RGSS-xp-ace-candidate-result.md)。Ace 使用 Ruby 1.9.2 的依据为 [官方产品说明](https://www.rpgmakerweb.com/products/rpg-maker-vx-ace)，1.8/1.9 字符串 API 分别核对 [Ruby 1.8.6](https://ruby-doc.org/core-1.8.6/String.html) 与 [Ruby 1.9.1](https://ruby-doc.org/core-1.9.1/String.html)
