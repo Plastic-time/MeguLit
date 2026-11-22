@@ -155,7 +155,10 @@
        sat on AUTO/SKIP). Japanese-only overflow is handled independently of the translation,
        and with room on the monitor the translation keeps its size; when it would land on the strip it goes below the window instead. */
     // Fit Japanese against its own extent, never against a late translation.
-    if (!anchor.estimated && !anchor.center && tr && tr.height) { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
+    // A dialogue box with downward growth keeps its first glyph at the measured origin
+    // even while the new Japanese wraps differently pending the engine's row breaks.
+    const growsDown = window.MeguLitProfile?.get?.('placement.translationGrowsDown', false) === true;
+    if (!growsDown && !anchor.estimated && !anchor.center && tr && tr.height) { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
       sentence.style.removeProperty('line-height'); let sx = sentence.getBoundingClientRect();
       if (sx.bottom > uiLimit && sentence.querySelector('br.megulit-row-br')) { set(sentence, 'line-height', closeRows(sentence)); sx = sentence.getBoundingClientRect(); }
       if (sx.bottom > uiLimit) { const up = Math.min(sx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); }
@@ -837,6 +840,12 @@
   /* 2026-11-21 (owner's recording 08:28, 千恋＊万花): game-fit.js measured the reader on its own place in the gap between two lines and cut the
      next line's translation; while this module anchors lines on the game's place it owns their layout, gaps included */
   b.textPlaceOwns = () => on && anchorMode && !!anchor;
+  // Replacing the tokens can change the first glyph's indent and ascent before
+  // a fresh set of boxes arrives. Pin the new text in the same paint as the swap.
+  b.textPlaceFirstPaint = (win, sentence) => {
+    if (on && anchorMode && anchor && !page && win.classList.contains('megulit-anchor-window')
+        && window.MeguLitProfile?.get?.('placement.translationGrowsDown', false) === true) pin(win, sentence);
+  };
   b.textPlaceStatus = () => ({ on, line: line ? { text: line.text, n: line.rects?.length || 0, fallback: !!line.fallback, approx: line.approx === true } : null, placed: document.body.classList.contains('megulit-placed'), geom: lastGeom.split(';').length });
   let busy = false;
   new MutationObserver(records => { if (on && (line || drawnByGame || page) && records.some(r => !(r.target.closest?.('.tomoyo-cn-dialog,#megulit-place-extras,#megulit-page-ahead,.megulit-old-line')) && !r.target.classList?.contains('megulit-old-line'))) { /* page mode: at once, before the next paint, so a line that just stopped being the reader's own never misses a frame */ if (page && !busy) { busy = true; try { apply(); } finally { busy = false; } } else schedule(); } }).observe(document.documentElement, { subtree: true, childList: true, characterData: true });

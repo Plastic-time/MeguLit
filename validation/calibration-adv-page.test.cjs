@@ -32,11 +32,12 @@ function calibration(t){
 const manualCases = [
  ['clannad','116a1b6ab5902bb6dc49e25086b1ef6f07d941dbb090b497fb7a158e997dea2d',1050,'glyph'],
  ['senren-banka','fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3',2035,'fallback'],
+ ['senren-banka','fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3',307,'krkr'],
  ['magical-girl-witch-trials','8bccd5415151accc86f2f6e093b45fac29da2a7bfdf06df953e62edf5b17c5be',1355,'none'],
  ['summer-pockets','c9c5d963570f417620a445828c8c66a12718430726e81ad8b7e5d2f4fd0f392a',250,'none'],
  ['doki-doki-literature-club-plus','b17b6a1e21e7beae66b256da045c02a5bf624e0c3ed3d7590167ee4d2f3cb7c5',250,'none']
 ];
-for(const [game,key,advanceMs,placement] of manualCases)test(game+' manual calibration waits for a visible line, measures and restores hiding',async t=>{
+for(const [game,key,advanceMs,placement] of manualCases)test(game+' '+placement+' manual calibration waits for a visible line, measures and restores hiding',async t=>{
  const r=calibration(t),gal=r.control.host;
  r.h.profile=require('../core/profiles/index.cjs').profileFor({exeSha256:key});
  assert.equal(r.h.profile.gameKey,game);
@@ -44,6 +45,10 @@ for(const [game,key,advanceMs,placement] of manualCases)test(game+' manual calib
  r.style.configure(gal.preferences,gal.state);
  if(placement==='glyph')gal.placement.current={engine:'glyph',text:B,rects:[[20,500,30,30]]};
  if(placement==='fallback')gal.placement.current={fallback:true,text:B};
+ if(placement==='krkr'){
+  r.h.pageMode={engine:'krkr',mode:'adv'};
+  gal.placement.current={engine:'krkr',text:B,rects:[[367,693,31,31]],client:[1505,846]};
+ }
  const reader={active:()=>true,gal:{...gal,controller:r.control}};
  await Reader.prototype.message.call(reader,{type:'gameStyleSync',key,part:'all',owner:'reader'});
  assert.equal(r.control.styleCalibration,true);
@@ -112,6 +117,6 @@ test('explicit speaker-only auxiliary text is metadata, while an ordinary short 
  t.mock.timers.enable({apis:['setTimeout']});const {h}=hook(),art=[];h.artCandidate=s=>art.push(s);h.auxText({text:'【 女性 】',sourceName:'TextRender',role:0});t.mock.timers.tick(200);assert.equal(h.speaker?.text,'女性');assert.deepEqual(art,[]);h.auxText({text:'待って',sourceName:'TextRender',role:0});t.mock.timers.tick(200);assert.deepEqual(art,['待って']);
 });
 test('engine name items retain Japanese and lookup rows but never translate; old async art cannot overwrite their empty translation',async()=>{
- let finish,calls=0;const events=[],rows=[{text:'女性',x:10,y:20,w:80,h:24}],r={emit:(type,m)=>events.push(m),targetLanguage:()=> 'zh',embedCached:()=>'',baseOptions:()=>({}),chainTranslate:()=>++calls===1?new Promise(resolve=>{finish=resolve;}):Promise.resolve({text:'名字不应翻译'})};
+ let finish,calls=0;const events=[],rows=[{text:'女性',x:10,y:20,w:80,h:24}],r={emit:(type,m)=>events.push(m),targetLanguage:()=> 'zh',localTranslation:()=>'',embedCached:()=>'',baseOptions:()=>({}),chainTranslate:()=>++calls===1?new Promise(resolve=>{finish=resolve;}):Promise.resolve({text:'名字不应翻译'})};
  const old=Reader.prototype.artText.call(r,{id:'ui:N',visible:true,source:'engine',role:'system',text:'中性テスト'});assert.equal(typeof finish,'function');await Reader.prototype.artText.call(r,{id:'ui:N',visible:true,source:'engine',role:'name',text:'女性',rows});finish({text:'迟到的旧翻译'});await old;const last=events.at(-1);assert.equal(calls,1);assert.equal(last.role,'name');assert.equal(last.text,'女性');assert.equal(last.rows,rows);assert.equal(last.translation,'');assert.deepEqual(last.rowTranslations,[]);assert.ok(!events.some(e=>e.translation==='迟到的旧翻译'));
 });

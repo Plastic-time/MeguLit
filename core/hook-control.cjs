@@ -37,7 +37,12 @@ class HookControl{
      ファタ / 千恋＊万花) is placed from those boxes: calibration never gives way to measure the original, it follows the engine */
   {const cur=h.placement?.current,engineBoxes=!!(cur&&(!cur.fallback||cur.engine==='krkr')&&Array.isArray(cur.rects)&&cur.rects.length);
    const readerPlaced=cur&&(cur.engine==='glyph'||cur.approx||(cur.fallback&&cur.engine!=='krkr'));
-   if((engineBoxes||h.hooks?.drawsHidden===true)&&!(manual&&readerPlaced)){
+   // A blanked ADV dialogue is typeset by the reader. Its engine cells supply the
+   // origin, but cannot measure the font, spacing or ink requested in the menu.
+   const profile=h.hooks?.profile;
+   const blankDialogue=profile?.placement?.drawWhileBlanking===true && profile.page?.engineRows===false
+    && !h.placement?.paged && !h.hooks.flowPage && !h.hooks.pageNvl?.();
+   if((engineBoxes||h.hooks?.drawsHidden===true)&&!(manual&&(readerPlaced||blankDialogue))){
     if(this.styleCalibration && h.styleSync.calibrating)this.finishStyleSync(false,true);
     this.styleCalibration=false;
     this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');
