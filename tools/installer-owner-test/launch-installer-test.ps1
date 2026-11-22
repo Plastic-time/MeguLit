@@ -14,7 +14,7 @@ function New-OwnerTestEnvironment([string]$ownerRoot, [string]$stamp) {
   $childEnv.MEGULIT_SETUP_UILOG = Join-Path $ownerRoot "log\ui-$stamp.log"
   $childEnv.MEGULIT_SETUP_TARGET = Join-Path $ownerRoot 'installed\MeguLit'
   $childEnv.MEGULIT_SETUP_STAGING = Join-Path $ownerRoot 'staging\packs'
-  $childEnv.MEGULIT_SETUP_WEBVIEW2_DATA = Join-Path $ownerRoot 'profile\webview2'
+  $childEnv.MEGULIT_SETUP_WEBVIEW2_DATA = Join-Path $childEnv.USERPROFILE 'WebView2'
   $childEnv.WEBVIEW2_USER_DATA_FOLDER = $childEnv.MEGULIT_SETUP_WEBVIEW2_DATA
   $childEnv.MEGULIT_SETUP_WEB = '1'; $childEnv.MEGULIT_SETUP_WEB_HOLD = '1'
   return $childEnv
