@@ -27,9 +27,18 @@ static const UINT32 WaitMs = 100; /* HookBridge.cs HideWaitMs */
 static bool Old = false;
 
 /* the parts of CommonSharedMem the wait uses */
-static wchar_t SharedText[1000];
+struct FakeSharedMem
+{
+  UINT32 header[3];
+  UINT32 answerTtlMs;
+  UINT64 hash;
+  wchar_t text[1000];
+};
+static_assert(offsetof(FakeSharedMem, answerTtlMs) == MeguLitEmbed::SharedAnswerTtlOffset, "TTL at offset 12");
+static FakeSharedMem SharedMem{};
 static std::atomic<UINT64> SharedGen{1};
 static MeguLitEmbed::Cache Cache;
+static const UINT32 TwinAnswerTtlMs = 500; /* HookBridge.cs TwinAnswerTtlMs */
 
 static UINT64 Hash(const std::wstring &s)
 {
@@ -80,7 +89,8 @@ static void Host()
     while (Now() < until)
       ;
     std::wstring answer = Mode == 0 && r.stream != LeaveAlone ? std::wstring(r.text.size(), L'　') : std::wstring();
-    wcsncpy_s(SharedText, answer.c_str(), _TRUNCATE);
+    SharedMem.answerTtlMs = (!answer.empty() && r.stream != Sel) ? TwinAnswerTtlMs : 0;
+    wcsncpy_s(SharedMem.text, answer.c_str(), _TRUNCATE);
     HANDLE ev = MeguLitEmbed::Open(Format, GetCurrentProcessId(), Hash(r.text));
     SetEvent(ev);
     CloseHandle(ev);
@@ -113,7 +123,7 @@ static Result Hooked(const std::wstring &text, bool selected, UINT64 stream = Se
   int armed = -1;
   if (Old)
   {
-    ZeroMemory(SharedText, sizeof(SharedText)); /* upstream checktranslatedok: every embeddable stream */
+    ZeroMemory(SharedMem.text, sizeof(SharedMem.text)); /* upstream checktranslatedok: every embeddable stream */
     armed = selected ? (Cache.Find(key, gen, GetTickCount64(), nullptr) != MeguLitEmbed::Miss ? 1 : 0) : -1;
   }
   else if (selected)
@@ -122,7 +132,8 @@ static Result Hooked(const std::wstring &text, bool selected, UINT64 stream = Se
       armed = 1;
     else
     {
-      ZeroMemory(SharedText, sizeof(SharedText));
+      MeguLitEmbed::ClearAnswerTtlMs(&SharedMem);
+      ZeroMemory(SharedMem.text, sizeof(SharedMem.text));
       MeguLitEmbed::Arm(Format, GetCurrentProcessId(), eventKey);
       armed = 0;
     }
@@ -149,9 +160,9 @@ static Result Hooked(const std::wstring &text, bool selected, UINT64 stream = Se
       CloseHandle(ev);
     if (ok)
     {
-      answer = SharedText;
+      answer = SharedMem.text;
       if (!Old || !answer.empty())
-        Cache.Put(key, gen, GetTickCount64(), answer);
+        Cache.Put(key, gen, GetTickCount64(), answer, MeguLitEmbed::ReadAnswerTtlMs(&SharedMem));
     }
   }
   res.answer = answer;
@@ -218,6 +229,21 @@ static void CheckCacheIdentity()
   Check(cache.Find(MeguLitEmbed::Key(0x402000, Sel, 0, first.data(), first.size() * sizeof(wchar_t)), 3, 2001, nullptr) == MeguLitEmbed::Miss &&
             cache.Find(MeguLitEmbed::Key(0x401000, Sel, 7, first.data(), first.size() * sizeof(wchar_t)), 3, 2001, nullptr) == MeguLitEmbed::Miss,
         "another hook address or subcontext is another stream");
+  /* #696 review: a timed twin hide answer expires after its TTL so a pause asks the bridge again;
+     the selected stream's own answer stays cached across the same pause */
+  FakeSharedMem sm{};
+  sm.answerTtlMs = TwinAnswerTtlMs;
+  Check(MeguLitEmbed::ReadAnswerTtlMs(&sm) == TwinAnswerTtlMs, "shared memory helper reads the timed answer TTL at offset 12");
+  MeguLitEmbed::ClearAnswerTtlMs(&sm);
+  Check(MeguLitEmbed::ReadAnswerTtlMs(&sm) == 0, "shared memory helper clears the timed answer TTL before asking the bridge");
+  const std::string twinKey = MeguLitEmbed::Key(0x401000, Twin1, 0, first.data(), first.size() * sizeof(wchar_t));
+  cache.Put(sel, 4, 1000, L"selected answer", 0);
+  cache.Put(twinKey, 4, 1000, L"twin hidden", TwinAnswerTtlMs);
+  Check(cache.Find(twinKey, 4, 1499, &out) == MeguLitEmbed::Replace && out == L"twin hidden", "timed twin hide answer hits within its TTL");
+  Check(cache.Find(twinKey, 4, 4000, &out) == MeguLitEmbed::Miss, "timed twin hide answer expires after a pause (t=1000 -> t=4000) and asks the bridge again");
+  cache.Put(twinKey, 4, 1000, L"twin hidden", TwinAnswerTtlMs);
+  Check(cache.Find(twinKey, 4, 1000 + TwinAnswerTtlMs, &out) == MeguLitEmbed::Miss, "timed twin hide answer expires at the exact TTL boundary");
+  Check(cache.Find(sel, 4, 4000, &out) == MeguLitEmbed::Replace && out == L"selected answer", "selected stream answer still hits after the same pause (t=1000 -> t=4000)");
 }
 
 int main(int argc, char **argv)
@@ -284,6 +310,15 @@ int main(int argc, char **argv)
   Asked = 0;
   Result selAgain = Hooked(line, true, Sel), twinAgain = Hooked(line, true, Twin1);
   Check(Asked == 0 && selAgain.answer.size() == line.size() && twinAgain.answer.size() == line.size(), "each context's redraw reuses its own answer");
+  /* 3d. #696 review: after a pause past the twin TTL (same generation), the twin asks the bridge again and gets passthrough
+     once the bridge's twin window has expired; the selected stream still hits its cached answer */
+  Sleep(TwinAnswerTtlMs + 50);
+  Asked = 0;
+  LeaveAlone = Twin1;
+  Result twinAfterPause = Hooked(line, true, Twin1), selAfterPause = Hooked(line, true, Sel);
+  LeaveAlone = 0;
+  Check(twinAfterPause.waitedAtAll && twinAfterPause.answer.empty() && Asked == 1, "after a pause, a twin asks the bridge again instead of reusing its expired hide answer");
+  Check(!selAfterPause.waitedAtAll && selAfterPause.answer.size() == line.size(), "after the same pause, the selected stream still reuses its cached answer");
   /* 3c. a twin asked first is left alone (E610: before the selected stream wrote the line); the selected stream still gets its answer */
   SharedGen++;
   LeaveAlone = Twin1;
