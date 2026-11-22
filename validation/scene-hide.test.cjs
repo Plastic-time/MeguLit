@@ -45,7 +45,10 @@ test('a BitBlt picture that stays the same while the screen moves is frozen and 
  assert.match(cap,/GetAncestor\(front,2\)!=GetAncestor\(hwnd,2\)\|\|!SameScale\(hwnd\)\)return 0;/,'no vote for a window not drawn at its monitor DPI');
  assert.match(cap,/var own=OwnParts;Cover\(now,own==null\?null:own\(hwnd,picture\.Width,picture\.Height\),picture\.Width,picture\.Height\);/,'MeguLit windows are left out');
  assert.match(bridge,/var ownPids=PageLocate\.OwnPids;GameCapture\.OwnParts=\(ownHwnd,ownW,ownH\)=>OwnCover\.Parts\(ownHwnd,ownW,ownH,ownPids\);/);
- assert.match(probe,/if\(GameCapture\.Into\(target,frame,2\)\)pictureAt=DateTime\.UtcNow;else if\(!GameCapture\.Recent\(target,frame,ref pictureAt\)\)return null;/,'the scene probe sees every print');
+ assert.match(probe,/if\(GameCapture\.Into\(target,frame,2\)\)pictureAt=DateTime\.UtcNow;else if\(!GameCapture\.Recent\(target,frame,ref pictureAt,now,RecentMs\)\)return null;/,'the scene probe sees every print, but not one it missed while paused (#714 review)');
+ assert.match(probe,/const int RecentMs=1000;/);
+ assert.match(probe,/var now=DateTime\.UtcNow;Resumed\(now\);/,'a pause between ticks starts the counting again (self-tested in GameSceneProbe.SelfTest)');
+ assert.match(cap,/c\.LastAt<=after\|\|\(now-c\.LastAt\)\.TotalMilliseconds>maxAgeMs\|\|/,'Recent: a print older than the caller allows is not given (self-tested in FreezeSelfTest)');
  assert.match(probe,/>1900&&seen>=3\)\{Line\(\);return null;\}/,'sparse pictures: at least three after an input');
  assert.match(bridge,/if\(!GameCapture\.FreezeSelfTest\(\)\)return 10;/);
 });

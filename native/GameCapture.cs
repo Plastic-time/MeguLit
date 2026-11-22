@@ -262,9 +262,11 @@ public static class GameCapture{
   lock(Gate){if(!c.Frozen||c.Last==null||(now-c.LastAt).TotalMilliseconds>KeptMs||c.Last.Width!=image.Width||c.Last.Height!=image.Height)return false;
    using(var g=Graphics.FromImage(image)){g.CompositingMode=System.Drawing.Drawing2D.CompositingMode.SourceCopy;g.DrawImage(c.Last,0,0,image.Width,image.Height);}return true;}
  }
- // Copies a frozen window's last printed picture into image when it is newer than after (then moved to its time).
- public static bool Recent(IntPtr hwnd,Bitmap image,ref DateTime after){
-  lock(Gate){Choice c;if(!Choices.TryGetValue(hwnd,out c)||!c.Frozen||c.Last==null||c.LastAt<=after||c.Last.Width!=image.Width||c.Last.Height!=image.Height)return false;
+ // Copies a frozen window's last printed picture into image when it is newer than after (then moved to its time) and at most
+ // maxAgeMs old at now. #714 review: a print the caller did not take while it was paused is not the game's picture now; the
+ // caller reads it as a picture of now, so an old one (the text window gone seconds ago, back since) would count as a change.
+ public static bool Recent(IntPtr hwnd,Bitmap image,ref DateTime after,DateTime now,int maxAgeMs){
+  lock(Gate){Choice c;if(!Choices.TryGetValue(hwnd,out c)||!c.Frozen||c.Last==null||c.LastAt<=after||(now-c.LastAt).TotalMilliseconds>maxAgeMs||c.Last.Width!=image.Width||c.Last.Height!=image.Height)return false;
    using(var g=Graphics.FromImage(image)){g.CompositingMode=System.Drawing.Drawing2D.CompositingMode.SourceCopy;g.DrawImage(c.Last,0,0,image.Width,image.Height);}after=c.LastAt;return true;}
  }
  // Translates Stale for BitBlt callers: true to deliver the picture; false with frozen=true to print instead; false with
@@ -448,8 +450,11 @@ public static class GameCapture{
   // Recent gives each print once, and nothing for a window that is not frozen; Picture takes a print at most KeptMs old
   var key=new IntPtr(-77);var k=new Choice{Frozen=true};lock(Gate)Choices[key]=k;
   try{using(var p=new Bitmap(8,8,PixelFormat.Format32bppArgb))using(var q=new Bitmap(8,8,PixelFormat.Format32bppArgb)){Keep(key,k,tick(k),p);DateTime seen=DateTime.MinValue;
-   if(!Recent(key,q,ref seen)||Recent(key,q,ref seen))return false;
-   k.Frozen=false;seen=DateTime.MinValue;if(Recent(key,q,ref seen)||Kept(k,q,k.LastAt))return false;k.Frozen=true;
+   // #714 review: a print not taken while the caller was paused is too old once it is back (and its own print failed): nothing,
+   // and it stays unread; within the age it is given once
+   if(Recent(key,q,ref seen,k.LastAt.AddMilliseconds(1001),1000)||seen!=DateTime.MinValue)return false;
+   if(!Recent(key,q,ref seen,k.LastAt.AddMilliseconds(1000),1000)||seen!=k.LastAt||Recent(key,q,ref seen,k.LastAt,1000))return false;
+   k.Frozen=false;seen=DateTime.MinValue;if(Recent(key,q,ref seen,k.LastAt,1000)||Kept(k,q,k.LastAt))return false;k.Frozen=true;
    if(!Kept(k,q,k.LastAt.AddMilliseconds(KeptMs))||Kept(k,q,k.LastAt.AddMilliseconds(KeptMs+1)))return false;
    // Drop leaves no disposed print behind, and a Keep still running for a dropped window keeps nothing
    lock(Gate)Drop();if(k.Last!=null)return false;Keep(key,k,tick(k),p);if(k.Last!=null)return false;}}
@@ -463,10 +468,10 @@ public static class GameCapture{
    Skipped=false;if(DeliverPrint(lateKey,lk,ptA,p,true,true,true,false)||!Skipped||lk.Last!=null)return false;
    foreach(int ms in new[]{7600,8200,8800})Stale(lk,tick(lk),2,t.AddMilliseconds(ms),differs);
    if(!lk.Frozen)return false;
-   DateTime seen=DateTime.MinValue;if(Recent(lateKey,q,ref seen)||Kept(lk,q,DateTime.UtcNow))return false;
+   DateTime seen=DateTime.MinValue;if(Recent(lateKey,q,ref seen,DateTime.UtcNow,int.MaxValue)||Kept(lk,q,DateTime.UtcNow))return false;
    // even if A's print arrives after B is already frozen again, ptA is overtaken by B's accepted tickets
    Skipped=false;if(DeliverPrint(lateKey,lk,ptA,p,true,true,true,false)||!Skipped)return false;
-   seen=DateTime.MinValue;if(lk.Last!=null||Recent(lateKey,q,ref seen)||Kept(lk,q,DateTime.UtcNow))return false;
+   seen=DateTime.MinValue;if(lk.Last!=null||Recent(lateKey,q,ref seen,DateTime.UtcNow,int.MaxValue)||Kept(lk,q,DateTime.UtcNow))return false;
    // out-of-order PrintWindow in the same frozen round: B delivers first, older A is skipped without overwriting Last
    long fptA=tick(lk),fptB=tick(lk);
    Skipped=false;if(!DeliverPrint(lateKey,lk,fptB,p,true,true,true,false)||Skipped||lk.Last==null||lk.Accepted!=fptB)return false;

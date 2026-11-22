@@ -26,6 +26,9 @@ public sealed class GameSceneProbe : IDisposable {
  const int BoxSettleMs=650;
  Bitmap frame;
  DateTime pictureAt;
+ // the oldest print of another reader the probe takes as its picture now (it reads every 170 ms; Tick)
+ const int RecentMs=1000;
+ DateTime tickedAt;
  int[] last, baseline, lastBox, baseBox;
  DateTime inputAt, next, candidateAt;
  bool hidden,boxHidden;
@@ -118,9 +121,16 @@ public sealed class GameSceneProbe : IDisposable {
   // The picture changed but the dialogue-box band did not: a background or CG behind a box that is still there.
   Reason="kept: picture changed "+Math.Round(delta*100)+"% but box only "+Math.Round(boxDelta*100)+"%";Line();return null;
  }
+ // #714 review: the probe was not called for longer than RecentMs (paused: not settled, busy). Pictures counted toward a
+ // decision before the pause say nothing about the picture now, so the counting starts again with the first one after it.
+ // The baseline and a line already hidden stay.
+ internal void Resumed(DateTime now){
+  if(tickedAt!=DateTime.MinValue&&(now-tickedAt).TotalMilliseconds>RecentMs){changed=returned=0;candidateAt=DateTime.MinValue;boxAt=DateTime.MinValue;}
+  tickedAt=now;
+ }
  public bool? Tick(IntPtr target,int w,int h){
   if(w<160||h<120||target==IntPtr.Zero)return null;
-  var now=DateTime.UtcNow;
+  var now=DateTime.UtcNow;Resumed(now);
   if(w!=width||h!=height){
    // A resize invalidates the old pixels, but must not re-show a hidden line.
    last=null;baseline=null;lastBox=null;baseBox=null;changed=returned=0;candidateAt=DateTime.MinValue;width=w;height=h;
@@ -131,8 +141,10 @@ public sealed class GameSceneProbe : IDisposable {
   if(frame==null)frame=new Bitmap(w,h,PixelFormat.Format32bppArgb);
   // The game window's own picture, without MeguLit's overlay; a window that cannot be read now is skipped.
   /* 2026-11-21 Aokana: a frozen window is printed for every reader together once every 2 s; its last print is used here
-     when another reader had the turn */
-  if(GameCapture.Into(target,frame,2))pictureAt=DateTime.UtcNow;else if(!GameCapture.Recent(target,frame,ref pictureAt))return null;
+     when another reader had the turn. #714 review: only while it is at most RecentMs old. The probe reads every 170 ms, so an
+     older print came while it was paused; taken as a picture of now it could be a second changed picture of a text window
+     that has come back since. */
+  if(GameCapture.Into(target,frame,2))pictureAt=DateTime.UtcNow;else if(!GameCapture.Recent(target,frame,ref pictureAt,now,RecentMs))return null;
   return Step(frame,now);
  }
  // Synthetic pictures, no window: MeguLit's text is never in the picture now, a background change behind a box that
@@ -167,6 +179,14 @@ public sealed class GameSceneProbe : IDisposable {
    // slow frames: old, old, new (first change only on frame 3) gives up on time rather than waiting for a fourth frame
    p.Line();slow(day,1);p.Input(t);if(slow(day,2)!=null||slow(cg,1)!=null||p.baseline!=null||slow(cg,2)==false)return false;
    using(var bare3=pic(Color.SkyBlue,Color.SkyBlue)){p.Line();slow(day,1);p.Input(t);if(slow(bare3,2)!=false)return false;if(slow(day,2)!=true)return false;}
+   /* #714 review: a pause between ticks. A changed picture before it and one after it (another reader's print, the probe's own
+      print failed) are not two in a row: the counting starts again after the pause. A change that holds after it still hides.
+      The same for the text window alone. */
+   p.Line();run(day,170);p.Input();t=t.AddMilliseconds(170);p.Resumed(t);if(p.Step(cg,t)!=null)return false;
+   t=t.AddMilliseconds(3000);p.Resumed(t);if(p.Step(cg,t)==false||run(day,600)==false)return false;
+   p.Line();run(day,170);p.Input();t=t.AddMilliseconds(3000);p.Resumed(t);if(run(cg,2000)!=false||run(day,600)!=true)return false;
+   using(var bare4=pic(Color.SkyBlue,Color.SkyBlue)){p.Line();run(day,170);p.Input();t=t.AddMilliseconds(170);p.Resumed(t);p.Step(bare4,t);
+    t=t.AddMilliseconds(3000);p.Resumed(t);if(p.Step(bare4,t)==false||run(day,600)==false)return false;}
    // E578: with immersion off (Full=false) a scene change is left alone, the text window is still followed.
    using(var bare2=pic(Color.SkyBlue,Color.SkyBlue)){p.Full=false;p.Line();run(day,170);p.Input();if(run(cg,2000)==false)return false;p.Line();run(day,170);p.Input();if(run(bare2,1000)!=false||!p.Box)return false;if(run(day,600)!=true)return false;p.Full=true;}
   }
