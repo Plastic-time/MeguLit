@@ -89,6 +89,23 @@ namespace MeguLitEmbed
     }
   };
 
+  /* the cache key: the stream that asks (LunaHook's ThreadParam fields; the process id is the same for every call in this
+     process, and the padding after it is never read) and the complete raw line. An answer is the bridge's answer for one
+     stream: another stream that writes back the same line (a Japanese twin of the selected setter, a backlog row) asks the
+     bridge itself, which decides per stream (HookBridge.cs OnEmbedAnswer: the twin window, TwinCrowd's at most two twins),
+     and an empty answer given to a twin never makes the selected stream's line "unchanged". (#696 review: three enabled
+     contexts showing the selected line were written back from its cached answer, so TwinCrowd never saw them.) */
+  inline std::string Key(UINT64 addr, UINT64 ctx, UINT64 ctx2, const void *data, size_t len)
+  {
+    std::string key;
+    key.reserve(3 * sizeof(UINT64) + len);
+    key.append(reinterpret_cast<const char *>(&addr), sizeof(addr));
+    key.append(reinterpret_cast<const char *>(&ctx), sizeof(ctx));
+    key.append(reinterpret_cast<const char *>(&ctx2), sizeof(ctx2));
+    key.append(static_cast<const char *>(data), len);
+    return key;
+  }
+
   /* generation: the bridge bumps CommonSharedMem::hash (unused upstream) when the selected stream, the mode or any switch
      that changes its answer changes; the hook also folds in what it can see itself (selection table, wait time, display mode) */
   inline UINT64 Fold(UINT64 h, const void *data, size_t n)

@@ -7,12 +7,17 @@ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 test('native cache uses exact complete binary input rather than a lossy 64-bit text identity',()=>{
  const h=read('native/megulithook/MeguLitEmbedWait.h'),e=read('native/megulithook/embed_util.cc');
  assert.match(h,/std::unordered_map<std::string, Entry> map;/);
- assert.match(e,/static std::string textkey\(const void \*data, size_t len\)\s*\{\s*return std::string\(static_cast<const char \*>\(data\), len\);/);
- assert.equal((e.match(/translatecache\.Find\(textkey\(buff\.data, buff\.size\)/g)||[]).length,2,'both preflight cache reads use all raw bytes');
- assert.match(e,/auto key = textkey\(buff->data, buff->size\);/,'writeback uses the same binary identity');
+ assert.match(h,/inline std::string Key\(UINT64 addr, UINT64 ctx, UINT64 ctx2, const void \*data, size_t len\)[\s\S]*?key\.append\(static_cast<const char \*>\(data\), len\);\s*return key;/);
+ assert.match(e,/static std::string textkey\(const ThreadParam &tp, const void \*data, size_t len\)\s*\{\s*return MeguLitEmbed::Key\(tp\.addr, tp\.ctx, tp\.ctx2, data, len\);/);
+ assert.equal((e.match(/translatecache\.Find\(textkey\(tp, buff\.data, buff\.size\)/g)||[]).length,1,'the preflight cache read uses the stream and all raw bytes');
+ assert.match(e,/auto key = textkey\(tp, buff->data, buff->size\);/,'writeback uses the same identity');
+ assert.equal((e.match(/textkey\(/g)||[]).length,3,'no cache read or write without the stream');
+ assert.doesNotMatch(e,/checktranslatedok/,'the text-only lookup is gone (upstream calls it only from texthook.cc, which MeguLit replaced)');
  assert.doesNotMatch(e,/\btexthash\s*\(/,'the lossy prefix-discarding hash is no longer used');
  const replay=read('native/megulithook/selftest/embedwait.cpp');
  assert.match(replay,/CheckCacheIdentity\(\);/,'the existing dual-architecture native replay executes the collision regression');
+ assert.match(replay,/MeguLitEmbed::Key\(0x401000, stream, 0, text\.data\(\)/,'the replay keys its cache like embed_util.cc');
+ assert.match(replay,/three contexts with the selected line ask the bridge themselves/,'#696 review: the replay warms the selected stream, then three contexts with its line');
 });
 test('hook: the answer event exists before the line goes out, every answer is cached per generation, only waiting streams clear the answer buffer',()=>{
  const h=read('native/megulithook/MeguLitEmbedWait.h');
