@@ -457,11 +457,20 @@ class HookNative{
     page rules (core/page-text.cjs) never knew it was a page game. Another stream of the same game that carries the text box as the
     game holds it (several lines, the current line among them: TMP set_text of the whole page) is that evidence: the game pages,
     and a page that holds the current line but no longer the one before it was turned before this line. Any engine. */
- auxPage(m){try{const P=this.pageText;if(this.calibrating||!P||typeof m?.text!=='string'||!m.text.includes(String.fromCharCode(10)))return;const k=HookNative.flat(m.text.replace(/<[^>]*>/g,'')),R=this.hookRecent||[],cur=R.length?R[R.length-1].key:'';if(cur.length<2||!k.includes(cur))return;
+ auxPage(m){try{const P=this.pageText;if(this.calibrating||!P||typeof m?.text!=='string'||!m.text.includes(String.fromCharCode(10)))return;
+  const raw=m.text.replace(/<[^>]*>/g,''),k=HookNative.flat(raw),R=this.hookRecent||[],cur=R.length?R[R.length-1].key:'';if(cur.length<2||!k.includes(cur))return;
   const prev=R.length>=2?R[R.length-2].key:'';
   /* One wrapped sentence (TextRender during calibration) is still ADV. Start a page only when the other stream
      demonstrably retains two distinct dialogue lines. An established page may then report its first new line alone. */
-  if(!P.pages&&(k===cur||!prev||prev===cur||!HookNative.retainedPrevious(k,prev,cur)))return;
+  if(!P.pages){
+   if(!prev||prev===cur||k===cur)return;
+   const dialogue=raw.replace(/【[^】\n]*】/g,''),flatDialogue=HookNative.flat(dialogue);
+   if(!flatDialogue.includes(cur))return;
+   const rows=dialogue.split('\n').map(HookNative.flat);
+   const independentRows=rows.includes(prev)&&rows.includes(cur);
+   // A translated row can repeat punctuation from the previous line. Only an entire row proves it in that case.
+   if(!independentRows&&(!/[\p{L}\p{N}]/u.test(prev)||!HookNative.retainedPrevious(flatDialogue,prev,cur)))return;
+  }
   P.paging=true;P.auxPageAt=this.now();
   if(prev&&prev!==cur&&!k.includes(prev)&&this.pageSaidSame===true&&P.auxResetFor!==cur){P.auxResetFor=cur;this.pageSaidSame=false;this.trace('page turned before this line (the page text no longer holds the line before it)');this.emit({type:'hookPage',engine:'text',reset:true,at:this.now()});}}catch{}}
  /* Exclude every occurrence of the current sentence, including overlapping redraws. A previous sentence must
