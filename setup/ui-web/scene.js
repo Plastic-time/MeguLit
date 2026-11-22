@@ -290,7 +290,7 @@
     const hasBytes = s.total > 0 && s.phase !== 'vc-runtime' && (!statusOnly || s.phase === 'download' || s.phase === 'verify');
     $('#hud').classList.toggle('waiting', !unpacking && !hasBytes);
     $('#hud').classList.toggle('unpacking', unpacking);
-    const pct = Math.floor(100 * clamp(unpacking ? s.unpack || 0 : hasBytes ? s.got / s.total : 0));
+    const pct = s.phase === 'done' ? 100 : Math.floor(100 * clamp(unpacking ? s.unpack || 0 : hasBytes ? s.got / s.total : 0));
     $('#pct').textContent = pct; $('#got').textContent = MB(s.got || 0); $('#total').textContent = MB(s.total || 0);
     $('#speed').textContent = s.phase === 'download' || s.phase === 'probe' ? (s.speed > 0 ? (s.speed / 1048576).toFixed(1) + ' MB/s' : tr('probing')) : '';
     $('#eta').textContent = s.eta > 0 ? tr("eta", s.eta) : '';

@@ -117,6 +117,7 @@
     let phase = s.phase === 'download' || s.phase === 'probe' ? (s.phase === 'download' || (!statusOnly && s.got > 0) ? 'download' : 'probe') : s.phase === 'downloaded' ? (statusOnly ? 'prepare' : 'download') : s.phase === 'verify' ? 'verify' : s.phase === 'unpack' ? 'unpack' : s.phase === 'done' ? 'done' : s.phase === 'idle' ? 'idle' : 'probe';
     const out = { t: t, st, fr, doneAt, got, total, speed, eta: speed > 0 ? (total - got) / speed : 0, pack: s.pack || '', src: s.src || '', srcN: s.srcN || 0, dir: s.dir || '', phase, unpack: s.unpack || 0 };
     if (s.phase === 'vc-runtime') out.phase = s.phase;
+    if (s.phase === 'prepare') out.phase = s.phase;
     if (s.phase === 'failed') { out.err = { kind: s.kind || 'download', message: s.message }; }
     return out;
   }

@@ -98,8 +98,15 @@ if ($process.ExitCode -eq 3) {
   $receipt.installerExitCode = 3
   try {
     if (-not [IO.File]::Exists($childEnv.MEGULIT_SETUP_TEST) -or (Get-Item -LiteralPath $childEnv.MEGULIT_SETUP_TEST).Length -gt 4MB) { throw 'OWNER_RUNTIME_INSTALL_EVENTS' }
-    $installedEvents = @(Get-Content -LiteralPath $childEnv.MEGULIT_SETUP_TEST -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.kind -eq 'installed' })
-    if ($installedEvents.Count -ne 1 -or (Get-SetupLocalPath $installedEvents[0].root) -ine $childEnv.MEGULIT_SETUP_TARGET) { throw 'OWNER_RUNTIME_INSTALL_TARGET' }
+    $events = @(Get-Content -LiteralPath $childEnv.MEGULIT_SETUP_TEST -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json })
+    $installedEvents = @($events | Where-Object kind -eq 'installed')
+    $confirmedEvents = @($events | Where-Object kind -eq 'confirmed')
+    if ($installedEvents.Count -ne 1 -or $confirmedEvents.Count -ne 1) { throw 'OWNER_RUNTIME_INSTALL_TARGET' }
+    $chosen = Get-SetupLocalPath $installedEvents[0].root
+    if ($chosen -ine (Get-SetupLocalPath $confirmedEvents[0].root)) { throw 'OWNER_RUNTIME_INSTALL_TARGET' }
+    Assert-SetupPath $chosen 'installed' -Tree
+    $finalizeScope.target = $chosen
+    $receipt.target = $chosen
     # Runs only after setup has finished copying and unpacking, never starts the installed app.
     $runtimeResult = Invoke-OwnerRuntimeFinalize $finalizeScope -Apply -OwnerLock $ownerLock
     if ($runtimeResult.ready -isnot [bool] -or -not $runtimeResult.ready) { throw 'OWNER_RUNTIME_FINALIZE_FAILED' }

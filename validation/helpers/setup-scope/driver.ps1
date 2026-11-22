@@ -65,6 +65,19 @@ Check 'integration functions return in test mode' { $testLog = 'explicit'; Make-
 $form = [pscustomobject]@{}; $form | Add-Member ScriptMethod Close { $script:closed = $true }
 Check 'cancel closes without install or process launch' { Web-Act @{ type = 'close'; via = 'shim' }; if (-not $script:closed -or $script:confirmed) { throw 'Cancel did not remain unconfirmed' } }
 Remove-Item Function:\New-Object
+Load-Function 'setup\setup-web.ps1' @('Web-State')
+Check 'one unpacked component out of three retains fractional progress' {
+  function Got-Bytes { 3 }
+  function Total-Bytes { 3 }
+  $packs = @{ base = @{ size = 1 }; reading = @{ size = 1 }; voice = @{ size = 1 } }
+  $script:dl = @('base','reading','voice')
+  $script:dlPos = 3
+  $script:busy = $true
+  $script:ready = @(@{ id = 'reading' }, @{ id = 'voice' })
+  $state = Web-State
+  if ($state.pack -ne 'reading' -or [math]::Floor(100 * $state.unpack) -ne 33) { throw 'Incorrect live unpack progress' }
+  $script:busy = $false
+}
 Load-Function 'tools\installer-owner-test\launch-installer-test.ps1' @('New-OwnerTestEnvironment','Assert-OwnerPayloadFiles')
 Load-Function 'setup\setup-runtime.ps1' @('Need-Bytes')
 Check 'a second session ignores archived profile state and validates its own profile' {

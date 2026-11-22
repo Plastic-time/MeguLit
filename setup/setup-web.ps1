@@ -86,13 +86,13 @@ function Web-State {
     $off += $len
   }
   $f = $script:fetch; $got = Got-Bytes; $total = Total-Bytes
-  $phase = if ($script:mode -eq 'failed') { 'failed' } elseif ($script:done) { 'done' } elseif ($script:copying -or $script:busy) { 'unpack' }
+  $phase = if ($script:mode -eq 'failed') { 'failed' } elseif ($script:done) { 'done' } elseif ($script:copying) { 'prepare' } elseif ($script:busy) { 'unpack' }
     elseif ($script:vcInstalling) { 'vc-runtime' }
     elseif ($script:statusOnly -and -not $script:confirmed) { 'idle' }
     elseif ($f) { if ([string]$f.Phase -eq 'verify') { 'verify' } elseif ([string]$f.Phase -eq 'download') { 'download' } else { 'probe' } }
     elseif (Downloads-Done) { if ($script:confirmed) { 'unpack' } else { 'downloaded' } } else { 'probe' }
-  $o = @{ phase = $phase; n = $n; total = $total; got = $got; speed = $(if ($f) { [long]$f.TotalSpeed } else { 0 }); pack = $(if ($script:fetchId) { $script:fetchId } elseif ($ids.Count) { $ids[-1] } else { '' })
-    src = $(if ($f) { [string]$f.SourceLabel() } else { '' }); srcN = 0; dir = $runtimeDir; unpack = $(if ($ids.Count) { [math]::Min(1, [math]::Max(0, ($script:dlPos - $script:ready.Count) / $ids.Count)) } else { 0 })
+  $o = @{ phase = $phase; n = $n; total = $total; got = $got; speed = $(if ($f) { [long]$f.TotalSpeed } else { 0 }); pack = $(if ($phase -eq 'unpack' -and $script:ready.Count) { $script:ready[0].id } elseif ($script:fetchId) { $script:fetchId } else { '' })
+    src = $(if ($f) { [string]$f.SourceLabel() } else { '' }); srcN = 0; dir = $runtimeDir; unpack = $(if ($ids.Count) { ($script:dlPos - $script:ready.Count) / [double]$ids.Count } else { 0 })
     st = ($st -join ''); fr = @($fr | ForEach-Object { [int][math]::Round($_ * 100) }); confirmed = [bool]$script:confirmed }
   if ($phase -eq 'failed') { $o.kind = $script:failKind }
   if ($phase -eq 'failed' -and $o.kind -eq 'vc-runtime') { $o.message = $script:vcError }
