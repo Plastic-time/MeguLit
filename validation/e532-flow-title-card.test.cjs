@@ -1,13 +1,14 @@
 // E532 (user: ファタモルガーナの館 opening 「館がある」「聖なるかな」 had no translation). Replay of the live hook log 2026-11-13:
 // on a flow-page game the card came through Krkr2wcs, was dropped as menu/help and switched the selected stream every 2 s,
 // which resent 「その瞬間、私は死体を見下ろしていた。」 (sequence 1..181) and kept the art scan off. Cards now go to the art path.
+const hookBridgeChild=require('./helpers/hook-bridge-child.cjs');
 const test=require('node:test'),assert=require('node:assert');
 const {HookNative}=require('../core/hook-native.cjs');
 
 function fixture(t){
  let now=1e6;const events=[],art=[],selects=[];
  const hook=new HookNative({native:__dirname,hook:__dirname,logs:'Z:/no-fixture-log'},m=>events.push(m),()=>{},()=>now);hook.trace=()=>{};t.after(()=>hook.stop());
- hook.flowPage=true;hook.artLocate=text=>art.push(text);hook.process={stdin:{write(){},end(){}},kill(){}};hook.select=id=>selects.push(id);
+ hook.flowPage=true;hook.artLocate=text=>art.push(text);hook.process=hookBridgeChild();hook.select=id=>selects.push(id);
  hook.state.hookThreads=[{id:'575310',selected:true,sample:'聖なるかな',embeddable:true},{id:'5240d0',selected:false,sample:'その瞬間、私は死体を見下ろしていた。'}];
  return {hook,art,selects,line:text=>hook.source({text,sourceName:'Krkr2wcs',origin:'live'},''),tick:ms=>{now+=ms;}};
 }

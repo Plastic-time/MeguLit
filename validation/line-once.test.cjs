@@ -5,6 +5,7 @@
 // Stage notes of the script (■自動車（車内／走行）) came through the same stream.
 'use strict';
 process.env.MEGULIT_RELAY_BASE??='off';
+const hookBridgeChild=require('./helpers/hook-bridge-child.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const L=require('../core/line-once.js');
 const {HookNative}=require('../core/hook-native.cjs');
@@ -45,7 +46,7 @@ test('script stage notes are not dialogue',()=>{
 function hookFixture(t){
  let now=1e6;const shown=[];
  const hook=new HookNative({native:__dirname,hook:__dirname,logs:'Z:/no-line-once-log'},m=>{if(typeof m?.hookSource==='string')shown.push(m.hookSource);},()=>{},()=>now);
- hook.trace=()=>{};hook.send=()=>{};hook.artLocate=()=>{};hook.process={stdin:{write(){},end(){}},kill(){}};t.after(()=>hook.stop());
+ hook.trace=()=>{};hook.send=()=>{};hook.artLocate=()=>{};hook.process=hookBridgeChild();t.after(()=>hook.stop());
  return {shown,hook,line(text,ms=1500){hook.source({text,sourceName:'KiriKiriZ',sourceCode:'HW-8*14:-8*0@F4600:SenrenBanka.exe',origin:'live'},'');now+=ms;}};
 }
 
