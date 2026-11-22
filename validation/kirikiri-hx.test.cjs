@@ -64,7 +64,7 @@ test('cold run: once per game, off when the setting is off, a failure is not ret
 });
 test('cold run helper: suspended start, minimised without focus, muted, ended after the report; DLL reports in cold mode',()=>{
  const cs=fs.readFileSync(path.join(__dirname,'..','native','ColdCapture.cs'),'utf8'),cpp=fs.readFileSync(path.join(__dirname,'..','native','scncapture','ScnCapture.cpp'),'utf8');
- assert.match(cs,/CREATE_SUSPENDED\|CREATE_UNICODE_ENVIRONMENT/);assert.match(cs,/SW_SHOWMINNOACTIVE/);assert.match(cs,/public static void Mute\(int pid\)\{Set\(pid,true\);\}/);assert.match(cs,/RememberAndSet\(\(ISimpleAudioVolume\)s,mute\)/);assert.match(cs,/int hr=v\.GetMute\(out was\);if\(hr!=0\)throw new COMException/);assert.match(cs,/int result=v\.SetMute\(mute,ref none\)/);assert.match(cs,/TerminateProcess\(pi\.hProcess,0\)/);
+ assert.match(cs,/CREATE_SUSPENDED\|CREATE_UNICODE_ENVIRONMENT/);assert.match(cs,/SW_SHOWMINNOACTIVE/);assert.match(cs,/public static void Mute\(int pid\)\{Set\(pid,true\);\}/);assert.match(cs,/RememberAndSet\(session,\(ISimpleAudioVolume\)s,mute\)/);assert.match(cs,/int hr=volume\.GetMute\(out was\);\s*if\(hr!=0\)throw new COMException/);assert.match(cs,/int result=volume\.SetMute\(mute,ref none\)/);assert.match(cs,/TerminateProcess\(pi\.hProcess,0\)/);
  assert.match(cs,/env\["MEGULIT_COLD"\]="1"/);assert.match(cs,/"steam":"exited"/);
  assert.match(cpp,/GetEnvironmentVariableW\(L"MEGULIT_COLD"/);assert.match(cpp,/Report\("done"\)/);assert.match(cpp,/Report\("no-hx"\)/);assert.match(cpp,/Report\("no-exporter"\)/);
  const build=fs.readFileSync(path.join(__dirname,'..','Build.ps1'),'utf8'),rel=fs.readFileSync(path.join(__dirname,'..','Release.ps1'),'utf8');

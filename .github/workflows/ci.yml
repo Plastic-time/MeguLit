@@ -51,6 +51,13 @@ jobs:
           & $csc /nologo /target:exe /optimize+ /platform:x86 /out:native\HookInjector32.exe native\HookInjector.cs native\HookTarget.cs; if ($LASTEXITCODE) { throw 'HookInjector32' }
           & $csc /nologo /target:exe /optimize+ /platform:x64 /out:native\HookInjector64.exe native\HookInjector.cs native\HookTarget.cs; if ($LASTEXITCODE) { throw 'HookInjector64' }
           & $csc /nologo /target:exe /optimize+ /reference:System.Security.dll /out:native\KeyVault.exe native\KeyVault.cs; if ($LASTEXITCODE) { throw 'KeyVault' }
+          foreach ($platform in @('x86', 'x64')) {
+            $capture = Join-Path $env:RUNNER_TEMP "ColdCapture-$platform.exe"
+            & $csc /nologo /target:exe /optimize+ "/platform:$platform" "/out:$capture" native\ColdCapture.cs
+            if ($LASTEXITCODE) { throw "ColdCapture $platform" }
+            & $capture --audio-selftest
+            if ($LASTEXITCODE) { throw "ColdCapture $platform audio self-test" }
+          }
 
       - name: DirectPlay decline DLLs (MSVC)
         shell: pwsh
