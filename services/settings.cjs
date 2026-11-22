@@ -62,7 +62,8 @@ class Settings{
  /* Issues 119 / 800: a text size changed in Settings reaches the running work too; it stops holding sizes of its own and follows
     Settings from now on (copying the sizes in kept them frozen in that work after the next change). */
  releaseSizes(profile,keys=profileTools.sizeKeys){const file=this.file('game-style-profiles.json'),document=readJSON(file),entry=document.entries?.[profile];if(!entry?.prefs)return false;
-  const prefs={...entry.prefs};let hit=false;for(const key of keys)if(key in prefs){delete prefs[key];hit=true;}
+  /* an old entry is read as one first: its copied 34 / 30 go together, the size not changed here is not left behind as the work's own */
+  const prefs={...profileTools.normalize(entry).prefs};let hit=false;for(const key of keys)if(key in prefs){delete prefs[key];hit=true;}
   if(!profileTools.sizeKeys.some(key=>key in prefs)&&'sizeSource' in prefs){delete prefs.sizeSource;hit=true;}
   if(!hit&&entry.sizes===1)return false;document.entries[profile]={...entry,prefs,sizes:1};atomic(file,document);return true;}
  save({scope,values,profile='',appendFolders=false}){

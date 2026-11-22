@@ -159,6 +159,19 @@ test('while the game runs, a changed global size releases only that size',t=>{
  settings.releaseSizes(key,['japaneseSize']);assert.deepEqual(stored().prefs,{});
 });
 
+test('an old entry of copied defaults keeps following Settings when one global size changes while it runs',t=>{
+ const {settings,launch,stored}=fixture(t,{prefs:{japaneseSize:34,translationSize:30,x:10}});
+ settings.save({scope:'text',values:{japaneseSize:24,translationSize:20}});
+ const {Runtime}=require('../services/runtime.cjs'),runtime=new Runtime(path.dirname(path.dirname(settings.folder))),shown=[];
+ runtime.reader={gal:{styleSync:{profileKey:key,reloadProfiles(){}},preferences:{},preview(){},setGameAudio(){}},prefs:()=>({})};
+ runtime.emit=(type,m)=>{if(m?.method==='restoreGalSettings')shown.push([m.args[0].japaneseSize,m.args[0].translationSize]);};
+ const values={...settings.get().values.text,japaneseSize:22},sizesBefore=settings.read('text');settings.save({scope:'text',values});
+ runtime.settingsSaved({scope:'text',values,sizesBefore});
+ assert.deepEqual(shown.at(-1),[22,20],'the running game');
+ assert.deepEqual([launch().japaneseSize,launch().translationSize],[22,20],'the next start');
+ assert.equal('translationSize' in stored().prefs,false);assert.equal(stored().prefs.x,10);
+});
+
 test('a work saved under the rule keeps a size equal to the old built-in one',()=>{
  assert.equal(profile.normalize({prefs:{japaneseSize:34},sizes:1}).prefs.japaneseSize,34);
  assert.equal('japaneseSize' in profile.normalize({prefs:{japaneseSize:34}}).prefs,false);
