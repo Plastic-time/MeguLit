@@ -124,8 +124,8 @@ test('web path wiring: the RPG Maker reader rides along, asks go to onAsk, confi
  await p.drawConfig({roles:true,embed:true,zh:true});await p.drawConfig({roles:true,embed:true,zh:true});
  assert.equal(evals.filter(j=>j.includes('__megulitRpgm.config({"roles":true,"embed":true,"zh":true})')).length,1,'sent once per change');
  await p.drawEmbed('今日は',{ruby:[[0,2,'きょう']],zh:'今天'});assert.ok(evals.at(-1).includes('__megulitRpgm.embed("今日は",{"ruby":[[0,2,"きょう"]],"zh":"今天"})'));
- const prof=require('../core/profiles/index.cjs');assert.deepEqual(prof.profileFor({engine:'RPG Maker MV/MZ'}).draw,{roles:false,advhdInput:false,cmvsInput:false,fvpInput:false,minoriInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]},'RPG Maker canvas detection does not grant wrapper or embed permission');
- assert.deepEqual(prof.profileFor({engine:'KiriKiri'}).draw,{roles:false,advhdInput:false,cmvsInput:false,fvpInput:false,minoriInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]});
+ const prof=require('../core/profiles/index.cjs');assert.deepEqual(prof.profileFor({engine:'RPG Maker MV/MZ'}).draw,{roles:false,advhdInput:false,cmvsInput:false,fvpInput:false,minoriInput:false,spikechunsoftInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]},'RPG Maker canvas detection does not grant wrapper or embed permission');
+ assert.deepEqual(prof.profileFor({engine:'KiriKiri'}).draw,{roles:false,advhdInput:false,cmvsInput:false,fvpInput:false,minoriInput:false,spikechunsoftInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]});
 });
 
 test('MZ: text drawn in buffered runs (flushTextState) still gives one box per character; rows use the window line height',()=>{
@@ -259,7 +259,7 @@ test('large drawn pages remain valid protocol records, including newline and sup
 
 test('every engine profile consumes the full default-off draw contract, including kemcoSprites, without cross-profile permission leaks',()=>{
  const fs=require('node:fs'),path=require('node:path'),P=require('../core/profiles/index.cjs');
- const expected={roles:false,advhdInput:false,cmvsInput:false,fvpInput:false,minoriInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]};
+ const expected={roles:false,advhdInput:false,cmvsInput:false,fvpInput:false,minoriInput:false,spikechunsoftInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]};
  const engines=fs.readdirSync(P.ENGINE_DIR).filter(f=>f.endsWith('.cjs')).map(f=>require(path.join(P.ENGINE_DIR,f)).engine);
  assert.ok(engines.includes('rpgmaker'));
  for(const engine of engines)assert.deepEqual(P.profileFor({engine}).draw,expected,engine+' must not inherit another renderer permission');

@@ -101,6 +101,7 @@ module.exports={
   cmvsInput:false,
   fvpInput:false,
   minoriInput:false,
+  spikechunsoftInput:false,
   kemcoSprites:false,
   /* the game draws MeguLit's replacement of a dialogue line itself (Japanese + ruby [+ Chinese]); false = hide + overlay */
   embed:false,

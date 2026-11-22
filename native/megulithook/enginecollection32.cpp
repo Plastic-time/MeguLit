@@ -236,6 +236,7 @@ std::vector<ENGINE *> check_engines()
     return {
         new ToMeIsland,
         new ToMeSteinsGate,
+        new ToMeDanganronpaPc,
         new LovaGame,
         new MusicaBasic,
         new MeguLitIgaText,
