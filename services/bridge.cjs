@@ -63,19 +63,21 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   if(!require('../core/library-mode.cjs').libraryOnly(root)){let target='';try{const sources=require('./import-source.cjs');sources.backfill(db);target=sources.targetOf(db,db.prepare('SELECT original FROM games WHERE id=?').get(id));}catch{}if(target&&target!==id&&!redirected)return launch(db,target,runtime,windowsLaunch,{redirected:true});}
    const trace=(stage,extra={})=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','game-launch.log'),JSON.stringify({at:new Date().toISOString(),gameId:id,stage,...extra})+'\n');}catch{}};
   let stage='launch-preflight',featureWatch=null,drmPlan=null;if(!retried)markLaunch(id,'prepare');
-  let launcherRun=null,launchLease=null,textPath=null;/* the DRM launcher this start runs (services/launcher-cleanup.cjs) */try{
+  let launcherRun=null,launchLease=null,textPath=null,ownerSteam=null,ownerPending=null,ownerAbort=null,ownerPreparation=null;/* the DRM launcher this start runs (services/launcher-cleanup.cjs) */try{
   if(!game.executable||!fs.existsSync(game.executable))throw Error('EXECUTABLE_MISSING');
   launchLease=require('./embedded-japanese-jobs.cjs').reserveLaunch(path.dirname(game.executable),launchToken);
   stage='background-stop';trace('background-stop');await require('./background-games.cjs').foreground();trace('background-stopped');if(require('../core/library-mode.cjs').libraryOnly(root))await runtime?.stopReading?.();
   let original={};try{original=JSON.parse(game.original||'{}')||{};}catch{}const profile=original.library || {};
   /* E-SteamOwned: a game Steam installed (appmanifest lists its folder) starts through Steam even when it was added by hand or by a folder scan (core/steam-owned.cjs) */
   const steamAppid=(()=>{try{return require('../core/steam-owned.cjs').launchAppid(game.executable,profile);}catch{return '';}})();if(steamAppid)trace('steam-owned',{appid:steamAppid,source:profile.source||''});
+  const Owner=require('../core/owner-tests.cjs'),ownerEngine=require('../core/profiles/index.cjs').engineId(profile.engine),privateSteamPolicy=Owner.launchPolicy(root,game.executable,ownerEngine)==='private-steam';if(privateSteamPolicy&&!steamAppid)throw Error('OWNER_STEAM_APPID');
+  if(privateSteamPolicy){ownerAbort=new AbortController();ownerPending={async stop(){ownerAbort.abort();if(ownerPreparation)await ownerPreparation.catch(()=>{});}};runtime?.trackTextPath?.({session:ownerPending});}
   if(!require('../core/library-mode.cjs').libraryOnly(root)&&require('./game-language.cjs').originalExecutable(db,id,root).blocked)throw Error('JAPANESE_EXECUTABLE_REQUIRED');
   /* E-DRM (user 2026-11-15, 死に逝く君、館に芽吹く憎悪): a DRM-wrapped program (SoftDenchi's SdWrap, DMM, DLsite) quits on
      its own when started directly. The record is corrected once to the engine program, and a crack / translation launcher
      beside it starts it (core/drm-wrap.cjs). The game's process and window stay the engine program's. */
   let launchVia='';
-  {let plan=null;try{plan=require('../core/drm-wrap.cjs').plan(game.executable,{allowTranslated:require('../core/library.cjs').isTranslated(path.dirname(game.executable))||profile.contentLanguage==='zh',source:steamAppid?'steam':profile.source});}catch(error){trace('drm-check-failed',{error:String(error?.message||error).slice(0,160)});}
+  if(!privateSteamPolicy){let plan=null;try{plan=require('../core/drm-wrap.cjs').plan(game.executable,{allowTranslated:require('../core/library.cjs').isTranslated(path.dirname(game.executable))||profile.contentLanguage==='zh',source:steamAppid?'steam':profile.source});}catch(error){trace('drm-check-failed',{error:String(error?.message||error).slice(0,160)});}
    if(plan){drmPlan=plan;trace('drm-wrapped',{kind:plan.kind,wrapped:path.basename(plan.wrapped||''),executable:path.basename(plan.executable||''),launcher:path.basename(plan.launchVia||''),changed:plan.changed});
     if(plan.changed&&plan.executable&&fs.existsSync(plan.executable)){
      const before=String(game.executable),same=before.toLowerCase()===plan.executable.toLowerCase(),record=profile.drm||{};
@@ -85,16 +87,16 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
       db.prepare('UPDATE games SET executable=?,original=? WHERE id=?').run(plan.executable,JSON.stringify(original),id);
       Object.assign(profile,original.library);trace('drm-corrected',{from:path.basename(before),executable:path.basename(plan.executable),launcher:path.basename(plan.launchVia||'')});}
      launchVia=plan.launchVia||'';}}}
-  const elevation=require('./locale-launch.cjs').requiresAdministrator(game.executable);
+  const elevation=require('./locale-launch.cjs').requiresAdministrator(game.executable);if(privateSteamPolicy&&(elevation||windowsLaunch))throw Error('OWNER_STEAM_ELEVATION_UNSUPPORTED');
   /* 2026-11-16 (user: 启动游戏后很久才自动绑定窗口): the reader entered the game only after the launch wait below said the
      window was ready (4 stable samples, and a launcher started in the Japanese environment waited out 15 s for a launcher
      window that never showed). enterGame is now pending from the start: the bridge binds and enters the moment the game's
      window is shown (EVENT_OBJECT_SHOW), and a failed launch cancels it in the catch below. */
-  runtime?.prepareGame(game.executable,{enter:true});
+  if(!privateSteamPolicy)runtime?.prepareGame(game.executable,{enter:true});
   /* E370: a first launch with nothing saved here starts from a matching shared adaptation record (stream memory before the Hook starts, locale mode for this launch) */
   try{const before=profile.localeMode,shared=require('./shared-adaptation.cjs');shared.importFor(root,{executable:game.executable,engine:profile.engine||'',library:profile,styleSync:runtime?.reader?.gal?.styleSync});if(profile.localeMode!==before){original.library=profile;db.prepare('UPDATE games SET original=? WHERE id=?').run(JSON.stringify(original),id);}}catch{}
   /* E590 automatic Japanese: self-check an earlier automatic switch, then switch a localized build once */
-  if(!require('../core/library-mode.cjs').libraryOnly(root)){
+  if(!privateSteamPolicy&&!require('../core/library-mode.cjs').libraryOnly(root)){
   const japaneseRestoreOptions=require('./japanese-restore-options.cjs').forExecutable(game.executable);
   try{const fix=require('../core/japanese-restore.cjs').repairNameColumns(path.dirname(game.executable),japaneseRestoreOptions);if(fix.repaired)trace('japanese-name-columns-repaired',fix);}catch(error){trace('japanese-restore-repair-failed',{error:error.message,detail:error.detail});throw error;}
   if(!retried)require('./japanese-auto-run.cjs').beforeLaunch(root,id,path.dirname(game.executable),trace,japaneseRestoreOptions);
@@ -107,7 +109,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   }
   stage='windows-features';markLaunch(id,'features');
   const gameDir=path.dirname(game.executable);
-  {let dp=null;try{dp=require('../core/directplay.cjs').prepare(gameDir,{root,exe:game.executable});if(dp.copied.length||dp.declined.length||dp.missing.length)trace('directplay',dp);}catch(error){trace('directplay-failed',{error:String(error?.message||error).slice(0,160)});}
+  if(!privateSteamPolicy){let dp=null;try{dp=require('../core/directplay.cjs').prepare(gameDir,{root,exe:game.executable});if(dp.copied.length||dp.declined.length||dp.missing.length)trace('directplay',dp);}catch(error){trace('directplay-failed',{error:String(error?.message||error).slice(0,160)});}
    try{const configs=require('../core/windows-features.cjs').prepareDotnet(gameDir);if(configs.length)trace('dotnet-runtime-config',{files:configs});}catch(error){trace('dotnet-config-failed',{error:String(error?.message||error).slice(0,160)});}
    if(dp?.missing?.length){neededFeature.set(id,'DirectPlay');throw Object.assign(Error('DIRECTPLAY_REQUIRED'),{detail:dp.missing.join(',')});}}
   stage='process-check';markLaunch(id,'process-check');
@@ -116,7 +118,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   const ready=()=>require('./game-readiness.cjs').waitForVisibleGame(()=>gameProcesses(root,focusExe));
   // Paths are passed as literal process arguments, never interpolated into a shell.
   /* If MeguLit cannot query processes here, launch anyway: a single-instance game handles a second start itself (v1.1.0). */
-  let focused='absent';try{focused=await require('./game-process.cjs').gameProcess(root,game.executable,{focus:true});}catch(error){if(error.message!=='PROCESS_QUERY_FAILED')throw error;trace('process-check-unavailable');}
+  let focused='absent';if(privateSteamPolicy){const running=await gameProcesses(root,game.executable);if(running.length)throw Error('RESTART_FROM_OWNER_TEST_ENTRY');}else try{focused=await require('./game-process.cjs').gameProcess(root,game.executable,{focus:true});}catch(error){if(error.message!=='PROCESS_QUERY_FAILED')throw error;trace('process-check-unavailable');}
   if(focused==='absent'&&existingRgss){focused=await require('./game-process.cjs').gameProcess(root,existingRgss,{focus:true});if(focused==='focused'||focused==='running')focusExe=existingRgss;}
   if(focused==='focused'||focused==='running') {
     // An earlier instance that never showed (or lost) its window blocks single-instance games: say so (E215.2, user:
@@ -128,7 +130,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   trace('launch-request',{windowsLaunch});markLaunch(id,'request');
   /* a Windows feature install window the game still opens is closed at once (the game goes on as if it was cancelled);
      DirectPlay is prepared while the game runs, anything else is remembered for this folder */
-  featureWatch=require('../core/windows-features.cjs').watch(gameDir,{trace,onFeature:feature=>{if(/^directplay$/i.test(feature)){const dp=require('../core/directplay.cjs').prepare(gameDir,{root,exe:game.executable,all:true});trace('directplay',dp);}}});
+  if(!privateSteamPolicy)featureWatch=require('../core/windows-features.cjs').watch(gameDir,{trace,onFeature:feature=>{if(/^directplay$/i.test(feature)){const dp=require('../core/directplay.cjs').prepare(gameDir,{root,exe:game.executable,all:true});trace('directplay',dp);}}});
   const prepareEnginePath=async()=>{if(require('../core/library-mode.cjs').libraryOnly(root))return;try{let ownerTestGrant=null;try{const P=require('../core/profiles/index.cjs'),engine=P.engineId(profile.engine||game.engine||require('../core/library.cjs').engineOf(path.dirname(game.executable))?.name);ownerTestGrant=await require('../core/owner-tests.cjs').resolve(root,{exe:game.executable,engine});}catch{}let prefs={};try{prefs=JSON.parse(fs.readFileSync(path.join(root,'data','preferences.json'),'utf8'))||{};}catch{}textPath=await require('../core/text-paths-launch.cjs').prepare({root,exe:game.executable,profile,title:game.title,ownerTestGrant,enabled:prefs.ownTextOutput===true||(()=>{try{return JSON.parse(fs.readFileSync(path.join(root,'data','config','gal-preferences.json'),'utf8')).textRenderer==='compositor';}catch{return false;}})(),trace});}catch(error){textPath=null;trace('text-paths-failed',{error:String(error?.message||error).slice(0,160)});}};
   if(rgssPath&&!launchVia&&!elevation&&!windowsLaunch)await prepareEnginePath();
   let state;
@@ -169,7 +171,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
    /* Text architecture ③ (core/text-paths-launch.cjs, owner switch preferences.ownTextOutput): a web or Unity engine path may start
       the game with Chromium debugging switches or from MeguLit's shadow folder (Steam app id in the environment, never a restart
       through Steam). Anything failing here leaves the launch exactly as before. */
-   if(!rgssPath)await prepareEnginePath();
+   if(!privateSteamPolicy&&!rgssPath)await prepareEnginePath();
    /* ①/③ with 文字显示 = compositor: a Steam game is started directly (SteamAppId; shadow + steam_appid.txt when the folder
       has none, core/text-paths-launch.cjs steamDirect) so MeguLitLaunch can load the glyph dots and the dot font before
       its first glyph. Anything failing keeps the steam:// launch. */
@@ -182,11 +184,13 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
       has neither steam_api.dll nor the shared archives), through the shadow with steam_appid.txt like a companion start. */
    if(textPath){runtime?.trackTextPath?.(textPath);if(require('../core/library-mode.cjs').libraryOnly(root)){await textPath.session.stop();textPath=null;}}
    const part=steamApp&&!textPath?require('../core/steam-owned.cjs').partOf(game.executable):null;if(part)trace('steam-part',{folder:part.folder});
-   let steamDirect=null;if(steamApp&&!textPath&&(companion||part||require('../core/glyph-dots.cjs').wanted(root))){try{steamDirect=require('../core/text-paths-launch.cjs').steamDirect({exe:game.executable,appid:steamAppid,base:part?part.root:null,trace});}catch(error){steamDirect=null;trace('steam-direct-failed',{error:String(error?.message||error).slice(0,160)});}}
+   if(privateSteamPolicy){ownerPreparation=(async()=>{const token=await Owner.resolve(root,{exe:game.executable,engine:ownerEngine,signal:ownerAbort.signal});if(ownerAbort.signal.aborted){if(token)Owner.revoke(token);throw Error('OWNER_STEAM_CANCELLED');}return require('../core/owner-steam-direct.cjs').prepare({root,exe:game.executable,engine:ownerEngine,appid:steamAppid,token,signal:ownerAbort.signal,trace});})();ownerSteam=await ownerPreparation;runtime?.forgetTextPath?.(ownerPending);runtime?.trackTextPath?.(ownerSteam);}
+   let steamDirect=null;if(steamApp&&!textPath&&(companion||part||require('../core/glyph-dots.cjs').wanted(root))){if(!ownerSteam){try{steamDirect=require('../core/text-paths-launch.cjs').steamDirect({exe:game.executable,appid:steamAppid,base:part?part.root:null,trace});}catch(error){steamDirect=null;trace('steam-direct-failed',{error:String(error?.message||error).slice(0,160)});}}}
+   if(ownerSteam)steamDirect=ownerSteam;
    const steam=steamApp&&!companion&&!textPath&&!steamDirect;
    const launchExe=steamDirect?steamDirect.exe:game.executable;
    const {startProcess,waitForVisibleGame}=require('./game-readiness.cjs');
-   const directEnv=companion?{...process.env,SteamAppId:String(steamAppid),SteamGameId:String(steamAppid),SteamOverlayGameId:String(steamAppid)}:steamDirect?{...process.env,...steamDirect.env}:null;
+   const directEnv=steamDirect?{...process.env,...steamDirect.env}:companion?{...process.env,SteamAppId:String(steamAppid),SteamGameId:String(steamAppid),SteamOverlayGameId:String(steamAppid)}:null;
    /* Text architecture ①: with 文字显示 = compositor a direct start goes through MeguLitLaunch<bit>.exe, so the glyph dots are in place before the game's first glyph (core/glyph-dots.cjs); Steam keeps the late attach */
    const early=steam||textPath?null:require('../core/glyph-dots.cjs').earlyStart(root,launchExe,companion?companionArgs:[],require('../core/locale-emulator.cjs').x86(game.executable),directEnv||process.env);
    if(early)trace('glyph-dots-early',{launcher:path.basename(early.file),font:early.env.MEGULIT_GLYPH_FONT||''});
@@ -204,11 +208,12 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
       subfolders, also for direct starts, since steam_api's restart (exit 53) runs Steam's own launch option
       (core/steam-owned.cjs installPrograms; it replaces the same-folder list, which it contains). */
    const siblings=steamApp&&!textPath?(()=>{try{return require('../core/steam-owned.cjs').installPrograms(game.executable);}catch{return [];}})():[];
-   const anyProcess=async()=>{const own=await gameProcesses(root,game.executable);if(!own.length&&textPath&&textPath.exe!==game.executable){const shadow=await gameProcesses(root,textPath.exe).catch(()=>[]);if(shadow.length){if(textPath.observeProcess){const p=shadow.find(p=>p.pid===child.pid);if(p)textPath.observeProcess(p);}return shadow;}}if(!own.length&&steamDirect?.shadow){const shadow=await gameProcesses(root,steamDirect.exe).catch(()=>[]);if(shadow.length)return shadow;}if(own.length||!siblings.length)return own;for(const exe of siblings){const found=await gameProcesses(root,exe).catch(()=>[]);if(found.length){trace('steam-runs-other-program',{exe:path.basename(exe)});return found;}}return own;};
+   const anyProcess=async()=>{if(ownerSteam)return gameProcesses(root,ownerSteam.exe);const own=await gameProcesses(root,game.executable);if(!own.length&&textPath&&textPath.exe!==game.executable){const shadow=await gameProcesses(root,textPath.exe).catch(()=>[]);if(shadow.length){if(textPath.observeProcess){const p=shadow.find(p=>p.pid===child.pid);if(p)textPath.observeProcess(p);}return shadow;}}if(!own.length&&steamDirect?.shadow){const shadow=await gameProcesses(root,steamDirect.exe).catch(()=>[]);if(shadow.length)return shadow;}if(own.length||!siblings.length)return own;for(const exe of siblings){const found=await gameProcesses(root,exe).catch(()=>[]);if(found.length){trace('steam-runs-other-program',{exe:path.basename(exe)});return found;}}return own;};
    /* E303: Steam may prepare a first start (cloud sync, install scripts) for longer than 15 s; wait up to 45 s for its window. */
    const startedAt=Date.now();
    try{state=await waitForVisibleGame(anyProcess,{helper:steam||!!early,indirect:steam,helperError:'GAME_LAUNCH_FAILED',exit:()=>child.exit,trace,...(steam?{attempts:180,timeout:45000}:textPath?{attempts:720,timeout:180000}:{})});}/* ③ shadow start: BepInEx (IL2CPP) builds its interop assemblies on the first start, minutes before the game window */
    catch(error){
+    if(ownerSteam)throw Object.assign(Error('RESTART_FROM_OWNER_TEST_ENTRY'),{detail:error.code||error.message});
     /* E333 (user 2026-11-10, 女装山脈 with 以日文系统环境启动 off): many Japanese x86 games quit at once, without a window,
        under a Chinese system locale. A quit within 3 s is retried once in the Japanese environment (this launch only). */
     /* 2026-11-15 (石头门): exit 53 is steam_api handing the start to Steam (SteamAPI_RestartAppIfNecessary), not a failed
@@ -233,6 +238,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
     state={pid:result.gamePid,locale:'japanese'};
     }
    }
+   if(ownerSteam)await ownerSteam.confirm(state?.pid);
    /* ③ dot font: the game must live 20 s with it, or the crash canary turns it off for this game */
    if(fontDot)fontDot.watch(state?.pid);
    /* ③ the engine path joins the hook reader once the game is up; its exit code goes to the crash canary */
@@ -241,10 +247,11 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   }
   if(textPath?.path==='rgss'){runtime?.trackTextPath?.(textPath);const tp=require('../core/text-paths-launch.cjs');const join=(n=0)=>{if(textPath.session.stopped)return;if(require('../core/library-mode.cjs').libraryOnly(root)){textPath.session.stop();return;}const hook=runtime?.reader?.gal?.hooks;if(hook){tp.attach(textPath,hook);return;}if(n<20)setTimeout(()=>join(n+1),1500).unref?.();};textPath.session.watch(state?.pid);join();}
   await require('./background-games.cjs').unmute(root,state?.pid);trace('new-window-ready',state);markLaunch(id,'ready');try{require('../core/japanese-auto.cjs').launchResult(root,id,true);}catch{}
-  {const watch=featureWatch;featureWatch=null;setTimeout(()=>watch.stop(),30000).unref?.();}
+  if(ownerSteam?.session.stopped||ownerAbort?.signal.aborted)throw Error('RESTART_FROM_OWNER_TEST_ENTRY');
+  if(featureWatch){const watch=featureWatch;featureWatch=null;setTimeout(()=>watch.stop(),30000).unref?.();}
   db.prepare('UPDATE games SET last_launched_at=? WHERE id=?').run(Math.floor(Date.now()/1000),id);
   runtime?.prepareGame(game.executable);runtime?.bindLaunched?.(state?.pid);return {action:'launched',connected:false};
-  }catch(error){if(textPath?.path==='rgss')textPath.session.stop();if(launcherRun)try{await require('./launcher-cleanup.cjs').endHidden({...launcherRun,gameExe:game.executable,list:exe=>require('./game-process.cjs').gameProcesses(root,exe),trace});}catch{}try{runtime?.reader?.gal?.send({type:'enterGame',cancel:true});}catch{}
+  }catch(error){if(ownerPending){await ownerPending.stop();runtime?.forgetTextPath?.(ownerPending);}if(ownerSteam){await ownerSteam.session.stop();runtime?.forgetTextPath?.(ownerSteam.session);}if(textPath?.path==='rgss')textPath.session.stop();if(launcherRun)try{await require('./launcher-cleanup.cjs').endHidden({...launcherRun,gameExe:game.executable,list:exe=>require('./game-process.cjs').gameProcesses(root,exe),trace});}catch{}try{runtime?.reader?.gal?.send({type:'enterGame',cancel:true});}catch{}
    /* a game that quit after asking Windows for a feature: DirectPlay is placed now, so try once more; anything else is
       offered as an install (no restart) */
    if(featureWatch){featureWatch.stop();const asked=featureWatch.found;featureWatch=null;

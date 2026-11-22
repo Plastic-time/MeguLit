@@ -1,5 +1,11 @@
 const labels={zh:['游戏启动失败','关闭'],en:['Game could not start','Close'],ja:['ゲームを起動できませんでした','閉じる']};
 const reasons={
+ OWNER_STEAM_PREPARE_FAILED:['隔离测试副本尚未安全就绪，已暂停启动并保留诊断日志，请检查文件权限、空间与测试清单后重试','The isolated test copy could not be prepared safely. Launch is paused and diagnostic logs are retained. Check file access, free space and the test catalog before retrying','隔離テスト用コピーを安全に準備できなかったため、起動を中止して診断ログを保持しました。アクセス権、空き容量、テスト一覧を確認してからお試しください'],
+ RESTART_FROM_OWNER_TEST_ENTRY:['请先关闭该游戏，再从隔离测试版 MeguLit 的游戏库重新启动；当前进程尚未确认来自本次私测入口','Close the game, then restart it from the isolated MeguLit test library. The current process is not confirmed as this private test launch','ゲームを閉じ、隔離された MeguLit テスト版のライブラリから再起動してください。現在のプロセスが今回のテスト起動元であることを確認できません'],
+ OWNER_STEAM_DISK_BUDGET:['测试副本空间不足，复制后必须保留至少 10 GiB 可用空间，原游戏未修改','The test copy needs enough space to leave at least 10 GiB free. The original game was not modified','テスト用コピー後に 10 GiB 以上の空き容量が必要です。元のゲームは変更していません'],
+ OWNER_STEAM_COPY_BUDGET:['游戏超过本次有界测试副本的文件或容量限制，已暂停启动并保留日志，原游戏未修改','This game exceeds the bounded test-copy limits. Launch is paused and logs are retained; the original game was not modified','テスト用コピーのファイル数または容量制限を超えたため、起動を中止しログを保持しました。元のゲームは変更していません'],
+ OWNER_STEAM_IDENTITY_CHANGED:['游戏资源或测试配置发生变化，本次测试授权已撤销，请重新准备测试清单后重试','The game resources or test configuration changed, so this test permission was revoked. Prepare the test catalog again before retrying','ゲームのリソースまたはテスト設定が変わったため、今回の許可を取り消しました。テスト一覧を再準備してからお試しください'],
+ OWNER_STEAM_SESSION_BUSY:['这个游戏的测试副本仍在准备或使用中，请先完成或关闭当前测试，再重新启动','This game already has a test preparation or session in progress. Finish or close it before starting another','このゲームのテスト準備またはセッションが進行中です。現在のテストを終了してから再起動してください'],
  JAPANESE_REPAIR_BLOCKED:['日文数据修复尚未安全完成，已暂停启动并保留备份与诊断日志。请通过「关于 → 一键上传问题反馈」发送日志','Japanese data repair could not finish safely. Launch is paused; backups and diagnostic logs are retained. Send the logs through About → Report a problem','日本語データの修復を安全に完了できなかったため、起動を中止しました。バックアップとログを保持しています。「About → 問題を報告」からログを送信してください'],
  JAPANESE_RESTORE_IDENTITY_UNVERIFIED:['暂时无法核对游戏版本，已停止修改日文数据。请确认游戏文件可读取后重试','The game version could not be verified. Japanese data was not changed. Check that the game files can be read, then retry','ゲームのバージョンを確認できなかったため、日本語データの変更を中止しました。ゲームファイルを読み取れることを確認してから、もう一度お試しください'],
  CARDINAL_TREE_EXIT_UNCONFIRMED:['无法确认后台阅读回放已安全退出，已暂停本次游戏启动并保留诊断日志。请通过「关于 → 一键上传问题反馈」发送日志','The background reader replay could not confirm a safe shutdown. Game launch is paused and diagnostic logs are retained. Send them through About → Report a problem','バックグラウンドの読書リプレイが安全に終了したことを確認できないため、ゲームの起動を中止し、診断ログを保持しています。「About → 問題を報告」からログを送信してください'],
@@ -53,5 +59,5 @@ const short={
 export const launchRestorable=error=>['JAPANESE_EXECUTABLE_REQUIRED','CHINESE_PATCH_ACTIVE'].includes(typeof error==='string'?error:error?.message);
 export const launchShort=(error,locale)=>{const code=typeof error==='string'?error:error?.message,full=launchReason(error,locale);const s=short[code]?.[locale==='zh'?0:locale==='ja'?2:1];if(s)return s;const first=full.split(/(?<=[。.!！])s*/)[0]||full;return first;};
 export const launchCopy=locale=>labels[locale]||labels.en;
-export const launchReason=(error,locale)=>reasons[typeof error==='string'?error:error?.message]?.[locale==='zh'?0:locale==='ja'?2:1]||'';
+export const launchReason=(error,locale)=>{const code=typeof error==='string'?error:error?.message;return (reasons[code]||(/^OWNER_STEAM_[A-Z_]+$/.test(code||'')?reasons.OWNER_STEAM_PREPARE_FAILED:null))?.[locale==='zh'?0:locale==='ja'?2:1]||'';};
 
