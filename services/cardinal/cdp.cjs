@@ -24,8 +24,8 @@ class Conn{
    for(const fn of this.handlers.get(m.method)||[])try{fn(m.params||{});}catch{}});
   this.ws.addEventListener('close',()=>this.fail(Error('cdp closed')));}
  fail(error){if(this.closed)return;this.closed=true;this.settleReady(error);for(const c of this.calls.values()){clearTimeout(c.timer);c.rej(error);}this.calls.clear();}
- send(method,params={}){if(this.closed)return Promise.reject(Error('cdp closed'));const id=++this.id;return new Promise((res,rej)=>{
-  const timer=setTimeout(()=>{if(!this.calls.delete(id))return;rej(Error('cdp command timeout: '+method));},this.commandMs);this.calls.set(id,{res,rej,timer});
+ send(method,params={},timeout=this.commandMs){if(this.closed)return Promise.reject(Error('cdp closed'));const id=++this.id;return new Promise((res,rej)=>{
+  const timer=setTimeout(()=>{if(!this.calls.delete(id))return;rej(Error('cdp command timeout: '+method));},timeout);this.calls.set(id,{res,rej,timer});
   try{this.ws.send(JSON.stringify({id,method,params}));}catch(error){clearTimeout(timer);this.calls.delete(id);rej(error);}});}
  on(method,fn){if(!this.handlers.has(method))this.handlers.set(method,[]);this.handlers.get(method).push(fn);}
  close(error=Error('cdp closed')){this.fail(error);try{this.ws.close();}catch{}}
@@ -55,7 +55,15 @@ class Page{
  async binding(p){const fn=this.bindings.get(p.name);if(!fn)return;let call;try{call=JSON.parse(p.payload);}catch{return;}let ok=true,v;try{v=await fn(...call.args);}catch(e){ok=false;v=String(e&&e.message||e);}
   try{await this.c.send('Runtime.evaluate',{expression:'window.__cdpDone('+call.id+','+ok+','+JSON.stringify(v===undefined?null:v)+')',contextId:p.executionContextId});}catch{}}
  addInitScript(fnOrSource){const source=typeof fnOrSource==='function'?'('+fnOrSource+')();':String(fnOrSource);return this.c.send('Page.addScriptToEvaluateOnNewDocument',{source});}
- async goto(url,timeout=30000){const done=new Promise(res=>{this.loaded=res;});try{await this.c.send('Page.navigate',{url});await bounded(done,timeout,'cdp page navigation timeout');}finally{this.loaded=null;}}
+ async goto(url,timeout=30000){
+  const loaded=new Promise(resolve=>{this.loaded=resolve;});
+  try{
+   const navigate=this.c.send('Page.navigate',{url},timeout).then(result=>{
+    if(result.errorText)throw Error(result.errorText);
+   });
+   await bounded(Promise.all([navigate,loaded]),timeout,'cdp page navigation timeout');
+  }finally{this.loaded=null;}
+ }
  /* fn: a function (called with arg) or an expression string */
  async evaluate(fn,arg){const expression=typeof fn==='function'?'('+fn+')('+(arg===undefined?'':JSON.stringify(arg))+')':String(fn);
   const r=await this.c.send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text||'evaluate failed');return r.result?.value;}

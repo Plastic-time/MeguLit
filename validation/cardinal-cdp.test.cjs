@@ -7,6 +7,20 @@ class Socket extends EventTarget{
  send(){}
  close(){this.dispatchEvent(new Event('close'));}
 }
+test('a routed navigation can load within its own timeout after the ordinary command deadline',async()=>{
+ const browser=await launch();
+ try{
+  const page=browser.page;
+  page.c.commandMs=100;
+  page.route(async()=>{
+   await new Promise(resolve=>setTimeout(resolve,250));
+   return {body:'<title>Replay ready</title>',headers:{'content-type':'text/html'}};
+  });
+  await page.goto('https://replay.invalid/',10000);
+  page.c.commandMs=15000;
+  assert.equal(await page.evaluate(()=>document.title),'Replay ready');
+ }finally{await browser.close();}
+});
 test('real Conn removes a command when WebSocket.send throws synchronously',async()=>{
  class Broken extends Socket{send(){throw Error('send failed');}}
  const conn=new Conn('ws://unit',{WebSocketCtor:Broken,connectMs:30,commandMs:30});await conn.ready;

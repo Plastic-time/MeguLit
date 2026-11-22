@@ -64,6 +64,7 @@
   .main[data-kids~="dtv-bg"] .game-detail-hero .detail-title{grid-template-columns:minmax(0,1fr) 150px!important}
  }
  @media(max-width:660px){
+  .main[data-kids~="dtv-bg"] .game-detail-hero{--detail-cover-gap:10px}
   .main[data-kids~="dtv-bg"] .game-detail-hero .detail-title{grid-template-columns:minmax(0,1fr) 116px!important;column-gap:10px!important}
   .main[data-kids~="dtv-bg"] .detail-title>h1{font-size:24px!important}
   .main[data-kids~="dtv-bg"] .detail-title>.detail-statistics{padding-inline-start:10px!important}
