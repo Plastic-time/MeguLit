@@ -45,7 +45,7 @@ const RPGM_SCRIPT=String.raw`(function(){
  function scr(){var d=dpr();return [innerWidth*d,innerHeight*d];}
  function is(w,n){var C=window[n];return typeof C==='function'&&w instanceof C;}
  /* ---- the message: what it draws ---- */
- function newCur(w,old){S.cur={w:w,bmp:w.contents,hidden:S.hide&&S.cfg.roles&&!S.cfg.embed,ink:[],inkBytes:0,rects:[],text:'',n:old?old.n:0,lastY:null,k:old?old.k:'',spans:old?old.spans:null,zh:old?old.zh:false,sent:false,emb:old?old.emb:0,line:0,cleared:false,originalText:old?old.originalText:undefined};}
+ function newCur(w,old){S.cur={w:w,bmp:w.contents,hidden:S.hide&&S.cfg.roles&&!S.cfg.embed,ink:[],inkBytes:0,rects:[],text:'',n:old?old.n:0,lastY:null,k:old?old.k:'',spans:old?old.spans:null,zh:old?old.zh:false,sent:false,emb:0,line:0,cleared:false,originalText:old?old.originalText:undefined};}
  /* Only glyph operations are withheld. Face blits, icons, backgrounds and other windows keep drawing.
     Restoring replays the original drawText with its original Bitmap paint settings, without clearing the page. */
  var paintKeys=['fontFace','fontSize','fontBold','fontItalic','textColor','outlineColor','outlineWidth','paintOpacity'];
@@ -80,10 +80,10 @@ const RPGM_SCRIPT=String.raw`(function(){
  function ruby(bmp,c,x,gy,fs){
   for(var i=0;i<c.spans.length;i++){var s=c.spans[i];if(s[0]!==c.n)continue;
    var base=chars(c.k).slice(s[0],s[0]+s[1]).join(''),bw=bmp.measureTextWidth(base),of=bmp.fontSize,ow=bmp.outlineWidth,rs=Math.max(8,Math.round(fs*0.45));
-   S.inRuby=true;try{bmp.fontSize=rs;if(typeof ow==='number')bmp.outlineWidth=Math.max(1,Math.round(ow*rs/fs));OD.call(bmp,s[2],x-Math.max(0,(rs*chars(s[2]).length-bw)/2),Math.max(0,gy-rs-1),Math.max(bw,rs*chars(s[2]).length),rs,'center');}catch(e){}
+   S.inRuby=true;try{bmp.fontSize=rs;if(typeof ow==='number')bmp.outlineWidth=Math.max(1,Math.round(ow*rs/fs));OD.call(bmp,s[2],x-Math.max(0,(rs*chars(s[2]).length-bw)/2),Math.max(0,gy-rs-1),Math.max(bw,rs*chars(s[2]).length),rs,'center');c.emb=Math.max(c.emb,1);}catch(e){}
    bmp.fontSize=of;if(typeof ow==='number')bmp.outlineWidth=ow;S.inRuby=false;}
  }
- function publish(c){var hidden=c.hidden&&c.ink.length>0,s=scr(),rs=c.rects.map(function(r){return rectOut(c.w,r[0],r[1],r[2],r[3]);}),sig=JSON.stringify([hidden,s,rs.map(function(r){return r.map(Math.round);})]);
+ function publish(c){var hidden=c.hidden&&c.ink.length>0,s=scr(),rs=c.rects.map(function(r){return rectOut(c.w,r[0],r[1],r[2],r[3]);}),sig=JSON.stringify([hidden,c.emb,s,rs.map(function(r){return r.map(Math.round);})]);
   if(c.sent&&!c.cleared&&c.sig===sig)return;if(!c.sent)c.line=++S.line;c.sent=true;c.cleared=false;c.sig=sig;send({line:c.line,hidden:hidden,sw:s[0],sh:s[1],rects:rs,text:c.text,emb:c.emb||0});}
  function flush(w){var c=S.cur;if(!active()||!c||c.sent||c.w!==w||!c.rects.length)return;publish(c);}
  function clearLine(){var c=S.cur;if(!c||!c.sent||c.cleared)return;var s=scr();send({line:c.line,hidden:false,sw:s[0],sh:s[1],rects:[],text:''});c.cleared=true;}
@@ -103,8 +103,9 @@ const RPGM_SCRIPT=String.raw`(function(){
   var zh=null,zhFs=0,x0=ts.startX!==undefined?ts.startX:(ts.left||ts.x||0);
   if(S.cfg.zh&&e.zh){var sizes=[Math.round(base*0.8),Math.round(base*0.7)];for(var i=0;i<sizes.length;i++){var zr=wrapZh(cont,e.zh,sizes[i],cont.width-x0-4);if(zr.length&&rows*rowH(w,jpFs)+off+zr.length*rowH(w,jpFs)<=H){zh=zr;zhFs=sizes[i];break;}}}
   w._mgFs=jpFs;w._mgZh=zhFs;cont.fontSize=jpFs;ts.y=(ts.y||0)+off;if(typeof w.calcTextHeight==='function')try{ts.height=w.calcTextHeight(ts,false);}catch(er){}
-  c.originalText=ts.text;c.offset=off;if(zh)ts.text+='\n\x1bMGZ'+zh.join('\n');
-  c.spans=spans.length?spans:null;c.emb=zh?2:spans.length?1:0;
+  c.originalText=ts.text;c.offset=off;
+  if(zh){ts.text+='\n\x1bMGZ[0]'+zh.join('\n');c.zhExpected=zh.join('');c.zhDrawn=0;}
+  c.spans=spans.length?spans:null;
  }
  var OD=null;
  function releaseEmbed(){
@@ -121,7 +122,14 @@ const RPGM_SCRIPT=String.raw`(function(){
   OD=Bitmap.prototype.drawText;
   var oClear=Bitmap.prototype.clear;if(oClear)Bitmap.prototype.clear=function(){var r=oClear.apply(this,arguments),c=S.cur;if(c&&c.bmp===this){c.ink=[];c.inkBytes=0;c.hidden=false;}return r;};
   var oCR=Bitmap.prototype.clearRect;if(oCR)Bitmap.prototype.clearRect=function(){if(S.cur&&S.cur.bmp===this)restore(S.cur);return oCR.apply(this,arguments);};
-  Bitmap.prototype.drawText=function(text,x,y,maxWidth,lineHeight,align){var r=drawOriginal(this,arguments),self=this,c=S.cur;try{if(text!==undefined&&active()&&c&&!S.inRuby&&!c.zh&&!c.sent&&c.w&&self===c.w.contents)track(self,String(text),x,y,maxWidth,lineHeight,align);}catch(e){visible(c,'RPGM_HIDE_TRACK_FAILED');}return r;};
+  Bitmap.prototype.drawText=function(text,x,y,maxWidth,lineHeight,align){var r=drawOriginal(this,arguments),self=this,c=S.cur;try{if(text!==undefined&&active()&&c&&!S.inRuby&&c.w&&self===c.w.contents){
+   if(!c.zh&&!c.sent)track(self,String(text),x,y,maxWidth,lineHeight,align);
+   else if(c.zh&&S.cfg.embed&&c.zhExpected&&text){
+    /* A fitting layout is a plan. Acknowledge the translation after its last bitmap draw returns. */
+    var run=String(text);if(c.zhExpected.substr(c.zhDrawn,run.length)===run){c.zhDrawn+=run.length;if(c.zhDrawn===c.zhExpected.length){c.emb=2;c.zhExpected='';if(c.sent&&!c.cleared)publish(c);}}
+    else c.zhExpected='';
+   }
+  }}catch(e){visible(c,'RPGM_HIDE_TRACK_FAILED');}return r;};
   var oSM=WM.startMessage;WM.startMessage=function(){if(!active())return oSM.apply(this,arguments);var self=this;observe(function(){releaseEmbed();clearLine();S.cur=null;self._mgFs=0;self._mgZh=0;self._mgHold=0;});var r=oSM.apply(this,arguments);
    observe(function(){S.msg=self;newCur(self);self._mgBase=self.contents&&self.contents.fontSize;var ts=self._textState,k=plain(ts&&ts.text);S.cur.k=k;
     if(S.cfg.embed&&k){if(S.emb[k])applyEmbed(self);else{ask(k);self._mgHold=performance.now()+HOLD;}}});
@@ -131,7 +139,7 @@ const RPGM_SCRIPT=String.raw`(function(){
    if(S.cfg.embed&&this._mgHold){var c=S.cur;if(c&&c.w===this&&S.emb[c.k]){this._mgHold=0;var self=this;observe(function(){applyEmbed(self);});}else if(performance.now()<this._mgHold)return true;else this._mgHold=0;}
    return oUM.apply(this,arguments);};
   var oRF=WB.resetFontSettings;if(oRF)WB.resetFontSettings=function(){var r=oRF.apply(this,arguments),self=this;observe(function(){if(S.cfg.embed&&self._mgFs&&self.contents)self.contents.fontSize=self._mgFs;});return r;};
-  var oPE=WB.processEscapeCharacter;WB.processEscapeCharacter=function(code,textState){if(S.cfg.embed&&code==='MGZ'&&this._mgZh){var self=this;observe(function(){if(self.contents)self.contents.fontSize=self._mgZh;if(S.cur&&S.cur.w===self){flush(self);S.cur.zh=true;}});return;}return oPE.apply(this,arguments);};
+  var oPE=WB.processEscapeCharacter;WB.processEscapeCharacter=function(code,textState){if(S.cfg.embed&&code==='MGZ'&&this._mgZh){var self=this;observe(function(){if(textState.text.substr(textState.index,3)==='[0]')textState.index+=3;if(self.contents)self.contents.fontSize=self._mgZh;if(S.cur&&S.cur.w===self){flush(self);S.cur.zh=true;}});return;}return oPE.apply(this,arguments);};
   var oNP=WM.newPage;if(oNP)WM.newPage=function(){var r=oNP.apply(this,arguments),self=this;observe(function(){var c=S.cur;if(active()&&c&&c.w===self){flush(self);clearLine();newCur(self,c);}});return r;};
   var oSP=WM.startPause;WM.startPause=function(){var r=oSP.apply(this,arguments),self=this;observe(function(){flush(self);});return r;};
   var oTM=WM.terminateMessage;WM.terminateMessage=function(){var self=this;observe(function(){flush(self);});var r=oTM.apply(this,arguments);observe(function(){if(S.cur&&S.cur.w===self){clearLine();releaseEmbed();S.cur=null;S.msg=null;}});return r;};

@@ -148,33 +148,74 @@ const PAGE_SCRIPT=String.raw`(function(){
 })();`;
 
 /* ---- DevTools protocol -------------------------------------------------------------------------------------------- */
-function getJson(port,p){return new Promise((resolve,reject)=>{const req=http.get({host:'127.0.0.1',port,path:p,timeout:2000},res=>{let s='';res.setEncoding('utf8');res.on('data',d=>s+=d);res.on('end',()=>{try{resolve(JSON.parse(s));}catch(e){reject(e);}});});req.on('error',reject);req.on('timeout',()=>req.destroy(Error('timeout')));});}
+function getJson(port,p,timeout=2000){return new Promise((resolve,reject)=>{
+ const req=http.get({host:'127.0.0.1',port,path:p},res=>{
+  res.on('error',reject);
+  if(res.statusCode!==200){req.destroy(Error('CDP_HTTP_'+res.statusCode));return;}
+  const chunks=[];let bytes=0;
+  res.on('data',chunk=>{bytes+=chunk.length;if(bytes>1024*1024)req.destroy(Error('CDP_LIST_TOO_LARGE'));else chunks.push(chunk);});
+  res.on('end',()=>{try{resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));}catch{reject(Error('CDP_INVALID_JSON'));}});
+ });
+ const timer=setTimeout(()=>req.destroy(Error('CDP_HTTP_TIMEOUT')),timeout);
+ req.on('error',reject);req.on('close',()=>clearTimeout(timer));
+});}
 class Cdp{
- constructor(url){this.ws=new WebSocket(url);this.id=0;this.pending=new Map();this.handlers=new Set();
-  this.ready=new Promise((resolve,reject)=>{this.ws.onopen=resolve;this.ws.onerror=()=>reject(Error('CDP_CONNECT'));});
+ constructor(url,timeout){this.ws=new WebSocket(url);this.id=0;this.pending=new Map();this.handlers=new Set();
+  this.ready=new Promise((resolve,reject)=>{this.openFailed=reject;this.ws.onopen=resolve;this.ws.onerror=()=>reject(Error('CDP_CONNECT'));});
+  this.initTimer=setTimeout(()=>{const error=Error('CDP_INIT_TIMEOUT');this.openFailed(error);for(const p of this.pending.values())p.reject(error);this.pending.clear();},timeout);
   this.ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data);}catch{return;}if(m.id&&this.pending.has(m.id)){const p=this.pending.get(m.id);this.pending.delete(m.id);m.error?p.reject(Object.assign(Error(m.error.message),{code:m.error.code})):p.resolve(m.result);}else if(m.method)for(const h of this.handlers)h(m);};
-  this.closed=new Promise(r=>{this.ws.onclose=()=>{this.isClosed=true;for(const p of this.pending.values())p.reject(Error('CDP_CLOSED'));this.pending.clear();r();};});}
+  this.closed=new Promise(r=>{this.ws.onclose=()=>{clearTimeout(this.initTimer);this.isClosed=true;this.openFailed(Error('CDP_CLOSED'));for(const p of this.pending.values())p.reject(Error('CDP_CLOSED'));this.pending.clear();r();};});}
  send(method,params={}){if(this.isClosed)return Promise.reject(Error('CDP_CLOSED'));const id=++this.id;return new Promise((resolve,reject)=>{this.pending.set(id,{resolve,reject});try{this.ws.send(JSON.stringify({id,method,params}));}catch(e){this.pending.delete(id);reject(e);}});}
  close(){try{this.ws.close();}catch{}}
+}
+async function restorePage(c){
+ const result=await c.send('Runtime.evaluate',{expression:'window.__megulitText&&(window.__megulitText.stop?window.__megulitText.stop():window.__megulitText.hide(false));window.__megulitRpgm&&window.__megulitRpgm.config({roles:false,embed:false,zh:false});window.__megulitText&&window.__megulitText.config&&window.__megulitText.config({roles:false,embed:false,zh:false});',returnByValue:true});
+ if(result?.exceptionDetails||result?.wasThrown)throw Error('READER_STOP_INCOMPLETE');
+ for(const identifier of c.scriptIds||[])await c.send('Page.removeScriptToEvaluateOnNewDocument',{identifier});
 }
 
 /* One game: attaches to every page target, keeps hide / wanted in sync, turns reports into ToMe_CHARS lines. */
 class WebTextPath{
  constructor({port,onChars=()=>{},onSource=()=>{},onStatus=()=>{},onAsk=()=>{},canary=null,now=()=>Date.now()}){Object.assign(this,{port,onChars,onSource,onStatus,onAsk,canary,now});this.drawCfg=null;this.pages=new Map();this.on=false;this.wanted='';this.stopped=false;this.armed=false;}
  async attach({timeout=60000}={}){const until=this.now()+timeout;
-  while(!this.stopped&&this.now()<until){let list=[];try{list=await getJson(this.port,'/json/list');}catch{}
-   for(const t of list)if(t.type==='page'&&t.webSocketDebuggerUrl&&!/^(devtools|chrome|chrome-extension):/i.test(t.url||'')&&!this.pages.has(t.id))await this.attachPage(t).catch(e=>this.onStatus('attach '+e.message));
-   if(this.pages.size)return true;await new Promise(r=>setTimeout(r,500));}
-  return false;}
- attachPage(t){this.attaching??=new Set();const p=this.attachPageInner(t);this.attaching.add(p);p.then(()=>this.attaching.delete(p),()=>this.attaching.delete(p));return p;}
- async attachPageInner(t){if(this.stopped)return;const c=new Cdp(t.webSocketDebuggerUrl);this.connections??=new Set();this.connections.add(c);c.closed.then(()=>{if(this.pages.get(t.id)===c)this.pages.delete(t.id);this.connections.delete(c);});const current=()=>{if(this.stopped)throw Error('READER_DISABLED');};try{await c.ready;current();
+  const details=this.discovery={phase:'no-endpoint',attempts:0};
+  while(!this.stopped&&this.now()<until){
+   let list;details.attempts++;
+   try{list=await getJson(this.port,'/json/list',Math.min(2000,until-this.now()));if(!Array.isArray(list))throw Error('CDP_INVALID_LIST');}
+   catch(e){if(details.phase==='no-endpoint'||details.phase==='invalid-endpoint'){
+     const invalid=/^CDP_(?:HTTP_\d+|INVALID_|LIST_TOO_LARGE)/.test(e.message);
+     if(invalid||details.phase==='no-endpoint'){details.phase=invalid?'invalid-endpoint':'no-endpoint';details.reason=e.code||e.message;}
+    }list=null;}
+   if(list){
+    const pages=list.filter(t=>t?.type==='page'),eligible=pages.filter(t=>t.webSocketDebuggerUrl&&!/^(devtools|chrome|chrome-extension):/i.test(t.url||''));
+    Object.assign(details,{targets:list.length,pages:pages.length,extensionPages:pages.filter(t=>/^chrome-extension:/i.test(t.url||'')).length,eligible:eligible.length});
+    if(details.phase!=='initialization'){details.phase='no-page';delete details.reason;}
+    for(const t of eligible){
+     if(this.stopped||this.now()>=until)break;
+     if(this.pages.has(t.id))continue;
+     details.phase='initialization';
+     try{await this.attachPage(t,until-this.now());}
+     catch(e){details.reason=e.code||(/^CDP_[A-Z_]+$/.test(e.message)?e.message:'CDP_INIT_FAILED');this.onStatus('attach '+e.message);if(details.restore==='unconfirmed')return false;}
+    }
+   }
+   if(this.pages.size){details.phase='ready';delete details.reason;return true;}
+   if(!this.stopped)await new Promise(r=>setTimeout(r,Math.max(0,Math.min(500,until-this.now()))));}
+  if(this.stopped)details.phase='stopped';return false;}
+ attachPage(t,timeout=60000){this.attaching??=new Set();const p=this.attachPageInner(t,timeout);this.attaching.add(p);p.then(()=>this.attaching.delete(p),()=>this.attaching.delete(p));return p;}
+ async attachPageInner(t,timeout){if(this.stopped)return;const c=new Cdp(t.webSocketDebuggerUrl,timeout);this.connections??=new Set();this.connections.add(c);c.closed.then(()=>{if(this.pages.get(t.id)===c)this.pages.delete(t.id);this.connections.delete(c);});const current=()=>{if(this.stopped)throw Error('READER_DISABLED');};try{await c.ready;current();
   c.handlers.add(m=>{if(m.method==='Runtime.bindingCalled'&&m.params?.name==='__megulitReport')this.report(m.params.payload,c);});
   await c.send('Runtime.enable');current();const bridge=require('./cdp-report.cjs'),channel=await bridge.reporter(c,{report:s=>this.report(s,c),active:()=>!this.stopped&&!c.isClosed,status:s=>this.onStatus(s)});current();
-  await c.send('Page.enable').catch(()=>{});current();c.scriptIds=[];let refresh=channel.legacy;for(const source of [PAGE_SCRIPT,RPGM_SCRIPT]){let result;try{result=await c.send('Page.addScriptToEvaluateOnNewDocument',{source});}catch(error){if(!bridge.missingMethod(error))throw error;refresh=true;}if(result?.identifier)c.scriptIds.push(result.identifier);current();}
+  await c.send('Page.enable').catch(error=>{if(!bridge.missingMethod(error))throw error;});current();c.scriptIds=[];let refresh=channel.legacy;for(const source of [PAGE_SCRIPT,RPGM_SCRIPT]){let result;try{result=await c.send('Page.addScriptToEvaluateOnNewDocument',{source});}catch(error){if(!bridge.missingMethod(error))throw error;refresh=true;}if(result?.identifier)c.scriptIds.push(result.identifier);current();}
   const resetSource=()=>{const old=c.rpgmSource;if(old&&!old.cleared)this.onSource({engine:'rpgm',clear:true,line:old.line,owner:old.owner});c.rpgmSource=new(require('./rpgm-source.cjs').RpgmSource)();};const install=async()=>{current();resetSource();await channel.bootstrap();current();await bridge.evaluate(c,PAGE_SCRIPT);current();await bridge.evaluate(c,RPGM_SCRIPT);current();const ready=await bridge.evaluate(c,'!!(window.__megulitText&&window.__megulitRpgm)');if(ready?.result?.value!==true)throw Error('CDP_SCRIPT_REJECTED');current();await this.sync(c);current();await channel.drain();};
-  await install();current();this.pages.set(t.id,c);
+  c.installStarted=true;await install();current();clearTimeout(c.initTimer);this.pages.set(t.id,c);
   /* a reload or new document: the page script runs again; give it the current state */
-  c.handlers.add(m=>{if(m.method==='Runtime.executionContextCreated')setTimeout(()=>{if(this.stopped)return;const p=refresh?install():(resetSource(),this.sync(c));this.attaching.add(p);p.finally(()=>this.attaching.delete(p)).catch(e=>this.onStatus('reload '+e.message));},300);});}catch(error){if(!this.stopped)c.close();throw error;}}
+  c.handlers.add(m=>{if(m.method==='Runtime.executionContextCreated')setTimeout(()=>{if(this.stopped)return;const p=refresh?install():(resetSource(),this.sync(c));this.attaching.add(p);p.finally(()=>this.attaching.delete(p)).catch(e=>this.onStatus('reload '+e.message));},300);});}catch(error){
+   clearTimeout(c.initTimer);
+   if(!this.stopped){
+    let timer;try{if(c.installStarted||c.scriptIds?.length)await Promise.race([restorePage(c),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('CDP_RESTORE_TIMEOUT')),2000);})]);}
+    catch{if(this.discovery)this.discovery.restore='unconfirmed';this.onStatus('initialization cleanup unconfirmed');}
+    finally{clearTimeout(timer);c.close();}
+   }throw error;}}
  evaluate(c,expression){return require('./cdp-report.cjs').evaluate(c,expression).catch(error=>{this.onStatus('web control failed: '+error.message);throw error;});}
  sync(c){if(this.stopped)return Promise.resolve();return this.evaluate(c,'window.__megulitText&&(window.__megulitText.want('+JSON.stringify(this.wanted)+'),window.__megulitText.hide('+(this.on?'true':'false')+'));'+(this.drawCfg?'window.__megulitRpgm&&window.__megulitRpgm.config('+JSON.stringify(this.drawCfg)+');window.__megulitText&&window.__megulitText.config&&window.__megulitText.config('+JSON.stringify(this.drawCfg)+');':'')+'window.__megulitRpgm&&window.__megulitRpgm.hide('+ (this.on?'true':'false')+');');}
  /* engine-draw (core/engine-draw.cjs): roles / embed switches and one sentence's replacement for the RPG Maker reader */
@@ -195,11 +236,7 @@ class WebTextPath{
   const all=this.connections||new Set(this.pages.values());let timer;
   const work=(async()=>{
    await Promise.allSettled([...(this.attaching||[])]);
-   const results=await Promise.allSettled([...all].map(async c=>{
-    const result=await c.send('Runtime.evaluate',{expression:'window.__megulitText&&(window.__megulitText.stop?window.__megulitText.stop():window.__megulitText.hide(false));window.__megulitRpgm&&window.__megulitRpgm.config({roles:false,embed:false,zh:false});window.__megulitText&&window.__megulitText.config&&window.__megulitText.config({roles:false,embed:false,zh:false});',returnByValue:true});
-    if(result?.exceptionDetails||result?.wasThrown)throw Error('READER_STOP_INCOMPLETE');
-    for(const identifier of c.scriptIds||[])await c.send('Page.removeScriptToEvaluateOnNewDocument',{identifier});
-   }));
+   const results=await Promise.allSettled([...all].map(restorePage));
    if(results.some(r=>r.status==='rejected'))throw Error('READER_STOP_INCOMPLETE');this.onSource({engine:'rpgm',clear:true,terminal:true});
   })();
   this.stopping=Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('READER_STOP_INCOMPLETE')),2000);})]).finally(()=>{clearTimeout(timer);for(const c of all)c.close();all.clear();this.pages.clear();});

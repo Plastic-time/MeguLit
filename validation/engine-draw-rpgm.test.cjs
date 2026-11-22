@@ -55,10 +55,11 @@ Window_NameBox.prototype=Object.create(Window_Base.prototype);
 var $gameMessage={_t:'',allText:function(){return this._t;}};
 var msg=new Window_Message(),layer={children:[msg]},SceneManager={_scene:null};
 `;
-function rig(){
+function rig(beforePage=''){
  const ctx={};vm.createContext(ctx);vm.runInContext(STANDIN,ctx);
  ctx.originals={draw:ctx.Bitmap.prototype.drawText,start:ctx.Window_Message.prototype.startMessage,update:ctx.Window_Message.prototype.updateMessage};
  ctx.window=ctx;ctx.__megulitReport=s=>ctx.reports.push(JSON.parse(s));
+ if(beforePage)vm.runInContext(beforePage,ctx);
  vm.runInContext(RPGM_SCRIPT,ctx);
  const boot=(cfg={roles:true,embed:false})=>{ctx.SceneManager._scene={children:[ctx.layer]};ctx.__megulitRpgm.config(cfg);};
  const say=(t)=>{ctx.$gameMessage._t=t;ctx.msg.startMessage();return ctx.msg.updateMessage();};
@@ -122,6 +123,48 @@ test('embed: timeout or no applied ruby/Chinese keeps the original message and r
  r.api.embed('一\n二\n三\n四'.replace(/\n/g,''),{ruby:[],zh:'很长'});
  r.ctx.$gameMessage._t='一\n二\n三\n四';r.ctx.msg.startMessage();r.ctx.msg.updateMessage();
  assert.equal(recs(r).at(-1).emb,undefined,'four rows leave no room and no ruby was applied');assert.ok(!r.ctx.draws.some(x=>x.t==='很'));
+});
+
+const bufferedMZ=String.raw`
+Utils.RPGMAKER_NAME='MZ';
+Window_Message.prototype.updateMessage=function(){
+ var ts=this._textState;if(!ts)return false;
+ while(ts.index<ts.text.length){
+  var run=/^[^\n\x1b]+/.exec(ts.text.slice(ts.index));
+  if(run){this.contents.drawText(run[0],0,ts.y,600,ts.height);ts.index+=run[0].length;continue;}
+  if(ts.text[ts.index++]==='\n'){ts.y+=ts.height;continue;}
+  var code=/^[A-Z]+/i.exec(ts.text.slice(ts.index))[0];ts.index+=code.length;
+  this.processEscapeCharacter(code.toUpperCase(),ts);
+ }
+ this.startPause();this._textState=null;return true;
+};`;
+for(const engine of ['MV','MZ'])test(engine+' delivers the complete cached Reader translation to the bitmap before acknowledging it',async()=>{
+ const {Reader}=require('../services/reader.cjs'),{HookNative}=require('../core/hook-native.cjs');
+ const r=rig(engine==='MZ'?bufferedMZ:''),path=new W.WebTextPath({port:1}),receipts=[];
+ const cache=new Map([['体力が戻った','HP恢复了'],['もう一度','再来一次']]);
+ const reader=Object.assign(Object.create(Reader.prototype),{runtime:{libraryOnly:()=>false,learning:()=>null},targetLanguage:()=>'zh',embedCached:key=>cache.get(key)});
+ const hook={attachTextPath(p){this.textPath=p;},emit:m=>reader.event(m),drawEmbedReply:HookNative.prototype.drawEmbedReply,charRects(line){
+  const rec=TP.parseChars(line);receipts.push({text:rec.text,emb:rec.emb,draws:Array.from(r.ctx.draws,d=>d.t).join('')});
+ }};
+ reader.gal={hooks:hook};require('../core/text-paths-launch.cjs').attach({path:'web',session:path},hook);
+ path.pages.set('game',{send:async(method,params)=>({result:{value:r.run(params.expression)}})});
+ r.ctx.__megulitReport=payload=>path.report(payload);
+ for(const [text,zh] of cache){
+  r.ctx.draws.length=0;receipts.length=0;
+  await path.drawConfig({roles:true,embed:true,zh:true});r.boot({roles:true,embed:true,zh:true});
+  r.say(text);await new Promise(resolve=>setImmediate(resolve));r.ctx.msg.updateMessage();
+  const ack=receipts.filter(row=>row.emb===2);
+  assert.deepEqual(ack,[{text,emb:2,draws:text+zh}]);
+  assert.ok(receipts.some(row=>!row.emb&&row.draws===text));
+ }
+});
+
+test('a translation interrupted after layout never claims an embedded translation',()=>{
+ const r=rig();r.boot({embed:true});r.api.embed('本文',{zh:'可以看见'});
+ r.ctx.$gameMessage._t='本文';r.ctx.msg.startMessage();
+ r.ctx.msg._textState.text=r.ctx.msg._textState.text.slice(0,-1);
+ r.ctx.msg.updateMessage();assert.ok(r.ctx.draws.some(d=>d.t==='看'));
+ assert.ok(recs(r).length);assert.ok(recs(r).every(line=>line.emb!==2));
 });
 
 test('web path wiring: the RPG Maker reader rides along, asks go to onAsk, config and replacements go to the page',async()=>{

@@ -39,8 +39,9 @@ async function prepare({root,exe,profile={},title='',enabled=false,ownerTestGran
  }
  if(W.chromiumShell(exe)&&canary.allowed('web')){
   const port=await W.freePort();if(require('./library-mode.cjs').libraryOnly(root))return null;const session=new W.WebTextPath({port,canary});
-  return {path:'web',exe,args:W.launchArgs(port),env:steamEnv,cwd:path.dirname(exe),session,
-   connect:()=>session.attach().then(ok=>{trace('text-paths-web',{attached:ok,port});return ok;})};
+  const args=W.launchArgs(port);trace('text-paths-web-prepared',{exe:path.basename(exe),args});
+  return {path:'web',exe,args,env:steamEnv,cwd:path.dirname(exe),session,
+   connect:()=>session.attach().then(ok=>{trace('text-paths-web',{attached:ok,port,...session.discovery});return ok;})};
  }
  const pack=unityPack(root);
  const kind=pack&&U.unityGame(exe),il2cppReady=kind==='il2cpp'&&require('node:fs').existsSync(path.join(pack,'MeguLitUnityText.IL2CPP.dll'));
