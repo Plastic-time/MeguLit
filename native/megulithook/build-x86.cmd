@@ -47,4 +47,5 @@ copy /y "%~dp0UnityEngine.cpp" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\
 for %%F in (Il2cppDraw.h Il2cppDrawRoles.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\unity\%%F" >nul || exit /b 1
 for %%F in (hde32.h pstdint.h) do copy /y "%~dp0..\shared\minhook\src\hde\%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\mages\%%F" >nul || exit /b 1
 cmake -S "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook" -B "%MEGULIT_HOOK_TREE%\build-x86-vs" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_HOST=OFF -DBUILD_HOOK=ON -DWIN10ABOVE=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DFETCHCONTENT_SOURCE_DIR_MINHOOK="%~dp0..\shared\minhook" -DFETCHCONTENT_FULLY_DISCONNECTED=ON || exit /b 1
-cmake --build "%MEGULIT_HOOK_TREE%\build-x86-vs" --target LunaHook --parallel 8
+if not defined CMAKE_BUILD_PARALLEL_LEVEL set "CMAKE_BUILD_PARALLEL_LEVEL=8"
+cmake --build "%MEGULIT_HOOK_TREE%\build-x86-vs" --target LunaHook
