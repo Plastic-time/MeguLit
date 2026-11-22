@@ -97,15 +97,18 @@ public sealed class GameSceneProbe : IDisposable {
    double bandDelta=Difference(baseBox,box,BandCell);
    if(delta<=StillPicture&&bandDelta>=BoxOnly){if(boxAt==DateTime.MinValue)boxAt=now;else if((now-boxAt).TotalMilliseconds>=BoxSettleMs){hidden=boxHidden=true;Box=true;returned=0;Reason="text window hidden: box "+Math.Round(bandDelta*100)+"%, picture "+Math.Round(delta*100)+"%";return false;}return null;}
    boxAt=DateTime.MinValue;
-   /* 2026-11-21 (user, Aokana): a window read by PrintWindow gives a picture every 2 s (GameCapture, frozen BitBlt); the change
-      after an input is looked for over at least three pictures, not only 1.9 s */
-   if((now-inputAt).TotalMilliseconds>1900&&seen>=3){Line();return null;}
-   if(!Full)return null;
-   if(delta>=Changed){if(changed==0)changedAt=now;changed++;}else changed=0;
-   /* held over three pictures (340 ms at the usual pace), or over two pictures that far apart; the settle time then counts
-      from where the third picture would have been */
-   if(changed<2||(now-changedAt).TotalMilliseconds<340)return null;
-   candidateAt=changedAt.AddMilliseconds(340);
+   if(Full){
+    if(delta>=Changed){if(changed==0)changedAt=now;changed++;}else changed=0;
+    /* held over three pictures (340 ms at the usual pace), or over two pictures that far apart; the settle time then counts
+       from where the third picture would have been */
+    if(changed>=2&&(now-changedAt).TotalMilliseconds>=340)candidateAt=changedAt.AddMilliseconds(340);
+   }
+   if(candidateAt==DateTime.MinValue){
+    /* 2026-11-21 (user, Aokana): a window read by PrintWindow gives a picture every 2 s (GameCapture, frozen BitBlt); the change
+       after an input is looked for over at least three pictures, not only 1.9 s */
+    if((now-inputAt).TotalMilliseconds>1900&&seen>=3){Line();return null;}
+    return null;
+   }
   }
   // A flash, shake or quick fade that settles back is not a scene change.
   if(delta<Changed){candidateAt=DateTime.MinValue;changed=0;return null;}
@@ -155,6 +158,14 @@ public sealed class GameSceneProbe : IDisposable {
    /* 2026-11-21 Aokana: one picture every 2 s (PrintWindow): a CG that takes the box away hides by the second picture after it */
    Func<Bitmap,int,bool?> slow=(img,n)=>{bool? r=null;for(int i=0;i<n;i++){t=t.AddMilliseconds(2000);var v=p.Step(img,t);if(v.HasValue)r=v;}return r;};
    p.Line();slow(day,1);p.Input(t);if(slow(cg,2)!=false)return false;if(slow(day,2)!=true)return false;
+   // slow frames: old, new, new (first frame after input still old, then two changed frames) must still hide
+   p.Line();slow(day,1);p.Input(t);if(slow(day,1)!=null||slow(cg,2)!=false)return false;if(slow(day,2)!=true)return false;
+   // slow frames: old, old, old gives up on time (baseline cleared; later change without input does not hide)
+   p.Line();slow(day,1);p.Input(t);if(slow(day,3)!=null||p.baseline!=null||slow(cg,2)==false)return false;
+   // slow frames: old, new, old (a one-frame flash) does not hide and gives up on time
+   p.Line();slow(day,1);p.Input(t);if(slow(day,1)!=null||slow(cg,1)!=null||slow(day,1)!=null||p.baseline!=null||slow(cg,2)==false)return false;
+   // slow frames: old, old, new (first change only on frame 3) gives up on time rather than waiting for a fourth frame
+   p.Line();slow(day,1);p.Input(t);if(slow(day,2)!=null||slow(cg,1)!=null||p.baseline!=null||slow(cg,2)==false)return false;
    using(var bare3=pic(Color.SkyBlue,Color.SkyBlue)){p.Line();slow(day,1);p.Input(t);if(slow(bare3,2)!=false)return false;if(slow(day,2)!=true)return false;}
    // E578: with immersion off (Full=false) a scene change is left alone, the text window is still followed.
    using(var bare2=pic(Color.SkyBlue,Color.SkyBlue)){p.Full=false;p.Line();run(day,170);p.Input();if(run(cg,2000)==false)return false;p.Line();run(day,170);p.Input();if(run(bare2,1000)!=false||!p.Box)return false;if(run(day,600)!=true)return false;p.Full=true;}
