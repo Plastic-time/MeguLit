@@ -38,3 +38,17 @@ test('a kanji-only name or part of the redrawn sentence does not establish pagin
  h.auxPage({type:'hookPageText',text:['\u3010'+prev+'\u3011',cur,cur].join('\n')});
  assert.equal(h.pageText.paging,undefined);
 });
+
+const repeatedKanji='\u7121\u7406\u3002';
+for(const [label,rows,pages] of [
+ ['separate older line beside a repeated sentence',[repeatedKanji,repeatedKanji+repeatedKanji],true],
+ ['one repeated sentence wrapped across rows',[repeatedKanji,repeatedKanji],false],
+]){
+ test('NVL row evidence: '+label,()=>{
+  const {HookNative}=require('../core/hook-native.cjs');
+  const h=Object.create(HookNative.prototype);
+  Object.assign(h,{pageText:{},now:()=>123,hookRecent:[{key:repeatedKanji},{key:repeatedKanji+repeatedKanji}]});
+  h.auxPage({type:'hookPageText',text:rows.join('\n')});
+  assert.equal(h.pageText.paging===true,pages);
+ });
+}

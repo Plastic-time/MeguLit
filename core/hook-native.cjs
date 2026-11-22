@@ -436,8 +436,10 @@ class HookNative{
   if(!P.paging){
    const dialogue=raw.replace(/\u3010[^\u3011]*\u3011/g,'');
    const flattened=HookNative.flat(dialogue);
-   const previousRetained=prev!==cur&&/\p{Script=Han}/u.test(prev)&&
-    dialogue.split('\n').some(row=>HookNative.flat(row)===prev)&&HookNative.retainedPrevious(flattened,prev,cur);
+   const rows=dialogue.split('\n').map(row=>HookNative.flat(row));
+   // Complete rows can prove independent sentences even when a flattened match overlaps their boundary.
+   const previousRetained=prev!==cur&&/\p{Script=Han}/u.test(prev)&&rows.includes(prev)&&
+    (rows.includes(cur)||HookNative.retainedPrevious(flattened,prev,cur));
    if(!previousRetained&&!/[\u3041-\u309f\u30a1-\u30fa]/.test(flattened.split(cur).join('')))return;
   }
   P.paging=true;P.auxPageAt=this.now();
