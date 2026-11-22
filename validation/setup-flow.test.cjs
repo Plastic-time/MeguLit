@@ -43,6 +43,7 @@ function server(rate,{slow}={}){
 function fakeRoot(dir,src,{installed=[]}={}){
  fs.mkdirSync(path.join(dir,'setup'),{recursive:true});
  fs.copyFileSync(script,path.join(dir,'setup','setup-runtime.ps1'));
+ fs.copyFileSync(path.join(repo,'setup','setup-vc-runtime.ps1'),path.join(dir,'setup','setup-vc-runtime.ps1'));
  if(process.env.MEGULIT_SETUP_WEB==='1'){/* web skin under test: the skin files go next to the script, like in the release package */for(const f of ['setup-web.ps1'])fs.copyFileSync(path.join(repo,'setup',f),path.join(dir,'setup',f));for(const d of ['ui-web','webview2'])fs.cpSync(path.join(repo,'setup',d),path.join(dir,'setup',d),{recursive:true});}
  const logo=path.join(repo,'setup','logo.png');if(fs.existsSync(logo))fs.copyFileSync(logo,path.join(dir,'setup','logo.png'));
  fs.writeFileSync(path.join(dir,'MeguLit.exe'),'not a real exe');

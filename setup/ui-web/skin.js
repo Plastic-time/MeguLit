@@ -30,7 +30,7 @@
     if (m.type === 'close' || m.type === 'minimize') return Promise.resolve(resp({ ok: true }));      /* the scene posts those itself */
     m.via = 'shim'; const wait = m.type === 'checkpath' || m.type === 'install' || m.type === 'browse' || m.type === 'listdir' || m.type === 'mkdir' || m.type === 'pickfolder';
     if (!wait) { post(m); return Promise.resolve(resp({ ok: true })); }
-    m.id = ++nid; return new Promise((ok) => { pend.set(m.id, (r) => ok(resp(r || {}))); post(m); setTimeout(() => { if (pend.has(m.id)) { pend.delete(m.id); ok(resp({ state: statusOnly ? 'readonly' : 'ok' })); } }, 8000); });
+    m.id = ++nid; return new Promise((ok) => { pend.set(m.id, (r) => ok(resp(r || {}))); post(m); setTimeout(() => { if (pend.has(m.id)) { pend.delete(m.id); ok(resp({ state: 'readonly' })); } }, 8000); });
   };
   /* verdict for the host (written to setup-ui.log as one line): pixels of the drawn canvas, renderer string, GL errors seen */
   const verdict = () => { if (window.Player && Player.verdict) return Player.verdict(); const o = { std: -1, renderer: '?', errs: window.__glErrs | 0 };

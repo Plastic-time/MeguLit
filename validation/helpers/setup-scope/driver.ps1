@@ -50,6 +50,12 @@ Check 'edited classic target rejected before copy' { if (Use-Target) { throw 'Un
 Check 'confirm rejects edited target before free-space or writes' { Confirm-Install; if ($script:confirmed) { throw 'Unexpected confirmation' } }
 Check 'web check rejects external path before write probe' { if ((Web-Check 'E:\MeguLit').state -ne 'readonly') { throw 'Unexpected acceptance' } }
 Check 'web write probe cannot fall back to outside ancestor' { if (Web-Writable 'E:\MeguLit') { throw 'Unexpected probe' } }
+Check 'editing a path leaves the selected folder uncreated' {
+  $parent = Join-Path $Work 'installed'
+  [void][IO.Directory]::CreateDirectory($parent)
+  $fresh = Join-Path $parent 'unconfirmed\MeguLit'
+  if (-not (Web-Writable $fresh) -or (Test-Path (Split-Path $fresh))) { throw 'Path probe changed the target' }
+}
 Check 'web list rejects external directory' { Reject { Web-List 'C:\Users\Megumin' } }
 Check 'web mkdir rejects external directory before create' { Web-Act @{ type = 'mkdir'; via = 'shim'; id = 1; path = 'E:\MeguLit'; name = 'must-not-create' }; if ($script:posts[-1].r.ok) { throw 'Unexpected mkdir' } }
 Check 'staged cleanup rejects outside path' { Reject { Remove-Staged 'E:\MeguLit\runtime-base.setup.part' } }

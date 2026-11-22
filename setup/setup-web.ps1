@@ -25,16 +25,24 @@ function Web-Wanted {
 function Web-Post($obj) { try { if ($script:win -and $script:win.Web.CoreWebView2) { $script:win.Web.CoreWebView2.PostWebMessageAsJson((ConvertTo-Json -Compress -Depth 6 $obj)) } } catch {} }
 function Web-Writable([string]$p) {
   try { Assert-SetupPath $p 'installed' -Tree } catch { return $false }
-  if ($script:setupTestScope) { return (Writable $p) }
-  try { $q = [IO.Path]::GetFullPath($p); while ($q -and -not (Test-Path $q)) { $q = Split-Path $q }; if (-not $q) { return $false }
-    $t = Join-Path $q ('.w-' + $PID); [IO.File]::WriteAllText($t, 'ok'); Remove-Item $t -Force; $true } catch { $false }
+  try {
+    $q = [IO.Path]::GetFullPath($p)
+    while (-not [IO.Directory]::Exists($q)) {
+      if ([IO.File]::Exists($q)) { return $false }
+      $q = [IO.Path]::GetDirectoryName($q)
+      if (-not $q) { return $false }
+    }
+    $probe = Join-Path $q ([IO.Path]::GetRandomFileName())
+    Assert-SetupPath $probe 'installed'
+    [IO.FileStream]::new($probe, 'CreateNew', 'Write', 'None', 1, 'DeleteOnClose').Dispose()
+    $true
+  } catch { $false }
 }
 function Web-Check([string]$p) {
   try { Assert-SetupPath $p 'installed' -Tree } catch { return @{ state = 'readonly'; free = 0; need = 0 } }
   $ok = $true; try { [void][IO.Path]::GetFullPath($p); if (-not [IO.Path]::IsPathRooted($p)) { $ok = $false } } catch { $ok = $false }
   if (-not $ok) { return @{ state = 'readonly'; free = 0; need = (Need-Bytes $pathBox.Text) } }
-  try { $need = Need-Bytes $p } catch { return @{ state = 'readonly'; free = 0; need = (Need-Bytes $pathBox.Text) } }   # e.g. a drive letter that does not exist
-  try { $target = Resolve-InstallTarget $p; Assert-SetupPath $target 'installed' -Tree } catch { return @{ state = 'readonly'; free = 0; need = $need } }
+  try { $target = Resolve-InstallTarget $p; Assert-SetupPath $target 'installed' -Tree; $need = Need-Bytes $target } catch { return @{ state = 'readonly'; free = 0; need = 0 } }
   @{ state = $(if (Web-Writable $target) { 'ok' } else { 'readonly' }); free = (Drive-Free $target); need = $need; target = $target }
 }
 # ---- in-page folder picker (index.html #picker): drives, usual places, recent choices, folders of one level, new folder ----

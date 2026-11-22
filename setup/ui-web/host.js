@@ -13,7 +13,12 @@
   const post = (type) => { try { chrome.webview.postMessage({ type }); } catch (e) { /* no host */ } };
   if (native) {
     const dr = document.getElementById('drag'); if (dr) dr.addEventListener('mousedown', (e) => { if (e.button === 0) post('drag'); });
-    window.addEventListener('install-failed', () => { const b = document.getElementById('install'); if (b) b.classList.remove('busy'); if (Scene.showInstallError) Scene.showInstallError(); });
+    window.addEventListener('install-failed', () => {
+      installed = false;
+      document.getElementById('install').classList.remove('busy');
+      goTo('loc', 'skim');
+      check(pathEl.value);
+    });
     /* edge and corner hot zones (index.html .rz): the host starts the system size loop for the edge pressed */
     /* zone widths in PHYSICAL pixels: the page is zoomed (devicePixelRatio = DPI scale x zoom), so 8 CSS px can be 4 device px or less */
     const fitZones = () => { const d = window.devicePixelRatio || 1, st = document.documentElement.style; st.setProperty('--rz', Math.max(6, 9 / d).toFixed(1) + 'px'); st.setProperty('--rzc', Math.max(12, 18 / d).toFixed(1) + 'px'); st.setProperty('--rzg', Math.max(16, 24 / d).toFixed(1) + 'px'); };

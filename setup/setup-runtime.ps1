@@ -77,7 +77,11 @@ if ($script:statusOnly) {
   $bootCancel.FlatAppearance.MouseDownBackColor = $bootCancel.BackColor
   $bootCancel.AccessibleName = '取消启动安装程序'
   $bootCancel.AccessibleDescription = '正在检查组件清单，按 Esc 或 Enter 取消'
-  $bootCancel.add_Click({ $script:startupCancelled = $true })
+  $bootCancel.add_Click({
+    if ([Windows.Forms.MessageBox]::Show($script:splash, '确定要退出安装吗？', 'MeguLit 安装', 'YesNo', 'Question', 'Button2') -eq 'Yes') {
+      $script:startupCancelled = $true
+    }
+  })
   $script:bootTip = New-Object Windows.Forms.ToolTip
   $script:bootTip.SetToolTip($bootCancel, '正在启动安装程序，按 Esc 取消')
   $script:splash.CancelButton = $bootCancel
@@ -1061,8 +1065,25 @@ function Show-State {
 }
 
 function Next-Download {
-  while ($script:dlPos -lt $script:dl.Count -and (Ok-Part $script:dl[$script:dlPos])) {
-    $id = $script:dl[$script:dlPos]; [void]$script:ready.Add(@{ id = $id; part = (Part $id) }); $script:fetched += [long]$packs.$id.size; $script:dlPos++
+  while ($script:dlPos -lt $script:dl.Count) {
+    $id = $script:dl[$script:dlPos]
+    $part = Part $id
+    if (-not (Ok-Part $id)) {
+      $bundle = Join-Path $sourceRoot "setup\packs\$id.zip"
+      if (-not $script:confirmed -or -not [IO.File]::Exists($bundle)) { break }
+      try {
+        Assert-SetupPath $bundle 'source'
+        # Only the verified staged copy can enter the unpack queue. Keep the package reusable.
+        Remove-Staged $part
+        [IO.File]::Copy($bundle, $part)
+        if ((Get-Item -LiteralPath $part).Length -ne [long]$packs.$id.size -or (Get-FileHash -LiteralPath $part -Algorithm SHA256).Hash -ine $packs.$id.sha256) {
+          throw '组件文件与安装清单不符'
+        }
+        [IO.File]::WriteAllText($part + '.ok', $packs.$id.sha256)
+        Note 'bundle-verified' @{ id = $id; sha256 = $packs.$id.sha256 }
+      } catch { Fail 'download' ('读取离线组件失败：' + $id + '，' + $_.Exception.Message); return }
+    }
+    [void]$script:ready.Add(@{ id = $id; part = $part }); $script:fetched += [long]$packs.$id.size; $script:dlPos++
     Note 'downloaded' @{ id = $id; reused = $true }
   }
   if ($script:dlPos -ge $script:dl.Count) {
@@ -1143,6 +1164,7 @@ function Use-Target {
   $script:copying = $true; Show-State; Note 'copy-start' @{ target = $target }
   $copyArgs = @("`"$sourceRoot`"", "`"$target`"", '/E', '/R:2', '/W:1', '/NP', '/NFL', '/NDL', '/NJH', '/NJS', '/XD', "`"$sourceRoot\logs`"", "`"$sourceRoot\cache`"", "`"$stageDir`"", $stageName, 'runtime-*.unpack', '/XF', 'runtime-*.part*')
   if ($script:setupTestScope) { $copyArgs += '/XJ' }
+  if ([IO.Directory]::Exists((Join-Path $sourceRoot 'setup\packs'))) { $copyArgs += @('/XD', ('"' + (Join-Path $sourceRoot 'setup\packs') + '"')) }
   $copy = Start-Process -FilePath "$env:SystemRoot\System32\robocopy.exe" -ArgumentList $copyArgs -WindowStyle Hidden -PassThru
   $null = $copy.Handle
   while (-not $copy.HasExited) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
@@ -1229,8 +1251,10 @@ function Confirm-VcRuntime {
 function Confirm-Install {
   if ($script:confirmed -or $script:vcInstalling) { return }
   try { Assert-SetupPath $pathBox.Text.Trim().Trim('"') 'installed' -Tree } catch { Say ('隔离测试只能安装到测试目录：' + $_.Exception.Message); return }
-  $f = Drive-Free $pathBox.Text; $need = Need-Bytes $pathBox.Text
-  if ($f -lt $need) { Say ('「' + $pathBox.Text + '」所在的磁盘空间不够：需要约 ' + (MB $need) + '，只剩 ' + (MB $f) + "`n换一个空间大一点的盘吧"); return }
+  try { $target = Resolve-InstallTarget $pathBox.Text; Assert-SetupPath $target 'installed' -Tree } catch { Say $_.Exception.Message; return }
+  if ($script:webActive -and $target -ine $script:confirmedInstallTarget) { Say '安装路径已变化，请重新确认'; return }
+  $f = Drive-Free $target; $need = Need-Bytes $target
+  if ($f -lt $need) { Say ('「' + $target + '」所在的磁盘空间不够：需要约 ' + (MB $need) + '，只剩 ' + (MB $f) + "`n换一个空间大一点的盘吧"); return }
   Lock-Choice $true
   if (-not (Confirm-VcRuntime)) { return }
   if (-not (Use-Target)) { Lock-Choice $false; return }
