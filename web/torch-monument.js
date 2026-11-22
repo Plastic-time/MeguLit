@@ -389,8 +389,8 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
    void main(){vec2 p=vUv*vec2(5.,1.3);float t=uTime*.05;
     vec2 q=vec2(fbm(p+vec2(0.,t)),fbm(p+vec2(5.2,1.3)-t));vec2 r=vec2(fbm(p+3.5*q+vec2(1.7,9.2)+t*.8),fbm(p+3.5*q+vec2(8.3,2.8)-t*.6));float f=fbm(p+3.*r);
     vec3 c=vec3(.28,.09,.58)*pow(smoothstep(.55,.9,f),2.)*.55+vec3(.72,.52,1.)*pow(smoothstep(.76,.97,f),4.)*.45;
-    float m=smoothstep(0.,.08,vUv.x)*smoothstep(1.,.92,vUv.x)*smoothstep(0.,.12,vUv.y)*smoothstep(1.,.88,vUv.y);
-    gl_FragColor=vec4(c*uI*.32*(.55+.45*m)*(.35+.65*lv(vUv.x)),1.);}`})));
+    float m=smoothstep(0.,.08,vUv.x)*(1.-smoothstep(.92,1.,vUv.x))*smoothstep(0.,.12,vUv.y)*(1.-smoothstep(.88,1.,vUv.y));
+    gl_FragColor=vec4(c*uI*.32*m*(.35+.65*lv(vUv.x)),1.);}`})));
  swirl.position.set(0,faceY,SD/2+.003);swirl.renderOrder=4;stele.add(swirl);
  const AW=SW+2.4,AH=SH+2.0;
  const aura=new THREE.Mesh(keep(new THREE.PlaneGeometry(AW,AH)),keep(new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,uniforms:auraU,
@@ -400,7 +400,9 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
    void main(){vec2 b=vec2(${(SW/2).toFixed(3)},${(SH/2).toFixed(3)});vec2 d=abs(vP)-b;float dist=length(max(d,0.))+min(max(d.x,d.y),0.);
     float a=exp(-max(dist,0.)*2.6)*step(0.,dist);float s=vP.x*.55+(vP.x<0.?-vP.y:vP.y)*.55;float wav=smoothstep(.42,.78,fbm(vec2(s*.8,uTime*.07)));
     wav*=lv(clamp(vP.x/${(SW).toFixed(3)}+.5,0.,1.));
-    gl_FragColor=vec4(vec3(.36,.16,.70)*a*wav*uI*.3,1.);}`})));
+    vec2 edge=vec2(${(AW/2).toFixed(3)},${(AH/2).toFixed(3)})-abs(vP);
+    float feather=smoothstep(.03,.48,min(edge.x,edge.y));
+    gl_FragColor=vec4(vec3(.36,.16,.70)*a*wav*uI*.3,feather);}`})));
  aura.position.set(0,faceY,-SD/2-.04);aura.renderOrder=1;stele.add(aura);
  /* motes off the face */
  const MOTES=90,mp=new Float32Array(MOTES*3),ms=new Float32Array(MOTES);for(let i=0;i<MOTES;i++){mp[i*3]=(Math.random()-.5)*faceW;mp[i*3+1]=faceY-faceH/2+Math.random()*faceH*.9;mp[i*3+2]=SD/2+.05;ms[i]=Math.random();}
