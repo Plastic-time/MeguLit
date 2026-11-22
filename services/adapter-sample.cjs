@@ -118,7 +118,7 @@ async function prepare(root,db,{ids=null,sampler,titles=true}={}){
   /* runtime findings of this game, through the privacy gate once more */
   let runtime=null;try{const rh=require('./runtime-harvest.cjs');runtime=rh.gate(rh.load(root,g.id));}catch{}
   let ident={id:'',vndb:''};try{const pi=require('./probe-identity.cjs');ident=pi.identity({executable:g.executable,result:r,vndb:pi.vndbOf(db,g.id)});}catch{}
-  list.push({key:fp?.key||sha('title:'+g.title).slice(0,64),...(ident.id?{identity:ident.id}:{}),...(ident.vndb?{vndb:ident.vndb}:{}),title:titles?String(g.title).slice(0,120):'',...publicResult(r),samples:extra.samples||[],keys:extra.keys||[],...(runtime?{runtime}:{})});}
+  list.push({key:fp?.key||sha('title:'+g.title).slice(0,64),...(fp?.key?{fingerprintKind:'exe-head-v1'}:{}),...(ident.id?{identity:ident.id}:{}),...(ident.vndb?{vndb:ident.vndb}:{}),title:titles?String(g.title).slice(0,120):'',...publicResult(r),samples:extra.samples||[],keys:extra.keys||[],...(runtime?{runtime}:{})});}
  if(!list.length)return {empty:true};
  let bundle={schema:'megulit.probe-bundle',version:1,features:list.some(g=>g.runtime)?['runtime-1']:[],app:appVersion(root),createdAt:new Date().toISOString(),games:list};
  /* over the relay limit: drop tails, then samples from the biggest games, until it fits */

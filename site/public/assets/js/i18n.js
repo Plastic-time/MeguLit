@@ -253,7 +253,7 @@ export const I18N = {
     'nt.title2': 'Most engines already work. After you submit a game, feel free to just start playing it',
     'nt.lede': 'Some games don’t work well yet. Type a game you want to play below and send it: support usually lands within half a day, and within a week at most',
     'nt.game.ph': 'Full game title (original or store name)',
-    'nt.req': 'Please write the full, exact title: the original Japanese title or the name on Steam or DLsite. Avoid abbreviations and nicknames, they make it hard to find the right game',
+    'nt.req': 'Please write the full, exact title: the original Japanese title or the name on Steam or DLsite. Avoid abbreviations and nicknames, they make it hard to find the right game. For an exact build, use VNDB ID | engine | source language | EXE SHA-256 | script SHA-256',
     'nt.submit': 'Send',
     'nt.more': 'If something goes wrong while you use it, send it through “Feedback” at the top; problems inside a game can be reported with one click too. Questions, ideas and plain messages are all welcome. Thanks for your support!',
     'nt.toFeedback': 'Feedback',

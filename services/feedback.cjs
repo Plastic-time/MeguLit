@@ -11,7 +11,7 @@ async function send(root,{kind,text,contact='',lang='zh',version=''}={},{fetcher
  const urls=endpoints(root,'/api/feedback',env);if(!urls.length)return {ok:false,error:'RELAY_NOT_CONFIGURED'};
  const page=('app/'+String(version||'').replace(/[^\w.-]/g,'')).slice(0,40).replace(/\/$/,'');
  /* 2026-11-15 both relays, cn-api first; the next one only when this one is unreachable, rate limited or 5xx */
- const payload=JSON.stringify({kind,text:body.slice(0,kind==='game'?200:2000),contact:String(contact||'').slice(0,120),lang:LANGS.has(lang)?lang:'zh',page});
+ const payload=JSON.stringify({kind,text:body.slice(0,kind==='game'?256:2000),contact:String(contact||'').slice(0,120),lang:LANGS.has(lang)?lang:'zh',page});
  let last={ok:false,error:'NETWORK'};
  for(const url of urls){
   try{
