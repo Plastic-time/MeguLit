@@ -87,6 +87,8 @@ test('progress boot keeps real video and sends ready only after first frame and 
 });
 
 test('stage changes follow Scene.goTo: transition at the loop point, then the next loop; no overlay canvas', { skip, timeout: 90000 }, async () => {
+  await open(fixture);
+  await on('welcome');
   await ev('void Scene.goTo("loc","skim")'); await on('to-loc'); await on('loc');
   await ev('void Scene.goTo("field","under")'); await on('to-field'); await on('field');
   const sw = await switches(); assert.ok(sw.includes('to-loc:cut') && sw.includes('to-field:cut'), 'loops end on the transition\'s first pose: ' + sw);
