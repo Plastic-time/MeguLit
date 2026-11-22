@@ -7,11 +7,16 @@
    Usage: node tools/native-stale.cjs [--ci]   (--ci: entries with "ci": false may be missing, they are not built there) */
 const fs=require('fs'),path=require('path'),{execFileSync}=require('child_process');
 const root=path.join(__dirname,'..');
-function git(args){try{return execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();}catch{return '';}}
-function sourceTime(sources){
- let t=Number(git(['log','-1','--format=%ct','--',...sources]))*1000||0;
- for(const line of git(['status','--porcelain','--',...sources]).split(/\r?\n/)){const f=line.slice(3).trim();if(!f)continue;
-  try{t=Math.max(t,fs.statSync(path.join(root,f)).mtimeMs);}catch{}}
+function git(args,cwd){return execFileSync('git',args,{cwd,encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe']});}
+function sourceTime(sources,cwd=root){
+ let t=Number(git(['log','-1','--format=%ct','--',...sources],cwd))*1000||0;
+ const changes=git(['status','--porcelain=v1','-z','--no-renames','--untracked-files=all','--',...sources],cwd);
+ for(const record of changes.split('\0')){
+  if(!record)continue;
+  const file=path.join(cwd,record.slice(3));
+  const stat=fs.statSync(file,{throwIfNoEntry:false});
+  if(stat)t=Math.max(t,stat.mtimeMs);
+ }
  return t;}
 function check({ci=false}={}){
  const entries=JSON.parse(fs.readFileSync(path.join(root,'native','native-builds.json'),'utf8'));const problems=[],ok=[];

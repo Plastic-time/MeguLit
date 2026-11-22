@@ -27,3 +27,17 @@ test('directory tracking includes a signature-only commit in the source freshnes
  const signature=sourceTime(['native/megulithook/DrawSitesSig.h']);assert.ok(signature>0);
  assert.ok(sourceTime(entry.sources)>=signature,'signature changes cannot leave hook freshness behind');
 });
+test('freshness includes unstaged edits and individual files inside new directories',t=>{
+ const {sourceTime}=require('../tools/native-stale.cjs'),{execFileSync}=require('node:child_process');
+ const dir=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'native-freshness-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const git=(...args)=>execFileSync('git',args,{cwd:dir,windowsHide:true,stdio:'pipe'});
+ git('init','-q');fs.mkdirSync(path.join(dir,'inputs'));
+ const file=path.join(dir,'inputs','first file.h');
+ fs.writeFileSync(file,'first');git('add','.');git('-c','user.name=Fixture','-c','user.email=test@example.invalid','commit','-qm','fixture');
+ fs.appendFileSync(file,' edited');const later=new Date(Date.now()+60000);fs.utimesSync(file,later,later);
+ assert.equal(sourceTime(['inputs'],dir),fs.statSync(file).mtimeMs);
+ const sub=path.join(dir,'inputs','new');fs.mkdirSync(sub);const added=path.join(sub,'second file.h');fs.writeFileSync(added,'second');
+ const last=new Date(later.getTime()+60000);fs.utimesSync(added,last,last);
+ assert.equal(sourceTime(['inputs'],dir),fs.statSync(added).mtimeMs);
+});
