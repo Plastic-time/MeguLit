@@ -35,6 +35,7 @@
     if (o.progress !== undefined) { const x = o.progress * N, k = Math.floor(x); for (let i = 0; i < N; i++) { st[i] = i < k ? 2 : i === k && o.progress < 1 ? 1 : (o.progress >= 1 ? 2 : 0); fr[i] = i === k ? x - k : 0; da[i] = 0; } s.got = o.progress * TOTAL; s.phase = 'download'; s.poseP = o.poseP !== undefined ? o.poseP : 0.5; }   /* pre-render preview: fake download progress, glass lit by the scene's own style */
     if (o.state === 'done') { st.fill(2); fr.fill(1); da.fill(0); s.got = TOTAL; s.speed = 0; s.eta = 0; s.phase = o.phase || 'unpack'; s.unpack = o.phase === 'done' ? 1 : 0.5; }   /* pre-render: every segment finished, glass in its final state */
     if (o.poseP !== undefined) s.poseP = o.poseP;
+    if (o.etchMix !== undefined) s.etchMix = o.etchMix;
     if (o.blank) { s.poseP = o.poseP !== undefined ? o.poseP : Math.max(0, Math.min(1, (t - T0) / (TEND - T0))); st.fill(0); fr.fill(0); s.got = 0; s.speed = 0; s.eta = 0; s.phase = 'download'; }   /* pre-render: every segment still pending, the glass is drawn unlit (the player lights it from the real progress) */
     if (o.fail === 'download') { for (let i = 0; i < N; i++) if (st[i] === 1 || st[i] === 3) st[i] = 4; s.speed = 0; s.eta = 0;
       s.err = { kind: 'download' }; }
