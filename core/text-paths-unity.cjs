@@ -44,6 +44,10 @@ function mirror(dir,shadow,{linkOnly=false,copyFiles=false,reserveBytes=0,ours=O
 }
 /* (Re)build the shadow folder for one game. pack: the unpacked "unity-text" pack folder holding x86\ and x64\
    (each: winhttp.dll, doorstop_config.ini, BepInEx\core\...) and MeguLitUnityText.dll. Returns the shadow program. */
+function shadowKey(exe,kind){
+ const pathKey=kind==='il2cpp'?'-'+require('node:crypto').createHash('sha256').update(process.platform==='win32'?fs.realpathSync.native(exe).toLowerCase():fs.realpathSync.native(exe)).digest('hex').slice(0,20):'';
+ return path.basename(exe).replace(/[^A-Za-z0-9._-]/g,'_')+'-'+fs.statSync(exe).size+pathKey;
+}
 function makeShadow({exe,shadowRoot,pack,port,sourceScope=null,steamAppId=null}){
  const dir=path.dirname(exe),b=bits(exe),kind=unityGame(exe),arch=b===64?'x64':b===32?'x86':null;if(!arch)throw Error('UNITY_BITS');
  if(!kind)throw Error('UNITY_NOT_UNITY');
@@ -51,8 +55,7 @@ function makeShadow({exe,shadowRoot,pack,port,sourceScope=null,steamAppId=null})
  const flavour=kind==='il2cpp'?'il2cpp-'+arch:arch,pluginFile=kind==='il2cpp'?'MeguLitUnityText.IL2CPP.dll':'MeguLitUnityText.dll';
  if(!fs.existsSync(path.join(pack,flavour))||!fs.existsSync(path.join(pack,pluginFile)))throw Error('UNITY_PACK_MISSING '+flavour);if(modded(exe))throw Error('UNITY_ALREADY_MODDED');
  if(kind==='il2cpp'&&!/^[a-f0-9]{32}$/.test(sourceScope||''))throw Error('UNITY_IL2CPP_SESSION_REQUIRED');
- const pathKey=kind==='il2cpp'?'-'+require('node:crypto').createHash('sha256').update(process.platform==='win32'?fs.realpathSync.native(exe).toLowerCase():fs.realpathSync.native(exe)).digest('hex').slice(0,20):'';
- const key=path.basename(exe).replace(/[^A-Za-z0-9._-]/g,'_')+'-'+fs.statSync(exe).size+pathKey,shadow=path.join(shadowRoot,key);
+ const shadow=path.join(shadowRoot,shadowKey(exe,kind));
  let reserveBytes=0;if(kind==='il2cpp'){let count=0;const size=p=>{const st=fs.lstatSync(p);if(st.isSymbolicLink()||++count>5000)throw Error('UNITY_PACK_PATH');if(st.isDirectory())for(const n of fs.readdirSync(p))size(path.join(p,n));else reserveBytes+=st.size;if(reserveBytes>256*1024**2)throw Error('UNITY_PACK_BUDGET');};size(path.join(pack,flavour));reserveBytes+=fs.statSync(path.join(pack,pluginFile)).size+256*1024**2;}
  const stats=mirror(dir,shadow,{copyFiles:kind==='il2cpp',reserveBytes});
  /* ours: doorstop + BepInEx (real files in the shadow) */
@@ -110,4 +113,4 @@ class UnityTextPath{
  }
 }
 
-module.exports={unityGame,modded,bits,mirror,makeShadow,UnityTextPath,formatChars};
+module.exports={unityGame,modded,bits,mirror,shadowKey,makeShadow,UnityTextPath,formatChars};

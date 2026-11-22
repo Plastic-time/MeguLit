@@ -242,7 +242,19 @@ class Reader{
  seedKeepsHide(exe,by,m={}){try{let p=this.gal?.profile;if(!p||!p.seedStatus)p=require('../core/profiles/index.cjs').profileFor({exe});
   if(!['verified','owner-ok'].includes(p.seedStatus)||p.hide?.textEffectsRead===true)return false;
   this.logVisibility({type:'layoutDiagnostic',kind:'textEffects',what:'keptHide',by,seed:p.gameKey,status:p.seedStatus,paired:Number(m.paired)||0,orphan:Number(m.orphan)||0});this.gal?.hooks?.trace?.('text effects: read mode not taken ('+by+'), seed '+p.gameKey+' '+p.seedStatus+' stays hidden');return true;}catch{return false;}}
- adoptTextSource(exe,pid){const hooks=this.gal?.hooks,same=!!(hooks?.originalText&&hooks.textSourcePid===0&&String(this.textExe||'').toLowerCase()===String(exe||'').toLowerCase());this.textExe=exe;
+ scriptExecutable(exe){
+  const selected=this.expectedExecutable;
+  if(!selected||!exe||!this.root)return exe;
+  const shadows=path.resolve(this.root,'data','unity-shadow');
+  if(path.relative(shadows,path.dirname(path.dirname(exe)))!=='')return exe;
+  try{
+   const key=require('../core/text-paths-unity.cjs').shadowKey(selected,'il2cpp');
+   const expectedCopy=path.join(shadows,key,path.basename(selected));
+   if(path.relative(expectedCopy,exe)==='')return selected;
+  }catch{}
+  return exe;
+ }
+ adoptTextSource(exe,pid){exe=this.scriptExecutable(exe);const hooks=this.gal?.hooks,same=!!(hooks?.originalText&&hooks.textSourcePid===0&&String(this.textExe||'').toLowerCase()===String(exe||'').toLowerCase());this.textExe=exe;
   if(same){hooks.textSourcePid=pid;this.refreshTextSource({force:false,exe,pid});}else this.refreshTextSource({exe,pid});this.watchTextSource(exe);}
  watchTextSource(exe){for(const t of this.textSourceTimers||[])clearTimeout(t);this.textSourceTimers=[3000,15000,60000,180000].map(ms=>{const t=setTimeout(()=>{if(this.textExe===exe&&this.gal)this.refreshTextSource({force:false});},ms);t.unref?.();return t;});}
  // E280: a Japanese game started without a patch set up: look for one on this computer in the background.
@@ -292,8 +304,7 @@ class Reader{
  /* 2026-11-12 art text (PageLocator art mode): the page gets the place and the translation; the game keeps drawing the line */
  async artText(message){if(message?.source==='engine'&&message.role==='name'){const turns=this.artTurns||(this.artTurns=new Map());turns.set(message.id,(turns.get(message.id)||0)+1);if(turns.size>300)turns.delete(turns.keys().next().value);if(message.visible!==true)turns.delete(message.id);this.emit('reader-event',{...message,translation:'',rowTranslations:[]});return;}const cacheLanguage=this.targetLanguage();/* 2026-11-15 unreadable art text (mojibake, the game's own noise lines) is neither translated nor drawn */if(message?.visible===true&&require('../core/text-sanity.cjs').garbledSource(String(message.text||''),{controls:false})){this.gal?.hooks?.trace?.('art text unreadable '+message.id);this.emit('reader-event',{...message,translation:'',visible:false});return;}/* E578: a list of short rows (a menu) is translated row by row, see artList */const list=message.source==='ocr'&&message.visible===true&&message.foreign!==true?artList(message.rows):null;let translation='';let text=String(message.text||'').slice(0,600);/* 2026-11-13 OCR rows (source ocr) carry recognition slips (「のた」 for 「のだ」): the script line they stand for replaces them */let shown='';/* 2026-11-13 a foreign group (the game draws the line in another language): its Japanese table line becomes the text, the drawn line is kept as shown; no table line, no item */if(message.foreign===true&&message.visible===true){const ja=this.gal?.hooks?.foreignArt?.(text,message.id)||'';this.gal?.hooks?.trace?.('art foreign '+message.id+' '+JSON.stringify(text.slice(0,40))+' -> '+JSON.stringify(ja.slice(0,40)));if(ja){shown=text;text=ja.slice(0,600);}else{/* not in the table: the Japanese OCR's own reading, when it is Japanese (a kanji card) */const alt=String(message.alt||'');if(!/[\u3040-\u30ff]/.test(alt)&&!/^[\u4e00-\u9fff]{2,8}$/.test(alt))return;text=alt.slice(0,600);}}else if(!list&&message.source==='ocr'&&message.visible===true&&text.trim()){const snapped=this.gal?.hooks?.ocrSnap?.(text);if(snapped)text=snapped.slice(0,600);}/* E540 (WHITE ALBUM2 title logo read as 「ミき=ミミミ」, the translator answered with an apology): an OCR read that is not a line is no item */if(message.visible===true&&message.source==='ocr'&&!shown&&artJunk(text,message.rows,message.sh))return;/* a hide (or newer read) that arrives while a translation is awaited wins: the stale show is dropped */const turns=this.artTurns||(this.artTurns=new Map()),turn=(turns.get(message.id)||0)+1;turns.set(message.id,turn);if(turns.size>300)turns.delete(turns.keys().next().value);
   if(list){const rowTranslations=(await this.artRows(list)).map((t,i)=>t&&!artNoTranslation(list[i],t)?t:'');if(turns.get(message.id)!==turn)return;this.emit('reader-event',{...message,text:list.join('\n'),translation:rowTranslations.some(Boolean)?rowTranslations.join('\n'):'',rowTranslations});return;}
-  if(message.visible===true&&text.trim()){try{/* the game's own drawn Chinese line is the translation of a foreign group */translation=(shown&&cacheLanguage!=='en'&&/[\u4e00-\u9fff]/.test(shown)&&!/[\u3040-\u30ff]/.test(shown)?shown:'')||this.embedCached(text,undefined,{language:cacheLanguage})||'';
-   if(!translation&&cacheLanguage!=='en'){translation=this.gal?.hooks?.scriptTranslation?.(text)||'';if(translation)this.embedCached(text,translation,{language:cacheLanguage});}
+  if(message.visible===true&&text.trim()){try{/* the game's own drawn Chinese line is the translation of a foreign group */translation=(shown&&cacheLanguage!=='en'&&/[\u4e00-\u9fff]/.test(shown)&&!/[\u3040-\u30ff]/.test(shown)?shown:'')||this.localTranslation(text,cacheLanguage);
    /* E540 (WHITE ALBUM2 opening: every card read, almost none shown): a card lasts 3-4 s and the translator can take as long,
       so the hide came first and the show was dropped. The line goes out at once (its readable copy), the translation follows. */
    if(!translation&&turns.get(message.id)===turn)this.emit('reader-event',{...message,text,translation:'',...(shown&&{shown})});
@@ -307,7 +318,7 @@ class Reader{
  /* engine-draw: ruby (game ruby, then dictionary-settled readings) and translation (script, then the fallback chain) for one dialogue line the engine will draw itself */
  async drawEmbed(m){const generation=this.visualGeneration||0,owner=this.gal,current=()=>!this.closed&&this.gal===owner&&(this.visualGeneration||0)===generation;const cacheLanguage=this.targetLanguage();const text=String(m?.text||'');if(!text||text.length>600||notJapanese(text))return;let ruby=[],zh='';
   try{const x=await require('./example-ruby.cjs').exampleRuby(null,this.runtime.learning(),[{text,ruby:this.gal?.hooks?.sourceRuby?.get(text)||[]}]);const it=x?.items?.[0];if(it?.text===text&&Array.isArray(it.spans))ruby=it.spans.map(sp=>[sp.start,sp.end,String(sp.reading||'')]);}catch{}
-  try{zh=this.embedCached(text,undefined,{language:cacheLanguage})||'';if(!zh&&cacheLanguage!=='en')zh=this.gal?.hooks?.scriptTranslation?.(text)||'';if(!zh){const until=Date.now()+4000;zh=(await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current:()=>Date.now()<until})).text||'';}if(zh)this.embedCached(text,zh,{language:cacheLanguage});}catch{}
+  try{zh=this.localTranslation(text,cacheLanguage);if(!zh){const until=Date.now()+4000;zh=(await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current:()=>Date.now()<until})).text||'';}if(zh)this.embedCached(text,zh,{language:cacheLanguage});}catch{}
   if(zh&&(/[\ufffd\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(zh)||require('../core/text-sanity.cjs').garbledSource(zh)))zh='';
   if(current())owner?.hooks?.drawEmbedReply?.(m.key,{ruby,zh});}
  async embedTranslate(id,text){const generation=this.visualGeneration||0,owner=this.gal,current=()=>!this.closed&&this.gal===owner&&(this.visualGeneration||0)===generation;const cacheLanguage=this.targetLanguage();
@@ -320,8 +331,7 @@ class Reader{
   {const sanity=require('../core/text-sanity.cjs');const fixed=sanity.repairMojibake(text);if(fixed)text=fixed.text;else if(sanity.garbledSource(text,{controls:false})){this.gal?.hooks?.embedReply(id,'',{source:text,text:''});return;}}
   if(notJapanese(text)){this.gal?.hooks?.embedReply(id,'',{source:text,text:''});return;}
   try{
-   trans=this.embedCached(text,undefined,{language:cacheLanguage})||'';
-   if(!trans&&cacheLanguage!=='en'){trans=this.gal?.hooks?.scriptTranslation?.(text)||'';if(trans)this.embedCached(text,trans,{language:cacheLanguage});}
+   trans=this.localTranslation(text,cacheLanguage);
    if(!trans){const until=Date.now()+3500;try{trans=(await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current:()=>Date.now()<until})).text;this.embedCached(text,trans,{language:cacheLanguage});}catch{}}
   }catch(error){try{logSink.append(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'embedTranslateFailed',error:String(error?.message||error).slice(0,200)})+'\n');}catch{}}
   /* E358: never let the game draw a translation with holes: a line its font cannot draw is hidden in the game and MeguLit draws it. */
@@ -329,6 +339,11 @@ class Reader{
   if(trans&&(/[\ufffd\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(trans)||require('../core/text-sanity.cjs').garbledSource(trans))){try{logSink.append(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'embedTranslateRefused',chars:trans.length})+'\n');}catch{}trans='';}
   let hide=false;if(trans){try{hide=this.gal?.hooks?.originalText?.drawable?.(trans)===false;}catch{}}
   if(current())owner?.hooks?.embedReply(id,hide?'':trans,{hide,source:text,text:trans});
+ }
+ localTranslation(text,language){
+  const script=language==='en'?'':this.gal?.hooks?.scriptTranslation?.(text);
+  if(script){this.embedCached(text,script,{language});return script;}
+  return this.embedCached(text,undefined,{language})||'';
  }
  async translate(request){const options=this.requestOptions(request),cacheLanguage=this.targetLanguage(options);const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;const current=()=>pageKey?this.pageScope===pageKey:this.latest===request.id;if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();const gameId=this.gameId;
   /* 2026-11-19 (user rule, every game): the script's own translation first (group / official, the same lookup the embed uses); a line it does not
@@ -396,7 +411,7 @@ class Reader{
    /* 2026-11-21 (owner: 「再加个兜底的检测有没有译文，没有的话就再查赶紧补上」): the reader's translation guard asks for a line still without a
       translation, by its text (no serial, no current-line check): the cache, the script, then the fallback chain; the answer fills the line wherever it is shown */
    case 'translateGuard':{const text=String(r.text||'');if(!text.trim()||text.length>4000)break;const tr=x=>{try{g?.hooks?.trace?.('translation guard '+x+' '+JSON.stringify(text.slice(0,24)));}catch{}};
-    (async()=>{const cacheLanguage=this.targetLanguage();let t=this.embedCached(text,undefined,{language:cacheLanguage})||'';if(!t&&cacheLanguage!=='en'){t=this.gal?.hooks?.scriptTranslation?.(text)||'';if(t)this.embedCached(text,t,{language:cacheLanguage});}
+    (async()=>{const cacheLanguage=this.targetLanguage();let t=this.localTranslation(text,cacheLanguage);
      if(t){tr('fill cache');}else{tr('retry chain');try{t=(await this.chainTranslate(text,this.baseOptions(cacheLanguage),{})).text||'';if(t)this.embedCached(text,t,{language:cacheLanguage});}catch(e){tr('still-missing '+String(e?.message||e).slice(0,40));}}
      if(t)this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[text,t,'guard',{target:cacheLanguage}]});})();break;}
    case 'engineGiveWay':g?.hooks?.giveWay?.(r.ms);break; /* 2026-11-21: a hidden line the reader cannot draw goes back to the game */
