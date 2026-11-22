@@ -5,7 +5,8 @@
 #include "IgaTextSig.h"
 #include "IgaTextPin.h"
 namespace IgaText {
-static bool Asked(){wchar_t value[2]={};return GetEnvironmentVariableW(L"MEGULIT_IGA_TEXT",value,2)==1&&value[0]==L'1';}
+static bool Flag(const wchar_t *name){wchar_t value[2]={};return GetEnvironmentVariableW(name,value,2)==1&&value[0]==L'1';}
+static bool Asked(){return Flag(L"MEGULIT_IGA_TEXT")&&Flag(L"MEGULIT_OWNER_TESTS")&&Flag(L"MEGULIT_SIDE_BY_SIDE");}
 static uintptr_t Entry(){
  if(!Asked())return 0;
  wchar_t exe[32768];DWORD n=GetModuleFileNameW(nullptr,exe,32768);if(!n||n>=32768)return 0;

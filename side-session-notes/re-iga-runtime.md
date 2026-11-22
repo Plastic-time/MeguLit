@@ -6,7 +6,7 @@
 
 实际游戏 EXE SHA256 `6fca9f7106f5fd57ac1471f403c72ca14d6de74150a5f310f5138e932f6f501a`，231936B。`plugin/Script.dll` SHA256 `89ea50edd61314a06a2d0b8ffb1f66c8a3e2fe058ae10c4301bc11cde536a5d3`，502784B。其函数 RVA 0x8440 接收 ECX 中的 CP932 NUL 字串，转换后向字体层派发 AddText。调用者含逐字绘制，普通 Luna 保留 caller context 分流并由原有缓冲合句，尚需真实运行确认句子完整性
 
-默认不装 hook：只有目标进程继承明确的 `MEGULIT_IGA_TEXT=1`，EXE、六个插件、script.iga、system.iga 的长度与完整 SHA256 全对，实际加载插件路径一致，83 字节入口签名在代码节唯一且 RVA 一致时才安装。签名中的两处 PE relocation 操数允许随装载基址改变，其他指令变化拒绝。哈希不是跨版本支持声明
+默认不装 hook：只有目标进程同时继承 `MEGULIT_IGA_TEXT=1`、`MEGULIT_OWNER_TESTS=1`、`MEGULIT_SIDE_BY_SIDE=1` 三个明确私测开关，EXE、六个插件、script.iga、system.iga 的长度与完整 SHA256 全对，实际加载插件路径一致，83 字节入口签名在代码节唯一且 RVA 一致时才安装。三个开关缺任一个或不等于字符串 1 均不安装，native 自检逐项验证。签名中的两处 PE relocation 操数允许随装载基址改变，其他指令变化拒绝。哈希不是跨版本支持声明
 
 只读 `USING_STRING`、CP932、ECX 输入，不设置 embed 标志、不写回、不隐藏、不输出 ToMe_CHARS。名字/选项/屏幕坐标/原生注音/翻页语义均未实现，不能以此声称可完整游玩。停止与重连仍走已有 Luna 生命周期
 
