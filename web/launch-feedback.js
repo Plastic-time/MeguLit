@@ -1,5 +1,7 @@
 const labels={zh:['游戏启动失败','关闭'],en:['Game could not start','Close'],ja:['ゲームを起動できませんでした','閉じる']};
 const reasons={
+ OWNER_PUBLISHER_PREPARE_FAILED:['发行方启动器或游戏资源未通过隔离测试身份检查，已暂停启动，请检查私测清单后重试','The publisher launcher or game resources did not pass the isolated test identity check. Launch is paused; check the private test catalog and retry','発売元の起動ファイルまたはゲーム資源を隔離テストの対象として確認できないため、起動を中止しました。テスト一覧を確認して再試行してください'],
+ OWNER_PUBLISHER_ELEVATION_UNSUPPORTED:['本次私测入口不支持需要管理员权限的发行方启动器，已暂停启动，请保留日志供检查','This private test entry does not support a publisher launcher that requires administrator permission. Launch is paused; retain the logs for review','今回のテスト起動では管理者権限を必要とする発売元ランチャーに対応していないため、起動を中止しました。ログを保持してください'],
  OWNER_STEAM_PREPARE_FAILED:['隔离测试副本尚未安全就绪，已暂停启动并保留诊断日志，请检查文件权限、空间与测试清单后重试','The isolated test copy could not be prepared safely. Launch is paused and diagnostic logs are retained. Check file access, free space and the test catalog before retrying','隔離テスト用コピーを安全に準備できなかったため、起動を中止して診断ログを保持しました。アクセス権、空き容量、テスト一覧を確認してからお試しください'],
  RESTART_FROM_OWNER_TEST_ENTRY:['请先关闭该游戏，再从隔离测试版 MeguLit 的游戏库重新启动；当前进程尚未确认来自本次私测入口','Close the game, then restart it from the isolated MeguLit test library. The current process is not confirmed as this private test launch','ゲームを閉じ、隔離された MeguLit テスト版のライブラリから再起動してください。現在のプロセスが今回のテスト起動元であることを確認できません'],
  OWNER_STEAM_DISK_BUDGET:['测试副本空间不足，复制后必须保留至少 10 GiB 可用空间，原游戏未修改','The test copy needs enough space to leave at least 10 GiB free. The original game was not modified','テスト用コピー後に 10 GiB 以上の空き容量が必要です。元のゲームは変更していません'],
@@ -59,5 +61,5 @@ const short={
 export const launchRestorable=error=>['JAPANESE_EXECUTABLE_REQUIRED','CHINESE_PATCH_ACTIVE'].includes(typeof error==='string'?error:error?.message);
 export const launchShort=(error,locale)=>{const code=typeof error==='string'?error:error?.message,full=launchReason(error,locale);const s=short[code]?.[locale==='zh'?0:locale==='ja'?2:1];if(s)return s;const first=full.split(/(?<=[。.!！])s*/)[0]||full;return first;};
 export const launchCopy=locale=>labels[locale]||labels.en;
-export const launchReason=(error,locale)=>{const code=typeof error==='string'?error:error?.message;return (reasons[code]||(/^OWNER_STEAM_[A-Z_]+$/.test(code||'')?reasons.OWNER_STEAM_PREPARE_FAILED:null))?.[locale==='zh'?0:locale==='ja'?2:1]||'';};
+export const launchReason=(error,locale)=>{const code=typeof error==='string'?error:error?.message;return (reasons[code]||(/^OWNER_STEAM_[A-Z_]+$/.test(code||'')?reasons.OWNER_STEAM_PREPARE_FAILED:/^OWNER_PUBLISHER_[A-Z_]+$/.test(code||'')?reasons.OWNER_PUBLISHER_PREPARE_FAILED:null))?.[locale==='zh'?0:locale==='ja'?2:1]||'';};
 
