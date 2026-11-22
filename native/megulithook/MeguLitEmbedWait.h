@@ -109,7 +109,9 @@ namespace MeguLitEmbed
      stream: another stream that writes back the same line (a Japanese twin of the selected setter, a backlog row) asks the
      bridge itself, which decides per stream (HookBridge.cs OnEmbedAnswer: the twin window, TwinCrowd's at most two twins),
      and an empty answer cached for a twin is not the selected stream's cached answer. (The answer event is still named by
-     the line, not the stream: a late bridge answer can wake another stream waiting for the same line.) #696 review: three
+     the line, not the stream, and LunaHost keeps one answer buffer: an answer wakes every stream waiting for that line. The
+     bridge keeps that to one waiter: a late embedded-translation answer is dropped once the selection that asked has
+     changed, and while answers come late the selected stream's twins are off; HookBridge.cs FinishEmbed, AnswersLater.) #696 review: three
      enabled contexts showing the selected line were written back from its cached answer, so TwinCrowd never saw them. */
   inline std::string Key(UINT64 addr, UINT64 ctx, UINT64 ctx2, const void *data, size_t len)
   {
