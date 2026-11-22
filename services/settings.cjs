@@ -35,7 +35,8 @@ class Settings{
     const session=readJSON(this.file('gal-preferences.json')),modern=Object.hasOwn(preset,'japaneseSize')||Object.hasOwn(preset,'translationSize');
     const global=gameStyle.clean({...(Object.keys(session||{}).length?gameStyle.clean(session):{}),...preset,...(modern?{layoutVersion:22}:{})});/* the session file alone takes the one-time spacing move (core/game-style.js), never the preset typed here */
     const entry=profile?readJSON(this.file('game-style-profiles.json')).entries?.[profile]:null;
-    return entry?gameStyle.clean({...global,...entry.prefs}):global;
+    /* Older settings pages could save the global renderer into a game profile. */
+    return entry?gameStyle.clean({...global,...entry.prefs,textRenderer:global.textRenderer}):global;
   }
   if(v4Scopes.has(scope))return cleanV4(readJSON(this.file('v4-preferences.json')));
   if(nativeScopes.has(scope))return {...nativeDefaults,...readJSON(this.file('native-preferences.json'))};
@@ -51,12 +52,13 @@ class Settings{
  }
  get(profile=''){
   if(profile&&!/^[a-f0-9]{64}$/.test(profile))throw Error('SETTINGS_PROFILE_INVALID');
-  const values={};for(const group of groups){const source=this.read(group.id,profile);values[group.id]={};for(const field of fields.filter(f=>f.scope===group.id))values[group.id][field.key]=getPath(source,field.key)??(field.type==='boolean'?false:field.type==='number'?field.min??0:'');}
+  const availableFields=profile?fields.filter(field=>!field.globalOnly):fields;
+  const values={};for(const group of groups){const source=this.read(group.id,profile);values[group.id]={};for(const field of availableFields.filter(f=>f.scope===group.id))values[group.id][field.key]=getPath(source,field.key)??(field.type==='boolean'?false:field.type==='number'?field.min??0:'');}
   const entries=readJSON(this.file('game-style-profiles.json')).entries||{};
   if(profile&&!entries[profile])throw Error('SETTINGS_PROFILE_INVALID');
   const {resolveOptions}=require('../core/providers.cjs'),{ENGINES}=require('../core/engines.cjs'),translationProfiles=readJSON(this.file('translation-profiles.json'));
   const providers={};for(const option of fields.find(field=>field.scope==='translation'&&field.key==='provider').options){const provider=option.value,base=resolveOptions({provider});providers[provider]={models:require('../core/engines.cjs').modelsFor(provider),defaultBaseUrl:base.baseUrl||'',defaultModel:base.model||'',baseUrl:base.baseUrl||'',model:base.model||(provider==='gpt'?'gpt-4.1-mini':''),editable:provider==='gpt'||ENGINES[provider]?.editable===true,keyless:provider==='google'||ENGINES[provider]?.keyless===true,...translationProfiles[provider]};}
-  return {groups,fields,values,providers,profile,profiles:Object.entries(entries).filter(([key])=>/^[a-f0-9]{64}$/.test(key)).map(([key,entry])=>({id:key,name:String(entry.name||key.slice(0,12)),savedAt:entry.savedAt||0})),hasSavedKeys:fs.existsSync(this.file('secrets.dpapi'))};
+  return {groups,fields:availableFields,values,providers,profile,profiles:Object.entries(entries).filter(([key])=>/^[a-f0-9]{64}$/.test(key)).map(([key,entry])=>({id:key,name:String(entry.name||key.slice(0,12)),savedAt:entry.savedAt||0})),hasSavedKeys:fs.existsSync(this.file('secrets.dpapi'))};
  }
  save({scope,values,profile='',appendFolders=false}){
   if(!groups.some(group=>group.id===scope))throw Error('SETTINGS_SCOPE_INVALID');
@@ -65,7 +67,7 @@ class Settings{
   const library=scope==='library'?libraryForSave(this.file('library.json')):undefined;
   const current=this.read(scope,profile,library),next=structuredClone(current),allowed=new Map(fields.filter(f=>f.scope===scope).map(field=>[field.key,field]));
   for(const[key,input]of Object.entries(values||{})){
-    const field=allowed.get(key);if(!field)throw Error('SETTINGS_FIELD_INVALID');let value=input;
+    const field=allowed.get(key);if(!field||profile&&field.globalOnly)throw Error('SETTINGS_FIELD_INVALID');let value=input;
     if(field.readOnly&&value!==getPath(current,key))throw Error('SETTINGS_READ_ONLY');
     if(field.type==='boolean'){if(typeof value!=='boolean')throw Error('SETTINGS_INVALID_VALUE');}
     else if(field.type==='number'){value=Number(value);if(!Number.isFinite(value))throw Error('SETTINGS_INVALID_VALUE');value=Math.max(field.min??-Infinity,Math.min(field.max??Infinity,value));if((field.step??1)===1)value=Math.round(value);}

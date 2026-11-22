@@ -73,7 +73,7 @@ choice('text','rubyFont','注音字体','Furigana font','ふりがなフォン�
 choice('text','shadow','文字阴影','Text shadow','文字の影',['outline','soft','none'].map(v=>option(v,...({outline:['描边','Outline','縁取り'],soft:['柔和阴影','Soft shadow','柔らかい影'],
  none:['关闭','Off','なし']}[v]))));
 
-choice('embedding','textRenderer','文字显示','Text drawing','文字の描画',[option('overlay','阅读窗口','Reader window','リーダーウィンドウ'),option('compositor','画进游戏画面','Into the game picture','ゲーム画面に描く')]);
+field('embedding','textRenderer','文字显示','Text drawing','文字の描画','select',{globalOnly:true,options:[option('overlay','阅读窗口','Reader window','リーダーウィンドウ'),option('compositor','画进游戏画面','Into the game picture','ゲーム画面に描く')]});
 choice('embedding','hookProfile','Hook 模式','Hook mode','Hook モード',[option('read','读取原文','Read source','原文を取得'),option('embed','内嵌','Embedding','埋め込み'),option('euphoria474',
  'euphoria 0.474'),option('off','关闭','Off','オフ')]);
 for(const[key,zh,en,ja]of [['hookAutoStart','绑定后自动启动 Hook','Start Hook after binding','紐付け後に Hook を開始'],['hookHide','隐藏游戏原文','Hide game source','ゲームの原文を隠す'],['hookFast',
