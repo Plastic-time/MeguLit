@@ -1,0 +1,17 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.join(__dirname,'..'),css=fs.readFileSync(path.join(root,'web/cursors.css'),'utf8'),manifest=JSON.parse(fs.readFileSync(path.join(root,'web/assets/cursors/manifest.json'),'utf8'));
+test('8 static small self-contained cursor assets have exact declared hotspots and native fallbacks',()=>{
+ assert.equal(manifest.size,24);assert.deepEqual(Object.keys(manifest.states).sort(),['arrow','grab','grabbing','pointer','read','text','zoom-in','zoom-out']);
+ for(const [name,s] of Object.entries(manifest.states)){
+  assert.equal(s.file,name+'.svg');assert(s.hotspot.every(n=>Number.isInteger(n)&&n>=0&&n<24));const file=path.join(root,'web/assets/cursors',s.file),svg=fs.readFileSync(file,'utf8');
+  assert(Buffer.byteLength(svg)<2048);assert.match(svg,/<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="24" height="24" viewBox="0 0 24 24">/);assert.match(svg,/<\/svg>\s*$/);assert(!/<(?:script|image|foreignObject|animate|filter|style)\b|\bon\w+=|(?:xlink:)?href=|url\(/i.test(svg));
+  assert(css.includes(`--mg-cursor-${name}:url("assets/cursors/${s.file}") ${s.hotspot.join(' ')}, ${s.fallback};`));assert(css.includes(`--mg-cursor-${name}:${s.fallback};`));
+ }
+ assert.match(css,/@media\(forced-colors:active\)/);
+});
+test('main and reader load the same stylesheet without moving final dictionary override',()=>{const main=fs.readFileSync(path.join(root,'web/index.html'),'utf8'),reader=fs.readFileSync(path.join(root,'web/reader/index.html'),'utf8');assert.equal((main.match(/href="cursors.css"/g)||[]).length,1);assert.equal((reader.match(/href="\.\.\/cursors.css"/g)||[]).length,1);assert(main.indexOf('href="cursors.css"')<main.indexOf('href="settings-dict.css"'));assert.equal(path.resolve(root,'web/reader','../cursors.css'),path.resolve(root,'web/cursors.css'));});
+test('lookup targets and ruby retain pointer contract, plain history is not falsely made interactive',()=>{assert.match(css,/\.char-token,\.tome-page-char,\.sentence-word/);assert.match(css,/:is\(\.char-token,\.tome-page-char\) :is\(ruby,rb,rt,span\)\{cursor:var\(--mg-cursor-read,pointer\)!important\}/);assert(css.includes('.dialogue-source,[data-selectable]){cursor:var(--mg-cursor-text,text)}'));assert(!/\.dialogue-source[^{}]*\{cursor:var\(--mg-cursor-(?:read|pointer)/.test(css));});
+test('editable fields and nested editable tokens have explicit text priority; selection behavior is untouched',()=>{assert(css.includes('[type=search]'));assert(css.includes('[type=password]'));assert(css.includes('[contenteditable=plaintext-only]'));assert(css.includes(':not([contenteditable=false]) *{cursor:var(--mg-cursor-text,text)!important}'));assert(!/(?:user-select|pointer-events|touch-action)\s*:/.test(css));assert(!/\*\s*\{cursor:var\(--mg-cursor-pointer/.test(css));});
+test('existing drag/zoom state hooks are mapped without custom tracking JavaScript',()=>{for(const s of ['.drift-dragging','.cw-dragging','.story-map:active','.tome-log-dragging','.tm-canvas.is-dragging','data-cursor=zoom-in','data-cursor=zoom-out'])assert(css.includes(s));assert(css.includes('cursor: grabbing;'));assert(css.includes('button:disabled'));const files=fs.readdirSync(path.join(root,'web/assets/cursors'));assert.equal(files.filter(f=>f.endsWith('.js')).length,0);});

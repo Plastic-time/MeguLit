@@ -1,0 +1,77 @@
+{
+  "schema": "megulit.cursor-family",
+  "version": 1,
+  "size": 24,
+  "palette": {
+    "outline": "#211617",
+    "ivory": "#fff2db",
+    "gold": "#d8a462",
+    "crimson": "#a84b50"
+  },
+  "states": {
+    "arrow": {
+      "file": "arrow.svg",
+      "hotspot": [
+        3,
+        3
+      ],
+      "fallback": "default"
+    },
+    "pointer": {
+      "file": "pointer.svg",
+      "hotspot": [
+        3,
+        3
+      ],
+      "fallback": "pointer"
+    },
+    "read": {
+      "file": "read.svg",
+      "hotspot": [
+        3,
+        3
+      ],
+      "fallback": "pointer"
+    },
+    "text": {
+      "file": "text.svg",
+      "hotspot": [
+        12,
+        12
+      ],
+      "fallback": "text"
+    },
+    "grab": {
+      "file": "grab.svg",
+      "hotspot": [
+        11,
+        11
+      ],
+      "fallback": "grab"
+    },
+    "grabbing": {
+      "file": "grabbing.svg",
+      "hotspot": [
+        11,
+        11
+      ],
+      "fallback": "grabbing"
+    },
+    "zoom-in": {
+      "file": "zoom-in.svg",
+      "hotspot": [
+        10,
+        10
+      ],
+      "fallback": "zoom-in"
+    },
+    "zoom-out": {
+      "file": "zoom-out.svg",
+      "hotspot": [
+        10,
+        10
+      ],
+      "fallback": "zoom-out"
+    }
+  }
+}

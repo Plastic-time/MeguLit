@@ -1,0 +1,39 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Static 24px cursors only: preserve selection, click handlers and OS resize/busy states */
+:root{
+ --mg-cursor-arrow:url("assets/cursors/arrow.svg") 3 3, default;
+ --mg-cursor-pointer:url("assets/cursors/pointer.svg") 3 3, pointer;
+ --mg-cursor-read:url("assets/cursors/read.svg") 3 3, pointer;
+ --mg-cursor-text:url("assets/cursors/text.svg") 12 12, text;
+ --mg-cursor-grab:url("assets/cursors/grab.svg") 11 11, grab;
+ --mg-cursor-grabbing:url("assets/cursors/grabbing.svg") 11 11, grabbing;
+ --mg-cursor-zoom-in:url("assets/cursors/zoom-in.svg") 10 10, zoom-in;
+ --mg-cursor-zoom-out:url("assets/cursors/zoom-out.svg") 10 10, zoom-out;
+}
+html,body{cursor:var(--mg-cursor-arrow,default)}
+html body :is(p,pre,code,.sentence-text,.tome-log-src,.dialogue-source,[data-selectable]){cursor:var(--mg-cursor-text,text)}
+html body :is(button:not(:disabled),a[href],summary,select:not(:disabled),input:is([type=button],[type=submit],[type=reset],[type=checkbox],[type=radio],[type=color],[type=range]):not(:disabled),[role=button]:not([aria-disabled=true]),[role=tab]:not([aria-disabled=true]),[data-cursor=pointer]){cursor:var(--mg-cursor-pointer,pointer)!important}
+html body :is(.library-card,.cw-tl,.fig,.g-link,.moji-entry,.swatch,[onclick]):not([aria-disabled=true]){cursor:var(--mg-cursor-pointer,pointer)!important}
+html body :is(button:not(:disabled),a[href],summary,[role=button]:not([aria-disabled=true]),.library-card,.cw-tl,.fig,.g-link,.moji-entry,.swatch,[onclick]) :where(svg,path,span,b,strong,em,i,small,p){cursor:inherit!important}
+/* Only real lookup targets; plain history paragraphs do not gain a fake action */
+html body :is(.char-token,.tome-page-char,.sentence-word,[data-lookup],[data-cursor=read]),html body :is(.char-token,.tome-page-char) :is(ruby,rb,rt,span){cursor:var(--mg-cursor-read,pointer)!important}
+html body :is(.lib-field,.cw-field,.cw-stage,.cm-viewport,.story-map,.tome-crop-stage i,.tome-crop header,.tome-color-head,.tome-backlog header,.tomoyo-menu-header,.tome-box-deco,.torch-monument .tm-canvas,[data-cursor=grab]),html body [style*="cursor: grab;"]{cursor:var(--mg-cursor-grab,grab)!important}
+html body :is(.lib-field.drift-dragging,.field-shield,.cw-dragging .cw-field,.cw-viewer.dragging .cw-stage,.cm-viewport.is-grab,.story-map:active,.tome-crop-stage i.tome-dragging,.tome-crop.tome-dragging header,.tome-color-panel.tome-dragging .tome-color-head,.tome-backlog.tome-log-dragging header,.torch-monument .tm-canvas.is-dragging,[data-cursor=grabbing]){cursor:var(--mg-cursor-grabbing,grabbing)!important}
+html body :is([style*="cursor: grabbing;"],[style*="cursor:grabbing;"]){cursor:var(--mg-cursor-grabbing,grabbing)!important}
+html body.tomoyo-ui-translation.tome-float-dragging .sentence-window,html body.tome-float-dragging .sentence-window *,html body .tomoyo-cn-dialog.tome-menu-dragging .tomoyo-menu-header{cursor:var(--mg-cursor-grabbing,grabbing)!important}
+html body :is([data-cursor=zoom-in],[style*="cursor: zoom-in"],[style*="cursor:zoom-in"]){cursor:var(--mg-cursor-zoom-in,zoom-in)!important}
+html body :is([data-cursor=zoom-out],[style*="cursor: zoom-out"],[style*="cursor:zoom-out"]){cursor:var(--mg-cursor-zoom-out,zoom-out)!important}
+/* Input/edit intent wins over parent drag or lookup affordances; no selection suppression */
+html body :is(input:not([type]),input:is([type=text],[type=search],[type=email],[type=password],[type=url],[type=tel],[type=number]),textarea,[contenteditable=""],[contenteditable=true],[contenteditable=plaintext-only],[data-cursor=text]),html body :is([contenteditable=""],[contenteditable=true],[contenteditable=plaintext-only]):not([contenteditable=false]) *{cursor:var(--mg-cursor-text,text)!important}
+html body :is(button:disabled,input:disabled,select:disabled,[aria-disabled=true]){cursor:var(--mg-cursor-arrow,default)!important}
+/* Preserve the OS high-contrast/large-cursor preference where forced colors requests it */
+@media(forced-colors:active){:root{
+ --mg-cursor-arrow:default;
+ --mg-cursor-pointer:pointer;
+ --mg-cursor-read:pointer;
+ --mg-cursor-text:text;
+ --mg-cursor-grab:grab;
+ --mg-cursor-grabbing:grabbing;
+ --mg-cursor-zoom-in:zoom-in;
+ --mg-cursor-zoom-out:zoom-out;
+}}
