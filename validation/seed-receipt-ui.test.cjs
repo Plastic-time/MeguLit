@@ -36,3 +36,23 @@ test('an answered miss and an unavailable relay show distinct status without a r
   for(const {html} of [missing,unavailable])assert.doesNotMatch(html,/first-player-receipt-source|<time/);
  }
 });
+test('bundled Seed, first public contribution and isolated submission are distinct from receipt provenance',async()=>{
+ const {receiptView}=await modulePromise,bundled={source:'official',revision:1};
+ const view=value=>receiptView({key,bundled,...value},{locale:'zh',esc}).html;
+ const pending=view({state:'bundled'});
+ assert.match(pending,/内置 The Seed 适配 · rev 1/);
+ assert.match(pending,/尚未确认/);
+ assert.doesNotMatch(pending,/首个公开传火贡献|内容校验值/);
+ const isolated=view({state:'not-published',eligible:true,submission:'isolated'});
+ assert.match(isolated,/暂无可接收的已发布适配/);
+ assert.match(isolated,/首个公开传火贡献/);
+ assert.match(isolated,/隔离测试模式已禁用提交/);
+ assert.doesNotMatch(isolated,/button|内容校验值/);
+ for(const [origin,label] of [['torch-release','已验证的公开传火发布'],['legacy-feed','已验证的旧版共享适配']]){
+  const receipt={...dto().receipt,origin};
+  const html=view({state:'received',receipt});
+  assert.ok(html.includes(label));
+  assert.match(html,/内置 The Seed 适配/);
+  assert.doesNotMatch(html,/首个公开传火贡献/);
+ }
+});

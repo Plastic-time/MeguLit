@@ -20,8 +20,8 @@ const exactProfile=(answer,key)=>answer?.version===2&&answer.versionLayer?.match
 function builtinCompatible(r){const builtin=require('../core/profiles/seed.cjs').versionOf(r.key);return !builtin||r.profile.rev>Number(builtin.rev||0)||protocol.same(builtin.settings,r.profile.settings);}
 function compatibleCached(answer,key,keys=trust(),{exe}={}){try{const r=answer.torchRelease,l=answer.torchLocal;protocol.releaseShape(r);if(typeof exe!=='string'||!exe||!l)return false;const current=fs.realpathSync(exe),bound=fs.realpathSync(l.exe),samePath=(a,b)=>process.platform==='win32'?a.toLowerCase()===b.toLowerCase():a===b;if(!samePath(current,bound)||r.key!==key||!builtinCompatible(r)||!protocol.same(r.profile,answer.diff)||l.key!==key||stamp(current)!==l.exeStamp||!samePath(scriptPath(current,r.review.identity.scriptFile),l.script)||stamp(l.script)!==l.scriptStamp)return false;const active=(list,doc)=>{const a=Array.isArray(list)?list.filter(k=>k.alg==='ed25519'&&!k.revoked&&k.id===doc.signature.keyId):[];return a.length===1?a:[];},h=crypto.createHash('sha256').update(diff.canonical(r.profile)).digest('hex');return h===r.review.candidateHash&&feed.verify(r.profile,active(keys.profileKeys,r.profile))&&feed.verify(r,active(keys.releaseKeys||keys.profileKeys,r))&&feed.verify(r.review,active(keys.reviewKeys,r.review));}catch{return false;}}
 async function installed(root,key,{keys=trust(),exe}={}){const answer=feed.cached(root,key);if(!answer||!feed.layer(answer,key,{torchTrust:keys,exe})?.exact)return null;
- if(answer.torchRelease){try{const p=await protocol.checked(answer.torchRelease,keys);if(answer.torchRelease.key!==key||!protocol.same(answer.diff,answer.torchRelease.profile))return null;return {version:1,status:'installed',verified:true,key,hash:p.hash,serverTime:answer.torchPublication?.hash===p.hash&&protocol.iso(answer.torchPublication.at)?answer.torchPublication.at:null,credit:credit(answer.torchCredit,answer.torchRelease.review.torchNo),revision:answer.torchRelease.revision,cardinalRev:answer.torchRelease.review.cardinalRev};}catch{return null;}}
- const p=exactProfile(answer,key);if(p&&Number.isSafeInteger(p.rev)&&p.rev>0)return {version:1,status:'installed',verified:true,key,hash:await protocol.hash({profile:p,gameLayer:answer.gameLayer||null}),serverTime:null,credit:null,revision:p.rev,cardinalRev:null};
+ if(answer.torchRelease){try{const p=await protocol.checked(answer.torchRelease,keys);if(answer.torchRelease.key!==key||!protocol.same(answer.diff,answer.torchRelease.profile))return null;return {version:1,status:'installed',verified:true,origin:'torch-release',key,hash:p.hash,serverTime:answer.torchPublication?.hash===p.hash&&protocol.iso(answer.torchPublication.at)?answer.torchPublication.at:null,credit:credit(answer.torchCredit,answer.torchRelease.review.torchNo),revision:answer.torchRelease.revision,cardinalRev:answer.torchRelease.review.cardinalRev};}catch{return null;}}
+ const p=exactProfile(answer,key);if(p&&Number.isSafeInteger(p.rev)&&p.rev>0)return {version:1,status:'installed',verified:true,origin:'legacy-feed',key,hash:await protocol.hash({profile:p,gameLayer:answer.gameLayer||null}),serverTime:null,credit:null,revision:p.rev,cardinalRev:null};
  return null;}
 function receiveEndpoints(root,key,legacy=false,env=process.env){
  if(!diff.KEY.test(String(key||'')))return [];
@@ -39,12 +39,14 @@ async function lookup(urls,fetcher,signal,{release=false,ownerTest=false}={}){
   catch{signal.throwIfAborted();continue;}
   if(response.status===404||release&&response.status===410){
    const missing=response.status===404;
-   if(ownerTest){
+   let confirmed=false;
+   if(missing||ownerTest){
     let answer;
-    try{answer=await body(response);}catch{signal.throwIfAborted();continue;}
-    if(answer?.ok!==false||answer.error!==(missing?'NOT_FOUND':'TORCH_REVOKED'))continue;
+    try{answer=await body(response);}catch{signal.throwIfAborted();}
+    confirmed=answer?.ok===false&&answer.error===(missing?'NOT_FOUND':'TORCH_REVOKED');
+    if(ownerTest&&!confirmed)continue;
    }else await response.body?.cancel().catch(()=>{});
-   return {state:missing?'missing':'revoked'};
+   return {state:missing?'missing':'revoked',confirmed};
   }
   if(!response.ok){await response.body?.cancel().catch(()=>{});continue;}
   try{return {state:'found',answer:await body(response)};}
@@ -91,7 +93,7 @@ async function receive(root,id,options={}){const jobKey=idKey(root,id);if(jobs.h
     const old=feed.cached(root,key);
     if(!old?.torchRelease&&!old?.torchQuarantined){
      const fallback=options.refresh?{answer:await options.refresh(root,key,{fetcher,signal})}:await legacy(root,key,fetcher,signal,ownerTest);
-     missing=fallback.state==='missing';
+     missing=result.confirmed&&fallback.state==='missing'&&fallback.confirmed;
      const answer=fallback.answer,p=exactProfile(answer,key),latest=feed.cached(root,key),prior=exactProfile(latest,key);
      if(!latest?.torchRelease&&!latest?.torchQuarantined&&answer&&!answer.none&&feed.layer(answer,key)?.exact&&p&&Number.isSafeInteger(p.rev)&&p.rev>0){
       if(prior&&(p.rev<prior.rev||p.rev===prior.rev&&!protocol.same(p,prior)))fail('TORCH_ROLLBACK');
@@ -99,7 +101,7 @@ async function receive(root,id,options={}){const jobKey=idKey(root,id);if(jobs.h
      }
     }
    }
-   still();const receipt=await installed(root,key,{keys,exe});const state=receipt?{state:'received',key,receipt}:{state:'hidden',key,...(missing?{code:'TORCH_NOT_PUBLISHED'}:{})};states.set(jobKey,state);return state;
+   still();const receipt=await installed(root,key,{keys,exe});const state=receipt?{state:'received',key,receipt}:{state:'hidden',key,...(missing?{code:'TORCH_NOT_PUBLISHED',checkedAt:Date.now()}:{})};states.set(jobKey,state);return state;
   });
  })().catch(e=>{const reason=signal.aborted?signal.reason:e,paused=reason?.code==='TORCH_DEFERRED'||e.code==='TORCH_DEFERRED',v={state:paused?'hidden':'install-failed',key:states.get(jobKey)?.key||'',code:paused?'TORCH_DEFERRED':/^TORCH_[A-Z_]+$/.test(e.code||'')?e.code:'TORCH_INSTALL_FAILED'};states.set(jobKey,v);return v;}).finally(()=>{jobs.delete(jobKey);last.set(jobKey,Date.now());});jobs.set(jobKey,work);return work;}
 function enqueue(root,ids,options={}){

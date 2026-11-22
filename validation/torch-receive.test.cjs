@@ -150,12 +150,14 @@ test('owner launcher to ordinary import, receipt and reader profile with the loc
  assert.equal(fs.existsSync(f.cache()),false);
  const legacy=await reimport('legacy');
  assert.equal(legacy.state,'received');
+ assert.equal(legacy.receipt.origin,'legacy-feed');
  assert.equal(legacy.receipt.credit,null);
  assert.equal(legacy.receipt.serverTime,null);
  assert.equal(legacy.receipt.cardinalRev,null);
  assert.equal(feed.cached(root,f.identity.exe).gameLayer,undefined);
  const latest=await reimport('release');
  assert.equal(latest.state,'received');
+ assert.equal(latest.receipt.origin,'torch-release');
  assert.equal(latest.receipt.hash,publication.hash);
  assert.equal(latest.receipt.serverTime,publication.at);
  const db=require('../services/store.cjs').openStore(root);
