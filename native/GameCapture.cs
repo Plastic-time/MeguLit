@@ -25,7 +25,13 @@ public static class GameCapture{
  [DllImport("shcore.dll")]static extern int GetDpiForMonitor(IntPtr monitor,int kind,out uint x,out uint y);
  // Proven: BitBlt has shown this window's picture. Blind: BitBlt keeps giving a blank picture while the screen shows
  // the game, so only PrintWindow can read it. Votes: screen checks in a row that said "blind".
- sealed class Choice{public bool Proven,Blind;public int Votes;public DateTime Printed,ProvenAt;public bool HasSig,Frozen;public int Sig,Round,VoteId,FrozenVotes;public DateTime SigAt,VoteAfter;public int[] Screen;public Bitmap Last;public DateTime LastAt;}
+ // #714 review (pictures delivered out of order): readers run in parallel and read outside Gate, so a reader can come back
+ // with an older picture after another reader delivered a newer one. Every read takes a ticket (NextTicket) under Gate before
+ // it reads; a picture is delivered, and changes what the window is known to show (Prove, a new round, Keep's print), only
+ // with a ticket newer than the last one delivered (Accepted), checked and recorded in the same lock. An overtaken read is
+ // Skipped and changes nothing. Round and VoteId only say which freeze vote is current: a vote counts for its round when no
+ // newer vote started, whichever read delivers. Dropped: Drop() removed this window; reads still under way change nothing.
+ sealed class Choice{public bool Proven,Blind,Dropped;public int Votes;public DateTime Printed,ProvenAt;public bool HasSig,Frozen;public int Sig,Round,VoteId,FrozenVotes;public long NextTicket,Accepted;public DateTime SigAt,VoteAfter;public int[] Screen;public Bitmap Last;public DateTime LastAt;}
  // 2026-11-21 (user, Aokana: 「画面都切换了译文还存在上一句」): a Unity window gave BitBlt one old picture for the whole session
  // (not blank, so it counted as proven) while the screen showed the game moving on; every scene and box check compared that
  // picture with itself. A BitBlt picture that has not changed for FreezeMs is checked against the screen while the game is in
@@ -38,7 +44,13 @@ public static class GameCapture{
  // The parts of the game's client area (w x h) that MeguLit's own windows cover: left out of the freeze check. GalWindowBridge
  // sets it (OwnCover.cs); GameStyleProbe and the test harnesses build this file alone and leave it unset.
  public static Func<IntPtr,int,int,List<Rectangle>> OwnParts;
- static void Drop(){foreach(var o in Choices.Values)Release(o);Choices.Clear();}
+ static void Drop(){foreach(var o in Choices.Values){o.Dropped=true;Release(o);}Choices.Clear();}
+ static long TakeTicket(IntPtr hwnd,out Choice c){
+  lock(Gate){if(!Choices.TryGetValue(hwnd,out c)){if(Choices.Count>16)Drop();c=new Choice();Choices[hwnd]=c;}return ++c.NextTicket;}
+ }
+ static bool AcceptTicket(IntPtr hwnd,Choice c,long ticket){
+  lock(Gate){Choice cur;if(c.Dropped||!Choices.TryGetValue(hwnd,out cur)||cur!=c||ticket<=c.Accepted)return false;c.Accepted=ticket;return true;}
+ }
  static void Release(Choice c){if(c.Last!=null){c.Last.Dispose();c.Last=null;}}
  // PrintWindow with PW_RENDERFULLCONTENT makes a DirectX game present an extra frame, seen as a whole black or white
  // flash. Games open on plain black/white screens (warnings, logos, fades), which BitBlt reads as "blank", and that used
@@ -76,32 +88,37 @@ public static class GameCapture{
  // use BitBlt only, never PrintWindow. A blank read is kept only for a window BitBlt has already shown (a dark scene is
  // dark); otherwise the round is skipped (Skipped). PrintWindow stays for one-off reads the user asks for.
  public static bool BltOnly(IntPtr hwnd,Bitmap image){
-  Skipped=false;FromScreen=false;if(Busy(hwnd)||!Blt(hwnd,image)){Skipped=true;return false;}
-  Choice c;lock(Gate){if(!Choices.TryGetValue(hwnd,out c)){if(Choices.Count>16)Drop();c=new Choice();Choices[hwnd]=c;}}
-  if(!Blank(image)){bool f;if(AcceptBlt(c,Signature(image),DateTime.UtcNow,(r,v)=>FreezeVote(hwnd,image,c,r,v),out f))return true;Skipped=true;return false;}
-  bool proven;lock(Gate)proven=c.Proven;if(!proven)Skipped=true;return proven;
+  Skipped=false;FromScreen=false;if(Busy(hwnd)){Skipped=true;return false;}
+  Choice c;long ticket=TakeTicket(hwnd,out c);
+  if(!Blt(hwnd,image)){Skipped=true;return false;}
+  if(!Blank(image)){bool f;if(AcceptBlt(c,ticket,Signature(image),DateTime.UtcNow,(r,v)=>FreezeVote(hwnd,image,c,r,v),out f))return true;Skipped=true;return false;}
+  if(KeepBlank(hwnd,c,ticket))return true;Skipped=true;return false;
+ }
+ // A blank BitBlt picture is delivered only for a window BitBlt has shown and that is not frozen, with a ticket not overtaken.
+ static bool KeepBlank(IntPtr hwnd,Choice c,long ticket){
+  lock(Gate){Choice cur;if(c.Dropped||!Choices.TryGetValue(hwnd,out cur)||cur!=c||!c.Proven||c.Frozen||ticket<=c.Accepted)return false;c.Accepted=ticket;return true;}
  }
  // screenFallback: some DirectX/Unity windows give a blank picture to both BitBlt and PrintWindow (style sync then saw
  // "ocrLines=0"). Only callers that hide MeguLit's own text first (style measurement) may read the screen instead: it
  // includes overlays, so marker and mask detection never use it.
  public static bool Into(IntPtr hwnd,Bitmap image,uint printFlags,bool screenFallback){
   Skipped=false;FromScreen=false;if(Busy(hwnd)){Skipped=true;return false;}
-  Choice c;lock(Gate){if(!Choices.TryGetValue(hwnd,out c)){if(Choices.Count>16)Drop();c=new Choice();Choices[hwnd]=c;}}
+  Choice c;long ticket=TakeTicket(hwnd,out c);
   bool frozen=false;
-  if(Blt(hwnd,image)&&!Blank(image)){if(AcceptBlt(c,Signature(image),DateTime.UtcNow,(r,v)=>FreezeVote(hwnd,image,c,r,v),out frozen))return true;if(!frozen)return false;}
-  if(!frozen&&!c.Proven&&!c.Blind&&!c.Frozen&&!c.HasSig){int vote=BlindVote(hwnd,image);lock(Gate){if(!c.Proven&&!c.Blind&&!c.Frozen&&!c.HasSig){if(vote>0){if(++c.Votes>=3)c.Blind=true;}else if(vote<0)c.Votes=0;}}}
-  bool print=false;int round=0;if(c.Blind||frozen)lock(Gate){Choice cur;if(Choices.TryGetValue(hwnd,out cur)&&cur==c&&(frozen?c.Frozen:c.Blind)&&(DateTime.UtcNow-c.Printed).TotalMilliseconds>=PrintGapMs){c.Printed=DateTime.UtcNow;round=c.Round;print=true;}}
+  if(Blt(hwnd,image)&&!Blank(image)){if(AcceptBlt(c,ticket,Signature(image),DateTime.UtcNow,(r,v)=>FreezeVote(hwnd,image,c,r,v),out frozen))return true;if(!frozen)return false;}
+  if(!frozen&&!c.Proven&&!c.Blind&&!c.Frozen&&!c.HasSig){int vote=BlindVote(hwnd,image);lock(Gate){if(!c.Dropped&&!c.Proven&&!c.Blind&&!c.Frozen&&!c.HasSig&&ticket>c.Accepted){if(vote>0){if(++c.Votes>=3)c.Blind=true;}else if(vote<0)c.Votes=0;}}}
+  bool print=false;long printTicket=0;if(c.Blind||frozen)lock(Gate){Choice cur;if(!c.Dropped&&Choices.TryGetValue(hwnd,out cur)&&cur==c&&(frozen?c.Frozen:c.Blind)&&(DateTime.UtcNow-c.Printed).TotalMilliseconds>=PrintGapMs){c.Printed=DateTime.UtcNow;printTicket=++c.NextTicket;print=true;}}
   if(!print){if(screenFallback&&!c.Proven&&ScreenInto(hwnd,image)){FromScreen=true;return true;}Skipped=true;return false;}
   /* a frozen window is printed client area only (PW_CLIENTONLY), as BitBlt read it: every reader gets the same framing and
      can share the kept print. Blind windows keep the caller's flags. */
   bool printed;using(var g=Graphics.FromImage(image)){IntPtr dc=g.GetHdc();try{printed=PrintWindow(hwnd,dc,frozen?printFlags|1:printFlags);}finally{g.ReleaseHdc(dc);}}
-  return DeliverPrint(hwnd,c,round,image,printed,printed&&!Blank(image),frozen,screenFallback);
+  return DeliverPrint(hwnd,c,printTicket,image,printed,printed&&!Blank(image),frozen,screenFallback);
  }
- static bool DeliverPrint(IntPtr hwnd,Choice c,int round,Bitmap image,bool printed,bool good,bool frozen,bool screenFallback){
+ static bool DeliverPrint(IntPtr hwnd,Choice c,long ticket,Bitmap image,bool printed,bool good,bool frozen,bool screenFallback){
   switch(AfterPrint(printed,good,frozen,screenFallback)){
-   case 1:if(!frozen||Keep(hwnd,c,round,image))return true;Skipped=true;return false;
+   case 1:if(frozen?Keep(hwnd,c,ticket,image):AcceptTicket(hwnd,c,ticket))return true;Skipped=true;return false;
    case 0:Skipped=true;return false;
-   case 2:return printed;
+   case 2:if(printed&&!AcceptTicket(hwnd,c,ticket)){Skipped=true;return false;}return printed;
   }
   FromScreen=true;return ScreenInto(hwnd,image);
  }
@@ -119,14 +136,14 @@ public static class GameCapture{
   bool whole=image.Width==clientW&&image.Height==clientH;int dx=whole?part.X:0,dy=whole?part.Y:0;
   Skipped=false;FromScreen=false;if(Busy(hwnd)){Skipped=true;return false;}
   if(part.Width<1||part.Height<1||part.X<0||part.Y<0||part.Right>clientW||part.Bottom>clientH||(!whole&&(image.Width<part.Width||image.Height<part.Height)))return false;
-  Choice c=null;int route=2,round=0;DateTime at=DateTime.MinValue;lock(Gate){if(Choices.TryGetValue(hwnd,out c)){route=PartRoute(c,DateTime.UtcNow);round=c.Round;at=c.ProvenAt;}}
+  Choice c=null;int route=2;long ticket=0;DateTime at=DateTime.MinValue;lock(Gate){if(Choices.TryGetValue(hwnd,out c)){route=PartRoute(c,DateTime.UtcNow);if(route==0){ticket=++c.NextTicket;at=c.ProvenAt;}}}
   if(route==1){Skipped=true;return false;}
   if(route==0){
    // Read into a part-sized picture: a device context over a client-sized bitmap copies the whole bitmap in and out
    // (measured 1920x1080: 5-20 ms against 0.5 ms), then copy its rows into place.
    Bitmap small=whole?Scratch(part.Width,part.Height):image;
    if(BltPart(hwnd,small,0,0,part)){bool blank=BlankPart(small,new Rectangle(0,0,part.Width,part.Height));
-    if(!blank||(DateTime.UtcNow-at).TotalMilliseconds<PartProofMs){if(!KeepPart(hwnd,c,round,blank,DateTime.UtcNow)){Skipped=true;return false;}if(whole)CopyRows(small,image,part.X,part.Y);return true;}}}
+    if(!blank||(DateTime.UtcNow-at).TotalMilliseconds<PartProofMs){if(!KeepPart(hwnd,c,ticket,blank,DateTime.UtcNow)){Skipped=true;return false;}if(whole)CopyRows(small,image,part.X,part.Y);return true;}}}
   if(whole)return Into(hwnd,image,printFlags);
   using(var full=new Bitmap(clientW,clientH,PixelFormat.Format32bppArgb)){if(!Into(hwnd,full,printFlags))return false;
    using(var g=Graphics.FromImage(image)){g.CompositingMode=System.Drawing.Drawing2D.CompositingMode.SourceCopy;g.DrawImage(full,new Rectangle(0,0,part.Width,part.Height),part,GraphicsUnit.Pixel);}}
@@ -135,9 +152,9 @@ public static class GameCapture{
  // 0: BitBlt the part (the whole picture is proven and not frozen). 1: skip this round (frozen and its print is not due:
  // a whole-window read would only BitBlt the frozen picture again, 16-33 times a second). 2: read the whole window (Into).
  static int PartRoute(Choice c,DateTime now){if(c.Frozen)return (now-c.Printed).TotalMilliseconds<PrintGapMs?1:2;return c.Proven&&!c.Blind?0:2;}
- // Checks in the lock that the window was not dropped, replaced, frozen, marked blind, or moved to a new round during BltPart.
- static bool KeepPart(IntPtr hwnd,Choice c,int round,bool blank,DateTime now){
-  lock(Gate){Choice cur;if(!Choices.TryGetValue(hwnd,out cur)||cur!=c||c.Frozen||c.Blind||!c.Proven||c.Round!=round)return false;if(!blank)c.ProvenAt=now;return true;}
+ // Checks in the lock that the window was not dropped, replaced, frozen, marked blind, or overtaken by a newer ticket during BltPart.
+ static bool KeepPart(IntPtr hwnd,Choice c,long ticket,bool blank,DateTime now){
+  lock(Gate){Choice cur;if(c.Dropped||!Choices.TryGetValue(hwnd,out cur)||cur!=c||c.Frozen||c.Blind||!c.Proven||ticket<=c.Accepted)return false;c.Accepted=ticket;if(!blank)c.ProvenAt=now;return true;}
  }
  [ThreadStatic]static Bitmap ScratchBitmap;
  static Bitmap Scratch(int w,int h){var b=ScratchBitmap;if(b==null||b.Width!=w||b.Height!=h){if(b!=null)b.Dispose();b=ScratchBitmap=new Bitmap(w,h,PixelFormat.Format32bppArgb);}return b;}
@@ -165,7 +182,7 @@ public static class GameCapture{
  static int BlindVote(IntPtr hwnd,Bitmap blank){
   IntPtr front=GetForegroundWindow();if(front==IntPtr.Zero||GetAncestor(front,2)!=GetAncestor(hwnd,2))return 0;
   try{using(var screen=new Bitmap(blank.Width,blank.Height,PixelFormat.Format32bppArgb)){
-   if(!ScreenInto(hwnd,screen))return -1;int w=blank.Width,h=blank.Height,n=0,diff=0;
+   if(!ScreenBlt(hwnd,screen))return -1;int w=blank.Width,h=blank.Height,n=0,diff=0;
    var a=blank.LockBits(new Rectangle(0,0,w,h),ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);
    try{var b=screen.LockBits(new Rectangle(0,0,w,h),ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);
     try{var ra=new byte[w*4];var rb=new byte[w*4];for(int y=h/16;y<h;y+=Math.Max(1,h/16)){Marshal.Copy(IntPtr.Add(a.Scan0,y*a.Stride),ra,0,w*4);Marshal.Copy(IntPtr.Add(b.Scan0,y*b.Stride),rb,0,w*4);
@@ -181,12 +198,12 @@ public static class GameCapture{
  static int FreezeVote(IntPtr hwnd,Bitmap picture,Choice c,int round,int voteId){
   IntPtr front=GetForegroundWindow();if(front==IntPtr.Zero||GetAncestor(front,2)!=GetAncestor(hwnd,2)||!SameScale(hwnd))return 0;
   try{using(var screen=new Bitmap(picture.Width,picture.Height,PixelFormat.Format32bppArgb)){
-   if(!ScreenInto(hwnd,screen))return 0;int[] now=Samples(screen);var own=OwnParts;Cover(now,own==null?null:own(hwnd,picture.Width,picture.Height),picture.Width,picture.Height);
+   if(!ScreenBlt(hwnd,screen))return 0;int[] now=Samples(screen);var own=OwnParts;Cover(now,own==null?null:own(hwnd,picture.Width,picture.Height),picture.Width,picture.Height);
    return VoteScreen(c,round,voteId,now,Samples(picture));}}catch{return 0;}
  }
  // Reads and updates c.Screen under the same lock as the round and voteId check so a late FreezeVote never reads or overwrites a newer baseline.
  static int VoteScreen(Choice c,int round,int voteId,int[] now,int[] pic){
-  int[] before;lock(Gate){if(c.Round!=round||c.VoteId!=voteId||c.Frozen)return 0;before=c.Screen;c.Screen=now;}
+  int[] before;lock(Gate){if(c.Dropped||c.Round!=round||c.VoteId!=voteId||c.Frozen)return 0;before=c.Screen;c.Screen=now;}
   return Judge(now,pic,before);
  }
  static bool SameScale(IntPtr hwnd){try{uint x,y,w=GetDpiForWindow(hwnd);return w!=0&&GetDpiForMonitor(MonitorFromWindow(hwnd,2),0,out x,out y)==0&&x==w;}catch{return false;}}
@@ -208,6 +225,11 @@ public static class GameCapture{
  static double Apart(int[] a,int[] b){int n=0,open=0;for(int i=0;i<a.Length;i++){if(a[i]<0||b[i]<0)continue;open++;if(Math.Abs((a[i]&255)-(b[i]&255))+Math.Abs((a[i]>>8&255)-(b[i]>>8&255))+Math.Abs((a[i]>>16&255)-(b[i]>>16&255))>72)n++;}return open*2<a.Length?-1:n/(double)open;}
  // Calibration only: after the renderer acknowledges its reader/menu are hidden, prefer what the user actually sees.
  public static bool ScreenInto(IntPtr hwnd,Bitmap image){
+  Choice c;long ticket=TakeTicket(hwnd,out c);
+  if(!ScreenBlt(hwnd,image))return false;
+  if(AcceptTicket(hwnd,c,ticket))return true;Skipped=true;return false;
+ }
+ static bool ScreenBlt(IntPtr hwnd,Bitmap image){
   if(Busy(hwnd))return false;
   var origin=new Pt();if(!ClientToScreen(hwnd,ref origin))return false;IntPtr screen=GetDC(IntPtr.Zero);if(screen==IntPtr.Zero)return false;
   try{using(var g=Graphics.FromImage(image)){IntPtr dc=g.GetHdc();try{if(!BitBlt(dc,0,0,image.Width,image.Height,screen,origin.X,origin.Y,0x00CC0020))return false;}finally{g.ReleaseHdc(dc);}}}finally{ReleaseDC(IntPtr.Zero,screen);}
@@ -219,9 +241,9 @@ public static class GameCapture{
  }
  // A frozen window is printed once every PrintGapMs for all readers together, so most readers are skipped most of the time.
  // Its last printed picture is kept for Recent (the scene probe needs every one of them, not one in several).
- // Returns false (and keeps nothing) when the window was dropped, replaced, unfrozen or moved to a new round meanwhile.
- static bool Keep(IntPtr hwnd,Choice c,int round,Bitmap image){lock(Gate){Choice cur;if(!Choices.TryGetValue(hwnd,out cur)||cur!=c||!c.Frozen||c.Round!=round)return false;if(c.Last==null||c.Last.Width!=image.Width||c.Last.Height!=image.Height){if(c.Last!=null)c.Last.Dispose();c.Last=new Bitmap(image.Width,image.Height,PixelFormat.Format32bppArgb);}
-  using(var g=Graphics.FromImage(c.Last)){g.CompositingMode=System.Drawing.Drawing2D.CompositingMode.SourceCopy;g.DrawImage(image,0,0,image.Width,image.Height);}c.LastAt=DateTime.UtcNow;return true;}}
+ // Returns false (and keeps nothing) when the window was dropped, replaced, unfrozen or overtaken by a newer ticket meanwhile.
+ static bool Keep(IntPtr hwnd,Choice c,long ticket,Bitmap image){lock(Gate){Choice cur;if(c.Dropped||!Choices.TryGetValue(hwnd,out cur)||cur!=c||!c.Frozen||ticket<=c.Accepted)return false;if(c.Last==null||c.Last.Width!=image.Width||c.Last.Height!=image.Height){if(c.Last!=null)c.Last.Dispose();c.Last=new Bitmap(image.Width,image.Height,PixelFormat.Format32bppArgb);}
+  using(var g=Graphics.FromImage(c.Last)){g.CompositingMode=System.Drawing.Drawing2D.CompositingMode.SourceCopy;g.DrawImage(image,0,0,image.Width,image.Height);}c.LastAt=DateTime.UtcNow;c.Accepted=ticket;return true;}}
  // Copies a frozen window's last print into image when it is at most KeptMs old (Picture).
  static bool Kept(Choice c,Bitmap image,DateTime now){
   lock(Gate){if(!c.Frozen||c.Last==null||(now-c.LastAt).TotalMilliseconds>KeptMs||c.Last.Width!=image.Width||c.Last.Height!=image.Height)return false;
@@ -233,28 +255,31 @@ public static class GameCapture{
    using(var g=Graphics.FromImage(image)){g.CompositingMode=System.Drawing.Drawing2D.CompositingMode.SourceCopy;g.DrawImage(c.Last,0,0,image.Width,image.Height);}after=c.LastAt;return true;}
  }
  // Translates Stale for BitBlt callers: true to deliver the picture; false with frozen=true to print instead; false with
- // frozen=false and Skipped=true when the round advanced while FreezeVote ran (stale picture: never deliver or print).
- static bool AcceptBlt(Choice c,int sig,DateTime now,Func<int,int,int> vote,out bool frozen){
-  int s=Stale(c,sig,now,vote);frozen=s==1;if(s==0)return true;if(s==2)Skipped=true;return false;
+ // frozen=false and Skipped=true when a newer ticket was accepted or a newer vote started (stale picture: never deliver or print).
+ static bool AcceptBlt(Choice c,long ticket,int sig,DateTime now,Func<int,int,int> vote,out bool frozen){
+  int s=Stale(c,ticket,sig,now,vote);frozen=s==1;if(s==0)return true;if(s==2)Skipped=true;return false;
  }
  // 0: this BitBlt picture (signature sig) is good to use and proves the window in the same lock. 1: frozen, must not be used.
- // 2: stale vote (another reader advanced Round or started a newer vote while vote ran), skip this read without delivering or printing.
- static int Stale(Choice c,int sig,DateTime now,Func<int,int,int> vote){
+ // 2: stale capture (a newer ticket was accepted, window dropped, or a newer vote started), skip without delivering or printing.
+ static int Stale(Choice c,long ticket,int sig,DateTime now,Func<int,int,int> vote){
   int round,voteId;
   lock(Gate){
-   if(!c.HasSig||sig!=c.Sig){c.HasSig=true;c.Sig=sig;c.Round++;c.SigAt=now;c.Frozen=false;c.FrozenVotes=0;c.VoteAfter=DateTime.MinValue;c.Screen=null;Release(c);Prove(c,now);return 0;}
+   if(c.Dropped||ticket<=c.Accepted)return 2;
+   if(!c.HasSig||sig!=c.Sig){c.HasSig=true;c.Sig=sig;c.Round++;c.SigAt=now;c.Frozen=false;c.FrozenVotes=0;c.VoteAfter=DateTime.MinValue;c.Screen=null;Release(c);Prove(c,now);c.Accepted=ticket;return 0;}
    if(c.Frozen)return 1;
-   if((now-c.SigAt).TotalMilliseconds<FreezeMs||now<c.VoteAfter){Prove(c,now);return 0;}
+   if((now-c.SigAt).TotalMilliseconds<FreezeMs||now<c.VoteAfter){Prove(c,now);c.Accepted=ticket;return 0;}
    c.VoteAfter=now.AddMilliseconds(FreezeVoteGapMs);round=c.Round;voteId=++c.VoteId;
   }
   int v=vote(round,voteId);
   lock(Gate){
-   /* another reader saw a new picture or started a newer vote meanwhile: leave the newer baseline and state intact */
-   if(c.Round!=round||c.VoteId!=voteId)return 2;
+   /* the vote belongs to its round and is the newest one: another reader saw a new picture or started a newer vote meanwhile, so leave that state intact */
+   if(c.Dropped||c.Round!=round||c.VoteId!=voteId)return 2;
    if(c.Frozen)return 1;
    if(v>0){if(++c.FrozenVotes>=3){c.Frozen=true;c.Proven=false;return 1;}}else if(v<0){c.FrozenVotes=0;c.VoteAfter=now.AddMilliseconds(FreezeIdleMs);}
    else c.VoteAfter=now.AddMilliseconds(FreezeUnsureMs);
-   Prove(c,now);
+   /* the vote counts, but a newer read of the same picture was delivered while it ran: this older picture is not delivered after it */
+   if(ticket<=c.Accepted)return 2;
+   Prove(c,now);c.Accepted=ticket;
   }
   return 0;
  }
@@ -270,71 +295,84 @@ public static class GameCapture{
  // A picture that stays the same while the screen differs becomes Frozen after three checks; a change clears it; a still
  // scene the screen agrees with is not checked again for FreezeIdleMs.
  public static bool FreezeSelfTest(){
-  var c=new Choice{Proven=true};var t=new DateTime(2026,1,1);int asked=0;Func<int,int,int> differs=(_,__)=>{asked++;return 1;},agrees=(_,__)=>{asked++;return -1;};
-  if(Stale(c,1,t,differs)!=0||Stale(c,1,t.AddMilliseconds(1000),differs)!=0||asked!=0)return false;
-  if(Stale(c,1,t.AddMilliseconds(3100),differs)!=0||Stale(c,1,t.AddMilliseconds(3300),differs)!=0||asked!=1)return false;
-  if(Stale(c,1,t.AddMilliseconds(3700),differs)!=0||Stale(c,1,t.AddMilliseconds(4300),differs)!=1||asked!=3)return false;
-  if(Stale(c,1,t.AddMilliseconds(4400),differs)!=1||asked!=3||c.Proven)return false;
-  if(Stale(c,2,t.AddMilliseconds(4500),differs)!=0||c.Frozen)return false;
-  asked=0;var still=new Choice();Stale(still,7,t,agrees);
-  if(Stale(still,7,t.AddMilliseconds(3100),agrees)!=0||asked!=1||Stale(still,7,t.AddMilliseconds(7000),agrees)!=0||asked!=1)return false;
-  if(Stale(still,7,t.AddMilliseconds(8200),agrees)!=0||asked!=2||still.Frozen)return false;
+  var c=new Choice{Proven=true};var t=new DateTime(2026,1,1);int asked=0;Func<int,int,int> differs=(_,__)=>{asked++;return 1;},agrees=(_,__)=>{asked++;return -1;};Func<Choice,long> tick=x=>++x.NextTicket;
+  if(Stale(c,tick(c),1,t,differs)!=0||Stale(c,tick(c),1,t.AddMilliseconds(1000),differs)!=0||asked!=0)return false;
+  if(Stale(c,tick(c),1,t.AddMilliseconds(3100),differs)!=0||Stale(c,tick(c),1,t.AddMilliseconds(3300),differs)!=0||asked!=1)return false;
+  if(Stale(c,tick(c),1,t.AddMilliseconds(3700),differs)!=0||Stale(c,tick(c),1,t.AddMilliseconds(4300),differs)!=1||asked!=3)return false;
+  if(Stale(c,tick(c),1,t.AddMilliseconds(4400),differs)!=1||asked!=3||c.Proven)return false;
+  if(Stale(c,tick(c),2,t.AddMilliseconds(4500),differs)!=0||c.Frozen)return false;
+  asked=0;var still=new Choice();Stale(still,tick(still),7,t,agrees);
+  if(Stale(still,tick(still),7,t.AddMilliseconds(3100),agrees)!=0||asked!=1||Stale(still,tick(still),7,t.AddMilliseconds(7000),agrees)!=0||asked!=1)return false;
+  if(Stale(still,tick(still),7,t.AddMilliseconds(8200),agrees)!=0||asked!=2||still.Frozen)return false;
   // a check that cannot tell waits FreezeUnsureMs
-  asked=0;var unsure=new Choice();Func<int,int,int> zero=(_,__)=>{asked++;return 0;};Stale(unsure,5,t,zero);Stale(unsure,5,t.AddMilliseconds(3100),zero);
-  if(Stale(unsure,5,t.AddMilliseconds(3700),zero)!=0||asked!=1||Stale(unsure,5,t.AddMilliseconds(5200),zero)!=0||asked!=2)return false;
+  asked=0;var unsure=new Choice();Func<int,int,int> zero=(_,__)=>{asked++;return 0;};Stale(unsure,tick(unsure),5,t,zero);Stale(unsure,tick(unsure),5,t.AddMilliseconds(3100),zero);
+  if(Stale(unsure,tick(unsure),5,t.AddMilliseconds(3700),zero)!=0||asked!=1||Stale(unsure,tick(unsure),5,t.AddMilliseconds(5200),zero)!=0||asked!=2)return false;
+  // out-of-order BitBlt: A takes ticket -> B takes ticket and delivers (advances round) -> A arrives late: skipped, B's baseline & round intact
+  var ord=new Choice();Stale(ord,tick(ord),1,t,differs);
+  long tA=tick(ord),tB=tick(ord);bool fB,fA;
+  Skipped=false;if(!AcceptBlt(ord,tB,2,t.AddMilliseconds(100),differs,out fB)||fB||Skipped||ord.Sig!=2||ord.Round!=2||ord.Accepted!=tB)return false;
+  Skipped=false;if(AcceptBlt(ord,tA,1,t.AddMilliseconds(200),differs,out fA)||fA||!Skipped||ord.Sig!=2||ord.Round!=2||ord.Accepted!=tB)return false;
+  // in-order BitBlt: A delivers then B delivers, both accepted
+  long t1=tick(ord);Skipped=false;if(!AcceptBlt(ord,t1,3,t.AddMilliseconds(300),differs,out fA)||fA||Skipped||ord.Sig!=3||ord.Accepted!=t1)return false;
+  long t2=tick(ord);Skipped=false;if(!AcceptBlt(ord,t2,4,t.AddMilliseconds(400),differs,out fB)||fB||Skipped||ord.Sig!=4||ord.Accepted!=t2)return false;
+  // a newer read of the same picture is delivered while A's freeze vote runs: A's vote still counts (readers that poll often
+  // must not keep every vote from counting), but A's older picture is not delivered after the newer one
+  var during=new Choice();Stale(during,tick(during),1,t,differs);long dA=tick(during),dB=0;
+  Func<int,int,int> overtaken=(_,__)=>{dB=tick(during);if(Stale(during,dB,1,t.AddMilliseconds(3150),differs)!=0)return 0;return 1;};
+  if(Stale(during,dA,1,t.AddMilliseconds(3100),overtaken)!=2||during.FrozenVotes!=1||during.Accepted!=dB||during.ProvenAt!=t.AddMilliseconds(3150))return false;
   // a vote that comes back after another reader saw a new picture is stale (2): skipped, never delivered or printed
-  var raced=new Choice();Stale(raced,3,t,differs);Func<int,int,int> late=(_,__)=>{Stale(raced,4,t.AddMilliseconds(3150),differs);return 1;};
-  if(Stale(raced,3,t.AddMilliseconds(3100),late)!=2||raced.FrozenVotes!=0||raced.Sig!=4)return false;
+  var raced=new Choice();Stale(raced,tick(raced),3,t,differs);Func<int,int,int> late=(_,__)=>{Stale(raced,tick(raced),4,t.AddMilliseconds(3150),differs);return 1;};
+  if(Stale(raced,tick(raced),3,t.AddMilliseconds(3100),late)!=2||raced.FrozenVotes!=0||raced.Sig!=4)return false;
   // ...and AcceptBlt translates that stale round into false + !frozen + Skipped=true for BitBlt callers (Into / BltOnly)
-  var raced2=new Choice();Stale(raced2,3,t,differs);Func<int,int,int> late2=(_,__)=>{Stale(raced2,4,t.AddMilliseconds(3150),differs);return 1;};
-  bool f;Skipped=false;if(AcceptBlt(raced2,3,t.AddMilliseconds(3100),late2,out f)||f||!Skipped||raced2.Frozen)return false;
+  var raced2=new Choice();Stale(raced2,tick(raced2),3,t,differs);Func<int,int,int> late2=(_,__)=>{Stale(raced2,tick(raced2),4,t.AddMilliseconds(3150),differs);return 1;};
+  bool f;Skipped=false;if(AcceptBlt(raced2,tick(raced2),3,t.AddMilliseconds(3100),late2,out f)||f||!Skipped||raced2.Frozen)return false;
   // ...also when the old picture is back by then (A, B, A): the vote was about the first A; VoteScreen does not write into the new round
-  var back=new Choice();Stale(back,3,t,differs);Func<int,int,int> abA=(rA,vA)=>{Stale(back,4,t.AddMilliseconds(3150),differs);Stale(back,3,t.AddMilliseconds(3160),differs);return VoteScreen(back,rA,vA,new int[225],new int[225]);};
-  if(Stale(back,3,t.AddMilliseconds(3100),abA)!=2||back.FrozenVotes!=0||back.Screen!=null)return false;
-  if(Stale(back,3,t.AddMilliseconds(6200),differs)!=0||Stale(back,3,t.AddMilliseconds(6800),differs)!=0||Stale(back,3,t.AddMilliseconds(7400),differs)!=1)return false;
+  var back=new Choice();Stale(back,tick(back),3,t,differs);Func<int,int,int> abA=(rA,vA)=>{Stale(back,tick(back),4,t.AddMilliseconds(3150),differs);Stale(back,tick(back),3,t.AddMilliseconds(3160),differs);return VoteScreen(back,rA,vA,new int[225],new int[225]);};
+  if(Stale(back,tick(back),3,t.AddMilliseconds(3100),abA)!=2||back.FrozenVotes!=0||back.Screen!=null)return false;
+  if(Stale(back,tick(back),3,t.AddMilliseconds(6200),differs)!=0||Stale(back,tick(back),3,t.AddMilliseconds(6800),differs)!=0||Stale(back,tick(back),3,t.AddMilliseconds(7400),differs)!=1)return false;
   // a vote so slow that a new round started and froze meanwhile: the window stays frozen and unproven, and the old read is skipped (2)
-  var slow=new Choice();Stale(slow,3,t,differs);Func<int,int,int> hang=(_,__)=>{Stale(slow,4,t.AddMilliseconds(3150),differs);foreach(int ms in new[]{6200,6800,7400})Stale(slow,4,t.AddMilliseconds(ms),differs);return 1;};
-  if(Stale(slow,3,t.AddMilliseconds(3100),hang)!=2||!slow.Frozen||slow.Proven)return false;
+  var slow=new Choice();Stale(slow,tick(slow),3,t,differs);Func<int,int,int> hang=(_,__)=>{Stale(slow,tick(slow),4,t.AddMilliseconds(3150),differs);foreach(int ms in new[]{6200,6800,7400})Stale(slow,tick(slow),4,t.AddMilliseconds(ms),differs);return 1;};
+  if(Stale(slow,tick(slow),3,t.AddMilliseconds(3100),hang)!=2||!slow.Frozen||slow.Proven)return false;
   // two concurrent votes in the same round: once a newer vote runs (freezing or not), the slower vote is skipped and cannot overwrite state
-  var same=new Choice();Stale(same,3,t,differs);Stale(same,3,t.AddMilliseconds(3100),differs);Stale(same,3,t.AddMilliseconds(3700),differs);
-  Func<int,int,int> concurrentFreeze=(_,__)=>{if(Stale(same,3,t.AddMilliseconds(4900),differs)!=1)return 1;return -1;};
-  if(Stale(same,3,t.AddMilliseconds(4300),concurrentFreeze)!=2||!same.Frozen||same.Proven||same.FrozenVotes!=3)return false;
+  var same=new Choice();Stale(same,tick(same),3,t,differs);Stale(same,tick(same),3,t.AddMilliseconds(3100),differs);Stale(same,tick(same),3,t.AddMilliseconds(3700),differs);
+  Func<int,int,int> concurrentFreeze=(_,__)=>{if(Stale(same,tick(same),3,t.AddMilliseconds(4900),differs)!=1)return 1;return -1;};
+  if(Stale(same,tick(same),3,t.AddMilliseconds(4300),concurrentFreeze)!=2||!same.Frozen||same.Proven||same.FrozenVotes!=3)return false;
   // the same picture again before it is checked: proven at its own time
-  var again=new Choice();Stale(again,1,t,differs);Stale(again,1,t.AddMilliseconds(1000),differs);if(again.ProvenAt!=t.AddMilliseconds(1000))return false;
+  var again=new Choice();Stale(again,tick(again),1,t,differs);Stale(again,tick(again),1,t.AddMilliseconds(1000),differs);if(again.ProvenAt!=t.AddMilliseconds(1000))return false;
   // +1, +1, -1, +1 is not frozen: a still check starts the count again
-  var mixed=new Choice();Stale(mixed,9,t,differs);int[] seq={1,1,-1,1};int at9=3100;bool any=false;
-  foreach(var s in seq){int r=s;any|=Stale(mixed,9,t.AddMilliseconds(at9),(_,__)=>r)!=0;at9+=s<0?5100:600;}
+  var mixed=new Choice();Stale(mixed,tick(mixed),9,t,differs);int[] seq={1,1,-1,1};int at9=3100;bool any=false;
+  foreach(var s in seq){int r=s;any|=Stale(mixed,tick(mixed),9,t.AddMilliseconds(at9),(_,__)=>r)!=0;at9+=s<0?5100:600;}
   if(any||mixed.Frozen||mixed.FrozenVotes!=1)return false;
   // a check that does not freeze the window proves the picture it was about
-  mixed.Proven=false;if(Stale(mixed,9,t.AddMilliseconds(at9),differs)!=0||!mixed.Proven)return false;
+  mixed.Proven=false;if(Stale(mixed,tick(mixed),9,t.AddMilliseconds(at9),differs)!=0||!mixed.Proven)return false;
   // a new picture starts a new round: the screen of the last check, the kept print and the freeze are dropped, and it is proven
   var fresh=new Choice{Screen=new int[225],Frozen=true,Last=new Bitmap(4,4)};fresh.HasSig=true;fresh.Sig=1;
-  if(Stale(fresh,2,t,differs)!=0||fresh.Screen!=null||fresh.Last!=null||fresh.Frozen||!fresh.Proven)return false;
+  if(Stale(fresh,tick(fresh),2,t,differs)!=0||fresh.Screen!=null||fresh.Last!=null||fresh.Frozen||!fresh.Proven)return false;
   // left-out points (MeguLit's windows) do not count; covering most of them gives no vote; a moved screen is +1, a same one -1
   int[] a=new int[225],b=new int[225];for(int i=0;i<225;i++){a[i]=0x101010;b[i]=0xF0F0F0;}
   if(Judge(a,(int[])a.Clone(),null)!=-1||Judge(a,b,null)!=1)return false;
   // A's FreezeVote in flight -> B advances round and stores valid screen samples -> A returns -> B's baseline stays intact and B's next sample votes +1 to freeze
   int[] s1=(int[])a.Clone(),s2=(int[])a.Clone(),s3=(int[])a.Clone(),s4=(int[])a.Clone();
   for(int i=0;i<90;i++){s1[i]=0xF0F0F0;s3[i]=0xF0F0F0;s2[90+i]=0xF0F0F0;s4[90+i]=0xF0F0F0;}
-  var sc=new Choice();Stale(sc,1,t,differs);
+  var sc=new Choice();Stale(sc,tick(sc),1,t,differs);
   Func<int,int,int> lateScreen=(rA,vA)=>{
-   Stale(sc,2,t.AddMilliseconds(3150),zero);
-   Stale(sc,2,t.AddMilliseconds(6200),(rB,vB)=>VoteScreen(sc,rB,vB,s1,a));
-   Stale(sc,2,t.AddMilliseconds(8300),(rB,vB)=>VoteScreen(sc,rB,vB,s2,a));
-   Stale(sc,2,t.AddMilliseconds(8900),(rB,vB)=>VoteScreen(sc,rB,vB,s3,a));
+   Stale(sc,tick(sc),2,t.AddMilliseconds(3150),zero);
+   Stale(sc,tick(sc),2,t.AddMilliseconds(6200),(rB,vB)=>VoteScreen(sc,rB,vB,s1,a));
+   Stale(sc,tick(sc),2,t.AddMilliseconds(8300),(rB,vB)=>VoteScreen(sc,rB,vB,s2,a));
+   Stale(sc,tick(sc),2,t.AddMilliseconds(8900),(rB,vB)=>VoteScreen(sc,rB,vB,s3,a));
    return VoteScreen(sc,rA,vA,b,a);
   };
-  if(Stale(sc,1,t.AddMilliseconds(3100),lateScreen)!=2||sc.Screen!=s3||sc.FrozenVotes!=2)return false;
-  if(Stale(sc,2,t.AddMilliseconds(9500),(rB,vB)=>VoteScreen(sc,rB,vB,s4,a))!=1||!sc.Frozen)return false;
+  if(Stale(sc,tick(sc),1,t.AddMilliseconds(3100),lateScreen)!=2||sc.Screen!=s3||sc.FrozenVotes!=2)return false;
+  if(Stale(sc,tick(sc),2,t.AddMilliseconds(9500),(rB,vB)=>VoteScreen(sc,rB,vB,s4,a))!=1||!sc.Frozen)return false;
   // VoteScreen refuses to overwrite c.Screen when the window is already frozen
   if(VoteScreen(sc,sc.Round,sc.VoteId,b,a)!=0||sc.Screen!=s4)return false;
   // two overlapping votes in the same unfrozen round: the older voteId cannot overwrite the newer vote's Screen, FrozenVotes or VoteAfter
-  var ov=new Choice();Stale(ov,1,t,differs);Stale(ov,1,t.AddMilliseconds(3100),differs);
+  var ov=new Choice();Stale(ov,tick(ov),1,t,differs);Stale(ov,tick(ov),1,t.AddMilliseconds(3100),differs);
   Func<int,int,int> overlap=(rA,vA)=>{
-   Stale(ov,1,t.AddMilliseconds(4300),(rB,vB)=>VoteScreen(ov,rB,vB,a,a));
+   Stale(ov,tick(ov),1,t.AddMilliseconds(4300),(rB,vB)=>VoteScreen(ov,rB,vB,a,a));
    return VoteScreen(ov,rA,vA,b,a);
   };
-  if(Stale(ov,1,t.AddMilliseconds(3700),overlap)!=2||ov.Screen!=a||ov.FrozenVotes!=0||ov.VoteAfter!=t.AddMilliseconds(4300+FreezeIdleMs))return false;
+  if(Stale(ov,tick(ov),1,t.AddMilliseconds(3700),overlap)!=2||ov.Screen!=a||ov.FrozenVotes!=0||ov.VoteAfter!=t.AddMilliseconds(4300+FreezeIdleMs))return false;
   var half=(int[])b.Clone();for(int i=0;i<120;i++)half[i]=-1;if(Judge(half,a,null)!=0)return false;
   // a word card closed since the last check: where it was is not counted as the screen moving
   var cardOver=(int[])a.Clone();for(int i=0;i<100;i++)cardOver[i]=-1;if(Judge((int[])a.Clone(),a,cardOver)!=-1)return false;
@@ -344,21 +382,32 @@ public static class GameCapture{
   var now=new DateTime(2026,1,1,0,0,10);
   if(PartRoute(new Choice{Proven=true,Frozen=true,Printed=now.AddMilliseconds(-500)},now)!=1||PartRoute(new Choice{Frozen=true,Printed=now.AddMilliseconds(-2500)},now)!=2)return false;
   if(PartRoute(new Choice{Proven=true},now)!=0||PartRoute(new Choice{Proven=true,Blind=true},now)!=2||PartRoute(new Choice(),now)!=2)return false;
-  // KeepPart rejects a partial BitBlt whose round advanced, froze, or was dropped/replaced before delivery
+  // KeepPart rejects a partial BitBlt overtaken by a newer ticket, frozen, marked blind, or dropped/replaced before delivery
   var pk=new IntPtr(-79);var pc=new Choice();lock(Gate)Choices[pk]=pc;
-  try{Stale(pc,1,t,differs);int pr=pc.Round;
-   if(!KeepPart(pk,pc,pr,false,t.AddMilliseconds(200))||pc.ProvenAt!=t.AddMilliseconds(200))return false;
-   if(!KeepPart(pk,pc,pr,true,t.AddMilliseconds(250))||pc.ProvenAt!=t.AddMilliseconds(200))return false;
-   pc.Blind=true;if(KeepPart(pk,pc,pr,false,t.AddMilliseconds(260)))return false;pc.Blind=false;
-   Stale(pc,2,t.AddMilliseconds(300),differs);
-   if(KeepPart(pk,pc,pr,false,t.AddMilliseconds(400))||pc.ProvenAt!=t.AddMilliseconds(300))return false;
-   int pr2=pc.Round;foreach(int ms in new[]{3400,4000,4600})Stale(pc,2,t.AddMilliseconds(ms),differs);
-   if(!pc.Frozen||KeepPart(pk,pc,pr2,false,t.AddMilliseconds(4700)))return false;
-   Stale(pc,3,t.AddMilliseconds(4800),differs);int pr3=pc.Round;
-   var pc2=new Choice{Proven=true,Round=pr3};lock(Gate)Choices[pk]=pc2;
-   if(KeepPart(pk,pc,pr3,false,t.AddMilliseconds(4900)))return false;
-   lock(Gate)Drop();if(KeepPart(pk,pc2,pr3,false,t.AddMilliseconds(5000)))return false;}
+  try{Stale(pc,tick(pc),1,t,differs);
+   // in-order Part: A then B both accepted; blank does not update ProvenAt
+   long p1=tick(pc);if(!KeepPart(pk,pc,p1,false,t.AddMilliseconds(200))||pc.ProvenAt!=t.AddMilliseconds(200))return false;
+   long p2=tick(pc);if(!KeepPart(pk,pc,p2,true,t.AddMilliseconds(250))||pc.ProvenAt!=t.AddMilliseconds(200))return false;
+   // out-of-order Part: A takes ticket -> B takes ticket and delivers -> A arrives late and is rejected
+   long pA=tick(pc),pB=tick(pc);
+   if(!KeepPart(pk,pc,pB,false,t.AddMilliseconds(270))||pc.ProvenAt!=t.AddMilliseconds(270))return false;
+   if(KeepPart(pk,pc,pA,false,t.AddMilliseconds(280))||pc.ProvenAt!=t.AddMilliseconds(270))return false;
+   pc.Blind=true;if(KeepPart(pk,pc,tick(pc),false,t.AddMilliseconds(290)))return false;pc.Blind=false;
+   long pBeforeNew=tick(pc);Stale(pc,tick(pc),2,t.AddMilliseconds(300),differs);
+   if(KeepPart(pk,pc,pBeforeNew,false,t.AddMilliseconds(400))||pc.ProvenAt!=t.AddMilliseconds(300))return false;
+   long pBeforeFreeze=tick(pc);foreach(int ms in new[]{3400,4000,4600})Stale(pc,tick(pc),2,t.AddMilliseconds(ms),differs);
+   if(!pc.Frozen||KeepPart(pk,pc,pBeforeFreeze,false,t.AddMilliseconds(4700)))return false;
+   Stale(pc,tick(pc),3,t.AddMilliseconds(4800),differs);long p3=tick(pc);
+   var pc2=new Choice{Proven=true};lock(Gate)Choices[pk]=pc2;
+   if(KeepPart(pk,pc,p3,false,t.AddMilliseconds(4900)))return false;
+   lock(Gate)Drop();if(KeepPart(pk,pc2,tick(pc2),false,t.AddMilliseconds(5000)))return false;}
   finally{lock(Gate){Choices.Remove(pk);Release(pc);}}
+  // BltOnly's blank picture: B delivers first, older A is skipped; a window BitBlt has not shown or a frozen one gets nothing
+  var bk=new IntPtr(-80);var bc=new Choice();lock(Gate)Choices[bk]=bc;
+  try{long bA=tick(bc);if(KeepBlank(bk,bc,tick(bc)))return false;Stale(bc,tick(bc),1,t,differs);
+   long bB=tick(bc);if(!KeepBlank(bk,bc,bB)||bc.Accepted!=bB||KeepBlank(bk,bc,bA)||bc.Accepted!=bB)return false;
+   bc.Frozen=true;if(KeepBlank(bk,bc,tick(bc)))return false;}
+  finally{lock(Gate)Choices.Remove(bk);}
   // ...and Part itself leaves such a window alone (a whole read would take a new picture of it: its signature and freeze change).
   // The desktop window stands in for the game: it can be read, and only its pixels are read.
   var desk=GetDesktopWindow();var held=new Choice{Frozen=true,Printed=DateTime.UtcNow};lock(Gate)Choices[desk]=held;
@@ -371,39 +420,47 @@ public static class GameCapture{
   if(AfterPrint(true,false,false,false)!=2||AfterPrint(false,false,false,true)!=3)return false;
   // Recent gives each print once, and nothing for a window that is not frozen; Picture takes a print at most KeptMs old
   var key=new IntPtr(-77);var k=new Choice{Frozen=true};lock(Gate)Choices[key]=k;
-  try{using(var p=new Bitmap(8,8,PixelFormat.Format32bppArgb))using(var q=new Bitmap(8,8,PixelFormat.Format32bppArgb)){Keep(key,k,k.Round,p);DateTime seen=DateTime.MinValue;
+  try{using(var p=new Bitmap(8,8,PixelFormat.Format32bppArgb))using(var q=new Bitmap(8,8,PixelFormat.Format32bppArgb)){Keep(key,k,tick(k),p);DateTime seen=DateTime.MinValue;
    if(!Recent(key,q,ref seen)||Recent(key,q,ref seen))return false;
    k.Frozen=false;seen=DateTime.MinValue;if(Recent(key,q,ref seen)||Kept(k,q,k.LastAt))return false;k.Frozen=true;
    if(!Kept(k,q,k.LastAt.AddMilliseconds(KeptMs))||Kept(k,q,k.LastAt.AddMilliseconds(KeptMs+1)))return false;
    // Drop leaves no disposed print behind, and a Keep still running for a dropped window keeps nothing
-   lock(Gate)Drop();if(k.Last!=null)return false;Keep(key,k,k.Round,p);if(k.Last!=null)return false;}}
+   lock(Gate)Drop();if(k.Last!=null)return false;Keep(key,k,tick(k),p);if(k.Last!=null)return false;}}
   finally{lock(Gate){Choices.Remove(key);Release(k);}}
-  // a print started during frozen round A that finishes after Stale saw B (round changed) is skipped and never enters B's cache
+  // a print started during frozen round A that finishes after Stale saw B (newer ticket accepted) is skipped and never enters B's cache
   var lateKey=new IntPtr(-78);var lk=new Choice();lock(Gate)Choices[lateKey]=lk;
   try{using(var p=new Bitmap(8,8,PixelFormat.Format32bppArgb))using(var q=new Bitmap(8,8,PixelFormat.Format32bppArgb)){
-   Stale(lk,1,t,differs);foreach(int ms in new[]{3100,3700,4300})Stale(lk,1,t.AddMilliseconds(ms),differs);
-   if(!lk.Frozen)return false;int roundA=lk.Round;
-   if(Stale(lk,2,t.AddMilliseconds(4500),differs)!=0||lk.Frozen)return false;
-   Skipped=false;if(DeliverPrint(lateKey,lk,roundA,p,true,true,true,false)||!Skipped||lk.Last!=null)return false;
-   foreach(int ms in new[]{7600,8200,8800})Stale(lk,2,t.AddMilliseconds(ms),differs);
+   Stale(lk,tick(lk),1,t,differs);foreach(int ms in new[]{3100,3700,4300})Stale(lk,tick(lk),1,t.AddMilliseconds(ms),differs);
+   if(!lk.Frozen)return false;long ptA=tick(lk);
+   if(Stale(lk,tick(lk),2,t.AddMilliseconds(4500),differs)!=0||lk.Frozen)return false;
+   Skipped=false;if(DeliverPrint(lateKey,lk,ptA,p,true,true,true,false)||!Skipped||lk.Last!=null)return false;
+   foreach(int ms in new[]{7600,8200,8800})Stale(lk,tick(lk),2,t.AddMilliseconds(ms),differs);
    if(!lk.Frozen)return false;
    DateTime seen=DateTime.MinValue;if(Recent(lateKey,q,ref seen)||Kept(lk,q,DateTime.UtcNow))return false;
-   // even if A's print arrives after B is already frozen again, roundA does not match B's round
-   Skipped=false;if(DeliverPrint(lateKey,lk,roundA,p,true,true,true,false)||!Skipped)return false;
+   // even if A's print arrives after B is already frozen again, ptA is overtaken by B's accepted tickets
+   Skipped=false;if(DeliverPrint(lateKey,lk,ptA,p,true,true,true,false)||!Skipped)return false;
    seen=DateTime.MinValue;if(lk.Last!=null||Recent(lateKey,q,ref seen)||Kept(lk,q,DateTime.UtcNow))return false;
-   // a print matching B's current frozen round is delivered and cached
-   Skipped=false;if(!DeliverPrint(lateKey,lk,lk.Round,p,true,true,true,false)||Skipped||lk.Last==null)return false;
-   // an unfrozen window skips delivery and keeps nothing even for its current round
-   if(Stale(lk,3,t.AddMilliseconds(9000),differs)!=0||lk.Frozen)return false;
-   Skipped=false;if(DeliverPrint(lateKey,lk,lk.Round,p,true,true,true,false)||!Skipped||lk.Last!=null)return false;
-   // a dropped or replaced window skips delivery and keeps nothing; a non-frozen (blind) print still delivers
-   foreach(int ms in new[]{12100,12700,13300})Stale(lk,3,t.AddMilliseconds(ms),differs);
+   // out-of-order PrintWindow in the same frozen round: B delivers first, older A is skipped without overwriting Last
+   long fptA=tick(lk),fptB=tick(lk);
+   Skipped=false;if(!DeliverPrint(lateKey,lk,fptB,p,true,true,true,false)||Skipped||lk.Last==null||lk.Accepted!=fptB)return false;
+   Skipped=false;if(DeliverPrint(lateKey,lk,fptA,p,true,true,true,false)||!Skipped||lk.Accepted!=fptB)return false;
+   // in-order PrintWindow: newer ticket after fptB is delivered
+   long fptC=tick(lk);Skipped=false;if(!DeliverPrint(lateKey,lk,fptC,p,true,true,true,false)||Skipped||lk.Accepted!=fptC)return false;
+   // an unfrozen window skips delivery and keeps nothing even with a fresh ticket
+   if(Stale(lk,tick(lk),3,t.AddMilliseconds(9000),differs)!=0||lk.Frozen)return false;
+   Skipped=false;if(DeliverPrint(lateKey,lk,tick(lk),p,true,true,true,false)||!Skipped||lk.Last!=null)return false;
+   // out-of-order non-frozen (blind) PrintWindow: B delivers first, older A is skipped; newer C delivers
+   long bptA=tick(lk),bptB=tick(lk);
+   Skipped=false;if(!DeliverPrint(lateKey,lk,bptB,p,true,true,false,false)||Skipped||lk.Accepted!=bptB)return false;
+   Skipped=false;if(DeliverPrint(lateKey,lk,bptA,p,true,true,false,false)||!Skipped||lk.Accepted!=bptB)return false;
+   // a dropped or replaced window skips delivery and keeps nothing
+   foreach(int ms in new[]{12100,12700,13300})Stale(lk,tick(lk),3,t.AddMilliseconds(ms),differs);
    if(!lk.Frozen)return false;
-   var newer=new Choice{Frozen=true,Round=lk.Round};lock(Gate)Choices[lateKey]=newer;
-   Skipped=false;if(DeliverPrint(lateKey,lk,lk.Round,p,true,true,true,false)||!Skipped||lk.Last!=null||newer.Last!=null)return false;
+   var newer=new Choice{Frozen=true};lock(Gate)Choices[lateKey]=newer;
+   Skipped=false;if(DeliverPrint(lateKey,lk,tick(lk),p,true,true,true,false)||!Skipped||lk.Last!=null||newer.Last!=null)return false;
    lock(Gate)Drop();
-   Skipped=false;if(DeliverPrint(lateKey,lk,lk.Round,p,true,true,true,false)||!Skipped||lk.Last!=null)return false;
-   Skipped=false;if(!DeliverPrint(lateKey,lk,0,p,true,true,false,false)||Skipped)return false;}}
+   Skipped=false;if(DeliverPrint(lateKey,lk,tick(lk),p,true,true,true,false)||!Skipped||lk.Last!=null)return false;
+   Skipped=false;if(DeliverPrint(lateKey,lk,tick(lk),p,true,true,false,false)||!Skipped)return false;}}
   finally{lock(Gate){Choices.Remove(lateKey);Release(lk);}}
   return true;
  }
