@@ -11,8 +11,8 @@ export function receiptTime(value){
  return expected.every((v,i)=>v===actual[i])?d:null;
 }
 function credit(value){if(!plain(value)||!Number.isSafeInteger(value.torchNo)||value.torchNo<0)return null;
- let name=null;if(typeof value.name==='string'){const s=value.name.trim();if(s&&[...s].length<=30&&!/[\p{Cc}\p{Cf}]/u.test(s))name=s;}
- return {torchNo:value.torchNo,name};
+ const text=v=>{if(typeof v==='string'){const s=v.trim();if(s&&[...s].length<=30&&!/[\p{Cc}\p{Cf}]/u.test(s))return s;}return null;};
+ return {torchNo:value.torchNo,name:text(value.name),alias:text(value.alias)};
 }
 export function installedReceipt(dto){const r=dto?.receipt;
  if(!plain(r)||r.version!==1||r.status!=='installed'||r.verified!==true||!HEX.test(r.key)||r.key!==dto.key||!HEX.test(r.hash)||!Number.isSafeInteger(r.revision)||r.revision<1)return null;
@@ -38,7 +38,7 @@ const ORIGIN_COPY={
  ja:{seed:'このバージョンには組み込みの The Seed 適応があります',public:'検証済みの公開リリース',legacy:'検証済みの旧形式の共有適応',eligible:'このバージョンで最初の公開貢献の候補になれます。公開には審査が必要です',isolated:'分離テストモードでは送信できません',bundled:'組み込みの適応があるため、通常のプレイでは初回の自動調整は行われません',unknown:'公開状況はまだ確認できていません'},
  en:{seed:'This version has a bundled The Seed adaptation',public:'Verified public flame release',legacy:'Verified legacy shared adaptation',eligible:'Eligible for this version’s first public contribution, subject to review',isolated:'Submission is disabled in isolated test mode',bundled:'The bundled adaptation supplies the settings. Normal play skips first-time automatic calibration',unknown:'Public release status is unconfirmed'}
 };
-export function receiptView(dto,{locale='zh',esc,torch=n=>'#'+n}={}){const w=COPY[locale]||COPY.zh,r=installedReceipt(dto),state=dto?.state;
+export function receiptView(dto,{locale='zh',esc}={}){const w=COPY[locale]||COPY.zh,r=installedReceipt(dto),state=dto?.state;
  const lookup=LOOKUP_COPY[locale]||LOOKUP_COPY.zh,origin=ORIGIN_COPY[locale]||ORIGIN_COPY.zh;
  const seed=Number.isSafeInteger(dto?.bundled?.revision)&&dto.bundled.revision>0?`${origin.seed} · rev ${dto.bundled.revision}`:'';
  const security=SECURITY_COPY[locale]||SECURITY_COPY.zh;
@@ -48,7 +48,7 @@ export function receiptView(dto,{locale='zh',esc,torch=n=>'#'+n}={}){const w=COP
  const notes=note.map(line=>`<p class="first-player-receipt-source">${esc(line)}</p>`).join('');
  if(state!=='received'||!r)return {signature:JSON.stringify([state,text,note]),html:`<p class="first-player-from" role="status">${esc(text)}</p>${notes}`};
  const label=r.origin==='torch-release'?origin.public:r.origin==='legacy-feed'?origin.legacy:'';
- const who=r.credit?(r.credit.name||torch(r.credit.torchNo)):w.unknown;
+ const who=r.credit?.name||r.credit?.alias||w.unknown;
  const date=r.serverTime?new Date(r.serverTime).toLocaleString(({zh:'zh-CN',ja:'ja-JP',en:'en-US'})[locale]||'zh-CN',{dateStyle:'medium',timeStyle:'short'}):w.noTime;
  const rows=[[w.revision,String(r.revision)],[w.hash,r.hash],...(r.cardinalRev?[[w.cardinal,r.cardinalRev]]:[])];
  return {signature:JSON.stringify([r,note]),html:`<p class="first-player-from">${esc(text)}</p>${label?`<p class="first-player-receipt-source">${esc(label)}</p>`:''}<p class="first-player-receipt-source">${esc(w.from)} · ${esc(who)}</p><p class="first-player-receipt-time">${esc(w.time)} · ${r.serverTime?`<time datetime="${esc(r.serverTime)}">${esc(date)}</time>`:esc(date)}</p><details class="first-player-receipt-details"><summary>${esc(w.hash)} · ${esc(r.hash.slice(0,12))}</summary><dl>${rows.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl></details>${notes}`};

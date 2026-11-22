@@ -25,21 +25,20 @@ import {VolumetricPass} from './torch-volumetric.js';
 import {loadGsap} from './gsap-loader.js';
 import {createTorchZoom,keepTorchCameraAboveFloor} from './torch-controls.js';
 
-/* 2026-11-21 店主: 匿名的传火人用大写数字（传火人壹、贰、叁）；#0 是店主 */
-const cnNo=n=>{n=Math.floor(Number(n)||0);if(n<=0)return "零";const D="零壹贰叁肆伍陆柒捌玖",U=["","拾","佰","仟"],B=["","万","亿","万亿"];const sec=p=>{let o="",z=false;for(let i=3;i>=0;i--){const x=Math.floor(p/10**i)%10;if(x){if(z&&o)o+="零";o+=D[x]+U[i];z=false;}else z=true;}return o;};const parts=[];for(let i=0;n>0;i++){parts.unshift([n%10000,i]);n=Math.floor(n/10000);}let out="",gap=false;for(const [p,i] of parts){if(!p){if(out)gap=true;continue;}if(out&&(gap||p<1000))out+="零";out+=sec(p)+B[i];gap=false;}return out;};
+/* Legacy number queries still jump to the original internal ID. */
 const cnParse=q=>{const D="零壹贰叁肆伍陆柒捌玖",U={"拾":10,"佰":100,"仟":1000},B={"万":1e4,"亿":1e8};if(!/^[零壹贰叁肆伍陆柒捌玖拾佰仟万亿]+$/.test(q))return null;let total=0,sec=0,d=0;for(const c of q){const v=D.indexOf(c);if(v>=0){d=v;continue;}if(U[c]){sec+=(d||1)*U[c];d=0;continue;}if(B[c]){total=(total+sec+d)*B[c];sec=0;d=0;}}return total+sec+d;};
 const COPY={
  zh:{title:'传火碑',sub:'分享过校准结果的玩家，名字都刻在这里',count:n=>'已刻 '+n+' 人',monthCount:(m,n)=>m+' · '+n+' 人',range:(a,b)=>'第 '+a+'–'+b+' 位',all:'全部',
-  anon:n=>'传火人'+cnNo(n),empty:'还没有人刻下名字',find:'找名字',findGo:'查找',me:'我的名字',meNone:'这台电脑还没有传过火',quality:{high:'画质 标准',low:'画质 省电'},
-  prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',notDeployed:'服务器尚未开放这个名单功能',loading:'正在读取…',preparing:'正在准备殿堂…',nth:n=>n===0?'#0':'第 '+n+' 位',more:'只显示前 50 个',
+  anon:'匿名',empty:'还没有人刻下名字',find:'找名字',findGo:'查找',me:'我的名字',meNone:'这台电脑还没有传过火',quality:{high:'画质 标准',low:'画质 省电'},
+  prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',notDeployed:'服务器尚未开放这个名单功能',loading:'正在读取…',preparing:'正在准备殿堂…',more:'只显示前 50 个',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')},
  en:{title:'Monument',sub:'Everyone who shared a calibration is carved here',count:n=>n+' names',monthCount:(m,n)=>m+' · '+n,range:(a,b)=>'#'+a+'–'+b,all:'All',
-  anon:n=>'Torch bearer #'+n,empty:'No names carved yet',find:'Find a name',findGo:'Find',me:'My name',meNone:'This PC has not shared yet',quality:{high:'Quality: full',low:'Quality: light'},
-  prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',notDeployed:'This list feature is not available on the server yet.',loading:'Loading…',preparing:'Preparing the hall…',nth:n=>'#'+n,more:'First 50 only',
+  anon:'Anonymous',empty:'No names carved yet',find:'Find a name',findGo:'Find',me:'My name',meNone:'This PC has not shared yet',quality:{high:'Quality: full',low:'Quality: light'},
+  prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',notDeployed:'This list feature is not available on the server yet.',loading:'Loading…',preparing:'Preparing the hall…',more:'First 50 only',
   ym:m=>m},
  ja:{title:'継火の碑',sub:'キャリブレーションを共有した人の名前が刻まれています',count:n=>n+' 名',monthCount:(m,n)=>m+' · '+n+' 名',range:(a,b)=>a+'–'+b+' 番目',all:'すべて',
-  anon:n=>'火を継ぐ人 #'+n,empty:'まだ誰の名前も刻まれていません',find:'名前を探す',findGo:'探す',me:'自分の名前',meNone:'この PC からはまだ共有していません',quality:{high:'画質 標準',low:'画質 軽量'},
-  prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',notDeployed:'名簿機能はサーバーでまだ公開されていません',loading:'読み込み中…',preparing:'聖堂を準備しています…',nth:n=>n===0?'#0':n+' 番目',more:'最初の 50 件のみ',
+  anon:'匿名',empty:'まだ誰の名前も刻まれていません',find:'名前を探す',findGo:'探す',me:'自分の名前',meNone:'この PC からはまだ共有していません',quality:{high:'画質 標準',low:'画質 軽量'},
+  prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',notDeployed:'名簿機能はサーバーでまだ公開されていません',loading:'読み込み中…',preparing:'聖堂を準備しています…',more:'最初の 50 件のみ',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')}};
 const QUALITY_KEY='megulit-torch-quality';
 const FONT='"Torch Serif","Noto Serif SC","Source Han Serif SC","Noto Serif JP","Songti SC","SimSun","Yu Mincho",serif';
@@ -145,8 +144,8 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
   else{if(state.off<=0)await behind(valid);if(!valid())return;if(state.off<=0){redraw();return;}const n=cols?backColumn(state.off):backPage(state.off);state.off=Math.max(0,state.off-n);redraw();}}
  const tip=$('.tm-tip');
  function showTip(entry,x,y){if(!entry){tip.hidden=true;return;}const it=entry.item;
-  tip.querySelector('.tm-tip-name').textContent=it.name||t.anon(it.torchNo);
-  tip.querySelector('.tm-tip-meta').textContent=[dateText(it.at,true),it.game,t.nth(it.torchNo)].filter(Boolean).join(' · ');
+  tip.querySelector('.tm-tip-name').textContent=it.name||it.alias||t.anon;
+  tip.querySelector('.tm-tip-meta').textContent=[dateText(it.at,true),it.game].filter(Boolean).join(' · ');
   tip.hidden=false;const r=host.getBoundingClientRect(),w=tip.offsetWidth,h=tip.offsetHeight;
   tip.style.left=Math.min(r.width-w-12,Math.max(12,x-r.left+16))+'px';tip.style.top=Math.min(r.height-h-12,Math.max(12,y-r.top+18))+'px';}
 
@@ -155,7 +154,7 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
  const runs=s=>{const out=[];for(const ch of s){const latin=/[ -~ -ɏ]/.test(ch);const last=out[out.length-1];if(last&&last.latin===latin)last.text+=ch;else out.push({latin,text:ch});}return out;};
  function verticalLength(s,px,adv){measure.font=px+'px '+FONT;let len=0;for(const r of runs(s))len+=r.latin?measure.measureText(r.text.trim()?r.text:' ').width+px*0.18:[...r.text].length*adv;return len;}
  function dateText(at,full){if(!at)return '';const d=new Date(at*1000),p=n=>String(n).padStart(2,'0');return full?d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()):p(d.getMonth()+1)+'·'+p(d.getDate());}
- function entryBox(item){const name=item.name||t.anon(item.torchNo);let px=NAME_PX,adv=NAME_ADV,len=verticalLength(name,px,adv);const room=AREA_Y1-AREA_Y0-56;
+ function entryBox(item){const name=item.name||item.alias||t.anon;let px=NAME_PX,adv=NAME_ADV,len=verticalLength(name,px,adv);const room=AREA_Y1-AREA_Y0-56;
   if(len>room){const k=room/len;px=Math.floor(px*k);adv=adv*k;len=verticalLength(name,px,adv);}
   const game=item.game||'';let side=game;const sideRoom=Math.max(len,4*SIDE_ADV);
   while(side&&verticalLength(side,SIDE_PX,SIDE_ADV)>sideRoom)side=[...side].slice(0,-2).join('')+'…';if(side==='…')side='';
@@ -185,7 +184,7 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
   if(!r?.ok){toast(t.offline);return;}if(r.available===false){toast(t.notDeployed);return;}
   const list=r.items||[];
   if(!list.length){toast(t.none);return;}if(list.length===1){jumpTo(list[0]);return;}
-  results.innerHTML=list.map((it,i)=>`<li><button type="button" data-i="${i}"><b>${esc(it.name||t.anon(it.torchNo))}</b><span>${esc(dateText(it.at,true))} · ${esc(t.nth(it.torchNo))}</span></button></li>`).join('')+(list.length>=50?`<li class="tm-results-more">${esc(t.more)}</li>`:'');
+  results.innerHTML=list.map((it,i)=>`<li><button type="button" data-i="${i}"><b>${esc(it.name||it.alias||t.anon)}</b><span>${esc(dateText(it.at,true))}</span></button></li>`).join('')+(list.length>=50?`<li class="tm-results-more">${esc(t.more)}</li>`:'');
   results.hidden=false;results.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{results.hidden=true;jumpTo(list[Number(b.dataset.i)]);}));});
  const onKey=e=>{if(!mounted||!sceneReady||!host.contains(e.target))return;
   if(e.key==='Escape'){if(!results.hidden){e.preventDefault();results.hidden=true;}else if(scene.reading()){e.preventDefault();scene.resetView();}return;}

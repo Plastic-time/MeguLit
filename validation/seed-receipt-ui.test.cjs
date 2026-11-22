@@ -23,6 +23,15 @@ test('all three locales escape public credit and unconfirmed or installing state
  for(const locale of ['zh','ja','en']){const v=dto();v.receipt.credit.name='<img src=x onerror=alert(1)>';const out=receiptView(v,{locale,esc});assert.ok(!out.html.includes('<img'));assert.ok(out.html.includes('&lt;img'));
  for(const state of ['installing','install-failed','received']){const h=receiptView({state,key,credit:{name:'Legacy Person',torchNo:1}},{locale,esc}).html;assert.ok(!h.includes('Legacy Person'));assert.ok(!h.includes('first-player-receipt-source'));assert.ok(!h.includes('<time'));}}
 });
+test('anonymous founder attribution renders the same official Japanese alias in every locale',async()=>{
+ const {receiptView}=await modulePromise,v=dto();
+ v.receipt.credit={torchNo:0,name:null,alias:'ユージオ'};
+ for(const locale of ['zh','ja','en']){
+  const {html}=receiptView(v,{locale,esc});
+  assert.match(html,/ユージオ/);
+  assert.doesNotMatch(html,/#0|传火人零|Torch bearer/);
+ }
+});
 test('receipt signature changes with winner/hash/revision but stays equal for nonsemantic fetch metadata',async()=>{const {receiptView}=await modulePromise;const base=dto(),a=receiptView(base,{esc}).signature;
  assert.equal(receiptView({...base,fetchedAt:Date.now()},{esc}).signature,a);
  for(const patch of [{hash:'c'.repeat(64)},{revision:3},{credit:{torchNo:3,name:null}},{serverTime:'2026-11-22T00:00:00Z'}])assert.notEqual(receiptView({...base,receipt:{...base.receipt,...patch}},{esc}).signature,a);

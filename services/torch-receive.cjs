@@ -2,6 +2,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),os=require('node:os');
 const protocol=require('../core/torch-release.cjs'),diff=require('../core/game-diff.cjs'),feed=require('./auto-profile-feed.cjs');
+const {fallbackAlias}=require('../core/torch-alias.cjs');
 const jobs=new Map(),states=new Map(),last=new Map(),locks=new Map(),queues=new Map(),controllers=new Map();
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 const idKey=(root,id)=>path.resolve(root)+'\0'+String(id);
@@ -15,13 +16,23 @@ function scriptPath(exe,relative){if(!protocol.scriptFile(relative))fail('TORCH_
 function trust(){let keys=[];try{keys=JSON.parse(fs.readFileSync(path.join(__dirname,'torch-review-keys.json'),'utf8')).keys||[];}catch{}return {profileKeys:feed.keys(),releaseKeys:feed.keys(),reviewKeys:keys};}
 async function body(response){if(Number(response.headers?.get('content-length'))>protocol.MAX_BYTES)fail('TORCH_LIMIT');if(!response.body?.getReader)fail('TORCH_RESPONSE');const reader=response.body.getReader(),parts=[];let size=0;try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>protocol.MAX_BYTES)fail('TORCH_LIMIT');parts.push(Buffer.from(value));}}finally{await reader.cancel().catch(()=>{});reader.releaseLock();}try{return JSON.parse(Buffer.concat(parts,size).toString('utf8'));}catch{fail('TORCH_RESPONSE');}}
 function atomic(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.'+crypto.randomUUID()+'.tmp';try{fs.writeFileSync(tmp,JSON.stringify(value),{flag:'wx'});fs.renameSync(tmp,file);}finally{try{fs.unlinkSync(tmp);}catch{}}}
-function credit(c,n){return c&&c.torchNo===n?{torchNo:n,name:feed.cleanName(c.name)}:{torchNo:n,name:null};}
+function credit(c,n){
+ const bound=c?.torchNo===n?c:null;
+ const name=feed.cleanName(bound?.name),alias=feed.cleanName(bound?.alias);
+ // Zero is also the review protocol's official-release sentinel. Use an alias
+ // for it only when the relay found the founder record for this executable.
+ const anonymous=!name&&(alias||(n>0?fallbackAlias(n):null));
+ return {torchNo:n,name,...(anonymous?{alias:anonymous}:{})};
+}
 const exactProfile=(answer,key)=>answer?.version===2&&answer.versionLayer?.match==='exe'&&answer.versionLayer.diff?.key===key?answer.versionLayer.diff:answer?.diff?.key===key?answer.diff:null;
 function builtinCompatible(r){const builtin=require('../core/profiles/seed.cjs').versionOf(r.key);return !builtin||r.profile.rev>Number(builtin.rev||0)||protocol.same(builtin.settings,r.profile.settings);}
 function compatibleCached(answer,key,keys=trust(),{exe}={}){try{const r=answer.torchRelease,l=answer.torchLocal;protocol.releaseShape(r);if(typeof exe!=='string'||!exe||!l)return false;const current=fs.realpathSync(exe),bound=fs.realpathSync(l.exe),samePath=(a,b)=>process.platform==='win32'?a.toLowerCase()===b.toLowerCase():a===b;if(!samePath(current,bound)||r.key!==key||!builtinCompatible(r)||!protocol.same(r.profile,answer.diff)||l.key!==key||stamp(current)!==l.exeStamp||!samePath(scriptPath(current,r.review.identity.scriptFile),l.script)||stamp(l.script)!==l.scriptStamp)return false;const active=(list,doc)=>{const a=Array.isArray(list)?list.filter(k=>k.alg==='ed25519'&&!k.revoked&&k.id===doc.signature.keyId):[];return a.length===1?a:[];},h=crypto.createHash('sha256').update(diff.canonical(r.profile)).digest('hex');return h===r.review.candidateHash&&feed.verify(r.profile,active(keys.profileKeys,r.profile))&&feed.verify(r,active(keys.releaseKeys||keys.profileKeys,r))&&feed.verify(r.review,active(keys.reviewKeys,r.review));}catch{return false;}}
 async function installed(root,key,{keys=trust(),exe}={}){const answer=feed.cached(root,key);if(!answer||!feed.layer(answer,key,{torchTrust:keys,exe})?.exact)return null;
  if(answer.torchRelease){try{const p=await protocol.checked(answer.torchRelease,keys);if(answer.torchRelease.key!==key||!protocol.same(answer.diff,answer.torchRelease.profile))return null;return {version:1,status:'installed',verified:true,origin:'torch-release',key,hash:p.hash,serverTime:answer.torchPublication?.hash===p.hash&&protocol.iso(answer.torchPublication.at)?answer.torchPublication.at:null,credit:credit(answer.torchCredit,answer.torchRelease.review.torchNo),revision:answer.torchRelease.revision,cardinalRev:answer.torchRelease.review.cardinalRev};}catch{return null;}}
- const p=exactProfile(answer,key);if(p&&Number.isSafeInteger(p.rev)&&p.rev>0)return {version:1,status:'installed',verified:true,origin:'legacy-feed',key,hash:await protocol.hash({profile:p,gameLayer:answer.gameLayer||null}),serverTime:null,credit:null,revision:p.rev,cardinalRev:null};
+ const p=exactProfile(answer,key);if(p&&Number.isSafeInteger(p.rev)&&p.rev>0){
+  const attribution=p.source==='auto'&&answer.versionLayer?.match==='exe'&&answer.versionLayer.key===key?feed.cleanCredit(answer.versionLayer.credit):null;
+  return {version:1,status:'installed',verified:true,origin:'legacy-feed',key,hash:await protocol.hash({profile:p,gameLayer:answer.gameLayer||null}),serverTime:null,credit:attribution,revision:p.rev,cardinalRev:null};
+ }
  return null;}
 function receiveEndpoints(root,key,legacy=false,env=process.env){
  if(!diff.KEY.test(String(key||'')))return [];

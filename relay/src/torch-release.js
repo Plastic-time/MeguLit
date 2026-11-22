@@ -52,8 +52,9 @@ export async function publish(db,release,env,now=new Date()){
 }
 export async function lookup(db,key,env){if(!gameDiff.KEY.test(key||''))return null;const r=await row(db,key);if(!r)return null;const release=await checkedRow(r,env);if((await revoked(db)).includes(release.review.candidateHash))reject('TORCH_REVOKED');
  if(await blockedProfile(db,release.profile))reject('TORCH_REVOKED');
- const n=release.review.torchNo,c=n===0?null:await db.prepare('SELECT name FROM torch_credits WHERE torch_no=? AND game_key=?').bind(n,key).first(),name=c?cleanName(c.name,env):null;
- return {release,publication:{hash:r.hash,at:r.published_at},credit:{torchNo:n,name:name?.ok?name.name:null}};
+ const n=release.review.torchNo,c=await db.prepare('SELECT name,alias FROM torch_credits WHERE torch_no=? AND game_key=?').bind(n,key).first(),cleaned=c?cleanName(c.name,env):null;
+ const name=cleaned?.ok?cleaned.name:null;
+ return {release,publication:{hash:r.hash,at:r.published_at},credit:{torchNo:n,name,...(!name&&c?.alias?{alias:c.alias}:{})}};
 }
 export async function exportHistory(db,key){if(!gameDiff.KEY.test(key||''))reject('TORCH_KEY');const rows=(await db.prepare('SELECT hash,body,published_at FROM torch_release_history WHERE game_key=? ORDER BY revision LIMIT 1001').bind(key).all()).results;if(rows.length>1000||rows.reduce((n,r)=>n+r.body.length,0)>8*1024*1024)reject('TORCH_LIMIT');const winner=await row(db,key);return {schema:'megulit.torch-history-export',version:1,key,winner:winner?.hash||null,releases:rows.map(r=>({hash:r.hash,release:JSON.parse(r.body),publishedAt:r.published_at})),revoked:await revoked(db)};}
 export async function revoke(db,document,env,now=new Date()){if(!document||Object.keys(document).sort().join(',')!=='profileHash,reason,schema,signature,version'||document.schema!=='megulit.torch-revocation'||document.version!==1||!gameDiff.KEY.test(document.profileHash)||!['compatibility-failed','review-withdrawn','signature-revoked'].includes(document.reason)||!await protocol.verify(document,trust(env).releaseKeys))reject('TORCH_REVOCATION');await db.prepare('INSERT OR IGNORE INTO torch_release_revocations(profile_hash,revoked_at,body) VALUES(?,?,?)').bind(document.profileHash,now.toISOString(),gameDiff.canonical(document)).run();return {status:'revoked'};}

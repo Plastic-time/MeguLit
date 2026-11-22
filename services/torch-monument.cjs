@@ -29,10 +29,12 @@ function cleanText(v,max){if(typeof v!=='string')return null;const t=[...v].map(
  const c=[...t].slice(0,max).join('').trim();return c||null;}
 const seconds=v=>{if(Number.isFinite(v))return v>1e12?Math.floor(v/1000):Math.floor(v);if(typeof v==='string'&&v){const t=Date.parse(v);return Number.isFinite(t)?Math.floor(t/1000):0;}return 0;};
 const monthOf=at=>at>0?new Date(at*1000).toISOString().slice(0,7):'';
+const {fallbackAlias}=require('../core/torch-alias.cjs');
 function cleanItem(r){if(!r||typeof r!=='object')return null;const no=r.torchNo;
  if(typeof no!=='number'&&(typeof no!=='string'||!/^\d+$/.test(no)))return null;
  const n=Number(no);if(!Number.isSafeInteger(n)||n<0)return null;const at=seconds(r.at);
- return {torchNo:n,name:cleanText(r.name,NAME_MAX),at,game:cleanText(r.game,GAME_MAX),month:MONTH.test(String(r.month||''))?r.month:monthOf(at)};}
+ const name=cleanText(r.name,NAME_MAX);
+ return {torchNo:n,name,...(!name?{alias:cleanText(r.alias,NAME_MAX)||fallbackAlias(n)}:{}),at,game:cleanText(r.game,GAME_MAX),month:MONTH.test(String(r.month||''))?r.month:monthOf(at)};}
 /* GET on each relay host in turn: {status:'ok',json} | {status:'missing'} (route not deployed) | {status:'failed'} */
 async function get(root,route,{fetch:fetcher=globalThis.fetch,env=process.env}={}){if(!fetcher)return {status:'failed'};let missing=false;
  const isolated=owner.privateMode(root,env);

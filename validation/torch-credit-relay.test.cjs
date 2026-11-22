@@ -5,6 +5,7 @@
    signed document). Relay in-process, no network. */
 process.env.MEGULIT_RELAY_BASE??='off';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
+const {fallbackAlias}=require('../core/torch-alias.cjs');
 const relayDir=path.join(__dirname,'..','relay'),MIGRATION=fs.readdirSync(path.join(relayDir,'migrations')).filter(f=>f.endsWith('.sql')).sort().map(f=>fs.readFileSync(path.join(relayDir,'migrations',f),'utf8')).join('');
 function d1(){const db=new DatabaseSync(':memory:');db.exec(MIGRATION);const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>{const r=db.prepare(sql).run(...args);return {success:true,meta:{changes:Number(r.changes)||0}};}});return {prepare:sql=>stmt(sql),raw:db};}
 const mod=name=>import(pathToFileURL(path.join(relayDir,'src',name)).href);
@@ -72,7 +73,7 @@ test('GET /api/game-profile: auto diff carries credit (first reporter of the pic
  b=await (await call('9.9.9.9','GET','/api/game-profile/'+KA)).json();assert.equal(b.credit,null,'official diffs carry no credit');
 });
 
-test('传火碑 GET /api/torch/monument: oldest first, cursor paging, total, withdrawn = 匿名 #N and stays, no key / reporter, game title when known, 30 characters',async()=>{
+test('传火碑 GET /api/torch/monument: oldest first, cursor paging, total, withdrawn uses a Japanese alias and stays, no key / reporter, game title when known, 30 characters',async()=>{
  const {report,call,ENV}=mk();
  await report('1.1.1.1',KA,{name:'あ'.repeat(30)},{});assert.equal((await report('9.9.9.1',KA,{name:'あ'.repeat(31)})).status,400,'31 characters refused');
  for(let i=2;i<=7;i++)await report('1.1.1.'+i,i%2?KA:KB,i===4?undefined:{name:'传火'+i});
@@ -82,11 +83,11 @@ test('传火碑 GET /api/torch/monument: oldest first, cursor paging, total, wit
  ENV.DB.raw.prepare("INSERT INTO probe_full(identity,upload,object_key,sha256,size,parts,state,title,vndb,created_at,updated_at,expires_at) VALUES('i','u','k','d',1,1,'ready','千恋＊万花','v17',0,0,9999999999)").run();
  const page=async q=>{const r=await call('7.7.7.7','GET','/api/torch/monument'+q);assert.equal(r.status,200);assert.match(r.headers.get('cache-control'),/max-age=60/);return r.json();};
  let a=await page('?limit=3');assert.equal(a.total,7);assert.deepEqual(a.items.map(i=>i.torchNo),[1,2,3]);assert.equal(a.next,'3');
- assert.equal(a.items[0].name,null);assert.equal(a.items[0].display,'传火人壹','withdrawn shows as 传火人 + 大写数字');assert.equal(a.items[1].name,'传火2');
+ assert.equal(a.items[0].name,null);assert.equal(a.items[0].display,fallbackAlias(1));assert.equal(a.items[0].alias,a.items[0].display);assert.equal(a.items[1].name,'传火2');
  assert.equal(a.items[1].game,'千恋＊万花');assert.equal(a.items[2].game,null,'KA has no known title');
- for(const it of a.items)assert.deepEqual(Object.keys(it).sort(),['at','display','game','name','torchNo']);
+ for(const it of a.items)assert.deepEqual(Object.keys(it).sort(),[...(it.name?[]:['alias']),'at','display','game','name','torchNo']);
  assert.doesNotMatch(JSON.stringify(a),/aaaaaaaa|bbbbbbbb|reporter|1\.1\.1/);
- let b=await page('?cursor='+a.next+'&limit=3');assert.deepEqual(b.items.map(i=>i.torchNo),[4,5,6]);assert.equal(b.items[0].display,'传火人肆','never named = 匿名 too');
+ let b=await page('?cursor='+a.next+'&limit=3');assert.deepEqual(b.items.map(i=>i.torchNo),[4,5,6]);assert.equal(b.items[0].display,fallbackAlias(4));
  let c=await page('?cursor='+b.next+'&limit=3');assert.deepEqual(c.items.map(i=>i.torchNo),[7]);assert.equal(c.next,null);
  assert.ok(a.items.every((x,i,arr)=>!i||arr[i-1].at<=x.at),'oldest first');
  assert.equal((await page('?limit=99999')).items.length,7,'limit is capped at 500, default 100');
@@ -138,4 +139,47 @@ test('0026 backfills the counters from rows that already exist',async()=>{
  assert.equal(db.prepare('SELECT total FROM torch_counter').get().total,3);
  assert.deepEqual(db.prepare('SELECT month,n FROM torch_months ORDER BY month').all().map(r=>[r.month,r.n]),[['2026-09',2],['2026-11',1]]);
  assert.deepEqual(db.prepare('SELECT * FROM torch_names ORDER BY torch_no').all().map(r=>r.name_key),['ann','bob']);
+});
+
+test('0030 preserves manual signatures and assigns dispersed official Japanese aliases including #0',()=>{
+ const db=new DatabaseSync(':memory:'),dir=path.join(relayDir,'migrations');
+ for(const file of fs.readdirSync(dir).filter(f=>f.endsWith('.sql')&&f<'0030').sort())db.exec(fs.readFileSync(path.join(dir,file),'utf8'));
+ const put=db.prepare('INSERT INTO torch_credits(game_key,reporter_hash,torch_no,name,at) VALUES(?,?,?,?,?)');
+ for(let n=0;n<48;n++)put.run(KA,'private-'+n,n,n===1?'惠惠':null,1790000000);
+ db.exec(fs.readFileSync(path.join(dir,'0030_torch_aliases.sql'),'utf8'));
+ put.run(KA,'inserted by an old worker',48,null,1790000000);
+ const rows=db.prepare('SELECT torch_no,name,alias FROM torch_credits ORDER BY torch_no').all();
+ assert.equal(rows[0].alias,'ユージオ');
+ assert.equal(rows[1].name,'惠惠');
+ for(const row of rows){
+  assert.equal(row.alias,fallbackAlias(row.torch_no));
+  assert.match(row.alias,/^[\p{Script=Hiragana}\p{Script=Katakana}ー・]+$/u);
+  assert.doesNotMatch(row.alias,/めぐみん|メグミン|惠惠|恵恵|megumin/iu);
+ }
+ assert.equal(new Set(rows.slice(0,24).map(r=>r.alias)).size,24);
+ assert.equal(new Set(rows.slice(24,48).map(r=>r.alias)).size,24);
+ assert.ok(rows.slice(1).every((r,i)=>r.alias!==rows[i].alias));
+});
+
+test('anonymous #0 is searchable and consistent through monument, me, reupload and withdrawal',async()=>{
+ const {report,call,ENV}=mk(),ip='4.4.4.4',alias=fallbackAlias(0);
+ const get=async route=>(await call(ip,'GET',route)).json();
+ const find=name=>get('/api/torch/find?name='+encodeURIComponent(name));
+ await report(ip,KA,{name:'Manual signature'});
+ ENV.DB.raw.exec("DELETE FROM torch_names WHERE torch_no=1; UPDATE torch_credits SET torch_no=0, name=NULL, alias='ユージオ' WHERE torch_no=1");
+ for(const result of [await get('/api/torch/monument'),await get('/api/torch/me?key='+KA),await find('ﾕｰ')]){
+  assert.equal(result.items[0].torchNo,0);
+  assert.equal(result.items[0].name,null);
+  assert.equal(result.items[0].alias,alias);
+  assert.doesNotMatch(JSON.stringify(result),/reporter|4\.4\.4\.4|Manual signature|aaaaaaaa/);
+ }
+ assert.equal((await (await report(ip,KA)).json()).credit.alias,alias);
+ const rename=name=>call(ip,'PUT','/api/game-profile/credit',{key:KA,name});
+ await rename('My Explicit Name');
+ assert.deepEqual((await find(alias)).items,[]);
+ assert.equal((await find('MY E')).items[0].name,'My Explicit Name');
+ await rename(null);
+ assert.deepEqual((await find('MY E')).items,[]);
+ assert.equal((await find(alias)).items[0].alias,alias);
+ assert.equal((await report('5.5.5.5',KB,{alias:'アクア',candidates:['private library']})).status,400);
 });

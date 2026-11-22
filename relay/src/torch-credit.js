@@ -41,18 +41,18 @@ export const monthOf=at=>new Date((at|0)*1000).toISOString().slice(0,7);
 const nameKey=n=>String(n||'').normalize('NFKC').toLowerCase().replace(/\s+/gu,'');
 async function setNameKey(env,torchNo,name){if(name)await env.DB.prepare('INSERT INTO torch_names(torch_no,name_key) VALUES(?,?) ON CONFLICT(torch_no) DO UPDATE SET name_key=excluded.name_key').bind(torchNo,nameKey(name)).run();
  else await env.DB.prepare('DELETE FROM torch_names WHERE torch_no=?').bind(torchNo).run();}
-export const creditOut=r=>r?{torchNo:r.torch_no|0,name:r.name??null,at:r.at|0}:null;
+export const creditOut=r=>r?{torchNo:r.torch_no,name:r.name??null,at:r.at|0,...(!r.name&&r.alias?{alias:r.alias}:{})}:null;
 
 /* file the upload: first time → the next number; later → the same number, the name only when mentioned */
 export async function noteUpload(env,key,reporter,credit,now){const t=sec(now);let fresh=false;
- const old=await env.DB.prepare('SELECT torch_no,name,at FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();
+ const old=await env.DB.prepare('SELECT torch_no,name,alias,at FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();
  if(old){if(credit.present&&credit.name!==undefined)await env.DB.prepare('UPDATE torch_credits SET name=? WHERE game_key=? AND reporter_hash=?').bind(credit.name,key,reporter).run();
   if(credit.present&&credit.name!==undefined)await setNameKey(env,old.torch_no,credit.name);
   return creditOut({...old,name:credit.present&&credit.name!==undefined?credit.name:old.name});}
  for(let i=0;i<5;i++){try{/* the number is taken inside the insert; the unique index catches two uploads racing for the same one */
   await env.DB.prepare('INSERT INTO torch_credits(game_key,reporter_hash,torch_no,name,at) VALUES(?,?,(SELECT COALESCE(MAX(torch_no),0)+1 FROM torch_credits),?,?)').bind(key,reporter,credit.name??null,t).run();fresh=true;break;}
   catch(e){const again=await env.DB.prepare('SELECT 1 AS x FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();if(again)break;if(i===4)throw e;}}
- const row=await env.DB.prepare('SELECT torch_no,name,at FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();
+ const row=await env.DB.prepare('SELECT torch_no,name,alias,at FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();
  if(fresh){/* the counters follow the insert: the total and the month the number belongs to */
   await env.DB.prepare('INSERT INTO torch_counter(id,total) VALUES(1,1) ON CONFLICT(id) DO UPDATE SET total=total+1').run();
   await env.DB.prepare('INSERT INTO torch_months(month,n) VALUES(?,1) ON CONFLICT(month) DO UPDATE SET n=n+1').bind(monthOf(row.at)).run();
@@ -63,7 +63,7 @@ export async function noteUpload(env,key,reporter,credit,now){const t=sec(now);l
 export async function creditOfDiff(env,layer,key,diff,hashOf){
  if(!diff||diff.source!=='auto')return null;
  try{const h=await hashOf(diff);
-  const r=await env.DB.prepare('SELECT c.torch_no,c.name,c.at FROM auto_profile_reports r JOIN torch_credits c ON c.game_key=r.game_key AND c.reporter_hash=r.reporter WHERE r.'+(layer==='version'?'game_key':'gid')+'=? AND r.settings_hash=? ORDER BY r.updated_at ASC LIMIT 1').bind(key,h).first();
+  const r=await env.DB.prepare('SELECT c.torch_no,c.name,c.alias,c.at FROM auto_profile_reports r JOIN torch_credits c ON c.game_key=r.game_key AND c.reporter_hash=r.reporter WHERE r.'+(layer==='version'?'game_key':'gid')+'=? AND r.settings_hash=? ORDER BY r.updated_at ASC LIMIT 1').bind(key,h).first();
   return creditOut(r);}catch{return null;}}
 
 /* PUT /api/game-profile/credit {key,name|null} */
@@ -72,13 +72,13 @@ export async function creditPut(request,env,reporter,now,{json,fail,readJSON},KE
  if(!plain(v)||!('name' in v))return fail('INVALID_CREDIT');for(const k of Object.keys(v))if(k!=='key'&&k!=='name')return fail('INVALID_CREDIT');
  const key=String(v.key||'');if(!KEY.test(key))return fail('INVALID_KEY');
  const c=cleanName(v.name,env);if(!c.ok||v.name===undefined)return fail('INVALID_CREDIT');
- const row=await env.DB.prepare('SELECT torch_no,at FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();if(!row)return fail('NO_CREDIT',404);
+ const row=await env.DB.prepare('SELECT torch_no,alias,at FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();if(!row)return fail('NO_CREDIT',404);
  await env.DB.prepare('UPDATE torch_credits SET name=? WHERE game_key=? AND reporter_hash=?').bind(c.name,key,reporter).run();await setNameKey(env,row.torch_no,c.name);
  return json({ok:true,...creditOut({...row,name:c.name})});}
 
 /* GET /api/torch/monument?cursor=&limit=  传火碑: every credit ever filed, oldest first, never shrinking.
    {ok,total,items:[{torchNo,name|null,at,game|null,display}],next}  cursor = the last torchNo of the previous page, next = the cursor
-   for the following page (null at the end). A withdrawn name is null and shows as 「传火人 #N」 (display). The game title is the
+   for the following page (null at the end). A withdrawn name is null and uses the assigned alias. The game title is the
    one the relay already knows for it (a probe title found through the VNDB id of its calibrations), else null. No key, no reporter. */
 const CHUNK=80;
 const chunks=(a,n=CHUNK)=>{const o=[];for(let i=0;i<a.length;i+=n)o.push(a.slice(i,i+n));return o;};
@@ -97,9 +97,7 @@ const PUBLIC={'access-control-allow-origin':'*','cache-control':'public, max-age
 const MONTH=/^\d{4}-(0[1-9]|1[0-2])$/;
 const monthRange=m=>{const [y,mo]=m.split('-').map(Number);return [Date.UTC(y,mo-1,1)/1000,Date.UTC(y,mo,1)/1000];};
 const totalOf=async env=>(await env.DB.prepare('SELECT total FROM torch_counter WHERE id=1').first())?.total|0;
-/* 2026-11-21 店主: 匿名的传火人按顺序用大写数字（传火人壹、贰、叁） */
-const cnNo=n=>{n=Math.floor(Number(n)||0);if(n<=0)return "零";const D="零壹贰叁肆伍陆柒捌玖",U=["","拾","佰","仟"],B=["","万","亿","万亿"];const sec=p=>{let o="",z=false;for(let i=3;i>=0;i--){const x=Math.floor(p/10**i)%10;if(x){if(z&&o)o+="零";o+=D[x]+U[i];z=false;}else z=true;}return o;};const parts=[];for(let i=0;n>0;i++){parts.unshift([n%10000,i]);n=Math.floor(n/10000);}let out="",gap=false;for(const [p,i] of parts){if(!p){if(out)gap=true;continue;}if(out&&(gap||p<1000))out+="零";out+=sec(p)+B[i];gap=false;}return out;};
-const shape=(r,titles)=>({torchNo:r.torch_no|0,name:r.name??null,at:r.at|0,game:titles?.get(r.game_key)??null,display:r.name||'传火人'+cnNo(r.torch_no|0)});
+const shape=(r,titles)=>({...creditOut(r),game:titles?.get(r.game_key)??null,display:r.name||r.alias||null});
 
 export async function monumentGet(env,url,{json,fail},ctx=null){
  if(!env.DB)return fail('NOT_CONFIGURED',503);
@@ -107,10 +105,10 @@ export async function monumentGet(env,url,{json,fail},ctx=null){
  if(cur!==null&&cur!==''&&!/^\d{1,12}$/.test(cur))return fail('INVALID_CURSOR');if(lim!==null&&lim!==''&&!/^\d{1,6}$/.test(lim))return fail('INVALID_LIMIT');
  if(month&&!MONTH.test(month))return fail('INVALID_MONTH');
  const limit=Math.max(1,Math.min(500,lim?Number(lim):100)),after=cur?Number(cur):-1;
- return cached('https://megulit-relay.internal/torch/monument/'+(month||'all')+'/'+after+'/'+limit,ctx,async()=>{
+ return cached('https://megulit-relay.internal/torch/monument/v2/'+(month||'all')+'/'+after+'/'+limit,ctx,async()=>{
   const [lo,hi]=month?monthRange(month):[0,0];
-  const rows=(await (month?env.DB.prepare('SELECT game_key,torch_no,name,at FROM torch_credits WHERE at>=? AND at<? AND torch_no>? ORDER BY torch_no ASC LIMIT ?').bind(lo,hi,after,limit+1)
-   :env.DB.prepare('SELECT game_key,torch_no,name,at FROM torch_credits WHERE torch_no>? ORDER BY torch_no ASC LIMIT ?').bind(after,limit+1)).all()).results||[];
+  const rows=(await (month?env.DB.prepare('SELECT game_key,torch_no,name,alias,at FROM torch_credits WHERE at>=? AND at<? AND torch_no>? ORDER BY torch_no ASC LIMIT ?').bind(lo,hi,after,limit+1)
+   :env.DB.prepare('SELECT game_key,torch_no,name,alias,at FROM torch_credits WHERE torch_no>? ORDER BY torch_no ASC LIMIT ?').bind(after,limit+1)).all()).results||[];
   const more=rows.length>limit,page=rows.slice(0,limit),titles=await titlesFor(env,[...new Set(page.map(r=>r.game_key))]);
   const total=month?(await env.DB.prepare('SELECT n FROM torch_months WHERE month=?').bind(month).first())?.n|0:await totalOf(env);
   return json({ok:true,total,month:month||null,items:page.map(r=>shape(r,titles)),next:more?String(page[page.length-1].torch_no):null},200,PUBLIC);});}
@@ -127,15 +125,19 @@ export async function findGet(env,url,{json,fail},ctx=null){
  if(!env.DB)return fail('NOT_CONFIGURED',503);
  const raw=String(url.searchParams.get('name')||'').replace(ZERO_WIDTH,'').replace(CONTROL,' ').slice(0,60),k=nameKey(raw);
  if(!k||[...k].length>MAX_NAME)return fail('INVALID_NAME');
- return cached('https://megulit-relay.internal/torch/find/'+encodeURIComponent(k),ctx,async()=>{
-  const rows=(await env.DB.prepare('SELECT c.torch_no,c.name,c.at FROM torch_names n JOIN torch_credits c ON c.torch_no=n.torch_no WHERE n.name_key>=? AND n.name_key<? AND c.name IS NOT NULL ORDER BY n.name_key,n.torch_no LIMIT 50').bind(k,k+'￿').all()).results||[];
-  return json({ok:true,items:rows.map(r=>({torchNo:r.torch_no|0,name:r.name,at:r.at|0,month:monthOf(r.at)}))},200,PUBLIC);});}
+ return cached('https://megulit-relay.internal/torch/find/v2/'+encodeURIComponent(k),ctx,async()=>{
+  const end=k+'￿';
+  const rows=(await env.DB.prepare(
+   'SELECT c.torch_no,c.name,NULL AS alias,c.at,n.name_key FROM torch_names n JOIN torch_credits c ON c.torch_no=n.torch_no WHERE n.name_key>=? AND n.name_key<? AND c.name IS NOT NULL '+
+   'UNION ALL SELECT torch_no,NULL,alias,at,alias FROM torch_credits WHERE name IS NULL AND alias>=? AND alias<? ORDER BY name_key,torch_no LIMIT 50'
+  ).bind(k,end,k,end).all()).results||[];
+  return json({ok:true,items:rows.filter(r=>nameKey(r.name||r.alias).startsWith(k)).map(r=>({...creditOut(r),month:monthOf(r.at)}))},200,PUBLIC);});}
 
 /* GET /api/torch/me[?key=<exe hash>] the caller's own numbers (the same salted IP hash the uploads used), optionally for one game; never cached */
 export async function meGet(env,url,reporter,{json,fail},KEY){
  if(!env.DB)return fail('NOT_CONFIGURED',503);const key=url.searchParams.get('key');
  if(key&&!KEY.test(key))return fail('INVALID_KEY');
- const rows=(await (key?env.DB.prepare('SELECT game_key,torch_no,name,at FROM torch_credits WHERE reporter_hash=? AND game_key=? ORDER BY torch_no ASC LIMIT 500').bind(reporter,key)
-  :env.DB.prepare('SELECT game_key,torch_no,name,at FROM torch_credits WHERE reporter_hash=? ORDER BY torch_no ASC LIMIT 500').bind(reporter)).all()).results||[];
+ const rows=(await (key?env.DB.prepare('SELECT game_key,torch_no,name,alias,at FROM torch_credits WHERE reporter_hash=? AND game_key=? ORDER BY torch_no ASC LIMIT 500').bind(reporter,key)
+  :env.DB.prepare('SELECT game_key,torch_no,name,alias,at FROM torch_credits WHERE reporter_hash=? ORDER BY torch_no ASC LIMIT 500').bind(reporter)).all()).results||[];
  const titles=await titlesFor(env,[...new Set(rows.map(r=>r.game_key))]);
  return json({ok:true,items:rows.map(r=>({...shape(r,titles),month:monthOf(r.at)}))},200,{'cache-control':'private, no-store'});}
