@@ -53,7 +53,7 @@ test('script: the cleared line is reported once, empty and not hidden, and only 
 test('wiring: the clear follows the flush in the wrapped MessageLayer.clear; the seed switches it on for ファタ only', () => {
   assert.ok(script.includes('try {this.st.flush(this,true);this.st.clearSent(this);this.cleared=true;'));
   assert.ok(script.includes("if(rec.role!='name') rec.sentLine=rec.line;"));
-  assert.ok(script.includes("else if(t=='#clearline') c.clear=1;"));
+  assert.ok(script.includes("if(t=='#clearline') c.clear=1;"));
   const P = require('../core/profiles/index.cjs'), E = require('../core/engine-draw.cjs');
   const fata = P.profileFor({ exe: 'E:/GAL/海市蜃楼之馆/fata_jp.exe', engine: 'KiriKiri' }), senren = P.profileFor({ exe: 'D:/Games/SenrenBanka/SenrenBanka.exe', engine: 'KiriKiri' });
   assert.equal(E.settings(fata).clear, true); assert.equal(E.settings(senren).clear, false, 'kernel default off');
@@ -66,6 +66,83 @@ function placementRig() {
   p.configure({ hookProfile: 'embed', hookHide: true }, { bound: true, clientWidth: 804, clientHeight: 604 }); sent.length = 0;
   return { p, sent, feed: raw => { const before = sent.length; p.hook(tp.parseChars(raw)); return sent.slice(before); } };
 }
+
+test('owner 06:05:27: glyph fragments and an unarmed observer do not take over the native page', () => {
+  const { p, sent } = placementRig();
+  const recovered = [];
+  p.hidden = line => recovered.push(line.text);
+  p.profile = require('../core/profiles/index.cjs').profileFor({ exe: 'D:/Games/fata_jp.exe', engine: 'KiriKiri' });
+  assert.equal(p.profile.page.engineRows, true);
+  const nativeLine = (line, text, y) => ({
+    type: 'hookCharRects', engine: 'krkr', line, hidden: true, text, sw: 800, sh: 600,
+    rects: [...text].map((_, i) => [70 + i * 19, y, 19, 22])
+  });
+  const first = 'うふふ……', full = 'いやだ、わたくしったら、ついついはしゃいでしまいました。';
+  p.hook(nativeLine(63, first, 488));
+  const glyph = (seq, text) => p.glyph({
+    seq, text, dots: [...text].map((ch, i) => ({ i, ch, h: 22, a: 19, k: 'd', at: { space: 'c', x: 172 + i * 19, y: 486 } }))
+  });
+  glyph(54, 'だ、');
+  p.hook({ ...nativeLine(57, 'い', 486), engine: 'gpu', hidden: false });
+  p.hook(nativeLine(64, full, 517));
+  glyph(56, 'たくしった');
+  p.page({ type: 'hookGpuPage', awake: true, armed: false, lines: [] });
+  assert.deepEqual(recovered, [first, full]);
+  assert.deepEqual(sent.at(-1).lines.map(row => row.text), [first, full]);
+  p.hook({ ...nativeLine(64, '', 517), hidden: false });
+  assert.deepEqual(sent.at(-1).lines, [], 'the current native line still clears the whole page');
+  p.configure({}, { bound: true, gameProcessId: 99, clientWidth: 804, clientHeight: 604 });
+  glyph(1, '次の行');
+  assert.equal(sent.at(-1).text, '次の行', 'glyph fallback works before a new binding has an engine page');
+});
+
+test('native character rows have one reader view and place its Chinese below the current Japanese', async t => {
+  let chromium;
+  try { ({ chromium } = require(process.env.MEGULIT_PLAYWRIGHT || 'H:/MeguLit-Work/pw/node_modules/playwright-core')); }
+  catch { t.skip('no playwright-core'); return; }
+  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await page.setContent('<body class="tomoyo-gal-bound tomoyo-ui-translation"><div class="sentence-window"></div></body>');
+    await page.evaluate(() => {
+      window.MeguLitProfile = { get: key => key === 'page.engineRows' };
+      window.__tomoyoChinese = {
+        galStatus() {},
+        galLayoutInfo: () => ({ clientX: 236, clientY: 235, clientWidth: 804, clientHeight: 604, workBottom: 900 })
+      };
+    });
+    for (const file of ['island-page.js', 'hook-reader.js', 'text-place.js']) {
+      await page.addScriptTag({ path: path.join(root, 'web', 'reader', 'modules', file) });
+    }
+    await page.evaluate(() => {
+      const b = window.__tomoyoChinese;
+      const first = 'うふふ……', current = 'いやだ、わたくしったら、ついついはしゃいでしまいました。';
+      b.textPlaceMode({ on: true, game: '48972' });
+      b.galStatus({ hookActive: true, hookSource: current, hookSourceEngine: 'krkr', hookSourceLine: 128, hookSequence: 66 });
+      const row = document.createElement('div');
+      row.className = 'tomoyo-cn-row';
+      row.textContent = '哎呀，我太得意忘形了';
+      document.querySelector('.tomoyo-hook-reader').append(row);
+      const line = (id, text, y) => ({ id, text, rects: [...text].map((_, i) => [70 + i * 19, y, 19, 22]) });
+      b.textPlacePage({ awake: true, armed: true, client: [804, 604], lines: [line('krkr:63', first, 491), line('krkr:64', current, 520)] });
+    });
+    await page.waitForFunction(() => {
+      const tokens = [...document.querySelectorAll('.tomoyo-hook-reader .sentence-text:not(.megulit-old-line) .char-token')];
+      return tokens.length === 28 && tokens.every(token => !token.classList.contains('megulit-unplaced'));
+    });
+    const result = await page.evaluate(() => {
+      const jp = document.querySelector('.tomoyo-hook-reader .sentence-text .char-token').getBoundingClientRect();
+      const cn = document.querySelector('.tomoyo-hook-reader .tomoyo-cn-row').getBoundingClientRect();
+      return {
+        spatial: document.querySelectorAll('.tome-island-page').length,
+        previous: document.querySelector('.megulit-old-line').textContent,
+        translationX: cn.left,
+        belowJapanese: cn.top >= jp.bottom
+      };
+    });
+    assert.deepEqual(result, { spatial: 0, previous: 'うふふ……', translationX: 306, belowJapanese: true });
+  } finally { await browser.close(); }
+});
 
 test('placement: the real line 25, then the clear: the placement lets it go; the next line is placed as before', () => {
   const { feed } = placementRig();

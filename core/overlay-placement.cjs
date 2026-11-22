@@ -65,6 +65,7 @@ class OverlayPlacement {
     /* engine position hooks (hookTextPos: line box in game-screen px) anchor lines that come without device positions */
     if (m.type === 'hookTextPos') { const k = m.sw > 0 && this.client[0] ? this.client[0] / m.sw : 1, ky = m.sh > 0 && this.client[1] ? this.client[1] / m.sh : k; if ([m.x0, m.y0, m.x1, m.size].every(Number.isFinite) && m.size > 0) this.anchor({ x: m.x0 * k, y: m.y0 * ky, size: m.size * ky, width: Math.max((m.x1 - m.x0) * k, m.size * ky * 16) }); return; }
     if (m.type === 'hookCharRects') {
+      if (m.engine === 'gpu' && m.hidden !== true && this.ownsEngineRows()) return;
       if (m.engine !== 'gpu') this.engineSeen = true; /* an engine reports this game's lines with their places (krkr, renpy, …) */
       const chars = [...String(m.text || '')].map(c => c === '\u001f' ? '\n' : c), flat = [];
       for (const c of chars) if (c !== '\n' && c !== '\r') flat.push(c);
@@ -113,6 +114,9 @@ class OverlayPlacement {
   }
   /* auto (null): back to the line model once the page holds one line again */
   rowsUnpage() { if (!this.rowsPaged) return; this.rowsPaged = false; this.pageKey = ''; this.send({ type: 'textPlacePage', lines: null }); }
+  ownsEngineRows() {
+    return this.rowsPaged === true && require('./profiles/index.cjs').get(this.profile, 'page.engineRows', false) === true;
+  }
   rowsCleared(id) { if (!this.rowPage || !this.rowPage.length) return; this.why('rowsgone:' + id, 'page: cleared by the game with ' + id + ', its ' + this.rowPage.length + ' row(s) go'); this.rowPage = [];
     if (require('./profiles/index.cjs').get(this.profile, 'page.engineRows', null) === true) this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: [] }); else this.rowsUnpage(); }
   /* ① MeguLitFont blank mode (record spec 3): the current line's table (hook-native state.hookGlyphDots) with a cell
@@ -124,6 +128,8 @@ class OverlayPlacement {
     if (!this.on || !table || typeof table.text !== 'string' || !table.text) return;
     const chars = [...table.text], { rects, drawn: recorded, sizes } = this.rectsOf(table, ['d', 'c']);
     const id = 'glyph:' + (Number(table.seq) || 0);
+    // A glyph fragment from the same draw can otherwise replace the native page's source.
+    if (this.ownsEngineRows()) return;
     /* 2026-11-16 (死に逝く君、館に芽吹く憎悪, KiriKiri: 「間　側　法律　当　　ば　ほとんど　犯罪行」): an engine with a glyph
        cache rasterises a character once and reuses the bitmap, so a character an earlier line used has no record in
        this one. "Drawn" used to mean "has a record", and every reused character stayed out for good: the reader drew
@@ -311,6 +317,7 @@ class OverlayPlacement {
      out as `elsewhere` and the reader places the line as it would without a page. */
   page(m, o = {}) {
     if (!this.on || !m) return;
+    if (m.type === 'hookGpuPage' && !m.armed && this.ownsEngineRows()) return;
     const [cw, ch] = this.client, kx = m.sw > 0 && cw ? cw / m.sw : 1, ky = m.sh > 0 && ch ? ch / m.sh : kx;
     const elsewhere = !m.armed && !!m.awake && o.replaced === true;
     const lines = m.awake && m.armed ? m.lines.map(l => ({ id: l.id, text: l.text, rects: l.rects.slice(0, [...l.text].length).map(r => [Math.round(r[0] * kx), Math.round(r[1] * ky), Math.round(r[2] * kx), Math.round(r[3] * ky)]) })) : [];

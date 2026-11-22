@@ -51,7 +51,8 @@
   if(typeof m.hookSource==='string'&&hiddenAt&&Date.now()-hiddenAt>=HIDDEN_HOLD_MS&&m.hookSource!==text){held={m,at:Date.now()};heldKeys.add(m.hookSource);b.hookHiddenHeld=(b.hookHiddenHeld||0)+1;return;}
   if(typeof m.hookSource==='string'){const next=once(b.splitDialogue(m.hookSource).text),old=text,oldSequence=sequence;sequence=Number.isSafeInteger(m.hookSequence)?m.hookSequence:next===text?sequence:sequence+1;/* the same line redrawn from its start (a shorter piece of what is shown) keeps the whole line: nothing is cut, nothing typed again */{const k=window.TomeLineOnce?.key||(v=>String(v||'').replace(/[\s　]+/g,''));text=sequence===oldSequence&&old&&k(next)&&k(next).length<k(old).length&&k(old).startsWith(k(next))?old:next;}
    {const who=b.splitDialogue(m.hookSource).name;if(sequence===oldSequence){}else if(!boxCleared&&!(who&&speaker&&who!==speaker)&&grows(old,text))continued=sequence;else continued=null;if(who)speaker=who;boxCleared=false;}
-   if(sequence!==oldSequence&&continued!==sequence){if(pending)decide(false);const key=/^(?:cs2|krkr|renpy|ocr)$/.test(engine)?token(next):null,report=key!==null?reports.get(key):early&&Date.now()-early.at<300?early:null;early=null;
+   if(b.textPlaceEngineRowsActive?.()){if(pending)clearTimeout(pending.timer);pending=null;page=[];}
+   else if(sequence!==oldSequence&&continued!==sequence){if(pending)decide(false);const key=/^(?:cs2|krkr|renpy|ocr)$/.test(engine)?token(next):null,report=key!==null?reports.get(key):early&&Date.now()-early.at<300?early:null;early=null;
     if(report&&Date.now()-report.at<5000){if(key!==null)reports.delete(key);page=report.same&&old?join(page,old,next):[];}
     else if((/^(?:cs2|krkr|renpy|ocr)$/.test(engine)||Date.now()-pageEngineAt<10*60*1000)&&next){pending={page,previous:old,token:key,timer:setTimeout(()=>decide(false),/^(?:cs2|krkr|renpy|ocr)$/.test(engine)?1200:150)};return;}else page=[];}}
   if(!pending){paint();window.__tomeTextPosition?.refresh?.();}};
