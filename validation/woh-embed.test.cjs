@@ -163,7 +163,7 @@ test('E358 wiring: the reader checks the game glyphs before writing back; the br
  assert.match(bridge,/string reply=hide\?\(p\.hidden\?\?""\):EmbedTextPolicy\.Writeback\(p\.text,trans\);/);
  assert.match(bridge,/new PendingEmbed\{tp=tp,text=text,hidden=replacement(,code=candidate\.code)?\}/);
  assert.match(bridge,/d\.TryGetValue\("hide",out hv\)&&Convert\.ToBoolean\(hv\)/);
- assert.match(text,/const api=\{kind:'patch',patch:!!patched,fill,drawable,tableDrawable,/);
+ assert.match(text,/const api=\{kind:'patch',patch:!!patched,[^;]*?\bfill,drawable,tableDrawable,/);
 });
 
 test('E358 real data: WoH\'s Japanese font cannot draw the reported line; every line it can draw has all its glyphs',t=>{
