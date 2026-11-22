@@ -95,8 +95,11 @@ public static class GameCapture{
   /* a frozen window is printed client area only (PW_CLIENTONLY), as BitBlt read it: every reader gets the same framing and
      can share the kept print. Blind windows keep the caller's flags. */
   bool printed;using(var g=Graphics.FromImage(image)){IntPtr dc=g.GetHdc();try{printed=PrintWindow(hwnd,dc,frozen?printFlags|1:printFlags);}finally{g.ReleaseHdc(dc);}}
-  switch(AfterPrint(printed,printed&&!Blank(image),frozen,screenFallback)){
-   case 1:if(frozen)Keep(hwnd,c,round,image);return true;
+  return DeliverPrint(hwnd,c,round,image,printed,printed&&!Blank(image),frozen,screenFallback);
+ }
+ static bool DeliverPrint(IntPtr hwnd,Choice c,int round,Bitmap image,bool printed,bool good,bool frozen,bool screenFallback){
+  switch(AfterPrint(printed,good,frozen,screenFallback)){
+   case 1:if(!frozen||Keep(hwnd,c,round,image))return true;Skipped=true;return false;
    case 0:Skipped=true;return false;
    case 2:return printed;
   }
@@ -208,9 +211,9 @@ public static class GameCapture{
  }
  // A frozen window is printed once every PrintGapMs for all readers together, so most readers are skipped most of the time.
  // Its last printed picture is kept for Recent (the scene probe needs every one of them, not one in several).
- // A window dropped meanwhile (Drop, or another window took its place) or moved to a new round / unfrozen keeps no print.
- static void Keep(IntPtr hwnd,Choice c,int round,Bitmap image){lock(Gate){Choice cur;if(!Choices.TryGetValue(hwnd,out cur)||cur!=c||!c.Frozen||c.Round!=round)return;if(c.Last==null||c.Last.Width!=image.Width||c.Last.Height!=image.Height){if(c.Last!=null)c.Last.Dispose();c.Last=new Bitmap(image.Width,image.Height,PixelFormat.Format32bppArgb);}
-  using(var g=Graphics.FromImage(c.Last)){g.CompositingMode=System.Drawing.Drawing2D.CompositingMode.SourceCopy;g.DrawImage(image,0,0,image.Width,image.Height);}c.LastAt=DateTime.UtcNow;}}
+ // Returns false (and keeps nothing) when the window was dropped, replaced, unfrozen or moved to a new round meanwhile.
+ static bool Keep(IntPtr hwnd,Choice c,int round,Bitmap image){lock(Gate){Choice cur;if(!Choices.TryGetValue(hwnd,out cur)||cur!=c||!c.Frozen||c.Round!=round)return false;if(c.Last==null||c.Last.Width!=image.Width||c.Last.Height!=image.Height){if(c.Last!=null)c.Last.Dispose();c.Last=new Bitmap(image.Width,image.Height,PixelFormat.Format32bppArgb);}
+  using(var g=Graphics.FromImage(c.Last)){g.CompositingMode=System.Drawing.Drawing2D.CompositingMode.SourceCopy;g.DrawImage(image,0,0,image.Width,image.Height);}c.LastAt=DateTime.UtcNow;return true;}}
  // Copies a frozen window's last print into image when it is at most KeptMs old (Picture).
  static bool Kept(Choice c,Bitmap image,DateTime now){
   lock(Gate){if(!c.Frozen||c.Last==null||(now-c.LastAt).TotalMilliseconds>KeptMs||c.Last.Width!=image.Width||c.Last.Height!=image.Height)return false;
@@ -318,23 +321,32 @@ public static class GameCapture{
    // Drop leaves no disposed print behind, and a Keep still running for a dropped window keeps nothing
    lock(Gate)Drop();if(k.Last!=null)return false;Keep(key,k,k.Round,p);if(k.Last!=null)return false;}}
   finally{lock(Gate){Choices.Remove(key);Release(k);}}
-  // a print started during frozen round A that finishes after Stale saw B (round changed) never enters B's cache
+  // a print started during frozen round A that finishes after Stale saw B (round changed) is skipped and never enters B's cache
   var lateKey=new IntPtr(-78);var lk=new Choice();lock(Gate)Choices[lateKey]=lk;
   try{using(var p=new Bitmap(8,8,PixelFormat.Format32bppArgb))using(var q=new Bitmap(8,8,PixelFormat.Format32bppArgb)){
    Stale(lk,1,t,differs);foreach(int ms in new[]{3100,3700,4300})Stale(lk,1,t.AddMilliseconds(ms),differs);
    if(!lk.Frozen)return false;int roundA=lk.Round;
    if(Stale(lk,2,t.AddMilliseconds(4500),differs)||lk.Frozen)return false;
-   Keep(lateKey,lk,roundA,p);
-   if(lk.Last!=null)return false;
+   Skipped=false;if(DeliverPrint(lateKey,lk,roundA,p,true,true,true,false)||!Skipped||lk.Last!=null)return false;
    foreach(int ms in new[]{7600,8200,8800})Stale(lk,2,t.AddMilliseconds(ms),differs);
    if(!lk.Frozen)return false;
    DateTime seen=DateTime.MinValue;if(Recent(lateKey,q,ref seen)||Kept(lk,q,DateTime.UtcNow))return false;
    // even if A's print arrives after B is already frozen again, roundA does not match B's round
-   Keep(lateKey,lk,roundA,p);
+   Skipped=false;if(DeliverPrint(lateKey,lk,roundA,p,true,true,true,false)||!Skipped)return false;
    seen=DateTime.MinValue;if(lk.Last!=null||Recent(lateKey,q,ref seen)||Kept(lk,q,DateTime.UtcNow))return false;
-   // an unfrozen window keeps nothing even for its current round
+   // a print matching B's current frozen round is delivered and cached
+   Skipped=false;if(!DeliverPrint(lateKey,lk,lk.Round,p,true,true,true,false)||Skipped||lk.Last==null)return false;
+   // an unfrozen window skips delivery and keeps nothing even for its current round
    if(Stale(lk,3,t.AddMilliseconds(9000),differs)||lk.Frozen)return false;
-   Keep(lateKey,lk,lk.Round,p);if(lk.Last!=null)return false;}}
+   Skipped=false;if(DeliverPrint(lateKey,lk,lk.Round,p,true,true,true,false)||!Skipped||lk.Last!=null)return false;
+   // a dropped or replaced window skips delivery and keeps nothing; a non-frozen (blind) print still delivers
+   foreach(int ms in new[]{12100,12700,13300})Stale(lk,3,t.AddMilliseconds(ms),differs);
+   if(!lk.Frozen)return false;
+   var newer=new Choice{Frozen=true,Round=lk.Round};lock(Gate)Choices[lateKey]=newer;
+   Skipped=false;if(DeliverPrint(lateKey,lk,lk.Round,p,true,true,true,false)||!Skipped||lk.Last!=null||newer.Last!=null)return false;
+   lock(Gate)Drop();
+   Skipped=false;if(DeliverPrint(lateKey,lk,lk.Round,p,true,true,true,false)||!Skipped||lk.Last!=null)return false;
+   Skipped=false;if(!DeliverPrint(lateKey,lk,0,p,true,true,false,false)||Skipped)return false;}}
   finally{lock(Gate){Choices.Remove(lateKey);Release(lk);}}
   return true;
  }
