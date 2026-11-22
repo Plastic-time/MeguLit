@@ -150,9 +150,9 @@ test('client sync uploads a long bilingual saved sentence with the other pending
  const r=relay(),clock={now:T0.getTime()},A=device(t,r,clock),B=device(t,r,clock);
  const text='読'.repeat(3000),translation='读'.repeat(3000);
  A.run(db=>{
-  const save=db.prepare("INSERT INTO saved_sentences(text,translation,created_at,original) VALUES(?,?,?,'{}')");
-  save.run(text,translation,1);
-  save.run('短い文','短句',2);
+  const {save}=require('../services/saved-sentences.cjs');
+  save(db,{text,translation},1000);
+  save(db,{text:'短い文',translation:'短句'},2000);
  });
  await signIn(A,r);clock.now+=61000;await signIn(B,r);
  const result=await A.a.sync();
@@ -163,8 +163,26 @@ test('client sync uploads a long bilingual saved sentence with the other pending
  assert.deepEqual(rows.map(row=>[row.text,row.translation]),[[text,translation],['短い文','短句']]);
 });
 
+test('migrated saved sentences keep their original sync key across retries and deletion',async t=>{
+ const {handleAccounts}=await load(),r=relay(),clock={now:T0.getTime()},A=device(t,r,clock),B=device(t,r,clock);
+ const text='読'.repeat(3001),key='s:'+require('node:crypto').createHash('sha256').update(text).digest('hex').slice(0,32);
+ A.run(db=>db.prepare("INSERT INTO saved_sentences(text,created_at,original) VALUES(?,1,'{}')").run(text));
+ await signIn(A,r);clock.now+=61000;await signIn(B,r);
+ const stale=await handleAccounts(req('PUT','/api/sync/sentences',{records:[{key,updated_at:clock.now,data:{text:text.slice(0,3000)}}]},
+  {authorization:'Bearer '+A.a.token()}),r.env,new Date(clock.now));
+ assert.equal(stale.status,413,'an older client must not upload a mismatched long record');
+ assert.equal((await A.a.sync()).summary.sentences.pushed,1);
+ await B.a.sync();
+ assert.equal(B.run(db=>db.prepare('SELECT text FROM saved_sentences').get().text),text);
+ assert.equal((await B.a.sync()).summary.sentences.pushed,0);
+ A.run(db=>db.exec('DELETE FROM saved_sentences'));
+ clock.now+=1000;await A.a.sync();await B.a.sync();
+ assert.equal(B.run(db=>db.prepare('SELECT COUNT(*) AS n FROM saved_sentences').get().n),0);
+});
+
 test('the relay bounds the size of each serialized sentence in bytes',async()=>{
- const {validateRecord}=await load(),updated_at=T0.getTime();
+ const {validateRecord,RECORD_CAP}=await load(),updated_at=T0.getTime();
+ assert.deepEqual(account.RECORD_CAP,RECORD_CAP);
  const body=length=>({key:'s:a',updated_at,data:{text:'x'.repeat(length-Buffer.byteLength('{"text":""}'))}});
  assert.equal(validateRecord('sentences',body(40*1024),updated_at).error,undefined);
  assert.equal(validateRecord('sentences',body(40*1024+1),updated_at).error,'RECORD_TOO_LARGE');
