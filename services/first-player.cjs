@@ -14,8 +14,11 @@ async function state(db,root,id,{wait=2500,fetcher=globalThis.fetch,hash,torchKe
  const auto=require('../core/auto-profile.cjs'),feed=require('./auto-profile-feed.cjs');
  const key=(hash?await timeout(hash(row.executable),wait):await timeout(auto.exeKey(root,row.executable),Math.max(wait,3000)))||'';if(!key)return HIDDEN;
  const seed=require('../core/profiles/seed.cjs').versionOf(key);
- const presentation=require('./presentation.cjs').read(root,key);
+ const presentation=require('./presentation.cjs').forGame(root,key,row.executable,id);
  const local=seed?{key,bundled:{source:seed.source,revision:seed.rev}}:{key};if(presentation)local.presentation=presentation;
+ const live=require('./self-check-live.cjs').current();
+ if(live?.reader.root===root&&live.exe===row.executable&&live.key===key&&live.reader.gal?.profile?.exeSha256===key)local.application=live.reader.gal.profile.application;
+ const inactiveCard=local.application?.layers.length?{...local,state:'applied'}:HIDDEN;
  const receiver=require('./torch-receive.cjs');
  const receipt=await receiver.installed(root,key,{exe:row.executable,...(torchKeys?{keys:torchKeys}:{})});
  if(receipt)return {...local,state:'received',receipt};
@@ -32,14 +35,14 @@ async function state(db,root,id,{wait=2500,fetcher=globalThis.fetch,hash,torchKe
  const age=Date.now()-pending?.checkedAt;
  // A confirmed miss can outlive a subsequent publication.
  const missing=pending?.key===key&&pending.code==='TORCH_NOT_PUBLISHED'&&age>=0&&age<MISSING_TTL&&!layer;
- if(!missing)return seed?{...local,state:'bundled'}:HIDDEN;
+ if(!missing)return seed?{...local,state:'bundled'}:inactiveCard;
  let storedEngine=row.engine||'';try{storedEngine=JSON.parse(row.original||'{}').library?.engine||storedEngine;}catch{}
  const engine=engineKnown(seed?.engine||storedEngine);
- if(!engine)return seed||isolated?{...local,state:'not-published'}:HIDDEN;
+ if(!engine)return seed||isolated?{...local,state:'not-published'}:inactiveCard;
  if(isolated||seed){
   return {...local,state:'not-published',eligible:true,submission:isolated?'isolated':'bundled'};
  }
- if(hasGameSeed(row,engine,key))return HIDDEN;
+ if(hasGameSeed(row,engine,key))return inactiveCard;
  return {...local,state:feed.sharing(root)?'first':'off',eligible:true};}
 /* the card's credit box: name = the text typed, null = anonymous / withdraw. -> {state:'saved'|'local'|'failed', credit} */
 async function setCredit(db,root,id,name,{fetcher=globalThis.fetch,hash}={}){

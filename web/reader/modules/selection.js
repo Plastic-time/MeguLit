@@ -12,7 +12,7 @@
   };
  const explain=(args,mode)=>new Promise((resolve,reject)=>{const id=++serial,timer=setTimeout(()=>{pending.delete(id);reject(Error('学习 API 等待超时，请稍后重试'));},45000);
   pending.set(id,{resolve,reject,timer});send({type:'lookupExplain',id,args,mode,options:b.options()});});
- function close(keepSurface=false){if(!keepSurface)try{getSelection()?.removeAllRanges();}catch{}pointSerial++;serial++;card?.remove();card=null;current=null;b.selectionActive=false;
+ function close(keepSurface=false){if(!keepSurface)try{getSelection()?.removeAllRanges();}catch{}b.refreshTranslationOrigin=null;pointSerial++;serial++;card?.remove();card=null;current=null;b.selectionActive=false;
   for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('选区已关闭'));}pending.clear();document.body.classList.remove('tomoyo-selection-open');try{send({
   type:'lookupCancel'});if(!keepSurface)send({type:'galLookup',open:false});}catch{}}
  function textBlock(word){const root=anchor?.closest?.('.sentence-text,.tome-log-src');if(!root)return word;const own=root.getBoundingClientRect(),parent=root.parentElement?.getBoundingClientRect?.();
@@ -150,7 +150,12 @@
   '本地查词与选区解释');const top=el('header');dragCard(top);if(typeof ResizeObserver==='function'){const watched=card;new ResizeObserver(()=>{if(card===watched&&watched.isConnected)place();
   }).observe(watched);}top.append(el('span',''),button('×',()=>close()));const body=el('div','tomoyo-selection-body'),status=el('div','tomoyo-muted','本地查询中…'),actions=el('footer'),
   ai=el('div','tomoyo-ai-result');ai.hidden=true;actions.append(button('上下文解释',()=>askAI('explain')),button('AI 归纳义项',()=>askAI('summary')));body.append(status);
-  card.append(top,actions,ai,body);document.body.append(card);document.body.classList.add('tomoyo-selection-open');send({type:'galLookup',open:true});place();
+  const anchorNode=at?.startContainer;const pair=(anchorNode?.parentElement||anchorNode)?.closest?.(".tome-island-pair");
+  const origin=el('small','tomoyo-muted');
+  b.refreshTranslationOrigin=()=>{const data=pair?.querySelector('.tomoyo-cn-output')?.dataset,r=b.returnedTranslation,hit=pair?{source:data?.translationOrigin,cached:data?.translationSource==='cache',provider:data?.translationProvider}:r&&r.id===b.serial&&r.target===b.translationTarget?.()&&r.line===args.text?r:null;
+   const names={script:'剧本',official:'官方译文',api:'API',unknown:'未知',patch:'补丁',machine:'机器翻译',mt:'机器翻译',local:'本地模型'};
+   origin.textContent='本句译文来源 · '+(hit?.cached?'缓存 · ':'')+(names[hit?.source]||'未知')+(hit?.provider?' · '+hit.provider:'');};
+  b.refreshTranslationOrigin();card.append(top,origin,actions,ai,body);document.body.append(card);document.body.classList.add('tomoyo-selection-open');send({type:'galLookup',open:true});place();
   // Short entrance (user, 2026-11-02): compositor-only translate/scale on the card (its CSS pins opacity/transform/animation)
   // and a fade on its contents, ~140 ms; the window region is refreshed once it settles.
   if(!['glass','both'].includes(document.documentElement.dataset.tomeCardSurface)&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const ease='cubic-bezier(.2,.7,.2,1)';

@@ -29,6 +29,16 @@ const post=(ip,record)=>user(ip)('https://relay.test/api/game-profile/report',{m
 const get=async key=>{const r=await user('9.9.9.9')('https://relay.test/api/game-profile/'+key);return {status:r.status,body:await r.json()};};
 const signRun=async()=>tool.signPicks('https://relay.test',path.join(KEYDIR,'signed'),{upload:true,fetcher:toolFetch,env:TOOLENV});
 
+test('same executable and reporter retain separate reviewed contributions for different scripts',async()=>{
+ const key=H('6'),profile=ap.diagnostic(rec(key,'hide',HIDE)).profile;
+ for(const script of [H('7'),H('8')]){
+  const res=await user('12.8.2.1')('https://relay.test/api/game-profile/report',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({version:1,profile,prints:{script}})});
+  assert.equal(res.status,201);
+ }
+ const rows=ENV.DB.raw.prepare('SELECT reporter,settings_hash,prints FROM auto_profile_reports WHERE game_key=?').all(key);
+ assert.equal(new Set(rows.map(r=>r.reporter)).size,2);assert.equal(new Set(rows.map(r=>r.settings_hash)).size,2);
+ assert.equal(ENV.DB.raw.prepare('SELECT count(*) AS n FROM auto_profile_picks WHERE game_key=?').get(key).n,0);
+});
 test('domains: every kernel key has a value domain and its default is in it; anything else is dropped',()=>{const D=require('../core/profiles/defaults.cjs');
  for(const leaf of domains.leaves(D)){assert.ok(domains.DOMAINS[leaf],'no domain for '+leaf);const v=leaf.split('.').reduce((o,k)=>o[k],D);assert.ok(domains.okValue(domains.DOMAINS[leaf],v),'default out of domain: '+leaf);}
  const c=domains.clean({placement:{firstLineAnchor:'glyph',lineOffsetY:9999,evil:'x'},choice:{filters:['(a+)+$','^…$']},hide:{textEffectsRead:'yes'},code:{run:'process.exit()'}});

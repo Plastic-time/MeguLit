@@ -71,14 +71,16 @@ export function validateReport(body){const p=body?.profile;if(body?.version!==1|
   engine:String(p.engine||'').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,32),exe:String(p.exe||'').toLowerCase().replace(/[\\/:*?"<>|]/g,'').slice(0,80),app:SEMVER.test(String(p.version||''))?String(p.version):''}};}
 
 /* the agreed best result from report rows, or null */
-export function pick(rows,{agree=PROFILE_LIMITS.agree}={}){if(!rows.length)return null;const groups=new Map();
+export function pick(rows,{agree=PROFILE_LIMITS.agree}={}){if(!rows.length)return null;const variants=new Set(rows.map(row=>{try{return JSON.parse(row.prints||'{}').script||'';}catch{return '';}}));
+ if(variants.size>1)return null;
+ const groups=new Map();
  for(const r of rows){let g=groups.get(r.settings_hash);if(!g){g={hash:r.settings_hash,mode:r.mode,settings:r.settings,n:0,cost:0,at:0,engine:r.engine||'',exe:r.exe||'',prints:r.prints||'{}'};groups.set(r.settings_hash,g);}g.n++;g.cost+=Number(r.cost)||0;if((Number(r.updated_at)||0)>=g.at){g.at=Number(r.updated_at)||0;g.prints=r.prints||g.prints;}}
  const all=[...groups.values()].map(g=>({...g,cost:g.cost/g.n})),total=rows.length,readN=rows.filter(r=>r.mode==='read').length;
  const out=g=>{let settings={},prints={};try{settings=JSON.parse(g.settings);}catch{}try{prints=JSON.parse(g.prints);}catch{}return {hash:g.hash,mode:g.mode,settings,prints,agree:g.n,reporters:total,cost:Math.round(g.cost*1000)/1000,at:g.at,engine:g.engine,exe:g.exe};};
  if(readN*2>total&&readN>=agree){const g=all.filter(x=>x.mode==='read').sort((a,b)=>b.n-a.n||b.at-a.at)[0];return {...out(g),agree:readN};}
  const hide=all.filter(g=>g.mode==='hide'&&g.n>=agree).sort((a,b)=>a.cost-b.cost||b.n-a.n||b.at-a.at);return hide[0]?out(hide[0]):null;}
 /* what a signature vouches for, minus the bookkeeping that may change between pick and signing */
-const essence=d=>canonical({key:d.key,layer:d.layer||'version',source:d.source,mode:d.mode,settings:d.settings});
+const essence=d=>canonical({key:d.key,layer:d.layer||'version',source:d.source,mode:d.mode,settings:d.settings,...(d.prints?.script?{script:d.prints.script}:{})});
 
 /* ---- fingerprints -> keys ------------------------------------------------------------------------------------------- */
 async function printKey(env,kind,value,layer){return value?(await env.DB.prepare('SELECT game_key FROM diff_prints WHERE kind=? AND value=? AND layer=?').bind(kind,value,layer).first())?.game_key||'':'';}
@@ -87,8 +89,8 @@ async function register(env,layer,key,prints,kinds,t){for(const k of kinds)if(pr
 async function gidFor(env,prints){for(const k of GAME_KINDS){const g=await printKey(env,k,prints[k],'game');if(g)return g;}const k=GAME_KINDS.find(x=>prints[x]);return k?sha256('game|'+k+':'+prints[k]):'';}
 /* the best key of a layer for the client's prints, with the print that found it */
 /* a build already filed under a game finds that game by its exe hash first */
-async function find(env,layer,prints){const kinds=layer==='version'?VERSION_KINDS:['exe',...GAME_KINDS];
- for(const k of kinds){if(!prints[k])continue;const key=layer==='version'&&k==='exe'?prints.exe:await printKey(env,k,prints[k],layer);if(!key)continue;const d=await best(env,layer,key);if(d)return {match:k,key,diff:d};}
+async function find(env,layer,prints){const kinds=layer==='version'?VERSION_KINDS:['script','exe',...GAME_KINDS.filter(k=>k!=='script')];
+ for(const k of kinds){if(!prints[k])continue;const key=layer==='version'&&k==='exe'?prints.exe:await printKey(env,k,prints[k],layer);if(!key)continue;const d=await best(env,layer,key);if(d&&!(d.source==='auto'&&d.prints?.script&&d.prints.script!==prints.script))return {match:k,key,diff:d};}
  return null;}
 async function best(env,layer,key){const rows=(await env.DB.prepare('SELECT source,body FROM game_diffs WHERE layer=? AND game_key=? AND withdrawn_at IS NULL').bind(layer,key).all()).results||[];
  const row=rows.find(r=>r.source==='official')||rows.find(r=>r.source==='auto');if(!row)return null;let document;try{document=JSON.parse(row.body);}catch{return null;}return await blockedProfile(env.DB,document)?null:document;}
@@ -98,7 +100,7 @@ async function settle(env,layer,key,now){const since=sec(now)-PROFILE_LIMITS.kee
  const rows=(await env.DB.prepare('SELECT settings_hash,settings,mode,cost,engine,exe,prints,updated_at FROM auto_profile_reports p WHERE '+(layer==='version'?'game_key':'gid')+"=? AND updated_at>=? AND NOT EXISTS(SELECT 1 FROM seed_admin_items a WHERE a.kind='report' AND a.game_key=p.game_key AND a.settings_hash=p.settings_hash AND a.state='deleted') ORDER BY updated_at DESC LIMIT 500").bind(key,since).all()).results||[];
  const p=pick(rows);
  if(!p){await env.DB.prepare('DELETE FROM auto_profile_picks WHERE layer=? AND game_key=?').bind(layer,key).run();return null;}
- const prints=pick2(p.prints,layer==='version'?VERSION_KINDS:GAME_KINDS);
+ const prints=pick2(p.prints,layer==='version'?[...VERSION_KINDS,'script']:GAME_KINDS);
  const draft=build({key,layer,prints,source:'auto',mode:p.mode,settings:p.settings,exe:layer==='version'?p.exe:'',engine:p.engine,issuedAt:now.toISOString(),agree:p.agree,reporters:p.reporters,cost:p.cost});
  const stamp=await sha256(essence(draft));const old=await env.DB.prepare('SELECT stamp,rev FROM auto_profile_picks WHERE layer=? AND game_key=?').bind(layer,key).first();
  if(old?.stamp===stamp)return p;
@@ -115,11 +117,12 @@ async function report(request,env,ip,now,{json,fail,readJSON}){
  const v=validateReport(body.value);if(!v.ok)return fail(v.error);const r=v.value,t=sec(now);
  /* 2026-11-21 传火署名: credit:{name?} next to profile (or inside it); refused whole when it is not a clean name (relay/src/torch-credit.js) */
  const cr=parseCredit(body.value.credit!==undefined?body.value.credit:body.value.profile?.credit,env);if(!cr.ok)return fail('INVALID_CREDIT');
- const hash=(await sha256(r.mode+'|'+canonical(r.settings))).slice(0,32);
+ const variant=r.prints.script||'';
+ const hash=(await sha256(r.mode+'|'+canonical(r.settings)+(variant?'|'+variant:''))).slice(0,32);
  if(!await reportAllowed(env.DB,r.key,hash))return fail('SEED_DELETED',410);
- const gid=await gidFor(env,r.prints);
+ const gid=variant?await sha256('game|script:'+variant):await gidFor(env,r.prints);
  await env.DB.prepare('INSERT INTO auto_profile_reports(game_key,reporter,gid,prints,settings_hash,settings,mode,source,cost,metrics,engine,exe,app,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(game_key,reporter) DO UPDATE SET gid=excluded.gid,prints=excluded.prints,settings_hash=excluded.settings_hash,settings=excluded.settings,mode=excluded.mode,source=excluded.source,cost=excluded.cost,metrics=excluded.metrics,engine=excluded.engine,exe=excluded.exe,app=excluded.app,updated_at=excluded.updated_at')
-  .bind(r.key,ip,gid,JSON.stringify(r.prints),hash,canonical(r.settings),r.mode,r.source,r.cost,JSON.stringify(r.metrics),r.engine,r.exe,r.app,t).run();
+  .bind(r.key,variant?await sha256(ip+'|'+variant):ip,gid,JSON.stringify(r.prints),hash,canonical(r.settings),r.mode,r.source,r.cost,JSON.stringify(r.metrics),r.engine,r.exe,r.app,t).run();
  await env.DB.prepare('DELETE FROM auto_profile_reports WHERE game_key=? AND reporter NOT IN (SELECT reporter FROM auto_profile_reports WHERE game_key=? ORDER BY updated_at DESC LIMIT ?)').bind(r.key,r.key,PROFILE_LIMITS.reportsPerKey).run();
  await register(env,'version',r.key,r.prints,['head','pe'],t);if(gid)await register(env,'game',gid,r.prints,['exe',...GAME_KINDS],t);
  const credit=await noteUpload(env,r.key,ip,cr,now);

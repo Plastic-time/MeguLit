@@ -42,7 +42,7 @@ const docOk=d=>gameDiff.validate(d).ok&&verify(d,keys());
 const part=d=>({source:d.source,mode:d.mode||'hide',settings:d.settings||{},rev:d.rev|0,issuedAt:d.issuedAt||'',agree:d.agree|0,reporters:d.reporters|0});
 const torchLayers=new WeakMap(),cachedRoots=new WeakMap(),layerDocuments=new WeakMap();
 function forExe(value,key,exe){if(!value?.torchBound)return value;const binding=torchLayers.get(value);if(!binding||binding.key!==key||!binding.root)return null;const answer=cached(binding.root,key);return answer?.torchRelease?layer(answer,key,{exe,torchTrust:binding.torchTrust}):null;}
-function layer(answer,key,{torchTrust,exe}={}){if(!answer||answer.schema!=='megulit.game-diff-feed'||answer.key!==key)return null;
+function layer(answer,key,{torchTrust,exe,script}={}){if(!answer||answer.schema!=='megulit.game-diff-feed'||answer.key!==key)return null;
  // An observation-bearing profile needs the checked release's local script binding.
  if(answer.versionLayer?.diff?.evidence||answer.diff?.evidence&&(!answer.torchRelease||answer.version!==1))return null;
  if(answer.torchRelease&&!require('./torch-receive.cjs').compatibleCached(answer,key,torchTrust,{exe}))return null;
@@ -51,6 +51,12 @@ function layer(answer,key,{torchTrust,exe}={}){if(!answer||answer.schema!=='megu
   if(V&&V.diff&&VERSION_MATCH.includes(V.match)&&V.diff.layer!=='game'&&(V.match!=='exe'||V.diff.key===key)&&docOk(V.diff)){v=V.diff;vm=V.match;}
   if(G&&G.diff&&GAME_MATCH.includes(G.match)&&G.diff.layer==='game'&&docOk(G.diff)){const {split}=require('../core/profiles/domains.cjs');if(!Object.keys(split(G.diff.settings).version).length){g=G.diff;gm=G.match;}}}
  if(!v&&!g&&answer.diff){const d=answer.diff;if(d.layer==='game'){if(docOk(d)){g=d;gm='title';}}else if(d.key===key&&docOk(d)){v=d;vm='exe';}}
+ if(!answer.torchRelease&&[v,g].some(d=>d?.source==='auto'&&d.prints?.script)){
+  const root=cachedRoots.get(answer);
+  const local=script??(root&&exe?require('./original-text.cjs').contributionScript(root,exe):'');
+  if(v?.source==='auto'&&v.prints?.script&&v.prints.script!==local)v=null;
+  if(g?.source==='auto'&&g.prints?.script&&g.prints.script!==local)g=null;
+ }
  if(!v&&!g)return null;
  let capabilityStatus;
  if (v?.evidence?.trials) {
@@ -85,7 +91,7 @@ async function refresh(root,key,{fetcher=globalThis.fetch,now=Date.now(),force=f
  for(const url of endpoints(root,'/api/game-profile'+query(key,prints,old,{exe}))){try{const r=await fetcher(url,{headers:{'user-agent':'MeguLit',accept:'application/json'},signal:AbortSignal.timeout(TIMEOUT)});
    if(r.status===304&&old&&!old.none){if(old.torchRelease)return cached(root,key);const v={...old,fetchedAt:now};return keep(root,key,v);}
    if(r.status===404){const v={none:true,key,fetchedAt:now};return keep(root,key,v);}
-   if(!r.ok)continue;const text=await r.text();if(text.length>64*1024)continue;const v=JSON.parse(text);if(Object.keys(v).some(k=>k.startsWith('torch'))||!layer(v,key))continue;v.fetchedAt=now;return keep(root,key,v);}catch{}}
+   if(!r.ok)continue;const text=await r.text();if(text.length>64*1024)continue;const v=JSON.parse(text);if(Object.keys(v).some(k=>k.startsWith('torch'))||!layer(v,key,{exe,script:prints?.script}))continue;v.fetchedAt=now;return keep(root,key,v);}catch{}}
  return cached(root,key);}
 /* 2026-11-21 this PC's calibration of the exe reached the relay: data/The Seed/<key>.sent.json (the game page's first-player card turns into its thank-you) */
 const sentFile=(root,key)=>path.join(dir(root),key+'.sent.json');
@@ -119,7 +125,7 @@ function keepLocal(root,key,want){const old=readSent(root,key)||{};writeSent(roo
 async function syncCredit(root,key,opts){const m=readSent(root,key);if(!m||m.localName===undefined)return null;return setCredit(root,key,m.localName,opts);}
 async function report(root,record,{fetcher=globalThis.fetch,prints=null,credit:creditName=null}={}){const credit=cleanName(creditName);if(!record||!sharing(root))return {state:'skipped'};const block=auto.diagnostic(record)?.profile;if(!block||!gameDiff.KEY.test(String(block.key||'')))return {state:'skipped'};
  /* Cardinal's score of this exe goes with the calibration when it has not reached the relay yet */
- const presentation=require('./presentation.cjs').read(root,block.key);
+ const presentation=require('./presentation.cjs').read(root,block.key,prints?.script);
  if(presentation)block.settings={...block.settings,page:{...block.settings?.page,presentation}};
  pendingScore(root,block.key,fetcher);
  const pr=prints?require('../core/game-print.cjs').check(prints):null;const body=JSON.stringify({version:1,profile:block,...(credit?{credit:{name:credit}}:{}),...(pr&&Object.keys(pr).length?{prints:pr}:{})});

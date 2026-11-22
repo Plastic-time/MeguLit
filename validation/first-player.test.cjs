@@ -74,7 +74,7 @@ test('credit: a relay without the route keeps the name here and retries at the n
  r=await fp.setCredit(db,root,'7','小明',{fetcher:async()=>{throw Error('offline');}});assert.equal(r.state,'local');
  const s=await fp.state(db,root,'7',{wait:500,fetcher:json(200,{torchNo:2,name:'小明',at:'x'})});assert.equal(s.state,'thanks');assert.equal(s.credit.synced,true);assert.equal(s.credit.name,'小明');});
 test('credit: nothing to name before an upload; the report carries a name and keeps the relay answer',async()=>{const {root,db}=setup();assert.equal((await fp.setCredit(db,root,'7','a',{fetcher:json(200,{})})).state,'failed');
- assert.equal(feed.cleanName(null),null);assert.equal(feed.cleanName('   '),null);assert.equal(feed.cleanName('a‮b\nc'),'a b c');assert.equal(feed.cleanCredit({torchNo:0}),null);assert.deepEqual(feed.cleanCredit({torchNo:3,name:'<i>x</i>',at:'t'}),{torchNo:3,name:'<i>x</i>',at:'t'});});
+ assert.equal(feed.cleanName(null),null);assert.equal(feed.cleanName('   '),null);assert.equal(feed.cleanName('a‮b\nc'),'a b c');assert.deepEqual(feed.cleanCredit({torchNo:0}),{torchNo:0,name:null,at:'',alias:'ユージオ'});assert.deepEqual(feed.cleanCredit({torchNo:3,name:'<i>x</i>',at:'t'}),{torchNo:3,name:'<i>x</i>',at:'t'});});
 test('received: a relay diff with a credit shows who passed it on; no credit, nothing',async()=>{const {root,db,exe}=setup();const key=await auto.exeKey(root,exe);
  const write=extra=>{fs.mkdirSync(feed.dir(root),{recursive:true});fs.writeFileSync(path.join(feed.dir(root),key+'.json'),JSON.stringify({schema:'megulit.game-diff-feed',key,version:2,fetchedAt:Date.now(),...extra}));};
  const orig=feed.layer;write({credit:{torchNo:5,name:'A',at:'2026-11-20T10:00:00Z'}});

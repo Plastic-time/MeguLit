@@ -675,6 +675,31 @@ function providerEntry(root,dir,id,{runtimeOnly=false}={}){
  return Object.entries(readState(root)).find(([key,s])=>(id===undefined||id===key)&&
   (s?.runtime?.file?runningDirOf(s.runtime).toLowerCase()===dir:!runtimeOnly&&String(s?.gameDir||'').toLowerCase()===dir));
 }
+const indexDigests=new Map();
+function scriptDigest(file){
+ const stat=fs.statSync(file,{bigint:true}),stamp=[stat.ino,stat.size,stat.mtimeNs,stat.ctimeNs].join('|');
+ const prior=indexDigests.get(file);if(prior?.stamp===stamp)return prior.digest;
+ const index=readIndex(file);if(!Array.isArray(index.lines)||!index.lines.length)throw Error('EMPTY_SCRIPT');
+ const digest=crypto.createHash('sha256').update(JSON.stringify(index.lines)).digest('hex');
+ indexDigests.set(file,{stamp,digest});if(indexDigests.size>32)indexDigests.delete(indexDigests.keys().next().value);
+ return digest;
+}
+function contributionScript(root,exe,id){
+ if(!exe)return '';
+ const dir=path.dirname(exe),archive=require('../core/japanese-import-original.cjs'),manifest=archive.archiveManifest(dir);
+ if(manifest)return archive.localArchive(exe,manifest)?.valid()?manifest.indexSha256:'';
+ const embedded=require('./embedded-japanese.cjs'),em=embedded.manifest(dir);
+ if(em)return embedded._internal.valid(dir,em)?em.indexSha256:'';
+ const entry=providerEntry(root,dir.toLowerCase(),id==null?undefined:String(id)),state=entry?.[1];
+ if(!state?.runtime?.sha256)return '';
+ try{if(fingerprint({engine:state.runtime.engine||'system4',target:state.runtime.file})!==state.runtime.sha256)return '';}catch{return '';}
+ try{
+  const hashes=[scriptDigest(state.runtime.index)];
+  if(state.patchStatus==='ready'&&patchCurrent(state))hashes.push('patch',scriptDigest(state.patch.index));
+  if(state.mode==='original'&&state.status==='ready')hashes.push('original',scriptDigest(state.original.index));
+  return crypto.createHash('sha256').update(hashes.join('|')).digest('hex');
+ }catch{return '';}
+}
 function providerKey(root,executable,id){const folder=path.dirname(String(executable||'')),dir=folder.toLowerCase();if(!dir||dir==='.')return '';
  const imported=require('../core/japanese-import-original.cjs'),archive=imported.archiveManifest(folder);
  if(archive)return 'archive|'+imported.archiveStamp(executable,archive);
@@ -802,4 +827,4 @@ function localPairs(root,db,id){
  if(embedded.manifest(dir))return {hasPairs:embedded.provider(dir)?.hasLocalPairs?.()===true,embedded:true};
  return {hasPairs:staticProvider(root,executable,{id:String(id)})?.hasLocalPairs?.()===true,embedded:false};
 }
-module.exports={backupOriginal,_fillStore:fillStore,providerKey,foreignKey,foreignNear,foreignSeq,scriptPairs,brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,importPatchSource,clearPatch,locate,readScript,ADAPTERS,readAin,_ain:{mtXor,inflateAin},align,Matcher,importOriginal,status,setMode,provider,localPairs,scanRunning,japaneseLine,chineseOnly,norm,discover,findCandidates};
+module.exports={contributionScript,backupOriginal,_fillStore:fillStore,providerKey,foreignKey,foreignNear,foreignSeq,scriptPairs,brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,importPatchSource,clearPatch,locate,readScript,ADAPTERS,readAin,_ain:{mtXor,inflateAin},align,Matcher,importOriginal,status,setMode,provider,localPairs,scanRunning,japaneseLine,chineseOnly,norm,discover,findCandidates};
