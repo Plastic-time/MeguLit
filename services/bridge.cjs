@@ -9,6 +9,27 @@ const store=require('./store.cjs');
 require('./relay-gate.cjs').install();
 const root=(process.env.MEGULIT_ROOT||process.env.TOME_FINAL_ROOT)?path.resolve(process.env.MEGULIT_ROOT||process.env.TOME_FINAL_ROOT):path.resolve(__dirname,'..');
 const MAX_INPUT=512*1024;
+const siteUpdatesUrls=['https://cn.megulit.com/assets/updates.json','https://megulit.com/assets/updates.json',
+  'https://raw.githubusercontent.com/ilynthn/MeguLit/main/site/public/assets/updates.json'];
+let siteUpdatesPending;
+function compareSiteUpdates(a,b){
+  const version=rows=>rows.map(row=>/^(\d+)\.(\d+)\.(\d+)\s*[:：]/.exec(row?.text)).find(Boolean)?.slice(1).map(Number)||[0,0,0];
+  const x=version(a),y=version(b);
+  return x[0]-y[0]||x[1]-y[1]||x[2]-y[2]||String(a[0]?.date||'').localeCompare(String(b[0]?.date||''));
+}
+async function readSiteUpdates(){
+  const file=path.join(root,'data','cache','site-updates.json');
+  let cached=[];try{const rows=JSON.parse(fs.readFileSync(file,'utf8'));if(Array.isArray(rows))cached=rows;}catch{}
+  const responses=await Promise.allSettled(siteUpdatesUrls.map(async url=>{
+    const response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(10000)});
+    if(!response.ok)return [];
+    const rows=await response.json();return Array.isArray(rows)?rows.slice(0,300):[];
+  }));
+  const fresh=responses.filter(r=>r.status==='fulfilled'&&r.value.length).map(r=>r.value).sort((a,b)=>compareSiteUpdates(b,a))[0];
+  if(!fresh||compareSiteUpdates(fresh,cached)<0)return cached;
+  try{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(fresh));fs.renameSync(file+'.tmp',file);}catch{}
+  return fresh;
+}
 function cleanUiState(values){
   const out={};let total=0;
   if(values&&typeof values==='object')for(const[key,value]of Object.entries(values)){
@@ -338,6 +359,12 @@ function restoreWord(db,id) {
 function localEntries(result,query){return (result?.entries||[]).slice(0,20).map(e=>({spelling:e.spellings?.[0]||e.readings?.[0]||query,reading:(e.readings||[]).join(' · '),definition:(Array.isArray(e.definition_groups)&&e.definition_groups.length?e.definition_groups.map(g=>g.text):(e.definitions||[])).map(String).join('\n')})).filter(e=>e.definition);}
 async function lookupEntry(learning,base,key){for(const text of [...new Set([base,key].filter(Boolean))]){const result=await learning.request('lookup_exact',{text,start:0,end:[...text].length},'zh');const entry=result?.entries?.find(e=>require('./learning-insights.cjs').entryMatches(e,base,key));if(entry)return entry;}return null;}
 async function dispatch(request,runtime=null) {
+  if(request.action==='site_updates'){
+    /* Return the freshest result this time, even when a faster mirror or the disk cache lags behind. */
+    siteUpdatesPending??=readSiteUpdates().finally(()=>{siteUpdatesPending=null;});
+    const rows=await siteUpdatesPending;
+    return compareSiteUpdates(rows,[request.cachedHead,request.cachedRelease].filter(Boolean))<0?[]:rows;
+  }
   if(String(request.action).startsWith('disc_'))return await require('./disc-install.cjs').handle(root,request,runtime,values=>dispatch({action:'save_game',...values},runtime));
   if(request.action==='backup_export')return require('./backup.cjs').exportBackup(root,request.path);
   if(request.action==='backup_preview')return require('./backup.cjs').previewBackup(root,request.path);
@@ -500,12 +527,6 @@ async function dispatch(request,runtime=null) {
       case 'uninstall_open':{const script=path.join(root,'setup','uninstall.ps1');if(!fs.existsSync(script))throw Error('UNINSTALLER_MISSING');const ps=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');const child=spawn(ps,['-NoProfile','-ExecutionPolicy','Bypass','-STA','-WindowStyle','Hidden','-File',script,'-Root',root],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {opened:true};}
       case 'diagnostics_reveal':{const file=require('./diagnostics.cjs').ownPackage(root,request.path);const child=spawn('explorer.exe',['/select,'+file],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {ok:true};}
       case 'diagnostics_build_all':return require('./diagnostics.cjs').buildAll(root,db,{version:String(request.version||'').slice(0,40)}); /* E394 whole-app package from About */
-      case 'site_updates':return (async()=>{/* E421 start-up notice list, through the service because the WebView CSP blocks megulit.com.
-        (user 2026-11-12: the list sometimes took a while to appear) the last copy is kept in data/cache and shown at once;
-        a fresh copy is fetched behind it for the next time, and waited for only when there is no copy yet */
-        const file=path.join(root,'data','cache','site-updates.json');let cached=null;try{const v=JSON.parse(fs.readFileSync(file,'utf8'));if(Array.isArray(v))cached=v;}catch{}
-        const fresh=(async()=>{try{/* megulit.com or its EdgeOne copy cn.megulit.com (mainland China), whichever answers first */const one=async u=>{const r=await fetch(u,{cache:'no-store',signal:AbortSignal.timeout(10000)});const v=r.ok?await r.json():null;if(!Array.isArray(v))throw new Error('BAD');return v;};const j=await Promise.any(['https://megulit.com/assets/updates.json','https://cn.megulit.com/assets/updates.json'].map(one)).catch(()=>null);if(!Array.isArray(j))return null;const list=j.slice(0,300);try{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(list));fs.renameSync(file+'.tmp',file);}catch{}return list;}catch{return null;}})();
-        if(cached){fresh.catch(()=>{});return cached;}return (await fresh)||[];})();
       case 'seed_stats':return require('./seed-stats.cjs').stats(root); /* The Seed live counts for the About page, null when the relay does not answer */
       case 'library_developers':return require('./nsfw.cjs').developers(db,root);
       case 'game_developer':return await require('./nsfw.cjs').developerOf(db,root,String(request.id||''));

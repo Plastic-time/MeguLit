@@ -1822,6 +1822,11 @@ html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-n
 @media (max-width:900px){html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]:not([hidden]){grid-template-rows:none}html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-notice-updates:not([hidden]){height:auto!important;min-height:0!important;max-height:min(240px,26vh)!important}}
 /* (user 2026-11-12: "别让框被选中") a dialog takes focus when it opens; its own frame never shows a focus ring */
 html:not(#u):not(#v):not(#w):not(#x) body :is(dialog,.lv-dialog):is(:focus,:focus-visible){outline:none!important}
+dialog.startup-notice>.startup-notice-close{align-self:flex-end;flex:none;margin:-10px 0 8px;padding:5px 9px;border:1px solid var(--u-line-2);border-radius:4px;color:var(--g-t1)}
+dialog.startup-notice>.startup-notice-close:hover{border-color:var(--g-gold);color:var(--g-gold)}
+html:not(#u):not(#v) body dialog.startup-notice :is(.startup-notice-close,.dev-notice-updates):focus-visible{outline:2px solid var(--g-gold);outline-offset:-2px!important}
+html:not(#u):not(#v):not(#w) body dialog.startup-notice .dev-notice-page[data-page="1"]>.dev-notice-updates{mask:none;-webkit-mask:none}
+dialog.startup-notice .startup-updates-empty{grid-area:upd}
 /* 2026-11-12 (user) the plan for the chosen level: in the guide and right after picking a level */
 html:not(#u):not(#v):not(#w):not(#x) body .guide-level-note{margin:8px 0 0;font-size:12.5px;color:var(--g-t3,#a08a80)}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lv-tips{width:min(560px,94vw)!important}

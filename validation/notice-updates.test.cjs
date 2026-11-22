@@ -55,19 +55,27 @@ test('a long update list builds only the first rows at once, the rest when idle'
 test('startup notice stays non-modal on a delayed cold cache and opens with the first rows', async t => {
   const { mountDevNotice } = await import(pathToFileURL(path.join(web, 'feedback-ui.js')).href);
   const { dialog, list, note } = fakeDom();
-  const game = new El('input'), form = new El('form'), button = new El('button'), seed = { querySelector: () => null };
+  const game = new El('input'), form = new El('form'), button = new El('button'), close = new El('button'), seed = { querySelector: () => null };
+  const empty = new El('p');
   const elements = new Map([['form', form], ['.dev-notice-game', game], ['.feedback-status', new El('p')],
-    ['.dev-notice-updates', list], ['.dev-notice-updates-note', note]]);
+    ['.dev-notice-updates', list], ['.dev-notice-updates-note', note], ['[data-notice-close]', close], ['.startup-updates-empty', empty]]);
   const openedWithRows = [];
   Object.assign(dialog, {
     isConnected: false,
     querySelector: selector => selector === '[data-guide-level]' ? null : elements.get(selector) || button,
     querySelectorAll: selector => selector === '.dev-notice-page' ? [{}, seed, {}] : [button],
     addEventListener() {},
+    setAttribute() {},
     showModal() { this.open = true; openedWithRows.push(list.children.length); },
+    close() { this.remove(); },
     remove() { this.open = this.isConnected = false; },
   });
-  document.createElement = tag => tag === 'dialog' ? dialog : new El(tag);
+  document.createElement = tag => {
+    if (tag !== 'dialog') return new El(tag);
+    list.replaceChildren();
+    list.hidden = note.hidden = empty.hidden = true;
+    return dialog;
+  };
   document.querySelector = () => dialog.isConnected ? dialog : null;
   document.body = { append: node => { node.isConnected = true; } };
 
@@ -97,7 +105,11 @@ test('startup notice stays non-modal on a delayed cold cache and opens with the 
   answer(rows(5));
   await shown;
   assert.deepStrictEqual(openedWithRows, [5]);
-  dialog.remove();
+  assert.match(dialog.innerHTML, /<button [^>]*data-notice-close autofocus[^>]*>/);
+  assert.match(dialog.innerHTML, /class="dev-notice-updates" tabindex="0"/);
+  assert.strictEqual(empty.hidden, true);
+  close.onclick();
+  assert.strictEqual(dialog.open, false);
   await mountDevNotice(options);
   assert.strictEqual(requests, 2, 'the startup notice opens at most once per launch');
 
@@ -112,6 +124,7 @@ test('startup notice stays non-modal on a delayed cold cache and opens with the 
   assert.strictEqual(dialog.open, false);
   await offline;
   assert.strictEqual(dialog.open, true, 'an offline response still opens the notice');
+  assert.strictEqual(empty.hidden, false);
   dialog.remove();
 
   t.mock.timers.enable({ apis: ['setTimeout'] });
@@ -122,6 +135,31 @@ test('startup notice stays non-modal on a delayed cold cache and opens with the 
   await stalled;
   assert.strictEqual(dialog.open, true, 'a stalled service cannot prevent the notice from opening');
   answer([]);
+});
+
+test('site_updates refreshes the current call and keeps the newest usable cache', async t => {
+  const { dispatch } = require('../services/bridge.cjs');
+  const stale = [{ date: '2026-11-20', text: '1.4.19：old' }];
+  const fresh = [{ date: '2026-11-21', text: '1.4.22：new' }, ...stale];
+  let cached = JSON.stringify(stale), nextCache, writes = 0, calls = 0, github;
+  t.mock.method(fs, 'readFileSync', () => cached);
+  t.mock.method(fs, 'mkdirSync', () => {});
+  t.mock.method(fs, 'writeFileSync', (_file, data) => { nextCache = data; });
+  t.mock.method(fs, 'renameSync', () => { cached = nextCache; writes++; });
+  t.mock.method(globalThis, 'fetch', url => {
+    calls++;
+    if (url.startsWith('https://raw.githubusercontent.com/') && !github) return new Promise(resolve => { github = resolve; });
+    return Promise.resolve({ ok: true, json: async () => stale });
+  });
+  const pending = dispatch({ action: 'site_updates' });
+  const concurrent = dispatch({ action: 'site_updates' });
+  assert.strictEqual(calls, 3, 'concurrent readers share one refresh');
+  github({ ok: true, json: async () => fresh });
+  assert.deepStrictEqual(await pending, fresh, 'the slower GitHub result beats both stale mirrors on this call');
+  assert.deepStrictEqual(await concurrent, fresh);
+  assert.deepStrictEqual(await dispatch({ action: 'site_updates' }), fresh, 'stale responses cannot replace the disk cache');
+  assert.strictEqual(writes, 1);
+  assert.deepStrictEqual(await dispatch({ action: 'site_updates', cachedHead: { date: '2026-11-22', text: '1.4.23：newer' } }), []);
 });
 
 test('every web stylesheet has balanced braces', () => {
