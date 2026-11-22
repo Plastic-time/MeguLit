@@ -13,7 +13,6 @@ test('website and desktop game requests close only against four durable exact ev
  const db=database(schema),f=fixture(),objects=new Map(),issues=new Map(),writes=[];
  t.after(()=>db.raw.close());
  const {handle}=await import('../relay/src/worker.js');
- const {retryProbeIssues}=await import('../relay/src/probe-issues.js');
  const torch=await import('../relay/src/torch-release.js');
  let failPatch=null;
  const env={...f.env,DB:db,HASH_SALT:'salt',GITHUB_REPO:repo,GITHUB_TOKEN:'fixture',GAME_REQUEST_ISSUE_AUTHOR:'relay-bot',
@@ -83,7 +82,7 @@ test('website and desktop game requests close only against four durable exact ev
  await register(backlog,'backlog','700');
  const pending=await submit(backlog,'app/1.4.22');failPatch=pending.number;
  assert.equal((await trigger(pending)).status,502);assert.equal(pending.state,'open');assert.equal(numberOfState(pending.number),null);
- failPatch=null;await retryProbeIssues(env,now);assert.equal(pending.state,'closed');
+ failPatch=null;assert.equal((await trigger(pending)).status,200);assert.equal(pending.state,'closed');
  assert.equal((await trigger(pending)).status,200);
  const receipt=await (await admin(undefined,'?issue='+pending.number)).json();
  assert.equal(receipt.status,'backlog');assert.equal(receipt.ref,'700');assert.ok(receipt.closedAt);

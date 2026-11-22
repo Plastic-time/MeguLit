@@ -23,7 +23,7 @@
      GET  /api/adapters/reports?pack=  the before/after numbers */
 import {probeFullRoute} from './probe-full.js';
 import {enqueueProbeDrafts,probeDraft} from './probe-seed.js';
-import {legacyProbeDisposition} from './probe-issues.js';
+import {legacyProbeDisposition,closeReceiptIssue} from './probe-issues.js';
 const HEX64=/^[a-f0-9]{64}$/,ID=/^[a-z0-9][a-z0-9-]{2,63}$/,SEMVER=/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 export const ADAPTER_LIMITS={pack:256*1024,bundle:8*1024*1024,chunk:512*1024,parts:16,reports:50,keys:200,feed:300};
 const encoder=new TextEncoder();
@@ -103,8 +103,10 @@ async function probeChunk(request,env,ip,now,{json,fail,readJSON}){
  let bytes;try{bytes=b64(v.data);}catch{return fail('INVALID_CHUNK');}if(bytes.length>ADAPTER_LIMITS.chunk||!bytes.length)return fail('PAYLOAD_TOO_LARGE',413);
  const t=Math.floor(now.getTime()/1000),dd=dedupeOf(v,request.headers.get('x-megulit-version'));
  const receipt=()=>env.DB.prepare('SELECT sha256,ip_hash FROM probe_bundles WHERE id=?').bind(v.upload).first();
+ const finish=async (result,status=200)=>await closeReceiptIssue(env,v.upload,now)
+  ?json(result,status):fail('PROBE_ISSUE_CLOSE_PENDING',502);
  const prior=await receipt();
- if(prior)return prior.sha256===v.sha256&&prior.ip_hash===ip?json({ok:true,id:v.upload,duplicate:true}):fail('CHUNK_MISMATCH',409);
+ if(prior)return prior.sha256===v.sha256&&prior.ip_hash===ip?finish({ok:true,id:v.upload,duplicate:true}):fail('CHUNK_MISMATCH',409);
  const first=await env.DB.prepare('SELECT parts,size,sha256,ip_hash FROM probe_uploads WHERE upload=? LIMIT 1').bind(v.upload).first();
  if(first&&(first.parts!==v.parts||first.size!==v.size||first.sha256!==v.sha256||first.ip_hash!==ip))return fail('CHUNK_MISMATCH',409);
  /* a new upload of a game the relay already holds an as-good probe of: count the reporter, keep nothing */
@@ -144,7 +146,7 @@ async function probeChunk(request,env,ip,now,{json,fail,readJSON}){
   const committed=await receipt();
   if(!committed)throw error;
   if(committed.sha256!==v.sha256||committed.ip_hash!==ip)return fail('CHUNK_MISMATCH',409);
-  return json({ok:true,id,duplicate:true});
+  return finish({ok:true,id,duplicate:true});
  }
  if(!await receipt())return fail('PROBE_QUEUE_RETRY',503);
  await env.DB.prepare('DELETE FROM probe_uploads WHERE upload=?').bind(id).run();
@@ -154,7 +156,7 @@ async function probeChunk(request,env,ip,now,{json,fail,readJSON}){
   const old=await env.DB.prepare("DELETE FROM probe_bundles WHERE id=? AND issue_url='' RETURNING object_key").bind(stored.bundle_id).first();
   if(old)await env.BUCKET.delete?.(old.object_key).catch(()=>{});
  }
- return json({ok:true,id,queued:true},201);}
+ return finish({ok:true,id,queued:true},201);}
 async function probeDownload(url,env,{fail}){const id=url.pathname.split('/').pop()||'',exp=Number(url.searchParams.get('exp')),sig=url.searchParams.get('sig')||'';
  if(!/^[0-9a-f-]{36}$/.test(id)||!Number.isSafeInteger(exp)||!HEX64.test(sig)||!env.LINK_SECRET)return fail('NOT_FOUND',404);
  if(!same(sig,await hmac(env.LINK_SECRET,'probe:'+id+':'+exp)))return fail('NOT_FOUND',404);if(exp<Math.floor(Date.now()/1000))return fail('LINK_EXPIRED',410);

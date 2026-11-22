@@ -153,7 +153,7 @@ test('signed GitHub events persist a skeleton or one Markdown record before clos
  assert.match(markdown.headers.get('content-type'),/^text\/markdown/);
  const record=await markdown.text();
  assert.match(record,/#901[\s\S]+parse-failed[\s\S]+probe-identity/);assert.doesNotMatch(record,/private detail/);
- failClose=false;await (await import('../relay/src/probe-issues.js')).retryProbeIssues(ENV,new Date());
+ failClose=false;assert.equal((await event(fallback)).status,200);
  assert.equal((await event(fallback)).status,200);
  assert.deepEqual(patches,[900,901,901]);assert.equal(job(901).markdown,record);assert.ok(job(901).closed_at);
  assert.equal(job(902),undefined);

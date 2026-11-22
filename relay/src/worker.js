@@ -20,7 +20,7 @@ import {forumRoute,forumDeletes,cleanupForumImages} from './forum.js';
 import {newsGet,hotWordsDailyGet,refreshDaily,imageGet,articleGet} from './daily.js';
 /* E562 adapter packs, before/after reports, desensitized probe uploads */
 import {adaptersRoute} from './adapters.js';
-import {probeIssueWebhook,probeIssueMarkdown,retryProbeIssues,repoOf,resolveRegisteredGameRequests} from './probe-issues.js';
+import {probeIssueWebhook,probeIssueMarkdown,repoOf,resolveRegisteredGameRequests} from './probe-issues.js';
 import {gameRequestEvidence} from './game-requests.js';
 import {contribRoute,cleanupContrib} from './contrib.js';
 /* 2026-11-21 game diffs per exe hash: calibration reports in, our signed diffs out (relay/src/auto-profile.js) */
@@ -333,7 +333,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
 export async function scheduled(event,env,ctx){
  /* every 30 minutes: website feedback still waiting for its GitHub issue; the weekly cron settles hot words */
  if(event?.cron==='20 21 * * *'){const job=refreshDaily(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
- if(event?.cron==='*/30 * * * *'){const job=Promise.all([retryProbeIssues(env,new Date(event?.scheduledTime||Date.now())).catch(()=>console.error('PROBE_ISSUE_RETRY_FAILED')),syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null),cleanupForumImages(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupContrib(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeFull(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeStats(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),refreshSeedStatsSafe(env,new Date(event?.scheduledTime||Date.now()))]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
+ if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null),cleanupForumImages(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupContrib(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeFull(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeStats(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),refreshSeedStatsSafe(env,new Date(event?.scheduledTime||Date.now()))]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
  const when=new Date(event?.scheduledTime||Date.now());const job=settleDue(env,when).then(async done=>{await cleanupAvatars(env,when).catch(()=>0);return done;});if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
 /* a token rotated while answering any request goes back on that answer, whichever endpoint it was */
 export default {fetch:async(request,env,ctx)=>{const response=await handle(request,env,new Date(),ctx);const token=ROTATED.get(request);if(!token||response.headers.get('x-megulit-token'))return response;const copy=new Response(response.body,response);copy.headers.set('x-megulit-token',token);return copy;},scheduled};

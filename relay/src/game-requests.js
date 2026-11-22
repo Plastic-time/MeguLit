@@ -23,7 +23,9 @@ export function gameRequestSelector(issue, env, repo, number) {
       (fromApp ? !lines[3].startsWith('界面语言：') || !/^_来自 MeguLit 软件(?: v[\w.-]+)?，由 relay 自动创建_$/.test(lines[5])
         : !lines[3].startsWith('网站语言：') || lines[5] !== '_来自 megulit.com 的表单，由 relay 自动创建_')) return null;
   const prefix = '**想玩的游戏**：';
-  return lines[0].startsWith(prefix) ? parseSelector(lines[0].slice(prefix.length)) : null;
+  const input = lines[0].slice(prefix.length);
+  if (!lines[0].startsWith(prefix) || issue.title !== (fromApp ? '[软件想玩] ' : '[官网想玩] ') + input.slice(0,80)) return null;
+  return parseSelector(input);
 }
 
 function reference(kind, ref) {
@@ -65,6 +67,17 @@ async function sourceExists(env, repo, selector, kind, ref) {
 export async function gameRequestEvidence(request, env, repo, now, url, {readJSON, json, fail, onRegistered}) {
   if (!seedAdminAuthorized(request, env)) return fail('UNAUTHORIZED', 401);
   if (request.method === 'GET') {
+    if (url.searchParams.has('selector')) {
+      const selector = parseSelector(url.searchParams.get('selector'));
+      if (!selector) return fail('INVALID_SELECTOR', 400);
+      const records = await env.DB.prepare(`SELECT kind,ref FROM game_request_evidence WHERE selector=?
+        AND ended_at IS NULL AND (expires_at IS NULL OR expires_at>?) ORDER BY registered_at DESC`)
+        .bind(selector.key,now.toISOString()).all();
+      for (const row of records.results) {
+        if (await sourceExists(env,repo,selector,row.kind,row.ref)) return json({selector:selector.key,...row});
+      }
+      return fail('NOT_FOUND',404);
+    }
     const number = Number(url.searchParams.get('issue'));
     if (!Number.isSafeInteger(number) || number < 1) return fail('INVALID_ISSUE', 400);
     const job = await env.DB.prepare(`SELECT issue,selector,matched_kind AS status,matched_ref AS ref,closed_at AS closedAt
@@ -148,17 +161,16 @@ export async function resolveGameRequest(env, repo, number, now, github) {
   return 'open';
 }
 
-export async function retryGameRequests(env, repo, now, github, selector = '') {
-  const {results} = await env.DB.prepare(`SELECT issue FROM game_request_jobs j WHERE repo=? AND closed_at IS NULL
-    AND (?='' OR j.selector=?)
-    AND EXISTS (SELECT 1 FROM game_request_evidence e WHERE e.selector=j.selector AND e.ended_at IS NULL
-      AND (e.expires_at IS NULL OR e.expires_at>?))
-    ORDER BY last_attempt_at,created_at LIMIT 10`).bind(repo, selector, selector, now.toISOString()).all();
-  for (const {issue} of results) {
-    try {
-      if (await resolveGameRequest(env, repo, issue, now, github) === 'retry') console.error('GAME_REQUEST_CLOSE_PENDING', issue);
-    } catch {
-      console.error('GAME_REQUEST_CLOSE_PENDING', issue);
+export async function retryGameRequests(env, repo, now, github, selector) {
+  let after = 0;
+  do {
+    const {results} = await env.DB.prepare(`SELECT issue FROM game_request_jobs
+      WHERE repo=? AND selector=? AND issue>? AND closed_at IS NULL ORDER BY issue LIMIT 50`)
+      .bind(repo, selector, after).all();
+    for (const {issue} of results) {
+      if (await resolveGameRequest(env, repo, issue, now, github) === 'retry') throw Error('GAME_REQUEST_CLOSE_PENDING');
+      after = issue;
     }
-  }
+    if (results.length < 50) return;
+  } while (true);
 }

@@ -12,11 +12,11 @@ const sha = async bytes => hex(await crypto.subtle.digest('SHA-256', bytes));
 const issueUrl = (repo, number) => `https://github.com/${repo}/issues/${number}`;
 const intro = 'MeguLit desensitized probe uploaded through the relay';
 
-function isAdapterProbe(issue, env, repo, number) {
+export function isAdapterProbe(issue, env, repo, number) {
   const author = env.ADAPTER_PROBE_ISSUE_AUTHOR || (repo === DEFAULT_REPO ? 'ilynthn' : '');
   return !!author && issue?.number === number && !issue.pull_request &&
     issue.html_url === issueUrl(repo, number) && issue.user?.login === author &&
-    Array.isArray(issue.labels) && issue.labels.some(label => label?.name === 'adapter-probe') &&
+    Array.isArray(issue.labels) && issue.labels.length === 1 && issue.labels[0]?.name === 'adapter-probe' &&
     typeof issue.body === 'string' && issue.body.startsWith(intro);
 }
 
@@ -39,34 +39,29 @@ export function legacyProbeDisposition(env, url, now, receipt) {
     .bind(repo, number, now.toISOString(), receipt);
 }
 
-async function closeIssue(env, repo, number, now) {
+async function closeIssue(env, repo, number, now, expectedBody) {
   const job = await env.DB.prepare('SELECT closed_at FROM probe_issue_disposition WHERE repo=? AND issue=?')
     .bind(repo, number).first();
-  if (!job || job.closed_at) return true;
+  if (!job) return true;
   await env.DB.prepare('UPDATE probe_issue_disposition SET last_attempt_at=? WHERE repo=? AND issue=?')
     .bind(now.toISOString(), repo, number).run();
   const response = await github(env, repo, number);
   if (!response.ok) return false;
   const issue = await response.json();
-  if (!isAdapterProbe(issue, env, repo, number)) return false;
+  if (!isAdapterProbe(issue, env, repo, number) || (expectedBody !== undefined && issue.body !== expectedBody)) return false;
   if (issue.state !== 'closed' && !(await github(env, repo, number, 'PATCH')).ok) return false;
   await env.DB.prepare('UPDATE probe_issue_disposition SET closed_at=? WHERE repo=? AND issue=? AND closed_at IS NULL')
     .bind(now.toISOString(), repo, number).run();
   return true;
 }
 
-export async function retryProbeIssues(env, now) {
-  if (!env.ADAPTER_PROBE_WEBHOOK_SECRET || !env.GITHUB_TOKEN) return;
-  const {results} = await env.DB.prepare(`SELECT repo,issue FROM probe_issue_disposition
-    WHERE repo=? AND closed_at IS NULL ORDER BY last_attempt_at,created_at LIMIT 10`).bind(repoOf(env)).all();
-  await retryGameRequests(env, repoOf(env), now, github);
-  for (const row of results) {
-    try {
-      if (!await closeIssue(env, row.repo, row.issue, now)) console.error('PROBE_ISSUE_CLOSE_PENDING', row.issue);
-    } catch {
-      console.error('PROBE_ISSUE_CLOSE_PENDING', row.issue);
-    }
-  }
+export async function closeReceiptIssue(env, receipt, now) {
+  if (!env.ADAPTER_PROBE_WEBHOOK_SECRET || !env.GITHUB_TOKEN) return true;
+  const game = await env.DB.prepare('SELECT issue_url FROM probe_games WHERE bundle_id=?').bind(receipt).first();
+  const repo = repoOf(env);
+  const number = Number(game?.issue_url?.split('/').pop());
+  if (!Number.isSafeInteger(number) || number < 1 || game.issue_url !== issueUrl(repo, number)) return true;
+  return closeIssue(env, repo, number, now);
 }
 
 export async function resolveRegisteredGameRequests(env, now, selector) {
@@ -89,7 +84,7 @@ async function readStoredDrafts(env, url) {
   return encoder.encode(JSON.stringify(drafts)).length <= sizeLimit ? {receipt: row.id, drafts} : null;
 }
 
-function backlogMarkdown(repo, issue, stored) {
+export function backlogMarkdown(repo, issue, stored) {
   const stages = [...new Set(Array.from(issue.body.matchAll(/^- step: \*\*([a-z-]+)\*\*/gm), match => probeStep(match[1])))];
   const evidence = stored?.drafts.map(draft => JSON.parse(draft.body));
   const missing = [...new Set(evidence?.flatMap(item => item.missing) || ['probe-identity', 'verified-fingerprint', 'work-identity'])];
@@ -116,29 +111,38 @@ export async function probeIssueWebhook(request, env, now, {json, fail}) {
   if (request.headers.get('x-github-event') !== 'issues') return json({ok: true, ignored: true});
   let event;
   try { event = JSON.parse(new TextDecoder().decode(bytes)); } catch { return fail('INVALID_JSON', 400); }
-  const repo = repoOf(env), issue = event?.issue, number = issue?.number;
+  const repo = repoOf(env), number = event?.issue?.number;
   if (event?.repository?.full_name !== repo || !Number.isSafeInteger(number) || number < 1) {
     return json({ok: true, ignored: true});
   }
-  const openEvent = ['opened', 'labeled', 'reopened'].includes(event.action);
-  const selector = (openEvent || event.action === 'edited') && gameRequestSelector(issue, env, repo, number);
+  const openEvent = ['opened', 'edited', 'labeled', 'reopened'].includes(event.action);
+  if (!openEvent || (!isAdapterProbe(event.issue,env,repo,number) && !gameRequestSelector(event.issue,env,repo,number))) {
+    return json({ok:true,ignored:true});
+  }
+  const live = await github(env,repo,number);
+  if (!live.ok) return fail('ISSUE_LOOKUP_FAILED',502);
+  const issue = await live.json();
+  const selector = gameRequestSelector(issue, env, repo, number);
   if (selector) {
+    if (issue.state === 'open') await env.DB.prepare('UPDATE game_request_jobs SET closed_at=NULL WHERE repo=? AND issue=? AND closed_at IS NOT NULL')
+      .bind(repo,number).run();
     await trackGameRequest(env, repo, number, selector, now);
     const state = await resolveGameRequest(env, repo, number, now, github);
     return state === 'retry' ? fail('GAME_REQUEST_CLOSE_PENDING', 502) : json({ok: true, gameRequest: state});
   }
-  if (!openEvent || !isAdapterProbe(issue, env, repo, number)) return json({ok: true, ignored: true});
+  if (!isAdapterProbe(issue, env, repo, number)) return json({ok: true, ignored: true});
   const db = env.DB;
   const prior = await db.prepare('SELECT markdown FROM probe_issue_disposition WHERE repo=? AND issue=?').bind(repo, number).first();
-  if (!prior) {
+  if (!prior || issue.state === 'open') {
     const stored = await readStoredDrafts(env, issueUrl(repo, number));
     const needsBacklog = !stored?.drafts.length || stored.drafts.some(d => d.kind !== 'probe-skeleton');
-    const writes = [db.prepare('INSERT OR IGNORE INTO probe_issue_disposition(repo,issue,markdown,created_at) VALUES(?,?,?,?)')
+    const writes = [db.prepare(`INSERT INTO probe_issue_disposition(repo,issue,markdown,created_at) VALUES(?,?,?,?)
+      ON CONFLICT(repo,issue) DO UPDATE SET markdown=excluded.markdown WHERE probe_issue_disposition.markdown IS NOT NULL`)
       .bind(repo, number, needsBacklog ? backlogMarkdown(repo, issue, stored) : null, now.toISOString())];
     if (stored) writes.push(enqueueProbeDrafts(db, stored.drafts, stored.receipt, now));
     await db.batch(writes);
   }
-  if (!await closeIssue(env, repo, number, now)) return fail('PROBE_ISSUE_CLOSE_PENDING', 502);
+  if (!await closeIssue(env, repo, number, now,issue.body)) return fail('PROBE_ISSUE_CLOSE_PENDING', 502);
   return json({ok: true, processed: true});
 }
 
