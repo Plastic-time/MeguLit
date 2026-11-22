@@ -144,8 +144,11 @@ async function receive(root,id,options={}){const jobKey=idKey(root,id);if(jobs.h
     if(old?.torchQuarantined&&(!result.consensus||release.review.candidateHash===previous?.review.candidateHash))fail('TORCH_REVOKED');
     still();if(stamp(script)!==scriptStamp)fail('TORCH_LOCAL_CHANGED');
     const publication={hash:p.hash,at:remote.publication.at};
-    (options.atomicWrite||atomic)(path.join(feed.dir(root),key+'.json'),{schema:'megulit.game-diff-feed',version:1,key,diff:release.profile,torchRelease:release,torchPublication:publication,torchCredit:credit(remote.credit,release.review.torchNo),torchLocal:{key,exe,exeStamp,script,scriptStamp},fetchedAt:Date.now()});
-    require('./self-check-live.cjs').stageSeed(root,key);
+    const local={key,exe,exeStamp,script,scriptStamp};
+    const alreadyActive=old?.torchPublication?.hash===p.hash&&protocol.same(old.torchLocal??null,local)&&
+      !old.torchQuarantined&&protocol.same(old.diff??null,release.profile);
+    (options.atomicWrite||atomic)(path.join(feed.dir(root),key+'.json'),{schema:'megulit.game-diff-feed',version:1,key,diff:release.profile,torchRelease:release,torchPublication:publication,torchCredit:credit(remote.credit,release.review.torchNo),torchLocal:local,fetchedAt:Date.now()});
+    if(!alreadyActive)require('./self-check-live.cjs').stageSeed(root,key);
    }else if(result.state==='missing'){
     /* Legacy exact signed profiles remain usable with unknown provenance. */
     const old=feed.cached(root,key);

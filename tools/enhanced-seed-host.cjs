@@ -101,9 +101,8 @@ async function main(file) {
     env:{SystemRoot:process.env.SystemRoot,WINDIR:process.env.WINDIR}
   });
   if (status.status !== 0 || !Conditions.check(JSON.parse(status.stdout)).ok) return {state:'busy'};
-  let fd;
-  try { fd = fs.openSync(cfg.queueLock,'wx'); }
-  catch(error) { if(error.code==='EEXIST')return {state:'busy'}; throw error; }
+  const releaseLock = require('./enhanced-seed-queue-host.cjs').lockQueue(cfg.queueLock);
+  if (!releaseLock) return {state:'busy'};
   const stop = new AbortController();
   const abort = () => stop.abort();
   process.once('SIGTERM',abort); process.once('SIGINT',abort);
@@ -123,7 +122,7 @@ async function main(file) {
     });
   } finally {
     process.removeListener('SIGTERM',abort); process.removeListener('SIGINT',abort);
-    fs.closeSync(fd); fs.unlinkSync(cfg.queueLock);
+    releaseLock();
   }
 }
 if (require.main === module) main(process.argv[2]).then(r=>console.log(JSON.stringify(r))).catch(e=>{

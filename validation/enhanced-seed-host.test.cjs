@@ -51,3 +51,32 @@ test('changed malware gate cannot reach publisher',async()=>{
   h.options.sign=assert.fail;
   await assert.rejects(processOne(h.options),/GATE_PROPOSAL_CHANGED/);
 });
+test('resident loop retries transport and empty queues serially with bounded backoff',async()=>{
+  const {serve}=require('../tools/enhanced-seed-queue-host.cjs');
+  const ctl=new AbortController(), delays=[], states=[];
+  let calls=0;
+  await serve(async()=>{
+    calls++;
+    if(calls===1)throw Error('SEED_RUNNER_TRANSPORT');
+    return {state:calls===9?'processed':'empty'};
+  },ctl.signal,{wait:async ms=>{delays.push(ms);if(calls===9)ctl.abort();},report:s=>states.push(JSON.parse(s).state)});
+  assert.deepEqual(delays,[2000,4000,8000,16000,32000,60000,60000,60000,1000]);
+  assert.deepEqual(states,['SEED_RUNNER_TRANSPORT','empty','processed']);
+});
+
+test('Windows kernel releases only the terminated owner queue lock',{skip:process.platform!=='win32',timeout:10000},async t=>{
+  const fs=require('node:fs'),path=require('node:path'),{once}=require('node:events');
+  const {lockQueue}=require('../tools/enhanced-seed-queue-host.cjs');
+  const root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'seed-lock-'));
+  const file=path.join(root,'queue.lock');
+  const script="require(process.argv[1]).lockQueue(process.argv[2]);process.send('ready');setInterval(()=>{},1000)";
+  const child=require('node:child_process').spawn(process.execPath,['-e',script,require.resolve('../tools/enhanced-seed-queue-host.cjs'),file],
+    {windowsHide:true,stdio:['ignore','ignore','ignore','ipc']});
+  const exited=once(child,'exit');
+  t.after(async()=>{child.kill();await exited;fs.rmSync(root,{recursive:true,force:true});});
+  await once(child,'message');
+  assert.equal(lockQueue(file),null);
+  child.kill();await exited;
+  const release=lockQueue(file);assert.equal(typeof release,'function');release();
+  assert.equal(fs.existsSync(file),false);
+});

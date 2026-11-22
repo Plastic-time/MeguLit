@@ -8,7 +8,23 @@ The calibration report endpoint returns an additional `enhanced:{id,state}` for 
 
 Run `node tools/enhanced-seed-queue-host.cjs <HTTPS-relay-origin> <absolute-private-host-config.json>` under the prepared host identity. The JSON contains `policy` (the existing trusted-host policy object) and `samples` (a local array of `{exe,identity}` using the relative executable and full identity described in [the collector contract](cardinal-trusted-runner.md)). The scheduler requires exactly one matching local sample. No raw capture, local paths or sample inventory are uploaded.
 
-Set a separate shared `ENHANCED_HOST_TOKEN` in the Worker and on that host. Use the existing external publisher/reviewer PEM providers or the existing DPAPI store with `ENHANCED_KEY_STORE`, `ENHANCED_VAULT`, `ENHANCED_PUBLISHER_ID` and `ENHANCED_REVIEWER_ID`. The process claims work every 15 seconds when idle and renews a five-minute lease every minute during collection. It constructs the signed candidate locally and calls `services/cardinal-trusted-runner.cjs:runHost` with a verified current release. The independent collector implements the runner's pinned executable protocol. Only the signed profile and signed standard review leave the host. Missing samples, incomplete measurement and unsigned outcomes retain the existing winner.
+Set a separate shared `ENHANCED_HOST_TOKEN` in the Worker and on that host. Use the existing external publisher/reviewer PEM providers or the existing DPAPI store with `ENHANCED_KEY_STORE`, `ENHANCED_VAULT`, `ENHANCED_PUBLISHER_ID` and `ENHANCED_REVIEWER_ID`. Empty queues and transport failures back off from two seconds to one minute. During collection the host renews its five-minute lease every minute. It constructs the signed candidate locally and calls `services/cardinal-trusted-runner.cjs:runHost` with a verified current release. The independent collector implements the runner's pinned executable protocol. Only the signed profile and signed standard review leave the host. Missing samples, incomplete measurement and unsigned outcomes retain the existing winner.
+
+### Windows service
+
+Deploy the host checkout under an operator-controlled service directory as `app`, with Node 22+ at `runtime/node.exe`. Compile the existing SCM wrapper from PowerShell in the checkout. These commands assume the service directory already exists and is writable only by administrators.
+
+```powershell
+$serviceRoot = 'C:\ProgramData\MeguLitEnhancedSeed'
+$source = (Resolve-Path relay/scan-service/windows-service.cs).Path
+& "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe" /nologo /define:ENHANCED_SEED /reference:System.ServiceProcess.dll "/out:$serviceRoot/host.exe" $source
+sc.exe create MeguLitEnhancedSeed binPath= ('"' + $serviceRoot + '\host.exe"') start= auto obj= 'NT SERVICE\MeguLitEnhancedSeed'
+sc.exe failure MeguLitEnhancedSeed reset= 86400 actions= restart/5000/restart/15000/restart/60000
+```
+
+Place the private service configuration at `private/enhanced-host.json`. In addition to the policy object and sample inventory, set `base` to the relay origin, `tokenFile` to an absolute path to a protected bearer file, and `queueLock` to the exclusive file shared by all game tests on this machine. Configure `reviewer` and `publisher` with their respective DPAPI `id`, `store` and `vault` under the actual service identity. Grant that identity read/execute access to the host tools and read access to its private configuration, bearer and keys. Give it write access to its state and shared lock directory. Keep all private material outside the checkout and all player deployment, state and sample directories. Inventory is per locally available game build. Incoming player calibrations need no per-report request file.
+
+Start with `Start-Service MeguLitEnhancedSeed`. The service invokes the same queue CLI as foreground mode. Closing the panel has no effect on SCM. For a local drain, create an empty `paused` file in the policy state directory. The host finishes active work and stops claiming until the marker is removed. Dashboard pause invalidates leases immediately. Stopping the service closes its control pipe and aborts the current operation. After a crash, Windows releases this host's exclusive queue file, and the relay retains the job until its lease expires. Keep any collector cleanup barrier intact until the host has verified game isolation and cleanup.
 
 ## Relay contract for other hosts
 

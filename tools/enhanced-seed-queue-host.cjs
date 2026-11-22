@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 const path=require('node:path');
-const {setTimeout:delay}=require('node:timers/promises');
+const fs=require('node:fs'),crypto=require('node:crypto');
+const {spawnSync}=require('node:child_process');
+const Runner=require('../services/cardinal-trusted-runner.cjs');
+const Conditions=require('../core/cold-test/conditions.cjs');
 const {jsonRequest,baseURL,publisherSigner,candidate}=require('./seed-release-runner.cjs');
 const protocol=require('../core/torch-release.cjs');
 const diff=require('../core/game-diff.cjs');
@@ -12,7 +15,12 @@ async function processOne({base,token,keys,collect,sign,signal,fetcher}){
  if(!job)return false;
  const work=new AbortController(),abort=signal?AbortSignal.any([signal,work.signal]):work.signal;
  const call=(action,fields)=>request('/api/enhanced-seed/'+action,{id:job.id,lease:job.lease,...fields},abort);
- const timer=setInterval(()=>call('renew').catch(()=>work.abort()),60000);
+ let renewal;
+ const timer=setInterval(()=>{
+   if(!renewal)renewal=call('renew').then(reply=>{
+     if(reply.ok!==true)work.abort();
+   }).catch(()=>work.abort()).finally(()=>{renewal=undefined;});
+ },60000);
  try{
    let baseline=null;
    try{baseline=(await request('/api/torch-release?exe='+encodeURIComponent(job.candidate.key),undefined,abort)).release;
@@ -23,6 +31,7 @@ async function processOne({base,token,keys,collect,sign,signal,fetcher}){
      const evidence=await collect(job.candidate,{baseline,signal:abort});
      if(!evidence){await call('retry');return true;}
      proposal=(await call('receipt',{profile:evidence.profile,review:evidence.review})).proposal;
+     if(!protocol.same(proposal?.profile,evidence.profile)||!protocol.same(proposal?.review,evidence.review))throw Error('RECEIPT_MISMATCH');
    }
    const ready=(await call('ready')).proposal;
    if(!protocol.same(ready,proposal))throw Error('PROPOSAL_CHANGED');
@@ -35,24 +44,65 @@ async function processOne({base,token,keys,collect,sign,signal,fetcher}){
    abort.throwIfAborted();
    const signed=await sign(structuredClone(proposal));
    if(!protocol.same(diff.unsigned(signed),proposal))throw Error('PROPOSAL_CHANGED');
-   await protocol.checked(signed,keys);
-   await call('publish',{release:signed});
+   const proof=await protocol.checked(signed,keys);
+   const published=await call('publish',{release:signed});
+   if(published.status!=='published'||published.hash!==proof.hash)throw Error('PUBLISH_UNCONFIRMED');
    return true;
  }catch(e){await call('retry').catch(()=>{});throw e;}
- finally{clearInterval(timer);work.abort();}
+ finally{clearInterval(timer);work.abort();await renewal;}
 }
 
-if(require.main===module)(async()=>{
- const [origin,configFile]=process.argv.slice(2),token=process.env.ENHANCED_HOST_TOKEN;
- if(!token||!configFile||!path.isAbsolute(configFile))throw Error('HOST_CONFIGURATION');
- const base=baseURL(origin),runner=require('../services/cardinal-trusted-runner.cjs');
- const {policy,samples}=runner.readJSON(configFile);
- if(!Array.isArray(samples)||!policy?.collector?.file)throw Error('COLLECTOR_CONFIGURATION');
- const keys={profileKeys:policy.profileKeys,reviewKeys:policy.reviewKeys};
- keys.releaseKeys=keys.profileKeys;
- const signing={keys,store:process.env.ENHANCED_KEY_STORE,id:process.env.ENHANCED_PUBLISHER_ID,vault:process.env.ENHANCED_VAULT};
- const sign=publisherSigner(signing),signProfile=publisherSigner({...signing,scope:'profile'});
- const collect=async(c,{baseline,signal})=>{
+// Windows CRT _O_TEMPORARY makes the shared exclusive file disappear when
+// the OS closes the descriptor, including after forcible process termination.
+function lockQueue(file) {
+  const {O_CREAT, O_EXCL, O_WRONLY} = fs.constants;
+  let fd;
+  try {
+    fd = fs.openSync(file, O_CREAT | O_EXCL | O_WRONLY | (process.platform === 'win32' ? 0x40 : 0), 0o600);
+  } catch (error) {
+    if (error.code === 'EEXIST') return null;
+    throw error;
+  }
+  return () => {
+    fs.closeSync(fd);
+    if (process.platform !== 'win32') fs.unlinkSync(file);
+  };
+}
+
+async function serve(run, signal, {wait = require('node:timers/promises').setTimeout, report = console.log} = {}) {
+  let delay = 1000, previous;
+  while (!signal.aborted) {
+    let state;
+    try { state = (await run(signal)).state; }
+    catch (error) {
+      if (signal.aborted) break;
+      state = /^[A-Z_]+$/.test(error.message) ? error.message : 'ENHANCED_HOST_FAILURE';
+    }
+    if (state !== previous) report(JSON.stringify({state}));
+    previous = state;
+    delay = state === 'processed' ? 1000 : Math.min(delay * 2, 60000);
+    try { await wait(delay, undefined, {signal}); }
+    catch (error) { if (!signal.aborted) throw error; }
+  }
+}
+
+async function guardedTick(cfg,policy,work){
+  if (fs.existsSync(path.join(policy.stateRoot,'paused')) ||
+      fs.existsSync(path.join(policy.stateRoot,'blocked.json')) || !Runner.resources()) return {state:'unavailable'};
+  const releaseLock = lockQueue(cfg.queueLock);
+  if (!releaseLock) return {state:'busy'};
+  try {
+    const status = spawnSync(path.join(policy.appRoot,'native','ColdDesk.exe'),['status'],{
+      windowsHide:true,encoding:'utf8',timeout:7000,maxBuffer:16384,
+      env:{SystemRoot:process.env.SystemRoot,WINDIR:process.env.WINDIR}
+    });
+    if (status.status !== 0 || !Conditions.check(JSON.parse(status.stdout)).ok) return {state:'busy'};
+    return {state:await work()?'processed':'empty'};
+  } finally { releaseLock(); }
+}
+
+function createCollector({samples,policy,signProfile,reviewer,runHost=Runner.runHost}){
+ return async(c,{baseline,signal})=>{
    const matches=samples.filter(s=>protocol.identity(s.identity)&&s.identity.exe===c.key&&(!c.script||s.identity.script===c.script)&&(!c.engine||s.identity.engine===c.engine));
    if(matches.length!==1)return null;
    const {identity,exe}=matches[0];
@@ -61,15 +111,68 @@ if(require.main===module)(async()=>{
    protocol.profileShape({...doc,signature:{alg:'ed25519',keyId:'shape',value:'A'.repeat(86)+'=='}},identity);
    const profile=await signProfile(doc);
    const request={schema:'megulit.cardinal-trusted-request',version:1,exe,identity,candidate:profile,baseline,torchNo:c.torchNo};
-   const result=await runner.runHost(request,policy,{signal,signing:signing.store?{store:signing.store,vault:signing.vault,id:process.env.ENHANCED_REVIEWER_ID}:undefined});
+   const result=await runHost(request,policy,{signal,signing:reviewer});
    return result.state==='reviewed'?{profile,review:result.review}:null;
  };
- const fs=require('node:fs'),crypto=require('node:crypto');
+}
+
+function readHostToken(file,policy){
+ if(!path.isAbsolute(file))throw Error('HOST_PRIVATE_CONFIG');
+ const resolved=fs.realpathSync.native(file);
+ if(path.relative(resolved,path.resolve(file))!=='')throw Error('HOST_PRIVATE_CONFIG');
+ for(const dir of [path.join(__dirname,'..'),policy.appRoot,policy.sampleRoot,policy.stateRoot]){
+   const rel=path.relative(fs.realpathSync(dir),resolved);
+   if(!path.isAbsolute(rel)&&rel!=='..'&&!rel.startsWith('..'+path.sep))throw Error('HOST_PRIVATE_CONFIG');
+ }
+ const fd=fs.openSync(resolved,'r');
+ try{
+   const stat=fs.fstatSync(fd);
+   if(!stat.isFile()||stat.nlink!==1||stat.size<1||stat.size>4096)throw Error('HOST_PRIVATE_CONFIG');
+   const buffer=Buffer.alloc(4097);
+   const count=fs.readSync(fd,buffer,0,buffer.length,0);
+   const token=buffer.toString('utf8',0,count).trim();
+   if(count!==stat.size||!/^\S{1,4096}$/.test(token))throw Error('HOST_PRIVATE_CONFIG');
+   return token;
+ }finally{fs.closeSync(fd);}
+}
+
+async function main(args){
+ const service=args[1]==='--service';
+ const configFile=service?args[0]:args[1];
+ if(!configFile||!path.isAbsolute(configFile))throw Error('HOST_CONFIGURATION');
+ const cfg=Runner.readJSON(configFile),{policy,samples}=cfg;
+ const base=baseURL(service?cfg.base:args[0]);
+ if(!Array.isArray(samples)||samples.length>4096||!policy?.collector?.file)throw Error('HOST_CONFIGURATION');
+ if(service){
+   const allowed=new Set(['base','policy','samples','queueLock','tokenFile','publisher','reviewer']);
+   if(Object.keys(cfg).some(k=>!allowed.has(k))||!path.isAbsolute(cfg.queueLock||''))throw Error('HOST_CONFIGURATION');
+ }
+ for(const role of ['publisher','reviewer']){
+   if(cfg[role]&&(Object.keys(cfg[role]).sort().join(',')!=='id,store,vault'||
+      !path.isAbsolute(cfg[role].store||'')||!path.isAbsolute(cfg[role].vault||'')||
+      !/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(cfg[role].id||'')))throw Error('HOST_SIGNING_CONFIG');
+ }
+ const token=cfg.tokenFile?readHostToken(cfg.tokenFile,policy):process.env.ENHANCED_HOST_TOKEN;
+ delete process.env.ENHANCED_HOST_TOKEN;
+ if(typeof token!=='string'||!token)throw Error('HOST_CONFIGURATION');
+ cfg.queueLock??=path.join(policy.stateRoot,'enhanced-queue.lock');
+ if(!path.isAbsolute(cfg.queueLock))throw Error('HOST_CONFIGURATION');
+ const keys={profileKeys:policy.profileKeys,reviewKeys:policy.reviewKeys};
+ keys.releaseKeys=keys.profileKeys;
+ const signing=cfg.publisher?{...cfg.publisher,keys}:{keys,store:process.env.ENHANCED_KEY_STORE,id:process.env.ENHANCED_PUBLISHER_ID,vault:process.env.ENHANCED_VAULT};
+ const sign=publisherSigner(signing),signProfile=publisherSigner({...signing,scope:'profile'});
+ const reviewer=cfg.reviewer||(signing.store?{store:signing.store,vault:signing.vault,id:process.env.ENHANCED_REVIEWER_ID}:undefined);
+ const collect=createCollector({samples,policy,signProfile,reviewer});
  if(!path.isAbsolute(policy.collector.file)||fs.statSync(policy.collector.file).size>64*1024**2||
     crypto.createHash('sha256').update(fs.readFileSync(policy.collector.file)).digest('hex')!==policy.collector.sha256)throw Error('COLLECTOR_CONFIGURATION');
- for(;;){
-   try{if(await processOne({base,token,keys,collect,sign}))continue;}catch(e){console.error(/^[A-Z_]+$/.test(e.code||'')?e.code:'HOST_RETRY');}
-   await delay(15000);
+ const stop=new AbortController(),abort=()=>stop.abort();
+ process.once('SIGTERM',abort);process.once('SIGINT',abort);
+ if(service){process.stdin.once('end',abort);process.stdin.resume();}
+ try{
+   await serve(signal=>guardedTick(cfg,policy,()=>processOne({base,token,keys,collect,sign,signal})),stop.signal);
+ }finally{
+   process.removeListener('SIGTERM',abort);process.removeListener('SIGINT',abort);
  }
-})().catch(()=>{console.error('HOST_CONFIGURATION');process.exitCode=1;});
-module.exports={processOne};
+}
+if(require.main===module)main(process.argv.slice(2)).catch(()=>{console.error('HOST_CONFIGURATION');process.exitCode=1;});
+module.exports={processOne,serve,lockQueue,createCollector};
