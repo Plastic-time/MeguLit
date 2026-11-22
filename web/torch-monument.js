@@ -25,6 +25,7 @@ import {VolumetricPass} from './torch-volumetric.js';
 import {loadGsap} from './gsap-loader.js';
 import {createTorchCovers} from './torch-covers.js';
 import {buildCourtyard} from './torch-courtyard.js';
+import {torchGroundHeight} from './torch-ground.js';
 import {createTorchWalk,keepTorchCameraAboveFloor} from './torch-controls.js';
 
 /* Legacy number queries still jump to the original internal ID. */
@@ -67,13 +68,14 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
  const opened=performance.now();
  const timing=(name,start)=>performance.measure('torch:'+name,{start,end:performance.now()});
  const t=COPY[locale]||COPY.zh;
+ const controls=({zh:'左键拖动平移 · 滚轮前后移动 · 按住滚轮旋转视角 · 右键拖动微调 · 双击左键复位',ja:'左ドラッグで平行移動 · ホイールで前後移動 · 中ドラッグで自由回転 · 右ドラッグで視点微調整 · 左ダブルクリックでリセット',en:'Left-drag to pan · Scroll forward/back · Middle-drag to look · Right-drag to adjust view · Double left-click to reset'})[locale]||'';
  const host=document.createElement('div');host.className='torch-monument';host.setAttribute('role','region');host.setAttribute('aria-label',t.title);
  host.innerHTML=`<canvas class="tm-canvas"></canvas><div class="tm-veil" aria-hidden="true"></div>
   <header class="tm-head"><h2 class="tm-title">${esc(t.title)}</h2><p class="tm-sub">${esc(t.sub)}</p></header>
   <p class="tm-count" aria-live="polite"></p>
   <div class="tm-tip" role="tooltip" hidden><b class="tm-tip-name"></b><span class="tm-tip-meta"></span></div>
   <p class="tm-status" role="status" hidden></p>
-  <p class="tm-help">${({zh:'右键按住拖动 · 滚轮前后移动 · 左键按住自由旋转视角 · 按住滚轮自由移动 · 双击左键复位',ja:'右ドラッグで移動 · ホイールで前後移動 · 左ドラッグで視点回転 · 中ドラッグで平行移動 · 左ダブルクリックでリセット',en:'Right-drag to move · Scroll forward/back · Left-drag to look · Middle-drag to pan · Double left-click to reset'})[locale]||''}</p>
+  <p class="tm-help">${controls}</p>
   <footer class="tm-bar">
    <div class="tm-pager"><button type="button" class="tm-btn tm-next" aria-label="${esc(t.next)}" title="${esc(t.next)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6.5 9 12l5.5 5.5"/></svg></button><span class="tm-range"></span><button type="button" class="tm-btn tm-prev" aria-label="${esc(t.prev)}" title="${esc(t.prev)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6.5 15 12l-5.5 5.5"/></svg></button></div>
    <form class="tm-find" hidden><input type="search" maxlength="30" autocomplete="off" spellcheck="false" placeholder="${esc(t.find)}" aria-label="${esc(t.find)}"><button type="submit" class="tm-btn tm-text">${esc(t.findGo)}</button><ul class="tm-results" hidden></ul></form>
@@ -90,7 +92,7 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
  const isVisit=id=>mounted&&visit===id;
  const canvas=$('.tm-canvas'),bar=$('.tm-bar'),veil=$('.tm-veil');
  canvas.inert=bar.inert=true;
- $('.tm-canvas').tabIndex=0;$('.tm-canvas').setAttribute('aria-label',({zh:'传火碑视图，右键拖动，滚轮前后移动，左键拖动转向，中键拖动平移，双击左键复位',ja:'継火の碑。右ドラッグで移動、ホイールで前後移動、左ドラッグで回転、中ドラッグで平行移動、左ダブルクリックでリセット',en:'Monument view. Right-drag to move, scroll forward/back, left-drag to look, middle-drag to pan, double left-click to reset'})[locale]);
+ $('.tm-canvas').tabIndex=0;$('.tm-canvas').setAttribute('aria-label',`${t.title} · ${controls}`);
  const quality=()=>{let q='auto';try{q=localStorage.getItem(QUALITY_KEY)||'auto';}catch{}return q==='high'||q==='low'?q:'auto';};
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -576,7 +578,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
    else{view.dragYaw=THREE.MathUtils.clamp(pointer.yaw0-dx*.9,-.26,.26);view.dragPitch=THREE.MathUtils.clamp(pointer.pitch0+dy*1.1,-.62,.12);}}};
  const clearPointerFocus=()=>{delete canvas.dataset.pointerFocus;};
  canvas.addEventListener('blur',clearPointerFocus);
- const onDown=e=>{if(pointer.down||![0,1,2].includes(e.button))return;e.preventDefault();canvas.dataset.pointerFocus="";canvas.focus({preventScroll:true});covers.point(null);pointer.down=true;pointer.id=e.pointerId;pointer.moved=0;pointer.sx=e.clientX;pointer.sy=e.clientY;pointer.freeLook=e.button===0;pointer.yaw0=pointer.freeLook?view.freeYaw:view.dragYaw;pointer.pitch0=pointer.freeLook?view.freePitch:view.dragPitch;pointer.pan=e.button===1||(e.button===2&&!!view.read);pointer.lastX=e.clientX;pointer.lastY=e.clientY;dragMoved=false;canvas.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);};
+ const onDown=e=>{if(pointer.down||![0,1,2].includes(e.button))return;e.preventDefault();canvas.dataset.pointerFocus="";canvas.focus({preventScroll:true});covers.point(null);pointer.down=true;pointer.id=e.pointerId;pointer.moved=0;pointer.sx=e.clientX;pointer.sy=e.clientY;pointer.freeLook=e.button===1;pointer.yaw0=pointer.freeLook?view.freeYaw:view.dragYaw;pointer.pitch0=pointer.freeLook?view.freePitch:view.dragPitch;pointer.pan=e.button===0||(e.button===2&&!!view.read);pointer.lastX=e.clientX;pointer.lastY=e.clientY;dragMoved=false;canvas.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);};
  const onUp=e=>{if(!pointer.down||e.pointerId!==pointer.id)return;pointer.down=false;dragMoved=pointer.moved>.012;canvas.classList.remove('is-dragging');if(canvas.hasPointerCapture?.(e.pointerId))canvas.releasePointerCapture(e.pointerId);};
  const onContextMenu=e=>e.preventDefault();
  canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointerup',onUp);canvas.addEventListener('pointercancel',onUp);canvas.addEventListener('lostpointercapture',onUp);canvas.addEventListener('contextmenu',onContextMenu);
@@ -606,9 +608,12 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
   if(view.smoothPos){const follow=reduced?1:1-Math.exp(-dt*2.2);view.smoothPos.lerp(view.pos,follow);view.smoothLook.lerp(view.look,follow);}else{view.smoothPos=view.pos.clone();view.smoothLook=view.look.clone();}
   tmpDir.copy(view.smoothLook).sub(view.smoothPos).normalize();
   eul.set(view.pitch,view.yaw,0);tmpDir.applyEuler(eul);
-  travel.addScaledVector(tmpDir,walk.step(dt));
+  const distance=walk.step(dt);
+  travel.addScaledVector(tmpDir,distance);
   camera.position.copy(view.smoothPos).add(travel);camera.position.x+=view.px;
-  keepTorchCameraAboveFloor(camera.position);travel.y=camera.position.y-view.smoothPos.y;
+  const {x,z}=camera.position,ground=torchGroundHeight(x,z);
+  if(distance)camera.position.y+=ground-torchGroundHeight(x-tmpDir.x*distance,z-tmpDir.z*distance);
+  keepTorchCameraAboveFloor(camera.position,ground);travel.y=camera.position.y-view.smoothPos.y;
   camera.lookAt(tmpPos.copy(camera.position).add(tmpDir));
  }
  function lookAtFocus(){placeGlow();if(glow.userData.on&&glow.userData.world)setRead(glow.userData.world);}

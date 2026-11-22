@@ -16,6 +16,6 @@ export function createTorchWalk({reduced=false}={}){
  };
 }
 
-export function keepTorchCameraAboveFloor(position){
- position.y=Math.max(1.2,position.y);
+export function keepTorchCameraAboveFloor(position,ground=0){
+ position.y=Math.max(ground+1.2,position.y);
 }

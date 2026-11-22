@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
+import {MIRROR_LEVEL} from './torch-ground.js';
 import * as THREE from './vendor/three/three.module.min.js';
 import {mergeGeometries} from './vendor/three/addons/utils/BufferGeometryUtils.js';
 
@@ -66,7 +67,7 @@ export function buildCourtyard(scene,west){
  for(const x of [-.2,0,.2])part(.088,.57,.08,x,1.34,.27);
  const chair=new THREE.Mesh(mergeGeometries(parts),wood);
  parts.forEach(part=>part.dispose());
- chair.name='Courtyard chair';chair.position.z=west+32;
+ chair.name='Courtyard chair';chair.position.set(0,MIRROR_LEVEL,west+32);
  const woodFill=new THREE.Color(0x584858),waterDay=new THREE.Color(0x789ebc),waterNight=new THREE.Color(0x354c76);
  const reflected=wood.clone();reflected.color.multiplyScalar(.58);
  const mirror=new THREE.Mesh(chair.geometry,reflected);
@@ -75,7 +76,7 @@ export function buildCourtyard(scene,west){
 
  function update(camera,state){
   sky.position.copy(camera.position);
-  surface.position.set(camera.position.x,-.008,camera.position.z);
+  surface.position.set(camera.position.x,MIRROR_LEVEL-.008,camera.position.z);
   const u=sky.material.uniforms;
   u.body.value.copy(state.sunPos);
   u.moon.value=Number(state.moon);

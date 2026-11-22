@@ -56,14 +56,16 @@ export function createTorchCovers(parent,{east,west,reduced}){
    thumb.height=Math.max(1,Math.round(image.naturalHeight*ratio));
    thumb.getContext('2d').drawImage(image,0,0,thumb.width,thumb.height);
    const map=new THREE.CanvasTexture(thumb);map.colorSpace=THREE.SRGBColorSpace;
-   const size=1.18+Math.random()*.62,aspect=thumb.width/thumb.height;
+   const slot=group.children.length,front=slot===0||slot%3!==2&&slot<7;
+   const size=(front?2.25:1.18)+Math.random()*.62,aspect=thumb.width/thumb.height;
    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(size*Math.min(1,aspect),size*Math.min(1,1/aspect)),
     new THREE.MeshBasicMaterial({map,side:THREE.DoubleSide,color:0xe6e5ed,transparent:true,opacity:0.65,depthWrite:false}));
-   const slot=group.children.length,side=slot%2===0?-1:1;
+   const side=slot%2===0?-1:1;
    mesh.name=id;
    const offset=10+Math.floor(slot/3)*12+Math.random()*8;
-   const behindStele=slot%3===2;
-   mesh.position.set(side*(6+(slot%3)*6+Math.random()*4),1.7+Math.random()*2.3,behindStele?east-offset:west+offset);
+   if(front){
+    mesh.position.set(side*(4.8+(slot%3)*1.7+Math.random()*.65),8.2+(slot%3)*2.1+Math.random()*.5,east-5-slot*2.5);
+   }else mesh.position.set(side*(6+(slot%3)*6+Math.random()*4),1.7+Math.random()*2.3,west+offset);
    mesh.rotation.y=Math.PI+(Math.random()-.5)*1.1;
    mesh.userData={height:mesh.position.y,yaw:mesh.rotation.y,phase:Math.random()*Math.PI*2};
    group.add(mesh);

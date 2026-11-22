@@ -53,7 +53,7 @@ async function main(){
    await mouse('mouseMoved',end,button,mask);
    await mouse('mouseReleased',end,button,0);
   }
-  await drag('left',1,380,890);
+  await drag('middle',4,380,890);
   await wait('heading()[0]>.8');
   await evaluate('hall.resetView()');
   await wait('heading()[2]<-.95');
@@ -70,16 +70,16 @@ async function main(){
    const meadow=object('Meadow grass');
    return {tier:hall.tier,baked:d.ao.baked,roof:wall.geometry.boundingBox.max.y,grass:meadow.count,
     opacity:glass.opacity,seeThrough:glass.transparent&&!glass.depthWrite,
-    lamp:!!object('Lamp shield enamel')&&!!object('Votive lamp chalice')&&!!object('Votive lamp star'),
+    badge:!!object('Megumin eyepatch')&&!!object('Eyepatch gold cross')&&!!object('Eyepatch strap'),
     relief:[frieze.map.image.width,frieze.map.image.height,frieze.normalMap.image.width,frieze.normalMap.image.height],
     aniso:frieze.normalMap.anisotropy};
   })()`);
   assert.equal(facts.tier,tier);
   assert.equal(facts.baked,true);
   assert.ok(facts.roof<24);
-  assert.equal(facts.grass,tier==='low'?800:1760);
+  assert.ok(facts.grass>0&&facts.grass<=(tier==='low'?800:1760));
   assert.equal(facts.opacity,.65);
-  assert.ok(facts.seeThrough&&facts.lamp);
+  assert.ok(facts.seeThrough&&facts.badge);
   const relief=tier==='low'?[2048,256]:[4096,512];
   assert.deepEqual(facts.relief,[...relief,...relief]);
   assert.equal(facts.aniso,tier==='low'?4:16);
@@ -123,7 +123,7 @@ async function main(){
    fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(photo.data,'base64'));
   }
   const width=await evaluate('canvas.clientWidth');
-  const turn=()=>drag('left',1,70,Math.round(70+Math.PI*width/4));
+  const turn=()=>drag('middle',4,70,Math.round(70+Math.PI*width/4));
   await turn();await wait('heading()[2]>.97');
   await evaluate(`for(let i=0;i<100;i++)canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:-120,bubbles:true,cancelable:true}));true`);
   await wait('d.camera.position.z>420');

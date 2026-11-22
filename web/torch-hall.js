@@ -12,6 +12,7 @@
 import * as THREE from './vendor/three/three.module.min.js';
 import {mergeGeometries} from './vendor/three/addons/utils/BufferGeometryUtils.js';
 import {ashlar,relief,coffers,rose,lancet,quarries,marble,marbleHQ,floorHQ,inlay,glowSprite,basalt,basketRelief} from './torch-textures.js';
+import {MIRROR_LEVEL,TERRACE,torchGroundHeight} from './torch-ground.js';
 import {maps,isBakedTorchCanvas} from './torch-bake.js';
 
 /* Twilight sky stays warm after sunset, but a sun below the horizon cannot cast direct light into the vault. */
@@ -134,29 +135,28 @@ export function buildStele({scene,keep,tier}){const low=tier==='low',T=textureMa
      for(const fz of [-1,1]){const z=fz*.432,ry=fz<0?Math.PI:0;
       const f=new THREE.Mesh(keep(new THREE.PlaneGeometry(L-.3,fh)),carvedB);f.name='Plinth carved frieze';f.position.set(0,cy,z);f.rotation.y=ry;f.receiveShadow=true;stele.add(f);
       for(const dy of [fh/2+.015,-fh/2-.015])mesh(new THREE.BoxGeometry(L-.26,.018,.016),gilt,0,cy+dy,z,false);}
-     const mr=dieH*.43,mz=.45;
-     const rim=keep(new THREE.MeshStandardMaterial({color:0xcfa474,roughness:.32,metalness:.72,envMapIntensity:1.3,emissive:0x564022,emissiveIntensity:.13}));
-     const inset=keep(new THREE.MeshStandardMaterial({color:0x241b2d,roughness:.48,metalness:.15,emissive:0x24122e,emissiveIntensity:.23}));
-     const flame=keep(new THREE.MeshStandardMaterial({color:0xe7b889,roughness:.38,metalness:.42,envMapIntensity:1.1,emissive:0xc68048,emissiveIntensity:.24}));
-     const ember=keep(new THREE.MeshStandardMaterial({color:0xffd4ac,roughness:.43,metalness:.24,emissive:0xdd8140,emissiveIntensity:.48}));
-     const beveled=(shape,depth,bevel)=>new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:true,bevelThickness:bevel,bevelSize:bevel,bevelSegments:3,curveSegments:24});
-     // A pointed enamel escutcheon echoes the lancet windows. The lamp and its
-     // detached ember remain distinct even at the default camera distance.
-     function outline(points){
-      const shape=new THREE.Shape();
-      for(const [i,[x,y]] of points.entries()){
-       if(i===0)shape.moveTo(x*mr,y*mr);else shape.lineTo(x*mr,y*mr);
-      }
-      shape.closePath();return shape;
+     const r=dieH*.44,mz=.45;
+     const leather=keep(new THREE.MeshStandardMaterial({color:0x9d1828,roughness:.58,emissive:0x64101d,emissiveIntensity:.5}));
+     const binding=keep(new THREE.MeshStandardMaterial({color:0x3c111a,roughness:.68,emissive:0x351019,emissiveIntensity:.24}));
+     const gold=keep(new THREE.MeshStandardMaterial({color:0xffce5b,roughness:.48,metalness:.34,emissive:0xcc831b,emissiveIntensity:.54}));
+     const patch=new THREE.Shape();
+     patch.moveTo(-.99*r,.31*r);patch.quadraticCurveTo(-.85*r,.79*r,-.12*r,.79*r);
+     patch.quadraticCurveTo(.56*r,.82*r,.99*r,.33*r);patch.quadraticCurveTo(.83*r,-.44*r,.38*r,-.71*r);
+     patch.quadraticCurveTo(-.04*r,-.92*r,-.48*r,-.62*r);patch.quadraticCurveTo(-.86*r,-.34*r,-.99*r,.31*r);
+     const raised=(shape,depth,bevel)=>new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:true,bevelThickness:bevel,bevelSize:bevel,bevelSegments:3,curveSegments:24});
+     const edge=mesh(raised(patch,.025,.012),binding,0,cy,mz,false);edge.rotation.z=.16;
+     const pad=raised(patch,.035,.006);pad.scale(.94,.94,1);
+     mesh(pad,leather,0,cy,mz+.016,false).rotation.z=.16;
+     stele.children.at(-1).name='Megumin eyepatch';
+     for(const angle of [-.61,.93]){
+      const cross=mesh(rbox(r*1.19,r*.12,.025,.009),gold,0,cy+.022,mz+.053,false);
+      cross.rotation.z=angle;cross.name='Eyepatch gold cross';
      }
-     const shield=outline([[0,1],[.81,.61],[.74,-.29],[.47,-.66],[0,-1],[-.47,-.66],[-.74,-.29],[-.81,.61]]);
-     mesh(beveled(shield,.026,.009),rim,0,cy,mz,false).name='Lamp shield gilt edge';
-     const enamel=beveled(shield,.018,.004);enamel.scale(.89,.89,1);
-     mesh(enamel,inset,0,cy,mz+.034,false).name='Lamp shield enamel';
-     const bowl=outline([[-.53,-.12],[.53,-.12],[.32,-.35],[.09,-.43],[.09,-.51],[.28,-.57],[.28,-.63],[-.28,-.63],[-.28,-.57],[-.09,-.51],[-.09,-.43],[-.32,-.35]]);
-     mesh(beveled(bowl,.021,.006),flame,0,cy,mz+.061,false).name='Votive lamp chalice';
-     const spark=outline([[0,.65],[.085,.32],[.28,.22],[.085,.12],[0,-.025],[-.085,.12],[-.28,.22],[-.085,.32]]);
-     mesh(beveled(spark,.026,.005),ember,0,cy,mz+.061,false).name='Votive lamp star';}
+     for(const side of [-1,1]){
+      const strap=mesh(rbox(r*.57,.027,.025,.007),binding,side*r*1.12,cy+side*.041,mz+.006,false);
+      strap.rotation.z=.22;strap.name='Eyepatch strap';
+     }}
+
    part(L+.1,.06,.94,.02);part(L+.2,.07,1.0,.03,inlayRed);part(L+.3,.1,1.06,.035);}
  const s=new THREE.Shape(),w=SW,h=SH,b=.04;s.moveTo(-w/2+b,-h/2);s.lineTo(w/2-b,-h/2);s.quadraticCurveTo(w/2,-h/2,w/2,-h/2+b);s.lineTo(w/2,h/2-b);s.quadraticCurveTo(w/2,h/2,w/2-b,h/2);
  s.lineTo(-w/2+b,h/2);s.quadraticCurveTo(-w/2,h/2,-w/2,h/2-b);s.lineTo(-w/2,-h/2+b);s.quadraticCurveTo(-w/2,-h/2,-w/2+b,-h/2);
@@ -242,6 +242,27 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  const ROSE_AVG=new THREE.Color(.42,.26,.56),LANCET_AVG=new THREE.Color(.30,.26,.62);
 
  const add=(geo,mat,pos,rot,{cast=true,recv=true}={})=>{const m=new THREE.Mesh(keep(geo),mat);if(pos)m.position.set(...pos);if(rot)m.rotation.set(...rot);m.castShadow=cast;m.receiveShadow=recv;hall.add(m);return m;};
+ /* Split the extrusion itself so the exterior cap is the only rendered surface at that depth. */
+ function masonry(geometry,outward,pos,rot,exterior,interior){
+  const source=geometry.attributes,caps=[],rest=[];
+  for(let i=0;i<source.position.count;i+=3)(source.normal.getZ(i)*outward>.999?caps:rest).push(i);
+  function section(triangles){
+   const part=new THREE.BufferGeometry();
+   for(const [name,attribute] of Object.entries(source)){
+    const data=new Float32Array(triangles.length*3*attribute.itemSize);
+    let at=0;
+    for(const vertex of triangles){
+     const first=vertex*attribute.itemSize;
+     data.set(attribute.array.subarray(first,first+3*attribute.itemSize),at);at+=3*attribute.itemSize;
+    }
+    part.setAttribute(name,new THREE.BufferAttribute(data,attribute.itemSize));
+   }
+   return part;
+  }
+  add(section(rest),interior,pos,rot);
+  geometry.dispose();
+  return add(section(caps),exterior,pos,rot);
+ }
  const inst=(geo,mat,list,{cast=true,pattern=false}={})=>{const m=new THREE.InstancedMesh(keep(geo),mat,list.length),o=new THREE.Object3D();
   if(pattern){const pr=new Float32Array(list.length*3),rr=(i,k)=>{const v=Math.sin((i+1)*12.9898+k*78.233)*43758.5453;return v-Math.floor(v);};
    for(let i=0;i<list.length;i++){pr[i*3]=rr(i,1);pr[i*3+1]=rr(i,2)*3;pr[i*3+2]=(rr(i,3)-.4)*.35;}m.geometry=keep(geo.clone());m.geometry.setAttribute('aPat',new THREE.InstancedBufferAttribute(pr,3));}
@@ -309,12 +330,9 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  const aisleLength=NZ1-BACK,aisleCenter=(BACK+NZ1)/2,outerX=AX+.5;
  const openings=[];
  for(let z=1.2;z<aisleLength-2;z+=3.4)openings.push({x:z,y:.9,w:1.5,h:4.2});
- const aisle=worldUV(wallWithArchesG(aisleLength,ENT_TOP,openings,.5),4);
  for(const sx of [-1,1]){
-  add(aisle,stoneDark,[sx*AX+(sx>0?.5:0),0,BACK],[0,-Math.PI/2,0]);
-  const outside=worldUV(wallWithArchesG(aisleLength,ENT_TOP,openings,.08),4);
-  const facing=sx<0?-outerX:outerX+.08;
-  add(outside,facadeStone,[facing,0,BACK],[0,-Math.PI/2,0]).name='Aisle exterior';
+  const aisle=worldUV(wallWithArchesG(aisleLength,ENT_TOP,openings,.58),4);
+  masonry(aisle,-sx,[sx*AX+(sx>0?.58:0),0,BACK],[0,-Math.PI/2,0],facadeStone,stoneDark).name='Aisle exterior';
   const windowGlass=glassMat(quarryTex,{normal:new THREE.Vector3(sx,0,0),avg:LANCET_AVG});
   const panes=[],sills=[],lintels=[],mullions=[],supports=[];
   openings.forEach(({x,w,h,y},index)=>{
@@ -352,11 +370,17 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  const bigArch=(pos,rot)=>{add(archBand(R-.05,R+.55,1.5),stone,pos,rot);add(archBand(R+.55,R+.75,1.2),smooth,pos,rot);add(archBand(R+.75,R+.9,.9),smooth,pos,rot);
   add(new THREE.TorusGeometry(R-.05,.1,8,64,Math.PI),smooth,pos,rot);};
  bigArch([0,SP,BACK]);bigArch([0,SP,FRONT]);
- const windows={};
+ const windows={},roseRadius=2.7,roseDepth=.5;
+ const sideRoseGlass=new THREE.CircleGeometry(roseRadius+.16,96);
+ const roseReveal=new THREE.Shape();roseReveal.absarc(0,0,roseRadius+.20,0,Math.PI*2,false);
+ const roseBore=new THREE.Path();roseBore.absarc(0,0,roseRadius-.12,0,Math.PI*2,true);roseReveal.holes.push(roseBore);
+ const revealDepth=roseDepth+.14;
+ const sideRoseGasket=worldUV(new THREE.ExtrudeGeometry(roseReveal,{depth:revealDepth,bevelEnabled:false,curveSegments:48}).translate(0,0,-revealDepth/2),4);
  for(const sx of [-1,1]){bigArch([sx*HX,SP,BAYZ],[0,Math.PI/2,0]);
-  const s=new THREE.Shape();s.moveTo(-R,0);s.absarc(0,0,R,Math.PI,0,true);s.closePath();const ry=4.6,rr=2.7;const h=new THREE.Path();h.absarc(0,ry,rr,0,Math.PI*2,true);s.holes.push(h);
-  add(worldUV(new THREE.ExtrudeGeometry(s,{depth:.5,bevelEnabled:false,curveSegments:48}),4),stone,[sx<0?-(HX+1.1):HX+.6,SP,BAYZ],[0,Math.PI/2,0]);
-  { const gm=glassMat(roseTex,{round:true,normal:new THREE.Vector3(sx,0,0),avg:ROSE_AVG});add(new THREE.CircleGeometry(rr,48),gm,[sx*(HX+.85),SP+ry,BAYZ],[0,Math.PI/2,0],{cast:false,recv:false});
+  const s=new THREE.Shape();s.moveTo(-R,0);s.absarc(0,0,R,Math.PI,0,true);s.closePath();const ry=4.6,rr=roseRadius;const h=new THREE.Path();h.absarc(0,ry,rr,0,Math.PI*2,true);s.holes.push(h);
+  add(worldUV(new THREE.ExtrudeGeometry(s,{depth:roseDepth,bevelEnabled:false,curveSegments:48}),4),stone,[sx<0?-(HX+1.1):HX+.6,SP,BAYZ],[0,Math.PI/2,0]);
+  { const gm=glassMat(roseTex,{round:true,normal:new THREE.Vector3(sx,0,0),avg:ROSE_AVG});add(sideRoseGlass,gm,[sx*(HX+.6+roseDepth/2),SP+ry,BAYZ],[0,Math.PI/2,0],{cast:false,recv:false}).name='Side rose glass';
+   add(sideRoseGasket,stoneDark,[sx*(HX+.6+roseDepth/2),SP+ry,BAYZ],[0,Math.PI/2,0]).name='Side rose gasket';
    const sp=add(new THREE.PlaneGeometry(rr*3.4,rr*3.4),spillMat(gm),[sx*(HX+.08),SP+ry,BAYZ],[0,-sx*Math.PI/2,0],{cast:false,recv:false});sp.renderOrder=2;noAO.push(sp);}
   add(new THREE.TorusGeometry(rr+.08,.16,10,64),smooth,[sx*(HX+.5),SP+ry,BAYZ],[0,Math.PI/2,0]);add(new THREE.TorusGeometry(rr*.22,.08,8,32),smooth,[sx*(HX+.55),SP+ry,BAYZ],[0,Math.PI/2,0]);
   const spokes=[];for(let i=0;i<12;i++)spokes.push([sx*(HX+.55),SP+ry,BAYZ,Math.PI/2,i/12*Math.PI*2,0]);
@@ -433,12 +457,10 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
    }
    facade.lineTo(-edge,SP+.17);facade.closePath();
    const roseOpening=new THREE.Path();roseOpening.absarc(0,wy,wr,0,Math.PI*2,true);facade.holes.push(roseOpening);
-   const outerFace=worldUV(new THREE.ShapeGeometry(facade,32),4);
-   add(outerFace,facadeStone,[0,0,NZ1+depth/2+.003]).name='West exterior stone';
    add(box(2*edge+1.4,.36,2.5),facadeStone,[0,-.19,NZ1+.55]).name='Portal landing';
    add(box(2*edge+.6,.17,1.9),exteriorTrim,[0,-.095,NZ1+.51]);
    add(archBand(roofRadius-.25,roofRadius+.12,.27),exteriorTrim,[0,SP,NZ1+depth/2+.11]);
-   const westWall=add(worldUV(new THREE.ExtrudeGeometry(facade,{depth,bevelEnabled:false,curveSegments:32}),4),stoneDark,[0,0,z]);
+   const westWall=masonry(worldUV(new THREE.ExtrudeGeometry(facade,{depth,bevelEnabled:false,curveSegments:32}),4),1,[0,0,z],null,facadeStone,stoneDark);
    westWall.name='West facade';
    for(const face of [-1,1]){
     const front=NZ1+face*(depth/2+.04);
@@ -471,19 +493,31 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
    add(new THREE.TorusGeometry(wr+.045,.105,8,64),exteriorTrim,[0,wy,NZ1+.62]);
    add(new THREE.TorusGeometry(wr+.1,.18,10,64),smooth,[0,wy,NZ1-.5]);windows.west={pos:new THREE.Vector3(0,wy,NZ1-.5),normal:new THREE.Vector3(0,0,1),r:wr};}
 
- /* Small meadows sit above the mirror plane. Their patches stay outside the two open axes. */
- const meadow=keep(new THREE.MeshStandardMaterial({
-  vertexColors:true,transparent:true,color:0xa7bc8e,roughness:.96,emissive:0x213525,emissiveIntensity:.22
+ /* The plateau shares its height function with the camera. Its sloped body continues below water. */
+ const {halfWidth,back,front,run:slopeRun}=TERRACE,edge=halfWidth+slopeRun+1,z0=back-slopeRun-1,z1=front+slopeRun+1;
+ const island=new THREE.PlaneGeometry(edge*2,z1-z0,low?44:74,low?58:92).rotateX(-Math.PI/2).translate(0,0,(z0+z1)/2);
+ const pts=island.attributes.position,colors=[];
+ const dark=new THREE.Color(0x3d5438),green=new THREE.Color(0x7e9557),soil=new THREE.Color(0x574637),path=new THREE.Color(0x95836a);
+ for(let i=0;i<pts.count;i++){
+  const x=pts.getX(i),z=pts.getZ(i),height=torchGroundHeight(x,z);
+  const hallInset=(1-THREE.MathUtils.smoothstep(Math.abs(x),12.8,13.45))
+   *THREE.MathUtils.smoothstep(z,back+1,back+2)*(1-THREE.MathUtils.smoothstep(z,39,40));
+  pts.setY(i,Math.min(-.012,height)-.14*hallInset-.20*THREE.MathUtils.smoothstep(-height,3.75,4));
+  const wave=.45+.14*Math.sin(x*.54+Math.sin(z*.25))+.11*Math.cos(z*.43+x*.78)+.05*Math.sin(x*1.53-z*.96);
+  const color=dark.clone().lerp(green,wave).lerp(soil,THREE.MathUtils.smoothstep(-height,2,4)*.75);
+  const foot=Math.max(Math.abs(x)-13.9,back+1-z,z-41.2);
+  color.multiplyScalar(.58+.42*THREE.MathUtils.smoothstep(foot,0,3));
+  const entry=(1-THREE.MathUtils.smoothstep(Math.abs(x),1.65,3.4))*THREE.MathUtils.smoothstep(z,40,43);
+  color.lerp(path,entry*.72);
+  color.toArray(colors,colors.length);
+ }
+ island.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));island.computeVertexNormals();
+ const turf=keep(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.96,
+  clippingPlanes:[new THREE.Plane(new THREE.Vector3(0,1,0),-MIRROR_LEVEL+.005)]
  }));
- meadow.onBeforeCompile=shader=>{
-  shader.vertexShader='attribute float meadowEdge;varying float vMeadowEdge;\n'+shader.vertexShader
-   .replace('#include <begin_vertex>','#include <begin_vertex>\nvMeadowEdge=meadowEdge;');
-  shader.fragmentShader='varying float vMeadowEdge;\n'+shader.fragmentShader
-   .replace('#include <dithering_fragment>','#include <dithering_fragment>\ngl_FragColor.a*=vMeadowEdge;');
- };
- meadow.customProgramCacheKey=()=> 'meadow-edge';
- skyFill(meadow,0x395a40,.26);
- const turfLight=new THREE.Color(0x71894d),turfShade=new THREE.Color(0x40583c),turfEdge=new THREE.Color(0x424d3f);
+ skyFill(turf,0x34472f,.23);
+ add(island,turf,null,null,{cast:false}).name='Church ground';
+
  const blades=keep(new THREE.MeshStandardMaterial({color:0x859c5a,roughness:.95,side:THREE.DoubleSide,emissive:0x385235,emissiveIntensity:.24}));
  skyFill(blades,0x40603c,.27);
  const grass=new THREE.BufferGeometry();
@@ -496,30 +530,11 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  const islands=[[19,-2,3.5,6.1],[-19,1,4,7],[21,12,5.2,7.6],[-21,15,5.8,7.2],
   [19.4,27,3.8,6.2],[-19.8,30,4.7,6.7],[20,41,4.5,5.8],[-19.8,43,4.2,6.1]];
  islands.forEach(([x,z,rx,rz],index)=>{
-  const N=48,positions=[0,.12,0],colors=[],alpha=[1],triangles=[];
-  const rim=a=>1+.10*Math.sin(a*3+index)+.066*Math.cos(a*6-index)+.035*Math.sin(a*9+index);
-  turfLight.toArray(colors,0);
-  for(const ring of [1,.84,.47]){
-   for(let j=0;j<N;j++){
-    const a=j/N*Math.PI*2,r=ring*rim(a);
-    positions.push(Math.cos(a)*rx*r,ring===1?-.015:(ring===.84?.027:.085),Math.sin(a)*rz*r);
-    const c=ring===1?turfEdge:turfShade.clone().lerp(turfLight,rand(index*999+j)*.8);
-    c.toArray(colors,colors.length);alpha.push(ring===1?0:1);
-   }
-  }
-  for(let j=0;j<N;j++){
-   const a=1+j,b=1+(j+1)%N;
-   triangles.push(a,b,a+N,b,b+N,a+N,a+N,b+N,a+2*N,b+N,b+2*N,a+2*N,0,a+2*N,b+2*N);
-  }
-  const geo=new THREE.BufferGeometry();
-  geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
-  geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
-  geo.setAttribute('meadowEdge',new THREE.Float32BufferAttribute(alpha,1));
-  geo.setIndex(triangles.reverse());geo.computeVertexNormals();
-  const patch=add(geo,meadow,[x,0,z],null,{cast:false});patch.name='Meadow turf';
+  const rim=a=>1+.10*Math.sin(a*3+index)+.066*Math.cos(a*6-index);
   for(let i=0;i<(low?100:220);i++){
    const seed=index*4201+i*7,a=rand(seed)*Math.PI*2,r=Math.sqrt(rand(seed+3))*.96;
-   grassAt.push([x+Math.cos(a)*rx*r*rim(a),.044-r*.024,z+Math.sin(a)*rz*r*rim(a),rand(seed+1)*Math.PI*2,0,0,.55+rand(seed+5)*.85]);
+   const px=x+Math.cos(a)*rx*r*rim(a),pz=z+Math.sin(a)*rz*r*rim(a),py=torchGroundHeight(px,pz);
+   if(py>MIRROR_LEVEL+.25)grassAt.push([px,py-.028,pz,rand(seed+1)*Math.PI*2,0,0,.28+rand(seed+5)*.70]);
   }
   for(let cluster=0;cluster<(low?3:6);cluster++){
    const seed=index*1709+cluster*37;
@@ -528,8 +543,10 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
    for(let j=0;j<(low?5:9);j++){
     const px=cx+(rand(seed+3+j*3)-.5)*1.35,pz=cz+(rand(seed+4+j*3)-.5)*1.35;
     const scale=.63+rand(seed+5+j*3)*.81;
-    stems.push([px,.065,pz,0,0,0,scale]);
-    flowerAt[(index+cluster)%flowerAt.length].push([px,.065+scale*.30,pz,rand(seed+j)*Math.PI*2,0,0,scale]);
+    const py=torchGroundHeight(px,pz);
+    if(py<=MIRROR_LEVEL+.25)continue;
+    stems.push([px,py-.024,pz,0,0,0,scale]);
+    flowerAt[(index+cluster)%flowerAt.length].push([px,py-.024+scale*.30,pz,rand(seed+j)*Math.PI*2,0,0,scale]);
    }
   }
  });
