@@ -2,16 +2,23 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const {spawn}=require('node:child_process'),{once}=require('node:events');
-const O=require('../core/owner-tests.cjs'),A=require('../core/artemis-session.cjs'),L=require('../core/text-paths-launch.cjs');
+const O=require('../core/owner-tests.cjs'),observer=require('../core/artemis-observer.cjs'),L=require('../core/text-paths-launch.cjs');
 const digest=b=>crypto.createHash('sha256').update(b).digest('hex');
 function fixture(t){
- const temp=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-artemis-owner-joint-')),root=path.join(temp,'private'),game=path.join(temp,'fixture-game'),exe=path.join(game,'fixture.exe');
+ const temp=fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()),'megulit-artemis-owner-joint-')),root=path.join(temp,'private'),game=path.join(temp,'fixture-game'),exe=path.join(game,'fixture.exe');
  for(const d of ['data/config','cache','logs'])fs.mkdirSync(path.join(root,d),{recursive:true});fs.mkdirSync(game);
  const write=(name,value)=>fs.writeFileSync(path.join(root,'data/config',name),JSON.stringify(value));
  const library=libraryOnly=>write('library.json',{runtimeSampleShare:false,autoProfileShare:false,sharedAdaptation:false,libraryOnly});library(false);write('online.json',{relayUrl:''});
- // Only copy the exact EXE and three small Lua members into a disposable synthetic archive, never run the game
- const source='H:/MeguLit-Work/samples/amakano3-trial',modules=A._internal.effectiveModules(source).modules;
- fs.copyFileSync(path.join(source,'Amakano3_tr.exe'),exe);const bytes=require('../core/artemis-language.cjs')._internal.pf8(Object.entries(modules).map(([name,data])=>({name,data})));fs.writeFileSync(path.join(game,'fixture.pfs'),bytes);
+ // Only the fingerprint catalogue is substituted in this process
+ const executable=Buffer.from('neutral Artemis executable fixture');
+ const members=Object.keys(observer.variants[0].modules).map(name=>({name,data:Buffer.from('-- neutral '+name+'\n')}));
+ const variant={id:'neutral-artemis',exe:digest(executable),modules:Object.fromEntries(members.map(({name,data})=>[name,digest(data)]))};
+ const check=require('../core/artemis-prepare.cjs');
+ assert.equal(observer.prepare({enabled:true,exe:executable,modules:{}}).state,'unsupported');
+ t.mock.method(observer,'prepare',input=>check([variant],input));
+ fs.writeFileSync(exe,executable);
+ const bytes=require('../core/artemis-language.cjs')._internal.pf8(members);
+ fs.writeFileSync(path.join(game,'fixture.pfs'),bytes);
  write('owner-tests.json',{schema:'megulit.owner-tests',version:1,root,entries:[{id:'artemis-integration',engine:'artemis',exe,sha256:digest(fs.readFileSync(exe)),files:[{path:'fixture.pfs',bytes:bytes.length,sha256:digest(bytes)}],draw:{},capabilities:['lua-input']}]});
  const saved={};for(const[k,v]of Object.entries({MEGULIT_ROOT:root,MEGULIT_SIDE_BY_SIDE:'1',MEGULIT_OWNER_TESTS:'1',MEGULIT_RELAY_BASE:'off'})){saved[k]=process.env[k];process.env[k]=v;}
  const sessions=[];t.after(async()=>{for(const p of sessions)await p.session.stop();O.revokeFor(root);for(const[k,v]of Object.entries(saved)){if(v===undefined)delete process.env[k];else process.env[k]=v;}fs.rmSync(temp,{recursive:true,force:true});});

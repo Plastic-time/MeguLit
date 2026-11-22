@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const check=require('./artemis-prepare.cjs');
 const variants=Object.freeze([
  Object.freeze({id:'amakano3-trial-lua-input-v1',exe:'ca1fe32160ee8557acc0af712cd5eaf642eb29cc14f0ec06715824675d3c05a5',modules:Object.freeze({
   'system/msg/message.lua':'a2257f0db2a6db99568b87c8ea985763b23275decd1b305a96c8bf4bd960133f',
@@ -15,25 +15,5 @@ const variants=Object.freeze([
   'system/msg/ui.lua':'4611f6dc36812d3fba03360ed79e42c3983e440fd80f6a379f92283cee5e0267',
   'system/adv/select.lua':'2dffde1429dd7edde42297f527ecfe8d9491b553597bab18976187397455bd7a'})})
 ]);
-const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
-const own=(o,k)=>{const d=Object.getOwnPropertyDescriptor(o,k);return d&&Object.hasOwn(d,'value')?d.value:undefined;};
-function prepare(input={}){
- if(!input||typeof input!=='object'||![Object.prototype,null].includes(Object.getPrototypeOf(input))||own(input,'enabled')!==true)return {state:'disabled'};
- const executable=own(input,'exe');
- if(!Buffer.isBuffer(executable)||executable.length>16*1024*1024)return {state:'unsupported',reason:'ARTEMIS_EXE'};
- const exe=hash(executable),candidates=variants.filter(v=>v.exe===exe);
- if(!candidates.length)return {state:'unsupported',reason:'ARTEMIS_EXE'};
- const modules=own(input,'modules');
- if(!modules||typeof modules!=='object'||![Object.prototype,null].includes(Object.getPrototypeOf(modules)))return {state:'unsupported',reason:'ARTEMIS_MODULES'};
- const fingerprints={};
- for(const name of Object.keys(candidates[0].modules)){
-  const d=Object.getOwnPropertyDescriptor(modules,name),b=d&&Object.hasOwn(d,'value')?d.value:null;
-  if(!Buffer.isBuffer(b)||b.length>65536)return {state:'unsupported',reason:'ARTEMIS_MODULES'};
-  fingerprints[name]=hash(b);
- }
- const variant=candidates.find(v=>Object.entries(v.modules).every(([name,expected])=>fingerprints[name]===expected));
- if(!variant)return {state:'unsupported',reason:'ARTEMIS_MODULES'};
- const lua=fs.readFileSync(path.join(__dirname,'artemis-observer.lua'),'utf8');
- return {state:'prepared',identity:variant.id,provenance:{exe,members:{...variant.modules}},script:'local factory = (function()\n'+lua+'\nend)()\nreturn function(env, control, sink) return factory(env, control, sink, "'+variant.id+'") end\n'};
-}
+function prepare(input){return check(variants,input);}
 module.exports={prepare,variants};
