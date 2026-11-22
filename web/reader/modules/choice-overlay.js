@@ -85,7 +85,10 @@
    const win=[...d.querySelectorAll('.sentence-window')].find(n=>!n.classList.contains('tome-island-page')),jp=win?.querySelector('.sentence-text');if(!jp)return;
    const cs=getComputedStyle(jp),first=jp.querySelector('.char-token')?.getBoundingClientRect(),box=jp.getBoundingClientRect(),root=getComputedStyle(d.documentElement),info=b.galLayoutInfo?.()||{},dpr=w.devicePixelRatio||1,p=b.galPreferences?.()||{};
    const gameRuby=b.gameRuby&&typeof b.gameRuby==='object'?Object.keys(b.gameRuby).filter(k=>text.includes(k)):[];
+   const cn=win.querySelector('.tomoyo-cn-output'),cr=cn?.getBoundingClientRect();
    send({type:'layoutDiagnostic',chars:[...text].length,furigana:jp.classList.contains('tomoyo-furigana'),rubyNodes:jp.querySelectorAll('[data-tomoyo-reading]').length,gameRuby:gameRuby.join(',').slice(0,200),
+    ...(cr?.width?{translationSizeSetting:p.translationSize,translationBasePx:parseFloat(root.getPropertyValue('--tomoyo-gal-cn-size')),
+     translationFontPx:parseFloat(getComputedStyle(cn).fontSize),translationWidthPx:Math.round(cr.width),translationBottomPx:Math.round(cr.bottom),translationState:cn.dataset.state}:{}),
     lineHeight:parseFloat(cs.lineHeight)||0,paddingTop:parseFloat(cs.paddingTop)||0,marginBottom:parseFloat(cs.marginBottom)||0,fontSize:parseFloat(cs.fontSize)||0,
     textTop:Math.round(box.top*10)/10,firstGlyphTop:first?Math.round(first.top*10)/10:-1,firstGlyphHeight:first?Math.round(first.height*10)/10:-1,
     textWidth:Math.round(box.width),settingWidth:p.width,firstGlyphLeft:first?Math.round(first.left):-1,

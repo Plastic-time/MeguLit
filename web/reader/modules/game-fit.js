@@ -42,6 +42,7 @@
      apply to a line text-place.js places or anchors (it fits those against the work area itself) */
   const own=':not(.megulit-anchored):not(.megulit-placed)';
   css.textContent=
+   'html body.tomoyo-gal-bound'+own+' .tomoyo-hook-reader:not(.tome-island-page):not(.megulit-ocr-notice) .tomoyo-cn-output[data-state=ready]{min-height:0!important}'+
    'html body.tomoyo-gal-bound.megulit-fit-on'+own+' .sentence-window:not(.tome-island-page) .tomoyo-cn-output{font-size:calc(var(--tomoyo-gal-cn-size,24px) * var(--megulit-fit,1))!important}'+
    'html body.tomoyo-gal-bound.megulit-fit-up'+own+' .sentence-window:not(.tome-island-page){top:calc(var(--tomoyo-reader-y,0px) + var(--megulit-fit-shift,0px))!important}'+
    'html body.tomoyo-gal-bound.megulit-fit-room'+own+' .sentence-window:not(.tome-island-page) .tomoyo-cn-output{min-height:0!important;max-height:var(--megulit-fit-room,4em)!important;overflow-y:auto!important;overscroll-behavior:contain}'+
@@ -76,6 +77,42 @@
    for(const n of [win,...win.querySelectorAll('.sentence-text,.tomoyo-cn-output')]){if(n.hidden)continue;const r=n.getBoundingClientRect();if(!(r.height>0))continue;top=Math.min(top,r.top);bottom=Math.max(bottom,r.bottom);}
    let jt=Infinity,jb=-Infinity;for(const n of win.querySelectorAll('.sentence-text')){if(n.hidden)continue;const r=n.getBoundingClientRect();if(!(r.height>0))continue;jt=Math.min(jt,r.top);jb=Math.max(jb,r.bottom);}
    return Number.isFinite(top)?{top,bottom,jp:Number.isFinite(jt)?{top:jt,bottom:jb}:null}:null;}
+  // The pending translation reserves space using earlier lines. It is not the height of this translation.
+  // Measure the actual output at its live width, with the Japanese already pinned in normal flow.
+  function fitTranslation(cn,limit){
+   let next=1,cap=0;
+   if(cn?.dataset.state==='ready'&&!cn.hidden&&cn.textContent.trim()&&cn.getClientRects().length){
+    if(fit===1&&shift===0&&room===0&&cn.getBoundingClientRect().bottom<=limit)return;
+    const base=parseFloat(w.getComputedStyle(cn).getPropertyValue('--tomoyo-gal-cn-size'));
+    if(!(base>0))return;
+    const inline=cn.style;
+    const saved=['font-size','min-height','max-height'].map(k=>[k,inline.getPropertyValue(k),inline.getPropertyPriority(k)]);
+    try{
+     inline.setProperty('min-height','0','important');inline.setProperty('max-height','none','important');
+     const measureAt=scale=>{
+      inline.setProperty('font-size',base*scale+'px','important');
+      return cn.getBoundingClientRect();
+     };
+     if(measureAt(1).bottom>limit){
+      const smallest=measureAt(MIN);
+      if(smallest.bottom>limit){
+       next=MIN;
+       const available=Math.floor(limit-smallest.top);
+       if(available>=(parseFloat(w.getComputedStyle(cn).lineHeight)||base*MIN))cap=available;
+      }else{
+       // Line breaks are discrete. A ratio of box heights can skip a larger size that still fits.
+       let low=Math.round(MIN*1000),high=1000;
+       while(high-low>1){
+        const mid=Math.floor((low+high)/2);
+        if(measureAt(mid/1000).bottom<=limit)low=mid;else high=mid;
+       }
+       next=low/1000;
+      }
+     }
+    }finally{for(const [k,v,p] of saved){if(v)inline.setProperty(k,v,p);else inline.removeProperty(k);}}
+   }
+   if(next!==fit||shift!==0||cap!==room){fit=next;shift=0;room=cap;set();}
+  }
   function check(){frame=0;
    if(!d.body?.classList.contains('tomoyo-gal-bound')){reset();return;}
    /* 2026-11-15 in-place drawing (text-place.js): every character sits on the game's own place and the window fills the client, so there is nothing to fit; measuring it shrank the text and switched the translation's height limit on and off every frame (the translation's second line flashed) */
@@ -83,6 +120,9 @@
    const info=b.galLayoutInfo?.(),win=main();if(!win||!info||!(info.clientHeight>0))return;
    const dpr=Math.max(.5,Number(w.devicePixelRatio)||1),client={top:info.clientY/dpr,bottom:(info.clientY+info.clientHeight)/dpr};
    if(notice){fitNotice(win,client);return;}
+   if(win.classList.contains('tomoyo-hook-reader')&&win.querySelector('.sentence-text')){
+    fitTranslation(win.querySelector('.tomoyo-cn-output'),Math.min(client.bottom,w.innerHeight)-MARGIN);return;
+   }
    /* measured with the current shift taken out, so moving up is decided again from the real place */
    const m=measure(win);if(!m)return;const box={top:m.top-shift,bottom:m.bottom-shift};
    const roomNow=room;if(roomNow>0){/* the translation was cut to roomNow: its full height decides */const cn=win.querySelector('.tomoyo-cn-output');if(cn&&cn.scrollHeight>cn.clientHeight)box.bottom+=cn.scrollHeight-cn.clientHeight;}
@@ -94,7 +134,12 @@
   }
   function schedule(){if(!frame)frame=(w.requestAnimationFrame||(f=>setTimeout(f,16)))(check);}
   const ro=w.ResizeObserver?new w.ResizeObserver(schedule):null;let watched=null;
-  const watch=()=>{const win=main();if(win&&win!==watched&&ro){if(watched)ro.unobserve(watched);ro.observe(win);for(const n of win.querySelectorAll('.sentence-text,.tomoyo-cn-output'))ro.observe(n);watched=win;}};
+  const content=w.MutationObserver?new w.MutationObserver(schedule):null;
+  const watch=()=>{const win=main();if(win!==watched){
+   ro?.disconnect();content?.disconnect();watched=win;
+   if(win){ro?.observe(win);for(const n of win.querySelectorAll('.sentence-text,.tomoyo-cn-output'))ro?.observe(n);
+    content?.observe(win,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['data-state']});}
+  }};
   const before=b.galStatus;
   b.galStatus=m=>{before?.(m);if(!m||typeof m!=='object')return;
    if(m.type==='gameClosed'||m.hookSource===null){notice=false;line='';reset();}
