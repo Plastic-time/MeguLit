@@ -19,7 +19,9 @@ Visual plan: preserve the existing black/gold operator console, use a single ful
 
 All endpoints are same-origin and use the existing admin Bearer contract. A token is only retained in a closure, removed from its input on connection, and cleared on disconnect/pagehide. It is never persisted, put in a URL, logged or included in request bodies. Unauthenticated page load makes no admin request
 
-Workflow state `passed` says **本版本核查通过**, separate from `published` saying **已签名下发**. Upload identifier counts are not real-person counts. Overview separates **收到上传次数**, **不同 Seed 产物数**, **被采用的 Seed** and **采用会话**. Missing historical event values remain unknown/no data. Public counts and repository annotations are not trusted execution or installation evidence
+The former `passed` workflow state is labelled **旧人工标记（非质量结论）** for historical filtering, and is not offered as a writable quality approval. Adaptation quality, Cardinal comparison and distribution belong to the automatic pipeline; the administrator only records independent malware review. A read-only quality section renders current Cardinal reliability, trusted-release receipt and publication state. No independent comparison evidence is invented when the API does not provide it. Signed publication is separate from these historical administrative states
+
+Upload identifier counts are not real-person counts. Overview separates **收到上传次数**, **不同 Seed 产物数**, **被采用的 Seed** and **采用会话**. Missing historical event values remain unknown/no data. Public counts and repository annotations are not trusted execution or installation evidence
 
 Queue controls require `queueLane: version-retest`, active pending/reviewing state, explicit queue capability, and an unpublished item. BeforeId choices are other active permitted jobs in that same lane, including different games and versions. It is a global ordering anchor, never a replacement for the selected job's identity. The server must independently enforce lane/CAS/anchor validity. `queueScope: exe-current-seed-retest` explicitly says that the current runner retests the EXE's currently available seed, not a specifically requested historical seed revision
 
@@ -40,6 +42,16 @@ The companion offline CLI candidate supplies `node tools/torch-release.cjs sign-
 The foldout explicitly loads `GET /api/seed-admin/uploaders?limit=20&cursor=` and displays only safe aliases/current public names, accepted-upload event counts, distinct artifacts and artifact links. Artifact continuation uses the separate `artifactsCursor` parameter and is checked against the uploader id. Following more uploader pages retains already expanded artifact pages. Truncated or missing continuation is disclosed rather than called complete
 
 Artifact links call the existing authenticated detail handler using itemId. Unknown titles remain unknown. Empty new-ingest history does not become historical zero; coverage start and the non-person identifier scope are shown. Refresh clears withdrawn public names from the view. Disconnect clears uploader data along with credentials
+
+## Independent malware review
+
+An explicit **读取病毒检查记录** action calls authenticated `GET /api/seed-admin/malware?id=`. No scanner or review runs automatically. Returned `identity.hash` is a server-derived exact artifact binding; settings-only identity is explicitly insufficient to authorize a later signed profile. The malware review revision is independent of the administrative item revision and starts at zero
+
+The administrator supplies scanner name/version/definitions version, actual scan completion time and a bounded single-line evidence summary. Local datetime input is converted to UTC ISO; no completion time or clean verdict is fabricated. Paths, emails and control text are refused in the summary. **病毒检查通过**, **发现风险** and **重新待查** submit clean/infected/pending respectively; pending sends no invented scanner result
+
+Before writing, a fresh malware GET must still match the shown identity hash and review revision. A mutation sends exactly id/expectedRevision/verdict/scanner/scannedAt/evidenceSummary. Success requires the acknowledgement plus another GET with the same identity, exact review revision/state/scanner/time/evidence and the matching auditId/itemId/beforeRevision/afterRevision/newState. Conflicts read the current record for manual reconsideration; ambiguous writes pause further operations rather than auto-retry. This UI cannot make an artifact clean by changing the old passed state or bypass the automatic quality gates
+
+Long item/uploader lists have bounded independent scrolling. Desktop detail is sticky and internally scrollable; below 800 px it returns to normal document flow. This preserves reachable actions without forcing a narrow screen to scroll through every loaded artifact before reaching detail
 
 ## Validation scope
 
