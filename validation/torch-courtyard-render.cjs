@@ -102,12 +102,12 @@ const seedCover='data:image/png;base64,'+png(32,48,[145,36,116],[24,52,84]).toSt
    await mouse('mouseMoved',toX,toY,button,mask);
    await mouse('mouseReleased',toX,toY,button,0);
   }
-  await drag('right',2,80,310,340,310);
+  await drag('left',1,80,310,340,310);
   await wait('direction()[0]>.5');
   await evaluate('hall.resetView()');
   await wait('direction()[2]<-.9');
   const w=await evaluate('canvas.clientWidth'),h=await evaluate('canvas.clientHeight');
-  await drag('right',2,80,310,Math.round(80+Math.PI*w/4),Math.round(310-.075*h/3));
+  await drag('left',1,80,310,Math.round(80+Math.PI*w/4),Math.round(310-.075*h/3));
   await wait('direction()[2]>.98');
   await capture('portal-day');
   const wheel=(count,delta)=>evaluate(`for(let i=0;i<${count};i++)canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:${delta},bubbles:true,cancelable:true}));true`);
@@ -128,7 +128,7 @@ const seedCover='data:image/png;base64,'+png(32,48,[145,36,116],[24,52,84]).toSt
   await wheel(110,-120);
   await wait('pos()[2]>500');
   assert.ok(await evaluate('d.courtyard.sky.position.distanceTo(d.camera.position)<1e-6'));
-  await drag('right',2,70,320,Math.round(70+Math.PI*w/4),320);
+  await drag('left',1,70,320,Math.round(70+Math.PI*w/4),320);
   await wait('direction()[2]<-.95');
   await wheel(112,-120);
   await wait('pos()[2]<65');
@@ -156,12 +156,12 @@ const seedCover='data:image/png;base64,'+png(32,48,[145,36,116],[24,52,84]).toSt
   await evaluate('hall.setActive(true);true');
   await evaluate('hall.resetView()');
   await wait('Math.abs(pos()[2]-20.5)<.02');
-  await drag('left',1,320,360,420,360);
+  await drag('right',2,320,360,420,360);
   await wait('Math.abs(direction()[0])>.04');
   const prior=await evaluate('pos()[0]');
   await drag('middle',4,380,360,485,565);
   await wait(`Math.abs(pos()[0]-(${prior}))>1`);
-  await drag('right',2,350,260,350,580);
+  await drag('left',1,350,260,350,580);
   await wheel(10,-120);
   await wait('Math.abs(pos()[1]-1.2)<1e-8');
   await evaluate(`canvas.dispatchEvent(new MouseEvent('dblclick',{button:0,bubbles:true}));true`);

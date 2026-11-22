@@ -73,7 +73,7 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
   <p class="tm-count" aria-live="polite"></p>
   <div class="tm-tip" role="tooltip" hidden><b class="tm-tip-name"></b><span class="tm-tip-meta"></span></div>
   <p class="tm-status" role="status" hidden></p>
-  <p class="tm-help">${({zh:'左键按住拖动 · 滚轮前后移动 · 右键按住自由旋转视角 · 按住滚轮自由移动 · 双击左键复位',ja:'左ドラッグで移動 · ホイールで前後移動 · 右ドラッグで視点回転 · 中ドラッグで平行移動 · 左ダブルクリックでリセット',en:'Left-drag to move · Scroll forward/back · Right-drag to look · Middle-drag to pan · Double left-click to reset'})[locale]||''}</p>
+  <p class="tm-help">${({zh:'右键按住拖动 · 滚轮前后移动 · 左键按住自由旋转视角 · 按住滚轮自由移动 · 双击左键复位',ja:'右ドラッグで移動 · ホイールで前後移動 · 左ドラッグで視点回転 · 中ドラッグで平行移動 · 左ダブルクリックでリセット',en:'Right-drag to move · Scroll forward/back · Left-drag to look · Middle-drag to pan · Double left-click to reset'})[locale]||''}</p>
   <footer class="tm-bar">
    <div class="tm-pager"><button type="button" class="tm-btn tm-next" aria-label="${esc(t.next)}" title="${esc(t.next)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6.5 9 12l5.5 5.5"/></svg></button><span class="tm-range"></span><button type="button" class="tm-btn tm-prev" aria-label="${esc(t.prev)}" title="${esc(t.prev)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6.5 15 12l-5.5 5.5"/></svg></button></div>
    <form class="tm-find" hidden><input type="search" maxlength="30" autocomplete="off" spellcheck="false" placeholder="${esc(t.find)}" aria-label="${esc(t.find)}"><button type="submit" class="tm-btn tm-text">${esc(t.findGo)}</button><ul class="tm-results" hidden></ul></form>
@@ -90,7 +90,7 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
  const isVisit=id=>mounted&&visit===id;
  const canvas=$('.tm-canvas'),bar=$('.tm-bar'),veil=$('.tm-veil');
  canvas.inert=bar.inert=true;
- $('.tm-canvas').tabIndex=0;$('.tm-canvas').setAttribute('aria-label',({zh:'传火碑视图，左键拖动，滚轮前后移动，右键拖动转向，中键拖动平移，双击左键复位',ja:'継火の碑。左ドラッグで移動、ホイールで前後移動、右ドラッグで回転、中ドラッグで平行移動、左ダブルクリックでリセット',en:'Monument view. Left-drag to move, scroll forward/back, right-drag to look, middle-drag to pan, double left-click to reset'})[locale]);
+ $('.tm-canvas').tabIndex=0;$('.tm-canvas').setAttribute('aria-label',({zh:'传火碑视图，右键拖动，滚轮前后移动，左键拖动转向，中键拖动平移，双击左键复位',ja:'継火の碑。右ドラッグで移動、ホイールで前後移動、左ドラッグで回転、中ドラッグで平行移動、左ダブルクリックでリセット',en:'Monument view. Right-drag to move, scroll forward/back, left-drag to look, middle-drag to pan, double left-click to reset'})[locale]);
  const quality=()=>{let q='auto';try{q=localStorage.getItem(QUALITY_KEY)||'auto';}catch{}return q==='high'||q==='low'?q:'auto';};
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -573,7 +573,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
     pointer.lastX=e.clientX;pointer.lastY=e.clientY;
    }
    else{view.dragYaw=THREE.MathUtils.clamp(pointer.yaw0-dx*.9,-.26,.26);view.dragPitch=THREE.MathUtils.clamp(pointer.pitch0+dy*1.1,-.62,.12);}}};
- const onDown=e=>{if(pointer.down||![0,1,2].includes(e.button))return;if(e.button===1)e.preventDefault();pointer.down=true;pointer.id=e.pointerId;pointer.moved=0;pointer.sx=e.clientX;pointer.sy=e.clientY;pointer.freeLook=e.button===2;pointer.yaw0=pointer.freeLook?view.freeYaw:view.dragYaw;pointer.pitch0=pointer.freeLook?view.freePitch:view.dragPitch;pointer.pan=e.button===1||(e.button===0&&!!view.read);pointer.lastX=e.clientX;pointer.lastY=e.clientY;dragMoved=false;canvas.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);};
+ const onDown=e=>{if(pointer.down||![0,1,2].includes(e.button))return;if(e.button===1)e.preventDefault();pointer.down=true;pointer.id=e.pointerId;pointer.moved=0;pointer.sx=e.clientX;pointer.sy=e.clientY;pointer.freeLook=e.button===0;pointer.yaw0=pointer.freeLook?view.freeYaw:view.dragYaw;pointer.pitch0=pointer.freeLook?view.freePitch:view.dragPitch;pointer.pan=e.button===1||(e.button===2&&!!view.read);pointer.lastX=e.clientX;pointer.lastY=e.clientY;dragMoved=false;canvas.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);};
  const onUp=e=>{if(!pointer.down||e.pointerId!==pointer.id)return;pointer.down=false;dragMoved=pointer.moved>.012;canvas.classList.remove('is-dragging');if(canvas.hasPointerCapture?.(e.pointerId))canvas.releasePointerCapture(e.pointerId);};
  const onContextMenu=e=>e.preventDefault();
  canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointerup',onUp);canvas.addEventListener('pointercancel',onUp);canvas.addEventListener('lostpointercapture',onUp);canvas.addEventListener('contextmenu',onContextMenu);
