@@ -26,7 +26,7 @@ function harness(t,{running=false,waitError=false,confirmError=false,policy=true
  };
  const forbidden=['../core/drm-wrap.cjs','../core/directplay.cjs','../core/windows-features.cjs','../core/japanese-restore.cjs','./japanese-auto-run.cjs','../core/text-paths-launch.cjs','./steam-restart.cjs'];
  const req=name=>{if(forbidden.includes(name))throw Error('UNEXPECTED_ORIGINAL_MUTATION_OR_FALLBACK '+name);if(name in modules)return modules[name];throw Error('UNEXPECTED_MODULE '+name);};
- const launch=vm.runInNewContext('('+launchSource+')',{require:req,fs,path,root,process,console,AbortController,markLaunch:()=>{},neededFeature:new Map(),setTimeout(){throw Error('UNEXPECTED_TIMER');}});
+ const launch=vm.runInNewContext('('+launchSource+')',{require:req,fs,path,root,process:{env:{...process.env,MEGULIT_OWNER_TESTS:'1',MEGULIT_SIDE_BY_SIDE:'1',MEGULIT_ROOT:root}},console,AbortController,markLaunch:()=>{},neededFeature:new Map(),setTimeout(){throw Error('UNEXPECTED_TIMER');}});
  const db={prepare(sql){return {get:()=>game,run(...args){record('db',sql,...args);}};}},runtime={prepareGame(x){record('reader-prepare',x);},bindLaunched(pid){record('reader-bind',pid);},trackTextPath(x){Runtime.prototype.trackTextPath.call(this,x);record(x===prepared?'tracked':'pending-tracked');},forgetTextPath(x){Runtime.prototype.forgetTextPath.call(this,x);record(x===prepared.session?'forgot':'pending-forgot');},reader:{async stop(){record('reader-stopped');},gal:{send:()=>{}}}};
  return {root,exe,alias,calls,run:()=>launch(db,'game',runtime),stop:()=>Runtime.prototype.stopReading.call(runtime)};
 }

@@ -94,3 +94,22 @@ The private direct process inherits the private launch environment. A game
 created by an already-running Steam process or an existing external process
 has no demonstrated inheritance from that private launch, so it cannot be
 substituted for the confirmed alias
+
+## Joint Reader and RGSS contract
+
+The public launch path does not load the private owner-test module unless both
+explicit private-test and side-by-side environment switches are enabled. Those
+switches only select the private check; the module still verifies its exact
+root, privacy settings, manifest and resource identities before granting any
+permission
+
+Reader captures both PID and reported birth for an executable query. Its
+completion must match current PID, current Reader birth, bridge birth and an
+active Reader before canonical mapping or library/profile work. A callback
+from an older birth or a closed Reader is discarded. A current callback with
+a different birth can observe the alias but cannot inherit an older Steam
+session's source mapping or owner-test authority
+
+The joint regression uses the complete production Reader.event method with
+controlled local services, the real authority module and real launch-path
+mapping. This is a pure-data/function test rather than an actual game launch

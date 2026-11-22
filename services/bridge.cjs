@@ -70,7 +70,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   let original={};try{original=JSON.parse(game.original||'{}')||{};}catch{}const profile=original.library || {};
   /* E-SteamOwned: a game Steam installed (appmanifest lists its folder) starts through Steam even when it was added by hand or by a folder scan (core/steam-owned.cjs) */
   const steamAppid=(()=>{try{return require('../core/steam-owned.cjs').launchAppid(game.executable,profile);}catch{return '';}})();if(steamAppid)trace('steam-owned',{appid:steamAppid,source:profile.source||''});
-  const Owner=require('../core/owner-tests.cjs'),ownerEngine=require('../core/profiles/index.cjs').engineId(profile.engine),privateSteamPolicy=Owner.launchPolicy(root,game.executable,ownerEngine)==='private-steam';if(privateSteamPolicy&&!steamAppid)throw Error('OWNER_STEAM_APPID');
+  const ownerEngine=require('../core/profiles/index.cjs').engineId(profile.engine),Owner=process.env.MEGULIT_OWNER_TESTS==='1'&&process.env.MEGULIT_SIDE_BY_SIDE==='1'?require('../core/owner-tests.cjs'):null,privateSteamPolicy=Owner?.launchPolicy(root,game.executable,ownerEngine)==='private-steam';if(privateSteamPolicy&&!steamAppid)throw Error('OWNER_STEAM_APPID');
   if(privateSteamPolicy){ownerAbort=new AbortController();ownerPending={async stop(){ownerAbort.abort();if(ownerPreparation)await ownerPreparation.catch(()=>{});}};runtime?.trackTextPath?.({session:ownerPending});}
   if(!require('../core/library-mode.cjs').libraryOnly(root)&&require('./game-language.cjs').originalExecutable(db,id,root).blocked)throw Error('JAPANESE_EXECUTABLE_REQUIRED');
   /* E-DRM (user 2026-11-15, 死に逝く君、館に芽吹く憎悪): a DRM-wrapped program (SoftDenchi's SdWrap, DMM, DLsite) quits on
