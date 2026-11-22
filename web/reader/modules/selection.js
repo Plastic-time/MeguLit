@@ -151,11 +151,11 @@
   }).observe(watched);}top.append(el('span',''),button('×',()=>close()));const body=el('div','tomoyo-selection-body'),status=el('div','tomoyo-muted','本地查询中…'),actions=el('footer'),
   ai=el('div','tomoyo-ai-result');ai.hidden=true;actions.append(button('上下文解释',()=>askAI('explain')),button('AI 归纳义项',()=>askAI('summary')));body.append(status);
   const anchorNode=at?.startContainer;const pair=(anchorNode?.parentElement||anchorNode)?.closest?.(".tome-island-pair");
-  const origin=el('small','tomoyo-muted');
+  const origin=el('small','tomoyo-muted tomoyo-translation-origin');
   b.refreshTranslationOrigin=()=>{const data=pair?.querySelector('.tomoyo-cn-output')?.dataset,r=b.returnedTranslation,hit=pair?{source:data?.translationOrigin,cached:data?.translationSource==='cache',provider:data?.translationProvider}:r&&r.id===b.serial&&r.target===b.translationTarget?.()&&r.line===args.text?r:null;
    const names={script:'剧本',official:'官方译文',api:'API',unknown:'未知',patch:'补丁',machine:'机器翻译',mt:'机器翻译',local:'本地模型'};
    origin.textContent='本句译文来源 · '+(hit?.cached?'缓存 · ':'')+(names[hit?.source]||'未知')+(hit?.provider?' · '+hit.provider:'');};
-  b.refreshTranslationOrigin();card.append(top,origin,actions,ai,body);document.body.append(card);document.body.classList.add('tomoyo-selection-open');send({type:'galLookup',open:true});place();
+  b.refreshTranslationOrigin();card.append(top,actions,ai,body,origin);document.body.append(card);document.body.classList.add('tomoyo-selection-open');send({type:'galLookup',open:true});place();
   // Short entrance (user, 2026-11-02): compositor-only translate/scale on the card (its CSS pins opacity/transform/animation)
   // and a fade on its contents, ~140 ms; the window region is refreshed once it settles.
   if(!['glass','both'].includes(document.documentElement.dataset.tomeCardSurface)&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const ease='cubic-bezier(.2,.7,.2,1)';

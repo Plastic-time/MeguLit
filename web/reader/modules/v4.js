@@ -43,7 +43,7 @@
   {const header=card.querySelector('header'),footer=card.querySelector('footer');if(header&&footer){let bar=header.querySelector('.tomoyo-card-bar');if(!bar){bar=el('div');
    bar.className='tomoyo-card-bar';const label=header.firstElementChild&&header.firstElementChild.tagName!=='BUTTON'?header.firstElementChild:null;header.prepend(bar);
    for(const n of [...footer.children])bar.append(n);footer.classList.add('tomoyo-footer-empty');const meta=el('div');meta.className='tomoyo-card-meta';if(label){
-   meta.append(el('span',label.textContent));label.remove();}card.append(meta);}
+   meta.append(el('span',label.textContent));label.remove();}const origin=card.querySelector('.tomoyo-translation-origin');if(origin)meta.append(origin);card.append(meta);}
    bar.querySelector('.tomoyo-anki-button')?.remove();bar.querySelector('.tomoyo-save-sentence-button')?.remove();/* 收藏句子 sits beside + Anki (user 2026-11-13: same level) */if(keepButton)bar.append(keepButton);bar.append(anki);const meta=card.querySelector('.tomoyo-card-meta');meta?.querySelector('.tomoyo-v4-status')?.remove();
     status.classList.add('tomoyo-v4-status');meta?.append(status);}}
   const phraseTitle=card.querySelector('.tomoyo-selected-phrase'),headWord=card.querySelector('.tomoyo-word-heading strong');
