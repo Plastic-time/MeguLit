@@ -62,3 +62,20 @@ test('scene preparation can finish before names arrive, and navigation owns tear
  assert.equal(f.host.removed,true);
  assert.equal(f.disposals,1);
 });
+
+test('a missing route, a connection failure and an empty page have distinct status',async()=>{
+ for(const [response,message] of [
+  [{ok:false,error:'NOT_DEPLOYED'},'This list feature is not available on the server yet.'],
+  [{ok:false,error:'OFFLINE'},'Cannot reach the server right now. Try again later.'],
+  [{ok:true,total:0,items:[]},'']
+ ]){
+  const f=fixture();
+  const pending=f.open();
+  f.bake.resolve({ok:true});f.font.resolve();f.page.resolve(response);
+  await pending;
+  f.ready();
+  assert.equal(f.nodes.get('.tm-status').textContent,message);
+  assert.equal(f.nodes.get('.tm-status').hidden,!message);
+  f.close();
+ }
+});

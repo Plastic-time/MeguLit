@@ -31,15 +31,15 @@ const cnParse=q=>{const D="零壹贰叁肆伍陆柒捌玖",U={"拾":10,"佰":100
 const COPY={
  zh:{title:'传火碑',sub:'分享过校准结果的玩家，名字都刻在这里',count:n=>'已刻 '+n+' 人',monthCount:(m,n)=>m+' · '+n+' 人',range:(a,b)=>'第 '+a+'–'+b+' 位',all:'全部',
   anon:n=>'传火人'+cnNo(n),empty:'还没有人刻下名字',find:'找名字',findGo:'查找',me:'我的名字',meNone:'这台电脑还没有传过火',quality:{high:'画质 标准',low:'画质 省电'},
-  prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',loading:'正在读取…',preparing:'正在准备殿堂…',nth:n=>n===0?'#0':'第 '+n+' 位',more:'只显示前 50 个',
+  prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',notDeployed:'服务器尚未开放这个名单功能',loading:'正在读取…',preparing:'正在准备殿堂…',nth:n=>n===0?'#0':'第 '+n+' 位',more:'只显示前 50 个',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')},
  en:{title:'Monument',sub:'Everyone who shared a calibration is carved here',count:n=>n+' names',monthCount:(m,n)=>m+' · '+n,range:(a,b)=>'#'+a+'–'+b,all:'All',
   anon:n=>'Torch bearer #'+n,empty:'No names carved yet',find:'Find a name',findGo:'Find',me:'My name',meNone:'This PC has not shared yet',quality:{high:'Quality: full',low:'Quality: light'},
-  prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',loading:'Loading…',preparing:'Preparing the hall…',nth:n=>'#'+n,more:'First 50 only',
+  prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',notDeployed:'This list feature is not available on the server yet.',loading:'Loading…',preparing:'Preparing the hall…',nth:n=>'#'+n,more:'First 50 only',
   ym:m=>m},
  ja:{title:'継火の碑',sub:'キャリブレーションを共有した人の名前が刻まれています',count:n=>n+' 名',monthCount:(m,n)=>m+' · '+n+' 名',range:(a,b)=>a+'–'+b+' 番目',all:'すべて',
   anon:n=>'火を継ぐ人 #'+n,empty:'まだ誰の名前も刻まれていません',find:'名前を探す',findGo:'探す',me:'自分の名前',meNone:'この PC からはまだ共有していません',quality:{high:'画質 標準',low:'画質 軽量'},
-  prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',loading:'読み込み中…',preparing:'聖堂を準備しています…',nth:n=>n===0?'#0':n+' 番目',more:'最初の 50 件のみ',
+  prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',notDeployed:'名簿機能はサーバーでまだ公開されていません',loading:'読み込み中…',preparing:'聖堂を準備しています…',nth:n=>n===0?'#0':n+' 番目',more:'最初の 50 件のみ',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')}};
 const QUALITY_KEY='megulit-torch-quality';
 const FONT='"Torch Serif","Noto Serif SC","Source Han Serif SC","Noto Serif JP","Songti SC","SimSun","Yu Mincho",serif';
@@ -72,7 +72,7 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
   </footer>`;
  mount.append(host);
  const $=s=>host.querySelector(s);
- const state={month:'',months:[],monthsOn:false,findOn:false,mine:[],mineAt:0,items:[],off:0,next:null,atStart:true,total:0,loading:false,offline:false,focusNo:null,fit:0,layout:null,
+ const state={month:'',months:[],monthsOn:false,findOn:false,mine:[],mineAt:0,items:[],off:0,next:null,atStart:true,total:0,loading:false,pageError:'',focusNo:null,fit:0,layout:null,
   bandWindow:0,hover:null,hoverMonth:null};
  let disposed=false,scene=null,sceneReady=false,gsap=null,ro=null,onKey=()=>{},onVis=()=>{},onBlur=()=>{},onFocus=()=>{};
  const ctl={close,focus:()=>$('.tm-canvas').focus()};current=ctl;
@@ -84,8 +84,8 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
  const call=async(a,p)=>{try{return await api(a,p);}catch{return {ok:false};}};
  async function loadAt({month=state.month,cursor=''}={}){state.loading=true;updateStatus();
   const r=await call('torch_page',{month,cursor,limit:PAGE});state.loading=false;if(disposed)return false;
-  if(!r||!r.ok){state.offline=true;state.items=[];state.total=0;updateStatus();redraw();return false;}
-  state.offline=false;updateStatus();state.month=r.month||month||'';state.items=r.items||[];state.next=r.next;state.total=r.total|0;state.off=0;
+  if(!r||!r.ok){state.pageError=r?.error==='NOT_DEPLOYED'?t.notDeployed:t.offline;state.items=[];state.next=null;state.total=0;updateStatus();redraw();return false;}
+  state.pageError='';updateStatus();state.month=r.month||month||'';state.items=r.items||[];state.next=r.next;state.total=r.total|0;state.off=0;
   state.atStart=!cursor||cursor==='0'||!state.items.length;return true;}
  async function ahead(){if(state.loading||!state.next||state.off+state.fit+60<state.items.length)return;state.loading=true;
   const r=await call('torch_page',{month:state.month,cursor:state.next,limit:PAGE});state.loading=false;if(disposed||!r?.ok)return;
@@ -107,7 +107,7 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
 
  /* ---------- UI ---------- */
  function status(msg){const el=$('.tm-status');el.textContent=msg||'';el.hidden=!msg;}
- function updateStatus(){status(!sceneReady?t.preparing:state.offline?t.offline:state.loading?t.loading:'');}
+ function updateStatus(){status(!sceneReady?t.preparing:state.loading?t.loading:state.pageError);}
  function updateChrome(){const L=state.layout,n=state.total;
   $('.tm-count').textContent=state.month?t.monthCount(t.ym(state.month),n):n?t.count(n):'';
   const first=L?.entries[0]?.item,last=L?.entries[L.entries.length-1]?.item;
@@ -172,7 +172,7 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
 
  /* Side requests follow the first page request. */
  call('torch_months').then(r=>{if(disposed||!r?.ok)return;state.monthsOn=r.available!==false;state.months=r.months||[];state.bandWindow=Math.max(0,state.months.length-12);redraw();});
- call('torch_find',{name:'',probe:true}).then(r=>{if(disposed)return;state.findOn=!!(r&&r.available!==false);$('.tm-find').hidden=!state.findOn;});
+ call('torch_find',{name:'',probe:true}).then(r=>{if(disposed)return;state.findOn=!!(r?.ok&&r.available!==false);$('.tm-find').hidden=!state.findOn;});
  call('torch_me').then(async r=>{if(disposed||!r?.ok)return;state.mine=r.items||[];$('.tm-me').hidden=!(r.available!==false&&state.mine.length);
   if(state.mine.length){await firstLoad;redraw(true);}});
 
@@ -184,7 +184,9 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
  $('.tm-find').addEventListener('submit',async e=>{e.preventDefault();const q=$('.tm-find input').value.trim();results.hidden=true;if(!q)return;
   const no=/^(?:传火人|火を継ぐ人|torch bearer)?\s*#?\s*(\d{1,12})$/i.exec(q);if(no){jumpTo({torchNo:Number(no[1]),month:''});return;}
   const cn=/^(?:传火人)?\s*([零壹贰叁肆伍陆柒捌玖拾佰仟万亿]+)$/.exec(q),cnv=cn?cnParse(cn[1]):null;if(cnv!==null){jumpTo({torchNo:cnv,month:''});return;}
-  const r=await call('torch_find',{name:q});if(disposed)return;const list=r?.items||[];
+  const r=await call('torch_find',{name:q});if(disposed)return;
+  if(!r?.ok){toast(t.offline);return;}if(r.available===false){toast(t.notDeployed);return;}
+  const list=r.items||[];
   if(!list.length){toast(t.none);return;}if(list.length===1){jumpTo(list[0]);return;}
   results.innerHTML=list.map((it,i)=>`<li><button type="button" data-i="${i}"><b>${esc(it.name||t.anon(it.torchNo))}</b><span>${esc(dateText(it.at,true))} · ${esc(t.nth(it.torchNo))}</span></button></li>`).join('')+(list.length>=50?`<li class="tm-results-more">${esc(t.more)}</li>`:'');
   results.hidden=false;results.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{results.hidden=true;jumpTo(list[Number(b.dataset.i)]);}));});
@@ -348,7 +350,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
    g.fillRect(b.x-2,BAND_Y1-10,4,14);g.font=(b.active?'600 42px ':'38px ')+FONT;g.fillText(b.label,b.x,BAND_Y0+30);
    if(b.sub){g.font='20px '+FONT;g.fillText(b.sub,b.x,BAND_Y0+68);}}
   const rc=colorFor({rule:true});if(rc){g.fillStyle=rc;g.fillRect(AREA_X0,RULE_Y,AREA_X1-AREA_X0,3);g.fillRect(AREA_X0,RULE_Y+10,AREA_X1-AREA_X0,1.2);}
-  if(!L.entries.length){const c=colorFor({empty:true});if(c&&!state.loading&&!state.offline){vText(g,t.empty,FW/2,(AREA_Y0+AREA_Y1)/2-verticalLen(t.empty,84,88)/2,84,88,c);}return;}
+  if(!L.entries.length){const c=colorFor({empty:true});if(c&&!state.loading&&!state.pageError){vText(g,t.empty,FW/2,(AREA_Y0+AREA_Y1)/2-verticalLen(t.empty,84,88)/2,84,88,c);}return;}
   for(const e of L.entries){const c=colorFor({entry:e});if(!c)continue;const cx=e.x+26;
    vText(g,e.box.name,cx,e.y,e.box.px,e.box.adv,c);
    if(e.box.side)vText(g,e.box.side,e.x+55,e.y+3,SIDE_PX,SIDE_ADV,c);

@@ -27,6 +27,6 @@ test('jumping to #0 focuses the founder, while a missing name does not focus ano
 });
 
 test('no focus uses null so #0 is not highlighted by default or after a month change',()=>{
- assert.match(src,/offline:false,focusNo:null,/);
+ assert.match(src,/focusNo:null,/);
  assert.match(src,/state\.focusNo=null;await loadAt\(\{month:b\.month/);
 });
