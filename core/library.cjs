@@ -195,10 +195,20 @@ async function vndbSteam(appid){
 }
 async function download(url,file){try{const r=await fetch(url,{signal:AbortSignal.timeout(15000)});if(!r.ok)return false;fs.writeFileSync(file,Buffer.from(await r.arrayBuffer()));return true;}catch{return false;}}
 
+const libraryStateFields=['autoSeries','localeAutoJapanese','localePath','setupDone','steamPath','folders','games','scanVersion','notGal'];
+const libraryScanFields=new Set(['games','scanVersion','notGal']);
+const librarySnapshot=state=>Object.fromEntries(libraryStateFields.filter(key=>!libraryScanFields.has(key)).map(key=>[key,JSON.stringify(state[key])]));
 class Library{
- constructor(layout){this.locale=new LocaleEmulator(layout.root||path.dirname(layout.config));this.file=path.join(layout.config,'library.json');this.coverDir=path.join(layout.root||path.dirname(layout.config),'data','assets','covers');this.state=this.read();this.verifiedPids=new Set();this.logRoot=layout.root||path.dirname(layout.config);}
+ constructor(layout){this.locale=new LocaleEmulator(layout.root||path.dirname(layout.config));this.file=path.join(layout.config,'library.json');this.coverDir=path.join(layout.root||path.dirname(layout.config),'data','assets','covers');this.state=this.read();this.persisted=librarySnapshot(this.state);this.verifiedPids=new Set();this.logRoot=layout.root||path.dirname(layout.config);}
  read(){try{const v=JSON.parse(fs.readFileSync(this.file,'utf8'));return {autoSeries:v.autoSeries!==false,localeAutoJapanese:v.localeAutoJapanese!==false,localePath:String(v.localePath||''),setupDone:!!v.setupDone,steamPath:steamRoot(String(v.steamPath||'').trim()),folders:Array.isArray(v.folders)?v.folders.map(String):[],games:Array.isArray(v.games)?v.games:[],scanVersion:5,notGal:v.scanVersion===5&&v.notGal&&typeof v.notGal==='object'?v.notGal:{}};}catch{return {setupDone:false,steamPath:'',folders:[],games:[],notGal:{}};}}
- write(){try{fs.mkdirSync(path.dirname(this.file),{recursive:true});fs.writeFileSync(this.file+'.tmp',JSON.stringify(this.state,null,2));fs.renameSync(this.file+'.tmp',this.file);return true;}catch{return false;}}
+ write(editedFields=[]){try{
+  let latest;try{latest=JSON.parse(fs.readFileSync(this.file,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;latest={};}
+  if(!latest||typeof latest!=='object'||Array.isArray(latest))return false;
+  // Scanning owns its result fields, while settings and future fields remain owned by their current file values.
+  const next={...latest};for(const key of libraryStateFields)if(Object.hasOwn(this.state,key)&&(libraryScanFields.has(key)||editedFields.includes(key)||!Object.hasOwn(latest,key)||JSON.stringify(this.state[key])!==this.persisted[key]))next[key]=this.state[key];
+  fs.mkdirSync(path.dirname(this.file),{recursive:true});fs.writeFileSync(this.file+'.tmp',JSON.stringify(next,null,2));fs.renameSync(this.file+'.tmp',this.file);
+  const saved=this.read();for(const key of libraryStateFields)if(!libraryScanFields.has(key))this.state[key]=saved[key];this.persisted=librarySnapshot(this.state);return true;
+ }catch{return false;}}
  load(){return {...this.state,games:this.state.games.map(playableGame)};}
  async findSteam(){return {path:await findSteam()};}
  check(kind,value){
@@ -207,7 +217,7 @@ class Library{
   if(kind==='steam'){if(!fs.existsSync(path.join(p,'steamapps')))return {ok:false,message:'不是 Steam 目录（里面没有 steamapps）'};const n=steamGames(p).length;return {ok:true,message:'找到 '+steamLibraries(p).length+' 个 Steam 库，'+n+' 个已安装应用'};}
   const n=folderGames(p).length;return {ok:true,message:n?'有 '+n+' 个子文件夹待识别':'文件夹是空的'};
  }
- settings(v){this.state.steamPath=steamRoot(String(v.steamPath||'').trim());this.state.folders=String(v.folders||'').split(/[;\n]/).map(s=>s.trim()).filter(Boolean);this.state.setupDone=v.setupDone!==false;this.write();return this.state;}
+ settings(v){this.state.steamPath=steamRoot(String(v.steamPath||'').trim());this.state.folders=String(v.folders||'').split(/[;\n]/).map(s=>s.trim()).filter(Boolean);this.state.setupDone=v.setupDone!==false;this.write(['steamPath','folders','setupDone']);return this.state;}
  // Scans Steam and the folders; returns games with engine, hook state, program and a cover file inside Tomoyo's
  // covers folder (Tomoyo only reads images there). Known games keep their media id and confirmed hook state.
  async scan(progress=()=>{},{incremental=false}={}){
