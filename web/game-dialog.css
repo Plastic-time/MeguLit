@@ -29,13 +29,8 @@ dialog.game-dialog .image-picker img{width:54px;height:76px;object-fit:cover;bor
 dialog.game-dialog .dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin:24px -28px 0;padding:16px 28px;border-top:1px solid rgba(255,236,214,.07);background:rgba(0,0,0,.18)}
 @media (prefers-reduced-motion:reduce){dialog.game-dialog .exe-card{transition:none}}
 
-/* The startup notice and its shade enter on the same timeline when showModal() adds both to the top layer. */
-dialog.game-dialog.startup-notice:modal,dialog.game-dialog.startup-notice:modal::backdrop{animation:dialog-in .2s cubic-bezier(.16,1,.3,1) both}
-dialog.game-dialog.startup-notice:modal::backdrop{animation-name:startup-notice-shade}
-@keyframes startup-notice-shade{from{opacity:0;backdrop-filter:blur(0px)}}
-@media (prefers-reduced-motion:reduce){
- dialog.game-dialog.startup-notice:modal,dialog.game-dialog.startup-notice:modal::backdrop{animation:none}
-}
+/* The startup card and its shade first paint together in their final state. */
+dialog.game-dialog.startup-notice:modal,dialog.game-dialog.startup-notice:modal::backdrop{animation:none}
 :root[data-theme=light] dialog.game-dialog{background:linear-gradient(180deg,#fbf6f1,#f3ebe3);border-color:rgba(168,50,63,.18);color:#2a1e1a;box-shadow:0 30px 80px rgba(60,30,20,.25)}
 :root[data-theme=light] dialog.game-dialog .game-dialog-head{background:radial-gradient(120% 140% at 0% 0%,rgba(200,48,60,.12),transparent 60%);border-color:rgba(60,30,20,.08)}
 :root[data-theme=light] dialog.game-dialog :is(.game-dialog-head p,.form-label){color:#6e4f47}

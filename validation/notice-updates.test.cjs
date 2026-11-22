@@ -52,7 +52,7 @@ test('a long update list builds only the first rows at once, the rest when idle'
   assert.strictEqual(list.children[0].children[0].textContent, '11.01');
 });
 
-test('startup notice stays non-modal on a delayed cold cache and opens with the first rows', async t => {
+test('startup notice opens immediately on a cold cache and updates its log in the background', async () => {
   const { mountDevNotice } = await import(pathToFileURL(path.join(web, 'feedback-ui.js')).href);
   const { dialog, list, note } = fakeDom();
   const game = new El('input'), form = new El('form'), button = new El('button'), close = new El('button'), seed = { querySelector: () => null };
@@ -88,53 +88,40 @@ test('startup notice stays non-modal on a delayed cold cache and opens with the 
     return new Promise(resolve => { answer = resolve; });
   } };
 
-  const skipped = mountDevNotice(options);
-  await new Promise(resolve => setImmediate(resolve));
-  assert.deepStrictEqual(openedWithRows, [], 'the main page has no modal backdrop while the request is pending');
-  await mountDevNotice(options);
-  assert.strictEqual(requests, 1, 'only one notice prepares at a time');
   canShow = false;
-  answer([]);
-  await skipped;
-  assert.strictEqual(dialog.isConnected, false);
-  assert.deepStrictEqual(openedWithRows, [], 'skip if the user left home or another dialog opened');
+  mountDevNotice(options);
+  assert.strictEqual(dialog.isConnected, false, 'skip off home or when another modal is open');
+  assert.strictEqual(requests, 0);
 
   canShow = true;
-  const shown = mountDevNotice(options);
-  assert.strictEqual(dialog.open, false);
-  answer(rows(5));
-  await shown;
-  assert.deepStrictEqual(openedWithRows, [5]);
+  mountDevNotice(options);
+  assert.deepStrictEqual(openedWithRows, [0], 'the populated card opens while the update log is pending');
   assert.match(dialog.innerHTML, /<button [^>]*data-notice-close autofocus[^>]*>/);
   assert.match(dialog.innerHTML, /class="dev-notice-updates" tabindex="0"/);
+  assert.strictEqual(empty.hidden, false);
+  mountDevNotice(options);
+  assert.strictEqual(requests, 1, 'only one notice per launch');
+  answer(rows(5));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.strictEqual(list.children.length, 5);
   assert.strictEqual(empty.hidden, true);
   close.onclick();
   assert.strictEqual(dialog.open, false);
-  await mountDevNotice(options);
-  assert.strictEqual(requests, 2, 'the startup notice opens at most once per launch');
+  mountDevNotice(options);
+  assert.strictEqual(requests, 1);
 
-  const cached = mountDevNotice({ ...options, force: true });
-  assert.deepStrictEqual(openedWithRows, [5, 5], 'the warm cache opens immediately');
-  answer([]);
-  await cached;
-  dialog.remove();
+  mountDevNotice({ ...options, force: true });
+  assert.strictEqual(list.children.length, 5, 'a warm cache is drawn immediately');
+  close.onclick();
+  answer(rows(6));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.strictEqual(dialog.open, false, 'a delayed response cannot reopen the notice');
 
   store.clear();
-  const offline = mountDevNotice({ ...options, force: true, api: async () => { throw Error('offline'); } });
-  assert.strictEqual(dialog.open, false);
-  await offline;
-  assert.strictEqual(dialog.open, true, 'an offline response still opens the notice');
-  assert.strictEqual(empty.hidden, false);
-  dialog.remove();
-
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  const stalled = mountDevNotice({ ...options, force: true });
-  t.mock.timers.tick(11999);
-  assert.strictEqual(dialog.open, false);
-  t.mock.timers.tick(1);
-  await stalled;
-  assert.strictEqual(dialog.open, true, 'a stalled service cannot prevent the notice from opening');
-  answer([]);
+  mountDevNotice({ ...options, force: true, api: async () => { throw Error('offline'); } });
+  assert.strictEqual(dialog.open, true, 'offline notice opens with its basic content');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(empty.textContent, /Could not load the updates/);
 });
 
 test('site_updates refreshes the current call and keeps the newest usable cache', async t => {

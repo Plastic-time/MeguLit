@@ -154,9 +154,10 @@ async function fillUpdates(dialog, locale, api, cached = cachedUpdates()) {
   } catch { /* offline: the cached list (or none) stays */ }
 }
 
-export async function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', force = false, canShow = () => true }) {
-  if ((shownThisLaunch && !force) || document.querySelector('.dev-notice')) return;
+export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', force = false, canShow = () => true }) {
+  if ((shownThisLaunch && !force) || document.querySelector('.dev-notice') || !canShow()) return;
   const t = words(locale), dialog = document.createElement('dialog');
+  const loadingUpdates = { zh: '正在读取更新日志…', ja: '更新履歴を読み込み中…', en: 'Loading update notes…' };
   dialog.className = 'game-dialog dev-notice seed-flow startup-notice';
   dialog.setAttribute('aria-label', t.noticeTitle);
   dialog.innerHTML = `<button type="button" class="startup-notice-close" data-notice-close autofocus title="${esc(t.close)} (Esc)">${esc(t.close)}</button>
@@ -165,7 +166,7 @@ export async function mountDevNotice({ api, locale = 'zh', esc, toast, version =
 <form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="secondary">${esc(t.submit)}</button></form><p class="dev-notice-rule">${esc(t.gameRule)}</p>
 <p class="feedback-status" role="status" aria-live="polite"></p>
 <ul class="dev-notice-updates" tabindex="0" aria-label="${esc(t.tabUpdates)}" hidden></ul><p class="dev-notice-updates-note" hidden></p>
-<p class="startup-updates-empty" role="status" hidden>${esc(t.noUpdates)}</p>
+<p class="startup-updates-empty" role="status">${esc(loadingUpdates[locale] || loadingUpdates.zh)}</p>
 <p class="dev-notice-more">${esc(t.noticeMore)}</p>
 <div class="dev-notice-actions"><button type="button" class="text-button" data-report>${esc(t.report)}</button><button type="button" class="primary" data-next>${esc(seedWords(locale).next)}</button></div></div>
 <div class="dev-notice-page" data-page="seed" hidden>${seedPageHTML(locale, esc, { left: `<button type="button" class="text-button" data-back>${esc(t.back)}</button>`, right: `<button type="button" class="primary" data-next-guide>${esc(t.next)}</button>` })}</div>
@@ -203,19 +204,15 @@ export async function mountDevNotice({ api, locale = 'zh', esc, toast, version =
   dialog.querySelector('[data-ok]').onclick = () => dialog.close();
   dialog.querySelector('[data-notice-close]').onclick = () => dialog.close();
   dialog.querySelector('[data-report]').onclick = () => { dialog.close(); openFeedback({ api, locale, esc, toast, version }); };
-  const cached = cachedUpdates();
-  const updates = fillUpdates(dialog, locale, api, cached).finally(() => {
-    dialog.querySelector('.startup-updates-empty').hidden = !dialog.querySelector('.dev-notice-updates').hidden;
-  });
-  if (!cached?.length) {
-    /* On a cold cache, let the log arrive while the dialog is still closed. The service has a 10s network deadline. */
-    let timer;
-    const deadline = new Promise(resolve => { timer = setTimeout(resolve, 12000); });
-    await Promise.race([updates, deadline]).finally(() => clearTimeout(timer));
-  }
-  if (!dialog.isConnected || !canShow()) { dialog.remove(); return; }
   dialog.showModal();
   shownThisLaunch = true;
+  const empty = dialog.querySelector('.startup-updates-empty'), list = dialog.querySelector('.dev-notice-updates');
+  fillUpdates(dialog, locale, api).then(() => {
+    if (!dialog.open) return;
+    empty.hidden = !list.hidden;
+    empty.textContent = t.noUpdates;
+  });
+  empty.hidden = !list.hidden; /* fillUpdates draws the browser cache before its first await */
   fillSeedCount(seed, locale, api);
   fillGuideLevel(dialog, { api, locale, esc }); /* the by-level part of the guide follows the chosen level */
 }

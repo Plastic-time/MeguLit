@@ -159,14 +159,19 @@ test('silent: hot-done note strings exist in zh, ja and en',()=>{
  for(const key of ['hotDone:','hotDoneMore:','hotDoneClose:','hotDoneNone:'])assert.equal(s.split(key).length-1,3,key);
 });
 
-test('consent: undecided → card at every start (no update, offline too); agreed or declined → no card',async()=>{
+test('1.4.23 startup checks updates without reading or recording adaptation consent',async()=>{
  const {checkForUpdates}=await notice();
- const run=async(consent,check)=>{let shown=0;await checkForUpdates({api:async a=>a==='contrib_consent'?consent:check(),invoke:async()=>{},version:'1.5.1',show:()=>{shown++;},silent:()=>{}});return shown;};
- const none=()=>({newer:false}),off=()=>{throw new Error('offline');};
- for(let i=0;i<3;i++)assert.equal(await run({ask:true,decided:false},none),1,'undecided: every start shows the card');
- assert.equal(await run({ask:true,decided:false},off),1,'undecided: shown offline too');
- assert.equal(await run({ask:false,decided:true,enabled:true},none),0,'agreed: no card');
- assert.equal(await run({ask:false,decided:true,enabled:false},none),0,'declined: no card');
+ const run=async check=>{
+  const calls=[],flow=[];
+  await checkForUpdates({api:async action=>{calls.push(action);return check();},invoke:async()=>{},
+   version:'1.4.23',show:()=>flow.push('full'),silent:()=>flow.push('silent')});
+  assert.deepEqual(calls,['update_check']);
+  return flow;
+ };
+ assert.deepEqual(await run(()=>({newer:false})),[]);
+ assert.deepEqual(await run(()=>{throw Error('offline');}),[]);
+ assert.deepEqual(await run(()=>({newer:true,silent:true})),['silent']);
+ assert.deepEqual(await run(()=>({newer:true,silent:false})),['full']);
 });
 
 test('a hot package the page refused is not handed out again: the next start downloads the full package',async t=>{
