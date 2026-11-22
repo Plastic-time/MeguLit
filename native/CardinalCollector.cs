@@ -291,7 +291,8 @@ internal static class CardinalCollector {
                 Directory.CreateDirectory(dir);
                 return Probe(dir);
             }
-            if(args.Length!=0)throw new ArgumentException("COLLECTOR_ARGUMENTS");
+            bool isolated=args.Length==4 && args[0]=="--isolated-game" && Regex.IsMatch(args[2],@"\A[a-f0-9]{64}\z");
+            if(args.Length!=0 && !isolated)throw new ArgumentException("COLLECTOR_ARGUMENTS");
             var line=new StringBuilder(); int next;
             while((next=Console.Read())>=0 && next!=10) {
                 if(line.Length>=270000)throw new IOException("CAPTURE_REQUEST_LIMIT"); line.Append((char)next);
@@ -300,8 +301,9 @@ internal static class CardinalCollector {
             if(!Equals(req["schema"],"megulit.trusted-capture-request") || !Equals(req["version"],1) ||
                 !Regex.IsMatch((string)req["challenge"],"\\A[a-f0-9]{64}\\z") ||
                 !Regex.IsMatch((string)req["reporter"],"\\A[a-zA-Z0-9_-]{1,80}\\z"))throw new IOException("CAPTURE_REQUEST");
+            string failure=isolated ? CardinalGameCapture.Run(req,args[1],args[2],args[3]) : "OS_SAVE_NETWORK_ISOLATION_UNAVAILABLE";
             Console.WriteLine(Json.Serialize(new {schema="megulit.capture-failure",challenge=req["challenge"],reporter=req["reporter"],
-                reason="OS_SAVE_NETWORK_ISOLATION_UNAVAILABLE",signed=false}));
+                reason=failure,signed=false}));
             return 2;
         } catch(Exception e) { Console.Error.WriteLine(e.GetBaseException().Message); return 2; }
     }

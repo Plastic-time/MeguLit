@@ -10,7 +10,7 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 
-// Neutral Windows diagnostic. Never accepts a game path or produces a signed report.
+// Shared zero-capability launcher and unsigned diagnostic entry point.
 internal static class CardinalIsolationProbe {
     [StructLayout(LayoutKind.Sequential)]
     struct Startup {
@@ -23,7 +23,7 @@ internal static class CardinalIsolationProbe {
     [StructLayout(LayoutKind.Sequential)]
     struct Caps { public IntPtr sid, capabilities; public int count,reserved; }
     [StructLayout(LayoutKind.Sequential)]
-    struct Child { public IntPtr process, thread; public int pid, tid; }
+    internal struct Child { public IntPtr process, thread; public int pid, tid; }
 
     [DllImport("userenv", CharSet=CharSet.Unicode)]
     static extern int CreateAppContainerProfile(string name,string display,string description,IntPtr caps,int count,out IntPtr sid);
@@ -44,35 +44,45 @@ internal static class CardinalIsolationProbe {
     [DllImport("kernel32")] static extern bool TerminateProcess(IntPtr handle,int code);
 
     static void Check(bool ok) { if(!ok) throw new Win32Exception(); }
-    static int RunRestricted(string exe,string args,IntPtr sid) {
+    internal static Child Launch(string exe,string args,IntPtr sid,string desktop,bool suspended) {
         IntPtr size=IntPtr.Zero;
         InitializeProcThreadAttributeList(IntPtr.Zero,1,0,ref size);
         IntPtr list=Marshal.AllocHGlobal(size);
+        var values=new System.Collections.Generic.SortedDictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+        values["APPDATA"]=Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        values["LOCALAPPDATA"]=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        values["USERPROFILE"]=Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        values["SystemDrive"]=Path.GetPathRoot(Environment.SystemDirectory).TrimEnd(Path.DirectorySeparatorChar);
         var block=new StringBuilder();
-        foreach(string key in new[]{"APPDATA","LOCALAPPDATA","SystemDrive","SystemRoot","TEMP","TMP","USERPROFILE","WINDIR"})
-            block.Append(key).Append("=").Append(Environment.GetEnvironmentVariable(key)).Append((char)0);
+        foreach(string key in new[]{"SystemRoot","TEMP","TMP","WINDIR"})
+            values[key]=Environment.GetEnvironmentVariable(key);
+        foreach(var pair in values)block.Append(pair.Key).Append("=").Append(pair.Value).Append((char)0);
         IntPtr env=Marshal.StringToHGlobalUni(block.ToString()+"\0");
         try {
             Check(InitializeProcThreadAttributeList(list,1,0,ref size));
             try {
                 Caps caps=new Caps {sid=sid};
                 Check(UpdateProcThreadAttribute(list,0,(IntPtr)0x20009,ref caps,(IntPtr)Marshal.SizeOf(caps),IntPtr.Zero,IntPtr.Zero));
-                Startup startup=new Startup { cb=Marshal.SizeOf(typeof(Startup)),attributes=list };
+                Startup startup=new Startup { cb=Marshal.SizeOf(typeof(Startup)),attributes=list,desktop=desktop==null ? IntPtr.Zero : Marshal.StringToHGlobalUni(desktop) };
                 Child child;
-                Check(CreateProcess(exe,new StringBuilder("\""+exe+"\" "+args),IntPtr.Zero,IntPtr.Zero,false,0x08080400,
-                    env,Path.GetDirectoryName(exe),ref startup,out child));
-                try {
-                    if(WaitForSingleObject(child.process,15000)!=0) {
-                        Check(TerminateProcess(child.process,80));
-                        WaitForSingleObject(child.process,5000);
-                        throw new TimeoutException();
-                    }
-                    int code;
-                    Check(GetExitCodeProcess(child.process,out code));
-                    return code;
-                } finally { CloseHandle(child.thread);CloseHandle(child.process); }
+                try { Check(CreateProcess(exe,new StringBuilder("\""+exe+"\" "+args),IntPtr.Zero,IntPtr.Zero,false,0x08080400 | (suspended ? 4 : 0),
+                    env,Path.GetDirectoryName(exe),ref startup,out child)); } finally { Marshal.FreeHGlobal(startup.desktop); }
+                return child;
             } finally { DeleteProcThreadAttributeList(list); }
         } finally { Marshal.FreeHGlobal(list);Marshal.FreeHGlobal(env); }
+    }
+    static int RunRestricted(string exe,string args,IntPtr sid) {
+        Child child=Launch(exe,args,sid,null,false);
+        try {
+            if(WaitForSingleObject(child.process,15000)!=0) {
+                Check(TerminateProcess(child.process,80));
+                Check(WaitForSingleObject(child.process,5000)==0);
+                throw new TimeoutException();
+            }
+            int code;
+            Check(GetExitCodeProcess(child.process,out code));
+            return code;
+        } finally { CloseHandle(child.thread);CloseHandle(child.process); }
     }
     static void Connect(string address) {
         using(var client=new TcpClient(AddressFamily.InterNetwork)) {
@@ -107,45 +117,49 @@ internal static class CardinalIsolationProbe {
         }
         return 0;
     }
-    static void Grant(string path,SecurityIdentifier sid,FileSystemRights rights) {
+    internal static void Grant(string path,SecurityIdentifier sid,FileSystemRights rights) {
         var info=new DirectoryInfo(path);
         var acl=info.GetAccessControl();
         acl.AddAccessRule(new FileSystemAccessRule(sid,rights,InheritanceFlags.ObjectInherit|InheritanceFlags.ContainerInherit,
             PropagationFlags.None,AccessControlType.Allow));
         info.SetAccessControl(acl);
     }
+    internal static void WithIsolation(string address,string probeFile,Action<string,IntPtr> run) {
+        Connect(address);
+        string name="MeguLit.Probe."+Guid.NewGuid().ToString("N");
+        string root=Path.Combine(@"F:\",name);
+        IntPtr sid;
+        Marshal.ThrowExceptionForHR(CreateAppContainerProfile(name,name,name,IntPtr.Zero,0,out sid));
+        try {
+            Directory.CreateDirectory(root);
+            string bin=Directory.CreateDirectory(Path.Combine(root,"bin")).FullName;
+            string save=Directory.CreateDirectory(Path.Combine(root,"save")).FullName;
+            string outside=Directory.CreateDirectory(Path.Combine(root,"outside")).FullName;
+            string canary=Path.Combine(outside,"slot");
+            File.WriteAllText(canary,"host");
+            var identity=new SecurityIdentifier(sid);
+            Grant(bin,identity,FileSystemRights.ReadAndExecute);
+            Grant(save,identity,FileSystemRights.Modify);
+            string exe=Path.Combine(bin,"probe.exe");
+            File.WriteAllText(Path.Combine(bin,"asset"),"asset");
+            File.Copy(probeFile,exe);
+            int code=RunRestricted(exe,"child \""+root+"\" "+IPAddress.Parse(address),sid);
+            if(code!=0)throw new IOException("Restricted child exit "+code);
+            if(File.ReadAllText(canary)!="host" || File.ReadAllText(Path.Combine(save,"slot"))!="isolated")
+                throw new IOException("Host readback failed");
+            if(run!=null)run(root,sid);
+        } finally {
+            FreeSid(sid);
+            Marshal.ThrowExceptionForHR(DeleteAppContainerProfile(name));
+            if(Directory.Exists(root) && Path.GetDirectoryName(Path.GetFullPath(root))==@"F:\" && Path.GetFileName(root)==name)
+                Directory.Delete(root,true);
+        }
+    }
     static int Main(string[] args) {
         try {
             if(args.Length==3 && args[0]=="child") return Measure(args[1],args[2]);
             if(args.Length!=1)throw new ArgumentException("Supply a reachable public IPv4 TCP/443 control endpoint");
-            Connect(args[0]);
-            string name="MeguLit.Probe."+Guid.NewGuid().ToString("N");
-            string root=Path.Combine(@"F:\",name);
-            IntPtr sid;
-            Marshal.ThrowExceptionForHR(CreateAppContainerProfile(name,name,name,IntPtr.Zero,0,out sid));
-            try {
-                Directory.CreateDirectory(root);
-                string bin=Directory.CreateDirectory(Path.Combine(root,"bin")).FullName;
-                string save=Directory.CreateDirectory(Path.Combine(root,"save")).FullName;
-                string outside=Directory.CreateDirectory(Path.Combine(root,"outside")).FullName;
-                string canary=Path.Combine(outside,"slot");
-                File.WriteAllText(canary,"host");
-                var identity=new SecurityIdentifier(sid);
-                Grant(bin,identity,FileSystemRights.ReadAndExecute);
-                Grant(save,identity,FileSystemRights.Modify);
-                string exe=Path.Combine(bin,"probe.exe");
-                File.WriteAllText(Path.Combine(bin,"asset"),"asset");
-                File.Copy(Assembly.GetExecutingAssembly().Location,exe);
-                int code=RunRestricted(exe,"child \""+root+"\" "+IPAddress.Parse(args[0]),sid);
-                if(code!=0)throw new IOException("Restricted child exit "+code);
-                if(File.ReadAllText(canary)!="host" || File.ReadAllText(Path.Combine(save,"slot"))!="isolated")
-                    throw new IOException("Host readback failed");
-            } finally {
-                FreeSid(sid);
-                Marshal.ThrowExceptionForHR(DeleteAppContainerProfile(name));
-                if(Directory.Exists(root) && Path.GetDirectoryName(Path.GetFullPath(root))==@"F:\" && Path.GetFileName(root)==name)
-                    Directory.Delete(root,true);
-            }
+            WithIsolation(args[0],Assembly.GetExecutingAssembly().Location,null);
             Console.WriteLine("Neutral probe passed: host TCP/443 connected, restricted TCP access denied, disposable write verified, outside canary read/write denied");
             return 0;
         } catch(Exception e) { Console.Error.WriteLine(e); return 2; }

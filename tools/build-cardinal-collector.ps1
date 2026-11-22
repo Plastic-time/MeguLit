@@ -11,7 +11,7 @@ foreach($name in 'Microsoft.Web.WebView2.WinForms.dll','Microsoft.Web.WebView2.C
     $refs+=$src
 }
 Copy-Item -LiteralPath (Join-Path $wv 'x64/WebView2Loader.dll') -Destination $out
-& $csc /nologo /optimize+ /platform:x64 /main:CardinalCollector ("/out:"+ (Join-Path $out 'CardinalCollector.exe')) @($refs|ForEach-Object{"/reference:"+$_}) (Join-Path $root 'native/CardinalCollector.cs') (Join-Path $root 'native/ColdDesk.cs')
+& $csc /nologo /optimize+ /platform:x64 /main:CardinalCollector ("/out:"+ (Join-Path $out 'CardinalCollector.exe')) @($refs|ForEach-Object{"/reference:"+$_}) (Join-Path $root 'native/CardinalCollector.cs') (Join-Path $root 'native/CardinalIsolationProbe.cs') (Join-Path $root 'native/CardinalGameCapture.cs') (Join-Path $root 'native/ColdDesk.cs')
 if($LASTEXITCODE){throw 'Collector build failed'}
 & $csc /nologo /optimize+ /platform:x64 ("/out:"+ (Join-Path $out 'ColdCapture64.exe')) (Join-Path $root 'native/ColdCapture.cs')
 if($LASTEXITCODE){throw 'Audio guard build failed'}
