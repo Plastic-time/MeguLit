@@ -67,8 +67,8 @@ if ($script:statusOnly) {
   $script:splash.StartPosition = 'CenterScreen'
   $script:splash.ControlBox = $false
   $bootCancel = New-Object Windows.Forms.Button
-  $bootCancel.Dock = 'Fill'
-  $track = Round-Rect 0 0 $script:splash.ClientSize.Width $script:splash.ClientSize.Height
+  $bootCancel.SetBounds(0, 0, 144, 3)
+  $track = Round-Rect 0 0 $bootCancel.Width $bootCancel.Height
   try { $script:splash.Region = [Drawing.Region]::new($track) } finally { $track.Dispose() }
   $bootCancel.FlatStyle = 'Flat'
   $bootCancel.FlatAppearance.BorderSize = 0

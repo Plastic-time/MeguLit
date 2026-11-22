@@ -202,7 +202,7 @@ test('calm native loading screen: real stages from the script, no frame bundle, 
   assert.ok(!fs.existsSync(path.join(repo, 'setup', 'ui-web', 'video', 'splash-frames.bin')), 'the frame bundle is gone from the package');
   assert.match(rs, /\.stage/); assert.match(rs, /MEGULIT_SPLASH_FLAG/); assert.match(rs, /AllowSetForegroundWindow/); assert.match(rs, /exe-splash-closed reason=skin-first-frame/); assert.match(rs, /exe-splash-faded/);
   assert.ok(!/GdipCreateBitmapFromStream|SHCreateMemStream/.test(rs), 'no video/frame decoding in the exe splash');
-  assert.match(rt, /Size\(144, 3\)/); assert.match(rt, /Round-Rect 0 0 \$fill \$height/); assert.match(rt, /Brushes\]::White/); assert.doesNotMatch(rt, /bootStripe/);
+  assert.match(rt, /SetBounds\(0, 0, 144, 3\)/); assert.match(rt, /Round-Rect 0 0 \$fill \$height/); assert.match(rt, /Brushes\]::White/); assert.doesNotMatch(rt, /bootStripe/);
   assert.match(rt, /Set-SplashStage/); assert.match(rt, /'page-frame1'/); assert.match(rt, /-not \$env:MEGULIT_NATIVE_SPLASH/);
   assert.match(web, /Release-NativeSplash 'skin-frame1'/); assert.match(rt, /\$script:win\.BringFront\(\)/, 'the skin window is brought to the front before the splash fades'); assert.match(web, /public void BringFront\(\)/);
   assert.match(rs, /913\.0/); assert.match(web, /913 \* \$scale/); assert.match(rt, /Size\(913, 584\)/);
