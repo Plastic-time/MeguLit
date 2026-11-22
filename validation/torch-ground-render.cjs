@@ -47,20 +47,26 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
      }
      return true;
     });
+    const friezes=d.scene.getObjectsByProperty('name','Plinth carved frieze');
+    const front=friezes.find(mesh=>mesh.position.z>0);
+    const continuous=friezes.length===2&&[-.32,-.16,0,.16,.32].every(x=>{
+     const ray=new T.Raycaster(new T.Vector3(x,front.position.y,1.3),new T.Vector3(0,0,-1));
+     return ray.intersectObject(front.parent)[0]?.object===front;
+    });
     return {baked:d.ao.baked,noLeak,rose:rose.length,
      cover:[p.x,p.y],opacity:d.covers.group.children[0].material.opacity,
-     terrain:[ground.torchGroundHeight(0,40),ground.torchGroundHeight(0,50),ground.torchGroundHeight(0,58)],
+     terrain:[ground.torchGroundHeight(0,40),ground.torchGroundHeight(0,50),ground.torchGroundHeight(0,72)],
      singleCap:!d.scene.getObjectByName('West exterior stone'),
-     badge:!!d.scene.getObjectByName('Megumin eyepatch')};
+     continuous};
    })()`);
-   assert.ok(facts.baked&&facts.noLeak&&facts.singleCap&&facts.badge,JSON.stringify(facts));
-   assert.ok(await ev(`document.querySelector('.tm-help').textContent.startsWith('\u5de6\u952e')&&canvas.getAttribute('aria-label').includes('\u65cb\u8f6c')`));
+   assert.ok(facts.baked&&facts.noLeak&&facts.singleCap&&facts.continuous,JSON.stringify(facts));
+   assert.ok(await ev(`document.querySelector('.tm-help').textContent.startsWith('WASD')&&canvas.getAttribute('aria-label').includes('WASD')`));
    assert.ok(Math.abs(facts.cover[0])<.7&&facts.cover[1]>.15&&facts.cover[1]<.75&&facts.opacity===.65,JSON.stringify(facts));
    assert.equal(facts.terrain[0],0);assert.ok(facts.terrain[1]<0);assert.equal(facts.terrain[2],-4);
   }
   async function cap(name,pose){await ev('window.pose='+JSON.stringify(pose));await delay(105);const r=await cdp.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(r.data,'base64'));}
   for(let i=0;i<15;i++)await cap('night-track-'+String(i).padStart(2,'0'),[[94+i*.65,2.4,133+i*.81],[8,10,11]]);
-  await cap('night-front',null);await cap('night-badge',[[.8,1.55,2.6],[0,1.23,.44]]);
+  await cap('night-front',null);await cap('night-plinth',[[.8,1.55,2.6],[0,1.23,.44]]);
   await cap('night-slope',[[29,2.4,59],[0,3,32]]);
   if(phase==='after'){
    for(const sx of [-1,1]){
@@ -72,7 +78,7 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
   await ev('window.__TORCH_HOUR=12');await delay(1500);
   await cap('day-track',[[102,2.4,143],[8,10,11]]);
   await cap('day-slope',[[29,2.4,59],[0,3,32]]);
-  await cap('day-front',null);await cap('day-badge',[[.8,1.55,2.6],[0,1.23,.44]]);
+  await cap('day-front',null);await cap('day-plinth',[[.8,1.55,2.6],[0,1.23,.44]]);
   if(phase==='after'){
    for(const sx of [-1,1]){
     await cap('day-rose-'+sx,[[0,4,14],[sx*10.85,14,4]]);
@@ -88,10 +94,27 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
    }
    await drag('left',1,[500,480],[590,480]);await wait('Math.abs(d.camera.position.x)>1');
    await ev('hall.resetView()');await wait('Math.abs(d.camera.position.x)<.01');
-   await drag('right',2,[500,480],[795,480]);await wait('Math.abs(d.camera.getWorldDirection(d.camera.position.clone()).x)>.1');
+   await drag('middle',4,[500,480],[795,480]);await wait('Math.abs(d.camera.getWorldDirection(d.camera.position.clone()).x)>.1');
    await ev('hall.resetView()');await wait('Math.abs(d.camera.getWorldDirection(d.camera.position.clone()).x)<.01');
+   const key=(type,c)=>cdp.send('Input.dispatchKeyEvent',{type,code:'Key'+c.toUpperCase(),key:c,text:type==='keyDown'?c:undefined});
+   await key('keyDown','w');await key('keyDown','d');
+   await wait('d.camera.position.x>.4&&d.camera.position.z<20.1');
+   await key('keyUp','w');await key('keyUp','d');
+   const released=await ev('d.camera.position.toArray()');
+   await delay(180);assert.deepEqual(await ev('d.camera.position.toArray()'),released);
+   await key('keyDown','s');await delay(210);
+   await ev("dispatchEvent(new Event('blur'));dispatchEvent(new Event('focus'))");
+   const blurred=await ev('d.camera.position.toArray()');
+   await delay(210);assert.deepEqual(await ev('d.camera.position.toArray()'),blurred);
+   await key('keyUp','s');
+   await ev("const input=document.createElement('input');input.id='wasd-fixture';document.querySelector('.torch-monument').append(input);input.focus()");
+   await key('keyDown','a');await key('keyUp','a');
+   assert.equal(await ev("document.querySelector('#wasd-fixture').value"),'a');
+   assert.deepEqual(await ev('d.camera.position.toArray()'),blurred);
+   await ev("document.querySelector('#wasd-fixture').remove();hall.resetView()");
+   await wait('d.camera.position.z===20.5');
    const w=await ev('canvas.clientWidth'),h=await ev('canvas.clientHeight');
-   await drag('middle',4,[100,480],[Math.round(100+Math.PI*w/4),Math.round(480-.075*h/3)]);
+   await drag('right',2,[100,480],[Math.round(100+Math.PI*w/4),Math.round(480-.075*h/3)]);
    await wait('d.camera.getWorldDirection(d.camera.position.clone()).z>.98');
    const wheel=n=>ev(`for(let i=0;i<${n};i++)canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:-120,bubbles:true,cancelable:true}));true`);
    await wheel(9);

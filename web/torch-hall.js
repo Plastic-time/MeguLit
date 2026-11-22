@@ -127,36 +127,14 @@ export function buildStele({scene,keep,tier}){const low=tier==='low',T=textureMa
   { const L=SW+.7;let y=POST_Y;const part=(w,h,d,r,m=baseMat)=>{mesh(rbox(w,h,d,r),m,0,y+h/2,0);y+=h;};
    part(L+.5,.2,1.2,.02);part(L+.3,.07,1.04,.03);part(L+.2,.06,.98,.025);
    const dieH=BASE_Y-POST_Y-(.2+.07+.06)-(.06+.07+.1);part(L,dieH,.86,.012);
-   /* one continuous carved vine frieze along both faces of the die, gilt fillets above and below, and a single medallion with a gilt
-      flame in the middle of the front (the only accent, so nothing repeats as boxes) */
+   /* Continuous carved vine friezes with gilt fillets above and below. */
    { const cy=y-dieH/2,fh=dieH*.58,rel=maps('plinthRelief',()=>relief(low?2048:4096,low?256:512,5,{normalStrength:low?7:14}));
      const carvedB=keep(new THREE.MeshStandardMaterial({map:T(rel.map),normalMap:T(rel.normal,false),color:0xe8e0d2,roughness:.7,metalness:0,normalScale:new THREE.Vector2(.82,.82),envMapIntensity:.4}));
      carvedB.map.repeat.set((L-.3)/(fh*8),1);carvedB.normalMap.repeat.set((L-.3)/(fh*8),1);
      for(const fz of [-1,1]){const z=fz*.432,ry=fz<0?Math.PI:0;
       const f=new THREE.Mesh(keep(new THREE.PlaneGeometry(L-.3,fh)),carvedB);f.name='Plinth carved frieze';f.position.set(0,cy,z);f.rotation.y=ry;f.receiveShadow=true;stele.add(f);
       for(const dy of [fh/2+.015,-fh/2-.015])mesh(new THREE.BoxGeometry(L-.26,.018,.016),gilt,0,cy+dy,z,false);}
-     const r=dieH*.44,mz=.45;
-     const leather=keep(new THREE.MeshStandardMaterial({color:0x9d1828,roughness:.58,emissive:0x64101d,emissiveIntensity:.5}));
-     const binding=keep(new THREE.MeshStandardMaterial({color:0x3c111a,roughness:.68,emissive:0x351019,emissiveIntensity:.24}));
-     const gold=keep(new THREE.MeshStandardMaterial({color:0xffce5b,roughness:.48,metalness:.34,emissive:0xcc831b,emissiveIntensity:.54}));
-     const patch=new THREE.Shape();
-     patch.moveTo(-.99*r,.31*r);patch.quadraticCurveTo(-.85*r,.79*r,-.12*r,.79*r);
-     patch.quadraticCurveTo(.56*r,.82*r,.99*r,.33*r);patch.quadraticCurveTo(.83*r,-.44*r,.38*r,-.71*r);
-     patch.quadraticCurveTo(-.04*r,-.92*r,-.48*r,-.62*r);patch.quadraticCurveTo(-.86*r,-.34*r,-.99*r,.31*r);
-     const raised=(shape,depth,bevel)=>new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:true,bevelThickness:bevel,bevelSize:bevel,bevelSegments:3,curveSegments:24});
-     const edge=mesh(raised(patch,.025,.012),binding,0,cy,mz,false);edge.rotation.z=.16;
-     const pad=raised(patch,.035,.006);pad.scale(.94,.94,1);
-     mesh(pad,leather,0,cy,mz+.016,false).rotation.z=.16;
-     stele.children.at(-1).name='Megumin eyepatch';
-     for(const angle of [-.61,.93]){
-      const cross=mesh(rbox(r*1.19,r*.12,.025,.009),gold,0,cy+.022,mz+.053,false);
-      cross.rotation.z=angle;cross.name='Eyepatch gold cross';
-     }
-     for(const side of [-1,1]){
-      const strap=mesh(rbox(r*.57,.027,.025,.007),binding,side*r*1.12,cy+side*.041,mz+.006,false);
-      strap.rotation.z=.22;strap.name='Eyepatch strap';
-     }}
-
+   }
    part(L+.1,.06,.94,.02);part(L+.2,.07,1.0,.03,inlayRed);part(L+.3,.1,1.06,.035);}
  const s=new THREE.Shape(),w=SW,h=SH,b=.04;s.moveTo(-w/2+b,-h/2);s.lineTo(w/2-b,-h/2);s.quadraticCurveTo(w/2,-h/2,w/2,-h/2+b);s.lineTo(w/2,h/2-b);s.quadraticCurveTo(w/2,h/2,w/2-b,h/2);
  s.lineTo(-w/2+b,h/2);s.quadraticCurveTo(-w/2,h/2,-w/2,h/2-b);s.lineTo(-w/2,-h/2+b);s.quadraticCurveTo(-w/2,-h/2,-w/2+b,-h/2);
@@ -503,12 +481,13 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
   const hallInset=(1-THREE.MathUtils.smoothstep(Math.abs(x),12.8,13.45))
    *THREE.MathUtils.smoothstep(z,back+1,back+2)*(1-THREE.MathUtils.smoothstep(z,39,40));
   pts.setY(i,Math.min(-.012,height)-.14*hallInset-.20*THREE.MathUtils.smoothstep(-height,3.75,4));
-  const wave=.45+.14*Math.sin(x*.54+Math.sin(z*.25))+.11*Math.cos(z*.43+x*.78)+.05*Math.sin(x*1.53-z*.96);
+  const wave=.46+.12*Math.sin(x*.31+1.2*Math.sin(z*.28))+.09*Math.cos(z*.41+x*.51)+.06*Math.sin(x*1.53-z*.96);
   const color=dark.clone().lerp(green,wave).lerp(soil,THREE.MathUtils.smoothstep(-height,2,4)*.75);
   const foot=Math.max(Math.abs(x)-13.9,back+1-z,z-41.2);
   color.multiplyScalar(.58+.42*THREE.MathUtils.smoothstep(foot,0,3));
-  const entry=(1-THREE.MathUtils.smoothstep(Math.abs(x),1.65,3.4))*THREE.MathUtils.smoothstep(z,40,43);
-  color.lerp(path,entry*.72);
+  const trailX=.85*Math.sin(Math.max(0,z-42.6)*.24);
+  const entry=(1-THREE.MathUtils.smoothstep(Math.abs(x-trailX),.85,2.2))*THREE.MathUtils.smoothstep(z,40,43);
+  color.lerp(path,entry*.50);
   color.toArray(colors,colors.length);
  }
  island.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));island.computeVertexNormals();
@@ -526,15 +505,17 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
   0,0,-.07,0,0,.07,0,.38,-.085
  ],3));grass.computeVertexNormals();
  const grassAt=[],flowerAt=[[],[],[]],stems=[];
+ const plantable=(x,z,y)=>y>MIRROR_LEVEL+.36&&
+  !(Math.abs(x)<14.3&&z>BACK&&z<NZ1+1.5)&&!(z>NZ1&&Math.abs(x)<3.4);
  const rand=(seed)=>{const f=Math.sin(seed*127.1+311.7)*43758.5453123;return f-Math.floor(f);};
- const islands=[[19,-2,3.5,6.1],[-19,1,4,7],[21,12,5.2,7.6],[-21,15,5.8,7.2],
-  [19.4,27,3.8,6.2],[-19.8,30,4.7,6.7],[20,41,4.5,5.8],[-19.8,43,4.2,6.1]];
+ const islands=[[18,-2,4.5,6.1],[-19,1,5.3,8],[23,12,7.2,7.6],[-23,15,6.8,8.2],
+  [20.4,27,5.8,7.2],[-25.8,31,5.7,7.7],[14.8,47,6.5,8.8],[-12.8,48,6.2,9.1]];
  islands.forEach(([x,z,rx,rz],index)=>{
   const rim=a=>1+.10*Math.sin(a*3+index)+.066*Math.cos(a*6-index);
   for(let i=0;i<(low?100:220);i++){
-   const seed=index*4201+i*7,a=rand(seed)*Math.PI*2,r=Math.sqrt(rand(seed+3))*.96;
+   const seed=index*4201+i*7,a=rand(seed)*Math.PI*2,r=Math.pow(rand(seed+3),.7+(index%3)*.26)*.96;
    const px=x+Math.cos(a)*rx*r*rim(a),pz=z+Math.sin(a)*rz*r*rim(a),py=torchGroundHeight(px,pz);
-   if(py>MIRROR_LEVEL+.25)grassAt.push([px,py-.028,pz,rand(seed+1)*Math.PI*2,0,0,.28+rand(seed+5)*.70]);
+   if(plantable(px,pz,py))grassAt.push([px,py-.028,pz,rand(seed+1)*Math.PI*2,0,0,.25+rand(seed+5)*(.43+.29*(index%2))]);
   }
   for(let cluster=0;cluster<(low?3:6);cluster++){
    const seed=index*1709+cluster*37;
@@ -544,7 +525,7 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
     const px=cx+(rand(seed+3+j*3)-.5)*1.35,pz=cz+(rand(seed+4+j*3)-.5)*1.35;
     const scale=.63+rand(seed+5+j*3)*.81;
     const py=torchGroundHeight(px,pz);
-    if(py<=MIRROR_LEVEL+.25)continue;
+    if(!plantable(px,pz,py))continue;
     stems.push([px,py-.024,pz,0,0,0,scale]);
     flowerAt[(index+cluster)%flowerAt.length].push([px,py-.024+scale*.30,pz,rand(seed+j)*Math.PI*2,0,0,scale]);
    }

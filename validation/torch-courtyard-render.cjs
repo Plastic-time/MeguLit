@@ -65,8 +65,7 @@ const seedCover='data:image/png;base64,'+png(32,48,[145,36,116],[24,52,84]).toSt
     lintel:ray(0,6.8,42,-1).intersectObject(facade).length>0,
     eastOpen:new T.Raycaster(new T.Vector3(8,2,-5),new T.Vector3(0,0,-1),0,35)
      .intersectObject(facade.parent).length===0,
-    badge:['Megumin eyepatch','Eyepatch gold cross','Eyepatch strap']
-     .every(name=>d.scene.getObjectByName(name)?.geometry.parameters),
+    continuousFrieze:d.scene.getObjectsByProperty('name','Plinth carved frieze').length===2,
     mirror:d.courtyard.mirror.scale.y===-1&&d.courtyard.chair.position.z===d.courtyard.mirror.position.z
    };
   })()`);
@@ -102,12 +101,12 @@ const seedCover='data:image/png;base64,'+png(32,48,[145,36,116],[24,52,84]).toSt
    await mouse('mouseMoved',toX,toY,button,mask);
    await mouse('mouseReleased',toX,toY,button,0);
   }
-  await drag('middle',4,80,310,340,310);
+  await drag('right',2,80,310,340,310);
   await wait('direction()[0]>.5');
   await evaluate('hall.resetView()');
   await wait('direction()[2]<-.9');
   const w=await evaluate('canvas.clientWidth'),h=await evaluate('canvas.clientHeight');
-  await drag('middle',4,80,310,Math.round(80+Math.PI*w/4),Math.round(310-.075*h/3));
+  await drag('right',2,80,310,Math.round(80+Math.PI*w/4),Math.round(310-.075*h/3));
   await wait('direction()[2]>.98');
   await capture('portal-day');
   const wheel=(count,delta)=>evaluate(`for(let i=0;i<${count};i++)canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:${delta},bubbles:true,cancelable:true}));true`);
@@ -128,7 +127,7 @@ const seedCover='data:image/png;base64,'+png(32,48,[145,36,116],[24,52,84]).toSt
   await wheel(110,-120);
   await wait('pos()[2]>500');
   assert.ok(await evaluate('d.courtyard.sky.position.distanceTo(d.camera.position)<1e-6'));
-  await drag('middle',4,70,320,Math.round(70+Math.PI*w/4),320);
+  await drag('right',2,70,320,Math.round(70+Math.PI*w/4),320);
   await wait('direction()[2]<-.95');
   await wheel(112,-120);
   await wait('pos()[2]<65');
@@ -156,12 +155,12 @@ const seedCover='data:image/png;base64,'+png(32,48,[145,36,116],[24,52,84]).toSt
   await evaluate('hall.setActive(true);true');
   await evaluate('hall.resetView()');
   await wait('Math.abs(pos()[2]-20.5)<.02');
-  await drag('right',2,320,360,420,360);
+  await drag('middle',4,320,360,420,360);
   await wait('Math.abs(direction()[0])>.04');
   const prior=await evaluate('pos()[0]');
   await drag('left',1,380,360,485,565);
   await wait(`Math.abs(pos()[0]-(${prior}))>1`);
-  await drag('middle',4,350,260,350,580);
+  await drag('right',2,350,260,350,580);
   await wheel(10,-120);
   await wait(`(async()=>{const {torchGroundHeight}=await import('/torch-ground.js');const [x,y,z]=pos();return Math.abs(y-torchGroundHeight(x,z)-1.2)<1e-7;})()`);
   await evaluate(`canvas.dispatchEvent(new MouseEvent('dblclick',{button:0,bubbles:true}));true`);
