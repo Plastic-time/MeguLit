@@ -16,3 +16,5 @@ if($LASTEXITCODE){throw 'Collector build failed'}
 & $csc /nologo /optimize+ /platform:x64 ("/out:"+ (Join-Path $out 'ColdCapture64.exe')) (Join-Path $root 'native/ColdCapture.cs')
 if($LASTEXITCODE){throw 'Audio guard build failed'}
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'cardinal-native-tap.cjs') -Destination $out
+& $csc /nologo /optimize+ /platform:x64 ("/out:"+ (Join-Path $out 'CardinalIsolationProbe.exe')) (Join-Path $root 'native/CardinalIsolationProbe.cs')
+if($LASTEXITCODE){throw 'Isolation probe build failed'}
