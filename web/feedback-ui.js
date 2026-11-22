@@ -88,6 +88,7 @@ export function openFeedback({ api, locale = 'zh', esc, toast, version = '' }) {
   dialog.className = 'game-dialog feedback-dialog';
   dialog.innerHTML = `<div class="game-dialog-head"><span class="game-dialog-kicker">${esc(t.kicker)}</span><h2>${esc(t.title)}</h2><p>${esc(issueHint)}</p></div>
 <fieldset class="feedback-issues"><legend>${esc(issueLabel)}</legend><div class="feedback-issue-options">${feedbackIssueLabels(locale).map(label=>`<button type="button" class="feedback-issue" aria-pressed="false">${esc(label)}</button>`).join('')}</div></fieldset>
+<label><input type="checkbox" data-yui disabled> ${esc(({zh:'允许 Yui 自动发送故障类型、上一阶段、启动耗时和匿名去重编号，同类故障会汇总到 GitHub',ja:'Yui に障害の種類、直前の処理、起動からの経過時間、匿名の重複防止 ID の自動送信を許可する（GitHub に種類別に集計）',en:'Allow Yui to send failure types, preceding stages, elapsed startup time and anonymous report IDs for automatic summaries on GitHub'})[locale])}</label>
 <textarea class="feedback-text" rows="6" maxlength="1800" placeholder="${esc(t.placeholder)}"></textarea>
 <input class="feedback-contact" maxlength="120" placeholder="${esc(t.contact)}">
 <p class="feedback-privacy">${esc(t.privacy)}</p>
@@ -97,6 +98,9 @@ export function openFeedback({ api, locale = 'zh', esc, toast, version = '' }) {
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
   dialog.showModal();
   const text = dialog.querySelector('.feedback-text'), contact = dialog.querySelector('.feedback-contact'), status = dialog.querySelector('.feedback-status'), send = dialog.querySelector('[data-send]');
+  const toggle=dialog.querySelector('[data-yui]');
+  Promise.resolve().then(()=>api('yui_consent')).then(v=>{toggle.checked=v.enabled===true;toggle.disabled=false;}).catch(()=>{});
+  toggle.onchange=async()=>{const enabled=toggle.checked;toggle.disabled=true;try{await api('yui_consent_set',{enabled});}catch{toggle.checked=!enabled;toast?.(t.failed);}finally{toggle.disabled=false;}};
   const issues = [...dialog.querySelectorAll('.feedback-issue')];
   for (const issue of issues) issue.onclick = () => issue.setAttribute('aria-pressed', String(issue.getAttribute('aria-pressed') !== 'true'));
   dialog.querySelector('[data-cancel]').onclick = () => dialog.close();
@@ -205,6 +209,17 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
   dialog.querySelector('[data-notice-close]').onclick = () => dialog.close();
   dialog.querySelector('[data-report]').onclick = () => { dialog.close(); openFeedback({ api, locale, esc, toast, version }); };
   dialog.showModal();
+  window.megulitYuiStage?.('notice-open');
+  const markVisible=()=>{
+    if(!dialog.open)return;
+    const title=dialog.querySelector('h2');
+    if(title?.getBoundingClientRect().height>0 && title.checkVisibility({opacityProperty:true,visibilityProperty:true})){
+      window.megulitYuiStage?.('notice-painted');
+    }else if(dialog.isConnected && performance.now()<deadline){requestAnimationFrame(markVisible);}
+  };
+  const deadline=performance.now()+15000;
+  if(window.megulitYuiStage)requestAnimationFrame(()=>requestAnimationFrame(markVisible));
+  dialog.addEventListener('close',()=>window.megulitYuiStage?.('notice-closed'),{once:true});
   shownThisLaunch = true;
   const empty = dialog.querySelector('.startup-updates-empty'), list = dialog.querySelector('.dev-notice-updates');
   fillUpdates(dialog, locale, api).then(() => {

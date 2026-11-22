@@ -121,7 +121,7 @@ function collect(root,db,id,{version='',now=new Date(),who=identity(),screenshot
  const files=[],logInfo={};
  for(const name of LOGS){const all=readLog(root,name);const kept=name==='game-launch.log'?all.filter(l=>l.includes(`"gameId":"${id}"`)).slice(-MAX_LINES):filterLines(all,windows,exe?[exe]:[]);logInfo[name]={linesInLog:all.length,linesKept:kept.length};if(kept.length)files.push({name:'logs/'+name,data:scrub(kept.join('\n')+'\n',who),kind:'log'});}
  let overviewRow=null;try{overviewRow=require('./adaptation-overview.cjs').overview(db,root,{entries}).games.find(g=>g.id===String(id))||null;}catch{}
- const info={schema:1,createdAt:now.toISOString(),megulit:{version:String(version||'')},os:osInfo(),
+ const info={schema:1,yui:require('./yui.cjs').sessions(root).filter(s=>s.session===process.env.MEGULIT_YUI_SESSION),createdAt:now.toISOString(),megulit:{version:String(version||'')},os:osInfo(),
   game:{id:String(row.id),title:row.title,engine:String(library.engine||''),executable:row.executable||'',executableName:exe,available:!!row.executable&&fs.existsSync(row.executable),localeMode:library.localeMode||(library.localeJapanese===true?'japanese':'auto'),source:row.source,lastLaunchedAt:ms(row.last_launched_at)?new Date(ms(row.last_launched_at)).toISOString():null,removed:row.removed_at!=null},
   embed:{hookSupport:String(library.hook||'unknown'),hookVerifiedAt:ms(library.hookVerifiedAt)?new Date(ms(library.hookVerifiedAt)).toISOString():null,hookVerifiedStream:library.hookVerifiedStream||null,hookReadonlyAt:ms(library.hookReadonlyAt)?new Date(ms(library.hookReadonlyAt)).toISOString():null,hookReadonlyBuild:library.hookReadonlyBuild||null,hookVerdictStale:require('./hook-verdict.cjs').stale(library,require('./hook-verdict.cjs').appVersion(root)),hookStreams:hookStreams(root,row.executable)},
   originalText:originalTextState(root,id),autoProfile:autoProfile(root,row.executable,library.engine),adaptation:overviewRow?{reading:overviewRow.reading,zeroLatency:overviewRow.zeroLatency,evidence:overviewRow.evidence}:null,
@@ -152,7 +152,7 @@ function collectAll(root,db,{version='',now=new Date(),who=identity()}={}){
  let games=[];try{games=db.prepare('SELECT id,title,library FROM games ORDER BY last_launched_at DESC LIMIT 60').all().map(r=>{let lib={};try{lib=JSON.parse(r.library||'{}');}catch{}return {id:String(r.id),title:r.title,engine:String(lib.engine||''),hook:String(lib.hook||'')};});}catch{}
  const marked=require('./sentence-marks.cjs').all(root);
  if(marked.length)files.push({name:'sentence-marks.json',kind:'info',data:JSON.stringify({schema:1,games:marked},null,2)});
- const info={schema:1,kind:'all',createdAt:now.toISOString(),megulit:{version:String(version||'')},os:osInfo(),games,logs:logInfo};
+ const info={schema:1,yui:require('./yui.cjs').sessions(root),kind:'all',createdAt:now.toISOString(),megulit:{version:String(version||'')},os:osInfo(),games,logs:logInfo};
  files.unshift({name:'info.json',data:scrub(JSON.stringify(info,null,2),who),kind:'info'});
  const readme=['MeguLit diagnostic package (whole app)','','Created: '+now.toISOString(),'',...files.map(f=>`${f.name}  ${f.kind==='log'?'last lines of this log':'MeguLit version, OS and the library'}`),'','Privacy: the Windows user name and profile paths are replaced by placeholders and e-mail addresses are removed.'].join('\n');
  files.push({name:'README.txt',data:scrub(readme,who),kind:'readme'});

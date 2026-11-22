@@ -554,6 +554,8 @@ async function dispatch(request,runtime=null) {
       case 'seed_producer':return await require('./seed-producer.cjs').producer(root,String(request.pid||''),{moegirl:require('./info-source.cjs').forRoot(root,String(request.locale||''))});
       case 'seed_producer_open':return require('./seed-producer.cjs').open(root,String(request.pid||''),String(request.kind||''));
       case 'seed_cover':return await require('./seed-catalog.cjs').cover(root,String(request.vndb||''),{nsfw:request.nsfw===true});
+      case 'yui_consent':return {enabled:require('./yui.cjs').enabled(root)};
+      case 'yui_consent_set':return require('./yui.cjs').setEnabled(root,request.enabled);
       case 'feedback_send':return require('./feedback.cjs').send(root,{kind:String(request.kind||''),text:String(request.text||''),contact:String(request.contact||''),lang:String(request.lang||'zh'),version:String(request.version||'')}); /* E394 in-app feedback through the relay */
       case 'diagnostics_upload':{const file=require('./diagnostics.cjs').ownPackage(root,request.path),m=request.meta||{};return require('./diagnostics-upload.cjs').upload(file,{version:m.version,game:m.game,note:m.note},{root});}
       /* 2026-11-15 学习 › 词典 「加入 Anki」: the in-game card path (reader v4 'anki') with a dictionary entry and no game context */

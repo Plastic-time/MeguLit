@@ -33,6 +33,7 @@ try{require('./probe-auto.cjs').start(root,()=>require('./store.cjs').openStore(
    library.coldTest); never while MeguLit has a game bound */
 require('./background-games.cjs').configure(()=>!!runtime.reader?.gamePid);
 try{require('./cold-test.cjs').start(root,()=>require('./store.cjs').openStore(root),{isPlaying:()=>{try{const r=runtime.reader;return !!(r&&r.gamePid);}catch{return false;}}});}catch{}
+require('./yui.cjs').start(root);
 input.on('line',line=>{handle(line).catch(()=>{});});
 /* E426 the host is gone once stdin closes: a stop that never settles must not leave node.exe and its bridges behind */
 input.on('close',()=>{closing=true;setTimeout(()=>process.exit(0),6000).unref();try{require('./cold-test.cjs').stop();}catch{}runtime.stop().finally(()=>process.exit(0));});

@@ -11,6 +11,7 @@ import {LIMITS,validateLeaderboard,validateBoardQuery,validateAdaptationRecord,v
 /* E379 accounts (relay/ACCOUNTS.md) and community features (avatars, hot words) */
 import {handleAccounts,isAccountsPath,authenticate,ROTATED} from './accounts.js';
 /* website game-request and feedback forms → GitHub issues */
+import {yuiPost,syncYui} from './yui.js';
 import {feedbackPost,syncPendingFeedback} from './feedback.js';
 /* E397 public profiles, follows, 同好 */
 import {profileOwn,profileCard,followEdit,followingFeed,kindred,socialDeletes,profileReport,profileAppeal} from './social.js';
@@ -299,6 +300,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
   else if(isAccountsPath(path))response=await handleAccounts(request,env,now,ctx)||fail('NOT_FOUND',404);
   else if(path==='/api/adaptation')response=request.method==='POST'?await adaptationPost(request,env,ip,now):request.method==='GET'?await adaptationGet(url,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/adaptation/query')response=request.method==='POST'?await adaptationQuery(request,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/yui')response=request.method==='POST'?await yuiPost(request,env,{readJSON,fail,json,hit},ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/feedback')response=request.method==='POST'?await feedbackPost(request,env,{readJSON,fail,json,hit},ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/diagnostics')response=request.method==='POST'?await diagnosticsPost(request,env,ip,url,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path.startsWith('/api/diagnostics/download/')&&request.method==='GET')response=await diagnosticsDownload(url,env,ip,now);
@@ -331,7 +333,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
 export async function scheduled(event,env,ctx){
  /* every 30 minutes: website feedback still waiting for its GitHub issue; the weekly cron settles hot words */
  if(event?.cron==='20 21 * * *'){const job=refreshDaily(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
- if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null),cleanupForumImages(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupContrib(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeFull(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeStats(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),refreshSeedStatsSafe(env,new Date(event?.scheduledTime||Date.now()))]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
+ if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncYui(env).catch(()=>0),syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null),cleanupForumImages(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupContrib(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeFull(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeStats(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),refreshSeedStatsSafe(env,new Date(event?.scheduledTime||Date.now()))]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
  const when=new Date(event?.scheduledTime||Date.now());const job=settleDue(env,when).then(async done=>{await cleanupAvatars(env,when).catch(()=>0);return done;});if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
 /* a token rotated while answering any request goes back on that answer, whichever endpoint it was */
 export default {fetch:async(request,env,ctx)=>{const response=await handle(request,env,new Date(),ctx);const token=ROTATED.get(request);if(!token||response.headers.get('x-megulit-token'))return response;const copy=new Response(response.body,response);copy.headers.set('x-megulit-token',token);return copy;},scheduled};

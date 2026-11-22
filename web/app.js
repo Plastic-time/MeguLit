@@ -1336,7 +1336,7 @@ async function renderRoute(){watchStage();
    main.classList.remove('searching','field-page','field-list','field-selecting','field-single');}main.classList.toggle('statistics-page',route==='statistics');main.classList.toggle('torch-page',route==='torch');
    if(route!=='learning'&&route!=='statistics')main.classList.remove('review-page');if(route!=='learning'&&route!=='statistics')delete main.dataset.page;main.scrollTop=0;
   const showFailure=error=>{
-   if(token!==pageToken)return;console.error('renderRoute',route,error);main.innerHTML=empty(text.loadingFailed,'refresh');
+   if(token!==pageToken)return;window.megulitYuiStage?.('route-failed');console.error('renderRoute',route,error);main.innerHTML=empty(text.loadingFailed,'refresh');
    (main.querySelector('.empty-state')||main).insertAdjacentHTML('beforeend',`<button class="primary" id="retry">${text.retry}</button>`);
    main.querySelector('#retry').addEventListener('click',renderRoute);
   };
@@ -1418,9 +1418,9 @@ async function start(){
      ja:'ゲームウィンドウを待機中です。Alt+T で手動選択できます'})[locale]);});if(pendingCallback)await invoke('plugin:event|listen',{event:'reader-event',target:{kind:'Any'},handler:pendingCallback});
      await invoke('window_action',{action:'ready'});const metadataCallback=window.__TAURI_INTERNALS__?.transformCallback(async()=>{try{model=await api('home');if(route==='library')renderGames();
      else if(route==='home')home();else if(route==='series')seriesUI.renderDetail(document.querySelector('#main'),selectedSeriesId);}catch{}});if(metadataCallback)await invoke('plugin:event|listen',
-     {event:'library-updated',target:{kind:'Any'},handler:metadataCallback});window.__TOME_READY__=true;refreshLibrary({startup:true}).catch(()=>{});openPlayReader({api,invoke,wait:waitReader}).catch(error=>readerNotice(error.message||error));
+     {event:'library-updated',target:{kind:'Any'},handler:metadataCallback});window.__TOME_READY__=true;requestAnimationFrame(()=>requestAnimationFrame(()=>{if(document.querySelector('#main')?.childElementCount)window.megulitYuiStage?.('content-painted');}));refreshLibrary({startup:true}).catch(()=>{});openPlayReader({api,invoke,wait:waitReader}).catch(error=>readerNotice(error.message||error));
   }
-  catch(error){app.innerHTML=`<div class="loading-screen"><div>${text.loadingFailed}<button class="primary" id="startup-retry">${text.retry}</button></div></div>`;
+  catch(error){window.megulitYuiStage?.('startup-failed');app.innerHTML=`<div class="loading-screen"><div>${text.loadingFailed}<button class="primary" id="startup-retry">${text.retry}</button></div></div>`;
    document.querySelector('#startup-retry').addEventListener('click',start);await invoke('window_action',{action:'ready'}).catch(()=>{});}
 }
 addEventListener('focus',()=>{refreshFocusedHome().catch(()=>{});});
