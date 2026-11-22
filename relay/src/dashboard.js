@@ -2,6 +2,7 @@
 /* 2026-11-16 beta live-usage dashboard served by the relay (GET /dashboard). Polls /api/probe/stats on both relay nodes
    (CORS open) every 15 s, shows the first answer and each node's latency. Phone: https://cn-api.megulit.com/dashboard.
    Operator console (btop/htop/tmux idiom), black + red, LED dot-matrix live counter, full-width 12-column grid. */
+import {SEED_ADMIN_HTML,SEED_ADMIN_SCRIPT} from './dashboard-seed-admin.js';
 export const DASHBOARD_HTML=String.raw`<!doctype html>
 <html lang="zh">
 <head>
@@ -157,6 +158,7 @@ tbody tr:hover td{background:#121212}
   </div>
 
   <div class="grid">
+    ${SEED_ADMIN_HTML}
     <section class="pane c3">
       <span class="ti">┤ <b>online</b> ├</span><span class="tr">last 10 min</span>
       <div class="on-row">
@@ -521,5 +523,6 @@ function start(){var left=PERIOD;
 boot();
 </script>
 
+<script>${SEED_ADMIN_SCRIPT}</script>
 </body>
 </html>`;
