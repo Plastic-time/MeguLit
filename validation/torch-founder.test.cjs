@@ -17,6 +17,7 @@ test('jumping to #0 focuses the founder, while a missing name does not focus ano
  assert.ok(start>=0&&end>start);
  for(const found of [true,false]){
   const state={monthsOn:false,focusNo:null,items:found?[{torchNo:0}]:[],fit:1,layout:{entries:[{item:{torchNo:0}}]}};
+  const mounted=true,visit=1,isVisit=id=>id===visit;
   let focused=0;
   const loadAt=async()=>true,layoutNow=()=>{},redraw=()=>{},ahead=async()=>{},scene={lookAtFocus(){focused++;}};
   const jumpTo=eval('('+src.slice(start,end).trim()+')');
@@ -28,5 +29,5 @@ test('jumping to #0 focuses the founder, while a missing name does not focus ano
 
 test('no focus uses null so #0 is not highlighted by default or after a month change',()=>{
  assert.match(src,/focusNo:null,/);
- assert.match(src,/state\.focusNo=null;await loadAt\(\{month:b\.month/);
+ assert.match(src,/await loadAt\(\{month:b\.month,cursor:''\},valid\);\s*if\(!ok\|\|!valid\(\)\)return;\s*state\.focusNo=null;/);
 });

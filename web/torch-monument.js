@@ -5,8 +5,8 @@
    monument with hundreds of thousands of names only ever holds a few hundred in memory.
 
    Data: services/torch-monument.cjs through the bridge (torch_page / torch_months / torch_find / torch_me).
-   Life cycle: the scene is built when the page opens and fully disposed when it closes (GPU context released). It stops
-   drawing while the window is hidden or not focused, and closes itself when a game starts (event megulit-game-launch).
+   Life cycle: the hall stays prepared between route visits, with drawing and input suspended while detached.
+   Locale changes, game launch, WebView shutdown and context loss dispose its GPU resources.
    Baked ahead (web/torch-bake.js): the hall's textures and an ambient-occlusion volume; sun shadows are redrawn only when the sun moves.
    Quality: 'high' (mirror floor, MSAA, clear coats, bloom, grading) or 'low' (none of those, lower resolution, smaller textures; baked AO and shadows on both); auto picks low on weak
    machines and drops to low when frames run slow. */
@@ -50,9 +50,19 @@ const NAME_PX=40,NAME_ADV=42,SIDE_PX=15,SIDE_ADV=16,DATE_PX=14,GAP=30;
 
 let current=null;
 export function closeTorchMonument(){current?.close();}
+export function suspendTorchMonument(){current?.suspend();}
+export function hasTorchMonument(locale){return current?.locale===locale;}
+export function invalidateTorchMonument(locale){if(current?.locale!==locale)closeTorchMonument();}
 
-export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),toast=()=>{},mount}){
- if(current){current.focus();return current;}
+export async function openTorchMonument({mount,onContextLost,locale='zh',...options}){
+ invalidateTorchMonument(locale);
+ if(!current)current=createMonument({locale,...options});
+ const hall=current;
+ hall.resume(mount,onContextLost);
+ return hall.prepared;
+}
+
+function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
  const opened=performance.now();
  const timing=(name,start)=>performance.measure('torch:'+name,{start,end:performance.now()});
  const t=COPY[locale]||COPY.zh;
@@ -70,40 +80,53 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
    <span class="tm-sep" aria-hidden="true"></span>
    <button type="button" class="tm-btn tm-text tm-quality" aria-pressed="false" disabled></button>
   </footer>`;
- mount.append(host);
  const $=s=>host.querySelector(s);
  const state={month:'',months:[],monthsOn:false,findOn:false,mine:[],mineAt:0,items:[],off:0,next:null,atStart:true,total:0,loading:false,pageError:'',focusNo:null,fit:0,layout:null,
   bandWindow:0,hover:null,hoverMonth:null};
- let disposed=false,scene=null,sceneReady=false,gsap=null,ro=null,onKey=()=>{},onVis=()=>{},onBlur=()=>{},onFocus=()=>{};
- const ctl={close,focus:()=>$('.tm-canvas').focus()};current=ctl;
+ let disposed=false,mounted=false,scene=null,sceneReady=false,gsap=null,ro=null;
+ let visit=0,wakePreparation,onContextLost,firstFrame=false,faceDirty=false;
+ const ctl={locale,close,suspend,resume,prepared:null};
+ const isVisit=id=>mounted&&visit===id;
+ const canvas=$('.tm-canvas'),bar=$('.tm-bar'),veil=$('.tm-veil');
+ canvas.inert=bar.inert=true;
  $('.tm-canvas').tabIndex=0;$('.tm-canvas').setAttribute('aria-label',({zh:'传火碑视图，滚轮缩放，按住拖动，双击复位',ja:'継火の碑。ホイールで拡大縮小、ドラッグで移動',en:'Monument view. Scroll to zoom, hold and drag, double-click to reset'})[locale]);
  const quality=()=>{let q='auto';try{q=localStorage.getItem(QUALITY_KEY)||'auto';}catch{}return q==='high'||q==='low'?q:'auto';};
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
  /* ---------- data ---------- */
  const call=async(a,p)=>{try{return await api(a,p);}catch{return {ok:false};}};
- async function loadAt({month=state.month,cursor=''}={}){state.loading=true;updateStatus();
-  const r=await call('torch_page',{month,cursor,limit:PAGE});state.loading=false;if(disposed)return false;
+ let pageRequest=0,initialPagePending=true;
+ async function loadAt({month=state.month,cursor=''}={},valid=()=>!disposed){
+  const request=++pageRequest;state.loading=true;updateStatus();
+  const r=await call('torch_page',{month,cursor,limit:PAGE});if(!valid()||request!==pageRequest)return false;
+  state.loading=false;
   if(!r||!r.ok){state.pageError=r?.error==='NOT_DEPLOYED'?t.notDeployed:t.offline;state.items=[];state.next=null;state.total=0;updateStatus();redraw();return false;}
   state.pageError='';updateStatus();state.month=r.month||month||'';state.items=r.items||[];state.next=r.next;state.total=r.total|0;state.off=0;
   state.atStart=!cursor||cursor==='0'||!state.items.length;return true;}
- async function ahead(){if(state.loading||!state.next||state.off+state.fit+60<state.items.length)return;state.loading=true;
-  const r=await call('torch_page',{month:state.month,cursor:state.next,limit:PAGE});state.loading=false;if(disposed||!r?.ok)return;
+ async function ahead(valid){if(!valid()||state.loading||!state.next||state.off+state.fit+60<state.items.length)return;
+  const request=++pageRequest;state.loading=true;
+  const r=await call('torch_page',{month:state.month,cursor:state.next,limit:PAGE});if(!valid()||request!==pageRequest)return;
+  state.loading=false;if(!r?.ok)return;
   const last=state.items.length?state.items[state.items.length-1].torchNo:-1;state.items.push(...(r.items||[]).filter(i=>i.torchNo>last));state.next=r.next;
   if(state.items.length>KEEP&&state.off>PAGE){state.items.splice(0,PAGE);state.off-=PAGE;state.atStart=false;}}
- async function behind(){if(state.loading||state.atStart||!state.items.length)return 0;const first=state.items[0].torchNo;if(first<=0){state.atStart=true;return 0;}
-  state.loading=true;const r=await call('torch_page',{month:state.month,cursor:first-1-PAGE>0?String(first-1-PAGE):'',limit:PAGE});state.loading=false;if(disposed||!r?.ok)return 0;
+ async function behind(valid){if(state.loading||state.atStart||!state.items.length)return 0;const first=state.items[0].torchNo;if(first<=0){state.atStart=true;return 0;}
+  const request=++pageRequest;state.loading=true;
+  const r=await call('torch_page',{month:state.month,cursor:first-1-PAGE>0?String(first-1-PAGE):'',limit:PAGE});
+  if(!valid()||request!==pageRequest)return 0;
+  state.loading=false;if(!r?.ok)return 0;
   const add=(r.items||[]).filter(i=>i.torchNo<first);if(!add.length){state.atStart=true;return 0;}state.items.unshift(...add);state.off+=add.length;
   if(first-1-PAGE<=0)state.atStart=true;
   if(state.items.length>KEEP){const cut=state.items.length-KEEP;state.items.splice(KEEP,cut);state.next=String(state.items[state.items.length-1].torchNo);}
   return add.length;}
- async function jumpTo(item){if(!item)return;const month=state.monthsOn&&item.month?item.month:'';state.focusNo=item.torchNo;
-  const ok=await loadAt({month,cursor:item.torchNo-80>0?String(item.torchNo-80):''});if(!ok)return;
+ async function jumpTo(item){if(!item||!mounted||state.loading)return;
+  const id=visit,valid=()=>isVisit(id),month=state.monthsOn&&item.month?item.month:'';
+  const ok=await loadAt({month,cursor:item.torchNo-80>0?String(item.torchNo-80):''},valid);if(!ok||!valid())return;
+  state.focusNo=item.torchNo;
   if(state.items.length&&item.torchNo-80>0)state.atStart=false;
   const idx=state.items.findIndex(i=>i.torchNo===item.torchNo);
   if(idx<0){state.focusNo=null;}else{const half=Math.floor((state.fit||160)/2);state.off=Math.max(0,idx-half);layoutNow();
    if(!state.layout.entries.some(e=>e.item.torchNo===item.torchNo)){state.off=idx;}}
-  redraw(true);await ahead();if(state.focusNo!==null)scene?.lookAtFocus();}
+  redraw();await ahead(valid);if(valid()&&state.focusNo===item.torchNo)scene?.lookAtFocus();}
 
  /* ---------- UI ---------- */
  function status(msg){const el=$('.tm-status');el.textContent=msg||'';el.hidden=!msg;}
@@ -115,10 +138,11 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
   $('.tm-pager').hidden=!first;
   $('.tm-prev').disabled=!state.off&&state.atStart;$('.tm-next').disabled=!(L&&state.off+L.entries.length<state.items.length)&&!state.next;
   const q=scene?.tier||tier;const qb=$('.tm-quality');qb.textContent=t.quality[q];qb.setAttribute('aria-pressed',String(q==='low'));}
- async function step(dir,cols=false){if(!state.layout)return;
+ async function step(dir,cols=false){if(!mounted||state.loading||!state.layout)return;
+  const id=visit,valid=()=>isVisit(id);
   if(dir>0){const L=state.layout;const n=cols?Math.max(1,L.firstColumnCount):Math.max(1,L.entries.length);if(state.off+n>=state.items.length&&!state.next)return;
-   state.off=Math.min(state.items.length-1,state.off+n);redraw();await ahead();redraw();}
-  else{if(state.off<=0)await behind();if(state.off<=0){redraw();return;}const n=cols?backColumn(state.off):backPage(state.off);state.off=Math.max(0,state.off-n);redraw();}}
+   state.off=Math.min(state.items.length-1,state.off+n);redraw();await ahead(valid);if(valid())redraw();}
+  else{if(state.off<=0)await behind(valid);if(!valid())return;if(state.off<=0){redraw();return;}const n=cols?backColumn(state.off):backPage(state.off);state.off=Math.max(0,state.off-n);redraw();}}
  const tip=$('.tm-tip');
  function showTip(entry,x,y){if(!entry){tip.hidden=true;return;}const it=entry.item;
   tip.querySelector('.tm-tip-name').textContent=it.name||t.anon(it.torchNo);
@@ -143,39 +167,12 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
  function backColumn(off){let y=AREA_Y0,n=0;for(let i=off-1;i>=0;i--){const h=entryBox(state.items[i]).h;if(y+h>AREA_Y1&&n)break;y+=h+GAP;n++;}return Math.max(1,n);}
  function backPage(off){let n=0,o=off;const cols=Math.floor((AREA_X1-AREA_X0)/COL_W);for(let c=0;c<cols&&o>0;c++){const k=backColumn(o);o-=k;n+=k;}return Math.max(1,n);}
  function layoutNow(){state.layout=layoutFrom(state.off);state.fit=state.layout.entries.length;return state.layout;}
- function redraw(force){if(disposed)return;layoutNow();updateChrome();scene?.paintFace(force);}
+ function redraw(){if(disposed)return;layoutNow();updateChrome();
+  if(mounted)scene?.paintFace();else faceDirty=true;}
 
  /* Prepare the visible shell before the renderer, overlapping data and local assets. */
  const tier=pickTier(quality());
  const timed=async(name,work)=>{const start=performance.now();try{return await work();}finally{timing(name,start);}};
- addEventListener('megulit-game-launch',close);
- updateStatus();redraw();
- const fontReady=timed('font',()=>document.fonts.load('44px "Torch Serif"','传火碑人').catch(()=>{}));
- const gsapReady=reduced?null:timed('gsap',()=>loadGsap().catch(()=>null));
- const bakeReady=timed('bake-assets',()=>loadBaked(tier==='low'));
- const firstLoad=timed('first-page',()=>loadAt({})).then(()=>{if(!disposed)return ahead();}).then(()=>{
-  if(!disposed){updateStatus();redraw();}
- });
- try{
-  const [bake,motion]=await Promise.all([bakeReady,gsapReady,fontReady]);
-  await new Promise(resolve=>setTimeout(resolve,0));
-  if(disposed)return null;
-  gsap=motion;
-  layoutNow();
-  const start=performance.now();
-  const {ok,reason}=bake;
-  scene=withBaked(bake,()=>buildScene({host,canvas:$('.tm-canvas'),state,t,tier,reduced,gsap,onTier:updateChrome,bakeInfo:{ok,reason},onFirstFrame:()=>timing('first-frame',opened)}));
-  timing(ok?'build-scene':'build-scene-fallback',start);
-  if(typeof window.__TORCH_HOUR==='number')host.__torch=scene;
- }catch(error){close();throw error;}
- updateChrome();
-
- /* Side requests follow the first page request. */
- call('torch_months').then(r=>{if(disposed||!r?.ok)return;state.monthsOn=r.available!==false;state.months=r.months||[];state.bandWindow=Math.max(0,state.months.length-12);redraw();});
- call('torch_find',{name:'',probe:true}).then(r=>{if(disposed)return;state.findOn=!!(r?.ok&&r.available!==false);$('.tm-find').hidden=!state.findOn;});
- call('torch_me').then(async r=>{if(disposed||!r?.ok)return;state.mine=r.items||[];$('.tm-me').hidden=!(r.available!==false&&state.mine.length);
-  if(state.mine.length){await firstLoad;redraw(true);}});
-
  /* controls */
  $('.tm-prev').addEventListener('click',()=>step(-1));$('.tm-next').addEventListener('click',()=>step(1));
  $('.tm-quality').addEventListener('click',()=>{const next=scene.tier==='low'?'high':'low';try{localStorage.setItem(QUALITY_KEY,next);}catch{}scene.setTier(next);updateChrome();});
@@ -184,22 +181,20 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
  $('.tm-find').addEventListener('submit',async e=>{e.preventDefault();const q=$('.tm-find input').value.trim();results.hidden=true;if(!q)return;
   const no=/^(?:传火人|火を継ぐ人|torch bearer)?\s*#?\s*(\d{1,12})$/i.exec(q);if(no){jumpTo({torchNo:Number(no[1]),month:''});return;}
   const cn=/^(?:传火人)?\s*([零壹贰叁肆伍陆柒捌玖拾佰仟万亿]+)$/.exec(q),cnv=cn?cnParse(cn[1]):null;if(cnv!==null){jumpTo({torchNo:cnv,month:''});return;}
-  const r=await call('torch_find',{name:q});if(disposed)return;
+  const id=visit,r=await call('torch_find',{name:q});if(!isVisit(id))return;
   if(!r?.ok){toast(t.offline);return;}if(r.available===false){toast(t.notDeployed);return;}
   const list=r.items||[];
   if(!list.length){toast(t.none);return;}if(list.length===1){jumpTo(list[0]);return;}
   results.innerHTML=list.map((it,i)=>`<li><button type="button" data-i="${i}"><b>${esc(it.name||t.anon(it.torchNo))}</b><span>${esc(dateText(it.at,true))} · ${esc(t.nth(it.torchNo))}</span></button></li>`).join('')+(list.length>=50?`<li class="tm-results-more">${esc(t.more)}</li>`:'');
   results.hidden=false;results.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{results.hidden=true;jumpTo(list[Number(b.dataset.i)]);}));});
- onKey=e=>{if(!host.contains(e.target))return;
+ const onKey=e=>{if(!mounted||!sceneReady||!host.contains(e.target))return;
   if(e.key==='Escape'){if(!results.hidden){e.preventDefault();results.hidden=true;}else if(scene.reading()){e.preventDefault();scene.resetView();}return;}
   if(e.target.closest?.('input,textarea'))return;
   if(e.key==='+'||e.key==='='){e.preventDefault();scene.zoomBy(-120,0);return;}if(e.key==='-'){e.preventDefault();scene.zoomBy(120,0);return;}if(e.key==='0'){e.preventDefault();scene.resetView();return;}
   if(e.key==='PageDown'||e.key==='ArrowLeft'){e.preventDefault();step(1);}else if(e.key==='PageUp'||e.key==='ArrowRight'){e.preventDefault();step(-1);}};
- addEventListener('keydown',onKey,true);
  /* Paging stays on the arrows; the wheel changes only the camera distance */
- const onWheel=e=>{if(e.target.closest?.('.tm-bar,.tm-results'))return;e.preventDefault();scene.zoomBy(e.deltaY||e.deltaX,e.deltaMode);};
+ const onWheel=e=>{if(!sceneReady||e.target.closest?.('.tm-bar,.tm-results'))return;e.preventDefault();scene.zoomBy(e.deltaY||e.deltaX,e.deltaMode);};
  host.addEventListener('wheel',onWheel,{passive:false});
- const canvas=$('.tm-canvas');
  canvas.addEventListener('pointermove',e=>{const hit=scene.pick(e.clientX,e.clientY);let cursor='';state.hoverMonth=null;
   if(hit&&hit.band){state.hoverMonth=hit.band;cursor='pointer';showTip(null);}else if(hit&&hit.entry){cursor='grab';showTip(hit.entry,e.clientX,e.clientY);}else{cursor='grab';showTip(null);}
   canvas.dataset.cursor=cursor;});
@@ -207,31 +202,125 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
  canvas.addEventListener('click',async e=>{if(scene.dragged())return;const hit=scene.pick(e.clientX,e.clientY);
   if(!hit||!hit.band)return;const b=hit.band;
   if(b.kind==='shift'){state.bandWindow=Math.max(0,Math.min(Math.max(0,state.months.length-12),state.bandWindow+b.dir*6));redraw();return;}
-  state.focusNo=null;await loadAt({month:b.month,cursor:''});redraw(true);await ahead();redraw();});
+  if(state.loading)return;
+  const id=visit,valid=()=>isVisit(id);
+  const ok=await loadAt({month:b.month,cursor:''},valid);
+  if(!ok||!valid())return;
+  state.focusNo=null;redraw();await ahead(valid);if(valid())redraw();});
  /* stop drawing in the background; close before a game starts */
  canvas.addEventListener('dblclick',e=>{e.preventDefault();scene.resetView();});
- onVis=()=>scene.setActive(!document.hidden&&document.hasFocus());
- onBlur=()=>scene.setActive(false);onFocus=()=>scene.setActive(!document.hidden);
- document.addEventListener('visibilitychange',onVis);addEventListener('blur',onBlur);addEventListener('focus',onFocus);
- ro=new ResizeObserver(()=>scene.resize());ro.observe(host);
+ const syncActive=()=>scene?.setActive(mounted&&sceneReady&&!document.hidden&&document.hasFocus());
+ const onBlur=()=>scene?.setActive(false);
+ function resume(mount,contextLost){
+  onContextLost=contextLost;
+  if(mounted)suspend();
+  mount.append(host);
+  mounted=true;
+  addEventListener('keydown',onKey,{capture:true});
+  document.addEventListener('visibilitychange',syncActive);
+  addEventListener('blur',onBlur);addEventListener('focus',syncActive);
+  if(scene){
+   scene.resize();ro?.observe(host);
+   if(faceDirty){faceDirty=false;scene.paintFace();}
+   syncActive();
+  }
+  wakePreparation?.();
+  if(!ctl.prepared)ctl.prepared=prepare();
+  else if(sceneReady&&state.pageError){
+   const id=visit,valid=()=>isVisit(id);
+   loadAt({},valid).then(ok=>{if(ok&&valid())redraw();});
+  }
+ }
+ function suspend(){
+  if(!mounted)return;
+  mounted=false;visit++;onContextLost=null;
+  if(!initialPagePending){state.loading=false;updateStatus();}
+  removeEventListener('keydown',onKey,{capture:true});document.removeEventListener('visibilitychange',syncActive);
+  removeEventListener('blur',onBlur);removeEventListener('focus',syncActive);ro?.disconnect();
+  results.hidden=true;showTip(null);state.hoverMonth=null;
+  if(scene?.suspend())faceDirty=true;
+  if(firstFrame){
+   gsap?.killTweensOf(veil);
+   veil.style.opacity='0';
+  }
+  host.remove();
+ }
 
- /* entrance */
- await new Promise(resolve=>setTimeout(resolve,0));
- if(disposed)return null;
- const veil=$('.tm-veil'),compileStart=performance.now();
- try{
-  scene.prepare(()=>{if(disposed)return;
-   sceneReady=true;$('.tm-quality').disabled=false;updateStatus();timing('shader-ready',compileStart);timing('ready',opened);
-   if(gsap)gsap.to(veil,{autoAlpha:0,duration:1.6,ease:'power2.out'});
-   else veil.style.opacity='0';
-   scene.intro();});
- }catch(error){close();throw error;}
+ /* Finish loading assets off-route, but build and compile only once a visit needs the scene. */
+ async function waitForMount(){
+  while(!disposed&&!mounted)await new Promise(resolve=>{wakePreparation=resolve;});
+  wakePreparation=null;
+ }
+ function onFirstFrame(){
+  firstFrame=true;timing('first-frame',opened);
+  scene.intro();
+  if(gsap)gsap.to(veil,{autoAlpha:0,duration:1.6,ease:'power2.out'});
+  else veil.style.opacity='0';
+ }
+ function onLost(){
+  const notify=onContextLost;
+  close();notify?.();
+ }
+ const onPageHide=event=>{if(!event.persisted)close();};
+ canvas.addEventListener('webglcontextlost',onLost);
+ addEventListener('pagehide',onPageHide);
+ addEventListener('megulit-game-launch',close);
 
- function close(){if(disposed)return;disposed=true;if(current===ctl)current=null;
-  removeEventListener('keydown',onKey,true);document.removeEventListener('visibilitychange',onVis);removeEventListener('blur',onBlur);removeEventListener('focus',onFocus);
-  removeEventListener('megulit-game-launch',close);ro?.disconnect();
-  if(gsap)gsap.killTweensOf($('.tm-veil'));
-  scene?.dispose();host.remove();}
+ async function prepare(){
+  updateStatus();redraw();
+  const fontReady=timed('font',()=>document.fonts.load('44px "Torch Serif"','传火碑人').catch(()=>{}));
+  const gsapReady=reduced?null:timed('gsap',()=>loadGsap().catch(()=>null));
+  const bakeReady=timed('bake-assets',()=>loadBaked(tier==='low'));
+  const firstLoad=timed('first-page',()=>loadAt({})).then(()=>{
+   initialPagePending=false;
+   if(disposed)return;
+   updateStatus();redraw();
+   const id=visit;
+   return ahead(()=>isVisit(id));
+  });
+  try{
+   const [bake,motion]=await Promise.all([bakeReady,gsapReady,fontReady]);
+   await new Promise(resolve=>setTimeout(resolve,0));
+   while(!mounted&&!disposed)await waitForMount();
+   if(disposed)return null;
+   gsap=motion;
+   layoutNow();
+   const start=performance.now();
+   const {ok,reason}=bake;
+   scene=withBaked(bake,()=>buildScene({host,canvas:$('.tm-canvas'),state,t,tier,reduced,gsap,onTier:updateChrome,bakeInfo:{ok,reason},onFirstFrame}));
+   timing(ok?'build-scene':'build-scene-fallback',start);
+   ro=new ResizeObserver(()=>{if(mounted)scene.resize();});ro.observe(host);
+   if(typeof window.__TORCH_HOUR==='number')host.__torch=scene;
+  }catch(error){close();throw error;}
+  updateChrome();
+
+  /* Side requests follow the first page request. */
+  call('torch_months').then(r=>{if(disposed||!r?.ok)return;state.monthsOn=r.available!==false;state.months=r.months||[];state.bandWindow=Math.max(0,state.months.length-12);redraw();});
+  call('torch_find',{name:'',probe:true}).then(r=>{if(disposed)return;state.findOn=!!(r?.ok&&r.available!==false);$('.tm-find').hidden=!state.findOn;});
+  call('torch_me').then(async r=>{if(disposed||!r?.ok)return;state.mine=r.items||[];$('.tm-me').hidden=!(r.available!==false&&state.mine.length);
+   if(state.mine.length){await firstLoad;redraw();}});
+
+  await new Promise(resolve=>setTimeout(resolve,0));
+  while(!mounted&&!disposed)await waitForMount();
+  if(disposed)return null;
+  const compileStart=performance.now();
+  try{
+   scene.prepare(()=>{
+    if(disposed)return;
+    sceneReady=true;canvas.inert=bar.inert=false;$('.tm-quality').disabled=false;
+    updateStatus();timing('shader-ready',compileStart);timing('ready',opened);syncActive();
+   });
+  }catch(error){close();throw error;}
+  return ctl;
+ }
+ function close(){
+  if(disposed)return;
+  suspend();disposed=true;if(current===ctl)current=null;
+  wakePreparation?.();
+  canvas.removeEventListener('webglcontextlost',onLost);
+  removeEventListener('pagehide',onPageHide);removeEventListener('megulit-game-launch',close);
+  scene?.dispose();host.remove();
+ }
  return ctl;
 }
 
@@ -453,10 +542,13 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
    if(!low){bloom=new UnrealBloomPass(new THREE.Vector2(512,512),.5,.65,.85);composer.addPass(bloom);grade=new ShaderPass(GRADE);composer.addPass(grade);}
    /* SMAA last, on the display-encoded image: thin gilt ribs and coffer edges stay clean (on top of MSAA on the full tier) */
    composer.addPass(new OutputPass());composer.addPass(new SMAAPass(size.x,size.y));}
-  resize();queuePaint();}
+  resize(true);queuePaint();}
 
  /* ---- view ---- */
- function resize(){const r=host.getBoundingClientRect();const w=Math.max(2,Math.round(r.width)),h=Math.max(2,Math.round(r.height));renderer.setSize(w,h,false);
+ let viewWidth=0,viewHeight=0;
+ function resize(force=false){const r=host.getBoundingClientRect();const w=Math.max(2,Math.round(r.width)),h=Math.max(2,Math.round(r.height));
+  if(!force&&w===viewWidth&&h===viewHeight)return;
+  viewWidth=w;viewHeight=h;renderer.setSize(w,h,false);
   camera.aspect=w/h;camera.fov=w/h<1.45?52:44;camera.updateProjectionMatrix();
   if(composer){composer.setSize(w,h);}
   if(reflector){const pr=renderer.getPixelRatio();reflector.getRenderTarget().setSize(Math.round(w*pr*.5),Math.round(h*pr*.5));}
@@ -521,12 +613,22 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
     if(aoUni)aoUni.uSteleLevels.value.copy(L).multiplyScalar(auraU.uI.value);}motes.material.uniforms.uPx.value=renderer.domElement.height/520;
   if(glow.userData.on){const p=(now-glow.userData.t0)/1000;const o=Math.min(1,p/1.2)*(.42+.1*Math.sin(p*1.6));glow.material.opacity=o;glowLight.intensity=o*2.2;}else{glow.material.opacity*=.9;glowLight.intensity*=.9;}
   updateCamera(dt);draw();
-  if(onFirstFrame){onFirstFrame();onFirstFrame=null;}
+  if(onFirstFrame&&!renderer.getContext().isContextLost()){onFirstFrame();onFirstFrame=null;}
   /* slow frames on the full tier for ~3 s after the intro: switch to the light tier (only in auto mode) */
   if(introDone&&tier==='high'&&autoTier){frames++;if(dt>.045)slow++;if(frames>=180){if(slow>120){setTier('low',true);}frames=0;slow=0;}}
   raf=requestAnimationFrame(frame);}
  let autoTier=(()=>{try{return !localStorage.getItem(QUALITY_KEY)||localStorage.getItem(QUALITY_KEY)==='auto';}catch{return true;}})();
  function setActive(on){if(disposed)return;active=!!on&&ready;if(active&&!raf){last=performance.now();raf=requestAnimationFrame(frame);}if(!active&&raf){cancelAnimationFrame(raf);raf=0;}}
+ function suspend(){
+  setActive(false);
+  const needsPaint=!!(paintQueued||lastHoverKey);
+  if(paintQueued){cancelAnimationFrame(paintQueued);paintQueued=0;}
+  lastHoverKey='';
+  if(pointer.down)onUp({pointerId:pointer.id});
+  pointer.x=pointer.y=0;dragMoved=false;
+  if(!onFirstFrame&&!introDone){introTween?.kill();introT=1;introDone=true;view.smoothPos=null;}
+  return needsPaint;
+ }
  function setTier(next,auto=false){if(next===tier)return;tier=next;if(!auto)autoTier=false;applyTier();scene.traverse(o=>{const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];ms.forEach(m=>m.needsUpdate=true);});onTier?.();}
  let disposed=false,ready=false,compilePoll=0;
  function dispose(){disposed=true;active=false;if(raf)cancelAnimationFrame(raf);raf=0;if(paintQueued)cancelAnimationFrame(paintQueued);
@@ -539,7 +641,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
    if(o.isLight&&o.shadow?.map)o.shadow.map.dispose();});
   for(const o of bag){try{o.dispose?.();}catch{}}bag.clear();
   for(const k of ['map','emissive','rough','mask','t1','t2']){faces[k].width=faces[k].height=1;}
-  renderer.renderLists.dispose();renderer.dispose();renderer.forceContextLoss();}
+  renderer.renderLists.dispose();renderer.dispose();if(!renderer.getContext().isContextLost())renderer.forceContextLoss();}
 
  /* ambient occlusion from the baked volume (or worked out now when the bake does not match this build) */
  let aoUni=null;{ const t0=performance.now(),vols=bakedAO()||(window.__TORCH_BAKE?null:computeVolumes(scene,H.torchPoints,steleEmit));if(vols){const r=applyAO(scene,vols);r.textures.forEach(keep);aoUni=r.uniforms;}
@@ -553,9 +655,9 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
   const poll=()=>{
    if(disposed)return;
    if(programs.some(program=>!program.isReady())){compilePoll=setTimeout(poll,10);return;}
-   ready=true;onReady();setActive(!document.hidden&&document.hasFocus());
+   ready=true;onReady();
   };
   poll();
  }
- return {get tier(){return tier;},prepare,intro,setActive,setTier,resize,pick,dispose,paintFace:()=>queuePaint(),lookAtFocus,setRead,resetView,zoomBy:(delta,mode)=>zoom.wheel(delta,mode),reading:()=>!!view.read||Math.abs(zoom.target-1)>.001,dragged:()=>dragMoved,debug:{renderer,scene,camera,zoom,buildMs,torchPoints:H.torchPoints,steleEmit,get ao(){return aoInfo;}}};
+ return {get tier(){return tier;},prepare,intro,setActive,suspend,setTier,resize,pick,dispose,paintFace:()=>queuePaint(),lookAtFocus,setRead,resetView,zoomBy:(delta,mode)=>zoom.wheel(delta,mode),reading:()=>!!view.read||Math.abs(zoom.target-1)>.001,dragged:()=>dragMoved,debug:{renderer,scene,camera,zoom,buildMs,torchPoints:H.torchPoints,steleEmit,get ao(){return aoInfo;}}};
 }

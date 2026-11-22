@@ -174,6 +174,7 @@ document.addEventListener('focusin',e=>{const t=e.target;if(t?.matches?.('input:
  'off');});
 function setAppearance(preferences=model.preferences){
   locale=['zh','ja','en'].includes(preferences.language)?preferences.language:'zh';text=messages[locale];
+  torchMonument?.invalidateTorchMonument(locale);
   document.documentElement.lang=locales[locale];
   {const theme=preferences.themeMode||'dark',was=document.documentElement.dataset.theme;document.documentElement.dataset.theme=theme;if(was&&was!==theme&&typeof themeBackground==='function')themeBackground();
    }
@@ -1295,7 +1296,7 @@ function syncStage(){const main=document.querySelector('#main'),layer=document.q
  }layer.dataset.glyphStage=stage;}
 let stageWatch=null;function watchStage(){const main=document.querySelector('#main');if(!main||stageWatch?.main===main)return;stageWatch?.observer.disconnect();
  const observer=new MutationObserver(syncStage);observer.observe(main,{childList:true});stageWatch={main,observer};}
-let stopDetailPage=()=>{};
+let stopDetailPage=()=>{},torchMonument=null;
 async function renderRoute(){watchStage();
   stopDetailPage();stopDetailPage=()=>{};
   stopHistoryTranslations();stopHistoryTranslations=()=>{};
@@ -1308,10 +1309,26 @@ async function renderRoute(){watchStage();
    }else stopGlow();main.closest('.workspace')?.classList.remove('home-fade','fade-off');}if(route!=='library'){stopSimpleGrid();stopSimpleGrid=()=>{};stopField();
    main.classList.remove('searching','field-page','field-list','field-selecting','field-single');}main.classList.toggle('statistics-page',route==='statistics');main.classList.toggle('torch-page',route==='torch');
    if(route!=='learning'&&route!=='statistics')main.classList.remove('review-page');if(route!=='learning'&&route!=='statistics')delete main.dataset.page;main.scrollTop=0;
+  const showFailure=error=>{
+   if(token!==pageToken)return;console.error('renderRoute',route,error);main.innerHTML=empty(text.loadingFailed,'refresh');
+   (main.querySelector('.empty-state')||main).insertAdjacentHTML('beforeend',`<button class="primary" id="retry">${text.retry}</button>`);
+   main.querySelector('#retry').addEventListener('click',renderRoute);
+  };
+  let reusedTorch=false;
   try{
-    if(route==='torch'){main.innerHTML=loading();const started=performance.now();const monument=await import('./torch-monument.js');if(token!==pageToken)return;
-     performance.measure('torch:modules',{start:started,end:performance.now()});main.replaceChildren();
-     stopDetailPage=monument.closeTorchMonument;await monument.openTorchMonument({api,locale,esc,toast,mount:main});if(token!==pageToken)return;
+    if(route==='torch'){
+     if(!torchMonument){
+      main.innerHTML=loading();const started=performance.now();
+      torchMonument=await import('./torch-monument.js');
+      if(token!==pageToken)return;
+      performance.measure('torch:modules',{start:started,end:performance.now()});
+     }
+     reusedTorch=torchMonument.hasTorchMonument(locale);
+     if(reusedTorch)main.classList.remove('g-enter');
+     main.replaceChildren();
+     stopDetailPage=torchMonument.suspendTorchMonument;
+     const hall=await torchMonument.openTorchMonument({api,locale,esc,toast,mount:main,onContextLost:()=>showFailure(Error('Torch WebGL context lost'))});
+     if(!hall||token!==pageToken)return;
     }else if(route==='home')home();else if(route==='library')library();else if(route==='series')seriesUI.renderDetail(main,selectedSeriesId);else if(route==='game'){main.innerHTML=loading();
      const detailCleanup=await renderGamePage({main,id:selectedGameId,tab:(t=>(gameTab='',t))(gameTab),api,invoke,locale,text,esc,icon,cover,duration,datetime,relativeTime,number,definitions,isCurrent:()=>token===pageToken,
      onBack:()=>navigate(gameOrigin),onLaunch:startGame,onEdit:editGame,onJapaneseRestore:only=>japaneseRestore(only),onRemove:removeGame,onForum:game=>{setForumFilter({game:String(game?.title||''),engine:'',
@@ -1325,13 +1342,10 @@ async function renderRoute(){watchStage();
      main.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>b.dataset.tool==='0'?japaneseRestore():toast((grimoireWords[locale]||grimoireWords.zh).toolPending)));
      }else if(route==='statistics')await statistics(token);
     if(token===pageToken){enhanceSelects(main);dockPageTools(main);moveTabInk();alignSubtabs();{const group=route==='statistics'?'learning':route,view=group+':'+subtab;
-     if(!main.querySelector(':scope>.tabs'))tabsGroup=null;if(main.dataset.lastRoute!==group){main.dataset.lastRoute=group;if(!document.documentElement.classList.contains('app-boot-pre'))pageEnter(main);
+     if(!main.querySelector(':scope>.tabs'))tabsGroup=null;if(main.dataset.lastRoute!==group){main.dataset.lastRoute=group;if(!reusedTorch&&!document.documentElement.classList.contains('app-boot-pre'))pageEnter(main);
      }else if(main.dataset.lastView!==view&&(group==='learning'||group==='history')){subpageEnter(main.querySelector(group==='learning'?'#learning-content':'#history-content'));
      }main.dataset.lastView=view;}requestAnimationFrame(()=>setupMarquees(main));}
-  }catch(error){if(token!==pageToken)return;console.error('renderRoute',route,error);main.innerHTML=empty(text.loadingFailed,'refresh');
-   /* 2026-11-14 the retry button sits inside the empty state, centred under the message (it used to land alone at the far left of #main) */
-   (main.querySelector('.empty-state')||main).insertAdjacentHTML('beforeend',`<button class="primary" id="retry">${text.retry}</button>`);main.querySelector('#retry').addEventListener('click',
-   renderRoute);}
+  }catch(error){showFailure(error);}
 }
 const navStack=[];let navIndex=-1,pageState=null;
 /* page: a view inside the page (语法 list / lesson / map) that the page pushed through page-nav.js */
