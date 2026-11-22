@@ -37,7 +37,7 @@ class HookControl{
      ファタ / 千恋＊万花) is placed from those boxes: calibration never gives way to measure the original, it follows the engine */
   {const cur=h.placement?.current,engineBoxes=!!(cur&&(!cur.fallback||cur.engine==='krkr')&&Array.isArray(cur.rects)&&cur.rects.length);
    const readerPlaced=cur&&(cur.engine==='glyph'||cur.approx||(cur.fallback&&cur.engine!=='krkr'));
-   if(engineBoxes){
+   if((engineBoxes||h.hooks?.drawsHidden===true)&&!(manual&&readerPlaced)){
     if(this.styleCalibration && h.styleSync.calibrating)this.finishStyleSync(false,true);
     this.styleCalibration=false;
     this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');
