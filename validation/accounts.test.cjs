@@ -146,6 +146,30 @@ function device(t,r,clock){
 }
 async function signIn(dev,r,email='megumin@example.com'){await dev.a.requestCode(email);return dev.a.verify(email,r.lastCode());}
 
+test('client sync uploads a long bilingual saved sentence with the other pending sentences',async t=>{
+ const r=relay(),clock={now:T0.getTime()},A=device(t,r,clock),B=device(t,r,clock);
+ const text='読'.repeat(3000),translation='读'.repeat(3000);
+ A.run(db=>{
+  const save=db.prepare("INSERT INTO saved_sentences(text,translation,created_at,original) VALUES(?,?,?,'{}')");
+  save.run(text,translation,1);
+  save.run('短い文','短句',2);
+ });
+ await signIn(A,r);clock.now+=61000;await signIn(B,r);
+ const result=await A.a.sync();
+ assert.equal(result.summary.sentences.pushed,2);
+ assert.equal(result.pending.sentences||0,0);
+ await B.a.sync();
+ const rows=B.run(db=>db.prepare('SELECT text,translation FROM saved_sentences ORDER BY created_at').all());
+ assert.deepEqual(rows.map(row=>[row.text,row.translation]),[[text,translation],['短い文','短句']]);
+});
+
+test('the relay bounds the size of each serialized sentence in bytes',async()=>{
+ const {validateRecord}=await load(),updated_at=T0.getTime();
+ const body=length=>({key:'s:a',updated_at,data:{text:'x'.repeat(length-Buffer.byteLength('{"text":""}'))}});
+ assert.equal(validateRecord('sentences',body(40*1024),updated_at).error,undefined);
+ assert.equal(validateRecord('sentences',body(40*1024+1),updated_at).error,'RECORD_TOO_LARGE');
+});
+
 test('client: not configured / logged out stays local; login keeps the token in the vault file, not in profile.json',async t=>{
  const r=relay(),clock={now:T0.getTime()},dev=device(t,r,clock);
  const plain=new account.Account(dev.root,{env:{MEGULIT_RELAY_BASE:'off'},vault:(a,v)=>v});

@@ -20,7 +20,8 @@ export const ROTATE_GRACE = 30 * 86400; /* the previous token keeps working this
 export const ROTATED = new WeakMap();   /* request -> the token issued while answering it */
 export const KINDS = ['words', 'sentences', 'reading', 'settings'];
 export const KIND_CAP = { words: 8 << 20, sentences: 4 << 20, reading: 1 << 20, settings: 512 << 10 };
-export const RECORD_CAP = { words: 32 << 10, sentences: 8 << 10, reading: 1 << 10, settings: 32 << 10 };
+// A saved sentence sends two strings of up to 3,000 UTF-16 units. JSON can escape each unit as six bytes.
+export const RECORD_CAP = { words: 32 << 10, sentences: 40 << 10, reading: 1 << 10, settings: 32 << 10 };
 export const PUT_MAX_RECORDS = 500;
 export const PUT_MAX_BYTES = 2 << 20;
 export const PULL_LIMIT = 500;
