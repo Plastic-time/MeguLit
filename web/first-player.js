@@ -19,6 +19,7 @@ const W={
   first:{title:'おめでとう、このバージョンを最初に遊ぶプレイヤーです',body:'このバージョンはまだ誰も校正していません。起動したら 3〜8 分ほど遊び続けて、自動校正を最後まで走らせてください。校正結果は同じバージョンを後から遊ぶ人に共有され、開くだけで使えます。いま使っている適応も、先に遊んだ人たちが共有してくれたものです。みんなで分け合えば、みんなが楽になります',note:'約 3〜8 分 · 自動校正 · 後のプレイヤーと共有'},
   off:{title:'共有適応をオンにすると参加できます',body:'このバージョンはまだ誰も校正していないので、あなたが最初です。いまは共有適応がオフで、結果はこの PC に残るだけ、後のプレイヤーには届きません。オンにして 3〜8 分遊び、自動校正を走らせれば、結果は同じバージョンを遊ぶ人に共有されます',button:'共有適応をオンにする',busy:'オンにしています…',failed:'オンにできませんでした。あとでもう一度'},
   thanks:{title:'共有ありがとうございます',body:'校正結果をアップロードしました。このバージョンを遊ぶ人は、開くだけで使えます',note:'共有済み'}}};
+export const feedbackIssueLabels=locale=>(W[locale]||W.zh).tags;
 const POLL_MS=20000,RECEIPT_POLL_MS=60000;
 export function mountFirstPlayer({host,id,api,locale,esc,isCurrent=()=>true,placement='main'}){
  if(!host)return;const w=W[locale]||W.zh;let timer=0,shown='',dead=false,epoch=0,inflight=false,failures=0,mutating=false,pendingRender=false;

@@ -9,6 +9,7 @@
 import { successHTML, guideHTML, GUIDE } from './guide-content.js';
 import { fillGuideLevel } from './guide-levels.js';
 import { seedPageHTML, seedWords, seedSeen, markSeedSeen, fillSeedCount } from './the-seed.js';
+import { feedbackIssueLabels } from './first-player.js';
 
 const T = {
   zh: {
@@ -79,8 +80,14 @@ const probeAfterReport = ({ api, locale, esc, toast }) => import('./adapter-prob
 
 export function openFeedback({ api, locale = 'zh', esc, toast, version = '' }) {
   const t = words(locale), dialog = document.createElement('dialog');
+  const [issueLabel, issueHint, issueEmpty] = ({
+    zh: ['遇到的问题（可多选）', '选择问题类型，或在下方补充说明。提交时会附上最近的日志', '请至少选一个问题，或写一句说明'],
+    ja: ['不具合の種類（複数選択可）', '該当する不具合を選ぶか、下に詳しく書いてください。最近のログも一緒に送られます', '不具合を選ぶか、状況をひとこと書いてください'],
+    en: ['What went wrong? Select all that apply', 'Select the problems you encountered or add details below. Recent logs are included with your report.', 'Select at least one problem or tell us what happened.'],
+  })[locale] || ['遇到的问题（可多选）', t.hint, t.empty];
   dialog.className = 'game-dialog feedback-dialog';
-  dialog.innerHTML = `<div class="game-dialog-head"><span class="game-dialog-kicker">${esc(t.kicker)}</span><h2>${esc(t.title)}</h2><p>${esc(t.hint)}</p></div>
+  dialog.innerHTML = `<div class="game-dialog-head"><span class="game-dialog-kicker">${esc(t.kicker)}</span><h2>${esc(t.title)}</h2><p>${esc(issueHint)}</p></div>
+<fieldset class="feedback-issues"><legend>${esc(issueLabel)}</legend><div class="feedback-issue-options">${feedbackIssueLabels(locale).map(label=>`<button type="button" class="feedback-issue" aria-pressed="false">${esc(label)}</button>`).join('')}</div></fieldset>
 <textarea class="feedback-text" rows="6" maxlength="1800" placeholder="${esc(t.placeholder)}"></textarea>
 <input class="feedback-contact" maxlength="120" placeholder="${esc(t.contact)}">
 <p class="feedback-privacy">${esc(t.privacy)}</p>
@@ -90,16 +97,21 @@ export function openFeedback({ api, locale = 'zh', esc, toast, version = '' }) {
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
   dialog.showModal();
   const text = dialog.querySelector('.feedback-text'), contact = dialog.querySelector('.feedback-contact'), status = dialog.querySelector('.feedback-status'), send = dialog.querySelector('[data-send]');
+  const issues = [...dialog.querySelectorAll('.feedback-issue')];
+  for (const issue of issues) issue.onclick = () => issue.setAttribute('aria-pressed', String(issue.getAttribute('aria-pressed') !== 'true'));
   dialog.querySelector('[data-cancel]').onclick = () => dialog.close();
   send.onclick = async () => {
-    const reason = text.value.trim();
-    if (!reason) { status.textContent = t.empty; status.dataset.state = 'bad'; text.focus(); return; }
-    send.disabled = true; send.textContent = t.sending; status.textContent = ''; delete status.dataset.state;
+    const selected = issues.filter(issue => issue.getAttribute('aria-pressed') === 'true').map(issue => issue.textContent);
+    const reason = [selected.join(' / '), text.value.trim()].filter(Boolean).join('\n\n');
+    if (!reason) { status.textContent = issueEmpty; status.dataset.state = 'bad'; text.focus(); return; }
+    send.disabled = true; for (const issue of issues) issue.disabled = true;
+    send.textContent = t.sending; status.textContent = ''; delete status.dataset.state;
     const outcome = await report({ api, reason, contact: contact.value.trim(), locale, version });
     if (!dialog.isConnected) return;
     send.textContent = t.send;
     if (outcome) { toast && toast(outcome === 'full' ? t.sent : t.sentTextOnly); dialog.close(); probeAfterReport({ api, locale, esc, toast }); return; }
-    send.disabled = false; status.textContent = t.failed; status.dataset.state = 'bad';
+    send.disabled = false; for (const issue of issues) issue.disabled = false;
+    status.textContent = t.failed; status.dataset.state = 'bad';
   };
   text.focus();
 }
