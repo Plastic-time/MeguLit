@@ -122,10 +122,10 @@ public sealed class GameSceneProbe : IDisposable {
   Reason="kept: picture changed "+Math.Round(delta*100)+"% but box only "+Math.Round(boxDelta*100)+"%";Line();return null;
  }
  // #714 review: the probe was not called for longer than RecentMs (paused: not settled, busy). Pictures counted toward a
- // decision before the pause say nothing about the picture now, so the counting starts again with the first one after it.
- // The baseline and a line already hidden stay.
+ // decision before the pause say nothing about the picture now, so the counting starts again with the first one after it,
+ // the pictures seen since the input too (giving up needs three, Step). The baseline and a line already hidden stay.
  internal void Resumed(DateTime now){
-  if(tickedAt!=DateTime.MinValue&&(now-tickedAt).TotalMilliseconds>RecentMs){changed=returned=0;candidateAt=DateTime.MinValue;boxAt=DateTime.MinValue;}
+  if(tickedAt!=DateTime.MinValue&&(now-tickedAt).TotalMilliseconds>RecentMs){changed=returned=seen=0;candidateAt=DateTime.MinValue;boxAt=DateTime.MinValue;}
   tickedAt=now;
  }
  public bool? Tick(IntPtr target,int w,int h){
@@ -187,6 +187,9 @@ public sealed class GameSceneProbe : IDisposable {
    p.Line();run(day,170);p.Input();t=t.AddMilliseconds(3000);p.Resumed(t);if(run(cg,2000)!=false||run(day,600)!=true)return false;
    using(var bare4=pic(Color.SkyBlue,Color.SkyBlue)){p.Line();run(day,170);p.Input();t=t.AddMilliseconds(170);p.Resumed(t);p.Step(bare4,t);
     t=t.AddMilliseconds(3000);p.Resumed(t);if(p.Step(bare4,t)==false||run(day,600)==false)return false;}
+   // slow frames: old, new, a pause, new, new hides: giving up counts the pictures after the pause only (#714 review)
+   p.Line();slow(day,1);p.Input(t);if(slow(day,1)!=null||slow(cg,1)!=null)return false;p.Resumed(t);t=t.AddMilliseconds(3000);p.Resumed(t);
+   if(slow(cg,2)!=false||slow(day,2)!=true)return false;
    // E578: with immersion off (Full=false) a scene change is left alone, the text window is still followed.
    using(var bare2=pic(Color.SkyBlue,Color.SkyBlue)){p.Full=false;p.Line();run(day,170);p.Input();if(run(cg,2000)==false)return false;p.Line();run(day,170);p.Input();if(run(bare2,1000)!=false||!p.Box)return false;if(run(day,600)!=true)return false;p.Full=true;}
   }
