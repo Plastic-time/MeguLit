@@ -4,11 +4,11 @@ const labels={
  en:['Japanese original & restore','Find original EXE','Choose original EXE','Close','Current Japanese executable','Executable saved','Looking for the original executable…','Pair scripts from Japanese folder','Read an installed Japanese release and pair it with this translated copy. Game files stay in place.','Japanese script paired','No usable pairs were found. The existing translation fallback is still available.'],
  ja:['日本語版と復元','日本語版 EXE を探す','日本語版 EXE を選ぶ','閉じる','現在の日本語版実行ファイル','実行ファイルを保存しました','日本語版の実行ファイルを探しています…','日本語版フォルダから照合','手元の日本語版フォルダを読み、現在の翻訳版と照合します。ゲームファイルは書き換えません','日本語版のシナリオを照合しました','利用できる対訳が見つかりませんでした。既存の翻訳方法で補います']
 };
-const localeWords={zh:['日文环境启动','弹窗或菜单乱码时再开启，仅对当前作品生效','保存失败，已恢复原设置'],en:['Launch in Japanese locale','Use if dialogs or menus are garbled. Applies to this game only.','Could not save. The previous setting was restored.'],ja:['日本語環境で起動','ダイアログやメニューが文字化けするときにオン。この作品だけに適用されます','設定を保存できなかったため元に戻しました']};
+const localeWords={zh:['日文环境启动','弹窗或菜单乱码时再开启，仅对当前作品生效','保存失败，已恢复原设置'],en:['Japanese locale','Launch in Japanese locale if dialogs or menus are garbled. Applies to this game only.','Could not save. The previous setting was restored.'],ja:['日本語環境で起動','ダイアログやメニューが文字化けするときにオン。この作品だけに適用されます','設定を保存できなかったため元に戻しました']};
 export const originalLabel=locale=>(labels[locale]||labels.en)[0];
 export function localeToggleHTML(locale,mode){
  const [label,hint]=localeWords[locale]||localeWords.en;
- return `<div class="detail-locale"><label class="locale-toggle"><strong>${label}</strong><input type="checkbox" role="switch" data-locale aria-describedby="detail-locale-help" ${mode==='japanese'?'checked':''}><span class="review-switch" aria-hidden="true"></span></label><small id="detail-locale-help" class="settings-help">${hint}</small><small class="detail-locale-error" role="status"></small></div>`;
+ return `<label class="locale-toggle detail-locale" title="${hint}"><strong>${label}</strong><input type="checkbox" role="switch" data-locale aria-describedby="detail-locale-help" ${mode==='japanese'?'checked':''}><span class="review-switch" aria-hidden="true"></span><span id="detail-locale-help" hidden>${hint}</span></label>`;
 }
 export function bindLocaleToggle(host,{id,api,locale}){
  const box=host.querySelector('[data-locale]'),status=host.querySelector('.detail-locale-error');
