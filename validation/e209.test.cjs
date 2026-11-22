@@ -181,3 +181,27 @@ test('launcher classification handles regional suffixes, excludes installers, an
  const chinese=write('Spring.zh-CN.EXE','translated');
  assert.deepEqual(inspect(db,'g',root).versions,{ja:original,zh:chinese});
 });
+test('automatic original selection repairs a saved versioned updater using its exact sibling',t=>{
+ const {root,game,write}=fixture(t),db=openStore(root);t.closeBeforeCleanup(()=>db.close());
+ const updater=write('NovelUpdata1.01.exe','updater'),original=write('NOVEL.EXE','original');
+ write('backup/NOVEL.EXE','old');write('Novel_JP.exe','different build');
+ const insert=db.prepare('INSERT INTO games(id,title,executable,source,original) VALUES(?,?,?,?,?)');
+ const data=JSON.stringify({library:{dir:game,originalExecutableVerified:true}});
+ insert.run('g','Fixture',updater,'manual',data);
+ const {originalExecutable}=require('../services/game-language.cjs');
+ assert.equal(originalExecutable(db,'g',root).blocked,true);
+ assert.equal(originalExecutable(db,'g',root,'find').executable,original);
+ assert.equal(db.prepare('SELECT executable FROM games WHERE id=?').get('g').executable,original);
+ const unrelated=write('UnrelatedUpdata1.01.exe','updater');
+ write('べつの作品.exe','unrelated game');write('べつの作品.cf','its companion');
+ insert.run('missing','Fixture',unrelated,'manual',data);
+ assert.throws(()=>originalExecutable(db,'missing',root,'find'),/JAPANESE_EXECUTABLE_REQUIRED/);
+ for(const language of ['zh','en']){
+  insert.run(language,'Fixture',updater,'manual',JSON.stringify({library:{dir:game,contentLanguage:language}}));
+  assert.throws(()=>originalExecutable(db,language,root,'find'),/JAPANESE_EXECUTABLE_REQUIRED/);
+  assert.equal(db.prepare('SELECT executable FROM games WHERE id=?').get(language).executable,updater);
+ }
+ write('AliceStart.ini','GameName = "示例汉化版"');
+ insert.run('patch','Fixture',updater,'manual',data);
+ assert.throws(()=>originalExecutable(db,'patch',root,'find'),/JAPANESE_EXECUTABLE_REQUIRED/);
+});

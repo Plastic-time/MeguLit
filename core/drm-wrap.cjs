@@ -8,6 +8,7 @@
    Any engine, any folder: evidence is read from the files only.
    Not evidence: KiriKiri Z's "-- SIGNATURE - SHA256/PSS/RSA --" .sig files (every file of a signed release has one). */
 const fs=require('node:fs'),path=require('node:path');
+const {isVersionedUpdater}=require('./launcher-language.cjs');
 
 const RULES=[
  {kind:'softdenchi',name:{zh:'软电池（SoftDenchi）正版验证',en:'SoftDenchi licence check',ja:'ソフト電池の認証'},needles:['soft-denchi','SoftDenchi','softdenchi','SdWrap']},
@@ -58,7 +59,7 @@ function classify(dir){
   else if(e.c.kind){role='protected';kind=e.c.kind;reason='text';}
   return {name:e.name,file:e.file,size:e.size,role,kind,reason};});
 }
-const usable=(e,allowTranslated)=>e.role==='clean'&&!NOT_LAUNCHER.test(e.name)&&(allowTranslated||!TRANSLATED_NAME.test(e.name.replace(/\.exe$/i,'')))&&e.size>=20000;
+const usable=(e,allowTranslated)=>e.role==='clean'&&!NOT_LAUNCHER.test(e.name)&&!isVersionedUpdater(e.name)&&(allowTranslated||!TRANSLATED_NAME.test(e.name.replace(/\.exe$/i,'')))&&e.size>=20000;
 /* A small clean program beside a protected one starts it (crack / translation launcher); a clean one of about the same
    size is the engine program itself with the protection removed. Named launchers first, then the larger file. */
 function launchersFor(list,target,allowTranslated){

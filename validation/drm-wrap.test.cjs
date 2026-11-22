@@ -43,6 +43,20 @@ test('library scan records the engine program, never the SdWrap wrapper',()=>{
  assert.equal(base(library.findGame(dir).exe),'bug02_yakata.exe');
  const own=drm.plan(path.join(dir,'bug02_yakata_srp.exe'));assert.equal(base(own.executable),'bug02_yakata.exe');
 });
+test('versioned updaters beside a game are excluded from scanning and launch planning',()=>{
+ const {isLauncher}=require('../core/launcher-language.cjs');
+ const dir=folder('Novel',{'Novel.exe':pe(1400000,{ascii:['SdWrap']}),'Novel.exe.emb':SIG,'script.npa':'NPA',
+  'NovelUpdata1.01.exe':pe(8000000),'NovelUpdate2.1.exe':pe(400000)});
+ assert.equal(isLauncher('NovelUpdata1.01.exe'),false);
+ assert.equal(isLauncher('NovelUpdate2.1.exe'),false);
+ assert.equal(isLauncher('NovelUpdateChronicle.exe'),true);
+ const exe=path.join(dir,'Novel.exe');
+ assert.equal(library.findGame(dir).exe,exe);
+ const plan=drm.plan(exe);
+ assert.equal(plan.executable,exe);
+ assert.equal(plan.launchVia,'');
+ assert.deepEqual(plan.alternatives,[]);
+});
 test('a cracked engine program of about the same size replaces the protected one directly',()=>{
  const dir=softdenchi({'bug02_yakata_crack.exe':pe(3782000)});const p=drm.plan(path.join(dir,'bug02_yakata.exe'));
  assert.equal(base(p.executable),'bug02_yakata_crack.exe');assert.equal(p.launchVia,'');
