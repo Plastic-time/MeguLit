@@ -156,3 +156,8 @@ credit/upload/usage/score queries keep statement count bounded; the 500-report
 plus 110-repository, 100-item first-page fixture uses 15 D1 statements with a
 276099-byte largest bound string. These are local SQLite/D1 API fixtures, not
 evidence of a deployed worker or a real Cardinal game run.
+
+Overview `usage.distinctSeeds` counts different complete signed-document hashes
+with accepted adoption events; `usage.count` counts sessions. Both remain null
+until an event exists. Repeat sessions and exact retry events do not inflate
+the distinct Seed count; neither measure asserts unique players.

@@ -12,6 +12,26 @@ async function setup(t){const f=fixture(),db=database();for(const m of ['0023_au
 }
 function report(f,key=H(1),settings='1'.repeat(32),reporter='private-identifier'){f.db.raw.prepare('INSERT INTO auto_profile_reports(game_key,reporter,settings_hash,settings,mode,engine,updated_at) VALUES(?,?,?,?,?,?,?)').run(key,reporter,settings,'{}','read','kirikiri',1);}
 const edit=(r,extra={})=>({id:r.id,expectedRevision:r.revision,reason:'neutral operator reason',...extra});
+
+test('overview counts distinct adopted signed Seeds separately from sessions and idempotent retries',async t=>{
+ const f=await setup(t);
+ assert.equal((await f.request('overview')).body.usage.distinctSeeds,null);
+ const submit=async(p,eventId=crypto.randomUUID())=>{
+  const value={schema:'megulit.seed-usage',version:1,eventId,exeSha256:p.key,seedHash:await P.hash(p),layer:'version',seedKey:p.key,revision:p.rev,engine:p.engine,at:now.toISOString()};
+  const url=new URL('https://local.invalid/api/seed/usage');
+  return f.api.seedUsageRoute(new Request(url,{method:'POST',body:JSON.stringify(value)}),f.env,'neutral reporter',now,url,url.pathname,helpers);
+ };
+ const first=f.profile(),second=f.profile(1,{...f.identity,exe:H(800)});
+ for(const p of [first,second])f.db.raw.prepare('INSERT INTO game_diffs(layer,game_key,source,body,rev,updated_at) VALUES(?,?,?,?,?,?)').run('version',p.key,'official',JSON.stringify(p),p.rev,1);
+ const event=crypto.randomUUID();assert.equal((await submit(first,event)).status,201);
+ assert.equal((await submit(first,event)).status,200);
+ assert.equal((await submit(first)).status,201);
+ let usage=(await f.request('overview')).body.usage;
+ assert.equal(usage.count,2);assert.equal(usage.distinctSeeds,1);
+ assert.equal((await submit(second)).status,201);
+ usage=(await f.request('overview')).body.usage;
+ assert.equal(usage.count,3);assert.equal(usage.distinctSeeds,2);
+});
 test('auth is checked before DB; missing migration is unavailable, never an empty healthy catalog',async t=>{const f=await setup(t);let r=await f.request('overview',null,false);assert.equal(r.status,401);assert.equal(f.calls(),0);f.db.raw.exec('DROP TABLE torch_release_pending');r=await f.request('overview');assert.equal(r.status,503);assert.equal(r.body.ok,false);});
 test('fixed repository contains all 110 distinct source artifacts, unknown history stays null and rev starts at 1',async t=>{const f=await setup(t),r=await f.request('overview');assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.counts.total,110);assert.equal(r.body.counts.repositoryGames,56);assert.equal(r.body.counts.repositoryVersions,54);assert.equal(r.body.counts.games,null);assert.equal(r.body.uploadCount,null);assert.equal(r.body.usage.count,null);const repo=f.rows('repository');assert.equal(new Set(repo.map(r=>r.source_path)).size,110);assert.equal(new Set(repo.map(r=>r.id)).size,110);assert.ok(repo.every(r=>r.revision===1));const dup=repo.filter(r=>r.layer==='game'&&r.game_key===repo.find(x=>repo.some(y=>y.id!==x.id&&y.layer===x.layer&&y.game_key===x.game_key))?.game_key);assert.ok(dup.length>=2);const list=await f.request('items?limit=100');assert.equal(list.body.items.length,100);assert.ok(list.body.nextCursor);const second=await f.request('items?limit=100&cursor='+list.body.nextCursor);assert.equal(second.body.items.length,10);assert.equal(new Set([...list.body.items,...second.body.items].map(x=>x.id)).size,110);assert.ok(list.body.items.every(x=>x.usageCount===null&&x.uniqueUploaders===null));});
 test('500 reports + repository first connection and 100 item page fit free D1 50 statements and 1MiB bind budget',async t=>{const f=await setup(t);for(let i=0;i<500;i++)report(f,H(i+100));f.reset();const r=await f.request('items?limit=100');assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(f.rows().length,610);assert.equal(r.body.items.length,100);t.diagnostic('first list statements='+f.calls()+', max UTF8 bind bytes='+f.boundMax());assert.ok(f.calls()<=50,'statements='+f.calls());assert.ok(f.boundMax()<=1024*1024,'bound='+f.boundMax());assert.ok(r.body.items.every(x=>x.revision===1));f.reset();assert.equal((await f.request('overview')).status,200);assert.ok(f.calls()<=50);});
