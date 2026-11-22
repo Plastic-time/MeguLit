@@ -535,7 +535,7 @@ LR"MGLT((function(){
      if(t.indexOf('#cfg')==0) {this.ctlOff();return;}
      if(t.charAt(0)=='#') {
       if(t=='#clearline') c.clear=1;
-      else if(t.indexOf('#choiceframe ')==0) {try {if(typeof c.choiceFrames!='Object') c.choiceFrames=[];if(c.choiceFrames.count<20) c.choiceFrames.add(new RegExp(t.substring(13)));} catch(e) {}}
+      else if(t.indexOf('#choiceframe ')==0) {try {if(typeof c.choiceFrames!='Object') c.choiceFrames=[];if(c.choiceFrames.count<20) c.choiceFrames.add(new global.RegExp(t.substring(13)));} catch(e) {}}
       continue;
      }
      var j=t.indexOf("\t");if(j<=0) continue;
