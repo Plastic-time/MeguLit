@@ -14,8 +14,8 @@ routes = [
 [vars]
 # Exact-version ordinary Seed signer. Set the HTTPS gateway and its matching public keys
 # at deployment, and provision ORDINARY_SCAN_TOKEN with wrangler secret put.
-ORDINARY_SCAN_URL = ""
-ORDINARY_PUBLIC_KEYS = '[]'
+ORDINARY_SCAN_URL = "https://megulit-ordinary-scan.egu-it--it.workers.dev/scan"
+ORDINARY_PUBLIC_KEYS = '[{"id":"ordinary-windows-01","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAooGygGN5ckXDPPv408UDa9UJiEvPVGYF9UoOeodGexY="}]'
 # Public trust only; private signing material stays in the local DPAPI store
 PROFILE_PUBLIC_KEYS = '[{"id":"seed-publisher-20261122","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAQUS2OCwp7pAFytVwXx/C5lU90TW4+BpJVB0NMx5Rw+U="}]'
 TORCH_RELEASE_PUBLIC_KEYS = '[{"id":"seed-publisher-20261122","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAQUS2OCwp7pAFytVwXx/C5lU90TW4+BpJVB0NMx5Rw+U="}]'

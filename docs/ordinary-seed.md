@@ -18,6 +18,26 @@ The upload response includes `ordinary: {id,state,revision}`. The game card read
 4. Apply the relay D1 migrations in order, including `0031_torch_changes.sql`, `0032_yui.sql` and `0033_ordinary_seeds.sql`. Configure `ORDINARY_SCAN_URL` with the gateway's HTTPS `/scan` URL, `ORDINARY_PUBLIC_KEYS` with the same ordinary public-key array, and `ORDINARY_SCAN_TOKEN` using Wrangler secret provisioning. Deploy the Worker with the existing cron trigger. Both desktop relay hosts reach the same Worker and database. Keep the token and private key out of client builds and source control
 5. Check a harmless calibration on the deployed path, its receipt, exact-version offline reuse and a signed revocation on a test version. An account's deployed quotas, scan-host uptime and trust rotation remain operational responsibilities. To pause new signing, stop the scan service. Pending jobs remain available for retry
 
+### Windows production host
+
+The Windows host runs three automatic services. `freshclam` updates the definitions, `clamd` listens on loopback port 3310, and `MeguLitOrdinaryScan` runs the loopback signer on port 8093. Each runs as its own Windows virtual service account. The signer depends on clamd and TCP/IP. The Service Control Manager restarts failed services
+
+The installation lives in `C:\ProgramData\MeguLitSeedScan`. The service executable launches the protected Node runtime and `app\relay\scan-service\windows-host.cjs` with no desktop window. The service identity can read its own configuration and ordinary signing key in `private`. Administrators and SYSTEM manage the directory. ClamAV writes its logs in `log`. Keep the private directory on the scan host
+
+The separate `megulit-ordinary-scan` Worker routes authenticated `POST /scan` requests to the Windows connector over its outbound WSS connection. It uses one SQLite-backed Durable Object on the Workers Free plan. The publisher and connector use distinct credentials. Each message carries one bounded calibration document, and the local service validates and scans it before signing. No inbound Windows firewall rule or public clamd listener is required. The queue and its retry schedule belong to the main relay
+
+Service operations in an elevated PowerShell:
+
+```powershell
+Get-Service clamd,freshclam,MeguLitOrdinaryScan
+Stop-Service MeguLitOrdinaryScan
+Start-Service MeguLitOrdinaryScan
+```
+
+While the signer is stopped, authenticated scans return 503. Check the same job on either relay host using `/api/game-profile/ordinary-status?id=<job-id>`. A failed scan sets a five-minute backoff. The half-hour cron takes up to two eligible jobs per run. Its successful result should have one revision, one signed exact-version profile and one change event for a new fixture. A retried upload of the same normalized settings should return the same job ID and revision
+
+Deploy the gateway separately with `relay/scan-service/gateway/wrangler.toml`. On the main relay, changes limited to gateway credentials can use `wrangler versions secret bulk` on the current production version. Compare the staged script ETag, runtime and unrelated bindings with the live version before promotion. The desktop verification key and the public Worker pin must match. A rollback to the previous Worker version leaves the D1 queue intact
+
 ### Scan host archive and release check
 
 From a clean release checkout, build the portable scanner archive with the following command. The destination needs Node 22 or later and a running clamd with maintained definitions. The archive contains the server, its JavaScript dependencies, license and systemd unit. It can be extracted into `/opt/megulit` without npm or a repository checkout. The service account reads its own key and environment file under `/etc/megulit`
