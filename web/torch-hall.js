@@ -136,17 +136,23 @@ export function buildStele({scene,keep,tier}){const low=tier==='low',Q=low?.5:1,
      const flame=keep(new THREE.MeshStandardMaterial({color:0xe7b889,roughness:.38,metalness:.42,envMapIntensity:1.1,emissive:0xc68048,emissiveIntensity:.24}));
      const ember=keep(new THREE.MeshStandardMaterial({color:0xffd4ac,roughness:.43,metalness:.24,emissive:0xdd8140,emissiveIntensity:.48}));
      const beveled=(shape,depth,bevel)=>new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:true,bevelThickness:bevel,bevelSize:bevel,bevelSegments:3,curveSegments:24});
-     mesh(new THREE.CylinderGeometry(mr,mr,.036,48).rotateX(Math.PI/2),inset,0,cy,mz,false).name='Flame badge enamel';
-     const band=new THREE.Shape();band.absarc(0,0,mr,0,Math.PI*2,false);
-     const cut=new THREE.Path();cut.absarc(0,0,mr*.83,0,Math.PI*2,true);band.holes.push(cut);
-     mesh(beveled(band,.028,.009),rim,0,cy,mz+.008,false).name='Flame badge rim';
-     mesh(new THREE.TorusGeometry(mr*.80,.006,6,48),rim,0,cy,mz+.026,false);
-     const fs=new THREE.Shape(),k=mr*.62;fs.moveTo(0,-k*.95);fs.bezierCurveTo(k*.75,-k*.9,k*.85,-k*.1,k*.28,k*.35);fs.bezierCurveTo(k*.38,k*.05,k*.2,-k*.15,k*.12,k*.05);
-     fs.bezierCurveTo(k*.2,k*.45,k*.05,k*.75,0,k*1.05);fs.bezierCurveTo(-k*.08,k*.7,-k*.3,k*.5,-k*.18,k*.15);fs.bezierCurveTo(-k*.32,k*.3,-k*.45,k*.15,-k*.4,-k*.05);
-     fs.bezierCurveTo(-k*.9,-k*.25,-k*.7,-k*.9,0,-k*.95);
-     mesh(beveled(fs,.025,.011),flame,0,cy-k*.02,mz+.021,false).name='Flame badge relief';
-     const core=beveled(fs,.015,.009);core.scale(.39,.46,.6);
-     mesh(core,ember,-k*.08,cy-k*.38,mz+.051,false).name='Flame badge ember';}
+     // A pointed enamel escutcheon echoes the lancet windows. The lamp and its
+     // detached ember remain distinct even at the default camera distance.
+     function outline(points){
+      const shape=new THREE.Shape();
+      for(const [i,[x,y]] of points.entries()){
+       if(i===0)shape.moveTo(x*mr,y*mr);else shape.lineTo(x*mr,y*mr);
+      }
+      shape.closePath();return shape;
+     }
+     const shield=outline([[0,1],[.81,.61],[.74,-.29],[.47,-.66],[0,-1],[-.47,-.66],[-.74,-.29],[-.81,.61]]);
+     mesh(beveled(shield,.026,.009),rim,0,cy,mz,false).name='Lamp shield gilt edge';
+     const enamel=beveled(shield,.018,.004);enamel.scale(.89,.89,1);
+     mesh(enamel,inset,0,cy,mz+.034,false).name='Lamp shield enamel';
+     const bowl=outline([[-.53,-.12],[.53,-.12],[.32,-.35],[.09,-.43],[.09,-.51],[.28,-.57],[.28,-.63],[-.28,-.63],[-.28,-.57],[-.09,-.51],[-.09,-.43],[-.32,-.35]]);
+     mesh(beveled(bowl,.021,.006),flame,0,cy,mz+.061,false).name='Votive lamp chalice';
+     const spark=outline([[0,.65],[.085,.32],[.28,.22],[.085,.12],[0,-.025],[-.085,.12],[-.28,.22],[-.085,.32]]);
+     mesh(beveled(spark,.026,.005),ember,0,cy,mz+.061,false).name='Votive lamp star';}
    part(L+.1,.06,.94,.02);part(L+.2,.07,1.0,.03,inlayRed);part(L+.3,.1,1.06,.035);}
  const s=new THREE.Shape(),w=SW,h=SH,b=.04;s.moveTo(-w/2+b,-h/2);s.lineTo(w/2-b,-h/2);s.quadraticCurveTo(w/2,-h/2,w/2,-h/2+b);s.lineTo(w/2,h/2-b);s.quadraticCurveTo(w/2,h/2,w/2-b,h/2);
  s.lineTo(-w/2+b,h/2);s.quadraticCurveTo(-w/2,h/2,-w/2,h/2-b);s.lineTo(-w/2,-h/2+b);s.quadraticCurveTo(-w/2,-h/2,-w/2+b,-h/2);
