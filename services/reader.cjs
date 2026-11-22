@@ -16,6 +16,7 @@ class Reader{
  emit(event,data){if(this.active())this.runtime.emit(event,data);}
  prefs(){return cleanPreferences(readJSON(path.join(this.folder,'preferences.json')));}
  clearGameVisuals(){
+  this.sentenceMarks=null;
   this.visualGeneration=(this.visualGeneration||0)+1;this.latest=(Number(this.latest)||0)+1;this.lookup=(Number(this.lookup)||0)+1;this.pageScope='';
   this.artTurns?.clear();this.artTurns=new Map();this.drawUi?.items?.clear();this.drawUi?.groups?.clear();this.drawUi=null;this.gameUiPreview=null;
   this.emit('reader-event',{type:'artText',clear:true});this.emit('reader-event',{hookSource:null,hookChoices:null,receivedText:false});
@@ -31,6 +32,7 @@ class Reader{
   if(message.type==='ready'||Array.isArray(message.windows))require('./bind-hotkey.cjs').startupScan(this,message,e=>this.emit('reader-event',e),this.uiLanguage(),()=>{const db=openStore(this.root);try{return db.prepare("SELECT id,title,executable FROM games WHERE removed_at IS NULL AND executable<>''").all();}finally{db.close();}});
   /* the hook's own inferences (left the dialogue screen) obey the same freeze as the screen probes */if(this.gal?.hooks&&!this.gal.hooks.contextFrozen)this.gal.hooks.contextFrozen=()=>this.immersion?.frozen?.()===true;
   if(message.type==='layerState'||message.type==='layerRaise'){this.logVisibility(message);return;}
+  if(message.type==='sentenceHideObservation'){const row=this.sentenceMarks?.rows.get(message.episode);if(row)row.original=message.original;return;}
   if(message.type==='readerContext'){this.immersion?.context(message.active);this.logVisibility({type:'readerContext',active:message.active});return;}
   if(message.type==='readerPointer'){this.emit('reader-pointer-input',message);return;}
   if(message.type==='hookEmbedRequest'){this.embedTranslate(message.id,message.text);return;}
@@ -94,7 +96,14 @@ class Reader{
   if(message.type==='gameClosed'||message.bound===false)this.immersion.bind('');else if(message.gameHwnd)this.immersion.bind(message.gameHwnd+'|'+message.gameProcessId+'|'+message.gameStarted);
   /* 2026-11-13 (ATRI: the choice overlay was drawn in a reader window hidden as "scene changed"): while choices are on screen the reader stays shown */if(Object.prototype.hasOwnProperty.call(message,'hookChoices'))this.immersion.choices(!!message.hookChoices);
   if(typeof message.hookSource==='string'&&message.hookSource.trim()&&message.hookActive===true&&message.processAttached===true&&!message.hookRecovering&&!message.recovering&&!['history','ocr'].includes(message.hookSourceOrigin)&&!['history','ocr'].includes(message.origin))try{require('./seed-usage.cjs').note(this);}catch{}
-  if(typeof message.hookSource==='string'&&message.hookSource&&!message.hookRecovering&&message.hookSourceOrigin!=='history')try{const target=this.cardinalTarget(),cardinalPair=require('../core/cardinal/tape.cjs').liveSource(message.hookSource,{target,sequence:message.hookSequence});this.embedCached(message.hookSource);message={...message,cardinalPair};}catch{}
+  if(typeof message.hookSource==='string'&&message.hookSource&&!message.hookRecovering&&message.hookSourceOrigin!=='history')try{const target=this.cardinalTarget(),cardinalPair=require('../core/cardinal/tape.cjs').liveSource(message.hookSource,{target,sequence:message.hookSequence});this.embedCached(message.hookSource);message={...message,cardinalPair};
+   if(cardinalPair&&this.gameId){
+    const live=require('./self-check-live.cjs').current(),s=live?.reader===this&&live.exe===this.gameExe&&live.pid===this.gamePid&&live.birth===this.gameBirth?live:null;
+    const seed=require('./cardinal.cjs').sourceOf(s,this.gal?.profile);
+    const markEpisode=(this.sentenceMarks??=new(require('./sentence-marks.cjs').Session)()).observe(this.gameId,cardinalPair.episode,{...message,scriptCursor:this.gal?.hooks?.originalText?.position?.()},seed.seedRev);
+    message={...message,cardinalPair:{...cardinalPair,markEpisode}};
+    if(this.gal)this.gal.sentenceDiagnosticEpisode=markEpisode;
+   }}catch{}
   if(typeof message.hookSource==='string'){/* #468 a reader line read by OCR marks the game for the probe upload (adapter-probe.cjs markRuntime), once per game and session */if(message.hookSourceOrigin==='ocr'&&this.gameId&&message.hookSource.trim()){const seen=this.ocrMarked||(this.ocrMarked=new Set());if(!seen.has(this.gameId)){seen.add(this.gameId);try{require('./adapter-probe.cjs').markRuntime(this.root,this.gameId,'ocr-fallback','reader lines came from OCR');}catch{}}}this.gal?.send({type:'markerSource',text:message.hookSource});if(!message.hookRecovering&&message.hookSourceOrigin!=='history'){
    if(message.hookSource&&message.hookSource!==this.immersion.currentText)this.gal?.send({type:'dialogSceneLine'});
    this.immersion.source(message.hookSource,message.hookSourceEngine,message.hookSourceOrigin);
@@ -383,6 +392,7 @@ class Reader{
    /* Alt+T 外观 → 危险区: the same reset and undo as Settings → 数据与备份 (services/settings-reset.cjs) */
    case 'settingsReset':case 'settingsResetUndo':{try{const lib=require('./settings-reset.cjs'),result=r.type==='settingsReset'?lib.reset(this.root):lib.undo(this.root,String(r.id||''));for(const scope of ['text','panels'])try{await this.runtime.settingsSaved?.({scope});}catch{}reply('restoreSettings',this.prefs());reply(r.type==='settingsReset'?'settingsResetDone':'settingsResetUndone',result.id);this.runtime.emit?.('reader-event',{type:'settings-reset'});}catch(e){reply('settingsResetFailed',String(e.message||e));}break;}
    case 'sentenceSave':case 'sentenceDelete':case 'sentenceState':{/* 收藏这一句: the reader sends the line it shows; the game is the one this reader is attached to */const text=String(r.text||''),lib=require('./saved-sentences.cjs'),db=openStore(this.root);try{const args={gameId:this.gameId,text,translation:String(r.translation||''),source:'manual'};const result=r.type==='sentenceSave'?lib.save(db,args):r.type==='sentenceDelete'?lib.remove(db,args,{root:this.root}):lib.state(db,args);/* 2026-11-13 the clean game picture of this moment, when one matches (sentence-scenes.cjs; async, never blocks the save) */if(r.type==='sentenceSave'&&result.id){require('./sentence-scenes.cjs').attach(this,result.id);/* 2026-11-15 its game voice (saved-line-voice.cjs; async) */require('./saved-line-voice.cjs').attach({root:this.root,reader:this},result.id,text);}reply('sentenceState',text,!!result.saved,'',!!result.created);if(r.type!=='sentenceState')this.runtime.emit?.('reader-event',{type:'sentence-saved'});}catch(e){reply('sentenceState',text,false,e.message);}finally{db.close();}break;}
+   case 'sentenceDisplayObservation':this.sentenceMarks?.displayed(this.gameId,r);break;
    case 'cardinalPairPolicy':{const result=require('../core/cardinal/tape.cjs').pairPolicy(r,this.cardinalTarget());if(result)reply('cardinalPairScope',result);break;}
    case 'cardinalPair':{const accepted=require('../core/cardinal/tape.cjs').pairObserved(r,this.cardinalTarget());this.logVisibility({type:'layoutDiagnostic',kind:'cardinalPair',episode:String(r.episode||'').slice(0,80),scope:String(r.scope||'').slice(0,80),target:String(r.target||'').slice(0,35),observed:r.observed===true,paired:r.paired===true,accepted});break;}
    case 'pageTranslationScope':this.pageScope=String(r.key||'').slice(0,100);break;
@@ -471,6 +481,7 @@ class Reader{
  }
  async v4(action,args){
   const config=this.runtime.config();
+  if(action==='markSentence'){if(!this.sentenceMarks)throw Error('SENTENCE_EXPIRED');return this.sentenceMarks.mark(this.root,this.gameId,args);}
   if(action==='load')return config;
   if(action==='configure'){atomic(path.join(this.folder,'v4-preferences.json'),{...readJSON(path.join(this.folder,'v4-preferences.json')),...require('../core/v4-config.cjs').cleanV4(args)});this.immersion?.configure(this.runtime.config());const current=this.runtime.config();this.gal?.send({type:'dialogConfig',scene:current.immersion===true,auto:current.immersion===true,active:current.immersion&&current.dialogDetection==='visual',marker:current.immersion&&current.dialogDetection==='marker'});this.gal?.setGameAudio(this.runtime.config().ankiGameMedia!==false);return this.runtime.config();}
   const mapped={modelStatus:'model_status',modelDownload:'model_download',modelCancel:'model_cancel',runtimeDownload:'runtime_download',runtimeCancel:'runtime_cancel',speakers:'speakers',speakersCached:'speakers_cached',preview:'speech_preview'};

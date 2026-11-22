@@ -11,7 +11,7 @@ class HookControl{
  hiddenWithoutEmbed(){const h=this.host,k=h.hooks||{};if(h.textEffectsHold)return READ_ON_PURPOSE(h.textEffectsHold.why);
   if(k.enabled===true&&k.route!=='read'&&(k.ownTextFn?.()===true||k.compositedFn?.()===true))return HIDDEN_REDRAWN;return '';}
  constructor(host,now=Date.now){this.host=host;this.now=now;this.seq=0;this.baseline=false;this.plan='read';this.running=false;this.lastIdentity='';}
- status(value){if('hookEmbedUnsupported' in value)this.unsupported=value.hookEmbedUnsupported===true;if(value.hookCheckState)this.host.hooks.trace?.('check '+value.hookCheckState+' '+(value.hookCheckMessage||''));this.host.notify({type:'hookCheck',hookProfile:this.plan,hookAutoOcr:!!this.autoOcr,...value});}
+ status(value){if('hookEmbedUnsupported' in value)this.unsupported=value.hookEmbedUnsupported===true;if(this.diagnosticEpisode&&['verified','visible'].includes(value.hookCheckState)&&this.diagnosticEpisode===this.host.sentenceDiagnosticEpisode)this.host.onEvent?.({type:'sentenceHideObservation',episode:this.diagnosticEpisode,original:value.hookCheckState==='verified'?'hidden':'visible'});if(value.hookCheckState)this.host.hooks.trace?.('check '+value.hookCheckState+' '+(value.hookCheckMessage||''));this.host.notify({type:'hookCheck',hookProfile:this.plan,hookAutoOcr:!!this.autoOcr,...value});}
  // No stream of this game can be embedded: keep reading and let OCR cover the original text instead. Only a mask
  // mode ToMe chose itself is changed back, never one the user picked.
  // OCR may still measure positions, but covering the original text is only ever the user's choice (maskModeSource 'user').
@@ -100,6 +100,7 @@ class HookControl{
   const stage=h.hooks.preflight?'baseline':h.hooks.enabled&&this.plan!=='read'?'hidden':'read';
   if(stage==='baseline'&&this.styleCalibration)h.styleSync?.status('measuring');
   this.stage=stage;this.status({hookCapturedAt:this.sourceAt,hookCaptureCharacters:text.length,hookVisualVerified:false,hookCheckState:stage==='baseline'?'baseline':stage==='hidden'?'checking':'captured',hookCheckMessage:stage==='baseline'?'已抓到台词，正在检查游戏中的原文':stage==='hidden'?'台词已捕捉，正在检查游戏原文是否消失':'台词捕捉成功，正在检查游戏画面'});
+  this.diagnosticEpisode=h.sentenceDiagnosticEpisode;
   h.send({type:'hookVerify',source:text,sequence:this.seq,stage,...require('./scan-area.cjs').area(h.preferences,h.hooks?.flowPage||h.flowPage||undefined,h.state?.processName)});
  }
  visual(m){

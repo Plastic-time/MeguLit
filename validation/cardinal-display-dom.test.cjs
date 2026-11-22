@@ -63,3 +63,15 @@ test('flag API failure after policy negotiation suppresses measurements until ev
 test('an existing mutation or reveal notification can recover valid flag APIs without another source or binding',()=>{
  const h=harness(),jp=node('本文です'),cn=node('正文');h.b.isEnabled=()=>undefined;h.pairs.availability('本文です','正文');h.b.cardinalPair.bind(h.source('本文です',1),jp,cn);h.flush();assert.equal(h.messages.length,0);h.b.isEnabled=()=>true;h.b.cardinalPair.notify();h.flush();assert.equal(h.pairs.snapshot(1).paired,1);assert.equal(h.messages.filter(m=>m.type==='cardinalPairPolicy').length,1);assert.equal(h.frames.length,0,'one renegotiation does not create an animation loop');
 });
+test('marked menu selection retains the bound occurrence when identical text is drawn again',()=>{
+ const h=harness(),jp=node('same'),cn=node('answer');cn.textContent='answer';cn.dataset.translationSource='local';jp.closest=()=>jp;
+ const draw=id=>{const descriptor=h.pairs.source('same',{sequence:id,target:'zh'});descriptor.markEpisode='instance-'+id;
+  h.b.cardinalPair.source({cardinalPair:descriptor});h.b.cardinalPair.bind(descriptor,jp,cn);h.flush();};
+ draw(1);const first=h.b.cardinalPair.selection(jp,'same');draw(2);
+ assert.equal(first.episode,'instance-1');assert.equal(first.translationSource,'local');
+ assert.equal(h.b.cardinalPair.selection(jp,'same').episode,'instance-2');
+ assert.equal(h.b.cardinalPair.selection(jp,'different'),null);
+ const observed=h.messages.filter(m=>m.type==='sentenceDisplayObservation').at(-1);
+ assert.equal(observed.episode,'instance-2');assert.deepEqual(observed.rect,{x:0,y:0,width:400,height:30});
+ assert.doesNotMatch(JSON.stringify(observed),/answer|same/);
+});

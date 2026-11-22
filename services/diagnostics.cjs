@@ -127,6 +127,8 @@ function collect(root,db,id,{version='',now=new Date(),who=identity(),screenshot
   originalText:originalTextState(root,id),autoProfile:autoProfile(root,row.executable,library.engine),adaptation:overviewRow?{reading:overviewRow.reading,zeroLatency:overviewRow.zeroLatency,evidence:overviewRow.evidence}:null,
   runs:windows.slice(-20).map(w=>({from:new Date(w.from).toISOString(),to:new Date(w.to).toISOString()})),logs:logInfo};
  files.unshift({name:'info.json',data:scrub(JSON.stringify(info,null,2),who),kind:'info'});
+ const marks=require('./sentence-marks.cjs').read(root,id);
+ if(marks.length)files.push({name:'sentence-marks.json',kind:'info',data:JSON.stringify({schema:1,marks},null,2)});
  const shot=screenshot?findScreenshot(root,row.executable):null;if(shot){try{files.push({name:'screenshot'+(shot.ext==='.png'?'.png':'.jpg'),data:fs.readFileSync(shot.file),kind:'screenshot'});}catch{}}
  const readme=['MeguLit diagnostic package','','Game: '+row.title,'Created: '+now.toISOString(),'',...files.map(f=>`${f.name}  ${f.kind==='log'?'log lines from this game\'s runs':f.kind==='info'?'game, engine, version, OS, original-text and embed evidence':'screenshot already on disk'}`),'','Privacy: the Windows user name and profile paths are replaced with <user> / %USERPROFILE%, e-mail addresses with <email>.'].join('\r\n');
  files.push({name:'README.txt',data:scrub(readme,who),kind:'readme'});
@@ -148,6 +150,8 @@ function collectAll(root,db,{version='',now=new Date(),who=identity()}={}){
  const files=[],logInfo={};
  for(const name of names){const all=readLog(root,name),kept=all.slice(-MAX_LINES);logInfo[name]={linesInLog:all.length,linesKept:kept.length};if(kept.length)files.push({name:'logs/'+name,data:scrub(kept.join('\n')+'\n',who),kind:'log'});}
  let games=[];try{games=db.prepare('SELECT id,title,library FROM games ORDER BY last_launched_at DESC LIMIT 60').all().map(r=>{let lib={};try{lib=JSON.parse(r.library||'{}');}catch{}return {id:String(r.id),title:r.title,engine:String(lib.engine||''),hook:String(lib.hook||'')};});}catch{}
+ const marked=require('./sentence-marks.cjs').all(root);
+ if(marked.length)files.push({name:'sentence-marks.json',kind:'info',data:JSON.stringify({schema:1,games:marked},null,2)});
  const info={schema:1,kind:'all',createdAt:now.toISOString(),megulit:{version:String(version||'')},os:osInfo(),games,logs:logInfo};
  files.unshift({name:'info.json',data:scrub(JSON.stringify(info,null,2),who),kind:'info'});
  const readme=['MeguLit diagnostic package (whole app)','','Created: '+now.toISOString(),'',...files.map(f=>`${f.name}  ${f.kind==='log'?'last lines of this log':'MeguLit version, OS and the library'}`),'','Privacy: the Windows user name and profile paths are replaced by placeholders and e-mail addresses are removed.'].join('\n');
