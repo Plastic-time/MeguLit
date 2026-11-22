@@ -23,10 +23,11 @@ const {RPGM_SCRIPT}=require('./text-paths-rpgm.cjs');
 /* ---- which games: a Chromium shell next to the program (generic, any web engine) ---------------------------------- */
 function chromiumShell(exe){const dir=path.dirname(String(exe||''));let names;try{names=fs.readdirSync(dir).map(n=>n.toLowerCase());}catch{return null;}
  const has=n=>names.includes(n);
- if(!has('icudtl.dat'))return null;
- if(has('nw.dll')||has('package.nw')||has('nw_elf.dll'))return 'nwjs';
- try{const res=fs.readdirSync(path.join(dir,'resources')).map(n=>n.toLowerCase());if(res.includes('app.asar')||res.includes('app'))return 'electron';}catch{}
- return null;}
+ if(has('icudtl.dat')){
+  if(has('nw.dll')||has('package.nw')||has('nw_elf.dll'))return 'nwjs';
+  try{const res=fs.readdirSync(path.join(dir,'resources')).map(n=>n.toLowerCase());if(res.includes('app.asar')||res.includes('app'))return 'electron';}catch{}
+ }
+ return require('./nw-runtime.cjs').legacyNw(exe)?'nwjs':null;}
 function freePort(){return new Promise((resolve,reject)=>{const s=net.createServer();s.unref();s.on('error',reject);s.listen(0,'127.0.0.1',()=>{const {port}=s.address();s.close(()=>resolve(port));});});}
 /* Chromium switches only: the game's own command line and package are not changed. */
 function launchArgs(port){return ['--remote-debugging-port='+port,'--remote-debugging-address=127.0.0.1','--remote-allow-origins=http://127.0.0.1:'+port];}
@@ -151,7 +152,7 @@ function getJson(port,p){return new Promise((resolve,reject)=>{const req=http.ge
 class Cdp{
  constructor(url){this.ws=new WebSocket(url);this.id=0;this.pending=new Map();this.handlers=new Set();
   this.ready=new Promise((resolve,reject)=>{this.ws.onopen=resolve;this.ws.onerror=()=>reject(Error('CDP_CONNECT'));});
-  this.ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data);}catch{return;}if(m.id&&this.pending.has(m.id)){const p=this.pending.get(m.id);this.pending.delete(m.id);m.error?p.reject(Error(m.error.message)):p.resolve(m.result);}else if(m.method)for(const h of this.handlers)h(m);};
+  this.ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data);}catch{return;}if(m.id&&this.pending.has(m.id)){const p=this.pending.get(m.id);this.pending.delete(m.id);m.error?p.reject(Object.assign(Error(m.error.message),{code:m.error.code})):p.resolve(m.result);}else if(m.method)for(const h of this.handlers)h(m);};
   this.closed=new Promise(r=>{this.ws.onclose=()=>{this.isClosed=true;for(const p of this.pending.values())p.reject(Error('CDP_CLOSED'));this.pending.clear();r();};});}
  send(method,params={}){if(this.isClosed)return Promise.reject(Error('CDP_CLOSED'));const id=++this.id;return new Promise((resolve,reject)=>{this.pending.set(id,{resolve,reject});try{this.ws.send(JSON.stringify({id,method,params}));}catch(e){this.pending.delete(id);reject(e);}});}
  close(){try{this.ws.close();}catch{}}
@@ -166,13 +167,14 @@ class WebTextPath{
    if(this.pages.size)return true;await new Promise(r=>setTimeout(r,500));}
   return false;}
  attachPage(t){this.attaching??=new Set();const p=this.attachPageInner(t);this.attaching.add(p);p.then(()=>this.attaching.delete(p),()=>this.attaching.delete(p));return p;}
- async attachPageInner(t){if(this.stopped)return;const c=new Cdp(t.webSocketDebuggerUrl);this.connections??=new Set();this.connections.add(c);const current=()=>{if(this.stopped)throw Error('READER_DISABLED');};try{await c.ready;current();this.pages.set(t.id,c);c.closed.then(()=>this.pages.delete(t.id));
+ async attachPageInner(t){if(this.stopped)return;const c=new Cdp(t.webSocketDebuggerUrl);this.connections??=new Set();this.connections.add(c);c.closed.then(()=>{if(this.pages.get(t.id)===c)this.pages.delete(t.id);this.connections.delete(c);});const current=()=>{if(this.stopped)throw Error('READER_DISABLED');};try{await c.ready;current();
   c.handlers.add(m=>{if(m.method==='Runtime.bindingCalled'&&m.params?.name==='__megulitReport')this.report(m.params.payload);});
-  await c.send('Runtime.enable');current();await c.send('Runtime.addBinding',{name:'__megulitReport'});current();
-  await c.send('Page.enable').catch(()=>{});current();c.scriptIds=[];for(const source of [PAGE_SCRIPT,RPGM_SCRIPT]){const result=await c.send('Page.addScriptToEvaluateOnNewDocument',{source}).catch(()=>null);if(result?.identifier)c.scriptIds.push(result.identifier);current();}
-  current();await this.evaluate(c,PAGE_SCRIPT);current();await this.evaluate(c,RPGM_SCRIPT);current();await this.sync(c);
+  await c.send('Runtime.enable');current();const bridge=require('./cdp-report.cjs'),channel=await bridge.reporter(c,{report:s=>this.report(s),active:()=>!this.stopped&&!c.isClosed,status:s=>this.onStatus(s)});current();
+  await c.send('Page.enable').catch(()=>{});current();c.scriptIds=[];let refresh=channel.legacy;for(const source of [PAGE_SCRIPT,RPGM_SCRIPT]){let result;try{result=await c.send('Page.addScriptToEvaluateOnNewDocument',{source});}catch(error){if(!bridge.missingMethod(error))throw error;refresh=true;}if(result?.identifier)c.scriptIds.push(result.identifier);current();}
+  const install=async()=>{current();await channel.bootstrap();current();await bridge.evaluate(c,PAGE_SCRIPT);current();await bridge.evaluate(c,RPGM_SCRIPT);current();const ready=await bridge.evaluate(c,'!!(window.__megulitText&&window.__megulitRpgm)');if(ready?.result?.value!==true)throw Error('CDP_SCRIPT_REJECTED');current();await this.sync(c);current();await channel.drain();};
+  await install();current();this.pages.set(t.id,c);
   /* a reload or new document: the page script runs again; give it the current state */
-  c.handlers.add(m=>{if(m.method==='Runtime.executionContextCreated')setTimeout(()=>this.sync(c).catch(()=>{}),300);});}catch(error){if(!this.stopped)c.close();throw error;}finally{if(!this.pages.has(t.id)&&!this.stopped)this.connections.delete(c);}}
+  c.handlers.add(m=>{if(m.method==='Runtime.executionContextCreated')setTimeout(()=>{if(this.stopped)return;const p=refresh?install():this.sync(c);this.attaching.add(p);p.finally(()=>this.attaching.delete(p)).catch(e=>this.onStatus('reload '+e.message));},300);});}catch(error){if(!this.stopped)c.close();throw error;}}
  evaluate(c,expression){return c.send('Runtime.evaluate',{expression,returnByValue:true}).catch(()=>null);}
  sync(c){if(this.stopped)return Promise.resolve();return this.evaluate(c,'window.__megulitText&&(window.__megulitText.want('+JSON.stringify(this.wanted)+'),window.__megulitText.hide('+(this.on?'true':'false')+'));'+(this.drawCfg?'window.__megulitRpgm&&window.__megulitRpgm.config('+JSON.stringify(this.drawCfg)+');window.__megulitText&&window.__megulitText.config&&window.__megulitText.config('+JSON.stringify(this.drawCfg)+')':''));}
  /* engine-draw (core/engine-draw.cjs): roles / embed switches and one sentence's replacement for the RPG Maker reader */
@@ -195,7 +197,7 @@ class WebTextPath{
    await Promise.allSettled([...(this.attaching||[])]);
    const results=await Promise.allSettled([...all].map(async c=>{
     const result=await c.send('Runtime.evaluate',{expression:'window.__megulitText&&(window.__megulitText.stop?window.__megulitText.stop():window.__megulitText.hide(false));window.__megulitRpgm&&window.__megulitRpgm.config({roles:false,embed:false,zh:false});window.__megulitText&&window.__megulitText.config&&window.__megulitText.config({roles:false,embed:false,zh:false});',returnByValue:true});
-    if(result?.exceptionDetails)throw Error('READER_STOP_INCOMPLETE');
+    if(result?.exceptionDetails||result?.wasThrown)throw Error('READER_STOP_INCOMPLETE');
     for(const identifier of c.scriptIds||[])await c.send('Page.removeScriptToEvaluateOnNewDocument',{identifier});
    }));
    if(results.some(r=>r.status==='rejected'))throw Error('READER_STOP_INCOMPLETE');

@@ -15,7 +15,7 @@ var document={querySelector:function(){return null;}};
 var Utils={RPGMAKER_NAME:'MV'};
 var Graphics={width:816,height:624,_canvas:{getBoundingClientRect:function(){return {left:0,top:0,width:816,height:624};}}};
 function Bitmap(w,h){this.width=w;this.height=h;this.fontSize=28;this.outlineWidth=4;}
-Bitmap.prototype.measureTextWidth=function(t){return Array.from(String(t)).length*this.fontSize;};
+Bitmap.prototype.measureTextWidth=function(t){return String(t).length*this.fontSize;};
 Bitmap.prototype.drawText=function(t,x,y,mw,lh,al){draws.push({t:String(t),x:x,y:y,mw:mw,lh:lh,al:al,fs:this.fontSize,bmp:this});};
 function Window_Base(x,y,w,h){this.x=x;this.y=y;this.width=w;this.height=h;this.padding=18;this.visible=true;this.openness=255;this.contents=new Bitmap(w-36,h-36);
  this._windowContentsSprite={worldTransform:{tx:x+18,ty:y+18}};this.worldTransform={tx:x,ty:y};}
@@ -76,6 +76,11 @@ test('patches only once the game booted (plugins loaded), then reports each mess
  assert.deepEqual([line.engine,line.text,line.hidden,line.rects.length,line.emb],['rpgm','今日は晴れ\n二行目',false,8,undefined]);
  assert.deepEqual(line.rects[0],[18,444+18+4,28,28],'contents origin + the glyph box (line height = size + 8, glyph centred in it)');
  assert.deepEqual(line.rects[5],[18,444+18+36+4,28,28].map((v,i)=>i===1?444+18+36+4:v),'second row');
+});
+
+test('MV Chrome 41 without Array.from still reports Japanese without modifying global built-ins',()=>{
+ const r=rig();r.run('Array.from=undefined');r.boot();r.say('今日は晴れ');const line=recs(r).at(-1);assert.equal(line.text,'今日は晴れ');assert.equal(line.rects.length,5);
+ r.api.embed('𠮷野',{ruby:[[0,1,'よし']],zh:'吉野'});assert.equal(r.api.state().emb,1,'supplementary characters remain one ruby index');assert.equal(r.run('typeof Array.from'),'undefined');
 });
 
 test('roles: choice list, title command and name box are reported as UI snapshots, never as dialogue; closing sends an empty one',()=>{

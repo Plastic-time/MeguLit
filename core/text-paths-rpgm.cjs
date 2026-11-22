@@ -25,7 +25,7 @@ const RPGM_SCRIPT=String.raw`(function(){
  function observe(f){try{f();}catch(e){if(S.errors++<3)send({status:'rpgm observation failed'});}}
  function active(){return S.cfg.roles||S.cfg.embed;}
  function plain(t){return String(t||'').replace(/\x1b[A-Za-z]+(\[[^\]]*\])?|\x1b[\$\.\|\^!><\{\}\\]/g,'').replace(/[\s　]/g,'');}
- function chars(t){return Array.from(String(t||''));}
+ function chars(t){var s=String(t||''),out=[];for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);if(c>=0xd800&&c<=0xdbff&&i+1<s.length){var d=s.charCodeAt(i+1);if(d>=0xdc00&&d<=0xdfff){out.push(s.substr(i,2));i++;continue;}}out.push(s.charAt(i));}return out;}
  function dpr(){return window.devicePixelRatio||1;}
  function isMZ(){return !!(window.Utils&&Utils.RPGMAKER_NAME==='MZ');}
  function stageToClient(x,y){var c=window.Graphics&&Graphics._canvas;if(!c||!(Graphics.width>0&&Graphics.height>0))throw Error('rpgm canvas unavailable');var r=c.getBoundingClientRect(),kx=r.width/Graphics.width,ky=r.height/Graphics.height,d=dpr();if(!(kx>0&&ky>0&&d>0))throw Error('rpgm canvas hidden');return [(r.left+x*kx)*d,(r.top+y*ky)*d,kx*d,ky*d];}
