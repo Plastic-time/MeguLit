@@ -44,7 +44,7 @@ static bool Dotted(const std::vector<uint8_t> &bmp, const char *label) {
  char b[200]; snprintf(b, sizeof b, "%s: every glyph cell is one 3x3 dot at the glyph's top-left, ink box kept by faint corners (%d cells, %d wrong pixels)", label, dots, bad); Check(bad == 0, b); return bad == 0;
 }
 int wmain(int argc, wchar_t **argv) {
- if (argc < 2) return 2; printf("font dots (%d-bit)\n", (int)sizeof(void *) * 8);
+ if (argc < 2) return 2; printf("font dots (%d-bit)\n", (int)sizeof(void *) * 8); fflush(stdout);
  std::vector<uint8_t> sheet = Bmp(true), pic = Bmp(false), eenz = Eenz(sheet);
  std::wstring pe = Write(L"megulit-fontdots-a.bmp", eenz), pb = Write(L"megulit-fontdots-b.bmp", sheet), pp = Write(L"megulit-fontdots-c.bmp", pic);
  SetEnvironmentVariableW(L"MEGULIT_FONT_DOTS", L"1"); wchar_t ev[64]; swprintf_s(ev, L"MeguLitFontReady-%lu", GetCurrentProcessId()); HANDLE ready = CreateEventW(NULL, TRUE, FALSE, ev);

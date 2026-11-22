@@ -61,25 +61,39 @@ test('wiring: the key, the seed, the control file, the script',()=>{
  assert.deepEqual(E.settings(fata).choiceFrames,['^選択肢$']);assert.deepEqual(E.settings(senren).choiceFrames,[]);
  assert.equal(E.krkrControlText(E.settings(fata),new Map()),'#cfg roles=0 embed=0 zh=1\r\n#clearline\r\n#choiceframe ^選択肢$\r\n');
  const t=require('../core/engine-draw.cjs');const ed=new t.EngineDraw({profile:fata,transport:{write(){},stop(){}}});assert.equal(ed.active,true,'the control file is written for ファタ');
- assert.ok(script.includes("else if(t.indexOf('#choiceframe ')==0) {try {if(typeof c.choiceFrames!='Object') c.choiceFrames=[];c.choiceFrames.add(new RegExp(t.substring(13)));} catch(e) {}}"));
+ const replay=require('./helpers/krkr-control-replay.cjs').controlReplay();
+ const cfg=replay.read(E.krkrControlText(E.settings(fata),new Map()));
+ assert.equal(cfg.choiceFrames.length,1);
+ assert.equal(cfg.choiceFrames[0].source,E.settings(fata).choiceFrames[0]);
+ const many=Array.from({length:21},(_,i)=>'#choiceframe ^frame'+i+'$');
+ const bounded=replay.read(['#cfg','#choiceframe [',...many].join('\n'));
+ assert.equal(bounded.choiceFrames.length,20,'invalid regex consumes no slot and valid paths remain bounded');
+ assert.ok(bounded.choiceFrames[19].test('frame19'));
+ assert.ok(!bounded.choiceFrames.some(r=>r.test('frame20')));
+ assert.deepEqual(replay.read('#cfg roles=1 roles=0\n#choiceframe ^stale$'),{roles:0,embed:0,zh:1},
+  'a duplicate header field clears the previous configuration');
+ assert.deepEqual(replay.read('#cfg roles=1\n#cfg\n#choiceframe ^stale$'),{roles:0,embed:0,zh:1},
+  'a repeated header cannot arm the channel');
  assert.ok(script.includes("var ui=st.uiDraw(self);if(ui=='link') st.link++;else if(ui=='choice') st.choiceDraws++;")&&script.includes("if(st.hideMsg() && ui=='') {"));
  assert.ok(!/historyWriteEnabled/.test(fn('st.choicePage=function(P)')),'no layout guess left');
 });
 
 test('drawSync starts the choice control channel only with a game pid and keeps unrelated switches independent',()=>{
  const P=require('../core/profiles/index.cjs'),ED=require('../core/engine-draw.cjs'),{HookNative}=require('../core/hook-native.cjs');
- const exercise=(profile,pid)=>{
+ const exercise=(profile,pid,kemcoSprites=false)=>{
   const calls=[],h=Object.create(HookNative.prototype);
   Object.assign(h,{profile,gamePid:()=>pid,ensureEngineDraw:id=>calls.push(['ensure',id]),
    engineDraw:{setProfile:p=>calls.push(['profile',p])},textPath:{drawConfig:c=>calls.push(['config',c])}});
   h.drawSync();
-  assert.deepEqual(calls[0],['config',ED.settings(profile)],'the text path receives the actual profile settings');
+  assert.deepEqual(calls[0],['config',{...ED.settings(profile),kemcoSprites}],'the text path receives the actual profile settings');
   return calls.slice(1);
  };
  const off=P.profileFor({}),fata=P.profileFor({exe:'E:/GAL/海市蜃楼之馆/fata_jp.exe',engine:'KiriKiri'});
  assert.deepEqual(exercise(fata,4321),[['ensure',4321]],'the real Fata choice-frame seed starts its control channel');
  assert.deepEqual(exercise(fata,0),[['profile',fata]],'a seed alone cannot start a channel without a game');
  assert.deepEqual(exercise(off,4321),[['profile',off]],'all switches off updates the existing channel without starting one');
+ const kemco={...off,draw:{...off.draw,kemcoSprites:true}};
+ assert.deepEqual(exercise(kemco,4321,true),[['profile',kemco]],'the Unity switch is passed to the text path independently');
  for(const [section,key] of [['draw','roles'],['draw','embed'],['draw','advhdInput'],['page','reportClear']]){
   const p=JSON.parse(JSON.stringify(off));p[section]={...p[section],[key]:true};
   assert.deepEqual(exercise(p,4321),[['ensure',4321]],section+'.'+key+' independently starts its channel');

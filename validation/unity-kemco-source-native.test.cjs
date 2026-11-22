@@ -33,8 +33,8 @@ class Check {
  static void Main(){new Check().Run();}
 }`);
   const compiler=process.env.MEGULIT_ROSLYN_CSC||'E:/Apps/build-tools/vs2022/MSBuild/Current/Bin/Roslyn/csc.exe';
-  let r=spawnSync(compiler,['/nologo','/codepage:65001','/out:'+path.join(dir,'check.exe'),path.join(base,'KemcoSpriteSnapshot.cs'),path.join(dir,'check.cs')],{windowsHide:true,encoding:'utf8',timeout:15000});assert.equal(r.status,0,r.stdout+r.stderr);
-  r=spawnSync(path.join(dir,'check.exe'),[],{windowsHide:true,encoding:'utf8',timeout:5000});assert.equal(r.status,0,r.stdout+r.stderr);
+  let r=spawnSync(compiler,['/nologo','/codepage:65001','/out:'+path.join(dir,'check.exe'),path.join(base,'KemcoSpriteSnapshot.cs'),path.join(dir,'check.cs')],{windowsHide:true,encoding:'utf8',timeout:15000});assert.ifError(r.error);assert.equal(r.status,0,r.stdout+r.stderr);
+  r=spawnSync(path.join(dir,'check.exe'),[],{windowsHide:true,encoding:'utf8',timeout:5000});assert.ifError(r.error);assert.equal(r.status,0,r.stdout+r.stderr);
   const lines=r.stdout.trim().split(/\r?\n/);assert.equal(lines.pop(),'PASS');assert.equal(lines.length,7);
   const parts=lines.map(l=>l.slice('ToMe_UNITY kemco2 '.length).split('\t'));assert.deepEqual(parts.map(p=>p[3]),['full','pending','pending','pending','gone','full','pending']);
   assert.equal(Buffer.from(parts[0][7],'base64').toString(),'日本');assert.equal(parts[0][5],'42');assert.equal(parts[0][6],'638000000000000000');assert.equal(parts[4][2],'0');assert.equal(parts[5][0],'b'.repeat(32));
