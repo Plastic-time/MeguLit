@@ -13,8 +13,8 @@ const css=fs.readFileSync(path.join(__dirname,'../web/diagnostics.css'),'utf8');
 function root(state){const r=fs.mkdtempSync(path.join(process.env.MEGULIT_TEST_TMP||os.tmpdir(),'ov-'));fs.mkdirSync(path.join(r,'data/config'),{recursive:true});fs.writeFileSync(path.join(r,'data/config/original-text.json'),JSON.stringify(state));return r;}
 
 test('brief separates ready, failed, removed and machine',()=>{
- const r=root({a:{status:'native-japanese',patchStatus:'ready',patch:{}},b:{status:'native-japanese',patchStatus:'unreliable',patch:{auto:false}},c:{status:'native-japanese',patchStatus:'none',patch:null,patchSearch:{declined:true}},d:{status:'native-japanese',patchStatus:'none'},e:{status:'chinese-only'}});
- assert.equal(ot.brief(r,'a'),'patch');assert.equal(ot.brief(r,'b'),'patch-unreliable');assert.equal(ot.brief(r,'c'),'patch-removed');
+ const r=root({a:{status:'native-japanese',patchStatus:'ready',runtime:{sha256:'current'},patch:{version:5,runtimeSha:'current'}},b:{status:'native-japanese',patchStatus:'unreliable',patch:{auto:false}},c:{status:'native-japanese',patchStatus:'none',patch:null,patchSearch:{declined:true}},d:{status:'native-japanese',patchStatus:'none'},e:{status:'chinese-only'},stale:{status:'native-japanese',patchStatus:'ready',runtime:{sha256:'updated'},patch:{version:5,runtimeSha:'older'}}});
+ assert.equal(ot.brief(r,'a'),'patch');assert.equal(ot.brief(r,'stale'),'machine');assert.equal(ot.brief(r,'b'),'patch-unreliable');assert.equal(ot.brief(r,'c'),'patch-removed');
  assert.equal(ot.brief(r,'d'),'machine');assert.equal(ot.brief(r,'e'),'needs-japanese');assert.equal(ot.brief(r,'zz'),'unknown');
 });
 test('running-script index is keyed by the reader code too',()=>{
@@ -26,7 +26,7 @@ test('running-script index is keyed by the reader code too',()=>{
 test('a user-picked patch is kept by autoPatch and restored after a failed search',()=>{
  assert.match(src,/state\.patch&&!state\.patch\.auto&&!options\.force\)return \{manual:true\}/);
  assert.match(src,/\(stale\|\|state\.patchStatus==='ready'\)&&state\.patch\.auto\)/);
- assert.match(src,/patch:before\.patch\|\|null/);
+ assert.match(src,/const fallback=before\.patch&&!before\.patch\.auto\?before:diagnostic\|\|before/);assert.match(src,/patch:fallback\.patch\|\|null/);
 });
 /* option C (user pick 2026-11-13): state colours by meaning, problems first with a reason, scan only through the probe hook */
 const ov=()=>import(require('node:url').pathToFileURL(path.join(__dirname,'../web/adaptation-overview.js')).href);
