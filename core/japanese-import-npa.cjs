@@ -154,7 +154,7 @@ async function plan(gameDir, source, executable) {
 async function discover(gameDir, executable) {
  const candidates=[],targets=new Set();
  let visited=0,matched=null;
- const skip=/^(?:\.|saves?$|savedata$|userdata$|backups?$|cache$)/i;
+ const skip=/^(?:\.|saves?$|savedata$|userdata$|cache$)/i;
  function walk(dir,depth) {
   const children=[],folder=fs.opendirSync(dir);
   try {

@@ -12,6 +12,8 @@ The preview lists one replacement and counts Japanese, paired and unpaired rows.
 
 ## Transaction and verification
 
+The local search includes ordinary `backup` and `backups` folders within its existing depth and entry limits. A bridge regression puts a Japanese archive in `backup`, discovers it without supplying the filename, confirms the preview, reads the Chinese from the installed pair index with global local pairs disabled, and undoes the swap. This test uses generated archives
+
 The original archive and Chinese pair index are verified and stored beside the journal before the authorized archive is swapped. The importer reads back the installed file. Undo checks both the current archive and its backup by SHA-256. A failed rollback leaves the journal available and disables the local provider if the archive, selected EXE or pair index falls out of sync
 
 The Reader loads the verified pair index for that EXE. Its per-game pairing takes effect even with the global local-pairs setting off and respects the English target setting. The fixture passed the original NPA reader, the production import bridge and the actual Reader hook translation. Tests exercised both input forms, local discovery, ambiguity, missing preview confirmation, byte-for-byte undo, a failed readback and a game file changed by an external update. No installed commercial Nitroplus game was executed in this check

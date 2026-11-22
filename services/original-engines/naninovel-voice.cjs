@@ -14,8 +14,7 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const unityfs=require('./unityfs.cjs'),fsb5=require('./fsb5.cjs');
 const VOICE=/Assets\/Naninovel\/Game\/Voice\/([^\0]*?)\.ogg/;
-const dataDirs=dir=>{try{return fs.readdirSync(dir,{withFileTypes:true}).filter(e=>e.isDirectory()&&/_Data$/i.test(e.name)).map(e=>path.join(dir,e.name));}catch{return [];}};
-function bundleDir(dir){for(const d of dataDirs(dir)){const b=path.join(d,'StreamingAssets','aa','StandaloneWindows64');if(fs.existsSync(b))return b;}return '';}
+const {dataDirs,bundleDir}=require('./naninovel.cjs')._internal;
 const cacheFile=d=>{let n=0;try{n=fs.readdirSync(d).length;}catch{}return path.join(os.tmpdir(),'megulit-unity-voice',crypto.createHash('sha256').update(path.resolve(d).toLowerCase()+'|'+n+'|3').digest('hex').slice(0,24)+'.json');};
 // A bundle's nodes; one too large to load whole gives its serialized node only.
 function nodesOf(file){try{return unityfs.read(file);}catch{try{const n=unityfs.readNode(file);return n?[n]:[];}catch{return [];}}}

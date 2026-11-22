@@ -402,19 +402,30 @@ const siglus={
   const dirs=[...new Set(found.dirs.flatMap(d=>[d,path.join(d,'dat'),path.join(d,'.megulit-japanese','dat')]))];let any=false;
   const list=base.map(item=>{
    const scene=interfaceDbsName(item.name)?{...item,scope:'interface'}:item,stem=scene.name.replace(/\.dbs$/i,'');
+   let keyedLines;
+   const patchFiles=[];
    for(const d of dirs)for(const name of [scene.name,...CHINESE_DBS_TWINS.map(suffix=>stem+'_'+suffix+'.dbs')]){
     const patchFile=path.join(d,name);let table;try{table=dbsTable(fs.readFileSync(patchFile));}catch{continue;}
-    const ids=rowIds(table);
-    let lines=serialTranslations(scene,table,scene.layout);
-    const keyed=!!lines;
-    if(keyed&&!lines.some(Boolean))continue;
-    if(!keyed){
-     if((ids||scene.rowIds)&&(!ids||!scene.rowIds||ids.length!==scene.rowIds.length||ids.some((id,i)=>id!==scene.rowIds[i])))continue;
-     lines=chineseColumn(table,scene.lines);
+    const verified=serialTranslations(scene,table,scene.layout);
+    if(verified){
+     // A partially restored table and its backup can contain different surviving slots.
+     // Keep the first verified translation of each serial, and record only files that contribute.
+     if(!verified.some((text,i)=>text&&!keyedLines?.[i])||dbsScope(table,name)==='interface')continue;
+     keyedLines=keyedLines?keyedLines.map((text,i)=>text||verified[i]):verified;
+     patchFiles.push(patchFile);
+     continue;
     }
+    if(keyedLines)continue;
+    const ids=rowIds(table);
+    if((ids||scene.rowIds)&&(!ids||!scene.rowIds||ids.length!==scene.rowIds.length||ids.some((id,i)=>id!==scene.rowIds[i])))continue;
+    const lines=chineseColumn(table,scene.lines);
     if(!lines)continue;any=true;
     return {...scene,scope:scene.scope==='interface'||dbsScope(table,name)==='interface'?'interface':'script',patchFile,
-     patched:true,keyed,lines:lines.map((t,k)=>t||scene.lines[k])};}
+     patched:true,keyed:false,lines:lines.map((t,k)=>t||scene.lines[k])};}
+   if(keyedLines){
+    any=true;
+    return {...scene,patched:true,keyed:true,patchFiles,lines:keyedLines.map((text,i)=>text||scene.lines[i])};
+   }
    return scene;});
   return any?list:null;
  },

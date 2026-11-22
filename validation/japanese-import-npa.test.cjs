@@ -137,7 +137,9 @@ test('bounded local discovery previews a uniquely verified candidate and leaves 
 });
 
 test('the Nitroplus library entry confirms a ZIP via the bridge and serves original Chinese with global local-pairs off',async t=>{
- const f=setup(t),source=path.join(f.from,'jp.zip');fs.writeFileSync(source,zip({'nss.npa':f.jp}));
+ const f=setup(t),backupDir=path.join(f.game,'backup');
+ fs.mkdirSync(backupDir);
+ const source=path.join(backupDir,'jp.zip');fs.writeFileSync(source,zip({'nss.npa':f.jp}));
  process.env.MEGULIT_ROOT=f.root;process.env.MEGULIT_NO_PREWARM='1';
  const restore=require('../core/japanese-restore.cjs')._internal,gameRunning=restore.gameRunning;
  restore.gameRunning=()=>false;t.after(()=>{restore.gameRunning=gameRunning;});
@@ -146,7 +148,8 @@ test('the Nitroplus library entry confirms a ZIP via the bridge and serves origi
  const settings=new(require('../services/settings.cjs').Settings)(f.root);settings.setScriptTranslation(false);
  const dispatch=require('../services/bridge.cjs').dispatch,call=(action,params={})=>dispatch({action,id,...params,requestId:'archive-fixture-'+action});
  assert.equal((await call('jp_restore_detect')).state,'importable');
- const p=await call('jp_import_preview',{source});
+ const p=await call('jp_import_preview',{discoverArchive:true});
+ assert.equal(p.source,source);
  assert.equal(p.archive,true);assert.equal(p.coverage.paired,2);
  const r=await call('jp_import_apply',{source,archiveToken:p.archiveToken});
  assert.equal(r.archive,true);assert.equal(r.patch,true);

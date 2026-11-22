@@ -17,7 +17,27 @@
 const fs=require('node:fs'),path=require('node:path'),unityfs=require('./unityfs.cjs');
 const memo=new Map();
 const {stat}=require('./file-key.cjs');
-function dataDirs(dir){let names;try{names=fs.readdirSync(dir,{withFileTypes:true});}catch{return [];}return names.filter(e=>e.isDirectory()&&/_Data$/i.test(e.name)).map(e=>path.join(dir,e.name));}
+function dataDirs(dir){
+ let entries;try{entries=fs.readdirSync(dir,{withFileTypes:true});}catch{return [];}
+ const result=[];
+ for(const entry of entries){
+  if(!/_Data$/i.test(entry.name))continue;
+  const data=path.join(dir,entry.name);
+  if(entry.isDirectory()){result.push(data);continue;}
+  if(!entry.isSymbolicLink())continue;
+  // Unity reads the original player's data through this junction when MeguLit launches a shadow.
+  try{
+   const manifest=path.join(dir,'megulit-shadow.json'),info=fs.lstatSync(manifest);
+   if(!info.isFile()||info.size>4096)continue;
+   const {game,exe}=JSON.parse(fs.readFileSync(manifest,'utf8'));
+   if(!path.isAbsolute(game)||exe!==path.basename(exe)||!/^.+\.exe$/i.test(exe)||entry.name.toLowerCase()!==path.parse(exe).name.toLowerCase()+'_data')continue;
+   if(!fs.statSync(path.join(dir,exe)).isFile()||!fs.statSync(path.join(game,exe)).isFile())continue;
+   const source=path.join(game,entry.name),target=fs.realpathSync(data);
+   if(fs.lstatSync(source).isDirectory()&&path.relative(fs.realpathSync(source),target)==='')result.push(target);
+  }catch{}
+ }
+ return result;
+}
 function bundleDir(dir){for(const d of dataDirs(dir)){const b=path.join(d,'StreamingAssets','aa','StandaloneWindows64');if(fs.existsSync(b))return b;}return '';}
 const isLocalizationBundle=f=>/-localization-[a-z-]+-scripts-.*\.bundle$/i.test(f)&&!/-scripts-debug/i.test(f);
 function localizationBundles(dir){const d=bundleDir(dir);if(!d)return [];let files;try{files=fs.readdirSync(d);}catch{return [];}
@@ -135,6 +155,6 @@ const naninovel={
  // E450 voices: auto-voice clips aligned to the printed lines (naninovel-voice.cjs)
  voiceLines:dir=>require('./naninovel-voice.cjs').voiceLines(dir),
  patchLines(base){let any=false;const list=base.map(scene=>{const zh=scene.zh||[];if(!zh.some(Boolean))return scene;any=true;return {...scene,patched:true,lines:scene.lines.map((t,k)=>zh[k]||t)};});return any?list:null;},
- _internal:{documents,localizationBundles,isLocalizationBundle,tidy,combine,scan,blocks},
+ _internal:{dataDirs,bundleDir,documents,localizationBundles,isLocalizationBundle,tidy,combine,scan,blocks},
 };
 module.exports=naninovel;

@@ -25,6 +25,21 @@ function fixture(t){
  const set=rows=>fs.writeFileSync(path.join(patch,'text00.dbs'),dbs(rows.map(([id,ja,zh])=>['【名前】',ja,zh,id]),ids));
  return {root,exe,db,set,patch};
 }
+test('a partial installed table can use verified missing choices from its pre-restore backup',t=>{
+ const {root,db,set,patch,exe}=fixture(t);
+ set([[20,body,'测试正文'],[2410,options[0],labels[0]]]);
+ const backup=path.join(patch,'.megulit-japanese','dat');
+ fs.mkdirSync(backup,{recursive:true});
+ fs.writeFileSync(path.join(backup,'text00.dbs'),dbs([
+  ['',body,'旧版本正文',20],['',options[1],labels[1],2420],['','別の文章です。','错误场景',2430],
+ ],ids));
+ const state=original.importPatch(root,db,'game',patch);
+ const quality=state.patch.coverage.translationQuality,provider=original.provider(root,exe);
+ assert.deepEqual(state.patch.sources,[path.join(patch,'text00.dbs'),path.join(backup,'text00.dbs')]);
+ assert.equal(quality.body.localPaired,1);assert.equal(quality.choice.localPaired,2);
+ assert.equal(provider.resolve(body).translation,'测试正文');
+ assert.deepEqual(options.map(text=>provider.resolveChoice(text).translation),labels);
+});
 test('serial and Japanese cell bind sparse, reordered translations to the actual choices and dialogue',async t=>{
  const {root,exe,db,set,patch}=fixture(t);
  // Explicitly synthetic Chinese labels. A different Japanese row with a recycled serial is not a match.

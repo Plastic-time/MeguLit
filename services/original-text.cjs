@@ -293,7 +293,7 @@ function buildPatch(runningState,source){
   const lines=list.flatMap(x=>x.lines);patched=list.filter(x=>x.patched).length;if(!patched)throw Error('PATCH_SCRIPT_NOT_FOUND');
   translated=list.flatMap((scene,i)=>!scene.patched?[]:scene.keyed?scene.lines.filter((t,k)=>sampler.translated(t,base[i].lines[k])):scene.lines);
   sections=list.map(scene=>({scope:scene.scope==='interface'?'interface':'script',length:scene.lines.length,keyed:scene.keyed===true}));
-  patchFiles=list.flatMap(scene=>scene.patchFile?[scene.patchFile]:[]);
+  patchFiles=list.flatMap(scene=>scene.patchFiles||(scene.patchFile?[scene.patchFile]:[]));
   script={engine,version:0,codepage:'text',lines,sizes:list.map(x=>x.lines.length),structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};
  }else throw Error('NO_SUPPORTED_SCRIPT');
  // Remapped-font ports: decode with the fonts the patch ships, or the ones it put next to the game.
