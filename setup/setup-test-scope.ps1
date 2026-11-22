@@ -10,14 +10,14 @@ function Get-SetupLocalPath([string]$Path) {
   [IO.Path]::GetFullPath($p).TrimEnd('\')
 }
 function Assert-SetupNoLink([string]$Path) {
-  $p = $Path
-  while ($p) {
+  $ancestors = [Collections.Generic.Stack[string]]::new()
+  for ($p = $Path; $p; $p = [IO.Path]::GetDirectoryName($p)) { $ancestors.Push($p) }
+  while ($ancestors.Count) {
+    $p = $ancestors.Pop()
     try {
       $attributes = [IO.File]::GetAttributes($p)
       if ($attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'SETUP_TEST_REPARSE_REJECTED' }
     } catch [IO.FileNotFoundException] { } catch [IO.DirectoryNotFoundException] { }
-    $parent = [IO.Path]::GetDirectoryName($p)
-    if ($parent -eq $p) { break }; $p = $parent
   }
 }
 function Assert-SetupPath([string]$Path, [string]$Area = 'root', [switch]$Tree) {
@@ -36,11 +36,15 @@ function Assert-SetupPath([string]$Path, [string]$Area = 'root', [switch]$Tree) 
   if (-not $inside) { throw ('SETUP_TEST_OUTSIDE_' + $Area) }
   Assert-SetupNoLink $p
   if ($Tree -and [IO.Directory]::Exists($p)) {
+    # Windows can create junctions inside the private USERPROFILE. Existing profiles
+    # are opaque here; the launcher gives each run a new profile, checked separately.
+    $profileStore = if ($p -ieq $script:setupTestScope.root) { Join-Path $p 'profile\user' }
     $pending = New-Object 'Collections.Generic.Stack[string]'; $pending.Push($p)
     while ($pending.Count) {
       foreach ($entry in [IO.Directory]::GetFileSystemEntries($pending.Pop())) {
         $attributes = [IO.File]::GetAttributes($entry)
-        if ($attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'SETUP_TEST_REPARSE_REJECTED' }
+        if ($attributes -band [IO.FileAttributes]::ReparsePoint) { throw ('SETUP_TEST_REPARSE_REJECTED: ' + $entry) }
+        if ($entry -ieq $profileStore) { continue }
         if ($attributes -band [IO.FileAttributes]::Directory) { $pending.Push($entry) }
       }
     }
@@ -60,6 +64,8 @@ function Initialize-SetupTestScope([string]$PayloadRoot) {
     LOCALAPPDATA = 'env'; APPDATA = 'env'; USERPROFILE = 'profile'
   }
   foreach ($name in $required.Keys) { Assert-SetupPath ([Environment]::GetEnvironmentVariable($name, 'Process')) $required[$name] }
+  # Check the current profile before WebView2 starts. Archived profiles remain untouched.
+  Assert-SetupPath $env:USERPROFILE 'profile' -Tree
   if ($env:MEGULIT_SPLASH_FLAG) { Assert-SetupPath $env:MEGULIT_SPLASH_FLAG 'env' }
   if ($env:MEGULIT_SETUP_PREVIEW -or $env:MEGULIT_SETUP_WEB_TEST -or $env:MEGULIT_SETUP_THEME -or $env:MEGULIT_SETUP_AUTOSTART -or $env:MEGULIT_SETUP_PREFETCH -or $env:MEGULIT_SETUP_FREE) { throw 'SETUP_TEST_OWNER_INTERACTIVE_ONLY' }
 }
