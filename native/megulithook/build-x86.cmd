@@ -27,6 +27,7 @@ copy /y "%~dp0PalTextBounds.h" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\
 rem one hook runtime (2026-11-19): the exact-program adapters (ISLAND, STEINS;GATE) are engines our enginecollection32.cpp lists first, euphoria HD sits in Yuris.cpp;
 rem the STEINS;GATE adapter is compiled from native\mages under its own namespaces (MeguLitSg.cpp), upstream engines\mages untouched
 for %%F in (enginecollection32.cpp MeguLitEngines.h MeguLitMatch.h MusicaBasic.h MusicaBasicSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
+for %%F in (IgaText.h IgaTextPin.h IgaTextSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
 rem engine-draw MAGES (MagesDraw.h, MagesDrawSig.h) next to MeguLitEngines.h, whose STEINS;GATE adapter arms it
 for %%F in (MagesDraw.h MagesDrawSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
 copy /y "%~dp0..\mages\readString.cpp" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engine32\MeguLitSg_readString.inc" >nul || exit /b 1

@@ -33,7 +33,7 @@ AdvHD、CMVS 与 FVP 输入诊断分别使用独立、默认 false 的 `draw.adv
 | ReaLive / AVG32（涙、Air） | DrawSites（GDI 画字点）签名 `avg32` | 已进 main，默认不挂 |
 | Softpal（レイライン 1 / 2） | DrawSites `softpal`、`softpal-2` | 已进 main，默认不挂 |
 | NScripter（月姬 v1.4 / v1.6，同一 exe） | DrawSites `nscripter`（mode 1 字形点） | 默认不挂；页面坐标、角色、mode 0/2 和样本编码尚未验收 |
-| Innocent Grey（虚ノ少女，MFC） | DrawSites `mfc-textoutw` / `mfc-exttextoutw` / `mfc-drawtextw` | 已进 main，默认不挂 |
+| Innocent Grey（虚ノ少女） | 旧 `mfc-*` 是补丁安装器界面；游戏实际为 Himorogi/Script/D3D9Font | 私测普通 IGA 文本流候选默认关闭，正文实流待核；见 re-iga-runtime.md，不授予画字角色 |
 | AdvHD / WillPlus（Under The Moon） | DrawSites `advhd`；AdvhdDraw 输入诊断 | 默认不挂；诊断钉住单一 exe，仅完整原始输入，不授予正文角色、隐藏或嵌入能力 |
 | CMVS（青い鳥） | DrawSites `cmvs`；CmvsDraw 双入口输入诊断 | 默认不挂；两个全文绘制入口必须一起通过版本与签名校验，仅原始输入，不支持角色、屏幕坐标或渲染 |
 | FVP（いろとりどりのヒカリ / HD） | DrawSites `fvp`；FvpDraw 原始追加诊断 | 默认不挂；两个版本各自 exact pin 单入口，仅追加 raw bytes，不覆盖缓存重绘或正文角色，见 [FVP 诊断交付](re-fvp-input.md) |
@@ -139,7 +139,7 @@ CMVS 本机版本同样确认字形、度量与节点缓存会绕过旧点；双
 | Musica / ぱれっと（1） | ましろ色シンフォニー | mashiroiro.exe | x86 | 只有 CreateFontA ×1（字形 API 不在导入表：运行时 GetProcAddress 或自绘） | DirectDraw | 无 | Palette.cpp | 中：先找动态取的 API |
 | minori（1） | eden*（Steam 英文版） | eden_en.exe | x86 | GetGlyphOutlineA ×3、CreateFontA ×2 | D3D9 + DirectDraw | 无 | Minori.cpp | 中 |
 | Leaf / AQUAPLUS（1） | WHITE ALBUM2 | WA2.exe | x86 | 没有任何 GDI 文字 API | D3D9 + D3DX（自绘字库） | 无 | Leaf.cpp | 难：和 MAGES 一样是字库图集，要找送字函数 |
-| Innocent Grey（1） | 虚ノ少女 | Innocentsetup.exe（98 MB，资源打在 exe 里） | x86 | DrawTextW ×1、ExtTextOutW ×1、TextOutW ×1 | GDI | 无 | 无专用（通用 GDI） | 易：3 个 W 调用点 |
+| Innocent Grey（1） | 虚ノ少女 | 虚ノ少女.exe（231936B）+ plugin/Himorogi.dll、Script.dll、D3D9Font.dll | x86 | 字体插件 GetGlyphOutlineW ×3；EXE 无正文文字 API | D3D9 | 普通 PE | 私测 IGA_Text 候选 | 原 MFC 三点属于补丁安装器，不能证明正文 |
 | BRUNS（1） | ダストマニア・グロテスク | gameplay.exe（121 KB 启动）+ umut.dll + libscr.dll | x86 | umut.dll 没有文字 API；libscr.dll TextOutW ×1（中文补丁的库） | GDI DIB | 无 | Bruns.cpp | 中：画字可能在中文补丁库里，原版走自绘 |
 | AdvHD / WillPlus（1） | Under The Moon（seed 里是 ディスコード！，本机只有同引擎的 utmoon.exe） | utmoon.exe | x86 | GetGlyphOutlineA ×2、TextOutA ×3、CreateFontIndirectA ×1 | DirectDraw | 无 | WillPlus.cpp（本仓库另有 Euphoria HD 474 精确匹配） | 易 |
 

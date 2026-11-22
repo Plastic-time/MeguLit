@@ -374,6 +374,8 @@ e-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4
 - 后续验收清单：先静态追踪调用者的页面合成坐标和角色，再进入全局单游戏实测队列；隐藏桌面验证重复字、模式和角色覆盖。未证明前不写角色或页面坐标，不把一次签名命中当完整逆向
 
 ### Innocent Grey（虚ノ少女）：MFC 的 CDC 文字包装
+- 2026-11-22 更正：下述三点属于 `Innocentsetup.exe` 的 MFC 补丁安装界面，不能作为游戏正文入口。真实日文宿主是 231936 字节的 `虚ノ少女.exe`，动态加载 `plugin/Himorogi.dll`、`Script.dll`、`D3D9Font.dll`；后者通过 GetGlyphOutlineW 栅格化再走 D3D9
+- 固定版本的缓存前 CP932 输入候选及默认关闭的普通 Luna 流见 [re-iga-runtime.md](../side-session-notes/re-iga-runtime.md)。它不产生 ToMe_CHARS，也不授予名字、选项、坐标、注音、隐藏或嵌入能力
 - 点：Innocentsetup.exe 里 MFC 的 CDC::TextOutW（0x41adc7）、CDC::ExtTextOutW（0x41a849）、CDC::DrawTextW（0x41a808），三个都是把参数原样转给 GDI、DC 取 `[ecx+4]` 的薄包装，有 EBP 帧
 - 程序经 CDC 画的字都从这里过（游戏自己的界面也是），via 是调用 CDC 的那个游戏例程，用它分台词 / 名字 / 菜单。这段是 MFC 自带代码，别的 MFC 程序也会命中，所以签名名叫 mfc-*，不叫游戏名
 - 店主测试清单：同 AVG32，行里是 `engine=mfc-textoutw` / `mfc-exttextoutw` / `mfc-drawtextw`；推一句后看哪个 via 带着台词
