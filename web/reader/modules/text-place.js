@@ -38,6 +38,9 @@
     '.megulit-anchor-window.megulit-game-rows .sentence-text{white-space:nowrap!important}' +
     '.megulit-anchor-window.megulit-rows-predicted .sentence-text{white-space:normal!important;max-width:var(--megulit-centre-width)!important;margin-left:auto!important;margin-right:auto!important}', /* a line on the game's rows breaks where the game broke it, nowhere else */ /* dialogue lines never carry the dimmed page above them (2026-11-20 user: the old lines covered the screen) */
     'body.megulit-placed .megulit-place-window .megulit-ruby-base{position:absolute!important;display:block!important;margin:0!important;padding:0!important}',
+    'body.megulit-placed .megulit-place-window .megulit-ruby-base:not(:has(.char-token:not(.megulit-unplaced)))::before{visibility:hidden}',
+    'body.megulit-placed .megulit-place-window .megulit-ruby-base[data-tomoyo-reading]::before{transform:translate(-50%,-100%) scaleX(var(--megulit-cell-ruby-scale,1))}',
+    'body.megulit-placed .megulit-place-window .char-token{scale:var(--megulit-cell-scale,1) 1;transform-origin:left center}',
     'body.megulit-placed .megulit-place-window .char-token{position:absolute!important;display:block!important;margin:0!important;padding:0!important;text-align:center!important;white-space:pre!important;letter-spacing:0!important;text-indent:0!important;pointer-events:auto}',
     'body.megulit-placed .megulit-place-window .char-token.megulit-unplaced{display:none!important}',
     'body.megulit-place-garbled .sentence-window.tomoyo-hook-reader{visibility:hidden!important}', /* a broken copy of the game's Japanese line: the game's own text is drawn instead */
@@ -215,7 +218,7 @@
     for (const w of document.querySelectorAll('.megulit-place-window')) {
       w.classList.remove('megulit-place-window');
       for (const o of w.querySelectorAll('.tomoyo-cn-row *')) { o.style.removeProperty('font-size'); o.style.removeProperty('line-height'); }
-      for (const n of w.querySelectorAll('.char-token,.megulit-ruby-base,.tomoyo-cn-row')) { n.classList.remove('megulit-unplaced'); for (const p of ['left', 'top', 'width', 'height', 'font-size', 'line-height']) n.style.removeProperty(p); }
+      for (const n of w.querySelectorAll('.char-token,.megulit-ruby-base,.tomoyo-cn-row')) { n.classList.remove('megulit-unplaced'); for (const p of ['left', 'top', 'width', 'height', 'font-size', 'line-height','--megulit-cell-scale']) n.style.removeProperty(p); }
     }
     if (lastGeom) { lastGeom = ''; dispatchEvent(new CustomEvent('megulit-reveal-progress', { detail: { typing: false } })); }
     /* between lines (the next one not matched yet) the text stays where the last line was, not at the reader's own place */
@@ -395,16 +398,10 @@
     const cjk = boxes.filter((r, j) => r && shown[j] && /[^\x00-\x7f｡-ﾟ]/.test(shown[j].textContent)).map(r => r[2]);
     return Math.max(6, median(cjk) || median(boxes.filter(Boolean).map(r => r[3])));
   }
-  /* put a sentence's character tokens on their boxes (boxes[j] for the j-th shown token; a missing box = not drawn yet) */
-  function layout(sentence, boxes, geom) {
-    const tokens = [...sentence.querySelectorAll('.char-token')].filter(t => !t.closest('.tome-page-lines'));
-    const shown = tokens.filter(t => !t.hasAttribute('data-tomoyo-leading-space') && !blank(t.textContent));
-    const size = glyphSize(shown, boxes);
-    for (const t of tokens) if (!shown.includes(t)) t.classList.add('megulit-unplaced');
-    const place = new Map();
-    shown.forEach((t, j) => { const r = boxes[j]; if (!r) { t.classList.add('megulit-unplaced'); return; } t.classList.remove('megulit-unplaced'); place.set(t, r); });
+  function placeGlyphs(sentence, place, size, geom, reported = place) {
+    let rubyMoved = false;
     for (const base of sentence.querySelectorAll('.megulit-ruby-base')) {
-      let rs = [...base.querySelectorAll('.char-token')].map(t => place.get(t)).filter(Boolean);
+      let rs = [...base.querySelectorAll('.char-token')].map(t => reported.get(t)).filter(Boolean);
       if (!rs.length) continue;
       /* a word the game wrapped (its first characters at the end of a row, the rest on the next): the base is the part
          on the first row, so the reading sits over it; a box over both rows put the reading in the middle of nowhere */
@@ -412,15 +409,36 @@
       const x0 = Math.min(...rs.map(r => r[0])), y0 = top, x1 = Math.max(...rs.map(r => r[0] + r[2])), y1 = Math.max(...rs.map(r => r[1] + r[3]));
       set(base, 'left', x0 + 'px'); set(base, 'top', y0 + 'px'); set(base, 'width', (x1 - x0) + 'px'); set(base, 'height', (y1 - y0) + 'px');
       base.__megulitOrigin = [x0, y0];
+      const key = [x0, y0, x1, y1, size, place.has(base.firstElementChild)].join(',');
+      if (base.__megulitRubyGeometry !== key) { base.__megulitRubyGeometry = key; rubyMoved = true; }
     }
     for (const [t, r] of place) {
       const base = t.parentElement?.closest('.megulit-ruby-base'), o = base && sentence.contains(base) && base.__megulitOrigin || [0, 0];
-      set(t, 'left', (r[0] - o[0]) + 'px'); set(t, 'top', (r[1] - o[1]) + 'px'); set(t, 'width', r[2] + 'px'); set(t, 'height', r[3] + 'px');
+      // Fit full-width ink to the game's narrower advances without changing its height or hit box.
+      const width = /[^\x00-\x7f｡-ﾟ]/.test(t.textContent) ? Math.max(size, r[2]) : r[2];
+      set(t, '--megulit-cell-scale', String(r[2] / width));
+      set(t, 'left', (r[0] - o[0]) + 'px'); set(t, 'top', (r[1] - o[1]) + 'px');
+      set(t, 'width', width + 'px'); set(t, 'height', r[3] + 'px');
       set(t, 'font-size', size + 'px'); set(t, 'line-height', r[3] + 'px');
       /* a dash is one unbroken stroke across its box in the game; fonts draw it short and raised */
       markDash(t);
       geom?.push(r.map(Math.round).join(','));
     }
+    if (rubyMoved) b.measurePlacedRuby?.(sentence);
+  }
+  /* put a sentence's character tokens on their boxes (boxes[j] for the j-th shown token; a missing box = not drawn yet) */
+  function layout(sentence, boxes, geom, visible = boxes.length) {
+    const tokens = [...sentence.querySelectorAll('.char-token')].filter(t => !t.closest('.tome-page-lines'));
+    const shown = tokens.filter(t => !t.hasAttribute('data-tomoyo-leading-space') && !blank(t.textContent));
+    const size = glyphSize(shown, boxes);
+    for (const t of tokens) if (!shown.includes(t)) t.classList.add('megulit-unplaced');
+    const place = new Map(), reported = new Map();
+    shown.forEach((t, j) => {
+      const r = boxes[j]; if (r) reported.set(t, r);
+      if (!r || j >= visible) { t.classList.add('megulit-unplaced'); return; }
+      t.classList.remove('megulit-unplaced'); place.set(t, r);
+    });
+    placeGlyphs(sentence, place, size, geom, reported);
     return { place, size, shown };
   }
   /* a line (or part of one) the reader has no tokens for: plain characters, in the reader sentence's own classes so they sit and look like its characters */
@@ -483,7 +501,7 @@
       if (reveal.n < have) schedule(); else reveal.t = nowT;
       const visible = Math.floor(reveal.n);
       const boxes = cur.rects.slice(at, at + (page.engineRows ? have : visible)).map(map);
-      const revealed = layout(sentence, boxes.slice(0, visible), geom);
+      const revealed = layout(sentence, boxes, geom, visible);
       const row = win.querySelector('.tomoyo-cn-row');
       // Anchor and size a native row's translation from its report, including the still-unrevealed glyphs.
       const all = page.engineRows ? boxes.filter(Boolean) : [...revealed.place.values()];
@@ -782,20 +800,7 @@
     shown.forEach((t, j) => {
       t.classList.toggle('megulit-native-cell', ink?.[idx[j]] === true);
       const r = boxes[j]; if (!r) { t.classList.add('megulit-unplaced'); return; } t.classList.remove('megulit-unplaced'); place.set(t, r); });
-    /* ruby bases: absolute at the union of their tokens; tokens inside are placed relative to the base */
-    for (const base of sentence.querySelectorAll('.megulit-ruby-base')) {
-      const rs = [...base.querySelectorAll('.char-token')].map(t => place.get(t)).filter(Boolean);
-      if (!rs.length) continue;
-      const x0 = Math.min(...rs.map(r => r[0])), y0 = Math.min(...rs.map(r => r[1])), x1 = Math.max(...rs.map(r => r[0] + r[2])), y1 = Math.max(...rs.map(r => r[1] + r[3]));
-      set(base, 'left', x0 + 'px'); set(base, 'top', y0 + 'px'); set(base, 'width', (x1 - x0) + 'px'); set(base, 'height', (y1 - y0) + 'px');
-      base.__megulitOrigin = [x0, y0];
-    }
-    for (const [t, r] of place) {
-      const base = t.parentElement?.closest('.megulit-ruby-base'), o = base && sentence.contains(base) && base.__megulitOrigin || [0, 0];
-      set(t, 'left', (r[0] - o[0]) + 'px'); set(t, 'top', (r[1] - o[1]) + 'px'); set(t, 'width', r[2] + 'px'); set(t, 'height', r[3] + 'px');
-      set(t, 'font-size', size + 'px'); set(t, 'line-height', r[3] + 'px');
-      geom.push(r.map(Math.round).join(','));
-    }
+    placeGlyphs(sentence, place, size, geom);
     /* translation: under the last row, starting at the line's left edge, no plate; translation only: in the Japanese's place */
     const row = win.querySelector('.tomoyo-cn-row'), all = [...place.values()];
     if (row && all.length) {

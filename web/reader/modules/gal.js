@@ -253,6 +253,11 @@
         first.before(base);base.append(...nodes);
       }
     }
+    measureRuby(sentence, chars, bases());
+  }
+  bridge.measurePlacedRuby = sentence => measureRuby(sentence, [...sentence.querySelectorAll('.char-token')], sentence.querySelectorAll('.megulit-ruby-base'));
+  function measureRuby(sentence, chars, bases) {
+    const placed = sentence.closest('.megulit-place-window') && document.body.classList.contains('megulit-placed');
     const canvas=document.createElement('canvas').getContext('2d');
     const root=getComputedStyle(document.documentElement),family=root.getPropertyValue('--tomoyo-ruby-font').trim()||'Meiryo';
     const offset=parseFloat(root.getPropertyValue('--tomoyo-ruby-offset-x'))||0,items=[];
@@ -286,11 +291,12 @@
     rows.sort((a,b)=>a.center-b.center);
     const rowOf=g=>{const c=(g.top+g.bottom)/2;let best=0;for(let i=1;i<rows.length;i++)if(Math.abs(rows[i].center-c)<Math.abs(rows[best].center-c))best=i;return best;
      };
-    for(const node of bases()){
+    for(const node of bases){
       const first=node.firstElementChild,style=getComputedStyle(first),rect=node.getBoundingClientRect(),glyph=first.getBoundingClientRect();
       const baseFont=parseFloat(style.fontSize)||16;
       const trailing=parseFloat(style.letterSpacing)||0,scale=rect.width/(node.offsetWidth||1)||1;
-      const spacing=Math.max(-.08,trailing/baseFont),reading=node.__megulitReading;
+      const spacing=Math.max(-.08,trailing/baseFont),reading=node.__megulitReading || node.dataset.tomoyoReading;
+      if (!reading) continue;
       node.style.setProperty('--megulit-ruby-trailing-space',trailing+'px');
       node.style.setProperty('--megulit-ruby-letter-spacing',spacing+'em');
       const scaleY=rect.height/(node.offsetHeight||1)||1,boxTop=(glyph.top+glyph.bottom)/2-baseFont*scaleY*.58;
@@ -317,6 +323,35 @@
     // One reading size for the whole sentence (user: 一样大最好): the smallest that fits any of its rows.
     const common=Math.min(...items.map(i=>i.font));for(const i of items){i.width*=common/i.font;i.font=common;}
     {const n=Math.min(16,rows.length);if(n&&n!==window.__megulitRubyRows){window.__megulitRubyRows=n;dispatchEvent(new Event('megulit-ruby-rows'));}} /* E270: the rows of the current sentence, not the most ever seen */
+    if (placed) {
+      // The game fixes every word's centre. Keep the requested height and fit only readings that
+      // meet on that row, horizontally, without displacing the clickable Japanese underneath.
+      const nativeRows = [];
+      for (const i of items) {
+        i.center = (i.left + i.right) / 2;
+        i.fit = 1;
+        if (i.right <= i.left || !i.node.offsetHeight) continue;
+        i.fit = Math.min(1, 2 * Math.max(0, Math.min(i.center, innerWidth - i.center)) / (i.width || 1));
+        const y = i.node.offsetTop + i.node.offsetHeight / 2;
+        let row = nativeRows.find(r => Math.abs(r.y - y) < i.node.offsetHeight / 2);
+        if (!row) { row = { y, labels: [] }; nativeRows.push(row); }
+        row.labels.push(i);
+      }
+      for (const { labels } of nativeRows) {
+        labels.sort((a, b) => a.center - b.center);
+        for (let j = 1; j < labels.length; j++) {
+          const a = labels[j - 1], b = labels[j];
+          const fit = Math.max(0, 2 * (b.center - a.center - 1) / (a.width + b.width || 1));
+          a.fit = Math.min(a.fit, fit); b.fit = Math.min(b.fit, fit);
+        }
+      }
+      for (const i of items) {
+        i.node.dataset.tomoyoReading = i.reading;
+        i.node.style.setProperty('--megulit-cell-ruby-scale', String(i.fit));
+        i.node.style.setProperty('--tomoyo-ruby-actual-size', i.font + 'px');
+      }
+      return;
+    }
     for(const item of window.TomoyoRubyLayout.layout(items,{minFont:1e9})){
       if(!item.visible){item.node.removeAttribute('data-tomoyo-reading');continue;}
       item.node.setAttribute('data-tomoyo-reading',item.reading);
