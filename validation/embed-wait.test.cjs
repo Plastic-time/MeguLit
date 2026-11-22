@@ -21,13 +21,14 @@ test('native cache uses exact complete binary input rather than a lossy 64-bit t
 });
 test('hook: the answer event exists before the line goes out, every answer is cached per generation, only waiting streams clear the answer buffer',()=>{
  const h=read('native/megulithook/MeguLitEmbedWait.h');
- assert.match(h,/const ULONGLONG UnchangedTtlMs = 500;/);
- assert.match(h,/bool unchanged = answer\.empty\(\);/);
+ assert.match(h,/const ULONGLONG AnswerTtlMs = 500;/,'#696 review: one TTL for every answer, nothing beside the answer in the shared memory');
+ assert.match(h,/map\[key\] = Entry\{answer, answer\.empty\(\), now\};/);
+ assert.doesNotMatch(h,/AnswerTtlOffset|ReadAnswerTtlMs|ClearAnswerTtlMs/);
  const e=read('native/megulithook/embed_util.cc');
  assert.match(e,/static_assert\(offsetof\(CommonSharedMem, hash\) == 16/);
  assert.match(e,/int MeguLitEmbedArm\(HookParam &hp, TextBuffer &buff, const ThreadParam &tp\)\s*\{\s*if \(!check_embed_able\(tp\)\)\s*return -1;/,'a stream that is not selected returns before anything else');
- assert.match(e,/MeguLitEmbed::ClearAnswerTtlMs\(commonsharedmem\);\s*ZeroMemory\(commonsharedmem->text[^;]*;[^\n]*\n[^\n]*\n\s*MeguLitEmbed::Arm\(/,'the buffer and answer TTL are cleared and the event made just before the line goes out');
- assert.match(e,/translatecache\.Put\(key, generation, GetTickCount64\(\), translate, MeguLitEmbed::ReadAnswerTtlMs\(commonsharedmem\)\);\s*if \(\(translate\.size\(\) == 0\)\)\s*return false;/,'an empty answer is cached too and timed answers carry their TTL from the bridge');
+ assert.match(e,/return -1;\s*ZeroMemory\(commonsharedmem->text[^;]*;[^\n]*\n[^\n]*\n\s*MeguLitEmbed::Arm\(/,'the buffer is cleared and the event made just before the line goes out');
+ assert.match(e,/translatecache\.Put\(key, generation, GetTickCount64\(\), translate\);\s*if \(\(translate\.size\(\) == 0\)\)\s*return false;/,'an empty answer is cached too');
  const t=read('native/megulithook/texthook.cc');
  assert.match(t,/int armed = MeguLitEmbedArm\(hp, buff, tp\);/);
  assert.match(t,/if \(armed > 0 \|\| armed == -2\)\s*buffer->type &= \(~EMBED_ABLE\);/,'never strips EMBED_ABLE from a stream that is not selected');
@@ -41,11 +42,9 @@ test('bridge: hide waits at most 100 ms, no fixed sleep before the answer, gener
  assert.doesNotMatch(b,/Thread\.Sleep\(8\)/);
  assert.match(b,/GlyphLine\(text\);GlyphDrain\(8\);try\{Luna_EmbedCallback\(tp,text,text\);\}/);
  assert.match(b,/MemoryMappedFile\.OpenExisting\("EMBED_SHARED_MEM"\+Pid\);EmbedView=EmbedMem\.CreateViewAccessor\(16,8\);/);
- assert.match(b,/const uint TwinAnswerTtlMs=500;/,'timed twin hide answers expire before the bridge 1.5 s twin window');
- assert.match(b,/EmbedTtlView=EmbedMem\.CreateViewAccessor\(12,4\);EmbedTtlView\.Write\(0,ttlMs\);/,'bridge writes the answer TTL at CommonSharedMem offset 12');
- assert.match(b,/Luna_EmbedCallback\(tp,text,twinHidden,TwinAnswerTtlMs\);/,'Japanese twin hide answers carry a finite cache TTL');
- assert.match(b,/Luna_EmbedCallback\(tp,text,hidden,TwinAnswerTtlMs\);/,'foreign twin hide answers carry a finite cache TTL');
- assert.match(b,/static void OnEmbedAnswer\(string text,ThreadParam tp\)\{SyncEmbedGeneration\(\);/);
+ assert.doesNotMatch(b,/CreateViewAccessor\(12,|TwinAnswerTtlMs/,'#696 review: the bridge writes nothing beside the answer and the generation (a per-answer TTL in the shared memory was cleared by another stream)');
+ assert.match(b,/static void OnEmbedAnswer\(string text,ThreadParam tp\)\{SyncEmbedGeneration\(\);if\(AnswerFromMemo\(tp,text\)\)return;/,'a redraw of the selected line asked again after the hook\'s 500 ms is answered from the memo');
+ assert.match(b,/static string AnswerState\(\)\{try\{return EmbedStateKey\(\)\+"\|"\+LeaveGen\+"\|"\+Interlocked\.Read\(ref EmbedGen\);\}/,'the memo is bound to the state, LeaveGen and the generation');
  assert.match(b,/Heartbeat\(\);SyncEmbedGeneration\(\);Thread\.Sleep\(40\);/);
  for(const k of ['Selected','ReplacementEnabled','TranslateMode','MarksMode','GlyphAll','SkipHeld','EngineDialogHidden','HookTarget.ChineseText','c.hideOnly'])assert.ok(b.includes('static string EmbedStateKey(){')&&b.slice(b.indexOf('static string EmbedStateKey(){')).split('\n')[0].includes(k),k);
  assert.match(b,/static void Diagnostic\(string value\)\{DiagQueue\.Enqueue\(/);});

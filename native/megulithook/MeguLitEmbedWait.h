@@ -13,22 +13,13 @@
 
 namespace MeguLitEmbed
 {
-  /* an empty answer is cached only this long: the bridge also answers by time (skip bursts, twins within 1.5 s) */
-  const ULONGLONG UnchangedTtlMs = 500;
-  /* 4-byte padding between CommonSharedMem::displaymode (offset 8) and hash (offset 16):
-     the bridge writes a non-zero TTL in ms for timed answers (twin 1.5 s window), 0 for permanent answers */
-  const size_t SharedAnswerTtlOffset = 12;
-  inline void ClearAnswerTtlMs(void *sharedMem)
-  {
-    if (sharedMem)
-      *reinterpret_cast<volatile UINT32 *>(static_cast<char *>(sharedMem) + SharedAnswerTtlOffset) = 0;
-  }
-  inline ULONGLONG ReadAnswerTtlMs(const void *sharedMem)
-  {
-    if (!sharedMem)
-      return 0;
-    return *reinterpret_cast<const volatile UINT32 *>(static_cast<const char *>(sharedMem) + SharedAnswerTtlOffset);
-  }
+  /* every answer is cached this long, empty or not: the bridge also answers by time (skip bursts, twins within its 1.5 s
+     window, so a twin's hide answer must expire well before that). #696 review: the bridge used to send a per-answer TTL
+     through the 4-byte padding of CommonSharedMem, read after the answer text; another stream arming its own question in
+     between cleared it and a twin's timed answer was kept for the whole generation. One TTL for every answer needs nothing
+     beside the answer itself. A redraw of the selected line asks again after this long; the bridge answers it from its own
+     memo of that answer (HookBridge.cs AnswerFromMemo), so it costs a short wait and no work there. */
+  const ULONGLONG AnswerTtlMs = 500;
   const size_t MaxEntries = 4096;
 
   enum Hit
@@ -43,7 +34,6 @@ namespace MeguLitEmbed
     std::wstring text;
     bool unchanged;
     ULONGLONG at;
-    ULONGLONG ttlMs; /* 0: valid for the whole generation; > 0: expires after ttlMs */
   };
 
   class Cache
@@ -71,7 +61,7 @@ namespace MeguLitEmbed
       auto found = map.find(key);
       if (found != map.end())
       {
-        if (found->second.ttlMs != 0 && now >= found->second.at && now - found->second.at >= found->second.ttlMs)
+        if (now >= found->second.at && now - found->second.at >= AnswerTtlMs)
           map.erase(found);
         else if (!found->second.unchanged)
         {
@@ -85,14 +75,12 @@ namespace MeguLitEmbed
       ReleaseSRWLockExclusive(&lock);
       return hit;
     }
-    /* an empty answer is "unchanged" (the bridge sends "" for passthrough); a non-empty one with ttlMs == 0 is cached for
-       good in this generation, while a timed answer (a twin hide from the bridge's 1.5 s window) expires after ttlMs */
-    void Put(const std::string &key, UINT64 g, ULONGLONG now, const std::wstring &answer, ULONGLONG ttlMs = 0)
+    /* an empty answer is "unchanged" (the bridge sends "" for passthrough); every answer expires after AnswerTtlMs */
+    void Put(const std::string &key, UINT64 g, ULONGLONG now, const std::wstring &answer)
     {
       AcquireSRWLockExclusive(&lock);
       Roll(g);
-      bool unchanged = answer.empty();
-      map[key] = Entry{answer, unchanged, now, unchanged ? UnchangedTtlMs : ttlMs};
+      map[key] = Entry{answer, answer.empty(), now};
       ReleaseSRWLockExclusive(&lock);
     }
     size_t Size()

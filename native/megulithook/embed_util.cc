@@ -317,9 +317,6 @@ static std::string textkey(const ThreadParam &tp, const void *data, size_t len)
   return MeguLitEmbed::Key(tp.addr, tp.ctx, tp.ctx2, data, len);
 }
 static_assert(offsetof(CommonSharedMem, hash) == 16, "HookBridge.cs SyncEmbedGeneration writes the generation at offset 16");
-static_assert(offsetof(CommonSharedMem, displaymode) + sizeof(Displaymode) <= MeguLitEmbed::SharedAnswerTtlOffset &&
-                  MeguLitEmbed::SharedAnswerTtlOffset + sizeof(UINT32) <= offsetof(CommonSharedMem, hash),
-              "HookBridge.cs writes the answer TTL at offset 12");
 /* MeguLit: the cache generation (MeguLitEmbedWait.h): what the bridge bumped plus what the hook sees itself */
 static UINT64 embedgeneration()
 {
@@ -361,7 +358,6 @@ int MeguLitEmbedArm(HookParam &hp, TextBuffer &buff, const ThreadParam &tp)
   auto t = commonparsestring(buff.data, buff.size, &hp, hostcodepage);
   if (!t)
     return -1;
-  MeguLitEmbed::ClearAnswerTtlMs(commonsharedmem);
   ZeroMemory(commonsharedmem->text, sizeof(commonsharedmem->text)); /* clear trans before call */
   auto &origin = t.value();
   MeguLitEmbed::Arm(LUNA_EMBED_notify_event, GetCurrentProcessId(), simplehash::djb2_n2((const unsigned char *)(origin.c_str()), origin.size() * 2));
@@ -401,8 +397,8 @@ bool TextHook::waitfornotify(TextBuffer *buff, ThreadParam tp)
     if (waitforevent(commonsharedmem->waittime, tp, origin) == false)
       return false;
     translate = commonsharedmem->text;
-    /* an empty answer is cached too (short-lived); a timed twin answer carries its TTL from the bridge */
-    translatecache.Put(key, generation, GetTickCount64(), translate, MeguLitEmbed::ReadAnswerTtlMs(commonsharedmem));
+    /* an empty answer is cached too; every answer for MeguLitEmbed::AnswerTtlMs */
+    translatecache.Put(key, generation, GetTickCount64(), translate);
     if ((translate.size() == 0))
       return false;
   }
