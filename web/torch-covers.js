@@ -57,7 +57,7 @@ export function createTorchCovers(parent,{east,west,reduced}){
    const map=new THREE.CanvasTexture(thumb);map.colorSpace=THREE.SRGBColorSpace;
    const size=1.18+Math.random()*.62,aspect=thumb.width/thumb.height;
    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(size*Math.min(1,aspect),size*Math.min(1,1/aspect)),
-    new THREE.MeshBasicMaterial({map,side:THREE.DoubleSide,color:0xe6e5ed}));
+    new THREE.MeshBasicMaterial({map,side:THREE.DoubleSide,color:0xe6e5ed,transparent:true,opacity:0.65,depthWrite:false}));
    const slot=group.children.length,side=slot%2===0?-1:1;
    mesh.name=id;
    const offset=10+Math.floor(slot/3)*12+Math.random()*8;
