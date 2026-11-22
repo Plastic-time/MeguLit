@@ -84,6 +84,12 @@ test('actual relay Worker routes torch-release paths to handler with real reques
  const worker=new vm.SourceTextModule(text,{context,identifier:'actual-worker'});
  await worker.link(async spec=>{
   if(modules.has(spec))return modules.get(spec);
+  if(spec==='./update-policy.js'){
+   const policy=await import('../relay/src/update-policy.js');
+   return new vm.SyntheticModule(['updateGuard','updatePolicy'],function(){
+    this.setExport('updateGuard',policy.updateGuard);this.setExport('updatePolicy',policy.updatePolicy);
+   },{context});
+  }
   const declarations=Array.from(text.matchAll(/(?:import|export)\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/g));
   const names=[...new Set(declarations.filter(m=>m[2]===spec).flatMap(m=>m[1].split(',').map(name=>name.trim())))];
   assert(names.length);const values=Object.fromEntries(names.map(n=>[n,()=>{throw Error('UNEXPECTED_ROUTE_DEPENDENCY:'+n);} ]));values.isAccountsPath=()=>false;values.ROTATED=new WeakMap();values.torchReleaseRoute=async(...args)=>{calls.push(args);return new Response('fixture',{status:209});};const mod=new vm.SyntheticModule(names,function(){for(const name of names)this.setExport(name,values[name]);},{context});modules.set(spec,mod);return mod;});await worker.evaluate();
