@@ -11,7 +11,6 @@ const {HookNative}=require('../core/hook-native.cjs'),Profiles=require('../core/
 const root=path.join(__dirname,'..'),PID=900000+(process.pid%90000);
 /* the DLL (native/krkrtext/KrkrText.cpp MakeCtlPath): GetTempPathW() + MeguLit\draw\<pid>.txt */
 const dllPath=pid=>path.join(process.env.TMP||process.env.TEMP||os.tmpdir(),'MeguLit','draw',pid+'.txt');
-const {KrkrModel}=require('../tools/reader-replay/krkr-model.cjs');
 test('Fata end to end: seed profile -> real pid from configure -> control file at the DLL path -> script.inc reads #choiceframe and #clearline',async t=>{
  const file=dllPath(PID);t.after(()=>{try{fs.unlinkSync(file);}catch{}});try{fs.unlinkSync(file);}catch{}
  const p=Profiles.profileFor({exe:'D:/Games/Fata/fata_jp.exe',engine:'KiriKiri'});assert.equal(p.gameKey,'fata-morgana');assert.equal(p.page.reportClear,true);assert.ok(p.choice.pageFrames.length);
@@ -21,8 +20,10 @@ test('Fata end to end: seed profile -> real pid from configure -> control file a
  assert.equal(hook.gamePid(),PID,'the pid comes from configure (window state / target), not this.state');
  await new Promise(r=>setTimeout(r,150));
  assert.ok(fs.existsSync(file),'control file written at '+file);
- assert.deepEqual([...fs.readFileSync(file).subarray(0,2)],[0xff,0xfe],'UTF-16LE with BOM');
- const model=new KrkrModel({pid:PID});assert.equal(model.ctl.win,file);const c=model.tick();
+ const {KrkrModel}=require('../tools/reader-replay/krkr-model.cjs');
+ const model=new KrkrModel({pid:PID,tmp:process.env.TMP||process.env.TEMP||os.tmpdir()});
+ assert.equal(model.ctl.win,file);assert.deepEqual([...fs.readFileSync(file).subarray(0,2)],[0xff,0xfe],'UTF-16LE with BOM');
+ const c=model.tick();
  assert.equal(c.clear,1,'#clearline read by script.inc');assert.ok(Array.isArray(c.choiceFrames)&&c.choiceFrames.some(r=>r.test('選択肢')),'#choiceframe read by script.inc');
  hook.engineDraw?.stop();
 });

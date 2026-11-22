@@ -764,7 +764,7 @@ class HookNative{
     page line took is never dropped. One the reader already has (a piece of a delivered line, or a page dump made of delivered lines) goes
     quietly; any other is the game's line drawn off the message layer (a text effect drawn on its own layer, a choice) and is delivered from
     the hook text, counted as an effect line (textEffectsLine). Choice texts glued in one hook line come as one row each */
- expirePageHeld(){const K=this.pageState;if(!K)return;const now=this.now(),keep=[];for(const h of K.held){if(now-h.at<this.holdFor(K.engine)){keep.push(h);continue;}if(this.pageNvl()&&K.engine!=='ocr'&&Profiles.get(this.profile,'page.keepHeld',false)!==true){this.trace(K.engine+' page: hook line drawn nowhere on the page, dropped chars='+h.text.length);continue;}if(this.pageNvl()&&K.engine!=='ocr'){if(this.heldCovered(h.text)){this.trace(K.engine+' page: hook line already read, skipped chars='+h.text.length);continue;}/* incr11 23:33:41Z: the option itself came on the dialogue stream; read as a line it cleared the choice screen. A held line made of the current choice candidates is the choice screen's: the game draws it (its link text stays visible) and the choice layer adds ruby and translation */const shown=this.choice?.active&&Array.isArray(this.state?.hookChoices?.items)?this.state.hookChoices.items.map(i=>HookNative.flat(i?.text)).filter(Boolean):[];const parts=HookNative.glued(h.text,shown);if(parts){this.trace(K.engine+' page: hook line is the choice screen ('+parts.length+' candidate(s)), left to the choice layer chars='+h.text.length);continue;}const text=h.text;this.trace(K.engine+' page: hook line drawn off the page layer, delivered from the hook text chars='+h.text.length);this.fxNext=true;try{this.deliverSource(text,h.origin);}finally{this.fxNext=false;}}else this.deliverSource(h.text,h.origin);}K.held=keep;this.schedulePageHeld();}
+ expirePageHeld(){const K=this.pageState;if(!K)return;const now=this.now(),keep=[];for(const h of K.held){if(now-h.at<this.holdFor(K.engine)){keep.push(h);continue;}if(this.pageNvl()&&K.engine!=='ocr'&&Profiles.get(this.profile,'page.keepHeld',false)!==true){this.trace(K.engine+' page: hook line drawn nowhere on the page, dropped chars='+h.text.length);continue;}if(this.pageNvl()&&K.engine!=='ocr'){if(this.heldCovered(h.text)){this.trace(K.engine+' page: hook line already read, skipped chars='+h.text.length);continue;}/* incr11 23:33:41Z: the option itself came on the dialogue stream; read as a line it cleared the choice screen. A held line made of the current choice candidates is the choice screen's: the game draws it (its link text stays visible) and the choice layer adds ruby and translation */const parts=this.heldChoiceParts(h.text);if(parts){this.trace(K.engine+' page: hook line is the choice screen ('+parts.length+' candidate(s)), left to the choice layer chars='+h.text.length);continue;}const text=h.text;this.trace(K.engine+' page: hook line drawn off the page layer, delivered from the hook text chars='+h.text.length);this.fxNext=true;try{this.deliverSource(text,h.origin);}finally{this.fxNext=false;}}else this.deliverSource(h.text,h.origin);}K.held=keep;this.schedulePageHeld();}
  /* content characters: no spaces, punctuation or symbols (ellipses and brackets say nothing about which line it is) */
  static content(v){return HookNative.flat(v).replace(/[\p{P}\p{S}]/gu,'');}
  /* the drawn text shows the hook line: the same text, one inside the other, or (a text effect: characters shuffled, repeated, fading in) nearly every
@@ -782,6 +782,26 @@ class HookNative{
  /* a held hook line the reader already has: inside one recent line, or (a page dump) at least 80 % made of recent lines */
  heldCovered(text){const f=HookNative.flat(text),R=(this.recentSources||[]).filter(Boolean);if(!f)return true;if(R.some(r=>r.includes(f)))return true;
   const mark=new Uint8Array(f.length);for(const r of R){if(r.length<4)continue;let at=f.indexOf(r);while(at>=0){mark.fill(1,at,at+r.length);at=f.indexOf(r,at+1);}}let n=0;for(const v of mark)n+=v;return n>=f.length*.8;}
+ heldChoiceParts(text){
+  const shown=this.choice?.active&&Array.isArray(this.state?.hookChoices?.items)?this.state.hookChoices.items.map(i=>HookNative.flat(i?.text)).filter(Boolean):[];
+  const confirmed=HookNative.glued(text,shown);
+  if(confirmed)return confirmed;
+  // The frame name and its option are also drawn separately before the choice boxes arrive.
+  // Only the composite with the repeated, profile-declared frame label is presentation text.
+  const frames=Profiles.get(this.profile,'choice.pageFrames',[]);
+  if(!frames.length)return null;
+  const flat=HookNative.flat(text),recent=this.choiceKeys();
+  for(const label of recent){
+   if(!frames.includes('^'+label+'$')||!flat.startsWith(label+label))continue;
+   const option=flat.slice(2*label.length);
+   if(option&&option!==label&&recent.includes(option)){
+    const known=this.sourceCache?.get(String(text).replace(/\s+/g,''));
+    if(known&&known.provider===this.originalText&&known.r?.status==='exact')return null;
+    return [label,option];
+   }
+  }
+  return null;
+ }
  choiceKeys(){const C=this.choice;if(!C||!Array.isArray(C.items))return [];const now=this.now();return C.items.filter(x=>now-x.at<5000).map(x=>x.key).filter(k=>k&&k.length>=2);}
  /* 2026-11-21 (ファタモルガーナの館: the reader's own count saw 5-11 % orphans and never switched to read mode, because the lines the text
     effect broke never reached it): core counts each of the game's first 20 lines. A line is an effect line when it came from the hook

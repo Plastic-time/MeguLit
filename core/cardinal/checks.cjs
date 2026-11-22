@@ -17,6 +17,8 @@ const norm=t=>String(t||'').replace(/[^぀-ヿ㐀-鿿]/g,'');
 /* the Japanese glyphs the player sees on the reader (no UI, no Chinese rows, nothing unclassified) */
 const jpGlyphs=s=>(s.glyphs||[]).filter(g=>JP.test(g.text)&&!['ui','zh'].includes(g.kind)&&!/[A-Za-z]{2}|[一-鿿]{2,}[，。：]/.test(g.text)&&g.kind!=='other');
 const lineGlyphs=s=>jpGlyphs(s).filter(g=>g.kind==='line');
+// Earlier rows on the same page are still clickable, but cannot complete the current source sentence.
+const currentGlyphs=s=>lineGlyphs(s).filter(g=>!g.retained&&!/(?:^|\s)(?:megulit-old-line|tome-page-lines)(?:\s|$)/.test(g.parentCls||''));
 const inside=(g,hits)=>(hits||[]).some(h=>{const cx=g.rect.x+g.rect.w/2,cy=g.rect.y+g.rect.h/2;return cx>=h.x-1&&cx<=h.x+h.width+1&&cy>=h.y-1&&cy<=h.y+h.height+1;});
 const menuOpen=s=>String(s.body||'').includes('megulit-menu-open');
 const opts=t=>({...T0,...(t||{})});
@@ -51,8 +53,7 @@ function lines(run,t){t=opts(t);const o=run.o,steps=fed(run).filter(st=>st.line!
 function perLine(run,t){t=opts(t);const name=run.name||'run',row=[],stable=[],owner=[],dup=[],pairs={shown:0,paired:0},visibility={shown:0,expected:0},complete={lines:0};const ls=lines(run,t);
  for(const l of ls){const want=norm(l.text);if(!want)continue;let rowBad=false,stableBad=false;
   /* while options are on the reader the line gives way to them (not a missing row) */
-  const settled=l.samples.filter(s=>s.at-l.samples[0].at>=t.settleMs&&!(s.choices||[]).some(c=>c.shown));// A retained page row is still checked for hits and duplicate rendering below.
-  const drawn=s=>norm(lineGlyphs(s).filter(g=>!g.retained).map(g=>g.text).join(''));const shown=settled.filter(s=>{const text=drawn(s);return text.length>=Math.min(want.length,2)&&want.startsWith(text);});
+  const settled=l.samples.filter(s=>s.at-l.samples[0].at>=t.settleMs&&!(s.choices||[]).some(c=>c.shown));const drawn=s=>norm(currentGlyphs(s).map(g=>g.text).join(''));const shown=settled.filter(s=>{const text=drawn(s);return text.length>=Math.min(want.length,2)&&want.startsWith(text);});
   l.complete=settled.some(s=>drawn(s)===want);if(l.complete)complete.lines++;else if(settled.length){row.push(name+' line '+l.line+' never completes the expected Japanese text');rowBad=true;}
   visibility.expected+=settled.length;visibility.shown+=shown.length;
   if(settled.length&&shown.length<settled.length*t.shownRate){row.push(name+' line '+l.line+' 「'+l.text+'」 Japanese shown in '+shown.length+'/'+settled.length+' samples');rowBad=true;}

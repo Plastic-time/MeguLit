@@ -79,7 +79,9 @@ const runtime=new Runtime(root,(channel,payload)=>{if(channel!=='reader-event')r
  if(page)page.evaluate(m=>window.__replayEvent(m),payload).catch(()=>{});else early.push(payload);});
 runtime.spawnReaderNative=()=>gwb;
 /* the tokenizer runtime is absent here and never installed (no pip / dictionary download from a replay): requests fail like an uninstalled one */
-runtime.learning=()=>({installed:()=>false,status:()=>({learningInstalled:false,learningProgress:{stage:'idle',percent:null}}),request:async()=>{throw Error('LEARNING_NOT_INSTALLED');},readings:{resolve:t=>t},adaptResult:r=>r,progress:{stage:'idle'}});
+const replayLearning={installed:()=>false,status:require(path.join(REPO,'core','learning-native.cjs')).LocalLearning.prototype.status,
+ request:async()=>{throw Error('LEARNING_NOT_INSTALLED');},readings:{resolve:t=>t},adaptResult:r=>r,progress:{stage:'idle'}};
+runtime.learning=()=>replayLearning;
 const bridge=require(path.join(REPO,'services','bridge.cjs'));
 async function service(request){
  if(request.action==='reader_attach'){const r=await runtime.call(request);const h=runtime.reader?.gal?.hooks;if(h){h.spawn=()=>{hookSpawned++;return newHook();};}return r;}

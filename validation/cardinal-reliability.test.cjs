@@ -6,6 +6,17 @@ require('./helpers/cardinal-identity.cjs')(test);
 const S=require('../core/cardinal/score.cjs'),C=require('../core/cardinal/checks.cjs'),D=require('../core/profiles/defaults.cjs');
 const Tape=require('../core/cardinal/tape.cjs'),Jobs=require('../services/cardinal.cjs'),Live=require('../services/self-check-live.cjs'),Profiles=require('../core/profiles/index.cjs');
 const fixture=require('./fixtures/cardinal/fata-live-visibility-20261121.json'),SHA='b'.repeat(64);
+test('a retained clickable row does not change or stand in for the current sentence',()=>{
+ const run=structuredClone(fixture.run),baseline=C.perLine(run).complete.lines;
+ assert.ok(baseline>0);
+ for(const s of run.o.samples){
+  const first=C.lineGlyphs(s)[0];
+  if(first)s.glyphs.push({...first,text:'前の行',retained:true});
+ }
+ assert.equal(C.perLine(run).complete.lines,baseline);
+ for(const s of run.o.samples)for(const g of C.lineGlyphs(s))g.retained=true;
+ assert.equal(C.perLine(run).complete.lines,0);
+});
 test('real faulty DOM: missing source state or all probe samples never becomes a perfect score',()=>{
  const baseline=S.score(fixture.run,D.cardinal);
  for(const variant of ['empty-source','wrong-source','no-samples']){

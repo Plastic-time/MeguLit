@@ -17,6 +17,16 @@ test('only confirmed on-screen choice text stays with the choice layer',()=>{
  const r=held({active:true,shown:true});r.h.expirePageHeld();assert.deepEqual(r.delivered,[]);
  const q=held({active:true,shown:true});q.h.state.hookChoices.items=[{text:'違う選択肢'}];q.h.expirePageHeld();assert.deepEqual(q.delivered,[[q.text,'live']]);
 });
+test('a doubled menu label requires a separate recent frame and option, and cannot swallow exact script text',()=>{
+ const {h}=held(),label='選択肢',option='……おはよう………………',text=label+label+option;
+ h.choice.items=[{key:label,at:4900},{key:option,at:4900}];
+ assert.deepEqual(h.heldChoiceParts(text),[label,option]);
+ assert.equal(h.heldChoiceParts(label+option),null);
+ h.originalText={};h.sourceCache=new Map([[text,{provider:h.originalText,r:{status:'exact'}}]]);
+ assert.equal(h.heldChoiceParts(text),null);
+ h.sourceCache.clear();h.choice.items[0].at=-100;
+ assert.equal(h.heldChoiceParts(text),null);
+});
 test('effect-frame game: aux art rejects interleaved draws and configured UI markers',()=>{
  const h=Object.create(HookNative.prototype),located=[];Object.assign(h,{profile:fata(),now:()=>5000,trace(){},artLocate:t=>located.push(t),lastSource:'今は別の台詞を読んでいる。',recentSources:[]});
  for(const t of ['しょう……。しょう……。しょ…う…。しょ…う…。','選択肢選択肢','選択ライン選択ライン'])h.artCandidate(t);
