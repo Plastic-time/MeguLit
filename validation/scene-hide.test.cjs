@@ -2,7 +2,7 @@
 // E322 (user, 2026-11-10: the whole reading layer faded out by itself, in several games). The scene probe read the
 // screen, MeguLit's own layer included, so MeguLit's own text changing after a click looked like the game's picture
 // changing. These checks keep it on the game window's own picture and make every whole-layer hide carry its cause.
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{execFileSync}=require('node:child_process');
 const {Immersion}=require('../core/immersion.cjs');
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 
@@ -25,4 +25,45 @@ test('every whole-layer hide carries its cause, and the reader host logs it',()=
  const reader=read('services/reader.cjs');
  assert.match(reader,/logVisibility\(\{type:'dialogVisibility',visible:message\.dialogVisible,reason:message\.reason\}\)/);
  assert.match(reader,/message\.type==='dialogSceneKept'/);
+});
+
+// 2026-11-21 (user, Aokana: the line stayed after the game's picture had moved on). Its window gave BitBlt one old picture for
+// the whole session, so every scene check compared that picture with itself.
+test('a BitBlt picture that stays the same while the screen moves is frozen and read through PrintWindow',()=>{
+ const cap=read('native/GameCapture.cs'),probe=read('native/GameSceneProbe.cs'),bridge=read('native/GalWindowBridge.cs');
+ assert.match(cap,/Choice c;long ticket=TakeTicket\(hwnd,out c\);\s+bool frozen=false;\s+if\(Blt\(hwnd,image\)&&!Blank\(image\)\)\{if\(AcceptBlt\(c,ticket,Signature\(image\),DateTime\.UtcNow,\(r,v\)=>FreezeVote\(hwnd,image,c,r,v\),out frozen\)\)return true;if\(!frozen\)return false;\}/,'Into: takes ticket before BitBlt; frozen prints, stale skips');
+ assert.match(cap,/Choice c;long ticket=TakeTicket\(hwnd,out c\);\s+if\(!Blt\(hwnd,image\)\)\{Skipped=true;return false;\}\s+if\(!Blank\(image\)\)\{bool f;if\(AcceptBlt\(c,ticket,Signature\(image\),DateTime\.UtcNow,\(r,v\)=>FreezeVote\(hwnd,image,c,r,v\),out f\)\)return true;Skipped=true;return false;\}/,'BltOnly: takes ticket before BitBlt; frozen or stale skips');
+ assert.match(cap,/return VoteScreen\(c,round,voteId,now,Samples\(picture\)\);/,'FreezeVote updates c.Screen under the round and voteId check');
+ assert.match(cap,/if\(!frozen&&!c\.Proven&&!c\.Blind&&!c\.Frozen&&!c\.HasSig\)\{int vote=BlindVote\(hwnd,image\);lock\(Gate\)\{if\(!c\.Dropped&&!c\.Proven&&!c\.Blind&&!c\.Frozen&&!c\.HasSig&&ticket>c\.Accepted\)/,'BlindVote skips and never updates a window that already saw a BitBlt picture, froze, or accepted a newer ticket');
+ assert.match(cap,/if\(!KeepPart\(hwnd,c,ticket,blank,DateTime\.UtcNow\)\)\{Skipped=true;return false;\}/,'Part checks ticket and state before delivering a partial BitBlt');
+ assert.match(cap,/long printTicket;bool print=PrintTurn\(hwnd,c,ticket,DateTime\.UtcNow,out frozen,out printTicket\);/,'Into takes its print turn from the window state, also when its own BitBlt failed or was blank');
+ assert.match(cap,/!\(c\.Frozen\|\|c\.Blind\)\|\|ticket<c\.Accepted\|\|\(now-c\.Printed\)\.TotalMilliseconds<PrintGapMs\)return false;\s+frozen=c\.Frozen;c\.Printed=now;printTicket=\+\+c\.NextTicket;return true;/,'a frozen window is printed under the same rate limit as a blind one, re-checking state in the lock and taking a print ticket');
+ assert.match(cap,/case 0:Skipped=true;return false;\s+case 2:if\(printed&&!Current\(hwnd,c,ticket\)\)\{Skipped=true;return false;\}return printed;\s+\}\s+FromScreen=true;return ScreenInto\(hwnd,image\);/,'Into does what AfterPrint (self-tested) decides');
+ assert.match(cap,/return DeliverPrint\(hwnd,c,printTicket,image,printed,printed&&!Blank\(image\),frozen,screenFallback\);/,'Into delivers PrintWindow results through DeliverPrint');
+ assert.match(cap,/switch\(AfterPrint\(printed,good,frozen,screenFallback\)\)\{\s+case 1:if\(frozen\?Keep\(hwnd,c,ticket,image\):Current\(hwnd,c,ticket\)\)return true;Skipped=true;return false;/);
+ assert.match(cap,/printed=PrintWindow\(hwnd,dc,frozen\?printFlags\|1:printFlags\);/,'a frozen window is printed client area only, the same for every reader');
+ assert.match(cap,/GetAncestor\(front,2\)!=GetAncestor\(hwnd,2\)\|\|!SameScale\(hwnd\)\)return 0;/,'no vote for a window not drawn at its monitor DPI');
+ assert.match(cap,/var own=OwnParts;Cover\(now,own==null\?null:own\(hwnd,picture\.Width,picture\.Height\),picture\.Width,picture\.Height\);/,'MeguLit windows are left out');
+ assert.match(bridge,/var ownPids=PageLocate\.OwnPids;GameCapture\.OwnParts=\(ownHwnd,ownW,ownH\)=>OwnCover\.Parts\(ownHwnd,ownW,ownH,ownPids\);/);
+ assert.match(probe,/if\(GameCapture\.Into\(target,frame,2\)\)pictureAt=DateTime\.UtcNow;else if\(!GameCapture\.Recent\(target,frame,ref pictureAt,now,RecentMs\)\)return null;/,'the scene probe sees every print, but not one it missed while paused (#714 review)');
+ assert.match(probe,/const int RecentMs=1000;/);
+ assert.match(probe,/var now=DateTime\.UtcNow;Resumed\(now\);/,'a pause between ticks starts the counting again (self-tested in GameSceneProbe.SelfTest)');
+ assert.match(cap,/c\.LastAt<=after\|\|\(now-c\.LastAt\)\.TotalMilliseconds>maxAgeMs\|\|/,'Recent: a print older than the caller allows is not given (self-tested in FreezeSelfTest)');
+ assert.match(probe,/>1900&&seen>=3\)\{Line\(\);return null;\}/,'sparse pictures: at least three after an input');
+ assert.match(bridge,/if\(!GameCapture\.FreezeSelfTest\(\)\)return 10;/);
+});
+
+// 2026-11-22 (#714 review): GameStyleProbe and the overlay harness compile GameCapture.cs without the bridge's files. The freeze
+// rules (votes by round, A-B-A, the order of the screen checks, Part, a blank print, saved pictures, a dropped window) and the
+// scene probe run as their own self-tests, built from those two files only.
+const csc=['C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe'].find(f=>fs.existsSync(f));
+test('GameCapture.cs builds on its own; its freeze rules and the scene probe pass their self-tests',{skip:!csc&&'no csc'},()=>{
+ const dir=fs.mkdtempSync(path.join(process.env.MEGULIT_WORK||os.tmpdir(),'megulit-capture-freeze-')),exe=path.join(dir,'freeze.exe'),main=path.join(dir,'main.cs');
+ /* GameCapture.cs (as GameStyleProbe and the overlay harness build it) and the scene probe that reads through it */
+ fs.writeFileSync(main,'static class FreezeMain{static int Main(){return !GameCapture.FreezeSelfTest()?1:!GameSceneProbe.SelfTest()?2:0;}}');
+ try{execFileSync(csc,['/nologo','/target:exe','/platform:x64','/reference:System.Drawing.dll','/out:'+exe,
+   ...['native/GameCapture.cs','native/GameSceneProbe.cs'].map(f=>path.join(__dirname,'..',f)),main],{windowsHide:true});
+  let code=0;try{execFileSync(exe,[],{windowsHide:true,timeout:30000});}catch(e){code=e.status;}
+  assert.equal(code,0,'1: GameCapture.FreezeSelfTest failed, 2: GameSceneProbe.SelfTest failed');}
+ finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

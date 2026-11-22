@@ -338,6 +338,7 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
             });
             locator.OwnPids=new uint[]{(uint)OverlayPid,(uint)Process.GetCurrentProcess().Id};
             PageLocate=locator;
+            var ownPids=PageLocate.OwnPids;GameCapture.OwnParts=(ownHwnd,ownW,ownH)=>OwnCover.Parts(ownHwnd,ownW,ownH,ownPids);
         }
     }
     static void ForgetGame(){ResetPageLocator();Audio.Stop();if(TrackedGame!=null){TrackedGame.Dispose();TrackedGame=null;}TrackedGameStarted=0;WindowGoneAt=DateTime.MinValue;}
@@ -840,6 +841,7 @@ if(args.Length==2&&args[0]=="--art-scan-file"){Console.OutputEncoding=Encoding.U
         }
         if(args.Length>0&&args[0]=="--mode-self-test"){
             if(!GameSceneProbe.SelfTest())return 6;
+            if(!GameCapture.FreezeSelfTest())return 10;
             if(!GameAudio.ClientShotSelfTest())return 9;
             Command(new Dictionary<string,object>{{"type","configure"},{"interfaceMode","translation"}});
             if(!TranslationMode)return 4;

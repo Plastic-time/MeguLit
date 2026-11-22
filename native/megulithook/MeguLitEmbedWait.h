@@ -13,8 +13,13 @@
 
 namespace MeguLitEmbed
 {
-  /* an empty answer is cached only this long: the bridge also answers by time (skip bursts, twins within 1.5 s) */
-  const ULONGLONG UnchangedTtlMs = 500;
+  /* every answer is cached this long, empty or not: the bridge also answers by time (skip bursts, twins within its 1.5 s
+     window, so a twin's hide answer must expire well before that). #696 review: the bridge used to send a per-answer TTL
+     through the 4-byte padding of CommonSharedMem, read after the answer text; another stream arming its own question in
+     between cleared it and a twin's timed answer was kept for the whole generation. One TTL for every answer needs nothing
+     beside the answer itself. A redraw of the selected line asks again after this long; the bridge answers it from its own
+     memo of that answer (HookBridge.cs AnswerFromMemo), so it costs a short wait and no work there. */
+  const ULONGLONG AnswerTtlMs = 500;
   const size_t MaxEntries = 4096;
 
   enum Hit
@@ -56,28 +61,26 @@ namespace MeguLitEmbed
       auto found = map.find(key);
       if (found != map.end())
       {
-        if (!found->second.unchanged)
+        if (now >= found->second.at && now - found->second.at >= AnswerTtlMs)
+          map.erase(found);
+        else if (!found->second.unchanged)
         {
           if (out)
             *out = found->second.text;
           hit = Replace;
         }
-        else if (now - found->second.at < UnchangedTtlMs)
-          hit = Unchanged;
         else
-          map.erase(found);
+          hit = Unchanged;
       }
       ReleaseSRWLockExclusive(&lock);
       return hit;
     }
-    /* an empty answer is "unchanged" (the bridge sends "" for passthrough); a non-empty one, also the line itself (glyph dots
-       passthrough), is cached for good as before */
+    /* an empty answer is "unchanged" (the bridge sends "" for passthrough); every answer expires after AnswerTtlMs */
     void Put(const std::string &key, UINT64 g, ULONGLONG now, const std::wstring &answer)
     {
       AcquireSRWLockExclusive(&lock);
       Roll(g);
-      bool unchanged = answer.empty();
-      map[key] = Entry{answer, unchanged, now};
+      map[key] = Entry{answer, answer.empty(), now};
       ReleaseSRWLockExclusive(&lock);
     }
     size_t Size()
@@ -88,6 +91,26 @@ namespace MeguLitEmbed
       return n;
     }
   };
+
+  /* the cache key: the stream that asks (LunaHook's ThreadParam fields; the process id is the same for every call in this
+     process, and the padding after it is never read) and the complete raw line. An answer is the bridge's answer for one
+     stream: another stream that writes back the same line (a Japanese twin of the selected setter, a backlog row) asks the
+     bridge itself, which decides per stream (HookBridge.cs OnEmbedAnswer: the twin window, TwinCrowd's at most two twins),
+     and an empty answer cached for a twin is not the selected stream's cached answer. (The answer event is still named by
+     the line, not the stream, and LunaHost keeps one answer buffer: an answer wakes every stream waiting for that line. The
+     bridge keeps that to one waiter: a late embedded-translation answer is dropped once the selection that asked has
+     changed, and while answers come late the selected stream's twins are off; HookBridge.cs FinishEmbed, AnswersLater.) #696 review: three
+     enabled contexts showing the selected line were written back from its cached answer, so TwinCrowd never saw them. */
+  inline std::string Key(UINT64 addr, UINT64 ctx, UINT64 ctx2, const void *data, size_t len)
+  {
+    std::string key;
+    key.reserve(3 * sizeof(UINT64) + len);
+    key.append(reinterpret_cast<const char *>(&addr), sizeof(addr));
+    key.append(reinterpret_cast<const char *>(&ctx), sizeof(ctx));
+    key.append(reinterpret_cast<const char *>(&ctx2), sizeof(ctx2));
+    key.append(static_cast<const char *>(data), len);
+    return key;
+  }
 
   /* generation: the bridge bumps CommonSharedMem::hash (unused upstream) when the selected stream, the mode or any switch
      that changes its answer changes; the hook also folds in what it can see itself (selection table, wait time, display mode) */
