@@ -1,6 +1,6 @@
 # RGSS 的有界观察通道
 
-2026-11-22，本轮只支持《魔女の家》免费 VX 1.09a 的固定版本，默认关闭
+2026-11-22，默认路径只支持《魔女の家》免费 VX 1.09a 的固定版本，默认关闭；隔离私测另开放已核实 XP Egomaniacs 1.04 与 Ace Soprano 1.01 的正文加载路径，见下方增量报告
 
 已核对完整游戏归档和实际 Ruby 类，完成副本加载、正文与选项分流、权限撤销回放。还没有在原版 RGSS 运行时或真实 Reader 中验收，不能据此宣布 XP、VX、VX Ace 全部适配完成
 
@@ -78,9 +78,9 @@ Ruby 回放使用私有 RubyInstaller 4.0.10 和合成 RGSS API，没有执行�
 
 VNR 的 RGSS 实现在 vnragent，vnrhook 忽略 rgss3a 不代表整个项目不支持。Textractor 的 VX H 码说明位于 WolfRPG 注释内，不能当坐标实现。导出 RGSSEval 也不能证明任意线程调用安全
 
-## XP / VX Ace 正文候选
+## 第一阶段 XP / VX Ace 正文候选记录
 
-第二轮新增 `candidatePageScript({generation:1|3,...})`、只做声明核对的 `declaredVariant` 和有界 `patchArchiveV3`。生产启动仍只调用默认 VX `pageScript`，没有新增 XP/Ace exe、DLL、脚本表 allowlist，也不会据文件名启动候选。现有只读剧本解析继续独立工作
+09:14 封存阶段新增 `candidatePageScript({generation:1|3,...})`、只做声明核对的 `declaredVariant` 和有界 `patchArchiveV3`。当时没有开放 XP/Ace 游戏加载。后续完整样本带来的隔离私测增量见文末；生产默认及既有只读剧本解析仍独立工作
 
 | 世代 | 原运行时 | 候选处理 | 当前证据 |
 |---|---|---|---|
@@ -99,3 +99,9 @@ node --test validation/rgss-candidates.test.cjs
 显式设置上述私有 `MEGULIT_RUBY` 后新增 9 项通过，包含两页正文到实际 RgssTextPath/HookNative、XP 选项排除和状态改变拒绝、Ace 实际 padding/选项所有权、v3 增长/缩短/异常归档，以及 Marshal 编码 ivar 和 symbol link 保留。合成归档到 Main 的数据链还核对了错误 Ruby 世代拒绝安装后，原 Main 仍执行。缺失该环境时 Ruby 检查会明确跳过，不算游戏通过
 
 固定源码、阅读时间门与剩余缺口见 [候选报告](../side-session-notes/RGSS-xp-ace-candidate-result.md)。Ace 使用 Ruby 1.9.2 的依据为 [官方产品说明](https://www.rpgmakerweb.com/products/rpg-maker-vx-ace)，1.8/1.9 字符串 API 分别核对 [Ruby 1.8.6](https://ruby-doc.org/core-1.8.6/String.html) 与 [Ruby 1.9.1](https://ruby-doc.org/core-1.9.1/String.html)
+
+## 完整 XP/Ace 样本后的隔离私测增量
+
+后续已取得真实完整样本，仅在严格 EXE/DLL/INI/归档或散装 Scripts/Main 源哈希、opaque roles grant 与原隔离环境均通过时，允许 Egomaniacs 1.04 / Soprano 1.01 进入正常 private 准备与普通副本加载。生产默认不变，不按 DLL 名称开放家族。Lumina 压缩动态 loader 无可靠 Main，继续拒绝
+
+37 项相关验证通过，含生产 Bridge.launch 无进程回放、全部原文件保护和正文/清页消费链。一次 XP 隐藏启动因音频 Guard 的 `session pid` 失败停止，未证明原版 Ruby/WinSock 或正文实机通过，没有重试。详细版本、部署合同、日志与限制见 [XP/Ace 私测加载报告](../side-session-notes/RGSS-xp-ace-runtime-result.md)

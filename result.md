@@ -22,3 +22,4 @@ Its optional source transport does not implement glyph coordinates, hiding or ne
 No live pass or engine-complete result is claimed
 - [RGSS opaque grant and actual-path Reader integration](side-session-notes/RGSS-vx-grant-result.md)
 - [XP/Ace body candidates and explicit runtime/sample gaps](side-session-notes/RGSS-xp-ace-candidate-result.md)
+- [Exact XP/Ace private sample loading and the hidden-run blocker](side-session-notes/RGSS-xp-ace-runtime-result.md)
