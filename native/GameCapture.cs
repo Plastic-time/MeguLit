@@ -24,7 +24,7 @@ public static class GameCapture{
  [DllImport("shcore.dll")]static extern int GetDpiForMonitor(IntPtr monitor,int kind,out uint x,out uint y);
  // Proven: BitBlt has shown this window's picture. Blind: BitBlt keeps giving a blank picture while the screen shows
  // the game, so only PrintWindow can read it. Votes: screen checks in a row that said "blind".
- sealed class Choice{public bool Proven,Blind;public int Votes;public DateTime Printed,ProvenAt;public bool HasSig,Frozen;public int Sig,FrozenVotes;public DateTime SigAt,VoteAfter;public int[] Screen;public Bitmap Last;public DateTime LastAt;}
+ sealed class Choice{public bool Proven,Blind;public int Votes;public DateTime Printed,ProvenAt;public bool HasSig,Frozen;public int Sig,Round,FrozenVotes;public DateTime SigAt,VoteAfter;public int[] Screen;public Bitmap Last;public DateTime LastAt;}
  // 2026-11-21 (user, Aokana: 「画面都切换了译文还存在上一句」): a Unity window gave BitBlt one old picture for the whole session
  // (not blank, so it counted as proven) while the screen showed the game moving on; every scene and box check compared that
  // picture with itself. A BitBlt picture that has not changed for FreezeMs is checked against the screen while the game is in
@@ -34,8 +34,9 @@ public static class GameCapture{
  // cannot tell waits FreezeUnsureMs.
  const int FreezeMs=3000,FreezeVoteGapMs=500,FreezeIdleMs=5000,FreezeUnsureMs=2000;
  static readonly Dictionary<IntPtr,Choice> Choices=new Dictionary<IntPtr,Choice>();static readonly object Gate=new object();
- // MeguLit's processes (GalWindowBridge sets them): their windows over the game are left out of the freeze check.
- public static uint[] OwnPids;
+ // The parts of the game's client area (w x h) that MeguLit's own windows cover: left out of the freeze check. GalWindowBridge
+ // sets it (OwnCover.cs); GameStyleProbe and the test harnesses build this file alone and leave it unset.
+ public static Func<IntPtr,int,int,List<Rectangle>> OwnParts;
  static void Drop(){foreach(var o in Choices.Values)if(o.Last!=null)o.Last.Dispose();Choices.Clear();}
  // PrintWindow with PW_RENDERFULLCONTENT makes a DirectX game present an extra frame, seen as a whole black or white
  // flash. Games open on plain black/white screens (warnings, logos, fades), which BitBlt reads as "blank", and that used
@@ -148,13 +149,13 @@ public static class GameCapture{
  }
  // +1: the game is in front and, while BitBlt kept the same picture, the screen over its client area moved on a quarter of the
  // sampled points since the last check, or differs from that picture on most of them. -1: the screen shows the picture
- // BitBlt gives (a still scene). 0: cannot tell. Points under MeguLit's own windows (OwnCover: the reader's text, a word
+ // BitBlt gives (a still scene). 0: cannot tell. Points under MeguLit's own windows (OwnParts: the reader's text, a word
  // card) are left out; with most of them covered there is no vote. A window not drawn at its monitor's DPI (a DPI-unaware
  // game under display scaling) is stretched on screen while BitBlt gives its unscaled picture, so it gets no vote either.
  static int FreezeVote(IntPtr hwnd,Bitmap picture,Choice c){
   IntPtr front=GetForegroundWindow();if(front==IntPtr.Zero||GetAncestor(front,2)!=GetAncestor(hwnd,2)||!SameScale(hwnd))return 0;
   try{using(var screen=new Bitmap(picture.Width,picture.Height,PixelFormat.Format32bppArgb)){
-   if(!ScreenInto(hwnd,screen))return 0;int[] now=Samples(screen);Cover(now,OwnCover.Parts(hwnd,picture.Width,picture.Height,OwnPids),picture.Width,picture.Height);
+   if(!ScreenInto(hwnd,screen))return 0;int[] now=Samples(screen);var own=OwnParts;Cover(now,own==null?null:own(hwnd,picture.Width,picture.Height),picture.Width,picture.Height);
    int[] before;lock(Gate){before=c.Screen;c.Screen=now;}
    return Judge(now,Samples(picture),before);}}catch{return 0;}
  }
@@ -196,17 +197,19 @@ public static class GameCapture{
   lock(Gate){Choice c;if(!Choices.TryGetValue(hwnd,out c)||!c.Frozen||c.Last==null||c.LastAt<=after||c.Last.Width!=image.Width||c.Last.Height!=image.Height)return false;
    using(var g=Graphics.FromImage(image)){g.CompositingMode=System.Drawing.Drawing2D.CompositingMode.SourceCopy;g.DrawImage(c.Last,0,0,image.Width,image.Height);}after=c.LastAt;return true;}
  }
- // True when this BitBlt picture (signature sig) is a frozen one that must not be used. vote: BlindVote against the screen.
+ // True when this BitBlt picture (signature sig) is a frozen one that must not be used. vote: FreezeVote against the screen.
  static bool Stale(Choice c,int sig,DateTime now,Func<int> vote){
+  int round;
   lock(Gate){
-   if(!c.HasSig||sig!=c.Sig){c.HasSig=true;c.Sig=sig;c.SigAt=now;c.Frozen=false;c.FrozenVotes=0;c.VoteAfter=DateTime.MinValue;c.Screen=null;return false;}
+   if(!c.HasSig||sig!=c.Sig){c.HasSig=true;c.Sig=sig;c.Round++;c.SigAt=now;c.Frozen=false;c.FrozenVotes=0;c.VoteAfter=DateTime.MinValue;c.Screen=null;return false;}
    if(c.Frozen)return true;
    if((now-c.SigAt).TotalMilliseconds<FreezeMs||now<c.VoteAfter)return false;
-   c.VoteAfter=now.AddMilliseconds(FreezeVoteGapMs);
+   c.VoteAfter=now.AddMilliseconds(FreezeVoteGapMs);round=c.Round;
   }
   int v=vote();
   lock(Gate){
-   if(c.Sig!=sig){c.Screen=null;return false;} /* another reader saw a new picture meanwhile: this vote was about the old one */
+   /* another reader saw a new picture meanwhile (even if the old one is back now): this vote was about the old round */
+   if(c.Round!=round){c.Screen=null;return false;}
    if(v>0){if(++c.FrozenVotes>=3){c.Frozen=true;c.Proven=false;return true;}}else if(v<0){c.FrozenVotes=0;c.VoteAfter=now.AddMilliseconds(FreezeIdleMs);}
    else c.VoteAfter=now.AddMilliseconds(FreezeUnsureMs);
   }
@@ -238,6 +241,10 @@ public static class GameCapture{
   // a vote that comes back after another reader saw a new picture is dropped
   var raced=new Choice();Stale(raced,3,t,differs);Func<int> late=()=>{Stale(raced,4,t.AddMilliseconds(3150),differs);return 1;};
   if(Stale(raced,3,t.AddMilliseconds(3100),late)||raced.FrozenVotes!=0||raced.Sig!=4)return false;
+  // ...also when the old picture is back by then (A, B, A): the vote was about the first A; the second A counts from its own start
+  var back=new Choice();Stale(back,3,t,differs);Func<int> abA=()=>{Stale(back,4,t.AddMilliseconds(3150),differs);Stale(back,3,t.AddMilliseconds(3160),differs);return 1;};
+  if(Stale(back,3,t.AddMilliseconds(3100),abA)||back.FrozenVotes!=0)return false;
+  if(Stale(back,3,t.AddMilliseconds(6200),differs)||Stale(back,3,t.AddMilliseconds(6800),differs)||!Stale(back,3,t.AddMilliseconds(7400),differs))return false;
   // left-out points (MeguLit's windows) do not count; covering most of them gives no vote; a moved screen is +1, a same one -1
   int[] a=new int[225],b=new int[225];for(int i=0;i<225;i++){a[i]=0x101010;b[i]=0xF0F0F0;}
   if(Judge(a,(int[])a.Clone(),null)!=-1||Judge(a,b,null)!=1)return false;
