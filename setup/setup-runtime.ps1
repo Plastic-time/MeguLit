@@ -1065,6 +1065,7 @@ function Show-State {
 }
 
 function Next-Download {
+  if ($script:cancelRequested) { return }
   while ($script:dlPos -lt $script:dl.Count) {
     $id = $script:dl[$script:dlPos]
     $part = Part $id
@@ -1168,7 +1169,9 @@ function Use-Target {
   $copy = Start-Process -FilePath "$env:SystemRoot\System32\robocopy.exe" -ArgumentList $copyArgs -WindowStyle Hidden -PassThru
   $null = $copy.Handle
   while (-not $copy.HasExited) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
-  $copy.WaitForExit(); $script:copying = $false; Show-State
+  $copy.WaitForExit(); $script:copying = $false
+  if ($script:cancelRequested) { return $false }
+  Show-State
   Assert-SetupPath $target 'installed' -Tree
   if ($copy.ExitCode -ge 8 -or -not (Test-Path (Join-Path $target 'MeguLit.exe'))) {
     Say ('复制到 ' + $target + ' 没成功（robocopy ' + $copy.ExitCode + '），检查磁盘空间后再试一次'); return $false
@@ -1256,8 +1259,10 @@ function Confirm-Install {
   $f = Drive-Free $target; $need = Need-Bytes $target
   if ($f -lt $need) { Say ('「' + $target + '」所在的磁盘空间不够：需要约 ' + (MB $need) + '，只剩 ' + (MB $f) + "`n换一个空间大一点的盘吧"); return }
   Lock-Choice $true
-  if (-not (Confirm-VcRuntime)) { return }
-  if (-not (Use-Target)) { Lock-Choice $false; return }
+  $vcOK = Confirm-VcRuntime
+  if ($script:cancelRequested) { $form.Close(); return }
+  if (-not $vcOK) { return }
+  if (-not (Use-Target)) { if (-not $script:cancelRequested) { Lock-Choice $false }; return }
   $script:confirmed = $true; $confirm.Text = '已确认'; $note.ForeColor = $C.gold; $note.Text = '安装到 ' + $Root + '：组件下载完就自动装好，不用再点'
   Note 'confirmed' @{ root = $Root; moved = $script:moved; downloadsDone = (Downloads-Done) }
   # The chosen folder may lack packs the suggested one had (or the other way round): fetch what this folder needs.
@@ -1292,12 +1297,13 @@ function Stop-RuntimeProcesses {
 }
 # Unpacks every ready pack once the user has pressed Install; re-entered from the poll timer, guarded by busy.
 function Pump {
-  if (-not $script:confirmed -or $script:busy -or $script:copying -or $script:done -or $script:mode -eq 'failed') { return }
+  if ($script:cancelRequested -or -not $script:confirmed -or $script:busy -or $script:copying -or $script:done -or $script:mode -eq 'failed') { return }
   $script:busy = $true
   try {
     while ($script:ready.Count -gt 0) {
       $r = $script:ready[0]
       if (@(Missing $Root) -contains $r.id) { if (-not (Install-Pack $r.id $r.part)) { return } }
+      if ($script:cancelRequested) { return }
       Remove-Staged $r.part; $script:ready.RemoveAt(0)
     }
   } finally { $script:busy = $false; $script:installLine = '' }
@@ -1321,8 +1327,17 @@ function Install-Pack([string]$id, [string]$part) {
     # tar reads the staged pack in place, from whichever drive it is on, and writes into the install folder.
     $tar = Start-Process -FilePath "$env:SystemRoot\System32\tar.exe" -ArgumentList @('-xf', "`"$part`"", '-C', "`"$unpack`"") -WindowStyle Hidden -PassThru
     $null = $tar.Handle  # keep the handle so ExitCode is readable after exit
-    while (-not $tar.HasExited) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
+    while (-not $tar.HasExited) {
+      [Windows.Forms.Application]::DoEvents()
+      if ($script:cancelRequested) {
+        # tar only owns this attempt's scratch directory. Leave the verified archive for retry.
+        try { if (-not $tar.HasExited) { $tar.Kill() } } catch [InvalidOperationException] {}
+        break
+      }
+      Start-Sleep -Milliseconds 30
+    }
     $tar.WaitForExit()
+    if ($script:cancelRequested) { return $false }
     Assert-SetupPath $unpack 'installed' -Tree
     if ($tar.ExitCode -ne 0 -or -not (Test-Path (Join-Path $unpack 'runtime'))) { throw '解压失败' }
     New-Item -ItemType Directory -Force $runtimeDir | Out-Null
@@ -1354,7 +1369,12 @@ $button.add_Click({
   else { if ($script:fetch) { $poll.Stop(); $script:fetch.Cancel() }; $form.Close() }
 })
 $form.add_Shown({ Close-Splash; Release-NativeSplash 'classic-shown'; Boot-Mark ('classic-shown web=' + [bool]$script:webActive + ' opacity=' + $form.Opacity + ' pos=' + $form.Location.X + ',' + $form.Location.Y + $(if ($script:webActive) { ' (invisible control surface, not a visible window)' } else { ' (the classic window is the real UI)' })) })
-$form.add_FormClosing({ if ($script:vcInstalling) { $_.Cancel = $true; return }; if (-not $script:done -and $script:fetch) { $poll.Stop(); $script:fetch.Cancel() } })
+$form.add_FormClosing({
+  if ($script:done -or $_.Cancel) { return }
+  $script:cancelRequested = $true
+  if ($script:vcInstalling) { $_.Cancel = $true; return }
+  if ($script:fetch) { $poll.Stop(); $script:fetch.Cancel() }
+})
 $form.add_Shown({ Update-Free; Note 'shown' @{ stage = $stageDir; want = ($want -join ',') }; if (-not $env:MEGULIT_SETUP_PREVIEW -and $env:MEGULIT_SETUP_PREFETCH -eq '1') { Next-Download } })   # nothing is downloaded, probed or prefetched before the user presses Install (tests may opt in with MEGULIT_SETUP_PREFETCH=1)
 if ($testLog) { $deskCheck.Checked = $false; $menuCheck.Checked = $false }
 if ($env:MEGULIT_SETUP_AUTOSTART -eq 'now') { $form.add_Shown({ Confirm-Install }) }

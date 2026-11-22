@@ -78,6 +78,17 @@ Check 'one unpacked component out of three retains fractional progress' {
   if ($state.pack -ne 'reading' -or [math]::Floor(100 * $state.unpack) -ne 33) { throw 'Incorrect live unpack progress' }
   $script:busy = $false
 }
+Load-Function 'setup\setup-runtime.ps1' @('Pump')
+Check 'confirmed exit stops the unpack queue at the current component' {
+  $script:confirmed = $true
+  $script:ready = [Collections.ArrayList]@(@{ id = 'base'; part = 'base.zip' }, @{ id = 'voice'; part = 'voice.zip' })
+  function Missing($dir) { @('base','voice') }
+  function Install-Pack($id, $part) { $script:cancelRequested = $true; return $true }
+  function Remove-Staged($part) { throw 'Cancelled work consumed the staged archive' }
+  Pump
+  if ($script:ready.Count -ne 2 -or $script:done) { throw 'Queue advanced after exit' }
+  $script:cancelRequested = $false
+}
 Load-Function 'tools\installer-owner-test\launch-installer-test.ps1' @('New-OwnerTestEnvironment','Assert-OwnerPayloadFiles')
 Load-Function 'setup\setup-runtime.ps1' @('Need-Bytes')
 Check 'a second session ignores archived profile state and validates its own profile' {
