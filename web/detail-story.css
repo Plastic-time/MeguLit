@@ -39,6 +39,13 @@
  .main[data-kids~="dtv-bg"] .detail-statistics .stat-card strong{min-width:0;max-width:100%;margin:0!important;font-size:26px!important;line-height:1.1!important;white-space:normal!important;overflow-wrap:anywhere}
  .main[data-kids~="dtv-bg"] .detail-statistics .stat-card span{font-size:11px!important;letter-spacing:normal!important;white-space:normal!important}
  .main[data-kids~="dtv-bg"] .detail-tabs{margin-top:0!important;padding-top:2px!important}
+ @media(min-width:1101px){
+  .main[data-kids~="dtv-bg"] .game-detail-hero{padding-top:32px!important}
+  .main[data-kids~="dtv-bg"] .game-detail-hero .detail-title{grid-template-columns:minmax(0,1fr) 138px!important;column-gap:14px!important}
+  .main[data-kids~="dtv-bg"] .detail-title>.detail-action-strip{grid-column:1!important}
+  .main[data-kids~="dtv-bg"] .detail-title>.detail-statistics{grid-row:1/-1!important;height:calc(var(--dcw)*4/3);box-sizing:border-box;align-content:space-between!important}
+  .main[data-kids~="dtv-bg"] .detail-statistics .stat-card strong{font-size:30px!important}
+ }
  @media(max-width:1100px){
   .main[data-kids~="dtv-bg"] .game-detail-hero{--dcw:160px;column-gap:26px!important}
   .main[data-kids~="dtv-bg"] .detail-title>.detail-statistics{gap:4px!important}
