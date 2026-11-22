@@ -84,10 +84,22 @@ async function externalSign(body,policy){
  const pub=crypto.createPublicKey(key).export({format:'der',type:'spki'}).toString('base64');if(!policy.reviewKeys.some(k=>k.id===id&&k.publicKey===pub))fail('TRUSTED_REVIEW_KEY_UNREGISTERED');
  return {...body,signature:{alg:'ed25519',keyId:id,value:crypto.sign(null,Buffer.from(D.canonical(body)),key).toString('base64')}};
 }
+function reviewerSigner(config,load=()=>require('./maintainer-signing.cjs')){
+ if(config===undefined)return externalSign;
+ if(!config||Object.getPrototypeOf(config)!==Object.prototype||Object.keys(config).sort().join(',')!=='id,store,vault'||typeof config.store!=='string'||!path.isAbsolute(config.store)||typeof config.vault!=='string'||!path.isAbsolute(config.vault)||typeof config.id!=='string'||!/^[a-z0-9][a-z0-9._-]{0,79}$/.test(config.id))fail('TRUSTED_REVIEW_SIGNING_CONFIG');
+ const {store,id,vault}=config;
+ return async(body,policy)=>{
+  if(!policy.reviewKeys.some(k=>k.id===id&&!k.revoked))fail('TRUSTED_REVIEW_KEY_UNREGISTERED');
+  const location=path.resolve(store);if([REPO,policy.appRoot,policy.sampleRoot,policy.stateRoot].some(root=>path.resolve(root)===location||inside(path.resolve(root),location)))fail('TRUSTED_REVIEW_KEY_UNAVAILABLE');
+  const S=load(),sign=S.createSigner({store,id,role:'reviewer',scope:'review',vault:S.createVault(vault),trust:policy});
+  return sign(body);
+ };
+}
 async function runHost(request,policy,dependencies={}){
  const injected=['resourceCheck','collect','sign'].some(k=>Object.hasOwn(dependencies,k));if(injected&&!['resourceCheck','collect','sign'].every(k=>typeof dependencies[k]==='function'))return {state:'awaiting-trusted-run',reason:'TRUSTED_TEST_BOUNDARY',signed:false};
- const resourceCheck=dependencies.resourceCheck||resources,collect=dependencies.collect||capture,sign=dependencies.sign||externalSign;let slot=null,context=null,unsafe=false;
+ const resourceCheck=dependencies.resourceCheck||resources,collect=dependencies.collect||capture;let sign,slot=null,context=null,unsafe=false;
  try{
+  sign=dependencies.sign||reviewerSigner(dependencies.signing);
   context=await prepare(request,policy,{signal:dependencies.signal,resourceCheck});collectorHash(policy);slot=lease(policy);const results=[];
   for(const reporter of policy.reporters.slice(0,3)){
    if(dependencies.signal?.aborted)fail('TRUSTED_CANCELLED');if(!resourceCheck())fail('TRUSTED_RESOURCE_GATE');collectorHash(policy);await Identity.verify(context.proof,{data:context.data,game:context.game,signal:dependencies.signal});
@@ -100,10 +112,10 @@ async function runHost(request,policy,dependencies={}){
   const body={schema:'megulit.torch-review',version:1,candidateHash:context.candidateHash,baselineHash:request.baseline?.review.candidateHash||null,identity:request.identity,cardinalRev:P.REV,policy:P.POLICY,cohort:context.cohort,lines,reporters:results.length,mean,floor,coverage:1,reliable:true,liveDisplay:true,domAck:true,eligibility:results[0].eligibility,timing:results[0].timing,torchNo:request.torchNo,storyRules:null};
   const shape={...body,signature:{alg:'ed25519',keyId:'shape-validation-only',value:'A'.repeat(86)+'=='}};P.reviewShape(shape);P.promotion(shape,request.baseline);
   if(!resourceCheck())fail('TRUSTED_RESOURCE_GATE');await Identity.verify(context.proof,{data:context.data,game:context.game,signal:dependencies.signal});
-  const review=await sign(body,policy);if(!P.same(D.unsigned(review),body)||!await P.verify(review,policy.reviewKeys))fail('TRUSTED_REVIEW_SIGNATURE');P.reviewShape(review);
+  const approved=D.canonical(body),review=await sign(JSON.parse(approved),policy);if(D.canonical(D.unsigned(review))!==approved||!await P.verify(review,policy.reviewKeys))fail('TRUSTED_REVIEW_SIGNATURE');P.reviewShape(review);
   return {state:'reviewed',review,summary:{sessions:results.length,lines,mean,floor}};
  }catch(error){const reason=/^(TRUSTED_|CARDINAL_IDENTITY_|TORCH_)[A-Z_]+$/.test(error?.code||'')?error.code:'TRUSTED_RUN_UNAVAILABLE';if(unsafe||reason==='TRUSTED_CLEANUP_BARRIER'){try{slot?.block(reason);}catch{}return {state:'blocked',reason,signed:false};}return {state:'awaiting-trusted-run',reason,signed:false};
  }finally{if(slot&&!unsafe)try{slot.release();}catch{}}
 }
 function status(){return {state:'awaiting-trusted-run',reason:'TRUSTED_LIVE_COLLECTOR_UNAVAILABLE',signed:false,availableSources:{coldCapture:'scene-export-only',coldTest:'native-only-no-reader',cardinalDriver:'offline-replay'},requiredCapabilities:CAPABILITIES};}
-module.exports={runHost,prepare,evaluate,capture,resources,status,readJSON,atomic,MAX_CAPTURE,MAX_REQUEST,CAPABILITIES};
+module.exports={runHost,prepare,evaluate,capture,resources,status,readJSON,atomic,reviewerSigner,MAX_CAPTURE,MAX_REQUEST,CAPABILITIES};

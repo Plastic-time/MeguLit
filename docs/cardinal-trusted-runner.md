@@ -105,3 +105,23 @@ The source review documents an existing audio limitation: enumeration alone does
 The neutral tests generate ephemeral signing keys in memory. Positive fixture signatures are test artifacts and are not registered production reviews. The programmatic fixture boundary requires capture, resource and signer replacements together, so an injected collector cannot accidentally fall through to the production key loader. The CLI exposes none of these overrides. Tests exercise the host validator, signature roles, digest binding, automatic comparison, corrupt evidence rejection, persistent cleanup barriers and bounded transport. Harmless Node children check stdin/stdout, environment stripping, cooperative ownership cleanup, resource cancellation and the CLI awaiting path. They launch no game, change no saves and call no real audio API.
 
 The current machine status was exercised and remains awaiting a real trusted collector. No real review key was opened, no trusted live game report was obtained and no release was published. The missing work is an audited native-game plus actual Reader collector with complete isolation and audio ownership, followed by real host acceptance. The runner is ready to refuse incomplete evidence; it does not claim that missing collector is implemented.
+
+## Existing DPAPI reviewer store
+
+An already configured CurrentUser DPAPI reviewer can be selected explicitly without a PEM:
+
+```text
+node tools/cardinal-trusted-runner.cjs run request.json trusted-host-policy.json H:/TrustedState/review.json H:/TrustedState/status.json --key-store C:/ExistingMaintainerStore --reviewer-id configured-reviewer --vault C:/TrustedTools/KeyVault.exe
+```
+
+All three options are required together, with absolute store/vault paths and an existing reviewer ID in host-policy reviewKeys
+The store must remain outside the repository, App, sample and state roots
+No option skips capture, imports a finished score, configures trust, initializes a key, or signs an arbitrary input document
+Without these options the existing external PEM path and its safe missing-key failure remain unchanged
+
+The adapter dynamically loads the existing services/maintainer-signing.cjs only after all three signed capture reports, cleanup, eligibility, comparison and final identity checks succeed
+It uses createSigner({store,id,role:'reviewer',scope:'review',vault:createVault(vault),trust:policy})
+The signing input is cloned from a separately retained canonical measured review; even an in-place signer mutation is rejected against the original snapshot
+Status, unavailable collectors and invalid capture evidence do not read/decrypt a key or invoke KeyVault
+This adds no dependency, live collector or actual trusted game result
+Tests use the existing explicitly synthetic full capture/resource/signer boundary and neutral ephemeral keys; no real DPAPI file, KeyVault process or game was used
