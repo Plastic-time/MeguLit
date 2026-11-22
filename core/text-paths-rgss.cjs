@@ -90,7 +90,7 @@ class RgssTextPath{
   if(rec.rects.some(r=>r.some(n=>!Number.isFinite(n)||Math.abs(n)>100000)||r[2]<=0||r[3]<=0))return;
   if(rec.role){if(!['choice','menu','system'].includes(rec.role)||!/^W\d+:\d*$/.test(rec.id||'')||!rec.box||rec.box.some(n=>!Number.isFinite(n)||Math.abs(n)>100000)||rec.text&&(rec.box[2]<=0||rec.box[3]<=0))return;
    const group=rec.role+'|'+rec.id.split(':')[0];if(rec.text){if(this.ui.size>=128&&!this.ui.has(group))return;this.ui.set(group,rec);}else this.ui.delete(group);
-  }else if(rec.text){if(this.body.size>=128&&!this.body.has(rec.line))return;this.body.set(rec.line,rec);}else{this.retire(this.body.get(rec.line));this.body.delete(rec.line);}
+  }else if(rec.text){if(this.body.size>=128&&!this.body.has(rec.line))return;const previous=this.body.get(rec.line);if(previous&&previous.text!==rec.text)this.retire(previous);this.body.set(rec.line,rec);}else{this.retire(this.body.get(rec.line));this.body.delete(rec.line);}
   this.onChars(m[2]);
  }
  retire(rec){if(!rec)return;const key=rec.line+'|'+rec.text;if(this.sources.delete(key))this.onClear({line:rec.line,text:rec.text,pid:this.pid,birth:this.birth,generation:this.generation});}
