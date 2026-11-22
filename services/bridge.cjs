@@ -234,7 +234,8 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
    const anyProcess=async()=>{if(ownerSteam)return gameProcesses(root,ownerSteam.exe);const own=await gameProcesses(root,game.executable);if(!own.length&&textPath&&textPath.exe!==game.executable){const shadow=await gameProcesses(root,textPath.exe).catch(()=>[]);if(shadow.length){if(textPath.observeProcess){const p=shadow.find(p=>p.pid===child.pid);if(p)textPath.observeProcess(p);}return shadow;}}if(!own.length&&steamDirect?.shadow){const shadow=await gameProcesses(root,steamDirect.exe).catch(()=>[]);if(shadow.length)return shadow;}if(own.length||!siblings.length)return own;for(const exe of siblings){const found=await gameProcesses(root,exe).catch(()=>[]);if(found.length){trace('steam-runs-other-program',{exe:path.basename(exe)});return found;}}return own;};
    /* E303: Steam may prepare a first start (cloud sync, install scripts) for longer than 15 s; wait up to 45 s for its window. */
    const startedAt=Date.now();
-   try{state=await waitForVisibleGame(anyProcess,{helper:steam||!!early,indirect:steam,helperError:'GAME_LAUNCH_FAILED',exit:()=>child.exit,trace,...(steam?{attempts:180,timeout:45000}:textPath?{attempts:720,timeout:180000}:{})});}/* ③ shadow start: BepInEx (IL2CPP) builds its interop assemblies on the first start, minutes before the game window */
+   const checkHelperHandoff=!!early&&!steamApp&&require('./locale-launch.cjs').josouOriginal(game.executable);
+   try{state=await waitForVisibleGame(anyProcess,{helper:steam||!!early,indirect:steam,checkHelperHandoff,helperError:'GAME_LAUNCH_FAILED',exit:()=>child.exit,trace,...(steam?{attempts:180,timeout:45000}:textPath?{attempts:720,timeout:180000}:{})});}/* ③ shadow start: BepInEx (IL2CPP) builds its interop assemblies on the first start, minutes before the game window */
    catch(error){
     if(ownerSteam)throw Object.assign(Error('RESTART_FROM_OWNER_TEST_ENTRY'),{detail:error.code||error.message});
     /* E333 (user 2026-11-10, 女装山脈 with 以日文系统环境启动 off): many Japanese x86 games quit at once, without a window,
@@ -255,9 +256,9 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
      try{state=await waitForVisibleGame(anyProcess,{helper:false,indirect:true,exit:()=>gone?{code:0,signal:null}:null,trace,attempts:2400,timeout:600000});}
      catch(waitError){throw Object.assign(Error('STEAM_LAUNCHER_START'),{detail:waitError.message});}finally{clearInterval(poll);}    }else{
     const LE=require('../core/locale-emulator.cjs'),fallbackExe=textPath?.path==='rgss'?textPath.exe:game.executable;
-    if(error.message!=='GAME_PROCESS_EXITED'||steam||elevation||windowsLaunch||Date.now()-startedAt>3000||!LE.x86(fallbackExe)||LE.steamApi(fallbackExe))throw error;
+    if(error.message!=='GAME_PROCESS_EXITED'||steam||elevation||windowsLaunch||(Date.now()-startedAt>3000&&error.detail!=='HELPER_FINISHED_WITHOUT_GAME')||!LE.x86(fallbackExe)||LE.steamApi(fallbackExe))throw error;
     const lib=runtime?.library?.()||new(require('../core/library.cjs').Library)(require('../core/layout.cjs'));
-    trace('locale-fallback',{});stage='locale-start';const result=await lib.locale.launch(fallbackExe,{trace});if(result.needLocaleEmulator)throw error;
+    trace('locale-fallback',error.detail?{reason:error.detail}:{});stage='locale-start';const result=await lib.locale.launch(fallbackExe,{trace});if(result.needLocaleEmulator)throw error;
     state={pid:result.gamePid,locale:'japanese'};
     }
    }
