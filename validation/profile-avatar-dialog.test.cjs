@@ -16,8 +16,8 @@ test('the profile avatar crop accepts clicks above the profile and displays the 
     const link=Object.assign(document.createElement('link'),{rel:'stylesheet',href:'/'+name});
     await new Promise(resolve=>{link.onload=resolve;document.head.append(link);});
    }
-   const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
-   const ctx=canvas.getContext('2d');ctx.fillStyle='#ab4521';ctx.fillRect(0,0,64,64);
+   const canvas=document.createElement('canvas');canvas.width=128;canvas.height=128;
+   const ctx=canvas.getContext('2d');ctx.fillStyle='#ab4521';ctx.fillRect(0,0,128,128);
    const png=await new Promise(resolve=>canvas.toBlob(resolve));
    const originalClick=HTMLInputElement.prototype.click;
    HTMLInputElement.prototype.click=function(){
@@ -32,11 +32,12 @@ test('the profile avatar crop accepts clicks above the profile and displays the 
     if(action==='leaderboard_profile')return {configured:true,joined:true,name};
     if(action==='leaderboard_profile_get')return {state:'ok',joined:true,favorites:[]};
     if(action==='leaderboard_avatar_status')return {state:'ok',status:'none'};
-    if(action==='leaderboard_avatar_set'){window.upload=args.data;return {state:'ok',status:'approved'};}
+    if(action==='leaderboard_avatar_set'){window.upload=args.data;window.uploads=(window.uploads||0)+1;return {state:'ok',status:window.uploadStatus||'approved'};}
     if(action==='leaderboard_join'){window.savedName=args.name;return {state:'ok'};}
     return [];
    };
-   const panel=await profile.openProfilePanel({api,locale:'en',esc:String,toast:()=>{}});
+   window.profileToasts=[];
+   const panel=await profile.openProfilePanel({api,locale:'en',esc:String,toast:message=>window.profileToasts.push(message)});
    const button=panel.querySelector('[data-hero-avatar]');button.click();
    for(let i=0;i<100&&!document.querySelector('.avatar-crop');i++)await new Promise(r=>setTimeout(r,20));
    const box=document.querySelector('.avatar-crop');
@@ -61,8 +62,32 @@ test('the profile avatar crop accepts clicks above the profile and displays the 
    const input=document.querySelector('.profile-hero-name-input');
    input.value='New reader';input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
    const {navigation}=await import('/settings-layout.js');
-   return {savedName:window.savedName,profileInSettings:navigation.some(category=>category.ids.includes('personal'))};
+   return {savedName:window.savedName,shownName:document.querySelector('[data-hero-name]')?.textContent,
+    pictured:!!document.querySelector('[data-hero-avatar] img'),profileInSettings:navigation.some(category=>category.ids.includes('personal'))};
   })()`);
-  assert.deepEqual(rename,{savedName:'New reader',profileInSettings:true});
+  assert.deepEqual(rename,{savedName:'New reader',shownName:'New reader',pictured:true,profileInSettings:true});
+
+  const reopen=`(async()=>{
+   const avatar=document.querySelector('[data-hero-avatar]');avatar.focus();avatar.click();
+   for(let i=0;i<100&&!document.querySelector('.avatar-crop');i++)await new Promise(r=>setTimeout(r,20));
+   return !!document.querySelector('.avatar-crop');
+  })()`;
+  assert.equal(await browser.evaluate(reopen),true);
+  await browser.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',windowsVirtualKeyCode:27});
+  await browser.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',windowsVirtualKeyCode:27});
+  assert.deepEqual(await browser.evaluate(`({closed:!document.querySelector('.avatar-crop'),
+   focused:document.activeElement.matches('[data-hero-avatar]'),uploads:window.uploads})`),{closed:true,focused:true,uploads:1});
+
+  assert.equal(await browser.evaluate(reopen),true);
+  await browser.evaluate(`window.uploadStatus='rejected';document.querySelector('.avatar-crop input').focus()`);
+  await browser.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',windowsVirtualKeyCode:13});
+  await browser.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',windowsVirtualKeyCode:13});
+  const rejection=await browser.evaluate(`(async()=>{
+   for(let i=0;i<100&&window.uploads!==2;i++)await new Promise(r=>setTimeout(r,20));
+   const note=document.querySelector('.profile-hero-note');
+   return {status:note.dataset.status,noteVisible:!note.hidden,message:window.profileToasts.at(-1),
+    pictured:!!document.querySelector('[data-hero-avatar] img')};
+  })()`);
+  assert.deepEqual(rejection,{status:'rejected',noteVisible:true,message:'Picture not approved',pictured:false});
  }finally{await browser?.stop();server?.close();fs.rmSync(temp,{recursive:true,force:true});}
 });
