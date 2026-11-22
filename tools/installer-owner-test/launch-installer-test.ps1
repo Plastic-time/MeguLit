@@ -47,7 +47,7 @@ $manifestFile = Join-Path $ownerRoot 'root-payload-manifest.json'
 $payload = Get-Content -LiteralPath $manifestFile -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($payload.schemaVersion -ne 1 -or ($payload.ready -isnot [bool] -or -not $payload.ready) -or $payload.candidateCommit -notmatch '^[0-9a-f]{40}$' -or -not $payload.packageVersion -or @($payload.files).Count -lt 1) { throw '最终候选清单尚未就绪' }
 $seen = Assert-OwnerPayloadFiles $source @($payload.files)
-foreach ($required in 'MeguLit.exe','setup/setup-runtime.ps1','setup/setup-test-scope.ps1','setup/setup-web.ps1','setup/runtime.json','setup/ui-web/index.html','setup/ui-web/player.js','setup/ui-web/video/light/intro.mp4','setup/webview2/Microsoft.Web.WebView2.Core.dll') { if (-not $seen.ContainsKey($required)) { throw ('候选缺少安装文件：' + $required) } }
+foreach ($required in 'MeguLit.exe','setup/setup-runtime.ps1','setup/setup-test-scope.ps1','setup/setup-web.ps1','setup/runtime.json','setup/ui-web/index.html','setup/ui-web/player.js','setup/ui-web/video/light/intro.mp4','setup/webview2/Microsoft.Web.WebView2.Core.dll','tools/installer-owner-test/finalize-runtime.ps1','tools/installer-owner-test/runtime-overlay/manifest.json') { if (-not $seen.ContainsKey($required)) { throw ('候选缺少安装文件：' + $required) } }
 $version = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $source 'MeguLit.exe')).FileVersion
 if ($version -ne $payload.packageVersion) { throw 'exe 版本与候选清单不符' }
 $runtime = Get-Content -LiteralPath (Join-Path $source 'setup\runtime.json') -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -58,7 +58,9 @@ foreach ($id in 'base','reading','voice') {
   $peakBytes += [long]$pack.size + [long]$pack.unpacked
 }
 if ((Get-PSDrive -Name H).Free -lt 10GB + [long]($peakBytes * 1.1)) { throw 'H 盘不足以容纳程序副本、组件包和展开文件并保留 10 GiB' }
-if ($ValidateOnly) { Write-Output ('候选文件已核对，未启动安装：' + $payload.candidateCommit + ' / ' + $version); return }
+$overlayCheck = & (Join-Path $source 'tools\installer-owner-test\finalize-runtime.ps1') -ValidateOnly
+$null = $overlayCheck | ConvertFrom-Json
+if ($ValidateOnly) { Write-Output ('候选文件及运行组件 overlay 已核对，未启动安装：' + $payload.candidateCommit + ' / ' + $version); return }
 foreach ($area in 'installed','staging','env','profile','log') { [IO.Directory]::CreateDirectory($script:setupTestScope[$area]) | Out-Null }
 $lockPath = Join-Path $ownerRoot 'log\installer-owner.lock'
 Assert-SetupPath $lockPath 'log'
@@ -77,7 +79,20 @@ $receipt = @{ candidateCommit = $payload.candidateCommit; packageVersion = $vers
 $receiptPath = Join-Path $ownerRoot "log\launch-$stamp.json"
 $receipt | ConvertTo-Json | Set-Content -LiteralPath $receiptPath -Encoding UTF8
 $process = [Diagnostics.Process]::Start($start); $process.WaitForExit(); $receipt.exitCode = $process.ExitCode
+if ($process.ExitCode -eq 3) {
+  $receipt.installerExitCode = 3
+  try {
+    if (-not [IO.File]::Exists($childEnv.MEGULIT_SETUP_TEST) -or (Get-Item -LiteralPath $childEnv.MEGULIT_SETUP_TEST).Length -gt 4MB) { throw 'OWNER_RUNTIME_INSTALL_EVENTS' }
+    $installedEvents = @(Get-Content -LiteralPath $childEnv.MEGULIT_SETUP_TEST -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.kind -eq 'installed' })
+    if ($installedEvents.Count -ne 1 -or (Get-SetupLocalPath $installedEvents[0].root) -ine $childEnv.MEGULIT_SETUP_TARGET) { throw 'OWNER_RUNTIME_INSTALL_TARGET' }
+    # Runs only after setup has finished copying and unpacking, never starts the installed app.
+    $finalized = & (Join-Path $source 'tools\installer-owner-test\finalize-runtime.ps1') -Apply -Target $childEnv.MEGULIT_SETUP_TARGET
+    $runtimeResult = $finalized | ConvertFrom-Json
+    if ($runtimeResult.ready -isnot [bool] -or -not $runtimeResult.ready) { throw 'OWNER_RUNTIME_FINALIZE_FAILED' }
+    $receipt.runtimeFinalized = $true
+  } catch { $receipt.exitCode = 1; $receipt.runtimeFinalized = $false; $receipt.runtimeError = 'OWNER_RUNTIME_FINALIZE_FAILED'; Write-Warning '安装器已结束，但运行组件核对未完成，暂时不要启动应用，请把 log 和 staging/runtime-finalize 交给负责人' }
+}
 $receipt | ConvertTo-Json | Set-Content -LiteralPath $receiptPath -Encoding UTF8
-Write-Output ('安装器退出码 ' + $process.ExitCode + '，日志：' + $receiptPath)
-exit $process.ExitCode
+Write-Output ('安装测试退出码 ' + $receipt.exitCode + '，日志：' + $receiptPath)
+exit $receipt.exitCode
 } finally { $ownerLock.Dispose() }
