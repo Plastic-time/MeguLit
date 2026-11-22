@@ -79,7 +79,11 @@ test('the same sentence refits on a resized or moved client without carrying ove
  assert.ok(win.getBoundingClientRect().bottom<=420);
  bridge.galLayout({...layout});flush();
  assert.deepStrictEqual(bridge.gameFit.state(),compact,'another poll with identical client geometry keeps its fit');
- anchor=330;bridge.galLayout({clientX:0,clientY:300,clientWidth:1100,clientHeight:600});flush();
+ classes.add('tome-surface-pending');
+ bridge.galLayout({clientX:0,clientY:300,clientWidth:1100,clientHeight:600});flush();
+ assert.deepStrictEqual(bridge.gameFit.state(),compact,'new native bounds do not fit the old hidden layout');
+ classes.delete('tome-surface-pending');
+ anchor=330;bridge.gameFit.schedule();flush();
  assert.deepStrictEqual(bridge.gameFit.state(),{fit:1,shift:0,room:0});
  assert.deepStrictEqual(win.getBoundingClientRect(),{top:330,bottom:550,height:220});
 });

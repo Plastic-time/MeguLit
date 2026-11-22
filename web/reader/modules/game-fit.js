@@ -58,6 +58,7 @@
    return Number.isFinite(top)?{top,bottom,jp:Number.isFinite(jt)?{top:jt,bottom:jb}:null}:null;}
   function check(){frame=0;
    if(!d.body?.classList.contains('tomoyo-gal-bound')){reset();return;}
+   if(d.body.classList.contains('tome-surface-pending'))return;
    /* 2026-11-15 in-place drawing (text-place.js): every character sits on the game's own place and the window fills the client, so there is nothing to fit; measuring it shrank the text and switched the translation's height limit on and off every frame (the translation's second line flashed) */
    if(d.body.classList.contains('megulit-placed')||d.body.classList.contains('megulit-anchored')||b.textPlaceOwns?.()===true){reset();return;}/* 2026-11-20 (user, CHAOS;CHILD: 「译文为啥都这么小」): a line anchored on the game's own place is fitted by text-place.js against the monitor's work area (translation at most 15 % smaller); fitting it again to the game client shrank two-row sentences' translation to 60 % */
    const info=b.galLayoutInfo?.(),win=main();if(!win||!info||!(info.clientHeight>0))return;
@@ -84,7 +85,7 @@
   if(typeof layoutBefore==='function')b.galLayout=layout=>{const r=layoutBefore(layout);watch();schedule();return r;};
   w.addEventListener('resize',schedule);
   if(w.MutationObserver)new w.MutationObserver(()=>{watch();schedule();}).observe(d.body||d.documentElement,{childList:true});
-  b.gameFit={check,state:()=>({fit,shift,room})};
+  b.gameFit={check,schedule,state:()=>({fit,shift,room})};
  }
  if(typeof module!=='undefined'&&module.exports)module.exports={plan,MIN,MARGIN,install};
  if(root&&root.document)install(root);
