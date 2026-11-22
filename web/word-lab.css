@@ -8,6 +8,7 @@ html:not(#wl1):not(#wl2):not(#wl3):not(#wl4):not(#wl5):not(#wl6) body .main{
  & :is(.ri-hud,.ri-status){max-width:none!important;margin-left:0!important;margin-right:0!important}
  & .ri-panel.ri-panel.ri-panel{max-width:none!important;width:100%;margin-left:0!important;margin-right:0!important}
  & .ri-pair .ri-head{flex-wrap:wrap;gap:10px 14px}
+ & .ri-pair>.ri-panel>:is(.ri-head,.ri-help){padding-inline:14px}
  & .ri-pair .ri-head h2{font-size:clamp(19px,1.5vw,23px)!important}
  & .ri-pair .ri-head select,& .ri-pair .ri-head .select-trigger{margin-left:auto}
  & .ri-pair .ri-head select,& .ri-pair .ri-head .select-trigger{padding-inline:14px 12px!important;box-sizing:border-box}
