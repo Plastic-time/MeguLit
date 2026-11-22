@@ -15,6 +15,12 @@ class GameProcess {
  static IntPtr FindGameWindow(int pid){IntPtr result=IntPtr.Zero;EnumWindows(delegate(IntPtr hwnd,IntPtr context){uint owner;GetWindowThreadProcessId(hwnd,out owner);if(owner==(uint)pid&&GetWindowTextLength(hwnd)>0){result=hwnd;return false;}return true;},IntPtr.Zero);return result;}
  static int Main(string[] args){
   try{
+   if(args.Length==2 && args[0]=="--image-running"){
+    var matches=Process.GetProcessesByName(Path.GetFileNameWithoutExtension(args[1]));
+    foreach(var match in matches)match.Dispose();
+    Console.WriteLine(matches.Length>0?"running":"absent");
+    return 0;
+   }
    if(args.Length!=2||(args[0]!="--query"&&args[0]!="--focus"&&args[0]!="--shell-open"&&args[0]!="--patch-check"))return 2;
    string expected=Path.GetFullPath(args[1]);
    if(args[0]=="--shell-open"){
