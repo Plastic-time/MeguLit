@@ -8,7 +8,7 @@ const { Reader } = require('../services/reader.cjs');
 const JP = '電車を降りて、駅前でタクシーを捕まえたものの、いつの間にかうたたねしていたらしい。';
 const ZH = '下了电车，在站前拦了辆出租车，结果不知什么时候打起了瞌睡。';
 const make = (strict=true) => { const r = Object.create(Reader.prototype), traced = [], chained = [];
-  Object.assign(r, { displayLanguage: () => 'zh', gal: { hooks: { trace: t => traced.push(t), scriptTranslation: () => '' } }, prefs: () => ({ provider: 'google', scriptTranslation:strict }), langOptions: o => o, loadKeys() {},
+  Object.assign(r, { runtime: { libraryOnly: () => false }, displayLanguage: () => 'zh', gal: { hooks: { trace: t => traced.push(t), scriptTranslation: () => '' } }, prefs: () => ({ provider: 'google', scriptTranslation:strict }), langOptions: o => o, loadKeys() {},
     chainTranslate: async t => { chained.push(t); return { text: '机翻:' + t.slice(0, 4) }; }, translationRetries: () => ({ add() {} }), stats: { translation() {} }, gameId: '' });
   return { r, traced, chained }; };
 test('stored from the patch, found with ruby markup, brackets and blanks', async () => {

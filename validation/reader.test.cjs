@@ -15,7 +15,10 @@ test('the original disable message cancels an in-flight translation without gene
 });
 
 test('translation uses the original per-request provider and context options',async t=>{
- const {reader}=setup(t);let received;reader.translation={translate:async(text,options)=>{received=options;return 'test';}};
+ const {reader,runtime}=setup(t);
+ runtime.local=()=>({status:()=>({installed:true}),ensure:async()=>{}});
+ runtime.models=()=>({status:()=>({models:[{installed:true}]})});
+ let received;reader.translation={translate:async(text,options)=>{received=options;return 'test';}};
  await reader.message({id:1,text:'試験',options:{provider:'sakura',baseUrl:'http://127.0.0.1:8080/v1',model:'local-test',contextLines:3}});
  assert.equal(received.provider,'sakura');assert.equal(received.model,'local-test');assert.equal(received.contextLines,3);
 });
