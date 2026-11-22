@@ -11,15 +11,7 @@ const {HookNative}=require('../core/hook-native.cjs'),Profiles=require('../core/
 const root=path.join(__dirname,'..'),PID=900000+(process.pid%90000);
 /* the DLL (native/krkrtext/KrkrText.cpp MakeCtlPath): GetTempPathW() + MeguLit\draw\<pid>.txt */
 const dllPath=pid=>path.join(process.env.TMP||process.env.TEMP||os.tmpdir(),'MeguLit','draw',pid+'.txt');
-/* script.inc st.ctl(): [].load (UTF-16 with BOM, one array item per line), then its own loop body, the TJS lines translated token by token */
-function scriptIncCtl(file){
- const src=fs.readFileSync(path.join(root,'native','krkrtext','script.inc'),'utf8');
- const i=src.indexOf("var c=%['roles'=>0,'embed'=>0,'zh'=>1],m=%[];"),j=src.indexOf('continue;}',i)+'continue;}'.length;assert.ok(i>0&&j>i,'script.inc ctl parser found');
- let body=src.slice(i,j).replace("%['roles'=>0,'embed'=>0,'zh'=>1]","{roles:0,embed:0,zh:1}").replace('%[]','{}').replace(/a\.count/g,'a.length').replace(/#t==0xfeff/,'t.charCodeAt(0)==0xfeff').replace("typeof c.choiceFrames!='Object'","!Array.isArray(c.choiceFrames)").replace(/\.add\(/g,'.push(');
- const buf=fs.readFileSync(file);assert.deepEqual([...buf.subarray(0,2)],[0xff,0xfe],'UTF-16LE with BOM, as [].load reads it');
- const a=buf.subarray(2).toString('utf16le').split(/\r?\n/);
- return new Function('a',body+'}return c;')(a);
-}
+const {KrkrModel}=require('../tools/reader-replay/krkr-model.cjs');
 test('Fata end to end: seed profile -> real pid from configure -> control file at the DLL path -> script.inc reads #choiceframe and #clearline',async t=>{
  const file=dllPath(PID);t.after(()=>{try{fs.unlinkSync(file);}catch{}});try{fs.unlinkSync(file);}catch{}
  const p=Profiles.profileFor({exe:'D:/Games/Fata/fata_jp.exe',engine:'KiriKiri'});assert.equal(p.gameKey,'fata-morgana');assert.equal(p.page.reportClear,true);assert.ok(p.choice.pageFrames.length);
@@ -29,7 +21,8 @@ test('Fata end to end: seed profile -> real pid from configure -> control file a
  assert.equal(hook.gamePid(),PID,'the pid comes from configure (window state / target), not this.state');
  await new Promise(r=>setTimeout(r,150));
  assert.ok(fs.existsSync(file),'control file written at '+file);
- const c=scriptIncCtl(file);
+ assert.deepEqual([...fs.readFileSync(file).subarray(0,2)],[0xff,0xfe],'UTF-16LE with BOM');
+ const model=new KrkrModel({pid:PID});assert.equal(model.ctl.win,file);const c=model.tick();
  assert.equal(c.clear,1,'#clearline read by script.inc');assert.ok(Array.isArray(c.choiceFrames)&&c.choiceFrames.some(r=>r.test('選択肢')),'#choiceframe read by script.inc');
  hook.engineDraw?.stop();
 });
