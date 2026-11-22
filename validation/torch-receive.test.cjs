@@ -307,6 +307,8 @@ test('explicit layout enters a version contribution and the reviewed release dri
  hook.profile=resolve();assert.equal(hook.flowPage,true);
  session.confirmedPresentation='adv';const effective=resolve();assert.equal(effective.page.presentation,'adv');assert.ok(effective.application.personal.includes('page.presentation'));assert.ok(effective.application.layers.some(x=>x.layer==='official'&&x.revision===profile.rev&&!x.keys.includes('page.presentation')));delete session.confirmedPresentation;
  session.script='f'.repeat(64);session.stored={source:'calibration',verifiedScript:session.script,mode:'hide',settings:{page:{presentation:'adv'}}};
+ assert.notEqual(live.choose(session)?.from,'local');
+ session.stored.score={lines:20,metrics:{repeatRate:0,hideVisible:0,positionPx:1,pairRate:1}};
  assert.equal(resolve().page.presentation,'adv');assert.equal(live.choose(session).from,'local');delete session.stored;
  fs.appendFileSync(f.script,'updated script');assert.equal(resolve().page.presentation,null);
  assert.equal(Profiles.profileFor({...session.input,exeSha256:'d'.repeat(64),vndbLayout:'nvl',vndbLayoutKey:key}).vndbLayout,null);

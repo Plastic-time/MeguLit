@@ -110,7 +110,7 @@ test('app: uploads on by default (the switch turns them off), hot-updated layer 
   const gal={setGameProfile(){},textEffectsHold:null,textEffects(on,why){modes.push([on,why]);this.textEffectsHold=on?{why}:null;},hooks:{pageMode:{engine:'krkr'},trace(){}}};
   const reader={root,gal,gameExe:exe,logVisibility(){}};const begin=()=>{live.stop();gal.textEffectsHold=null;modes.length=0;return live.start(reader,exe,P.profileFor({exe}),{exe});};
   let s=begin();assert.equal(s.from,'shared');assert.ok(s.check.recording,'still calibrating here');assert.equal(s.sample,null,'no runtime sample when the player turned it off');
-  ap.store(root,key,ap.record({key,engine:'krkr',exe,version:'x',result:{mode:'hide',settings:{...HIDE,placement:{firstLineAnchor:'glyph'}},score:{cost:0}}}));
+  ap.store(root,key,ap.record({key,engine:'krkr',exe,version:'x',result:{mode:'hide',settings:{...HIDE,placement:{firstLineAnchor:'glyph'}},score:{cost:0,lines:20,metrics:{hideVisible:0,positionPx:0,pairRate:1,repeatRate:0}}}}));
   s=begin();assert.equal(s.from,'local','own calibration over the shared one');assert.equal(s.layer.placement.firstLineAnchor,'glyph');
   await maint('POST','/api/game-profile/signed',{diff:tool.signDoc(gameDiff.build({key,rev:5,source:'official',mode:'hide',settings:{placement:{firstLineAnchor:'box'}}}),OURS,'p1')});
   await feed.refresh(root,key,{fetcher:user('40.0.0.3'),force:true});s=begin();assert.equal(s.from,'official','official over this PC');assert.equal(s.layer.placement.firstLineAnchor,'box');

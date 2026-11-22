@@ -29,3 +29,34 @@ test('minimum lines and actual drawing are required, while unencountered choices
 test('encountered mismatching choices remain subject to the existing threshold',()=>{
  const r=AP.calibrate([...measured(),{kind:'choice',raw:2,shown:0},{kind:'choice',raw:2,shown:0}]);const kernel=r.candidates.filter(c=>c.params.hideMethod==='hide'&&c.params.filters==='kernel');assert.ok(kernel.every(c=>!c.pass&&c.over.includes('choiceMismatch')));
 });
+
+test('legacy calibration-hide admission uses existing metric evidence and preserves other sources',()=>{
+ const valid={source:'calibration',mode:'hide',score:{lines:20,metrics:{hideVisible:0,positionPx:0,pairRate:1,repeatRate:0}}};
+ assert.equal(AP.calibrationAdmission(valid).eligible,true,'no new fields or sample counts required');
+ for(const field of ['hideVisible','positionPx','pairRate','repeatRate']){const r=JSON.parse(JSON.stringify(valid));r.score.metrics[field]=null;assert.equal(AP.calibrationAdmission(r).eligible,false);}
+ for(const lines of [0,7,null,'20'])assert.equal(AP.calibrationAdmission({...valid,score:{...valid.score,lines}}).eligible,false);
+ assert.equal(AP.calibrationAdmission(valid,{thresholds:{minLines:21}}).eligible,false);
+ for(const [source,mode] of [['manual','hide'],['gate','hide'],['calibration','read'],['cold','hide']])assert.equal(AP.calibrationAdmission({source,mode}).eligible,true);
+});
+
+test('actual local load/choose/inputOf/profileFor ignore unmeasured hide without modifying the file',()=>{
+ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),Module=require('node:module'),P=require('../core/profiles/index.cjs');
+ const root=fs.mkdtempSync(path.join(process.env.MEGULIT_TMP||require('node:os').tmpdir(),'observation-admission-')),key='a'.repeat(64),exe=path.join(root,'neutral.exe');
+ const full=require.resolve('../services/self-check-live.cjs'),m=new Module(full,module);m.filename=full;m.paths=Module._nodeModulePaths(path.dirname(full));const real=m.require.bind(m),logs=[];
+ const overrides={'./auto-profile-feed.cjs':{forExe:()=>null,cached:()=>null,layer:()=>null,rejected:()=>false},'./runtime-sample.cjs':{enabled:()=>false,RuntimeSample:class{}},'./hook-verdict.cjs':{appVersion:()=> 'neutral'}};m.require=id=>Object.hasOwn(overrides,id)?overrides[id]:real(id);m._compile(fs.readFileSync(full,'utf8'),full);const live=m.exports;
+ const reader={root,gal:{hooks:{trace:t=>logs.push(t)},textEffects:()=>null},logVisibility:()=>null},input={exe,engine:'unknown'},profile={engine:'unknown',seedStatus:'skeleton',selfCheck:{}};
+ const valid={schema:1,key,source:'calibration',mode:'hide',settings:{calibrate:{hideMethod:'hide'},hide:{textEffectsRead:false}},score:{lines:20,metrics:{hideVisible:0,positionPx:0,pairRate:1,repeatRate:0}}};
+ const digest=()=>crypto.createHash('sha256').update(fs.readFileSync(path.join(AP.dir(root),key+'.json'))).digest('hex');
+ try{
+  for(const patch of [{metrics:{}},{metrics:{...valid.score.metrics,positionPx:null}},{metrics:{...valid.score.metrics,repeatRate:null}},{lines:7}]){
+   const raw={...valid,score:{...valid.score,...patch}};AP.store(root,key,raw);const before=digest(),s=live.start(reader,exe,profile,input,{key,skipFeed:true});
+   assert.equal(s.stored,null);assert.equal(s.calibrated,false);assert.ok(s.check.recording);assert.ok(s.calibrationPending.length);assert.equal(live.choose(s),null);assert.equal(live.inputOf(s).auto,undefined);assert.equal(P.profileFor(live.inputOf(s)).calibrate.hideMethod,null);
+   const injected={...s,stored:raw};assert.equal(live.choose(injected),null);assert.equal(live.inputOf(injected).auto,undefined);
+   assert.equal(live.choose({...injected,profile:{...profile,seedStatus:'verified'}}).from,'seed');
+   live.stop();assert.equal(digest(),before,'admission and stop do not write/delete the old file');
+  }
+  assert.ok(logs.some(x=>x.includes('calibration pending')&&x.includes('positionPx')));
+  AP.store(root,key,valid);let s=live.start(reader,exe,profile,input,{key,skipFeed:true});assert.equal(live.choose(s).mode,'hide');assert.equal(P.profileFor(live.inputOf(s)).calibrate.hideMethod,'hide');live.stop();
+  for(const [source,mode] of [['manual','hide'],['gate','read'],['calibration','read']]){AP.store(root,key,{...valid,source,mode,score:{},settings:{calibrate:{hideMethod:mode},hide:{textEffectsRead:mode==='read'}}});s=live.start(reader,exe,profile,input,{key,skipFeed:true});assert.equal(live.choose(s).mode,mode);assert.equal(live.choose(s).from,source==='gate'?'local-gate':'local');assert.equal(P.profileFor(live.inputOf(s)).calibrate.hideMethod,mode);live.stop();}
+ }finally{live.stop();fs.rmSync(root,{recursive:true,force:true});}
+});

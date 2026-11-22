@@ -32,6 +32,7 @@ function readMode(reader,reason){try{const g=reader.gal;if(g&&!g.textEffectsHold
    shared (the players' agreed diff) <- auto (this PC's calibration) <- official (the maintainer's diff) <- stepDown (this PC's
    gate step-down, always last so a game that broke here can always fall back). choose() still names the deciding one (reason,
    read mode, whether to calibrate). */
+function admittedStored(s){return auto.calibrationAdmission(s.stored,{thresholds:s.profile?.selfCheck||{}}).eligible?s.stored:null;}
 function profileInput(s,sh){const out={...(s.input||{})};for(const k of ['sharedGame','shared','auto','officialGame','official','officialGameRev','officialRev','sharedGameRev','sharedRev','stepDown','match','prints','verifiedLocal','verifiedTrialRevision'])delete out[k];
  if(/^[0-9a-f]{64}$/.test(String(s.key||'')))out.exeSha256=s.key;
  /* the relay's two layers, each official or agreed (services/auto-profile-feed.cjs layer) */
@@ -44,7 +45,7 @@ function profileInput(s,sh){const out={...(s.input||{})};for(const k of ['shared
  return out;}
 function verifiedLocal(s){const st=s.stored;
  return !!s.script&&st?.source!=='gate'&&(st?.verifiedScript===s.script||st?.cold?.verdict==='pass'&&st.cold.measured?.length>0);}
-function inputOf(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe||s.exe,{pinned:true}),out=profileInput(s,sh);
+function inputOf(s){const st=admittedStored(s),sh=feed.forExe(s.shared,s.key,s.input?.exe||s.exe,{pinned:true}),out=profileInput(s,sh);
  /* a verified / owner-ok built-in seed is official: this PC's calibration is not layered under it (its unpinned calibrate.* would
     still say read); the active gate step-down stays last */
  const seedOk=['verified','owner-ok'].includes(s.profile?.seedStatus);
@@ -56,10 +57,10 @@ function inputOf(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe
  return out;}
 function applyLayer(s){try{const p=require('../core/owner-tests.cjs').apply(Profiles.profileFor(inputOf(s)),s.reader.gal?.hooks?.ownerTestGrant,{exe:s.exe,engine:s.profile?.engine});s.profile=p;/* Cardinal's tape keeps the lines this game's rules replay */require('../core/cardinal/tape.cjs').keep(p.cardinal?.lines);s.reader.gal?.setGameProfile?.(p,s.input);}catch{}}
 /* which layer wins (see above) */
-function choose(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe||s.exe,{pinned:true});
+function choose(s){const st=admittedStored(s),sh=feed.forExe(s.shared,s.key,s.input?.exe||s.exe,{pinned:true});
  const gate=st?.source==='gate',superseded=gate&&supersedesGate(profileInput(s,sh),st);
  if(gate&&!superseded)return {from:'local-gate',mode:'read',settings:st.settings,reason:st.reason||''};
- if(verifiedLocal(s))return {from:'local',mode:st.mode,settings:st.settings,reason:st.reason||''};
+ if(st&&verifiedLocal(s))return {from:'local',mode:st.mode,settings:st.settings,reason:st.reason||''};
  if(sh&&sh.source==='official')return {from:'official',mode:sh.mode,settings:sh.settings,reason:sh.mode==='read'?'官方差分：这部游戏只显示译文':''};
  /* 2026-11-21 (1.4.22 test, ファタモルガーナの館: a calibration this PC stored as read mode took the game out of the hide mode the
     owner confirmed) a built-in seed that is verified or owner-ok is official too: this PC's own calibration does not override it
@@ -88,7 +89,10 @@ function start(reader,exe,profile=null,input=null,options={}){stop();profile=pro
  if(known)bindKey(s,known);
  else auto.exeKey(reader.root,exe).then(k=>{if(live!==s||!k)return;bindKey(s,k);applyLayer(s);}).catch(()=>{});
  return s;}
-function bindKey(s,key){const {reader}=s;s.key=key;const script=require('./original-text.cjs').contributionScript(reader.root,s.exe,reader.gameId);s.script=script;s.prints={exe:key,script};s.confirmedPresentation=require('./presentation.cjs').read(reader.root,key,script);s.stored=auto.load(reader.root,key,script);s.calibrated=!!s.stored;if(s.stored)s.check.recording=null;
+function bindKey(s,key){const {reader}=s;s.key=key;const script=require('./original-text.cjs').contributionScript(reader.root,s.exe,reader.gameId);s.script=script;s.prints={exe:key,script};s.confirmedPresentation=require('./presentation.cjs').read(reader.root,key,script);s.stored=auto.load(reader.root,key,script);
+ const admission=auto.calibrationAdmission(s.stored,{thresholds:s.profile?.selfCheck||{}});
+ if(!admission.eligible){s.stored=null;s.calibrationPending=admission.missing;hookTrace(reader,'selfCheck calibration pending key='+key+' missing='+admission.missing.join(','));reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'calibrationPending',key,reason:'观测不足，等待重新校准',missing:admission.missing});}
+ s.calibrated=!!s.stored;if(s.stored)s.check.recording=null;
  s.shared=s.skipFeed?null:feed.layer(feed.cached(reader.root,key),key,{exe:s.exe,script});if(s.shared&&feed.rejected(reader.root,key,s.shared))s.shared=null;
  if(s.shared?.torchBound&&!s.check.w.lines&&!s.check.windows.length)s.check.t={...s.check.t,...Profiles.profileFor(inputOf(s)).selfCheck};
  const c=settle(s);

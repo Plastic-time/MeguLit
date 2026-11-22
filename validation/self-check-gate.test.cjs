@@ -104,7 +104,7 @@ try{
  live.stop();
  /* a stored hide diff that fails later steps down */
  /* Explicit historic stored-hide fixture: the unmeasured Senren recording above no longer creates one. */
- const historicHide={mode:'hide',settings:{calibrate:{hideMethod:'hide'},hide:{textEffectsRead:false}},score:{cost:0},reason:''};
+ const historicHide={mode:'hide',settings:{calibrate:{hideMethod:'hide'},hide:{textEffectsRead:false}},score:{cost:0,lines:20,metrics:{hideVisible:0,positionPx:0,pairRate:1,repeatRate:0}},reason:''};
  ap.store(root,key,ap.record({key,engine:'krkr',exe:reader.gameExe,version:'x',result:historicHide}));calls.length=0;live.start(reader,reader.gameExe);assert.strictEqual(calls.length,0);
  for(const l of he.split('\n'))if(l>=FATA[0]&&l<FATA[1])live.feedTrace(l);
  const down=ap.load(root,key);assert.strictEqual(down.mode,'read');assert.strictEqual(down.source,'gate');assert.ok(down.gate.over.includes('dropRate'));assert.strictEqual(down.previous.mode,'hide');assert.strictEqual(calls.length,1);

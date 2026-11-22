@@ -76,6 +76,18 @@ function missingHideObservations(r,t){const missing=[];
  for(const k of ['hideVisible','positionPx','pairRate'])if(r.metrics[k]==null)missing.push(k);
  return missing;}
 const OBSERVATIONS={lines:'正文行数',drawn:'阅读层绘制',hideVisible:'隐藏检测',positionPx:'位置测量',pairRate:'配对测量'};
+/* Old records did not store sensor counts. A finite metric records that its original sample minimum was met;
+   repeatRate was only produced after reader drawing. Do not demand new fields from a measured old record. */
+function calibrationAdmission(rec,{thresholds={}}={}){
+ if(!rec||rec.source!=='calibration'||rec.mode!=='hide')return {eligible:true,missing:[]};
+ const m=rec.score?.metrics||{},min=Number.isFinite(+thresholds.minLines)?+thresholds.minLines:DEFAULTS.minLines,missing=[];
+ if(!Number.isInteger(rec.score?.lines)||rec.score.lines<min)missing.push('lines');
+ const ratio=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1;
+ if(!ratio(m.repeatRate))missing.push('drawn');
+ if(!ratio(m.hideVisible))missing.push('hideVisible');
+ if(typeof m.positionPx!=='number'||!Number.isFinite(m.positionPx)||m.positionPx<0)missing.push('positionPx');
+ if(!ratio(m.pairRate))missing.push('pairRate');
+ return {eligible:missing.length===0,missing};}
 
 /* the calibration: returns {mode,settings,score,candidates,reason} */
 function calibrate(recording,{thresholds={}}={}){const t={...DEFAULTS};for(const [k,v] of Object.entries(thresholds||{}))if(k in DEFAULTS&&Number.isFinite(+v))t[k]=+v;
@@ -103,4 +115,4 @@ function stepDown(prev,{key,engine,exe,version,trip,window}){const base=prev||{s
 function diagnostic(rec,windows=[],pendingLines=null){if(!rec&&!windows.length&&pendingLines===null)return null;return {schema:SCHEMA,windowState:windows.length?'scored':pendingLines===null?'noWindowEvidence':'noClosedWindow',pendingLines,gameplayAcceptance:'unverified',profile:rec?{key:rec.key,engine:rec.engine,exe:rec.exe,version:rec.version,at:rec.at,source:rec.source,mode:rec.mode,reason:rec.reason,settings:rec.settings,score:rec.score,gate:rec.gate||null,candidates:(rec.candidates||[]).slice(0,4),...(rec.cold?{cold:rec.cold}:{})}:null,
  windows:windows.slice(-10).map(w=>({window:w.window,lines:w.lines,metrics:w.metrics,over:w.over,pass:w.pass,evidence:windowEvidence(w)}))};}
 function list(root){try{return fs.readdirSync(dir(root)).filter(f=>f.endsWith('.json')).map(f=>load(root,f.slice(0,-5))).filter(Boolean);}catch{return [];}}
-module.exports={SCHEMA,KEY,dir,keyFor,exeKey,exeKeySync,load,store,clear,list,candidates,predict,calibrate,record,stepDown,diagnostic};
+module.exports={SCHEMA,KEY,dir,keyFor,exeKey,exeKeySync,load,store,clear,list,candidates,predict,calibrate,calibrationAdmission,record,stepDown,diagnostic};
