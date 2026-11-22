@@ -8,6 +8,17 @@ const wordsURL=data(fs.readFileSync(path.join(base,'disc-install-copy.js'),'utf8
 const uiURL=data(fs.readFileSync(path.join(base,'disc-install.js'),'utf8').replace("'./disc-install-flow.js'",JSON.stringify(flowURL)).replace("'./disc-install-copy.js'",JSON.stringify(wordsURL)));
 const imports=Promise.all([import(flowURL),import(wordsURL),import(uiURL)]);
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
+test('actual Japanese-original import context includes its installation guidance',async()=>{
+ const [, {discWords},{discInstallHTML}]=await imports;
+ const app=fs.readFileSync(path.join(base,'app.js'),'utf8');
+ assert.match(app,/installDisc\(\[source\],'japanese'\)/);
+ const view={session:null,paths:[],installRoots:[],confirmed:false,pending:false};
+ for(const locale of ['zh','en','ja']){
+  assert.ok(discInstallHTML(view,{locale,context:'japanese'}).includes(discWords[locale].jp));
+  assert.ok(discInstallHTML(view,{locale,context:'jp-import'}).includes(discWords[locale].jp));
+  assert.equal(discInstallHTML(view,{locale,context:'library'}).includes(discWords[locale].jp),false);
+ }
+});
 const dto=(state,extra={})=>({id:'owned-fixture',state,busy:false,mounted:false,image:'H:\\fixture.mds',installers:[],candidates:[],imported:[],warnings:[],error:'',...extra});
 function fake(api,extra={}){return {api,schedule:()=>1,unschedule:()=>{},...extra};}
 test('all eight image suffixes are handed to the backend unchanged; no conversion or pair guessing',async()=>{

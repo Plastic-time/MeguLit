@@ -10,7 +10,7 @@ export function discInstallHTML(view,{locale='zh',esc=escapeHTML,context='librar
  const before=!view.confirmed&&!s?.mounted&&!['done','cancelled'].includes(stage);
  const problem=view.notice||s?.error;
  let body=`<p class="settings-help">${esc(w.formats)}</p>`;
- if(context==='jp-import')body+=`<p class="settings-help">${esc(w.jp)}</p>`;
+ if(context==='japanese'||context==='jp-import')body+=`<p class="settings-help">${esc(w.jp)}</p>`;
  if(view.paths.length)body+=`<p class="disc-path"><strong>${esc(w.selected)}</strong><br>${view.paths.map(p=>esc(p)).join('<br>')}</p>`;
  if(before){body+=`<div class="disc-input-actions">${button('pick',w.pick)}${button('roots',w.chooseRoots)}</div><p class="settings-help">${esc(w.rootHint)}</p>`;}
  if(view.installRoots.length)body+=`<p class="disc-path"><strong>${esc(w.roots)}</strong><br>${view.installRoots.map(p=>esc(p)).join('<br>')}</p>`;
