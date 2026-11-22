@@ -15,8 +15,16 @@ class Reader{
  active(){return !this.closed&&!(this.runtime.libraryOnly?this.runtime.libraryOnly():this.root?require('../core/library-mode.cjs').libraryOnly(this.root):false);}
  emit(event,data){if(this.active())this.runtime.emit(event,data);}
  prefs(){return cleanPreferences(readJSON(path.join(this.folder,'preferences.json')));}
+ clearGameVisuals(){
+  this.visualGeneration=(this.visualGeneration||0)+1;this.latest=(Number(this.latest)||0)+1;this.lookup=(Number(this.lookup)||0)+1;this.pageScope='';
+  this.artTurns?.clear();this.artTurns=new Map();this.drawUi?.items?.clear();this.drawUi?.groups?.clear();this.drawUi=null;this.gameUiPreview=null;
+  this.emit('reader-event',{type:'artText',clear:true});this.emit('reader-event',{hookSource:null,hookChoices:null,receivedText:false});
+ }
  uiLanguage(){try{return require('./store.cjs').publicPreferences(this.root)?.language||'zh';}catch{return 'zh';}}
  event(message){if(!this.active())return;
+  const visualBirth=String(message.gameStarted||this.gal?.state?.gameStarted||'');
+  if(message.type==='gameClosed'||message.bound===false){if(this.visualIdentity||this.artTurns?.size||this.drawUi||message.type==='gameClosed')Reader.prototype.clearGameVisuals.call(this);this.visualIdentity='';}
+  else if(message.gameProcessId){const identity=String(message.gameProcessId)+'|'+visualBirth;if(identity!==this.visualIdentity){Reader.prototype.clearGameVisuals.call(this);this.visualIdentity=identity;}}
   /* Alt+M binds the window in front (services/bind-hotkey.cjs); it no longer opens or closes the home window */
   if(message.type==='bindHotkey'){require('./bind-hotkey.cjs').request(this,message,e=>this.emit('reader-event',e),this.uiLanguage());return;}
   if(this.hotkeyBind&&(message.type==='bound'||message.type==='error'))require('./bind-hotkey.cjs').follow(this,message,e=>this.emit('reader-event',e),this.uiLanguage());
@@ -27,7 +35,7 @@ class Reader{
   if(message.type==='readerPointer'){this.emit('reader-pointer-input',message);return;}
   if(message.type==='hookEmbedRequest'){this.embedTranslate(message.id,message.text);return;}
   /* engine-draw (docs/engine-draw-protocol.md): UI items drawn by the engine get the art-text treatment (copy + translation beside, clicks reach the game); a dialogue line asks for its in-game replacement */
-  if(message.type==='hookDrawUi'){const t=this.drawUi||(this.drawUi=new (require('../core/engine-draw.cjs').UiTracker)());for(const m of t.feed(message,gone=>{for(const g of gone)this.artText(g);}))this.artText(m);return;}
+  if(message.type==='hookDrawUi'){const t=this.drawUi||(this.drawUi=new (require('../core/engine-draw.cjs').UiTracker)()),generation=this.visualGeneration||0;for(const m of t.feed(message,gone=>{if(this.closed||generation!==(this.visualGeneration||0)||this.drawUi!==t)return;for(const g of gone)this.artText(g);}))this.artText(m);return;}
   if(message.type==='hookDrawEmbed'){this.drawEmbed(message);return;}
   if(message.type==='artText'){this.artText(message);return;}
   /* A Chinese-patched game read in Japanese: the patch's line is the translation, cached before the page asks. */
@@ -289,12 +297,12 @@ class Reader{
  async artRows(list){const cacheLanguage=this.targetLanguage();let options;try{options=this.baseOptions(cacheLanguage);}catch{return list.map(()=>'');}const until=Date.now()+4000;
   return Promise.all(list.map(async row=>{try{let t=this.embedCached(row,undefined,{language:cacheLanguage})||'';if(!t){t=(await this.chainTranslate(row,options,{current:()=>Date.now()<until})).text;this.embedCached(row,t,{language:cacheLanguage});}return t||'';}catch{return '';}}));}
  /* engine-draw: ruby (game ruby, then dictionary-settled readings) and translation (script, then the fallback chain) for one dialogue line the engine will draw itself */
- async drawEmbed(m){const cacheLanguage=this.targetLanguage();const text=String(m?.text||'');if(!text||text.length>600||notJapanese(text))return;let ruby=[],zh='';
+ async drawEmbed(m){const generation=this.visualGeneration||0,owner=this.gal,current=()=>!this.closed&&this.gal===owner&&(this.visualGeneration||0)===generation;const cacheLanguage=this.targetLanguage();const text=String(m?.text||'');if(!text||text.length>600||notJapanese(text))return;let ruby=[],zh='';
   try{const x=await require('./example-ruby.cjs').exampleRuby(null,this.runtime.learning(),[{text,ruby:this.gal?.hooks?.sourceRuby?.get(text)||[]}]);const it=x?.items?.[0];if(it?.text===text&&Array.isArray(it.spans))ruby=it.spans.map(sp=>[sp.start,sp.end,String(sp.reading||'')]);}catch{}
   try{zh=this.embedCached(text,undefined,{language:cacheLanguage})||'';if(!zh&&cacheLanguage!=='en')zh=this.gal?.hooks?.scriptTranslation?.(text)||'';if(!zh){const until=Date.now()+4000;zh=(await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current:()=>Date.now()<until})).text||'';}if(zh)this.embedCached(text,zh,{language:cacheLanguage});}catch{}
   if(zh&&(/[\ufffd\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(zh)||require('../core/text-sanity.cjs').garbledSource(zh)))zh='';
-  this.gal?.hooks?.drawEmbedReply?.(m.key,{ruby,zh});}
- async embedTranslate(id,text){const cacheLanguage=this.targetLanguage();
+  if(current())owner?.hooks?.drawEmbedReply?.(m.key,{ruby,zh});}
+ async embedTranslate(id,text){const generation=this.visualGeneration||0,owner=this.gal,current=()=>!this.closed&&this.gal===owner&&(this.visualGeneration||0)===generation;const cacheLanguage=this.targetLanguage();
   let trans='';
   /* E352: the engine's string still carries its ruby markup (HuneX <rふ>触</r>, ISLAND \x1d pairs): translate the text the player reads. */
   try{const plain=require('../core/source-ruby.cjs').extractSourceRuby(text).text;if(plain.trim())text=plain;}catch{}
@@ -312,7 +320,7 @@ class Reader{
   /* 2026-11-15 never write garbage into a game: a translation with replacement characters, control codes or mojibake goes back empty (the game keeps its line); HookBridge checks the code page (EmbedTextPolicy.GuardWrite) */
   if(trans&&(/[\ufffd\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(trans)||require('../core/text-sanity.cjs').garbledSource(trans))){try{logSink.append(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'embedTranslateRefused',chars:trans.length})+'\n');}catch{}trans='';}
   let hide=false;if(trans){try{hide=this.gal?.hooks?.originalText?.drawable?.(trans)===false;}catch{}}
-  this.gal?.hooks?.embedReply(id,hide?'':trans,{hide,source:text,text:trans});
+  if(current())owner?.hooks?.embedReply(id,hide?'':trans,{hide,source:text,text:trans});
  }
  async translate(request){const options=this.requestOptions(request),cacheLanguage=this.targetLanguage(options);const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;{const cached=this.embedCached(text,undefined,{language:cacheLanguage});if(cached)return cached;}const current=()=>pageKey?this.pageScope===pageKey:this.latest===request.id;if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();const gameId=this.gameId;
   /* 2026-11-19 (user rule, every game): the script's own translation first (group / official, the same lookup the embed uses); a line it does not
@@ -363,7 +371,7 @@ class Reader{
    case 'galWindows':g?.send({type:'windows'});break;
    case 'galBind':if(!/^\d{1,19}$/.test(r.hwnd||''))throw Error('INVALID_GAME_WINDOW');require('./bind-hotkey.cjs').bindWindow(this,{hwnd:r.hwnd,title:r.title,processName:r.processName},r.settings,e=>this.emit('reader-event',e));break;
    case 'galPickWindow':g?.send({type:'pickWindow',active:r.active===true});break;
-   case 'galUnbind':this.translator().clearContext();g?.save({...g.preferences,bindEnabled:false});this.stats.reset();break;
+   case 'galUnbind':Reader.prototype.clearGameVisuals.call(this);this.visualIdentity='';this.translator().clearContext();g?.save({...g.preferences,bindEnabled:false});this.stats.reset();break;
    case 'galMenu':/* opening and closing the menu both freeze every inferred hide/show (core/immersion.cjs), whatever the bridge reports */if(r.open===true)this.immersion?.context(false);this.immersion?.menu?.(r.open===true);g?.send({type:'menu',open:r.open===true});break;
    case 'galLookup':g?.send({type:'lookup',open:r.open===true});break;
    case 'galFloatDrag':if([r.x,r.y].every(Number.isFinite))g?.send({type:'floatDrag',x:r.x,y:r.y});break;
@@ -550,6 +558,7 @@ class Reader{
  stop(){
   try{require('../core/owner-tests.cjs').revokeFor(this.root);}catch{}
   if(this.stopping)return this.stopping;
+  Reader.prototype.clearGameVisuals.call(this);this.visualIdentity='';
   this.closed=true;++this.latest;++this.lookup;this.pageScope='';this.gamePid=null;this.hotkeyBind=null;clearInterval(this.tick);clearTimeout(this.hideTimer);
   // Keep failed teardown resources out of the live reader, but reachable for another stop.
   const gal=this.gal||this.stoppingGal,child=gal?.process;this.stoppingGal=gal;this.gal=null;
