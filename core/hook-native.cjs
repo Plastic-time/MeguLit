@@ -432,6 +432,11 @@ class HookNative{
      translated): a whole Japanese sentence among the other rows is a notice the player reads; it is taken like a line */
   if(it.others>=3&&!HookNative.ocrSentence(flat))return 'a title or menu screen';
   if(it.once&&(!kana||n<4))return 'read once, too short or without kana';
+  if(it.once&&n<=12&&it.rows.length===1&&it.sw>0&&it.sh>0&&this.originalText?.ocrSuffix&&this.scriptAllowed?.()!==false){
+   const row=it.rows[0],x=(row.x+row.w/2)*100/it.sw,y=(row.y+row.h/2)*100/it.sh;
+   const box=require('./scan-area.cjs').area(this.preferences||{},this.flowPage,this.target?.name);
+   if(x>=box.scanX&&x<=box.scanX+box.scanWidth&&y>=box.scanY&&y<=box.scanY+box.scanHeight&&this.originalText.ocrSuffix(t))return 'vanished script line ending';
+  }
   if(n<2||n>120)return 'length';if(f.artJunk(t,it.rows,it.sh))return 'logo or OCR noise';if(!it.repeated&&f.artList(it.rows))return 'a list'; /* rows of one phrase (a litany fading in) are that phrase, not a list */
   if(require('./text-sanity.cjs').garbledSource(t,{controls:false}))return 'unreadable';
   /* radicals the OCR guesses inside a logo (Novectacle read as 「ノベクタク丿レ」): no word uses them alone */
@@ -452,11 +457,20 @@ class HookNative{
     page rules (core/page-text.cjs) never knew it was a page game. Another stream of the same game that carries the text box as the
     game holds it (several lines, the current line among them: TMP set_text of the whole page) is that evidence: the game pages,
     and a page that holds the current line but no longer the one before it was turned before this line. Any engine. */
- auxPage(m){try{const P=this.pageText;if(this.calibrating||!P||typeof m?.text!=='string'||!m.text.includes(String.fromCharCode(10)))return;const k=HookNative.flat(m.text.replace(/<[^>]*>/g,'')),R=this.hookRecent||[],cur=R.length?R[R.length-1].key:'';if(cur.length<2||!k.includes(cur))return;
+ auxPage(m){try{const P=this.pageText;if(this.calibrating||!P||typeof m?.text!=='string'||!m.text.includes(String.fromCharCode(10)))return;
+  const raw=m.text.replace(/<[^>]*>/g,''),k=HookNative.flat(raw),R=this.hookRecent||[],cur=R.length?R[R.length-1].key:'';if(cur.length<2||!k.includes(cur))return;
   const prev=R.length>=2?R[R.length-2].key:'';
   /* One wrapped sentence (TextRender during calibration) is still ADV. Start a page only when the other stream
      demonstrably retains two distinct dialogue lines. An established page may then report its first new line alone. */
-  if(!P.pages&&(k===cur||!prev||prev===cur||!HookNative.retainedPrevious(k,prev,cur)))return;
+  if(!P.pages){
+   if(!prev||prev===cur||k===cur)return;
+   const dialogue=raw.replace(/【[^】\n]*】/g,''),flatDialogue=HookNative.flat(dialogue);
+   if(!flatDialogue.includes(cur))return;
+   const rows=dialogue.split('\n').map(HookNative.flat);
+   const independentRows=rows.includes(prev)&&rows.includes(cur);
+   // A translated row can repeat punctuation from the previous line. Only an entire row proves it in that case.
+   if(!independentRows&&(!/[\p{L}\p{N}]/u.test(prev)||!HookNative.retainedPrevious(flatDialogue,prev,cur)))return;
+  }
   P.paging=true;P.auxPageAt=this.now();
   if(prev&&prev!==cur&&!k.includes(prev)&&this.pageSaidSame===true&&P.auxResetFor!==cur){P.auxResetFor=cur;this.pageSaidSame=false;this.trace('page turned before this line (the page text no longer holds the line before it)');this.emit({type:'hookPage',engine:'text',reset:true,at:this.now()});}}catch{}}
  /* Exclude every occurrence of the current sentence, including overlapping redraws. A previous sentence must
@@ -972,7 +986,7 @@ class HookNative{
   const part=text;let continues=0;/* not when the engine named a new speaker after the last line */if(paged&&!(this.speaker&&this.speaker.at>(this.lastSourceAt||0))){const c=this.pageText.continuation(text,this.now());if(c){this.trace('sentence continues the shown line ('+c.continues+' chars before)');text=c.text;continues=c.continues;}}
   this.beforeDialogue?.({hookSequence:(this.state.hookSequence||0)+1,hookSource:text,hookSourceOrigin:origin,hookSourceContinues:continues});
   this.learnBareName(text);
-  const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;/* E416 the choice detector learns every dialogue line and speaker, whatever the engine */(this.choice||(this.choice=this.newChoiceCapture())).noteDialogue(text,speaker);/* E407 a new dialogue line ends the choice screen */if(text.replace(/\s+/g,'')!==String(this.lastSource||'').replace(/\s+/g,''))this.clearChoices('new dialogue line',400,text);this.lastSource=text;this.lastSourceAt=this.now();/* #468 the lines the game's own text gave (never an OCR line): an OCR reading of the same page is refused (ocrLineRefused) */if(origin!=='ocr'){const R=this.hookRecent||(this.hookRecent=[]);R.push({key:HookNative.flat(text),at:this.now()});if(R.length>24)R.shift();}this.palFlush?.();this.lastSourceStream=this.sourceStream||'';this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.textEffectsLine(text,this.fxNext===true||origin==='placement');if(paged){/* the reader keeps the page's earlier lines above this one while the page stays (web hook-reader.js) */if(!continues&&this.pageText.pages){const same=this.pageText.samePage(this.now());this.pageSaidSame=same;this.emit({type:'hookPage',engine:'text',line:(this.state.hookSequence||0)+1,same,at:this.now()});}this.pageText.shown(part,text,this.now());}this.notify({...(this.lineUnreadable?(this.lineUnreadable=false,{hookLineUnreadable:false}):{}),hookActive:true,...(engine==='saya-page-ocr'?{}:{processAttached:true,streamSelected:true}),hookRecovering:false,hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookFlowGrid:engine==='nvl'?(this.flowGridName||''):'',...(()=>{const f=engine==='nvl'?this.flowLayout(text):null;/* E410 */return {hookFlowPageStart:f?.pageStart===true,hookFlowRow:f?.row||'',hookSourceIndex:Number.isSafeInteger(f?.index)?f.index:-1};})(),hookSourceContinues:continues,hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:engine==='saya-page-ocr'?'画面文字已匹配原版剧本':text.trim()?'已收到真实游戏台词':'收到空文本信号'});
+  const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;/* E416 the choice detector learns every dialogue line and speaker, whatever the engine */(this.choice||(this.choice=this.newChoiceCapture())).noteDialogue(text,speaker);/* E407 a new dialogue line ends the choice screen */if(text.replace(/\s+/g,'')!==String(this.lastSource||'').replace(/\s+/g,''))this.clearChoices('new dialogue line',400,text);this.lastSource=text;this.lastSourceAt=this.now();/* #468 the lines the game's own text gave (never an OCR line): an OCR reading of the same page is refused (ocrLineRefused) */if(origin!=='ocr'){const R=this.hookRecent||(this.hookRecent=[]);R.push({key:HookNative.flat(text),at:this.now()});if(R.length>24)R.shift();}this.palFlush?.();this.lastSourceStream=this.sourceStream||'';this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.textEffectsLine(text,this.fxNext===true||origin==='placement');if(paged){/* the reader keeps the page's earlier lines above this one while the page stays (web hook-reader.js) */if(!continues&&this.pageText.pages){const same=this.pageText.samePage(this.now());this.pageSaidSame=same;this.emit({type:'hookPage',engine:'text',line:(this.state.hookSequence||0)+1,same,at:this.now()});}this.pageText.shown(part,text,this.now());}this.notify({...(this.lineUnreadable?(this.lineUnreadable=false,{hookLineUnreadable:false}):{}),hookActive:true,...(origin==='ocr'||engine==='saya-page-ocr'?{}:{processAttached:true,streamSelected:true,hookRecovering:false}),hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookFlowGrid:engine==='nvl'?(this.flowGridName||''):'',...(()=>{const f=engine==='nvl'?this.flowLayout(text):null;/* E410 */return {hookFlowPageStart:f?.pageStart===true,hookFlowRow:f?.row||'',hookSourceIndex:Number.isSafeInteger(f?.index)?f.index:-1};})(),hookSourceContinues:continues,hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:engine==='saya-page-ocr'?'画面文字已匹配原版剧本':origin==='ocr'?'已读取画面文字':text.trim()?'已收到真实游戏台词':'收到空文本信号'});
   this.il2cppShown=require('./unity-il2cpp-source.cjs').tagged(authority)?{authority,sequence:this.state.hookSequence}:null;
  }
  /* #141 (CLANNAD: a bare name sent as its own string, with no brackets, before the 「…」 line). A short name-like line
@@ -1036,11 +1050,16 @@ class HookNative{
   tasks.push(attempt(()=>draw?.stop()).then(()=>{if(this.engineDraw===draw)this.engineDraw=null;}));
   tasks.push(attempt(()=>{this.embedModeSent=undefined;this.probing=false;if(this.lineUnreadable){this.lineUnreadable=false;this.notify({hookLineUnreadable:false});}if(this.state?.scriptSource)this.notify({scriptSource:false});if(this.state?.embedTranslating)this.notify({embedTranslating:false});clearTimeout(this.skipBurst?.timer);this.skipBurst=null;this.pageReset();this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.retryAt=0;this.attempt=0;this.markerKey='';this.waitTarget=null;}));
   // Even failed control revocation must request and await the owned helper's shutdown.
-  tasks.push(attempt(()=>require('./owned-exit.cjs').trackStop(this,old,()=>{try{this.send({type:'quit'});}finally{old.stdin.end();}})));
+  // HookBridge checks game exit and releases the hide layers before its final stdout drain (up to 2 s).
+  tasks.push(attempt(()=>require('./owned-exit.cjs').trackStop(this,old,()=>{try{this.send({type:'quit'});}finally{old.stdin.end();}},{graceMs:8000})));
   this.process=null;if(old)++this.serial;this.enabled=false;
   tasks.push(attempt(()=>this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'disabled',hookSource:null,hookThreads:[],hookDrawCount:0,hookDrawAt:0})));
   Promise.allSettled(tasks).then(results=>{this.stopPending=null;const failed=results.find(r=>r.status==='rejected');
-   if(failed){const error=Error('READER_STOP_INCOMPLETE',{cause:failed.reason});error.code='READER_STOP_INCOMPLETE';this.stopError=error;reject(error);}else{this.stopError=null;resolve();}
+   if(failed){
+    const error=Error('READER_STOP_INCOMPLETE',{cause:failed.reason});error.code='READER_STOP_INCOMPLETE';
+    if(!this.stopError)this.trace?.('hook stop incomplete gamePid='+this.pid+' bridgeExit='+old?.exitCode+' signal='+old?.signalCode+' cause='+String(failed.reason?.message||failed.reason));
+    this.stopError=error;reject(error);
+   }else{this.stopError=null;resolve();}
   });return result;
  }
 }
