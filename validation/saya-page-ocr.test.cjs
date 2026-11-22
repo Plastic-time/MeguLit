@@ -62,6 +62,41 @@ test('two script lines sharing the observed fragment cannot identify the page', 
  assert.equal(lookup(line), line);
 });
 
+test('the bottom row with an extra OCR digit must identify a unique script ending', () => {
+ const row = 'のまま3そこにあった。';
+ const line = '世界は昨日と同じように醜く歪んだ姿のまま、そこにあった。';
+ assert.equal(scriptLookup([line])(row,'bottom'),line);
+ assert.equal(scriptLookup([line,'昨日の風景のまま、そこにあった。'])(row,'bottom'),'');
+ assert.equal(scriptLookup([line])(row,true),'');
+});
+
+test('cumulative Saya pages select the last visible sentence across OCR groups and wrapped rows', () => {
+ const previous = '昨日と同じように醜く歪んだ姿のまま、そこにあった。';
+ const next = 'これが悪夢であってくれればと、どれほど願ったことだろうか。';
+ const hook = new HookNative({}, () => {}, () => {}, () => 10000);
+ hook.trace = () => {};
+ hook.target = {name:'saya.exe'};
+ hook.windowState = {bound:true};
+ hook.originalText = {sayaPageLine:scriptLookup([previous,next]), resolve:() => null};
+ const row = (text,y,x=64) => ({text,y,x,h:24});
+ const group = (id,rows) => hook.sayaOcrGroup({id,source:'ocr',visible:true,sh:600,text:rows.map(r=>r.text).join(''),rows});
+ try {
+  group(1,[row(previous,94),row('カ悪夢であてくればと、',130)]);
+  group(2,[row('どれほど願ったことだろうか。',131,355)]);
+  group(4,[{text:'イアノ',x:260,y:549,w:135,h:51}]);
+  hook.sayaOcr.flush();
+  assert.equal(hook.state.hookSource,next);
+  group(3,[row('歪テ語ヱ断ト別ラ字読セ',167)]);
+  hook.sayaOcr.flush();
+  assert.equal(hook.state.hookSource,'');
+  hook.emitSource('ＭＳ Ｐゴシック','live');
+  hook.emitSource(previous+next,'live');
+  assert.equal(hook.state.hookSource,'');
+  hook.emitSource(previous,'live');
+  assert.equal(hook.state.hookSource,previous);
+ } finally { clearInterval(hook.timer); hook.sayaOcr?.stop(); }
+});
+
 test('legacy Saya never translates a page using a cached fragment of another line', () => {
  const r = Object.create(Reader.prototype);
  r.gal = {hooks:{target:{name:'saya.exe'}}};
@@ -69,4 +104,21 @@ test('legacy Saya never translates a page using a cached fragment of another lin
  assert.equal(r.embedNear(Reader.normKey(line)), null);
  r.gal.hooks.target.name = 'Saya_Steam.exe';
  assert.equal(r.embedNear(Reader.normKey(line)).value, 'previous translation');
+});
+
+test('the reviewed Saya line precedes keyless MT and keeps its provenance', async () => {
+ const r = Object.create(Reader.prototype);
+ r.runtime = {};
+ r.gal = {preferences:{display:'bilingual'},hooks:{originalText:{sayaPageLine:scriptLookup([line])}}};
+ r.prefs = () => ({provider:'google',learnerLanguage:'zh'});
+ r.loadKeys = () => {};
+ r.translator = () => ({hasKey:() => false,translate:() => {throw Error('unexpected MT call');}});
+ const result = await r.chainTranslate(line,{provider:'google',learnerLanguage:'zh'});
+ assert.equal(result.text,'我当然很想否认这一点——可我早就放弃抵抗了。');
+ assert.equal(result.source,'filled');
+ assert.equal(result.provider,'');
+ r.translator = () => ({hasKey:() => true, translate:async () => '自定义 API 的译文'});
+ const api = await r.chainTranslate(line,{provider:'deepseek',learnerLanguage:'zh'});
+ assert.equal(api.text,'自定义 API 的译文');
+ assert.equal(api.source,'api');
 });

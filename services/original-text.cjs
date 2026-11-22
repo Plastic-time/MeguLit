@@ -798,7 +798,7 @@ function staticProvider(root,executable,opts={}){
    resolveChoice:require('./script-translation-quality.cjs').choiceLookup(rt,patched?m.og:[],rtIndex.roles),resolve:text=>withRuby(resolveLine(text))};
   if(state.runtime.engine==='nitro-pak'&&require('../core/saya-page-ocr.cjs').legacyExe(path.basename(executable))){
    let lookup;
-   api.sayaPageLine=text=>(lookup??=require('../core/saya-page-ocr.cjs').scriptLookup(rt))(text);
+   api.sayaPageLine=(text,mode)=>(lookup??=require('../core/saya-page-ocr.cjs').scriptLookup(rt))(text,mode);
   }
   function resolveLine(text){const r=m.match(text);if(r.japanese===undefined)return r;
     // E449 lines the release leaves in Japanese take the filled translation written for them (fill.cjs), marked filled.

@@ -39,6 +39,7 @@ test('the background retry fills a line in once a source answers, then forgets i
 
 test('reader returns the answering provider on both immediate and cached requests',async()=>{
  const r=Object.create(require('../services/reader.cjs').Reader.prototype);
+ r.runtime={};
  r.requestOptions=()=>({provider:'google'});r.targetLanguage=()=>'zh';
  r.chainTranslate=async()=>({text:'translated',source:'mt',provider:'bing'});
  const first={},second={};

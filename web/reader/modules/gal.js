@@ -643,7 +643,7 @@
    document.body.append(tip); setTimeout(()=>{tip.style.opacity='0';setTimeout(()=>tip.remove(),350);},message.ok===true?2600:4500); };
   bridge.galStatus = message => {
     if ('hookSource' in message || message.type==='gameClosed') {
-      const page=!!message.hookSource && message.hookSourceEngine==='saya-page-ocr';
+      const page=!!message.hookSource && ['saya-page-ocr','saya-script-read'].includes(message.hookSourceEngine);
       document.body.classList.toggle('megulit-saya-page',page);
       if(page)placeLayers();
     }

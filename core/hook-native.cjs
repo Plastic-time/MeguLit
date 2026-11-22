@@ -411,7 +411,7 @@ class HookNative{
   (this.sayaOcr??=new SayaPageOcr(this)).update(m);
   return true;
  }
- artScanState(now=this.now(),quiet=2000){this.sayaOcr?.providerReady();const hidden=this.engineDialog===false,line=String(this.lastSource||'').trim(),own=!!line&&(this.ocr?.lastText===line||this.state?.hookSourceEngine==='saya-page-ocr'),current=!!line&&!hidden&&!own;
+ artScanState(now=this.now(),quiet=2000){this.sayaOcr?.providerReady();const hidden=this.engineDialog===false,line=String(this.lastSource||'').trim(),own=!!line&&(this.ocr?.lastText===line||['saya-page-ocr','saya-script-read'].includes(this.state?.hookSourceEngine)),current=!!line&&!hidden&&!own;
   const on=hidden||!line||own||now-(this.lastSourceAt||0)>quiet;
   return {on,dialog:current?line.slice(0,600):'',speaker:current?String(this.state?.hookSpeaker||'').slice(0,40):'',band:current,foreign:this.foreignArtReady()};}
  /* 2026-11-19 (素晴らしき日々: the opening quotes 「私（あるいはこれを読むあなた）は世界に属さない。」 are pictures, no stream carries them; every
@@ -1024,7 +1024,16 @@ class HookNative{
   /* 2026-11-19 names glued while skipping (謎の男謎の男…美亜美亜) are the last name */{const nm=LineOnce.nameStack(text);if(nm){this.speaker={text:nm,at:this.now()};this.noteSpeaker(nm);this.trace('name stack kept last name '+JSON.stringify(nm));return;}}
   {const bare=LineOnce.stripStageNotes(text);if(bare!==text){if(!bare.trim()){this.trace('drop stage note '+JSON.stringify(String(text).slice(0,40)));return;}text=bare;}const once=LineOnce.collapse(text);if(once.collapsed){this.trace('emit repeat collapsed chars='+text.length+'->'+once.text.length);text=once.text;}}
   /* 2026-11-20 core/page-text.cjs: the page drawn again is nothing new; the page plus a new part is the new part */
-  const paged=!nativeLine&&!this.flowPage&&engine!=='saya-page-ocr';if(paged){const r=(this.pageText||(this.pageText=new PageText())).take(text,this.now());if(r.drop){this.trace('page text: '+r.drop+' '+JSON.stringify(String(text).slice(0,40)));return;}if(r.page){this.trace('page text: new part after '+r.page+' shown lines');text=r.text;}}
+  if(origin!=='ocr'&&require('./saya-page-ocr.cjs').legacyExe(this.target?.name)){
+   if(/^(?:MS\s*P?ゴシック)+$/iu.test(String(text).normalize('NFKC').replace(/\s/g,'')))return;
+   if(this.originalText?.sayaPageLine){
+    const exact=this.originalText.sayaPageLine(text,true);
+    if(!exact)return;
+    text=exact;
+    if(this.windowState?.bound&&!this.originalReplaced())engine='saya-script-read';
+   }
+  }
+  const paged=!nativeLine&&!this.flowPage&&!['saya-page-ocr','saya-script-read'].includes(engine);if(paged){const r=(this.pageText||(this.pageText=new PageText())).take(text,this.now());if(r.drop){this.trace('page text: '+r.drop+' '+JSON.stringify(String(text).slice(0,40)));return;}if(r.page){this.trace('page text: new part after '+r.page+' shown lines');text=r.text;}}
   {const sp=splitSpeaker(text,this.knownSpeakers);if(sp.name){this.speaker={text:sp.name,at:this.now()};this.noteSpeaker(sp.name);if(!sp.text.trim()){this.trace('speaker name split from the text flow');return;}text=sp.text;}}
   if(!engine&&!nativeLine&&this.flowPage)engine='nvl';
   const takesOverSayaPage=this.state.hookSourceEngine==='saya-page-ocr'&&origin!=='ocr'&&origin!=='history';
