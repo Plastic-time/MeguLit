@@ -32,7 +32,7 @@
  const active=new Map();
  function ensureStyle(){
   if(styleInstalled||!root.document)return;const host=root.document.head||root.document.documentElement;if(!host)return;
-  const style=root.document.createElement('style');style.textContent='.tome-typewriter-pending{opacity:0!important;pointer-events:none!important;transition:none!important}[data-tome-typing=true] .char-token,[data-tome-typing=true]>*{transition:opacity 70ms linear}@media (prefers-reduced-motion:reduce){[data-tome-typing=true] .char-token,[data-tome-typing=true]>*{transition:none}}[data-tome-typing=true]>.tome-inline-wait{visibility:hidden!important}';host.appendChild(style);styleInstalled=true;
+  const style=root.document.createElement('style');style.textContent='.tome-typewriter-pending{opacity:0!important;pointer-events:none!important;transition:none!important}[data-tome-typing=true] .char-token,[data-tome-typing=true]>*{transition:opacity 70ms linear}[data-tome-revealed]:not([data-tome-typing=true]) .char-token,[data-tome-revealed]:not([data-tome-typing=true])>.tome-translation-char{transition-property:none!important}@media (prefers-reduced-motion:reduce){[data-tome-typing=true] .char-token,[data-tome-typing=true]>*{transition:none}}[data-tome-typing=true]>.tome-inline-wait{visibility:hidden!important}';host.appendChild(style);styleInstalled=true;
  }
  function stop(element){const state=active.get(element);if(!state)return;state.controller.stop();active.delete(element);}
  function finishAll(native=false){const now=root.performance?.now?.()||0;for(const state of [...active.values()])if(!native||now-state.started>=120)state.controller.finish();}
