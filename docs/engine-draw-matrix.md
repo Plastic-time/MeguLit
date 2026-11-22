@@ -33,7 +33,7 @@ AdvHD、CMVS 与 FVP 输入诊断分别使用独立、默认 false 的 `draw.adv
 | ReaLive / AVG32（涙、Air） | DrawSites（GDI 画字点）签名 `avg32` | 已进 main，默认不挂 |
 | Softpal（レイライン 1 / 2） | DrawSites `softpal`、`softpal-2` | 已进 main，默认不挂 |
 | NScripter（月姬 v1.4 / v1.6，同一 exe） | DrawSites `nscripter`（mode 1 字形点） | 默认不挂；页面坐标、角色、mode 0/2 和样本编码尚未验收 |
-| Innocent Grey（虚ノ少女） | 旧 `mfc-*` 是补丁安装器界面；游戏实际为 Himorogi/Script/D3D9Font | 私测普通 IGA 文本流候选默认关闭，正文实流待核；见 re-iga-runtime.md，不授予画字角色 |
+| Innocent Grey（虚ノ少女） | 旧 `mfc-*` 是补丁安装器界面；游戏实际为 Himorogi/Script/D3D9Font | 私测普通流默认关闭；三次未注入隐藏基线均先在 Himorogi+5a2c 崩溃，无 live 正文；服务回放通过，见 re-iga-runtime.md，不授予画字角色 |
 | AdvHD / WillPlus（Under The Moon） | DrawSites `advhd`；AdvhdDraw 输入诊断 | 默认不挂；诊断钉住单一 exe，仅完整原始输入，不授予正文角色、隐藏或嵌入能力 |
 | CMVS（青い鳥） | DrawSites `cmvs`；CmvsDraw 双入口输入诊断 | 默认不挂；两个全文绘制入口必须一起通过版本与签名校验，仅原始输入，不支持角色、屏幕坐标或渲染 |
 | FVP（いろとりどりのヒカリ / HD） | DrawSites `fvp`；FvpDraw 原始追加诊断 | 默认不挂；两个版本各自 exact pin 单入口，仅追加 raw bytes，不覆盖缓存重绘或正文角色，见 [FVP 诊断交付](re-fvp-input.md) |

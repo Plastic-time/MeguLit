@@ -14,4 +14,18 @@
 
 验证命令：`node --test validation/iga-text.test.cjs validation/engine-draw-opt-in.test.cjs validation/unify-hook-runtime.test.cjs`；`native/megulithook/selftest/run-iga.cmd` 支持私有 `MEGULIT_IGA_SAMPLE` 与 `MEGULIT_IGA_OUT`。自检包括真实九个身份 pin、同尺寸错误 SHA、重定位、截断、变异、歧义、实际进程环境默认关闭和错误 EXE 不装 hook
 
-本机运行证据单独存放 `H:/MeguLit-Work/night-1423/iga-runtime/`，不将样本路径、存档或正文日志打入公共 Seed。当前候选未有实际正文/Reader 或前台验收，最终屏幕体验交店主
+本机运行证据单独存放 `H:/MeguLit-Work/night-1423/iga-runtime/`，不将样本路径、存档或正文日志打入公共 Seed
+
+## 隐藏启动基线受阻，未取得 live 正文
+
+统一 x86 DLL 由 root 从固定 native 源构建，2361344B，SHA256 `a1a99296957eef971f79ca314dad1263310f8aba8b74896224aa38d3ffbbb21f`，真实 HookBridge ABI probe 9 exports、source-frame 和 runtime-choice 自检通过。三重环境门标记在 DLL 中以 UTF-16LE 存储，不能只搜 ASCII 后断言缺失
+
+09:19–09:24 仅在普通复制的隔离游戏上用 HidDesk，依次检查原日文 EXE 名、同 SHA 的 ASCII EXE 别名、还原原配置后收窄改动，三次均在自己的 hook 注入之前崩溃。Application Error 1000 均为 `Himorogi.dll` RVA `0x5a2c`，异常 `0xc0000005`。WER 三份模块列表都没有 MeguLitHook/LunaHook，Script/字体插件也尚未加载。静态对应代码在未检查的对象指针上取 vtable；隐藏桌面图形初始化不兼容是推断，并未由 HRESULT 或前台对照证实，不把它归因于 hook
+
+三次后停止实机尝试，未转前台、未改系统区域或系统设置、未加图形代理。现有目录未找到 LEProc，不下载额外兼容工具。三个进程均已退出，自己的 slot1 已核 owner 后释放；副本 config 和原目录全部 16 文件前后 SHA 核对一致。未调用 Windows 音量 mute/unmute API，未写原游戏或原存档
+
+固定 c23d0b89 的 core/services 480 文件采用 git archive 独立副本，全部与归档原字节相同，按 Git 文本换行归一后 blob 480/480 对应。原始 blob 比对有 CRLF 导出差异的失败收据保留，未据此谎称逐字节等于 Git blob
+
+另用该固定版本的真实 HookNative 与 Reader.event，输入从本机 IGA 资源解析的十句文本，回放分片 UTF-8 JSON 管道，十句均到达 Reader；合作停止等待 helper EOF/exit、Reader 收到 null 清空、旧 helper 迟到数据被 serial fence 拒绝、新会话同句重新进入均通过。这里 helper/event bus 是本地测试替身，不是游戏进程、真实注入、游戏清页、前端点读、译文或隐藏验收
+
+最终状态：静态/原生/加载合同与服务回放通过；真实挂 hook、正文完整性及前台体验仍未验证。下一步由店主在正常桌面先确认同版本基线能启动，再从私测正常入口绑定并观察 IGA_Text 正文流，不开启隐藏/内嵌
