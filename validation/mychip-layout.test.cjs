@@ -5,6 +5,8 @@
    lines were only as tall as their font size and the glyphs touched; the line boxes themselves do not overlap, so the check is
    each line's own line-height). A chip with a value (阅读榜, signed in) is rendered too, so the value keeps its spacing.
    The real web/ UI runs in headless Edge. Skipped without Edge. */
+// The signed-out chip needs no remote data. Both relay timeouts can outlast this test's render poll.
+process.env.MEGULIT_RELAY_BASE='off';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {startService,startWeb,startEdge}=require('./library-views-perf.cjs');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
