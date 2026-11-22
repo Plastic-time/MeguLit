@@ -46,7 +46,7 @@
    'html body.tomoyo-gal-bound.megulit-fit-up'+own+' .sentence-window:not(.tome-island-page){top:calc(var(--tomoyo-reader-y,0px) + var(--megulit-fit-shift,0px))!important}'+
    'html body.tomoyo-gal-bound.megulit-fit-room'+own+' .sentence-window:not(.tome-island-page) .tomoyo-cn-output{max-height:var(--megulit-fit-room,4em)!important;overflow-y:auto!important;overscroll-behavior:contain}';
   (d.head||d.documentElement).append(css);
-  let fit=1,shift=0,room=0,line='',frame=0;
+  let fit=1,shift=0,room=0,line='',frame=0,clientGeometry='';
   const main=()=>[...d.querySelectorAll('.sentence-window')].find(n=>!n.classList.contains('tome-island-page'));
   function set(){const r=d.documentElement.style,c=d.body.classList;
    r.setProperty('--megulit-fit',String(fit));r.setProperty('--megulit-fit-shift',shift+'px');r.setProperty('--megulit-fit-room',Math.max(0,room)+'px');
@@ -62,6 +62,8 @@
    if(d.body.classList.contains('megulit-placed')||d.body.classList.contains('megulit-anchored')||b.textPlaceOwns?.()===true){reset();return;}/* 2026-11-20 (user, CHAOS;CHILD: 「译文为啥都这么小」): a line anchored on the game's own place is fitted by text-place.js against the monitor's work area (translation at most 15 % smaller); fitting it again to the game client shrank two-row sentences' translation to 60 % */
    const info=b.galLayoutInfo?.(),win=main();if(!win||!info||!(info.clientHeight>0))return;
    const dpr=Math.max(.5,Number(w.devicePixelRatio)||1),client={top:info.clientY/dpr,bottom:(info.clientY+info.clientHeight)/dpr};
+   const geometry=[info.clientX,info.clientY,info.clientWidth,info.clientHeight,dpr].join(':');
+   if(geometry!==clientGeometry){clientGeometry=geometry;reset();}
    /* measured with the current shift taken out, so moving up is decided again from the real place */
    const m=measure(win);if(!m)return;const box={top:m.top-shift,bottom:m.bottom-shift};
    const roomNow=room;if(roomNow>0){/* the translation was cut to roomNow: its full height decides */const cn=win.querySelector('.tomoyo-cn-output');if(cn&&cn.scrollHeight>cn.clientHeight)box.bottom+=cn.scrollHeight-cn.clientHeight;}
