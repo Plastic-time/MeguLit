@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import protocol from '../../core/torch-release.cjs';
 import gameDiff from '../../core/game-diff.cjs';
+import {cleanForProfile} from './seed-malware.js';
 import {cleanName} from './torch-credit.js';
 import {blockedProfile,blockedProposal,profileBlock} from './seed-admin.js';
 const keys=(env,name)=>{try{const v=JSON.parse(env[name]||'[]');return Array.isArray(v)?v:[];}catch{return [];}};
@@ -41,9 +42,9 @@ export async function publish(db,release,env,now=new Date()){
  const blocked=await revoked(db),target=release.targetHash?await checkedRow(await history(db,release.targetHash),env):null;
  protocol.transition(release,current,{target,revoked:blocked});
  if(release.action==='promote'&&await db.prepare('SELECT hash FROM torch_release_history WHERE profile_hash=?').bind(proof.profileHash).first())reject('TORCH_REPLAY');
- const tombstone=await profileBlock(release.profile),body=gameDiff.canonical(release),args=[proof.hash,release.key,release.revision,release.previous,proof.profileHash,body,now.toISOString(),release.key,release.previous,release.previous];
+ const malware=await cleanForProfile(db,release.profile),tombstone=await profileBlock(release.profile),body=gameDiff.canonical(release),args=[proof.hash,release.key,release.revision,release.previous,proof.profileHash,body,now.toISOString(),release.key,release.previous,release.previous];
  const result=await db.batch([
-  db.prepare('INSERT INTO torch_release_history(hash,game_key,revision,previous_hash,profile_hash,body,published_at) SELECT ?,?,?,?,?,?,? WHERE (SELECT hash FROM torch_release_winners WHERE game_key=?) IS ? AND NOT EXISTS(SELECT 1 FROM torch_release_revocations WHERE profile_hash=?) AND NOT EXISTS(SELECT 1 FROM seed_admin_items WHERE '+tombstone.sql+')').bind(...args.slice(0,9),proof.profileHash,...tombstone.args),
+  db.prepare('INSERT INTO torch_release_history(hash,game_key,revision,previous_hash,profile_hash,body,published_at) SELECT ?,?,?,?,?,?,? WHERE (SELECT hash FROM torch_release_winners WHERE game_key=?) IS ? AND NOT EXISTS(SELECT 1 FROM torch_release_revocations WHERE profile_hash=?) AND NOT EXISTS(SELECT 1 FROM seed_admin_items WHERE '+tombstone.sql+') AND EXISTS(SELECT 1 FROM seed_malware_current m JOIN seed_admin_items i ON i.id=m.item_id WHERE m.artifact_key=? AND m.state=? AND m.revision=? AND m.identity_hash=? AND m.profile_hash=? AND m.item_id=? AND i.state<>? AND i.body=?)').bind(...args.slice(0,9),proof.profileHash,...tombstone.args,malware.artifactKey,'clean',malware.revision,malware.identityHash,malware.profileHash,malware.itemId,'deleted',malware.sourceBody),
   db.prepare('INSERT INTO torch_release_winners(game_key,hash) SELECT ?,? WHERE EXISTS(SELECT 1 FROM torch_release_history WHERE hash=?) ON CONFLICT(game_key) DO UPDATE SET hash=excluded.hash WHERE torch_release_winners.hash IS ?').bind(release.key,proof.hash,proof.hash,release.previous)
  ]);
  if(!result[0]?.meta?.changes||!result[1]?.meta?.changes)reject('TORCH_STALE');
@@ -65,5 +66,5 @@ export async function torchReleaseRoute(request,env,now,url,path,{json,fail}){
   if(['/api/torch-release/propose','/api/torch-release/publish','/api/torch-release/revoke'].includes(path)&&request.method==='POST')return json(await (path.endsWith('/propose')?propose:path.endsWith('/revoke')?revoke:publish)(env.DB,await input(request),env,now));
   if(path==='/api/torch-release/history'&&request.method==='GET')return json(await exportHistory(env.DB,url.searchParams.get('exe')));
   return fail('NOT_FOUND',404);
- }catch(e){return fail(/^TORCH_[A-Z_]+$/.test(e?.code||'')?e.code:'TORCH_REJECTED',e?.code==='TORCH_REVOKED'?410:422);}
+ }catch(e){return fail(/^TORCH_[A-Z_]+$/.test(e?.code||'')?e.code:'TORCH_REJECTED',e?.code==='TORCH_REVOKED'?410:e?.code==='TORCH_MALWARE_UNAVAILABLE'?503:/^TORCH_MALWARE_/.test(e?.code||'')?409:422);}
 }

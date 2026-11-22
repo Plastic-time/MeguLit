@@ -41,6 +41,7 @@ import gameDiff from '../../core/game-diff.cjs';
 import domains from '../../core/profiles/domains.cjs';
 import gamePrint from '../../core/game-print.cjs';
 import {parseCredit,noteUpload,creditOfDiff,creditPut} from './torch-credit.js';
+import {cleanForProfile} from './seed-malware.js';
 import {reportAllowed,noteSeedUpload,blockedProfile,profileBlock,retestOrder} from './seed-admin.js';
 const {canonical,validate,build,unsigned,KEY}=gameDiff;
 const {VERSION_KINDS,GAME_KINDS}=gamePrint;
@@ -157,16 +158,17 @@ async function picksGet(env,url,{json}){
 async function signedPost(request,env,now,{json,fail,readJSON}){const body=await readJSON(request,PROFILE_LIMITS.signed);if(body.error)return fail(body.error,400);const d=body.value?.diff;
  const v=validate(d);if(!v.ok)return fail('INVALID_DIFF_'+v.error);if(!SIGNED(d.signature))return fail('UNSIGNED');const t=sec(now),layer=d.layer||'version';
  if(await blockedProfile(env.DB,d))return fail('SEED_DELETED',410);
+ const previous=await env.DB.prepare('SELECT body FROM game_diffs WHERE layer=? AND game_key=? AND source=? AND withdrawn_at IS NULL').bind(layer,d.key,d.source).first();let known=null;try{if(previous&&canonical(JSON.parse(previous.body))===canonical(d))known=previous.body;}catch{}let malware=null;if(!known){try{malware=await cleanForProfile(env.DB,d);}catch(e){return fail(e.code||'TORCH_MALWARE_UNAVAILABLE',e.status||503);}}
  if(d.source==='auto'){const p=await env.DB.prepare('SELECT stamp FROM auto_profile_picks WHERE layer=? AND game_key=?').bind(layer,d.key).first();
   if(!p||p.stamp!==await sha256(essence(d)))return fail('NOT_THE_CURRENT_PICK',409);
-  await env.DB.prepare('UPDATE auto_profile_picks SET signed_stamp=stamp WHERE layer=? AND game_key=?').bind(layer,d.key).run();}
+}
  else{/* 2026-11-21 rev only grows (docs/diff-layers.md: the app takes a relay diff over its built-in The Seed only with a higher
     rev): an official document needs a rev above the one stored, so an old signed copy can never roll a game back */
   const top=Math.max((await env.DB.prepare('SELECT MAX(rev) AS rev FROM game_diffs WHERE layer=? AND game_key=?').bind(layer,d.key).first())?.rev|0,(await env.DB.prepare('SELECT rev FROM auto_profile_picks WHERE layer=? AND game_key=?').bind(layer,d.key).first())?.rev|0);
   if(!Number.isSafeInteger(d.rev)||d.rev<1)return fail('REV_REQUIRED');if(d.rev<=top)return json({ok:false,error:'REV_NOT_NEWER',min:top+1},409);
   /* an official diff defines its game / build: its prints point here */const pr=gamePrint.check(d.prints||{});
   if(layer==='version')await register(env,'version',d.key,pr,['head','pe'],t);else await register(env,'game',d.key,pr,GAME_KINDS,t);}
- const tombstone=await profileBlock(d);await env.DB.prepare('INSERT INTO game_diffs(layer,game_key,source,body,rev,updated_at) SELECT ?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM seed_admin_items WHERE '+tombstone.sql+') ON CONFLICT(layer,game_key,source) DO UPDATE SET body=excluded.body,rev=excluded.rev,updated_at=excluded.updated_at,withdrawn_at=NULL').bind(layer,d.key,d.source,JSON.stringify(d),d.rev|0,t,...tombstone.args).run();if(await blockedProfile(env.DB,d))return fail('SEED_DELETED',410);
+ const tombstone=await profileBlock(d),guard=malware?{sql:'EXISTS(SELECT 1 FROM seed_malware_current m JOIN seed_admin_items i ON i.id=m.item_id WHERE m.artifact_key=? AND m.state=? AND m.revision=? AND m.identity_hash=? AND m.profile_hash=? AND m.item_id=? AND i.state<>? AND i.body=?)',args:[malware.artifactKey,'clean',malware.revision,malware.identityHash,malware.profileHash,malware.itemId,'deleted',malware.sourceBody]}:{sql:'EXISTS(SELECT 1 FROM game_diffs WHERE layer=? AND game_key=? AND source=? AND body=? AND withdrawn_at IS NULL)',args:[layer,d.key,d.source,known]};await env.DB.prepare('INSERT INTO game_diffs(layer,game_key,source,body,rev,updated_at) SELECT ?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM seed_admin_items WHERE '+tombstone.sql+') AND '+guard.sql+' ON CONFLICT(layer,game_key,source) DO UPDATE SET body=excluded.body,rev=excluded.rev,updated_at=excluded.updated_at,withdrawn_at=NULL').bind(layer,d.key,d.source,JSON.stringify(d),d.rev|0,t,...tombstone.args,...guard.args).run();if(await blockedProfile(env.DB,d))return fail('SEED_DELETED',410);const stored=await env.DB.prepare('SELECT body FROM game_diffs WHERE layer=? AND game_key=? AND source=? AND withdrawn_at IS NULL').bind(layer,d.key,d.source).first();if(!stored||canonical(JSON.parse(stored.body))!==canonical(d))return fail('TORCH_MALWARE_CHANGED',409);if(d.source==='auto')await env.DB.prepare('UPDATE auto_profile_picks SET signed_stamp=stamp WHERE layer=? AND game_key=?').bind(layer,d.key).run();
  if(d.source==='official'){if(layer==='version')await env.DB.prepare('UPDATE auto_profile_queue SET closed_at=? WHERE game_key=? AND closed_at IS NULL').bind(t,d.key).run();
   else await env.DB.prepare("UPDATE auto_profile_queue SET closed_at=? WHERE gid=? AND kind<>'newVersion' AND closed_at IS NULL").bind(t,d.key).run();/* a build that needs its own version layer stays open */}
  return json({ok:true,key:d.key,layer,source:d.source},201);}

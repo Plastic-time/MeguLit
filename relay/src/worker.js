@@ -26,6 +26,7 @@ import {profileRoute} from './auto-profile.js';
 /* 2026-11-21 Cardinal replay scores in, auto diffs verified / sent to the repair queue (relay/src/cardinal.js) */
 import {cardinalRoute} from './cardinal.js';
 import {torchReleaseRoute} from './torch-release.js';
+import {seedMalwareRoute} from './seed-malware.js';
 import {seedAdminRoute,seedUsageRoute} from './seed-admin.js';
 import {monumentGet,monthsGet,findGet,meGet} from './torch-credit.js';
 
@@ -302,6 +303,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
   /* 2026-11-15 adaptation contribution packages, consented in the app (relay/src/contrib.js) */
   else if(path.startsWith('/api/contrib/'))response=await contribRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else if((path==='/dashboard'||path==='/probe/dashboard')&&request.method==='GET')response=new Response(DASHBOARD_HTML,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'public, max-age=60','x-content-type-options':'nosniff'}});
+  else if(path==='/api/seed-admin/malware')response=await seedMalwareRoute(request,env,now,url,path,{json,fail,readJSON})||fail('NOT_FOUND',404);
   else if(path.startsWith('/api/seed-admin/'))response=await seedAdminRoute(request,env,now,url,path,{json,fail,readJSON})||fail('NOT_FOUND',404);
   else if(path==='/api/seed/usage')response=await seedUsageRoute(request,env,ip,now,url,path,{json,fail,readJSON,hit})||fail('NOT_FOUND',404);
   else if(path==='/api/seed/stats'&&(request.method==='GET'||request.method==='HEAD')){const r=await seedStatsGet(env,{json,fail},ctx,now);response=request.method==='HEAD'?new Response(null,{status:r.status,headers:r.headers}):r;}
