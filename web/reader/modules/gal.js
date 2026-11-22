@@ -579,8 +579,12 @@
   // back to black as soon as the outline was touched) and Cancel would undo the sync.
   let syncingForm=false;
   const syncOpenForm = values => { const dialog = document.querySelector('.tomoyo-cn-dialog[open]'); if (!dialog) return;
-    syncingForm=true;try{for (const [key, value] of Object.entries(values)) { const name = key === 'translationSize' ? 'ChineseSize' : key[0].toUpperCase()+key.slice(1),
-     field = dialog.querySelector('[name="gal'+name+'"]'); if (!field) continue; if (field.type === 'checkbox') field.checked = !!value; else field.value = key==='readTextColor'&&!value?preferences.textColor:key==='japaneseFont'&&preferences.japaneseFontSource!=='user'&&field.querySelector?.('option[value="@game"]')?'@game':value;
+    syncingForm=true;try{for (const [key, value] of Object.entries(values)) {
+     // The same two controls edit either the box position or the offset from the game glyph.
+     // A calibration can update both pairs while the menu is open. Only display the pair the form will read.
+     const name = key === 'translationSize' ? 'ChineseSize' : key[0].toUpperCase()+key.slice(1);
+     const field = ['x','y','anchorDX','anchorDY'].includes(key) ? dialog.querySelector('[data-position-pref="'+key+'"]') : dialog.querySelector('[name="gal'+name+'"]');
+     if (!field) continue; if (field.type === 'checkbox') field.checked = !!value; else field.value = key==='readTextColor'&&!value?preferences.textColor:key==='japaneseFont'&&preferences.japaneseFontSource!=='user'&&field.querySelector?.('option[value="@game"]')?'@game':value;
      field.dispatchEvent(new Event('input', { bubbles:true })); }}finally{syncingForm=false;} };
   // Interface mode and window binding are runtime state owned by the launcher: a saved profile, import or form snapshot
   // carrying stale values (interfaceMode normal, bindEnabled false) dropped game style, so colours and embedding stopped.
@@ -890,7 +894,16 @@
      anchorResetWords = {zh:['回到游戏原字位置','本作品尚无引擎坐标'],en:['Back to the game text position','No engine positions for this game yet'],ja:['ゲームの文字位置に戻す','この作品はまだエンジン座標がありません']};
     const paintAnchorReset = () => { const w = anchorResetWords[(window.__tomeI18n?.get?.()||'zh').slice(0,2)] || anchorResetWords.zh, on = document.body.classList.contains('megulit-anchored'); /* the button: this line sits on the game's places now (the fields use the stable mode, anchoredNow) */ anchorReset.dataset.noI18n = '';
      anchorReset.textContent = w[0]; anchorReset.disabled = !on; anchorReset.title = on ? '' : w[1]; anchorReset.setAttribute('aria-disabled', String(!on)); };
-    const fillPosition = () => { fieldsAreOffset = anchoredNow(); if (fieldsAreOffset) { f('galX').value = Number(preferences.anchorDX) || 0; f('galY').value = Number(preferences.anchorDY) || 0; f('galX').min = f('galY').min = '-95'; } else { f('galX').value = preferences.x; f('galY').value = preferences.y; f('galX').min = f('galY').min = '0'; } };
+    const fillPosition = () => {
+      fieldsAreOffset = anchoredNow();
+      for (const axis of ['X','Y']) {
+        const field = f('gal'+axis), key = fieldsAreOffset ? 'anchorD'+axis : axis.toLowerCase();
+        field.dataset.positionPref = key;
+        field.min = fieldsAreOffset ? '-95' : '0';
+        field.value = Number(preferences[key]) || 0;
+        field.dispatchEvent(new Event('input')); // refresh its output label without previewing the form
+      }
+    };
     fillPosition();
     const modeWatch = new MutationObserver(() => { if (anchoredNow() !== fieldsAreOffset && document.body.contains(dialog)) { const was = syncingForm; syncingForm = true; try { fillPosition(); } finally { syncingForm = was; } } paintAnchorReset(); });
     paintAnchorReset();
