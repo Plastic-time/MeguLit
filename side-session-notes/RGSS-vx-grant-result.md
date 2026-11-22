@@ -34,3 +34,11 @@ VX 第一轮可 cherry 的顺序是 `06ff20f9`、`ff175fda`、`c616be67`、`6762
 现有 H/E 样本只找到完整 VX 游戏。arc_unpacker 的 55/98 字节 rgssad/rgss3a 是测试夹具，不算 XP/Ace 样本。禁止为这一轮下载新游戏，原版 Ruby 1.8/1.9 验证环境也尚缺
 
 RPGMakerTrans 的网络 Ruby 是离线 patcher，使用较新 Ruby 的 require_relative/force_encoding 和阻塞 socket，不能直接搬进 RGSS1 游戏帧。lunajspatch 检查 JS Utils.RPGMAKER_NAME，是 MV/MZ。mkxp 明确区分 RGSS1 无 Graphics.width/height、RGSS3 的 padding 和窗口接口；它的现代 MRI 兼容层也不能证明原版 Ruby 1.8/1.9
+
+## 第二轮封存
+
+- VX 功能增量 `3c50773f86c0e67aebb943576bac0003e7a2a687`，主线程已有 CPU `499dc63d` 时只取此增量，不重复取本分支 CPU cherry `7ddfb46e`
+- `9ed5026f70f100703f00528e4c1f6b6194a8109a` 进一步将真实完整 VX 测试从直接 prepare 推进到生产 Bridge.launch：raw catalog 没有手动 draw 开关，Bridge 实际 resolve opaque grant，实际复制/补丁/登记副本，检查传给替身 startProcess 的 shadow exe/cwd，检查 actual PID 的 watch/attach/bind，再调用实际 Reader 和 HookNative。替身进程与原生查询不算游戏运行
+- 全局 `ownTextOutput`/compositor 开关仍保留；回放在隔离 root 预置 ownTextOutput=true。fresh 每游戏 roles=false 已由 grant 处理，但总测试包若连全局文字模式也全关，prepare 会按原设计返回普通启动，不应把这个前置条件漏掉。生产默认不改
+- 功能封 SHA 后的 VX/CPU 原相关范围 202/202、0 skip 日志为 `vx-grant-related.tap`，对应 1557 JS 的哈希/语法记录为 `vx-grant-syntax.json`
+- XP/Ace 候选见 [单独报告](RGSS-xp-ace-candidate-result.md)，不得把它算成可运行游戏或原版 Ruby 验收

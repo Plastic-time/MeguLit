@@ -48,3 +48,10 @@ v3 检查首/中/末成员增长与缩短、奇数字节、原 Buffer 不变、�
 主测试需显式设置 `MEGULIT_RUBY` 为私有 4.0.10；完整 VX 相关回归还需 `MEGULIT_RGSS_SAMPLE` 为保留的 majonoie1_09a。最终相关日志、语法 manifest 与提交收据在同一 round2 私有报告目录，收尾追加最终计数
 
 下一步仍需要完整 XP/Ace 样本、对应原版 Ruby/DLL 与实际 Main/消息类核对，才能讨论将其加入窄 allowlist 和副本启动。本轮没有实机通过、没有完成完整七项、没有修改 E 测试安装目录或 CI
+
+## 最终封存
+
+- 候选代码 `d32416339ec4d49192ad188982f6524a9b893c1e`，在 VX `3c50773f`、正常库启动回放 `9ed5026f` 之后，顺序可 cherry；后续只有报告追加
+- 21 个相关测试文件 165/165、0 fail、0 skip，含 VX 17、候选 9、opaque grant、实际 Reader/HookNative、profiles 与其他现有消费路径，日志 `H:/MeguLit-Work/reports/engine-rgss-round2-20261122-0828/candidates-sealed.tap`
+- 1560 个受控 JS/CJS/MJS 逐个 SHA 与先前已通过的 3c50773f manifest 比较；core/rgss-page.cjs、core/rgss-scripts.cjs、core/rgss-variants.cjs、validation/engine-draw-rgss.test.cjs、validation/helpers/rgss-launch-replay.cjs、validation/rgss-candidates.test.cjs 这六个变化/新增文件全部 fresh node --check。其他 1554 个哈希相同，沿用既有全量语法检查；记录 `candidates-syntax.json`，0 failures
+- Git 工作树在候选功能提交后为空；不改 CI、不推 main、不建 PR，源 ZIP、完整 VX 样本与副本存档边界保留，E 测试包由主线程唯一部署
