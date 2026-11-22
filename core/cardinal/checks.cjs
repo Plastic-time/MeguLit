@@ -51,7 +51,8 @@ function lines(run,t){t=opts(t);const o=run.o,steps=fed(run).filter(st=>st.line!
 function perLine(run,t){t=opts(t);const name=run.name||'run',row=[],stable=[],owner=[],dup=[],pairs={shown:0,paired:0},visibility={shown:0,expected:0},complete={lines:0};const ls=lines(run,t);
  for(const l of ls){const want=norm(l.text);if(!want)continue;let rowBad=false,stableBad=false;
   /* while options are on the reader the line gives way to them (not a missing row) */
-  const settled=l.samples.filter(s=>s.at-l.samples[0].at>=t.settleMs&&!(s.choices||[]).some(c=>c.shown));const drawn=s=>norm(lineGlyphs(s).map(g=>g.text).join(''));const shown=settled.filter(s=>{const text=drawn(s);return text.length>=Math.min(want.length,2)&&want.startsWith(text);});
+  const settled=l.samples.filter(s=>s.at-l.samples[0].at>=t.settleMs&&!(s.choices||[]).some(c=>c.shown));// A retained page row is still checked for hits and duplicate rendering below.
+  const drawn=s=>norm(lineGlyphs(s).filter(g=>!g.retained).map(g=>g.text).join(''));const shown=settled.filter(s=>{const text=drawn(s);return text.length>=Math.min(want.length,2)&&want.startsWith(text);});
   l.complete=settled.some(s=>drawn(s)===want);if(l.complete)complete.lines++;else if(settled.length){row.push(name+' line '+l.line+' never completes the expected Japanese text');rowBad=true;}
   visibility.expected+=settled.length;visibility.shown+=shown.length;
   if(settled.length&&shown.length<settled.length*t.shownRate){row.push(name+' line '+l.line+' 「'+l.text+'」 Japanese shown in '+shown.length+'/'+settled.length+' samples');rowBad=true;}
