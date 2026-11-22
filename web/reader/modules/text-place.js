@@ -842,6 +842,28 @@
     if (key !== lastGeom) { lastGeom = key; dispatchEvent(new CustomEvent('megulit-reveal-progress', { detail: { typing: false } })); window.__tomoyoHitRegionsRefresh?.(true); }
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(apply); };
+  // The overlay covers the desktop, so moving the game need not resize the WebView or deliver another line.
+  let clientArea = b.gameArea?.();
+  b.textPlaceClientArea = area => {
+    const prev = clientArea;
+    clientArea = area;
+    if (!on || (prev && prev.left === area.left && prev.top === area.top &&
+        prev.width === area.width && prev.height === area.height)) return;
+    // These caches are in surface CSS pixels. Carry them with the client before anchor smoothing and page detection.
+    if (prev) {
+      const sx = area.width / prev.width, sy = area.height / prev.height;
+      const x = value => area.left + (value - prev.left) * sx;
+      const y = value => area.top + (value - prev.top) * sy;
+      if (anchor) {
+        anchor[0] = x(anchor[0]); anchor[1] = y(anchor[1]);
+        anchor.size *= sy; anchorLimit = y(anchorLimit);
+      }
+      if (leftEdge !== null) leftEdge = x(leftEdge);
+      if (rowsPrev !== null) rowsPrev = y(rowsPrev);
+      centreWidth *= sx;
+    }
+    schedule();
+  };
   b.textPlace = m => {
     if (m?.clearedFallback) {
       drawnByGame = '';

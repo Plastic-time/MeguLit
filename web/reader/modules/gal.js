@@ -53,6 +53,7 @@
     if (layoutInfo) {
       const root = document.documentElement.style;
       const game = bridge.gameArea();
+      if (game) bridge.textPlaceClientArea?.(game);
       if (game && document.body.classList.contains('megulit-saya-page')) {
         root.setProperty('--saya-page-left', (game.left + game.width * .05) + 'px');
         root.setProperty('--saya-page-bottom', (game.top + game.height * .98) + 'px');
