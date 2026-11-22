@@ -13,7 +13,9 @@ function Assert-OwnerFinalizePath($Scope, [string]$Path, [string]$Area) {
 function Get-OwnerFinalizeHash([string]$Path) {
   if (-not [IO.File]::Exists($Path)) { return $null }
   if ((Get-Item -LiteralPath $Path).Length -gt 16MB) { throw 'OWNER_RUNTIME_FINALIZE_FILE_LIMIT' }
-  return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try { return [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($Path))).Replace('-', '').ToLowerInvariant() }
+  finally { $sha.Dispose() }
 }
 function Get-OwnerFinalizeTreeFiles([string]$Root) {
   $pending = New-Object 'Collections.Generic.Stack[string]'; $pending.Push($Root)
