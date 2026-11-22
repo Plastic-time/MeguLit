@@ -45,7 +45,9 @@ module.exports=async ({assert,root,fixture})=>{
   scenario('art',       '2026-11-21T03:31:50.000Z','2026-11-21T03:32:32.000Z',game(42452,'638994198000000000')),
   scenario('advance',   '2026-11-21T02:56:30.000Z','2026-11-21T02:58:20.000Z',game(39016,'638994190000000000'))];
  const {replay}=require(path.join(root,'services','cardinal','run.cjs'));
- const outs=await Promise.all(runs.map(async r=>({...r,o:await replay(r.scenario,{data,work,name:r.name,keep:!!process.env.MEGULIT_REPLAY_KEEP})})));
+ // Frame deadlines and browser cleanup are measured in wall time. Run one reader at a time.
+ const outs=[];
+ for(const r of runs){const o=await replay(r.scenario,{data,work,name:r.name,keep:!!process.env.MEGULIT_REPLAY_KEEP});outs.push({...r,o});}
  const res={},put=(k,ok,why)=>{res[k]={ok:!!ok,why:String(why||'').slice(0,600)};};
  for(const r of outs)assert.ok(r.o&&!r.o.errors.length,r.name+' replay ran: '+JSON.stringify(r.o?.errors||'no output').slice(0,600));
  const by=Object.fromEntries(outs.map(r=>[r.name,r]));
