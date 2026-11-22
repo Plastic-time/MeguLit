@@ -77,7 +77,8 @@ typedef struct _HOOK_ENTRY
 // Suspended threads for Freeze()/Unfreeze().
 typedef struct _FROZEN_THREADS
 {
-    LPDWORD pItems;         // Data heap
+    LPDWORD pItems;         // Enumerated thread IDs; zero marks an unsuccessful suspension.
+    HANDLE *pHandles;       // Handles retained until all threads have been resumed.
     UINT    capacity;       // Size of allocated data heap, items
     UINT    size;           // Actual number of data items
 } FROZEN_THREADS, *PFROZEN_THREADS;
@@ -405,64 +406,55 @@ static BOOL EnumerateThreadsSnapshot(PFROZEN_THREADS pThreads)
 //-------------------------------------------------------------------------
 static MH_STATUS Freeze(PFROZEN_THREADS pThreads, UINT pos, UINT action)
 {
-    MH_STATUS status = MH_OK;
+    UINT i;
 
     pThreads->pItems   = NULL;
+    pThreads->pHandles = NULL;
     pThreads->capacity = 0;
     pThreads->size     = 0;
     if (!EnumerateThreads(pThreads))
-    {
-        status = MH_ERROR_MEMORY_ALLOC;
-    }
-    else if (pThreads->pItems != NULL)
-    {
-        UINT i;
-        for (i = 0; i < pThreads->size; ++i)
-        {
-            HANDLE hThread = OpenThread(THREAD_ACCESS, FALSE, pThreads->pItems[i]);
-            BOOL suspended = FALSE;
-            if (hThread != NULL)
-            {
-                DWORD result = SuspendThread(hThread);
-                if (result != 0xFFFFFFFF)
-                {
-                    suspended = TRUE;
-                    ProcessThreadIPs(hThread, pos, action);
-                }
-                CloseHandle(hThread);
-            }
+        return MH_ERROR_MEMORY_ALLOC;
+    if (pThreads->pItems == NULL)
+        return MH_OK;
 
-            if (!suspended)
-            {
-                // Mark thread as not suspended, so it's not resumed later on.
-                pThreads->pItems[i] = 0;
-            }
-        }
+    pThreads->pHandles = (HANDLE *)HeapAlloc(g_hHeap, 0, pThreads->size * sizeof(HANDLE));
+    if (pThreads->pHandles == NULL)
+    {
+        HeapFree(g_hHeap, 0, pThreads->pItems);
+        pThreads->pItems = NULL;
+        return MH_ERROR_MEMORY_ALLOC;
     }
 
-    return status;
+    for (i = 0; i < pThreads->size; ++i)
+        pThreads->pHandles[i] = OpenThread(THREAD_ACCESS, FALSE, pThreads->pItems[i]);
+
+    for (i = 0; i < pThreads->size; ++i)
+    {
+        HANDLE hThread = pThreads->pHandles[i];
+        if (hThread != NULL && SuspendThread(hThread) != (DWORD)-1)
+            ProcessThreadIPs(hThread, pos, action);
+        else
+            pThreads->pItems[i] = 0;
+    }
+    return MH_OK;
 }
 
 //-------------------------------------------------------------------------
 static VOID Unfreeze(PFROZEN_THREADS pThreads)
 {
-    if (pThreads->pItems != NULL)
+    if (pThreads->pHandles != NULL)
     {
         UINT i;
+        // MeguLit local patch: file detours can take a lock in CloseHandle.
+        // Resume every thread before closing any handle, including a failed suspension's handle.
         for (i = 0; i < pThreads->size; ++i)
-        {
-            DWORD threadId = pThreads->pItems[i];
-            if (threadId != 0)
-            {
-                HANDLE hThread = OpenThread(THREAD_ACCESS, FALSE, threadId);
-                if (hThread != NULL)
-                {
-                    ResumeThread(hThread);
-                    CloseHandle(hThread);
-                }
-            }
-        }
+            if (pThreads->pItems[i] != 0)
+                ResumeThread(pThreads->pHandles[i]);
+        for (i = 0; i < pThreads->size; ++i)
+            if (pThreads->pHandles[i] != NULL)
+                CloseHandle(pThreads->pHandles[i]);
 
+        HeapFree(g_hHeap, 0, pThreads->pHandles);
         HeapFree(g_hHeap, 0, pThreads->pItems);
     }
 }
