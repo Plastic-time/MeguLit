@@ -58,7 +58,7 @@ export function mountFirstPlayer({host,id,api,locale,esc,isCurrent=()=>true,plac
   const normal=['received','hidden','not-published','bundled'].includes(last.state)?RECEIPT_POLL_MS:POLL_MS,delay=Math.min(120000,normal*2**Math.min(failures,2));timer=setTimeout(()=>load(false),delay);}
  async function load(first=false){if(dead||inflight||mutating||!visible()){schedule();return;}inflight=true;const token=epoch;try{
   const r=await api('first_player',{id,poll:!first});if(dead||token!==epoch||!visible())return;failures=0;
-  const state=r&&['first','off','thanks','received','installing','install-failed','not-published','bundled'].includes(r.state)?r.state:'hidden';last=state==='hidden'?{state}:r;render(last);
+  const state=r&&['first','off','thanks','received','installing','install-failed','not-published','bundled','applied'].includes(r.state)?r.state:'hidden';last=state==='hidden'?{state}:r;render(last);
  }catch{if(!dead&&token===epoch)failures++;}finally{inflight=false;schedule();}}
  function visibility(){epoch++;clearTimeout(timer);timer=0;if(!isCurrent()||!box.isConnected){dispose();return;}if(visible()){if(pendingRender&&!box.contains(document.activeElement))render(last);load(false);}}
  function leaveInput(){queueMicrotask(()=>{if(!dead&&pendingRender&&!box.contains(document.activeElement))render(last);});}

@@ -68,3 +68,19 @@ test('bundled Seed, first public contribution and isolated submission are distin
   assert.doesNotMatch(html,/首个公开传火贡献/);
  }
 });
+
+test('detail card shows the applied revision and surviving local settings without an installed receipt',async t=>{
+ let chromium;try{({chromium}=require(process.env.MEGULIT_PLAYWRIGHT||'H:/MeguLit-Work/pw/node_modules/playwright-core'));}catch{return t.skip('no playwright-core');}
+ const browser=await chromium.launch({channel:'msedge',headless:true});t.after(()=>browser.close());
+ const page=await browser.newPage();
+ await page.route('http://megulit.test/**',route=>{
+  const name=new URL(route.request().url()).pathname.slice(1);
+  return name==='first-player.js'||name==='seed-receipt.js'?route.fulfill({contentType:'text/javascript',body:fs.readFileSync(path.join(root,'web',name),'utf8')}):route.fulfill({contentType:'text/html',body:'<main><div id="host"></div></main>'});
+ });
+ await page.goto('http://megulit.test/');
+ await page.evaluate(async()=>{const {mountFirstPlayer}=await import('/first-player.js');
+  mountFirstPlayer({host:document.querySelector('#host'),id:'7',locale:'zh',esc:String,api:async()=>({state:'applied',application:{layers:[{layer:'seed',revision:4,keys:['draw.embed']}],personal:['page.presentation'],values:{'draw.embed':true,'page.presentation':'adv'}}})});
+ });
+ const card=page.locator('.first-player');await card.waitFor({state:'visible'});const text=await card.innerText();
+ assert.match(text,/rev 4.*draw.embed = true/);assert.match(text,/保留的本机设置.*page.presentation = adv/);
+});
