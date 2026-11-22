@@ -17,7 +17,7 @@ test('no ini decides the text language', () => {
   assert.doesNotMatch(target, /ReadChineseText|Directory\.GetFiles\(dir,"\*\.ini"\)/);
   assert.match(target, /ExePath=path\.ToString\(\);\s*ChineseText=false;SetSourceLanguage\(Environment\.GetEnvironmentVariable\("MEGULIT_SOURCE_LANGUAGE"\)\);/);
   assert.match(bridge, /if\(!HookTarget\.LanguageSelfTest\(\)\)\{Console\.Error\.WriteLine\("FAIL text language hide policy"\);return 3;\}/);
-  assert.match(bridge, /HookTarget\.ObserveLanguage\(text\);ReceivedText=true;/, 'every selected source line is observed');
+  assert.match(bridge, /\{bool wasZh=HookTarget\.ChineseText;HookTarget\.ObserveLanguage\(text\);if\(HookTarget\.ChineseText!=wasZh\)\{MarkAllEmbedDirty\(\);ScheduleEmbedSync\(\);\}\}ReceivedText=true;/, 'every selected source line is observed, and a language change reconciles the streams it hides');
 });
 
 test('the stream decides: one Japanese line, or two Chinese lines in a row', () => {
