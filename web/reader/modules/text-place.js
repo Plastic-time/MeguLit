@@ -96,7 +96,7 @@
   /* the game's place is in use for this game (placement on, anchored mode): stable while lines come and go, unlike the body class */
   b.textPlaceAnchorActive = () => on && anchorMode;
   b.textPlaceEngineRowsActive = () => on && window.MeguLitProfile?.get?.('page.engineRows', false) === true;
-  b.textPlaceAnchor = v => { anchorMode = v !== false; anchor = null; anchorLine = ''; schedule?.(); };
+  b.textPlaceAnchor = v => { anchorMode = v !== false; document.body.classList.toggle('megulit-anchor-mode', on && anchorMode); anchor = null; anchorLine = ''; schedule?.(); };
   const median = list => { const v = list.filter(n => n > 0).sort((x, y) => x - y); return v.length ? v[v.length >> 1] : 0; };
   function target() {
     const own = document.querySelector('.sentence-window.tomoyo-hook-reader');
@@ -838,7 +838,7 @@
   b.textPlacePage = m => { const had = !!page; if (m?.elsewhere === true || !m || !Array.isArray(m.lines)) { if (pageOwn) { pageOwn = false; briefSync(false); } } if (m?.elsewhere === true) { page = null; drawnByGame = ''; if (had) { pageGone(); dropOld(null); document.getElementById('megulit-page-ahead')?.replaceChildren(); document.body.classList.remove('megulit-place-game-drawn'); } schedule(); return; } page = m && Array.isArray(m.lines) ? { awake: m.awake === true, armed: m.armed === true, lines: m.lines.filter(l => l && typeof l.text === 'string' && Array.isArray(l.rects)), client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] } : null; if (page) { line = null; drawnByGame = ''; } else if (had) pageGone(); schedule(); };
   b.textPlaceExtra = m => { extras = { items: Array.isArray(m?.items) ? m.items.filter(i => i && typeof i.text === 'string' && Array.isArray(i.rects)) : [], client: Array.isArray(m?.client) ? m.client : null }; schedule(); };
   let modeGame = null;
-  b.textPlaceMode = m => { on = m?.on === true; if (on) bindAdvance(); if (!on) stale.clear(); if (!on) waits.clear(); if (!on) { orphans = []; orphanWait = null; } const g = m && 'game' in m ? String(m.game || '') : modeGame; if (!on || g !== modeGame) { anchor = null; anchorLine = ''; cnBelow = { key: null, below: false }; } modeGame = g; if (!on) { document.body.classList.remove('megulit-place-gone'); if (pageOwn) { pageOwn = false; briefSync(false); } line = null; drawnByGame = ''; boxBottom = 0; boxKey = ''; if (page) { page = null; pageGone(); } } schedule(); };
+  b.textPlaceMode = m => { on = m?.on === true; document.body.classList.toggle('megulit-anchor-mode', on && anchorMode); if (on) bindAdvance(); if (!on) stale.clear(); if (!on) waits.clear(); if (!on) { orphans = []; orphanWait = null; } const g = m && 'game' in m ? String(m.game || '') : modeGame; if (!on || g !== modeGame) { anchor = null; anchorLine = ''; cnBelow = { key: null, below: false }; } modeGame = g; if (!on) { document.body.classList.remove('megulit-place-gone'); if (pageOwn) { pageOwn = false; briefSync(false); } line = null; drawnByGame = ''; boxBottom = 0; boxKey = ''; if (page) { page = null; pageGone(); } } schedule(); };
   /* 2026-11-21 (owner's recording 08:28, 千恋＊万花): game-fit.js measured the reader on its own place in the gap between two lines and cut the
      next line's translation; while this module anchors lines on the game's place it owns their layout, gaps included */
   b.textPlaceOwns = () => on && anchorMode && !!anchor;

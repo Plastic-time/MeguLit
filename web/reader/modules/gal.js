@@ -50,6 +50,16 @@
     const dpr = Math.max(.5, Number(window.devicePixelRatio) || 1);
     if (layoutInfo) for (const [name,key] of Object.entries({x:'readerX',y:'readerY',width:'readerWidth'})) document.documentElement.style.setProperty('--tomoyo-reader-'+name,
      (layoutInfo[key]/dpr)+'px');
+    if (layoutInfo) {
+      const root = document.documentElement.style;
+      for (const [axis, dimension, offset] of [['X','Width','anchorDX'], ['Y','Height','anchorDY']]) {
+        const length = layoutInfo['client' + dimension], origin = layoutInfo['client' + axis], reader = layoutInfo['reader' + axis];
+        if (![length, origin, reader].every(Number.isFinite) || length <= 0) continue;
+        const delta = length * (Number(preferences[offset]) || 0) / 100;
+        const position = delta ? Math.max(origin, Math.min(origin + Math.max(0, length - 40*dpr), reader + delta)) : reader;
+        root.setProperty('--megulit-fallback-' + axis.toLowerCase(), position / dpr + 'px');
+      }
+    }
     if (maskImage && maskGeometry) {
       maskImage.style.left = (maskGeometry.x/dpr)+'px'; maskImage.style.top = (maskGeometry.y/dpr)+'px';
       maskImage.style.width = (maskGeometry.width/dpr)+'px'; maskImage.style.height = (maskGeometry.height/dpr)+'px';
@@ -139,6 +149,7 @@
     .tomoyo-native-mask { position:fixed!important; z-index:10!important; pointer-events:none!important; user-select:none!important; max-width:none!important; margin:0!important; padding:0!important; border:0!important; opacity:1!important; filter:none!important; }
     body:not(.tomoyo-gal-bound) .tomoyo-native-mask { display:none!important; }
     body.tomoyo-gal-bound .sentence-window { position:fixed!important; z-index:20!important; inset:auto!important; left:var(--tomoyo-reader-x,0px)!important; top:var(--tomoyo-reader-y,0px)!important; margin:var(--tomoyo-gal-out-y,0px) var(--tomoyo-gal-out-x,0px)!important; width:calc(var(--tomoyo-reader-width,100vw) - var(--tomoyo-gal-out-x,0px) * 2)!important; height:auto!important; max-height:none!important; flex-direction:column!important; justify-content:flex-start!important; max-width:none!important; min-height:0!important; padding:var(--tomoyo-gal-pad-y,10px) var(--tomoyo-gal-pad-x,20px)!important; box-sizing:border-box!important; border:0!important; border-radius:0!important; align-items:stretch!important; overflow:visible!important; scrollbar-width:none; -webkit-app-region:no-drag; }
+    body.tomoyo-gal-bound.megulit-anchor-mode:not(.megulit-placed):not(.megulit-anchored) .sentence-window { left:var(--megulit-fallback-x,var(--tomoyo-reader-x,0px))!important; top:var(--megulit-fallback-y,var(--tomoyo-reader-y,0px))!important; }
     body.tomoyo-gal-bound .sentence-window::-webkit-scrollbar { display:none; }
     html:has(body.tomoyo-gal-bound), body.tomoyo-gal-bound, body.tomoyo-gal-bound [data-gal-reader-container], body.tomoyo-gal-bound .sentence-window { background-color:transparent!important; background-image:none!important; box-shadow:none!important; backdrop-filter:none!important; -webkit-backdrop-filter:none!important; }
     body.tomoyo-gal-bound .lookup-limit-badge { display:none!important; }
