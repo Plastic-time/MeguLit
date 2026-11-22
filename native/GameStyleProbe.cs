@@ -31,6 +31,41 @@ public static class GameStyleProbe{
  // What the same glyphs stand on: the mean of the pixels around the words (the dialogue box, or the picture behind the text); null when unknown.
  // The caller decides with it whether the measured fill can be the text at all (a fill that does not stand out from its background is not).
  [ThreadStatic]static string LastBack;
+ // A broad outline can win the pixel count around a thin stroke. Count cross-sections
+ // through the same OCR words: edge-fill-edge encloses the fill regardless of luminance.
+ static bool SecondColorIsInside(byte[] px,int width,int height,List<Word> words,Color fill,Color edge){
+  const int fillRun=1,edgeRun=2;
+  int insideFill=0,insideEdge=0;
+  Action<int,int,int> scan=(start,step,length)=>{
+   int first=0,current=0,runs=0,gap=0;
+   for(int i=0,o=start;i<=length;i++,o+=step){
+    int next=0;
+    if(i<length){
+     int r=px[o+2],g=px[o+1],b=px[o];
+     int f=Math.Abs(r-fill.R)+Math.Abs(g-fill.G)+Math.Abs(b-fill.B);
+     int e=Math.Abs(r-edge.R)+Math.Abs(g-edge.G)+Math.Abs(b-edge.B);
+     if(Math.Min(f,e)<=60)next=f<e?fillRun:edgeRun;
+    }
+    if(next==0){
+     if(++gap<2 && i<length)continue; // allow one antialias pixel between colours
+     if(runs>=3 && first==current){
+      if(first==fillRun)insideEdge++;else insideFill++;
+     }
+     first=current=runs=0;
+     continue;
+    }
+    gap=0;if(next==current)continue;
+    if(first==0)first=next;
+    current=next;runs++;
+   }
+  };
+  foreach(var word in words){
+   var box=Rectangle.Intersect(new Rectangle(0,0,width,height),Rectangle.Inflate(word.Box,2,2));
+   for(int y=box.Top;y<box.Bottom;y++)scan((y*width+box.Left)*4,4,box.Width);
+   for(int x=box.Left;x<box.Right;x++)scan((box.Top*width+x)*4,width*4,box.Height);
+  }
+  return insideEdge>=12 && insideEdge>2*insideFill;
+ }
  static string Ink(Bitmap image,List<Word> words){string top,bottom;return Ink(image,words,out top,out bottom);}
  static string Ink(Bitmap image,List<Word> words,out string gradientTop,out string gradientBottom){
   gradientTop=gradientBottom=null;LastEdge=null;LastBack=null;var bands=Enumerable.Range(0,8).Select(i=>new Band()).ToArray();
@@ -58,7 +93,14 @@ public static class GameStyleProbe{
   if(bins.Count==0)return null;int top=bins.Values.Max();if(top<12)return null;
   int best=bins.Where(p=>p.Value>=Math.Max(12,top/5)).OrderByDescending(p=>p.Value-2*touches[p.Key]).ThenByDescending(p=>p.Value).First().Key,count=bins[best];var s=sums[best];Gradient(bands,out gradientTop,out gradientBottom);
   {int edgeKey=-1,edgeCount=0;foreach(var p in bins){if(p.Key==best||p.Value<Math.Max(12,count/6))continue;var e=sums[p.Key];if(back[3]>0&&Math.Abs(e[0]/p.Value-back[0]/back[3])+Math.Abs(e[1]/p.Value-back[1]/back[3])+Math.Abs(e[2]/p.Value-back[2]/back[3])<90)continue; /* the background seen inside closed strokes */if(Math.Abs(e[0]/p.Value-s[0]/count)+Math.Abs(e[1]/p.Value-s[1]/count)+Math.Abs(e[2]/p.Value-s[2]/count)<120)continue;if(p.Value>edgeCount){edgeCount=p.Value;edgeKey=p.Key;}}
-   if(edgeKey>=0){var e=sums[edgeKey];LastEdge=String.Format("#{0:x2}{1:x2}{2:x2}",e[0]/edgeCount,e[1]/edgeCount,e[2]/edgeCount);}}
+   if(edgeKey>=0){var e=sums[edgeKey];
+    var fill=Color.FromArgb((int)(s[0]/count),(int)(s[1]/count),(int)(s[2]/count));
+    var edge=Color.FromArgb((int)(e[0]/edgeCount),(int)(e[1]/edgeCount),(int)(e[2]/edgeCount));
+    // When the backdrop itself resembles a candidate it can close a false ring.
+    if(gradientTop==null && back[3]>0 && Math.Abs(fill.R-back[0]/back[3])+Math.Abs(fill.G-back[1]/back[3])+Math.Abs(fill.B-back[2]/back[3])>=90 &&
+       SecondColorIsInside(px,w,h,words,fill,edge)){
+     LastEdge=String.Format("#{0:x2}{1:x2}{2:x2}",fill.R,fill.G,fill.B);s=e;count=edgeCount;
+    }else LastEdge=String.Format("#{0:x2}{1:x2}{2:x2}",edge.R,edge.G,edge.B);}}
   return String.Format("#{0:x2}{1:x2}{2:x2}",s[0]/count,s[1]/count,s[2]/count);
  }
  // Fit a vertical two-stop gradient to per-height fill candidates, after the same background flood as solid ink.
@@ -94,6 +136,17 @@ public static class GameStyleProbe{
   using(var image=OpaqueBitmap(300,100))using(var g=Graphics.FromImage(image))using(var font=new Font("Meiryo",30)){g.Clear(Color.Black);g.DrawString("原文の検査",font,Brushes.White,10,10);string top,bottom;Ink(image,new List<Word>{new Word{Text="原文の検査",Box=new Rectangle(10,20,240,45)}},out top,out bottom);if(top!=null)throw new Exception("Solid text falsely identified as a gradient");}
  }
  static void InkSelfTest(){
+  // Thin stems with more outline than fill, in both polarities.
+  foreach(var fill in new[]{Color.White,Color.Black})using(var image=OpaqueBitmap(160,48))using(var g=Graphics.FromImage(image)){
+   Color edge=fill==Color.White?Color.Black:Color.White;
+   g.Clear(Color.SteelBlue);
+   using(var border=new SolidBrush(edge))using(var stem=new SolidBrush(fill)){
+    for(int x=10;x<144;x+=16){g.FillRectangle(border,x,6,10,34);g.FillRectangle(stem,x+4,10,2,26);}
+   }
+   string actual=Ink(image,new List<Word>{new Word{Text="川",Box=new Rectangle(10,6,138,34)}});
+   if(actual==null||LastEdge==null||ColorTranslator.FromHtml(actual).ToArgb()!=fill.ToArgb()||ColorTranslator.FromHtml(LastEdge).ToArgb()!=edge.ToArgb())
+    throw new Exception("Thin stem fill/edge mismatch: "+actual+"/"+LastEdge);
+  }
   var cases=new[]{new[]{Color.White,Color.White,Color.Black},new[]{Color.FromArgb(22,30,45),Color.White,Color.Black},new[]{Color.White,Color.Black,Color.White},new[]{Color.FromArgb(22,30,45),Color.FromArgb(187,238,255),Color.Black},new[]{Color.White,Color.FromArgb(200,20,30),Color.Transparent},/* 2026-11-19 素晴らしき日々: white text with a dark outline over a light blue sky */new[]{Color.FromArgb(120,170,230),Color.White,Color.FromArgb(16,16,24)},new[]{Color.FromArgb(190,215,240),Color.FromArgb(250,250,250),Color.Black},/* the same game's real text (frame of the user's recording): black with a white edge on #799ebe */new[]{Color.FromArgb(121,158,190),Color.Black,Color.White},/* dark text on a light text box, no outline */new[]{Color.FromArgb(240,236,225),Color.FromArgb(40,36,48),Color.Transparent}};
   foreach(var weight in new[]{FontStyle.Regular,FontStyle.Bold})foreach(var colors in cases)using(var image=OpaqueBitmap(420,100))using(var g=Graphics.FromImage(image))using(var path=new System.Drawing.Drawing2D.GraphicsPath())using(var font=new FontFamily("Meiryo")){
    g.Clear(colors[0]);g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;path.AddString("原文色の検査",font,(int)weight,38,new PointF(20,20),StringFormat.GenericDefault);if(colors[2].A>0)using(var pen=new Pen(colors[2],4)){pen.LineJoin=System.Drawing.Drawing2D.LineJoin.Round;g.DrawPath(pen,path);}using(var brush=new SolidBrush(colors[1]))g.FillPath(brush,path);

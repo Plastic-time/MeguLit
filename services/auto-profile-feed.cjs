@@ -144,8 +144,8 @@ const CREDIT_MAX=30;
 const BAD_CP=c=>c<32||c===127||c===0x2028||c===0x2029||(c>=0x202a&&c<=0x202e)||(c>=0x2066&&c<=0x2069);
 function cleanName(v){if(typeof v!=='string')return null;const t=[...v].map(ch=>BAD_CP(ch.codePointAt(0))?' ':ch).join('').replace(/\s+/g,' ').trim();const c=[...t].slice(0,CREDIT_MAX).join('').trim();return c||null;}
 /* what the relay says about a credit: {torchNo, name|null, at} or null */
-const {fallbackAlias}=require('../core/torch-alias.cjs');
-function cleanCredit(c){if(!c||typeof c!=='object')return null;const no=c.torchNo;if(typeof no!=='number'&&(typeof no!=='string'||!/^\d+$/.test(no)))return null;const n=Number(no);if(!Number.isSafeInteger(n)||n<0)return null;const at=typeof c.at==='string'||Number.isFinite(c.at)?c.at:'',name=cleanName(c.name);return {torchNo:n,name,at,...(!name?{alias:cleanName(c.alias)||fallbackAlias(n)}:{})};}
+const {displayAlias}=require('../core/torch-alias.cjs');
+function cleanCredit(c){if(!c||typeof c!=='object')return null;const no=c.torchNo;if(typeof no!=='number'&&(typeof no!=='string'||!/^\d+$/.test(no)))return null;const n=Number(no);if(!Number.isSafeInteger(n)||n<0)return null;const at=typeof c.at==='string'||Number.isFinite(c.at)?c.at:'',name=cleanName(c.name);return {torchNo:n,name,at,...(!name?{alias:displayAlias(cleanName(c.alias),n)}:{})};}
 /* this PC's credit of the diff it sent: the relay's last answer, or the local one still waiting for the relay */
 function creditOf(root,key){const m=readSent(root,key);if(!m)return null;const c=cleanCredit(m.credit)||cleanCredit(m);
  if(m.localName!==undefined){const local=c?cleanCredit({...c,name:m.localName}):{torchNo:0,name:cleanName(m.localName),at:m.at||''};return {...local,synced:false};}return c?{...c,synced:true}:{torchNo:0,name:null,at:m.at||'',synced:true};}
