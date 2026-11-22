@@ -1,4 +1,10 @@
 {
   "note": "Dedicated public verification keys for exact-version ordinary calibrations. Provision alongside the scan service before enabling publication.",
-  "keys": []
+  "keys": [
+    {
+      "id": "ordinary-windows-01",
+      "alg": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEAooGygGN5ckXDPPv408UDa9UJiEvPVGYF9UoOeodGexY="
+    }
+  ]
 }
