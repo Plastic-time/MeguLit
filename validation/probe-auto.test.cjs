@@ -4,15 +4,16 @@
    Covers: the switches default on; the per-game identity (same game in two folders → same id, different games →
    different ids); the quiet queue (sends once, skips what the relay already has, retries later on failure, does nothing
    when off); the relay keeping one probe per identity (a second upload of an as-good probe adds no row and no blob, a
-   better one replaces the stored one and comments on its issue). No game is launched; the relay runs in-process. */
+   better one replaces the stored one and updates pending evidence). No game is launched; the relay runs in-process. */
 process.env.MEGULIT_RELAY_BASE??='off';
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{pathToFileURL}=require('node:url');
+const {database}=require('./helpers/torch-release.cjs');
 const fx=require('./helpers/adapter-fixtures.cjs');
 const auto=require('../services/probe-auto.cjs'),pi=require('../services/probe-identity.cjs'),sample=require('../services/adapter-sample.cjs'),d=require('../services/desensitize.cjs');
 
 /* ---- an in-process relay (all migrations, D1 on node:sqlite, R2 in a Map) ------------------------------------------ */
 const relayDir=path.join(__dirname,'..','relay'),MIGRATION=fs.readdirSync(path.join(relayDir,'migrations')).filter(f=>f.endsWith('.sql')).sort().map(f=>fs.readFileSync(path.join(relayDir,'migrations',f),'utf8')).join('');
-function d1(){const db=new DatabaseSync(':memory:');db.exec(MIGRATION);const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>{db.prepare(sql).run(...args);return {success:true};}});return {prepare:sql=>stmt(sql),raw:db};}
+function d1(){return database(MIGRATION); }
 function r2(){const store=new Map();return {store,put:async(k,b)=>{store.set(k,new Uint8Array(b));},get:async k=>store.has(k)?{body:store.get(k)}:null,delete:async k=>{store.delete(k);}};}
 const github=[];
 const ENV={DB:d1(),BUCKET:r2(),LINK_SECRET:'link',HASH_SALT:'salt',GITHUB_TOKEN:'gh',GITHUB_REPO:'o/r',fetch:async(url,init)=>{github.push({url,body:JSON.parse(init.body)});return new Response(JSON.stringify({html_url:'https://github.com/o/r/issues/'+(github.length+6)}),{status:201});}};
@@ -63,7 +64,8 @@ test('quiet upload: sent once in the background, the next player of the same gam
  let r=await auto.run(u1.root,u1.db,{...quiet,...ENDPOINTS,fetcher:f1,sampler:sampler(1)});
  assert.deepEqual(r.results,{g1:'sent'});assert.equal(rows('SELECT * FROM probe_bundles').length,1);assert.equal(blobs().length,1);
  const g=rows('SELECT * FROM probe_games');assert.equal(g.length,1);assert.equal(g[0].state,'partial','no runtime findings yet');assert.equal(g[0].items,2);assert.equal(g[0].reporters,1);
- assert.equal(github.filter(x=>x.url.endsWith('/issues')).length,1,'one issue');
+ assert.equal(github.length,0,'direct intake bypasses GitHub');
+ assert.equal(rows("SELECT * FROM seed_admin_items WHERE kind='probe-skeleton'").length,1);
  const st=auto.status(u1.root);assert.equal(st.log[0].state,'sent');assert.ok(sample.manifest(u1.root,st.log[0].hash).manifest.length,'the manifest stays viewable as a record');
  /* the same player again: nothing new, no request at all */
  const before=f1.calls;r=await auto.run(u1.root,u1.db,{...quiet,...ENDPOINTS,fetcher:f1,sampler:sampler(1)});assert.deepEqual(r.results,{g1:'skipped'});assert.equal(f1.calls,before);
@@ -72,13 +74,14 @@ test('quiet upload: sent once in the background, the next player of the same gam
  r=await auto.run(u2.root,u2.db,{...quiet,...ENDPOINTS,fetcher:f2,sampler:sampler(1)});
  assert.deepEqual(r.results,{g1:'known'});assert.equal(f2.calls,1,'only GET /api/probe/has');
  assert.equal(rows('SELECT * FROM probe_bundles').length,1,'no new row');assert.equal(blobs().length,1,'no new blob');assert.equal(rows('SELECT reporters FROM probe_games')[0].reporters,2);
- /* a third player whose probe carries more: it replaces the stored one (still one row, one blob) and comments on the issue */
+ /* a third player whose probe carries more: it replaces the stored one (still one row, one blob) and updates the skeleton */
  const u3=setup('megulit-pa-u3-',{folder:'E/A'}),f3=user('198.51.100.3');const oldBundle=rows('SELECT bundle_id FROM probe_games')[0].bundle_id;
  r=await auto.run(u3.root,u3.db,{...quiet,...ENDPOINTS,fetcher:f3,sampler:sampler(3)});
  assert.deepEqual(r.results,{g1:'sent'});const after=rows('SELECT * FROM probe_games')[0];
  assert.notEqual(after.bundle_id,oldBundle);assert.equal(after.items,4);assert.equal(after.reporters,3);
  assert.equal(rows('SELECT * FROM probe_bundles').length,1,'one probe per game');assert.equal(blobs().length,1);
- assert.equal(github.filter(x=>x.url.endsWith('/issues')).length,1,'no second issue');assert.ok(github.at(-1).url.endsWith('/comments'),'a comment on the first one');
+ assert.equal(github.length,0);
+ assert.equal(rows("SELECT * FROM seed_admin_items WHERE kind='probe-skeleton'").length,1);
 });
 
 test('relay: a second upload of a complete probe is answered duplicate on the first chunk — no row, no blob',async()=>{

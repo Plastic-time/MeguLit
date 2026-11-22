@@ -28,7 +28,7 @@ const MAGIC_ENGINES=[
  ['PACK','qlie-pack','qlie'],['FilePackVer','qlie-pack','qlie'],['EPK ','epk','ethornell'],['DXA','dxa','dxlib'],['AR2','ar2','tenco'],
  ['MRG\0','mrg','mrg'],['NNK','nnk','nnk'],['ARCX','arcx','arcx'],['SNPA','snpa','snpa'],['TCR','tcr','tcr'],
 ];
-const MAGIC_HEX=MAGIC_ENGINES.map(([m,format,engine])=>[Buffer.from(m,'latin1').toString('hex'),format,engine]);
+const MAGIC_HEX=MAGIC_ENGINES.map(([m,format,engine])=>[[...m].map(c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join(''),format,engine]);
 
 /* name rules: [regex on the relative path, engine, resource-only] — resource-only files never hold the script */
 const NAME_ENGINES=[

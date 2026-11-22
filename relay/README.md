@@ -371,17 +371,16 @@ Endpoints (`src/adapters.js`, tables in `migrations/0016_adapters.sql`, probe bu
 | GET | `/api/adapters/feed?app=&format=` | the app (packs on offer, withdrawn versions, open probe requests; cached 5 min) |
 | GET | `/api/adapters/pack/:id/:version` | the app (the signed pack as published) |
 | POST | `/api/adapters/report` | the app (before/after line and pairing counts, anonymous game key) |
-| POST | `/api/probe` | the app (one ≤ 512 KiB chunk of a desensitized bundle; the last one opens the `adapter-probe` issue) |
+| POST | `/api/probe` | the app (one ≤ 512 KiB chunk of a desensitized bundle; the completed bundle is verified and queued for Seed evidence review) |
 | GET | `/api/probe/has?id=<identity>[&seen=1]` | the app before an automatic upload: `{state:none\|partial\|complete\|failed, items}` (one row read; `seen=1` bumps the reporter count once per app and game) |
-| GET | `/api/probe/download/:id?exp=&sig=` | link in the issue |
+| GET | `/api/probe/download/:id?exp=&sig=` | historical signed link |
 | POST | `/api/adapters/publish`, `/withdraw`, `/probe-request`; GET `/api/adapters/reports` | maintainer, `Authorization: Bearer $ADAPTER_ADMIN_TOKEN` |
 
-2026-11-14 one probe per game (`migrations/0017_probe_dedupe.sql`, table `probe_games`): the app uploads automatically
-(`services/probe-auto.cjs`), one game per bundle, with a game identity (`services/probe-identity.cjs`: engine + exe
-content hash + archive names hash). A chunk carrying `identity`, `items`, `state` is answered `{ok,duplicate:true}` on
-the first chunk when the stored probe of that identity is complete or has at least as many items (only `reporters` goes
-up: no row, no blob, no issue); a better one replaces the stored bundle (old row and R2 object deleted) and is posted as a
-comment on the game's existing issue. Bundles without an identity (the manual path, older apps) behave as before.
+The app uploads automatically through `services/probe-auto.cjs`. The relay deduplicates quality updates by probe identity and persists the bundle receipt and the Seed review item in one D1 batch. A failure before commit returns an error so the app can retry. Exact retries and repeated evidence leave the queue item unchanged. Monitor drafts in Dashboard ? ??????????? ? ????, or use the authenticated `GET /api/seed-admin/items?source=probe&state=pending`.
+
+Drafts contain the probe stage, engine evidence, typed fingerprints, probe app version and missing evidence. Older untyped keys can be a title hash. Work identity, complete EXE hash, game build version and Cardinal evidence stay unknown until supplied. Drafts use separate review keys and are ineligible for automatic EXE retests or distribution. A bundle without probe identity enters the evidence backlog.
+
+For legacy issue events, migration `0030_probe_issue_disposition.sql` stores the result before closure. A repository GitHub `issues` webhook targets `POST /api/probe/issue-webhook` with the shared `ADAPTER_PROBE_WEBHOOK_SECRET`. The existing `GITHUB_TOKEN` needs Issues write access. Set `ADAPTER_PROBE_ISSUE_AUTHOR` to the account that created the original relay issues if it differs from the default `ilynthn` on `ilynthn/MeguLit`. The relay accepts opened, labeled and reopened events and rechecks the live issue before closing. A matching historical bundle in local relay storage can supply the evidence. Otherwise the disposition stores Markdown, available by issue number through authenticated `GET /api/seed-admin/probe-backlog?issue=<number>`. The 30-minute cron retries pending closures. Failed deliveries before a disposition commits return a server error for redelivery. Ordinary issues and the historical issue backlog need no scan.
 
 The relay stores packs but cannot sign them: apps only load packs signed with a key in `services/adapter-pack-keys.json`.
 

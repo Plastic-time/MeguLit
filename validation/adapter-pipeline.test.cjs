@@ -5,7 +5,9 @@
    signed pack, sync the feed, rebuild the index, report before/after, roll back a pack that made a game worse, and the
    withdrawn path. */
 process.env.MEGULIT_RELAY_BASE??='off';
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url');
+const {database}=require('./helpers/torch-release.cjs');
+const {createHash,createHmac,randomUUID}=require('node:crypto');
 const fx=require('./helpers/adapter-fixtures.cjs'),d=require('../services/desensitize.cjs');
 const R=fx.root('megulit-pipeline-');process.env.MEGULIT_ROOT=R;process.env.MEGULIT_ADAPTER_PACKS_DIR=path.join(R,'data','adapter-packs');
 const packs=require('../services/adapter-packs.cjs'),probe=require('../services/adapter-probe.cjs'),sample=require('../services/adapter-sample.cjs'),feed=require('../services/adapter-feed.cjs');
@@ -15,7 +17,7 @@ fs.writeFileSync(path.join(R,'data','config','online.json'),JSON.stringify({rela
 
 /* relay stand-ins (as in relay.test.cjs) */
 const relayDir=path.join(__dirname,'..','relay'),MIGRATION=fs.readdirSync(path.join(relayDir,'migrations')).filter(f=>f.endsWith('.sql')).sort().map(f=>fs.readFileSync(path.join(relayDir,'migrations',f),'utf8')).join('');
-function d1(){const db=new DatabaseSync(':memory:');db.exec(MIGRATION);const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>{db.prepare(sql).run(...args);return {success:true};}});return {prepare:sql=>stmt(sql),raw:db};}
+function d1(){return database(MIGRATION); }
 function r2(){const store=new Map();return {store,put:async(k,b)=>{store.set(k,new Uint8Array(b));},get:async k=>store.has(k)?{body:store.get(k)}:null,delete:async k=>{store.delete(k);}};}
 const issues=[];
 const ENV={DB:d1(),BUCKET:r2(),LINK_SECRET:'link',HASH_SALT:'salt',ADAPTER_ADMIN_TOKEN:'admin-token',GITHUB_TOKEN:'gh',GITHUB_REPO:'o/r',fetch:async(url,init)=>{issues.push(JSON.parse(init.body));return new Response(JSON.stringify({html_url:'https://github.com/o/r/issues/1'}),{status:201});}};
@@ -61,16 +63,100 @@ test('upload bundle: desensitized samples + key candidates, manifest, no game te
  assert.equal(z.raw,Math.max(prep.bytes,prep.bytes+smp.reduce((n,i)=>n+i.raw-i.bytes,0)));
  assert.equal(ui.bundleSizes({bytes:10,manifest:[]}).limit,8<<20,'an older service without limit: the relay cap');
 });
-test('upload: chunks to /api/probe, assembled and checked by the relay, one issue with a summary only',async()=>{
+test('upload: chunks to /api/probe, assembled and checked by the relay, one private skeleton',async()=>{
  const {hash}=test.prep;const before=sample.CHUNK;
- const r=await sample.upload(R,{hash,followUp:true,fetcher});assert.equal(r.state,'uploaded',JSON.stringify(r));assert.match(r.issueUrl,/issues\/1$/);
- assert.equal(issues.length,1);assert.deepEqual(issues[0].labels,['adapter-probe']);assert.ok(!fx.LINES.some(l=>issues[0].body.includes(l)));
+ const r=await sample.upload(R,{hash,followUp:true,fetcher});assert.equal(r.state,'uploaded',JSON.stringify(r));assert.equal(r.issueUrl,'');
+ assert.equal(issues.length,0);
+ const item=await ENV.DB.prepare("SELECT * FROM seed_admin_items WHERE kind='probe-skeleton'").first();
+ assert.equal(item.state,'pending');assert.equal(item.published,0);assert.equal(item.author_torch_no,null);
+ assert.ok(!item.body.includes(GAMES[0].title));assert.ok(!fx.LINES.some(l=>item.body.includes(l)));
  const row=await ENV.DB.prepare('SELECT * FROM probe_bundles').first();assert.equal(row.sha256,hash);assert.equal(ENV.BUCKET.store.get(row.object_key).length,row.size);
  assert.ok(![...ENV.BUCKET.store.keys()].some(k=>k.startsWith('probes/parts/')),'chunks cleaned up');
  assert.equal(Object.keys(sample.consent(R)).length,1,'follow-up consent kept for that game');
  assert.equal((await sample.upload(R,{hash:'0'.repeat(64),fetcher})).error,'NOT_PREPARED');
  const bad=await fetcher('https://relay.test/api/probe',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({version:1,upload:'x',part:0,parts:1})});assert.equal(bad.status,400);
  assert.equal(before,sample.CHUNK);
+});
+const bundleOf = games => JSON.stringify({schema:'megulit.probe-bundle',version:1,app:'1.4.22',games});
+const sha = text => createHash('sha256').update(text).digest('hex');
+function uploadBundle(bundle, upload=randomUUID()){
+ return fetcher('https://relay.test/api/probe',{method:'POST',body:JSON.stringify({
+  version:1,upload,part:0,parts:1,size:Buffer.byteLength(bundle),sha256:sha(bundle),data:Buffer.from(bundle).toString('base64')
+ })});
+}
+test('intake maps all four failure steps to pending admin evidence and retries a rolled-back queue write',async()=>{
+ const expected={'parse-failed':'readable-script','unsupported-engine':'supported-reader',
+  'decrypt-failed':'readable-archive','chinese-build':'japanese-source'};
+ const games=Object.keys(expected).map((step,i)=>({identity:sha(step),key:sha('fp'+step),fingerprintKind:'exe-head-v1',
+  step,title:'private-player@example.invalid',vndb:'v123',detail:'C:/Users/private-player',
+  ...(i===3?{detected:'reallive',lines:111839,engines:[{id:'reallive',lines:111839}]}:
+  {inventory:{archives:[i===1?{name:'script.bin',magic:'50534200'}:{name:'data.xp3',magic:'5850330d0a'}]}})}));
+ const bundle=bundleOf(games),id=randomUUID();
+ ENV.DB.raw.exec("CREATE TRIGGER fail_probe_draft BEFORE INSERT ON seed_admin_items WHEN NEW.kind='probe-skeleton' BEGIN SELECT RAISE(ABORT,'test queue failure'); END");
+ try {
+  assert.equal((await uploadBundle(bundle,id)).status,500);
+  assert.equal(await ENV.DB.prepare('SELECT * FROM probe_bundles WHERE id=?').bind(id).first(),null);
+ } finally { ENV.DB.raw.exec('DROP TRIGGER fail_probe_draft'); }
+ assert.equal((await uploadBundle(bundle,id)).status,201);
+ assert.equal((await (await uploadBundle(bundle,id)).json()).duplicate,true);
+ const list=await (await admin('/api/seed-admin/items?state=pending&source=probe',null,'GET')).json();
+ for(const [i,game] of games.entries()){
+  const row=list.items.find(item=>item.probe?.probeIdentity===game.identity);
+  assert.ok(row,game.step);assert.equal(row.engine,['kirikiri','emote','kirikiri','reallive'][i]);
+  assert.equal(row.probe.status,'skeleton');assert.equal(row.probe.step,game.step);
+  assert.ok(row.probe.missing.includes(expected[game.step]));assert.equal(row.probe.probeAppVersion,'1.4.22');
+  assert.equal(row.probe.exeHeadFingerprint,game.key);assert.equal(row.seedRev,null);
+  assert.equal(row.author,null);assert.equal(row.published,false);assert.equal(row.cardinal.reliable,false);
+  assert.equal(row.capabilities.queue,false);assert.equal(row.revision,1);
+  assert.doesNotMatch(JSON.stringify(row),/private-player|v123/);
+ }
+});
+
+test('signed GitHub events persist a skeleton or one Markdown record before closing and retry failed closure',async t=>{
+ const originalFetch=ENV.fetch;
+ t.after(()=>{ENV.fetch=originalFetch;delete ENV.ADAPTER_PROBE_WEBHOOK_SECRET;delete ENV.ADAPTER_PROBE_ISSUE_AUTHOR;});
+ ENV.ADAPTER_PROBE_WEBHOOK_SECRET='fixture-webhook';ENV.ADAPTER_PROBE_ISSUE_AUTHOR='probe-fixture';
+ const issueOf=number=>({number,html_url:'https://github.com/o/r/issues/'+number,user:{login:'probe-fixture'},
+  state:'open',labels:[{name:'adapter-probe'}],body:'MeguLit desensitized probe uploaded through the relay\n- step: **parse-failed** private detail'});
+ const stored=issueOf(900),fallback=issueOf(901),ordinary={...issueOf(902),labels:[{name:'bug'}]};
+ const rows=[stored,fallback,ordinary],patches=[];
+ const upload=randomUUID(),identity=sha('legacy-probe');
+ const bundle=bundleOf([{identity,step:'parse-failed'}]);
+ assert.equal((await uploadBundle(bundle,upload)).status,201);
+ ENV.DB.raw.prepare('UPDATE probe_bundles SET issue_url=? WHERE id=?').run(stored.html_url,upload);
+ ENV.DB.raw.prepare("DELETE FROM seed_admin_items WHERE json_extract(body,'$.probeIdentity')=?").run(identity);
+ const job=number=>ENV.DB.raw.prepare('SELECT * FROM probe_issue_disposition WHERE issue=?').get(number);
+ let failClose=true;
+ ENV.fetch=async(url,init)=>{
+  const issue=rows.find(x=>url.endsWith('/'+x.number));assert.ok(issue);
+  if(init.method==='GET')return Response.json(issue);
+  assert.equal(init.method,'PATCH');assert.ok(job(issue.number),'disposition before any PATCH');
+  assert.equal(JSON.parse(init.body).state_reason,'not_planned');
+  patches.push(issue.number);
+  if(issue===fallback&&failClose)return new Response(null,{status:503});
+  issue.state='closed';return Response.json(issue);
+ };
+ const event=(issue,valid=true)=>{
+  const body=JSON.stringify({action:'opened',repository:{full_name:'o/r'},issue});
+  return fetcher('https://relay.test/api/probe/issue-webhook',{method:'POST',body,headers:{'x-github-event':'issues',
+   'x-hub-signature-256':'sha256='+createHmac('sha256',valid?'fixture-webhook':'wrong').update(body).digest('hex')}});
+ };
+ assert.equal((await event(stored,false)).status,401);
+ assert.equal((await (await event(ordinary)).json()).ignored,true);
+ ENV.DB.raw.exec("CREATE TRIGGER fail_disposition BEFORE INSERT ON probe_issue_disposition BEGIN SELECT RAISE(ABORT,'test disposition failure'); END");
+ try { assert.equal((await event(stored)).status,500); } finally { ENV.DB.raw.exec('DROP TRIGGER fail_disposition'); }
+ assert.deepEqual(patches,[]);
+ assert.equal((await event(stored)).status,200);assert.equal(job(900).markdown,null);
+ assert.equal(ENV.DB.raw.prepare("SELECT state FROM seed_admin_items WHERE json_extract(body,'$.probeIdentity')=?").get(identity).state,'pending');
+ assert.equal((await event(fallback)).status,502);assert.equal(job(901).closed_at,null);
+ const markdown=await admin('/api/seed-admin/probe-backlog?issue=901',null,'GET');
+ assert.match(markdown.headers.get('content-type'),/^text\/markdown/);
+ const record=await markdown.text();
+ assert.match(record,/#901[\s\S]+parse-failed[\s\S]+probe-identity/);assert.doesNotMatch(record,/private detail/);
+ failClose=false;await (await import('../relay/src/probe-issues.js')).retryProbeIssues(ENV,new Date());
+ assert.equal((await event(fallback)).status,200);
+ assert.deepEqual(patches,[900,901,901]);assert.equal(job(901).markdown,record);assert.ok(job(901).closed_at);
+ assert.equal(job(902),undefined);
 });
 test('relay admin: publishing needs the token; feed lists packs; packs are served as signed',async()=>{
  const p=packs.sign({...fx.fixturePack(),id:'mgpk-reader',version:1},K.privateKey,'test');

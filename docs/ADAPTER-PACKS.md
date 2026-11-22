@@ -140,7 +140,7 @@ node tools/adapter-pack.cjs reports my-engine           # before/after from the 
 node tools/adapter-pack.cjs probe-request req-2 <key>   # ask that game for a fresh probe (only consenting users send one automatically)
 ```
 
-A probe upload opens a GitHub issue labelled `adapter-probe` with the summary and a 30-day download link of the bundle.
+A completed probe upload enters the Seed evidence queue in the existing relay dashboard. See the [relay guide](../relay/README.md#e562-adapter-packs-and-desensitized-probes) for legacy issue disposition and the Markdown backlog API.
 
 ## Runtime findings (E596–E599)
 
@@ -190,7 +190,7 @@ did not reach.
 included) passes `naturalLanguage()` (three kana in a row, kanji runs, GB2312 runs, UTF-16 CJK runs with kana, English
 prose) and the finding is dropped if it reads as language; the bundle is checked once more as a whole. The test runs an
 independent detector (every 2-character piece of the stand-in game's lines, in every encoding, in every field and every
-decoded base64 / hex value) over the findings, the bundle and the issue; it fails on any hit. Desensitizing memory also
+decoded base64 / hex value) over the findings and the bundle; it fails on any hit. Desensitizing memory also
 fixed a gap in `desensitize.cjs`: a UTF-16 line inside Shift-JIS bytecode was left as is (its bytes were "taken" by
 misread Shift-JIS characters); such runs now win and remainders are replaced again.
 

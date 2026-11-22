@@ -8,8 +8,7 @@
                                                         verdict?,origin?}]} (verdict solved|read|partial|failed and origin
                                                         runtime|probe are optional, E596; kept with the after numbers)
      POST /api/probe                                    one chunk {version:1,upload,part,parts,size,sha256,data(base64)}
-                                                        the last chunk assembles the bundle, checks its sha256 and opens
-                                                        a GitHub issue (label adapter-probe) with a summary and a link
+                                                        the last chunk verifies and stores the bundle and enqueues a Seed evidence draft
                                                         2026-11-14 optional identity, items, state (complete|partial|
                                                         failed), vndb on a one-game bundle: one probe per identity
                                                         (probe_games, 0017); a probe that adds nothing is answered
@@ -23,6 +22,8 @@
      POST /api/adapters/probe-request  {id,keys:[...]}   ask those games for a fresh probe; {id,close:true} ends it
      GET  /api/adapters/reports?pack=  the before/after numbers */
 import {probeFullRoute} from './probe-full.js';
+import {enqueueProbeDrafts,probeDraft} from './probe-seed.js';
+import {legacyProbeDisposition} from './probe-issues.js';
 const HEX64=/^[a-f0-9]{64}$/,ID=/^[a-z0-9][a-z0-9-]{2,63}$/,SEMVER=/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 export const ADAPTER_LIMITS={pack:256*1024,bundle:8*1024*1024,chunk:512*1024,parts:16,reports:50,keys:200,feed:300};
 const encoder=new TextEncoder();
@@ -32,7 +33,6 @@ async function hmac(secret,value){const key=await crypto.subtle.importKey('raw',
 function same(a,b){if(a.length!==b.length)return false;let d=0;for(let i=0;i<a.length;i++)d|=a.charCodeAt(i)^b.charCodeAt(i);return d===0;}
 function canonical(v){if(Array.isArray(v))return '['+v.map(canonical).join(',')+']';if(v&&typeof v==='object')return '{'+Object.keys(v).filter(k=>v[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+canonical(v[k])).join(',')+'}';return JSON.stringify(v);}
 const admin=(request,env)=>!!env.ADAPTER_ADMIN_TOKEN&&same(request.headers.get('authorization')||'','Bearer '+env.ADAPTER_ADMIN_TOKEN);
-const md=t=>String(t??'').replace(/[\\`*_{}[\]()#+!|<>@]/g,c=>'\\'+c).replace(/[\r\n]+/g,' ').slice(0,200);
 const nums=o=>({lines:Math.max(0,Math.min(1e8,o?.lines|0)),japanese:Math.max(0,Math.min(1e8,o?.japanese|0)),total:Math.max(0,Math.min(1e8,o?.total|0)),paired:Math.max(0,Math.min(1e8,o?.paired|0))});
 const b64=s=>{const bin=atob(s);const out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out;};
 
@@ -78,18 +78,6 @@ async function reportsGet(env,url,{json}){const pack=url.searchParams.get('pack'
  return json({ok:true,reports:(rows||[]).map(r=>({pack:r.pack,packVersion:r.pack_version,key:r.game_key,state:r.state,before:JSON.parse(r.before_json),after:JSON.parse(r.after_json),app:r.app,reporters:r.reporters,updatedAt:r.updated_at}))});}
 
 /* ---- probe uploads --------------------------------------------------------------------------------------------- */
-/* summary of a bundle for the issue: steps, engines, archive formats, sample and key counts; never the samples */
-/* E596 one line for the runtime findings of a game (counts and algorithms only; the bundle has the rest) */
-function runtimeLine(rt){const n=k=>Array.isArray(rt[k])?rt[k].length:0;
- return `- runtime (v${rt.version|0}): keys ${(rt.keys||[]).slice(0,6).map(k=>md(k.algo)+' '+md(k.verified||'')).join(', ')||'-'} · indexes ${(rt.indexes||[]).slice(0,4).map(x=>md(x.archive?.name)+' ×'+(x.count|0)).join(', ')||'-'} · dispatch ${n('dispatch')} · scripts ${n('scripts')}`;}
-export function probeIssueBody(bundle,link,days){
- const lines=['MeguLit desensitized probe uploaded through the relay (no game text: every natural-language character was replaced locally and checked before upload).','',`- App: ${md(bundle.app||'?')}`,`- Created: ${md(bundle.createdAt||'?')}`,`- Games: ${bundle.games.length}`,''];
- for(const g of bundle.games.slice(0,30)){lines.push(`### ${md(g.title||'(title not shared)')}`,`- key: \`${String(g.key||'').slice(0,64)}\``,`- step: **${md(g.step)}** ${md(g.detail||'')}`,`- reader: ${md(g.detected||'none')} · lines ${g.lines|0} · Japanese ${g.japaneseLines|0}${g.pairing?` · pairing ${g.pairing.paired}/${g.pairing.total}`:''}`,
-  `- archives: ${(g.inventory?.archives||[]).slice(0,6).map(a=>md(a.name)+' '+md(a.format||a.magic)).join(', ')||'-'}`,`- engines tried: ${(g.engines||[]).map(e=>md(e.id)+(e.error?' ('+md(e.error)+')':'')).slice(0,10).join(', ')||'-'}`,
-  `- samples: ${(g.samples||[]).filter(s=>s.sample).length}, dropped: ${(g.samples||[]).filter(s=>s.dropped).length}, key candidates: ${(g.keys||[]).map(k=>md(k.algo)+(k.key?':'+md(k.key):'')).slice(0,5).join(', ')||'-'}`,
-  ...(g.runtime&&typeof g.runtime==='object'?[runtimeLine(g.runtime)]:[]),'');}
- lines.push(`Download (expires in ${days} days): ${link}`,'','Answer with a pack: `node tools/adapter-pack.cjs sign …` then `publish`; ask for a fresh probe with `probe-request`.');
- return lines.join('\n');}
 /* ---- one probe per game (2026-11-14, owner: 去重) ------------------------------------------------------------------ */
 const PROBE_STATES=['complete','partial','failed'];
 function dedupeOf(v,app=''){if(!HEX64.test(String(v.identity||'')))return null;
@@ -109,11 +97,14 @@ async function probeHas(env,url,now,{json,fail}){const id=url.searchParams.get('
  const row=await env.DB.prepare('SELECT state,items FROM probe_games WHERE identity=?').bind(id).first();
  if(row&&url.searchParams.get('seen')==='1')await bump(env,id,Math.floor(now.getTime()/1000));
  return json({ok:true,state:row?.state||'none',items:row?.items|0});}
-async function probeChunk(request,env,ip,now,url,{json,fail,readJSON}){
+async function probeChunk(request,env,ip,now,{json,fail,readJSON}){
  const body=await readJSON(request,Math.ceil(ADAPTER_LIMITS.chunk*4/3)+4096);if(body.error)return fail(body.error,body.error==='PAYLOAD_TOO_LARGE'?413:400);const v=body.value||{};
  if(v.version!==1||!/^[0-9a-f-]{36}$/.test(String(v.upload||''))||!Number.isSafeInteger(v.part)||!Number.isSafeInteger(v.parts)||v.parts<1||v.parts>ADAPTER_LIMITS.parts||v.part<0||v.part>=v.parts||!Number.isSafeInteger(v.size)||v.size<1||v.size>ADAPTER_LIMITS.bundle||!HEX64.test(String(v.sha256||''))||typeof v.data!=='string')return fail('INVALID_CHUNK');
  let bytes;try{bytes=b64(v.data);}catch{return fail('INVALID_CHUNK');}if(bytes.length>ADAPTER_LIMITS.chunk||!bytes.length)return fail('PAYLOAD_TOO_LARGE',413);
  const t=Math.floor(now.getTime()/1000),dd=dedupeOf(v,request.headers.get('x-megulit-version'));
+ const receipt=()=>env.DB.prepare('SELECT sha256,ip_hash FROM probe_bundles WHERE id=?').bind(v.upload).first();
+ const prior=await receipt();
+ if(prior)return prior.sha256===v.sha256&&prior.ip_hash===ip?json({ok:true,id:v.upload,duplicate:true}):fail('CHUNK_MISMATCH',409);
  const first=await env.DB.prepare('SELECT parts,size,sha256,ip_hash FROM probe_uploads WHERE upload=? LIMIT 1').bind(v.upload).first();
  if(first&&(first.parts!==v.parts||first.size!==v.size||first.sha256!==v.sha256||first.ip_hash!==ip))return fail('CHUNK_MISMATCH',409);
  /* a new upload of a game the relay already holds an as-good probe of: count the reporter, keep nothing */
@@ -122,39 +113,48 @@ async function probeChunk(request,env,ip,now,url,{json,fail,readJSON}){
  await env.DB.prepare('INSERT INTO probe_uploads(upload,part,parts,size,sha256,ip_hash,created_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(upload,part) DO NOTHING').bind(v.upload,v.part,v.parts,v.size,v.sha256,ip,t).run();
  const have=(await env.DB.prepare('SELECT COUNT(*) AS n FROM probe_uploads WHERE upload=?').bind(v.upload).first())?.n||0;
  if(have<v.parts)return json({ok:true,received:have,parts:v.parts},202);
- /* all parts: assemble, verify, store, open the issue */
+ /* all parts: assemble, verify, store, enqueue */
  const chunks=[];for(let i=0;i<v.parts;i++){const o=await env.BUCKET.get(`probes/parts/${v.upload}/${i}`);if(!o)return fail('CHUNK_MISSING',409);chunks.push(new Uint8Array(await new Response(o.body).arrayBuffer()));}
  const total=chunks.reduce((n,c)=>n+c.length,0);if(total!==v.size)return fail('SIZE_MISMATCH',409);const all=new Uint8Array(total);let at=0;for(const c of chunks){all.set(c,at);at+=c.length;}
  if(await sha256(all)!==v.sha256)return fail('CHECKSUM_MISMATCH',409);
  let bundle;try{bundle=JSON.parse(new TextDecoder().decode(all));}catch{return fail('INVALID_BUNDLE');}
- if(bundle?.schema!=='megulit.probe-bundle'||bundle.version!==1||!Array.isArray(bundle.games)||!bundle.games.length)return fail('INVALID_BUNDLE');
+ if(bundle?.schema!=='megulit.probe-bundle'||bundle.version!==1||!Array.isArray(bundle.games)||!bundle.games.length||bundle.games.some(g=>!g||typeof g!=='object'||Array.isArray(g)))return fail('INVALID_BUNDLE');
  if(dd&&(bundle.games.length!==1||bundle.games[0].identity!==dd.identity))return fail('IDENTITY_MISMATCH');
  /* another upload of this game may have finished meanwhile */
  if(dd){stored=await storedProbe(env,dd.identity);if(stored&&!betterProbe(stored,dd)){for(let i=0;i<v.parts;i++){try{await env.BUCKET.delete?.(`probes/parts/${v.upload}/${i}`);}catch{}}
   await env.DB.prepare('DELETE FROM probe_uploads WHERE upload=?').bind(v.upload).run();const b=await bump(env,dd.identity,t);return json({ok:true,duplicate:true,reporters:b?.reporters|0});}}
- const id=crypto.randomUUID(),objectKey=`probes/${now.toISOString().slice(0,7)}/${id}.json`;await env.BUCKET.put(objectKey,all,{httpMetadata:{contentType:'application/json'},customMetadata:{sha256:v.sha256}});
- for(let i=0;i<v.parts;i++){try{await env.BUCKET.delete?.(`probes/parts/${v.upload}/${i}`);}catch{}}
- await env.DB.prepare('DELETE FROM probe_uploads WHERE upload=?').bind(v.upload).run();
+ const id=v.upload,objectKey=`probes/intake/${id}-${v.sha256}.json`;
+ const drafts=await Promise.all(bundle.games.map((g,i)=>probeDraft(g,bundle.app,v.sha256,i)));
+ if(encoder.encode(JSON.stringify(drafts)).length>512*1024)return fail('PROBE_QUEUE_LIMIT',413);
+ await env.BUCKET.put(objectKey,all,{httpMetadata:{contentType:'application/json'},customMetadata:{sha256:v.sha256}});
  const days=Math.max(1,Math.min(90,Number(env.LINK_DAYS)||30)),expires=t+days*86400;
- const link=env.LINK_SECRET?`${url.origin}/api/probe/download/${id}?exp=${expires}&sig=${await hmac(env.LINK_SECRET,'probe:'+id+':'+expires)}`:'(LINK_SECRET not set)';
- let issueUrl='';
- if(env.GITHUB_TOKEN){const repo=/^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPO||'')?env.GITHUB_REPO:'ilynthn/MeguLit';const steps=[...new Set(bundle.games.map(g=>g.step))].join(', ');
-  const title=`[适配探针] ${bundle.games.length===1?String(bundle.games[0].title||'未知游戏').slice(0,80):bundle.games.length+' 个游戏'} · ${steps}`.slice(0,200);
-  const headers={authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'megulit-relay','content-type':'application/json'};
-  /* a better probe of a game that has an issue already: a comment there, not a new issue */
-  const old=/^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/issues\/(\d+)$/.exec(String(stored?.issue_url||''));
-  try{if(old){const r=await (env.fetch||fetch)(`https://api.github.com/repos/${old[1]}/issues/${old[2]}/comments`,{method:'POST',headers,body:JSON.stringify({body:`**更完整的探针 / a more complete probe** (${md(stored.state)} ${stored.items|0} → ${md(dd.state)} ${dd.items})\n\n`+probeIssueBody(bundle,link,days)})});if(r.ok){issueUrl=stored.issue_url;
-    /* a newer release still fails on this game: the issue was closed after a fix, so it opens again */
-    if(dd.app&&newerApp(dd.app,stored.app||APP_BEFORE_COLUMN)&&bundle.games.some(g=>g.step!=='ok')){try{await (env.fetch||fetch)(`https://api.github.com/repos/${old[1]}/issues/${old[2]}`,{method:'PATCH',headers,body:JSON.stringify({state:'open'})});}catch{}}}}
-   else{const r=await (env.fetch||fetch)(`https://api.github.com/repos/${repo}/issues`,{method:'POST',headers,body:JSON.stringify({title,body:probeIssueBody(bundle,link,days),labels:['adapter-probe']})});
-    if(r.ok){const d=await r.json().catch(()=>({}));issueUrl=typeof d.html_url==='string'?d.html_url:'';}}}catch{}}
- await env.DB.prepare('INSERT INTO probe_bundles(id,object_key,issue_url,ip_hash,size,sha256,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?)').bind(id,objectKey,issueUrl,ip,total,v.sha256,t,expires).run();
- if(dd){/* one probe per game: the one it replaces goes (row and blob). reporters is not bumped here: the app's has-check
-    (seen=1) already counted this player */
-  if(stored?.bundle_id){const o=await env.DB.prepare('SELECT object_key FROM probe_bundles WHERE id=?').bind(stored.bundle_id).first();if(o){try{await env.BUCKET.delete?.(o.object_key);}catch{}await env.DB.prepare('DELETE FROM probe_bundles WHERE id=?').bind(stored.bundle_id).run();}}
-  await env.DB.prepare("INSERT INTO probe_games(identity,bundle_id,state,items,reporters,vndb,issue_url,first_at,updated_at,app) VALUES(?,?,?,?,1,?,?,?,?,?) ON CONFLICT(identity) DO UPDATE SET bundle_id=excluded.bundle_id,app=CASE WHEN excluded.app<>'' THEN excluded.app ELSE probe_games.app END,state=excluded.state,items=excluded.items,vndb=CASE WHEN excluded.vndb<>'' THEN excluded.vndb ELSE probe_games.vndb END,issue_url=CASE WHEN excluded.issue_url<>'' THEN excluded.issue_url ELSE probe_games.issue_url END,updated_at=excluded.updated_at")
-   .bind(dd.identity,id,dd.state,dd.items,dd.vndb,issueUrl,t,t,dd.app).run();}
- return json({ok:true,id,issueUrl},201);}
+ const writes=[env.DB.prepare(`INSERT INTO probe_bundles(id,object_key,ip_hash,size,sha256,created_at,expires_at)
+   SELECT ?,?,?,?,?,?,? WHERE ?='' OR COALESCE((SELECT bundle_id FROM probe_games WHERE identity=?),'')=?`)
+   .bind(id,objectKey,ip,total,v.sha256,t,expires,dd?.identity||'',dd?.identity||'',stored?.bundle_id||''),
+  enqueueProbeDrafts(env.DB,drafts,id,now)];
+ if(dd)writes.push(env.DB.prepare(`INSERT INTO probe_games(identity,bundle_id,state,items,reporters,vndb,first_at,updated_at,app)
+   SELECT ?,?,?,?,1,?,?,?,? WHERE EXISTS (SELECT 1 FROM probe_bundles WHERE id=?)
+   ON CONFLICT(identity) DO UPDATE SET bundle_id=excluded.bundle_id,state=excluded.state,items=excluded.items,
+     app=CASE WHEN excluded.app<>'' THEN excluded.app ELSE probe_games.app END,
+     vndb=CASE WHEN excluded.vndb<>'' THEN excluded.vndb ELSE probe_games.vndb END,updated_at=excluded.updated_at`)
+   .bind(dd.identity,id,dd.state,dd.items,dd.vndb,t,t,dd.app,id));
+ const disposition=dd&&drafts[0].kind==='probe-skeleton'&&legacyProbeDisposition(env,stored?.issue_url,now,id);
+ if(disposition)writes.push(disposition);
+ try{await env.DB.batch(writes);}catch(error){
+  const committed=await receipt();
+  if(!committed)throw error;
+  if(committed.sha256!==v.sha256||committed.ip_hash!==ip)return fail('CHUNK_MISMATCH',409);
+  return json({ok:true,id,duplicate:true});
+ }
+ if(!await receipt())return fail('PROBE_QUEUE_RETRY',503);
+ await env.DB.prepare('DELETE FROM probe_uploads WHERE upload=?').bind(id).run();
+ for(let i=0;i<v.parts;i++)await env.BUCKET.delete?.(`probes/parts/${id}/${i}`).catch(()=>{});
+ // Keep historical issue-linked evidence available for its disposition.
+ if(stored?.bundle_id){
+  const old=await env.DB.prepare("DELETE FROM probe_bundles WHERE id=? AND issue_url='' RETURNING object_key").bind(stored.bundle_id).first();
+  if(old)await env.BUCKET.delete?.(old.object_key).catch(()=>{});
+ }
+ return json({ok:true,id,queued:true},201);}
 async function probeDownload(url,env,{fail}){const id=url.pathname.split('/').pop()||'',exp=Number(url.searchParams.get('exp')),sig=url.searchParams.get('sig')||'';
  if(!/^[0-9a-f-]{36}$/.test(id)||!Number.isSafeInteger(exp)||!HEX64.test(sig)||!env.LINK_SECRET)return fail('NOT_FOUND',404);
  if(!same(sig,await hmac(env.LINK_SECRET,'probe:'+id+':'+exp)))return fail('NOT_FOUND',404);if(exp<Math.floor(Date.now()/1000))return fail('LINK_EXPIRED',410);
@@ -169,7 +169,7 @@ export async function adaptersRoute(request,env,ip,now,url,path,deps){
  if(path==='/api/adapters/report'&&m==='POST')return await hit(env,'adapt-report',ip,now.getTime())?reportPost(request,env,now,deps):fail('RATE_LIMITED',429);
  /* 2026-11-15 closed-beta full probes (probe-full.js) */
  if(path.startsWith('/api/probe/full/'))return probeFullRoute(request,env,ip,now,url,path,deps);
- if(path==='/api/probe'&&m==='POST')return await hit(env,'probe',ip,now.getTime())?probeChunk(request,env,ip,now,url,deps):fail('RATE_LIMITED',429);
+ if(path==='/api/probe'&&m==='POST')return await hit(env,'probe',ip,now.getTime())?probeChunk(request,env,ip,now,deps):fail('RATE_LIMITED',429);
  /* no rate-limit row here (D1 write budget): the global per-IP limiter covers it */
  if(path==='/api/probe/has'&&m==='GET')return probeHas(env,url,now,deps);
  if(path.startsWith('/api/probe/download/')&&m==='GET')return await hit(env,'diag-dl',ip,now.getTime())?probeDownload(url,env,deps):fail('RATE_LIMITED',429);
