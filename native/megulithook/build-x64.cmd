@@ -25,7 +25,8 @@ rem the changed engine files go to engine32 (copied by hand before; the YU-RIS i
 for %%F in (BGI.cpp BgiDraw.h BgiDrawSig.h Siglus.cpp Yuris.cpp Pal.cpp ToMeIslandDraw.h ToMeIslandFlow.h ToMeTextPos.h MeguLitSg.cpp EuphoriaHD474Draw.h EuphoriaDrawFlow.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engine32\%%F" >nul || exit /b 1
 rem one hook runtime (2026-11-19): the exact-program adapters (ISLAND, STEINS;GATE) are engines our enginecollection32.cpp lists first, euphoria HD sits in Yuris.cpp;
 rem the STEINS;GATE adapter is compiled from native\mages under its own namespaces (MeguLitSg.cpp), upstream engines\mages untouched
-for %%F in (enginecollection32.cpp MeguLitEngines.h MeguLitMatch.h MusicaBasic.h MusicaBasicSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
+for %%F in (enginecollection32.cpp MeguLitEngines.h MeguLitMatch.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
+for %%F in (MusicaBasic.h MusicaBasicSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
 copy /y "%~dp0..\mages\readString.cpp" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engine32\MeguLitSg_readString.inc" >nul || exit /b 1
 copy /y "%~dp0..\mages\mages.cpp" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engine32\MeguLitSg_mages.inc" >nul || exit /b 1
 copy /y "%~dp0..\mages\sgBlank.h" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\mages\sgBlank.h" >nul || exit /b 1
