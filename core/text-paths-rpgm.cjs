@@ -20,7 +20,7 @@
 const RPGM_SCRIPT=String.raw`(function(){
  if(window.__megulitRpgm)return;
  var HOLD=1200,MAXE=64;
- var S={cfg:{roles:false,embed:false,zh:true},emb:Object.create(null),order:[],asked:Object.create(null),asks:[],line:0,ui:0,cur:null,msg:null,wins:{},seq:0,inRuby:false,patched:false,errors:0};
+ var S={cfg:{roles:false,embed:false,zh:true},hide:false,emb:Object.create(null),order:[],asked:Object.create(null),asks:[],line:0,ui:0,cur:null,msg:null,wins:{},seq:0,inRuby:false,patched:false,errors:0};
  function send(o){o.engine='rpgm';try{window.__megulitReport(JSON.stringify(o));}catch(e){}}
  function observe(f){try{f();}catch(e){if(S.errors++<3)send({status:'rpgm observation failed'});}}
  function active(){return S.cfg.roles||S.cfg.embed;}
@@ -45,7 +45,31 @@ const RPGM_SCRIPT=String.raw`(function(){
  function scr(){var d=dpr();return [innerWidth*d,innerHeight*d];}
  function is(w,n){var C=window[n];return typeof C==='function'&&w instanceof C;}
  /* ---- the message: what it draws ---- */
- function newCur(w,old){S.cur={w:w,rects:[],text:'',n:old?old.n:0,lastY:null,k:old?old.k:'',spans:old?old.spans:null,zh:old?old.zh:false,sent:false,emb:old?old.emb:0,line:0,cleared:false,originalText:old?old.originalText:undefined};}
+ function newCur(w,old){S.cur={w:w,bmp:w.contents,hidden:S.hide&&S.cfg.roles&&!S.cfg.embed,ink:[],inkBytes:0,rects:[],text:'',n:old?old.n:0,lastY:null,k:old?old.k:'',spans:old?old.spans:null,zh:old?old.zh:false,sent:false,emb:old?old.emb:0,line:0,cleared:false,originalText:old?old.originalText:undefined};}
+ /* Only glyph operations are withheld. Face blits, icons, backgrounds and other windows keep drawing.
+    Restoring replays the original drawText with its original Bitmap paint settings, without clearing the page. */
+ var paintKeys=['fontFace','fontSize','fontBold','fontItalic','textColor','outlineColor','outlineWidth','paintOpacity'];
+ function paint(b){return paintKeys.map(function(k){return b[k];});}
+ function setPaint(b,p){paintKeys.forEach(function(k,i){b[k]=p[i];});}
+ function restore(c){if(!c||!c.ink.length){if(c)c.hidden=false;return;}
+  if(c.w.contents!==c.bmp)throw Error('RPGM_RESTORE_BITMAP_CHANGED');
+  var b=c.bmp,p=paint(b),ctx=b._context||b.context,alpha=ctx&&ctx.globalAlpha;try{while(c.ink.length){var q=c.ink[0];setPaint(b,q.paint);if(ctx&&typeof q.alpha==='number')ctx.globalAlpha=q.alpha;OD.apply(b,q.args);c.ink.shift();}}finally{setPaint(b,p);if(ctx&&typeof alpha==='number')ctx.globalAlpha=alpha;}
+  c.inkBytes=0;c.hidden=false;
+ }
+ function visible(c,reason){restore(c);if(reason)send({status:reason});}
+ function drawOriginal(b,args){var c=S.cur;
+  if(!c||b!==c.bmp||b!==c.w.contents||!c.hidden||!S.hide||!S.cfg.roles||S.cfg.embed||S.inRuby||c.zh)return OD.apply(b,args);
+  if(c.sent){visible(c,'RPGM_HIDE_PAGE_REDRAW');return OD.apply(b,args);}
+  var ctx=b._context||b.context,text=args[0],n=String(text===undefined?'':text).length;
+  if(!ctx||typeof ctx.fillText!=='function'||typeof ctx.strokeText!=='function'||c.ink.length>=4000||c.inkBytes+n>16000||c.text.length+n>4000){visible(c,'RPGM_HIDE_UNSUPPORTED');return OD.apply(b,args);}
+  var fill=ctx.fillText,stroke=ctx.strokeText,hits=0,q={args:Array.prototype.slice.call(args),paint:paint(b),alpha:ctx.globalAlpha};
+  function withheld(){hits++;}
+  try{ctx.fillText=withheld;ctx.strokeText=withheld;
+   if(ctx.fillText!==withheld||ctx.strokeText!==withheld)throw Error('RPGM_HIDE_CONTEXT_READONLY');
+  }catch(e){ctx.fillText=fill;ctx.strokeText=stroke;visible(c,'RPGM_HIDE_UNSUPPORTED');return OD.apply(b,args);}
+  var result,failed=false;try{result=OD.apply(b,args);}catch(e){failed=true;throw e;}finally{ctx.fillText=fill;ctx.strokeText=stroke;if(hits){c.ink.push(q);c.inkBytes+=n;}if(failed)visible(c,'RPGM_HIDE_DRAW_FAILED');}
+  if(!hits&&n&&/\S/.test(String(text)))visible(c,'RPGM_HIDE_NO_GLYPH_PROOF');return result;
+ }
  function track(bmp,text,x,y,mw,lh,align){
   var c=S.cur,fs=bmp.fontSize,cs=chars(text),tw=bmp.measureTextWidth(text),width=mw||0xffffffff,k=tw>width?width/tw:1,drawn=tw*k,x0=x,prev=0,prefix='',gy=y+((lh||fs)-fs)/2;
   if(align==='center')x0=x+(width-drawn)/2;else if(align==='right')x0=x+width-drawn;
@@ -59,8 +83,8 @@ const RPGM_SCRIPT=String.raw`(function(){
    S.inRuby=true;try{bmp.fontSize=rs;if(typeof ow==='number')bmp.outlineWidth=Math.max(1,Math.round(ow*rs/fs));OD.call(bmp,s[2],x-Math.max(0,(rs*chars(s[2]).length-bw)/2),Math.max(0,gy-rs-1),Math.max(bw,rs*chars(s[2]).length),rs,'center');}catch(e){}
    bmp.fontSize=of;if(typeof ow==='number')bmp.outlineWidth=ow;S.inRuby=false;}
  }
- function publish(c){var s=scr(),rs=c.rects.map(function(r){return rectOut(c.w,r[0],r[1],r[2],r[3]);}),sig=JSON.stringify([s,rs.map(function(r){return r.map(Math.round);})]);
-  if(c.sent&&!c.cleared&&c.sig===sig)return;if(!c.sent)c.line=++S.line;c.sent=true;c.cleared=false;c.sig=sig;send({line:c.line,hidden:false,sw:s[0],sh:s[1],rects:rs,text:c.text,emb:c.emb||0});}
+ function publish(c){var hidden=c.hidden&&c.ink.length>0,s=scr(),rs=c.rects.map(function(r){return rectOut(c.w,r[0],r[1],r[2],r[3]);}),sig=JSON.stringify([hidden,s,rs.map(function(r){return r.map(Math.round);})]);
+  if(c.sent&&!c.cleared&&c.sig===sig)return;if(!c.sent)c.line=++S.line;c.sent=true;c.cleared=false;c.sig=sig;send({line:c.line,hidden:hidden,sw:s[0],sh:s[1],rects:rs,text:c.text,emb:c.emb||0});}
  function flush(w){var c=S.cur;if(!active()||!c||c.sent||c.w!==w||!c.rects.length)return;publish(c);}
  function clearLine(){var c=S.cur;if(!c||!c.sent||c.cleared)return;var s=scr();send({line:c.line,hidden:false,sw:s[0],sh:s[1],rects:[],text:''});c.cleared=true;}
  function rendered(node){if(node.renderable!==false)return true;return !isMZ()&&window.PIXI&&/^v?2[.]/.test(String(PIXI.VERSION||''))&&typeof PIXI.DisplayObjectContainer==='function'&&node instanceof PIXI.DisplayObjectContainer;}
@@ -95,7 +119,9 @@ const RPGM_SCRIPT=String.raw`(function(){
   if(!required.every(function(f){return typeof f==='function';}))return false;
   S.patched=true;var WM=Window_Message.prototype,WB=Window_Base.prototype;
   OD=Bitmap.prototype.drawText;
-  Bitmap.prototype.drawText=function(text,x,y,maxWidth,lineHeight,align){var r=OD.apply(this,arguments),self=this;observe(function(){var c=S.cur;if(text!==undefined&&active()&&c&&!S.inRuby&&!c.zh&&!c.sent&&c.w&&self===c.w.contents)track(self,String(text),x,y,maxWidth,lineHeight,align);});return r;};
+  var oClear=Bitmap.prototype.clear;if(oClear)Bitmap.prototype.clear=function(){var r=oClear.apply(this,arguments),c=S.cur;if(c&&c.bmp===this){c.ink=[];c.inkBytes=0;c.hidden=false;}return r;};
+  var oCR=Bitmap.prototype.clearRect;if(oCR)Bitmap.prototype.clearRect=function(){if(S.cur&&S.cur.bmp===this)restore(S.cur);return oCR.apply(this,arguments);};
+  Bitmap.prototype.drawText=function(text,x,y,maxWidth,lineHeight,align){var r=drawOriginal(this,arguments),self=this,c=S.cur;try{if(text!==undefined&&active()&&c&&!S.inRuby&&!c.zh&&!c.sent&&c.w&&self===c.w.contents)track(self,String(text),x,y,maxWidth,lineHeight,align);}catch(e){visible(c,'RPGM_HIDE_TRACK_FAILED');}return r;};
   var oSM=WM.startMessage;WM.startMessage=function(){if(!active())return oSM.apply(this,arguments);var self=this;observe(function(){releaseEmbed();clearLine();S.cur=null;self._mgFs=0;self._mgZh=0;self._mgHold=0;});var r=oSM.apply(this,arguments);
    observe(function(){S.msg=self;newCur(self);self._mgBase=self.contents&&self.contents.fontSize;var ts=self._textState,k=plain(ts&&ts.text);S.cur.k=k;
     if(S.cfg.embed&&k){if(S.emb[k])applyEmbed(self);else{ask(k);self._mgHold=performance.now()+HOLD;}}});
@@ -139,7 +165,8 @@ const RPGM_SCRIPT=String.raw`(function(){
   for(var k in S.wins)if(!seen[k]){send({ui:true,line:++S.ui,hidden:false,sw:s[0],sh:s[1],role:S.wins[k].role,id:'W'+k+':',box:[0,0,0,0],rects:[],text:''});delete S.wins[k];}
  }
  window.__megulitRpgm={
-  config:function(c){c=c||{};var next={roles:c.roles===true,embed:c.embed===true,zh:c.zh!==false};observe(function(){if(!next.embed)releaseEmbed();if(!next.roles)clearUi();if(!next.roles&&!next.embed){clearLine();S.cur=null;S.msg=null;if(t){clearInterval(t);t=0;}}});S.cfg=next;if(active())startInstaller();return S.cfg;},
+  config:function(c){c=c||{};var next={roles:c.roles===true,embed:c.embed===true,zh:c.zh!==false};if(!next.roles||next.embed)restore(S.cur);observe(function(){if(!next.embed)releaseEmbed();if(!next.roles)clearUi();if(!next.roles&&!next.embed){clearLine();S.cur=null;S.msg=null;if(t){clearInterval(t);t=0;}}});S.cfg=next;if(active())startInstaller();return S.cfg;},
+  hide:function(on){on=on===true;if(!on)restore(S.cur);S.hide=on;if(S.cur&&S.cur.sent)publish(S.cur);return {requested:on,hidden:!!(S.cur&&S.cur.hidden&&S.cur.ink.length)};},
   embed:function(k,e){k=String(k||'');if(!k||k.length>4000)return;var n=chars(k).length,end=0,spans=[];
    (Array.isArray(e&&e.ruby)?e.ruby:[]).slice(0,64).forEach(function(s){if(!Array.isArray(s)||!Number.isInteger(s[0])||!Number.isInteger(s[1])||s[0]<end||s[1]<=s[0]||s[1]>n||typeof s[2]!=='string'||!s[2]||chars(s[2]).length>160||/[\x00-\x1f\x7f]/.test(s[2]))return;spans.push([s[0],s[1],s[2]]);end=s[1];});
    if(!S.emb[k])S.order.push(k);S.emb[k]={ruby:spans,zh:String(e&&e.zh||'').slice(0,4000).replace(/[\x00-\x09\x0b-\x1e\x7f]/g,'')};while(S.order.length>MAXE)delete S.emb[S.order.shift()];},
