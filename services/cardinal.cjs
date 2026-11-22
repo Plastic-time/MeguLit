@@ -10,6 +10,7 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const Tape=require('../core/cardinal/tape.cjs'),Score=require('../core/cardinal/score.cjs'),{fromTape}=require('../core/cardinal/timeline.cjs');
 const Profiles=require('../core/profiles/index.cjs');
+const Identity=require('./cardinal/identity.cjs');
 const KEY=/^[0-9a-f]{64}$/;
 const MIN_LINES=10;
 const dir=root=>path.join(root,'data','The Seed','cardinal');
@@ -47,6 +48,7 @@ function kick(reader,why,{now=Date.now(),replay=null,fetcher=undefined,manual=fa
  if(why!=='session-end'&&now-(lastRun.get(key)||0)<rules.minIntervalMin*60000)return {state:'skipped',why:'ran lately'};
  const snap=Tape.snapshot(rules.lines);if(snap.lines<MIN_LINES)return {state:'skipped',why:'too few lines ('+snap.lines+')'};
  const job={root,key,why,rules,pairing:snap.pairing,rows:snap.rows,lines:snap.lines,game:gameOf(reader,key),...sourceOf(s,profile),reader,replay,fetcher,manual,trace:line=>trace(reader,line)};
+ try{job.identity=Identity.capture({root,game:job.game,profile,source:job.source,seedRev:job.seedRev,context:s?.input});}catch(error){const code=Identity.reasonCode(error);trace(reader,'cardinal deferred key='+key.slice(0,8)+' '+code);return {state:'deferred',why:'session identity unavailable',code};}
  if(running){const at=pending.findIndex(x=>x.root===root&&x.key===key);
   if(at>=0){pending[at]=job;lastRun.set(key,now);return {state:'queued',replaced:true};}
   if(pending.length>=QUEUE_MAX){trace(reader,'cardinal queue full key='+key.slice(0,8)+' deferred: retry on next kick');return {state:'deferred',why:'queue full'};}
@@ -60,9 +62,18 @@ async function go(job){const {root,key,rules,reader}=job;const started=Date.now(
  trace(reader,'cardinal replay key='+key.slice(0,8)+' why='+job.why+' lines='+job.lines);
  const steps=fromTape(job.rows,job.game);
  const scenario={game:job.game,steps,maxGap:rules.maxGapMs,sampleEvery:rules.sampleMs,models:false,tailMs:1200,attachSettleMs:2000};
- const o=await require('./cardinal/automatic.cjs').automatic(job,scenario,{data:path.join(root,'data'),work:path.join(os.tmpdir(),'megulit-cardinal'),low:true,timeoutMs:15*60000,name:'cardinal'});
+ const data=path.join(root,'data'),defer=(code='CARDINAL_IDENTITY_CHANGED')=>({deferred:true,errors:[code],samples:[],processClosed:true});
+ const boundReplay=async(sc,options)=>{
+  try{job.proof=await Identity.prepare(job.identity,{data,game:job.game,signal:options.signal});}
+  catch(error){return options.signal?.aborted?{interrupted:true,processClosed:true}:defer(Identity.reasonCode(error));}
+  const output=await (job.replay||require('./cardinal/run.cjs').replay)({...sc,sessionIdentity:job.proof},options);
+  if(!output.cleanupFailure&&output.processClosed!==false&&!output.deferred&&!output.interrupted){try{await Identity.verify(job.proof,{data,game:job.game,signal:options.signal});}catch(error){return options.signal?.aborted?{interrupted:true,processClosed:true}:defer(Identity.reasonCode(error));}}
+  return output;
+ };
+ const o=await require('./cardinal/automatic.cjs').automatic({...job,replay:boundReplay},scenario,{data,work:path.join(os.tmpdir(),'megulit-cardinal'),low:true,timeoutMs:15*60000,name:'cardinal'});
  if(o.cleanupFailure||o.processClosed===false){const failure=o.cleanupFailure||{reason:'driver-tree-stop-unconfirmed'};block(job,failure);return {cleanupFailure:failure};}
  if(o.deferred){lastRun.delete(key);trace(reader,'cardinal deferred key='+key.slice(0,8)+' '+(o.errors||[]).join('; '));return o;}
+ try{Identity.unchanged(job.proof,{data,game:job.game});}catch{lastRun.delete(key);trace(reader,'cardinal deferred key='+key.slice(0,8)+' session identity changed before score');return defer();}
  const errors=(o.errors||[]).slice(0,4);if(!(o.samples||[]).length&&!errors.length)errors.push('replay produced no DOM samples');
  if(errors.length&&!(o.samples||[]).length){trace(reader,'cardinal failed key='+key.slice(0,8)+' '+String(errors[0]).slice(0,200));save(root,key,{...(load(root,key)||{}),failed:{at:new Date().toISOString(),why:job.why,errors}});return null;}
  const result=Score.score({name:'session',steps,o,livePairing:job.pairing},rules);
@@ -70,7 +81,8 @@ async function go(job){const {root,key,rules,reader}=job;const started=Date.now(
  const rec=Score.record({key,seedRev:job.seedRev,source:job.source,app:appVersion(root),result,cardinalRev:rules.rev});
  /* Errors, a missing measured delivery clock, or excessive replay lag cannot supply a reliable relay vote. */
  const lag=o.lag||null,unreliable=!timing.reliable||!result.detail.pairObservation.reliable||o.models===true||!result.detail.leakObservation.observed||!result.detail.timeline.reliable||!result.detail.choiceObservation.reliable||errors.length>0;
- const doc={record:rec,why:job.why,applies:result.applies,below:result.below,detail:result.detail,ms:Date.now()-started,lag,unreliable,errors,sent:false};
+ const identity={schema:1,digest:job.proof.digest,candidate:job.proof.candidate,configHash:job.proof.config?.digest,scripts:(job.proof.scripts||[]).map(({path,sha256})=>({path,sha256}))};
+ const doc={record:rec,why:job.why,identity,applies:result.applies,below:result.below,detail:result.detail,ms:Date.now()-started,lag,unreliable,errors,sent:false};
  try{save(root,key,doc);}catch(error){doc.persistenceError=String(error?.message||error);doc.unreliable=true;trace(reader,'cardinal not uploaded: local score persistence failed key='+key.slice(0,8)+' '+doc.persistenceError);return doc;}
  trace(reader,'cardinal scored key='+key.slice(0,8)+' total='+rec.total+' lines='+rec.lines+' source='+rec.source+' seedRev='+(rec.seedRev||'-')+' '+Score.KEYS.map(k=>k+'='+rec.scores[k]).join(' ')+(lag?' lagP95='+lag.stepP95:'')+(unreliable?(!timing.reliable?' unreliable (timing: '+timing.why+'): not uploaded':!result.detail.pairObservation.reliable?' unreliable (translation display unobserved): not uploaded':o.models===true?' unreliable (modeled visibility): not uploaded':!result.detail.leakObservation.observed?' unreliable (original visibility unobserved): not uploaded':!result.detail.choiceObservation.reliable?' unreliable (unobserved option state): not uploaded':!result.detail.timeline.reliable?' unreliable (missing delivery clock): not uploaded':errors.length?' unreliable (replay errors): not uploaded':' unreliable (busy PC): not uploaded'):''));
  if(unreliable||!require('../core/cardinal/upload.cjs').eligible(doc))return doc;

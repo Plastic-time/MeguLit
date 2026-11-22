@@ -2,6 +2,7 @@
 'use strict';
 process.env.MEGULIT_RELAY_BASE='https://relay.test';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+require('./helpers/cardinal-identity.cjs')(test);
 const S=require('../core/cardinal/score.cjs'),C=require('../core/cardinal/checks.cjs'),D=require('../core/profiles/defaults.cjs');
 const Tape=require('../core/cardinal/tape.cjs'),Jobs=require('../services/cardinal.cjs'),Live=require('../services/self-check-live.cjs'),Profiles=require('../core/profiles/index.cjs');
 const fixture=require('./fixtures/cardinal/fata-live-visibility-20261121.json'),SHA='b'.repeat(64);

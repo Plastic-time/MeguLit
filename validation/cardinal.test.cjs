@@ -8,6 +8,7 @@
 /* never the real relay from a test, whatever a test forgets */
 process.env.MEGULIT_RELAY_BASE='https://relay.test';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+require('./helpers/cardinal-identity.cjs')(test);
 const C=require('../core/cardinal/checks.cjs'),S=require('../core/cardinal/score.cjs'),Tape=require('../core/cardinal/tape.cjs'),L=require('../core/cardinal/timeline.cjs');
 const D=require('../core/profiles/defaults.cjs'),domains=require('../core/profiles/domains.cjs'),Profiles=require('../core/profiles/index.cjs');
 const tmp=()=>fs.mkdtempSync(path.join(process.env.MEGULIT_TMP||os.tmpdir(),'cardinal-'));
