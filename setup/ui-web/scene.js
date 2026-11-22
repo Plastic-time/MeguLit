@@ -29,6 +29,7 @@
       downT: (p) => '「' + p + '」进货中', downP: (src) => '现在走的是 ' + src + '。底下那条细线，每一格都是一段真实在下的数据。',
       retryNote: '有一条线卡住了，已经自动换线重试。',
       verifyT: '验货', verifyP: (p) => '在核对「' + p + '」是不是原版，几秒钟的事。',
+      prepareT: '正在准备安装…',
       unpackT: '拆箱上架', unpackP: (p, d) => '把「' + p + '」解压到 ' + d + '。',
       doneT: '安装完成', doneEn: 'INSTALLED', launch: '开读',
       probing: '测速中', eta: (s) => s < 60 ? '还要 ' + Math.ceil(s) + ' 秒左右' : '还要 ' + Math.floor(s / 60) + ' 分 ' + Math.round(s % 60) + ' 秒左右', srcMore: (h, n) => h + ' 等 ' + n + ' 条线',
@@ -51,6 +52,7 @@
       downT: (p) => 'Downloading ' + p, downP: (src) => 'Pulling from ' + src + '. Each tick in the thin line below is one real piece of the download.',
       retryNote: 'One route stalled, so it switched and is trying again.',
       verifyT: 'Checking the files', verifyP: (p) => 'Making sure ' + p + ' is the original. Takes a few seconds.',
+      prepareT: 'Preparing installation…',
       unpackT: 'Installing', unpackP: (p, d) => 'Unpacking ' + p + ' into ' + d + '.',
       doneT: 'Installed', doneEn: 'Ready when you are', launch: 'Open MeguLit',
       probing: 'testing', eta: (s) => s < 60 ? 'about ' + Math.ceil(s) + ' s left' : 'about ' + Math.floor(s / 60) + ' min ' + Math.round(s % 60) + ' s left', srcMore: (h, n) => h + ' and ' + (n - 1) + ' more',
@@ -175,7 +177,7 @@
 
   /* ---------- camera ---------- */
   const cam = { cx: -420, cy: -150, cz: 800, rx: 6, ry: -12, rz: 0 };
-  let section = 'welcome', moving = false, last = { t: 0, phase: 'probe' };
+  let section = 'welcome', moving = false, last = { t: 0, phase: 'idle' };
   const orbit = (az, el, R) => { const a = az * Math.PI / 180, e = el * Math.PI / 180; return { cx: A.x + R * Math.sin(a) * Math.cos(e), cy: A.y - R * Math.sin(e), cz: A.z + R * Math.cos(a) * Math.cos(e), rx: el, ry: -az, rz: 0 }; };
   const toSph = (p) => { const dx = p.cx - A.x, dy = A.y - p.cy, dz = p.cz - A.z, R = Math.hypot(dx, dy, dz); return { az: Math.atan2(dx, dz) * 180 / Math.PI, el: Math.asin(dy / R) * 180 / Math.PI, R }; };
   const key = (ks, p) => { for (let i = 1; i < ks.length; i++) if (p <= ks[i][0]) { const [p0, v0] = ks[i - 1], [p1, v1] = ks[i]; return lerp(v0, v1, smooth(clamp((p - p0) / (p1 - p0)))); } return ks[ks.length - 1][1]; };
@@ -212,7 +214,22 @@
   const STEPN = new Proxy({}, { get: (_, k) => tr('step_' + k) });
   function setSteps() { const k = ORDER.indexOf(section); document.querySelectorAll('#steps i').forEach((el, i) => el.classList.toggle('on', i < Math.min(4, k + 1) || section === 'done')); $('#stepname').textContent = STEPN[section]; }
 
+  const statusOnly = document.documentElement.classList.contains('status-only');
   function goTo(name, move, fromName) {
+    if (statusOnly) {
+      if (name === 'field') {
+        $('#hud').classList.add('waiting');
+        $('#phaseWait').hidden = false;
+        $('#whatT').textContent = tr('prepareT');
+      }
+      for (const layer of new Set(Object.values(UI).flat())) {
+        const visible = UI[name].includes(layer);
+        gsap.set(layer, { visibility: visible ? 'visible' : 'hidden', opacity: visible ? 1 : 0 });
+      }
+      section = name;
+      setSteps();
+      return;
+    }
     const tl = gsap.timeline(), m = MOVES[move] || MOVES.push, o = { p: 0 }; let A0 = null;
     const from = fromName || section; const outs = UI[from] || [], ins = UI[name] || [];
     tl.call(() => { A0 = { ...cam }; section = name; moving = true; setSteps(); if (name !== 'done') revealAt = 1e9; });
@@ -279,12 +296,15 @@
     { const pp = s.phase === 'unpack' || s.phase === 'done' ? 1 : (s.total ? clamp(s.got / s.total) : 0), pr = progCircle && progCircle.querySelector('.prog'); if (pr && cache && cache.pp !== Math.round(pp * 200)) { cache.pp = Math.round(pp * 200); pr.setAttribute('stroke-dashoffset', (471 * (1 - pp)).toFixed(1)); }
       if (bandEl) bandEl.style.backgroundPosition = '0 ' + ((REDUCE ? 0 : (s.t || 0) * 160) % 120).toFixed(0) + 'px'; }
     if (window.GL && GL.ok) { GL.update(lastFrames, { s, t, reveal: lastReveal, prog: s.phase === 'unpack' || s.phase === 'done' ? 1 : (s.total ? clamp(s.got / s.total) : 0) }); GL.draw(); }
+    const waiting = statusOnly && (s.phase !== 'download' || s.total <= 0);
+    $('#hud').classList.toggle('waiting', waiting);
+    $('#phaseWait').hidden = !waiting;
     const pct = s.total ? Math.floor(100 * s.got / s.total) : 0;
     $('#pct').textContent = pct; $('#got').textContent = MB(s.got || 0); $('#total').textContent = MB(s.total || 0);
     $('#speed').textContent = s.phase === 'download' || s.phase === 'probe' ? (s.speed > 0 ? (s.speed / 1048576).toFixed(1) + ' MB/s' : tr('probing')) : '';
     $('#eta').textContent = s.eta > 0 ? tr("eta", s.eta) : '';
     const pk = (I18N[LANG].packs[s.pack] || s.pack || ''), srcTxt = s.srcN > 1 ? tr('srcMore', s.src, s.srcN) : (s.src || ''), anyRetry = s.st && Array.prototype.indexOf.call(s.st, 3) >= 0;
-    const W = { probe: [tr('probeT'), tr('probeP')], download: [tr('downT', pk), tr('downP', '<span class="src">' + srcTxt + '</span>') + (anyRetry ? ' ' + tr('retryNote') : '')], verify: [tr('verifyT'), tr('verifyP', pk)], unpack: [tr('unpackT'), tr('unpackP', pk, s.dir || '')], done: [tr('doneT'), ''] }[s.phase] || ['', ''];
+    const W = { probe: [tr('probeT'), tr('probeP')], download: [tr('downT', pk), tr('downP', '<span class="src">' + srcTxt + '</span>') + (anyRetry ? ' ' + tr('retryNote') : '')], verify: [tr('verifyT'), tr('verifyP', pk)], prepare: [LANG === 'en' ? 'Preparing installation?' : '正在准备安装…', ''], unpack: [tr('unpackT'), tr('unpackP', pk, s.dir || '')], done: [tr('doneT'), ''] }[s.phase] || ['', ''];
     $('#whatT').textContent = W[0]; $('#whatP').innerHTML = W[1];
     if (s.err && !showErr) showError(s.err); else if (!s.err && showErr) hideError();
   }
@@ -307,7 +327,7 @@
   if (Q.get('desk') === '1') document.documentElement.classList.add('deskmode');
   let quitOpen = false;
   Scene.showQuit = (on) => { quitOpen = on; const el = $('#ui-quit'); if (on) { gsap.set(el, { visibility: 'visible' }); gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.2, overwrite: true }); $('#stay').focus(); } else gsap.to(el, { opacity: 0, duration: 0.18, overwrite: true, onComplete() { el.style.visibility = 'hidden'; } }); };
-  $('#btnClose').addEventListener('click', () => { if (last.phase === 'download' || last.phase === 'probe' || last.phase === 'unpack') Scene.showQuit(true); else act('close'); });
+  $('#btnClose').addEventListener('click', () => { if (last.phase === 'download' || last.phase === 'probe' || last.phase === 'verify' || last.phase === 'prepare' || last.phase === 'unpack') Scene.showQuit(true); else act('close'); });
   $('#stay').addEventListener('click', () => Scene.showQuit(false)); $('#leave').addEventListener('click', () => act('close')); $('#btnMin').addEventListener('click', () => act('minimize'));
   $('#drag').addEventListener('mousedown', (e) => { if (e.button === 0) act('dragstart'); });
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (quitOpen) Scene.showQuit(false); else $('#btnClose').click(); } });

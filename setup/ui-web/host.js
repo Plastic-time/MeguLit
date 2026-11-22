@@ -28,7 +28,8 @@
   const clock = () => performance.now() / 1000;
   async function check(p) { const c = await api('checkpath', { path: p }); Scene.setFree(c.free || 0, c.need || (info && info.need) || 0, c.state === 'protected' ? 'protected' : c.state === 'readonly' ? 'readonly' : 'ok'); return c; }
   /* in-page folder picker (the native window only): disks with free space, usual places, recent choices, one level of folders, new folder, and the modern Explorer dialog as a side door */
-  const EN = new URLSearchParams(location.search).get('lang') === 'en', L = (zh, en) => (EN ? en : zh);
+  const params = new URLSearchParams(location.search), statusOnly = params.get('status') === '1';
+  const EN = params.get('lang') === 'en', L = (zh, en) => (EN ? en : zh);
   const pk = document.getElementById('picker'), pkSide = document.getElementById('pkSide'), pkMain = document.getElementById('pkMain'), pkCrumb = document.getElementById('pkCrumb'), pkMsg = document.getElementById('pkMsg'), pkNew = document.getElementById('pkNew');
   let pkCur = '';
   const gb = (b) => (b / 1073741824 >= 100 ? Math.round(b / 1073741824) : (b / 1073741824).toFixed(1)) + ' GB';
@@ -71,14 +72,14 @@
   function goTo(name, move) { if (section === name) return; Scene.goTo(name, move, section); section = name; }
   /* the engine's JSON becomes a scene snapshot */
   function snapshot() {
-    let s = state; if (!s || !s.n) return null; if (!st || st.length !== s.n) { N = s.n; st = new Int8Array(N); fr = new Float32Array(N); doneAt = new Float32Array(N); }
+    let s = state; if (!s || (!statusOnly && !s.n)) return null; if (!st || st.length !== s.n) { N = s.n; st = new Int8Array(N); fr = new Float32Array(N); doneAt = new Float32Array(N); }
     const t = clock(); for (let i = 0; i < N; i++) { const v = +s.st[i] || 0; if (v === 2 && st[i] !== 2) doneAt[i] = t; st[i] = v; fr[i] = (s.fr[i] || 0) / 100; }
     /* the engine reports 0 / no source for a moment while it re-ranks sources: hold the last real values for 2.5 s so the text does not flicker */
     const tn = clock(); if (s.speed > 0) { held.speed = s.speed; held.t = tn; } if (s.src) { held.src = s.src; held.srcN = s.srcN; held.ts = tn; }
     if (!(s.speed > 0) && s.phase === 'download' && tn - held.t < 2.5) s = Object.assign({}, s, { speed: held.speed });
     if (!s.src && s.phase === 'download' && tn - held.ts < 2.5) s = Object.assign({}, s, { src: held.src, srcN: held.srcN });
     const speed = s.speed || 0, total = s.total || 0, got = s.got || 0;
-    let phase = s.phase === 'download' || s.phase === 'probe' ? (s.got > 0 || s.phase === 'download' ? 'download' : 'probe') : s.phase === 'downloaded' ? 'download' : s.phase === 'unpack' ? 'unpack' : s.phase === 'done' ? 'done' : 'probe';
+    let phase = s.phase === 'download' || s.phase === 'probe' ? (s.phase === 'download' || (!statusOnly && s.got > 0) ? 'download' : 'probe') : s.phase === 'downloaded' ? (statusOnly ? 'prepare' : 'download') : s.phase === 'verify' ? 'verify' : s.phase === 'unpack' ? 'unpack' : s.phase === 'done' ? 'done' : s.phase === 'idle' ? 'idle' : 'probe';
     const out = { t: t, st, fr, doneAt, got, total, speed, eta: speed > 0 ? (total - got) / speed : 0, pack: s.pack || '', src: s.src || '', srcN: s.srcN || 0, dir: s.dir || '', phase, unpack: s.unpack || 0 };
     if (s.phase === 'failed') { out.err = { kind: s.kind || 'download' }; }
     return out;
@@ -95,6 +96,10 @@
   (async () => {
     info = await (await fetch('/api/info')).json(); pathEl.value = info.defaultTarget; Scene.setDrives(info.drives || []); await check(info.defaultTarget);
     poll(); requestAnimationFrame(frame);
-    setTimeout(() => { if (section === 'welcome') goTo('loc', 'skim'); }, 2200);
+    if (statusOnly) {
+      goTo('loc', 'skim');
+      document.getElementById('boot').remove();
+      post('ready');
+    } else setTimeout(() => { if (section === 'welcome') goTo('loc', 'skim'); }, 2200);
   })();
 })();

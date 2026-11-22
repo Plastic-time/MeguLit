@@ -61,6 +61,33 @@ Check 'cancel closes without install or process launch' { Web-Act @{ type = 'clo
 Remove-Item Function:\New-Object
 Load-Function 'tools\installer-owner-test\launch-installer-test.ps1' @('New-OwnerTestEnvironment','Assert-OwnerPayloadFiles')
 Load-Function 'setup\setup-runtime.ps1' @('Need-Bytes')
+Check 'a second session ignores archived profile state and validates its own profile' {
+  $first = (New-OwnerTestEnvironment $Work 'first').USERPROFILE
+  $second = (New-OwnerTestEnvironment $Work 'second').USERPROFILE
+  [void][IO.Directory]::CreateDirectory($first)
+  [void][IO.Directory]::CreateDirectory($second)
+  $saved = $env:USERPROFILE
+  $oldLink = Join-Path $first 'Content.IE5'
+  $activeLink = Join-Path $second 'unexpected-link'
+  $outsideProfile = Join-Path $Work 'profile\unexpected-link'
+  $destination = Join-Path $Work 'link-destination'
+  try {
+    $env:USERPROFILE = $first; Initialize-SetupTestScope $sourceRoot
+    New-Item -ItemType Junction -Path $oldLink -Target $destination | Out-Null
+    $env:USERPROFILE = $second; Initialize-SetupTestScope $sourceRoot
+    Reject { Assert-SetupPath (Join-Path $oldLink 'child') 'profile' } 'REPARSE'
+    New-Item -ItemType Junction -Path $activeLink -Target $destination | Out-Null
+    Reject { Initialize-SetupTestScope $sourceRoot } 'REPARSE'
+    [IO.Directory]::Delete($activeLink)
+    New-Item -ItemType Junction -Path $outsideProfile -Target $destination | Out-Null
+    Reject { Initialize-SetupTestScope $sourceRoot } 'REPARSE'
+  } finally {
+    foreach ($link in $oldLink,$activeLink,$outsideProfile) {
+      if ([IO.Directory]::Exists($link)) { [IO.Directory]::Delete($link) }
+    }
+    $env:USERPROFILE = $saved; Initialize-SetupTestScope $sourceRoot
+  }
+}
 Check 'scoped installation reserves headroom without changing unscoped need' {
   function Missing($dir) { @() }; function Sum($ids, $field) { 0 }; function Drive-Of($path) { 'H:' }; function Stage-Bytes { 0 }
   $appSize = 0; $want = @(); $stageDir = Join-Path $Work 'staging'

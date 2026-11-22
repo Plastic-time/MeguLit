@@ -27,18 +27,59 @@ $script:procStart = try { [Diagnostics.Process]::GetCurrentProcess().StartTime }
 # Real start-up stages for the exe's loading screen (bar + one status line): "<0..1>|<text>" in <flag>.stage, read by the exe every 100 ms.
 $script:splashStages = @{ 'script-start' = @(0.22, '正在启动安装程序…'); 'winforms-loaded' = @(0.30, '正在启动安装程序…'); 'webview2-env-started' = @(0.38, '正在准备界面引擎…'); 'compiled' = @(0.48, '正在准备界面引擎…'); 'logic-built' = @(0.56, '正在载入安装逻辑…'); 'web-layer-start' = @(0.62, '正在载入界面…'); 'skin-window-shown' = @(0.72, '正在载入界面…'); 'page-poster' = @(0.86, '正在载入画面…'); 'page-frame1' = @(0.96, '马上就好') }
 function Set-SplashStage([string]$step) { if ($env:MEGULIT_SPLASH_FLAG -and $script:splashStages.ContainsKey($step)) { try { $s = $script:splashStages[$step]; [IO.File]::WriteAllText($env:MEGULIT_SPLASH_FLAG + '.stage', ([string]$s[0] + '|' + $s[1])) } catch {} } }
-function Boot-Mark([string]$step) { try { $n = [DateTime]::Now; [IO.Directory]::CreateDirectory((Split-Path $script:bootLog)) | Out-Null; [IO.File]::AppendAllText($script:bootLog, (Get-Date -Format 's') + ' boot step=' + $step + ' since_proc=' + [int]($n - $script:procStart).TotalMilliseconds + ' at=' + [DateTimeOffset]::Now.ToUnixTimeMilliseconds() + "`r`n") } catch {} ; Set-SplashStage $step }
+function Boot-Mark([string]$step) { try { $n = [DateTime]::Now; [IO.Directory]::CreateDirectory((Split-Path $script:bootLog)) | Out-Null; [IO.File]::AppendAllText($script:bootLog, (Get-Date -Format 's') + ' boot step=' + $step + ' since_proc=' + [int]($n - $script:procStart).TotalMilliseconds + ' at=' + [DateTimeOffset]::Now.ToUnixTimeMilliseconds() + "`r`n") } catch {} ; Set-SplashStage $step; Show-SetupBootStatus $step }
+function Show-SetupBootStatus([string]$step) {
+  if (-not $script:bootStatus) { return }
+  $message = switch ($step) {
+    'compile-1-start' { '正在准备运行组件…' }
+    'logic-built' { '正在初始化安装控件…' }
+    'web-layer-start' { '正在启动安装界面…' }
+    'skin-window-shown' { '正在连接安装界面…' }
+  }
+  if ($message) { $script:bootStatus.Text = $message; $script:splash.Refresh() }
+  Test-SetupBootCancellation
+}
+function Test-SetupBootCancellation {
+  if (-not $script:bootStatus) { return }
+  [Windows.Forms.Application]::DoEvents()
+  if ($script:startupCancelled) { $script:bootStatus = $null; Boot-Mark 'startup-cancelled'; exit 1 }
+}
 Boot-Mark 'script-start'
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+[Windows.Forms.Application]::EnableVisualStyles()
 Boot-Mark 'winforms-loaded'
 # Splash: the first frame of the installer's opening clip, on screen before any C# is compiled (each Add-Type -TypeDefinition starts csc.exe,
 # seconds on a busy machine). The real window replaces it (setup-web.ps1 / the classic window's Shown). Only where the web skin is wanted.
 $script:splash = $null; $script:wv2EnvTask = $null
+$script:statusOnly = [bool]$script:setupTestScope
+if ($script:statusOnly) {
+  $script:splash = New-Object Windows.Forms.Form
+  $script:splash.Text = 'MeguLit 安装'
+  $script:splash.ClientSize = New-Object Drawing.Size(400, 126)
+  $script:splash.StartPosition = 'CenterScreen'
+  $script:splash.FormBorderStyle = 'FixedDialog'
+  $script:splash.ControlBox = $false
+  $script:bootStatus = New-Object Windows.Forms.Label
+  $script:bootStatus.Text = '正在检查组件清单…'
+  $script:bootStatus.SetBounds(20, 18, 360, 28)
+  $bootProgress = New-Object Windows.Forms.ProgressBar
+  $bootProgress.Style = 'Marquee'
+  $bootProgress.SetBounds(20, 58, 360, 14)
+  $bootCancel = New-Object Windows.Forms.Button
+  $bootCancel.Text = '取消'
+  $bootCancel.SetBounds(300, 84, 80, 28)
+  $bootCancel.add_Click({ $script:startupCancelled = $true })
+  $script:splash.CancelButton = $bootCancel
+  $script:splash.Controls.AddRange([Windows.Forms.Control[]]@($script:bootStatus, $bootProgress, $bootCancel))
+  $script:splash.Show()
+  $script:splash.Refresh()
+  Boot-Mark 'startup-status-shown'
+}
 if ($env:MEGULIT_SETUP_WEB -ne '0' -and (-not $env:MEGULIT_SETUP_TEST -or $env:MEGULIT_SETUP_WEB -eq '1') -and -not $env:MEGULIT_SETUP_PREVIEW -and -not $env:MEGULIT_SETUP_THEME -and -not $env:MEGULIT_SETUP_WEB_TEST -and -not $env:MEGULIT_NATIVE_SPLASH) {   # with the exe's animated native splash there is no PowerShell startup form at all (it cost ~1.4 s of Forms/GDI+ start-up and showed a still picture)
-  try { $bsPath = Join-Path $Root 'setup\ui-web\video\light\intro.jpg'
+  if (-not $script:statusOnly) { try { $bsPath = Join-Path $Root 'setup\ui-web\video\light\intro.jpg'
     if (Test-Path $bsPath) { $bsForm = New-Object Windows.Forms.Form; $bsForm.FormBorderStyle = 'None'; $bsForm.StartPosition = 'CenterScreen'; $bsForm.ShowInTaskbar = $false; $bsForm.Text = 'MeguLit'; $bsForm.ClientSize = New-Object Drawing.Size(913, 584); $bsForm.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
       $bsPic = New-Object Windows.Forms.PictureBox; $bsPic.Dock = 'Fill'; $bsPic.SizeMode = 'StretchImage'; $bsPic.Image = [Drawing.Image]::FromStream((New-Object IO.MemoryStream (,[IO.File]::ReadAllBytes($bsPath)))); $bsForm.Controls.Add($bsPic)
-      $bsForm.Show(); $bsForm.Refresh(); $script:splash = $bsForm; Boot-Mark 'splash-shown' } } catch { Boot-Mark ('splash-failed ' + ($_ -replace '\s+', ' ')) }
+      $bsForm.Show(); $bsForm.Refresh(); $script:splash = $bsForm; Boot-Mark 'splash-shown' } } catch { Boot-Mark ('splash-failed ' + ($_ -replace '\s+', ' ')) } }
   # WebView2 warms up while the rest of the setup is built: its browser process starts now, not when the skin window is created.
   try { $bsWv = Join-Path $Root 'setup\webview2'; if (Test-Path (Join-Path $bsWv 'Microsoft.Web.WebView2.Core.dll')) { Add-Type -Path (Join-Path $bsWv 'Microsoft.Web.WebView2.Core.dll'); $env:PATH = (Join-Path $bsWv $(if ([Environment]::Is64BitProcess) { 'x64' } else { 'x86' })) + ';' + $env:PATH
       $script:webData = $(if ($env:MEGULIT_SETUP_WEBVIEW2_DATA) { $env:MEGULIT_SETUP_WEBVIEW2_DATA } elseif ($env:WEBVIEW2_USER_DATA_FOLDER) { $env:WEBVIEW2_USER_DATA_FOLDER } else { Join-Path $env:LOCALAPPDATA ('MeguLit\setup-webview2' + $PID) })
@@ -49,9 +90,8 @@ function Release-NativeSplash([string]$why) { if ($env:MEGULIT_SPLASH_FLAG -and 
     # the skin window must be in front and active BEFORE the loading screen fades (a window shown behind a topmost one is not activated): bring it up, then drop the flag
     try { if ($script:win) { $script:win.BringFront(); $script:win.FadeIn(14, 280) } } catch { Boot-Mark ('bring-front failed ' + $_) }
     try { [IO.File]::WriteAllText($env:MEGULIT_SPLASH_FLAG, $why) } catch {}; Boot-Mark ('native-splash-released why=' + $why) } }
-function Close-Splash { if ($script:splash) { try { $script:splash.Close(); $script:splash.Dispose() } catch {}; $script:splash = $null; Boot-Mark 'splash-closed' } }
+function Close-Splash { $script:bootStatus = $null; if ($script:splash) { try { $script:splash.Close(); $script:splash.Dispose() } catch {}; $script:splash = $null; Boot-Mark 'splash-closed' } }
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-[Windows.Forms.Application]::EnableVisualStyles()
 
 $manifest = Get-Content -Raw -Encoding UTF8 (Join-Path $Root 'setup\runtime.json') | ConvertFrom-Json
 $packs = $manifest.packs

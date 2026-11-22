@@ -7,7 +7,7 @@ function New-OwnerTestEnvironment([string]$ownerRoot, [string]$stamp) {
   $childEnv.PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
   $childEnv.TEMP = Join-Path $ownerRoot 'env\temp'; $childEnv.TMP = $childEnv.TEMP
   $childEnv.LOCALAPPDATA = Join-Path $ownerRoot 'env\local'; $childEnv.APPDATA = Join-Path $ownerRoot 'env\roaming'
-  $childEnv.USERPROFILE = Join-Path $ownerRoot 'profile\user'; $childEnv.HOME = $childEnv.USERPROFILE
+  $childEnv.USERPROFILE = Join-Path $ownerRoot "profile\user\run-$stamp"; $childEnv.HOME = $childEnv.USERPROFILE
   $childEnv.MEGULIT_SETUP_TEST_ROOT = $ownerRoot
   $childEnv.MEGULIT_SETUP_TEST = Join-Path $ownerRoot "log\events-$stamp.jsonl"
   $childEnv.MEGULIT_SETUP_UILOG = Join-Path $ownerRoot "log\ui-$stamp.log"
@@ -41,6 +41,7 @@ if (-not (Test-Path -LiteralPath $scopeHelper)) { throw '最终候选尚未放�
 $scopeHelperHash = (Get-FileHash -LiteralPath $scopeHelper -Algorithm SHA256).Hash
 . $scopeHelper
 $script:setupTestScope = @{ root = $ownerRoot; source = $source; installed = (Join-Path $ownerRoot 'installed'); staging = (Join-Path $ownerRoot 'staging'); env = (Join-Path $ownerRoot 'env'); profile = (Join-Path $ownerRoot 'profile'); log = (Join-Path $ownerRoot 'log') }
+Write-Host '正在检查隔离目录…'
 Assert-SetupPath $ownerRoot 'root' -Tree
 $lockPath = Join-Path $ownerRoot 'log\installer-owner.lock'
 Assert-SetupPath $lockPath 'log'
@@ -54,10 +55,12 @@ if ((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory * 1KB -lt 4GB) { 
 $manifestFile = Join-Path $ownerRoot 'root-payload-manifest.json'
 $payload = Get-Content -LiteralPath $manifestFile -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($payload.schemaVersion -ne 1 -or ($payload.ready -isnot [bool] -or -not $payload.ready) -or $payload.candidateCommit -notmatch '^[0-9a-f]{40}$' -or -not $payload.packageVersion -or @($payload.files).Count -lt 1) { throw '最终候选清单尚未就绪' }
+Write-Host '正在核对安装文件…'
 $seen = Assert-OwnerPayloadFiles $source @($payload.files)
 foreach ($required in 'MeguLit.exe','setup/setup-runtime.ps1','setup/setup-test-scope.ps1','setup/setup-web.ps1','setup/runtime.json','setup/ui-web/index.html','setup/ui-web/player.js','setup/ui-web/video/light/intro.mp4','setup/webview2/Microsoft.Web.WebView2.Core.dll','tools/installer-owner-test/finalize-runtime.ps1','tools/installer-owner-test/runtime-overlay/manifest.json') { if (-not $seen.ContainsKey($required)) { throw ('候选缺少安装文件：' + $required) } }
 $version = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $source 'MeguLit.exe')).FileVersion
 if ($version -ne $payload.packageVersion) { throw 'exe 版本与候选清单不符' }
+Write-Host '正在核对运行组件和可用空间…'
 $runtime = Get-Content -LiteralPath (Join-Path $source 'setup\runtime.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $peakBytes = 0L; foreach ($file in $payload.files) { $peakBytes += [long]$file.size }
 foreach ($id in 'base','reading','voice') {
@@ -73,6 +76,8 @@ if ($ValidateOnly) { Write-Output ('候选文件及运行组件 overlay 已核�
 foreach ($area in 'installed','staging','env','profile','log') { [IO.Directory]::CreateDirectory($script:setupTestScope[$area]) | Out-Null }
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
 $childEnv = New-OwnerTestEnvironment $ownerRoot $stamp
+Assert-SetupPath $childEnv.USERPROFILE 'profile'
+if (Test-Path -LiteralPath $childEnv.USERPROFILE) { throw 'OWNER_SETUP_PROFILE_ALREADY_EXISTS' }
 foreach ($dir in $childEnv.TEMP,$childEnv.LOCALAPPDATA,$childEnv.APPDATA,$childEnv.USERPROFILE,$childEnv.MEGULIT_SETUP_STAGING,$childEnv.MEGULIT_SETUP_WEBVIEW2_DATA) { Assert-SetupPath $dir; [IO.Directory]::CreateDirectory($dir) | Out-Null }
 $start = New-Object Diagnostics.ProcessStartInfo
 $start.FileName = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -83,6 +88,7 @@ foreach ($name in $childEnv.Keys) { $start.EnvironmentVariables[$name] = $childE
 $receipt = @{ candidateCommit = $payload.candidateCommit; packageVersion = $version; source = $source; target = $childEnv.MEGULIT_SETUP_TARGET; events = $childEnv.MEGULIT_SETUP_TEST; uiLog = $childEnv.MEGULIT_SETUP_UILOG; startedAt = (Get-Date -Format o); exitCode = $null }
 $receiptPath = Join-Path $ownerRoot "log\launch-$stamp.json"
 $receipt | ConvertTo-Json | Set-Content -LiteralPath $receiptPath -Encoding UTF8
+Write-Host '正在启动安装界面…'
 $process = [Diagnostics.Process]::Start($start); $process.WaitForExit(); $receipt.exitCode = $process.ExitCode
 if ($process.ExitCode -eq 3) {
   $receipt.installerExitCode = 3

@@ -3,7 +3,7 @@
    - bridge: /api/info, /api/state and /api/act are answered from messages the host posts (no server, no network). */
 (function () {
   const q = new URLSearchParams(location.search); if (q.get('host') !== '2' || !(window.chrome && chrome.webview)) return;
-  const T = q.get('t') || '', post = (o) => { try { chrome.webview.postMessage(o); } catch (e) { /* host gone */ } };
+  const statusOnly = q.get('status') === '1', T = q.get('t') || '', post = (o) => { try { chrome.webview.postMessage(o); } catch (e) { /* host gone */ } };
   /* attempts: every page load is one attempt; a failed one reloads after a pause until the time limit (the profile is cold only for the first seconds) */
   let S = null; try { S = JSON.parse(sessionStorage.getItem('skinTry') || 'null'); } catch (e) { /* none */ } if (!S) S = { n: 0, t0: Date.now() }; S.n++; try { sessionStorage.setItem('skinTry', JSON.stringify(S)); } catch (e) { /* none */ }
   const LIMIT_MS = 26000, since = () => Date.now() - S.t0;
@@ -25,13 +25,15 @@
   window.fetch = (url, opt) => {
     const u = String(url); if (u.indexOf('/api/') !== 0) return nativeFetch(url, opt);
     if (u === '/api/info') return info ? Promise.resolve(resp(info)) : new Promise((ok) => { infoWait.push((i) => ok(resp(i))); post({ type: 'hello' }); });
-    if (u === '/api/state') return Promise.resolve(resp(lastState || { phase: 'probe', n: 0, st: '', fr: [] }));
+    if (u === '/api/state') return Promise.resolve(resp(lastState || { phase: statusOnly ? 'idle' : 'probe', n: 0, st: '', fr: [] }));
     let m = {}; try { m = JSON.parse(opt && opt.body || '{}'); } catch (e) { /* none */ }
     if (m.type === 'close' || m.type === 'minimize') return Promise.resolve(resp({ ok: true }));      /* the scene posts those itself */
     m.via = 'shim'; const wait = m.type === 'checkpath' || m.type === 'install' || m.type === 'browse' || m.type === 'listdir' || m.type === 'mkdir' || m.type === 'pickfolder';
     if (!wait) { post(m); return Promise.resolve(resp({ ok: true })); }
-    m.id = ++nid; return new Promise((ok) => { pend.set(m.id, (r) => ok(resp(r || {}))); post(m); setTimeout(() => { if (pend.has(m.id)) { pend.delete(m.id); ok(resp({ state: 'ok' })); } }, 8000); });
+    m.id = ++nid; return new Promise((ok) => { pend.set(m.id, (r) => ok(resp(r || {}))); post(m); setTimeout(() => { if (pend.has(m.id)) { pend.delete(m.id); ok(resp({ state: statusOnly ? 'readonly' : 'ok' })); } }, 8000); });
   };
+  // The status-only page reports ready after the bridge has checked the actual location.
+  if (statusOnly) return;
   /* verdict for the host (written to setup-ui.log as one line): pixels of the drawn canvas, renderer string, GL errors seen */
   const verdict = () => { if (window.Player && Player.verdict) return Player.verdict(); const o = { std: -1, renderer: '?', errs: window.__glErrs | 0 };
     try { const g = document.getElementById('gl'); if (g) { const x = g.getContext('webgl2') || g.getContext('webgl'); const ex = x && x.getExtension('WEBGL_debug_renderer_info'); if (ex) o.renderer = String(x.getParameter(ex.UNMASKED_RENDERER_WEBGL)).slice(0, 80); const c = document.createElement('canvas'); c.width = 48; c.height = 30; const c2 = c.getContext('2d'); c2.drawImage(g, 0, 0, 48, 30); const d = c2.getImageData(0, 0, 48, 30).data; let m = 0, n = d.length / 4; for (let i = 0; i < d.length; i += 4) m += d[i] + d[i + 1] + d[i + 2]; m /= n * 3; let v = 0; for (let i = 0; i < d.length; i += 4) { const a = (d[i] + d[i + 1] + d[i + 2]) / 3 - m; v += a * a; } o.std = +Math.sqrt(v / n).toFixed(2); } } catch (e) { o.err = String(e).slice(0, 60); }

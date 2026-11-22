@@ -78,7 +78,8 @@ function Web-State {
   }
   $f = $script:fetch; $got = Got-Bytes; $total = Total-Bytes
   $phase = if ($script:mode -eq 'failed') { 'failed' } elseif ($script:done) { 'done' } elseif ($script:copying -or $script:busy) { 'unpack' }
-    elseif ($f) { if ([string]$f.Phase -eq 'download' -and $got -gt 0) { 'download' } else { 'probe' } }
+    elseif ($script:statusOnly -and -not $script:confirmed) { 'idle' }
+    elseif ($f) { if ([string]$f.Phase -eq 'verify') { 'verify' } elseif ([string]$f.Phase -eq 'download') { 'download' } else { 'probe' } }
     elseif (Downloads-Done) { if ($script:confirmed) { 'unpack' } else { 'downloaded' } } else { 'probe' }
   $o = @{ phase = $phase; n = $n; total = $total; got = $got; speed = $(if ($f) { [long]$f.TotalSpeed } else { 0 }); pack = $(if ($script:fetchId) { $script:fetchId } elseif ($ids.Count) { $ids[-1] } else { '' })
     src = $(if ($f) { [string]$f.SourceLabel() } else { '' }); srcN = 0; dir = $runtimeDir; unpack = $(if ($ids.Count) { [math]::Min(1, [math]::Max(0, ($script:dlPos - $script:ready.Count) / $ids.Count)) } else { 0 })
@@ -190,8 +191,6 @@ public class SetupWin : Form {
   [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr c);
   [DllImport("user32.dll")] public static extern uint GetDpiForSystem();
   [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr h, int a, ref int v, int s);
-  [DllImport("dwmapi.dll")] static extern int DwmExtendFrameIntoClientArea(IntPtr h, ref MARGINS m);
-  [StructLayout(LayoutKind.Sequential)] struct MARGINS { public int l, r, t, b; }
   public bool AllowClose = false; public Action AskClose; public Control Web;
   protected override CreateParams CreateParams { get { CreateParams cp = base.CreateParams; cp.Style |= 0x00020000 | 0x00080000 | 0x00040000; return cp; } }
   [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int i);
@@ -205,7 +204,7 @@ public class SetupWin : Form {
   // the skin window loads invisible (opacity 0) under the transparent native loading screen and fades in as that fades out
   System.Windows.Forms.Timer fadeT; int fadeStep;
   public void FadeIn(int steps, int ms) { if (fadeT != null) return; fadeStep = 0; fadeT = new System.Windows.Forms.Timer(); fadeT.Interval = Math.Max(10, ms / steps); fadeT.Tick += delegate { fadeStep++; Opacity = Math.Min(1.0, fadeStep / (double)steps); if (fadeStep >= steps) { fadeT.Stop(); if (Log != null) Log("window: skin faded in, opacity=" + Opacity); } }; fadeT.Start(); if (Log != null) Log("window: skin fade-in starts"); }
-  public void Dress() { int round = 2; DwmSetWindowAttribute(Handle, 33, ref round, 4); MARGINS m = new MARGINS(); m.l = 1; m.r = 1; m.t = 1; m.b = 1; DwmExtendFrameIntoClientArea(Handle, ref m); }
+  public void Dress() { int round = 2; DwmSetWindowAttribute(Handle, 33, ref round, 4); int noBorder = -2; DwmSetWindowAttribute(Handle, 34, ref noBorder, 4); }
   // ---- drag-resize of the frameless window, locked to the design box 1000:640 (the page is scaled as a whole by the WebView2 zoom) ----
   public const double Ratio = 0.64;   // 640 / 1000
   public int Grip = 8; public bool Sizable = true; public Action<string> Log; bool hitLogged = false;
@@ -251,10 +250,12 @@ public class SetupWin : Form {
     $wa0 = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea; $scale = [math]::Max(0.5, [math]::Min($scale, [math]::Min($wa0.Width / 913.0, $wa0.Height / 584.0)))   # never larger than the work area (small screens)
     if ($testLog -and $env:MEGULIT_SETUP_WEB_DPI) { $scale = [double]$env:MEGULIT_SETUP_WEB_DPI / 96.0; $dpiS = $scale }   # tests: emulate 125/150/200 % (with --force-device-scale-factor)
     $win = New-Object SetupWin
+    if ($script:statusOnly) { $win.Opacity = 0 }
     if ($env:MEGULIT_NATIVE_SPLASH) { $win.Opacity = 0 }   # under the transparent native loading screen the skin window is there (WebView2 loads and plays) but invisible until it is released
     $win.Text = 'MeguLit 安装'; $win.FormBorderStyle = 'None'; $win.StartPosition = 'CenterScreen'; $win.ShowInTaskbar = -not $testLog; $win.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
     # starts at 91 % of the design box (913 x 584 logical); the user can drag the edges/corners: ratio locked, 480 x 307 logical minimum, at most the work area
-    $win.ClientSize = New-Object Drawing.Size([int](913 * $scale), [int](584 * $scale)); $win.Grip = [int][math]::Max(5, [math]::Round(5 * $scale)); $win.Padding = New-Object Windows.Forms.Padding($win.Grip)   # route 1: a thin ring of the form's own around the WebView2 child (which swallows hit-tests): WM_NCHITTEST there gives the sizing codes. Route 2: the page's edge hot zones (index.html .rz) ask the host via a 'resize' message
+    $win.ClientSize = New-Object Drawing.Size([int](913 * $scale), [int](584 * $scale))
+    $win.Grip = 0   # The WebView edge and corner hit zones start the native resize loop.
     $win.Log = [Action[string]]{ param($s) Web-Log $s }
     $lim = @(0, 0, 0, 0); $miW = 0; $miH = 0; $maW = 0; $maH = 0; [SetupWin]::SizeLimits($scale, $wa0.Width, $wa0.Height, [ref]$miW, [ref]$miH, [ref]$maW, [ref]$maH)
     $win.MinimumSize = New-Object Drawing.Size($miW, $miH); $win.MaximumSize = New-Object Drawing.Size($maW, $maH); $win.MinW = $miW; $win.MaxW = $maW
@@ -265,7 +266,7 @@ public class SetupWin : Form {
     # Native poster: the first frame of the opening clip, drawn by the window itself the moment it appears. A cold WebView2 needs ~2 s
     # (more on a loaded machine) before the page can paint anything; the poster covers that and is removed when the page shows its own.
     $script:posterBox = $null
-    try { $pp = Join-Path $ui 'video\light\intro.jpg'; if (Test-Path $pp) { $ms = New-Object IO.MemoryStream (,[IO.File]::ReadAllBytes($pp)); $pb = New-Object Windows.Forms.PictureBox; $pb.Dock = 'Fill'; $pb.SizeMode = 'StretchImage'; $pb.Image = [Drawing.Image]::FromStream($ms); $win.Controls.Add($pb); $pb.BringToFront(); $script:posterBox = $pb } } catch { Web-Log ('native poster: ' + $_) }
+    if (-not $script:statusOnly) { try { $pp = Join-Path $ui 'video\light\intro.jpg'; if (Test-Path $pp) { $ms = New-Object IO.MemoryStream (,[IO.File]::ReadAllBytes($pp)); $pb = New-Object Windows.Forms.PictureBox; $pb.Dock = 'Fill'; $pb.SizeMode = 'StretchImage'; $pb.Image = [Drawing.Image]::FromStream($ms); $win.Controls.Add($pb); $pb.BringToFront(); $script:posterBox = $pb } } catch { Web-Log ('native poster: ' + $_) } }
     $props = New-Object Microsoft.Web.WebView2.WinForms.CoreWebView2CreationProperties; $script:webData = $(if ($env:MEGULIT_SETUP_WEBVIEW2_DATA) { $env:MEGULIT_SETUP_WEBVIEW2_DATA } elseif ($env:WEBVIEW2_USER_DATA_FOLDER) { $env:WEBVIEW2_USER_DATA_FOLDER } else { Join-Path $env:LOCALAPPDATA ('MeguLit\setup-webview2' + $PID) }); $props.UserDataFolder = $script:webData   # one folder per setup process: two setups at once do not fight over it; $web.CreationProperties = $props
     $script:win = $win; $script:webReady = $false
     $win.AskClose = { $script:askAt = [DateTime]::Now; try { $script:win.Web.CoreWebView2.ExecuteScriptAsync('window.__askClose&&window.__askClose()') | Out-Null } catch { Web-Close } }
@@ -276,19 +277,20 @@ public class SetupWin : Form {
       $cw.add_WebMessageReceived({ param($s2, $a) try { Web-Act ($a.WebMessageAsJson | ConvertFrom-Json) } catch { Web-Log ('message error: ' + $_) } })
       $uiLang = $(if ($env:MEGULIT_SETUP_LANG -eq 'en') { 'en' } else { 'zh' })   # Chinese by default like the old window; English only on request (MEGULIT_SETUP_LANG=en). Windows' language says too little: many Chinese users run an English Windows.
       $q = 'host=2&desk=1&lang=' + $uiLang;
+      if ($script:statusOnly) { $q += '&status=1' }
       if ($testLog -and $env:MEGULIT_SETUP_WEB_QUERY) { $q += '&' + $env:MEGULIT_SETUP_WEB_QUERY }   # tests: feature switches such as shadow=0&env=0&trans=0&aa=1
       if ($env:MEGULIT_SETUP_WEB_TEST) { $q += '&t=' + $env:MEGULIT_SETUP_WEB_TEST }   # was inside the comment above, so the page never saw the test switch
       $cw.add_NavigationCompleted({ try { $w = $script:win.Web; $w.ZoomFactor = [math]::Min([SetupWin]::ZoomFor($w.Width, $script:dpiS), [SetupWin]::ZoomFor([int]($w.Height / [SetupWin]::Ratio), $script:dpiS)) } catch {}; if (-not $script:tNav) { $script:tNav = [int]([DateTime]::Now - $script:skinT0).TotalMilliseconds } })
       $cw.Navigate('https://megulit-setup.local/index.html?' + $q)
     })
-    $win.Show(); $script:shownAt = [DateTime]::Now; Boot-Mark 'skin-window-shown'; Close-Splash; if ($script:posterBox) { $win.Refresh(); Web-Log ('cold-start mark=native-poster ms=' + [int]([DateTime]::Now - $script:shownAt).TotalMilliseconds) }; $wvEnv = $null; if ($script:wv2EnvTask) { $tw = [DateTime]::Now; while (-not $script:wv2EnvTask.IsCompleted -and ([DateTime]::Now - $tw).TotalSeconds -lt 20) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 10 }; if ($script:wv2EnvTask.Status -eq 'RanToCompletion') { $wvEnv = $script:wv2EnvTask.Result; Web-Log ('webview2 environment prewarmed, ready ' + [int]([DateTime]::Now - $tw).TotalMilliseconds + ' ms after the window') } else { Web-Log ('prewarmed environment not usable: ' + $script:wv2EnvTask.Status) } }; if ($wvEnv) { [void]$web.EnsureCoreWebView2Async($wvEnv) } else { $web.CreationProperties = $props; [void]$web.EnsureCoreWebView2Async($null) }
+    $win.Show(); $script:shownAt = [DateTime]::Now; Boot-Mark 'skin-window-shown'; if (-not $script:statusOnly) { Close-Splash }; if ($script:posterBox) { $win.Refresh(); Web-Log ('cold-start mark=native-poster ms=' + [int]([DateTime]::Now - $script:shownAt).TotalMilliseconds) }; $wvEnv = $null; if ($script:wv2EnvTask) { $tw = [DateTime]::Now; while (-not $script:wv2EnvTask.IsCompleted -and ([DateTime]::Now - $tw).TotalSeconds -lt 20) { [Windows.Forms.Application]::DoEvents(); Test-SetupBootCancellation; Start-Sleep -Milliseconds 10 }; if ($script:wv2EnvTask.Status -eq 'RanToCompletion') { $wvEnv = $script:wv2EnvTask.Result; Web-Log ('webview2 environment prewarmed, ready ' + [int]([DateTime]::Now - $tw).TotalMilliseconds + ' ms after the window') } else { Web-Log ('prewarmed environment not usable: ' + $script:wv2EnvTask.Status) } }; if ($wvEnv) { [void]$web.EnsureCoreWebView2Async($wvEnv) } else { $web.CreationProperties = $props; [void]$web.EnsureCoreWebView2Async($null) }
     # Watchdog: the page must report its first video frame within 12 s of the window (MEGULIT_SETUP_WATCHDOG_MS in tests). If it does
     # not (a hung renderer, a decoder that never delivers, a script stuck before it could report fatal), reload the page once; if the
     # reload does not bring a frame either, drop the skin for the classic window. The user never sits in front of a picture that does nothing.
     $script:wdLimit = $(if ($env:MEGULIT_SETUP_WATCHDOG_MS -match '^\d+$') { [int]$env:MEGULIT_SETUP_WATCHDOG_MS } else { 12000 }); $script:wdT0 = [DateTime]::Now; $script:wdReloads = 0
     $script:wdTimer = New-Object Windows.Forms.Timer; $script:wdTimer.Interval = 250
     $script:wdTimer.add_Tick({
-      if ($script:frame1Seen -or -not $script:win) { $script:wdTimer.Stop(); return }
+      if ($script:frame1Seen -or ($script:statusOnly -and $script:webReady) -or -not $script:win) { $script:wdTimer.Stop(); return }
       if (([DateTime]::Now - $script:wdT0).TotalMilliseconds -lt $script:wdLimit) { return }
       if ($script:wdReloads -eq 0 -and $script:win.Web.CoreWebView2) {
         $script:wdReloads = 1; $script:wdT0 = [DateTime]::Now; Web-Log ('watchdog: no video frame within ' + $script:wdLimit + ' ms, reloading the page')
@@ -302,8 +304,14 @@ public class SetupWin : Form {
     if ($oldCtx -ne [IntPtr]::Zero) { try { [void][SetupWin]::SetThreadDpiAwarenessContext($oldCtx) } catch {} }
     # wait for the first rendered frame (the page says "ready" only after WebGL and the scene came up); 10 s at most
     $deadline = $t0.AddSeconds(32)
-    while (-not $script:webReady -and [DateTime]::Now -lt $deadline -and $script:win -and -not $script:webFatalSeen) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 20 }
+    while (-not $script:webReady -and [DateTime]::Now -lt $deadline -and $script:win -and -not $script:webFatalSeen) { [Windows.Forms.Application]::DoEvents(); Test-SetupBootCancellation; Start-Sleep -Milliseconds 20 }
     if (-not $script:webReady) { throw ('no confirmed scene within 32 s' + $(if ($script:webFatalSeen) { ' (page reported a problem)' } else { '' })) }
+    if ($script:statusOnly) {
+      $win.Opacity = 1
+      $win.Activate()
+      Close-Splash
+      Boot-Mark 'installer-ui-ready'
+    }
     $win.Dress(); Web-Log ('window: skin dressed after the first frame, pos=' + $win.Location + ' size=' + $win.Size)
     $script:webActive = $true
     # the old window becomes the invisible control surface: same controls, same handlers, no second taskbar button
@@ -320,7 +328,7 @@ public class SetupWin : Form {
     })
     $script:webTimer.Start()
     $script:chkT = New-Object Windows.Forms.Timer; $script:chkT.Interval = 2500; $script:chkT.add_Tick({ $script:chkT.Stop(); Web-Log ('skin window enabled=' + $script:win.Enabled + ' visible=' + $script:win.Visible + ' taskbar: skin=' + $script:win.ShowInTaskbar + ' classic=' + $form.ShowInTaskbar + ' size=' + $script:win.ClientSize.Width + 'x' + $script:win.ClientSize.Height) }); $script:chkT.Start()
-    Web-Log ('web skin active, first frame after ' + [int]([DateTime]::Now - $t0).TotalMilliseconds + ' ms')
+    Web-Log ('web skin active after ' + [int]([DateTime]::Now - $t0).TotalMilliseconds + ' ms')
   } catch {
     $script:webActive = $false
     try { if ($script:win) { $script:win.AllowClose = $true; $script:win.Close(); $script:win.Dispose() } } catch {}
