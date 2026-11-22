@@ -44,7 +44,16 @@ class OverlayPlacement {
     /* 2026-11-21 (owner, STEINS;GATE right after 千恋＊万花 in one MeguLit run: its lines came with no place and were pinned at 千恋＊万花's place and rows):
        the reader is told which game the mode is for; another game starts with no place of its own */
     const game = String(state?.gameProcessId || state?.gameHwnd || '');
-    if (on !== this.on || game !== this.game) { const was = this.on; this.on = on; if (game !== this.game) this.engineHidden = false; this.game = game; if (!on && was) { this.clear(); if (this.extraKey && this.extraKey !== '[]') this.send({ type: 'textPlaceExtra', items: [] }); this.extraKey = ''; } this.send(game ? { type: 'textPlaceMode', on, game } : { type: 'textPlaceMode', on }); }
+    const birth = String(state?.gameStarted || '');
+    if (on === this.on && game === this.game && birth === this.birth) return;
+    if (this.on) {
+      this.stop();
+      if (on) this.send({ type: 'textPlaceMode', on: false });
+    }
+    this.on = on;
+    this.game = game;
+    this.birth = birth;
+    this.send(game ? { type: 'textPlaceMode', on, game } : { type: 'textPlaceMode', on });
   }
   clear() { if (this.current) { this.current = null; this.send({ type: 'textPlace', clear: true }); } }
   /* 2026-11-19 (千恋＊万花 maximised, krkr drawing its text invisible, the reader still in its style box): why a reported line
@@ -323,10 +332,34 @@ class OverlayPlacement {
       if (rects && !line.approx) this.learn(rects);
     }
     const key = JSON.stringify(line);
-    if (key === this.lastKey) return; this.lastKey = key; this.current = line;
+    if (this.current && key === this.lastKey) return; this.lastKey = key; this.current = line;
     this.send({ type: 'textPlace', ...line });
   }
-  stop() { clearTimeout(this.doneTimer); this.typing = null; this.hideSeen = false; this.clear(); if (this.paged) { this.paged = false; this.pageKey = ''; this.send({ type: 'textPlacePage', awake: false, armed: false, lines: [] }); } if (this.extraKey && this.extraKey !== '[]') this.send({ type: 'textPlaceExtra', items: [] }); this.extraKey = ''; this.on = false; }
+  stop() {
+    this.on = false;
+    clearTimeout(this.doneTimer);
+    this.typing = null;
+    this.clear();
+    if (this.paged) this.send({ type: 'textPlacePage', lines: null });
+    if (this.extraKey && this.extraKey !== '[]') this.send({ type: 'textPlaceExtra', items: [] });
+    if (this.choiceSent) this.send({ type: 'placeChoiceBoxes', items: [] });
+    this.rowPage = [];
+    this.rowsPaged = false;
+    this.paged = false;
+    this.choiceSent = false;
+    this.choicesPlaced = false;
+    this.pageKey = '';
+    this.extraKey = '';
+    this.lastKey = '';
+    this.visibleKey = '';
+    this.goneId = '';
+    this.whyKey = '';
+    this.anchorBox = null;
+    this.gpuHiding = 0;
+    this.hideSeen = false;
+    this.engineSeen = false;
+    this.engineHidden = false;
+  }
 }
 
 /* a typing engine sends a record every few tens of ms; this long without one, the line is complete */
