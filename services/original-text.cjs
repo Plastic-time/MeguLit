@@ -528,6 +528,16 @@ class Matcher{
   const from=this.last>=0?Math.max(0,this.last-40):0,to=this.last>=0?Math.min(this.normalized.length,this.last+600):this.normalized.length;let best=-1,score=0;
   for(let i=from;i<to;i++){const t=this.normalized[i];if(!t||t.length<s.length*.6||s.length<t.length*.6&&t.length-s.length>12)continue;const d=dice(t.slice(0,s.length+2));if(d>score){score=d;best=i;}}
   if(best<0||score<.8||s.length<this.normalized[best].length*.6)return -1;this.moveTo(best);return best;}
+ // A vanished OCR group can contain just the end of a line being replaced.
+ // A complete short line anywhere in the script takes precedence. Keep the reading position intact.
+ ocrSuffix(text){
+  const raw=matchKey(text),tail=raw.replace(/^[・…]+/u,'');
+  if(!/^[ぁ-ヺ一-龯々ー]{3,10}[。！？]$/u.test(tail))return false;
+  for(const key of [raw,tail]){
+   if(this.heads.get(key.slice(0,4))?.some(i=>this.normalized[i]===key))return false;
+  }
+  return this.normalized.some(line=>line.length>=tail.length+2&&line.endsWith(tail));
+ }
  constructor(runtimeLines,originalLines){this.isUntranslated=untranslatedJapanese(runtimeLines);this.rt=runtimeLines;this.og=originalLines;this.normalized=runtimeLines.map(matchKey);this.heads=new Map();this.normalized.forEach((t,i)=>{if(!t)return;const k=t.slice(0,4);if(!this.heads.has(k))this.heads.set(k,[]);this.heads.get(k).push(i);});this.last=-1;}
  /* 2026-11-13 (涙 name screen: 「あなたの現在の名前は『春日　光一』、」 lost its head as if it were a speaker): a line after the
     first of a joined text is also tried whole, without the speaker cut */
@@ -652,6 +662,7 @@ function liveProvider(root,id,executable){
    if(r.status==='none'&&r.method!=='empty'&&changed()&&rebuild()&&inner)r=inner.resolve(text);return r;},
   foreign(text,opt){return inner?.foreign?inner.foreign(text,opt):'';},
   near(text){return inner?.near?inner.near(text):'';},
+  ocrSuffix(text){return inner?.ocrSuffix?.(text)===true;},
   position(){return inner?.position?inner.position():-1;},
   save(){return inner?.save?{inner,v:inner.save()}:null;},
   load(x){if(x&&x.inner===inner)inner.load(x.v);},
@@ -781,7 +792,7 @@ function staticProvider(root,executable,opts={}){
   /* 2026-11-13 the same script in the game's other languages (scene engines with parallel tables): a captured line in one
      of them gives back its Japanese line; built on first use, never when the engine has none */
   let foreignMap,foreignSeqFn;const foreign=(text,opt)=>{if(foreignMap===undefined){foreignMap=null;try{const f=scenes.ENGINES[state.runtime.engine]?.foreign;if(f){const map=f(path.dirname(String(executable)));if(map&&map.size)foreignMap=map;}}catch{}}if(!foreignMap)return '';const k=foreignKey(text),hit=foreignMap.get(k);if(opt?.fuzzy)return (foreignSeqFn||(foreignSeqFn=foreignSeq(foreignMap)))(text);if(hit||!opt?.prefix||k.length<40)return hit||'';/* a truncated stream sample (thread list keeps 110 chars): the one line it starts */let one='';for(const [key,ja] of foreignMap)if(key.startsWith(k)){if(one&&one!==ja)return '';one=ja;}return one;};
-  /* position(): the script line read last (core/hook-native.cjs keeps a repeated line's answer only while it is there) */const api={kind:'patch',patch:!!patched,hasLocalPairs:()=>!!patched&&rt.some((ja,i)=>japaneseLine(ja)&&!untranslated(i)&&localTranslation(m.og[i])),fill,drawable,tableDrawable,position:()=>m.last,save:()=>m.save(),load:v=>m.load(v),flowLayout,flowGame,foreign,near:text=>{const i=m.near(text);return i>=0?inlineTags(rt[i]):'';},
+  /* position(): the script line read last (core/hook-native.cjs keeps a repeated line's answer only while it is there) */const api={kind:'patch',patch:!!patched,hasLocalPairs:()=>!!patched&&rt.some((ja,i)=>japaneseLine(ja)&&!untranslated(i)&&localTranslation(m.og[i])),fill,drawable,tableDrawable,position:()=>m.last,save:()=>m.save(),load:v=>m.load(v),flowLayout,flowGame,foreign,ocrSuffix:text=>m.ocrSuffix(text),near:text=>{const i=m.near(text);return i>=0?inlineTags(rt[i]):'';},
    translationIndex:{runtime:state.runtime.sha256,patch:patchCurrent(state)?state.patch.sha256:null},
    matchedBody:text=>rtIndex.roles?.[m.last]==='b'&&norm(rt[m.last])===norm(text),
    resolveChoice:require('./script-translation-quality.cjs').choiceLookup(rt,patched?m.og:[],rtIndex.roles),resolve:text=>withRuby(resolveLine(text))};
