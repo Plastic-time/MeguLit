@@ -1303,17 +1303,19 @@ function learningFailed(target,error,token){if(token!==pageToken||!target)return
 function loading(){return '<div class="loading-screen"><span class="spinner" aria-label="'+text.loading+'"></span></div>';}
 /* v1.1.6 (user): the second-level tab bar starts under the first top tab (首页), on every page and size */
 /* the 个人主页 pill at the right of the top bar: same panel as the 排行榜 chip; shows your picture and name once known */
+let topProfileRevision=0;
 async function paintTopProfile(){
- const me=document.querySelector('[data-top-me]');if(!me)return;
- const paint=data=>{if(!data?.name)return;
-  me.querySelector('.leaderboard-avatar')?.replaceWith(document.createRange().createContextualFragment(avatarHTML({name:data.name,avatar:data.self?.avatar||null},
-   data.avatars||{},esc)));
-  me.querySelector('.top-me-name').textContent=data.name;me.title=data.name;};
- /* 2026-11-14 (user: the pill sat on 「个人主页」 and a blank circle): name and cached picture from this PC first; the
-    board call, which waits on the relay, only refreshes them */
- try{paint(await api('profile_chip',{}));}catch{}
- try{paint(await api('leaderboard_view',{tab:'board'}));}catch{}
+ const revision=++topProfileRevision,me=document.querySelector('[data-top-me]');if(!me)return;
+ try{
+  const data=await api('profile_chip',{});
+  if(revision!==topProfileRevision||!me.isConnected)return;
+  const name=data.name||me.getAttribute('aria-label');
+  me.querySelector('.leaderboard-avatar')?.replaceWith(document.createRange().createContextualFragment(
+   avatarHTML({name,avatar:data.self?.avatar},data.avatars||{},esc)));
+  me.querySelector('.top-me-name').textContent=name;me.title=name;
+ }catch{}
 }
+window.addEventListener('megulit-profile-changed',paintTopProfile);
 function bindTopProfile(){
  const me=document.querySelector('[data-top-me]');if(!me)return;
  me.addEventListener('click',()=>openProfilePanel({api,locale,esc,toast,openSettings:()=>navigate('settings'),onClose:()=>{paintTopProfile();if(route==='leaderboard')renderRoute();

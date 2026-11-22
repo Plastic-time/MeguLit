@@ -5,8 +5,9 @@
    the same panel turns into the profile editor (web/profile-settings.js) without closing or moving. Signing out turns
    it back. The drawer has a fixed size; only its body changes, with a short fade. */
 import {mountEmailLogin} from './account-ui.js';
+import {leaderboardWords} from './leaderboard-view.js';
 import {mountProfileSettings} from './profile-settings.js';
-import {cropAvatarFile,pickImageFile} from './avatar-crop.js';
+import {avatarCropWords,cropAvatarFile,pickImageFile} from './avatar-crop.js';
 import {readerLevel,rankTitle,SCHOOLS,SCHOOL_LEVEL,classWords,openRite,elementName} from './reader-class.js';
 const T={
  zh:{title:'个人主页',close:'关闭',joinTitle:'注册 / 登录 MeguLit 账号',joinText:'用邮箱收一个 6 位验证码就能登录，第一次登录就是注册，不用密码',
@@ -22,11 +23,11 @@ const T={
    welcome:'Signed in'}
 };
 
-const HERO={zh:{time:'累计阅读',chars:'读过的字',words:'收录单词',streak:'最长连续',days:'天',fav:'最喜欢的游戏',noBio:'还没有签名',pick:'更换头像',rename:'改昵称',checking:'头像审核中',rejected:'头像没有通过审核，换一张吧',
+const HERO={zh:{time:'累计阅读',chars:'读过的字',words:'收录单词',streak:'最长连续',days:'天',fav:'最喜欢的游戏',noBio:'还没有签名',useCrop:'使用此裁剪',edit:'编辑资料',save:'保存',cancel:'取消',pick:'更换头像',rename:'改昵称',checking:'头像审核中',rejected:'头像没有通过审核，换一张吧',
  joining:'设置头像会同时参加排行榜',saved:'已保存',offline:'暂时连不上联网服务',xp:'经验',h:'小时',m:'分'},
- ja:{time:'累計読書',chars:'読んだ文字',words:'登録単語',streak:'最長連続',days:'日',fav:'お気に入りのゲーム',noBio:'ひとことはまだありません',pick:'アイコンを変更',rename:'ニックネームを変更',checking:'アイコン審査中',rejected:'アイコンが審査を通過しませんでした',
+ ja:{time:'累計読書',chars:'読んだ文字',words:'登録単語',streak:'最長連続',days:'日',fav:'お気に入りのゲーム',noBio:'ひとことはまだありません',useCrop:'この範囲を使う',edit:'プロフィールを編集',save:'保存',cancel:'キャンセル',pick:'アイコンを変更',rename:'ニックネームを変更',checking:'アイコン審査中',rejected:'アイコンが審査を通過しませんでした',
   joining:'アイコンを設定するとランキングにも参加します',saved:'保存しました',offline:'オンラインサービスに接続できません',xp:'経験値',h:'時間',m:'分'},
- en:{time:'Time read',chars:'Characters',words:'Words saved',streak:'Best streak',days:'days',fav:'Favourite games',noBio:'No signature yet',pick:'Change picture',
+ en:{time:'Time read',chars:'Characters',words:'Words saved',streak:'Best streak',days:'days',fav:'Favourite games',noBio:'No signature yet',useCrop:'Use crop',edit:'Edit profile',save:'Save',cancel:'Cancel',pick:'Change picture',
   rename:'Rename',checking:'Picture being checked',rejected:'Picture not approved; try another',joining:'Setting a picture also joins the leaderboard',saved:'Saved',
   offline:'Cannot reach the online service',xp:'XP',h:'h',m:'min'}};
 async function heroData(api){
@@ -42,14 +43,17 @@ export const panelWords=locale=>T[locale]||T.zh;
 let current=null;
 /* opens (or brings back) the panel; onClose runs once when it closes, e.g. to refresh the 排行榜 page */
 export async function openProfilePanel({api,locale,esc,toast,onClose=()=>{},openSettings=()=>{}}){
- if(current?.isConnected){current.querySelector('[data-close]')?.focus();return current;}
+ if(current?.isConnected&&current.open){current.querySelector('[data-close]')?.focus();return current;}
  const t=panelWords(locale),dialog=document.createElement('dialog');dialog.className='profile-panel';dialog.setAttribute('aria-label',t.title);
  dialog.innerHTML=`<header class="profile-panel-head"><h2>${t.title}</h2><button type="button" class="profile-panel-close" data-close aria-label="${t.close}">×</button></header><div class="profile-panel-body settings-content" data-body></div>`;
  /* inside .main so the settings form styles (.main .settings-content …) apply; a modal dialog is drawn on top anyway */
  (document.querySelector('.main')||document.body).append(dialog);current=dialog;
- const body=dialog.querySelector('[data-body]');let closed=false;
- const close=()=>{if(!closed){closed=true;dialog.close();}};
- dialog.addEventListener('close',()=>{dialog.remove();if(current===dialog)current=null;onClose();},{once:true});
+ const body=dialog.querySelector('[data-body]');
+ const saving=()=>!!body.querySelector('.profile-identity-form[inert]');
+ const finish=()=>{if(!dialog.isConnected)return;dialog.remove();if(current===dialog)current=null;onClose();};
+ const close=()=>{if(!saving()){dialog.close();finish();}};
+ dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
+ dialog.addEventListener('close',finish,{once:true});
  dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
  dialog.querySelector('[data-close]').onclick=close;
  /* swap the body with a short fade; the drawer itself never changes size or place */
@@ -72,41 +76,69 @@ export async function openProfilePanel({api,locale,esc,toast,onClose=()=>{},open
   const nf=new Intl.NumberFormat({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale]||'zh-CN'),st=d.stats||{},sec=Number(st.seconds)||0;
   const time=sec>=3600?`${Math.floor(sec/3600)}<small>${h.h}</small>${Math.floor(sec%3600/60)}<small>${h.m}</small>`:`${Math.floor(sec/60)}<small>${h.m}</small>`;
   const lv=readerLevel(d.stats,d.school),cw=classWords(locale);const initial=esc([...(d.name||'?')][0]||'?');
-  hero.innerHTML=`<div class="profile-hero-id"><button type="button" class="profile-hero-avatar" data-hero-avatar title="${h.pick}" aria-label="${h.pick}">${d.pic?.image&&d.pic.status==='approved'?`<img src="${esc(d.pic.image)}" alt="">`:initial}<span class="profile-hero-avatar-edit" aria-hidden="true">${h.pick}</span></button><div class="profile-hero-who"><h3><button type="button" class="profile-hero-name" data-hero-name title="${h.rename}">${esc(d.name||'')}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11.5V13h1.5l6.8-6.8-1.5-1.5L3 11.5zm9.7-6.2a.6.6 0 000-.9l-1-1a.6.6 0 00-.9 0l-.8.8 1.9 1.9.8-.8z"/></svg></button></h3>${d.pic&&['pending','rejected'].includes(d.pic.status)?`<small class="profile-hero-note" data-status="${esc(d.pic.status)}">${d.pic.status==='pending'?h.checking:h.rejected}</small>`:''}<div class="profile-rank"><span class="profile-rank-lv">Lv.<b>${lv.level}</b></span><span class="profile-rank-name">${d.school?`<i class="profile-school" style="--c:${SCHOOLS[d.school].color}">${esc(elementName(d.school,locale))}</i>`:''}${esc(rankTitle(lv.level,locale,d.school))}${lv.level>=SCHOOL_LEVEL?`<button type="button" class="profile-class-go${lv.locked?' is-due':''}" data-class-go>${d.school?cw.again:cw.open}</button>`:`<small class="profile-class-locked">${cw.locked(SCHOOL_LEVEL)}</small>`}</span><span class="profile-rank-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${lv.need}" aria-valuenow="${lv.into}" aria-label="${h.xp}"><i style="--p:${(lv.into/lv.need*100).toFixed(1)}%"></i></span><span class="profile-rank-xp">${lv.locked?`<b class="profile-rank-due">${esc(cw.due)}</b>`:`${nf.format(lv.into)} / ${nf.format(lv.need)} ${h.xp}`}</span></div></div></div>
+  hero.innerHTML=`<div class="profile-hero-id"><button type="button" class="profile-hero-avatar" data-hero-avatar title="${h.pick}" aria-label="${h.pick}">${d.pic?.image&&d.pic.status==='approved'?`<img src="${esc(d.pic.image)}" alt="">`:initial}<span class="profile-hero-avatar-edit" aria-hidden="true">${h.pick}</span></button><div class="profile-hero-who"><h3><button type="button" class="profile-hero-name" data-hero-name title="${h.rename}">${esc(d.name||h.rename)}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11.5V13h1.5l6.8-6.8-1.5-1.5L3 11.5zm9.7-6.2a.6.6 0 000-.9l-1-1a.6.6 0 00-.9 0l-.8.8 1.9 1.9.8-.8z"/></svg></button></h3>${d.pic&&['pending','rejected'].includes(d.pic.status)?`<small class="profile-hero-note" data-status="${esc(d.pic.status)}">${d.pic.status==='pending'?h.checking:h.rejected}</small>`:''}<div class="profile-rank"><span class="profile-rank-lv">Lv.<b>${lv.level}</b></span><span class="profile-rank-name">${d.school?`<i class="profile-school" style="--c:${SCHOOLS[d.school].color}">${esc(elementName(d.school,locale))}</i>`:''}${esc(rankTitle(lv.level,locale,d.school))}${lv.level>=SCHOOL_LEVEL?`<button type="button" class="profile-class-go${lv.locked?' is-due':''}" data-class-go>${d.school?cw.again:cw.open}</button>`:`<small class="profile-class-locked">${cw.locked(SCHOOL_LEVEL)}</small>`}</span><span class="profile-rank-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${lv.need}" aria-valuenow="${lv.into}" aria-label="${h.xp}"><i style="--p:${(lv.into/lv.need*100).toFixed(1)}%"></i></span><span class="profile-rank-xp">${lv.locked?`<b class="profile-rank-due">${esc(cw.due)}</b>`:`${nf.format(lv.into)} / ${nf.format(lv.need)} ${h.xp}`}</span></div></div></div>
 <dl class="profile-hero-figs"><div><dt>${h.time}</dt><dd>${time}</dd></div><div><dt>${h.chars}</dt><dd>${nf.format(Number(st.characters)||0)}</dd></div><div><dt>${h.words}</dt><dd>${nf.format(Number(st.words)||0)}</dd></div><div><dt>${h.streak}</dt><dd>${nf.format(Number(st.streak)||0)}<small>${h.days}</small></dd></div></dl>
 ${d.favorites.length?`<div class="profile-hero-fav"><h4>${h.fav}</h4><ol>${d.favorites.map(f=>`<li>${esc(f.title||f)}</li>`).join('')}</ol></div>`:''}`;
+  hero.insertAdjacentHTML('beforeend',`<button type="button" class="secondary" data-edit-profile>${h.edit}</button>`);
   bindHero(hero,d,h);
  }
 
  /* 2026-11-12 (user): the header is where the picture and the name change. Choosing a picture joins the leaderboard
-    when not joined yet (the picture only exists there); the name saves through leaderboard_join when joined, the
+    when not joined yet (the picture only exists there); the name uses the
     same name check as before, and into the local setting otherwise. */
  function bindHero(hero,d,h){
-  const board=d.board||{},sync=v=>{const f=body.querySelector('[name=leaderboardName]');if(f)f.value=v;};
-  hero.querySelector('[data-hero-avatar]').onclick=async()=>{
-   const file=await pickImageFile();if(!file)return;let data;try{data=await cropAvatarFile(file,locale);}catch{toast(h.offline);return;}if(!data||!hero.isConnected)return;
-   const btn=hero.querySelector('[data-hero-avatar]');btn.classList.add('is-busy');
-   try{
-    if(!board.joined){toast(h.joining);await api('leaderboard_join',{name:d.name,shareGames:board.shareGames===true,consent:true});}
-    const r=await api('leaderboard_avatar_set',{data});if(r?.state&&r.state!=='ok')toast(h.offline);
-   }catch(e){toast(String(e?.message||h.offline));}
-   await paintHero(hero);
-  };
   const lv0=readerLevel(d.stats,d.school);
   hero.querySelector('[data-class-go]')?.addEventListener('click',()=>openRite({api,locale,esc,toast,current:d.school,pending:lv0.pending,xpTotal:lv0.xp+lv0.pending,
    onDone:()=>paintHero(hero)}));
-  const nameBtn=hero.querySelector('[data-hero-name]');
-  nameBtn.onclick=()=>{
-   const input=document.createElement('input');input.type='text';input.maxLength=16;input.value=d.name||'';input.className='profile-hero-name-input';input.setAttribute('aria-label',
-    h.rename);
-   nameBtn.replaceWith(input);input.focus();input.select();let done=false;
-   const finish=async save=>{if(done)return;done=true;const v=input.value.trim();
-    if(save&&v&&v!==d.name){try{if(board.joined)await api('leaderboard_join',{name:v,shareGames:board.shareGames===true,consent:true});else await api('settings_save',
-     {scope:'online',values:{leaderboardName:v}});d.name=v;sync(v);toast(h.saved);}catch(e){toast(String(e?.message||h.offline));}}
-    await paintHero(hero);};
-   input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();finish(true);}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();finish(false);}};
-   input.onblur=()=>finish(true);
+  const edit=async(pick=false)=>{
+   if(hero.querySelector('form'))return;
+   const words=avatarCropWords(locale),form=document.createElement('form');
+   form.className='profile-identity-form';
+   form.innerHTML=`<label>${h.rename} <input name="nickname" maxlength="16" required></label>
+    <button type="button" class="secondary" data-picture>${h.pick}</button><img width="48" height="48" alt="" hidden>
+    <button type="submit" class="primary">${h.save}</button><button type="button" class="secondary" data-cancel>${h.cancel}</button><p role="status"></p>`;
+   const input=form.elements.nickname,preview=form.querySelector('img'),status=form.querySelector('[role=status]');
+   let picture='';
+   const settings=body.querySelector('[data-editor]');settings.inert=true;
+   const editButton=hero.querySelector('[data-edit-profile]');
+   editButton.hidden=true;hero.querySelector('[data-class-go]')?.setAttribute('disabled','');hero.append(form);input.value=d.name;input.focus();
+   form.querySelector('[data-cancel]').onclick=()=>paintEditor();
+   const choose=async()=>{
+    const file=await pickImageFile();if(!file)return;
+    try{const data=await cropAvatarFile(file,locale,h.useCrop);if(data){picture=data;preview.src=data;preview.hidden=false;status.textContent=d.board?.joined?'':h.joining;}}
+    catch(error){status.textContent=words[error.message]||words.unreadable;}
+   };
+   form.querySelector('[data-picture]').onclick=choose;
+   form.onsubmit=async event=>{
+    event.preventDefault();if(form.inert)return;
+    form.inert=true;status.textContent='';
+    try{
+     const board=await api('leaderboard_profile',{}),name=input.value.trim();
+     if(name!==board.name||(picture&&!board.joined)){
+      const saved=await api('profile_name_save',{name,joinBoard:!!picture});
+      input.value=saved.name;
+      hero.querySelector('[data-hero-name]').firstChild.textContent=saved.name;
+     }
+     if(picture){
+      const result=await api('leaderboard_avatar_set',{data:picture});
+      if(result?.state!=='ok')throw Error(result?.error||h.offline);
+      toast(words[result.status]||words.pending);
+     }else toast(h.saved);
+     if(dialog.open)await paintEditor();
+    }catch(error){
+     const code=String(error?.message||error).replace(/^LEADERBOARD_/,'');
+     status.textContent=leaderboardWords(locale)[code]||h.offline+' ('+code+')';
+    }
+    finally{
+     form.inert=false;
+     window.dispatchEvent(new Event('megulit-profile-changed'));
+    }
+   };
+   if(pick)await choose();
   };
+  hero.querySelector('[data-edit-profile]').onclick=()=>edit();
+  hero.querySelector('[data-hero-name]').onclick=()=>edit();
+  hero.querySelector('[data-hero-avatar]').onclick=()=>edit(true);
  }
  async function paint(){
   let state;try{state=await api('account_status',{autoSync:false});}catch{state=null;}

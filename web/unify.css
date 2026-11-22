@@ -1893,3 +1893,8 @@ html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.guide
  html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.guide-success{margin-top:18px!important}
  html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-notice-updates{max-height:200px!important}
 }
+
+.profile-identity-form{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px}
+.profile-identity-form label,.profile-identity-form [role=status]{flex-basis:100%}
+.profile-identity-form img{border-radius:50%}
+.profile-identity-form [role=status]:empty{display:none}

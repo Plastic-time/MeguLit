@@ -194,6 +194,29 @@ test('avatars: only small WebP goes up; pictures come back as cached data URLs; 
  assert.deepEqual(await lb.avatarStatus(fixture(t).root,{env:NO_ENV}),{state:'not-configured',status:'none'});
 });
 
+test('profile editor publishes the nickname before updating the navigation chip and caches only approved pictures',async t=>{
+ const {root,db}=fixture(t),id='a'.repeat(32);
+ const options={env:BASE_ENV,account:{accountId:'test',token:()=>''},fetch:async()=>Response.json({error:'NAME_TAKEN'},{status:409})};
+ await lb.saveProfileName(root,db,{name:'Local'},options);
+ await assert.rejects(lb.saveProfileName(root,db,{name:'Taken',joinBoard:true},options),/NAME_TAKEN/);
+ assert.equal(lb.config(root,BASE_ENV,options).joined,false);
+ assert.equal(lb.chip(root).name,'Local');
+ options.fetch=async(url,init)=>{assert.equal(JSON.parse(init.body).name,'Joined');return Response.json({ok:true});};
+ await lb.saveProfileName(root,db,{name:'Joined',joinBoard:true},options);
+ assert.equal(lb.chip(root).name,'Joined');
+ const bytes=Buffer.alloc(40);bytes.write('RIFF');bytes.write('WEBP',8);
+ const data='data:image/webp;base64,'+bytes.toString('base64');
+ options.fetch=async()=>Response.json({status:'approved',avatar:id});
+ await lb.setAvatar(root,data,options);
+ assert.equal(lb.chip(root).avatars[id],data);
+ options.fetch=async()=>Response.json({error:'RATE_LIMITED'},{status:429});
+ assert.equal((await lb.setAvatar(root,data,options)).state,'error');
+ assert.equal(lb.chip(root).avatars[id],data);
+ options.fetch=async()=>Response.json({status:'rejected'});
+ await lb.setAvatar(root,data,options);
+ assert.equal(lb.chip(root).self.avatar,null);
+});
+
 test('name filter also blocks R18 and abuse words on both sides',async()=>{
  const relayValidate=await import(pathToFileURL(path.join(__dirname,'..','relay','src','validate.js')).href);
  for(const name of ['hentai王','R18大好き','エロ魔法使い','巨乳控','智障一号','nmsl','ロリコン','ヘンタイ紳士'])assert.equal(lb.cleanName(name).error,'NAME_BLOCKED',name);

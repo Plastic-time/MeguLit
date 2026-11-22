@@ -581,6 +581,7 @@ async function dispatch(request,runtime=null) {
       case 'daily_anki':return await require('./daily.cjs').anki(root,runtime,request);
       case 'daily_open':{const url=String(request.url||'');if(!require('./daily.cjs').canOpen(url))throw Error('URL_NOT_ALLOWED');const child=spawn('explorer.exe',[new URL(url).href],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {opened:true};}
       /* E377 opt-in leaderboard (services/leaderboard.cjs) */
+      case 'profile_name_save':return await require('./leaderboard.cjs').saveProfileName(root,db,{name:request.name,joinBoard:request.joinBoard===true});
       case 'profile_chip':return require('./leaderboard.cjs').chip(root);
       /* 2026-11-21 传火碑 (services/torch-monument.cjs, web/torch-monument.js) */
       case 'torch_page':return await require('./torch-monument.cjs').page(root,{month:String(request.month||''),cursor:String(request.cursor??''),before:String(request.before??''),limit:Number(request.limit)||300});

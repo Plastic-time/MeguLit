@@ -193,8 +193,8 @@ async function call(url,init,fetcher,who=null,raw=false){
  return {state:'ok',data:data||{}};
 }
 /* submit(stats) — stats as collectStats() returns it; this week's lookup counts ride along (term + count only). */
-async function submit(stats,options={}){
- const root=options.root,c=config(root,options.env,options);
+async function submit(stats,options={},c=config(options.root,options.env,options)){
+ const root=options.root;
  if(!c.joined)return {state:'disabled'};if(!c.configured)return {state:'not-configured'};
  const body={version:1,id:c.installId,name:cleanName(c.name).name,keys:{week:stats?.keys?.week,month:stats?.keys?.month},stats:{}};
  for(const period of PERIODS){const p=stats?.stats?.[period]||{};body.stats[period]=Object.fromEntries(METRICS.map(m=>[m,int(p[m])]));}
@@ -211,6 +211,21 @@ async function submit(stats,options={}){
  const res=await call(c.base+'/api/leaderboard',{method:'POST',body:payload},options.fetch||fetch,identity(root,options));
  if(res.state==='ok'&&root)atomic(stateFile(root),{...relay.readJSON(stateFile(root)),lastSubmitAt:(options.now||new Date()).getTime(),lastSubmitHash:fingerprint});
  return res.state==='ok'?{state:'ok'}:res;
+}
+/* A profile edit can join and rename together. Publish the proposed identity before committing
+   it locally so a refused submission keeps the previous name and membership on this PC. */
+async function saveProfileName(root,db,{name,joinBoard=false},options={}){
+ const checked=cleanName(name);if(!checked.ok)throw Error('LEADERBOARD_'+checked.error);
+ const now=options.now||new Date(),c=config(root,options.env,options);
+ if(c.joined||joinBoard){
+  if(!c.account)throw Error('LEADERBOARD_ACCOUNT_REQUIRED');
+  const installId=c.installId||crypto.randomUUID();
+  const result=await submit(collectStats(db,now,root),{...options,root,now,force:true},{...c,joined:true,name:checked.name,installId});
+  if(result.state!=='ok')throw Error(result.error||'LEADERBOARD_OFFLINE');
+  if(!c.joined)atomic(stateFile(root),{...relay.readJSON(stateFile(root)),installId,consentAt:now.toISOString()});
+  saveOnline(root,{leaderboardEnabled:true,leaderboardName:checked.name});
+ }else saveOnline(root,{leaderboardName:checked.name});
+ return {name:checked.name};
 }
 const AVATAR_ID=/^[0-9a-f]{32}$/;
 /* fetch(period, metric) — named fetchBoard inside so the global fetch stays reachable. */
@@ -270,9 +285,15 @@ async function avatarCall(root,method,options={},body){
 }
 /* → {state:'ok',status:'approved'|'rejected',reason} */
 async function setAvatar(root,data,options={}){
- const res=await avatarCall(root,'POST',options,avatarBytes(data));if(res.state!=='ok')return res;
+ const bytes=avatarBytes(data);
+ const res=await avatarCall(root,'POST',options,bytes);if(res.state!=='ok')return res;
  const status=res.data.status==='approved'?'approved':'rejected';
- atomic(stateFile(root),{...relay.readJSON(stateFile(root)),avatar:{status,reason:String(res.data.reason||'').slice(0,40),id:status==='approved'&&AVATAR_ID.test(String(res.data.avatar||''))?res.data.avatar:''}});
+ const id=status==='approved'&&AVATAR_ID.test(String(res.data.avatar||''))?res.data.avatar:'';
+ if(id){
+  const folder=path.join(root,'data','cache','avatars');
+  try{fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(path.join(folder,id+'.webp'),bytes);trimAvatarCache(folder);}catch{}
+ }
+ atomic(stateFile(root),{...relay.readJSON(stateFile(root)),avatar:{status,reason:String(res.data.reason||'').slice(0,40),id}});
  return {state:'ok',status,reason:String(res.data.reason||'').slice(0,40)};
 }
 async function removeAvatar(root,options={}){const res=await avatarCall(root,'DELETE',options);if(res.state==='ok'){const s=relay.readJSON(stateFile(root));delete s.avatar;atomic(stateFile(root),s);}return res.state==='ok'?{state:'ok'}:res;}
@@ -301,6 +322,9 @@ async function report(root,avatarId,options={}){
 /* Avatar pictures as data URLs (the page's CSP allows no remote images). Ids are immutable, so they are cached on
    disk; at most AVATAR_CACHE files are kept. */
 const AVATAR_CACHE=400;
+function trimAvatarCache(folder){
+ try{const files=fs.readdirSync(folder).map(name=>({name,t:fs.statSync(path.join(folder,name)).mtimeMs})).sort((a,b)=>b.t-a.t);for(const f of files.slice(AVATAR_CACHE))fs.rmSync(path.join(folder,f.name),{force:true});}catch{}
+}
 async function avatarImages(root,ids,options={}){
  const c=config(root,options.env,options),out={},folder=path.join(root,'data','cache','avatars');if(!c.configured)return out;
  const wanted=[...new Set(ids.filter(id=>AVATAR_ID.test(String(id||''))))].slice(0,60),missing=[];
@@ -309,7 +333,7 @@ async function avatarImages(root,ids,options={}){
  for(let i=0;i<missing.length;i+=8)await Promise.all(missing.slice(i,i+8).map(async id=>{const res=await call(c.base+'/api/avatar/'+id,{method:'GET'},fetcher,null,true);
   if(res.state!=='ok'||res.bytes.length>64*1024||res.bytes.toString('latin1',8,12)!=='WEBP')return;out[id]='data:image/webp;base64,'+res.bytes.toString('base64');
   try{fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(path.join(folder,id+'.webp'),res.bytes);}catch{}}));
- if(missing.length)try{const files=fs.readdirSync(folder).map(name=>({name,t:fs.statSync(path.join(folder,name)).mtimeMs})).sort((a,b)=>b.t-a.t);for(const f of files.slice(AVATAR_CACHE))fs.rmSync(path.join(folder,f.name),{force:true});}catch{}
+ if(missing.length)trimAvatarCache(folder);
  return out;
 }
 
@@ -424,4 +448,4 @@ function libraryTitles(db){
  const seen=new Set();return rows.map(r=>String(r.title||'').trim().slice(0,120)).filter(t=>t&&!seen.has(t)&&seen.add(t)).slice(0,500);
 }
 /* forum pictures (forum.cjs) send raw WebP bytes */
-module.exports={chip,relayCall:(...a)=>call(...a),socialCall,appealProfile,cleanBio,profileGet,profileSave,profileCard,followSet,reportProfile,social,libraryTitles,REPORT_KINDS,PERIODS,METRICS,CATEGORIES,BLOCKED,cleanName,cleanTerm,collectStats,collectLookups,hotWeekKey,periodKeys,windows,longestRun,currentRun,config,join,leave,submit,fetch:fetchBoard,view,publicHash,stateFile,identity,setAvatar,removeAvatar,avatarStatus,appealAvatar,avatarImages,report,hotWords};
+module.exports={chip,saveProfileName,relayCall:(...a)=>call(...a),socialCall,appealProfile,cleanBio,profileGet,profileSave,profileCard,followSet,reportProfile,social,libraryTitles,REPORT_KINDS,PERIODS,METRICS,CATEGORIES,BLOCKED,cleanName,cleanTerm,collectStats,collectLookups,hotWeekKey,periodKeys,windows,longestRun,currentRun,config,join,leave,submit,fetch:fetchBoard,view,publicHash,stateFile,identity,setAvatar,removeAvatar,avatarStatus,appealAvatar,avatarImages,report,hotWords};
