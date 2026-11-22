@@ -1,6 +1,6 @@
 -- Recast three historical automatic aliases whose characters also have real-name entries.
 -- Keep receipt numbers, work links and personally chosen names.
-CREATE TEMP TABLE mushoku_aliases(slot INTEGER PRIMARY KEY, old_label TEXT, new_label TEXT);
+CREATE TABLE mushoku_aliases(slot INTEGER PRIMARY KEY, old_label TEXT, new_label TEXT);
 INSERT INTO mushoku_aliases VALUES
  (10,'Sinon','ルーデウス・グレイラット'),
  (16,'Leafa','ロキシー・ミグルディア'),
