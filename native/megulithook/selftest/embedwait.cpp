@@ -7,7 +7,7 @@
    - #696 review: other enabled contexts (Japanese twins) show the line the selected stream has cached.
    Asserts: the stream that is not selected never waits and never clears the answer buffer; redraws hit the cache (the bridge
    is asked once); a new line waits p95 < 5 ms; every new line gets its own answer; every context asks the bridge for its
-   own answer and never borrows the selected stream's.
+   own answer instead of reusing the selected stream's cached one.
    "--old" runs the waiting as it was before (event made after the line went out, empty answers not cached, every stream
    clearing the answer buffer); run.cmd requires that run to FAIL, so the test cannot pass by accident. Exit code = failures. */
 #include "../MeguLitEmbedWait.h"
