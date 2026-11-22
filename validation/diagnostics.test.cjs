@@ -38,7 +38,7 @@ function fixture(t){
  ins.run('c','Game C','',JSON.stringify({library:{engine:''}}),null);
  ins.run('d','Game D','',JSON.stringify({library:{engine:'Artemis',hook:'supported'}}),Math.floor(Date.parse('2026-11-01T09:00:00Z')/1000));
  fs.mkdirSync(path.join(root,'logs'));fs.mkdirSync(path.join(root,'data','config'),{recursive:true});fs.mkdirSync(path.join(root,'data','hook-streams'));
- fs.writeFileSync(path.join(root,'data','config','original-text.json'),JSON.stringify({a:{status:'native-japanese',patchStatus:'ready',engine:'kirikiri',runtime:{engine:'kirikiri',file:'C:\\Users\\Megumin\\Game\\data.xp3',lines:10}}}));
+ fs.writeFileSync(path.join(root,'data','config','original-text.json'),JSON.stringify({a:{status:'native-japanese',patchStatus:'ready',patch:{version:4,coverage:{script:{paired:10}}},patchAlignment:{pairing:{paired:10}},engine:'kirikiri',runtime:{engine:'kirikiri',file:'C:\\Users\\Megumin\\Game\\data.xp3',lines:10}}}));
  fs.writeFileSync(path.join(root,'data','hook-streams','game_a.exe-2.json'),JSON.stringify({name:'KiriKiri',embeddable:true,at:'2026-11-01T10:05:30Z'}));
  const L=o=>JSON.stringify(o);
  fs.writeFileSync(path.join(root,'logs','game-launch.log'),[L({at:'2026-11-01T09:00:00Z',gameId:'d',stage:'launch-failed',error:'GAME_EXITED'}),L({at:'2026-11-01T10:00:00Z',gameId:'a',stage:'launch-request'}),L({at:'2026-11-01T10:00:05Z',gameId:'a',stage:'new-window-ready',exe:'C:\\Users\\Megumin\\Game\\game_a.exe'}),L({at:'2026-11-01T11:00:00Z',gameId:'b',stage:'launch-request'})].join('\n')+'\n');
