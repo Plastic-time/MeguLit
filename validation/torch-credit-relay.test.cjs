@@ -242,8 +242,10 @@ test('unknown work, conflicting work, gate and empty data keep only a receipt; a
 
 test('concurrent claims and exhaustion leave unique displayed names and permit an unused explicit signature',async()=>{
  const {report,call,ENV}=mk(),ip='10.4.0.1';
- const rows=await Promise.all(Array.from({length:26},(_,i)=>report('10.4.0.'+(i+1),KA,undefined,{},'actor'+i).then(r=>r.json())));
- assert.ok(rows.every(r=>r.ok));assert.equal(new Set(rows.filter(r=>r.credit.engraved).map(r=>r.credit.alias)).size,24);
+ const capacity=ENV.DB.raw.prepare('SELECT count(*) n FROM torch_alias_pool').get().n;
+ assert.ok(capacity>=26);
+ const rows=await Promise.all(Array.from({length:capacity+2},(_,i)=>report('10.4.0.'+(i+1),KA,undefined,{},'actor'+i).then(r=>r.json())));
+ assert.ok(rows.every(r=>r.ok));assert.equal(new Set(rows.filter(r=>r.credit.engraved).map(r=>r.credit.alias)).size,capacity);
  const exhausted=rows.findIndex(r=>!r.credit.engraved);assert.ok(exhausted>=0);
  const edit=(i,name)=>call(ip,'PUT','/api/game-profile/credit',{key:KA,name},'actor'+i);
  assert.equal((await edit(exhausted,'Unique Person')).status,200);
@@ -253,9 +255,9 @@ test('concurrent claims and exhaustion leave unique displayed names and permit a
  assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);
  const loser=race[0].status===409?a:b;
  assert.equal((await (await call(ip,'GET','/api/torch/me',undefined,'actor'+loser)).json()).items[0].name,loser===a?'Former A':'Former B');
- assert.equal((await (await call(ip,'GET','/api/torch/monument')).json()).total,25);
- assert.equal(ENV.DB.raw.prepare('SELECT total FROM torch_counter').get().total,26);
- assert.equal(ENV.DB.raw.prepare('SELECT sum(n) n FROM torch_roster_months').get().n,25);
+ assert.equal((await (await call(ip,'GET','/api/torch/monument')).json()).total,capacity+1);
+ assert.equal(ENV.DB.raw.prepare('SELECT total FROM torch_counter').get().total,capacity+2);
+ assert.equal(ENV.DB.raw.prepare('SELECT sum(n) n FROM torch_roster_months').get().n,capacity+1);
 });
 
 test('sparse receipt numbers page backwards by visible rows, include zero, and agree with filtered search',async()=>{
