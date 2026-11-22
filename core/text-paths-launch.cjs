@@ -22,17 +22,19 @@ async function prepare({root,exe,profile={},title='',enabled=false,ownerTestGran
  if(ownerTestGrant){const canary=new Canary(root,exe);canary.settle();if(canary.allowed('artemis')){
   const a=await require('./artemis-session.cjs').prepare({root,exe,ownerTestGrant,shadowRoot,steamAppId:require('./steam-owned.cjs').launchAppid(exe,profile)||null,canary,trace});if(a)return a;
  }}
- const O=require('./owner-tests.cjs'),privateSource=U.unityGame(exe)==='il2cpp'&&O.allowed(ownerTestGrant,{exe,engine:'unity',capability:'diagnostic-input'});
- if(!enabled&&!privateSource)return null;
+ const O=require('./owner-tests.cjs'),privateSource=U.unityGame(exe)==='il2cpp'&&O.allowed(ownerTestGrant,{exe,engine:'unity',capability:'diagnostic-input'}),privateRgss=require('./profiles/index.cjs').engineId(profile.engine)==='rgss'&&O.allowed(ownerTestGrant,{exe,engine:'rgss',capability:'roles'});
+ if(!enabled&&!privateSource&&!privateRgss)return null;
  const canary=new Canary(root,exe);const off=canary.settle();if(Object.keys(off||{}).length)trace('text-paths-canary',{off:Object.keys(off)});
  const steam=require('./steam-owned.cjs').launchAppid(exe,profile)||null; /* E-SteamOwned */
  const steamEnv=steam?{SteamAppId:steam,SteamGameId:steam,SteamOverlayGameId:steam}:{};
  if(require('./profiles/index.cjs').engineId(profile.engine)==='rgss'&&canary.allowed('rgss')){
   const R=require('./text-paths-rgss.cjs');let session;
   try{const resolved=require('./owner-tests.cjs').apply(R.launchProfile({root,exe,profile,title}),ownerTestGrant,{exe,engine:'rgss',prepared:true});if(resolved.draw?.roles!==true)return null;
-   const source=R.plan(exe);session=new R.RgssTextPath();session.drawConfig(resolved.draw);const port=await session.listen(),sh=R.makeShadow({source,shadowRoot:shadowRoot||path.join(root,'data','rgss-shadow'),port,token:session.token});
+   const source=R.plan(exe,{ownerTestGrant});session=new R.RgssTextPath();session.drawConfig(resolved.draw);const port=await session.listen(),sh=R.makeShadow({source,shadowRoot:shadowRoot||path.join(root,'data','rgss-shadow'),port,token:session.token});
    if(ownerTestGrant&&!await require('./owner-tests.cjs').registerLaunch(ownerTestGrant,{exe:sh.exe,engine:'rgss',artifact:sh})){session.stop();trace('text-paths-rgss-skipped',{error:'RGSS_OWNER_ALIAS_REJECTED'});return null;}
-   trace('text-paths-rgss',{shadow:sh.shadow,reused:sh.reused,files:sh.files,bytes:sh.bytes});return {path:'rgss',exe:sh.exe,args:[],env:steamEnv,cwd:sh.shadow,session,connect:async()=>true};
+   const privateGrant=source.generation?ownerTestGrant:null;
+   if(privateGrant){const stop=session.stop.bind(session),unsub=O.onRevoke(privateGrant,()=>session.stop());session.stop=()=>{if(session.stopped)return;stop();unsub();O.revoke(privateGrant);};}
+   trace('text-paths-rgss',{shadow:sh.shadow,reused:sh.reused,files:sh.files,bytes:sh.bytes,generation:source.generation||2});return {path:'rgss',exe:sh.exe,args:[],env:steamEnv,cwd:sh.shadow,session,ownerTestGrant:privateGrant,observeProcess:privateGrant?p=>O.allowed(privateGrant,{exe:sh.exe,engine:'rgss',capability:'roles'})&&O.bind(privateGrant,{pid:p.pid,birth:p.started}):null,connect:async()=>true};
   }catch(error){session?.stop();trace('text-paths-rgss-skipped',{error:error.message});return null;}
  }
  if(W.chromiumShell(exe)&&canary.allowed('web')){
@@ -58,7 +60,9 @@ async function prepare({root,exe,profile={},title='',enabled=false,ownerTestGran
 
 /* Connect a prepared session to the hook reader (core/hook-native.cjs): records in, replacement switch and lines out. */
 function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepared.session;
- if(prepared.path==='rgss'){s.owner=()=>hook.wanted===false||hook.disposed||hook.stopPending||hook.stopError?0:hook.gamePid?.()||hook.target?.pid||0;s.ownerBirth=()=>String(hook.target?.started||hook.windowState?.gameStarted||'');}
+ let rgssShown=null;
+ if(prepared.path==='rgss'&&prepared.ownerTestGrant)s.onClear=m=>{if(!rgssShown||hook.textPath!==s||hook.state?.hookSourceOrigin!=='rgss'||hook.state.hookSequence!==rgssShown.sequence||m.line!==rgssShown.line||m.text!==rgssShown.text||m.pid!==rgssShown.pid||m.birth!==rgssShown.birth)return;rgssShown=null;hook.lastSource='';hook.lastSourceAt=0;hook.pageReset?.();hook.pageText?.reset?.();hook.notify?.({hookSource:'',hookSpeaker:'',hookSourceRuby:[],hookSourceOrigin:'leave',hookSequence:(hook.state.hookSequence||0)+1,receivedText:false,hookMessage:'RGSS 原文已清空'});};
+ if(prepared.path==='rgss'){s.owner=()=>hook.wanted===false||hook.disposed||hook.stopPending||hook.stopError||prepared.ownerTestGrant&&(hook.wanted!==true||hook.ownerTestGrant!==prepared.ownerTestGrant||!require('./owner-tests.cjs').allowed(prepared.ownerTestGrant,{exe:prepared.exe,engine:'rgss',capability:'roles'}))?0:hook.gamePid?.()||hook.target?.pid||0;s.ownerBirth=()=>String(hook.target?.started||hook.windowState?.gameStarted||'');}
  if(prepared.path==='artemis'){
   const current=m=>hook.textPath===s&&hook.wanted!==false&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&s.permission()&&s.owner&&m?.artemisOwner&&hook.target?.pid===s.owner.pid&&hook.target?.started===s.owner.started&&m.artemisOwner.pid===s.owner.pid&&m.artemisOwner.started===s.owner.started;
   let rubyOwner=null,speakerOwner=null;
@@ -88,11 +92,13 @@ function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepa
  }else{
  s.onSource=m=>{if(prepared.path==='web'&&m?.engine==='rpgm')return require('./rpgm-source.cjs').deliver(hook,s,m);const {sameOwner}=require('./unity-kemco-source.cjs');
   if(prepared.path==='rgss'){
-   const current=()=>hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&hook.wanted!==false&&!s.stopped&&s.roles&&s.generation===m.generation&&hook.gamePid?.()===m.pid&&s.body.get(m.line)?.text===m.text;
+   const grantCurrent=()=>!prepared.ownerTestGrant||hook.wanted===true&&hook.ownerTestGrant===prepared.ownerTestGrant&&require('./owner-tests.cjs').allowed(prepared.ownerTestGrant,{exe:prepared.exe,engine:'rgss',capability:'roles'})&&require('./owner-tests.cjs').matches(prepared.ownerTestGrant,{pid:m.pid,birth:s.birth});
+   const current=()=>grantCurrent()&&hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&hook.wanted!==false&&!s.stopped&&s.roles&&s.generation===m.generation&&hook.gamePid?.()===m.pid&&s.body.get(m.line)?.text===m.text;
    if(!current()||typeof hook.emitSource!=='function')return false;
    if(hook.state?.hookSourceOrigin!=='rgss'&&hook.sameAsLast?.(m.text))return true;
    const before=hook.state?.hookSequence||0;hook.emitSource(m.text,'rgss','rgss',m.line);
-   return current()&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='rgss'&&hook.state.hookSourceLine===m.line;
+   const accepted=current()&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='rgss'&&hook.state.hookSourceLine===m.line;
+   if(accepted&&prepared.ownerTestGrant)rgssShown={line:m.line,text:m.text,pid:m.pid,birth:s.birth,sequence:hook.state.hookSequence};return accepted;
   }
   const current=()=>prepared.path==='unity'&&hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&sameOwner(hook.target,m?.unityOwner);
   if(!current())return false;const before=hook.state?.hookSequence||0;hook.source(m,'KEMCO Message');

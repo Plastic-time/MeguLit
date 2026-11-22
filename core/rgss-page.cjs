@@ -5,7 +5,7 @@ const SCRIPT=String.raw`
 # MEGULIT_RGSS_BOOTSTRAP
 unless defined?(MeguLitRGSS)
  module MeguLitRGSS
-  @variant=__VARIANT__; @windows={}; @owners={}; @serial=0; @ui=0; @generation=0; @roles=true; @ready=false; @out=''; @input=''; @socket=nil; @attempt=0
+  @variant=__VARIANT__; @message_mode='__MESSAGE_MODE__'; @windows={}; @owners={}; @serial=0; @ui=0; @generation=0; @roles=true; @ready=false; @out=''; @input=''; @socket=nil; @attempt=0
   class << self
    def observe
     yield
@@ -17,6 +17,7 @@ unless defined?(MeguLitRGSS)
    def api(name,args); Win32API.new('ws2_32',name,args,'i'); end
    def start
     raise 'RGSS Ruby family mismatch' unless @variant==2 || @variant==1 && RUBY_VERSION =~ /\A1\.8\./ || @variant==3 && RUBY_VERSION =~ /\A1\.9\./
+    raise 'RGSS message API mismatch' if @message_mode=='egomaniacs' && (!Window_Message.method_defined?(:text_end) || !Window_Message.method_defined?(:rubi_draw))
     @out=binary(''); @input=binary('')
     @wsa=api('WSAStartup','ip'); @open=api('socket','iii'); @nonblock=api('ioctlsocket','ilp'); @connect=api('connect','ipi')
     @send=api('send','ipii'); @recv=api('recv','ipii'); @close=api('closesocket','i'); @error=api('WSAGetLastError',''); @select=api('select','ipppp')
@@ -106,6 +107,9 @@ unless defined?(MeguLitRGSS)
    end
    def source_ready?(w)
     return false if @variant==1 && !xp_choices
+    if @message_mode=='egomaniacs'
+     return xp_choices[1]==0 && w.instance_variable_get(:@text)=='' && w.instance_variable_get(:@contents_showed)==true
+    end
     return true if w.respond_to?(:pause) && w.pause
     if @variant==1
      choices=xp_choices;return choices && choices[1]>0 && w.respond_to?(:active) && w.active
@@ -120,6 +124,7 @@ unless defined?(MeguLitRGSS)
    def draw(bmp,args)
     return unless active?;c=@owners[bmp.object_id];return unless c
     w=c[:window];r=role(w);return unless r
+    return if @message_mode=='egomaniacs' && w.instance_variable_get(:@__megulit_rgss_rubi)
     if args[0].is_a?(Rect)
      box=args[0];x=box.x;y=box.y;width=box.width;height=box.height;text=args[1];align=args[2] || 0
     else
@@ -136,6 +141,7 @@ unless defined?(MeguLitRGSS)
     if @variant==1
      choices=xp_choices
      unless choices;c[:overflow]=true;return;end
+     if @message_mode=='egomaniacs' && choices[1]>0;c[:overflow]=true;return;end
      if c[:glyphs].empty?;c[:xp_choices]=choices
      elsif c[:xp_choices]!=choices;c[:overflow]=true;return;end
      return if choices[1]>0 && y+height>choices[0]*32
@@ -161,6 +167,9 @@ unless defined?(MeguLitRGSS)
    end
    def visible?(w)
     return false if w.disposed? || !w.visible || w.contents_opacity==0
+    if @message_mode=='egomaniacs' && w.is_a?(Window_Message)
+     history=w.instance_variable_get(:@h_window);return false if history && history.visible
+    end
     bmp=w.contents;return false if !bmp || bmp.respond_to?(:disposed?) && bmp.disposed?
     return false if w.respond_to?(:openness) && w.openness!=255
     v=w.viewport;return false if v && (v.disposed? || !v.visible)
@@ -239,6 +248,12 @@ unless defined?(MeguLitRGSS)
     @windows.values.each{|c|observe{if c[:window].disposed?;dispose(c[:window]);else;bind(c[:window],c[:window].contents);publish(c);end}}
    end
    def install
+    if @message_mode=='egomaniacs'
+     Window_Message.class_eval do
+      alias_method :__megulit_rgss_rubi_draw,:rubi_draw
+      def rubi_draw(*args);before=@__megulit_rgss_rubi;@__megulit_rgss_rubi=true;begin;__megulit_rgss_rubi_draw(*args);ensure;@__megulit_rgss_rubi=before;end;end
+     end
+    end
     Window_Base.class_eval do
      alias_method :__megulit_rgss_initialize,:initialize
      def initialize(*args,&block);r=__megulit_rgss_initialize(*args,&block);MeguLitRGSS.observe{MeguLitRGSS.register(self)};r;end
@@ -278,8 +293,8 @@ unless defined?(MeguLitRGSS)
  end
 end
 `;
-function render({port,token},generation){if(!Number.isInteger(port)||port<1||port>65535||!/^[a-f0-9]{32}$/.test(token))throw Error('RGSS_SESSION_ARGUMENTS');return SCRIPT.replace('__VARIANT__',String(generation)).replace('__PORT__',String(port)).replace('__TOKEN__',token);}
+function render({port,token},generation,messageMode=''){if(!Number.isInteger(port)||port<1||port>65535||!/^[a-f0-9]{32}$/.test(token))throw Error('RGSS_SESSION_ARGUMENTS');return SCRIPT.replace('__VARIANT__',String(generation)).replace('__MESSAGE_MODE__',messageMode).replace('__PORT__',String(port)).replace('__TOKEN__',token);}
 function pageScript(options){return render(options,2);}
 /* No launch path selects these candidates until complete games and original Ruby runtimes are verified. */
-function candidatePageScript({generation,...options}){if(![1,3].includes(generation))throw Error('RGSS_CANDIDATE_GENERATION');return (generation===3?'# encoding: UTF-8\n':'')+render(options,generation);}
+function candidatePageScript({generation,messageMode='',...options}){if(![1,3].includes(generation)||!['','egomaniacs'].includes(messageMode)||messageMode&&generation!==1)throw Error('RGSS_CANDIDATE_GENERATION');return (generation===3?'# encoding: UTF-8\n':'')+render(options,generation,messageMode);}
 module.exports={pageScript,candidatePageScript};

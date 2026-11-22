@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
-const zlib=require('node:zlib');
+const zlib=require('node:zlib'),crypto=require('node:crypto');
 const MAX=8<<20,TOTAL=32<<20;
 
 /* Scripts is data: accept only its primitive Marshal shapes, never Ruby classes or executable object loaders. */
@@ -39,10 +39,12 @@ function marshalInteger(n){
 }
 
 /* Replace only the Main compressed-string token; other objects, links and encoding ivars keep their exact bytes. */
-function patchMain(buffer,bootstrap){
- const table=scriptTable(buffer),main=table.rows.filter(row=>row.name==='Main');
+function patchMain(buffer,bootstrap,{name='Main',sourceSha256}={}){
+ if(name!=='Main'&&!/^[a-f0-9]{64}$/.test(sourceSha256||''))throw Error('RGSS_MAIN_EXACT_HASH_REQUIRED');
+ const table=scriptTable(buffer),main=table.rows.filter(row=>row.name===name);
  if(main.length!==1||table.rows.slice(table.rows.indexOf(main[0])+1).some(row=>!['','exit'].includes(row.source.toString('utf8').trim())))throw Error('RGSS_MAIN_NOT_FINAL');
  const row=main[0];if(row.source.includes(Buffer.from('MEGULIT_RGSS_BOOTSTRAP')))throw Error('RGSS_ALREADY_PATCHED');
+ if(sourceSha256&&crypto.createHash('sha256').update(row.source).digest('hex')!==sourceSha256)throw Error('RGSS_MAIN_SOURCE_CHANGED');
  const prefix=Buffer.from(String(bootstrap),'utf8');if(prefix.length>1<<20)throw Error('RGSS_BOOTSTRAP_BUDGET');
  const source=Buffer.concat([prefix,Buffer.from('\n'),row.source]),packed=zlib.deflateSync(source);
  return Buffer.concat([buffer.subarray(0,row.packed.start),Buffer.from([34]),marshalInteger(packed.length),packed,buffer.subarray(row.packed.end)]);

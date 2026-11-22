@@ -14,9 +14,10 @@ function launchProfile({root,exe,profile,title=''}){
  return P.profileFor({engine:'rgss',exe,exeSha256:key,folder:path.dirname(exe),title,auto:stored?.source==='gate'?undefined:stored?.settings,stepDown:stored?.source==='gate'?stored.settings:undefined});
 }
 function relative(name){const n=String(name||'').replace(/\\/g,'/');if(!n||/^[\/]|:|\0/.test(n)||n.split('/').some(p=>!p||p==='.'||p==='..'))throw Error('RGSS_UNSAFE_INI_PATH');return n;}
-function plan(exe){
+function plan(exe,{ownerTestGrant=null}={}){
  const dir=path.dirname(exe),iniFile=path.join(dir,'Game.ini');if(fs.statSync(iniFile).size>65536)throw Error('RGSS_INI_BUDGET');const ini=fs.readFileSync(iniFile,'latin1'),get=k=>new RegExp('^'+k+'[ \t]*=[ \t]*([^\r\n]+)','im').exec(ini)?.[1]?.trim();
  const library=relative(get('Library')),scripts=relative(get('Scripts'));
+ if(!/^RGSS2\d\d[JE]?\.dll$/i.test(path.basename(library))){const result=require('./rgss-private-samples.cjs').plan(exe,ownerTestGrant);plans.add(result);return result;}
  const dll=path.join(dir,library);if(!/^RGSS2\d\d[JE]?\.dll$/i.test(path.basename(library))||fs.statSync(dll).size>4<<20||!DLLS.has(hash(fs.readFileSync(dll))))throw Error('RGSS_DLL_NOT_VERIFIED');
  if(fs.statSync(exe).size>4<<20||!EXES.has(hash(fs.readFileSync(exe))))throw Error('RGSS_EXE_NOT_VERIFIED');
  if(!/^Data\/Scripts\.rvdata$/i.test(scripts))throw Error('RGSS_SCRIPTS_NOT_VERIFIED');
@@ -30,27 +31,28 @@ function plan(exe){
 
 function shadowPath(exe,shadowRoot){return path.join(shadowRoot,'rgss-'+hash(Buffer.from(fs.realpathSync(exe).toLowerCase())).slice(0,24));}
 function regular(file){const st=fs.lstatSync(file);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1)throw Error('RGSS_SHADOW_FILE_CHANGED');return st;}
-function markerAt(shadow){const file=path.join(shadow,'megulit-rgss-shadow.json');if(regular(file).size>8192)throw Error('RGSS_SHADOW_MARKER');const m=JSON.parse(fs.readFileSync(file,'utf8'));if(m.version!==1||!Number.isSafeInteger(m.sourceFiles)||m.sourceFiles<1||m.sourceFiles>5000||!Number.isSafeInteger(m.sourceBytes)||m.sourceBytes<1||m.sourceBytes>256<<20)throw Error('RGSS_SHADOW_MARKER');return m;}
-function existingShadow({exe,shadowRoot}){try{const shadow=shadowPath(exe,shadowRoot),st=fs.lstatSync(shadow);if(!st.isDirectory()||st.isSymbolicLink())return null;const m=markerAt(shadow);return m.sourceExe===fs.realpathSync(exe)?path.join(shadow,path.basename(exe)):null;}catch{return null;}}
+function markerAt(shadow,maxBytes=256<<20){const file=path.join(shadow,'megulit-rgss-shadow.json');if(regular(file).size>8192)throw Error('RGSS_SHADOW_MARKER');const m=JSON.parse(fs.readFileSync(file,'utf8'));if(m.version!==1||!Number.isSafeInteger(m.sourceFiles)||m.sourceFiles<1||m.sourceFiles>5000||!Number.isSafeInteger(m.sourceBytes)||m.sourceBytes<1||m.sourceBytes>maxBytes)throw Error('RGSS_SHADOW_MARKER');return m;}
+function existingShadow({exe,shadowRoot}){try{const shadow=shadowPath(exe,shadowRoot),st=fs.lstatSync(shadow);if(!st.isDirectory()||st.isSymbolicLink())return null;const m=markerAt(shadow,512<<20);return m.sourceExe===fs.realpathSync(exe)?path.join(shadow,path.basename(exe)):null;}catch{return null;}}
 
 function makeShadow({source,shadowRoot,port,token}){
  if(!plans.has(source))throw Error('RGSS_SOURCE_REQUIRED');
+ const privateSamples=require('./rgss-private-samples.cjs'),pin=privateSamples.verify(source),copyLimit=pin?512<<20:256<<20;
  fs.mkdirSync(shadowRoot,{recursive:true});const base=fs.realpathSync(source.dir),container=fs.realpathSync(shadowRoot);
  if(container===base||container.startsWith(base+path.sep))throw Error('RGSS_SHADOW_INSIDE_GAME');
- const shadow=shadowPath(source.exe,container),sourceExe=fs.realpathSync(source.exe),originalArchive=fs.readFileSync(source.archive),sourceArchiveSha256=hash(originalArchive),archiveName=path.basename(source.archive);
- const patched=Codec.patchMain(source.original,pageScript({port,token})),archive=Codec.patchArchiveV1(originalArchive,source.entry,patched);
+ const shadow=shadowPath(source.exe,container),sourceExe=fs.realpathSync(source.exe),originalArchive=fs.readFileSync(source.archive),sourceArchiveSha256=hash(originalArchive),archiveName=source.storage==='loose'?source.scripts:path.basename(source.archive);
+ const patched=pin?privateSamples.patch(source,{port,token}):Codec.patchMain(source.original,pageScript({port,token})),archive=source.storage==='loose'?patched:Codec.patchArchiveV1(originalArchive,source.entry,patched);
  const reused=fs.existsSync(shadow);let sourceFiles=0,sourceBytes=0;
  if(reused){
-  const st=fs.lstatSync(shadow);if(!st.isDirectory()||st.isSymbolicLink())throw Error('RGSS_SHADOW_CHANGED');const m=markerAt(shadow);
+  const st=fs.lstatSync(shadow);if(!st.isDirectory()||st.isSymbolicLink())throw Error('RGSS_SHADOW_CHANGED');const m=markerAt(shadow,copyLimit);
   if(m.sourceExe!==sourceExe||m.sourceArchiveSha256!==sourceArchiveSha256)throw Error('RGSS_SHADOW_SOURCE_CHANGED');sourceFiles=m.sourceFiles;sourceBytes=m.sourceBytes;
   for(const name of [path.basename(source.exe),source.library,'Game.ini',archiveName])regular(path.join(shadow,name));
-  if(!EXES.has(hash(fs.readFileSync(path.join(shadow,path.basename(source.exe)))))||!DLLS.has(hash(fs.readFileSync(path.join(shadow,source.library))))||hash(fs.readFileSync(path.join(shadow,archiveName)))!==m.patchedArchiveSha256)throw Error('RGSS_SHADOW_CHANGED');
+  if((pin?hash(fs.readFileSync(path.join(shadow,path.basename(source.exe))))!==pin.exe||hash(fs.readFileSync(path.join(shadow,source.library)))!==pin.dll:!EXES.has(hash(fs.readFileSync(path.join(shadow,path.basename(source.exe)))))||!DLLS.has(hash(fs.readFileSync(path.join(shadow,source.library)))))||hash(fs.readFileSync(path.join(shadow,archiveName)))!==m.patchedArchiveSha256)throw Error('RGSS_SHADOW_CHANGED');
   const ini=fs.readFileSync(path.join(shadow,'Game.ini'),'latin1'),get=k=>new RegExp('^'+k+'[ \\t]*=[ \\t]*([^\\r\\n]+)','im').exec(ini)?.[1]?.trim();
-  if(relative(get('Library'))!==source.library||relative(get('Scripts'))!==source.scripts||fs.existsSync(path.join(shadow,source.scripts)))throw Error('RGSS_SHADOW_STARTUP_CHANGED');
+  if(relative(get('Library'))!==source.library||relative(get('Scripts'))!==source.scripts||source.storage!=='loose'&&fs.existsSync(path.join(shadow,source.scripts))||pin&&hash(fs.readFileSync(path.join(shadow,'Game.ini')))!==pin.ini)throw Error('RGSS_SHADOW_STARTUP_CHANGED');
  }else{
  const files=[];let total=0;
- function walk(dir,depth){if(depth>12)throw Error('RGSS_COPY_DEPTH');for(const e of fs.readdirSync(dir,{withFileTypes:true})){const f=path.join(dir,e.name);if(e.isSymbolicLink())throw Error('RGSS_COPY_LINK');if(e.isDirectory())walk(f,depth+1);else if(e.isFile()){total+=fs.statSync(f).size;if(total>256<<20||files.length>=5000)throw Error('RGSS_COPY_BUDGET');files.push(f);}}}
- walk(base,0);fs.mkdirSync(shadow);
+ function walk(dir,depth){if(depth>12)throw Error('RGSS_COPY_DEPTH');for(const e of fs.readdirSync(dir,{withFileTypes:true})){const f=path.join(dir,e.name);if(e.isSymbolicLink())throw Error('RGSS_COPY_LINK');if(e.isDirectory())walk(f,depth+1);else if(e.isFile()){total+=fs.statSync(f).size;if(total>copyLimit||files.length>=5000)throw Error('RGSS_COPY_BUDGET');files.push(f);}}}
+ walk(base,0);if(pin){const space=fs.statfsSync(container);if(space.bavail*space.bsize-total-archive.length<10*1024**3||require('node:os').freemem()<4*1024**3)throw Error('RGSS_PRIVATE_RESOURCE_BUDGET');}fs.mkdirSync(shadow);
  for(const f of files){const target=path.join(shadow,path.relative(base,f));fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(f,target,fs.constants.COPYFILE_EXCL);}
  sourceFiles=files.length;sourceBytes=total;
  }
@@ -63,7 +65,7 @@ function makeShadow({source,shadowRoot,port,token}){
 function launchArtifact(artifact,{exe,sourceExe,shadowRoot}){const a=artifacts.get(artifact);if(!a||a.sourceExe!==sourceExe||a.exe!==exe||a.container!==shadowRoot)return null;return {sourceArchive:a.sourceArchive,files:a.files.map(f=>({...f}))};}
 
 class RgssTextPath{
- constructor({onChars=()=>{},onStatus=()=>{},onSource=()=>false,owner=()=>0,ownerBirth=()=>''}={}){this.onChars=onChars;this.onStatus=onStatus;this.onSource=onSource;this.owner=owner;this.ownerBirth=ownerBirth;this.birth='';this.token=crypto.randomBytes(16).toString('hex');this.roles=false;this.generation=0;this.body=new Map();this.ui=new Map();this.sources=new Set();this.sockets=new Set();this.stopped=false;}
+ constructor({onChars=()=>{},onStatus=()=>{},onSource=()=>false,onClear=()=>{},owner=()=>0,ownerBirth=()=>''}={}){this.onChars=onChars;this.onStatus=onStatus;this.onSource=onSource;this.onClear=onClear;this.owner=owner;this.ownerBirth=ownerBirth;this.birth='';this.token=crypto.randomBytes(16).toString('hex');this.roles=false;this.generation=0;this.body=new Map();this.ui=new Map();this.sources=new Set();this.sockets=new Set();this.stopped=false;}
  async listen(){this.server=net.createServer(s=>this.accept(s));this.server.unref();await new Promise((resolve,reject)=>{this.server.on('error',reject);this.server.listen(0,'127.0.0.1',resolve);});this.port=this.server.address().port;this.timer=setInterval(()=>this.sync(),100);this.timer.unref();return this.port;}
  accept(socket){
   if(this.stopped||this.sockets.size>=4){socket.destroy();return;}this.sockets.add(socket);socket.setNoDelay(true);const decoder=new StringDecoder('utf8');let pending='',pid=0;
@@ -88,10 +90,11 @@ class RgssTextPath{
   if(rec.rects.some(r=>r.some(n=>!Number.isFinite(n)||Math.abs(n)>100000)||r[2]<=0||r[3]<=0))return;
   if(rec.role){if(!['choice','menu','system'].includes(rec.role)||!/^W\d+:\d*$/.test(rec.id||'')||!rec.box||rec.box.some(n=>!Number.isFinite(n)||Math.abs(n)>100000)||rec.text&&(rec.box[2]<=0||rec.box[3]<=0))return;
    const group=rec.role+'|'+rec.id.split(':')[0];if(rec.text){if(this.ui.size>=128&&!this.ui.has(group))return;this.ui.set(group,rec);}else this.ui.delete(group);
-  }else if(rec.text){if(this.body.size>=128&&!this.body.has(rec.line))return;this.body.set(rec.line,rec);}else this.body.delete(rec.line);
+  }else if(rec.text){if(this.body.size>=128&&!this.body.has(rec.line))return;this.body.set(rec.line,rec);}else{this.retire(this.body.get(rec.line));this.body.delete(rec.line);}
   this.onChars(m[2]);
  }
- clear(){for(const rec of this.body.values())this.onChars(TP.formatChars({...rec,text:'',rects:[],hidden:false}));for(const rec of this.ui.values())this.onChars(TP.formatChars({...rec,text:'',rects:[],box:[0,0,0,0],id:rec.id.split(':')[0]+':',hidden:false}));this.body.clear();this.ui.clear();this.sources.clear();}
+ retire(rec){if(!rec)return;const key=rec.line+'|'+rec.text;if(this.sources.delete(key))this.onClear({line:rec.line,text:rec.text,pid:this.pid,birth:this.birth,generation:this.generation});}
+ clear(){for(const rec of this.body.values()){this.retire(rec);this.onChars(TP.formatChars({...rec,text:'',rects:[],hidden:false}));}for(const rec of this.ui.values())this.onChars(TP.formatChars({...rec,text:'',rects:[],box:[0,0,0,0],id:rec.id.split(':')[0]+':',hidden:false}));this.body.clear();this.ui.clear();this.sources.clear();}
  hide(){} want(){} drawEmbed(){} exited(){}
  watch(pid,{alive=p=>{try{process.kill(p,0);return true;}catch(e){return e.code==='EPERM';}},every=1000}={}){clearInterval(this.exitTimer);if(!Number.isSafeInteger(pid)||pid<=0)return;this.exitTimer=setInterval(()=>{if(!alive(pid))this.stop();},every);this.exitTimer.unref();}
  stop(){if(this.stopped)return;this.stopped=true;this.clear();clearInterval(this.timer);clearInterval(this.exitTimer);for(const s of this.sockets)s.destroy();this.sockets.clear();this.server?.close();}
