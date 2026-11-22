@@ -30,7 +30,7 @@ async function ahead(reader,{count=AHEAD}={}){
    if(provider.fill.has(item.text))continue;
    t.service.clearContext?.();for(const line of item.context)t.service.observeSource?.(line);
    /* 2026-11-16 (死に逝く君、館に芽吹く憎悪: 「然后%p-1;%fMS 哥特;——」): a script line's engine tags never go to the translator */const source=require('../core/language-tracks.cjs').engineMarkup(item.text);let text='';try{text=normalizeTranslation(await t.service.translate(source,options,()=>true));}catch{break;}
-   if(!text)continue;provider.fill.set(item.text,text);reader.embedCached?.(item.text,text,{language:options.learnerLanguage==='en'?'en':''});done++;
+   if(!text)continue;provider.fill.set(item.text,text);if(provider===reader.gal?.hooks?.originalText)reader.embedCached?.(item.text,text,{language:options.learnerLanguage==='en'?'en':'',source:'machine'});done++;
   }
  }finally{t.running=false;}
  return done;

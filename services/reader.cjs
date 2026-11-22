@@ -235,11 +235,16 @@ class Reader{
   const allowed=hooks.scriptAllowed();
   let game;try{const db=require('./store.cjs').openStore(this.root);try{game=require('./library.cjs').activeGameForProgram(db,exe);}finally{db.close();}}catch{}
   const ot=require('./original-text.cjs'),key=exe?String(exe).toLowerCase()+'|'+ot.providerKey(this.root,exe,game?.id):'';
-  if(hooks.textSourceAllowed!==allowed||hooks.textSourceKey!==key){
+  const sourceChanged=hooks.textSourceKey!==key;
+  if(hooks.textSourceAllowed!==allowed||sourceChanged){
    this.embedCache?.clear();this.embedOrigins?.clear();this.humanLines?.clear();hooks.textSourceAllowed=allowed;
   }
   if(!exe){hooks.originalText=null;hooks.textSourceKey='';return;}
   if(!force&&hooks.originalText&&hooks.textSourceKey===key)return;hooks.originalText=ot.provider(this.root,exe,{id:game?.id});hooks.textSourceKey=key;hooks.textSourcePid=pid;
+  if(sourceChanged&&exe===this.gameExe){
+   const session=require('./self-check-live.cjs').current();
+   if(session?.reader===this&&session.exe===exe&&session.script!==ot.contributionScript(this.root,exe,game?.id))this.applyGameProfile(exe,game);
+  }
   /* 2026-11-14 the launch notice asks the shared check first: an install known to have Japanese never gets "the script is Chinese" */
   try{const db=require('./store.cjs').openStore(this.root);try{const archive=hooks.originalText?.archiveImport===true;
    hooks.japaneseInstall=game?.id&&!archive?require('./japanese-presence.cjs').verdict(this.root,db,game.id).japanese:null;const lib=JSON.parse(game?.original||'{}').library||{};hooks.setSourceLanguage?.(archive?'':lib.contentLanguage==='zh'?'zh!':lib.contentLanguage==='ja'||hooks.japaneseInstall===true?'ja':hooks.japaneseInstall===false?'zh':'');}finally{db.close();}}catch{hooks.japaneseInstall=null;}}catch{}}
