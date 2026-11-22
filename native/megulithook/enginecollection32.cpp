@@ -229,11 +229,13 @@
 #include "engines/python/Renpy.h"
 #include "emulators/ppsspp.h"
 #include "MeguLitEngines.h" /* MeguLit: exact-program adapters, listed first */
+#include "MusicaBasic.h" /* explicit private, exact executable + scenario pair; ordinary Luna body stream */
 std::vector<ENGINE *> check_engines()
 {
     return {
         new ToMeIsland,
         new ToMeSteinsGate,
+        new MusicaBasic,
         new LovaGame,
         new PPSSPPWindows,
         new VanillawareGC,
