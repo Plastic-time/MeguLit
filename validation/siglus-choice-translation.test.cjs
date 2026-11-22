@@ -25,6 +25,36 @@ function fixture(t){
  const set=rows=>fs.writeFileSync(path.join(patch,'text00.dbs'),dbs(rows.map(([id,ja,zh])=>['【名前】',ja,zh,id]),ids));
  return {root,exe,db,set,patch};
 }
+test('hooked native choices open before coordinates, survive a missed locate and close on the next line',t=>{
+ const {root,exe,db,set,patch}=fixture(t);
+ set([[20,body,'测试正文']]);
+ original.importPatch(root,db,'game',patch);
+ const {HookNative}=require('../core/hook-native.cjs');
+ const events=[],locates=[];
+ const hook=new HookNative({native:root,hook:root,logs:root},m=>events.push(m));
+ t.after(()=>hook.stop());
+ hook.originalText=original.provider(root,exe);
+ hook.locateChoices=texts=>locates.push(texts);
+ hook.emitSource(body,'live');
+ for(const text of [options[1],options[0]+'／',options.join('')])hook.auxText({type:'hookAuxText',sourceName:'SiglusEngine4',role:0,text});
+ hook.requestChoices(0);
+ const pending=hook.state.hookChoices;
+ assert.deepEqual(pending.items,options.map(text=>({text})));
+ assert.equal(pending.geometryPending,true);
+ assert.deepEqual(locates,[options]);
+ hook.choiceBoxes({status:'miss',items:[],missed:options});
+ assert.equal(hook.state.hookChoices,pending);
+ const frames=fs.readFileSync(path.join(__dirname,'helpers/choice-replay/clannad.jsonl'),'utf8').trim().split(/\r?\n/).map(line=>JSON.parse(line).m);
+ const measured=frames.find(m=>m.type==='hookChoiceBoxes'&&options.every(text=>m.items.some(i=>i.text===text)));
+ hook.choiceBoxes({...measured,items:measured.items.slice().reverse()});
+ assert.deepEqual(hook.state.hookChoices.items.map(i=>i.text),options);
+ assert.ok(hook.state.hookChoices.items.every(i=>i.y1>i.y0));
+ hook.emitSource('何もしない。','live');
+ assert.equal(hook.state.hookChoices,null);
+ hook.choiceBoxes(measured);
+ assert.equal(hook.state.hookChoices,null);
+ assert.equal(events.filter(m=>m.hookChoices?.geometryPending).length,1);
+});
 test('a partial installed table can use verified missing choices from its pre-restore backup',t=>{
  const {root,db,set,patch,exe}=fixture(t);
  set([[20,body,'测试正文'],[2410,options[0],labels[0]]]);
@@ -50,6 +80,9 @@ test('serial and Japanese cell bind sparse, reordered translations to the actual
  assert.deepEqual(counts.body,{extracted:2,localPaired:1,workTotal:null});
  assert.deepEqual(counts.choice,{extracted:2,localPaired:2,workTotal:null});
  const provider=original.provider(root,exe);
+ assert.deepEqual(provider.choiceGroupAfter(body,options.slice().reverse()),options);
+ assert.equal(provider.choiceGroupAfter(body,[options[0],options[0]]),null);
+ assert.equal(provider.choiceGroupAfter('何もしない。',options),null);
  assert.equal(provider.resolve(body).translation,'测试正文');
  const pos=provider.position();
  assert.deepEqual(options.map(s=>provider.resolveChoice(s).translation),labels);

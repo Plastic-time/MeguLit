@@ -794,6 +794,21 @@ function staticProvider(root,executable,opts={}){
   let foreignMap,foreignSeqFn;const foreign=(text,opt)=>{if(foreignMap===undefined){foreignMap=null;try{const f=scenes.ENGINES[state.runtime.engine]?.foreign;if(f){const map=f(path.dirname(String(executable)));if(map&&map.size)foreignMap=map;}}catch{}}if(!foreignMap)return '';const k=foreignKey(text),hit=foreignMap.get(k);if(opt?.fuzzy)return (foreignSeqFn||(foreignSeqFn=foreignSeq(foreignMap)))(text);if(hit||!opt?.prefix||k.length<40)return hit||'';/* a truncated stream sample (thread list keeps 110 chars): the one line it starts */let one='';for(const [key,ja] of foreignMap)if(key.startsWith(k)){if(one&&one!==ja)return '';one=ja;}return one;};
   /* position(): the script line read last (core/hook-native.cjs keeps a repeated line's answer only while it is there) */const api={kind:'patch',patch:!!patched,hasLocalPairs:()=>!!patched&&rt.some((ja,i)=>japaneseLine(ja)&&!untranslated(i)&&localTranslation(m.og[i])),fill,drawable,tableDrawable,position:()=>m.last,save:()=>m.save(),load:v=>m.load(v),flowLayout,flowGame,foreign,ocrSuffix:text=>m.ocrSuffix(text),near:text=>{const i=m.near(text);return i>=0?inlineTags(rt[i]):'';},
    translationIndex:{runtime:state.runtime.sha256,patch:patchCurrent(state)?state.patch.sha256:null},
+   // A live hook burst can identify controls before OCR has measured the native glyphs.
+   // Only an exact body anchor followed by the whole recorded choice group qualifies.
+   choiceGroupAfter(body,options){
+    if(!rtIndex.roles||!body||!Array.isArray(options)||options.length<2)return null;
+    const key=matchKey(body);
+    const anchors=(m.heads.get(key.slice(0,4))||[]).filter(i=>rtIndex.roles[i]==='b'&&norm(rt[i])===norm(body));
+    const anchor=anchors.includes(m.last)?m.last:anchors.length===1?anchors[0]:-1;
+    if(anchor<0)return null;
+    let i=anchor+1;
+    while(i<rt.length&&!rt[i]&&rtIndex.roles[i]==='?')i++;
+    const group=[];
+    while(rtIndex.roles[i]==='c')group.push(rt[i++]);
+    const live=new Set(options);
+    return group.length===options.length&&new Set(group).size===group.length&&group.every(text=>live.has(text))?group:null;
+   },
    matchedBody:text=>rtIndex.roles?.[m.last]==='b'&&norm(rt[m.last])===norm(text),
    resolveChoice:require('./script-translation-quality.cjs').choiceLookup(rt,patched?m.og:[],rtIndex.roles),resolve:text=>withRuby(resolveLine(text))};
   if(state.runtime.engine==='nitro-pak'&&require('../core/saya-page-ocr.cjs').legacyExe(path.basename(executable))){

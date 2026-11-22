@@ -563,13 +563,41 @@ class HookNative{
  requestChoices(round){const options=this.choiceFilter(round>0&&this.choiceOptions?this.choiceOptions:this.choice?.options());
   if(!options){this.trace('choice candidates too few n='+(this.choice?.items.length||0));return;}
   if(typeof this.locateChoices!=='function'){this.trace('choice locate unavailable');return;}
-  this.choiceOptions=options;this.choiceRound=round;this.trace('choice locate round='+round+' options='+JSON.stringify(options));this.locateChoices(options);}
+  const group=this.originalText?.choiceGroupAfter?.(this.lastSource,options);
+  const confirmed=!!group&&this.choiceReaderAllowed?.()!==false;
+  if(this.state.hookChoices?.scriptGroup&&!confirmed){
+   if(this.choiceReaderAllowed?.()===false)this.clearChoices('reader disabled');
+   return;
+  }
+  this.choiceOptions=group||options;this.choiceRound=round;
+  if(confirmed&&!this.state.hookChoices?.scriptGroup){
+   this.choice.active=true;
+   this.trace('choice script group confirmed, awaiting native rectangles');
+   this.notify({hookChoices:{items:group.map(text=>({text})),geometryPending:true,scriptGroup:true,at:this.now()}});
+  }
+  this.trace('choice locate round='+round+' options='+JSON.stringify(this.choiceOptions));
+  this.locateChoices(this.choiceOptions,!!group);
+  if(confirmed&&this.state.hookChoices?.geometryPending&&round<2){
+   const screen=this.state.hookChoices;
+   clearTimeout(this.choiceTimer);
+   this.choiceTimer=setTimeout(()=>{if(this.state.hookChoices===screen)this.requestChoices(round+1);},6000);
+   this.choiceTimer.unref?.();
+  }}
  choiceBoxes(m){if(process.env.MEGULIT_HOOK_RECORD)try{fs.appendFileSync(process.env.MEGULIT_HOOK_RECORD,JSON.stringify({t:this.now(),m:{...m,type:'hookChoiceBoxes'}})+'\n');}catch{}const n=v=>Number.isFinite(Number(v))?Math.round(Number(v)):0,items=(Array.isArray(m.items)?m.items:[]).filter(i=>i&&typeof i.text==='string').slice(0,12).map(i=>({text:i.text.slice(0,120),x0:n(i.x0),y0:n(i.y0),x1:n(i.x1),y1:n(i.y1)}));
   this.trace('choice ocr '+String(m.status||'')+' found='+items.length+' boxes='+JSON.stringify(items.map(i=>[i.text,i.x0,i.y0,i.x1,i.y1]))+' missed='+JSON.stringify(m.missed||[])+' screen='+m.sw+'x'+m.sh+' rows='+JSON.stringify(m.rows||[]));
   if(!this.choiceOptions)return;
-  {const fixed=placeChoices(items,this.choiceOptions,Array.isArray(m.missed)?m.missed.map(String):[],this.choice?.order);if(fixed.length!==items.length)this.trace('choice placed '+JSON.stringify(fixed.map(i=>[i.text,i.x0,i.y0,i.x1,i.y1])));items.splice(0,items.length,...fixed);}
+  const scriptGroup=this.state.hookChoices?.scriptGroup===true;
+  if(scriptGroup){
+   // Only replace the detached labels with measured rectangles for this entire group.
+   const ordered=this.choiceOptions.map(text=>items.find(i=>i.text===text&&i.x1>i.x0&&i.y1>i.y0));
+   if(!ordered.every(Boolean)||!(m.sw>0&&m.sh>0)){
+    if(!this.state.hookChoices.geometryPending&&!items.length&&m.status==='miss'&&this.choiceOptions.every(text=>m.missed?.includes(text)))this.clearChoices('choices no longer on screen');
+    return;
+   }
+   items.splice(0,items.length,...ordered);
+  }else{const fixed=placeChoices(items,this.choiceOptions,Array.isArray(m.missed)?m.missed.map(String):[],this.choice?.order);if(fixed.length!==items.length)this.trace('choice placed '+JSON.stringify(fixed.map(i=>[i.text,i.x0,i.y0,i.x1,i.y1])));items.splice(0,items.length,...fixed);}
   /* 2026-11-13 one box is enough when every other option is only ellipses (nothing to read or translate there) */
-  if(items.length>=2||items.length===1&&this.choiceOptions.length>=2&&(m.missed||[]).length>0&&(m.missed||[]).every(s=>SYMBOL_OPTION.test(String(s)))){this.choice.active=true;this.notify({hookChoices:{items,sw:n(m.sw),sh:n(m.sh),at:this.now(),/* options on screen OCR could not box (ellipsis rows): the reader keeps clear of them */unboxed:Math.max(0,this.choiceOptions.length-items.length)}});
+  if(items.length>=2||items.length===1&&this.choiceOptions.length>=2&&(m.missed||[]).length>0&&(m.missed||[]).every(s=>SYMBOL_OPTION.test(String(s)))){this.choice.active=true;this.notify({hookChoices:{items,...(scriptGroup&&{scriptGroup:true}),sw:n(m.sw),sh:n(m.sh),at:this.now(),/* options on screen OCR could not box (ellipsis rows): the reader keeps clear of them */unboxed:Math.max(0,this.choiceOptions.length-items.length)}});
    /* the buttons can move (hover, animation): read them again a few times while the choice screen is up */const r=(this.choiceRound||0)+1;if(r<=8){clearTimeout(this.choiceTimer);this.choiceTimer=setTimeout(()=>{if(this.choice?.active)this.requestChoices(r);},1500);this.choiceTimer.unref?.();}}
   else if(this.choice?.active)this.clearChoices('choices no longer on screen');}
  /* 2026-11-13 the choice detector also knows the names learned from bare name lines (CLANNAD 「朋也」) */newChoiceCapture(){const C=new ChoiceCapture(()=>this.now());C.extraNames=()=>this.knownSpeakers||[];return C;}
@@ -1140,6 +1168,7 @@ class HookNative{
   return true;
  }
  stop(dispose=true){
+  if(this.state.hookChoices?.scriptGroup)this.clearChoices('hook stopped');
   this.sayaOcr?.stop();this.sayaOcr=null;
   require('./danganronpa-pc-source.cjs').clear(this);
   let sourceStop;try{sourceStop=this.textPath?.stopIl2CppSource?.();}catch(error){sourceStop=Promise.reject(error);}sourceStop?.catch(()=>{});
