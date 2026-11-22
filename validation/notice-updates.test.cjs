@@ -52,6 +52,78 @@ test('a long update list builds only the first rows at once, the rest when idle'
   assert.strictEqual(list.children[0].children[0].textContent, '11.01');
 });
 
+test('startup notice stays non-modal on a delayed cold cache and opens with the first rows', async t => {
+  const { mountDevNotice } = await import(pathToFileURL(path.join(web, 'feedback-ui.js')).href);
+  const { dialog, list, note } = fakeDom();
+  const game = new El('input'), form = new El('form'), button = new El('button'), seed = { querySelector: () => null };
+  const elements = new Map([['form', form], ['.dev-notice-game', game], ['.feedback-status', new El('p')],
+    ['.dev-notice-updates', list], ['.dev-notice-updates-note', note]]);
+  const openedWithRows = [];
+  Object.assign(dialog, {
+    isConnected: false,
+    querySelector: selector => selector === '[data-guide-level]' ? null : elements.get(selector) || button,
+    querySelectorAll: selector => selector === '.dev-notice-page' ? [{}, seed, {}] : [button],
+    addEventListener() {},
+    showModal() { this.open = true; openedWithRows.push(list.children.length); },
+    remove() { this.open = this.isConnected = false; },
+  });
+  document.createElement = tag => tag === 'dialog' ? dialog : new El(tag);
+  document.querySelector = () => dialog.isConnected ? dialog : null;
+  document.body = { append: node => { node.isConnected = true; } };
+
+  const store = new Map();
+  globalThis.localStorage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value) };
+  let canShow = true, answer, requests = 0;
+  const options = { locale: 'en', esc: String, canShow: () => canShow, api: action => {
+    if (action !== 'site_updates') return Promise.resolve(null);
+    requests++;
+    return new Promise(resolve => { answer = resolve; });
+  } };
+
+  const skipped = mountDevNotice(options);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepStrictEqual(openedWithRows, [], 'the main page has no modal backdrop while the request is pending');
+  await mountDevNotice(options);
+  assert.strictEqual(requests, 1, 'only one notice prepares at a time');
+  canShow = false;
+  answer([]);
+  await skipped;
+  assert.strictEqual(dialog.isConnected, false);
+  assert.deepStrictEqual(openedWithRows, [], 'skip if the user left home or another dialog opened');
+
+  canShow = true;
+  const shown = mountDevNotice(options);
+  assert.strictEqual(dialog.open, false);
+  answer(rows(5));
+  await shown;
+  assert.deepStrictEqual(openedWithRows, [5]);
+  dialog.remove();
+  await mountDevNotice(options);
+  assert.strictEqual(requests, 2, 'the startup notice opens at most once per launch');
+
+  const cached = mountDevNotice({ ...options, force: true });
+  assert.deepStrictEqual(openedWithRows, [5, 5], 'the warm cache opens immediately');
+  answer([]);
+  await cached;
+  dialog.remove();
+
+  store.clear();
+  const offline = mountDevNotice({ ...options, force: true, api: async () => { throw Error('offline'); } });
+  assert.strictEqual(dialog.open, false);
+  await offline;
+  assert.strictEqual(dialog.open, true, 'an offline response still opens the notice');
+  dialog.remove();
+
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const stalled = mountDevNotice({ ...options, force: true });
+  t.mock.timers.tick(11999);
+  assert.strictEqual(dialog.open, false);
+  t.mock.timers.tick(1);
+  await stalled;
+  assert.strictEqual(dialog.open, true, 'a stalled service cannot prevent the notice from opening');
+  answer([]);
+});
+
 test('every web stylesheet has balanced braces', () => {
   for (const f of fs.readdirSync(web).filter(x => x.endsWith('.css'))) {
     const s = fs.readFileSync(path.join(web, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');

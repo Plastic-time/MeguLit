@@ -130,8 +130,8 @@ export function drawUpdates(dialog, locale, items) {
   list.hidden = note.hidden = !rows.length;
   return rows.length;
 }
-async function fillUpdates(dialog, locale, api) {
-  const cached = cachedUpdates(), first = cached ? JSON.stringify(cached.slice(0, 300)) : "";
+async function fillUpdates(dialog, locale, api, cached = cachedUpdates()) {
+  const first = cached ? JSON.stringify(cached.slice(0, 300)) : "";
   if (cached) drawUpdates(dialog, locale, cached);
   try {
     const items = await api('site_updates', {});
@@ -142,11 +142,10 @@ async function fillUpdates(dialog, locale, api) {
   } catch { /* offline: the cached list (or none) stays */ }
 }
 
-export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', force = false }) {
+export async function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', force = false, canShow = () => true }) {
   if ((shownThisLaunch && !force) || document.querySelector('.dev-notice')) return;
-  shownThisLaunch = true;
   const t = words(locale), dialog = document.createElement('dialog');
-  dialog.className = 'game-dialog dev-notice seed-flow';
+  dialog.className = 'game-dialog dev-notice seed-flow startup-notice';
   dialog.innerHTML = `<div class="dev-notice-page" data-page="1"><div class="dev-notice-top"><span>${esc(t.noticeKicker)}</span><span>${esc(t.noticeTag)}</span></div>
 <h2>${esc(t.noticeTitle)}</h2><h2 class="dev-notice-title2">${esc(t.noticeTitle2)}</h2>${successHTML(locale, esc)}<p class="dev-notice-text">${esc(t.noticeText)}</p>
 <form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="secondary">${esc(t.submit)}</button></form><p class="dev-notice-rule">${esc(t.gameRule)}</p>
@@ -160,7 +159,6 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
 <div class="dev-notice-actions"><button type="button" class="text-button" data-back>${esc(t.back)}</button><button type="button" class="secondary" data-ok>${esc(t.done)}</button></div></div>`;
   document.body.append(dialog);
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  fillUpdates(dialog, locale, api);
   const form = dialog.querySelector('form'), game = dialog.querySelector('.dev-notice-game'), status = dialog.querySelector('.feedback-status');
   form.onsubmit = async event => {
     event.preventDefault();
@@ -184,13 +182,23 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
     if (n === 2) two.querySelector('[data-page-no]').textContent = total === 3 ? '3 / 3' : '2 / 2';
     shown.querySelector('.secondary, .primary').focus();
   };
-  fillSeedCount(seed, locale, api);
   dialog.querySelector('[data-next]').onclick = () => { if (seedSeen()) { trail.push(2); page(2); } else { markSeedSeen(); trail.push('seed'); page('seed'); } };
   dialog.querySelector('[data-next-guide]').onclick = () => { trail.push(2); page(2); };
   dialog.querySelectorAll('[data-back]').forEach(b => { b.onclick = () => { trail.pop(); page(trail[trail.length - 1] || 1); }; });
   dialog.querySelector('[data-ok]').onclick = () => dialog.close();
   dialog.querySelector('[data-report]').onclick = () => { dialog.close(); openFeedback({ api, locale, esc, toast, version }); };
+  const cached = cachedUpdates();
+  const updates = fillUpdates(dialog, locale, api, cached);
+  if (!cached?.length) {
+    /* On a cold cache, let the log arrive while the dialog is still closed. The service has a 10s network deadline. */
+    let timer;
+    const deadline = new Promise(resolve => { timer = setTimeout(resolve, 12000); });
+    await Promise.race([updates, deadline]).finally(() => clearTimeout(timer));
+  }
+  if (!dialog.isConnected || !canShow()) { dialog.remove(); return; }
   dialog.showModal();
+  shownThisLaunch = true;
+  fillSeedCount(seed, locale, api);
   fillGuideLevel(dialog, { api, locale, esc }); /* the by-level part of the guide follows the chosen level */
 }
 
