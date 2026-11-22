@@ -325,7 +325,7 @@ async function syncPush(request, env, auth, kind, now) {
   for (const raw of list) {
     const r = validateRecord(kind, raw, now.getTime()); if (r.error) return fail(r.error, r.error === 'RECORD_TOO_LARGE' ? 413 : 400, { key: typeof raw?.key === 'string' ? raw.key.slice(0, 200) : '' });
     // Older clients can send a truncated legacy sentence under the hash of its full original text.
-    if (kind === 'sentences' && r.json && encoder.encode(r.json).length > (8 << 10) && /^s:[a-f0-9]{32}$/.test(r.key)) {
+    if (kind === 'sentences' && encoder.encode(r.json ?? '').length > (8 << 10) && /^s:[a-f0-9]{32}$/.test(r.key)) {
       if (typeof r.data.text !== 'string' || r.key !== 's:' + (await sha256(r.data.text)).slice(0, 32)) return fail('RECORD_TOO_LARGE', 413, { key: r.key });
     }
     incoming.set(r.key, newerRecord(incoming.get(r.key), r));

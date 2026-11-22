@@ -183,6 +183,17 @@ test('the relay bounds the size of each serialized sentence in bytes',async()=>{
  assert.equal(validateRecord('sentences',body(40*1024+1),updated_at).error,'RECORD_TOO_LARGE');
 });
 
+test('the larger-record safeguard keeps existing sync keys and rejects missing original text',async()=>{
+ const {handleAccounts,sha256}=await load(),r=relay(),a=await login(handleAccounts,r),updated_at=T0.getTime();
+ const send=(kind,key,data)=>handleAccounts(req('PUT','/api/sync/'+kind,{records:[{key,updated_at,data}]},
+  {authorization:'Bearer '+a.token}),r.env,T0);
+ const key='s:'+(await sha256('undefined')).slice(0,32),translation='読'.repeat(3000);
+ assert.equal((await send('sentences',key,{text:'legacy'})).status,200,'small legacy records keep their previous behavior');
+ assert.equal((await send('sentences','legacy-key',{text:'legacy',translation})).status,200,'older opaque keys are not content hashes');
+ assert.equal((await send('words',key,{definition:translation})).status,200,'the rule only applies to saved sentences');
+ assert.equal((await send('sentences',key,{translation})).status,413,'a matching hash of undefined cannot stand in for original text');
+});
+
 test('client: not configured / logged out stays local; login keeps the token in the vault file, not in profile.json',async t=>{
  const r=relay(),clock={now:T0.getTime()},dev=device(t,r,clock);
  const plain=new account.Account(dev.root,{env:{MEGULIT_RELAY_BASE:'off'},vault:(a,v)=>v});
