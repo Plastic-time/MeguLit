@@ -59,7 +59,7 @@ function classify(dir){
   else if(e.c.kind){role='protected';kind=e.c.kind;reason='text';}
   return {name:e.name,file:e.file,size:e.size,role,kind,reason};});
 }
-const usable=(e,allowTranslated)=>e.role==='clean'&&!NOT_LAUNCHER.test(e.name)&&!isVersionedUpdater(e.name)&&(allowTranslated||!TRANSLATED_NAME.test(e.name.replace(/\.exe$/i,'')))&&e.size>=20000;
+const usable=(e,allowTranslated)=>e.role==='clean'&&!NOT_LAUNCHER.test(e.name)&&(allowTranslated||!TRANSLATED_NAME.test(e.name.replace(/\.exe$/i,'')))&&e.size>=20000;
 /* A small clean program beside a protected one starts it (crack / translation launcher); a clean one of about the same
    size is the engine program itself with the protection removed. Named launchers first, then the larger file. */
 function launchersFor(list,target,allowTranslated){
@@ -71,7 +71,9 @@ function replacementFor(list,target,allowTranslated){return list.filter(e=>usabl
    {kind, name:{zh,en,ja}, executable, launchVia, original, wrapped, changed, launcherNames, alternatives} */
 function plan(exe,{allowTranslated=true,source=''}={}){
  exe=String(exe||'');if(!/\.exe$/i.test(exe)||!stat(exe))return null;
- const dir=path.dirname(exe),list=classify(dir),self=list.find(e=>e.name.toLowerCase()===path.basename(exe).toLowerCase());if(!self)return null;
+ // An updater can have its own DRM, so exclude it before selecting either an engine or a launcher.
+ const list=classify(path.dirname(exe)).filter(e=>!isVersionedUpdater(e.name));
+ const self=list.find(e=>e.name.toLowerCase()===path.basename(exe).toLowerCase());if(!self)return null;
  const engines=list.filter(e=>e.role==='protected').sort((a,b)=>b.size-a.size);
  let target=null;
  if(self.role==='protected')target=self;

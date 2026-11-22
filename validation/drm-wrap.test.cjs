@@ -57,6 +57,16 @@ test('versioned updaters beside a game are excluded from scanning and launch pla
  assert.equal(plan.launchVia,'');
  assert.deepEqual(plan.alternatives,[]);
 });
+test('a protected versioned updater cannot be the engine for a smaller clean game',t=>{
+ const dir=folder('Novel',{'Novel.exe':pe(1400000),
+  'NovelUpdata1.01.exe':pe(8000000),'NovelUpdata1.01.exe.emb':SIG,
+  'NovelUpdate2.1.exe':pe(6000000,{ascii:['DMMGamePlayer']})});
+ t.after(()=>fs.rmSync(path.dirname(dir),{recursive:true,force:true}));
+ assert.deepEqual(drm.classify(dir).filter(e=>e.role==='protected').map(e=>e.kind).sort(),['dmm','softdenchi']);
+ const exe=path.join(dir,'Novel.exe');
+ assert.equal(drm.plan(exe),null);
+ assert.equal(drm.plan(path.join(dir,'NovelUpdata1.01.exe')),null);
+});
 test('a cracked engine program of about the same size replaces the protected one directly',()=>{
  const dir=softdenchi({'bug02_yakata_crack.exe':pe(3782000)});const p=drm.plan(path.join(dir,'bug02_yakata.exe'));
  assert.equal(base(p.executable),'bug02_yakata_crack.exe');assert.equal(p.launchVia,'');
