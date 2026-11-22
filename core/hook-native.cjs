@@ -437,12 +437,16 @@ class HookNative{
     page rules (core/page-text.cjs) never knew it was a page game. Another stream of the same game that carries the text box as the
     game holds it (several lines, the current line among them: TMP set_text of the whole page) is that evidence: the game pages,
     and a page that holds the current line but no longer the one before it was turned before this line. Any engine. */
- auxPage(m){try{const P=this.pageText;if(!P||typeof m?.text!=='string'||!m.text.includes(String.fromCharCode(10)))return;const k=HookNative.flat(m.text.replace(/<[^>]*>/g,'')),R=this.hookRecent||[],cur=R.length?R[R.length-1].key:'';if(cur.length<2||!k.includes(cur))return;
-  P.paging=true;P.auxPageAt=this.now();const prev=R.length>=2?R[R.length-2].key:'';
+ auxPage(m){try{const P=this.pageText;if(this.calibrating||!P||typeof m?.text!=='string'||!m.text.includes(String.fromCharCode(10)))return;const k=HookNative.flat(m.text.replace(/<[^>]*>/g,'')),R=this.hookRecent||[],cur=R.length?R[R.length-1].key:'';if(cur.length<2||!k.includes(cur))return;
+  const prev=R.length>=2?R[R.length-2].key:'';
+  /* One wrapped sentence (TextRender during calibration) is still ADV. Start a page only when the other stream
+     demonstrably retains two distinct dialogue lines. An established page may then report its first new line alone. */
+  if(!P.pages&&(k===cur||!prev||prev===cur||!k.includes(prev)))return;
+  P.paging=true;P.auxPageAt=this.now();
   if(prev&&prev!==cur&&!k.includes(prev)&&this.pageSaidSame===true&&P.auxResetFor!==cur){P.auxResetFor=cur;this.pageSaidSame=false;this.trace('page turned before this line (the page text no longer holds the line before it)');this.emit({type:'hookPage',engine:'text',reset:true,at:this.now()});}}catch{}}
  /* share of the character pairs of `flat` found in the hooked lines of the last ten minutes (0 when nothing to compare) */
  static hookOverlap(flat,recent,now){const t=String(flat||'');if([...t].length<4||!Array.isArray(recent))return 0;const hay=recent.filter(r=>now-r.at<600000).map(r=>r.key).join(String.fromCharCode(10));if(!hay)return 0;const ch=[...t];let n=0,hit=0;for(let i=0;i+1<ch.length;i++){n++;if(hay.includes(ch[i]+ch[i+1]))hit++;}return n?hit/n:0;}
- auxText(m){this.auxPage(m);/* 2026-11-15 (沙耶の唄, user: 「ocr遮挡又出来了」): the dialogue hook sends each line on two thread contexts; the one not selected
+ auxText(m){this.auxPage(m);{const sp=splitSpeaker(m?.text,this.knownSpeakers);if(sp.name&&!sp.text.trim()){this.speaker={text:sp.name,at:this.now()};this.noteSpeaker(sp.name);return;}}/* 2026-11-15 (沙耶の唄, user: 「ocr遮挡又出来了」): the dialogue hook sends each line on two thread contexts; the one not selected
     came here as aux text, went to the art path and its translation was drawn over the game's own line. A line from the same hook
     as the dialogue stream is dialogue, never art text. */
   if(m.sourceName&&this.dialogueHook&&String(m.sourceName)===this.dialogueHook)return;/* nor choice text (user: 「不是选项」) */
