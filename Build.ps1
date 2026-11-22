@@ -55,10 +55,10 @@ function Invoke-TaskCmd([string]$Script) {
  if ($Script -like '*.ps1') { & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '$Script' 2>&1; exit `$LASTEXITCODE" | Out-Host; return $LASTEXITCODE }
  & cmd /c ('""' + $Script + '" 2>&1"') | Out-Host; return $LASTEXITCODE }
 function Invoke-TaskSelfTest([string]$Script) {
- $body = "& '" + $Script.Replace("'","''") + "' 2>&1; exit `$LASTEXITCODE"
+ $body = "& '" + $Script.Replace("'","''") + "'; exit `$LASTEXITCODE"
  $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($body))
  $powerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
- & $taskNode (Join-Path $taskRoot 'tools/run-isolated.cjs') $powerShell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded | Out-Host
+ & $taskNode (Join-Path $taskRoot 'tools/run-isolated.cjs') $powerShell -NonInteractive -NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded | Out-Host
  return $LASTEXITCODE
 }
 foreach ($taskNb in (Get-Content -LiteralPath (Join-Path $taskRoot 'native/native-builds.json') -Raw | ConvertFrom-Json)) {
