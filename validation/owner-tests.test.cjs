@@ -25,6 +25,15 @@ test('zero default and opaque tokens; process identity required before profile a
  const again=O.apply(a,token,f.options);assert.equal(again.layers,a.layers);assert.equal(O.apply(again,null,f.options).draw.roles,false);assert.equal(O.apply(again,null,f.options).draw.kemcoSprites,false);
  assert.equal(O.matches(token,{pid:42,birth:'1234'}),false);assert.equal(O.allowed(token,f.ctx),false);
 });
+test('KiriKiri blanked dialogue keeps reader ruby even when an older owner manifest enables native embed',async t=>{
+ const f=fixture(t,'kirikiri'),base=P.profileFor({exe:f.exe,engine:'kirikiri'});
+ const senren=P.apply(base,{placement:{drawWhileBlanking:true}},'test');
+ const token=await O.resolve(f.root,f.options);assert.ok(token);
+ assert.equal(O.bind(token,{pid:41,birth:'1234'}),true);
+ const {krkrControlText,settings}=require('../core/engine-draw.cjs');
+ assert.match(krkrControlText(settings(O.apply(senren,token,f.options)),[]),/^#cfg roles=1 embed=0 /);
+ assert.match(krkrControlText(settings(O.apply(base,token,f.options)),[]),/^#cfg roles=1 embed=1 /);
+});
 test('same exe in another directory or different script cannot use this grant',async t=>{
  const f=fixture(t),other=path.join(f.dir,'other');fs.mkdirSync(other);const b=path.join(other,'Game.exe');fs.copyFileSync(f.exe,b);fs.writeFileSync(path.join(other,'data.dat'),'different script');
  const token=await O.resolve(f.root,f.options);O.bind(token,{pid:42,birth:'2'});assert.equal(O.allowed(token,{...f.ctx,exe:b}),false);assert.equal(await O.resolve(f.root,{...f.options,exe:b}),null);

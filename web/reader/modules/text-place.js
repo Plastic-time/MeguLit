@@ -629,7 +629,17 @@
     drawExtras();
     if (page) return applyPage();
     if (!on || !line) { document.body.classList.remove('megulit-place-garbled'); release(); gameDrawn(); return; }
-    if (line.fallback) { release(true); return; }
+    if (line.cleared) {
+      gameDrawn();
+      release(true);
+      document.body.classList.toggle('megulit-place-gone', readerLine() === line.text);
+      return;
+    }
+    if (line.fallback) {
+      const native = gameDrawn();
+      document.body.classList.remove('megulit-place-garbled');
+      if (native || !line.rects?.length) { release(!native); return; }
+    }
     const win = target(), sentence = win?.querySelector('.sentence-text:not(.megulit-old-line)');
     orphansMeet(line);
     if (!sentence) { orphan(line); release(); return; }
@@ -649,6 +659,8 @@
        reader's own place, a different spot from the line before. The characters are aligned instead (align()); a line
        is placed when most of the game's characters are found in it. */
     const idx = readerText ? align([...readerText], [...placeText]) : null;
+    // A blank-stream placement supplies geometry only for its matching source. The reader may already be one line ahead.
+    if (!idx && line.fallback) { release(true); return; }
     // Estimated glyph rows describe the host's guess. Use their origin with the reader's own wrap width.
     if (anchorMode && line.approx) {
       const map = mapper(line.client), first = map(line.rects[0]);
@@ -797,21 +809,36 @@
     if (key !== lastGeom) { lastGeom = key; dispatchEvent(new CustomEvent('megulit-reveal-progress', { detail: { typing: false } })); window.__tomoyoHitRegionsRefresh?.(true); }
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(apply); };
-  b.textPlace = m => { if (m?.gone === true) { pageCleared(m.text); return; } if (m && Array.isArray(m.rects) && m.text && [...String(m.text)].filter(c => !blank(c)).join('') !== goneText) goneText = ''; if (m && m.text && typeof m.read === 'boolean') b.lineReadDrawn?.(m.text, m.read); if (m && m.text && typeof m.color === 'string') b.lineColorDrawn?.(m.text, m.color); if (m?.visible === true) { const vis = [...String(m.text || '')].filter(c => !blank(c)).join(''), cur = line && !line.fallback ? [...String(line.text || '')].filter(c => !blank(c)).join('') : '';
+  b.textPlace = m => {
+    if (m?.clearedFallback) {
+      drawnByGame = '';
+      line = { cleared: true, fallback: true, text: [...String(m.text)].filter(c => !blank(c)).join('') };
+      schedule(); return;
+    }
+    if (m?.gone === true) { pageCleared(m.text); return; } if (m && Array.isArray(m.rects) && m.text && [...String(m.text)].filter(c => !blank(c)).join('') !== goneText) goneText = '';
+    const draw = Number.isSafeInteger(m?.sourceToken) ? m.id + '/' + m.sourceToken : undefined;
+    if (m?.text && typeof m.read === 'boolean') b.lineReadDrawn?.(m.text, m.read, draw);
+    if (m?.text && typeof m.color === 'string') b.lineColorDrawn?.(m.text, m.color, draw);
+    if (m?.visible === true) { const vis = [...String(m.text || '')].filter(c => !blank(c)).join(''), cur = line && !line.fallback ? [...String(line.text || '')].filter(c => !blank(c)).join('') : '';
     /* 2026-11-20 (CHAOS;CHILD: the click that clears a page at a scene change makes the game draw the whole page once more as plain text,
        earlier lines and the placed one together, while its hidden line leaves the screen): the placed line goes with the page until the next line */
     if (m.hiding === true && cur && vis.length > cur.length && vis.endsWith(cur)) { document.body.classList.add('megulit-place-gone'); line = null; schedule(); return; }
-    drawnEmbedded = m.embedded === 1 || m.embedded === 2 ? m.embedded : 0; drawnByGame = vis; drawnHiding = m.hiding === true; schedule(); return; } if (m && Array.isArray(m.rects) && m.text) { drawnByGame = ''; stale.delete([...String(m.text)].filter(c => !blank(c)).join('')); } { const nb = t => [...String(t || '')].filter(c => !blank(c)).join(''), cur = line && !line.fallback ? nb(line.text) : '', nt = m?.fallback && m.text ? nb(m.text) : '';
+    if (line?.cleared) { line = null; document.body.classList.remove('megulit-place-gone'); }
+    drawnEmbedded = m.embedded === 1 || m.embedded === 2 ? m.embedded : 0; drawnByGame = vis; drawnHiding = m.hiding === true; schedule(); return; } if (m?.text && (m.fallback || Array.isArray(m.rects))) { drawnByGame = ''; if (!m.fallback) stale.delete([...String(m.text)].filter(c => !blank(c)).join('')); } { const nb = t => [...String(t || '')].filter(c => !blank(c)).join(''), cur = line && !line.fallback ? nb(line.text) : '', nt = m?.fallback && m.text ? nb(m.text) : '';
     /* the same page redraw seen first as an unplaced line of the whole page (earlier lines + the placed one) */
     if (cur && nt.length > cur.length && nt.endsWith(cur)) { document.body.classList.add('megulit-place-gone'); line = null; schedule(); return; } }
-    document.body.classList.remove('megulit-place-gone'); if (m?.clear) line = null; else if (m?.fallback && m.text) line = { fallback: true, text: String(m.text) }; else if (m && Array.isArray(m.rects) && m.text) { if (line && !line.fallback && line.text !== String(m.text)) noteReplaced(line); } if (m?.clear) {} else if (m?.fallback && m.text) {} else if (m && Array.isArray(m.rects) && m.text) line = { text: String(m.text), approx: m.approx === true, rects: m.rects, client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] }; schedule(); };
+    document.body.classList.remove('megulit-place-gone'); if (m?.clear) line = null; else if (m?.text && (m.fallback || Array.isArray(m.rects))) {
+      const text = String(m.text);
+      if (!m.fallback && line && line.text !== text) noteReplaced(line);
+      line = { text, fallback: m.fallback === true, approx: m.approx === true, rects: m.rects, client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] };
+    } schedule(); };
   const pageGone = () => { for (const n of document.querySelectorAll('.megulit-old-line')) n.remove(); clones.clear(); document.body.classList.remove('megulit-place-asleep'); };
   /* 2026-11-15 `elsewhere` (core/overlay-placement.cjs page()): the layer is not armed and another path hides the game's
      line (write-back, glyph layer); the page says nothing about the line, so the reader places it as without a page */
   b.textPlacePage = m => { const had = !!page; if (m?.elsewhere === true || !m || !Array.isArray(m.lines)) { if (pageOwn) { pageOwn = false; briefSync(false); } } if (m?.elsewhere === true) { page = null; drawnByGame = ''; if (had) { pageGone(); dropOld(null); document.getElementById('megulit-page-ahead')?.replaceChildren(); document.body.classList.remove('megulit-place-game-drawn'); } schedule(); return; } page = m && Array.isArray(m.lines) ? { awake: m.awake === true, armed: m.armed === true, lines: m.lines.filter(l => l && typeof l.text === 'string' && Array.isArray(l.rects)), client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] } : null; if (page) { line = null; drawnByGame = ''; } else if (had) pageGone(); schedule(); };
   b.textPlaceExtra = m => { extras = { items: Array.isArray(m?.items) ? m.items.filter(i => i && typeof i.text === 'string' && Array.isArray(i.rects)) : [], client: Array.isArray(m?.client) ? m.client : null }; schedule(); };
   let modeGame = null;
-  b.textPlaceMode = m => { on = m?.on === true; if (on) bindAdvance(); if (!on) stale.clear(); if (!on) waits.clear(); if (!on) { orphans = []; orphanWait = null; } const g = m && 'game' in m ? String(m.game || '') : modeGame; if (!on || g !== modeGame) { anchor = null; anchorLine = ''; cnBelow = { key: null, below: false }; } modeGame = g; if (!on) { if (pageOwn) { pageOwn = false; briefSync(false); } line = null; drawnByGame = ''; boxBottom = 0; boxKey = ''; if (page) { page = null; pageGone(); } } schedule(); };
+  b.textPlaceMode = m => { on = m?.on === true; if (on) bindAdvance(); if (!on) stale.clear(); if (!on) waits.clear(); if (!on) { orphans = []; orphanWait = null; } const g = m && 'game' in m ? String(m.game || '') : modeGame; if (!on || g !== modeGame) { anchor = null; anchorLine = ''; cnBelow = { key: null, below: false }; } modeGame = g; if (!on) { document.body.classList.remove('megulit-place-gone'); if (pageOwn) { pageOwn = false; briefSync(false); } line = null; drawnByGame = ''; boxBottom = 0; boxKey = ''; if (page) { page = null; pageGone(); } } schedule(); };
   /* 2026-11-21 (owner's recording 08:28, 千恋＊万花): game-fit.js measured the reader on its own place in the gap between two lines and cut the
      next line's translation; while this module anchors lines on the game's place it owns their layout, gaps included */
   b.textPlaceOwns = () => on && anchorMode && !!anchor;

@@ -37,7 +37,12 @@
  window.__tomeTextPosition=api;
  const priorStatus=b.galStatus;b.galStatus=m=>{if(typeof m.hookSourceRead==='boolean')readState=m.hookSourceReadOrigin==='engine'?(m.hookSourceRead?'read':'unread'):'';else if(typeof m.hookSource==='string')readState='';
   /* the engine named the state of the sentence already on screen (no new source with it): paint it again under that state */
-  if(typeof m.hookSourceRead==='boolean'&&m.hookSourceReadOrigin==='engine'&&typeof m.hookSource!=='string'&&colorSource)repaintCurrent();if(m.type==='gameClosed'){api.resetSession('');}else if(m.hookSource===null||typeof m.hookSource==='string'&&!m.hookSource.trim())b.lineColorReset?.();else if(typeof m.hookSource==='string')b.lineColorFor?.(m.hookSource,m.hookSequence);else if(m.gameStarted||m.gameProcessId){const old=identity.split('|'),next=String(m.gameProcessId||old[0]||'')+'|'+String(m.gameStarted||old[1]||'');if(identity&&next!==identity)api.resetSession(next);identity=next;}return priorStatus?.(m);};
+  if(typeof m.hookSourceRead==='boolean'&&m.hookSourceReadOrigin==='engine'&&typeof m.hookSource!=='string'&&colorSource)repaintCurrent();if(m.type==='gameClosed'){api.resetSession('');}else if(m.hookSource===null||typeof m.hookSource==='string'&&!m.hookSource.trim())b.lineColorReset?.();else if(typeof m.hookSource==='string')b.lineColorFor?.(m.hookSource,m.hookSequence);else if(m.gameStarted||m.gameProcessId){const old=identity.split('|'),next=String(m.gameProcessId||old[0]||'')+'|'+String(m.gameStarted||old[1]||'');if(identity&&next!==identity)api.resetSession(next);identity=next;}
+  // The history marker can arrive after TextRender has identified this exact draw as read.
+  if(typeof m.hookSourceRead==='boolean'&&m.hookSourceReadOrigin!=='engine'&&engineRead?.draw&&applyRead()){
+   m={...m,hookSourceRead:engineRead.read,hookSourceReadOrigin:'engine'};
+  }
+  return priorStatus?.(m);};
  // ISLAND (CS2) reports dialogue in its message texture: pages sit in 720-high slots of a tall texture (y 4364-4837
  // seen for one on-screen page), and the message layer is drawn about 63 px right and 8 px down on the 1280x720
  // canvas (measured against the game's own screenshots). Normalized coordinates are reported as cs2_screen_v3, so
@@ -82,25 +87,41 @@
     draws the earlier ones too: most characters of either text found in the other is a match. */
  const compact=t=>String(t||'').replace(/\s+/g,''),sameText=(src,drawn)=>{const a=[...compact(src)],d=[...compact(drawn)];if(!a.length||!d.length)return false;
   const left=new Map();for(const c of a)left.set(c,(left.get(c)||0)+1);let hit=0;for(const c of d){const n=left.get(c);if(n){hit++;left.set(c,n-1);}}return hit>=Math.ceil(Math.min(a.length,d.length)*.8);};
- const pixelFor=src=>pixelPaint&&src&&(pixelPaint.token!=null?pixelPaint.token===sourceToken(src):sameText(src,pixelPaint.text))?pixelPaint:null;let pixelEarly=null;
+ const placementClaims=new Map();let sourceGeneration=0,currentPlacement=null;
+ const retired=x=>x?.draw&&placementClaims.has(x.draw)&&placementClaims.get(x.draw)!==sourceGeneration;
+ const matchesSample=(x,src)=>!!x&&!!src&&!retired(x)&&(!x.draw||!currentPlacement||currentPlacement===x.draw)&&(x.token!=null?x.token===sourceToken(src):x.draw?compact(src)===compact(x.text):sameText(src,x.text));
+ function claimPlacement(x){if(!x?.draw)return;currentPlacement=x.draw;placementClaims.set(x.draw,sourceGeneration);if(placementClaims.size>64)placementClaims.delete(placementClaims.keys().next().value);}
+ const pixelFor=src=>matchesSample(pixelPaint,src)?pixelPaint:null;let pixelEarly=null;
  /* a sample that is not the current sentence's is either late (dropped at the next source) or early (its source comes next): it waits
     beside the current one and never replaces it */
- const matchesSample=(x,src)=>!!x&&!!src&&(x.token!=null?x.token===sourceToken(src):sameText(src,x.text));
- const pixelSeen=(sample)=>{if(matchesSample(sample,colorSource)||!pixelFor(colorSource))pixelPaint=sample;else pixelEarly=sample;const own=pixelFor(colorSource);if(own&&!(colorDraw?.claimed&&(colorDraw.color||colorDraw.style)))paintLine(own.color,colorSource,own.style);};
- b.lineColorDrawn=(text,color)=>{if(!/^#[0-9a-f]{6}$/i.test(String(color)))return;pixelSeen({text:String(text||''),token:null,color,style:null});};
+ const pixelSeen=(sample)=>{if(retired(sample))return;if(matchesSample(sample,colorSource)||!pixelFor(colorSource))pixelPaint=sample;else pixelEarly=sample;const own=pixelFor(colorSource);claimPlacement(own);if(own&&!(colorDraw?.claimed&&(colorDraw.color||colorDraw.style)))paintLine(own.color,colorSource,own.style);};
+ b.lineColorDrawn=(text,color,draw)=>{if(!/^#[0-9a-f]{6}$/i.test(String(color)))return;pixelSeen({text:String(text||''),token:draw?sourceToken(text):null,draw,color,style:null});};
  b.lineStyleSample=m=>{const style=m.style&&typeof m.style==='object'&&/^#[0-9a-f]{6}$/i.test(m.style.fill||'')?m.style:null,byText=typeof m.text==='string'&&!!m.text.trim();if(!style||!Number.isSafeInteger(m.sourceToken)&&!byText)return;
   pixelSeen(Number.isSafeInteger(m.sourceToken)?{text:'',token:m.sourceToken,color:style.fill,style}:{text:m.text,token:null,color:style.fill,style});}; /* by text: the draw colour of a blank-glyph / GPU-hidden line (core/hook-native.cjs glyphColor) */
  /* The game's own read flag for a line (ToMe_CHARS read=, KAG getCurrentRead): which of the game's two looks the sentence has, also
     when the line is written back hidden and nothing of it is ever drawn (live 千恋＊万花, hide mode: no pixels, no colour, the reader
     stayed white on read lines). It sets the read state of the matching sentence: the sentence then takes the last real sample of that
     state, else the saved read / unread colours, and a sample that does arrive is remembered under the right state. */
- let engineRead=null;
+ let engineRead=null,readEarly=null;
  const repaintCurrent=()=>{if(!colorSource)return;if(colorDraw?.claimed&&(colorDraw.color||colorDraw.style)){paintLine(colorDraw.color,colorSource,colorDraw.style);return;}const own=pixelFor(colorSource);paintLine(own?.color||'',colorSource,own?.style);};
- const applyRead=()=>{if(!engineRead||!colorSource||!sameText(colorSource,engineRead.text))return false;readState=engineRead.read?'read':'unread';document.body.classList.toggle('tome-line-read',engineRead.read);return true;};
- b.lineReadDrawn=(text,read)=>{if(typeof read!=='boolean')return;engineRead={text:String(text||''),read};if(applyRead())repaintCurrent();};
- b.lineColorReset=()=>{engineRead=null;pixelPaint=pixelEarly=null;colorSource='';colorSequence=null;colorDraw=latestDraw=retiredDraw=null;waitingDraw=false;paintLine('','');};
+ const applyRead=()=>{if(!matchesSample(engineRead,colorSource))return false;claimPlacement(engineRead);readState=engineRead.read?'read':'unread';document.body.classList.toggle('tome-line-read',engineRead.read);return true;};
+ b.lineReadDrawn=(text,read,draw)=>{
+  if(typeof read!=='boolean')return;
+  const sample={text:String(text||''),token:draw?sourceToken(text):null,draw,read};
+  if(retired(sample))return;
+  if(draw&&!matchesSample(sample,colorSource)){readEarly=sample;return;}
+  engineRead=sample;if(applyRead())repaintCurrent();
+ };
+ b.lineColorReset=()=>{placementClaims.clear();currentPlacement=null;engineRead=readEarly=null;pixelPaint=pixelEarly=null;colorSource='';colorSequence=null;colorDraw=latestDraw=retiredDraw=null;waitingDraw=false;paintLine('','');};
  b.lineColorFor=(text,sequence)=>{const next=String(text||''),seq=Number.isSafeInteger(sequence)?sequence:null;
-  if(next===colorSource&&(seq===null||seq===colorSequence))return;colorSource=next;colorSequence=seq;applyRead();if(!pixelFor(next))pixelPaint=matchesSample(pixelEarly,next)?pixelEarly:null;pixelEarly=null; /* pixels seen before their source arrived stay; another sentence's never carry over */
+  if(next===colorSource&&(seq===null||seq===colorSequence))return;
+  const previousNativeRead=engineRead?.draw&&matchesSample(engineRead,colorSource);
+  sourceGeneration++;currentPlacement=null;colorSource=next;colorSequence=seq;
+  if(matchesSample(readEarly,next))engineRead=readEarly;
+  readEarly=null;
+  if(!applyRead()&&previousNativeRead)document.body.classList.toggle('tome-line-read',false);
+  if(!pixelFor(next))pixelPaint=matchesSample(pixelEarly,next)?pixelEarly:null;
+  claimPlacement(pixelPaint);pixelEarly=null; /* pixels seen before their source arrived stay; another sentence's never carry over */
   if(colorDraw&&!colorDraw.claimed&&colorDraw.sourceToken!=null&&colorDraw.sourceToken===sourceToken(next)){colorDraw.claimed=true;waitingDraw=false;paintLine(colorDraw.color,next,colorDraw.style);return;}
   /* A draw already claimed by the previous sequence is retired: a late end for it must not recolour this one, even with the same text. */
   retiredDraw=colorDraw?.claimed?{engine:colorDraw.engine,line:colorDraw.line}:null;colorDraw=null;waitingDraw=true;{const own=pixelFor(next);paintLine(own?.color||'',next,own?.style);}

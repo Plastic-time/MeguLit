@@ -183,6 +183,7 @@
    session.saved(m.gameStyleKey||session.key,prefs,map,m.gameStyleSavedAt,m.gameStyleHistory||[]);saving=null;apply(prefs,map,false);message='';
   }else if(m.gameStyleState==='saveFailed'){if(saving&&m.gameStyleSaveId&&m.gameStyleSaveId!==saving.id)return;saving=null;message=t('failed');}
   else if(m.gameStyleState==='measured'&&m.gameStyle)receivedMeasurement(m);
+  else if(['following','timeout','unmatched','unavailable','cancelled','autoGaveUp'].includes(m.gameStyleState))window.__tomeTextPosition?.cancelCalibration?.();
   else if(m.gameStyleState==='positionMap'&&!dirty())window.__tomeTextPosition?.setMap?.(m.gameStylePositionMap);
   last={...last,...m};paint();
  };

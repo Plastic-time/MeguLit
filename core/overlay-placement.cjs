@@ -70,28 +70,65 @@ class OverlayPlacement {
       const chars = [...String(m.text || '')].map(c => c === '\u001f' ? '\n' : c), flat = [];
       for (const c of chars) if (c !== '\n' && c !== '\r') flat.push(c);
       const rects = rectsToClient(m, this.client[0], this.client[1]);
+      const id = String(m.engine || 'path') + ':' + (Number(m.line) || 0);
+      const text = flat.join('');
+      const blankStream = this.profile.placement?.drawWhileBlanking === true;
+      const readerDraw = m.engine === 'krkr' && blankStream;
+      const style = { ...(readerDraw && text ? { sourceToken: require('./island-source.js').token(text) } : {}),
+        ...(m.color ? { color: m.color } : {}), ...(typeof m.read === 'boolean' ? { read: m.read } : {}) };
       /* 2026-11-21 (ファタモルガーナの館, owner's recording 02:57Z: the line just read came back in white for 0.7 s after each click): an
          engine that reports its cleared line (KiriKiri MessageLayer.clear, page.reportClear in the game's diff) sends it once more,
          empty and not hidden. The game's page is gone: the reader never draws it again from its boxes. The line stays the placement's
          last line (the next one is typed where it was) */
-      if (m.hidden !== true && !flat.length && !rects.length && m.engine !== 'gpu') { const id0 = String(m.engine || 'path') + ':' + (Number(m.line) || 0); if (this.current && !this.current.fallback && this.current.id === id0 && this.goneId !== id0) { this.goneId = id0; this.why('gone:' + id0, 'gone: line ' + (Number(m.line) || 0) + ' cleared by the game'); this.send({ type: 'textPlace', gone: true, text: this.current.text }); this.rowsCleared(id0); } return; }
+      if (m.hidden !== true && !flat.length && !rects.length && m.engine !== 'gpu') {
+        if (readerDraw && (this.nativeEmbed?.id === id || this.current?.id === id && this.current.fallback)) {
+          const cleared = this.nativeEmbed?.id === id ? this.nativeEmbed.text : this.current.text;
+          if (this.nativeEmbed?.id === id) this.nativeEmbed = null;
+          if (this.current && this.current.id !== id) return;
+          this.current = null;
+          this.visibleKey = '';
+          this.send({ type: 'textPlace', clearedFallback: true, text: cleared });
+          return;
+        }
+        if (this.current?.id === id && !this.current.fallback && this.goneId !== id) { this.goneId = id; this.why('gone:' + id, 'gone: line ' + (Number(m.line) || 0) + ' cleared by the game'); this.send({ type: 'textPlace', gone: true, text: this.current.text }); this.rowsCleared(id); }
+        return;
+      }
       if (rects.length !== flat.length) { this.why('count:' + m.line + ':' + rects.length, 'rejected: line ' + (Number(m.line) || 0) + ' has ' + rects.length + ' boxes for ' + flat.length + ' characters'); return; } // one rect per character is the protocol; anything else is not placeable
-      const id = String(m.engine || 'path') + ':' + (Number(m.line) || 0);
+      if (readerDraw && this.nativeEmbed && (this.nativeEmbed.id !== id || m.hidden || this.nativeEmbed.text !== text || m.emb === 0)) this.nativeEmbed = null;
+      // A late colour sample can follow emb=2 on the same draw. It does not transfer the line back to the reader.
+      if (readerDraw && !m.hidden && (m.emb || this.nativeEmbed?.id === id)) {
+        const embedded = m.emb || this.nativeEmbed.embedded;
+        this.clear();
+        this.nativeEmbed = { id, text, embedded };
+        const key = id + '|' + text + '|emb' + embedded;
+        if (key !== this.visibleKey) this.send({ type: 'textPlace', visible: true, hiding: this.hiding, text, embedded });
+        this.visibleKey = key;
+        return;
+      }
       /* 2026-11-15 (沙耶の唄: MeguLit's Japanese drawn a few px off the game's own, unhidden line): the source says the game
          draws this line itself (not hidden yet, or never). The reader must not put its Japanese over it: it gets a
          `visible` note for this text and shows only the translation until the line is placed. */
       /* 2026-11-16 (1.4.16 live, user: 切一次屏之后文字层就不见了 再点一下才出来): after a focus change the game repaints the line it
          already showed hidden from its cached glyphs, and the repaint reports it as not hidden. That is the same line,
          still hidden on screen: it stays placed. */
-      if (m.hidden !== true && m.engine !== 'gpu' && this.current && !this.current.fallback && this.current.id === id && this.current.text === flat.join('')) return; /* GPU hiding is decided per frame: there, not hidden is the game showing it */
+      if (m.hidden !== true && m.engine !== 'gpu' && this.current && !this.current.fallback && this.current.id === id && this.current.text === text) {
+        if (readerDraw && (m.color || typeof m.read === 'boolean')) this.emitLine({ ...this.current, ...style });
+        return;
+      } /* GPU hiding is decided per frame: there, not hidden is the game showing it */
       /* incr9 2026-11-21 (owner, 千恋＊万花 lines 100001..: 「お客さん」 drawn by nobody): the bridge blanks this stream's glyphs, so a line the
          engine reports unhidden is not on screen: the reader draws its Japanese where the last line was; a hidden glyph later only places it */
-      if (m.hidden !== true && m.engine !== 'gpu' && require('./profiles/index.cjs').get(this.profile, 'placement.drawWhileBlanking', false) && this.blanking()) { this.why('sblank:' + id, 'fallback: line ' + (Number(m.line) || 0) + ' reported unhidden while the glyph layer blanks the stream (the reader draws it)'); return this.emitLine({ id, engine: m.engine || 'engine', text: flat.join(''), fallback: true, client: this.client.slice() }); }
+      if (m.hidden !== true && m.engine !== 'gpu' && blankStream && this.blanking()) {
+        this.why('sblank:' + id, 'fallback: line ' + (Number(m.line) || 0) + ' reported unhidden while the glyph layer blanks the stream (the reader draws it)');
+        // TextRender's boxes are still usable while the glyph layer owns hiding. Keep fallback ownership so
+        // these records never create an orphan line or count as engine hide proof.
+        const boxes = readerDraw && !this.profile.draw?.embed && OverlayPlacement.sane(rects, this.client);
+        return this.emitLine({ id, engine: m.engine || 'engine', text, fallback: true, client: this.client.slice(), ...(boxes ? { rects: boxes } : {}), ...style });
+      }
       if (m.hidden !== true) { this.why('shown:' + id, 'not placed: line ' + (Number(m.line) || 0) + ' is drawn by the game itself (hidden=0)'); if (this.current?.id === id) this.clear(); const vis = flat.join(''), vkey = vis + (m.emb ? '|emb' + m.emb : ''); if (vis && vkey !== this.visibleKey) { this.visibleKey = vkey; this.send({ type: 'textPlace', visible: true, text: vis, ...(this.hiding === true ? { hiding: true } : {}), ...(m.emb === 1 || m.emb === 2 ? { embedded: m.emb } : {}) }); } return; }
       if (m.engine === 'gpu') this.gpuHiding = Date.now();
       else this.engineHidden = true;
       this.visibleKey = ''; this.why('placed:' + id + ':' + rects.length, 'placed: line ' + (Number(m.line) || 0) + ', ' + rects.length + ' characters, first box ' + (rects[0] ? [].concat(rects[0]).map(v => Math.round(Number(v) || 0)).join(',') : '-') + ' in client ' + this.client.join('x'));
-      this.emitLine({ id, engine: m.engine, text: flat.join(''), rects, client: this.client.slice(), ...(m.color ? { color: m.color } : {}), ...(typeof m.read === 'boolean' ? { read: m.read } : {}) });
+      this.emitLine({ id, engine: m.engine, text, rects, client: this.client.slice(), ...style });
       if (m.engine !== 'gpu') this.rows({ id, text: flat.join(''), rects: this.current && !this.current.fallback && this.current.id === id ? this.current.rects : null });
     }
   }
@@ -129,7 +166,8 @@ class OverlayPlacement {
     const chars = [...table.text], { rects, drawn: recorded, sizes } = this.rectsOf(table, ['d', 'c']);
     const id = 'glyph:' + (Number(table.seq) || 0);
     // A glyph fragment from the same draw can otherwise replace the native page's source.
-    if (this.ownsEngineRows()) return;
+    if (this.ownsEngineRows() || this.nativeEmbed?.text === table.text) return;
+    if (this.current?.sourceToken != null && this.current.rects && this.current.text === table.text) return;
     /* 2026-11-16 (死に逝く君、館に芽吹く憎悪, KiriKiri: 「間　側　法律　当　　ば　ほとんど　犯罪行」): an engine with a glyph
        cache rasterises a character once and reuses the bitmap, so a character an earlier line used has no record in
        this one. "Drawn" used to mean "has a record", and every reused character stayed out for good: the reader drew
@@ -335,11 +373,15 @@ class OverlayPlacement {
          carried becomes a source line (furigana, translation, lookups) or, with others at once, the options of a choice */
       if (rects) try { this.hidden({ text: line.text, rects, client: line.client }); } catch {}
       if (!rects) this.why('insane:' + line.id + ':' + line.text, 'not placed: ' + line.id + ' has no box on the game client (off the client, or all on its top edge: a buffer drawn at its own origin); the reader keeps its own box and the anchor is not taught');
-      line = rects ? { ...line, rects } : { id: line.id, engine: line.engine, text: line.text, fallback: true, client: line.client, ...(line.color ? { color: line.color } : {}), ...(typeof line.read === 'boolean' ? { read: line.read } : {}) };
+      if (rects) line = { ...line, rects };
+      else {
+        const { id, engine, text, client, sourceToken, color, read } = line;
+        line = { id, engine, text, client, fallback: true, ...(sourceToken != null ? { sourceToken } : {}), ...(color ? { color } : {}), ...(typeof read === 'boolean' ? { read } : {}) };
+      }
       if (rects && !line.approx) this.learn(rects);
     }
     const key = JSON.stringify(line);
-    if (this.current && key === this.lastKey) return; this.lastKey = key; this.current = line;
+    if (this.current && key === this.lastKey) return; this.lastKey = key; this.current = line; this.visibleKey = '';
     this.send({ type: 'textPlace', ...line });
   }
   stop() {
@@ -359,6 +401,7 @@ class OverlayPlacement {
     this.extraKey = '';
     this.lastKey = '';
     this.visibleKey = '';
+    this.nativeEmbed = null;
     this.goneId = '';
     this.whyKey = '';
     this.anchorBox = null;

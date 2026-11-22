@@ -44,3 +44,12 @@ test('a give way elsewhere (no engine boxes; the 03:32:47Z baseline) is back wit
  t.mock.timers.tick(2000);assert.equal(r.switches().at(-1).type,'enable','hide and replacement back');assert.equal(r.hook.preflight,false);
  assert.equal(r.style.statuses.at(-1),'timeout');assert.ok(r.traces.some(l=>/give way capped/.test(l)));
 });
+test('SenrenBanka calibration follows TextRender boxes even when the glyph fallback owns the hidden text',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const r=rig('');
+ Object.assign(r.control.host.placement.current,{fallback:true,engine:'krkr'});
+ r.control.beginStyleSync(true,'all');
+ t.mock.timers.tick(25000);
+ assert.equal(r.style.statuses.at(-1),'following');
+ assert.deepEqual(r.switches(),[]);
+});

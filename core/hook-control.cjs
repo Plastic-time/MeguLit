@@ -35,10 +35,16 @@ class HookControl{
   const h=this.host;if(!h.styleSync||!h.state.bound){this.styleCalibration=false;h.styleSync?.status('waiting');return;}
   /* 2026-11-21 (owner, test pack v5 ファタモルガーナの館): a game whose engine reports every character's box (KiriKiri page DLL,
      ファタ / 千恋＊万花) is placed from those boxes: calibration never gives way to measure the original, it follows the engine */
-  {const cur=h.placement?.current,engineBoxes=!!(cur&&!cur.fallback&&Array.isArray(cur.rects)&&cur.rects.length);
-   // Glyph placement can be reconstructed from a previous line. It cannot complete a manual screen measurement.
-   const readerPlaced=cur&&(cur.fallback||cur.engine==='glyph'||cur.approx);
-   if((engineBoxes||h.hooks?.drawsHidden===true)&&!(manual&&readerPlaced)){clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');h.styleSync.calibrating=false;h.hooks.calibrating=false;if(h.hooks.preflight){h.hooks.preflight=false;h.hooks.configure?.(h.preferences,h.state);}try{h.hooks.trace?.('calibration: engine boxes, no give way (following the engine coordinates)');}catch{}h.styleSync.status('following');return;}}
+  {const cur=h.placement?.current,engineBoxes=!!(cur&&(!cur.fallback||cur.engine==='krkr')&&Array.isArray(cur.rects)&&cur.rects.length);
+   const readerPlaced=cur&&(cur.engine==='glyph'||cur.approx||(cur.fallback&&cur.engine!=='krkr'));
+   if(engineBoxes){
+    if(this.styleCalibration && h.styleSync.calibrating)this.finishStyleSync(false,true);
+    this.styleCalibration=false;
+    this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');
+    this.styleRetryLine=null;
+    if(h.hooks.preflight){h.hooks.preflight=false;h.hooks.configure?.(h.preferences,h.state);}
+    h.hooks.trace?.('calibration: engine boxes, no give way (following the engine coordinates)');
+    h.styleSync.status('following');return;}}
   h.hooks.onGiveWayCapped=()=>this.giveWayCapped();
   this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');clearTimeout(this.styleTimer);this.styleManual=manual;this.styleRetryLine=null;this.styleAwaitLive=false;this.styleCalibration=true;this.styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleRestore=['embed','euphoria474'].includes(this.plan)&&h.preferences.hookHide!==false;
   h.styleSync.calibrating=true;h.styleSync.waitNext=this.styleRestore||h.hooks.drawsHidden===true;h.hooks.calibrating=true; // E246.1: embedding cleared the current line, so measure the next original line
@@ -69,6 +75,9 @@ class HookControl{
  giveWayCapped(){const h=this.host;if(this.styleCalibration){if(h.styleSync?.publish?.())return;this.finishStyleSync(false);h.styleSync?.status('timeout');return;}
   if(this.running&&!this.baseline){this.stage='switching';this.status({hookCheckState:'switching',hookCheckMessage:'原文检查超过 2 秒，已恢复隐藏'});}}
  finishStyleSync(success,cancel=false){
+  // Returning to hidden mode retires the OCR request for the revealed frame, even if the dialogue hasn't advanced.
+  if(this.styleCalibration && this.stage==='baseline'){this.seq++;this.stage='waiting';this.host.send({type:'hookVerifyCancel'});}
+  if(!this.styleCalibration)return;clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;const h=this.host;if(this.styleRevealed){this.styleRevealed=false;h.onEvent?.({gameStyleReveal:false});}h.hooks.calibrating=false;h.hooks.preflight=false;h.styleSync.calibrating=false;clearTimeout(h.styleSync.timer);h.styleSync.cancel?.();if(cancel){/* the calibration showed the original (hide paused): a cancelled one hides again at once, not at the next settings save */h.hooks.configure?.(h.preferences,h.state);}h.onEvent?.({gameStylePreview:false});
   if(!this.styleCalibration)return;clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;const h=this.host;h.hooks.manualStyleWindow=0;if(this.styleRevealed){this.styleRevealed=false;h.onEvent?.({gameStyleReveal:false});}h.hooks.calibrating=false;h.hooks.preflight=false;h.styleSync.calibrating=false;clearTimeout(h.styleSync.timer);h.styleSync.cancel?.();if(cancel){/* the calibration showed the original (hide paused): a cancelled one hides again at once, not at the next settings save */h.hooks.configure?.(h.preferences,h.state);}h.onEvent?.({gameStylePreview:false});
   const same=this.styleIdentity===String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleRetryAt=this.now()+15000;
   if(same&&!cancel){h.hooks.preflight=false;h.hooks.configure?.(h.preferences,h.state);this.styleAwaitLive=false;h.styleSync.status(success?'applied':'retrying');}

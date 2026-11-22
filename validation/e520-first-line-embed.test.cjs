@@ -30,6 +30,27 @@ test('remembered stream: start() and modeChanged() never bring the baseline back
  c.baseline=false;c.modeChanged();assert.equal(h.hooks.preflight,false);
 });
 
+test('save, exit and bind a new process: the first hook configuration uses the saved style and fast hide',t=>{
+ const {GalNative}=require('../core/gal-native.cjs'),{GameStyleSync}=require('../core/game-style-sync.cjs');
+ const dir=fs.mkdtempSync(path.join(require('os').tmpdir(),'megulit-saved-first-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const key='8bccd5415151accc86f2f6e093b45fac29da2a7bfdf06df953e62edf5b17c5be';
+ const {h}=host(),first=new GameStyleSync({config:dir},()=>{});
+ first.configure(h.preferences,{...h.state,gameStyleKey:key});
+ assert.equal(first.saveProfile({japaneseSize:34,y:76},'all',key,null,'confirmed'),true);first.stop();
+ for(const [hash,fast,expectWarmup] of [[key,true,false],[key,false,true],['a'.repeat(64),true,true]]){
+  const {h}=host();h.state={};h.preferences={...h.preferences,japaneseSize:18,hookFast:fast};
+  const configs=[];h.hooks.configure=p=>{configs.push({warmup:h.hooks.preflight,size:p.japaneseSize});h.hooks.enabled=!h.hooks.preflight;};
+  h.styleSync=new GameStyleSync({config:dir},m=>{if(m.gameStyleEffectivePrefs)Object.assign(h.preferences,m.gameStyleEffectivePrefs);});
+  h.controller=new HookControl(h);h.controller.running=true;h.controller.plan='embed';
+  GalNative.prototype.notify.call(h,{type:'bound',bound:true,coverEnabled:true,gameProcessId:62341,gameStarted:'2',gameHwnd:'1',gameStyleKey:hash});
+  assert.equal(configs[0].warmup,expectWarmup);
+  if(hash===key)assert.equal(configs[0].size,34);
+  if(!expectWarmup){h.controller.source('「最初の台詞です」');assert.equal(h.controller.stage,'hidden');assert.ok(!h.controller.styleCalibration);}
+  h.styleSync.stop();
+ }
+});
+
 test('no memory: the existing warm-up still applies (first time a game is embedded)',()=>{
  const {h}=host();const c=new HookControl(h);c.plan='embed';c.running=true;
  h.hooks.state.hookThreads=[{id:'1',embeddable:true}];

@@ -81,6 +81,24 @@ for(const [game,key,advanceMs,placement] of manualCases)test(game+' manual calib
   assert.equal(reopened.styleSync.latest?.profile,true);
  }finally{reopened.hooks.process=null;await reopened.stop();}
 });
+test('manosaba sequence 8: a baseline OCR result after the two-second cap cannot reopen the finished check',t=>{
+ const r=calibration(t);r.control.beginStyleSync(false,'all');r.control.source(C);
+ const seq=r.control.seq;assert.equal(r.control.stage,'baseline');
+ t.mock.timers.tick(2000);assert.equal(r.h.preflight,false);
+ const events=r.events.length;
+ for(const matched of [false,true])r.control.visual({sequence:seq,stage:'baseline',sample:2,valid:true,matched,recognizedCharacters:155,japaneseCharacters:43,sourceCharacters:18});
+ assert.equal(r.events.length,events);assert.notEqual(r.control.stage,'switching');
+ assert.notEqual(r.control.baseline,true);assert.equal(r.control.baselineMisses||0,0);
+});
+test('current engine boxes discovered during a probe retire its pending capture before following',t=>{
+ const r=calibration(t);r.control.beginStyleSync(true,'all');r.style.observe(C);r.control.source(C);t.mock.timers.tick(500);
+ const old=r.style.pending;assert.ok(old);
+ r.control.host.placement.current={engine:'krkr',fallback:true,text:C,rects:[[200,510,24,24]]};
+ r.control.beginStyleSync(true,'all');
+ assert.equal(r.style.pending,null);assert.equal(r.style.captureReady(old.id),false);
+ assert.equal(r.events.filter(m=>m.gameStyleReveal!==undefined).at(-1).gameStyleReveal,false);
+ assert.equal(r.events.filter(m=>m.gameStyleState).at(-1).gameStyleState,'following');
+});
 for(const terminal of ['give-way-cap','cancel','timeout'])test('wrapped ADV during calibration -> '+terminal+' -> next dialogue; stale helper/capture/timeout cannot apply',t=>{
  const r=calibration(t);r.control.beginStyleSync(terminal!=='give-way-cap','all');r.style.observe(C);r.feed(C);t.mock.timers.tick(500);const pending={...r.style.pending};assert.ok(pending.id);r.h.auxPage({text:'「中性の第三\n文です。」',sourceName:'TextRender'});
  if(terminal==='give-way-cap')t.mock.timers.tick(1500);else if(terminal==='cancel')r.control.finishStyleSync(false,true);else{r.h.preflight=false;clearTimeout(r.h.giveWayTimer);r.h.giveWayTimer=null;t.mock.timers.tick(8000);}

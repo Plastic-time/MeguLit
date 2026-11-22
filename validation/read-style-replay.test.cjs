@@ -163,8 +163,14 @@ test('pass-through by engine confirmation can be taken back: unconfirmed lines r
    engine hide event reset, three sentences rendered by TextRender with lit glyphs, and still nothing on screen). The KiriKiri text layer
    functions are run as they are written in native/krkrtext/script.inc (TJS2 read as JavaScript: void -> undefined, isvalid -> true). */
 const trScript=()=>{const s=read('native/krkrtext/script.inc'),a=s.indexOf('st.trRestore=function(){'),b=s.indexOf('st.trDone=function(inst){');assert.ok(a>0&&b>a);
- const js=s.slice(a,b).replace(/ incontextof st;/g,';').replace(/isvalid this\.trT/g,'true').replace(/\bvoid\b/g,'undefined').replace(/%\[\]/g,'({})').replace(/\)MGLT",? LR"MGLT\(/g,'');
- return ()=>{const T={opacity:255},L={textLayer:T},sent=[],st={trOwner:L,trRec:[0,100001,' sw=1280 sh=720 text=あ'],trKey:'',on:false,trLayer:()=>L,hideOn(){return this.on;},report:l=>sent.push(l)};new Function('st',js)(st);return{T,L,st,sent,tick:()=>st.trHide()};};};
+ const shown=s.match(/st\.shown=function\(L\)\{[\s\S]*?\} incontextof st;/)[0];
+ const js=(shown+s.slice(a,b)).replace(/ incontextof st;/g,';').replace(/isvalid this\.trT/g,'true').replace(/\bvoid\b/g,'undefined').replace(/'Object'/g,"'object'").replace(/%\[\]/g,'({})').replace(/\)MGLT",? LR"MGLT\(/g,'');
+ return ()=>{const T={opacity:255},L={textLayer:T,visible:true},sent=[],st={kag:{fore:{messages:{0:L,count:1}}},trOwner:L,trRec:[0,100001,' sw=1280 sh=720 text=あ'],trKey:'',on:false,trLayer:()=>L,hideOn(){return this.on;},report:l=>sent.push(l)};new Function('st',js)(st);return{T,L,st,sent,tick:()=>st.trHide()};};};
+test('the TextRender control flag gives a blanked Senren line to the clickable reader',()=>{
+ const r=trScript()();r.st.on=true;
+ r.st.cfg={embed:true};r.tick();assert.equal(r.T.opacity,255,'the old embed setting left the game layer visible');
+ r.st.cfg.embed=false;r.tick();assert.equal(r.T.opacity,0);assert.match(r.sent.at(-1),/line=100001 hidden=1/);
+});
 test('preflight with the engine hide: the text layer is visible again whatever the game did to it while it was hidden',()=>{const rig=trScript();
  {const r=rig();r.st.on=true;r.tick();assert.equal(r.T.opacity,0);r.tick();r.st.on=false;r.tick();assert.equal(r.T.opacity,255,'plain case');assert.deepEqual(r.sent.map(l=>/hidden=(\d)/.exec(l)[1]),['1','0'],'the record follows the state');}
  /* a scene change: the game takes its text window away (opacity 0), MeguLit starts hiding in that moment, the game brings the window back */
