@@ -52,6 +52,13 @@
      (layoutInfo[key]/dpr)+'px');
     if (layoutInfo) {
       const root = document.documentElement.style;
+      const game = bridge.gameArea();
+      if (game && document.body.classList.contains('megulit-saya-page')) {
+        root.setProperty('--saya-page-left', (game.left + game.width * .05) + 'px');
+        root.setProperty('--saya-page-bottom', (game.top + game.height * .98) + 'px');
+        root.setProperty('--saya-page-width', (game.width * .9) + 'px');
+        root.setProperty('--saya-page-height', (game.height * .34) + 'px');
+      }
       for (const [axis, dimension, offset] of [['X','Width','anchorDX'], ['Y','Height','anchorDY']]) {
         const length = layoutInfo['client' + dimension], origin = layoutInfo['client' + axis], reader = layoutInfo['reader' + axis];
         if (![length, origin, reader].every(Number.isFinite) || length <= 0) continue;
@@ -151,6 +158,15 @@
     body.tomoyo-gal-bound .sentence-window { position:fixed!important; z-index:20!important; inset:auto!important; left:var(--tomoyo-reader-x,0px)!important; top:var(--tomoyo-reader-y,0px)!important; margin:var(--tomoyo-gal-out-y,0px) var(--tomoyo-gal-out-x,0px)!important; width:calc(var(--tomoyo-reader-width,100vw) - var(--tomoyo-gal-out-x,0px) * 2)!important; height:auto!important; max-height:none!important; flex-direction:column!important; justify-content:flex-start!important; max-width:none!important; min-height:0!important; padding:var(--tomoyo-gal-pad-y,10px) var(--tomoyo-gal-pad-x,20px)!important; box-sizing:border-box!important; border:0!important; border-radius:0!important; align-items:stretch!important; overflow:visible!important; scrollbar-width:none; -webkit-app-region:no-drag; }
     body.tomoyo-gal-bound.megulit-anchor-mode:not(.megulit-placed):not(.megulit-anchored) .sentence-window { left:var(--megulit-fallback-x,var(--tomoyo-reader-x,0px))!important; top:var(--megulit-fallback-y,var(--tomoyo-reader-y,0px))!important; }
     body.tomoyo-gal-bound .sentence-window::-webkit-scrollbar { display:none; }
+    /* The original page is visible during OCR. Its translation fits the game client
+       even when the reader surface covers the whole desktop. */
+    body.tomoyo-gal-bound.megulit-saya-page .sentence-window.tomoyo-hook-reader[data-hook-reader] {
+      left:var(--saya-page-left)!important; top:auto!important; bottom:calc(100% - var(--saya-page-bottom))!important;
+      width:var(--saya-page-width)!important; max-height:var(--saya-page-height)!important;
+      overflow:auto!important; margin:0!important; padding:0!important;
+    }
+    body.tomoyo-gal-bound.megulit-saya-page .tomoyo-hook-reader .sentence-text { display:none!important; }
+    body.tomoyo-gal-bound.megulit-saya-page .tomoyo-hook-reader .tomoyo-cn-output { white-space:pre-wrap!important; overflow-wrap:anywhere; }
     html:has(body.tomoyo-gal-bound), body.tomoyo-gal-bound, body.tomoyo-gal-bound [data-gal-reader-container], body.tomoyo-gal-bound .sentence-window { background-color:transparent!important; background-image:none!important; box-shadow:none!important; backdrop-filter:none!important; -webkit-backdrop-filter:none!important; }
     body.tomoyo-gal-bound .lookup-limit-badge { display:none!important; }
     body.tomoyo-ui-translation.tomoyo-cover-hidden .sentence-window, body.tomoyo-ui-translation.tomoyo-cover-hidden .tomoyo-native-mask { visibility:hidden!important; pointer-events:none!important; }
@@ -621,6 +637,11 @@
    tip.style.cssText='position:fixed;left:50%;top:9%;transform:translateX(-50%);z-index:2147483000;max-width:min(560px,86vw);padding:10px 18px;border-radius:12px;background:rgba(18,12,14,.92);color:#f3e6da;font:500 14px/1.6 "Microsoft YaHei",sans-serif;box-shadow:0 12px 32px rgba(0,0,0,.45);pointer-events:none;transition:opacity .3s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
    document.body.append(tip); setTimeout(()=>{tip.style.opacity='0';setTimeout(()=>tip.remove(),350);},message.ok===true?2600:4500); };
   bridge.galStatus = message => {
+    if ('hookSource' in message || message.type==='gameClosed') {
+      const page=!!message.hookSource && message.hookSourceEngine==='saya-page-ocr';
+      document.body.classList.toggle('megulit-saya-page',page);
+      if(page)placeLayers();
+    }
     bridge.cardinalPair?.source(message);
     if(message?.type==='modeRequest'){if(window.__tomoyoMode?.requestToggle)window.__tomoyoMode.requestToggle();else send({type:'galToggleMode'});return;}
     if(message?.type==='regionApplied'){window.dispatchEvent(new CustomEvent('tome-region-applied',{detail:message}));return;}

@@ -307,7 +307,9 @@ class Reader{
   return t;}
  static keyPrint(key){let h=0;for(const c of String(key))h=(h*31+c.codePointAt(0))>>>0;return h.toString(16)+'/'+[...String(key)].length;}
  embedNote(kind,key,why=''){const n={at:Date.now(),kind,key:Reader.keyPrint(key),why};(this.embedLog||(this.embedLog=[])).push(n);if(this.embedLog.length>60)this.embedLog.shift();try{this.gal?.hooks?.trace?.('translation '+kind+' key='+n.key+(why?' '+why:''));}catch{}}
- embedNear(key){const p=key.startsWith('en|')?'en|':'',q=key.slice(p.length),ql=[...q].length;if(ql<4)return null;let best=null;
+ embedNear(key){
+  if(require('../core/saya-page-ocr.cjs').legacyExe(this.gal?.hooks?.target?.name))return null;
+  const p=key.startsWith('en|')?'en|':'',q=key.slice(p.length),ql=[...q].length;if(ql<4)return null;let best=null;
   for(const [k,v] of this.embedCache){if(!v||!k.startsWith(p)||(p===''&&k.startsWith('en|')))continue;const c=k.slice(p.length),cl=[...c].length;if(c===q)continue;
    const inside=c.includes(q),around=q.includes(c);if(!inside&&!around)continue;
    if(Math.min(cl,ql)/Math.max(cl,ql)<.6&&!(inside&&c.endsWith(q)))continue;
