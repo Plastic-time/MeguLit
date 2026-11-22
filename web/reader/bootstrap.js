@@ -71,7 +71,20 @@ try{
  window.__tomoyoUiState=snapshot();localStorage.setItem('tome-ui-language',home.preferences.language);localStorage.setItem('tomoyo-ui-language',home.preferences.language);appearance(home.preferences);
  const callback=internal.transformCallback(response=>event(response.payload));await native('plugin:event|listen',{event:'reader-event',target:{kind:'Any'},handler:callback});
  phase='native-attach';const connected=await native('reader_connect');if(connected?.libraryOnly)throw Error('READER_DISABLED');
- for(const name of modules){await health('loading:'+name);await new Promise((resolve,reject)=>{phase='module:'+name;const script=document.createElement('script');script.src='modules/'+name+'.js';const failed=error=>{removeEventListener('error',failed);reject(Error(name+': '+(error.message||'Script load failed')));};addEventListener('error',failed);script.onload=()=>{removeEventListener('error',failed);resolve();};script.onerror=failed;document.head.append(script);});}
+ for(const name of modules){
+  await health('loading:'+name);
+  phase='module:'+name;
+  const script=document.createElement('script');
+  script.src='modules/'+name+'.js';
+  if(name==='local-font'){
+   // Only this generated font is optional. Tauri may return index.html with a JavaScript MIME type.
+   const response=await fetch(script.src);
+   if(response.status===404)continue;
+   if(!response.ok)throw Error(name+': HTTP '+response.status);
+   if(/^\s*(?:<!doctype\s+html\b|<html[\s>])/i.test(await response.text()))continue;
+  }
+  await new Promise((resolve,reject)=>{const failed=error=>{removeEventListener('error',failed);reject(Error(name+': '+(error.message||'Script load failed')));};addEventListener('error',failed);script.onload=()=>{removeEventListener('error',failed);resolve();};script.onerror=failed;document.head.append(script);});
+ }
  // Record actual opened cards separately from the original lookup implementation.
  const viewed=new WeakSet();new MutationObserver(()=>{for(const card of document.querySelectorAll('.tomoyo-selection-card')){if(viewed.has(card))continue;const surface=card.querySelector('.tomoyo-word-heading strong')?.textContent?.trim();if(surface){viewed.add(card);api('reader_message',{message:{type:'lookupViewed',surface,operationId:crypto.randomUUID()}}).catch(()=>{});}}}).observe(document.body,{childList:true,subtree:true});
  await import('./word-status.js');installLearningNotice(window.__tomoyoChinese);loaded=true;for(const message of queued.splice(0))event(message);
