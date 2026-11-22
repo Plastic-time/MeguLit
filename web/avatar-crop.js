@@ -34,7 +34,7 @@ export function openAvatarCrop({src,width,height,locale='zh'}){
  active?.();
  const w=avatarCropWords(locale);
  return new Promise(resolve=>{
-  const box=document.createElement('div');box.className='tome-crop avatar-crop';box.dataset.noI18n='';box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');
+  const box=document.createElement('dialog');box.style.margin='0';box.className='tome-crop avatar-crop';box.dataset.noI18n='';box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');
   box.innerHTML='<header><span></span><button type="button" data-x>×</button></header><div class="avatar-crop-body"><div class="tome-crop-stage"><img alt=""><i></i></div><figure class="avatar-crop-preview"><span><img alt=""></span><figcaption></figcaption></figure></div><label class="tome-crop-zoom"><span></span><input type="range" min="0" max="100" step="any"><output></output></label><small></small><footer><button type="button" data-cancel></button><button type="button" data-ok></button></footer>';
   const $=q=>box.querySelector(q),stage=$('.tome-crop-stage'),img=$('.tome-crop-stage img'),frame=$('.tome-crop-stage i'),zoom=$('input'),out=$('output'),ring=$('.avatar-crop-preview span'),thumb=$('.avatar-crop-preview img');
   $('header span').textContent=w.title;$('.tome-crop-zoom span').textContent=w.zoom;$('small').textContent=w.hint;$('figcaption').textContent=w.preview;$('[data-cancel]').textContent=w.cancel;$('[data-ok]').textContent=w.ok;$('[data-x]').setAttribute('aria-label',w.cancel);
@@ -47,7 +47,7 @@ export function openAvatarCrop({src,width,height,locale='zh'}){
   const frameNow=()=>{const r=cropRect(width,height,c);return {left:r.sx/width,top:r.sy/height,width:r.side/width,height:r.side/height};};
   const moveTo=(left,topFrac)=>{c=cropFromFrame(width,height,c.zoom,left,topFrac);draw();};
   const setZoom=z=>{const g=frameNow();c.zoom=Math.max(1,Math.min(top,z));const n=frameNow();moveTo(g.left+(g.width-n.width)/2,g.top+(g.height-n.height)/2);};
-  const finish=ok=>{if(active!==cancel)return;active=null;box.remove();removeEventListener('keydown',key,true);resolve(ok?cropRect(width,height,c):null);};
+  const finish=ok=>{if(active!==cancel)return;active=null;box.close();box.remove();removeEventListener('keydown',key,true);resolve(ok?cropRect(width,height,c):null);};
   const cancel=()=>finish(false),key=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();finish(false);}else if(e.key==='Enter'&&!e.target.closest?.('button')){e.preventDefault();finish(true);}};
   active=cancel;addEventListener('keydown',key,true);
   $('[data-x]').onclick=$('[data-cancel]').onclick=cancel;$('[data-ok]').onclick=()=>finish(true);
@@ -61,7 +61,7 @@ export function openAvatarCrop({src,width,height,locale='zh'}){
    const move=ev=>{box.style.left=Math.max(8,Math.min(ev.clientX-dx,innerWidth-r.width-8))+'px';box.style.top=Math.max(8,Math.min(ev.clientY-dy,innerHeight-r.height-8))+'px';},up=()=>{head.removeEventListener('pointermove',move);head.removeEventListener('pointerup',up);};head.addEventListener('pointermove',move);head.addEventListener('pointerup',up);});
   const maxW=Math.min(420,innerWidth-200),maxH=Math.min(340,innerHeight-260),k=Math.min(maxW/width,maxH/height);
   stage.style.width=Math.max(120,Math.round(width*k))+'px';stage.style.height=Math.max(120,Math.round(height*k))+'px';
-  img.src=thumb.src=src;document.body.append(box);
+  img.src=thumb.src=src;document.body.append(box);box.showModal();
   box.style.left=Math.max(8,(innerWidth-box.offsetWidth)/2)+'px';box.style.top=Math.max(8,(innerHeight-box.offsetHeight)/2)+'px';draw();$('[data-ok]').focus();
  });
 }
