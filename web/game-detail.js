@@ -9,7 +9,7 @@ import {originalLabel,zeroLatencyLabel,zeroActivityLabel,localeToggleHTML,bindLo
 import {mountCnGuide} from './cn-version-guide.js';
 import {mountFirstPlayer} from './first-player.js';
 import {mountDetailDeveloper} from './developer.js';
-import {synopsisHTML,bindSynopsis} from './synopsis-view.js';
+import {synopsisHTML,synopsisContentHTML,bindSynopsis,missingSynopsis} from './synopsis-view.js';
 import {receptionHTML,receptionMessages,bindReception} from './game-reception.js';
 import {openDiagnostics,diagnosticsLabel} from './diagnostics-ui.js';
 import {cardify} from './home-tv.js';
@@ -71,6 +71,32 @@ export async function renderGamePage({main,id,tab:startTab='',api,locale,text,es
  window.addEventListener('focus',refreshZero);
  void refreshZero();
  const target=main.querySelector('.game-detail-content'),row=(title,value)=>`<div class="detail-info-row"><span>${title}</span><span>${esc(Array.isArray(value)?value.join(' / '):value||'—')}</span></div>`;
+ const sourceKey='megulit-synopsis-source:'+locale+':'+id;
+ let sourceOverride='';
+ try{const saved=localStorage.getItem(sourceKey);if(saved==='moegirl'||saved==='vndb')sourceOverride=saved;}catch{}
+ const preferredSource=()=>sourceOverride||data.synopsisChoices?.preferred||(locale==='zh'?'moegirl':'vndb');
+ function mountSynopsis(){
+  const panel=target.querySelector('.synopsis-panel'),content=panel.querySelector('.synopsis-content');
+  const select=panel.querySelector('[data-synopsis-source]');
+  let disconnect=()=>{};
+  const render=()=>{
+   disconnect();
+   const synopsis=sourceOverride?(data.synopsisChoices?.[sourceOverride]||{}):data.synopsis;
+   const placeholder=loadingMetadata?rw.loading:sourceOverride?missingSynopsis(locale):rw.noSynopsis;
+   panel.classList.toggle('is-expanded',synopsisExpanded);
+   panel.classList.toggle('is-collapsed',!synopsisExpanded);
+   content.innerHTML=synopsisContentHTML(synopsis,{locale,esc,placeholder,expanded:synopsisExpanded});
+   disconnect=bindSynopsis(panel,locale,expanded=>synopsisExpanded=expanded);
+  };
+  select.onchange=()=>{
+   sourceOverride=select.value;
+   try{localStorage.setItem(sourceKey,sourceOverride);}catch{}
+   render();
+  };
+  render();
+  return ()=>disconnect();
+ }
+
  function show(tab){const order=['overview','sessions','words','sentences','memories','flowchart'],dir=Math.sign(order.indexOf(tab)-order.indexOf(activeTab)),changed=tab!==activeTab;activeTab=tab;unmount();unmount=()=>{};requestAnimationFrame(()=>{firstPlayer?.place(tab);devCard?.place(tab);});
   /* E266 sliding tab bar + directional content swap */requestAnimationFrame(()=>{const tabs=main.querySelector('.detail-tabs'),on=tabs?.querySelector('[aria-selected="true"]');
   if(!tabs||!on)return;let bar=tabs.querySelector('.detail-tab-bar');if(!bar){bar=document.createElement('span');bar.className='detail-tab-bar';bar.setAttribute('aria-hidden',
@@ -78,8 +104,8 @@ export async function renderGamePage({main,id,tab:startTab='',api,locale,text,es
   bar.style.transition='';});});if(changed&&!matchMedia('(prefers-reduced-motion: reduce)').matches)queueMicrotask(()=>{target.animate([{opacity:0,transform:'translateX('+(dir*18)+'px)'},
   {opacity:1,transform:'none'}],{duration:260,easing:'cubic-bezier(.2,.8,.2,1)'});});main.querySelectorAll('[data-detail-tab]').forEach(button=>button.setAttribute('aria-selected',
   String(button.dataset.detailTab===tab)));
-  if(tab==='overview'){target.innerHTML=`<div class="detail-overview"><div class="detail-main">${synopsisHTML(data.synopsis,{locale,esc,icon,title:w.synopsis,refresh:w.refresh,placeholder:loadingMetadata?rw.loading:rw.noSynopsis,expanded:synopsisExpanded})}${receptionHTML(data.reception,locale,esc,id)}</div><aside class="detail-aside"><details class="panel detail-technical" open><summary>${rw.technical}</summary>${row(w.aliases,info.names)}${row(w.engine,game.engine)}${row(w.hook,hook)}<div class="detail-info-row" data-detail-zero-status><span>${zeroLatencyLabel(locale)}</span><span>${esc(zeroActivityLabel(locale,activity))}</span></div>${row(w.source,info.source)}${info.appid?row('Steam App ID',info.appid):''}${info.vndbId?row('VNDB',info.vndbId):''}${info.developer?row(w.developer,info.developer):''}${info.released?row(w.released,info.released):''}${row(w.executable,info.executable)}</details><button class="text-button detail-forum" data-forum>${icon('lookup')}${esc(({zh:'这部作品的讨论',ja:'この作品の話題',en:'Discussions of this game'})[locale]||'这部作品的讨论')}</button><button class="text-button" data-story-entry>${esc(w.flowchart)}</button><button class="text-button detail-diag" data-diag>${icon('copy')}${esc(diagnosticsLabel(locale))}</button><button class="text-button detail-remove" data-remove>${icon('trash')}${w.remove}</button></aside></div>`;
-   target.querySelector('[data-story-entry]').onclick=()=>show('flowchart');bindSynopsis(target,locale,expanded=>synopsisExpanded=expanded);bindReception(target,{api,id,locale,esc,value:data.reception});target.querySelector('[data-remove]').onclick=()=>onRemove(id);
+  if(tab==='overview'){target.innerHTML=`<div class="detail-overview"><div class="detail-main">${synopsisHTML({locale,esc,icon,title:w.synopsis,refresh:w.refresh,source:preferredSource()})}${receptionHTML(data.reception,locale,esc,id)}</div><aside class="detail-aside"><details class="panel detail-technical" open><summary>${rw.technical}</summary>${row(w.aliases,info.names)}${row(w.engine,game.engine)}${row(w.hook,hook)}<div class="detail-info-row" data-detail-zero-status><span>${zeroLatencyLabel(locale)}</span><span>${esc(zeroActivityLabel(locale,activity))}</span></div>${row(w.source,info.source)}${info.appid?row('Steam App ID',info.appid):''}${info.vndbId?row('VNDB',info.vndbId):''}${info.developer?row(w.developer,info.developer):''}${info.released?row(w.released,info.released):''}${row(w.executable,info.executable)}</details><button class="text-button detail-forum" data-forum>${icon('lookup')}${esc(({zh:'这部作品的讨论',ja:'この作品の話題',en:'Discussions of this game'})[locale]||'这部作品的讨论')}</button><button class="text-button" data-story-entry>${esc(w.flowchart)}</button><button class="text-button detail-diag" data-diag>${icon('copy')}${esc(diagnosticsLabel(locale))}</button><button class="text-button detail-remove" data-remove>${icon('trash')}${w.remove}</button></aside></div>`;
+   target.querySelector('[data-story-entry]').onclick=()=>show('flowchart');unmount=mountSynopsis();bindReception(target,{api,id,locale,esc,value:data.reception});target.querySelector('[data-remove]').onclick=()=>onRemove(id);
    target.querySelector('[data-forum]').onclick=()=>onForum?.(game);target.querySelector('[data-diag]').onclick=()=>openDiagnostics({api,id,locale,esc,toast}).catch(()=>{
    });target.querySelector('[data-refresh]').onclick=()=>enrich(true).catch(()=>toast(w.failed));target.querySelectorAll('[data-source-url]').forEach(button=>button.onclick=()=>api('open_source',
    {url:button.dataset.sourceUrl}).catch(()=>toast(w.failed)));return;}
@@ -94,7 +120,10 @@ export async function renderGamePage({main,id,tab:startTab='',api,locale,text,es
  async function enrich(refresh=false){const result=await api('game_enrich',{id,locale,refresh});if(!isCurrent())return;Object.assign(data,result);Object.assign(info,
   result.info||{});loadingMetadata=false;const coverArea=main.querySelector('.detail-cover');if(coverArea&&result.game?.cover){const face=coverArea.querySelector('.dtv-front')||coverArea.querySelector('.tv-face');
   if(face){face.querySelectorAll(':scope>:not(.tv-foil):not(.tv-glare)').forEach(n=>n.remove());face.insertAdjacentHTML('afterbegin',cover(result.game));}else coverArea.innerHTML=cover(result.game);
-  }show(activeTab);}
+  }const restoreSynopsisFocus=document.activeElement?.matches('[data-synopsis-source]')&&target.contains(document.activeElement);
+  show(activeTab);
+  if(restoreSynopsisFocus)target.querySelector('[data-synopsis-source]')?.focus({preventScroll:true});
+ }
  main.querySelectorAll('[data-detail-tab]').forEach(button=>button.onclick=()=>show(button.dataset.detailTab));show(['sessions','words','sentences','memories','flowchart'].includes(startTab)?startTab:'overview');enrich().catch(()=>{if(isCurrent()){
   loadingMetadata=false;data.reception??={at:Date.now(),reviews:[]};show(activeTab);}});
  return ()=>{disposed=true;window.removeEventListener('focus',refreshZero);firstPlayer?.dispose?.();devCard?.dispose?.();unmount();};

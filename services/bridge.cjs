@@ -567,7 +567,7 @@ async function dispatch(request,runtime=null) {
       case 'game_detail':await require('./background-games.cjs').foreground();return require('./game-detail.cjs').detail(db,root,String(request.id),request.locale);
       case 'home_lines':return require('./home-lines.cjs').list(db,root,String(request.id),{query:request.query,limit:request.limit});
       case 'home_lines_save':return {chosen:require('./home-lines.cjs').save(root,String(request.id),request.lines)};
-      case 'game_synopsis':return await require('./game-detail.cjs').refreshSynopsis(db,root,String(request.id),request.locale);
+      case 'game_synopsis':return await require('./game-detail.cjs').refreshSynopsis(db,root,String(request.id),request.locale,runtime?.metadata().synopses);
       case 'unknown_words':return require('./unknown-words.cjs').unknownWords(root);
       case 'preferences':return store.publicPreferences(root);
       /* Settings → 重置所有设置 (services/settings-reset.cjs): back up, reset, then push the defaults to an open reader */

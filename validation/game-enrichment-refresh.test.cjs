@@ -23,24 +23,29 @@ for(const corrected of [false,true])test('two detail languages keep the right wo
  t.after(()=>meta.stop());
  let started,release;
  const fetching=new Promise(resolve=>{started=resolve;}),gate=new Promise(resolve=>{release=resolve;});
- const calls=[];meta.synopses.get=async({lang,vndbId})=>{
-  calls.push(lang);if(lang==='en'){started();await gate;}
-  return {source:'VNDB',text:vndbId+'-'+lang};
+ const calls=[];
+ meta.synopses.lookup=async vndbId=>{
+  calls.push(vndbId);if(calls.length===1){started();await gate;}
+  return {text:vndbId+'-en'};
  };
+ meta.synopses.moegirl=async()=>null;
+ meta.synopses.translate=async(text,lang)=>text.replace('-en','-'+lang);
  const english=meta.ensure('g','en');await fetching;
  if(corrected){
   const write=store.openStore(work);
   try{write.prepare("UPDATE games SET original=json_set(original,'$.vndbManual','v2') WHERE id='g'").run();}finally{write.close();}
  }
- const japanese=meta.ensure('g','ja');release();await Promise.all([english,japanese]);
- const {synopses:saved,reviews}=store.readJSON(meta.file).g;
- assert.equal(saved.en?.text,corrected?undefined:'v1-en');
- assert.equal(saved.ja?.text,corrected?'v2-ja':'v1-ja');
+ const japanese=meta.ensure('g','ja');release();
+ const [en,ja]=await Promise.all([english,japanese]);
+ const {reviews,synopses}=store.readJSON(meta.file).g;
+ assert.equal(synopses,undefined);
+ assert.equal(en.synopsis.text,corrected?'':'v1-en');
+ assert.equal(ja.synopsis.text,corrected?'v2-ja':'v1-ja');
  assert.equal(reviews.en?.[0]?.text,corrected?undefined:'review-english');
  assert.equal(reviews.ja?.[0]?.text,'review-japanese');
  if(!corrected)await meta.ensure('g','en');
  await meta.ensure('g','ja');
- assert.equal(calls.length,2);
+ assert.deepEqual(calls,corrected?['v1','v2']:['v1']);
 });
 
 test('a forced refresh asked during a run is not lost',async()=>{

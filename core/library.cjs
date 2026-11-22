@@ -371,34 +371,55 @@ async function moegirlText(titles,{fetcher=globalThis.fetch,timeout=8000}={}){
   const text=page.extract.split(String.fromCharCode(10)).map(x=>x.split(String.fromCharCode(9)).join(' ').trim()).filter(Boolean).slice(0,3).join(String.fromCharCode(10,10)).slice(0,1500).trim();return text.length>=40?{text,title:String(page.title)}:null;}catch{return null;}
 }
 class Synopses{
- constructor(layout,options={}){this.lookup=options.lookup||vndbText;this.moegirl=options.moegirl||moegirlText;this.translate=options.translate||machine;this.file=path.join(layout.config,'synopsis.json');try{this.cache=JSON.parse(fs.readFileSync(this.file,'utf8'))||{};}catch{this.cache={};}this.running=new Map();}
- write(){try{fs.writeFileSync(this.file+'.tmp',JSON.stringify(this.cache,null,1));fs.renameSync(this.file+'.tmp',this.file);}catch{}}
- // {mediaId,titles[],vndbId,appid,lang,refresh} -> {text,lang,source,fresh}
- async get(a){
-  const id=String(a.mediaId),lang=['zh','en','ja'].includes(a.lang)?a.lang:'zh';let entry=this.cache[id];
-   if(a.appid&&entry?.steamIdentity!==String(a.appid)+':'+(a.vndbId||''))entry=null;
-  // A language that could not be translated last time (offline, rate limited) is retried after ten minutes, not a day.
-  const missing=entry&&!entry[lang]&&Date.now()-(entry.at||0)>600000;
-  if(a.refresh||!entry||missing||entry.policy!==2||entry.mg!==1||Date.now()-(entry.at||0)>86400000){if(!this.running.has(id))this.running.set(id,this.fetch(a).finally(()=>this.running.delete(id)));entry=await this.running.get(id)||entry;}
-  if(!entry)return {text:'',lang,source:''};
-   if(a.moegirl&&entry.moegirl?.text&&require('./synopsis-policy.cjs').approved(entry.moegirl.src))return {text:entry.moegirl.text,lang:'zh',source:entry.moegirl.src};
-  const order={zh:['zh','ja','en'],en:['en','zh','ja'],ja:['ja','zh','en']}[lang];for(const l of order)if(entry[l]&&require('./synopsis-policy.cjs').approved(entry.src?.[l]))return {text:entry[l],lang:l,source:entry.src?.[l]||''};return {text:'',lang,source:''};
+ constructor(layout,options={}){
+  this.lookup=options.lookup||vndbText;this.moegirl=options.moegirl||moegirlText;this.translate=options.translate||machine;
+  this.file=path.join(layout.config,'synopsis.json');this.running=new Map();
  }
- async fetch(a){
-   const titles=[...new Set((a.titles||[]).map(String).filter(Boolean))],out={at:Date.now(),policy:2,mg:1,src:{}};
-   if(a.appid)out.steamIdentity=String(a.appid)+':'+(a.vndbId||'');
-   const cached=this.cache[String(a.mediaId)]||{},old=a.appid&&cached.steamIdentity!==out.steamIdentity?{}:cached;
-  const put=(l,text,src)=>{if(text&&!out[l]){out[l]=text;out.src[l]=src;}};
-   const v=a.appid&&!a.vndbId?null:await this.lookup(a.vndbId,a.appid?[]:titles);if(v?.text){put('en',v.text.slice(0,20000),'VNDB');if(v.alttitle)titles.push(v.alttitle);}
-   /* 2026-11-21 (owner: 作品简介也用萌娘百科) the Chinese synopsis is the Moegirlpedia page's own opening when the work has one there (CC BY-NC-SA 3.0, source named); only then the machine translation below */
-   /* kept in its own slot (the UI language does not decide which source is shown: the info-source setting does) */
-   if(v?.names)titles.push(...v.names);const mg=await this.moegirl(titles);if(mg?.text)out.moegirl={text:mg.text,src:MOEGIRL_SOURCE,title:mg.title};
-  // A language still missing is machine-translated from the best text found (the original Japanese first).
-  await Promise.all([['zh',['ja','en']],['en',['ja','zh']],['ja',['zh','en']]].map(async([l,from])=>{if(out[l]||(old[l]&&require('./synopsis-policy.cjs').approved(old.src?.[l])&&!/机翻|MT/.test(old.src[l])))return;const f=from.find(x=>out[x]&&!/机翻/.test(out.src[x]||''));if(!f)return;const text=await this.translate(out[f],l,f);if(text&&text.trim()!==out[f].trim())put(l,text,out.src[f]+' · 机翻');}));
-  // Keep what an earlier fetch found for a language this one could not reach (offline, rate limits).
-   if(!out.moegirl&&old.moegirl?.text)out.moegirl=old.moegirl;
-  for(const l of ['zh','en','ja'])if(!out[l]&&old[l]&&require('./synopsis-policy.cjs').approved(old.src?.[l])){out[l]=old[l];out.src[l]=old.src?.[l]||'';}
-   if(!out.zh&&!out.en&&!out.ja&&!out.moegirl&&!a.appid)return Object.keys(old.src||{}).some(l=>require('./synopsis-policy.cjs').approved(old.src[l]))?old:null;if(!fs.existsSync(this.file+'.pre-vndb.json')&&fs.existsSync(this.file))fs.copyFileSync(this.file,this.file+'.pre-vndb.json');this.cache[String(a.mediaId)]=out;this.write();return out;
+ read(){try{return JSON.parse(fs.readFileSync(this.file,'utf8'))||{};}catch{return {};}}
+ write(id,entry){
+  try{
+   fs.mkdirSync(path.dirname(this.file),{recursive:true});
+   const cache=this.read();cache[id]=entry;
+   if(!fs.existsSync(this.file+'.pre-vndb.json')&&fs.existsSync(this.file))fs.copyFileSync(this.file,this.file+'.pre-vndb.json');
+   fs.writeFileSync(this.file+'.tmp',JSON.stringify(cache,null,1));fs.renameSync(this.file+'.tmp',this.file);
+  }catch{}
+ }
+ async get(a){
+  const policy=require('./synopsis-policy.cjs'),id=String(a.mediaId);
+  const lang=['zh','en','ja'].includes(a.lang)?a.lang:'zh';
+  while(this.running.has(id))await this.running.get(id).catch(()=>{});
+  let entry=policy.forWork(this.read()[id],a);
+  // Retry a missing translation after ten minutes. A choice between providers never invalidates the shared entry.
+  const age=Date.now()-(entry?.at||0);
+  if(a.refresh||!entry||(!entry[lang]&&age>600000)||entry.policy!==policy.POLICY||entry.mg!==1||age>86400000){
+   const job=this.fetch(a,entry).finally(()=>this.running.delete(id));this.running.set(id,job);
+   entry=await job;
+  }
+  return policy.views(entry,lang,a.moegirl).synopsis;
+ }
+ async fetch(a,previous){
+  const {approved,POLICY}=require('./synopsis-policy.cjs'),old=previous||{};
+  const titles=[...new Set((a.titles||[]).map(String).filter(Boolean))];
+  const out={at:Date.now(),policy:POLICY,mg:1,src:{},vndbId:String(a.vndbId||'')};
+  if(a.appid)out.steamIdentity=a.appid+':'+out.vndbId;
+  const put=(lang,text,source)=>{if(text&&!out[lang]){out[lang]=text;out.src[lang]=source;}};
+  const vn=a.appid&&!a.vndbId?null:await this.lookup(a.vndbId,a.appid?[]:titles);
+  if(vn?.text)put('en',vn.text.slice(0,20000),'VNDB');
+  if(vn?.alttitle)titles.push(vn.alttitle);
+  if(vn?.names)titles.push(...vn.names);
+  const mg=await this.moegirl(titles);
+  if(mg?.text)out.moegirl={text:mg.text,src:MOEGIRL_SOURCE,title:mg.title};
+  else if(old.moegirl?.text)out.moegirl=old.moegirl;
+  const changed=out.en&&old.en&&out.en!==old.en;
+  const keep=lang=>approved(old.src?.[lang])&&!(changed&&/^VNDB.*(?:机翻|MT)/i.test(old.src[lang]));
+  await Promise.all(['zh','ja'].map(async lang=>{
+   if(!out.en||(old[lang]&&keep(lang)&&!/机翻|MT/.test(old.src[lang])))return;
+   const text=await this.translate(out.en,lang,'en');
+   if(text&&text.trim()!==out.en.trim())put(lang,text,'VNDB · 机翻');
+  }));
+  for(const lang of ['zh','en','ja'])if(keep(lang))put(lang,old[lang],old.src[lang]);
+  this.write(String(a.mediaId),out);
+  return out;
  }
 }
 module.exports={_moegirlText:moegirlText,searchNames,machine,restoreTool,Library,Synopses,engineOf,findGame,steamGames,steamAppidFor,folderGames,findSteam,registryString,findVariants,steamParts,isTranslated,playableGame};

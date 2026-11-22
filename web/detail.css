@@ -31,6 +31,10 @@
 .detail-overview{display:grid;grid-template-columns:minmax(0,1fr) clamp(240px,22vw,300px);gap:clamp(28px,4vw,56px);align-items:start}
 .detail-main{min-width:0}
 .detail-main>.panel:first-child{border-top:0!important}
+.synopsis-panel .section-header{flex-wrap:wrap}
+.synopsis-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-inline-start:auto}
+.synopsis-actions select{height:30px;padding:0 8px;border-radius:8px;background:var(--surface);font-size:12px}
+.synopsis-actions [data-refresh]{white-space:nowrap}
 .detail-main .game-synopsis,.detail-main .synopsis-panel p{max-width:72ch;font-size:14px}
 .detail-aside{position:sticky;top:16px;display:flex;flex-direction:column;gap:14px;padding-top:22px}
 .game-detail-content .detail-aside .detail-technical{border-top:0!important;padding:0!important}

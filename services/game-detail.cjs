@@ -4,10 +4,16 @@ function workIdentity(row,original){
  const library=original.library||{};
  const appid=String(library.appid||'')||require('../core/library.cjs').steamAppidFor(row.executable);
  const vndbId=original.vndbManual||(!appid||library.vndbSteamAppid===appid?library.vndbId:'');
- return {appid,vndbId:String(vndbId||'')};
+ return {appid,vndbId:String(vndbId||''),rejectLegacy:!!original.vndbManual&&library.vndbId!==vndbId};
 }
 function record(db,id){const row=db.prepare('SELECT * FROM games WHERE id=? AND removed_at IS NULL').get(id);if(!row)throw Error('GAME_NOT_FOUND');let original={};try{original=JSON.parse(row.original||'{}');}catch{}return{row,original};}
-function synopsis(root,row,original,locale){const identity=workIdentity(row,original),saved=store.readJSON(path.join(root,'data/config/synopsis.json'))[String(row.legacy_id??row.id)]||{};const cached=!identity.appid||saved.steamIdentity===identity.appid+':'+identity.vndbId?saved:{},media=original.media||{},library=original.library||{};const lang=['zh','ja','en'].includes(locale)?locale:'zh';if(cached.moegirl?.text&&require('./info-source.cjs').forRoot(root,locale)&&require('../core/synopsis-policy.cjs').approved(cached.moegirl.src))return {text:String(cached.moegirl.text).replace(/<[^>]+>/g,'').trim(),source:String(cached.moegirl.src),lang:'zh'};const source=cached.src?.[lang],approved=!cached[lang]||require('../core/synopsis-policy.cjs').approved(source);return {text:String(approved?cached[lang]||media.description||library.description||'':'').replace(/<[^>]+>/g,'').trim(),source:approved&&cached[lang]?String(source||''):'',lang};}
+function synopsisViews(root,row,original,locale){
+ const policy=require('../core/synopsis-policy.cjs'),identity=workIdentity(row,original);
+ const saved=store.readJSON(path.join(root,'data/config/synopsis.json'))[String(row.legacy_id??row.id)];
+ const cached=policy.forWork(saved,identity);
+ const localText=original.media?.description||original.library?.description||'';
+ return policy.views(cached,locale,require('./info-source.cjs').forRoot(root,locale),localText);
+}
 /* 2026-11-13 关联单词 / 收录句子 tabs. One pass over this game's examples feeds both: per word how many lines met it here (×N), the first and latest
    line with its highlight, and the times it was met (for the small "met over time" strip); per saved sentence the words collected from that very
    line (their highlight ranges). JLPT level from the open JLPT list, "in Anki" from anki_links when that table exists. No per-chapter data exists. */
@@ -67,7 +73,14 @@ function detail(db,root,id,locale){const {row,original}=record(db,id),game=store
  const recentLines=db.prepare("SELECT text,read_at FROM reading_events WHERE game_id=? AND length(trim(text))>=6 ORDER BY read_at DESC,id DESC LIMIT 12").all(id).reverse();
  const count=db.prepare('SELECT COUNT(*) sessions FROM reading_sessions WHERE game_id=?').get(id);
  const launchIssue=require('./game-language.cjs').originalExecutable(db,id,root).blocked?'JAPANESE_EXECUTABLE_REQUIRED':require('./locale-launch.cjs').requiresAdministrator(row.executable)?'GAME_ELEVATION_REQUIRED':'';
- const identity=workIdentity(row,original);game.vndbId=identity.vndbId;let reception=store.readJSON(path.join(root,'data/config/game-reception.json'))[id];if(reception&&identity.appid&&reception.vndb?.url!=='https://vndb.org/'+identity.vndbId)reception={...reception,vndb:null};return {game,launchIssue,reception:reception?{...reception,reviews:reception.reviews?.[locale]||[]}:null,synopsis:synopsis(root,row,original,locale),info:{zeroLatency:(()=>{try{return require('./original-text.cjs').brief(root,id);}catch{return 'unknown';}})(),names:Array.isArray(library.names)?library.names:[],source:row.source,executable:row.executable,status:row.status,appid:library.appid||'',vndbId:identity.vndbId,developer:media.developer||library.developer||'',released:media.release_date||library.release_date||''},sessions,words,sentences,recentLines,homeLines:(()=>{try{return require('./home-lines.cjs').chosen(root,id);}catch{return [];}})(),homeAuto:(()=>{try{return require('./home-lines.cjs').auto(db,id);}catch{return null;}})(),counts:{sessions:count.sessions,sentences:db.prepare('SELECT COUNT(*) n FROM saved_sentences WHERE game_id=?').get(id).n,words:wordCounts}};
+ const identity=workIdentity(row,original);game.vndbId=identity.vndbId;let reception=store.readJSON(path.join(root,'data/config/game-reception.json'))[id];if(reception&&identity.appid&&reception.vndb?.url!=='https://vndb.org/'+identity.vndbId)reception={...reception,vndb:null};return {game,launchIssue,reception:reception?{...reception,reviews:reception.reviews?.[locale]||[]}:null,...synopsisViews(root,row,original,locale),info:{zeroLatency:(()=>{try{return require('./original-text.cjs').brief(root,id);}catch{return 'unknown';}})(),names:Array.isArray(library.names)?library.names:[],source:row.source,executable:row.executable,status:row.status,appid:library.appid||'',vndbId:identity.vndbId,developer:media.developer||library.developer||'',released:media.release_date||library.release_date||''},sessions,words,sentences,recentLines,homeLines:(()=>{try{return require('./home-lines.cjs').chosen(root,id);}catch{return [];}})(),homeAuto:(()=>{try{return require('./home-lines.cjs').auto(db,id);}catch{return null;}})(),counts:{sessions:count.sessions,sentences:db.prepare('SELECT COUNT(*) n FROM saved_sentences WHERE game_id=?').get(id).n,words:wordCounts}};
 }
-async function refreshSynopsis(db,root,id,locale){const {row,original}=record(db,id),library=original.library||{},identity=workIdentity(row,original);const {Synopses}=require('../core/library.cjs');return new Synopses({config:path.join(root,'data/config')}).get({mediaId:row.legacy_id??row.id,titles:library.names||[row.title],vndbId:identity.vndbId,appid:identity.appid,lang:locale,refresh:true});}
+async function refreshSynopsis(db,root,id,locale,synopses){
+ const {row,original}=record(db,id),identity=workIdentity(row,original);
+ const {Synopses}=require('../core/library.cjs');
+ synopses??=new Synopses({config:path.join(root,'data/config')});
+ await synopses.get({mediaId:row.legacy_id??row.id,titles:[row.title,...(original.library?.names||[])],...identity,lang:locale,refresh:true});
+ const current=record(db,id);
+ return synopsisViews(root,current.row,current.original,locale).synopsis;
+}
 module.exports={detail,refreshSynopsis,studyWords};
