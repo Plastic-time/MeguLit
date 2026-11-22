@@ -219,6 +219,15 @@ class LocalLearning{
   const selected=[...args.text].slice(args.start,args.end).join(''),fixed=!chosen?selectedReading(selected,entry):null;if(fixed){reading=fixed.reading;surface=selected;pronunciationForm=fixed.form;}
   // A selection spanning several tokens (e.g. 木曜日の空) reads as the sentence-context readings joined in order.
   let phrase=false;if(!chosen&&!fixed){const inside=tokens.filter(t=>t.start>=args.start&&t.end<=args.end).sort((a,b)=>a.start-b.start);if(inside.length>1&&inside[0].start===args.start&&inside.at(-1).end===args.end&&inside.every((t,i)=>i===0||inside[i-1].end===t.start)&&inside.every(t=>t.reading||!/[一-龯々]/.test(t.surface))){reading=inside.map(t=>t.reading||t.surface).join('');surface=[...args.text].slice(args.start,args.end).join('');phrase=true;pronunciationForm='phrase';}}
+  // Separate digit tokens lose the counter pronunciation in a multi-digit minute count.
+  const minute = /^([1-9][0-9]?)分$/u.exec(selected.normalize('NFKC'));
+  if (minute && !/^の/u.test([...args.text].slice(args.end).join(''))) {
+    const n = Number(minute[1]), tens = Math.floor(n / 10), ones = n % 10;
+    const digits = ['', 'イチ', 'ニ', 'サン', 'ヨン', 'ゴ', 'ロク', 'ナナ', 'ハチ', 'キュウ'];
+    const minutes = ['ジュップン','イップン','ニフン','サンプン','ヨンプン','ゴフン','ロップン','ナナフン','ハップン','キュウフン'];
+    reading = (tens > 1 ? digits[tens] : '') + (tens && ones ? 'ジュウ' : '') + minutes[ones];
+    surface = selected; chosen = null; phrase = true; pronunciationForm = 'phrase';
+  }
   const ambiguous=!reading||!!chosen?.reading_ambiguous||!phrase&&!fixed&&!!entry&&!entry.readings?.some(r=>kana(r)===kana(reading));
   return {surface,clickedSurface:result.surface,base:m.base||result.surface,reading,pitch:chosen?.pitch||[],pitchSource:chosen?.pitch_source||(phrase?'词组 · 音调由语音引擎估计':'UniDic 未匹配 · 音调由语音引擎估计'),pronunciationForm,ambiguous,pos:m.wordClass||entry?.pos?.join('、')||'',meaning:entry?.definition_groups?.map(g=>g.text).join('\n')||entry?.definitions?.join('\n')||'',sentence:args.text};
  }

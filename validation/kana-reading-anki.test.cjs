@@ -54,3 +54,9 @@ test('an aligned kanji token keeps its sentence-context reading (the fallback on
  const w=await learning(tokens,{'電車':{id:9,spellings:['電車'],readings:['でんしゃ']}}).word({text,start:0,end:2});
  assert.equal(w.reading,'デンシャ');assert.equal(w.pronunciationForm,'surface');
 });
+
+test('full-width minute count keeps its counter reading across digit tokens',async()=>{
+ const model=learning([tok(0,1,'２','ニ'),tok(1,2,'０','レイ'),tok(2,3,'分','フン')]);
+ const word=await model.word({text:'２０分待つ',start:0,end:3});
+ assert.equal(word.reading,'ニジュップン');
+});
