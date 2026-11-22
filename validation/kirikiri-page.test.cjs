@@ -252,6 +252,25 @@ test('E358 per line: a line the game draws in translation is not drawn again; a 
  const css=fs.readFileSync(file,'utf8');assert.match(css,/body\.megulit-embed-translation \.sentence-window\.tome-island-page \.tome-island-pair:not\(\.tome-island-overlay-drawn\)\{visibility:hidden!important\}/);
 });
 
+test('session boundaries discard native drawing status before the same line arrives in another game',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const saved=global.MutationObserver;global.MutationObserver=class{observe(){}};t.after(()=>{global.MutationObserver=saved;});
+ const IslandPage=require('../web/reader/modules/island-page.js');
+ for(const boundary of [{hookSource:null},{type:'gameClosed'}]){
+  const {w,b,doc}=fakeWindow({clientX:58,clientY:85,clientWidth:1546,clientHeight:870,readerX:900,readerY:500,readerWidth:600,readerHeight:100});
+  IslandPage.install(w);
+  const source='\u6570\u5206\u5f8c\u3002';
+  const say=()=>b.islandPage.accept({hookSource:source,hookSourceEngine:'nvl',hookSequence:1,hookSourceLine:0});
+  const pair=()=>doc.querySelectorAll('.tome-island-pair')[0];
+  say();
+  b.islandPage.accept({embedLine:{source,text:'older translation',drawn:true}});
+  assert.ok(pair().classList.contains('tome-island-game-drawn'));
+  b.islandPage.accept(boundary);
+  say();
+  assert.equal(pair().classList.contains('tome-island-game-drawn'),false);
+ }
+});
+
 test('E410 flow page from the script: a page start clears the page, a line already on it is not drawn again, script rows win',t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  const saved=global.MutationObserver;global.MutationObserver=class{observe(){}};t.after(()=>{global.MutationObserver=saved;});
