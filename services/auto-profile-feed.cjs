@@ -40,7 +40,7 @@ function verify(doc,list){const s=doc?.signature;if(!s||s.alg!=='ed25519'||typeo
 const VERSION_MATCH=['exe','head','pe'],GAME_MATCH=['exe','head','pe','pack','script','steam','vndb','title'];
 const docOk=d=>gameDiff.validate(d).ok&&verify(d,keys());
 const part=d=>({source:d.source,mode:d.mode||'hide',settings:d.settings||{},rev:d.rev|0,issuedAt:d.issuedAt||'',agree:d.agree|0,reporters:d.reporters|0});
-const torchLayers=new WeakMap(),cachedRoots=new WeakMap();
+const torchLayers=new WeakMap(),cachedRoots=new WeakMap(),layerDocuments=new WeakMap();
 function forExe(value,key,exe){if(!value?.torchBound)return value;const binding=torchLayers.get(value);if(!binding||binding.key!==key||!binding.root)return null;const answer=cached(binding.root,key);return answer?.torchRelease?layer(answer,key,{exe,torchTrust:binding.torchTrust}):null;}
 function layer(answer,key,{torchTrust,exe}={}){if(!answer||answer.schema!=='megulit.game-diff-feed'||answer.key!==key)return null;
  if(answer.torchRelease&&!require('./torch-receive.cjs').compatibleCached(answer,key,torchTrust,{exe}))return null;
@@ -54,7 +54,8 @@ function layer(answer,key,{torchTrust,exe}={}){if(!answer||answer.schema!=='megu
  const merged=JSON.parse(JSON.stringify(P.game?.settings||{}));const deep=(a,b)=>{for(const [k,x] of Object.entries(b||{}))a[k]=x&&typeof x==='object'&&!Array.isArray(x)&&a[k]&&typeof a[k]==='object'?deep(a[k],x):x;return a;};deep(merged,P.version?.settings);
  const mode=(P.version&&P.version.mode==='read')||(P.game&&P.game.mode==='read')?'read':'hide';
  const result={source:lead.source,mode,match:v?vm:VERSION_MATCH.includes(gm)?gm:'game:'+gm,exact:vm==='exe'||!v&&gm==='exe',settings:merged,version:P.version,game:P.game,agree:lead.agree,reporters:lead.reporters,issuedAt:lead.issuedAt,
-  stamp:(v?v.key+'@'+(v.rev|0)+'@'+(v.issuedAt||''):'-')+'|'+(g?g.key+'@'+(g.rev|0)+'@'+(g.issuedAt||''):'-')};if(answer.torchRelease){result.torchBound=true;torchLayers.set(result,{answer,key,torchTrust,root:cachedRoots.get(answer)});}return result;}
+  stamp:(v?v.key+'@'+(v.rev|0)+'@'+(v.issuedAt||''):'-')+'|'+(g?g.key+'@'+(g.rev|0)+'@'+(g.issuedAt||''):'-')};if(answer.torchRelease){result.torchBound=true;torchLayers.set(result,{answer,key,torchTrust,root:cachedRoots.get(answer)});}layerDocuments.set(result,{snapshot:gameDiff.canonical(result),documents:[...(v?[{document:v,slot:'version',match:vm}]:[]),...(g?[{document:g,slot:'game',match:gm}]:[])]});return result;}
+function documentsFor(value,key,exe){const current=forExe(value,key,exe),proof=current&&layerDocuments.get(current);return proof&&proof.snapshot===gameDiff.canonical(current)?proof.documents.filter(x=>docOk(x.document)):[];}
 /* a candidate (not this exe's own hash) the self-check gate refused on this PC: not applied again until the relay hands out another */
 const rejectFile=(root,key)=>path.join(dir(root),key+'.rejected.json');
 function rejected(root,key,l){if(!l||l.exact)return false;try{return JSON.parse(fs.readFileSync(rejectFile(root,key),'utf8')).stamp===l.stamp;}catch{return false;}}
@@ -119,4 +120,4 @@ async function reportScore(root,record,{fetcher=globalThis.fetch}={}){if(!record
  return {state:'failed'};}
 function pendingScore(root,key,fetcher){let doc=null;try{doc=require('./cardinal.cjs').load(root,key);}catch{}if(doc?.sent||!require('../core/cardinal/upload.cjs').eligible(doc))return;
  reportScore(root,doc.record,{fetcher}).then(r=>{if(r.state!=='sent')return;try{const cur=require('./cardinal.cjs').load(root,key);if(cur?.record?.at===doc.record.at){const f=require('./cardinal.cjs').fileOf(root,key);fs.writeFileSync(f,JSON.stringify({...cur,sent:true,upload:{state:'sent'}},null,1));}}catch{}}).catch(()=>{});}
-module.exports={reportScore,sent,markSent,creditOf,setCredit,syncCredit,cleanName,cleanCredit,CREDIT_MAX,cached,refresh,report,layer,forExe,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};
+module.exports={documentsFor,reportScore,sent,markSent,creditOf,setCredit,syncCredit,cleanName,cleanCredit,CREDIT_MAX,cached,refresh,report,layer,forExe,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};

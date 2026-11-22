@@ -63,7 +63,7 @@ function settle(s){const shared=feed.forExe(s.shared,s.key,s.input?.exe||s.exe);
 
 /* profile: the game's layered profile without the auto layer; input: its profileFor input */
 function start(reader,exe,profile=null,input=null,options={}){stop();profile=profile||Profiles.profileFor({exe});input=input||{exe};
- const s={reader,exe,key:'',input,profile,stored:null,shared:null,layer:null,from:'',calibrated:false,skipFeed:!!options.skipFeed,ver:version(reader.root)};
+ const s={reader,exe,pid:Number(reader.gamePid),birth:String(reader.gameBirth||''),key:'',input,profile,stored:null,shared:null,layer:null,from:'',calibrated:false,skipFeed:!!options.skipFeed,ver:version(reader.root)};
  s.check=new SelfCheck({thresholds:profile.selfCheck||{},record:true,onWindow:r=>windowDone(s,r)});
  /* the runtime sample only with the player's consent (runtime-sample.cjs enabled, default off) */
  s.sample=require('./runtime-sample.cjs').enabled(reader.root)?new RuntimeSample({exe,engine:profile.engine,app:s.ver}):null;
