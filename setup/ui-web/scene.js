@@ -286,7 +286,7 @@
     { const pp = s.phase === 'unpack' || s.phase === 'done' ? 1 : (s.total ? clamp(s.got / s.total) : 0), pr = progCircle && progCircle.querySelector('.prog'); if (pr && cache && cache.pp !== Math.round(pp * 200)) { cache.pp = Math.round(pp * 200); pr.setAttribute('stroke-dashoffset', (471 * (1 - pp)).toFixed(1)); }
       if (bandEl) bandEl.style.backgroundPosition = '0 ' + ((REDUCE ? 0 : (s.t || 0) * 160) % 120).toFixed(0) + 'px'; }
     if (window.GL && GL.ok) { GL.update(lastFrames, { s, t, reveal: lastReveal, prog: s.phase === 'unpack' || s.phase === 'done' ? 1 : (s.total ? clamp(s.got / s.total) : 0) }); GL.draw(); }
-    const waiting = statusOnly && (s.phase !== 'download' || s.total <= 0);
+    const waiting = s.phase === 'vc-runtime' || (statusOnly && (s.phase !== 'download' || s.total <= 0));
     $('#hud').classList.toggle('waiting', waiting);
     const pct = s.total ? Math.floor(100 * s.got / s.total) : 0;
     $('#pct').textContent = pct; $('#got').textContent = MB(s.got || 0); $('#total').textContent = MB(s.total || 0);
@@ -294,12 +294,18 @@
     $('#eta').textContent = s.eta > 0 ? tr("eta", s.eta) : '';
     const pk = (I18N[LANG].packs[s.pack] || s.pack || ''), srcTxt = s.srcN > 1 ? tr('srcMore', s.src, s.srcN) : (s.src || ''), anyRetry = s.st && Array.prototype.indexOf.call(s.st, 3) >= 0;
     const W = { probe: [tr('probeT'), tr('probeP')], download: [tr('downT', pk), tr('downP', '<span class="src">' + srcTxt + '</span>') + (anyRetry ? ' ' + tr('retryNote') : '')], verify: [tr('verifyT'), tr('verifyP', pk)], prepare: [LANG === 'en' ? 'Preparing installation?' : '正在准备安装…', ''], unpack: [tr('unpackT'), tr('unpackP', pk, s.dir || '')], done: [tr('doneT'), ''] }[s.phase] || ['', ''];
-    $('#whatT').textContent = W[0]; $('#whatP').innerHTML = W[1];
+    $('#whatT').textContent = s.phase === 'vc-runtime' ? (LANG === 'en' ? 'Checking Visual C++ Runtime' : '正在检查 Visual C++ 运行库') : W[0];
+    $('#whatP').innerHTML = s.phase === 'vc-runtime' ? (LANG === 'en' ? 'Approve the Microsoft installer if Windows asks.' : '如需安装，请确认微软安装程序的管理员提示') : W[1];
     if (s.err && !showErr) showError(s.err); else if (!s.err && showErr) hideError();
   }
   let showErr = false;
   function showError(e) {
     showErr = true; const k = e.kind === 'install' ? 'Inst' : 'Down'; $('#errT').textContent = tr('err' + k + 'T'); $('#errEn').textContent = ''; $('#errM').textContent = tr('err' + k + 'M'); $('#errTip').textContent = tr('err' + k + 'Tip');
+    if (e.kind === 'vc-runtime') {
+      $('#errT').textContent = 'Visual C++ 运行库未就绪';
+      $('#errM').textContent = e.message || '请确认管理员提示后重试';
+      $('#errTip').textContent = '详情见 %LOCALAPPDATA%\\MeguLit\\setup-vc-runtime.log';
+    }
     gsap.set('#ui-err', { visibility: 'visible' }); gsap.fromTo('#ui-err', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: REDUCE ? 0.2 : 0.45, ease: 'power2.out', overwrite: true });
   }
   function hideError() { showErr = false; gsap.to('#ui-err', { opacity: 0, duration: 0.25, overwrite: true, onComplete() { $('#ui-err').style.visibility = 'hidden'; } }); }

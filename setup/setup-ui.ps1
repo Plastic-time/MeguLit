@@ -181,7 +181,8 @@ $errSite = New-Btn '手动下载 Manual' 9 $false $false; $errSite.Surface = $er
 $errRetry.add_Click({ $m = [Windows.Forms.Button].GetMethod('OnClick', [Reflection.BindingFlags]'NonPublic,Instance'); [void]$m.Invoke($button, @([EventArgs]::Empty)) })
 $errCopy.add_Click({
   try {
-    $log = Join-Path $Root 'logs\setup-download.log'; $t = "MeguLit setup`r`n" + $errMsg.Text + "`r`n"
+    $log = if ($script:failKind -eq 'vc-runtime') { Join-Path $env:LOCALAPPDATA 'MeguLit\setup-vc-runtime.log' } else { Join-Path $Root 'logs\setup-download.log' }
+    $t = "MeguLit setup`r`n" + $errMsg.Text + "`r`n"
     if (Test-Path $log) { $t += (Get-Content -Tail 120 -Encoding UTF8 $log) -join "`r`n" }
     [Windows.Forms.Clipboard]::SetText($t); $errCopy.Text = '已复制 Copied'
   } catch { $errCopy.Text = '复制失败' }
@@ -296,6 +297,10 @@ function UI-Progress($p) {
   $cnt = [math]::Max(1, $p.count)
   $overall = if ($p.total -gt 0) { [int][math]::Min(1000, 1000.0 * $p.totalGot / $p.total) } else { 0 }
   switch ($p.phase) {
+    'vc-runtime' {
+      $title.Text = '正在检查 Visual C++ 运行库'; $titleEn.Text = 'Checking Visual C++ Runtime'
+      Set-Busy; $detail.Text = '如需安装，请确认微软安装程序的管理员提示'; $detail2.Text = ''
+    }
     'probe' {
       $title.Text = '正在准备下载'; $titleEn.Text = 'Picking the fastest sources'
       Set-Busy; $detail.Text = '正在同时测速所有下载源，挑最快的几个一起下'; $detail2.Text = ('先下载 ' + $p.name + ' · 共 ' + $cnt + ' 个组件，约 ' + (MB $p.total) + ' · GitHub 与国内镜像一起测')
@@ -323,9 +328,10 @@ function Show-State {
 }
 function UI-Fail([string]$kind, [string]$message) {
   UI-Show-Err $true; $errCopy.Text = '复制日志 Copy log'
-  $errTitle.Text = if ($kind -eq 'install') { '安装没有完成 · Install did not finish' } else { '下载中断了 · Download interrupted' }
+  $errTitle.Text = if ($kind -eq 'vc-runtime') { 'Visual C++ 运行库未就绪' } elseif ($kind -eq 'install') { '安装没有完成 · Install did not finish' } else { '下载中断了 · Download interrupted' }
   $errTitle.ForeColor = $pal.warn; $errMsg.Text = $message
-  $errSteps.Text = if ($kind -eq 'install') { '多半是磁盘空间不够或文件被占用：关掉占用的程序、腾出空间后点「重试」；组件已下载好，不会重下' }
+  $errSteps.Text = if ($kind -eq 'vc-runtime') { '确认管理员提示后点「重试」，也可以复制日志' }
+    elseif ($kind -eq 'install') { '多半是磁盘空间不够或文件被占用：关掉占用的程序、腾出空间后点「重试」；组件已下载好，不会重下' }
     else { '先点「重试」：会重新测速并换最快的源，已下的部分接着用。还是不行就「复制日志」发给我们，或到官网手动下载整包' }
   $percent.Text = ''; Pack-Rows @{ phase = 'none' }
 }

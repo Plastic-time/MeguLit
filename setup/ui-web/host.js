@@ -72,7 +72,7 @@
   function goTo(name, move) { if (section === name) return; Scene.goTo(name, move, section); section = name; }
   /* the engine's JSON becomes a scene snapshot */
   function snapshot() {
-    let s = state; if (!s || (!statusOnly && !s.n)) return null; if (!st || st.length !== s.n) { N = s.n; st = new Int8Array(N); fr = new Float32Array(N); doneAt = new Float32Array(N); }
+    let s = state; if (!s || (!statusOnly && !s.n && s.phase !== 'vc-runtime' && s.kind !== 'vc-runtime')) return null; if (!st || st.length !== s.n) { N = s.n; st = new Int8Array(N); fr = new Float32Array(N); doneAt = new Float32Array(N); }
     const t = clock(); for (let i = 0; i < N; i++) { const v = +s.st[i] || 0; if (v === 2 && st[i] !== 2) doneAt[i] = t; st[i] = v; fr[i] = (s.fr[i] || 0) / 100; }
     /* the engine reports 0 / no source for a moment while it re-ranks sources: hold the last real values for 2.5 s so the text does not flicker */
     const tn = clock(); if (s.speed > 0) { held.speed = s.speed; held.t = tn; } if (s.src) { held.src = s.src; held.srcN = s.srcN; held.ts = tn; }
@@ -81,7 +81,8 @@
     const speed = s.speed || 0, total = s.total || 0, got = s.got || 0;
     let phase = s.phase === 'download' || s.phase === 'probe' ? (s.phase === 'download' || (!statusOnly && s.got > 0) ? 'download' : 'probe') : s.phase === 'downloaded' ? (statusOnly ? 'prepare' : 'download') : s.phase === 'verify' ? 'verify' : s.phase === 'unpack' ? 'unpack' : s.phase === 'done' ? 'done' : s.phase === 'idle' ? 'idle' : 'probe';
     const out = { t: t, st, fr, doneAt, got, total, speed, eta: speed > 0 ? (total - got) / speed : 0, pack: s.pack || '', src: s.src || '', srcN: s.srcN || 0, dir: s.dir || '', phase, unpack: s.unpack || 0 };
-    if (s.phase === 'failed') { out.err = { kind: s.kind || 'download' }; }
+    if (s.phase === 'vc-runtime') out.phase = s.phase;
+    if (s.phase === 'failed') { out.err = { kind: s.kind || 'download', message: s.message }; }
     return out;
   }
   async function poll() {

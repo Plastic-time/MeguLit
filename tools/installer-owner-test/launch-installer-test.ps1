@@ -90,7 +90,10 @@ $receipt = @{ candidateCommit = $payload.candidateCommit; packageVersion = $vers
 $receiptPath = Join-Path $ownerRoot "log\launch-$stamp.json"
 $receipt | ConvertTo-Json | Set-Content -LiteralPath $receiptPath -Encoding UTF8
 Write-Host '正在启动安装界面…'
-$process = [Diagnostics.Process]::Start($start); $process.WaitForExit(); $receipt.exitCode = $process.ExitCode
+$process = [Diagnostics.Process]::Start($start)
+$receipt.processId = $process.Id
+$receipt | ConvertTo-Json | Set-Content -LiteralPath $receiptPath -Encoding UTF8
+$process.WaitForExit(); $receipt.exitCode = $process.ExitCode
 if ($process.ExitCode -eq 3) {
   $receipt.installerExitCode = 3
   try {

@@ -78,6 +78,7 @@ function Web-State {
   }
   $f = $script:fetch; $got = Got-Bytes; $total = Total-Bytes
   $phase = if ($script:mode -eq 'failed') { 'failed' } elseif ($script:done) { 'done' } elseif ($script:copying -or $script:busy) { 'unpack' }
+    elseif ($script:vcInstalling) { 'vc-runtime' }
     elseif ($script:statusOnly -and -not $script:confirmed) { 'idle' }
     elseif ($f) { if ([string]$f.Phase -eq 'verify') { 'verify' } elseif ([string]$f.Phase -eq 'download') { 'download' } else { 'probe' } }
     elseif (Downloads-Done) { if ($script:confirmed) { 'unpack' } else { 'downloaded' } } else { 'probe' }
@@ -85,6 +86,7 @@ function Web-State {
     src = $(if ($f) { [string]$f.SourceLabel() } else { '' }); srcN = 0; dir = $runtimeDir; unpack = $(if ($ids.Count) { [math]::Min(1, [math]::Max(0, ($script:dlPos - $script:ready.Count) / $ids.Count)) } else { 0 })
     st = ($st -join ''); fr = @($fr | ForEach-Object { [int][math]::Round($_ * 100) }); confirmed = [bool]$script:confirmed }
   if ($phase -eq 'failed') { $o.kind = $script:failKind }
+  if ($phase -eq 'failed' -and $o.kind -eq 'vc-runtime') { $o.message = $script:vcError }
   $o
 }
 function Web-Close { $script:webHold = $false; try { $form.Close() } catch {} }
@@ -140,12 +142,12 @@ function Web-Act($m) {
           if ($chk.state -eq 'ok') { Web-AddRecent ([string]$m.path); $pathBox.Text = [string]$m.path; $deskCheck.Checked = [bool]$m.desktop; $menuCheck.Checked = [bool]$m.menu
             if (-not $script:installTimer) { $script:installTimer = New-Object Windows.Forms.Timer; $script:installTimer.Interval = 30
               $script:installTimer.add_Tick({ $script:installTimer.Stop(); $t1 = [DateTime]::Now; try { $confirm.PerformClick() } catch { Web-Log ('install failed: ' + $_) }
-                Web-Log ('install: confirm took ' + [int]([DateTime]::Now - $t1).TotalMilliseconds + ' ms, confirmed=' + $script:confirmed); if (-not $script:confirmed) { Web-Post @{ t = 'installfail' } } }) }
+                Web-Log ('install: confirm took ' + [int]([DateTime]::Now - $t1).TotalMilliseconds + ' ms, confirmed=' + $script:confirmed); if (-not $script:confirmed -and $script:mode -ne 'failed') { Web-Post @{ t = 'installfail' } } }) }
             $script:installTimer.Start() }
           Web-Post @{ t = 'reply'; id = $m.id; r = $chk }
         } }
       'retry' { if ($shim -and $script:mode -eq 'failed') { $button.PerformClick() } }
-      'copylog' { if ($shim) { try { $lp = Join-Path $sourceRoot 'logs\setup-download.log'; $txt = 'MeguLit setup ' + (Get-Date -Format s) + "`r`n" + $(if (Test-Path $lp) { (Get-Content -Tail 120 -Encoding UTF8 $lp) -join "`r`n" } else { '(no log yet)' }); [Windows.Forms.Clipboard]::SetText($txt) } catch {} } }
+      'copylog' { if ($shim) { try { $lp = if ($script:failKind -eq 'vc-runtime') { Join-Path $env:LOCALAPPDATA 'MeguLit\setup-vc-runtime.log' } else { Join-Path $sourceRoot 'logs\setup-download.log' }; $txt = 'MeguLit setup ' + (Get-Date -Format s) + "`r`n" + $(if (Test-Path $lp) { (Get-Content -Tail 120 -Encoding UTF8 $lp) -join "`r`n" } else { '(no log yet)' }); [Windows.Forms.Clipboard]::SetText($txt) } catch {} } }
       'manual' { if ($shim) { try { Start-Process 'https://github.com/ilynthn/MeguLit/releases/latest' } catch {} } }
       'launch' { if ($shim) { Web-Close } }
     }
