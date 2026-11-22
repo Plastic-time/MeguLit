@@ -170,7 +170,7 @@ const kinds={
  sentences:{
   collect(db){
    const titles=gameTitles(db),out=new Map();
-   for(const s of db.prepare('SELECT game_id,text,translation,created_at,source,original FROM saved_sentences ORDER BY created_at,id').all()){const key='s:'+sha(s.text,32);if(!out.has(key))out.set(key,{text:s.text.slice(0,3000),translation:String(s.translation||'').slice(0,3000),created_at:s.created_at,game:titles.get(s.game_id)||syncedTitle(s.original),/* only auto rows carry it, so older (manual) records keep their hash */...(s.source==='auto'?{source:'auto'}:{})});}
+   for(const s of db.prepare('SELECT game_id,text,translation,created_at,source,original FROM saved_sentences ORDER BY created_at,id').all()){const key='s:'+sha(s.text,32);if(!out.has(key))out.set(key,{text:s.text,translation:String(s.translation||''),created_at:s.created_at,game:titles.get(s.game_id)||syncedTitle(s.original),/* only auto rows carry it, so older (manual) records keep their hash */...(s.source==='auto'?{source:'auto'}:{})});}
    return out;
   },
   apply(db,key,record){
@@ -300,7 +300,7 @@ class Account{
   const rotated=response.headers?.get?.('x-megulit-token');if(auth&&rotated&&/^mgl_[A-Za-z0-9_-]{43}$/.test(rotated))this.setToken(rotated);
   let data={};try{data=await response.json();}catch{}
   if(response.status===401&&auth){this.forget();throw Object.assign(Error('UNAUTHORIZED'),{code:'UNAUTHORIZED'});}
-  if(!response.ok||data.ok===false){const code=typeof data.error==='string'?data.error:'HTTP_'+response.status;throw Object.assign(Error(code),{code,status:response.status,detail:data,...(response.status===429?{retryAfter:require('./relay-gate.cjs').retryAfterSeconds(response)}:{})});}
+  if(!response.ok||data?.ok===false){const code=typeof data?.error==='string'?data.error:'HTTP_'+response.status;throw Object.assign(Error(code),{code,status:response.status,detail:data,...(response.status===429?{retryAfter:require('./relay-gate.cjs').retryAfterSeconds(response)}:{})});}
   return data;
  }
  /* local logout: token, sync state and cursors go; deviceId and kind choices stay */
@@ -375,23 +375,33 @@ class Account{
     const spec=kinds[kind];summary[kind]={pulled:0,pushed:0,changed:0};
     db.exec('BEGIN IMMEDIATE');try{summary[kind].changed=scan(db,kind,spec.collect(db,this.root,ctx),this.now(),spec.times?.(db,this.root));db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
    }
+   let oversized=false;
    for(const kind of active){
     const s=summary[kind];
     let cursor=Number(this.profile().cursors?.[kind])||0;
     for(let page=0;page<200;page++){
      const data=await this.call('GET',`/api/sync/${kind}?since=${cursor}`);
+     if(data?.ok!==true||data.kind!==kind||!Array.isArray(data.records)||!Number.isSafeInteger(data.cursor)||data.cursor<cursor||
+        typeof data.more!=='boolean'||(data.more&&data.cursor===cursor))throw Error('SYNC_RESPONSE_INVALID');
      s.pulled+=applyRemote(db,this.root,kind,data.records||[],ctx);
      cursor=Number(data.cursor)||cursor;this.saveProfile({cursors:{...this.profile().cursors,[kind]:cursor}});
      if(!data.more)break;
     }
-    for(const part of chunks(pendingRecords(db,this.root,kind,ctx))){
+    const sendable=pendingRecords(db,this.root,kind,ctx).filter(record=>{
+     if(record.deleted||bytes(record.data)<=RECORD_CAP[kind])return true;
+     oversized=true;return false;
+    });
+    for(const part of chunks(sendable)){
      const data=await this.call('PUT',`/api/sync/${kind}`,{records:part});
+     if(data?.ok!==true||data.kind!==kind||!Array.isArray(data.newer)||!Number.isSafeInteger(data.accepted)||
+        data.accepted<0||data.accepted+data.newer.length>part.length)throw Error('SYNC_RESPONSE_INVALID');
      const lost=new Set((data.newer||[]).map(r=>r.key)),done=db.prepare('UPDATE account_sync SET pending=0 WHERE kind=? AND key=? AND updated_at=?');
      for(const r of part)if(!lost.has(r.key))done.run(kind,r.key,r.updated_at);
      if(data.newer?.length)applyRemote(db,this.root,kind,data.newer,ctx,{force:true});
      s.pushed+=data.accepted||0;
     }
    }
+   if(oversized)throw Error('RECORD_TOO_LARGE');
    this.saveProfile({lastSyncAt:this.now(),lastError:''});
    return {...this.status(),summary};
   }catch(error){if(error.code!=='UNAUTHORIZED')this.saveProfile({lastError:error.code||error.message});throw error;}
