@@ -10,7 +10,26 @@ const inside=(base,file)=>{const r=path.relative(base,file);return !!r&&r!=='..'
 function noLinks(file){let p=path.resolve(file);for(;;){if(fs.lstatSync(p).isSymbolicLink())fail('TRUSTED_PATH_LINK');const parent=path.dirname(p);if(parent===p)return;p=parent;}}
 function readJSON(file,max=P.MAX_BYTES){noLinks(file);const s=fs.statSync(file);if(!s.isFile()||s.size>max)fail('TRUSTED_FILE_LIMIT');return JSON.parse(fs.readFileSync(file,'utf8'));}
 function atomic(file,value){const temp=file+'.'+crypto.randomUUID()+'.tmp';try{fs.writeFileSync(temp,D.canonical(value),{flag:'wx'});fs.renameSync(temp,file);}finally{try{fs.unlinkSync(temp);}catch{}}}
-function resources(){if(process.platform!=='win32')return false;try{return os.freemem()>=4*1024**3&&['C:/','E:/','H:/'].every(d=>{const s=fs.statfsSync(d);return s.bavail*s.bsize>=10*1024**3;});}catch{return false;}}
+function resources(policy,{platform=process.platform,freemem=os.freemem,statfs=fs.statfsSync}={}){
+ if(platform!=='win32')return false;
+ try{
+  const ram=freemem();
+  if(!Number.isFinite(ram)||ram<4*1024**3)return false;
+  // The collector inherits TEMP, TMP, and cwd from stateRoot. The reader writes under appRoot.
+  const destinations=[policy.stateRoot,policy.appRoot];
+  // The isolated-game collector creates its disposable sibling tree on the pinned game's volume.
+  const args=policy.collector?.args;
+  if(args?.[0]==='--isolated-game'){
+   if(!path.isAbsolute(args[1]))return false;
+   destinations.push(path.parse(args[1]).root);
+  }
+  return [...new Set(destinations)].every(dir=>{
+   if(typeof dir!=='string'||!path.isAbsolute(dir))return false;
+   const stat=statfs(dir),bytes=stat.bavail*stat.bsize;
+   return Number.isFinite(bytes)&&bytes>=10*1024**3;
+  });
+ }catch{return false;}
+}
 function publicKeys(keys){return Array.isArray(keys)&&keys.length>0&&keys.length<=32&&keys.every(k=>k&&k.alg==='ed25519'&&!k.revoked&&typeof k.id==='string'&&/^[a-z0-9_-]{1,80}$/i.test(k.id)&&typeof k.publicKey==='string')&&new Set(keys.map(k=>k.id)).size===keys.length&&new Set(keys.map(k=>k.publicKey)).size===keys.length;}
 function policyShape(policy){
  if(policy?.schema!=='megulit.cardinal-trusted-host'||policy.version!==1)fail('TRUSTED_HOST_POLICY');
@@ -25,7 +44,7 @@ function policyShape(policy){
  if(!fs.existsSync(c.file))fail('TRUSTED_LIVE_COLLECTOR_UNAVAILABLE');noLinks(c.file);const collector=fs.realpathSync(c.file);if(inside(REPO,collector)||roots.some(r=>inside(r,collector)))fail('TRUSTED_REPLAY_COLLECTOR_REFUSED');
  return policy;
 }
-async function prepare(request,policy,{signal,resourceCheck=resources}={}){
+async function prepare(request,policy,{signal,resourceCheck=()=>resources(policy)}={}){
  policyShape(policy);if(fs.existsSync(path.join(policy.stateRoot,'blocked.json')))fail('TRUSTED_CLEANUP_BARRIER');if(process.env.MEGULIT_CARDINAL_REPLAY==='1')fail('TRUSTED_REPLAY_REFUSED');if(!resourceCheck())fail('TRUSTED_RESOURCE_GATE');
  if(request?.schema!=='megulit.cardinal-trusted-request'||request.version!==1||!P.identity(request.identity)||!IdentitySafeRelative(request.exe)||!Number.isSafeInteger(request.torchNo)||request.torchNo<0)fail('TRUSTED_REQUEST');
  P.profileShape(request.candidate,request.identity);if(!await P.verify(request.candidate,policy.profileKeys))fail('TRUSTED_PROFILE_SIGNATURE');if(request.torchNo===0&&request.candidate.source!=='official')fail('TRUSTED_CREDIT_BINDING');
@@ -43,7 +62,7 @@ function IdentitySafeRelative(s){return typeof s==='string'&&s.length<=200&&!/[\
 function collectorHash(policy){const file=policy.collector.file;noLinks(file);const s=fs.statSync(file);if(!s.isFile()||s.size>64*1024**2||hash(fs.readFileSync(file))!==policy.collector.sha256)fail('TRUSTED_COLLECTOR_CHANGED');}
 function verifyCapture(report,reporter){try{const signature=report?.signature;if(signature?.alg!=='ed25519'||signature.keyId!==reporter.id||!/^[A-Za-z0-9+/]{86}==$/.test(signature.value))return false;const text=D.canonical(D.unsigned(report));if(Buffer.byteLength(text)>MAX_CAPTURE)return false;return crypto.verify(null,Buffer.from(text),crypto.createPublicKey({key:Buffer.from(reporter.publicKey,'base64'),format:'der',type:'spki'}),Buffer.from(signature.value,'base64'));}catch{return false;}}
 function lease(policy){const barrier=path.join(policy.stateRoot,'blocked.json');if(fs.existsSync(barrier))fail('TRUSTED_CLEANUP_BARRIER');for(let n=0;n<policy.slots;n++){const file=path.join(policy.stateRoot,'slot-'+n+'.json');try{fs.writeFileSync(file,D.canonical({schema:1,owner:process.pid,at:new Date().toISOString()}),{flag:'wx'});return {file,release(){fs.unlinkSync(file);},block(reason){atomic(barrier,{schema:1,state:'blocked',reason,at:new Date().toISOString()});}};}catch(e){if(e.code!=='EEXIST')throw e;}}fail('TRUSTED_SLOTS_BUSY');}
-function capture(context,reporter,challenge,{signal,spawnChild=spawn,resourceCheck=resources}={}){
+function capture(context,reporter,challenge,{signal,spawnChild=spawn,resourceCheck=()=>resources(context.policy)}={}){
  if(signal?.aborted)return Promise.reject(Object.assign(Error('TRUSTED_CANCELLED'),{code:'TRUSTED_CANCELLED'}));
  return new Promise((resolve,reject)=>{
   let child,timer,watch,done=false,stopping=false,bytes=0,output=[];const cleanupFailure=()=>Object.assign(Error('TRUSTED_CAPTURE_CLEANUP_UNCONFIRMED'),{code:'TRUSTED_CAPTURE_CLEANUP_UNCONFIRMED'});
@@ -104,7 +123,7 @@ function reviewerSigner(config,load=()=>require('./maintainer-signing.cjs')){
 }
 async function runHost(request,policy,dependencies={}){
  const injected=['resourceCheck','collect','sign'].some(k=>Object.hasOwn(dependencies,k));if(injected&&!['resourceCheck','collect','sign'].every(k=>typeof dependencies[k]==='function'))return {state:'awaiting-trusted-run',reason:'TRUSTED_TEST_BOUNDARY',signed:false};
- const resourceCheck=dependencies.resourceCheck||resources,collect=dependencies.collect||capture;let sign,slot=null,context=null,unsafe=false;
+ const resourceCheck=dependencies.resourceCheck||(()=>resources(policy)),collect=dependencies.collect||capture;let sign,slot=null,context=null,unsafe=false;
  try{
   sign=dependencies.sign||reviewerSigner(dependencies.signing);
   context=await prepare(request,policy,{signal:dependencies.signal,resourceCheck});collectorHash(policy);slot=lease(policy);const results=[];

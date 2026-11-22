@@ -80,3 +80,26 @@ test('Windows kernel releases only the terminated owner queue lock',{skip:proces
   const release=lockQueue(file);assert.equal(typeof release,'function');release();
   assert.equal(fs.existsSync(file),false);
 });
+test('resource guard measures the live write destinations and isolated copy volume',()=>{
+ const {resources}=require('../services/cardinal-trusted-runner.cjs'),path=require('node:path');
+ const stateRoot=path.resolve('scratch'),appRoot=path.resolve('reader');
+ const sample=path.resolve('sample/game.exe'),copy=path.parse(sample).root,paths=[];
+ const gib=1024**3,policy={stateRoot,appRoot,sampleRoot:path.resolve('read-only'),collector:{args:['--isolated-game',sample]}};
+ const options={platform:'win32',freemem:()=>4*gib,statfs:dir=>{paths.push(dir);return {bavail:10*gib,bsize:1};}};
+ assert.equal(resources(policy,options),true);assert.deepEqual(paths,[stateRoot,appRoot,copy]);
+ for(const dir of paths.slice())assert.equal(resources(policy,{...options,statfs:d=>({bavail:d===dir?10*gib-1:10*gib,bsize:1})}),false);
+ assert.equal(resources(policy,{...options,freemem:()=>4*gib-1}),false);
+ assert.equal(resources(policy,{...options,statfs:()=>{throw Error('unavailable');}}),false);
+});
+
+test('unprovisioned production inventory returns even a stored proposal without signing',async()=>{
+ const {processOne}=require('../tools/enhanced-seed-queue-host.cjs'),routes=[];
+ const state=await processOne({base:'https://example.invalid',token:'temporary',sign:assert.fail,
+   fetcher:async(url,init)=>{
+     const route=new URL(url).pathname.split('/').pop();routes.push(route);
+     if(route==='claim')return Response.json({job:{id:'job',lease:'lease',proposal:{}}});
+     assert.equal(route,'retry');assert.deepEqual(JSON.parse(init.body),{id:'job',lease:'lease'});
+     return Response.json({ok:true});
+   }});
+ assert.equal(state,'awaiting-sample');assert.deepEqual(routes,['claim','retry']);
+});

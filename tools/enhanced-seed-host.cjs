@@ -95,7 +95,7 @@ async function main(file) {
   const token = process.env.ENHANCED_HOST_TOKEN;
   delete process.env.ENHANCED_HOST_TOKEN;
   if (!token || !path.isAbsolute(cfg.queueLock)) throw Error('HOST_CONFIG');
-  if (fs.existsSync(path.join(policy.stateRoot,'blocked.json')) || !Runner.resources()) return {state:'unavailable'};
+  if (fs.existsSync(path.join(policy.stateRoot,'blocked.json')) || !Runner.resources(policy)) return {state:'unavailable'};
   const status = spawnSync(path.join(policy.appRoot,'native','ColdDesk.exe'),['status'],{
     windowsHide:true,encoding:'utf8',timeout:7000,maxBuffer:16384,
     env:{SystemRoot:process.env.SystemRoot,WINDIR:process.env.WINDIR}

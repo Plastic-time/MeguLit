@@ -22,6 +22,12 @@ async function processOne({base,token,keys,collect,sign,signal,fetcher}){
    }).catch(()=>work.abort()).finally(()=>{renewal=undefined;});
  },60000);
  try{
+   // A provisioned queue identity may come online before the first accepted collector.
+   // Never handle a saved proposal with an unconfigured inventory or signer.
+   if(!collect){
+     if((await call('retry')).ok!==true)throw Error('RETRY_UNCONFIRMED');
+     return 'awaiting-sample';
+   }
    let baseline=null;
    try{baseline=(await request('/api/torch-release?exe='+encodeURIComponent(job.candidate.key),undefined,abort)).release;
      await protocol.checked(baseline,keys);
@@ -69,7 +75,7 @@ function lockQueue(file) {
   };
 }
 
-async function serve(run, signal, {wait = require('node:timers/promises').setTimeout, report = console.log} = {}) {
+async function serve(run, signal, {wait = require('node:timers/promises').setTimeout, report = console.log, observe} = {}) {
   let delay = 1000, previous;
   while (!signal.aborted) {
     let state;
@@ -78,6 +84,7 @@ async function serve(run, signal, {wait = require('node:timers/promises').setTim
       if (signal.aborted) break;
       state = /^[A-Z_]+$/.test(error.message) ? error.message : 'ENHANCED_HOST_FAILURE';
     }
+    observe?.(state);
     if (state !== previous) report(JSON.stringify({state}));
     previous = state;
     delay = state === 'processed' ? 1000 : Math.min(delay * 2, 60000);
@@ -88,7 +95,8 @@ async function serve(run, signal, {wait = require('node:timers/promises').setTim
 
 async function guardedTick(cfg,policy,work){
   if (fs.existsSync(path.join(policy.stateRoot,'paused')) ||
-      fs.existsSync(path.join(policy.stateRoot,'blocked.json')) || !Runner.resources()) return {state:'unavailable'};
+      fs.existsSync(path.join(policy.stateRoot,'blocked.json')) || !Runner.resources(policy)) return {state:'unavailable'};
+  if (!cfg.samples.length) return {state:await work() || 'empty'};
   const releaseLock = lockQueue(cfg.queueLock);
   if (!releaseLock) return {state:'busy'};
   try {
@@ -142,7 +150,7 @@ async function main(args){
  if(!configFile||!path.isAbsolute(configFile))throw Error('HOST_CONFIGURATION');
  const cfg=Runner.readJSON(configFile),{policy,samples}=cfg;
  const base=baseURL(service?cfg.base:args[0]);
- if(!Array.isArray(samples)||samples.length>4096||!policy?.collector?.file)throw Error('HOST_CONFIGURATION');
+ if(!Array.isArray(samples)||samples.length>4096||!policy||(samples.length&&!policy.collector?.file))throw Error('HOST_CONFIGURATION');
  if(service){
    const allowed=new Set(['base','policy','samples','queueLock','tokenFile','publisher','reviewer']);
    if(Object.keys(cfg).some(k=>!allowed.has(k))||!path.isAbsolute(cfg.queueLock||''))throw Error('HOST_CONFIGURATION');
@@ -162,14 +170,22 @@ async function main(args){
  const signing=cfg.publisher?{...cfg.publisher,keys}:{keys,store:process.env.ENHANCED_KEY_STORE,id:process.env.ENHANCED_PUBLISHER_ID,vault:process.env.ENHANCED_VAULT};
  const sign=publisherSigner(signing),signProfile=publisherSigner({...signing,scope:'profile'});
  const reviewer=cfg.reviewer||(signing.store?{store:signing.store,vault:signing.vault,id:process.env.ENHANCED_REVIEWER_ID}:undefined);
- const collect=createCollector({samples,policy,signProfile,reviewer});
- if(!path.isAbsolute(policy.collector.file)||fs.statSync(policy.collector.file).size>64*1024**2||
-    crypto.createHash('sha256').update(fs.readFileSync(policy.collector.file)).digest('hex')!==policy.collector.sha256)throw Error('COLLECTOR_CONFIGURATION');
+ const collect=samples.length?createCollector({samples,policy,signProfile,reviewer}):null;
+ if(collect&&(!path.isAbsolute(policy.collector.file)||fs.statSync(policy.collector.file).size>64*1024**2||
+    crypto.createHash('sha256').update(fs.readFileSync(policy.collector.file)).digest('hex')!==policy.collector.sha256))throw Error('COLLECTOR_CONFIGURATION');
  const stop=new AbortController(),abort=()=>stop.abort();
  process.once('SIGTERM',abort);process.once('SIGINT',abort);
  if(service){process.stdin.once('end',abort);process.stdin.resume();}
  try{
-   await serve(signal=>guardedTick(cfg,policy,()=>processOne({base,token,keys,collect,sign,signal})),stop.signal);
+   let lastRetry=null;
+   const observe=service?state=>{
+     const now=new Date().toISOString();
+     if(state==='awaiting-sample')lastRetry=now;
+     Runner.atomic(path.join(policy.stateRoot,'enhanced-host-status.json'),{
+       state,checkedAt:now,lastRetry,samples:samples.length,pid:process.pid
+     });
+   }:undefined;
+   await serve(signal=>guardedTick(cfg,policy,()=>processOne({base,token,keys,collect,sign,signal})),stop.signal,{observe});
  }finally{
    process.removeListener('SIGTERM',abort);process.removeListener('SIGINT',abort);
  }
