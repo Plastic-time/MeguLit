@@ -1,0 +1,153 @@
+{
+  "scope": "Exact DC4UP stock Luna c3 evidence. Static source/call-site and NewHook-recorder replay, not live attach or Reader acceptance.",
+  "sourceCommit": "25b466ffb46318b192d91cf8dc88e160329ab9df",
+  "stockSource": {
+    "path": "preserved/source/lunahoook-adapted/NativeImpl/LunaHook/LunaHook/engine32/Circus.cpp",
+    "normalizedSha256": "ec5856124844ae41da811814ffce4684b4c2486d6b07dcc015890b535a7163bc",
+    "unchangedUpstreamCommit": "7772ec7bb186bd3773bb534dcbc8655a4a364150"
+  },
+  "sample": {
+    "executable": "DC4UP.exe",
+    "bytes": 908800,
+    "sha256": "3644133cfe341e31233ebd460050cb1fd73005c7ef228f0831eeb269bfcfc9a2",
+    "imageBase": 4194304,
+    "marker": 185,
+    "scriptVersion": 166,
+    "scriptPins": [
+      {
+        "name": "Advdata/GRP/NAMES.DAT",
+        "bytes": 42244,
+        "sha256": "8fba5c6976adfacd44cfa376caf4e743e1336ae07c06f6889d4e8106587cbfdc"
+      },
+      {
+        "name": "Advdata/MES/advmenu.mes",
+        "bytes": 2534,
+        "sha256": "e5ee556fcb89bc927b8e5675bc8b8e0459fd605b4cc883d4db93997dc7ebd0f8"
+      },
+      {
+        "name": "Advdata/MES/dc4_sen20181213b.mes",
+        "bytes": 9140,
+        "sha256": "1898566f645949ebbd0b66cd605cd48d7389677d4adc8da82a37b75ec3002bc5"
+      }
+    ],
+    "publisherLauncher": {
+      "name": "DC4UP_dstart.exe",
+      "bytes": 479232,
+      "sha256": "b0a705ff51c96d238ad82f7812bd8a473ecd363231dd256e3b71a7ff927edb9e",
+      "hookTarget": "DC4UP.exe",
+      "readme": {
+        "name": "初めにお読みください.txt",
+        "bytes": 4420,
+        "sha256": "b659fb96b4fe9fa763a49f7980be42ed62d5526f9da83199e4b79633fa06e2b4"
+      },
+      "imageBase": 4194304,
+      "childCallRva": 6185,
+      "childHelperRva": 4096,
+      "processApi": "CreateProcessA",
+      "processApiCallRva": 4260,
+      "spans": [
+        {
+          "name": "publisher-child-name",
+          "rva": 62368,
+          "size": 10,
+          "fileOffset": 56224,
+          "hex": "44433455502e65786500",
+          "sha256": "58dd9ee53a5fbcc438426e6f8348fa14119a6080b5cf1fbd70d12d4d4b5c79c1"
+        },
+        {
+          "name": "publisher-launch-branch",
+          "rva": 6163,
+          "size": 27,
+          "fileOffset": 3091,
+          "hex": "68c03c4100ff1524f040005368e03d410068a0f34000e8d2f7ffff",
+          "sha256": "85a09eec1dc1a19945f63397cc9985e669f60a5056bd942075c91d03e6dd5bf4"
+        },
+        {
+          "name": "publisher-create-process",
+          "rva": 4260,
+          "size": 6,
+          "fileOffset": 1188,
+          "hex": "ff1510f04000",
+          "sha256": "28c7174704645f59994461609a5da0c2f966b76500c8da4384a4d24434c1345e"
+        }
+      ]
+    }
+  },
+  "normalHook": {
+    "name": "Circus2_1",
+    "entryRva": 272528,
+    "stringStackOffset": 4,
+    "typeName": "USING_STRING",
+    "typeValue": 32,
+    "filter": "filter",
+    "legacySignatureHits": 0,
+    "bodyCallRva": 205589,
+    "bodyReturnRva": 205594,
+    "nameCallRva": 205398,
+    "nameReturnRva": 205403,
+    "requiresDrawRoles": false,
+    "requiresNewOwnerGrant": false
+  },
+  "spans": [
+    {
+      "name": "c3-entry",
+      "rva": 272512,
+      "fileOffset": 269440,
+      "size": 272,
+      "hex": "cce8c48c01008be55dc20800cccccccc81ec08010000a198694b0033c48984240401000053568bb424140100008bc68bd98d50018a084084c975f92bc23d04010000761c68002004006880c948006800f048006a00ff15e0c24800e997000000558b6b486868c8480056c7435c16000000e8ea83010083c40885c074648d54240c8bc62bd68a08880c024084c975f68d74240c8bc66868c8480050e8c083010083c40885c0743a57eb068d9b000000006868c8480056e8a583010083c4088bf8568bcbc60700e865fbffff8d77016868c8480056e88783010083c40885c075d05f568bcbe847fbffff896b48c78380000000000000005d8b8c240c0100005e5b33cce8c38b010081c408010000c20400",
+      "sha256": "4825ecd00f824ea93ebcd5935cf2cccd057902301abf343795060a8a77942362"
+    },
+    {
+      "name": "overflow-string",
+      "rva": 585728,
+      "fileOffset": 579584,
+      "size": 16,
+      "hex": "536574537472206f766572666c6f7700",
+      "sha256": "5e60ecc277df54389544469a361f33ea97c759f4ea01fe9de0b5026c646de6e2"
+    },
+    {
+      "name": "name-call",
+      "rva": 205369,
+      "fileOffset": 202297,
+      "size": 34,
+      "hex": "80bbe42c0000008d83e42c000074138b8b8428000050e81c20feff8bc8e835060100",
+      "sha256": "791186fe0a02a3547c30ac3dae00923c72c511c287380c920f28235eb452ab98"
+    },
+    {
+      "name": "body-call",
+      "rva": 205560,
+      "fileOffset": 202488,
+      "size": 34,
+      "hex": "80bbe4300000008d83e430000074758b8b8028000050e85d1ffeff8bc8e876050100",
+      "sha256": "8d7dd77158107e7e6d7e5e1313db888a5ebb725944b6567ae02a11e0de1ef5dc"
+    }
+  ],
+  "deploymentSnapshot": {
+    "observedAt": "2026-11-22T09:16:00+09:00",
+    "files": [
+      {
+        "name": "runtime/megulithook/MeguLitHook32.dll",
+        "bytes": 2340864,
+        "sha256": "43024ab9a1e7a9c5ced06b1e68d3c880da0cc2bb23568db166a9052230567820"
+      },
+      {
+        "name": "runtime/megulithook/MeguLitHost64.dll",
+        "bytes": 408064,
+        "sha256": "886b2e8d4286c20992eaf1eeaed273c25d8c5aadee516012fe71a2ae8315779e"
+      },
+      {
+        "name": "native/HookBridge.exe",
+        "bytes": 301568,
+        "sha256": "7a6d13a063c7d0f45a1169954a84221b7e393832d197f8485070c635141079c1"
+      },
+      {
+        "name": "native/HookInjector32.exe",
+        "bytes": 10752,
+        "sha256": "8d1d069bc8f3ebdb3f49ff23c8eadb3111f12c77d0c19f8313aca838d9589ba3"
+      }
+    ],
+    "actualGameStarted": false,
+    "actualHookInstalled": false,
+    "actualReaderOutput": false
+  }
+}
