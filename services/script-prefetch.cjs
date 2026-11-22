@@ -18,7 +18,7 @@ function translator(reader){
 async function ahead(reader,{count=AHEAD}={}){
  const provider=reader?.gal?.hooks?.originalText;if(!provider?.upcoming||!provider.fill)return 0;
  // One language per store (Chinese); an English display keeps translating line by line as before.
- if(reader.displayLanguage?.()==='en')return 0;
+ if(reader.zeroLatencyEnabled?.(reader.targetLanguage())||reader.displayLanguage?.()==='en')return 0;
  const prefs=reader.prefs?.()||{};if(prefs.scriptPrefetch===false)return 0;
  const t=translator(reader);if(t.running)return 0;t.running=true;let done=0;
  try{

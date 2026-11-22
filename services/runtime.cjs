@@ -32,7 +32,32 @@ class Runtime {
  packs(){return this.packStore??=require('../core/runtime-packs.cjs').RuntimePacks.shared(this.root);}
  local(){return this.localEngine??=new(require('../core/local-llm.cjs').LocalLlm)({root:this.root,models:this.models(),logs:path.join(this.root,'logs')});}
  library(){return this.libraryManager??=new(require('../core/library.cjs').Library)(require('../core/layout.cjs'));}
- history(){return this.historyTranslations??=new(require('./history-view.cjs').HistoryTranslations)(this.root,async text=>{if(this.stopped)throw Error('RUNTIME_STOPPED');const {createTranslationService,resolveOptions}=require('../core/providers.cjs'),preferences=require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json'))),options=resolveOptions(preferences),translator=createTranslationService();if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless){const {SecretStore}=require('../core/secrets.cjs');for(const[base,key]of new SecretStore(this.folder,undefined,path.join(this.root,'native','KeyVault.exe')).entries())translator.setKey(base,key);}/* 2026-11-19 a dialogue-log line goes down the same fallback chain as the reader (services/translation-chain.cjs) */const chain=require('./translation-chain.cjs');let localInstalled=false;try{localInstalled=!!this.local().status().installed&&this.models().status().models.some(m=>m.installed);}catch{}const list=chain.candidates(options,{hasKey:base=>translator.hasKey(base,''),localInstalled});return (await chain.translate(text,list,async o=>{if(chain.isLocal(o.provider))await this.local().ensure(o);return translator.translate(text,o);})).text;});}
+ history(){return this.historyTranslations??=new(require('./history-view.cjs').HistoryTranslations)(this.root,async (text,game)=>{
+  if(this.stopped)throw Error('RUNTIME_STOPPED');
+  const {createTranslationService,resolveOptions}=require('../core/providers.cjs');
+  const preferences=require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json')));
+  const options=resolveOptions(preferences),strict=preferences.scriptTranslation!==false&&options.learnerLanguage!=='en';
+  if(strict&&game?.executable){
+   // History may belong to another game. Use its own matcher and reading position.
+   const provider=require('./original-text.cjs').provider(this.root,game.executable,{id:game.id});
+   if(provider){
+    const hooks=Object.create(require('../core/hook-native.cjs').HookNative.prototype);
+    hooks.originalText=provider;
+    const origin={},hit=hooks.scriptTranslation(text,origin);
+    if(hit&&hit!==text&&['patch','script','official'].includes(origin.source))return hit;
+   }
+  }
+  const translator=createTranslationService();
+  if(strict||options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless){
+   const {SecretStore}=require('../core/secrets.cjs');
+   for(const [base,key] of new SecretStore(this.folder,undefined,path.join(this.root,'native','KeyVault.exe')).entries())translator.setKey(base,key);
+  }
+  const chain=require('./translation-chain.cjs');let localInstalled=false;
+  try{localInstalled=!!this.local().status().installed&&this.models().status().models.some(m=>m.installed);}catch{}
+  const profiles=strict?readJSON(path.join(this.folder,'translation-profiles.json')):{};
+  const list=chain.candidates(options,{hasKey:base=>translator.hasKey(base,''),localInstalled,apiFirst:strict,profiles});
+  return (await chain.translate(text,list,async o=>{if(chain.isLocal(o.provider))await this.local().ensure(o);return translator.translate(text,o);})).text;
+ });}
  reviews({daily=false}={}){
   const preferences=()=>require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json')));
   if(daily){const p=preferences();if(!p.reviewEngine||p.reviewEngine==='machine'||(p.reviewEngine==='follow'&&(!p.provider||p.provider==='google')))return null;}

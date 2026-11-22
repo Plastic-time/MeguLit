@@ -10,7 +10,7 @@ test('switching games immediately clears all art and choice content, including e
 });
 test('late art translation cannot paint a previous game over the new session, even with a reused id',async()=>{
  let finish;const events=[],r={emit:(type,m)=>events.push(m),targetLanguage:()=> 'zh',embedCached:()=>'',baseOptions:()=>({}),chainTranslate:()=>new Promise(resolve=>{finish=resolve;})};
- const old=Reader.prototype.artText.call(r,{id:'same',visible:true,text:'魔法使い',source:'engine',role:'system'});assert.equal(typeof finish,'function');reset(r);
+ Object.setPrototypeOf(r,Reader.prototype);const old=Reader.prototype.artText.call(r,{id:'same',visible:true,text:'魔法使い',source:'engine',role:'system'});assert.equal(typeof finish,'function');reset(r);
  await Reader.prototype.artText.call(r,{id:'same',visible:true,text:'女性',source:'engine',role:'name'});finish({text:'巫师'});await old;
  assert.ok(!events.some(m=>m.translation==='巫师'));assert.equal(events.at(-1).role,'name');assert.equal(events.at(-1).translation,'');
 });
@@ -27,5 +27,5 @@ test('frontend clear removes every current art node immediately and allows a fre
 test('a late native embed result is not written into another game using the same bridge',async()=>{
  let finish;const writes=[],owner={hooks:{embedReply:(...a)=>writes.push(a)}};
  const r={gal:owner,targetLanguage:()=> 'zh',embedCached:()=>'',baseOptions:()=>({}),chainTranslate:()=>new Promise(resolve=>{finish=resolve;}),emit(){}};
- const work=Reader.prototype.embedTranslate.call(r,1,'これは中性の台詞です。');assert.equal(typeof finish,'function');reset(r);finish({text:'旧游戏译文'});await work;assert.deepEqual(writes,[]);
+ Object.setPrototypeOf(r,Reader.prototype);const work=Reader.prototype.embedTranslate.call(r,1,'これは中性の台詞です。');assert.equal(typeof finish,'function');reset(r);finish({text:'旧游戏译文'});await work;assert.deepEqual(writes,[]);
 });

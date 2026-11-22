@@ -2,7 +2,7 @@
 'use strict';
 // E545 (user: 零延迟翻译 only worked after switching the setting off and on again). With the switch on, a cold start
 // (MeguLit just started, the game launched from the library) must have the script provider ready before the first line,
-// keep it when the game process binds, pick up a patch found later, and let the prefetch run from the first line.
+// keep it when the game process binds, pick up a patch found later, without launching speculative translations.
 const test=require('node:test'),assert=require('node:assert'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const ot=require('../services/original-text.cjs');
 const {Reader}=require('../services/reader.cjs');
@@ -27,13 +27,13 @@ test('switch on + cold start: provider ready at launch, before the game process 
  assert.strictEqual(r.gal.hooks.originalText,p,'the bound process keeps the launch provider (reading position kept)');
  assert.strictEqual(r.gal.hooks.textSourcePid,4242);
 });
-test('switch on + cold start: the prefetch runs from the first line',async()=>{
+test('switch on + cold start: future rows do not launch speculative translations',async()=>{
  const env=setup(),r=reader(env);r.selectGame('game.exe',true,env.exe);
  const calls=[],cached=new Map();r.scriptPrefetch={service:{translate:async t=>{calls.push(t);return '译：'+t;},clearContext(){},observeSource(){},setKey(){}},keysAt:Date.now(),running:false};
  r.localReady=async()=>{};r.embedCached=(t,v)=>cached.set(t,v);
  const p=r.gal.hooks.originalText;assert.strictEqual(p.resolve('おはよう、今日はいい天気だね。').status,'none');
- assert.strictEqual(await require('../services/script-prefetch.cjs').ahead(r),1,'prefetch ran');
- assert.deepStrictEqual(calls,['そうだね、散歩に行こうか。']);assert.strictEqual(cached.get('そうだね、散歩に行こうか。'),'译：そうだね、散歩に行こうか。');
+ assert.strictEqual(await require('../services/script-prefetch.cjs').ahead(r),0);
+ assert.deepStrictEqual(calls,[]);assert.equal(cached.size,0);
 });
 test('a non-forced refresh keeps an unchanged provider and rebuilds a changed one; settings save refreshes',()=>{
  const env=setup(),r=reader(env);r.selectGame('game.exe',true,env.exe);const p=r.gal.hooks.originalText;

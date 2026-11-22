@@ -16,7 +16,7 @@ class Reader{
  emit(event,data){if(this.active())this.runtime.emit(event,data);}
  prefs(){return cleanPreferences(readJSON(path.join(this.folder,'preferences.json')));}
  clearGameVisuals(){
-  this.sentenceMarks=null;
+  this.retryQueue?.clear();this.strictMtCache?.clear();this.embedCache?.clear();this.embedOrigins?.clear();this.gal?.hooks?.trackPairs?.clear();this.sentenceMarks=null;
   this.visualGeneration=(this.visualGeneration||0)+1;this.latest=(Number(this.latest)||0)+1;this.lookup=(Number(this.lookup)||0)+1;this.pageScope='';
   this.artTurns?.clear();this.artTurns=new Map();this.drawUi?.items?.clear();this.drawUi?.groups?.clear();this.drawUi=null;this.gameUiPreview=null;
   this.emit('reader-event',{type:'artText',clear:true});this.emit('reader-event',{hookSource:null,hookChoices:null,receivedText:false});
@@ -41,7 +41,8 @@ class Reader{
   if(message.type==='hookDrawEmbed'){this.drawEmbed(message);return;}
   if(message.type==='artText'){this.artText(message);return;}
   /* A Chinese-patched game read in Japanese: the patch's line is the translation, cached before the page asks. */
-  if(message.type==='hookPatchTranslation'){if(typeof message.japanese==='string'&&typeof message.chinese==='string'&&message.chinese.length<=4000){if(message.machine!==true&&message.chinese.trim())this.logVisibility({type:'patchLine'});this.embedCached(message.japanese,message.chinese.trim(),{language:'',source:message.machine?'machine':this.gal?.hooks?.originalText?.kind==='original'?'official':'patch'});/* 2026-11-21 (owner, 千恋＊万花 中文版, r26 21:40:06 / 21:40:10: the patch translation stored, the reader never asked for it): a stored patch line is offered to the line on screen at once; the reader fills it when that line shows no translation of its own */try{if(message.chinese.trim())this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[message.japanese,message.chinese.trim(),message.machine===true?'machine':this.gal?.hooks?.originalText?.kind==='original'?'official':'patch',{target:'zh'}]});}catch{}/* learning: remember which lines carry a human translation (group patch / official Chinese) */if(message.machine!==true){const source=this.gal?.hooks?.originalText?.kind==='original'?'official':'group';this.humanLine(message.japanese,{text:message.chinese.trim(),source});if(this.gameId)this.stats.translation(this.gameId,message.japanese,message.chinese.trim(),source);}}return;}
+  if(message.type==='hookPatchTranslation'){if(this.zeroLatencyEnabled?.(this.targetLanguage?.())&&(message.machine||message.filled||message.japanese===message.chinese))return;if(typeof message.japanese==='string'&&typeof message.chinese==='string'&&message.chinese.length<=4000){
+   if(!message.machine&&!message.filled&&message.chinese.trim())this.logVisibility({type:'patchLine'});this.embedCached(message.japanese,message.chinese.trim(),{language:'',source:message.filled?'filled':message.machine?'machine':this.gal?.hooks?.originalText?.kind==='original'?'official':'patch'});/* 2026-11-21 (owner, 千恋＊万花 中文版, r26 21:40:06 / 21:40:10: the patch translation stored, the reader never asked for it): a stored patch line is offered to the line on screen at once; the reader fills it when that line shows no translation of its own */try{if(message.chinese.trim())this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[message.japanese,message.chinese.trim(),message.filled?'filled':message.machine===true?'machine':this.gal?.hooks?.originalText?.kind==='original'?'official':'patch',{target:'zh'}]});}catch{}/* learning: remember which lines carry a human translation (group patch / official Chinese) */if(!message.machine&&!message.filled){const source=this.gal?.hooks?.originalText?.kind==='original'?'official':'group';this.humanLine(message.japanese,{text:message.chinese.trim(),source});if(this.gameId)this.stats.translation(this.gameId,message.japanese,message.chinese.trim(),source);}}return;}
   if(message.type==='hostFrame'){
    try{logSink.append(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),...message})+'\n');}catch{}
    return;
@@ -101,7 +102,7 @@ class Reader{
   if(message.type==='gameClosed'||message.bound===false)this.immersion.bind('');else if(message.gameHwnd)this.immersion.bind(message.gameHwnd+'|'+message.gameProcessId+'|'+message.gameStarted);
   /* 2026-11-13 (ATRI: the choice overlay was drawn in a reader window hidden as "scene changed"): while choices are on screen the reader stays shown */if(Object.prototype.hasOwnProperty.call(message,'hookChoices'))this.immersion.choices(!!message.hookChoices);
   if(typeof message.hookSource==='string'&&message.hookSource.trim()&&message.hookActive===true&&message.processAttached===true&&!message.hookRecovering&&!message.recovering&&!['history','ocr'].includes(message.hookSourceOrigin)&&!['history','ocr'].includes(message.origin))try{require('./seed-usage.cjs').note(this);}catch{}
-  if(typeof message.hookSource==='string'&&message.hookSource&&!message.hookRecovering&&message.hookSourceOrigin!=='history')try{const target=this.cardinalTarget(),cardinalPair=require('../core/cardinal/tape.cjs').liveSource(message.hookSource,{target,sequence:message.hookSequence});this.embedCached(message.hookSource);message={...message,cardinalPair};
+  if(typeof message.hookSource==='string'&&message.hookSource&&!message.hookRecovering&&message.hookSourceOrigin!=='history')try{const target=this.cardinalTarget(),cardinalPair=require('../core/cardinal/tape.cjs').liveSource(message.hookSource,{target,sequence:message.hookSequence});if(!this.zeroLatencyEnabled(target))this.embedCached(message.hookSource);message={...message,cardinalPair};
    if(cardinalPair&&this.gameId){
     const live=require('./self-check-live.cjs').current(),s=live?.reader===this&&live.exe===this.gameExe&&live.pid===this.gamePid&&live.birth===this.gameBirth?live:null;
     const seed=require('./cardinal.cjs').sourceOf(s,this.gal?.profile);
@@ -238,7 +239,7 @@ class Reader{
   const ot=require('./original-text.cjs'),key=exe?String(exe).toLowerCase()+'|'+ot.providerKey(this.root,exe,game?.id):'';
   const sourceChanged=hooks.textSourceKey!==key;
   if(hooks.textSourceAllowed!==allowed||sourceChanged){
-   this.embedCache?.clear();this.embedOrigins?.clear();this.humanLines?.clear();hooks.textSourceAllowed=allowed;
+   this.strictMtCache?.clear();this.embedCache?.clear();this.embedOrigins?.clear();this.humanLines?.clear();hooks.textSourceAllowed=allowed;
   }
   if(!exe){hooks.originalText=null;hooks.textSourceKey='';return;}
   if(!force&&hooks.originalText&&hooks.textSourceKey===key)return;hooks.originalText=ot.provider(this.root,exe,{id:game?.id});hooks.textSourceKey=key;hooks.textSourcePid=pid;
@@ -322,7 +323,12 @@ class Reader{
    const cg=grams(c);let both=0;for(const [g,n] of qg)both+=Math.min(n,cg.get(g)||0);const dice=2*both/(qn+Math.max(1,cl-1));if(dice>=.8&&(!close||dice>close.dice))close={value:v,cacheKey:k,dice,why:'similar '+dice.toFixed(2)+' '+Reader.keyPrint(k)};}
   return close;}
  embedKey(text,language=this.targetLanguage()){return (language==='en'?'en|':'')+Reader.normKey(text);}
- embedCached(text,value,{language=this.targetLanguage(),source,provider,returned}={}){this.embedCache??=new Map();const embedded=language!=='en'&&this.gal?.hooks?.originalText?.embedded===true,scope=embedded?this.gal.hooks.originalText.cacheKey(text):'';if(embedded&&!scope)return undefined;const key=embedded?'embedded|'+scope:this.embedKey(text,language);if(!key)return undefined;if(value===undefined){const hit=this.embedCache.get(key);if(hit){if(returned)Object.assign(returned,{cached:true,...this.embedOrigins?.get(key)});this.embedNote('hit',key);try{require('../core/cardinal/tape.cjs').liveTranslation(text,hit,{target:language==='en'?'en':'zh'});}catch{}return hit;}const near=embedded?null:this.embedNear(key);if(near){if(returned)Object.assign(returned,{cached:true,...this.embedOrigins?.get(near.cacheKey)});this.embedNote('near',key,near.why);try{require('../core/cardinal/tape.cjs').liveTranslation(text,near.value,{target:language==='en'?'en':'zh'});}catch{}return near.value;}this.embedNote('miss',key,'no cached line equal to or around it ('+this.embedCache.size+' cached)');return undefined;}if(value){this.embedNote('store',key);try{require('../core/cardinal/tape.cjs').liveTranslation(text,value,{target:language==='en'?'en':'zh'});}catch{}}this.embedOrigins??=new Map();this.embedOrigins.delete(key);if(source)this.embedOrigins.set(key,{source,provider});this.embedCache.delete(key);this.embedCache.set(key,value);if(this.embedCache.size>800){const oldest=this.embedCache.keys().next().value;this.embedCache.delete(oldest);this.embedOrigins.delete(oldest);}return value;}
+ embedCached(text,value,{language=this.targetLanguage(),source,provider,returned,verified=false}={}){this.embedCache??=new Map();const embedded=language!=='en'&&this.gal?.hooks?.originalText?.embedded===true,scope=embedded?this.gal.hooks.originalText.cacheKey(text):'';if(embedded&&!scope)return undefined;const key=embedded?'embedded|'+scope:this.embedKey(text,language);if(!key)return undefined;if(value===undefined){const hit=this.embedCache.get(key);const origin=this.embedOrigins?.get(key),index=this.gal?.hooks?.originalText;
+  const allowed=!verified||origin?.verified&&origin.index===index&&origin.position===index?.position?.();
+  if(hit&&allowed){if(returned)Object.assign(returned,{cached:true,...(origin&&{source:origin.source,provider:origin.provider})});this.embedNote('hit',key);try{require('../core/cardinal/tape.cjs').liveTranslation(text,hit,{target:language==='en'?'en':'zh'});}catch{}return hit;}const near=embedded||verified?null:this.embedNear(key);if(near){if(returned){const o=this.embedOrigins?.get(near.cacheKey);Object.assign(returned,{cached:true,...(o&&{source:o.source,provider:o.provider})});}this.embedNote('near',key,near.why);try{require('../core/cardinal/tape.cjs').liveTranslation(text,near.value,{target:language==='en'?'en':'zh'});}catch{}return near.value;}this.embedNote('miss',key,'no cached line equal to or around it ('+this.embedCache.size+' cached)');return undefined;}if(value){this.embedNote('store',key);try{require('../core/cardinal/tape.cjs').liveTranslation(text,value,{target:language==='en'?'en':'zh'});}catch{}}this.embedOrigins??=new Map();this.embedOrigins.delete(key);if(source){const origin={source,provider};
+   if(['script','patch','official','group'].includes(source)){origin.verified=true;origin.index=this.gal?.hooks?.originalText;origin.position=origin.index?.position?.();}
+   this.embedOrigins.set(key,origin);
+  }this.embedCache.delete(key);this.embedCache.set(key,value);if(this.embedCache.size>800){const oldest=this.embedCache.keys().next().value;this.embedCache.delete(oldest);this.embedOrigins.delete(oldest);}return value;}
  /* 2026-11-12 art text (PageLocator art mode): the page gets the place and the translation; the game keeps drawing the line */
  async artText(message){if(message?.source==='engine'&&message.role==='name'){const turns=this.artTurns||(this.artTurns=new Map());turns.set(message.id,(turns.get(message.id)||0)+1);if(turns.size>300)turns.delete(turns.keys().next().value);if(message.visible!==true)turns.delete(message.id);this.emit('reader-event',{...message,translation:'',rowTranslations:[]});return;}const cacheLanguage=this.targetLanguage();/* 2026-11-15 unreadable art text (mojibake, the game's own noise lines) is neither translated nor drawn */if(message?.visible===true&&require('../core/text-sanity.cjs').garbledSource(String(message.text||''),{controls:false})){this.gal?.hooks?.trace?.('art text unreadable '+message.id);this.emit('reader-event',{...message,translation:'',visible:false});return;}/* E578: a list of short rows (a menu) is translated row by row, see artList */const list=message.source==='ocr'&&message.visible===true&&message.foreign!==true?artList(message.rows):null;let translation='';let text=String(message.text||'').slice(0,600);/* 2026-11-13 OCR rows (source ocr) carry recognition slips (「のた」 for 「のだ」): the script line they stand for replaces them */let shown='';/* 2026-11-13 a foreign group (the game draws the line in another language): its Japanese table line becomes the text, the drawn line is kept as shown; no table line, no item */if(message.foreign===true&&message.visible===true){const ja=this.gal?.hooks?.foreignArt?.(text,message.id)||'';this.gal?.hooks?.trace?.('art foreign '+message.id+' '+JSON.stringify(text.slice(0,40))+' -> '+JSON.stringify(ja.slice(0,40)));if(ja){shown=text;text=ja.slice(0,600);}else{/* not in the table: the Japanese OCR's own reading, when it is Japanese (a kanji card) */const alt=String(message.alt||'');if(!/[\u3040-\u30ff]/.test(alt)&&!/^[\u4e00-\u9fff]{2,8}$/.test(alt))return;text=alt.slice(0,600);}}else if(!list&&message.source==='ocr'&&message.visible===true&&text.trim()){const snapped=this.gal?.hooks?.ocrSnap?.(text);if(snapped)text=snapped.slice(0,600);}/* E540 (WHITE ALBUM2 title logo read as 「ミき=ミミミ」, the translator answered with an apology): an OCR read that is not a line is no item */if(message.visible===true&&message.source==='ocr'&&!shown&&artJunk(text,message.rows,message.sh))return;/* a hide (or newer read) that arrives while a translation is awaited wins: the stale show is dropped */const turns=this.artTurns||(this.artTurns=new Map()),turn=(turns.get(message.id)||0)+1;turns.set(message.id,turn);if(turns.size>300)turns.delete(turns.keys().next().value);
   if(list){const rowTranslations=(await this.artRows(list)).map((t,i)=>t&&!artNoTranslation(list[i],t)?t:'');if(turns.get(message.id)!==turn)return;this.emit('reader-event',{...message,text:list.join('\n'),translation:rowTranslations.some(Boolean)?rowTranslations.join('\n'):'',rowTranslations});return;}
@@ -330,17 +336,17 @@ class Reader{
    /* E540 (WHITE ALBUM2 opening: every card read, almost none shown): a card lasts 3-4 s and the translator can take as long,
       so the hide came first and the show was dropped. The line goes out at once (its readable copy), the translation follows. */
    if(!translation&&turns.get(message.id)===turn)this.emit('reader-event',{...message,text,translation:'',...(shown&&{shown})});
-   if(!translation){const until=Date.now()+4000;try{const result=await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current:()=>Date.now()<until});translation=result.text;this.embedCached(text,translation,{language:cacheLanguage,source:result.source,provider:result.provider});}catch{}}}catch{}}
+   if(!translation){const until=this.zeroLatencyEnabled(cacheLanguage)?Infinity:Date.now()+4000;try{const result=await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current:()=>turns.get(message.id)===turn&&Date.now()<until});translation=result.text;this.embedCached(text,translation,{language:cacheLanguage,source:result.source,provider:result.provider});}catch{}}}catch{}}
   /* E540: a translator's apology, or the drawn line given back unchanged (a Chinese-patched title menu read as a kanji card), is no translation */
   if(translation&&artNoTranslation(text,translation))translation='';
   if(turns.get(message.id)!==turn)return;if(message.visible!==true)turns.delete(message.id);this.emit('reader-event',{...message,text,translation,...(shown&&{shown})});}
  /* E578: one translation per menu row (cached per row, so an item seen again costs nothing); an empty string where none came in time */
- async artRows(list){const cacheLanguage=this.targetLanguage();let options;try{options=this.baseOptions(cacheLanguage);}catch{return list.map(()=>'');}const until=Date.now()+4000;
-  return Promise.all(list.map(async row=>{try{let t=this.embedCached(row,undefined,{language:cacheLanguage})||'';if(!t){const result=await this.chainTranslate(row,options,{current:()=>Date.now()<until});t=result.text;this.embedCached(row,t,{language:cacheLanguage,source:result.source,provider:result.provider});}return t||'';}catch{return '';}}));}
+ async artRows(list){const cacheLanguage=this.targetLanguage();let options;try{options=this.baseOptions(cacheLanguage);}catch{return list.map(()=>'');}const until=this.zeroLatencyEnabled(cacheLanguage)?Infinity:Date.now()+4000;
+  return Promise.all(list.map(async row=>{try{let t=this.zeroLatencyEnabled(cacheLanguage)?(this.localChoice(row,cacheLanguage)?.text||this.localTranslation(row,cacheLanguage)):this.embedCached(row,undefined,{language:cacheLanguage})||'';if(!t){const result=await this.chainTranslate(row,options,{current:()=>Date.now()<until});t=result.text;this.embedCached(row,t,{language:cacheLanguage,source:result.source,provider:result.provider});}return t||'';}catch{return '';}}));}
  /* engine-draw: ruby (game ruby, then dictionary-settled readings) and translation (script, then the fallback chain) for one dialogue line the engine will draw itself */
  async drawEmbed(m){const generation=this.visualGeneration||0,owner=this.gal,current=()=>!this.closed&&this.gal===owner&&(this.visualGeneration||0)===generation;const cacheLanguage=this.targetLanguage();const text=String(m?.text||'');if(!text||text.length>600||notJapanese(text))return;let ruby=[],zh='';
   try{const x=await require('./example-ruby.cjs').exampleRuby(null,this.runtime.learning(),[{text,ruby:this.gal?.hooks?.sourceRuby?.get(text)||[]}]);const it=x?.items?.[0];if(it?.text===text&&Array.isArray(it.spans))ruby=it.spans.map(sp=>[sp.start,sp.end,String(sp.reading||'')]);}catch{}
-  try{zh=this.localTranslation(text,cacheLanguage);if(!zh){const until=Date.now()+4000;const result=await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current:()=>Date.now()<until});zh=result.text||'';if(zh)this.embedCached(text,zh,{language:cacheLanguage,source:result.source,provider:result.provider});}}catch{}
+  try{zh=this.localTranslation(text,cacheLanguage);if(!zh){const until=this.zeroLatencyEnabled(cacheLanguage)?Infinity:Date.now()+4000;const result=await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current:()=>current()&&Date.now()<until});zh=result.text||'';if(zh)this.embedCached(text,zh,{language:cacheLanguage,source:result.source,provider:result.provider});}}catch{}
   if(zh&&(/[\ufffd\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(zh)||require('../core/text-sanity.cjs').garbledSource(zh)))zh='';
   if(current())owner?.hooks?.drawEmbedReply?.(m.key,{ruby,zh});}
  async embedTranslate(id,text){const generation=this.visualGeneration||0,owner=this.gal,current=()=>!this.closed&&this.gal===owner&&(this.visualGeneration||0)===generation;const cacheLanguage=this.targetLanguage();
@@ -354,7 +360,7 @@ class Reader{
   if(notJapanese(text)){this.gal?.hooks?.embedReply(id,'',{source:text,text:''});return;}
   try{
    trans=this.localTranslation(text,cacheLanguage);
-   if(!trans){const until=Date.now()+3500;try{const result=await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current:()=>Date.now()<until});trans=result.text;this.embedCached(text,trans,{language:cacheLanguage,source:result.source,provider:result.provider});}catch{}}
+   if(!trans){const until=this.zeroLatencyEnabled(cacheLanguage)?Infinity:Date.now()+3500;try{const result=await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current:()=>current()&&Date.now()<until});trans=result.text;this.embedCached(text,trans,{language:cacheLanguage,source:result.source,provider:result.provider});}catch{}}
   }catch(error){try{logSink.append(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'embedTranslateFailed',error:String(error?.message||error).slice(0,200)})+'\n');}catch{}}
   /* E358: never let the game draw a translation with holes: a line its font cannot draw is hidden in the game and MeguLit draws it. */
   /* 2026-11-15 never write garbage into a game: a translation with replacement characters, control codes or mojibake goes back empty (the game keeps its line); HookBridge checks the code page (EmbedTextPolicy.GuardWrite) */
@@ -362,22 +368,28 @@ class Reader{
   let hide=false;if(trans){try{hide=this.gal?.hooks?.originalText?.drawable?.(trans)===false;}catch{}}
   if(current())owner?.hooks?.embedReply(id,hide?'':trans,{hide,source:text,text:trans});
  }
+ zeroLatencyEnabled(language){
+  if(language==='en')return false;
+  try{return this.prefs().scriptTranslation!==false;}catch{return false;}
+ }
  localTranslation(text,language,returned={}){
+  const strict=this.zeroLatencyEnabled?.(language);
   const script=language==='en'?'':this.gal?.hooks?.scriptTranslation?.(text,returned);
-  if(script){returned.source??="script";this.embedCached(text,script,{language,source:returned.source});return script;}
+  if(script&&(!strict||script.trim()!==text.trim()&&[undefined,'script','patch','official','group'].includes(returned.source))){returned.source??="script";this.embedCached(text,script,{language,source:returned.source});return script;}
+  if(strict){
+   const parts=this.gal?.hooks?.piecedTranslation?.(text);
+   if(parts?.text&&!parts.machine&&!parts.filled){returned.source='patch';return parts.text;}
+   if(!script&&this.gal?.hooks?.scriptAllowed?.()!==false)return this.embedCached(text,undefined,{language,returned,verified:true})||'';
+   return '';
+  }
   return this.embedCached(text,undefined,{language,returned})||'';
  }
  recordTranslation(role,result,index){
   if(!this.gameId||!index||result.target!=='zh')return;
   this.logVisibility({type:'translationReturned',game:this.gameId,...index,role,source:result.source||'unknown',provider:result.provider||''});
  }
- async choiceTranslations(request){
-  const texts=request.items;
-  if(!Array.isArray(texts)||texts.length>12||texts.some(t=>typeof t!=='string'||!t.trim()||t.length>4000))throw Error('INVALID_READER_TEXT');
-  const options=this.requestOptions(request),target=this.targetLanguage(options),hooks=this.gal?.hooks;
-  const token=this.choiceRequest={},generation=this.visualGeneration,index=hooks?.originalText?.translationIndex;
-  const current=()=>this.choiceRequest===token&&this.gal?.hooks===hooks&&this.visualGeneration===generation&&this.active()&&target===this.targetLanguage();
-  const local=text=>{
+ localChoice(text,target){
+   const hooks=this.gal?.hooks;
    if(target==='en'||hooks?.scriptAllowed?.()===false)return null;
    const track=hooks?.trackPairs?.get(text.replace(/\s+/g,''));
    if(track)return {text:track,source:'official'};
@@ -389,13 +401,19 @@ class Reader{
     const position=provider.save?.();
     try{hit=provider.resolve(text);}finally{if(position!==undefined)provider.load?.(position);}
    }
-   if(hit?.status!=='exact')return null;
+   if(hit?.status!=='exact'||this.zeroLatencyEnabled(target)&&(hit.machine||hit.filled||['machine','filled'].includes(hit.source)))return null;
    const translation=hit.translation??(provider.kind==='original'?hit.captured:'');
    return typeof translation==='string'&&translation.trim()&&
     !require('./original-text.cjs').japaneseLine(translation)&&translation!==text?
     {text:translation,source:hit.machine?'machine':hit.filled?'filled':provider.kind==='original'?'official':'patch'}:null;
-  };
-  const rows=texts.map(text=>{try{return local(text);}catch{return null;}});
+  }
+ async choiceTranslations(request){
+  const texts=request.items;
+  if(!Array.isArray(texts)||texts.length>12||texts.some(t=>typeof t!=='string'||!t.trim()||t.length>4000))throw Error('INVALID_READER_TEXT');
+  const options=this.requestOptions(request),target=this.targetLanguage(options),hooks=this.gal?.hooks;
+  const token=this.choiceRequest={},generation=this.visualGeneration,index=hooks?.originalText?.translationIndex;
+  const current=()=>this.choiceRequest===token&&this.gal?.hooks===hooks&&this.visualGeneration===generation&&this.active()&&target===this.targetLanguage();
+  const rows=texts.map(text=>{try{return this.localChoice(text,target);}catch{return null;}});
   if(rows.some(Boolean)&&rows.includes(null)&&current()){
    this.emit('reader-event',{type:'call',method:'deliverChoiceTranslations',args:[request.request,{target,rows:rows.slice()}]});
   }
@@ -408,23 +426,41 @@ class Reader{
   for(const row of rows)this.recordTranslation('choice',{...row,target},index);
   return {target,rows};
  }
- async translate(request,returned={}){const options=this.requestOptions(request),cacheLanguage=this.targetLanguage(options);const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;const current=()=>pageKey?this.pageScope===pageKey:this.latest===request.id;if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();const gameId=this.gameId;
-  /* 2026-11-19 (user rule, every game): the script's own translation first (group / official, the same lookup the embed uses); a line it does not
-     cover goes down services/translation-chain.cjs (local model, bound API, machine translation); when every source fails the line
-     is retried in the background and filled in on screen and in the dialogue log (fillTranslation) */
+ async translate(request,returned={}){const options=this.requestOptions(request),cacheLanguage=this.targetLanguage(options);const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;const current=()=>pageKey?this.pageScope===pageKey:this.latest===request.id;const gameId=this.gameId;
   const local=this.localTranslation(text,cacheLanguage,returned);if(local)return local;
-  try{const r=await this.chainTranslate(text,options,{id:request.id,current});Object.assign(returned,{source:r.source,provider:r.provider});if(gameId)this.stats.translation(gameId,text,r.text);this.embedCached(text,r.text,{language:cacheLanguage,source:r.source,provider:r.provider});/* 2026-11-21 (owner, 千恋＊万花 r34: lines the patch did not pair got their fallback translation 1 to 8 s later, after the reader had moved on, and it was dropped): a late answer still fills the line wherever it is shown (on screen, the page's earlier lines, the log) */if(!current()&&r?.text)try{this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[text,r.text,'late',{target:cacheLanguage,source:r.source,provider:r.provider}]});}catch{}return r.text;}
+  try{const r=await this.chainTranslate(text,options,{id:request.id,current});Object.assign(returned,{source:r.source,provider:r.provider,...(r.cached&&{cached:true})});if(gameId)this.stats.translation(gameId,text,r.text);this.embedCached(text,r.text,{language:cacheLanguage,source:r.source,provider:r.provider});/* 2026-11-21 (owner, 千恋＊万花 r34: lines the patch did not pair got their fallback translation 1 to 8 s later, after the reader had moved on, and it was dropped): a late answer still fills the line wherever it is shown (on screen, the page's earlier lines, the log) */if(!current()&&r?.text)try{this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[text,r.text,'late',{target:cacheLanguage,source:r.source,provider:r.provider}]});}catch{}return r.text;}
   catch(error){if(this.active())this.translationRetries().add(text,{gameId,options});throw error;}}
  /* One line through the fallback chain (services/translation-chain.cjs). options: the reader's resolved options. */
- async chainTranslate(text,options,{id=null,current:previous=()=>true}={}){if(!this.active())throw Error('READER_DISABLED');const current=()=>this.active()&&previous();const requestLanguage=this.targetLanguage(options),cacheLanguage=requestLanguage;const chain=require('./translation-chain.cjs'),engines=require('../core/engines.cjs').ENGINES;this.loadKeys();
+ async chainTranslate(text,options,{id=null,current:previous=()=>true}={}){if(!this.active())throw Error('READER_DISABLED');const current=()=>this.active()&&previous();const requestLanguage=this.targetLanguage(options),cacheLanguage=requestLanguage;const chain=require('./translation-chain.cjs');this.loadKeys();
   let localInstalled=false;try{localInstalled=!!this.runtime.local().status().installed&&this.runtime.models().status().models.some(m=>m.installed);}catch{}
-  const list=chain.candidates(options,{hasKey:base=>this.translator().hasKey(base,''),localInstalled});
-  return chain.translate(text,list,async o=>{const opts={...o,translationPrompt:this.workPrompt||'',learnerLanguage:requestLanguage};if(chain.isLocal(opts.provider))await this.localReady(opts,id,current);return normalizeTranslation(await this.translator().translate(text,opts,current));},{isCurrent:current,budgetMs:2500,trace:t=>{try{this.gal?.hooks?.trace?.(t);}catch{}},onLate:r=>{if(!this.active())return;this.embedCached(text,r.text,{language:cacheLanguage,source:r.source,provider:r.provider});try{this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[text,r.text,'better',{target:cacheLanguage,source:r.source,provider:r.provider}]});}catch{}}}).then(r=>{/* E415 (user: 提示用户是微软机翻): said once per reader session when machine translation stood in for the chosen engine */if(r.source==='mt'&&!chain.isMt(options.provider)&&!this.mtNoticed){this.mtNoticed=true;this.emit('reader-event',{type:'call',method:'mtNotice',args:[]});}return r;});}
+  const strict=this.zeroLatencyEnabled(requestLanguage);
+  const profiles=strict&&this.folder?readJSON(path.join(this.folder,'translation-profiles.json')):{};
+  const list=chain.candidates(options,{hasKey:base=>this.translator().hasKey(base,''),localInstalled,apiFirst:strict,profiles});
+  let cachedProvider;
+  const generation=this.visualGeneration,game=this.gameId;
+  return chain.translate(text,list,async o=>{
+   const opts={...o,translationPrompt:this.workPrompt||'',learnerLanguage:requestLanguage};
+   // Reuse an exact MT answer only after all higher-ranked providers have been tried.
+   const key=strict&&chain.isMt(o.provider)?JSON.stringify([game,requestLanguage,o.provider,text]):null;
+   if(key&&this.strictMtCache?.has(key)){cachedProvider=o.provider;return this.strictMtCache.get(key);}
+   if(chain.isLocal(opts.provider))await this.localReady(opts,id,current);
+   const value=normalizeTranslation(await this.translator().translate(text,opts,current));
+   if(key&&value&&generation===this.visualGeneration&&game===this.gameId){
+    this.strictMtCache??=new Map();this.strictMtCache.set(key,value);
+    if(this.strictMtCache.size>800)this.strictMtCache.delete(this.strictMtCache.keys().next().value);
+   }
+   return value;
+  },{isCurrent:current,budgetMs:strict?0:2500,trace:t=>{try{this.gal?.hooks?.trace?.(t);}catch{}},onLate:r=>{if(!this.active())return;this.embedCached(text,r.text,{language:cacheLanguage,source:r.source,provider:r.provider});try{this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[text,r.text,'better',{target:cacheLanguage,source:r.source,provider:r.provider}]});}catch{}}}).then(r=>{if(cachedProvider===r.provider)r.cached=true;/* E415 (user: 提示用户是微软机翻): said once per reader session when machine translation stood in for the chosen engine */if(r.source==='mt'&&!chain.isMt(options.provider)&&!this.mtNoticed){this.mtNoticed=true;this.emit('reader-event',{type:'call',method:'mtNotice',args:[]});}return r;});}
  /* The reader's own options (preferences, display language, work prompt) */
  baseOptions(language){const options=this.requestOptions();return language?{...options,learnerLanguage:language}:options;}
- translationRetries(){return this.retryQueue??=new(require('./translation-chain.cjs').Retries)((text,c)=>this.chainTranslate(text,c.options||this.langOptions(require('../core/providers.cjs').resolveOptions({...this.prefs(),translationPrompt:this.workPrompt||''}))),(text,r,c)=>this.fillTranslation(text,r,c));}
+ translationRetries(){return this.retryQueue??=new(require('./translation-chain.cjs').Retries)((text,c)=>{
+  const options=c.options||this.requestOptions(),target=this.targetLanguage(options);
+  if(c.gameId!==this.gameId)return null;
+  if(this.zeroLatencyEnabled(target)){const origin={},hit=this.localTranslation(text,target,origin);if(hit)return {text:hit,...origin};}
+  return this.chainTranslate(text,options,{current:()=>c.gameId===this.gameId});
+ },(text,r,c)=>this.fillTranslation(text,r,c));}
  /* A translation that came late: the cache, the dialogue log (reading_events, never as a group pairing) and the line on screen */
- fillTranslation(text,r,{gameId,options}={}){if(!this.active())return;this.embedCached(text,r.text,{language:this.targetLanguage(options),source:r.source,provider:r.provider});if(gameId)try{this.stats.translation(gameId,text,r.text);}catch{}this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[text,r.text,r.source,{target:this.targetLanguage(options),source:r.source,provider:r.provider}]});}
+ fillTranslation(text,r,{gameId,options}={}){if(!this.active())return;this.embedCached(text,r.text,{language:this.targetLanguage(options),source:r.source,provider:r.provider});if(gameId)try{const source=r.source==='official'?'official':['patch','script','group'].includes(r.source)?'group':'machine';this.stats.translation(gameId,text,r.text,source);}catch{}this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[text,r.text,r.source,{target:this.targetLanguage(options),source:r.source,provider:r.provider}]});}
  async invoke(command,args={}){if(!this.active())throw Error('READER_DISABLED');
   if(command.startsWith('plugin:sql|'))return require('./legacy-reader-sql.cjs').request(this.root,command,args,{sentenceTranslation:text=>this.sentenceTranslation(text,this.embedCached(text)||'')});
   if(command==='word_states'){const forms=Array.isArray(args.forms)?[...new Set(args.forms.filter(v=>typeof v==='string'&&v.length<=100))].slice(0,200):[];if(!forms.length)return [];const db=openStore(this.root);try{return db.prepare('SELECT id,spelling,reading,status FROM vocabulary WHERE spelling IN ('+forms.map(()=>'?').join(',')+')').all(...forms);}finally{db.close();}}
