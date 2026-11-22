@@ -41,6 +41,7 @@ import gameDiff from '../../core/game-diff.cjs';
 import domains from '../../core/profiles/domains.cjs';
 import gamePrint from '../../core/game-print.cjs';
 import {parseCredit,noteUpload,creditOfDiff,creditPut} from './torch-credit.js';
+import {reportAllowed,noteSeedUpload,blockedProfile,profileBlock,retestOrder} from './seed-admin.js';
 const {canonical,validate,build,unsigned,KEY}=gameDiff;
 const {VERSION_KINDS,GAME_KINDS}=gamePrint;
 export const PROFILE_LIMITS={body:16*1024,signed:32*1024,runtime:3*1024*1024,agree:2,keepDays:180,reportsPerKey:50,queue:200,picks:200};
@@ -89,11 +90,11 @@ async function find(env,layer,prints){const kinds=layer==='version'?VERSION_KIND
  for(const k of kinds){if(!prints[k])continue;const key=layer==='version'&&k==='exe'?prints.exe:await printKey(env,k,prints[k],layer);if(!key)continue;const d=await best(env,layer,key);if(d)return {match:k,key,diff:d};}
  return null;}
 async function best(env,layer,key){const rows=(await env.DB.prepare('SELECT source,body FROM game_diffs WHERE layer=? AND game_key=? AND withdrawn_at IS NULL').bind(layer,key).all()).results||[];
- const row=rows.find(r=>r.source==='official')||rows.find(r=>r.source==='auto');if(!row)return null;try{return JSON.parse(row.body);}catch{return null;}}
+ const row=rows.find(r=>r.source==='official')||rows.find(r=>r.source==='auto');if(!row)return null;let document;try{document=JSON.parse(row.body);}catch{return null;}return await blockedProfile(env.DB,document)?null:document;}
 
 /* ---- picks ---------------------------------------------------------------------------------------------------------- */
 async function settle(env,layer,key,now){const since=sec(now)-PROFILE_LIMITS.keepDays*86400;
- const rows=(await env.DB.prepare('SELECT settings_hash,settings,mode,cost,engine,exe,prints,updated_at FROM auto_profile_reports WHERE '+(layer==='version'?'game_key':'gid')+'=? AND updated_at>=? ORDER BY updated_at DESC LIMIT 500').bind(key,since).all()).results||[];
+ const rows=(await env.DB.prepare('SELECT settings_hash,settings,mode,cost,engine,exe,prints,updated_at FROM auto_profile_reports p WHERE '+(layer==='version'?'game_key':'gid')+"=? AND updated_at>=? AND NOT EXISTS(SELECT 1 FROM seed_admin_items a WHERE a.kind='report' AND a.game_key=p.game_key AND a.settings_hash=p.settings_hash AND a.state='deleted') ORDER BY updated_at DESC LIMIT 500").bind(key,since).all()).results||[];
  const p=pick(rows);
  if(!p){await env.DB.prepare('DELETE FROM auto_profile_picks WHERE layer=? AND game_key=?').bind(layer,key).run();return null;}
  const prints=pick2(p.prints,layer==='version'?VERSION_KINDS:GAME_KINDS);
@@ -114,12 +115,14 @@ async function report(request,env,ip,now,{json,fail,readJSON}){
  /* 2026-11-21 传火署名: credit:{name?} next to profile (or inside it); refused whole when it is not a clean name (relay/src/torch-credit.js) */
  const cr=parseCredit(body.value.credit!==undefined?body.value.credit:body.value.profile?.credit,env);if(!cr.ok)return fail('INVALID_CREDIT');
  const hash=(await sha256(r.mode+'|'+canonical(r.settings))).slice(0,32);
+ if(!await reportAllowed(env.DB,r.key,hash))return fail('SEED_DELETED',410);
  const gid=await gidFor(env,r.prints);
  await env.DB.prepare('INSERT INTO auto_profile_reports(game_key,reporter,gid,prints,settings_hash,settings,mode,source,cost,metrics,engine,exe,app,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(game_key,reporter) DO UPDATE SET gid=excluded.gid,prints=excluded.prints,settings_hash=excluded.settings_hash,settings=excluded.settings,mode=excluded.mode,source=excluded.source,cost=excluded.cost,metrics=excluded.metrics,engine=excluded.engine,exe=excluded.exe,app=excluded.app,updated_at=excluded.updated_at')
   .bind(r.key,ip,gid,JSON.stringify(r.prints),hash,canonical(r.settings),r.mode,r.source,r.cost,JSON.stringify(r.metrics),r.engine,r.exe,r.app,t).run();
  await env.DB.prepare('DELETE FROM auto_profile_reports WHERE game_key=? AND reporter NOT IN (SELECT reporter FROM auto_profile_reports WHERE game_key=? ORDER BY updated_at DESC LIMIT ?)').bind(r.key,r.key,PROFILE_LIMITS.reportsPerKey).run();
  await register(env,'version',r.key,r.prints,['head','pe'],t);if(gid)await register(env,'game',gid,r.prints,['exe',...GAME_KINDS],t);
  const credit=await noteUpload(env,r.key,ip,cr,now);
+ await noteSeedUpload(env.DB,r,hash,ip,credit.torchNo,now);
  /* 2026-11-21 kind: 'newVersion' = a shared diff found by head / pe / the game (not this exe) failed its first window here (the
     client's reason starts 「同游戏新版本」): this build needs its own version layer; 'broken' = the self-check stepped it down */
  if(r.source==='gate'){const kind=r.reason.startsWith('同游戏新版本')?'newVersion':'broken';await env.DB.prepare("INSERT INTO auto_profile_queue(game_key,gid,prints,exe,engine,reasons,note,kind,reporters,app,first_at,last_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?) ON CONFLICT(game_key) DO UPDATE SET gid=excluded.gid,prints=excluded.prints,exe=excluded.exe,engine=excluded.engine,reasons=excluded.reasons,note=excluded.note,kind=excluded.kind,reporters=auto_profile_queue.reporters+1,app=excluded.app,last_at=excluded.last_at,closed_at=NULL")
@@ -150,9 +153,10 @@ async function runtimePost(request,env,ip,now,{json,fail,readJSON}){const body=a
 /* ---- ours ----------------------------------------------------------------------------------------------------------- */
 async function picksGet(env,url,{json}){
  const rows=(await env.DB.prepare('SELECT body FROM auto_profile_picks WHERE stamp<>signed_stamp ORDER BY updated_at DESC LIMIT ?').bind(PROFILE_LIMITS.picks).all()).results||[];
- return json({picks:rows.map(r=>{try{return JSON.parse(r.body);}catch{return null;}}).filter(Boolean)});}
+ const picks=[];for(const r of rows){let d;try{d=JSON.parse(r.body);}catch{continue;}if(!await blockedProfile(env.DB,d))picks.push(d);}return json({picks});}
 async function signedPost(request,env,now,{json,fail,readJSON}){const body=await readJSON(request,PROFILE_LIMITS.signed);if(body.error)return fail(body.error,400);const d=body.value?.diff;
  const v=validate(d);if(!v.ok)return fail('INVALID_DIFF_'+v.error);if(!SIGNED(d.signature))return fail('UNSIGNED');const t=sec(now),layer=d.layer||'version';
+ if(await blockedProfile(env.DB,d))return fail('SEED_DELETED',410);
  if(d.source==='auto'){const p=await env.DB.prepare('SELECT stamp FROM auto_profile_picks WHERE layer=? AND game_key=?').bind(layer,d.key).first();
   if(!p||p.stamp!==await sha256(essence(d)))return fail('NOT_THE_CURRENT_PICK',409);
   await env.DB.prepare('UPDATE auto_profile_picks SET signed_stamp=stamp WHERE layer=? AND game_key=?').bind(layer,d.key).run();}
@@ -162,7 +166,7 @@ async function signedPost(request,env,now,{json,fail,readJSON}){const body=await
   if(!Number.isSafeInteger(d.rev)||d.rev<1)return fail('REV_REQUIRED');if(d.rev<=top)return json({ok:false,error:'REV_NOT_NEWER',min:top+1},409);
   /* an official diff defines its game / build: its prints point here */const pr=gamePrint.check(d.prints||{});
   if(layer==='version')await register(env,'version',d.key,pr,['head','pe'],t);else await register(env,'game',d.key,pr,GAME_KINDS,t);}
- await env.DB.prepare('INSERT INTO game_diffs(layer,game_key,source,body,rev,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(layer,game_key,source) DO UPDATE SET body=excluded.body,rev=excluded.rev,updated_at=excluded.updated_at,withdrawn_at=NULL').bind(layer,d.key,d.source,JSON.stringify(d),d.rev|0,t).run();
+ const tombstone=await profileBlock(d);await env.DB.prepare('INSERT INTO game_diffs(layer,game_key,source,body,rev,updated_at) SELECT ?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM seed_admin_items WHERE '+tombstone.sql+') ON CONFLICT(layer,game_key,source) DO UPDATE SET body=excluded.body,rev=excluded.rev,updated_at=excluded.updated_at,withdrawn_at=NULL').bind(layer,d.key,d.source,JSON.stringify(d),d.rev|0,t,...tombstone.args).run();if(await blockedProfile(env.DB,d))return fail('SEED_DELETED',410);
  if(d.source==='official'){if(layer==='version')await env.DB.prepare('UPDATE auto_profile_queue SET closed_at=? WHERE game_key=? AND closed_at IS NULL').bind(t,d.key).run();
   else await env.DB.prepare("UPDATE auto_profile_queue SET closed_at=? WHERE gid=? AND kind<>'newVersion' AND closed_at IS NULL").bind(t,d.key).run();/* a build that needs its own version layer stays open */}
  return json({ok:true,key:d.key,layer,source:d.source},201);}
@@ -176,7 +180,7 @@ async function queueGet(env,url,{json}){const all=url.searchParams.get('all')===
    the game identity), no names, no reasons. Public and cached; the app's idle-time cold test (services/cold-test.cjs) takes these
    games first. */
 async function retestGet(env,url,{json}){const rows=(await env.DB.prepare('SELECT game_key,gid,last_at FROM auto_profile_queue WHERE closed_at IS NULL ORDER BY last_at DESC LIMIT ?').bind(PROFILE_LIMITS.queue).all()).results||[];
- return json({schema:'megulit.cold-retest',version:1,items:rows.map(r=>({key:r.game_key,game:r.gid||null,at:r.last_at}))},200,{'cache-control':'public, max-age=3600'});}
+ const ordered=await retestOrder(env.DB,rows);return json({schema:'megulit.cold-retest',version:1,items:ordered.map(r=>({key:r.game_key,game:r.gid||null,at:r.last_at}))},200,{'cache-control':'no-store'});}
 async function queueClose(request,env,now,{json,fail,readJSON}){const body=await readJSON(request,4096);const key=String(body.value?.key||'');if(!KEY.test(key))return fail('INVALID_KEY');
  await env.DB.prepare('UPDATE auto_profile_queue SET closed_at=? WHERE game_key=?').bind(sec(now),key).run();return json({ok:true});}
 async function runtimeList(env,url,{json}){const rows=(await env.DB.prepare('SELECT game_key,identity,gid,prints,size,reporters,updated_at FROM profile_runtime ORDER BY updated_at DESC LIMIT 500').all()).results||[];

@@ -2,6 +2,7 @@
 import protocol from '../../core/torch-release.cjs';
 import gameDiff from '../../core/game-diff.cjs';
 import {cleanName} from './torch-credit.js';
+import {blockedProfile,blockedProposal,profileBlock} from './seed-admin.js';
 const keys=(env,name)=>{try{const v=JSON.parse(env[name]||'[]');return Array.isArray(v)?v:[];}catch{return [];}};
 const trust=env=>({profileKeys:keys(env,'PROFILE_PUBLIC_KEYS'),reviewKeys:keys(env,'CARDINAL_REVIEW_PUBLIC_KEYS'),releaseKeys:keys(env,'TORCH_RELEASE_PUBLIC_KEYS')});
 const row=async(db,key)=>db.prepare('SELECT h.* FROM torch_release_winners w JOIN torch_release_history h ON h.hash=w.hash WHERE w.game_key=?').bind(key).first();
@@ -16,6 +17,7 @@ export async function propose(db,input,env,now=new Date()){
  let profile=input.profile,review=input.review,target=null,action='promote',reason;
  if(input.targetHash!==undefined){if(!gameDiff.KEY.test(input.targetHash)||!protocol.ROLLBACK_REASONS.includes(input.rollbackReason))reject('TORCH_ROLLBACK');target=await checkedRow(await history(db,input.targetHash),env);if(!target)reject('TORCH_ROLLBACK');profile=target.profile;review=target.review;action='rollback';reason=input.rollbackReason;}
  await candidate(profile,review,env);
+ if(await blockedProfile(db,profile)||await blockedProposal(db,{key:review.identity.exe,profile}))reject('TORCH_REVOKED');
  const currentRow=await row(db,review.identity.exe),current=await checkedRow(currentRow,env),blocked=await revoked(db);
  if(blocked.includes(review.candidateHash))reject('TORCH_REVOKED');
  if(action==='promote')reason=protocol.promotion(review,current);
@@ -31,6 +33,7 @@ export async function propose(db,input,env,now=new Date()){
  return {hash,proposal,status:'awaiting-offline-signature'};
 }
 export async function publish(db,release,env,now=new Date()){
+ if(await blockedProfile(db,release.profile)||await blockedProposal(db,release))reject('TORCH_REVOKED');
  const proof=await protocol.checked(release,trust(env)),unsigned=gameDiff.unsigned(release),pendingHash=await protocol.hash(unsigned),pending=await db.prepare('SELECT * FROM torch_release_pending WHERE hash=?').bind(pendingHash).first();
  if(!pending||pending.body!==gameDiff.canonical(unsigned)||now.getTime()-Date.parse(pending.created_at)>7*86400000||Date.parse(pending.created_at)>now.getTime())reject('TORCH_PENDING');
  const existing=await history(db,proof.hash);if(existing){await checkedRow(existing,env);return {hash:proof.hash,status:'published',duplicate:true};}
@@ -38,15 +41,16 @@ export async function publish(db,release,env,now=new Date()){
  const blocked=await revoked(db),target=release.targetHash?await checkedRow(await history(db,release.targetHash),env):null;
  protocol.transition(release,current,{target,revoked:blocked});
  if(release.action==='promote'&&await db.prepare('SELECT hash FROM torch_release_history WHERE profile_hash=?').bind(proof.profileHash).first())reject('TORCH_REPLAY');
- const body=gameDiff.canonical(release),args=[proof.hash,release.key,release.revision,release.previous,proof.profileHash,body,now.toISOString(),release.key,release.previous,release.previous];
+ const tombstone=await profileBlock(release.profile),body=gameDiff.canonical(release),args=[proof.hash,release.key,release.revision,release.previous,proof.profileHash,body,now.toISOString(),release.key,release.previous,release.previous];
  const result=await db.batch([
-  db.prepare('INSERT INTO torch_release_history(hash,game_key,revision,previous_hash,profile_hash,body,published_at) SELECT ?,?,?,?,?,?,? WHERE (SELECT hash FROM torch_release_winners WHERE game_key=?) IS ? AND NOT EXISTS(SELECT 1 FROM torch_release_revocations WHERE profile_hash=?)').bind(...args.slice(0,9),proof.profileHash),
+  db.prepare('INSERT INTO torch_release_history(hash,game_key,revision,previous_hash,profile_hash,body,published_at) SELECT ?,?,?,?,?,?,? WHERE (SELECT hash FROM torch_release_winners WHERE game_key=?) IS ? AND NOT EXISTS(SELECT 1 FROM torch_release_revocations WHERE profile_hash=?) AND NOT EXISTS(SELECT 1 FROM seed_admin_items WHERE '+tombstone.sql+')').bind(...args.slice(0,9),proof.profileHash,...tombstone.args),
   db.prepare('INSERT INTO torch_release_winners(game_key,hash) SELECT ?,? WHERE EXISTS(SELECT 1 FROM torch_release_history WHERE hash=?) ON CONFLICT(game_key) DO UPDATE SET hash=excluded.hash WHERE torch_release_winners.hash IS ?').bind(release.key,proof.hash,proof.hash,release.previous)
  ]);
  if(!result[0]?.meta?.changes||!result[1]?.meta?.changes)reject('TORCH_STALE');
  return {hash:proof.hash,status:'published'};
 }
 export async function lookup(db,key,env){if(!gameDiff.KEY.test(key||''))return null;const r=await row(db,key);if(!r)return null;const release=await checkedRow(r,env);if((await revoked(db)).includes(release.review.candidateHash))reject('TORCH_REVOKED');
+ if(await blockedProfile(db,release.profile))reject('TORCH_REVOKED');
  const n=release.review.torchNo,c=n===0?null:await db.prepare('SELECT name FROM torch_credits WHERE torch_no=? AND game_key=?').bind(n,key).first(),name=c?cleanName(c.name,env):null;
  return {release,publication:{hash:r.hash,at:r.published_at},credit:{torchNo:n,name:name?.ok?name.name:null}};
 }
