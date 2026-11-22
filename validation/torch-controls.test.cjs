@@ -10,6 +10,8 @@ test('ground limits height but preserves travel in both horizontal axes',async()
  keepTorchCameraAboveFloor(below);keepTorchCameraAboveFloor(above);
  assert.deepEqual(below,{x:853,y:1.2,z:-917});
  assert.deepEqual(above,{x:-853,y:300,z:917});
+ const shore={x:0,y:-8,z:62};keepTorchCameraAboveFloor(shore,-4);
+ assert.deepEqual(shore,{x:0,y:-2.8,z:62});
 });
 
 test('walking damps wheel input without losing distance at either frame rate',async()=>{
