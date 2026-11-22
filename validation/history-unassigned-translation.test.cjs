@@ -46,7 +46,7 @@ test('sync updates the full legacy sentence when the transmitted text is truncat
  const add=db.prepare('INSERT INTO saved_sentences(text,translation,created_at,original) VALUES(?,?,1,?)');
  add.run(short,'Short','{}');add.run(long,'Long','{}');
  const [key,data]=[...account.kinds.sentences.collect(db)].find(([,d])=>d.translation==='Long');
- assert.equal(data.text,short);
- account.ensureState(db);account.applyRemote(db,root,'sentences',[{key,updated_at:1000,data:{...data,translation:'Revised'}}],{now:()=>1000});
+ assert.equal(data.text,long);
+ account.ensureState(db);account.applyRemote(db,root,'sentences',[{key,updated_at:1000,data:{...data,text:short,translation:'Revised'}}],{now:()=>1000});
  assert.deepEqual(db.prepare('SELECT translation FROM saved_sentences ORDER BY id').all().map(r=>r.translation),['Short','Revised']);
 });
