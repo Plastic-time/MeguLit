@@ -545,7 +545,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
 
  /* ---- view ---- */
  let viewWidth=0,viewHeight=0;
- function resize(force=false){const r=host.getBoundingClientRect();const w=Math.max(2,Math.round(r.width)),h=Math.max(2,Math.round(r.height));
+ function resize(force=false){const r=host.getBoundingClientRect();const w=Math.max(2,r.width),h=Math.max(2,r.height);
   if(!force&&w===viewWidth&&h===viewHeight)return;
   viewWidth=w;viewHeight=h;renderer.setSize(w,h,false);
   camera.aspect=w/h;camera.fov=w/h<1.45?52:44;camera.updateProjectionMatrix();

@@ -8,7 +8,8 @@
 .torch-monument .tm-canvas[data-cursor=pointer]{cursor:pointer}
 .torch-monument .tm-canvas.is-dragging{cursor:grabbing!important}
 .torch-monument .tm-canvas:focus-visible{outline:1px solid var(--tm-cold);outline-offset:-3px}
-#main.torch-page{position:relative;padding:0!important;overflow:hidden}
+#main.torch-page{position:relative;padding:0!important;overflow:clip;scrollbar-gutter:auto!important;mask:none!important}
+#main.torch-page>.torch-monument{max-width:none;margin:0;animation:none}
 .torch-monument .tm-help{position:absolute;bottom:66px;left:0;right:0;margin:0;text-align:center;font:12px/1.5 var(--font-sans,system-ui,sans-serif);color:#b5bbc6;z-index:2;pointer-events:none}
 
 .torch-monument .tm-veil{position:absolute;inset:0;background:#000;pointer-events:none;z-index:1}
