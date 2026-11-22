@@ -29,5 +29,7 @@ test('reader: a page the layer does not hide keeps the reader\'s Japanese out, a
   assert.ok(js.includes("const own = on && page.awake;"), 'only an awake page: a layer that never woke (E610) does not hide the reader');
   assert.ok(js.includes("'body.megulit-place-game-drawn.megulit-game-line-brief .sentence-window.tomoyo-hook-reader .sentence-text:not(.megulit-old-line){visibility:hidden!important}',"), 'needs no megulit-placed');
   assert.ok(js.includes("'body.megulit-place-game-drawn .sentence-window.tomoyo-hook-reader .tomoyo-cn-row{visibility:visible!important}',"), 'the translation stays');
-  assert.ok(js.includes("if (m?.elsewhere === true || !m || !Array.isArray(m.lines)) { if (pageOwn) { pageOwn = false; briefSync(false); } }") && js.includes("if (!on) { if (pageOwn) { pageOwn = false; briefSync(false); } line = null;"), 'page gone or placement off: cleared');
+  const pageHandler = js.slice(js.indexOf('b.textPlacePage ='), js.indexOf('b.textPlaceMode ='));
+  assert.match(pageHandler, /if \(m\?\.elsewhere === true \|\| !Array\.isArray\(m\?\.lines\)\)\s*\{\s*if \(pageOwn\) \{ pageOwn = false; briefSync\(false\); \}/, 'discarding a page clears its ownership');
+  assert.ok(js.slice(js.indexOf('b.textPlaceMode =')).includes("if (!on) { document.body.classList.remove('megulit-place-gone'); if (pageOwn) { pageOwn = false; briefSync(false); } line = null;"), 'turning placement off clears page ownership and the current line');
 });
