@@ -17,3 +17,12 @@ export class SeedNotifications {
  webSocketClose(socket){socket.close(1000,'closed');}
 }
 export function notifier(env){return env.SEED_NOTIFICATIONS.get(env.SEED_NOTIFICATIONS.idFromName('releases'));}
+
+export async function wakeClients(env){
+ if(!env.SEED_NOTIFICATIONS)return;
+ // Clients replay the durable log on reconnect, including after a failed broadcast.
+ try{
+  const result=await notifier(env).fetch('https://seed.internal/wake',{method:'POST'});
+  if(!result.ok)console.error('Seed notification failed',result.status);
+ }catch(error){console.error('Seed notification failed',error.message);}
+}

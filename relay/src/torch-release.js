@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import {notifier} from './seed-notifications.js';
+import {wakeClients} from './seed-notifications.js';
 import protocol from '../../core/torch-release.cjs';
 import gameDiff from '../../core/game-diff.cjs';
 import {cleanForProfile} from './seed-malware.js';
@@ -74,13 +74,7 @@ export async function torchReleaseRoute(request,env,now,url,path,{json,fail}){
   if(!env.ADAPTER_ADMIN_TOKEN||request.headers.get('authorization')!=='Bearer '+env.ADAPTER_ADMIN_TOKEN)return fail('UNAUTHORIZED',401);
   if(['/api/torch-release/propose','/api/torch-release/publish','/api/torch-release/revoke'].includes(path)&&request.method==='POST'){
    const result=await (path.endsWith('/propose')?propose:path.endsWith('/revoke')?revoke:publish)(env.DB,await input(request),env,now);
-   if(env.SEED_NOTIFICATIONS&&!path.endsWith('/propose')){
-    // The D1 commit is final. Reconnecting clients replay it even if fan-out fails.
-    try{
-     const notified=await notifier(env).fetch('https://seed.internal/wake',{method:'POST'});
-     if(!notified.ok)console.error('Seed notification failed',notified.status);
-    }catch(error){console.error('Seed notification failed',error.message);}
-   }
+   if(!path.endsWith('/propose'))await wakeClients(env);
    return json(result);
   }
   if(path==='/api/torch-release/history'&&request.method==='GET')return json(await exportHistory(env.DB,url.searchParams.get('exe')));

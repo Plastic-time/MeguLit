@@ -63,6 +63,11 @@ export async function noteUpload(env,key,reporter,credit,now){const t=sec(now);l
 export async function creditOfDiff(env,layer,key,diff,hashOf){
  if(!diff||diff.source!=='auto')return null;
  try{const h=await hashOf(diff);
+  if(layer==='version'&&diff.prints?.script){
+   const variant=await hashOf(diff,diff.prints.script);
+   const r=await env.DB.prepare("SELECT c.torch_no,c.name,c.alias,c.at FROM seed_admin_items i JOIN seed_admin_uploads u ON u.item_id=i.id JOIN torch_credits c ON c.game_key=i.game_key AND c.reporter_hash=u.reporter_tag WHERE i.kind='report' AND i.game_key=? AND i.settings_hash=? ORDER BY u.at,u.upload_id LIMIT 1").bind(key,variant).first();
+   if(r)return creditOut(r);
+  }
   const r=await env.DB.prepare('SELECT c.torch_no,c.name,c.alias,c.at FROM auto_profile_reports r JOIN torch_credits c ON c.game_key=r.game_key AND c.reporter_hash=r.reporter WHERE r.'+(layer==='version'?'game_key':'gid')+'=? AND r.settings_hash=? ORDER BY r.updated_at ASC LIMIT 1').bind(key,h).first();
   return creditOut(r);}catch{return null;}}
 

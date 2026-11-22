@@ -30,7 +30,11 @@ async function state(db,root,id,{wait=2500,fetcher=globalThis.fetch,hash,torchKe
  if(!isolated){
   const credit=layer&&feed.cleanCredit(answer.credit);
   if(credit)return {...local,state:'received',credit,receipt:null};
-  if(feed.sent(root,key)){if(wait>0)await timeout(feed.syncCredit(root,key,{fetcher}),wait);return {...local,state:'thanks',credit:feed.creditOf(root,key)};}
+  if(feed.sent(root,key)){if(wait>0)await timeout(feed.syncCredit(root,key,{fetcher}),wait);const ordinary=await feed.ordinaryState(root,key,fetcher);return {...local,state:'thanks',credit:feed.creditOf(root,key),...(ordinary?{ordinary}:{})};}
+ }
+ if(isolated&&feed.calibrationSharing(root)&&feed.sent(root,key)){
+  const ordinary=await feed.ordinaryState(root,key,fetcher);
+  return {...local,state:'thanks',isolated:true,...(ordinary?{ordinary}:{})};
  }
  const age=Date.now()-pending?.checkedAt;
  // A confirmed miss can outlive a subsequent publication.
@@ -40,7 +44,7 @@ async function state(db,root,id,{wait=2500,fetcher=globalThis.fetch,hash,torchKe
  const engine=engineKnown(seed?.engine||storedEngine);
  if(!engine)return seed||isolated?{...local,state:'not-published'}:inactiveCard;
  if(isolated||seed){
-  return {...local,state:'not-published',eligible:true,submission:isolated?'isolated':'bundled'};
+  return {...local,state:'not-published',eligible:true,submission:isolated?(feed.calibrationSharing(root)?'isolated-sharing':'isolated'):'bundled'};
  }
  if(hasGameSeed(row,engine,key))return inactiveCard;
  return {...local,state:feed.sharing(root)?'first':'off',eligible:true};}

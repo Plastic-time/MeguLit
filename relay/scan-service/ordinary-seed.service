@@ -1,0 +1,19 @@
+[Unit]
+Description=MeguLit ordinary Seed scanner and signer
+After=network.target
+
+[Service]
+User=megulit-seed
+Group=megulit-seed
+WorkingDirectory=/opt/megulit
+EnvironmentFile=/etc/megulit/ordinary-seed.env
+ExecStart=/usr/bin/node /opt/megulit/relay/scan-service/server.cjs
+Restart=on-failure
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

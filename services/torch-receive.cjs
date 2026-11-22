@@ -31,16 +31,17 @@ async function installed(root,key,{keys=trust(),exe}={}){const answer=feed.cache
  if(answer.torchRelease){try{const p=await protocol.checked(answer.torchRelease,keys);if(answer.torchRelease.key!==key||!protocol.same(answer.diff,answer.torchRelease.profile))return null;return {version:1,status:'installed',verified:true,origin:'torch-release',key,...(answer.diff.evidence?{evidence:answer.diff.evidence,...(installedLayer.capabilityStatus?{capabilityStatus:installedLayer.capabilityStatus}:{})}:{}),hash:p.hash,serverTime:answer.torchPublication?.hash===p.hash&&protocol.iso(answer.torchPublication.at)?answer.torchPublication.at:null,credit:credit(answer.torchCredit,answer.torchRelease.review.torchNo),revision:answer.torchRelease.revision,cardinalRev:answer.torchRelease.review.cardinalRev};}catch{return null;}}
  const p=exactProfile(answer,key);if(p&&Number.isSafeInteger(p.rev)&&p.rev>0){
   const attribution=p.source==='auto'&&answer.versionLayer?.match==='exe'&&answer.versionLayer.key===key?feed.cleanCredit(answer.versionLayer.credit):null;
-  return {version:1,status:'installed',verified:true,origin:'legacy-feed',key,hash:await protocol.hash({profile:p,gameLayer:answer.gameLayer||null}),serverTime:null,credit:attribution,revision:p.rev,cardinalRev:null};
+  const ordinary=require('../core/ordinary-seed.cjs').signed(p);
+  return {version:1,status:'installed',verified:true,origin:ordinary?'ordinary-seed':'legacy-feed',key,hash:await protocol.hash(ordinary?p:{profile:p,gameLayer:answer.gameLayer||null}),serverTime:null,credit:attribution,revision:p.rev,cardinalRev:null};
  }
  return null;}
-function receiveEndpoints(root,key,legacy=false,env=process.env){
+function receiveEndpoints(root,key,legacy=false,env=process.env,script=''){
  if(!diff.KEY.test(String(key||'')))return [];
- const route=legacy?'/api/game-profile'+feed.query(key,{exe:key},null):'/api/torch-release?exe='+key;
+ const q=new URLSearchParams(feed.query(key,{exe:key,script},legacy?feed.cached(root,key):null));q.delete('have');q.delete('haveGame');
+ const route=legacy?'/api/game-profile?'+q:'/api/torch-release?exe='+key;
  const relay=require('./relay-config.cjs');
  if(!require('../core/owner-tests.cjs').privateMode(root,env))return relay.endpoints(root,route,env);
- if(env.MEGULIT_OWNER_TORCH_RECEIVE!=='1'||env.MEGULIT_OFFLINE==='1'||env.MEGULIT_CARDINAL_REPLAY==='1')return [];
- return [relay.CN_RELAY_BASE+route,relay.DEFAULT_RELAY_BASE+route];
+ return relay.seedBases(root,'receive',env).map(base=>base+route);
 }
 async function queryRelay(url,fetcher,signal,{release,strict}){
  let response;
@@ -51,12 +52,13 @@ async function queryRelay(url,fetcher,signal,{release,strict}){
   try{return {state:'found',answer:await body(response)};}
   catch(e){signal.throwIfAborted();return e.code?{state:'rejected',code:e.code}:{state:'unavailable'};}
  }
- if(status===404||release&&[409,410,422].includes(status)){
+ if(status===404||status===410||release&&[409,422].includes(status)){
   let answer;
   try{answer=await body(response);}catch{signal.throwIfAborted();}
   const code=answer?.ok===false?answer.error:null;
   if(status===404&&(code==='NOT_FOUND'||!strict))return {state:'missing',confirmed:code==='NOT_FOUND'};
-  if(status===410&&(code==='TORCH_REVOKED'||!strict))return {state:'revoked',answer};
+  if(!release&&status===410&&code==='ORDINARY_REVOKED'&&answer.hash===new URL(url).searchParams.get('ordinary'))return {state:'ordinary-revoked',hash:answer.hash};
+  if(release&&status===410&&(code==='TORCH_REVOKED'||!strict))return {state:'revoked',answer};
   if([409,422].includes(status)&&/^TORCH_[A-Z_]+$/.test(code||''))return {state:'rejected',code};
  }else await response.body?.cancel().catch(()=>{});
  return {state:'unavailable'};
@@ -73,6 +75,7 @@ async function lookup(urls,fetcher,signal,{release=false,ownerTest=false,accept,
   signed.sort((a,b)=>b.revision-a.revision);
   return {state:'revoked',release:signed[0]};
  }
+ const withdrawn=results.find(r=>r.state==='ordinary-revoked');if(withdrawn)return withdrawn;
  const rejected=results.find(r=>r.state==='rejected');
  if(rejected)fail(rejected.code);
  const found=results.filter(r=>r.state==='found');
@@ -94,14 +97,14 @@ async function checkedRelease(answer,key,keys){
  if(p?.hash!==proof.hash||!protocol.iso(p.at)||Date.parse(p.at)<Date.parse(release.preparedAt)||Date.parse(p.at)>Date.now()+300000)fail('TORCH_PUBLICATION');
  return {answer,proof,revision:release.revision,document:release};
 }
-function checkedLegacy(answer,key,ownerTest){
+function checkedLegacy(answer,key,ownerTest,script){
  if(!answer||Object.keys(answer).some(k=>k.startsWith('torch')))fail('TORCH_RESPONSE');
- const layer=feed.layer(answer,key);
+ const layer=feed.layer(answer,key,{script});
  if(!layer)fail('TORCH_RESPONSE');
  const exact=ownerTest?{schema:answer.schema,version:1,key,diff:answer.version===2
   ? (answer.versionLayer?.match==='exe'&&answer.versionLayer.key===key?answer.versionLayer.diff:null)
   : answer.diff}:answer;
- const document=(ownerTest?feed.layer(exact,key):layer)?.exact?exactProfile(exact,key):null;
+ const document=(ownerTest?feed.layer(exact,key,{script}):layer)?.exact?exactProfile(exact,key):null;
  return {answer:{...exact,fetchedAt:Date.now()},document,revision:document?.rev||0};
 }
 function status(root,id){return states.get(idKey(root,id))||null;}
@@ -148,12 +151,25 @@ async function receive(root,id,options={}){const jobKey=idKey(root,id);if(jobs.h
     const old=feed.cached(root,key);
     if(old?.torchQuarantined)fail('TORCH_REVOKED');
     if(!old?.torchRelease){
-     const fallback=options.refresh?{answer:await options.refresh(root,key,{fetcher,signal})}:await lookup(receiveEndpoints(root,key,true),fetcher,signal,{ownerTest,accept:answer=>checkedLegacy(answer,key,ownerTest)});
+     const script=require('./original-text.cjs').contributionScript(root,exe,id);
+     const fetchFallback=()=>lookup(receiveEndpoints(root,key,true,process.env,script),fetcher,signal,{ownerTest,accept:answer=>checkedLegacy(answer,key,ownerTest,script)});
+     let fallback=options.refresh?{answer:await options.refresh(root,key,{fetcher,signal})}:await fetchFallback();
+     if(fallback.state==='ordinary-revoked'){
+      still();
+      if(!feed.revokeOrdinary(root,key,fallback.hash))fail('TORCH_RELAY_UNAVAILABLE');
+      require('./self-check-live.cjs').stageSeed(root,key);
+      // A later publication may already be in the same replay page as this withdrawal.
+      fallback=await fetchFallback();
+      if(fallback.state!=='found')fail('TORCH_REVOKED');
+     }
      missing=result.confirmed&&fallback.state==='missing'&&fallback.confirmed;
      const answer=fallback.answer,p=exactProfile(answer,key),latest=feed.cached(root,key),prior=exactProfile(latest,key);
-     if(!latest?.torchRelease&&!latest?.torchQuarantined&&answer&&!answer.none&&feed.layer(answer,key)?.exact&&p&&Number.isSafeInteger(p.rev)&&p.rev>0){
+     if(!latest?.torchRelease&&!latest?.torchQuarantined&&answer&&!answer.none&&feed.layer(answer,key,{script})?.exact&&p&&Number.isSafeInteger(p.rev)&&p.rev>0){
+      if(!feed.ordinaryAllowed(root,key,p))fail('TORCH_REVOKED');
       if(prior&&(p.rev<prior.rev||p.rev===prior.rev&&!protocol.same(p,prior)))fail('TORCH_ROLLBACK');
-      still();(options.atomicWrite||atomic)(path.join(feed.dir(root),key+'.json'),{...answer,torchInstalled:true});
+      still();if(script!==require('./original-text.cjs').contributionScript(root,exe,id))fail('TORCH_SCRIPT_IDENTITY');
+      (options.atomicWrite||atomic)(path.join(feed.dir(root),key+'.json'),{...answer,torchInstalled:true});
+      if(require('../core/ordinary-seed.cjs').signed(p))require('./self-check-live.cjs').stageSeed(root,key);
      }
     }
    }

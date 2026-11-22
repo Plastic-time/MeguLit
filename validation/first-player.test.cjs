@@ -57,7 +57,7 @@ for(const isolated of [false,true])test('Fata exact Seed and public eligibility 
  }
  await receive((url,request)=>{assert.equal(new URL(url).search,'?exe='+key);assert.equal(request.method,'GET');return none();});
  const result=await fp.state(db,root,'7',opts);
- assert.deepEqual(result,{state:'not-published',key,bundled:{source:'official',revision:require('../core/profiles/seed.cjs').versionOf(key).rev},eligible:true,submission:isolated?'isolated':'bundled'});
+ assert.deepEqual(result,{state:'not-published',key,bundled:{source:'official',revision:require('../core/profiles/seed.cjs').versionOf(key).rev},eligible:true,submission:isolated?'isolated-sharing':'bundled'});
  assert.equal(fs.existsSync(feed.dir(root)),false);
 });
 test('this PC uploaded its calibration -> thanks, whatever the relay says now',async()=>{const {root,db,exe}=setup();const key=await auto.exeKey(root,exe);assert.equal(feed.sent(root,key),false);feed.markSent(root,key);

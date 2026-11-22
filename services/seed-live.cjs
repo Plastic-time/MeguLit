@@ -21,7 +21,7 @@ async function reconcile(root,rows,signal){
 
 function subscribe(root,{base,Socket=globalThis.WebSocket,fetcher=fetch,apply=reconcile}={}){
  if(!Socket||process.env.MEGULIT_OFFLINE==='1'||process.env.MEGULIT_CARDINAL_REPLAY==='1')return;
- const bases=base?[base]:relay.endpoints(root,'');
+ const bases=base?[base]:relay.seedBases(root,'receive');
  if(!bases.length)return;
  const owner=new AbortController();
  let cursor=0;

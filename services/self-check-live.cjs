@@ -98,7 +98,7 @@ function bindKey(s,key){const {reader}=s;s.key=key;const script=require('./origi
  /* the relay's copy is refreshed in the background (hot update: a new diff applies at once) */
  /* the relay is asked with every fingerprint (core/game-print.cjs): exe, head, pe, main archive, Steam, VNDB, title, engine */
  if(!s.skipFeed)new Promise(res=>setImmediate(()=>{try{s.prints=require('../core/game-print.cjs').prints(s.exe,{exe:key,script,title:s.input?.title||'',steamAppId:s.input?.steamAppId||'',vndb:s.input?.vndb||'',engine:s.input?.engine||s.profile?.engine||''});}catch{s.prints={exe:key,script};}res(s.prints);}))
-  .then(prints=>feed.refresh(reader.root,key,{prints,exe:s.exe})).then(v=>{if(live!==s)return;const l=feed.layer(v,key,{exe:s.exe,script});if(l?.torchBound){stageSeed(reader.root,key);return;}if(!l||s.shared?.torchBound||feed.cached(reader.root,key)?.torchQuarantined||feed.rejected(reader.root,key,l)||JSON.stringify(l)===JSON.stringify(s.shared))return;s.shared=l;const before=s.from;settle(s);
+  .then(prints=>feed.refresh(reader.root,key,{prints,exe:s.exe})).then(v=>{if(live!==s)return;const l=feed.layer(v,key,{exe:s.exe,script});if(l?.torchBound||l?.ordinaryHash||s.shared?.ordinaryHash&&!l){stageSeed(reader.root,key);return;}if(!l||s.shared?.torchBound||feed.cached(reader.root,key)?.torchQuarantined||feed.rejected(reader.root,key,l)||JSON.stringify(l)===JSON.stringify(s.shared))return;s.shared=l;const before=s.from;settle(s);
   if(s.from!==before||s.from==='official'||s.from==='shared'){hookTrace(reader,'selfCheck fetched key='+key+' '+l.source+' match='+l.match+' mode='+l.mode+' layer='+(s.from||'none'));applyLayer(s);}}).catch(()=>{});
  /* a window that closed before the key was known */
  if(s.pending){const r=s.pending;s.pending=null;windowDone(s,r);}}
@@ -170,9 +170,11 @@ function seedBoundary(reader,message){
  if(!s.seedPending)return;
  const answer=feed.cached(reader.root,s.key);
  const shared=feed.layer(answer,s.key,{exe:s.exe});
- if(!answer?.torchQuarantined&&(!shared?.torchBound||feed.rejected(reader.root,s.key,shared)))return;
+ const previousOrdinary=s.shared?.ordinaryHash;
+ if(!answer?.torchQuarantined&&!shared?.torchBound&&!shared?.ordinaryHash&&!previousOrdinary)return;
+ if(shared&&feed.rejected(reader.root,s.key,shared))return;
  s.seedPending=false;
- const applied=answer.torchPublication?.hash||'revoked';
+ const applied=answer?.torchPublication?.hash||shared?.ordinaryHash||shared?.stamp||'revoked';
  if(s.seedApplied===applied)return;
  s.seedApplied=applied;
  const previous=s.profile;

@@ -18,8 +18,14 @@ function insertion(db,id,v,now){return db.prepare('INSERT OR IGNORE INTO seed_ad
 async function put(db,v,now){const id=await itemId(v);await insertion(db,id,v,now).run();return id;}
 const queueLane=r=>r.layer==='version'&&!r.published&&['report','pick','repository'].includes(r.kind)&&['pending','reviewing'].includes(r.state)?'version-retest':null;
 export async function reportAllowed(db,key,settingsHash){const r=await db.prepare("SELECT id FROM seed_admin_items WHERE kind='report' AND game_key=? AND settings_hash=? AND state='deleted' LIMIT 1").bind(key,settingsHash).first();return !r;}
-export async function noteSeedUpload(db,r,settingsHash,reporter,torchNo,now){if(!await reportAllowed(db,r.key,settingsHash))reject('SEED_DELETED',410);const id=await put(db,{kind:'report',key:r.key,settingsHash,body:{mode:r.mode,settings:r.settings,...(r.prints?.script?{script:r.prints.script}:{})},engine:r.engine,torchNo,uploadedAt:now.toISOString()},now);await db.prepare('INSERT INTO seed_admin_uploads(upload_id,item_id,reporter_tag,at) VALUES(?,?,?,?)').bind(crypto.randomUUID(),id,reporter,now.toISOString()).run();return id;}
-export async function profileBlock(profile,{profileHash=null,proposal=false}={}){return {sql:"state='deleted' AND layer=? AND game_key=? AND (profile_hash=? OR (settings_hash=? AND (kind='report' OR (kind='pick' AND seed_rev=?))))",args:[profile.layer||'version',profile.key,profileHash||await hash(profile),(await hash((profile.mode||'')+'|'+diff.canonical(profile.settings||{}))).slice(0,32),String(profile.rev??'')]};}
+export async function noteSeedUpload(db,r,settingsHash,reporter,torchNo,now,uploadId=crypto.randomUUID()){if(!await reportAllowed(db,r.key,settingsHash))reject('SEED_DELETED',410);const id=await put(db,{kind:'report',key:r.key,settingsHash,body:{mode:r.mode,settings:r.settings,...(r.prints?.script?{script:r.prints.script}:{})},engine:r.engine,torchNo,uploadedAt:now.toISOString()},now);await db.prepare('INSERT INTO seed_admin_uploads(upload_id,item_id,reporter_tag,at) VALUES(?,?,?,?) ON CONFLICT(upload_id) DO NOTHING').bind(uploadId,id,reporter,now.toISOString()).run();return id;}
+export async function profileBlock(profile,{profileHash=null}={}){
+ const settings=(profile.mode||'')+'|'+diff.canonical(profile.settings||{});
+ const legacy=(await hash(settings)).slice(0,32);
+ const variant=profile.source==='auto'&&profile.prints?.script?(await hash(settings+'|'+profile.prints.script)).slice(0,32):legacy;
+ return {sql:"state='deleted' AND layer=? AND game_key=? AND (profile_hash=? OR (settings_hash IN (?,?) AND (kind='report' OR (kind='pick' AND seed_rev=?))))",
+  args:[profile.layer||'version',profile.key,profileHash||await hash(profile),legacy,variant,String(profile.rev??'')]};
+}
 export async function blockedProfile(db,profile,options={}){const b=await profileBlock(profile,options);return !!await db.prepare('SELECT id FROM seed_admin_items WHERE '+b.sql+' LIMIT 1').bind(...b.args).first();}
 export async function blockedProposal(db,release){return !!await db.prepare("SELECT id FROM seed_admin_items WHERE state='deleted' AND kind='proposal' AND game_key=? AND profile_hash=? LIMIT 1").bind(release.key,await hash(release.profile)).first();}
 export async function syncCatalog(db,now=new Date()){

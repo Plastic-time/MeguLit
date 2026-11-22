@@ -31,6 +31,7 @@ import {notifier} from './seed-notifications.js';
 import {torchReleaseRoute} from './torch-release.js';
 import {seedMalwareRoute} from './seed-malware.js';
 import {seedAdminRoute,seedUsageRoute} from './seed-admin.js';
+import {retryJobs} from './ordinary-seed.js';
 import {monumentGet,monthsGet,findGet,meGet} from './torch-credit.js';
 
 /* requests per window; key prefix → [limit, seconds] */
@@ -319,7 +320,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
   else if(path==='/api/torch-release/events'&&request.method==='GET')return notifier(env).fetch(request);
   else if(path==='/api/torch-release'||path.startsWith('/api/torch-release/'))response=await torchReleaseRoute(request,env,now,url,path,{json,fail})||fail('NOT_FOUND',404);
   else if(path.startsWith('/api/cardinal/'))response=await cardinalRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
-  else if(path==='/api/game-profile'||path.startsWith('/api/game-profile/'))response=await profileRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
+  else if(path==='/api/game-profile'||path.startsWith('/api/game-profile/'))response=await profileRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON,ctx})||fail('NOT_FOUND',404);
   else if(path.startsWith('/api/adapters/')||path==='/api/probe'||path.startsWith('/api/probe/'))response=await adaptersRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else response=fail('NOT_FOUND',404);
   /* 2026-11-16 live-usage pulse: a MeguLit client touched the relay (probe-stats.js); aggregate, no identity kept */
@@ -331,6 +332,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
 }
 /* Cron (wrangler.toml [triggers]): Monday 00:00 UTC+8 settles last week's hot words. */
 export async function scheduled(event,env,ctx){
+ if(event?.cron==='*/30 * * * *'&&env.ORDINARY_SCAN_URL){const retry=retryJobs(env,new Date(event.scheduledTime||Date.now()));if(ctx?.waitUntil)ctx.waitUntil(retry);else await retry;}
  /* every 30 minutes: website feedback still waiting for its GitHub issue; the weekly cron settles hot words */
  if(event?.cron==='20 21 * * *'){const job=refreshDaily(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
  if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncYui(env).catch(()=>0),syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null),cleanupForumImages(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupContrib(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeFull(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeStats(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),refreshSeedStatsSafe(env,new Date(event?.scheduledTime||Date.now()))]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}

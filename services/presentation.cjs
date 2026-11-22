@@ -25,7 +25,7 @@ async function confirm(db,root,{id,key,mode}){
  const record=auto.load(root,key,script);
  if(record){
   const feed=require('./auto-profile-feed.cjs');
-  if(feed.sharing(root)){
+  if(feed.calibrationSharing(root)){
    const prints={...((live?.exe===row.executable&&live.prints)||require('../core/game-print.cjs').prints(row.executable,{exe:key,engine:record.engine})),script};
    await feed.report(root,record,{prints});
   }

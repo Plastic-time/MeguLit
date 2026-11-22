@@ -59,13 +59,13 @@ All of these must hold before a grant is resolved or used
 - `data`, `data/config`, `cache`, `logs`, any existing database and configuration sources remain inside the root without reparse paths; shared hard-linked state/config files are refused
 - No `data/config/secrets.dpapi` or `data/secrets.dpapi` is present
 
-Private mode separately suppresses MeguLit relay, runtime sample, profile report and adaptation sync, even if a user changes a sharing preference during the test
+Private mode separately suppresses MeguLit relay, runtime sample, general profile reports and adaptation sync, even if a user changes a sharing preference during the test
 It does not suppress translation providers or dictionaries
 The launcher must clear inherited provider credentials and old root overrides and use its own TEMP/TMP directory
 This isolates MeguLit's data, settings, database, caches and logs
 It does not isolate an external game's saves, registry or Steam Cloud; the game catalog must state whether a game uses its existing save or a separately verified fixture
 
-The owner-test launcher enables read-only flame reception. Import a game or open its details to query the two official relay hosts. The queries send only the executable SHA-256 as game identity. The client verifies the signed release and local executable and script identity, then stores the result under the isolated root's `data/The Seed`. The legacy fallback accepts an exact signed executable profile with unknown publication time and source.
+The owner-test launcher enables signed flame reception, live updates and ordinary Seed submission. Only eligible calibration settings, executable hash, mode and an optional script fingerprint go to the report endpoint. Credit changes, scores, runtime packages and other production writes remain disabled. Import a game or open its details to query the two official relay hosts. The reviewed release query sends the executable SHA-256. The ordinary fallback also sends an available local script fingerprint and a cached ordinary artifact hash to check withdrawal. The client verifies the signed release and local executable and script identity, then stores the result under the isolated root's `data/The Seed`. The legacy fallback accepts an exact signed executable profile with unknown publication time and source.
 
 For manual acceptance, use a game version with a known published release. Wait for the installed receipt in the game details, then launch from the isolated library and check the applied adaptation. Keep the isolated `logs/reader-host.log` if the profile differs. Both lookup routes must return the relay's `NOT_FOUND` response before the card says no adaptation is available. If the relay cannot answer, the card shows that the lookup failed and retries later.
 

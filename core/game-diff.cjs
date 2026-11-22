@@ -14,7 +14,7 @@
    the app trusts the public keys of services/profile-keys.json.
    A document whose settings needed any cleaning is refused whole: a signer never signs anything the kernel does not know. */
 const {clean,split}=require('./profiles/domains.cjs');
-const gamePrint=require('./game-print.cjs');
+const gamePrint=require('./game-print-schema.cjs');
 const KEY=/^[0-9a-f]{64}$/;
 function canonical(v){if(Array.isArray(v))return '['+v.map(canonical).join(',')+']';if(v&&typeof v==='object')return '{'+Object.keys(v).filter(k=>v[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+canonical(v[k])).join(',')+'}';return JSON.stringify(v);}
 const unsigned=d=>{const {signature,...rest}=d||{};return rest;};

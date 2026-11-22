@@ -38,8 +38,12 @@
    half of the reporters ended in read mode and at least AGREE did; otherwise the hide group with the lowest mean cost among the
    groups of at least AGREE reporters. A single report is never picked. Each new pick of a key gets the next rev. */
 import gameDiff from '../../core/game-diff.cjs';
+import {wakeClients} from './seed-notifications.js';
+import ordinary from '../../core/ordinary-seed.cjs';
+import {boundedJSON, enqueue, processJob, status as ordinaryStatus} from './ordinary-seed.js';
+import protocol from '../../core/torch-release.cjs';
 import domains from '../../core/profiles/domains.cjs';
-import gamePrint from '../../core/game-print.cjs';
+import gamePrint from '../../core/game-print-schema.cjs';
 import {parseCredit,noteUpload,creditOfDiff,creditPut} from './torch-credit.js';
 import {cleanForProfile} from './seed-malware.js';
 import {reportAllowed,noteSeedUpload,blockedProfile,profileBlock,retestOrder} from './seed-admin.js';
@@ -90,10 +94,21 @@ async function gidFor(env,prints){for(const k of GAME_KINDS){const g=await print
 /* the best key of a layer for the client's prints, with the print that found it */
 /* a build already filed under a game finds that game by its exe hash first */
 async function find(env,layer,prints){const kinds=layer==='version'?VERSION_KINDS:['script','exe',...GAME_KINDS.filter(k=>k!=='script')];
- for(const k of kinds){if(!prints[k])continue;const key=layer==='version'&&k==='exe'?prints.exe:await printKey(env,k,prints[k],layer);if(!key)continue;const d=await best(env,layer,key);if(d&&!(d.source==='auto'&&d.prints?.script&&d.prints.script!==prints.script))return {match:k,key,diff:d};}
+ for(const k of kinds){
+  if(!prints[k])continue;
+  const key=layer==='version'&&k==='exe'?prints.exe:await printKey(env,k,prints[k],layer);
+  if(!key)continue;
+  const d=await best(env,layer,key);
+  if(!d||d.source==='auto'&&d.prints?.script&&d.prints.script!==prints.script)continue;
+  if(ordinary.signed(d)&&(layer!=='version'||k!=='exe'||key!==prints.exe||(d.prints?.script||'')!==(prints.script||'')))continue;
+  return {match:k,key,diff:d};
+ }
  return null;}
 async function best(env,layer,key){const rows=(await env.DB.prepare('SELECT source,body FROM game_diffs WHERE layer=? AND game_key=? AND withdrawn_at IS NULL').bind(layer,key).all()).results||[];
- const row=rows.find(r=>r.source==='official')||rows.find(r=>r.source==='auto');if(!row)return null;let document;try{document=JSON.parse(row.body);}catch{return null;}return await blockedProfile(env.DB,document)?null:document;}
+ const row=rows.find(r=>r.source==='official')||rows.find(r=>r.source==='auto');if(!row)return null;let document;try{document=JSON.parse(row.body);}catch{return null;}
+ if(ordinary.signed(document)&&await ordinaryBlocked(env.DB,await protocol.hash(document)))return null;
+ return await blockedProfile(env.DB,document)?null:document;}
+async function ordinaryBlocked(db,hash){return !!await db.prepare("SELECT 1 FROM torch_release_revocations WHERE profile_hash=? UNION ALL SELECT 1 FROM seed_malware_current WHERE profile_hash=? AND state='infected' LIMIT 1").bind(hash,hash).first();}
 
 /* ---- picks ---------------------------------------------------------------------------------------------------------- */
 async function settle(env,layer,key,now){const since=sec(now)-PROFILE_LIMITS.keepDays*86400;
@@ -112,12 +127,18 @@ async function settle(env,layer,key,now){const since=sec(now)-PROFILE_LIMITS.kee
  return p;}
 
 /* ---- public --------------------------------------------------------------------------------------------------------- */
-async function report(request,env,ip,now,{json,fail,readJSON}){
- const body=await readJSON(request,PROFILE_LIMITS.body);if(body.error)return fail(body.error,body.error==='PAYLOAD_TOO_LARGE'?413:400);
+async function report(request,env,ip,now,{json,fail,ctx}){
+ const body=await boundedJSON(request,PROFILE_LIMITS.body);if(body.error)return fail(body.error,body.error==='PAYLOAD_TOO_LARGE'?413:400);
+ let candidate=body.value?.ordinary===undefined?null:ordinary.normalize(body.value.ordinary);
+ if(body.value?.ordinary!==undefined&&(!candidate||candidate.key!==body.value.profile?.key||candidate.mode!==body.value.profile?.mode))return fail('INVALID_ORDINARY_SEED',422);
+ const script=(body.value?.prints||body.value?.profile?.prints)?.script;
+ if(candidate&&(candidate.prints||script!=null&&script!==''&&(typeof script!=='string'||!KEY.test(script))))return fail('INVALID_ORDINARY_SEED',422);
+ if(candidate){const original=ordinary.normalize({key:candidate.key,mode:candidate.mode,settings:body.value.profile.settings});if(!original||canonical(original)!==canonical(candidate))return fail('INVALID_ORDINARY_SEED',422);}
  const v=validateReport(body.value);if(!v.ok)return fail(v.error);const r=v.value,t=sec(now);
  /* 2026-11-21 传火署名: credit:{name?} next to profile (or inside it); refused whole when it is not a clean name (relay/src/torch-credit.js) */
  const cr=parseCredit(body.value.credit!==undefined?body.value.credit:body.value.profile?.credit,env);if(!cr.ok)return fail('INVALID_CREDIT');
  const variant=r.prints.script||'';
+ if(candidate&&variant)candidate={...candidate,prints:{script:variant}};
  const hash=(await sha256(r.mode+'|'+canonical(r.settings)+(variant?'|'+variant:''))).slice(0,32);
  if(!await reportAllowed(env.DB,r.key,hash))return fail('SEED_DELETED',410);
  const gid=variant?await sha256('game|script:'+variant):await gidFor(env,r.prints);
@@ -126,20 +147,29 @@ async function report(request,env,ip,now,{json,fail,readJSON}){
  await env.DB.prepare('DELETE FROM auto_profile_reports WHERE game_key=? AND reporter NOT IN (SELECT reporter FROM auto_profile_reports WHERE game_key=? ORDER BY updated_at DESC LIMIT ?)').bind(r.key,r.key,PROFILE_LIMITS.reportsPerKey).run();
  await register(env,'version',r.key,r.prints,['head','pe'],t);if(gid)await register(env,'game',gid,r.prints,['exe',...GAME_KINDS],t);
  const credit=await noteUpload(env,r.key,ip,cr,now);
- await noteSeedUpload(env.DB,r,hash,ip,credit.torchNo,now);
+ const uploadId=candidate?await protocol.hash({ordinary:candidate,reporter:ip}):undefined;
+ await noteSeedUpload(env.DB,r,hash,ip,credit.torchNo,now,uploadId);
  /* 2026-11-21 kind: 'newVersion' = a shared diff found by head / pe / the game (not this exe) failed its first window here (the
     client's reason starts 「同游戏新版本」): this build needs its own version layer; 'broken' = the self-check stepped it down */
  if(r.source==='gate'){const kind=r.reason.startsWith('同游戏新版本')?'newVersion':'broken';await env.DB.prepare("INSERT INTO auto_profile_queue(game_key,gid,prints,exe,engine,reasons,note,kind,reporters,app,first_at,last_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?) ON CONFLICT(game_key) DO UPDATE SET gid=excluded.gid,prints=excluded.prints,exe=excluded.exe,engine=excluded.engine,reasons=excluded.reasons,note=excluded.note,kind=excluded.kind,reporters=auto_profile_queue.reporters+1,app=excluded.app,last_at=excluded.last_at,closed_at=NULL")
   .bind(r.key,gid,JSON.stringify(r.prints),r.exe,r.engine,JSON.stringify(r.over),r.reason,kind,r.app,t,t).run();}
  await settle(env,'version',r.key,now);if(gid)await settle(env,'game',gid,now);
- return json({ok:true,queued:r.source==='gate',game:gid||null,torchNo:credit.torchNo,name:credit.name,at:credit.at,credit},201);}
+ let job=null;
+ if(candidate){job=await enqueue(env.DB,candidate,now);if(job.state==='pending'&&env.ORDINARY_SCAN_URL&&ctx?.waitUntil)ctx.waitUntil(processJob(env,job.id,now));}
+ return json({ok:true,...(job?{ordinary:job}:{}),queued:r.source==='gate',game:gid||null,torchNo:credit.torchNo,name:credit.name,at:credit.at,credit},201);}
 async function lookup(env,url,exeFromPath,{json,fail}){const q=Object.fromEntries(['exe','head','pe','pack','script','steam','vndb','title'].map(k=>[k,url.searchParams.get(k)||'']));if(exeFromPath)q.exe=exeFromPath;
  const prints=gamePrint.check(q);if(!Object.keys(prints).length)return fail('NO_PRINTS',400);
+ const previous=url.searchParams.get('ordinary');
+ if(prints.exe&&KEY.test(previous||'')){
+  const old=await env.DB.prepare("SELECT revision,state FROM ordinary_seed_jobs WHERE game_key=? AND profile_hash=?").bind(prints.exe,previous).first();
+  if(old&&(old.state==='blocked'||await ordinaryBlocked(env.DB,previous)))
+   return json({ok:false,error:'ORDINARY_REVOKED',hash:previous},410,{'cache-control':'no-store'});
+ }
  const version=await find(env,'version',prints),game=await find(env,'game',prints);
  if(!version&&!game)return fail('NOT_FOUND',404,{'cache-control':'public, max-age=900'});
  const have=url.searchParams.get('have'),haveGame=url.searchParams.get('haveGame');
  if((have!==null||haveGame!==null)&&String(version?.diff?.rev??'')===String(have??'')&&String(game?.diff?.rev??'')===String(haveGame??''))return new Response(null,{status:304,headers:{'cache-control':'public, max-age=3600'}});
- const hashOf=async d=>(await sha256(d.mode+'|'+canonical(d.settings))).slice(0,32);
+ const hashOf=async(d,script)=>(await sha256(d.mode+'|'+canonical(d.settings)+(script?'|'+script:''))).slice(0,32);
  if(version)version.credit=await creditOfDiff(env,'version',version.key,version.diff,hashOf);if(game)game.credit=await creditOfDiff(env,'game',game.key,game.diff,hashOf);
  const out=x=>x?{match:x.match,key:x.key,diff:x.diff,credit:x.credit}:null;const top=version||game;
  return json({schema:'megulit.game-diff-feed',version:2,key:prints.exe||'',match:top.match,versionLayer:out(version),gameLayer:out(game),diff:top.diff,credit:top.credit},200,{'cache-control':'public, max-age=3600'});}
@@ -176,7 +206,11 @@ async function signedPost(request,env,now,{json,fail,readJSON}){const body=await
   else await env.DB.prepare("UPDATE auto_profile_queue SET closed_at=? WHERE gid=? AND kind<>'newVersion' AND closed_at IS NULL").bind(t,d.key).run();/* a build that needs its own version layer stays open */}
  return json({ok:true,key:d.key,layer,source:d.source},201);}
 async function withdraw(request,env,now,{json,fail,readJSON}){const body=await readJSON(request,4096);const v=body.value||{},key=String(v.key||''),source=v.source==='auto'?'auto':'official',layer=v.layer==='game'?'game':'version';if(!KEY.test(key))return fail('INVALID_KEY');
- await env.DB.prepare('UPDATE game_diffs SET withdrawn_at=? WHERE layer=? AND game_key=? AND source=?').bind(sec(now),layer,key,source).run();return json({ok:true});}
+ const update=env.DB.prepare('UPDATE game_diffs SET withdrawn_at=? WHERE layer=? AND game_key=? AND source=?').bind(sec(now),layer,key,source);
+ if(source==='auto'&&layer==='version'){
+  const [job]=await env.DB.batch([env.DB.prepare("UPDATE ordinary_seed_jobs SET state='blocked' WHERE game_key=? AND state='published' AND revision=(SELECT rev FROM game_diffs WHERE layer='version' AND game_key=? AND source='auto')").bind(key,key),update]);
+  if(job.meta.changes)await wakeClients(env);
+ }else await update.run();return json({ok:true});}
 async function queueGet(env,url,{json}){const all=url.searchParams.get('all')==='1';
  const rows=(await env.DB.prepare('SELECT game_key,gid,prints,exe,engine,reasons,note,kind,reporters,app,first_at,last_at,closed_at FROM auto_profile_queue'+(all?'':' WHERE closed_at IS NULL')+' ORDER BY last_at DESC LIMIT ?').bind(PROFILE_LIMITS.queue).all()).results||[];
  const j=(s,f)=>{try{return JSON.parse(s);}catch{return f;}};
@@ -197,6 +231,7 @@ const OURS={'/api/game-profile/picks':['GET',picksGet,'q'],'/api/game-profile/qu
  '/api/game-profile/signed':['POST',signedPost,'b'],'/api/game-profile/withdraw':['POST',withdraw,'b'],'/api/game-profile/queue/close':['POST',queueClose,'b']};
 /* router; null when the path is not one of these */
 export async function profileRoute(request,env,ip,now,url,path,deps){const {fail,hit}=deps,m=request.method;
+ if(path==='/api/game-profile/ordinary-status'){const id=url.searchParams.get('id');if(m!=='GET'||!KEY.test(id||''))return fail('INVALID_REQUEST',400);const job=await ordinaryStatus(env.DB,id);return job?deps.json(job,200,{'cache-control':'no-store'}):fail('NOT_FOUND',404);}
  if(path==='/api/game-profile/report')return m==='POST'?(await hit(env,'autoprof-report',ip,now.getTime())?report(request,env,ip,now,deps):fail('RATE_LIMITED',429)):fail('METHOD_NOT_ALLOWED',405);
  if(path==='/api/game-profile/runtime')return m==='POST'?(await hit(env,'profile-runtime',ip,now.getTime())?runtimePost(request,env,ip,now,deps):fail('RATE_LIMITED',429)):fail('METHOD_NOT_ALLOWED',405);
  if(path==='/api/game-profile/credit')return m==='PUT'?(await hit(env,'autoprof-credit',ip,now.getTime())?creditPut(request,env,ip,now,deps,KEY):fail('RATE_LIMITED',429)):fail('METHOD_NOT_ALLOWED',405);
