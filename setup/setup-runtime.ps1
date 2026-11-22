@@ -1204,7 +1204,7 @@ function Stop-RuntimeProcesses {
 }
 # Unpacks every ready pack once the user has pressed Install; re-entered from the poll timer, guarded by busy.
 function Pump {
-  if (-not $script:confirmed -or $script:busy -or $script:copying -or $script:mode -eq 'failed') { return }
+  if (-not $script:confirmed -or $script:busy -or $script:copying -or $script:done -or $script:mode -eq 'failed') { return }
   $script:busy = $true
   try {
     while ($script:ready.Count -gt 0) {

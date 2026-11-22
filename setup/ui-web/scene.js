@@ -218,7 +218,6 @@
   function goTo(name, move, fromName) {
     if (statusOnly && name === 'field') {
       $('#hud').classList.add('waiting');
-      $('#phaseWait').hidden = false;
       $('#whatT').textContent = tr('prepareT');
     }
     const tl = gsap.timeline(), m = MOVES[move] || MOVES.push, o = { p: 0 }; let A0 = null;
@@ -289,7 +288,6 @@
     if (window.GL && GL.ok) { GL.update(lastFrames, { s, t, reveal: lastReveal, prog: s.phase === 'unpack' || s.phase === 'done' ? 1 : (s.total ? clamp(s.got / s.total) : 0) }); GL.draw(); }
     const waiting = statusOnly && (s.phase !== 'download' || s.total <= 0);
     $('#hud').classList.toggle('waiting', waiting);
-    $('#phaseWait').hidden = !waiting;
     const pct = s.total ? Math.floor(100 * s.got / s.total) : 0;
     $('#pct').textContent = pct; $('#got').textContent = MB(s.got || 0); $('#total').textContent = MB(s.total || 0);
     $('#speed').textContent = s.phase === 'download' || s.phase === 'probe' ? (s.speed > 0 ? (s.speed / 1048576).toFixed(1) + ' MB/s' : tr('probing')) : '';

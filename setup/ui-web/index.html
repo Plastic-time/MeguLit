@@ -81,7 +81,6 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);color:v
 .steps i.on{background:var(--red)}
 .steps span{font-size:11px;letter-spacing:2px;color:var(--mute);margin-left:10px;text-transform:uppercase}
 #hud{pointer-events:none}
-#phaseWait{position:absolute;left:30px;bottom:78px;width:38%;accent-color:var(--red)}
 #hud.waiting .pct,#hud.waiting .stat{visibility:hidden}
 .startup-progress #boot{inset:auto 0 0;min-height:128px;padding:22px 56px 42px}.startup-progress #boot b{font-size:22px}.startup-progress #boot i,.startup-progress #boot #bootT2{display:none}.startup-progress #boot u{bottom:22px}
 @media (prefers-reduced-motion:reduce){.startup-progress #boot u::after{animation:none;transform:none}}
@@ -211,7 +210,7 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 <div id="fx"><div id="vig"></div><div id="streaks"></div><div id="flash"></div></div>
 <div class="layer" id="ui-top" style="opacity:1;visibility:visible"><div class="top"><img id="topLogo" src="logos/logo-orig.svg" alt="MeguLit"><div class="steps" id="steps"><i></i><i></i><i></i><i></i><span id="stepname"></span></div></div></div>
 <div class="scrimb layer" id="scrimb" style="opacity:1;visibility:visible;pointer-events:none"></div>
-<div class="layer" id="hud"><progress id="phaseWait" hidden aria-labelledby="whatT"></progress><div class="pct"><span id="pct">0</span><small>%</small></div><div class="stat"><span><b id="got">0 MB</b> / <span id="total">0 MB</span></span><span id="speed">测速中</span><span id="eta"></span></div><div class="what"><h3 id="whatT"></h3><p id="whatP"></p></div></div>
+<div class="layer" id="hud"><div class="pct"><span id="pct">0</span><small>%</small></div><div class="stat"><span><b id="got">0 MB</b> / <span id="total">0 MB</span></span><span id="speed">测速中</span><span id="eta"></span></div><div class="what"><h3 id="whatT"></h3><p id="whatP"></p></div></div>
 <div class="layer" id="ui-welcome" style="opacity:1;visibility:visible"><div class="welcome"><i></i><p id="welcomeSub"></p></div></div>
 <div class="layer" id="ui-loc"><div class="card glassy"><h2></h2><div class="en"></div>
   <div class="lbl" id="lblPath"></div>
