@@ -22,6 +22,8 @@ test('publisher authority preserves live stepdown and canary shutdown gates',asy
 function harness(t,options={}){
  const f=fixture(t),calls=[],record=(...args)=>calls.push(args),game={id:'game',title:'neutral',executable:f.exe,original:JSON.stringify({library:{engine:'circus',localeMode:'off',launchVia:path.join(f.game,'Forged.exe')}})};
  const modules={
+  './japanese-restore-options.cjs':require('../services/japanese-restore-options.cjs'),
+  '../core/japanese-restore.cjs':require('../core/japanese-restore.cjs'),
   '../core/owner-tests.cjs':options.resolveHook?{...O,resolve:async(...args)=>{const token=await O.resolve(...args);await options.resolveHook();return token;}}:O,
   '../core/profiles/index.cjs':P,'../core/library-mode.cjs':{libraryOnly:()=>false},'./import-source.cjs':{backfill(){},targetOf:()=>null},
   './embedded-japanese-jobs.cjs':{reserveLaunch:()=>({release:()=>record('lease-release')})},'./background-games.cjs':{foreground:async()=>{},unmute:async()=>{await options.unmuteHook?.();}},
