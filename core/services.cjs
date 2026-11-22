@@ -1,5 +1,21 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process');
+function defaultVoiceRateLimited(file,attemptStart){
+ let fd;
+ try{
+  fd=fs.openSync(file,'r');
+  const end=fs.fstatSync(fd).size,start=Math.max(attemptStart,end-64*1024);
+  if(end<=start)return false;
+  const buffer=Buffer.alloc(end-start);
+  const bytes=fs.readSync(fd,buffer,0,buffer.length,start);
+  const attempts=buffer.toString('utf8',0,bytes).split(/(?=Downloading AIVMX file from )/);
+  return attempts.some(attempt=>{
+   const exhausted=/Failed to download AIVMX file from (https:\/\/api\.aivis-project\.com\/v1\/aivm-models\/[a-f0-9-]+\/download)\?\S+ after \d+ attempts\./i.exec(attempt);
+   return exhausted&&attempt.includes('Failed to install default model.')&&attempt.split('\n').some(line=>line.includes('429 Too Many Requests')&&line.includes(exhausted[1]+'?'));
+  });
+ }catch{return false;}
+ finally{if(fd!==undefined)fs.closeSync(fd);}
+}
 class Services{
  constructor(root,options={}){this.root=root;this.children=[];this.starting=null;this.epoch=0;this.controller=new AbortController();this.fetch=options.fetch||fetch;this.prepare=options.prepare||require('./speech-setup.cjs').prepareSpeechModel;this.spawn=options.spawn||spawn;this.exe=options.exe||require('./layout.cjs').aivis;this.killTree=options.killTree||killTree;this.releasing=Promise.resolve();this.game='';this.log=message=>fs.appendFileSync(path.join(this.root,'logs','speech-engine.log'),message+'\n');}
  async gameEvent(message,config){
@@ -25,9 +41,15 @@ class Services{
    const exe=this.exe;if(!fs.existsSync(exe))throw Error('缺少 AivisSpeech 引擎，请完整解压语音组件');
    await this.prepare(this.log);check();
    const marker=path.join(this.root,'cache','speech-gpu-unavailable'),modes=gpu&&!fs.existsSync(marker)?['--use_gpu','--no-use_gpu']:['--no-use_gpu'];
-   for(const mode of modes){check();this.log('[MeguLit] starting AivisSpeech with '+mode);const log=fs.openSync(path.join(this.root,'logs','speech-engine.log'),'a');let child;try{child=this.spawn(exe,['--host','127.0.0.1','--port','10101',mode],{cwd:path.dirname(exe),windowsHide:true,stdio:['ignore',log,log]});}finally{fs.closeSync(log);}this.children.push(child);let failed=false;child.on('error',()=>{failed=true;});child.on('exit',()=>{failed=true;});
+   const logFile=path.join(this.root,'logs','speech-engine.log');
+   for(const mode of modes){check();this.log('[MeguLit] starting AivisSpeech with '+mode);const log=fs.openSync(logFile,'a');let child,attemptStart;try{attemptStart=fs.fstatSync(log).size;child=this.spawn(exe,['--host','127.0.0.1','--port','10101',mode],{cwd:path.dirname(exe),windowsHide:true,stdio:['ignore',log,log]});}finally{fs.closeSync(log);}this.children.push(child);let failed=false;child.on('error',()=>{failed=true;});child.on('exit',()=>{failed=true;});
     const until=Date.now()+180000;while(Date.now()<until&&!failed){await require('node:timers/promises').setTimeout(500,undefined,{signal});check();const ready=await probe();check();if(ready){this.mode=mode;return;}}
-    await this.killTree(child);this.children=this.children.filter(c=>c!==child);check();if(mode==='--use_gpu')try{fs.writeFileSync(marker,new Date().toISOString());}catch{}
+    await this.killTree(child);this.children=this.children.filter(c=>c!==child);check();
+    if(defaultVoiceRateLimited(logFile,attemptStart)){
+     this.log('[MeguLit] AivisHub rate-limited the default voice download (HTTP 429)');
+     throw Error('AivisHub 默认语音模型下载被限流（HTTP 429），请稍后重试');
+    }
+    if(mode==='--use_gpu')try{fs.writeFileSync(marker,new Date().toISOString());}catch{}
    }throw Error('AivisSpeech 尚未就绪，首次启动可能需要下载模型，请查看 speech-engine.log');
   })();this.starting=job;job.finally(()=>{if(this.starting===job)this.starting=null;}).catch(()=>{});return job;
  }
