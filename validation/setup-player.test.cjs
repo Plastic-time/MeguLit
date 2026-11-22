@@ -53,7 +53,80 @@ test('poster first, then intro, then the welcome loop', { skip, timeout: 60000 }
   assert.equal(await ev('Player.state.dead'), false);
 });
 
+test('progress boot keeps real video and sends ready only after first frame and the host reply', { skip, timeout: 60000 }, async () => {
+  const source = `(() => {
+    if (new URLSearchParams(location.search).get('boot') !== 'progress') return;
+    const messages = [], received = [];
+    window.__bootMessages = messages;
+    window.chrome ||= {};
+    const send = data => received.forEach(fn => fn({ data }));
+    window.__sendSetupState = s => send({ t: 'state', s });
+    chrome.webview = {
+      addEventListener(type, fn) { if (type === 'message') received.push(fn); },
+      postMessage(m) {
+        messages.push(m);
+        if (m.type === 'hello') queueMicrotask(() => send({ t: 'info', i: { defaultTarget: 'H:/Fixture' } }));
+        if (m.type === 'checkpath') {
+          const reply = () => send({ t: 'reply', id: m.id, r: { state: 'ok', target: 'H:/Fixture/MeguLit' } });
+          if (!window.__replyLocation) window.__replyLocation = reply;
+          else queueMicrotask(reply);
+        }
+        if (m.via === 'shim' && m.type === 'install') queueMicrotask(() => send({ t: 'reply', id: m.id, r: { state: 'ok' } }));
+      }
+    };
+  })();`;
+  const { result } = await cdp('Page.addScriptToEvaluateOnNewDocument', { source });
+  try {
+    await open(path.join(repo, 'setup', 'ui-web', 'video'), '&host=2&boot=progress&theme=edge');
+    await on('intro');
+    await until('!!window.__replyLocation');
+    assert.equal(await ev('document.querySelector("#vposter, #vstage img.vp[src]") === null'), true);
+    assert.equal(await ev('!!document.querySelector("#boot:not(.gone)")'), true);
+    assert.equal(await ev('__bootMessages.some(m => m.type === "ready")'), false);
+    await ev('__replyLocation()');
+    await until('__bootMessages.some(m => m.type === "ready")');
+    await on('loc');
+    await ev('document.querySelector("#btnClose").click()');
+    await until('getComputedStyle(document.querySelector("#ui-quit")).visibility === "visible"');
+    assert.equal(await ev('__bootMessages.some(m => m.type === "close")'), false);
+    await ev('document.querySelector("#stay").click()');
+    await until('getComputedStyle(document.querySelector("#ui-quit")).visibility === "hidden"');
+    await ev('window.__askClose()');
+    await until('getComputedStyle(document.querySelector("#ui-quit")).visibility === "visible"');
+    assert.equal(await ev('__bootMessages.some(m => m.type === "asked")'), true);
+    await ev('document.querySelector("#leave").click()');
+    assert.equal(await ev('__bootMessages.filter(m => m.type === "close").length'), 1);
+    await ev('Scene.showQuit(false); __sendSetupState({ phase: "done", confirmed: true, n: 0, st: "", fr: [] })');
+    await sleep(350);
+    assert.equal(await ev('Scene.section'), 'loc', 'a done snapshot cannot skip path selection');
+    await ev('document.querySelector("#install").click()');
+    await until('document.querySelector("#install-confirm").open');
+    assert.equal(await ev('document.activeElement.id'), 'confirm-install-back');
+    assert.equal(await ev('document.querySelector("#confirm-install-path").textContent'), 'H:/Fixture/MeguLit');
+    assert.equal(await ev('__bootMessages.some(m => m.type === "install" && m.via === "shim")'), false);
+    await ev('document.querySelector("#confirm-install-back").click()');
+    await until('!document.querySelector("#install-confirm").open && !document.querySelector("#install").classList.contains("busy")');
+    assert.equal(await ev('__bootMessages.some(m => m.type === "install" && m.via === "shim")'), false);
+    await ev('__sendSetupState({ phase: "idle", n: 0, st: "", fr: [] }); document.querySelector("#install").click()');
+    await until('document.querySelector("#install-confirm").open');
+    await ev('document.querySelector("#confirm-install-go").click()');
+    await until('Scene.section === "field"');
+    assert.equal(await ev('__bootMessages.find(m => m.type === "install" && m.via === "shim").target'), 'H:/Fixture/MeguLit');
+    assert.equal(await ev('__bootMessages.filter(m => m.type === "install" && m.via === "shim").length'), 1);
+    await ev('__sendSetupState({ phase: "unpack", unpack: 0.5, n: 1, st: "2", fr: [100], got: 100, total: 100 });');
+    await until('document.querySelector("#pct").textContent === "50" && getComputedStyle(document.querySelector("#pct")).visibility === "visible"');
+    assert.equal(await ev('getComputedStyle(document.querySelector(".stat")).visibility'), 'hidden');
+    await ev('__sendSetupState({ phase: "unpack", unpack: 0.75, n: 1, st: "2", fr: [100], got: 100, total: 100 });');
+    await until('document.querySelector("#pct").textContent === "75"');
+    assert.equal(await ev('__bootMessages.some(m => m.what === "poster" || m.type === "fatal")'), false);
+  } finally {
+    await cdp('Page.removeScriptToEvaluateOnNewDocument', { identifier: result.identifier });
+  }
+});
+
 test('stage changes follow Scene.goTo: transition at the loop point, then the next loop; no overlay canvas', { skip, timeout: 90000 }, async () => {
+  await open(fixture);
+  await on('welcome');
   await ev('void Scene.goTo("loc","skim")'); await on('to-loc'); await on('loc');
   await ev('void Scene.goTo("field","under")'); await on('to-field'); await on('field');
   const sw = await switches(); assert.ok(sw.includes('to-loc:cut') && sw.includes('to-field:cut'), 'loops end on the transition\'s first pose: ' + sw);
@@ -151,6 +224,7 @@ test('calm native loading screen: real stages from the script, no frame bundle, 
   assert.ok(!fs.existsSync(path.join(repo, 'setup', 'ui-web', 'video', 'splash-frames.bin')), 'the frame bundle is gone from the package');
   assert.match(rs, /\.stage/); assert.match(rs, /MEGULIT_SPLASH_FLAG/); assert.match(rs, /AllowSetForegroundWindow/); assert.match(rs, /exe-splash-closed reason=skin-first-frame/); assert.match(rs, /exe-splash-faded/);
   assert.ok(!/GdipCreateBitmapFromStream|SHCreateMemStream/.test(rs), 'no video/frame decoding in the exe splash');
+  assert.match(rt, /SetBounds\(0, 0, 144, 3\)/); assert.match(rt, /Round-Rect 0 0 \$fill \$height/); assert.match(rt, /Brushes\]::White/); assert.doesNotMatch(rt, /bootStripe/);
   assert.match(rt, /Set-SplashStage/); assert.match(rt, /'page-frame1'/); assert.match(rt, /-not \$env:MEGULIT_NATIVE_SPLASH/);
   assert.match(web, /Release-NativeSplash 'skin-frame1'/); assert.match(rt, /\$script:win\.BringFront\(\)/, 'the skin window is brought to the front before the splash fades'); assert.match(web, /public void BringFront\(\)/);
   assert.match(rs, /913\.0/); assert.match(web, /913 \* \$scale/); assert.match(rt, /Size\(913, 584\)/);

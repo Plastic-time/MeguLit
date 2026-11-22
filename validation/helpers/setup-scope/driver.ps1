@@ -50,6 +50,12 @@ Check 'edited classic target rejected before copy' { if (Use-Target) { throw 'Un
 Check 'confirm rejects edited target before free-space or writes' { Confirm-Install; if ($script:confirmed) { throw 'Unexpected confirmation' } }
 Check 'web check rejects external path before write probe' { if ((Web-Check 'E:\MeguLit').state -ne 'readonly') { throw 'Unexpected acceptance' } }
 Check 'web write probe cannot fall back to outside ancestor' { if (Web-Writable 'E:\MeguLit') { throw 'Unexpected probe' } }
+Check 'editing a path leaves the selected folder uncreated' {
+  $parent = Join-Path $Work 'installed'
+  [void][IO.Directory]::CreateDirectory($parent)
+  $fresh = Join-Path $parent 'unconfirmed\MeguLit'
+  if (-not (Web-Writable $fresh) -or (Test-Path (Split-Path $fresh))) { throw 'Path probe changed the target' }
+}
 Check 'web list rejects external directory' { Reject { Web-List 'C:\Users\Megumin' } }
 Check 'web mkdir rejects external directory before create' { Web-Act @{ type = 'mkdir'; via = 'shim'; id = 1; path = 'E:\MeguLit'; name = 'must-not-create' }; if ($script:posts[-1].r.ok) { throw 'Unexpected mkdir' } }
 Check 'staged cleanup rejects outside path' { Reject { Remove-Staged 'E:\MeguLit\runtime-base.setup.part' } }
@@ -59,8 +65,48 @@ Check 'integration functions return in test mode' { $testLog = 'explicit'; Make-
 $form = [pscustomobject]@{}; $form | Add-Member ScriptMethod Close { $script:closed = $true }
 Check 'cancel closes without install or process launch' { Web-Act @{ type = 'close'; via = 'shim' }; if (-not $script:closed -or $script:confirmed) { throw 'Cancel did not remain unconfirmed' } }
 Remove-Item Function:\New-Object
+Load-Function 'setup\setup-web.ps1' @('Web-State')
+Check 'one unpacked component out of three retains fractional progress' {
+  function Got-Bytes { 3 }
+  function Total-Bytes { 3 }
+  $packs = @{ base = @{ size = 1 }; reading = @{ size = 1 }; voice = @{ size = 1 } }
+  $script:dl = @('base','reading','voice')
+  $script:dlPos = 3
+  $script:busy = $true
+  $script:ready = @(@{ id = 'reading' }, @{ id = 'voice' })
+  $state = Web-State
+  if ($state.pack -ne 'reading' -or [math]::Floor(100 * $state.unpack) -ne 33) { throw 'Incorrect live unpack progress' }
+  $script:busy = $false
+}
 Load-Function 'tools\installer-owner-test\launch-installer-test.ps1' @('New-OwnerTestEnvironment','Assert-OwnerPayloadFiles')
 Load-Function 'setup\setup-runtime.ps1' @('Need-Bytes')
+Check 'a second session ignores archived profile state and validates its own profile' {
+  $first = (New-OwnerTestEnvironment $Work 'first').USERPROFILE
+  $second = (New-OwnerTestEnvironment $Work 'second').USERPROFILE
+  [void][IO.Directory]::CreateDirectory($first)
+  [void][IO.Directory]::CreateDirectory($second)
+  $saved = $env:USERPROFILE
+  $oldLink = Join-Path $first 'Content.IE5'
+  $activeLink = Join-Path $second 'unexpected-link'
+  $outsideProfile = Join-Path $Work 'profile\unexpected-link'
+  $destination = Join-Path $Work 'link-destination'
+  try {
+    $env:USERPROFILE = $first; Initialize-SetupTestScope $sourceRoot
+    New-Item -ItemType Junction -Path $oldLink -Target $destination | Out-Null
+    $env:USERPROFILE = $second; Initialize-SetupTestScope $sourceRoot
+    Reject { Assert-SetupPath (Join-Path $oldLink 'child') 'profile' } 'REPARSE'
+    New-Item -ItemType Junction -Path $activeLink -Target $destination | Out-Null
+    Reject { Initialize-SetupTestScope $sourceRoot } 'REPARSE'
+    [IO.Directory]::Delete($activeLink)
+    New-Item -ItemType Junction -Path $outsideProfile -Target $destination | Out-Null
+    Reject { Initialize-SetupTestScope $sourceRoot } 'REPARSE'
+  } finally {
+    foreach ($link in $oldLink,$activeLink,$outsideProfile) {
+      if ([IO.Directory]::Exists($link)) { [IO.Directory]::Delete($link) }
+    }
+    $env:USERPROFILE = $saved; Initialize-SetupTestScope $sourceRoot
+  }
+}
 Check 'scoped installation reserves headroom without changing unscoped need' {
   function Missing($dir) { @() }; function Sum($ids, $field) { 0 }; function Drive-Of($path) { 'H:' }; function Stage-Bytes { 0 }
   $appSize = 0; $want = @(); $stageDir = Join-Path $Work 'staging'

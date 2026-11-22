@@ -11,7 +11,7 @@
 # %TEMP%\Rar$EXa..., installed onto a nearly full C: drive and left no shortcut. When the chosen folder is not
 # this one, the whole MeguLit folder is copied there first, then the new copy is started (exit 3 = moved).
 # Packs, URLs, SHA-256 and sizes come from setup\runtime.json. Exit 0 = runtime ready.
-param([Parameter(Mandatory=$true)][string]$Root)
+param([Parameter(Mandatory=$true)][string]$Root, [switch]$InstallFromPackage)
 $ErrorActionPreference = 'Stop'
 # Scoped tests validate every configured path before logs, splash or WebView2 can write anything.
 $script:setupTestScope = $null
@@ -21,24 +21,95 @@ if ($env:MEGULIT_SETUP_TEST_ROOT) {
   . (Join-Path $PSScriptRoot 'setup-test-scope.ps1')
   Initialize-SetupTestScope $Root
 }
+. (Join-Path $PSScriptRoot 'setup-vc-runtime.ps1')
 # Boot timing (setup-ui.log, one line per step): where the time between the double click and the first window goes.
 $script:bootLog = $(if ($env:MEGULIT_SETUP_UILOG) { $env:MEGULIT_SETUP_UILOG } else { Join-Path $env:LOCALAPPDATA 'MeguLit\setup-ui.log' })
 $script:procStart = try { [Diagnostics.Process]::GetCurrentProcess().StartTime } catch { [DateTime]::Now }
 # Real start-up stages for the exe's loading screen (bar + one status line): "<0..1>|<text>" in <flag>.stage, read by the exe every 100 ms.
 $script:splashStages = @{ 'script-start' = @(0.22, '正在启动安装程序…'); 'winforms-loaded' = @(0.30, '正在启动安装程序…'); 'webview2-env-started' = @(0.38, '正在准备界面引擎…'); 'compiled' = @(0.48, '正在准备界面引擎…'); 'logic-built' = @(0.56, '正在载入安装逻辑…'); 'web-layer-start' = @(0.62, '正在载入界面…'); 'skin-window-shown' = @(0.72, '正在载入界面…'); 'page-poster' = @(0.86, '正在载入画面…'); 'page-frame1' = @(0.96, '马上就好') }
 function Set-SplashStage([string]$step) { if ($env:MEGULIT_SPLASH_FLAG -and $script:splashStages.ContainsKey($step)) { try { $s = $script:splashStages[$step]; [IO.File]::WriteAllText($env:MEGULIT_SPLASH_FLAG + '.stage', ([string]$s[0] + '|' + $s[1])) } catch {} } }
-function Boot-Mark([string]$step) { try { $n = [DateTime]::Now; [IO.Directory]::CreateDirectory((Split-Path $script:bootLog)) | Out-Null; [IO.File]::AppendAllText($script:bootLog, (Get-Date -Format 's') + ' boot step=' + $step + ' since_proc=' + [int]($n - $script:procStart).TotalMilliseconds + ' at=' + [DateTimeOffset]::Now.ToUnixTimeMilliseconds() + "`r`n") } catch {} ; Set-SplashStage $step }
+function Boot-Mark([string]$step) { try { $n = [DateTime]::Now; [IO.Directory]::CreateDirectory((Split-Path $script:bootLog)) | Out-Null; [IO.File]::AppendAllText($script:bootLog, (Get-Date -Format 's') + ' boot step=' + $step + ' since_proc=' + [int]($n - $script:procStart).TotalMilliseconds + ' at=' + [DateTimeOffset]::Now.ToUnixTimeMilliseconds() + "`r`n") } catch {} ; Set-SplashStage $step; Show-SetupBootStatus $step }
+function Show-SetupBootStatus([string]$step) {
+  if (-not $script:bootStatus) { return }
+  $message = switch ($step) {
+    'compile-1-start' { '正在准备运行组件…' }
+    'logic-built' { '正在初始化安装控件…' }
+    'web-layer-start' { '正在启动安装界面…' }
+    'skin-window-shown' { '正在连接安装界面…' }
+  }
+  if ($message) { $script:bootStatus.AccessibleDescription = $message + ' 按 Esc 取消' }
+  if ($script:splashStages.ContainsKey($step)) { $script:bootFraction = $script:splashStages[$step][0]; $script:bootStatus.Refresh() }
+  Test-SetupBootCancellation
+}
+function Test-SetupBootCancellation {
+  if (-not $script:bootStatus) { return }
+  [Windows.Forms.Application]::DoEvents()
+  if ($script:startupCancelled) { $script:bootStatus = $null; Boot-Mark 'startup-cancelled'; exit 1 }
+}
 Boot-Mark 'script-start'
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+[Windows.Forms.Application]::EnableVisualStyles()
 Boot-Mark 'winforms-loaded'
+function Round-Rect($x, $y, $w, $h) {
+  $r = [math]::Min($h, $w); $gp = New-Object Drawing.Drawing2D.GraphicsPath
+  if ($w -le 0) { return $gp }
+  $gp.AddArc([float]$x, [float]$y, [float]$r, [float]$h, 90, 180); $gp.AddArc([float]($x + $w - $r), [float]$y, [float]$r, [float]$h, 270, 180); $gp.CloseFigure(); $gp
+}
 # Splash: the first frame of the installer's opening clip, on screen before any C# is compiled (each Add-Type -TypeDefinition starts csc.exe,
 # seconds on a busy machine). The real window replaces it (setup-web.ps1 / the classic window's Shown). Only where the web skin is wanted.
 $script:splash = $null; $script:wv2EnvTask = $null
+$script:statusOnly = [bool]($script:setupTestScope -or $InstallFromPackage)
+if ($script:statusOnly) {
+  $script:splash = New-Object Windows.Forms.Form
+  $script:splash.Text = 'MeguLit 安装'
+  $script:splash.FormBorderStyle = 'None'
+  $script:splash.ClientSize = New-Object Drawing.Size(144, 3)
+  $script:splash.StartPosition = 'CenterScreen'
+  $script:splash.ControlBox = $false
+  $bootCancel = New-Object Windows.Forms.Button
+  $bootCancel.SetBounds(0, 0, 144, 3)
+  $track = Round-Rect 0 0 $bootCancel.Width $bootCancel.Height
+  try { $script:splash.Region = [Drawing.Region]::new($track) } finally { $track.Dispose() }
+  $bootCancel.FlatStyle = 'Flat'
+  $bootCancel.FlatAppearance.BorderSize = 0
+  $bootCancel.BackColor = [Drawing.Color]::FromArgb(95, 95, 100)
+  $bootCancel.FlatAppearance.MouseOverBackColor = $bootCancel.BackColor
+  $bootCancel.FlatAppearance.MouseDownBackColor = $bootCancel.BackColor
+  $bootCancel.AccessibleName = '取消启动安装程序'
+  $bootCancel.AccessibleDescription = '正在检查组件清单，按 Esc 或 Enter 取消'
+  $bootCancel.add_Click({
+    if ([Windows.Forms.MessageBox]::Show($script:splash, '确定要退出安装吗？', 'MeguLit 安装', 'YesNo', 'Question', 'Button2') -eq 'Yes') {
+      $script:startupCancelled = $true
+    }
+  })
+  $script:bootTip = New-Object Windows.Forms.ToolTip
+  $script:bootTip.SetToolTip($bootCancel, '正在启动安装程序，按 Esc 取消')
+  $script:splash.CancelButton = $bootCancel
+  $script:splash.Controls.Add($bootCancel)
+  $script:bootStatus = $bootCancel
+  $script:bootFraction = $script:splashStages['winforms-loaded'][0]
+  $bootCancel.add_Paint({
+    param($sender, $paint)
+    $width = $sender.ClientSize.Width
+    $height = $sender.ClientSize.Height
+    $fill = [int][math]::Round($width * $script:bootFraction)
+    if ($fill -gt 0) {
+      $shape = Round-Rect 0 0 $fill $height
+      try { $paint.Graphics.SmoothingMode = 'AntiAlias'; $paint.Graphics.FillPath([Drawing.Brushes]::White, $shape) }
+      finally { $shape.Dispose() }
+    }
+  })
+  $script:splash.Show()
+  [void]$bootCancel.Focus()
+  $script:splash.Refresh()
+  Boot-Mark ('startup-line-shown border=' + $script:splash.FormBorderStyle + ' height=' + $bootCancel.Height)
+  Boot-Mark 'startup-status-shown'
+}
 if ($env:MEGULIT_SETUP_WEB -ne '0' -and (-not $env:MEGULIT_SETUP_TEST -or $env:MEGULIT_SETUP_WEB -eq '1') -and -not $env:MEGULIT_SETUP_PREVIEW -and -not $env:MEGULIT_SETUP_THEME -and -not $env:MEGULIT_SETUP_WEB_TEST -and -not $env:MEGULIT_NATIVE_SPLASH) {   # with the exe's animated native splash there is no PowerShell startup form at all (it cost ~1.4 s of Forms/GDI+ start-up and showed a still picture)
-  try { $bsPath = Join-Path $Root 'setup\ui-web\video\light\intro.jpg'
+  if (-not $script:statusOnly) { try { $bsPath = Join-Path $Root 'setup\ui-web\video\light\intro.jpg'
     if (Test-Path $bsPath) { $bsForm = New-Object Windows.Forms.Form; $bsForm.FormBorderStyle = 'None'; $bsForm.StartPosition = 'CenterScreen'; $bsForm.ShowInTaskbar = $false; $bsForm.Text = 'MeguLit'; $bsForm.ClientSize = New-Object Drawing.Size(913, 584); $bsForm.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
       $bsPic = New-Object Windows.Forms.PictureBox; $bsPic.Dock = 'Fill'; $bsPic.SizeMode = 'StretchImage'; $bsPic.Image = [Drawing.Image]::FromStream((New-Object IO.MemoryStream (,[IO.File]::ReadAllBytes($bsPath)))); $bsForm.Controls.Add($bsPic)
-      $bsForm.Show(); $bsForm.Refresh(); $script:splash = $bsForm; Boot-Mark 'splash-shown' } } catch { Boot-Mark ('splash-failed ' + ($_ -replace '\s+', ' ')) }
+      $bsForm.Show(); $bsForm.Refresh(); $script:splash = $bsForm; Boot-Mark 'splash-shown' } } catch { Boot-Mark ('splash-failed ' + ($_ -replace '\s+', ' ')) } }
   # WebView2 warms up while the rest of the setup is built: its browser process starts now, not when the skin window is created.
   try { $bsWv = Join-Path $Root 'setup\webview2'; if (Test-Path (Join-Path $bsWv 'Microsoft.Web.WebView2.Core.dll')) { Add-Type -Path (Join-Path $bsWv 'Microsoft.Web.WebView2.Core.dll'); $env:PATH = (Join-Path $bsWv $(if ([Environment]::Is64BitProcess) { 'x64' } else { 'x86' })) + ';' + $env:PATH
       $script:webData = $(if ($env:MEGULIT_SETUP_WEBVIEW2_DATA) { $env:MEGULIT_SETUP_WEBVIEW2_DATA } elseif ($env:WEBVIEW2_USER_DATA_FOLDER) { $env:WEBVIEW2_USER_DATA_FOLDER } else { Join-Path $env:LOCALAPPDATA ('MeguLit\setup-webview2' + $PID) })
@@ -49,9 +120,12 @@ function Release-NativeSplash([string]$why) { if ($env:MEGULIT_SPLASH_FLAG -and 
     # the skin window must be in front and active BEFORE the loading screen fades (a window shown behind a topmost one is not activated): bring it up, then drop the flag
     try { if ($script:win) { $script:win.BringFront(); $script:win.FadeIn(14, 280) } } catch { Boot-Mark ('bring-front failed ' + $_) }
     try { [IO.File]::WriteAllText($env:MEGULIT_SPLASH_FLAG, $why) } catch {}; Boot-Mark ('native-splash-released why=' + $why) } }
-function Close-Splash { if ($script:splash) { try { $script:splash.Close(); $script:splash.Dispose() } catch {}; $script:splash = $null; Boot-Mark 'splash-closed' } }
+function Close-Splash {
+  if ($script:bootTip) { $script:bootTip.Dispose(); $script:bootTip = $null }
+  $script:bootStatus = $null
+  if ($script:splash) { try { $script:splash.Close(); $script:splash.Dispose() } catch {}; $script:splash = $null; Boot-Mark 'splash-closed' }
+}
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-[Windows.Forms.Application]::EnableVisualStyles()
 
 $manifest = Get-Content -Raw -Encoding UTF8 (Join-Path $Root 'setup\runtime.json') | ConvertFrom-Json
 $packs = $manifest.packs
@@ -222,11 +296,6 @@ $status = Label '' 32 80 656 70 9 $false $C.muted $progress
 # Hand-drawn progress bar: rounded dark track, crimson-to-gold fill, a soft shimmer while unpacking.
 $script:barValue = 0; $script:barBusy = $false; $script:barPhase = 0.0
 $bar = New-Object GrimoirePanel; $bar.Location = New-Object Drawing.Point(32,56); $bar.Size = New-Object Drawing.Size(584,14); $bar.BackColor = [Drawing.Color]::Transparent
-function Round-Rect($x, $y, $w, $h) {
-  $r = [math]::Min($h, $w); $gp = New-Object Drawing.Drawing2D.GraphicsPath
-  if ($w -le 0) { return $gp }
-  $gp.AddArc([float]$x, [float]$y, [float]$r, [float]$h, 90, 180); $gp.AddArc([float]($x + $w - $r), [float]$y, [float]$r, [float]$h, 270, 180); $gp.CloseFigure(); $gp
-}
 $bar.add_Paint({ param($s,$e)
   $g = $e.Graphics; $g.SmoothingMode = 'AntiAlias'; $w = $bar.Width - 1; $h = $bar.Height - 1
   $track = Round-Rect 0 0 $w $h
@@ -287,7 +356,7 @@ if (-not $webview) {
   $choice.Controls.Add($link)
 }
 $confirm = New-Object Windows.Forms.Button; $confirm.Text = '安装 Install'; $confirm.Location = New-Object Drawing.Point(508,196); $confirm.Size = New-Object Drawing.Size(180,38)
-$confirm.Font = New-Object Drawing.Font($ui, 11, [Drawing.FontStyle]::Bold); Style-Button $confirm $true; $choice.Controls.Add($confirm); $form.AcceptButton = $confirm
+$confirm.Font = New-Object Drawing.Font($ui, 11, [Drawing.FontStyle]::Bold); Style-Button $confirm $true; $choice.Controls.Add($confirm)
 
 # Space the chosen drive needs: unpacked packs (+ the program when it is copied there), plus whatever still has to
 # be downloaded when the staging folder is on that same drive (packs are deleted right after they are unpacked).
@@ -996,8 +1065,25 @@ function Show-State {
 }
 
 function Next-Download {
-  while ($script:dlPos -lt $script:dl.Count -and (Ok-Part $script:dl[$script:dlPos])) {
-    $id = $script:dl[$script:dlPos]; [void]$script:ready.Add(@{ id = $id; part = (Part $id) }); $script:fetched += [long]$packs.$id.size; $script:dlPos++
+  while ($script:dlPos -lt $script:dl.Count) {
+    $id = $script:dl[$script:dlPos]
+    $part = Part $id
+    if (-not (Ok-Part $id)) {
+      $bundle = Join-Path $sourceRoot "setup\packs\$id.zip"
+      if (-not $script:confirmed -or -not [IO.File]::Exists($bundle)) { break }
+      try {
+        Assert-SetupPath $bundle 'source'
+        # Only the verified staged copy can enter the unpack queue. Keep the package reusable.
+        Remove-Staged $part
+        [IO.File]::Copy($bundle, $part)
+        if ((Get-Item -LiteralPath $part).Length -ne [long]$packs.$id.size -or (Get-FileHash -LiteralPath $part -Algorithm SHA256).Hash -ine $packs.$id.sha256) {
+          throw '组件文件与安装清单不符'
+        }
+        [IO.File]::WriteAllText($part + '.ok', $packs.$id.sha256)
+        Note 'bundle-verified' @{ id = $id; sha256 = $packs.$id.sha256 }
+      } catch { Fail 'download' ('读取离线组件失败：' + $id + '，' + $_.Exception.Message); return }
+    }
+    [void]$script:ready.Add(@{ id = $id; part = $part }); $script:fetched += [long]$packs.$id.size; $script:dlPos++
     Note 'downloaded' @{ id = $id; reused = $true }
   }
   if ($script:dlPos -ge $script:dl.Count) {
@@ -1018,8 +1104,8 @@ function Next-Download {
 $poll = New-Object Windows.Forms.Timer; $poll.Interval = 200
 function Fail([string]$kind, [string]$message) {
   $script:mode = 'failed'; $script:failKind = $kind; $status.ForeColor = $C.red; Set-Bar 0
-  $title.Text = if ($kind -eq 'install') { '安装没完成' } else { '下载中断了' }
-  $hint = if ($kind -eq 'install') { '磁盘空间不足或文件被占用时会这样，点「重试」再来一次 / Retry' } else { '检查网络后点「重试」，已下载的部分会接着用 / Check your connection and retry' }
+  $title.Text = if ($kind -eq 'vc-runtime') { 'Visual C++ 运行库未就绪' } elseif ($kind -eq 'install') { '安装没完成' } else { '下载中断了' }
+  $hint = if ($kind -eq 'vc-runtime') { '确认管理员提示后点「重试」，详情见 %LOCALAPPDATA%\MeguLit\setup-vc-runtime.log' } elseif ($kind -eq 'install') { '磁盘空间不足或文件被占用时会这样，点「重试」再来一次 / Retry' } else { '检查网络后点「重试」，已下载的部分会接着用 / Check your connection and retry' }
   $status.Text = $message + "`n" + $hint; $button.Text = '重试 Retry'; Style-Button $button $true
   UI-Fail $kind $message
   Note 'failed' @{ kind = $kind; message = $message }
@@ -1058,20 +1144,27 @@ function Save-FetchLog($f, $id) {
 # ---- Install: copy MeguLit to the chosen folder, then unpack each pack there as soon as it is downloaded ----
 # Resolve the chosen folder; copy MeguLit there when it is not this folder. Returns $false (and says why) when it cannot.
 $script:moved = $false
+function Resolve-InstallTarget([string]$raw) {
+  $raw = $raw.Trim().Trim('"')
+  if (-not $raw -or -not [IO.Path]::IsPathRooted($raw)) { throw '请填写完整的安装位置，例如 D:\MeguLit' }
+  $target = [IO.Path]::GetFullPath($raw).TrimEnd('\')
+  if ($target -eq $sourceRoot) { return $target }
+  if ($target.StartsWith($sourceRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { throw '安装位置不能放在当前 MeguLit 文件夹里面' }
+  if ((Test-Path $target) -and -not (Test-Path (Join-Path $target 'MeguLit.exe')) -and @(Get-ChildItem -Force $target -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne $stageName }).Count -gt 0) { $target = Join-Path $target 'MeguLit' }
+  $target
+}
 function Use-Target {
   $raw = $pathBox.Text.Trim().Trim('"')
   try { Assert-SetupPath $raw 'installed' -Tree } catch { Say ('隔离测试只能安装到测试目录：' + $_.Exception.Message); return $false }
-  try { $target = [IO.Path]::GetFullPath($raw).TrimEnd('\') } catch { $target = $null }
-  if (-not $raw -or -not $target -or -not [IO.Path]::IsPathRooted($raw)) { Say '请填写完整的安装位置，例如 D:\MeguLit'; return $false }
+  try { $target = Resolve-InstallTarget $raw } catch { Say $_.Exception.Message; return $false }
+  if ($script:webActive -and $target -ine $script:confirmedInstallTarget) { Say '安装路径已变化，请重新确认'; return $false }
   if ($target -ieq $sourceRoot) { return $true }
-  if ($target.StartsWith($sourceRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { Say '安装位置不能放在当前 MeguLit 文件夹里面，换一个位置吧'; return $false }
-  # The staging folder may already live in the suggested folder; it does not make that folder "taken".
-  if ((Test-Path $target) -and -not (Test-Path (Join-Path $target 'MeguLit.exe')) -and @(Get-ChildItem -Force $target -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne $stageName }).Count -gt 0) { $target = Join-Path $target 'MeguLit' }
   try { Assert-SetupPath $sourceRoot 'source' -Tree; Assert-SetupPath $target 'installed' -Tree } catch { Say ('隔离测试路径不安全：' + $_.Exception.Message); return $false }
   if (-not (Writable $target)) { Say ('这个位置不能写入：' + $target + "`n换一个位置吧，例如 D:\MeguLit（Program Files 需要管理员权限）"); return $false }
   $script:copying = $true; Show-State; Note 'copy-start' @{ target = $target }
   $copyArgs = @("`"$sourceRoot`"", "`"$target`"", '/E', '/R:2', '/W:1', '/NP', '/NFL', '/NDL', '/NJH', '/NJS', '/XD', "`"$sourceRoot\logs`"", "`"$sourceRoot\cache`"", "`"$stageDir`"", $stageName, 'runtime-*.unpack', '/XF', 'runtime-*.part*')
   if ($script:setupTestScope) { $copyArgs += '/XJ' }
+  if ([IO.Directory]::Exists((Join-Path $sourceRoot 'setup\packs'))) { $copyArgs += @('/XD', ('"' + (Join-Path $sourceRoot 'setup\packs') + '"')) }
   $copy = Start-Process -FilePath "$env:SystemRoot\System32\robocopy.exe" -ArgumentList $copyArgs -WindowStyle Hidden -PassThru
   $null = $copy.Handle
   while (-not $copy.HasExited) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
@@ -1123,12 +1216,47 @@ function Register-Uninstall {
   } catch {}
 }
 function Lock-Choice([bool]$locked) { foreach ($ctl in $pathBox, $browse, $deskCheck, $menuCheck, $confirm) { $ctl.Enabled = -not $locked } }
+function Write-VcRuntimeLog([string]$message) {
+  Note 'vc-runtime' @{ message = $message }
+  if ($testLog) { return }
+  try {
+    $dir = Join-Path $env:LOCALAPPDATA 'MeguLit'
+    [void][IO.Directory]::CreateDirectory($dir)
+    Add-Content -LiteralPath (Join-Path $dir 'setup-vc-runtime.log') -Encoding UTF8 ((Get-Date -Format s) + ' ' + $message)
+  } catch {}
+}
+function Confirm-VcRuntime {
+  if ($script:vcReady) { return $true }
+  $script:vcInstalling = $true
+  $title.Text = '正在检查 Visual C++ 运行库'
+  $status.Text = '如需安装，请确认微软安装程序的管理员提示'
+  Set-Busy
+  UI-Progress @{ phase = 'vc-runtime' }
+  try {
+    $result = Invoke-SetupVcRuntime (Join-Path $sourceRoot 'setup') -Required:$InstallFromPackage
+    Write-VcRuntimeLog "result=$result"
+    switch ($result) {
+      'cancelled' { $script:vcError = '已取消 Visual C++ 运行库安装，请重试并确认管理员提示' }
+      'restart-pending' { $script:vcError = 'Visual C++ 运行库需要重启 Windows，重启后请重新运行安装程序' }
+      'failed' { $script:vcError = '微软 Visual C++ 运行库安装失败，请查看日志后重试' }
+      default { $script:vcReady = $true; $script:vcRestart = $result -eq 'restart-required' }
+    }
+  } catch {
+    Write-VcRuntimeLog $_.Exception.Message
+    $script:vcError = '无法核对或启动微软 Visual C++ 安装包，请重新解压完整安装包后重试'
+  } finally { $script:vcInstalling = $false }
+  if (-not $script:vcReady) { Fail 'vc-runtime' $script:vcError }
+  [bool]$script:vcReady
+}
 function Confirm-Install {
-  if ($script:confirmed) { return }
+  if ($script:confirmed -or $script:vcInstalling) { return }
   try { Assert-SetupPath $pathBox.Text.Trim().Trim('"') 'installed' -Tree } catch { Say ('隔离测试只能安装到测试目录：' + $_.Exception.Message); return }
-  $f = Drive-Free $pathBox.Text; $need = Need-Bytes $pathBox.Text
-  if ($f -lt $need) { Say ('「' + $pathBox.Text + '」所在的磁盘空间不够：需要约 ' + (MB $need) + '，只剩 ' + (MB $f) + "`n换一个空间大一点的盘吧"); return }
+  try { $target = Resolve-InstallTarget $pathBox.Text; Assert-SetupPath $target 'installed' -Tree } catch { Say $_.Exception.Message; return }
+  if ($script:webActive -and $target -ine $script:confirmedInstallTarget) { Say '安装路径已变化，请重新确认'; return }
+  $f = Drive-Free $target; $need = Need-Bytes $target
+  if ($f -lt $need) { Say ('「' + $target + '」所在的磁盘空间不够：需要约 ' + (MB $need) + '，只剩 ' + (MB $f) + "`n换一个空间大一点的盘吧"); return }
   Lock-Choice $true
+  if (-not (Confirm-VcRuntime)) { return }
   if (-not (Use-Target)) { Lock-Choice $false; return }
   $script:confirmed = $true; $confirm.Text = '已确认'; $note.ForeColor = $C.gold; $note.Text = '安装到 ' + $Root + '：组件下载完就自动装好，不用再点'
   Note 'confirmed' @{ root = $Root; moved = $script:moved; downloadsDone = (Downloads-Done) }
@@ -1164,7 +1292,7 @@ function Stop-RuntimeProcesses {
 }
 # Unpacks every ready pack once the user has pressed Install; re-entered from the poll timer, guarded by busy.
 function Pump {
-  if (-not $script:confirmed -or $script:busy -or $script:copying -or $script:mode -eq 'failed') { return }
+  if (-not $script:confirmed -or $script:busy -or $script:copying -or $script:done -or $script:mode -eq 'failed') { return }
   $script:busy = $true
   try {
     while ($script:ready.Count -gt 0) {
@@ -1220,12 +1348,13 @@ $webLayer = Join-Path $sourceRoot 'setup/setup-web.ps1'; if (Test-Path $webLayer
 $button.add_Click({
   if ($script:mode -eq 'failed') {
     $script:mode = ''; $status.ForeColor = $C.muted; $button.Text = '取消 Cancel'; Style-Button $button $false; $button.FlatAppearance.BorderColor = $C.red
-    if ($script:failKind -eq 'download') { Next-Download } else { Show-State; Pump }
+    if ($script:failKind -eq 'vc-runtime') { Confirm-Install }
+    elseif ($script:failKind -eq 'download') { Next-Download } else { Show-State; Pump }
   }
   else { if ($script:fetch) { $poll.Stop(); $script:fetch.Cancel() }; $form.Close() }
 })
 $form.add_Shown({ Close-Splash; Release-NativeSplash 'classic-shown'; Boot-Mark ('classic-shown web=' + [bool]$script:webActive + ' opacity=' + $form.Opacity + ' pos=' + $form.Location.X + ',' + $form.Location.Y + $(if ($script:webActive) { ' (invisible control surface, not a visible window)' } else { ' (the classic window is the real UI)' })) })
-$form.add_FormClosing({ if (-not $script:done -and $script:fetch) { $poll.Stop(); $script:fetch.Cancel() } })
+$form.add_FormClosing({ if ($script:vcInstalling) { $_.Cancel = $true; return }; if (-not $script:done -and $script:fetch) { $poll.Stop(); $script:fetch.Cancel() } })
 $form.add_Shown({ Update-Free; Note 'shown' @{ stage = $stageDir; want = ($want -join ',') }; if (-not $env:MEGULIT_SETUP_PREVIEW -and $env:MEGULIT_SETUP_PREFETCH -eq '1') { Next-Download } })   # nothing is downloaded, probed or prefetched before the user presses Install (tests may opt in with MEGULIT_SETUP_PREFETCH=1)
 if ($testLog) { $deskCheck.Checked = $false; $menuCheck.Checked = $false }
 if ($env:MEGULIT_SETUP_AUTOSTART -eq 'now') { $form.add_Shown({ Confirm-Install }) }
@@ -1262,6 +1391,7 @@ if ($script:done -and (Test-Path (Join-Path $Root 'runtime\node.exe'))) {
   if ($testLog) { Note 'exit' @{ code = $(if ($script:moved) { 3 } else { 0 }) }; exit $(if ($script:moved) { 3 } else { 0 }) }
   Make-Shortcuts
   Register-Uninstall
+  if ($script:vcRestart) { Say '安装完成。请重启 Windows 后再启动 MeguLit，以完成 Visual C++ 运行库更新'; exit 0 }
   # Installed somewhere else: start that copy (its own single-instance lock) and tell this exe to quit (exit 3 = not ready here).
   if ($script:moved) { Start-Process -FilePath (Join-Path $Root 'MeguLit.exe') -WorkingDirectory $Root; exit 3 }
   exit 0
