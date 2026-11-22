@@ -162,9 +162,21 @@ test('pass-through by engine confirmation can be taken back: unconfirmed lines r
 /* 2026-11-19 (user: calibrating 千恋＊万花 in hide mode, the screenshots had no game text in the dialogue box; log 05:56:10-05:56:20Z: write-back off,
    engine hide event reset, three sentences rendered by TextRender with lit glyphs, and still nothing on screen). The KiriKiri text layer
    functions are run as they are written in native/krkrtext/script.inc (TJS2 read as JavaScript: void -> undefined, isvalid -> true). */
-const trScript=()=>{const s=read('native/krkrtext/script.inc'),a=s.indexOf('st.trRestore=function(){'),b=s.indexOf('st.trDone=function(inst){');assert.ok(a>0&&b>a);
- const js=s.slice(a,b).replace(/ incontextof st;/g,';').replace(/isvalid this\.trT/g,'true').replace(/\bvoid\b/g,'undefined').replace(/%\[\]/g,'({})').replace(/\)MGLT",? LR"MGLT\(/g,'');
- return ()=>{const T={opacity:255},L={textLayer:T},sent=[],st={trOwner:L,trRec:[0,100001,' sw=1280 sh=720 text=あ'],trKey:'',on:false,trLayer:()=>L,hideOn(){return this.on;},report:l=>sent.push(l)};new Function('st',js)(st);return{T,L,st,sent,tick:()=>st.trHide()};};};
+const trScript=()=>{
+ const s=read('native/krkrtext/script.inc'),a=s.indexOf('st.shown=function(L){'),b=s.indexOf('st.trDone=function(inst){');
+ assert.ok(a>=0&&b>a);
+ const js=s.slice(a,b).replace(/ incontextof st;/g,';').replace(/isvalid (?:this\.trT|c)/g,'true')
+  .replace(/typeof ([\w.]+)==['"]Object['"]/g,'typeof $1==="object"')
+  .replace(/(fore|ms)\.count/g,'$1.length').replace(/\bvoid\b/g,'undefined').replace(/%\[\]/g,'({})')
+  .replace(/\)MGLT",? LR"MGLT\(/g,'').replace(/\bint\(/g,'Math.trunc(');
+ return ()=>{
+  const T={opacity:255},L={visible:true,textLayer:T},sent=[];
+  const st={kag:{current:L,fore:{messages:[L]}},trOwner:L,trRec:[0,100001,' sw=1280 sh=720 text=fixture'],
+   trKey:'',on:false,screen:()=>[1280,720],hideOn(){return this.on;},report:l=>sent.push(l)};
+  new Function('st',js)(st);
+  return {T,L,st,sent,tick:()=>st.trHide()};
+ };
+};
 test('preflight with the engine hide: the text layer is visible again whatever the game did to it while it was hidden',()=>{const rig=trScript();
  {const r=rig();r.st.on=true;r.tick();assert.equal(r.T.opacity,0);r.tick();r.st.on=false;r.tick();assert.equal(r.T.opacity,255,'plain case');assert.deepEqual(r.sent.map(l=>/hidden=(\d)/.exec(l)[1]),['1','0'],'the record follows the state');}
  /* a scene change: the game takes its text window away (opacity 0), MeguLit starts hiding in that moment, the game brings the window back */
@@ -176,6 +188,15 @@ test('preflight with the engine hide: the text layer is visible again whatever t
  {const r=rig();r.T.opacity=200;for(let i=0;i<3;i++){r.st.on=true;r.tick();assert.equal(r.T.opacity,0);r.st.on=false;r.tick();assert.equal(r.T.opacity,200);}}
  /* a text window the game itself keeps away stays away: MeguLit does not show what the game hid */
  {const r=rig();r.T.opacity=0;r.st.on=true;r.tick();r.tick();r.st.on=false;r.tick();assert.equal(r.T.opacity,0);}});
+test('TextRender restores opacity and clears the stale snapshot when ownership changes',()=>{
+ const rig=trScript();
+ for(const release of [r=>{r.st.kag.fore.messages=[];},r=>{r.L.parent={visible:false};},r=>{r.L.numLinks=1;}]){
+  const r=rig();r.st.on=true;r.tick();assert.equal(r.T.opacity,0);
+  release(r);r.tick();
+  assert.equal(r.T.opacity,255);assert.equal(r.st.trRec,undefined);
+  assert.match(r.sent.at(-1),/hidden=0 .* n=0 /);
+ }
+});
 test('every layer that hides the game text gives way in one place, and the pass-through counts clicks',()=>{const hb=read('native/HookBridge.cs');
  const down=hb.slice(hb.indexOf('static string LayersGiveWay(string reason){'),hb.indexOf('public static bool GiveWaySelfTest(){'));
  for(const part of ['ReplacementEnabled=false;','h.Reset();','EnginePassConfirmed=true;','GlyphOff();','Diagnostic("hide layers give way ("+reason+"): "+state);'])assert.ok(down.includes(part),part);

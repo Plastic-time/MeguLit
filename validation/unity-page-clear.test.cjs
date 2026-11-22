@@ -19,8 +19,8 @@ void Run(){ClearPublished();if(output.Count!=0)throw new Exception("unpublished"
  line=43;ClearPublished();if(output.Count!=2)throw new Exception("candidate");Console.WriteLine("PASS");}
 static void Main(){new H().Run();}}`;
   fs.writeFileSync(path.join(dir,'clear.cs'),harness);
-  let r=spawnSync(compiler,['/nologo','/out:'+path.join(dir,'clear.exe'),path.join(dir,'clear.cs')],{encoding:'utf8',windowsHide:true,timeout:15000});assert.equal(r.status,0,r.stdout+r.stderr);
-  r=spawnSync(path.join(dir,'clear.exe'),[],{encoding:'utf8',windowsHide:true,timeout:5000});assert.equal(r.status,0,r.stdout+r.stderr);
+  let r=spawnSync(compiler,['/nologo','/out:'+path.join(dir,'clear.exe'),path.join(dir,'clear.cs')],{encoding:'utf8',windowsHide:true,timeout:15000});assert.ifError(r.error);assert.equal(r.status,0,r.stdout+r.stderr);
+  r=spawnSync(path.join(dir,'clear.exe'),[],{encoding:'utf8',windowsHide:true,timeout:5000});assert.ifError(r.error);assert.equal(r.status,0,r.stdout+r.stderr);
   const lines=r.stdout.trim().split(/\r?\n/);assert.equal(lines.pop(),'PASS');
   const {parseChars}=require('../core/text-paths.cjs'),{OverlayPlacement}=require('../core/overlay-placement.cjs');
   const sent=[],place=new OverlayPlacement({send:m=>sent.push(m)});place.wanted=()=>true;place.configure({},{bound:true,clientWidth:1280,clientHeight:720});sent.length=0;

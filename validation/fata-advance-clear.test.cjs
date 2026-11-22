@@ -53,12 +53,12 @@ test('script: the cleared line is reported once, empty and not hidden, and only 
 test('wiring: the clear follows the flush in the wrapped MessageLayer.clear; the seed switches it on for ファタ only', () => {
   assert.ok(script.includes('try {this.st.flush(this,true);this.st.clearSent(this);this.cleared=true;'));
   assert.ok(script.includes("if(rec.role!='name') rec.sentLine=rec.line;"));
-  assert.ok(script.includes("else if(t=='#clearline') c.clear=1;"));
   const P = require('../core/profiles/index.cjs'), E = require('../core/engine-draw.cjs');
   const fata = P.profileFor({ exe: 'E:/GAL/海市蜃楼之馆/fata_jp.exe', engine: 'KiriKiri' }), senren = P.profileFor({ exe: 'D:/Games/SenrenBanka/SenrenBanka.exe', engine: 'KiriKiri' });
   assert.equal(E.settings(fata).clear, true); assert.equal(E.settings(senren).clear, false, 'kernel default off');
-  assert.ok(E.krkrControlText(E.settings(fata), new Map()).split('\r\n').includes('#clearline'));
-  assert.ok(!E.krkrControlText(E.settings(senren), new Map()).includes('#clearline'), '千恋＊万花: control file unchanged');
+  const replay=require('./helpers/krkr-control-replay.cjs').controlReplay();
+  assert.equal(replay.read(E.krkrControlText(E.settings(fata),new Map())).clear,1);
+  assert.equal(replay.read(E.krkrControlText(E.settings(senren),new Map())).clear,undefined,'the default preserves the engine path');
 });
 
 function placementRig() {

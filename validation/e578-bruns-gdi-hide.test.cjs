@@ -82,7 +82,15 @@ test('hook-native sends the probe once per state and forgets it with the process
  const {HookNative}=require('../core/hook-native.cjs');const n=Object.create(HookNative.prototype),sent=[];
  Object.assign(n,{process:{},send:m=>sent.push(m),trace(){}});
  n.probeHide(true);n.probeHide(true);n.probeHide(false);assert.deepEqual(sent,[{type:'probe',on:true},{type:'probe',on:false}]);
- assert.match(read('core/hook-native.cjs'),/stop\(dispose=true\)\{this\.embedModeSent=undefined;this\.probing=false;/);});
+ const pairs=[{base:'test'}],latest=[{base:'new'}];
+ Object.assign(n,{process:null,probing:true,embedModeSent:true,notify(){},islandSources:new Map(),
+  nativeRuby:{keys:['owned','replaced'],pairs},sourceRuby:new Map([['owned',pairs],['replaced',latest]])});
+ n.stop(false);
+ assert.equal(n.probing,false);
+ assert.equal(n.embedModeSent,undefined);
+ assert.equal(n.nativeRuby,null);
+ assert.deepEqual([...n.sourceRuby],[['replaced',latest]],'only ruby owned by the stopped session is dropped');
+ n.process={};n.probeHide(true);assert.deepEqual(sent.at(-1),{type:'probe',on:true},'the new process receives its own probe');});
 test('host: the probe switches the probed stream on without replacement, keeps it through a read-mode disable, and feeds the glyph hide',()=>{
  const b=read('native/HookBridge.cs');
  assert.ok(b.includes('else if(type=="probe"){object pv;ProbeWanted=d.TryGetValue("on",out pv)&&Convert.ToBoolean(pv);Probe();}'));
