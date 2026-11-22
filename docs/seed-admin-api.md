@@ -109,6 +109,43 @@ coverage start; newly accepted submissions count as upload requests, including
 accepted submission retries, not reconstructed historical unique uploads.
 Distinct reporter tags are explicitly upload identifiers, never human counts.
 
+## New-ingest uploader breakdown
+
+Overview also returns nullable `newIngestDistinctArtifacts` (distinct `item_id`
+among actual accepted upload events). `uploadCount` counts accepted upload
+events, including accepted resubmission requests. Neither value reconstructs
+the historical uploads overwritten by the legacy reports table.
+
+Authenticated `GET /api/seed-admin/uploaders?limit=1..50&cursor=` returns
+`{uploaders,nextCursor,coverageSince,scope}`. Scope is
+`accepted-new-ingest-identifiers-not-people`. Each uploader row contains:
+
+- `id`: server-secret HMAC identifier; `alias`: a short anonymous display code
+- `publicNames`: current, validated public credit names, with a truncation flag
+- `uploadCount`, `distinctArtifacts`
+- up to 20 `artifacts`, plus `artifactsTruncated` and `artifactsCursor`
+
+Artifact rows contain `itemId,key,layer,seedRev,title,engine,uploadCount` and
+link to the existing authenticated item detail. A missing title stays null;
+no work title is inferred from a shared EXE key. To read more artifacts, use
+`GET /api/seed-admin/uploaders?artifactsCursor=&limit=1..50`, whose response is
+`{id,artifacts,nextCursor,coverageSince,scope}`. Its next cursor is supplied
+again as `artifactsCursor`, not the top-level uploader cursor.
+
+Raw reporter tags, salted IP hashes, paths and emails are not exposed as
+uploader identities. Pagination cursors encrypt their internal keyset position
+with AES-GCM and a purpose-bound authenticated payload; identifiers use a
+separately derived HMAC key. The existing server `HASH_SALT`, or the configured
+admin token when no salt is present, is the secret material. Rotation invalidates
+old cursors/aliases. These are identifiers, not an assertion that one IP scope
+is one human. Public name withdrawal is read on every request.
+
+Empty new-ingest history returns `uploaders:[]` and nullable overview counts,
+not fabricated historical zeroes. A 50-uploader first-page fixture takes 12 D1
+statements; related artifact/credit lookup is page-scoped SQL, not per-uploader
+queries. Artifact pagination covers the complete finite event set without
+claiming that the initial 20 links are exhaustive.
+
 ## Capacity and validation
 
 Source rows are capped at 500 per community table/group set; exceeding that
