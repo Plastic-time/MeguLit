@@ -40,7 +40,7 @@ Deploy the gateway separately with `relay/scan-service/gateway/wrangler.toml`. O
 
 ### Dashboard control
 
-Open `/dashboard#seed-admin` on either relay and connect with the administrator credential. **自动处理普通 Seed** controls the ordinary publication queue on both domains. New installations default to enabled with migration `0038_ordinary_publish_policy.sql`. A clean, verified eligible upload publishes automatically. An infected candidate is quarantined. Temporary scan failures stay pending for retry
+Open `/dashboard#seed-admin` on either relay and connect with the administrator credential. **自动处理普通与增强 Seed** controls the ordinary and enhanced publication queues on both domains. New installations default to enabled with migration `0038_ordinary_publish_policy.sql`. A clean, verified eligible upload publishes automatically. An infected candidate is quarantined. Temporary scan failures stay pending for retry
 
 Pausing invalidates active publication leases while preserving queued uploads and published versions. Resuming starts processing again. The scanner indicator independently probes the authenticated gateway, Windows service and ClamAV definitions. An offline scanner leaves uploads queued. **高级管理 → 历史审核目录** contains the separate catalog of repository snapshots, reports, candidates and signed records
 

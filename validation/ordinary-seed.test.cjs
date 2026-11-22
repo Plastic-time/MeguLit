@@ -43,6 +43,7 @@ async function setup(t,{live=false}={}) {
   db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0031_torch_changes.sql'),'utf8'));
   db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0033_ordinary_seeds.sql'),'utf8'));
   db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0038_ordinary_publish_policy.sql'),'utf8'));
+  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0039_enhanced_seed_jobs.sql'),'utf8'));
   db.raw.exec('CREATE TABLE rate_limits(bucket TEXT PRIMARY KEY,count INTEGER,reset_at INTEGER)');
   t.after(()=>db.raw.close());
   const worker=await import('../relay/src/worker.js');
@@ -87,6 +88,17 @@ async function setup(t,{live=false}={}) {
     if(row.state===state&&!row.lease&&(state!=='pending'||row.retry_at>0))return row;await new Promise(r=>setTimeout(r,50));}assert.fail('missing state '+state);};
   return {root,config,publicKey,request,fetcher,submit,find,store,retry,f,socketBase,gateway};
 }
+test('enhanced scanner inspects exact signed bytes without using the ordinary signing key',async t=>{
+ const {f,config,gateway}=await setup(t);
+ config.ORDINARY_PRIVATE_KEY_FILE='missing-fixture-key';
+ const profile=f.profile(1,{...f.identity,script:'c'.repeat(64)});
+ const body=diff.canonical(profile);
+ const res=await fetch(new URL('scan-enhanced',gateway),{method:'POST',headers:{authorization:'Bearer '+config.ORDINARY_SCAN_TOKEN},body});
+ assert.equal(res.status,200);
+ const receipt=await res.json();
+ assert.equal(receipt.subject,crypto.createHash('sha256').update(body).digest('hex'));
+ assert.equal(receipt.state,'clean');assert.equal(receipt.signature,undefined);
+});
 test('player upload, scanner retry, quarantine, signature, offline install and signed revocation',async t=>{
   const {root,config,publicKey,request,fetcher,submit,find,store,retry,f,gateway}=await setup(t);
   if(process.env.MEGULIT_TEST_WORKER_BUNDLE){
@@ -116,7 +128,7 @@ test('player upload, scanner retry, quarantine, signature, offline install and s
     assert.doesNotMatch(init.body,/private library title|v7771|v19073|"v4"/);
     return fetcher(url,init);
   }});
-  assert.equal(posted.state,'sent');assert.equal(posted.credit.engraved,false);assert.equal(posted.credit.alias,null);
+  assert.equal(posted.state,'sent');assert.equal(posted.credit.engraved,false);assert.equal(posted.credit.alias,require('../core/torch-alias.cjs').fallbackAlias(posted.credit.torchNo));
   const [{id}]=(await store.prepare('SELECT id FROM ordinary_seed_jobs').all()).results;
   await find(id,'pending');assert.equal((await request('/api/game-profile?exe='+key)).status,404);
   config.CLAMD_PORT=realPort;
@@ -164,6 +176,7 @@ test('indeterminate receipts and untrusted publisher keys leave the job pending'
   db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0031_torch_changes.sql'),'utf8'));
   db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0033_ordinary_seeds.sql'),'utf8'));
   db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0038_ordinary_publish_policy.sql'),'utf8'));
+  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0039_enhanced_seed_jobs.sql'),'utf8'));
   const f=fixture(),thing=await jobs.enqueue(db,clean,new Date()),row=await db.prepare('SELECT * FROM ordinary_seed_jobs').first();
   const doc=ordinary.document(clean,thing.revision,row.issued_at);
   const signer=require('./helpers/torch-release.cjs').signer('ordinary-untrusted'),signed=signer.sign(doc);

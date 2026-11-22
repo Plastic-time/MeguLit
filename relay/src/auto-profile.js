@@ -40,6 +40,7 @@
 import gameDiff from '../../core/game-diff.cjs';
 import {wakeClients} from './seed-notifications.js';
 import ordinary from '../../core/ordinary-seed.cjs';
+import {enqueueEnhanced} from './enhanced-seed.js';
 import {boundedJSON, enqueue, processJob, status as ordinaryStatus} from './ordinary-seed.js';
 import protocol from '../../core/torch-release.cjs';
 import domains from '../../core/profiles/domains.cjs';
@@ -155,20 +156,21 @@ async function report(request,env,ip,now,{json,fail,ctx}){
  const reporter=owner||ip;
  const raw=await noteUpload(env,r.key,reporter,cr,now);
  const uploadId=candidate?await protocol.hash({ordinary:candidate,reporter}):undefined;
- await noteSeedUpload(env.DB,r,hash,reporter,raw.torchNo,now,uploadId);
+ const item=await noteSeedUpload(env.DB,r,hash,reporter,raw.torchNo,now,uploadId);
  /* 2026-11-21 kind: 'newVersion' = a shared diff found by head / pe / the game (not this exe) failed its first window here (the
     client's reason starts 「同游戏新版本」): this build needs its own version layer; 'broken' = the self-check stepped it down */
  if(r.source==='gate'){const kind=r.reason.startsWith('同游戏新版本')?'newVersion':'broken';await env.DB.prepare("INSERT INTO auto_profile_queue(game_key,gid,prints,exe,engine,reasons,note,kind,reporters,app,first_at,last_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?) ON CONFLICT(game_key) DO UPDATE SET gid=excluded.gid,prints=excluded.prints,exe=excluded.exe,engine=excluded.engine,reasons=excluded.reasons,note=excluded.note,kind=excluded.kind,reporters=auto_profile_queue.reporters+1,app=excluded.app,last_at=excluded.last_at,closed_at=NULL")
   .bind(r.key,gid,JSON.stringify(r.prints),r.exe,r.engine,JSON.stringify(r.over),r.reason,kind,r.app,t,t).run();}
  await settle(env,'version',r.key,now);if(gid)await settle(env,'game',gid,now);
  let job=null;
+ const enhanced=r.source!=='gate'&&(!candidate||r.engine&&variant)?await enqueueEnhanced(env.DB,item,r,raw.torchNo,now):null;
  if(candidate){job=await enqueue(env.DB,candidate,now);if(job.state==='pending'&&env.ORDINARY_SCAN_URL&&ctx?.waitUntil)ctx.waitUntil(processJob(env,job.id,now));}
  if(owner&&r.source!=='gate'&&(candidate||Object.keys(body.value.profile.settings||{}).length&&ordinary.normalize({key:r.key,mode:r.mode,settings:body.value.profile.settings}))){
   await engrave(env.DB,{owner,key:r.key,no:raw.torchNo,time:t,credit:cr,preferred:alias,declaredWork:r.prints.vndb});
  }
  const shown=owner&&creditOut(await carvingFor(env.DB,raw.torchNo));
  const credit=shown?{...shown,engraved:true}:{torchNo:raw.torchNo,name:cr.name??null,at:raw.at,engraved:false};
- return json({ok:true,...(job?{ordinary:job}:{}),queued:r.source==='gate',game:gid||null,torchNo:credit.torchNo,name:credit.name,at:credit.at,credit},201);}
+ return json({ok:true,...(job?{ordinary:job}:{}),...(enhanced?{enhanced}:{}),queued:r.source==='gate',game:gid||null,torchNo:credit.torchNo,name:credit.name,at:credit.at,credit},201);}
 async function lookup(env,url,exeFromPath,{json,fail}){const q=Object.fromEntries(['exe','head','pe','pack','script','steam','vndb','title'].map(k=>[k,url.searchParams.get(k)||'']));if(exeFromPath)q.exe=exeFromPath;
  const prints=gamePrint.check(q);if(!Object.keys(prints).length)return fail('NO_PRINTS',400);
  const previous=url.searchParams.get('ordinary');

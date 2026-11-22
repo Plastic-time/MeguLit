@@ -9,10 +9,10 @@ async function authorized(request,secret){
  const [actual,expected]=await Promise.all([digest(header),digest('Bearer '+secret)]);
  return crypto.subtle.timingSafeEqual(actual,expected);
 }
-async function readDocument(request){
+async function readDocument(request,limit){
  const reader=request.body?.getReader();
  if(!reader)return null;
- const data=new Uint8Array(4096);
+ const data=new Uint8Array(limit);
  let offset=0;
  for(;;){
   const {done,value}=await reader.read();
@@ -25,7 +25,7 @@ async function readDocument(request){
 export default {
  async fetch(request,env){
   const path=new URL(request.url).pathname;
-  const scan=path==='/scan'&&request.method==='POST';
+  const scan=(path==='/scan'||path==='/scan-enhanced')&&request.method==='POST';
   const connect=path==='/connect'&&request.method==='GET'&&request.headers.get('upgrade')?.toLowerCase()==='websocket';
   const health=path==='/health'&&request.method==='GET';
   if(!scan&&!connect&&!health)return new Response(null,{status:404});
@@ -43,9 +43,10 @@ export class OrdinaryScanner {
    this.state.acceptWebSocket(host);
    return new Response(null,{status:101,webSocket:client});
   }
+  const enhanced=new URL(request.url).pathname==='/scan-enhanced';
   let doc;
   if(!health){
-   try{doc=await readDocument(request);}catch{return new Response(null,{status:400});}
+   try{doc=await readDocument(request,enhanced?128*1024:4096);}catch{return new Response(null,{status:400});}
    if(!doc)return new Response(null,{status:413});
   }
   const [host]=this.state.getWebSockets();
@@ -55,7 +56,7 @@ export class OrdinaryScanner {
    const finish=response=>{clearTimeout(timer);this.pending.delete(id);resolve(response);};
    const timer=setTimeout(()=>finish(unavailable()),health?3500:20000);
    this.pending.set(id,{host,finish});
-   try{host.send(JSON.stringify(health?{id,health:true}:{id,doc}));}catch{finish(unavailable());}
+   try{host.send(JSON.stringify(health?{id,health:true}:{id,doc,...(enhanced?{enhanced:true}:{})}));}catch{finish(unavailable());}
   });
  }
  webSocketMessage(host,raw){

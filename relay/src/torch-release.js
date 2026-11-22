@@ -34,7 +34,15 @@ export async function propose(db,input,env,now=new Date()){
  await db.prepare('INSERT OR IGNORE INTO torch_release_pending(hash,game_key,previous_hash,body,created_at) VALUES(?,?,?,?,?)').bind(hash,proposal.key,proposal.previous,gameDiff.canonical(proposal),proposal.preparedAt).run();
  return {hash,proposal,status:'awaiting-offline-signature'};
 }
-export async function publish(db,release,env,now=new Date()){
+export async function enhancedBaseline(db,proposal){
+ if(proposal.previous)return null;
+ const prior=await db.prepare("SELECT body FROM game_diffs WHERE layer='version' AND game_key=? AND withdrawn_at IS NULL ORDER BY (source='official') DESC LIMIT 1").bind(proposal.key).first();
+ if(!prior)return null;
+ const doc=JSON.parse(prior.body);
+ if(doc.mode!==proposal.profile.mode||!protocol.same(doc.settings,proposal.profile.settings))reject('TORCH_BASELINE_UNREVIEWED');
+ return prior.body;
+}
+export async function publish(db,release,env,now=new Date(),job=null){
  if(await blockedProfile(db,release.profile)||await blockedProposal(db,release))reject('TORCH_REVOKED');
  const proof=await protocol.checked(release,trust(env)),unsigned=gameDiff.unsigned(release),pendingHash=await protocol.hash(unsigned),pending=await db.prepare('SELECT * FROM torch_release_pending WHERE hash=?').bind(pendingHash).first();
  if(!pending||pending.body!==gameDiff.canonical(unsigned)||now.getTime()-Date.parse(pending.created_at)>7*86400000||Date.parse(pending.created_at)>now.getTime())reject('TORCH_PENDING');
@@ -44,9 +52,11 @@ export async function publish(db,release,env,now=new Date()){
  protocol.transition(release,current,{target,revoked:blocked});
  if(release.action==='promote'&&await db.prepare('SELECT hash FROM torch_release_history WHERE profile_hash=?').bind(proof.profileHash).first())reject('TORCH_REPLAY');
  const malware=await cleanForProfile(db,release.profile),tombstone=await profileBlock(release.profile),body=gameDiff.canonical(release),args=[proof.hash,release.key,release.revision,release.previous,proof.profileHash,body,now.toISOString(),release.key,release.previous,release.previous];
+ const priorBody=job?await enhancedBaseline(db,release):null;
+ const jobGuard=job?" AND EXISTS(SELECT 1 FROM enhanced_seed_jobs j JOIN seed_admin_items i ON i.id=j.id WHERE j.id=? AND j.lease=? AND j.state='pending' AND j.available_at>? AND i.state<>'deleted' AND j.proposal=? AND (json_extract(j.proposal,'$.previous') IS NOT NULL OR (SELECT body FROM game_diffs WHERE layer='version' AND game_key=? AND withdrawn_at IS NULL ORDER BY (source='official') DESC LIMIT 1) IS ?) AND (SELECT enabled FROM ordinary_publish_policy WHERE id=1)=1)":"";
  const result=await db.batch([
-  db.prepare('INSERT INTO torch_release_history(hash,game_key,revision,previous_hash,profile_hash,body,published_at) SELECT ?,?,?,?,?,?,? WHERE (SELECT hash FROM torch_release_winners WHERE game_key=?) IS ? AND NOT EXISTS(SELECT 1 FROM torch_release_revocations WHERE profile_hash=?) AND NOT EXISTS(SELECT 1 FROM seed_admin_items WHERE '+tombstone.sql+') AND EXISTS(SELECT 1 FROM seed_malware_current m JOIN seed_admin_items i ON i.id=m.item_id WHERE m.artifact_key=? AND m.state=? AND m.revision=? AND m.identity_hash=? AND m.profile_hash=? AND m.item_id=? AND i.state<>? AND i.body=?)').bind(...args.slice(0,9),proof.profileHash,...tombstone.args,malware.artifactKey,'clean',malware.revision,malware.identityHash,malware.profileHash,malware.itemId,'deleted',malware.sourceBody),
-  db.prepare('INSERT INTO torch_release_winners(game_key,hash) SELECT ?,? WHERE EXISTS(SELECT 1 FROM torch_release_history WHERE hash=?) ON CONFLICT(game_key) DO UPDATE SET hash=excluded.hash WHERE torch_release_winners.hash IS ?').bind(release.key,proof.hash,proof.hash,release.previous)
+  db.prepare('INSERT INTO torch_release_history(hash,game_key,revision,previous_hash,profile_hash,body,published_at) SELECT ?,?,?,?,?,?,? WHERE (SELECT hash FROM torch_release_winners WHERE game_key=?) IS ? AND NOT EXISTS(SELECT 1 FROM torch_release_revocations WHERE profile_hash=?) AND NOT EXISTS(SELECT 1 FROM seed_admin_items WHERE '+tombstone.sql+') AND EXISTS(SELECT 1 FROM seed_malware_current m JOIN seed_admin_items i ON i.id=m.item_id WHERE m.artifact_key=? AND m.state=? AND m.revision=? AND m.identity_hash=? AND m.profile_hash=? AND m.item_id=? AND i.state<>? AND i.body=?)'+jobGuard).bind(...args.slice(0,9),proof.profileHash,...tombstone.args,malware.artifactKey,'clean',malware.revision,malware.identityHash,malware.profileHash,malware.itemId,'deleted',malware.sourceBody,...(job?[job.id,job.lease,job.time,job.proposal,release.key,priorBody]:[])),
+  db.prepare('INSERT INTO torch_release_winners(game_key,hash) SELECT ?,? WHERE EXISTS(SELECT 1 FROM torch_release_history WHERE hash=?) ON CONFLICT(game_key) DO UPDATE SET hash=excluded.hash WHERE torch_release_winners.hash IS ?').bind(release.key,proof.hash,proof.hash,release.previous),
  ]);
  if(!result[0]?.meta?.changes||!result[1]?.meta?.changes)reject('TORCH_STALE');
  return {hash:proof.hash,status:'published'};

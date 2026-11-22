@@ -54,3 +54,25 @@ test('changed malware identity before POST requires a new explicit review, no si
 test('malware acknowledgement without own exact audit remains unconfirmed and blocks repeat writes',async()=>{const r=await malwareRig();await r.load();r.fill();const initial=r.data();let posted=false;r.setFetch((_url,init)=>{if(init.method==='POST'){posted=true;return new Response(JSON.stringify({ok:true,itemId:id,identity:initial.identity,review:{...initial.review,state:'clean',revision:1},auditId:'ours'}));}return new Response(JSON.stringify(posted?{...initial,review:{state:'clean',revision:1,evidenceSummary:'isolated evidence 01'},audit:[{auditId:'someone-else',itemId:id,beforeRevision:0,afterRevision:1,newState:'clean'}]}:initial));});await r.find('病毒检查通过').emit('click');assert.match(r.map.notice.textContent,/检查写入尚未确认/);assert.equal(r.find('病毒检查通过').disabled,true);});
 test('ten-point formatter bounds total scores, precision and unknown values without converting invalids to zero',async()=>{const {cardinalTenPoint}=await import(pathToFileURL(path.join(__dirname,'../relay/src/dashboard-seed-admin.js')));for(const [input,output] of [[0,'0 / 10'],[.94,'9.4 / 10'],[.999,'9.99 / 10'],[.9999,'9.99 / 10'],[.9999999999999999,'9.99 / 10'],[1,'10 / 10'],[.12899,'1.29 / 10']])assert.equal(cardinalTenPoint(input),output);for(const input of [null,undefined,NaN,Infinity,-.01,1.0001,'0.5',false])assert.equal(cardinalTenPoint(input),'未知');});
 test('actual client renders total and all seven dimensions on ten-point scale while preserving counts and source data',async()=>{const cardinal={total:.999,scores:{row:0,stable:.94,clean:.999,clear:1,choice:null,pair:.57,leak:1.1},reliable:false,basis:'fixture'};const before=JSON.stringify(cardinal),r=await rig({item:{cardinal}});await r.connect();assert.match(r.map.items.textContent,/Cardinal 9\.99 \/ 10/);assert.match(r.map.items.textContent,/上传 2 \/ 标识 1/);await r.select();assert.match(r.map.detail.textContent,/Cardinal 得分：9\.99 \/ 10/);for(const value of ['正文 0 / 10','稳定 9.4 / 10','杂字 9.99 / 10','翻页清除 10 / 10','配对 5.7 / 10'])assert.ok(r.map.detail.textContent.includes(value),value);assert.doesNotMatch(r.map.detail.textContent,/选项 未知|残留 未知/);assert.equal(JSON.stringify(cardinal),before);});
+
+test('history source clears empty state and search, retains source on next page, and opens signed detail',async()=>{
+ const r=await rig();await r.connect();
+ const picks=Array.from({length:21},(_,i)=>({...item(),kind:'pick',id:(i+1).toString(16).padStart(64,'0')}));
+ const signed={...item(),kind:'signed',title:'signed detail'};
+ const overview={counts:{total:227,reviewing:0},byKind:{pick:21,report:95,repository:110,signed:1}};
+ r.setFetch((path,init)=>{
+  assert.equal(init.headers.authorization,'Bearer private-test-token');
+  const url=new URL(path,'https://fixture.invalid'),q=url.searchParams;
+  if(path.endsWith('/overview'))return Response.json(overview);
+  if(url.pathname.endsWith('/item'))return Response.json({item:signed,audit:[]});
+  const kind=q.get('kind');
+  if(kind)assert.equal(q.get('state'),null);
+  const items=q.get('state')==='reviewing'?[]:kind==='pick'?(q.has('cursor')?picks.slice(20):picks.slice(0,20)):[signed];
+  return Response.json({items,nextCursor:kind==='pick'&&!q.has('cursor')?picks[19].id:null});
+ });
+ await r.find('核查中 0').emit('click');assert.match(r.map.items.textContent,/核查中/);assert.ok(r.find('查看全部'));
+ r.map.search.value='conflict';await r.find('自动候选 21').emit('click');assert.equal(r.map.search.value,'');assert.equal(r.map.filter.value,'');assert.equal(r.map.items.children.length,20);
+ await r.map.more.emit('click');assert.equal(r.map.items.children.length,21);
+ await r.find('已签名版本 1').emit('click');assert.equal(r.map.items.children.length,1);assert.match(r.map.items.textContent,/查看详情/);
+ await r.select();assert.match(r.map.detail.textContent,/signed detail/);assert.equal(r.map.detail.focused,true);
+});

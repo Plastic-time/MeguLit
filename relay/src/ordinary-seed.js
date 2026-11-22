@@ -126,10 +126,12 @@ export async function ordinaryPolicyRoute(request,env,now,ctx,{json,fail,readJSO
     return json({ok:true});
   }
   if(request.method!=='GET')return fail('METHOD_NOT_ALLOWED',405);
+  const time=Math.floor(now.getTime()/1000);
+  const enhanced=await db.prepare(`SELECT count(*) AS pending,count(CASE WHEN lease IS NOT NULL AND available_at>? THEN 1 END) AS active,(SELECT seen_at FROM enhanced_seed_host WHERE id=1) AS lastSeen FROM enhanced_seed_jobs j JOIN seed_admin_items i ON i.id=j.id WHERE j.state='pending' AND i.state<>'deleted'`).bind(time).first();
   const [row,scanner]=await Promise.all([db.prepare(`SELECT enabled,revision,changed_at,
     (SELECT count(*) FROM ordinary_seed_jobs WHERE state='pending') AS pending,
     (SELECT count(*) FROM ordinary_seed_jobs WHERE state='pending' AND lease IS NOT NULL AND retry_at>?) AS scanning
     FROM ordinary_publish_policy WHERE id=1`).bind(Math.floor(now.getTime()/1000)).first(),scannerState(env)]);
   if(!row)return fail('NOT_CONFIGURED',503);
-  return json({enabled:!!row.enabled,revision:row.revision,changedAt:row.changed_at,pending:row.pending,scanning:row.scanning,scanner});
+  return json({enabled:!!row.enabled,revision:row.revision,changedAt:row.changed_at,pending:row.pending,scanning:row.scanning,scanner,enhanced:{...enhanced,host:enhanced.lastSeen!=null&&time-enhanced.lastSeen<=300?'online':'waiting'}});
 }

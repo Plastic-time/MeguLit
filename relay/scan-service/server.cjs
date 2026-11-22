@@ -60,8 +60,9 @@ function server(config) {
   let active = 0;
   return http.createServer({requestTimeout:15000,headersTimeout:10000}, async (req,res) => {
     const send = (status,value) => { res.writeHead(status,{'content-type':'application/json','cache-control':'no-store'}); res.end(JSON.stringify(value)); };
+    const enhanced=req.url==='/scan-enhanced';
     const health=req.method==='GET'&&req.url==='/health';
-    if (!health && (req.method !== 'POST' || req.url !== '/scan')) return send(404,{});
+    if (!health && (req.method !== 'POST' || req.url !== '/scan' && !enhanced)) return send(404,{});
     if (!crypto.timingSafeEqual(auth,Buffer.from(hash(req.headers.authorization || '')))) return send(401,{});
     if(health){try{await scannerInfo(config);return send(200,{scanner:'online'});}catch{return send(200,{scanner:'unready'});}}
     if (active >= 2) return send(503,{});
@@ -71,12 +72,17 @@ function server(config) {
       const chunks = [];
       for await (const chunk of req) {
         size += chunk.length;
-        if (size > 4096) return send(413,{});
+        if (size > (enhanced?128*1024:4096)) return send(413,{});
         chunks.push(chunk);
       }
       const bytes = Buffer.concat(chunks), text = bytes.toString('utf8');
       let doc;
       try { doc = JSON.parse(text); } catch { return send(422,{}); }
+      if(enhanced){
+        if(!diff.validate(doc).ok||!doc.signature||!bytes.equals(Buffer.from(diff.canonical(doc))))return send(422,{});
+        const {connection,version,definitions}=await scannerInfo(config);
+        return send(200,{subject:hash(bytes),state:await scan(connection,bytes),scanner:'ClamAV',version,definitions,scannedAt:new Date().toISOString()});
+      }
       if (!ordinary.valid(doc) || !bytes.equals(Buffer.from(diff.canonical(doc)))) return send(422,{});
       send(200,await inspect(doc,bytes,config));
     } catch { send(503,{state:'unavailable'}); }
