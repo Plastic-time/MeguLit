@@ -29,3 +29,21 @@ files 中各文件置于同级 files 目录，overlay manifest 与五个文件�
 完整命令、原错误、私有目录、0 遗留进程与旧 payload 未变证据在 `H:/MeguLit-Work/night-1423/installer-finalize-pending-approval.md`
 
 新增 fixture 预期覆盖 25 个行为断言，当前未通过，不跳过或删断言，不把静态解析或先前 Python 事务夹具通过当此 PowerShell 工具行为通过
+
+## 独立静态并发修正（行为仍未验）
+
+原候选有两处可由代码时序直接确认的缺口：standalone finalize 只拿自己的 finalizer.lock，不能和安装/刷新共锁；launcher 在拿共同锁之前完成 source/manifest 校验，刷新可夹在校验与启动之间导致 receipt 仍指旧 candidate
+
+本追加禁止 standalone `-Apply`，安装器单入口持有 `owner/log/installer-owner.lock` 的真实 FileStream
+source/manifest/overlay 校验、子安装器完成、installed 事件核对和最终 overlay 发布都位于同一共同锁内，`-ValidateOnly` 入口也先持共同锁
+已提前载入的纯 scope helper 在持锁后重新核哈希，变化即拒绝重试；dot-source finalizer 显式保留入口的 ValidateOnly 开关，不得掉入安装路径
+
+finalize API 不接受布尔 skip-lock 参数，只接受精确共同锁路径、仍有效、可读写的真实 FileStream，并分别核对新读/写句柄均因 sharing violation 被拒
+内部 apply core 也再次校验，保留原 finalizer.lock、回滚与 journal，不通过公开参数绕过共同锁
+standalone 非 Apply 模式仍仅是只读诊断，不是安装器的权威锁内 preflight
+入口 ValidateOnly 现在会取得/创建小的共同控制锁及 log 目录，仍不写 source/installed/runtime，不启动界面；不可再声称整个入口完全零文件写入
+
+原 25 项夹具改为持同一真实锁调用，追加无句柄拒绝项，共 26 项计划断言
+这些脚本、Node driver、AST/运行验证均未执行；没有更换解释器、Bypass 或重试先前被拒动作
+后续批准后仍须验证：非独占/已释放/错误路径句柄拒绝，ValidateOnly 不启动，安装与 refresh/finalize 的共同锁排斥，锁内重新核验的 candidate 归属、取消/失败/exit3、五文件发布及失败回滚
+现有 launcher 先前就包含的 `-ExecutionPolicy Bypass` 字符串并未在此静态追加中获得执行许可，运行链保持 pending

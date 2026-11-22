@@ -70,7 +70,25 @@ function Get-OwnerRuntimeOverlay($Scope) {
   foreach ($r in $components.files) { $name = [string]$r.name; $match = @($rows | Where-Object { $_.name -ceq $name }); if ($name -ceq 'components.json' -or $componentNames.ContainsKey($name) -or $match.Count -ne 1 -or $match[0].after -cne $r.sha256 -or $match[0].size -ne [long]$r.size) { throw 'OWNER_RUNTIME_COMPONENTS_PIN' }; $componentNames[$name] = $true }
   return @{ candidateCommit = $m.candidateCommit; rows = @($rows | Sort-Object @{ Expression = { $_.name -eq 'components.json' } }, name) }
 }
-function Invoke-OwnerRuntimeFinalizeCore($Scope, [switch]$Apply, [scriptblock]$ProcessInventory = { Get-CimInstance Win32_Process }) {
+function Assert-OwnerFinalizeInstallerLock($Scope, [IO.FileStream]$OwnerLock) {
+  $expected = Assert-OwnerFinalizePath $Scope (Join-Path $Scope.owner 'log\installer-owner.lock') 'owner'
+  if (-not $OwnerLock -or $OwnerLock.GetType() -ne [IO.FileStream] -or -not $OwnerLock.CanRead -or -not $OwnerLock.CanWrite -or $OwnerLock.SafeFileHandle.IsClosed -or $OwnerLock.SafeFileHandle.IsInvalid -or (Get-SetupLocalPath $OwnerLock.Name) -ine $expected -or -not [IO.File]::Exists($expected)) { throw 'OWNER_RUNTIME_INSTALLER_LOCK_REQUIRED' }
+  # Only the launcher's actual, still-held FileStream is accepted; no serialized skip-lock flag exists.
+  foreach ($access in [IO.FileAccess]::Read,[IO.FileAccess]::Write) {
+    $probe = $null; $denied = $false
+    try { $probe = [IO.File]::Open($expected, [IO.FileMode]::Open, $access, [IO.FileShare]::ReadWrite) }
+    catch {
+      $failure = $_.Exception
+      for ($depth = 0; $depth -lt 4 -and $failure.InnerException; $depth++) { $failure = $failure.InnerException }
+      if ($failure -isnot [IO.IOException] -or ($failure.HResult -band 0xffff) -ne 32) { throw }
+      $denied = $true
+    }
+    finally { if ($probe) { $probe.Dispose() } }
+    if (-not $denied) { throw 'OWNER_RUNTIME_INSTALLER_LOCK_NOT_EXCLUSIVE' }
+  }
+}
+function Invoke-OwnerRuntimeFinalizeCore($Scope, [switch]$Apply, [IO.FileStream]$OwnerLock, [scriptblock]$ProcessInventory = { Get-CimInstance Win32_Process }) {
+  if ($Apply) { Assert-OwnerFinalizeInstallerLock $Scope $OwnerLock }
   foreach ($area in 'owner','source','staging','target') { Assert-OwnerFinalizePath $Scope $Scope[$area] $area | Out-Null }
   $overlay = Get-OwnerRuntimeOverlay $Scope
   $hook = Assert-OwnerFinalizePath $Scope (Join-Path $Scope.target 'runtime\megulithook') 'target'
@@ -122,7 +140,8 @@ function Invoke-OwnerRuntimeFinalizeCore($Scope, [switch]$Apply, [scriptblock]$P
   }
 }
 
-function Invoke-OwnerRuntimeFinalize($Scope, [switch]$Apply, [scriptblock]$ProcessInventory = { Get-CimInstance Win32_Process }) {
+function Invoke-OwnerRuntimeFinalize($Scope, [switch]$Apply, [IO.FileStream]$OwnerLock, [scriptblock]$ProcessInventory = { Get-CimInstance Win32_Process }) {
+  Assert-OwnerFinalizeInstallerLock $Scope $OwnerLock
   if (-not $Apply) { return Invoke-OwnerRuntimeFinalizeCore $Scope -ProcessInventory $ProcessInventory }
   # Reject a bad overlay or target link before even creating the owned control lock.
   $null = Get-OwnerRuntimeOverlay $Scope
@@ -131,15 +150,17 @@ function Invoke-OwnerRuntimeFinalize($Scope, [switch]$Apply, [scriptblock]$Proce
   [IO.Directory]::CreateDirectory($stage) | Out-Null
   $lock = Assert-OwnerFinalizePath $Scope (Join-Path $stage 'finalizer.lock') 'staging'
   $held = [IO.File]::Open($lock, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
-  try { return Invoke-OwnerRuntimeFinalizeCore $Scope -Apply -ProcessInventory $ProcessInventory } finally { $held.Dispose() }
+  try { return Invoke-OwnerRuntimeFinalizeCore $Scope -Apply -OwnerLock $OwnerLock -ProcessInventory $ProcessInventory } finally { $held.Dispose() }
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
   try {
+    if ($Apply) { throw 'OWNER_RUNTIME_FINALIZE_LAUNCHER_ONLY' }
     $owner = 'H:\MeguLit-Work\night-1423\installer-owner-test'
     $expected = Join-Path $owner 'installed\MeguLit'
     if ((Get-SetupLocalPath $Target) -ine $expected -or ($Apply -and $ValidateOnly)) { throw 'OWNER_RUNTIME_FINALIZE_EXACT_TARGET_REQUIRED' }
     $scope = @{ owner = $owner; source = (Join-Path $owner 'source'); target = $expected; staging = (Join-Path $owner 'staging\runtime-finalize') }
-    Invoke-OwnerRuntimeFinalize $scope -Apply:$Apply | ConvertTo-Json -Depth 4 -Compress
+    # Standalone validation is a read-only diagnostic, not the launcher's authoritative locked preflight.
+    Invoke-OwnerRuntimeFinalizeCore $scope | ConvertTo-Json -Depth 4 -Compress
   } catch { throw ('安装后的运行组件尚未就绪：' + $_.Exception.Message) }
 }
