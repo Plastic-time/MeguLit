@@ -15,7 +15,7 @@ function fixture(t,entry){
 }
 
 test('a size changed in Settings while the game is closed is the one the game starts with',t=>{
- const {settings,launch}=fixture(t,{prefs:{japaneseSize:34,translationSize:30,sizeSource:'user',x:10,y:70,width:80}});
+ const {settings,launch}=fixture(t,{prefs:{japaneseSize:34,translationSize:30,englishSize:34,sizeSource:'',x:10,y:70,width:80}});
  settings.save({scope:'text',values:{japaneseSize:24,translationSize:20}});
  assert.deepEqual([launch().japaneseSize,launch().translationSize],[24,20]);
  assert.equal(settings.read('text',key).japaneseSize,24,'the work\'s page in Settings shows the same size');
@@ -174,7 +174,25 @@ test('an old entry of copied defaults keeps following Settings when one global s
 
 test('a work saved under the rule keeps a size equal to the old built-in one',()=>{
  assert.equal(profile.normalize({prefs:{japaneseSize:34},sizes:1}).prefs.japaneseSize,34);
- assert.equal('japaneseSize' in profile.normalize({prefs:{japaneseSize:34}}).prefs,false);
- assert.equal(profile.normalize({prefs:{japaneseSize:34}}).sizes,1);
+ assert.equal('japaneseSize' in profile.normalize({prefs:{japaneseSize:34,translationSize:30}}).prefs,false);
+ assert.equal(profile.normalize({prefs:{japaneseSize:34,translationSize:30}}).sizes,1);
  assert.equal(fs.readFileSync(path.join(__dirname,'..','core','game-profile.js'),'utf8'),fs.readFileSync(path.join(__dirname,'..','web','reader','modules','game-profile.js'),'utf8'));
+});
+
+// Shapes the previous release wrote for a size picked by hand while Settings said 24: Alt+T saved the whole text set and
+// marked a size changed in the menu sizeSource 'user'; the work's page in Settings saved only the fields it changed, with the
+// same mark. Neither is a copied default, so the upgrade, the next save from either place and a restart keep 34.
+test('a size an old release saved by hand stays through the upgrade, the next save and a restart',t=>{
+ for(const prefs of [{japaneseSize:34,translationSize:30,englishSize:34,sizeSource:'user',x:10},{japaneseSize:34,sizeSource:'user',x:10}]){
+  const {settings,launch,stored}=fixture(t,{prefs});
+  settings.save({scope:'text',values:{japaneseSize:24}});
+  assert.equal(launch().japaneseSize,34,'after the upgrade');
+  const sync=new GameStyleSync({config:settings.folder},()=>{});sync.profileKey=key;
+  assert.equal(sync.saveProfile({...sync.effective(sync.profile),textColor:'#ffeeaa'},'text'),true);
+  assert.equal(stored().prefs.japaneseSize,34,'Alt+T save');
+  settings.save({scope:'text',profile:key,values:{textColor:'#eeeeee'}});
+  assert.equal(stored().prefs.japaneseSize,34,"the work's page");assert.equal(stored().sizes,1);
+  settings.save({scope:'text',values:{japaneseSize:22}});
+  assert.equal(launch().japaneseSize,34,'restart');
+ }
 });
