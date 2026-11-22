@@ -93,6 +93,7 @@ class Reader{
   if(message.type==='hookFont')this.engineFont(message);
   if(message.type==='hookFontFile')this.engineFontFile(message);
   if(message.type==='markerPresence')this.immersion.marker(message.present===true);
+  if(message.hookSequence!==undefined)require('./self-check-live.cjs').seedBoundary(this,message);
   if(message.type==='waitMarkerDrawn'){this.immersion.markerDrawn();this.gal?.send({type:'markerHookDrawn'});}
   /* 2026-11-16 why the bridge hid or moved the reading layer (menu / cover / dialogue / foreground), once per change: a report of MeguLit's text vanishing is matched against it */if(message.type==='coverDebug'&&typeof message.text==='string'&&message.text!==this.lastCoverDebug){/* every change is kept: the 250 ms limit dropped the hide that followed a z-order move right after the menu closed */this.lastCoverDebug=message.text;this.lastCoverDebugAt=Date.now();this.logVisibility({type:'coverDebug',text:message.text.slice(0,240)});}
   /* Issue 127: Alt+H and its hotkey registration reach the log, so a report shows whether the cover was really switched */if(message.type==='ready')this.logVisibility({type:'readerHotkeys',menu:message.hotkey,cover:message.coverHotkey,mode:message.modeHotkey});if(message.type==='cover'&&typeof message.coverEnabled==='boolean')this.logVisibility({type:'cover',enabled:message.coverEnabled});

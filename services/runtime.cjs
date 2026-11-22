@@ -128,7 +128,7 @@ case 'library_scan':{this.libraryScans??=new(require('./library-scan.cjs').Libra
   this.stopping=(async()=>{
    let first,failed=false;
    const settle=async tasks=>{const results=await Promise.allSettled(tasks.map(run=>Promise.resolve().then(run)));for(const r of results)if(r.status==='rejected'&&!failed){failed=true;first=r.reason;}};
-   await settle([()=>require('./torch-receive.cjs').stop(this.root),()=>require('./story-analysis.cjs').stop(),()=>this.stopReading(),()=>this.ankiRunner?.stop(),()=>this.gameEnrichment?.stop(),()=>this.gameReviews?.stop()]);
+   await settle([()=>this.stopSeedLive?.(),()=>require('./torch-receive.cjs').stop(this.root),()=>require('./story-analysis.cjs').stop(),()=>this.stopReading(),()=>this.ankiRunner?.stop(),()=>this.gameEnrichment?.stop(),()=>this.gameReviews?.stop()]);
    await settle([()=>this.localLearning?.stop(),...Object.keys(this.modelStore?.jobs||{}).map(id=>()=>this.modelStore.cancel(id)),()=>this.localEngine?.cancel()]);
    await settle([()=>this.serviceManager?.stop(),()=>this.localEngine?.stop()]);
    if(failed)throw first;

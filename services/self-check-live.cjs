@@ -44,7 +44,7 @@ function profileInput(s,sh){const out={...(s.input||{})};for(const k of ['shared
  return out;}
 function verifiedLocal(s){const st=s.stored;
  return !!s.script&&st?.source!=='gate'&&(st?.verifiedScript===s.script||st?.cold?.verdict==='pass'&&st.cold.measured?.length>0);}
-function inputOf(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe||s.exe),out=profileInput(s,sh);
+function inputOf(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe||s.exe,{pinned:true}),out=profileInput(s,sh);
  /* a verified / owner-ok built-in seed is official: this PC's calibration is not layered under it (its unpinned calibrate.* would
     still say read); the active gate step-down stays last */
  const seedOk=['verified','owner-ok'].includes(s.profile?.seedStatus);
@@ -56,7 +56,7 @@ function inputOf(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe
  return out;}
 function applyLayer(s){try{const p=require('../core/owner-tests.cjs').apply(Profiles.profileFor(inputOf(s)),s.reader.gal?.hooks?.ownerTestGrant,{exe:s.exe,engine:s.profile?.engine});s.profile=p;/* Cardinal's tape keeps the lines this game's rules replay */require('../core/cardinal/tape.cjs').keep(p.cardinal?.lines);s.reader.gal?.setGameProfile?.(p,s.input);}catch{}}
 /* which layer wins (see above) */
-function choose(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe||s.exe);
+function choose(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe||s.exe,{pinned:true});
  const gate=st?.source==='gate',superseded=gate&&supersedesGate(profileInput(s,sh),st);
  if(gate&&!superseded)return {from:'local-gate',mode:'read',settings:st.settings,reason:st.reason||''};
  if(verifiedLocal(s))return {from:'local',mode:st.mode,settings:st.settings,reason:st.reason||''};
@@ -68,7 +68,7 @@ function choose(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe|
  if(st)return {from:'local',mode:st.mode,settings:st.settings,reason:st.reason||''};
  if(sh)return {from:'shared',mode:sh.mode,settings:sh.settings,reason:sh.mode==='read'?'多数玩家在这部游戏上自检未过线':''};
  return null;}
-function settle(s){const shared=feed.forExe(s.shared,s.key,s.input?.exe||s.exe);const c=choose(s);const was=s.from;s.layer=c?.settings||null;s.from=c?.from||'';
+function settle(s){const shared=feed.forExe(s.shared,s.key,s.input?.exe||s.exe,{pinned:true});const c=choose(s);const was=s.from;s.layer=c?.settings||null;s.from=c?.from||'';
  if(c&&c.mode==='read')readMode(s.reader,c.reason);
  /* nothing to record when the result is already decided for this exe */
  /* a candidate (the relay found it by the binary or the game, not this exe) does not stop the recording: if the gate refuses it
@@ -83,12 +83,14 @@ function start(reader,exe,profile=null,input=null,options={}){stop();profile=pro
  /* the runtime sample only with the player's consent (runtime-sample.cjs enabled, default off) */
  s.sample=require('./runtime-sample.cjs').enabled(reader.root)?new RuntimeSample({exe,engine:profile.engine,app:s.ver}):null;
  live=s;
+ if(reader.gal?.hooks)reader.gal.hooks.beforeDialogue=message=>{if(live===s)seedBoundary(reader,message);};
  const known=options.key||auto.exeKeySync(reader.root,exe);
  if(known)bindKey(s,known);
  else auto.exeKey(reader.root,exe).then(k=>{if(live!==s||!k)return;bindKey(s,k);applyLayer(s);}).catch(()=>{});
  return s;}
 function bindKey(s,key){const {reader}=s;s.key=key;const script=require('./original-text.cjs').contributionScript(reader.root,s.exe,reader.gameId);s.script=script;s.prints={exe:key,script};s.confirmedPresentation=require('./presentation.cjs').read(reader.root,key,script);s.stored=auto.load(reader.root,key,script);s.calibrated=!!s.stored;if(s.stored)s.check.recording=null;
  s.shared=s.skipFeed?null:feed.layer(feed.cached(reader.root,key),key,{exe:s.exe,script});if(s.shared&&feed.rejected(reader.root,key,s.shared))s.shared=null;
+ if(s.shared?.torchBound&&!s.check.w.lines&&!s.check.windows.length)s.check.t={...s.check.t,...Profiles.profileFor(inputOf(s)).selfCheck};
  const c=settle(s);
  if(s.stored?.source==='gate'&&c?.from!=='local-gate')reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'gateSuperseded',key,previousAt:s.stored.at,layer:c?.from||'none'});
  reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'bound',key,pid:s.pid,birth:s.birth,layer:s.from||'none',mode:c?.mode||'',calibrating:!s.calibrated});
@@ -96,7 +98,7 @@ function bindKey(s,key){const {reader}=s;s.key=key;const script=require('./origi
  /* the relay's copy is refreshed in the background (hot update: a new diff applies at once) */
  /* the relay is asked with every fingerprint (core/game-print.cjs): exe, head, pe, main archive, Steam, VNDB, title, engine */
  if(!s.skipFeed)new Promise(res=>setImmediate(()=>{try{s.prints=require('../core/game-print.cjs').prints(s.exe,{exe:key,script,title:s.input?.title||'',steamAppId:s.input?.steamAppId||'',vndb:s.input?.vndb||'',engine:s.input?.engine||s.profile?.engine||''});}catch{s.prints={exe:key,script};}res(s.prints);}))
-  .then(prints=>feed.refresh(reader.root,key,{prints,exe:s.exe})).then(v=>{if(live!==s)return;const l=feed.layer(v,key,{exe:s.exe,script});if(!l||feed.rejected(reader.root,key,l)||JSON.stringify(l)===JSON.stringify(s.shared))return;s.shared=l;const before=s.from;settle(s);
+  .then(prints=>feed.refresh(reader.root,key,{prints,exe:s.exe})).then(v=>{if(live!==s)return;const l=feed.layer(v,key,{exe:s.exe,script});if(l?.torchBound){stageSeed(reader.root,key);return;}if(!l||s.shared?.torchBound||feed.cached(reader.root,key)?.torchQuarantined||feed.rejected(reader.root,key,l)||JSON.stringify(l)===JSON.stringify(s.shared))return;s.shared=l;const before=s.from;settle(s);
   if(s.from!==before||s.from==='official'||s.from==='shared'){hookTrace(reader,'selfCheck fetched key='+key+' '+l.source+' match='+l.match+' mode='+l.mode+' layer='+(s.from||'none'));applyLayer(s);}}).catch(()=>{});
  /* a window that closed before the key was known */
  if(s.pending){const r=s.pending;s.pending=null;windowDone(s,r);}}
@@ -156,4 +158,28 @@ const feedReader=msg=>{const s=live;if(!s)return;try{const e=parseReader(msg);if
 /* diagnostics: the running game's record + its windows, for info.json */
 function diagnostic(){const s=live;if(!s)return null;return auto.diagnostic(s.stored,s.check.windows,s.check.w.lines);}
 function setPresentation(root,key,mode){if(live?.key===key&&live.reader.root===root){live.confirmedPresentation=mode;applyLayer(live);}}
-module.exports={setPresentation,start,stop,recalibrate,feedTrace,feedReader,diagnostic,current:()=>live,choose,inputOf};
+function stageSeed(root,key){
+ if(live?.reader.root===root&&live.key===key&&!live.skipFeed)live.seedPending=true;
+}
+function seedBoundary(reader,message){
+ const s=live;
+ if(!s||s.reader!==reader||!Number.isSafeInteger(message.hookSequence)||typeof message.hookSource!=='string'||
+    message.hookSourceContinues||message.hookRecovering||['ocr','history'].includes(message.hookSourceOrigin))return;
+ if(message.hookSequence<=(s.seedSequence??-1))return;
+ s.seedSequence=message.hookSequence;
+ if(!s.seedPending)return;
+ const answer=feed.cached(reader.root,s.key);
+ const shared=feed.layer(answer,s.key,{exe:s.exe});
+ if(!answer?.torchQuarantined&&(!shared?.torchBound||feed.rejected(reader.root,s.key,shared)))return;
+ s.seedPending=false;
+ const applied=answer.torchPublication?.hash||'revoked';
+ if(s.seedApplied===applied)return;
+ s.seedApplied=applied;
+ const previous=s.profile;
+ s.shared=shared;
+ settle(s);
+ applyLayer(s);
+ if(JSON.stringify(previous.selfCheck)!==JSON.stringify(s.profile.selfCheck))
+  reader.gal?.hooks?.notify?.({hookNotice:'Seed 已更新，自检窗口参数在下次启动游戏后生效',hookNoticeAt:Date.now()});
+}
+module.exports={stageSeed,seedBoundary,setPresentation,start,stop,recalibrate,feedTrace,feedReader,diagnostic,current:()=>live,choose,inputOf};

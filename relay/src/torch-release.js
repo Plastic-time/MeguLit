@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+import {notifier} from './seed-notifications.js';
 import protocol from '../../core/torch-release.cjs';
 import gameDiff from '../../core/game-diff.cjs';
 import {cleanForProfile} from './seed-malware.js';
@@ -50,7 +51,8 @@ export async function publish(db,release,env,now=new Date()){
  if(!result[0]?.meta?.changes||!result[1]?.meta?.changes)reject('TORCH_STALE');
  return {hash:proof.hash,status:'published'};
 }
-export async function lookup(db,key,env){if(!gameDiff.KEY.test(key||''))return null;const r=await row(db,key);if(!r)return null;const release=await checkedRow(r,env);if((await revoked(db)).includes(release.review.candidateHash))reject('TORCH_REVOKED');
+export async function lookup(db,key,env){if(!gameDiff.KEY.test(key||''))return null;const r=await row(db,key);if(!r)return null;const release=await checkedRow(r,env);const withdrawal=await db.prepare('SELECT body FROM torch_release_revocations WHERE profile_hash=?').bind(release.review.candidateHash).first();
+ if(withdrawal)throw Object.assign(new Error('TORCH_REVOKED'),{code:'TORCH_REVOKED',withdrawal:{release,revocation:JSON.parse(withdrawal.body)}});
  if(await blockedProfile(db,release.profile))reject('TORCH_REVOKED');
  const n=release.review.torchNo,c=await db.prepare('SELECT name,alias FROM torch_credits WHERE torch_no=? AND game_key=?').bind(n,key).first(),cleaned=c?cleanName(c.name,env):null;
  const name=cleaned?.ok?cleaned.name:null;
@@ -62,10 +64,26 @@ async function input(request){if(Number(request.headers.get('content-length'))>p
 export async function torchReleaseRoute(request,env,now,url,path,{json,fail}){
  try{
   if(path==='/api/torch-release'&&request.method==='GET'){const got=await lookup(env.DB,url.searchParams.get('exe'),env);return got?json(got):fail('NOT_FOUND',404);}
+  if(path==='/api/torch-release/changes'&&request.method==='GET'){
+   const after=Number(url.searchParams.get('after'));
+   if(!Number.isSafeInteger(after)||after<0)return fail('TORCH_CURSOR',400);
+   const {results}=await env.DB.prepare('SELECT seq,game_key FROM torch_changes WHERE seq>? ORDER BY seq LIMIT 128').bind(after).all();
+   return json({changes:results});
+  }
   if(!path.startsWith('/api/torch-release/'))return null;
   if(!env.ADAPTER_ADMIN_TOKEN||request.headers.get('authorization')!=='Bearer '+env.ADAPTER_ADMIN_TOKEN)return fail('UNAUTHORIZED',401);
-  if(['/api/torch-release/propose','/api/torch-release/publish','/api/torch-release/revoke'].includes(path)&&request.method==='POST')return json(await (path.endsWith('/propose')?propose:path.endsWith('/revoke')?revoke:publish)(env.DB,await input(request),env,now));
+  if(['/api/torch-release/propose','/api/torch-release/publish','/api/torch-release/revoke'].includes(path)&&request.method==='POST'){
+   const result=await (path.endsWith('/propose')?propose:path.endsWith('/revoke')?revoke:publish)(env.DB,await input(request),env,now);
+   if(env.SEED_NOTIFICATIONS&&!path.endsWith('/propose')){
+    // The D1 commit is final. Reconnecting clients replay it even if fan-out fails.
+    try{
+     const notified=await notifier(env).fetch('https://seed.internal/wake',{method:'POST'});
+     if(!notified.ok)console.error('Seed notification failed',notified.status);
+    }catch(error){console.error('Seed notification failed',error.message);}
+   }
+   return json(result);
+  }
   if(path==='/api/torch-release/history'&&request.method==='GET')return json(await exportHistory(env.DB,url.searchParams.get('exe')));
   return fail('NOT_FOUND',404);
- }catch(e){return fail(/^TORCH_[A-Z_]+$/.test(e?.code||'')?e.code:'TORCH_REJECTED',e?.code==='TORCH_REVOKED'?410:e?.code==='TORCH_MALWARE_UNAVAILABLE'?503:/^TORCH_MALWARE_/.test(e?.code||'')?409:422);}
+ }catch(e){if(e.withdrawal)return json({ok:false,error:'TORCH_REVOKED',...e.withdrawal},410);return fail(/^TORCH_[A-Z_]+$/.test(e?.code||'')?e.code:'TORCH_REJECTED',e?.code==='TORCH_REVOKED'?410:e?.code==='TORCH_MALWARE_UNAVAILABLE'?503:/^TORCH_MALWARE_/.test(e?.code||'')?409:422);}
 }

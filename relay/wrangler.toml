@@ -119,3 +119,11 @@ name = "RL_FORUM_GET"
 type = "ratelimit"
 namespace_id = "1009"
 simple = { limit = 120, period = 60 }
+
+[[durable_objects.bindings]]
+name = "SEED_NOTIFICATIONS"
+class_name = "SeedNotifications"
+
+[[migrations]]
+tag = "seed-notifications-v1"
+new_sqlite_classes = ["SeedNotifications"]

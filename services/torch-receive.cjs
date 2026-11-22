@@ -56,17 +56,23 @@ async function queryRelay(url,fetcher,signal,{release,strict}){
   try{answer=await body(response);}catch{signal.throwIfAborted();}
   const code=answer?.ok===false?answer.error:null;
   if(status===404&&(code==='NOT_FOUND'||!strict))return {state:'missing',confirmed:code==='NOT_FOUND'};
-  if(status===410&&(code==='TORCH_REVOKED'||!strict))return {state:'revoked'};
+  if(status===410&&(code==='TORCH_REVOKED'||!strict))return {state:'revoked',answer};
   if([409,422].includes(status)&&/^TORCH_[A-Z_]+$/.test(code||''))return {state:'rejected',code};
  }else await response.body?.cancel().catch(()=>{});
  return {state:'unavailable'};
 }
-async function lookup(urls,fetcher,signal,{release=false,ownerTest=false,accept}){
+async function lookup(urls,fetcher,signal,{release=false,ownerTest=false,accept,verifyWithdrawal}){
  if(!fetcher||!urls.length)return {state:'disabled'};
  const results=await Promise.all(urls.map(url=>queryRelay(url,fetcher,signal,{release,strict:ownerTest||urls.length>1})));
  signal.throwIfAborted();
  // A mirror can still serve a signed release after the other mirror has seen its revocation.
- if(results.some(r=>r.state==='revoked'))return {state:'revoked'};
+ const withdrawals=results.filter(r=>r.state==='revoked');
+ if(withdrawals.length){
+  if(!verifyWithdrawal)return {state:'revoked'};
+  const signed=await Promise.all(withdrawals.map(r=>verifyWithdrawal(r.answer)));
+  signed.sort((a,b)=>b.revision-a.revision);
+  return {state:'revoked',release:signed[0]};
+ }
  const rejected=results.find(r=>r.state==='rejected');
  if(rejected)fail(rejected.code);
  const found=results.filter(r=>r.state==='found');
@@ -100,7 +106,10 @@ function checkedLegacy(answer,key,ownerTest){
 }
 function status(root,id){return states.get(idKey(root,id))||null;}
 async function serial(key,fn){const old=locks.get(key)||Promise.resolve(),next=old.catch(()=>{}).then(fn);locks.set(key,next);try{return await next;}finally{if(locks.get(key)===next)locks.delete(key);}}
-async function receive(root,id,options={}){const jobKey=idKey(root,id);if(jobs.has(jobKey))return jobs.get(jobKey);
+async function receive(root,id,options={}){const jobKey=idKey(root,id);if(jobs.has(jobKey)){
+  if(!options.fresh)return jobs.get(jobKey);
+  await jobs.get(jobKey);return receive(root,id,{...options,fresh:false});
+ }
  const rootKey=path.resolve(root);if(!controllers.has(rootKey))controllers.set(rootKey,new AbortController());const owner=controllers.get(rootKey);if(owner.signal.aborted)return {state:'install-failed',code:'TORCH_STOPPED'};
  const signal=AbortSignal.any([owner.signal,AbortSignal.timeout(60000),...(options.signal?[options.signal]:[])]);
  const resourcePaths=[],check=()=>{signal.throwIfAborted();if((options.resources||resources)(root,{paths:resourcePaths})!==true||options.permission&&options.permission()!==true||options.priority==='user'&&options.active&&options.active()!==true)throw deferred();};
@@ -109,11 +118,22 @@ async function receive(root,id,options={}){const jobKey=idKey(root,id);if(jobs.h
    const still=()=>{check();const now=read(root,id);if(!now||now.executable!==exe||stamp(exe)!==exeStamp)fail('TORCH_GAME_CHANGED');};still();
    const fetcher=options.fetcher===undefined?globalThis.fetch:options.fetcher,keys=options.keys||trust(),urls=options.urls||receiveEndpoints(root,key);
    const ownerTest=require('../core/owner-tests.cjs').privateMode(root);
-   const result=await lookup(urls,fetcher,signal,{release:true,ownerTest,accept:answer=>checkedRelease(answer,key,keys)});
+   const verifyWithdrawal=async answer=>{
+    const release=answer?.release,document=answer?.revocation;
+    const proof=await protocol.checked(release,keys);
+    if(release.key!==key||document?.schema!=='megulit.torch-revocation'||document.version!==1||
+       document.profileHash!==proof.profileHash||!await protocol.verify(document,keys.releaseKeys))fail('TORCH_SIGNATURE');
+    return release;
+   };
+   const result=await lookup(urls,fetcher,signal,{release:true,ownerTest,accept:answer=>checkedRelease(answer,key,keys),
+    verifyWithdrawal:options.liveSync?verifyWithdrawal:null});
    let missing=false;
    if(result.state==='revoked'){
     const old=feed.cached(root,key);
-    if(!old?.torchQuarantined){still();(options.atomicWrite||atomic)(path.join(feed.dir(root),key+'.json'),{none:true,key,torchQuarantined:{release:old?.torchRelease||null},fetchedAt:Date.now()});}
+    const prior=old?.torchRelease||old?.torchQuarantined?.release;
+    if(result.release&&prior&&result.release.revision<prior.revision)fail('TORCH_ROLLBACK');
+    if(!old?.torchQuarantined||result.release&&result.release.revision>Number(prior?.revision||0)){still();(options.atomicWrite||atomic)(path.join(feed.dir(root),key+'.json'),{none:true,key,torchQuarantined:{release:result.release||prior||null},fetchedAt:Date.now()});}
+    require('./self-check-live.cjs').stageSeed(root,key);
     fail('TORCH_REVOKED');
    }
    if(result.state==='found'){const remote=result.answer,release=remote.release,p=result.proof;if(!builtinCompatible(release))fail('TORCH_BUILTIN_NEWER');check();const script=scriptPath(exe,p.identity.scriptFile);resourcePaths.push(script);const scriptStamp=stamp(script);if(await fileHash(script,{signal,check})!==p.identity.script)fail('TORCH_SCRIPT_IDENTITY');const old=feed.cached(root,key);
@@ -122,6 +142,7 @@ async function receive(root,id,options={}){const jobKey=idKey(root,id);if(jobs.h
     still();if(stamp(script)!==scriptStamp)fail('TORCH_LOCAL_CHANGED');
     const publication={hash:p.hash,at:remote.publication.at};
     (options.atomicWrite||atomic)(path.join(feed.dir(root),key+'.json'),{schema:'megulit.game-diff-feed',version:1,key,diff:release.profile,torchRelease:release,torchPublication:publication,torchCredit:credit(remote.credit,release.review.torchNo),torchLocal:{key,exe,exeStamp,script,scriptStamp},fetchedAt:Date.now()});
+    require('./self-check-live.cjs').stageSeed(root,key);
    }else if(result.state==='missing'){
     /* Legacy exact signed profiles remain usable with unknown provenance. */
     const old=feed.cached(root,key);
