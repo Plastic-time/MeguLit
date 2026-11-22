@@ -31,8 +31,10 @@ test('every whole-layer hide carries its cause, and the reader host logs it',()=
 // the whole session, so every scene check compared that picture with itself.
 test('a BitBlt picture that stays the same while the screen moves is frozen and read through PrintWindow',()=>{
  const cap=read('native/GameCapture.cs'),probe=read('native/GameSceneProbe.cs'),bridge=read('native/GalWindowBridge.cs');
- assert.match(cap,/if\(Blt\(hwnd,image\)&&!Blank\(image\)\)\{if\(AcceptBlt\(c,Signature\(image\),DateTime\.UtcNow,\(\)=>FreezeVote\(hwnd,image,c\),out frozen\)\)return true;if\(!frozen\)return false;\}/,'Into: frozen prints, stale skips');
- assert.match(cap,/if\(!Blank\(image\)\)\{bool f;if\(AcceptBlt\(c,Signature\(image\),DateTime\.UtcNow,\(\)=>FreezeVote\(hwnd,image,c\),out f\)\)return true;Skipped=true;return false;\}/,'BltOnly: frozen or stale skips');
+ assert.match(cap,/if\(Blt\(hwnd,image\)&&!Blank\(image\)\)\{if\(AcceptBlt\(c,Signature\(image\),DateTime\.UtcNow,\(r,v\)=>FreezeVote\(hwnd,image,c,r,v\),out frozen\)\)return true;if\(!frozen\)return false;\}/,'Into: frozen prints, stale skips');
+ assert.match(cap,/if\(!Blank\(image\)\)\{bool f;if\(AcceptBlt\(c,Signature\(image\),DateTime\.UtcNow,\(r,v\)=>FreezeVote\(hwnd,image,c,r,v\),out f\)\)return true;Skipped=true;return false;\}/,'BltOnly: frozen or stale skips');
+ assert.match(cap,/return VoteScreen\(c,round,voteId,now,Samples\(picture\)\);/,'FreezeVote updates c.Screen under the round and voteId check');
+ assert.match(cap,/if\(!frozen&&!c\.Proven&&!c\.Blind&&!c\.Frozen&&!c\.HasSig\)\{int vote=BlindVote\(hwnd,image\);lock\(Gate\)\{if\(!c\.Proven&&!c\.Blind&&!c\.Frozen&&!c\.HasSig\)/,'BlindVote skips and never updates a window that already saw a BitBlt picture or froze');
  assert.match(cap,/if\(!KeepPart\(hwnd,c,round,blank,DateTime\.UtcNow\)\)\{Skipped=true;return false;\}/,'Part checks round and state before delivering a partial BitBlt');
  assert.match(cap,/if\(c\.Blind\|\|frozen\)lock\(Gate\)\{Choice cur;if\(Choices\.TryGetValue\(hwnd,out cur\)&&cur==c&&\(frozen\?c\.Frozen:c\.Blind\)&&\(DateTime\.UtcNow-c\.Printed\)\.TotalMilliseconds>=PrintGapMs\)\{c\.Printed=DateTime\.UtcNow;round=c\.Round;print=true;\}\}/,'a frozen window is printed under the same rate limit as a blind one, re-checking state and carrying its round');
  assert.match(cap,/case 0:Skipped=true;return false;\s+case 2:return printed;\s+\}\s+FromScreen=true;return ScreenInto\(hwnd,image\);/,'Into does what AfterPrint (self-tested) decides');
