@@ -9,12 +9,12 @@ const labels=read('game-detail.js').slice(read('game-detail.js').indexOf('const 
 const original={zh:'日文原版与恢复',ja:'日本語版と復元',en:'Japanese original & restore'};
 const zero={zh:'零延迟翻译',ja:'ゼロ遅延翻訳',en:'Zero-latency translation'};
 const languageUI=read('game-language.js');
-const localeToggleHTML=vm.runInNewContext(languageUI.slice(languageUI.indexOf('const localeWords='),languageUI.indexOf('export function bindLocaleToggle')).replaceAll('export ','')+'\nlocaleToggleHTML');
+const {localeToggleHTML,localeHelpText}=vm.runInNewContext(languageUI.slice(languageUI.indexOf('const localeWords='),languageUI.indexOf('export function bindLocaleToggle')).replaceAll('export ','')+'\n({localeToggleHTML,localeHelpText})');
 const durationSource=read('detail-sessions.js').split(/\r?\n/);
 const durationStart=durationSource.findIndex(line=>line.startsWith('export function durHTML'));
 const durHTML=vm.runInNewContext(durationSource.slice(durationStart,durationStart+2).join('\n').replace('export ','')+'\ndurHTML');
 function hero(locale,title){
- const context={main:{},game:{title,available:true,engine:'KiriKiri',readingSeconds:137520,characters:412906,learnedWords:1284},data:{counts:{sessions:57}},locale,embed:{kind:'pending'},hook:'未测',esc:s=>String(s??''),cover:()=>'<div class="cover"></div>',icon:()=>'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6Z"/></svg>',relativeTime:()=>'',originalLabel:()=>original[locale],zeroLatencyLabel:()=>zero[locale],zeroActivityLabel:()=>'',localeToggleHTML,launchReason:()=>'',durHTML,number:String};
+ const context={main:{},game:{title,available:true,engine:'KiriKiri',readingSeconds:137520,characters:412906,learnedWords:1284},data:{counts:{sessions:57}},locale,embed:{kind:'pending'},hook:'未测',esc:s=>String(s??''),cover:()=>'<div class="cover"></div>',icon:()=>'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6Z"/></svg>',relativeTime:()=>'',originalLabel:()=>original[locale],zeroLatencyLabel:()=>zero[locale],zeroActivityLabel:()=>'',localeToggleHTML,localeHelpText,launchReason:()=>'',durHTML,number:String};
  // The production template and its localized labels are used without starting the app or a game
  vm.runInNewContext(labels+'\nconst w=labels[locale];'+template,context);
  return context.main.innerHTML;
