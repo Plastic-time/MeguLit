@@ -65,7 +65,7 @@ class GameStyleSync{
  // Calibration import lists: other saved works on this PC, names and save times only. importFrom reads one group
  // (text appearance, or position/wrap with its coordinate map) of a source work; it never writes the source.
  savedWorks(){return Object.entries(this.profiles||{}).filter(([key,e])=>key!==this.profileKey&&e&&e.prefs).map(([key,e])=>({key,name:String(e.name||key).slice(0,120),textSavedAt:e.textSavedAt||0,positionSavedAt:e.positionSavedAt||0})).sort((a,b)=>Math.max(b.textSavedAt,b.positionSavedAt)-Math.max(a.textSavedAt,a.positionSavedAt)).slice(0,200);}
- importFrom(key,part){const e=this.profiles?.[key];if(!e||!e.prefs||key===this.profileKey||!['text','position'].includes(part))return null;return {prefs:profileTools.pick({...profileTools.pick(gameStyle.defaults,part),...e.prefs},part),map:part==='position'?(this.maps?.[key]||null):undefined};}
+ importFrom(key,part){const e=this.profiles?.[key];if(!e||!e.prefs||key===this.profileKey||!['text','position'].includes(part))return null;return {prefs:profileTools.pick({...profileTools.pick(this.base(),part),...e.prefs},part),map:part==='position'?(this.maps?.[key]||null):undefined};}
  // Built-in defaults, then the user's global text preset from the home settings (E215); a work's saved prefs go on top.
  /* 2026-11-19 (user, 素晴らしき日々: 「默认的位置贼偏」): a work with no saved settings at all, before any engine place is known,
     starts where this user's other works keep their text: the median box of the saved positions (3 or more), else 20 / 76 /
@@ -74,7 +74,7 @@ class GameStyleSync{
   const pos=saved.length>=3?{x:median(saved.map(p=>Number(p.x))),y:median(saved.map(p=>Number(p.y))),width:median(saved.map(p=>Number(p.width)))}:{x:20,y:76,width:60};
   pos.x=Math.max(0,Math.min(95,pos.x));pos.y=Math.max(0,Math.min(95,pos.y));pos.width=Math.max(20,Math.min(100-pos.x,pos.width));pos.height=Math.max(5,Math.min(Number(gameStyle.defaults.height)||27,100-pos.y));return pos;}
  effective(entry){return {...this.base(),...(entry?.prefs?{}:this.newWorkPosition()),...entry?.prefs};}
- base(){return {...profileTools.pick(gameStyle.defaults,'base'),...(this.profileFile?require('./text-defaults.cjs').read(path.dirname(this.profileFile)):{})};}
+ base(){return this.profileFile?require('./text-defaults.cjs').workBase(path.dirname(this.profileFile)):profileTools.pick(gameStyle.defaults,'base');}
  replay(){this.status('profile',{gameStyleProfile:this.profile?.prefs||{},gameStyleEffectivePrefs:this.effective(this.profile),gameStylePositionMap:this.positionMap()});}
  // Measuring only runs during a calibration (the original is shown for it); between calibrations nothing is scanned.
  observe(source,read,engine=''){this.sourceEngine=engine;if(!source?.trim()||source===this.source)return;this.source=source.slice(0,4000);this.sourceRead=read===true;this.generation++;this.waitNext=false;if(this.calibrating&&(this.sessionMisses||0)<SESSION_MISSES)this.request(true);}
@@ -86,9 +86,9 @@ class GameStyleSync{
  publish(){const result=combine(this.samples);this.samples=[];if(!result)return false;{const lost=combine.lostInBackground(result.style);if(lost){this.rejected={at:Date.now(),textColor:result.style.textColor,background:lost};for(const k of ['textColor','speechTextColor','narrationTextColor','readTextColor','textEdgeColor'])delete result.style[k];result.style.textGradient=false;result.colourRejected=true;}else{const outline=combine.outlineFor(result.style);if(outline)result.style.outlineColor=outline;}}if(!result.style.textColor&&result.style.readTextColor)result.style.textColor=this.p?.textColor||gameStyle.defaults.textColor;if(!result.style.readTextGradient&&combine.inverted(result.style.textColor,result.style.readTextColor))result.style.readTextColor='';this.latest=result;this.status('measured',{gameStyle:result,gameStyleConfirm:true,gameStyleSamples:result.samples,gameStyleNeeded:Math.max(NEEDED,result.samples)});return true;}
  saveProfile(prefs,kind='all',key=this.profileKey,map,saveId){
   if(!this.profileKey||key!==this.profileKey||!prefs||typeof prefs!=='object')return false;
-  const clean=profileTools.pick(prefs,kind),previous=this.profile||{prefs:{},textSavedAt:0,positionSavedAt:0},now=Math.max(Date.now(),(previous.savedAt||0)+1);
+  const previous=this.profile||{prefs:{},textSavedAt:0,positionSavedAt:0},clean=profileTools.ownSizes(profileTools.pick(prefs,kind),this.base(),previous.prefs),now=Math.max(Date.now(),(previous.savedAt||0)+1);
   if(map!==undefined&&profileTools.map(map)===undefined){this.status('saveFailed',{gameStyleSavedPart:kind,gameStyleSaveId:saveId});return false;}
-  const next={...previous,name:this.gameName||previous.name||'',prefs:{...previous.prefs,...clean},savedAt:now};if(kind!=='position')next.textSavedAt=now;if(kind!=='text')next.positionSavedAt=now;
+  const next={...previous,name:this.gameName||previous.name||'',prefs:{...previous.prefs,...clean},savedAt:now,sizes:1};if(kind!=='position')next.textSavedAt=now;if(kind!=='text')next.positionSavedAt=now;
   const currentMap=map===undefined?this.positionMap():profileTools.map(map);next.positionMap=currentMap||null;
   const oldHistory=(previous.history||[]).slice();if(!oldHistory.length&&previous.savedAt)oldHistory.push({id:String(previous.savedAt),savedAt:previous.savedAt,prefs:profileTools.pick({...this.base(),...previous.prefs}),positionMap:this.positionMap()});
   next.history=[{id:String(now),savedAt:now,prefs:profileTools.pick({...this.base(),...next.prefs}),positionMap:currentMap||null},...oldHistory].slice(0,7);
