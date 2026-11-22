@@ -40,7 +40,7 @@ test('the stream decides: one Japanese line, or two Chinese lines in a row', () 
 });
 
 test('a Chinese build the library knows stays Chinese', () => {
-  assert.match(reader, /hooks\.setSourceLanguage\?\.\(lib\.contentLanguage==='zh'\?'zh!':/);
+  assert.match(reader, /hooks\.setSourceLanguage\?\.\(archive\?'':lib\.contentLanguage==='zh'\?'zh!':/);
   assert.match(native, /const language=value==='zh'\|\|value==='zh!'\|\|value==='ja'\?value:'';/);
   assert.match(bridge, /if\(lang=="zh"\|\|lang=="zh!"\|\|lang=="ja"\)\{HookTarget\.SetSourceLanguage\(lang\);/);
   assert.match(target, /public static void ConfirmJapanese\(string text\)\{if\(ChineseText&&!ChineseKnown&&JapaneseLine\(text\)\)ChineseText=false;\}/);
