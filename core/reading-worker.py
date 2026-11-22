@@ -50,4 +50,4 @@ for line in sys.stdin:
             result.append(token)
         print(json.dumps({'id':request['id'],'tokens':result},ensure_ascii=False),flush=True)
     except Exception:
-        print(json.dumps({'id':request.get('id',0),'error':'Sudachi 本地分词失败，请检查 Full 组件安装状态'},ensure_ascii=False),flush=True)
+        print(json.dumps({'id':request.get('id',0),'error':'Sudachi 本地分词失败'},ensure_ascii=False),flush=True)

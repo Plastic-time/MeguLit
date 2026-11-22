@@ -6,7 +6,13 @@
  const send=m=>window.__tomoyoTranslateRequest(JSON.stringify(m));
  const request=m=>new Promise((resolve,reject)=>{const id=++serial;const timer=setTimeout(()=>{requests.delete(id);reject(Error('本地辞书尚未就绪，请在设置中查看组件安装状态'));},600000);requests.set(id,{resolve,reject,timer});try{send({...m,type:'learningRequest',id});}catch(e){clearTimeout(timer);requests.delete(id);reject(e);}});
  bridge.learningDeliver=(id,result,error)=>{const p=requests.get(id);if(!p)return;clearTimeout(p.timer);requests.delete(id);error?p.reject(Error(error)):p.resolve(result);};
- bridge.learningStatus=message=>{if(message.learningRecovered){const notice=document.querySelector('.tomoyo-learning-notice');if(notice?.dataset?.learningOperation===message.learningRecovered)notice.remove();return;}if(message.learningMessage){
+ const rubyStatus=()=>bridge.localLearningRubyError?'最近一次注音失败：'+bridge.localLearningRubyError:'';
+ bridge.learningStatus=message=>{
+  if(message.learningRubyError&&bridge.localLearningRubyError!==message.learningRubyError){
+   bridge.localLearningRubyError=message.learningRubyError;
+   for(const n of document.querySelectorAll('[data-learning-ruby-status]'))n.textContent=rubyStatus();
+  }
+  if(message.learningRecovered){const notice=document.querySelector('.tomoyo-learning-notice');if(notice?.dataset?.learningOperation===message.learningRecovered)notice.remove();return;}if(message.learningMessage){
   bridge.localLearningMessage=message.learningMessage;for(const n of document.querySelectorAll('[data-learning-status]'))if(n.textContent!==message.learningMessage)n.textContent=message.learningMessage;
   if(message.learningNotice===false)return;
   const ready=message.learningMessage.startsWith('实际运行：'),parent=document.querySelector('.sentence-window');let notice=document.querySelector('.tomoyo-learning-notice');
@@ -33,12 +39,13 @@
  <label>学习者语言 / Learner language<select data-learner-language><option value="zh">中文学习者：中文释义、词性和动词类别</option><option value="en">English learner: English definitions and grammar</option></select></label>
  <label>本地分词 · 注音 · 点读<select data-reading-engine><option value="sudachi">SudachiDict Full ＋ JMdict（全流程）</option><option value="unidic">UniDic（MeguLit 内置分词）＋ JMdict 读音校正</option></select></label>
  <small>Sudachi 模式下分词、书写读音、词形还原和点读均经同一条本地流程；首次安装需要下载词典，日常使用不调用注音或查词 API</small>
- <div data-learning-status role="status"></div><button type="button" data-install-reading>安装 / 修复 Full 本地组件</button></fieldset>`;
+ <div data-learning-status role="status"></div><div data-learning-ruby-status></div><button type="button" data-install-reading>安装 / 修复 Full 本地组件</button></fieldset>`;
  function attach(container){
   if(!container||container.querySelector('.tomoyo-learning-panel'))return;
   const host=document.createElement('div');host.innerHTML=html;const panel=host.firstElementChild;container.prepend(panel);
   const options=bridge.options?.()||{};panel.querySelector('[data-learner-language]').value=options.learnerLanguage||'zh';panel.querySelector('[data-reading-engine]').value=options.readingEngine||'sudachi';
   panel.querySelector('[data-learning-status]').textContent=bridge.localLearningMessage||'选择 Full 后不会静默切回旧分词器；缺少组件时会显示安装状态';
+  panel.querySelector('[data-learning-ruby-status]').textContent=rubyStatus();
   panel.onchange=()=>bridge.updateLearningSettings?.({learnerLanguage:panel.querySelector('[data-learner-language]').value,readingEngine:panel.querySelector('[data-reading-engine]').value});
   panel.querySelector('[data-install-reading]').onclick=()=>{try{send({type:'learningInstall'});}catch{}};
  }

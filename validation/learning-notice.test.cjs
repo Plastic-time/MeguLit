@@ -6,14 +6,21 @@ test('installed notice fades after a few seconds, disappears, and repeated statu
  const value={learningMessage:'SudachiDict Full 已安装，离线词典可用'};bridge.learningStatus(value);bridge.learningStatus(value);assert.equal(timers.size,1);const hold=timers.get(1);assert.equal(hold.ms,2800);timers.delete(1);hold.fn();assert.equal(node.style.opacity,'0');const fade=timers.get(2);assert.equal(fade.ms,350);fade.fn();assert.equal(node,null);bridge.learningStatus(value);assert.equal(node,null);
 });
 test('real learning module removes only the recovered operation notice and keeps errors in settings',async()=>{
- let notice=null;const setting={textContent:''},parent={appendChild:n=>{notice=n;}};
- const doc={documentElement:{},head:{appendChild(){}},addEventListener(){},querySelector:s=>s==='.sentence-window'?parent:s==='.tomoyo-learning-notice'?notice:null,querySelectorAll:s=>s==='[data-learning-status]'?[setting]:[],createElement:()=>({dataset:{},style:{},setAttribute(){},remove(){notice=null;}})};
+ let notice=null;const setting={textContent:''},ruby={textContent:''},parent={appendChild:n=>{notice=n;}};
+ const doc={documentElement:{},head:{appendChild(){}},addEventListener(){},querySelector:s=>s==='.sentence-window'?parent:s==='.tomoyo-learning-notice'?notice:null,querySelectorAll:s=>s==='[data-learning-status]'?[setting]:s==='[data-learning-ruby-status]'?[ruby]:[],createElement:()=>({dataset:{},style:{},setAttribute(){},remove(){notice=null;}})};
  const bridge={},context=vm.createContext({document:doc,window:{__tomoyoChinese:bridge},setTimeout:()=>0,clearTimeout(){},MutationObserver:class{observe(){}}});
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/reader/modules/learning.js'),'utf8'),context);
  bridge.learningStatus({learningMessage:'current failure',learningOperation:'ruby'});assert.equal(notice.dataset.learningOperation,'ruby');
  bridge.learningStatus({learningRecovered:'lookup'});assert.ok(notice,'unrelated operation cannot erase this error');
  bridge.learningStatus({learningRecovered:'ruby'});assert.equal(notice,null);assert.equal(setting.textContent,'current failure');assert.equal(bridge.localLearningMessage,'current failure');
  bridge.learningStatus({learningMessage:'正在安装组件'});bridge.learningStatus({learningRecovered:'ruby'});assert.ok(notice,'ruby recovery cannot erase an installation status');
+ const installNotice=notice;
+ bridge.learningStatus({learningRubyError:'current line failed'});
+ bridge.learningStatus({learningRubyError:'current line failed'});
+ assert.equal(notice,installNotice);assert.equal(notice.textContent,'正在安装组件');
+ assert.equal(setting.textContent,'正在安装组件');assert.match(ruby.textContent,/current line failed/);
+ installNotice.remove();bridge.learningStatus({learningRubyError:'another line failed'});
+ assert.equal(notice,null,'automatic ruby failures only update the diagnostic');assert.match(ruby.textContent,/another line failed/);
 });
 test('repeated tokenizer errors expire while settings keep their status; recovery allows a later distinct incident',async()=>{
  const {installLearningNotice}=await import('../web/reader/learning-notice.js');let node,id=0,setting='';const timers=new Map();

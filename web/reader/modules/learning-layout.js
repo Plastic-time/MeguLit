@@ -9,7 +9,7 @@
  const bytes=n=>n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(0,n/1024).toFixed(0)+' KB';
  function update(panel){
   localizedStatus(panel);const labels=words();
-  const p=bridge.localLearningProgress||{stage:bridge.localLearningReady?'ready':'idle'},stage=p.stage||'idle',track=panel.querySelector('[data-learning-progress]');if(!track)return;
+  const p=bridge.localLearningProgress||{stage:'verify'},stage=p.stage||'verify',track=panel.querySelector('[data-learning-progress]');if(!track)return;
   const percent=Number.isFinite(p.percent)?Math.max(0,Math.min(100,p.percent)):null;
   track.dataset.stage=stage;track.classList.toggle('indeterminate',busy.has(stage)&&percent===null);track.firstElementChild.style.width=percent===null?'36%':percent+'%';
   if(percent===null)track.removeAttribute('aria-valuenow');else track.setAttribute('aria-valuenow',String(Math.round(percent)));

@@ -297,6 +297,11 @@
   function preserveNativeBreaks(sentence,text){
     sentence.toggleAttribute('data-megulit-native-breaks',text.includes('\n'));
   }
+  function reportRubyFailure(error){
+    const message=error.message||'当前行注音暂不可用';
+    bridge.learningStatus?.({learningRubyError:message});
+    if(dialogFields&&dialogFields.state.textContent!==message)dialogFields.state.textContent=message;
+  }
   async function updateRuby() {
     const targets = rubyTargets(), page = !!targets[0]?.closest('.tome-island-page');
     if (!page) return updateLineRuby();
@@ -305,16 +310,15 @@
       const text = sourceText(sentence);
       if (!preferences.furigana || !text) { paint([], sentence, false); continue; }
       const cacheKey = (bridge.options?.().readingEngine || 'sudachi') + '\0' + text;
-      if (sentence.__tomeRubyText === text && sentence.__tomeRubyKey === cacheKey && tokenCache.has(cacheKey)) { paint(tokenCache.get(cacheKey), sentence, false); bridge.learningStatus?.({learningRecovered:'ruby'});
+      if (sentence.__tomeRubyText === text && sentence.__tomeRubyKey === cacheKey && tokenCache.has(cacheKey)) { paint(tokenCache.get(cacheKey), sentence, false);
        continue; }
       try {
         const tokens = await rubyTokens(text);
         if (id !== renderSerial || !preferences.furigana) return;
         if (!sentence.isConnected || sourceText(sentence) !== text) continue;
         sentence.__tomeRubyText = text; sentence.__tomeRubyKey = cacheKey; paint(tokens, sentence, false);
-        bridge.learningStatus?.({learningRecovered:'ruby'});
       } catch(error) { if (id !== renderSerial || !preferences.furigana || !sentence.isConnected || sourceText(sentence) !== text) return;
-       clearRuby(sentence); bridge.learningStatus?.({learningMessage:error.message||'Full 注音尚未就绪',learningOperation:'ruby'}); if (dialogFields) dialogFields.state.textContent = error.message||'本地注音暂未就绪';
+       clearRuby(sentence); reportRubyFailure(error);
        return; }
     }
     bridge.islandPage?.refresh?.(); // furigana changes each pair's height and reserved band
@@ -334,7 +338,7 @@
     const text = sourceText(sentence);if (!preferences.furigana || !text) return false;
     const key = rubyKey(text), tokens = await rubyTokens(text);
     if (!preferences.furigana || !sentence.isConnected || sourceText(sentence) !== text) return false;
-    sentence.__tomeRubyText = text; sentence.__tomeRubyKey = key; paint(tokens, sentence, false); bridge.learningStatus?.({learningRecovered:'ruby'}); bridge.islandPage?.refresh?.(); return true;
+    sentence.__tomeRubyText = text; sentence.__tomeRubyKey = key; paint(tokens, sentence, false); bridge.islandPage?.refresh?.(); return true;
   };
   // The backlog annotates past lines with the same readings as the current one: the game's own ruby first, then the
   // tokenizer with its whole-word dictionary readings (E138). null while furigana is off.
@@ -346,7 +350,10 @@
   async function tokenize(text, cacheKey) {
     const full=(bridge.options?.().readingEngine||'sudachi')==='sudachi';
     const raw = full?await bridge.localTokenize(text):await window.__TAURI_INTERNALS__.invoke('tokenize_text', { text });
-    if(full&&(!Array.isArray(raw)||raw.some(t=>t.source!=='SudachiDict Full')))throw Error('注音未取得 Full 原生分词结果');
+    // tokenizeWhole restores authored line breaks as blank tokens after Sudachi runs.
+    const layoutBreak=t=>t.source===undefined&&t.pos==='空白'&&t.reading===''&&typeof t.surface==='string'&&/^[\r\n]+$/u.test(t.surface);
+    if(full&&(!Array.isArray(raw)||raw.some(t=>!t||(t.source!=='SudachiDict Full'&&!layoutBreak(t)))))
+      throw Error('当前行注音未取得 Full 原生分词结果');
     const tokens = window.TomoyoFurigana.contextual(text, full?raw:await spellingReadings(Array.isArray(raw)?raw:[]));
     const result = Array.isArray(tokens) ? tokens : [];
     tokenCache.set(cacheKey, result);
@@ -361,11 +368,10 @@
     const current=()=>id===renderSerial&&preferences.furigana&&document.querySelector('.sentence-text')===sentence&&sourceText(sentence)===text;
     try {
       const tokens=await rubyTokens(text);
-      if(current()){lastText=text;paint(tokens,sentence);bridge.learningStatus?.({learningRecovered:'ruby'});}
+      if(current()){lastText=text;paint(tokens,sentence);}
     } catch(error) {
       if(!current())return;
-      clearRuby(sentence);bridge.learningStatus?.({learningMessage:error.message||'Furigana unavailable',learningOperation:'ruby'});
-      if(dialogFields)dialogFields.state.textContent=error.message||'Furigana unavailable';
+      clearRuby(sentence);reportRubyFailure(error);
     }
   }
   function markReader() {

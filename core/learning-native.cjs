@@ -20,6 +20,11 @@ class LocalLearning{
  python(){const own=require('./layout.cjs').python;return fs.existsSync(own)?own:'python.exe';}
  runtimeFolder(){return require('./layout.cjs').reading;}
  installed(){return fs.existsSync(path.join(this.runtimeFolder(),'sudachidict_full/resources/system.dic'));}
+ status(){
+  const installed=this.installed();
+  const progress=installed?{stage:'ready',percent:100}:{stage:'idle',percent:null};
+  return {learningInstalled:installed,learningProgress:this.installing||this.progress.stage==='error'?this.progress:progress};
+ }
  async install(retry=false,force=false,only=null){
   if(this.closed)throw Error('本地辞书已关闭');
   const SPECS={sudachi:['sudachidict_full==20261015'],unidic:['unidic-lite==1.0.8']},ALL=['sudachipy==0.7.0','sudachidict_full==20261015','fugashi==1.5.2','unidic-lite==1.0.8'];
