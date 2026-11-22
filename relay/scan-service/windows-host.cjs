@@ -21,11 +21,11 @@ function connect(){
  ws.on('close',()=>{clearInterval(heartbeat);setTimeout(connect,delay);delay=Math.min(delay*2,60000);});
  ws.on('message',async raw=>{
   let job;try{job=JSON.parse(raw.toString());}catch{return;}
-  if(!/^[a-f0-9-]{36}$/.test(job?.id)||typeof job.doc!=='string'||Buffer.byteLength(job.doc)>4096)return;
+  if(!/^[a-f0-9-]{36}$/.test(job?.id)||job.health!==true&&(typeof job.doc!=='string'||Buffer.byteLength(job.doc)>4096))return;
   let status=503,body='';
   try{
-   const response=await fetch('http://127.0.0.1:'+port+'/scan',{method:'POST',redirect:'error',signal:AbortSignal.timeout(18000),
-    headers:{'content-type':'application/json',authorization:'Bearer '+config.ORDINARY_SCAN_TOKEN},body:job.doc});
+   const response=await fetch('http://127.0.0.1:'+port+(job.health===true?'/health':'/scan'),{method:job.health===true?'GET':'POST',redirect:'error',signal:AbortSignal.timeout(18000),
+    headers:{'content-type':'application/json',authorization:'Bearer '+config.ORDINARY_SCAN_TOKEN},body:job.health===true?undefined:job.doc});
    status=response.status;body=await response.text();
   }catch{}
   if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({id:job.id,status,body}));

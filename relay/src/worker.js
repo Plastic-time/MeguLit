@@ -32,8 +32,8 @@ export {SeedNotifications} from './seed-notifications.js';
 import {notifier} from './seed-notifications.js';
 import {torchReleaseRoute} from './torch-release.js';
 import {seedMalwareRoute} from './seed-malware.js';
-import {seedAdminRoute,seedUsageRoute} from './seed-admin.js';
-import {retryJobs} from './ordinary-seed.js';
+import {seedAdminRoute,seedUsageRoute,seedAdminAuthorized} from './seed-admin.js';
+import {retryJobs,ordinaryPolicyRoute} from './ordinary-seed.js';
 import {rosterOwner} from './torch-roster.js';
 import {monumentGet,monthsGet,findGet,meGet} from './torch-credit.js';
 
@@ -314,6 +314,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
   else if(path==='/api/seed-admin/malware')response=await seedMalwareRoute(request,env,now,url,path,{json,fail,readJSON})||fail('NOT_FOUND',404);
   else if(path==='/api/seed-admin/probe-backlog')response=await probeIssueMarkdown(request,env,url,{fail});
   else if(path==='/api/seed-admin/game-request-evidence')response=await gameRequestEvidence(request,env,repoOf(env),now,url,{json,fail,readJSON,onRegistered:selector=>resolveRegisteredGameRequests(env,now,selector)});
+  else if(path==='/api/seed-admin/ordinary-policy')response=seedAdminAuthorized(request,env)?await ordinaryPolicyRoute(request,env,now,ctx,{json,fail,readJSON}):fail('UNAUTHORIZED',401);
   else if(path.startsWith('/api/seed-admin/'))response=await seedAdminRoute(request,env,now,url,path,{json,fail,readJSON})||fail('NOT_FOUND',404);
   else if(path==='/api/seed/usage')response=await seedUsageRoute(request,env,ip,now,url,path,{json,fail,readJSON,hit})||fail('NOT_FOUND',404);
   else if(path==='/api/seed/stats'&&(request.method==='GET'||request.method==='HEAD')){const r=await seedStatsGet(env,{json,fail},ctx,now);response=request.method==='HEAD'?new Response(null,{status:r.status,headers:r.headers}):r;}
