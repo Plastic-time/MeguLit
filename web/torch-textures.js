@@ -44,7 +44,7 @@ export function ashlar(size,seed,{base=[196,184,164],courses=6,mortar=[120,110,9
  return {map,normal:heightToNormal(H,size,size,5),rough};}
 
 /* ---- carved frieze: egg-and-dart over an acanthus scroll over bead-and-reel (height drawn, then lit by its normal) ---- */
-export function relief(w,h,seed,{base=[204,192,172]}={}){
+export function relief(w,h,seed,{base=[204,192,172],normalStrength=7}={}){
  const c=canvas2d(w,h),g=c.getContext('2d');g.fillStyle='#3a3a3a';g.fillRect(0,0,w,h);
  const fillDome=(cx,cy,rx,ry,top=255)=>{const gr=g.createRadialGradient(cx,cy-ry*.2,0,cx,cy,Math.max(rx,ry));gr.addColorStop(0,`rgb(${top},${top},${top})`);gr.addColorStop(.75,'rgb(150,150,150)');gr.addColorStop(1,'rgb(70,70,70)');
   g.fillStyle=gr;g.beginPath();g.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);g.fill();};
@@ -83,7 +83,7 @@ export function relief(w,h,seed,{base=[204,192,172]}={}){
  const soft=canvas2d(w,h),sg=soft.getContext('2d');sg.filter='blur('+Math.max(1,h/220)+'px)';sg.drawImage(c,0,0);
  const H=heightOf(soft),fbm=makeNoise(seed);
  const map=pixels(w,h,(u,v,x,y)=>{const hh=H[y*w+x],ao=.55+.45*Math.pow(hh,.7),n=.92+.12*fbm(u,v*h/w,8,4);return [base[0]*ao*n,base[1]*ao*n,base[2]*ao*n];});
- return {map,normal:heightToNormal(H,w,h,7)};}
+ return {map,normal:heightToNormal(H,w,h,normalStrength)};}
 
 /* ---- coffered vault: sunk panels with stepped frames and a gilt rosette; `cols` around, `rows` down ---- */
 export function coffers(w,h,{cols=24,rows=6,v0=.1,v1=.92,field=[44,38,72],frame=[196,184,164],gold=[186,146,82]}={}){

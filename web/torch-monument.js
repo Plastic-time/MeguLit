@@ -362,6 +362,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
  /* ---- the hall (web/torch-hall.js) ---- */
  const tBuild=performance.now();const H=buildHall({scene,keep,tex,tier,maxAniso:8});const buildMs=performance.now()-tBuild;
  const courtyard=buildCourtyard(scene,HALL.NZ1);
+ const hazeDay=new THREE.Color(0xb1c6d6),hazeNight=new THREE.Color(0x475777),haze=new THREE.Color();
  const covers=createTorchCovers(courtyard.group,{east:HALL.BACK,west:HALL.NZ1,reduced});const {skipInMirror,floorMat,FL_W,FL_L,FL_Z}=H;
 
  /* ---- the stele (web/torch-hall.js) ---- */
@@ -641,7 +642,13 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
   { const L=auraU.uLv.value,b=breathPhase;for(let i=0;i<4;i++){const v=.5+.5*Math.sin(time*.23*b[i][2]+b[i][0]),w=.5+.5*Math.sin(time*.13*b[i][2]+b[i][1]);L.setComponent(i,Math.pow(Math.min(1,v*.75+w*.45),2.2));}
     if(aoUni)aoUni.uSteleLevels.value.copy(L).multiplyScalar(auraU.uI.value);}motes.material.uniforms.uPx.value=renderer.domElement.height/520;
   if(glow.userData.on){const p=(now-glow.userData.t0)/1000;const o=Math.min(1,p/1.2)*(.42+.1*Math.sin(p*1.6));glow.material.opacity=o;glowLight.intensity=o*2.2;}else{glow.material.opacity*=.9;glowLight.intensity*=.9;}
-  updateCamera(dt);courtyard.update(camera,H.state);covers.update(time,dt);draw();
+  updateCamera(dt);
+  const p=camera.position,outside=Math.max(Math.abs(p.x)-HALL.AX,p.z-HALL.NZ1,HALL.BACK-p.z,p.y-29);
+  const outdoor=THREE.MathUtils.smoothstep(outside,-.6,14);
+  const night=1-THREE.MathUtils.smoothstep(H.state.el,-13,1);
+  scene.fog.color.lerp(haze.copy(hazeDay).lerp(hazeNight,night),outdoor);
+  scene.fog.density=THREE.MathUtils.lerp(scene.fog.density,.00135,outdoor);
+  courtyard.update(camera,H.state);covers.update(time,dt);draw();
   if(onFirstFrame&&!renderer.getContext().isContextLost()){onFirstFrame();onFirstFrame=null;}
   /* slow frames on the full tier for ~3 s after the intro: switch to the light tier (only in auto mode) */
   if(introDone&&tier==='high'&&autoTier){frames++;if(dt>.045)slow++;if(frames>=180){if(slow>120){setTier('low',true);}frames=0;slow=0;}}

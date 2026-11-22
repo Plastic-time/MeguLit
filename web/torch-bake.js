@@ -21,7 +21,9 @@ const hex=buf=>[...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).j
 /* same as tools/torch-bake.cjs and the test: sha-256 over the sources with \r\n folded, first 24 hex digits */
 export async function sourceHash(){const parts=await Promise.all(BAKE_SOURCES.map(f=>fetch(new URL('./'+f,import.meta.url),{cache:'no-store'}).then(r=>r.text())));
  return hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(parts.map(t=>t.replace(/\r\n/g,'\n')).join('\n--\n')))).slice(0,24);}
-const shrink=img=>{const c=document.createElement('canvas');c.width=Math.max(1,img.width>>1);c.height=Math.max(1,img.height>>1);c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c;};
+const bakedCanvases=new WeakSet();
+export const isBakedTorchCanvas=canvas=>bakedCanvases.has(canvas);
+const shrink=img=>{const c=document.createElement('canvas');c.width=Math.max(1,img.width>>1);c.height=Math.max(1,img.height>>1);c.getContext('2d').drawImage(img,0,0,c.width,c.height);bakedCanvases.add(c);return c;};
 async function inflate(buf){return new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());}
 
 /* Keep one tier's CPU assets across route visits. GPU textures are owned by the scene. */
@@ -134,8 +136,10 @@ const b64=u8=>{let bin='';for(let i=0;i<u8.length;i+=8192)bin+=String.fromCharCo
 export async function exportBake(scene,torches,stele){const out={files:{},textures:{}};
  /* encode every canvas at once (the browser encodes off the main thread, in parallel) */
  const jobs=[];for(const [key,o] of record||[]){out.textures[key]={};for(const [f,c] of Object.entries(o)){if(!c||!c.toBlob)continue;
-  const name=key+'.'+f+'.webp',q=f==='normal'?.96:.9;out.textures[key][f]=name;
-  jobs.push(new Promise(r=>c.toBlob(r,'image/webp',q)).then(async blob=>{out.files[name]=b64(new Uint8Array(await blob.arrayBuffer()));}));}}
+  const lossless=f==='normal'&&(key==='plinthRelief'||key==='steleMarble');
+  const format=lossless?'png':'webp',name=key+'.'+f+'.'+format,q=f==='normal'||key==='plinthRelief'?.96:.9;
+  out.textures[key][f]=name;
+  jobs.push(new Promise(r=>c.toBlob(r,'image/'+format,q)).then(async blob=>{out.files[name]=b64(new Uint8Array(await blob.arrayBuffer()));}));}}
  const te=performance.now();await Promise.all(jobs);console.log('BAKESTEP encoded',jobs.length,'images',Math.round(performance.now()-te),'ms');
  const tv=performance.now();const vols=computeVolumes(scene,torches,stele);console.log('BAKESTEP volumes',Math.round(performance.now()-tv),'ms');const zip=async u8=>new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
  out.files['ao.bin']=b64(await zip(vols.ao.data));out.files['torch.bin']=b64(await zip(vols.torch.data));out.files['stele.bin']=b64(await zip(vols.stele.data));

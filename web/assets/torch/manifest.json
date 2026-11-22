@@ -1,5 +1,5 @@
 {
- "hash": "d7ce97565b9b33bf75511466",
+ "hash": "08013628775acac73f66e61a",
  "textures": {
   "ashlar": {
    "map": "ashlar.map.webp",
@@ -62,7 +62,11 @@
   "steleMarble": {
    "map": "steleMarble.map.webp",
    "rough": "steleMarble.rough.webp",
-   "normal": "steleMarble.normal.webp"
+   "normal": "steleMarble.normal.png"
+  },
+  "plinthRelief": {
+   "map": "plinthRelief.map.webp",
+   "normal": "plinthRelief.normal.png"
   }
  },
  "ao": {

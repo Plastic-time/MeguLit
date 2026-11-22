@@ -30,7 +30,7 @@ async function main(){const browser=BROWSERS.find(b=>fs.existsSync(b));if(!brows
  const srv=http.createServer((q,r)=>{const u=decodeURIComponent(q.url.split('?')[0]);if(u==='/bake.html'){r.writeHead(200,{'content-type':'text/html'});r.end(PAGE);return;}
   const f=path.join(ROOT,u);if(!f.startsWith(ROOT)){r.writeHead(403);r.end();return;}fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);r.end();return;}r.writeHead(200,{'content-type':MIME[path.extname(f)]||'application/octet-stream'});r.end(d);});});
  await new Promise(r=>srv.listen(0,'127.0.0.1',r));const port=srv.address().port,dport=20000+Math.floor(Math.random()*9000),prof=fs.mkdtempSync(path.join(os.tmpdir(),'torch-bake-'));
- const proc=spawn(browser,['--headless=new','--no-first-run','--disable-extensions','--use-angle=d3d11','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--remote-debugging-port='+dport,'--user-data-dir='+prof,'--window-size=1280,720','about:blank'],{stdio:'ignore'});
+ const proc=spawn(browser,['--headless=new','--mute-audio','--no-first-run','--disable-extensions','--use-angle=d3d11','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--remote-debugging-port='+dport,'--user-data-dir='+prof,'--window-size=1280,720','about:blank'],{stdio:'ignore',windowsHide:true});
  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  try{let tabs;for(let i=0;i<100;i++){try{tabs=await (await fetch('http://127.0.0.1:'+dport+'/json')).json();break;}catch{await sleep(200);}}
   const ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j;});

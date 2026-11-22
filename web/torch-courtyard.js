@@ -67,6 +67,7 @@ export function buildCourtyard(scene,west){
  const chair=new THREE.Mesh(mergeGeometries(parts),wood);
  parts.forEach(part=>part.dispose());
  chair.name='Courtyard chair';chair.position.z=west+32;
+ const woodFill=new THREE.Color(0x584858),waterDay=new THREE.Color(0x789ebc),waterNight=new THREE.Color(0x354c76);
  const reflected=wood.clone();reflected.color.multiplyScalar(.58);
  const mirror=new THREE.Mesh(chair.geometry,reflected);
  mirror.name='Reflected courtyard chair';mirror.scale.y=-1;mirror.position.copy(chair.position);
@@ -80,6 +81,10 @@ export function buildCourtyard(scene,west){
   u.moon.value=Number(state.moon);
   u.night.value=1-THREE.MathUtils.smoothstep(state.el,-13,1);
   u.twilight.value=1-THREE.MathUtils.smoothstep(Math.abs(state.el),1,13);
+  wood.emissive.copy(woodFill).lerp(state.skyColor,.16);
+  wood.emissiveIntensity=.12+.25*u.night.value;
+  reflected.emissive.copy(wood.emissive);reflected.emissiveIntensity=wood.emissiveIntensity*.62;
+  surface.material.color.copy(waterDay).lerp(waterNight,u.night.value);
  }
  return {group,sky,chair,mirror,update};
 }
