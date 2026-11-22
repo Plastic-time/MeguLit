@@ -32,9 +32,9 @@ test('every whole-layer hide carries its cause, and the reader host logs it',()=
 test('a BitBlt picture that stays the same while the screen moves is frozen and read through PrintWindow',()=>{
  const cap=read('native/GameCapture.cs'),probe=read('native/GameSceneProbe.cs'),bridge=read('native/GalWindowBridge.cs');
  assert.match(cap,/if\(!Stale\(c,Signature\(image\),DateTime\.UtcNow,\(\)=>FreezeVote\(hwnd,image,c\)\)\)return true;frozen=true;/,'Into: a frozen picture is not used');
- assert.match(cap,/if\(c\.Blind\|\|frozen\)lock\(Gate\)/,'a frozen window is printed under the same rate limit as a blind one');
+ assert.match(cap,/if\(c\.Blind\|\|frozen\)lock\(Gate\)\{if\(\(DateTime\.UtcNow-c\.Printed\)\.TotalMilliseconds>=PrintGapMs\)\{c\.Printed=DateTime\.UtcNow;round=c\.Round;print=true;\}\}/,'a frozen window is printed under the same rate limit as a blind one, carrying its round');
  assert.match(cap,/case 0:Skipped=true;return false;\s+case 2:return printed;\s+\}\s+FromScreen=true;return ScreenInto\(hwnd,image\);/,'Into does what AfterPrint (self-tested) decides');
- assert.match(cap,/switch\(AfterPrint\(printed,printed&&!Blank\(image\),frozen,screenFallback\)\)\{\s+case 1:if\(frozen\)Keep\(hwnd,c,image\);return true;/);
+ assert.match(cap,/switch\(AfterPrint\(printed,printed&&!Blank\(image\),frozen,screenFallback\)\)\{\s+case 1:if\(frozen\)Keep\(hwnd,c,round,image\);return true;/);
  assert.match(cap,/printed=PrintWindow\(hwnd,dc,frozen\?printFlags\|1:printFlags\);/,'a frozen window is printed client area only, the same for every reader');
  assert.match(cap,/GetAncestor\(front,2\)!=GetAncestor\(hwnd,2\)\|\|!SameScale\(hwnd\)\)return 0;/,'no vote for a window not drawn at its monitor DPI');
  assert.match(cap,/var own=OwnParts;Cover\(now,own==null\?null:own\(hwnd,picture\.Width,picture\.Height\),picture\.Width,picture\.Height\);/,'MeguLit windows are left out');
