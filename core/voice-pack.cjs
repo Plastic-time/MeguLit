@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Recommended AivisSpeech voices: four male and four female original characters from AivisHub, all ACML 1.0
-// (free to use, no credit required). Downloaded only when the user asks (about 250 MB each), checked against the size
-// and SHA-256 that AivisHub publishes, then placed where AivisSpeech Engine loads models at start.
+// (free to use, no credit required). Each download is checked against the size and SHA-256 that AivisHub publishes.
 'use strict';
 const fs=require('node:fs'),path=require('node:path');
 const VOICES=[
- {uuid:'a59cb814-0083-4369-8542-f51a29e72af7',name:'まお',gender:'female',recommended:true},
- {uuid:'22e8ed77-94fe-4ef2-871f-a86f94e9a579',name:'コハク',gender:'female',recommended:true},
+ {uuid:'a59cb814-0083-4369-8542-f51a29e72af7',name:'まお',gender:'female',recommended:true,bundledDefault:true},
+ {uuid:'22e8ed77-94fe-4ef2-871f-a86f94e9a579',name:'コハク',gender:'female',recommended:true,bundledDefault:true},
  {uuid:'f5017410-fbb5-49e1-97cb-e785f42e15f5',name:'凛音エル',gender:'female'},
  {uuid:'1b2830f4-8cf1-4184-a0d9-3a1bace3a844',name:'みちのくあいり',gender:'female'},
  {uuid:'2e1fdde8-d089-42d7-b64f-cf89952b1bdc',name:'澤原 玄二郎',gender:'male'},
@@ -38,9 +37,9 @@ class VoicePack{
  // engine's folder is touched. The engine must not hold the file: the caller stops it first and restarts it after.
  remove(uuid){const voice=VOICES.find(v=>v.uuid===uuid);if(!voice)throw Error('未知的声音');if(this.jobs.get(uuid)?.running)throw Error(voice.name+' 正在下载，请先取消');
   const target=path.join(this.dir,voice.uuid+'.aivmx');if(path.dirname(target)!==path.resolve(this.dir))throw Error('路径无效');try{fs.unlinkSync(target);}catch(e){if(e.code!=='ENOENT')throw e;}this.jobs.delete(uuid);this.log('[ToMe] voice removed: '+voice.name);return this.status();}
- async download(voice,job=null){
-  const progress=job||this.state,signal=job?AbortSignal.any([job.controller.signal,AbortSignal.timeout(1800000)]):AbortSignal.timeout(1800000);
-  const meta=await(await this.fetch(API+voice.uuid,{signal:job?AbortSignal.any([job.controller.signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)})).json();const file=(meta.model_files||[]).find(f=>f.model_type==='AIVMX');
+ async download(voice,job=null,cancel=job?.controller.signal){
+  const progress=job||this.state,signal=cancel?AbortSignal.any([cancel,AbortSignal.timeout(1800000)]):AbortSignal.timeout(1800000);
+  const meta=await(await this.fetch(API+voice.uuid,{signal:cancel?AbortSignal.any([cancel,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)})).json();const file=(meta.model_files||[]).find(f=>f.model_type==='AIVMX');
   if(!file||!/^[a-f0-9]{64}$/i.test(String(file.checksum||''))||!(file.file_size>0))throw Error('AivisHub 没有 '+voice.name+' 的 AIVMX 文件信息');
   if(!['ACML 1.0','CC0'].includes(file.license_type))throw Error(voice.name+' 的许可已变为 '+file.license_type+'，已跳过');
   /* 2026-11-19: core/fast-download.cjs pulls the file in parallel Range pieces when AivisHub's answer allows it (one
@@ -70,4 +69,25 @@ class VoicePack{
   try{await downloader.download({urls:[endpoint],dest:tmp,size:file.file_size,sha256:String(file.checksum).toLowerCase(),fetch:fetchModel,signal,onProgress:p=>{progress.bytes=p.received;}});fs.renameSync(tmp,target);this.log('[ToMe] voice installed: '+voice.name);}
   catch(e){for(const f of [tmp,tmp+'.part',tmp+'.part.json'])try{fs.unlinkSync(f);}catch{}if(/^(HASH|SIZE)_MISMATCH$/.test(e.code||''))throw Error(voice.name+' 校验失败');if(e.code==='DOWNLOAD_FAILED')throw Error(voice.name+' 下载失败 '+String((e.last&&e.last.message)||''));throw e;}}
 }
-module.exports={VoicePack,VOICES};
+
+// Use the bundled engine's own first-run defaults when its model folder is empty.
+async function prepareDefaultVoices({fetch,signal,dir=modelsDir()}){
+ signal.throwIfAborted();
+ fs.mkdirSync(dir,{recursive:true});
+ const hasModels=()=>fs.readdirSync(dir,{withFileTypes:true}).some(entry=>/\.aivmx$/i.test(entry.name)&&!entry.isDirectory());
+ if(hasModels())return;
+ const stage=fs.mkdtempSync(path.join(dir,'.megulit-first-voices-'));
+ try{
+  const pack=new VoicePack({dir:stage,fetch});
+  const voices=VOICES.filter(voice=>voice.bundledDefault);
+  for(const voice of voices){signal.throwIfAborted();await pack.download(voice,null,signal);}
+  signal.throwIfAborted();
+  if(hasModels())return;
+  for(const voice of voices){
+   const file=voice.uuid+'.aivmx';
+   // Publish a complete model without replacing a file installed by another downloader.
+   try{fs.linkSync(path.join(stage,file),path.join(dir,file));}catch(e){if(e.code!=='EEXIST')throw e;}
+  }
+ }finally{fs.rmSync(stage,{recursive:true,force:true});}
+}
+module.exports={VoicePack,VOICES,prepareDefaultVoices};

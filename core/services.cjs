@@ -1,5 +1,6 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process');
+const DEFAULT_VOICE_PREP_MS=45000;
 class Services{
  constructor(root,options={}){this.root=root;this.children=[];this.starting=null;this.epoch=0;this.controller=new AbortController();this.fetch=options.fetch||fetch;this.prepare=options.prepare||require('./speech-setup.cjs').prepareSpeechModel;this.spawn=options.spawn||spawn;this.exe=options.exe||require('./layout.cjs').aivis;this.killTree=options.killTree||killTree;this.releasing=Promise.resolve();this.game='';this.log=message=>fs.appendFileSync(path.join(this.root,'logs','speech-engine.log'),message+'\n');}
  async gameEvent(message,config){
@@ -23,7 +24,11 @@ class Services{
   const job=(async()=>{await this.releasing;check();const ready=await probe();check();if(ready)return;
    if(url!=='http://127.0.0.1:10101')throw Error('无法连接所配置的 AivisSpeech 地址，请先启动对应引擎');
    const exe=this.exe;if(!fs.existsSync(exe))throw Error('缺少 AivisSpeech 引擎，请完整解压语音组件');
+   // Keep time for the engine's ordinary startup when the model host is slow or unreachable.
+   const voicePrepSignal=AbortSignal.any([signal,AbortSignal.timeout(DEFAULT_VOICE_PREP_MS)]);
    await this.prepare(this.log);check();
+   try{await require('./voice-pack.cjs').prepareDefaultVoices({fetch:this.fetch,signal:voicePrepSignal});}
+   catch(e){check();this.log('[MeguLit] default voice preparation failed; AivisSpeech will handle first-run setup: '+e.message);}
    const marker=path.join(this.root,'cache','speech-gpu-unavailable'),modes=gpu&&!fs.existsSync(marker)?['--use_gpu','--no-use_gpu']:['--no-use_gpu'];
    for(const mode of modes){check();this.log('[MeguLit] starting AivisSpeech with '+mode);const log=fs.openSync(path.join(this.root,'logs','speech-engine.log'),'a');let child;try{child=this.spawn(exe,['--host','127.0.0.1','--port','10101',mode],{cwd:path.dirname(exe),windowsHide:true,stdio:['ignore',log,log]});}finally{fs.closeSync(log);}this.children.push(child);let failed=false;child.on('error',()=>{failed=true;});child.on('exit',()=>{failed=true;});
     const until=Date.now()+180000;while(Date.now()<until&&!failed){await require('node:timers/promises').setTimeout(500,undefined,{signal});check();const ready=await probe();check();if(ready){this.mode=mode;return;}}
