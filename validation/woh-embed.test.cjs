@@ -160,7 +160,7 @@ test('E358 wiring: the reader checks the game glyphs before writing back; the br
  assert.match(reader,/hide=this\.gal\?\.hooks\?\.originalText\?\.drawable\?\.\(trans\)===false/);
  assert.match(reader,/embedReply\(id,hide\?'':trans,\{hide,source:text,text:trans\}\)/);
  assert.match(bridge,/string reply=hide\?\(p\.hidden\?\?""\):EmbedTextPolicy\.Writeback\(p\.text,trans\);/);
- assert.match(bridge,/new PendingEmbed\{tp=tp,text=text,hidden=replacement(,code=candidate\.code)?\}/);
+ assert.match(bridge,/new PendingEmbed\{tp=tp,text=text,hidden=replacement,code=candidate\.code,selected=Selected,selectedGen=SelectGen\}/,'a pending line remembers the selection it was asked for (#696: an answer after a stream switch is not credited to the new stream)');
  assert.match(bridge,/d\.TryGetValue\("hide",out hv\)&&Convert\.ToBoolean\(hv\)/);
  assert.match(text,/const api=\{kind:'patch',patch:!!patched,fill,drawable,tableDrawable,/);
 });
