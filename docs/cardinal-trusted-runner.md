@@ -125,3 +125,23 @@ The signing input is cloned from a separately retained canonical measured review
 Status, unavailable collectors and invalid capture evidence do not read/decrypt a key or invoke KeyVault
 This adds no dependency, live collector or actual trusted game result
 Tests use the existing explicitly synthetic full capture/resource/signer boundary and neutral ephemeral keys; no real DPAPI file, KeyVault process or game was used
+
+## External collector diagnostics
+
+Build the external executable and its private dependencies in a new host tools directory with
+`tools/build-cardinal-collector.ps1 -OutputDirectory F:/TrustedTools/Cardinal`.
+Keep this entire directory administrator-controlled, including the native stdout tap and WebView2 assemblies.
+
+- `CardinalCollector.exe --probe` opens a neutral WebView2 on a unique private desktop and reads its visible challenge text over CDP
+- `CardinalCollector.exe --reader-probe F:/fresh-app --cdp-port 49279` starts the actual MeguLit desktop reader. Use a fresh F-drive copy containing the trusted desktop executable, its matching native GalWindowBridge, runtime Node, services and core, without player data or cache. Keep the parent's stdin pipe open during the diagnostic. EOF cancels the job
+- The Reader diagnostic opens the Reader through its host command, reads readiness and visible translation from its page, and checks a real native bridge ready record from the same job. It obtains the pipe client identity from Windows and verifies the service and bridge image paths. An empty Reader returns a null translation
+- The configured IPv4 loopback port is exclusively bound and released before launch. The collector checks the actual listening PID, process creation ticks and job membership again at observation. The Reader page ID must match the WebSocket target path. `readerTargetId` is required in the trusted report signature payload
+- Normal stdin capture requests currently exit 2 with a challenge-bound isolation failure before any game launch. These diagnostics produce unsigned output. They do not qualify the executable for the host's live collector allowlist. The remaining work includes OS-enforced disposable saves and game network isolation, full native source episodes paired with visible translations, effective profile readback and reporter signing after verified cleanup
+
+## Enhanced-seed host adapter
+
+Run `node tools/enhanced-seed-host.cjs <local-config.json>` once per scheduler tick on an authorized host. The administrator configuration contains the relay origin in `base`, a local trusted `policy` file, a list of local signed-candidate request file paths in `requests`, and the shared single-game queue's exclusive file path in `queueLock`. Use this adapter only with a queue that uses exclusive file creation and deletion. The optional `reviewer` and `publisher` objects specify existing DPAPI `store`, `id` and `vault` values for their respective roles.
+
+The host checks its idle reading, resource limits and cleanup barrier, then takes the queue lock before claim. One invocation processes at most one job. A missing sample retries, a running measurement renews every 90 seconds, and renewal failure aborts the run. An existing proposal can resume at the malware gate. The adapter compares the signed profile and review, candidate identity, baseline and exact ready proposal before invoking an existing publisher. It compares the published hash to the locally verified signed release. A host without a publisher leaves the receipt available for a publishing host.
+
+Only the host HTTP client receives `ENHANCED_HOST_TOKEN`. The collector receives the trusted runner's restricted environment. No endpoint, host credential, game sample or signing key is configured by building the diagnostic program.

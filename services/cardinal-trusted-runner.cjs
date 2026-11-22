@@ -65,6 +65,7 @@ async function evaluate(report,context,reporter,challenge){
  if(!P.same(report.identity,context.request.identity)||report.candidateHash!==context.candidateHash||report.appliedProfileHash!==context.proof.candidate.profileHash||report.configHash!==context.proof.config.digest||report.identityDigest!==context.proof.digest)fail('TRUSTED_CAPTURE_BINDING');
  const p=report.process,c=report.cleanup;if(!p||!Number.isSafeInteger(p.pid)||p.pid<1||!/^[1-9]\d{0,29}$/.test(p.birth)||['owned','jobAssigned','hiddenDesktop','privateCopy','savesIsolated','networkBlocked','parentWatchdog'].some(k=>p[k]!==true))fail('TRUSTED_PROCESS_ISOLATION');
  if(!c||['treeExited','audioRestored','ownershipReleased'].some(k=>c[k]!==true))fail('TRUSTED_CAPTURE_CLEANUP_UNCONFIRMED');
+ if(typeof report.readerTargetId!=='string'||!/^[a-f0-9]{32}$/i.test(report.readerTargetId))fail('TRUSTED_READER_TARGET');
  if(typeof report.runId!=='string'||!/^[0-9a-f-]{36}$/.test(report.runId))fail('TRUSTED_RUN_ID');
  const run=report.run;if(!run||!Array.isArray(run.steps)||run.steps.length>10000||!run.o||run.o.models!==false||!Array.isArray(run.o.samples)||run.o.samples.length>12000||!Array.isArray(run.o.sourceEpisodes)||run.o.sourceEpisodes.length>400||(run.o.errors||[]).length)fail('TRUSTED_CAPTURE_OBSERVATIONS');
  const bound=run.steps.filter(x=>x.gwb?.type==='bound');if(bound.length!==1||bound[0].gwb.gameProcessId!==p.pid||String(bound[0].gwb.gameStarted)!==p.birth)fail('TRUSTED_PROCESS_BINDING');

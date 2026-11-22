@@ -138,28 +138,28 @@ static class ColdDesk{
    Emit("{\"type\":\"shot\",\"ok\":true,\"path\":"+Q(file)+",\"w\":"+tw+",\"h\":"+th+",\"black\":"+(black?"true":"false")+"}");}}
 
  static bool StopUnassigned(IntPtr process){try{TerminateProcess(process,1);return WaitForSingleObject(process,4000)==0;}catch{return false;}}
- static int Run(string[] a){string exe=Path.GetFullPath(a[1]);int seconds=600,parentPid=0;for(int i=2;i<a.Length-1;i++){if(a[i]=="--seconds")seconds=Math.Max(10,int.Parse(a[i+1]));if(a[i]=="--parent-pid")parentPid=int.Parse(a[i+1]);}
+ internal static int Run(string[] a,string desktop=DESK,string childArgument=null,Func<IntPtr,int,bool> observe=null){string exe=Path.GetFullPath(a[1]);int seconds=600,parentPid=0;for(int i=2;i<a.Length-1;i++){if(a[i]=="--seconds")seconds=Math.Max(10,int.Parse(a[i+1]));if(a[i]=="--parent-pid")parentPid=int.Parse(a[i+1]);}
   using(var owner=Process.GetCurrentProcess())Emit("{\"type\":\"owner\",\"pid\":"+owner.Id+",\"started\":"+Q(owner.StartTime.ToUniversalTime().Ticks.ToString())+"}");
   ImageName=Path.GetFileNameWithoutExtension(exe);
-  Desk=OpenDesktop(DESK,0,false,0x10000000);if(Desk==IntPtr.Zero)Desk=CreateDesktop(DESK,IntPtr.Zero,IntPtr.Zero,0,0x10000000,IntPtr.Zero);if(Desk==IntPtr.Zero){Emit("{\"type\":\"ended\",\"why\":\"desktop\"}");return 1;}
+  Desk=OpenDesktop(desktop,0,false,0x10000000);if(Desk==IntPtr.Zero)Desk=CreateDesktop(desktop,IntPtr.Zero,IntPtr.Zero,0,0x10000000,IntPtr.Zero);if(Desk==IntPtr.Zero){Emit("{\"type\":\"ended\",\"why\":\"desktop\"}");return 1;}
   PROCESS_INFORMATION pi=new PROCESS_INFORMATION();string why="";
   try{
   Job=CreateJobObject(IntPtr.Zero,null);var lim=new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();lim.Basic.LimitFlags=0x2000;/* KILL_ON_JOB_CLOSE */if(Job==IntPtr.Zero||!SetInformationJobObject(Job,9,ref lim,(uint)Marshal.SizeOf(lim)))throw new Exception("Job setup failed");
-  var si=new STARTUPINFO();si.cb=Marshal.SizeOf(si);si.lpDesktop="WinSta0\\"+DESK;
+  var si=new STARTUPINFO();si.cb=Marshal.SizeOf(si);si.lpDesktop="WinSta0\\"+desktop;
   const uint CREATE_SUSPENDED=4,CREATE_NO_WINDOW=0x08000000;
-  if(!CreateProcess(exe,new StringBuilder("\""+exe+"\""),IntPtr.Zero,IntPtr.Zero,false,CREATE_SUSPENDED|CREATE_NO_WINDOW,IntPtr.Zero,Path.GetDirectoryName(exe),ref si,out pi)){Emit("{\"type\":\"ended\",\"why\":\"create "+Marshal.GetLastWin32Error()+"\"}");return 1;}
+  if(!CreateProcess(exe,new StringBuilder("\""+exe+"\""+(childArgument==null?"":" "+childArgument)),IntPtr.Zero,IntPtr.Zero,false,CREATE_SUSPENDED|CREATE_NO_WINDOW,IntPtr.Zero,Path.GetDirectoryName(exe),ref si,out pi)){Emit("{\"type\":\"ended\",\"why\":\"create "+Marshal.GetLastWin32Error()+"\"}");return 1;}
   if(!AssignProcessToJobObject(Job,pi.hProcess)){/* This suspended child is outside the job: only its original handle identifies it safely. */if(!StopUnassigned(pi.hProcess))CleanupSafe=false;Emit("{\"type\":\"ended\",\"why\":\"job\"}");return 1;}
   WatchParent(parentPid);ResumeThread(pi.hThread);CloseHandle(pi.hThread);pi.hThread=IntPtr.Zero;StartedAt=DateTime.UtcNow;
   string started="";try{started=Process.GetProcessById(pi.dwProcessId).StartTime.ToUniversalTime().Ticks.ToString();}catch{}
   Emit("{\"type\":\"started\",\"pid\":"+pi.dwProcessId+",\"started\":"+Q(started)+"}");
-  var cmds=new Queue<string>();var reader=new Thread(()=>{string l;try{while((l=Console.In.ReadLine())!=null){if(l.Trim()=="kill"){RequestStop();return;}lock(cmds)cmds.Enqueue(l);}}catch{}RequestStop();});reader.IsBackground=true;reader.Start();
+  var cmds=new Queue<string>();var reader=new Thread(()=>{string l;try{while((l=Console.In.ReadLine())!=null){if(l.Trim()=="kill" || (observe!=null && l.Trim()=="{\"type\":\"stop\"}")){RequestStop();return;}if(observe==null)lock(cmds)cmds.Enqueue(l);}}catch{}RequestStop();});reader.IsBackground=true;reader.Start();
   uint baseInput=0;{var li=new LASTINPUTINFO();li.cbSize=(uint)Marshal.SizeOf(li);GetLastInputInfo(ref li);baseInput=li.dwTime;}
   int lastW=0,lastH=0;IntPtr lastHwnd=IntPtr.Zero;DateTime lastMute=DateTime.MinValue,lastPower=DateTime.MinValue;bool everAlive=false;DateTime goneAt=DateTime.MinValue;bool wasFull=Quns()>=2&&Quns()<=4;
   var end=DateTime.UtcNow.AddSeconds(seconds);
   while(why==""){
    if(Stopping){why="stopped";break;}
    /* the user is back: end now, before anything else */
-   {var li=new LASTINPUTINFO();li.cbSize=(uint)Marshal.SizeOf(li);if(GetLastInputInfo(ref li)&&li.dwTime!=baseInput){Emit("{\"type\":\"input\"}");why="input";break;}}
+   {var li=new LASTINPUTINFO();li.cbSize=(uint)Marshal.SizeOf(li);if(observe==null && GetLastInputInfo(ref li)&&li.dwTime!=baseInput){Emit("{\"type\":\"input\"}");why="input";break;}}
    string c=null;lock(cmds)if(cmds.Count>0)c=cmds.Dequeue();
    if(c!=null){var p=c.Trim().Split(new[]{' '},3);try{switch(p[0]){
      case "key":Key(Convert.ToUInt32(p[1]),true,true);break;
@@ -170,6 +170,7 @@ static class ColdDesk{
      case "shot":Shot(int.Parse(p[1]),p[2]);break;
      case "kill":why="killed";break;}}catch(Exception e){Emit("{\"type\":\"error\",\"what\":"+Q(c)+",\"why\":"+Q(e.Message)+"}");}
     if(why!="")break;continue;}
+   if(observe!=null && observe(Job,pi.dwProcessId)){why="sampled";break;}
    var pids=JobPids();
    if(pids.Count>0){everAlive=true;goneAt=DateTime.MinValue;}
    else if(everAlive){if(goneAt==DateTime.MinValue){goneAt=DateTime.UtcNow;}
