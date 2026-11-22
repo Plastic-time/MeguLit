@@ -151,6 +151,12 @@ Names use its existing speaker-name parser; choice normal/hover inputs remain se
 Accepted body ruby is converted from explicit codepoint spans to the existing exact/whitespace-compacted `sourceRuby` cache and the real Reader ruby consumer
 The actual consumer regression covers an 80-codepoint base and 160-codepoint reading including supplementary characters
 Only values owned by this session are cleared on rejection or stop; a rejected queued row restores the preceding accepted row's ruby
+On permission withdrawal or session stop, the current Reader sentence is also withdrawn with the existing `hookSource: null` clear signal
+Ownership is the actual delivered sequence, origin and normalized text, rather than the raw Lua input alone
+A pending publication is covered during synchronous revocation, and an emitter failure retains ownership for stop cleanup
+A later stock sentence or a row owned by another session is preserved; the stop does not globally disable other hooks
+This is a source lifecycle fix, not a game-side clear/hide acknowledgement or proof that a menu was detected
+
 Private Symbol plus WeakMap authority is checked at source, deliverSource and emitSource; stale stopped/rebound input is rejected even in an existing delayed callback
 All three gates also reject a private delivery immediately when HookNative no longer wants binding, before teardown has finished
 Unauthenticated use of the reserved origin is rejected, never treated as permission

@@ -66,13 +66,23 @@ function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepa
  if(prepared.path==='rgss'){s.owner=()=>hook.wanted===false||hook.disposed||hook.stopPending||hook.stopError||prepared.ownerTestGrant&&(hook.wanted!==true||hook.ownerTestGrant!==prepared.ownerTestGrant||!require('./owner-tests.cjs').allowed(prepared.ownerTestGrant,{exe:prepared.exe,engine:'rgss',capability:'roles'}))?0:hook.gamePid?.()||hook.target?.pid||0;s.ownerBirth=()=>String(hook.target?.started||hook.windowState?.gameStarted||'');}
  if(prepared.path==='artemis'){
   const current=m=>hook.textPath===s&&hook.wanted!==false&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&s.permission()&&s.owner&&m?.artemisOwner&&hook.target?.pid===s.owner.pid&&hook.target?.started===s.owner.started&&m.artemisOwner.pid===s.owner.pid&&m.artemisOwner.started===s.owner.started;
-  let rubyOwner=null,speakerOwner=null;
+  let rubyOwner=null,speakerOwner=null,sourceOwner=null,pendingOwner=null;
   const clearRuby=()=>{if(rubyOwner)for(const key of rubyOwner.keys)if(hook.sourceRuby?.get(key)===rubyOwner.pairs)hook.sourceRuby.delete(key);rubyOwner=null;};
-  s.onStop=()=>{clearRuby();if(hook.speaker===speakerOwner)hook.speaker=null;speakerOwner=null;};
+  s.onStop=()=>{clearRuby();if(hook.speaker===speakerOwner)hook.speaker=null;speakerOwner=null;
+   // A revoked input session must withdraw its current Reader row, including synchronous revocation during notify.
+   const owns=o=>o&&hook.state?.hookSourceOrigin==='artemis-lua-input'&&hook.state.hookSequence===o.sequence&&(o.text===undefined||hook.state.hookSource===o.text);
+   const shown=owns(sourceOwner)||owns(pendingOwner);sourceOwner=null;if(!shown)return;
+   hook.lastSource='';hook.lastSourceAt=0;hook.pageReset?.();hook.pageText?.reset?.();
+   hook.notify?.({hookSource:null,hookSpeaker:'',hookSourceRuby:[],hookSourceOrigin:'leave',hookSequence:hook.state.hookSequence+1,receivedText:false});
+  };
   s.onSource=m=>{if(!current(m))return false;const previous=rubyOwner;clearRuby();const before=hook.state?.hookSequence||0,chars=[...m.text];
    const pairs=m.artemisRuby.map(([at,n,reading])=>[chars.slice(at,at+n).join(''),reading,chars.slice(0,at).filter(c=>!/\s/u.test(c)).length]);
    if(pairs.length){const keys=[...new Set([m.text,m.text.replace(/\s+/g,'')])],map=hook.sourceRuby||(hook.sourceRuby=new Map());for(const key of keys)map.set(key,pairs);while(map.size>64)map.delete(map.keys().next().value);rubyOwner={keys,pairs};}
-   hook.source(m,'Artemis Lua input');
+   const previousPending=pendingOwner,pending={sequence:before+1};pendingOwner=pending;
+   try{hook.source(m,'Artemis Lua input');}finally{
+    if(hook.state?.hookSequence===pending.sequence&&hook.state.hookSourceOrigin==='artemis-lua-input'&&typeof hook.state.hookSource==='string')sourceOwner={sequence:pending.sequence,text:hook.state.hookSource};
+    pendingOwner=previousPending;
+   }
    const accepted=current(m)&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='artemis-lua-input'&&hook.state.hookSource===m.text;
    if(!accepted){clearRuby();if(previous&&current(m)){const map=hook.sourceRuby;for(const key of previous.keys)if(!map.has(key))map.set(key,previous.pairs);rubyOwner=previous;}}return accepted;};
   /* Semantic input metadata is deliberately not CHARS/UI rectangles or a current-pixel visibility acknowledgement. */

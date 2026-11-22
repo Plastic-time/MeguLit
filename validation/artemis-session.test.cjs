@@ -98,7 +98,7 @@ test('actual attach/source/deliver/emit reject a stopped or rebound private sour
   let held;const original=s.onSource;s.onSource=x=>{held=x;return original(x);};now+=20;h.engineDialog=false;h.engineDialogAt=now;
   assert.equal(s.accept(packet('遅れて届く本文を拒否します。')),false);assert.equal(h.boxBlink.lines.length,1);
   assert.deepEqual(h.sourceRuby.get('最初の本文を読みます。'),[['最初',reading,0]],'rejected pending input must not erase the accepted current native ruby');
-  await s.stop();now+=1000;t.mock.timers.tick(1000);assert.equal(h.state.hookSource,'最初の本文を読みます。');
+  await s.stop();now+=1000;t.mock.timers.tick(1000);assert.equal(h.state.hookSource,null,'withdrawal clears its current Reader row and late callbacks cannot revive it');
   assert.equal(h.sourceRuby.has('最初の本文を読みます。'),false);
   const sequence=h.state.hookSequence;h.deliverSource('偽の本文です。','artemis-lua-input','',0,held);h.emitSource('偽の本文です。','artemis-lua-input');assert.equal(h.state.hookSequence,sequence);
   h.target={pid:43,started:'638990000000000001'};h.source({...held},'Artemis Lua input');assert.equal(h.state.hookSequence,sequence);
