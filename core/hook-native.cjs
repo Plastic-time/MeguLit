@@ -441,9 +441,12 @@ class HookNative{
   const prev=R.length>=2?R[R.length-2].key:'';
   /* One wrapped sentence (TextRender during calibration) is still ADV. Start a page only when the other stream
      demonstrably retains two distinct dialogue lines. An established page may then report its first new line alone. */
-  if(!P.pages&&(k===cur||!prev||prev===cur||!k.includes(prev)))return;
+  if(!P.pages&&(k===cur||!prev||prev===cur||!HookNative.retainedPrevious(k,prev,cur)))return;
   P.paging=true;P.auxPageAt=this.now();
   if(prev&&prev!==cur&&!k.includes(prev)&&this.pageSaidSame===true&&P.auxResetFor!==cur){P.auxResetFor=cur;this.pageSaidSame=false;this.trace('page turned before this line (the page text no longer holds the line before it)');this.emit({type:'hookPage',engine:'text',reset:true,at:this.now()});}}catch{}}
+ /* Exclude every occurrence of the current sentence, including overlapping redraws. A previous sentence must
+    survive in a separate gap; a speaker prefix or suffix cannot make a substring into a second sentence. */
+ static retainedPrevious(page,previous,current){if(!previous||!current)return false;let end=0;for(let at=page.indexOf(current);at>=0;at=page.indexOf(current,at+1)){if(at>end&&page.slice(end,at).includes(previous))return true;end=Math.max(end,at+current.length);}return page.slice(end).includes(previous);}
  /* share of the character pairs of `flat` found in the hooked lines of the last ten minutes (0 when nothing to compare) */
  static hookOverlap(flat,recent,now){const t=String(flat||'');if([...t].length<4||!Array.isArray(recent))return 0;const hay=recent.filter(r=>now-r.at<600000).map(r=>r.key).join(String.fromCharCode(10));if(!hay)return 0;const ch=[...t];let n=0,hit=0;for(let i=0;i+1<ch.length;i++){n++;if(hay.includes(ch[i]+ch[i+1]))hit++;}return n?hit/n:0;}
  auxText(m){this.auxPage(m);{const sp=splitSpeaker(m?.text,this.knownSpeakers);if(sp.name&&!sp.text.trim()){this.speaker={text:sp.name,at:this.now()};this.noteSpeaker(sp.name);return;}}/* 2026-11-15 (沙耶の唄, user: 「ocr遮挡又出来了」): the dialogue hook sends each line on two thread contexts; the one not selected

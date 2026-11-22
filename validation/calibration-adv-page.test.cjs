@@ -14,6 +14,12 @@ test('two retained distinct sentences establish a real page; an established page
 test('a previous short line contained in the wrapped current sentence is not a second retained sentence',()=>{
  const {h,events,feed}=hook();feed('「はい」');feed('「はい」、その声に返事をした。');h.auxPage({text:'「はい」、その声に\n返事をした。',sourceName:'TextRender'});feed(C);assert.equal(h.pageText.pages,false);assert.equal(events.filter(m=>m.type==='hookPage').length,0);
 });
+for(const decoration of ['speaker','speaker-and-suffix','repeated-current'])test('wrapped current sentence with '+decoration+' cannot reuse its contained previous line as NVL evidence',()=>{
+ const {h,events,feed}=hook(),prev='「はい」',cur='「はい」、その声に返事をした。';feed(prev);feed(cur);const wrapped='「はい」、その声に\n返事をした。';const text=decoration==='speaker'?'【将臣】\n'+wrapped:decoration==='speaker-and-suffix'?'【将臣】\n'+wrapped+'\n▼':'【将臣】\n'+wrapped+'\n'+wrapped;h.auxPage({text,sourceName:'TextRender'});feed(C);assert.equal(h.pageText.pages,false);assert.equal(events.filter(m=>m.type==='hookPage').length,0);
+});
+for(const order of ['before','after'])test('an independent previous short line '+order+' the current sentence still establishes a real page',()=>{
+ const {h,events,feed}=hook(),prev='「はい」',cur='「はい」、その声に返事をした。';feed(prev);feed(cur);h.auxPage({text:'【将臣】\n'+(order==='before'?prev+'\n'+cur:cur+'\n'+prev),sourceName:'TextRender'});assert.equal(h.pageText.pages,true);feed(C);assert.equal(events.filter(m=>m.type==='hookPage').at(-1).same,true);
+});
 test('native KiriKiri NVL reports remain authoritative, including real same-page and new-page reports',()=>{
  const {h,events}=hook();for(const [i,text]of[A,B,C].entries())h.pageLine({engine:'krkr',line:i+1,phase:'end',nvl:true,same:i===1,text,sw:1280,sh:720,x0:20,y0:30+i*40,x1:900,y1:60+i*40,size:24,count:text.length});assert.equal(h.pageMode.mode,'nvl');assert.deepEqual(events.filter(m=>m.type==='hookPage'&&m.token!==0).map(m=>m.same),[false,true,false]);
 });
