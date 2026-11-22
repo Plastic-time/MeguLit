@@ -7,6 +7,21 @@ const WORDS={
 const PHASES=new Set(['idle','scanning','cancelling','cancelled','preview','confirm','applying','applied','error']);
 const ERROR_ALIASES={SCAN_STALE:'JP_SCAN_SOURCE_CHANGED',EMBEDDED_UNSUPPORTED:'JP_SCAN_UNSUPPORTED',EMBEDDED_CONFLICT:'JP_SCAN_SOURCE_CHANGED'};
 Object.assign(WORDS.zh,{sources:'已检查的游戏文件'});Object.assign(WORDS.en,{sources:'Checked game files'});Object.assign(WORDS.ja,{sources:'確認したゲームファイル'});
+Object.assign(WORDS.zh,{
+ diagnostic:{'read-only':'找到了日文剧本，目前仅支持只读检查','no-japanese':'已读取可识别的剧本，未发现日文正文',detected:'已识别游戏格式，暂未读到可确认的剧本',unknown:'未识别游戏格式或可读的剧本'},
+ partial:'部分资源超出扫描限额或无法解析，结果仅覆盖已读到的内容',
+ diagnosticTranslations:'同一剧本中读到的中文译文',
+});
+Object.assign(WORDS.en,{
+ diagnostic:{'read-only':'Japanese script found. These files can currently be inspected only', 'no-japanese':'Readable scripts checked. No Japanese dialogue found', detected:'Game format detected. Script contents could not be verified', unknown:'No game format or readable script was recognized'},
+ partial:'Some resources exceeded scan limits or could not be read. This result covers the content that was read',
+ diagnosticTranslations:'Chinese translations found in the same scripts',
+});
+Object.assign(WORDS.ja,{
+ diagnostic:{'read-only':'日本語シナリオが見つかりました。現在は読み取り専用です','no-japanese':'読み取れるシナリオを確認しましたが、日本語の本文は見つかりませんでした',detected:'ゲームの形式を検出しました。シナリオの内容は確認できませんでした',unknown:'ゲームの形式や読み取れるシナリオを検出できませんでした'},
+ partial:'上限を超えた、または解析できなかったデータがあります。結果は読み取れた範囲に限ります',
+ diagnosticTranslations:'同じシナリオ内で確認できた中国語訳',
+});
 Object.assign(WORDS.zh,{refresh:'重新查询进度',undoing:'正在还原，请等待完成后再关闭'});Object.assign(WORDS.en,{refresh:'Check progress again',undoing:'Undoing; wait for completion before closing'});Object.assign(WORDS.ja,{refresh:'進行状況を再確認',undoing:'元に戻しています。完了するまで閉じないでください'});
 Object.assign(WORDS.zh,{unknown:'任务未完成，请重新查询进度或查看诊断日志'});Object.assign(WORDS.en,{unknown:'The task did not finish; check progress again or consult the diagnostic log'});Object.assign(WORDS.ja,{unknown:'処理が完了していません。進行状況または診断ログを確認してください'});
 WORDS.zh.errors.ORIGINAL_SCAN_NOT_STARTED='后台已确认这次任务未启动，可以重试';WORDS.en.errors.ORIGINAL_SCAN_NOT_STARTED='The backend confirmed this request never started; you can retry';WORDS.ja.errors.ORIGINAL_SCAN_NOT_STARTED='今回の処理が開始されていないことを確認しました。再試行できます';
@@ -15,39 +30,47 @@ WORDS.zh.capacityPending='扫描服务的任务数已满，请重新查询，确
 export const originalScanWords=locale=>WORDS[locale]||WORDS.zh;
 const count=value=>Number.isSafeInteger(value)&&value>=0&&value<=1000000000;
 const byteCount=value=>Number.isSafeInteger(value)&&value>=0;
+const DIAGNOSTIC_STATES=new Set(['read-only','no-japanese','detected','unknown']);
 
 /* Only the documented embedded-scan result is accepted; a file path never becomes a client scan argument */
 export function normalizeOriginalScanPreview(result){
  const fail=code=>{throw Error(code);};
  if(!result||typeof result!=='object')fail('ORIGINAL_SCAN_PROTOCOL');
- if(result.state==='unsupported')fail('EMBEDDED_UNSUPPORTED');
+ if(result.state==='unsupported')fail(result.warnings?.includes('EMBEDDED_CONFLICT')?'EMBEDDED_CONFLICT':'EMBEDDED_UNSUPPORTED');
  if(result.state==='stale')fail('SCAN_STALE');
- if(!['restorable','applied'].includes(result.state)||result.adapter!=='utage-embedded')fail('ORIGINAL_SCAN_PROTOCOL');
+ const diagnostic=DIAGNOSTIC_STATES.has(result.state);
+ if(diagnostic?result.adapter!=='folder-diagnostic':!['restorable','applied'].includes(result.state)||result.adapter!=='utage-embedded')fail('ORIGINAL_SCAN_PROTOCOL');
  const c=result.coverage;
  if(!c||!['japaneseLines','localTranslations','missingTranslations'].every(k=>count(c[k]))||c.localTranslations+c.missingTranslations!==c.japaneseLines)fail('ORIGINAL_SCAN_PROTOCOL');
  if(typeof result.canRestore!=='boolean'||result.canRestore&&(typeof result.scanToken!=='string'||!result.scanToken||result.scanToken.length>512))fail('ORIGINAL_SCAN_PROTOCOL');
- if(!Array.isArray(result.sources)||result.sources.length>128||!result.sources.length)fail('ORIGINAL_SCAN_PROTOCOL');
+ if(diagnostic&&(result.canRestore||result.scanToken!==''||typeof result.partial!=='boolean'||typeof result.engine!=='string'||result.engine.length>128||(result.state==='read-only')!==(c.japaneseLines>0)))fail('ORIGINAL_SCAN_PROTOCOL');
+ if(!Array.isArray(result.sources)||result.sources.length>128||!diagnostic&&!result.sources.length)fail('ORIGINAL_SCAN_PROTOCOL');
  const sources=result.sources.map(s=>{if(!s||typeof s.path!=='string'||!s.path||s.path.length>4096||!Number.isSafeInteger(s.bytes)||s.bytes<0||typeof s.sha256!=='string'||!/^[0-9a-f]{64}$/i.test(s.sha256))fail('ORIGINAL_SCAN_PROTOCOL');return Object.freeze({path:s.path,bytes:s.bytes,sha256:s.sha256});});
  return Object.freeze({state:result.state,japanese:c.japaneseLines,local:c.localTranslations,missing:c.missingTranslations,
-  canRestore:result.state==='restorable'&&result.canRestore,scanToken:result.canRestore?result.scanToken:'',sources:Object.freeze(sources)});
+  canRestore:result.state==='restorable'&&result.canRestore,scanToken:result.canRestore?result.scanToken:'',sources:Object.freeze(sources),
+  engine:typeof result.engine==='string'?result.engine.slice(0,128):'',partial:diagnostic&&result.partial});
 }
 
 /* Counts arrive through a backend adapter; malformed totals never become an actionable preview */
 export function originalScanPresentation(state={},locale='zh'){
  const t=originalScanWords(locale),phase=PHASES.has(state.phase)?state.phase:'error';
  const p=state.preview,valid=!!p&&count(p.japanese)&&count(p.local)&&count(p.missing)&&p.local+p.missing===p.japanese;
+ const diagnostic=valid&&DIAGNOSTIC_STATES.has(p.state);
  const hasGame=typeof state.gameId==='string'&&state.gameId.length>0;
- const ready=valid&&p.japanese>0&&p.local>0&&p.canRestore===true;
+ const ready=valid&&!diagnostic&&p.japanese>0&&p.local>0&&p.canRestore===true;
  const showResult=valid&&['preview','confirm','applying','applied'].includes(phase),writing=state.operation==='restore'||state.operation==='undo';
+ const status=t[phase]||t.unknown;
+ const reportStatus=phase==='preview'&&valid?[diagnostic?t.diagnostic[p.state]:status,p.engine].filter(Boolean).join(' · '):status;
  const progress=state.progress;
  const knownProgress=!!progress&&count(progress.done)&&count(progress.total)&&progress.total>0&&progress.done<=progress.total;
- return {phase,lead:t.lead,status:phase==='error'?(state.pendingJob&&state.error==='EMBEDDED_REQUEST_LIMIT'?t.capacityPending:t.errors[ERROR_ALIASES[state.error]||state.error]||t.unknown):phase==='idle'&&!hasGame?t.pick:phase==='applying'&&state.operation==='undo'?t.undoing:t[phase]||t.unknown,
-  showCounts:showResult,counts:valid?[p.japanese,p.local,p.missing]:[],
-  localNote:showResult&&p.local>0?t.localNote:showResult?t.noLocal:'',missingNote:showResult&&p.missing>0?t.missingNote:'',
+ return {phase,lead:t.lead,status:phase==='error'?(state.pendingJob&&state.error==='EMBEDDED_REQUEST_LIMIT'?t.capacityPending:t.errors[ERROR_ALIASES[state.error]||state.error]||t.unknown):phase==='idle'&&!hasGame?t.pick:phase==='applying'&&state.operation==='undo'?t.undoing:reportStatus,
+  showCounts:showResult&&(!diagnostic||p.state==='read-only'),showSources:showResult&&!!p.sources?.length,counts:valid?[p.japanese,p.local,p.missing]:[],
+  localLabel:diagnostic?t.diagnosticTranslations:t.local,
+  localNote:showResult&&!diagnostic?(p.local>0?t.localNote:t.noLocal):'',missingNote:showResult&&!diagnostic&&p.missing>0?t.missingNote:'',
   canScan:hasGame&&(state.error!=='EMBEDDED_REQUEST_LIMIT'||state.pendingJob)&&(phase==='error'&&state.pendingJob?state.recoverable===true:!['scanning','cancelling','applying'].includes(phase)&&!(writing&&state.pendingJob)),canCancel:!writing&&(state.pendingJob||['scanning','cancelling'].includes(phase))&&state.cancellable!==false,
-  cancelPending:phase==='cancelling',showRestore:phase==='preview',canRestore:hasGame&&ready&&phase==='preview',
+  cancelPending:phase==='cancelling',showRestore:phase==='preview'&&!diagnostic,canRestore:hasGame&&ready&&phase==='preview',
   showConfirm:phase==='confirm',canConfirm:hasGame&&ready&&phase==='confirm',
-  blockedNote:phase==='preview'&&!ready?(valid&&p.local===0?t.noLocal:t.notReady):'',
+  blockedNote:phase==='preview'&&(diagnostic?p.partial:!ready)?(diagnostic?t.partial:valid&&p.local===0?t.noLocal:t.notReady):'',
   progressVisible:['scanning','cancelling','applying'].includes(phase),progressValue:knownProgress?Math.floor(progress.done*100/progress.total):null,
   progressText:knownProgress?progress.done.toLocaleString(locale)+' / '+progress.total.toLocaleString(locale):progress&&(progress.file||byteCount(progress.bytes))?[progress.file?.split(/[/\\]/).pop(),byteCount(progress.bytes)?progress.bytes.toLocaleString(locale)+' B':''].filter(Boolean).join(' · '):t.wait,
   closeAllowed:phase!=='applying'&&!(writing&&state.pendingJob)};
@@ -160,9 +183,9 @@ export function mountOriginalScanView(container,{locale='zh',actions={}}={}){
  function render(state){if(disposed)return;const v=originalScanPresentation(state,locale);section.dataset.phase=v.phase;section.setAttribute('aria-busy',String(['scanning','cancelling','applying'].includes(v.phase)));node('[data-os-status]').textContent=v.status;
   const progress=node('progress');if(v.progressValue===null)progress.removeAttribute('value');else progress.value=v.progressValue;
   node('[data-os-progress]').hidden=!v.progressVisible;node('[data-os-progress-text]').textContent=v.progressText;
-  const counts=node('[data-os-counts]');counts.hidden=!v.showCounts;counts.querySelectorAll('dd').forEach((dd,i)=>{dd.textContent=v.counts[i]===undefined?'':v.counts[i].toLocaleString(locale);});
-  const sources=node('[data-os-sources]');sources.hidden=!v.showCounts;sources.querySelector('summary').textContent=t.sources;
-  const list=sources.querySelector('ul');list.replaceChildren();for(const source of v.showCounts?(state.preview.sources||[]):[]){const item=doc.createElement('li');item.textContent=source.path+' · '+source.bytes.toLocaleString(locale)+' B';list.append(item);}
+  const counts=node('[data-os-counts]');counts.hidden=!v.showCounts;counts.querySelectorAll('dt')[1].textContent=v.localLabel;counts.querySelectorAll('dd').forEach((dd,i)=>{dd.textContent=v.counts[i]===undefined?'':v.counts[i].toLocaleString(locale);});
+  const sources=node('[data-os-sources]');sources.hidden=!v.showSources;sources.querySelector('summary').textContent=t.sources;
+  const list=sources.querySelector('ul');list.replaceChildren();for(const source of v.showSources?state.preview.sources:[]){const item=doc.createElement('li');item.textContent=source.path+' · '+source.bytes.toLocaleString(locale)+' B';list.append(item);}
   for(const [selector,value] of [['[data-os-local]',v.localNote],['[data-os-missing]',v.missingNote],['[data-os-blocked]',v.blockedNote]]){node(selector).textContent=value;node(selector).hidden=!value;}
   node('[data-os-confirm-note]').textContent=t.confirmNote;node('[data-os-confirm-note]').hidden=!v.showConfirm;
   buttons.scan.disabled=!v.canScan;buttons.scan.textContent=state.pendingJob&&v.phase==='error'?t.refresh:v.phase==='idle'?t.scan:t.retry;

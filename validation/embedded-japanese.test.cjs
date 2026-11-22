@@ -21,7 +21,11 @@ test('embedded scan is read-only, covers the compiled patch, and preserves row s
 
 test('source/role/Voice/header mismatch and duplicate source row IDs are refused before any write',t=>{
  const edits=[rows=>rows[1][2]='これは違う物語の文章です。',rows=>rows[1][1]='別の役者',rows=>rows[1][4]='wrong.ogg',rows=>rows[0][3]='English'];
- for(const mutatePatch of edits){const f=fixture(t,{mutatePatch}),before=hash(f.baseFile);assert.equal(embedded.scan(f.dir).state,'unsupported');assert.equal(hash(f.baseFile),before);}
+ for(const mutatePatch of edits){
+  const f=fixture(t,{mutatePatch}),before=hash(f.baseFile),scan=embedded.scan(f.dir);
+  assert.equal(scan.state,'detected');assert.equal(scan.engine,'Unity (Utage)');
+  assert.equal(scan.canRestore,false);assert.equal(scan.scanToken,'');assert.equal(hash(f.baseFile),before);
+ }
  const duplicate=fixture(t,{patch:false,duplicateId:true});assert.deepEqual(embedded.scan(duplicate.dir).warnings,['EMBEDDED_DUPLICATE_ROW_ID']);
  const shifted=fixture(t,{patchRowOffset:100});assert.deepEqual(embedded.scan(shifted.dir).warnings,['EMBEDDED_CONFLICT']);
  const multiple=fixture(t);fs.mkdirSync(path.join(multiple.dir,'Other_Data'));assert.deepEqual(embedded.scan(multiple.dir).warnings,['EMBEDDED_UNSUPPORTED_DATA_LAYOUT']);
@@ -80,7 +84,8 @@ test('the restored index reaches original-text, HookNative and Reader.translate 
 
 test('Japanese voice labels cannot substitute for Japanese body, and oversized bundle metadata is rejected',t=>{
  const chinese=fixture(t,{patch:false,mutateBase:rows=>{for(const row of rows.slice(1))if(!row[0]){row[1]='日本語の役者';row[2]='这是一段中文故事，正文完全没有日语内容。';row[4]='これは日本語の音声ラベル.ogg';}}});
- assert.deepEqual(embedded.scan(chinese.dir).warnings,['EMBEDDED_NO_JAPANESE_BODY']);
+ const result=embedded.scan(chinese.dir);
+ assert.equal(result.state,'no-japanese');assert.deepEqual(result.warnings,['EMBEDDED_NO_JAPANESE_BODY']);
  const names=fixture(t,{patch:false,mutateBase:rows=>{for(const row of rows.slice(1))if(!row[0])row[2]='ノワール与カルハ正在讨论这段中文剧情。';}});
  assert.deepEqual(embedded.scan(names.dir).warnings,['EMBEDDED_NO_JAPANESE_BODY']);
  const f=fixture(t),bytes=fs.readFileSync(f.patchFile);let pos=12;for(let i=0;i<2;i++)pos=bytes.indexOf(0,pos)+1;bytes.writeUInt32BE(0x7fffffff,pos+12);fs.writeFileSync(f.patchFile,bytes);

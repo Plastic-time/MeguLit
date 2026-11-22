@@ -15,6 +15,21 @@ const dto=()=>({state:'restorable',adapter:'utage-embedded',scanToken:'scan-toke
 test('documented preview fields retain counts and immutable source identity without input mutation',async()=>{const {normalizeOriginalScanPreview:n}=await modulePromise;const input=dto(),before=JSON.stringify(input),p=n(input);assert.equal(p.scanToken,'scan-token');assert.equal(p.japanese,100);assert.equal(p.local,90);assert.equal(p.missing,10);assert.equal(Object.isFrozen(p.sources[0]),true);assert.notEqual(p.sources,input.sources);assert.equal(JSON.stringify(input),before);});
 test('missing token or contradictory totals cannot authorize restoration',async()=>{const {normalizeOriginalScanPreview:n}=await modulePromise;for(const change of [r=>{delete r.scanToken;},r=>r.coverage.missingTranslations=4,r=>r.canRestore='true',r=>r.sources[0].sha256='bad',r=>r.adapter='guessed-engine']){const input=dto();change(input);assert.throws(()=>n(input),/ORIGINAL_SCAN_PROTOCOL/);}});
 test('actual backend stale and unsupported codes remain fixed and localized',async()=>{const {normalizeOriginalScanPreview:n,originalScanPresentation:p}=await modulePromise;assert.throws(()=>n({state:'unsupported'}),/EMBEDDED_UNSUPPORTED/);assert.throws(()=>n({state:'stale'}),/SCAN_STALE/);assert.match(p({phase:'error',error:'SCAN_STALE'}).status,/重新扫描/);assert.match(p({phase:'error',error:'EMBEDDED_UNSUPPORTED'}).status,/暂不支持/);});
+test('diagnostic results show findings and never expose a restore action',async()=>{
+ const {normalizeOriginalScanPreview:normalize,originalScanPresentation:present}=await modulePromise;
+ const result={state:'read-only',adapter:'folder-diagnostic',engine:'Unity (Naninovel)',canRestore:false,scanToken:'',partial:true,
+  coverage:{japaneseLines:17,localTranslations:15,missingTranslations:2},sources:[{path:'scenario.bundle',bytes:13,sha256:'a'.repeat(64)}]};
+ for(const locale of ['zh','en','ja']){
+  const view=present({phase:'preview',gameId:'fixture',preview:normalize(result)},locale);
+  assert.match(view.status,/Naninovel/);assert.ok(view.blockedNote);assert.equal(view.showSources,true);
+  assert.deepEqual(view.counts,[17,15,2]);assert.equal(view.showRestore,false);assert.equal(view.canRestore,false);
+ }
+ assert.throws(()=>normalize({...result,canRestore:true,scanToken:'a'.repeat(64)}),/ORIGINAL_SCAN_PROTOCOL/);
+ const statuses=['detected','no-japanese','unknown'].map(state=>present({phase:'preview',gameId:'fixture',preview:normalize({
+  ...result,state,coverage:{japaneseLines:0,localTranslations:0,missingTranslations:0},sources:[],partial:false,
+ })}).status);
+ assert.equal(new Set(statuses).size,3);
+});
 
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 const deferred=()=>{let resolve,reject;const promise=new Promise((y,n)=>{resolve=y;reject=n;});return {promise,resolve,reject};};

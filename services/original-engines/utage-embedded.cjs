@@ -41,11 +41,12 @@ function sourceFiles(dir,check,directories){
  for(const e of entries(dir))if(e.isDirectory()&&/_Data$/i.test(e.name))dataDirs.push(path.join(dir,e.name));
  if(dataDirs.length!==1)throw Error('EMBEDDED_UNSUPPORTED_DATA_LAYOUT');
  for(const data of dataDirs){
-  for(const e of entries(data))if(e.isFile()&&/^(?:resources|sharedassets\d+|globalgamemanagers)\.assets$|^level\d+$/i.test(e.name))files.push(path.join(data,e.name));
-  const streaming=path.join(data,'StreamingAssets');
-  if(!fs.existsSync(streaming))continue;
+  const children=entries(data);
+  for(const e of children)if(e.isFile()&&/^(?:resources|sharedassets\d+|globalgamemanagers)\.assets$|^level\d+$/i.test(e.name))files.push(path.join(data,e.name));
+  const streaming=children.find(e=>e.isDirectory()&&/^StreamingAssets$/i.test(e.name));
+  if(!streaming)continue;
   const walk=(folder,depth)=>{for(const e of entries(folder)){const file=path.join(folder,e.name);if(e.isDirectory()&&depth<4)walk(file,depth+1);else if(e.isFile()&&/\.scenarios\.asset$/i.test(e.name))files.push(file);}};
-  walk(streaming,0);
+  walk(path.join(data,streaming.name),0);
  }
  return [...new Set(files)].sort();
 }

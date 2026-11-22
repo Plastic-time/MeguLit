@@ -2,6 +2,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const engine=require('./original-engines/utage-embedded.cjs');
+const {inspectFolder}=require('./original-engines/folder-diagnostic.cjs');
 const ADAPTER='utage-embedded',BACKUP='.megulit-japanese',MAX_FILE=128<<20;
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const folder=dir=>path.join(dir,BACKUP),manifestFile=dir=>path.join(folder(dir),'manifest.json');
@@ -42,12 +43,15 @@ function coverage(plan){
  const rows=plan.pairs,byText=new Map();for(const row of rows){const k=key(row.japanese);if(!byText.has(k))byText.set(k,new Set());byText.get(k).add(row.chinese);}
  return {tables:plan.tables,rows:rows.length,japaneseLines:rows.length,kanaLines:rows.filter(r=>/[ぁ-ゖァ-ヺ]/.test(r.japanese)).length,localTranslations:rows.filter(r=>r.chinese).length,missingTranslations:rows.filter(r=>!r.chinese).length,voicedLines:rows.filter(r=>r.voice).length,ambiguousJapaneseKeys:[...byText.values()].filter(values=>values.size>1).length};
 }
-function summary(plan){const counts=coverage(plan);return {state:'restorable',adapter:ADAPTER,scanToken:plan.token,canRestore:plan.writes.length>0,sources:plan.sources,coverage:counts,warnings:counts.missingTranslations?['MISSING_LOCAL_TRANSLATIONS']:[],readBytes:plan.readBytes};}
+function summary(plan){const counts=coverage(plan);return {state:'restorable',adapter:ADAPTER,engine:'Unity (Utage)',scanToken:plan.token,canRestore:plan.writes.length>0,sources:plan.sources,coverage:counts,warnings:counts.missingTranslations?['MISSING_LOCAL_TRANSLATIONS']:[],readBytes:plan.readBytes};}
 function scan(dir,options={}){
- dir=path.resolve(dir);const m=manifest(dir);
- if(m){const ok=valid(dir,m);return {state:ok?'applied':'stale',adapter:ADAPTER,scanToken:m.scanToken,canRestore:false,sources:m.sources.map(s=>({path:target(dir,s.file),bytes:s.bytes,sha256:s.sha256})),coverage:m.coverage,warnings:ok?[]:['SOURCE_CHANGED']};}
+ dir=fs.realpathSync(dir);const m=manifest(dir);
+ if(m){const ok=valid(dir,m);return {state:ok?'applied':'stale',adapter:ADAPTER,engine:'Unity (Utage)',scanToken:m.scanToken,canRestore:false,sources:m.sources.map(s=>({path:target(dir,s.file),bytes:s.bytes,sha256:s.sha256})),coverage:m.coverage,warnings:ok?[]:['SOURCE_CHANGED']};}
  if(fs.existsSync(folder(dir)))return {state:'unsupported',adapter:ADAPTER,canRestore:false,scanToken:'',sources:[],coverage:{tables:0,rows:0,japaneseLines:0,localTranslations:0,missingTranslations:0},warnings:['EMBEDDED_CONFLICT']};
- try{return summary(engine.plan(dir,options));}catch(error){return {state:'unsupported',adapter:ADAPTER,canRestore:false,scanToken:'',sources:[],coverage:{tables:0,rows:0,japaneseLines:0,kanaLines:0,localTranslations:0,missingTranslations:0,voicedLines:0},warnings:[String(error.message||error)]};}
+ const folderScan=inspectFolder(dir,options);
+ if(!folderScan.tryUtage)return folderScan.diagnose();
+ try{return summary(engine.plan(dir,{...options,budgetMs:folderScan.remainingMs()}));}
+ catch(error){return folderScan.diagnose(/^EMBEDDED_[A-Z_]+$/.test(error.message)?error.message:'EMBEDDED_SOURCE_UNREADABLE');}
 }
 function io(){
  const j=require('../core/japanese-restore.cjs')._internal,check=()=>{const pid=Number(process.env.MEGULIT_EMBEDDED_OWNER_PID||0);if(pid>0)try{process.kill(pid,0);}catch{throw Error('EMBEDDED_OWNER_GONE');}};

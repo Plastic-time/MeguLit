@@ -1,6 +1,8 @@
 # Japanese script scanning
 
-The detail-page and Tools restore dialogs share a built-in folder scanner. Scanning is read-only. Applying a verified result requires a separate confirmation, makes backups, and can be undone. The current adapter supports verified Utage compiled scenario books with original Japanese and Chinese columns; other layouts return unsupported
+The detail-page and Tools restore dialogs share a built-in folder scanner. It reports the detected format, whether it found Japanese dialogue in the scripts it could read, and whether it can restore the files. The only writable adapter handles verified Utage compiled scenario books with Japanese and Chinese columns. Applying its result requires separate confirmation, creates backups, and supports undo
+
+The read-only pass reuses the engine registry's names and file signatures, the Naninovel localization document reader, and the existing loose-script parsers for Ren'Py, KiriKiri, Artemis, TyranoScript, and RPG Maker MV/MZ. It skips runtime capture and archive readers that require external tools or unbounded unpacking. It caps enumeration at 4,096 entries, evidence at 128 files, diagnostic reads at 64 MiB, and UnityFS expansion at 128 MiB. The worker supports cancellation and has a 60-second outer timeout. The UI identifies partial results when a limit or parsing failure cuts the scan short
 
 ## Reuse decision
 
@@ -28,5 +30,9 @@ Local translations retain source row, speaker and voice identity. Ambiguous Japa
 ## Verification scope
 
 Regression coverage includes read-only scans, row identity, serialized offsets and UnityFS rebuilding, byte-identical undo, rollback, stale sources, canonical-directory aliases, launch/write exclusion, lost replies, cancellation, capacity sealing and local Reader translations without an online call
+
+The installed Steam `manosaba_game` sample previously returned `EMBEDDED_UNSUPPORTED`. Its IL2CPP assembly list identifies Naninovel. The new scan checked 23 non-debug UnityFS localization bundles, read 398 script documents with dialogue, and counted 33,873 Japanese dialogue entries and 33,728 Chinese translations in the corresponding localization blocks. The SHA-256 hashes of all 23 bundles and the assembly list matched before and after scanning. The read-only result supplies no restore token. This sample reproduces the former generic result independently of the unidentified game in the screenshot
+
+The synthetic Hoshizora-shaped Utage fixture exercises a base book and its compiled scenario patch. It produces a restore token only after the Japanese text, row identity, speaker and voice match, and restores the exact original hashes on undo
 
 The headless integration harness uses the actual dialog functions, UI module, persistent bridge, child workers and synthetic resources. It does not execute a game. Successful resource reconstruction and a matching undo hash do not prove that a particular game chooses the restored language at runtime, preserves its voice playback, or renders a clickable Japanese overlay; those remain separate game acceptance checks
