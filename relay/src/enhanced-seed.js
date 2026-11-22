@@ -92,7 +92,7 @@ export async function enhancedRoute(request,env,now,action,{json,fail}){
     return fail('NOT_FOUND',404);
   }catch(e){
     if(['TORCH_NOT_BETTER','TORCH_INCOMPARABLE'].includes(e.code)){
-      if(!await update("state='retained',reason=?,lease=NULL",e.code))return fail('LEASE_LOST',409);
+      if(!await update("proposal=NULL,reason=?,lease=NULL,available_at=?",e.code,time+86400))return fail('LEASE_LOST',409);
     }
     return fail(/^TORCH_[A-Z_]+$/.test(e.code)?e.code:'ENHANCED_PROCESSING_FAILED',422);
   }
