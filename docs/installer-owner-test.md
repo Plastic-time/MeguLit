@@ -10,7 +10,7 @@
 
 ## 固定环境与运行方式
 
-双击入口：`H:/MeguLit-Work/night-1423/installer-owner-test/启动隔离安装测试.cmd`
+计划交付的双击入口（当前未标就绪）：`H:/MeguLit-Work/night-1423/installer-owner-test/启动隔离安装测试.cmd`
 
 | 目录 | 用途 |
 | --- | --- |
@@ -49,13 +49,25 @@
 
 清单与实际文件必须双向精确一致，含用户 data、凭据、密钥或本地数据库的源会被拒绝，exe 版本也必须匹配；这是 root 对构建来源的声明，并不以版本号代替 commit 构建证据
 
-root 放入完成后先运行：
+以下仅保留标准 PowerShell 校验命令作为待批准操作说明，本轮不执行：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File H:\MeguLit-Work\night-1423\installer-owner-test\launch-installer-test.ps1 -ValidateOnly
+powershell.exe -NoProfile -File H:\MeguLit-Work\night-1423\installer-owner-test\launch-installer-test.ps1 -ValidateOnly
 ```
 
 `-ValidateOnly` 只验证文件与资源门，不启动安装器，普通双击也会先做同样校验
+
+### 执行策略与验收状态
+
+两份入口模板均只调用标准 `powershell.exe`，不传执行策略覆盖参数，不切换解释器，也没有失败后重试或替代启动分支
+
+此前 Windows PowerShell 5.1 已拒绝安装后 runtime finalizer 的夹具入口，原错误与随后不当继续的一次失败保留在 `H:/MeguLit-Work/night-1423/installer-finalize-pending-approval.md`，行为验收仍待 owner 明确批准
+
+移除覆盖参数后，当前机器的执行策略仍可能阻止 `.cmd` 调用的 launcher、其加载的 helper/finalizer 或后续 setup 脚本；拒绝时应停止并保留错误，不能改策略、换解释器或添加绕过参数
+
+`-ValidateOnly` 也会加载 finalizer 并调用其只读校验入口，因此本轮同样不运行，不以“只是校验”为由重试原被拒行为
+
+root 获准正常复制和打包新版文件，不等于 finalizer 已通过行为验收或脚本可以启动；payload 文件清单 `ready:true` 只说明逐文件准备完成，安装链仍须单独确认，不能把上述计划入口标为已可用
 
 暂不新下载大包，已有完整组件包复用须由 root 与唯一下载 owner 协调，复制至暂存后核对 `setup/runtime.json` 中的完整 size/SHA，再生成原安装器所需的 `.ok` 标记，不得拿空文件或伪 marker 冒充组件包
 

@@ -76,7 +76,7 @@ $childEnv = New-OwnerTestEnvironment $ownerRoot $stamp
 foreach ($dir in $childEnv.TEMP,$childEnv.LOCALAPPDATA,$childEnv.APPDATA,$childEnv.USERPROFILE,$childEnv.MEGULIT_SETUP_STAGING,$childEnv.MEGULIT_SETUP_WEBVIEW2_DATA) { Assert-SetupPath $dir; [IO.Directory]::CreateDirectory($dir) | Out-Null }
 $start = New-Object Diagnostics.ProcessStartInfo
 $start.FileName = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$start.Arguments = '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "' + (Join-Path $source 'setup\setup-runtime.ps1') + '" -Root "' + $source + '"'
+$start.Arguments = '-NoProfile -STA -WindowStyle Hidden -File "' + (Join-Path $source 'setup\setup-runtime.ps1') + '" -Root "' + $source + '"'
 $start.WorkingDirectory = $source; $start.UseShellExecute = $false; $start.CreateNoWindow = $true
 $start.EnvironmentVariables.Clear()
 foreach ($name in $childEnv.Keys) { $start.EnvironmentVariables[$name] = $childEnv[$name] }
