@@ -152,11 +152,11 @@ public sealed class GameSceneProbe : IDisposable {
    using(var bare=pic(Color.SkyBlue,Color.SkyBlue)){p.Line();run(day,170);p.Input();if(run(bare,1000)!=false)return false;if(run(day,600)!=true)return false;
     // a box that only blinks (a new line redrawing it) is not a hidden window
     p.Line();run(day,170);p.Input();run(bare,340);if(run(day,1200)==false)return false;}
-   // E578: with immersion off (Full=false) a scene change is left alone, the text window is still followed.
    /* 2026-11-21 Aokana: one picture every 2 s (PrintWindow): a CG that takes the box away hides by the second picture after it */
    Func<Bitmap,int,bool?> slow=(img,n)=>{bool? r=null;for(int i=0;i<n;i++){t=t.AddMilliseconds(2000);var v=p.Step(img,t);if(v.HasValue)r=v;}return r;};
    p.Line();slow(day,1);p.Input(t);if(slow(cg,2)!=false)return false;if(slow(day,2)!=true)return false;
    using(var bare3=pic(Color.SkyBlue,Color.SkyBlue)){p.Line();slow(day,1);p.Input(t);if(slow(bare3,2)!=false)return false;if(slow(day,2)!=true)return false;}
+   // E578: with immersion off (Full=false) a scene change is left alone, the text window is still followed.
    using(var bare2=pic(Color.SkyBlue,Color.SkyBlue)){p.Full=false;p.Line();run(day,170);p.Input();if(run(cg,2000)==false)return false;p.Line();run(day,170);p.Input();if(run(bare2,1000)!=false||!p.Box)return false;if(run(day,600)!=true)return false;p.Full=true;}
   }
   return true;

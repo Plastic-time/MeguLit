@@ -31,28 +31,30 @@ test('every whole-layer hide carries its cause, and the reader host logs it',()=
 // the whole session, so every scene check compared that picture with itself.
 test('a BitBlt picture that stays the same while the screen moves is frozen and read through PrintWindow',()=>{
  const cap=read('native/GameCapture.cs'),probe=read('native/GameSceneProbe.cs'),bridge=read('native/GalWindowBridge.cs');
- assert.match(cap,/if\(!Stale\(c,Signature\(image\),at,\(\)=>FreezeVote\(hwnd,image,c\)\)\)\{lock\(Gate\)\{c\.Proven=true;/,'Into: a frozen picture is not proven');
+ assert.match(cap,/if\(!Stale\(c,Signature\(image\),DateTime\.UtcNow,\(\)=>FreezeVote\(hwnd,image,c\)\)\)return true;frozen=true;/,'Into: a frozen picture is not used');
  assert.match(cap,/if\(c\.Blind\|\|frozen\)lock\(Gate\)/,'a frozen window is printed under the same rate limit as a blind one');
- assert.match(cap,/return differs>=\.6\|\|moved>=\.25\?1:differs<\.05\?-1:0;/);
- assert.match(cap,/if\(printed&&!Blank\(image\)\)\{if\(frozen\)Keep\(c,image\);return true;\}/);
+ assert.match(cap,/case 0:Skipped=true;return false;\s+case 2:return printed;\s+\}\s+FromScreen=true;return ScreenInto\(hwnd,image\);/,'Into does what AfterPrint (self-tested) decides');
+ assert.match(cap,/switch\(AfterPrint\(printed,printed&&!Blank\(image\),frozen,screenFallback\)\)\{\s+case 1:if\(frozen\)Keep\(hwnd,c,image\);return true;/);
  assert.match(cap,/printed=PrintWindow\(hwnd,dc,frozen\?printFlags\|1:printFlags\);/,'a frozen window is printed client area only, the same for every reader');
  assert.match(cap,/GetAncestor\(front,2\)!=GetAncestor\(hwnd,2\)\|\|!SameScale\(hwnd\)\)return 0;/,'no vote for a window not drawn at its monitor DPI');
  assert.match(cap,/var own=OwnParts;Cover\(now,own==null\?null:own\(hwnd,picture\.Width,picture\.Height\),picture\.Width,picture\.Height\);/,'MeguLit windows are left out');
  assert.match(bridge,/var ownPids=PageLocate\.OwnPids;GameCapture\.OwnParts=\(ownHwnd,ownW,ownH\)=>OwnCover\.Parts\(ownHwnd,ownW,ownH,ownPids\);/);
- assert.match(cap,/if\(c\.Round!=round\)\{c\.Screen=null;return false;\}/,'a vote from an earlier round of pictures is dropped');
  assert.match(probe,/if\(GameCapture\.Into\(target,frame,2\)\)pictureAt=DateTime\.UtcNow;else if\(!GameCapture\.Recent\(target,frame,ref pictureAt\)\)return null;/,'the scene probe sees every print');
  assert.match(probe,/>1900&&seen>=3\)\{Line\(\);return null;\}/,'sparse pictures: at least three after an input');
  assert.match(bridge,/if\(!GameCapture\.FreezeSelfTest\(\)\)return 10;/);
 });
 
-// 2026-11-22 (#714 review): GameStyleProbe and the overlay harness compile GameCapture.cs without the bridge's files, and a
-// freeze vote about a picture that came back after another one (A, B, A) was counted for the second A.
+// 2026-11-22 (#714 review): GameStyleProbe and the overlay harness compile GameCapture.cs without the bridge's files. The freeze
+// rules (votes by round, A-B-A, the order of the screen checks, Part, a blank print, saved pictures, a dropped window) and the
+// scene probe run as their own self-tests, built from those two files only.
 const csc=['C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe'].find(f=>fs.existsSync(f));
-test('GameCapture.cs builds on its own and its freeze check passes, A-B-A included',{skip:!csc&&'no csc'},()=>{
+test('GameCapture.cs builds on its own; its freeze rules and the scene probe pass their self-tests',{skip:!csc&&'no csc'},()=>{
  const dir=fs.mkdtempSync(path.join(process.env.MEGULIT_WORK||os.tmpdir(),'megulit-capture-freeze-')),exe=path.join(dir,'freeze.exe'),main=path.join(dir,'main.cs');
- /* GameCapture.cs and this one line only, as GameStyleProbe and the overlay harness build it */
- fs.writeFileSync(main,'static class FreezeMain{static int Main(){return GameCapture.FreezeSelfTest()?0:1;}}');
- try{execFileSync(csc,['/nologo','/target:exe','/platform:x64','/reference:System.Drawing.dll','/out:'+exe,path.join(__dirname,'..','native/GameCapture.cs'),main],{windowsHide:true});
-  execFileSync(exe,[],{windowsHide:true,timeout:30000});}
+ /* GameCapture.cs (as GameStyleProbe and the overlay harness build it) and the scene probe that reads through it */
+ fs.writeFileSync(main,'static class FreezeMain{static int Main(){return !GameCapture.FreezeSelfTest()?1:!GameSceneProbe.SelfTest()?2:0;}}');
+ try{execFileSync(csc,['/nologo','/target:exe','/platform:x64','/reference:System.Drawing.dll','/out:'+exe,
+   ...['native/GameCapture.cs','native/GameSceneProbe.cs'].map(f=>path.join(__dirname,'..',f)),main],{windowsHide:true});
+  let code=0;try{execFileSync(exe,[],{windowsHide:true,timeout:30000});}catch(e){code=e.status;}
+  assert.equal(code,0,'1: GameCapture.FreezeSelfTest failed, 2: GameSceneProbe.SelfTest failed');}
  finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
