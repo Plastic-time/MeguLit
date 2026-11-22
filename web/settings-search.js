@@ -16,7 +16,7 @@ const syllables={bie:'别',a:'阿',an:'按暗安',ba:'把',bao:'保包',bei:'背
  zhuan:'转专',zhuang:'状装',zi:'字自子',zong:'纵总',zu:'组',zuo:'左作最',bi:'闭',cang:'藏',chuang:'窗'};
 const pinyinMap=new Map(Object.entries(syllables).flatMap(([syllable,characters])=>[...characters].map(character=>[character,syllable])));
 for(const [syllable,characters]of Object.entries({qing:'擎',zhi:'址',hu:'户糊',yan:'言',lai:'来来',wu:'务',miao:'描',xi:'戏悉',chuang:'窗',fang:'放方',jian:'渐',pian:'偏',bang:'绑',
- cang:'藏',ji:'击',chen:'沉',jin:'浸',kuang:'框',pai:'牌',bi:'笔',jing:'径',xian:'先',jie:'截',bao:'饱',mao:'毛',bo:'玻',li:'璃',mian:'面',ban:'板',cai:'菜',jiao:'角脚',chu:'触',hui:'汇',
+ cang:'藏',ji:'击',chen:'沉',jin:'浸',kuang:'框',pai:'牌',bi:'笔',jing:'径',xian:'先',jie:'截',bao:'饱',mao:'毛',bo:'玻',li:'璃',mian:'面',ban:'伴板',cai:'菜',jiao:'角脚',chu:'触',hui:'汇',
  wo:'握',shi:'视',shao:'少',xun:'询',shu:'熟',qian:'嵌'}))for(const character of characters)pinyinMap.set(character,syllable);
 const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0300-\u036f\s_-]/g,'').toLowerCase();
 pinyinMap.set('引','yin');
