@@ -111,8 +111,16 @@ const seedCover='data:image/png;base64,'+png(32,48,[145,36,116],[24,52,84]).toSt
   await wait('direction()[2]>.98');
   await capture('portal-day');
   const wheel=(count,delta)=>evaluate(`for(let i=0;i<${count};i++)canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:${delta},bubbles:true,cancelable:true}));true`);
+  function assertPortalCrossing(a,b){
+   const t=(40-a[2])/(b[2]-a[2]);
+   assert.ok(t>0&&t<1,JSON.stringify({a,b}));
+   const x=a[0]+t*(b[0]-a[0]),y=a[1]+t*(b[1]-a[1]);
+   assert.ok(Math.abs(x)<1.3&&y>=1.2&&y<4.25+Math.sqrt(2.15**2-x*x),JSON.stringify({x,y}));
+  }
+  const beforeExit=await evaluate('pos()');
   await wheel(9,-120);
-  await wait('pos()[2]>57&&Math.abs(pos()[0])<2.15');
+  const afterExit=await wait('pos()[2]>57&&pos()');
+  assertPortalCrossing(beforeExit,afterExit);
   await capture('courtyard-day');
   await evaluate('window.__TORCH_HOUR=0');
   await wait('d.courtyard.sky.material.uniforms.night.value>.97');
@@ -125,6 +133,13 @@ const seedCover='data:image/png;base64,'+png(32,48,[145,36,116],[24,52,84]).toSt
   await wheel(112,-120);
   await wait('pos()[2]<65');
   await capture('look-back-night');
+  const outsideY=await evaluate('pos()[1]');
+  const panY=Math.round((2.7-outsideY)*h/14);
+  await drag('middle',4,470,500,470,500+panY);
+  const beforeEntry=await wait('Math.abs(pos()[1]-2.7)<.1&&pos()');
+  await wheel(5,-120);
+  const afterEntry=await wait('pos()[2]<38&&pos()');
+  assertPortalCrossing(beforeEntry,afterEntry);
   await evaluate(`hall.setActive(false);
    const cam=d.camera;
    cam.position.set(0,2.3,110);
