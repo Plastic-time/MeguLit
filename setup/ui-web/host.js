@@ -28,7 +28,7 @@
   const clock = () => performance.now() / 1000;
   async function check(p) { const c = await api('checkpath', { path: p }); Scene.setFree(c.free || 0, c.need || (info && info.need) || 0, c.state === 'protected' ? 'protected' : c.state === 'readonly' ? 'readonly' : 'ok'); return c; }
   /* in-page folder picker (the native window only): disks with free space, usual places, recent choices, one level of folders, new folder, and the modern Explorer dialog as a side door */
-  const params = new URLSearchParams(location.search), statusOnly = params.get('status') === '1';
+  const params = new URLSearchParams(location.search), statusOnly = params.get('boot') === 'progress';
   const EN = params.get('lang') === 'en', L = (zh, en) => (EN ? en : zh);
   const pk = document.getElementById('picker'), pkSide = document.getElementById('pkSide'), pkMain = document.getElementById('pkMain'), pkCrumb = document.getElementById('pkCrumb'), pkMsg = document.getElementById('pkMsg'), pkNew = document.getElementById('pkNew');
   let pkCur = '';
@@ -97,9 +97,9 @@
     info = await (await fetch('/api/info')).json(); pathEl.value = info.defaultTarget; Scene.setDrives(info.drives || []); await check(info.defaultTarget);
     poll(); requestAnimationFrame(frame);
     if (statusOnly) {
+      // The media bridge releases the loading layer only after a decoded frame.
+      window.__installLocationChecked = true;
       goTo('loc', 'skim');
-      document.getElementById('boot').remove();
-      post('ready');
     } else setTimeout(() => { if (section === 'welcome') goTo('loc', 'skim'); }, 2200);
   })();
 })();

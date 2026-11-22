@@ -7,6 +7,7 @@ function New-OwnerTestEnvironment([string]$ownerRoot, [string]$stamp) {
   $childEnv.PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
   $childEnv.TEMP = Join-Path $ownerRoot 'env\temp'; $childEnv.TMP = $childEnv.TEMP
   $childEnv.LOCALAPPDATA = Join-Path $ownerRoot 'env\local'; $childEnv.APPDATA = Join-Path $ownerRoot 'env\roaming'
+  $childEnv.PSModuleAnalysisCachePath = Join-Path $childEnv.LOCALAPPDATA 'ModuleAnalysisCache'
   $childEnv.USERPROFILE = Join-Path $ownerRoot "profile\user\run-$stamp"; $childEnv.HOME = $childEnv.USERPROFILE
   $childEnv.MEGULIT_SETUP_TEST_ROOT = $ownerRoot
   $childEnv.MEGULIT_SETUP_TEST = Join-Path $ownerRoot "log\events-$stamp.jsonl"

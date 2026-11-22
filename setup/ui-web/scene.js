@@ -214,21 +214,12 @@
   const STEPN = new Proxy({}, { get: (_, k) => tr('step_' + k) });
   function setSteps() { const k = ORDER.indexOf(section); document.querySelectorAll('#steps i').forEach((el, i) => el.classList.toggle('on', i < Math.min(4, k + 1) || section === 'done')); $('#stepname').textContent = STEPN[section]; }
 
-  const statusOnly = document.documentElement.classList.contains('status-only');
+  const statusOnly = document.documentElement.classList.contains('startup-progress');
   function goTo(name, move, fromName) {
-    if (statusOnly) {
-      if (name === 'field') {
-        $('#hud').classList.add('waiting');
-        $('#phaseWait').hidden = false;
-        $('#whatT').textContent = tr('prepareT');
-      }
-      for (const layer of new Set(Object.values(UI).flat())) {
-        const visible = UI[name].includes(layer);
-        gsap.set(layer, { visibility: visible ? 'visible' : 'hidden', opacity: visible ? 1 : 0 });
-      }
-      section = name;
-      setSteps();
-      return;
+    if (statusOnly && name === 'field') {
+      $('#hud').classList.add('waiting');
+      $('#phaseWait').hidden = false;
+      $('#whatT').textContent = tr('prepareT');
     }
     const tl = gsap.timeline(), m = MOVES[move] || MOVES.push, o = { p: 0 }; let A0 = null;
     const from = fromName || section; const outs = UI[from] || [], ins = UI[name] || [];

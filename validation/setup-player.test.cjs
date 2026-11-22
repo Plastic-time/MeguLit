@@ -53,6 +53,39 @@ test('poster first, then intro, then the welcome loop', { skip, timeout: 60000 }
   assert.equal(await ev('Player.state.dead'), false);
 });
 
+test('progress boot keeps real video and sends ready only after first frame and the host reply', { skip, timeout: 60000 }, async () => {
+  const source = `(() => {
+    if (new URLSearchParams(location.search).get('boot') !== 'progress') return;
+    const messages = [], received = [];
+    window.__bootMessages = messages;
+    window.chrome ||= {};
+    const send = data => received.forEach(fn => fn({ data }));
+    chrome.webview = {
+      addEventListener(type, fn) { if (type === 'message') received.push(fn); },
+      postMessage(m) {
+        messages.push(m);
+        if (m.type === 'hello') queueMicrotask(() => send({ t: 'info', i: { defaultTarget: 'H:/Fixture' } }));
+        if (m.type === 'checkpath') window.__replyLocation = () => send({ t: 'reply', id: m.id, r: { state: 'ok' } });
+      }
+    };
+  })();`;
+  const { result } = await cdp('Page.addScriptToEvaluateOnNewDocument', { source });
+  try {
+    await open(path.join(repo, 'setup', 'ui-web', 'video'), '&host=2&boot=progress&theme=edge');
+    await on('intro');
+    await until('!!window.__replyLocation');
+    assert.equal(await ev('document.querySelector("#vposter, #vstage img.vp[src]") === null'), true);
+    assert.equal(await ev('!!document.querySelector("#boot:not(.gone)")'), true);
+    assert.equal(await ev('__bootMessages.some(m => m.type === "ready")'), false);
+    await ev('__replyLocation()');
+    await until('__bootMessages.some(m => m.type === "ready")');
+    await on('loc');
+    assert.equal(await ev('__bootMessages.some(m => m.what === "poster" || m.type === "fatal")'), false);
+  } finally {
+    await cdp('Page.removeScriptToEvaluateOnNewDocument', { identifier: result.identifier });
+  }
+});
+
 test('stage changes follow Scene.goTo: transition at the loop point, then the next loop; no overlay canvas', { skip, timeout: 90000 }, async () => {
   await ev('void Scene.goTo("loc","skim")'); await on('to-loc'); await on('loc');
   await ev('void Scene.goTo("field","under")'); await on('to-field'); await on('field');

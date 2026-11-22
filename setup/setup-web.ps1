@@ -250,7 +250,6 @@ public class SetupWin : Form {
     $wa0 = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea; $scale = [math]::Max(0.5, [math]::Min($scale, [math]::Min($wa0.Width / 913.0, $wa0.Height / 584.0)))   # never larger than the work area (small screens)
     if ($testLog -and $env:MEGULIT_SETUP_WEB_DPI) { $scale = [double]$env:MEGULIT_SETUP_WEB_DPI / 96.0; $dpiS = $scale }   # tests: emulate 125/150/200 % (with --force-device-scale-factor)
     $win = New-Object SetupWin
-    if ($script:statusOnly) { $win.Opacity = 0 }
     if ($env:MEGULIT_NATIVE_SPLASH) { $win.Opacity = 0 }   # under the transparent native loading screen the skin window is there (WebView2 loads and plays) but invisible until it is released
     $win.Text = 'MeguLit 安装'; $win.FormBorderStyle = 'None'; $win.StartPosition = 'CenterScreen'; $win.ShowInTaskbar = -not $testLog; $win.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
     # starts at 91 % of the design box (913 x 584 logical); the user can drag the edges/corners: ratio locked, 480 x 307 logical minimum, at most the work area
@@ -270,27 +269,48 @@ public class SetupWin : Form {
     $props = New-Object Microsoft.Web.WebView2.WinForms.CoreWebView2CreationProperties; $script:webData = $(if ($env:MEGULIT_SETUP_WEBVIEW2_DATA) { $env:MEGULIT_SETUP_WEBVIEW2_DATA } elseif ($env:WEBVIEW2_USER_DATA_FOLDER) { $env:WEBVIEW2_USER_DATA_FOLDER } else { Join-Path $env:LOCALAPPDATA ('MeguLit\setup-webview2' + $PID) }); $props.UserDataFolder = $script:webData   # one folder per setup process: two setups at once do not fight over it; $web.CreationProperties = $props
     $script:win = $win; $script:webReady = $false
     $win.AskClose = { $script:askAt = [DateTime]::Now; try { $script:win.Web.CoreWebView2.ExecuteScriptAsync('window.__askClose&&window.__askClose()') | Out-Null } catch { Web-Close } }
-    $web.Add_CoreWebView2InitializationCompleted({ param($s, $e)
-      if (-not $e.IsSuccess) { Web-Log ('WebView2 init failed: ' + $e.InitializationException.Message); return }
-      $script:tInit = [int]([DateTime]::Now - $script:skinT0).TotalMilliseconds; $cw = $script:win.Web.CoreWebView2; $cw.Settings.AreDefaultContextMenusEnabled = $false; $cw.Settings.AreDevToolsEnabled = [bool]$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS; $cw.Settings.IsStatusBarEnabled = $false; $cw.Settings.IsZoomControlEnabled = $false
-      $cw.SetVirtualHostNameToFolderMapping('megulit-setup.local', (Join-Path $sourceRoot 'setup\ui-web'), [Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind]::Allow)
-      $cw.add_WebMessageReceived({ param($s2, $a) try { Web-Act ($a.WebMessageAsJson | ConvertFrom-Json) } catch { Web-Log ('message error: ' + $_) } })
-      $uiLang = $(if ($env:MEGULIT_SETUP_LANG -eq 'en') { 'en' } else { 'zh' })   # Chinese by default like the old window; English only on request (MEGULIT_SETUP_LANG=en). Windows' language says too little: many Chinese users run an English Windows.
-      $q = 'host=2&desk=1&lang=' + $uiLang;
-      if ($script:statusOnly) { $q += '&status=1' }
-      if ($testLog -and $env:MEGULIT_SETUP_WEB_QUERY) { $q += '&' + $env:MEGULIT_SETUP_WEB_QUERY }   # tests: feature switches such as shadow=0&env=0&trans=0&aa=1
-      if ($env:MEGULIT_SETUP_WEB_TEST) { $q += '&t=' + $env:MEGULIT_SETUP_WEB_TEST }   # was inside the comment above, so the page never saw the test switch
-      $cw.add_NavigationCompleted({ try { $w = $script:win.Web; $w.ZoomFactor = [math]::Min([SetupWin]::ZoomFor($w.Width, $script:dpiS), [SetupWin]::ZoomFor([int]($w.Height / [SetupWin]::Ratio), $script:dpiS)) } catch {}; if (-not $script:tNav) { $script:tNav = [int]([DateTime]::Now - $script:skinT0).TotalMilliseconds } })
-      $cw.Navigate('https://megulit-setup.local/index.html?' + $q)
-    })
-    $win.Show(); $script:shownAt = [DateTime]::Now; Boot-Mark 'skin-window-shown'; if (-not $script:statusOnly) { Close-Splash }; if ($script:posterBox) { $win.Refresh(); Web-Log ('cold-start mark=native-poster ms=' + [int]([DateTime]::Now - $script:shownAt).TotalMilliseconds) }; $wvEnv = $null; if ($script:wv2EnvTask) { $tw = [DateTime]::Now; while (-not $script:wv2EnvTask.IsCompleted -and ([DateTime]::Now - $tw).TotalSeconds -lt 20) { [Windows.Forms.Application]::DoEvents(); Test-SetupBootCancellation; Start-Sleep -Milliseconds 10 }; if ($script:wv2EnvTask.Status -eq 'RanToCompletion') { $wvEnv = $script:wv2EnvTask.Result; Web-Log ('webview2 environment prewarmed, ready ' + [int]([DateTime]::Now - $tw).TotalMilliseconds + ' ms after the window') } else { Web-Log ('prewarmed environment not usable: ' + $script:wv2EnvTask.Status) } }; if ($wvEnv) { [void]$web.EnsureCoreWebView2Async($wvEnv) } else { $web.CreationProperties = $props; [void]$web.EnsureCoreWebView2Async($null) }
+    $navigate = {
+      try {
+        Web-Log 'WebView2 controller initialized'
+        $script:tInit = [int]([DateTime]::Now - $script:skinT0).TotalMilliseconds; $cw = $script:win.Web.CoreWebView2; $cw.Settings.AreDefaultContextMenusEnabled = $false; $cw.Settings.AreDevToolsEnabled = [bool]$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS; $cw.Settings.IsStatusBarEnabled = $false; $cw.Settings.IsZoomControlEnabled = $false
+        $cw.SetVirtualHostNameToFolderMapping('megulit-setup.local', (Join-Path $sourceRoot 'setup\ui-web'), [Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind]::Allow)
+        $cw.add_WebMessageReceived({ param($s2, $a) try { Web-Act ($a.WebMessageAsJson | ConvertFrom-Json) } catch { Web-Log ('message error: ' + $_) } })
+        $uiLang = $(if ($env:MEGULIT_SETUP_LANG -eq 'en') { 'en' } else { 'zh' })   # Chinese by default like the old window; English only on request (MEGULIT_SETUP_LANG=en). Windows' language says too little: many Chinese users run an English Windows.
+        $q = 'host=2&desk=1&lang=' + $uiLang;
+        if ($script:statusOnly) { $q += '&boot=progress' }
+        if ($testLog -and $env:MEGULIT_SETUP_WEB_QUERY) { $q += '&' + $env:MEGULIT_SETUP_WEB_QUERY }   # tests: feature switches such as shadow=0&env=0&trans=0&aa=1
+        if ($env:MEGULIT_SETUP_WEB_TEST) { $q += '&t=' + $env:MEGULIT_SETUP_WEB_TEST }   # was inside the comment above, so the page never saw the test switch
+        $cw.add_NavigationCompleted({ param($sender, $nav)
+          if (-not $nav.IsSuccess) { Web-Log ('WebView2 navigation failed: ' + $nav.WebErrorStatus); $script:webFatalSeen = $true; return }
+          Web-Log ('WebView2 navigation ready: ' + $sender.Source)
+          try { $w = $script:win.Web; $w.ZoomFactor = [math]::Min([SetupWin]::ZoomFor($w.Width, $script:dpiS), [SetupWin]::ZoomFor([int]($w.Height / [SetupWin]::Ratio), $script:dpiS)) } catch {}; if (-not $script:tNav) { $script:tNav = [int]([DateTime]::Now - $script:skinT0).TotalMilliseconds } })
+        $cw.Navigate('https://megulit-setup.local/index.html?' + $q)
+        Web-Log 'WebView2 navigation requested'
+      } catch {
+        Web-Log ('WebView2 bridge setup failed: ' + $_.Exception.Message)
+        $script:webFatalSeen = $true
+      }
+    }
+    $win.Show(); $script:shownAt = [DateTime]::Now; Boot-Mark 'skin-window-shown'; if (-not $script:statusOnly) { Close-Splash }; if ($script:posterBox) { $win.Refresh(); Web-Log ('cold-start mark=native-poster ms=' + [int]([DateTime]::Now - $script:shownAt).TotalMilliseconds) }; $wvEnv = $null; if ($script:wv2EnvTask) { $tw = [DateTime]::Now; while (-not $script:wv2EnvTask.IsCompleted -and ([DateTime]::Now - $tw).TotalSeconds -lt 20) { [Windows.Forms.Application]::DoEvents(); Test-SetupBootCancellation; Start-Sleep -Milliseconds 10 }; if ($script:wv2EnvTask.Status -eq 'RanToCompletion') { $wvEnv = $script:wv2EnvTask.Result; Web-Log ('webview2 environment prewarmed, ready ' + [int]([DateTime]::Now - $tw).TotalMilliseconds + ' ms after the window') } else { Web-Log ('prewarmed environment not usable: ' + $script:wv2EnvTask.Status) } }; if (-not $wvEnv) { $web.CreationProperties = $props }
+    # The startup message pump can unwind the auto-installed context before WebView2 awaits COM.
+    if ([Threading.SynchronizationContext]::Current -isnot [Windows.Forms.WindowsFormsSynchronizationContext]) {
+      [Threading.SynchronizationContext]::SetSynchronizationContext((New-Object Windows.Forms.WindowsFormsSynchronizationContext))
+    }
+    $controller = $web.EnsureCoreWebView2Async($wvEnv)
+    $controllerDeadline = $t0.AddSeconds(12)
+    while (-not $controller.IsCompleted -and [DateTime]::Now -lt $controllerDeadline) {
+      [Windows.Forms.Application]::DoEvents(); Test-SetupBootCancellation; Start-Sleep -Milliseconds 15
+    }
+    if (-not $controller.IsCompleted) { throw 'WebView2 controller initialization timed out' }
+    try { [void]$controller.GetAwaiter().GetResult() } catch { Web-Log ($_.Exception.ToString()); throw }
+    & $navigate
     # Watchdog: the page must report its first video frame within 12 s of the window (MEGULIT_SETUP_WATCHDOG_MS in tests). If it does
     # not (a hung renderer, a decoder that never delivers, a script stuck before it could report fatal), reload the page once; if the
     # reload does not bring a frame either, drop the skin for the classic window. The user never sits in front of a picture that does nothing.
     $script:wdLimit = $(if ($env:MEGULIT_SETUP_WATCHDOG_MS -match '^\d+$') { [int]$env:MEGULIT_SETUP_WATCHDOG_MS } else { 12000 }); $script:wdT0 = [DateTime]::Now; $script:wdReloads = 0
     $script:wdTimer = New-Object Windows.Forms.Timer; $script:wdTimer.Interval = 250
     $script:wdTimer.add_Tick({
-      if ($script:frame1Seen -or ($script:statusOnly -and $script:webReady) -or -not $script:win) { $script:wdTimer.Stop(); return }
+      if ($script:frame1Seen -or -not $script:win) { $script:wdTimer.Stop(); return }
       if (([DateTime]::Now - $script:wdT0).TotalMilliseconds -lt $script:wdLimit) { return }
       if ($script:wdReloads -eq 0 -and $script:win.Web.CoreWebView2) {
         $script:wdReloads = 1; $script:wdT0 = [DateTime]::Now; Web-Log ('watchdog: no video frame within ' + $script:wdLimit + ' ms, reloading the page')
@@ -307,7 +327,6 @@ public class SetupWin : Form {
     while (-not $script:webReady -and [DateTime]::Now -lt $deadline -and $script:win -and -not $script:webFatalSeen) { [Windows.Forms.Application]::DoEvents(); Test-SetupBootCancellation; Start-Sleep -Milliseconds 20 }
     if (-not $script:webReady) { throw ('no confirmed scene within 32 s' + $(if ($script:webFatalSeen) { ' (page reported a problem)' } else { '' })) }
     if ($script:statusOnly) {
-      $win.Opacity = 1
       $win.Activate()
       Close-Splash
       Boot-Mark 'installer-ui-ready'
