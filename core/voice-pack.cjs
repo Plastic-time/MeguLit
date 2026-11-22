@@ -16,6 +16,18 @@ const VOICES=[
 const API='https://api.aivis-project.com/v1/aivm-models/';
 const modelsDir=()=>path.join(process.env.APPDATA||path.join(process.env.USERPROFILE||'',"AppData/Roaming"),'AivisSpeech-Engine','Models');
 class VoicePack{
+ async fetchVoice(url,options){
+  for(let attempt=0;;attempt++){
+   const response=await this.fetch(url,options);
+   if(response.status!==429||attempt>=2)return response;
+   const header=response.headers?.get?.('retry-after');
+   const delay=header==null?1000*(2**attempt):/^\d+$/.test(header)?Number(header)*1000:Date.parse(header)-Date.now();
+   // Let the caller surface long cooldowns instead of retrying before the server permits.
+   if(!Number.isFinite(delay)||delay>30000)return response;
+   await response.body?.cancel?.();
+   await require('node:timers/promises').setTimeout(Math.max(0,delay),undefined,{signal:options.signal});
+  }
+ }
  constructor(options={}){this.fetch=options.fetch||fetch;this.dir=options.dir||modelsDir();this.log=options.log||(()=>{});this.job=null;this.jobs=new Map();this.state={running:false,done:0,total:0,current:'',bytes:0,size:0,error:'',installed:[]};this.sweep();}
  // A half-written download left by a crash or a closed app is removed at start; only this pack's own temp names.
  sweep(){for(const v of VOICES){const tmp=path.join(this.dir,v.uuid+'.aivmx.tome-download');if(!this.jobs.has(v.uuid))try{fs.unlinkSync(tmp);}catch{}}}
@@ -40,13 +52,13 @@ class VoicePack{
   const target=path.join(this.dir,voice.uuid+'.aivmx');if(path.dirname(target)!==path.resolve(this.dir))throw Error('路径无效');try{fs.unlinkSync(target);}catch(e){if(e.code!=='ENOENT')throw e;}this.jobs.delete(uuid);this.log('[ToMe] voice removed: '+voice.name);return this.status();}
  async download(voice,job=null){
   const progress=job||this.state,signal=job?AbortSignal.any([job.controller.signal,AbortSignal.timeout(1800000)]):AbortSignal.timeout(1800000);
-  const meta=await(await this.fetch(API+voice.uuid,{signal:job?AbortSignal.any([job.controller.signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)})).json();const file=(meta.model_files||[]).find(f=>f.model_type==='AIVMX');
+  const metadata=await this.fetchVoice(API+voice.uuid,{signal:job?AbortSignal.any([job.controller.signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)});if(metadata.ok===false)throw Error(voice.name+' 下载失败 HTTP '+metadata.status);const meta=await metadata.json();const file=(meta.model_files||[]).find(f=>f.model_type==='AIVMX');
   if(!file||!/^[a-f0-9]{64}$/i.test(String(file.checksum||''))||!(file.file_size>0))throw Error('AivisHub 没有 '+voice.name+' 的 AIVMX 文件信息');
   if(!['ACML 1.0','CC0'].includes(file.license_type))throw Error(voice.name+' 的许可已变为 '+file.license_type+'，已跳过');
   /* 2026-11-19: core/fast-download.cjs pulls the file in parallel Range pieces when AivisHub's answer allows it (one
      connection otherwise); a silent connection is dropped after 15 s. Size and checksum still decide. */
   const target=path.join(this.dir,voice.uuid+'.aivmx'),tmp=target+'.tome-download';progress.bytes=0;progress.size=file.file_size;
-  try{await require('./fast-download.cjs').download({urls:[API+voice.uuid+'/download?model_type=AIVMX'],dest:tmp,size:file.file_size,sha256:String(file.checksum).toLowerCase(),fetch:this.fetch,signal,onProgress:p=>{progress.bytes=p.received;}});fs.renameSync(tmp,target);this.log('[ToMe] voice installed: '+voice.name);}
+  try{await require('./fast-download.cjs').download({urls:[API+voice.uuid+'/download?model_type=AIVMX'],dest:tmp,size:file.file_size,sha256:String(file.checksum).toLowerCase(),fetch:(url,opts)=>this.fetchVoice(url,opts),signal,onProgress:p=>{progress.bytes=p.received;}});fs.renameSync(tmp,target);this.log('[ToMe] voice installed: '+voice.name);}
   catch(e){for(const f of [tmp,tmp+'.part',tmp+'.part.json'])try{fs.unlinkSync(f);}catch{}if(/^(HASH|SIZE)_MISMATCH$/.test(e.code||''))throw Error(voice.name+' 校验失败');if(e.code==='DOWNLOAD_FAILED')throw Error(voice.name+' 下载失败 '+String((e.last&&e.last.message)||''));throw e;}}
 }
 module.exports={VoicePack,VOICES};
