@@ -33,16 +33,30 @@ class BatchMountProvider{
  }
 }
 function create(root){
- const folder=path.join(root,'runtime','wincdemu'),batchmnt=path.join(folder,process.arch==='x64'?'batchmnt64.exe':'batchmnt.exe'),installer=path.join(folder,'WinCDEmu-4.1.exe');
+ const folder=path.join(root,'runtime','wincdemu'),installer=path.join(folder,'WinCDEmu-4.1.exe');
  const packs=require('./runtime-packs.cjs').RuntimePacks.shared(root),system=path.join(process.env.SystemRoot||'C:\\Windows','System32');
  async function standardDriver(){const r=await execute(path.join(system,'sc.exe'),['query','BazisVirtualCDBus']);return r.code===0&&/:\s*4\s+RUNNING\b/i.test(r.stdout);}
  // The portable-only early-return path is not a working standalone-driver fallback.
- const provider=new BatchMountProvider({batchmnt,protocolReady:true,driverReady:async()=>packs.installed('disc-mount')&&fs.existsSync(batchmnt)&&await standardDriver()});
+ const tools=require('./disc-tools.cjs');
+ async function client(){
+  const local=tools.findClient([folder,...tools.programFolders()]);
+  if(local)return local;
+  const key='HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\WinCDEmu';
+  const reg=await execute(path.join(system,'reg.exe'),['query',key,'/reg:32']);
+  return reg.code===0?tools.findClient(tools.registeredFolders(reg.stdout)):'';
+ }
+ const provider=new BatchMountProvider({protocolReady:true,driverReady:async()=>{
+  if(!await standardDriver())return false;
+  provider.batchmnt=await client();return !!provider.batchmnt;
+ }});
  return {
-  async status(){const installed=packs.installed('disc-mount'),running=await standardDriver();return {installed,batchmntPresent:fs.existsSync(batchmnt),protocolReady:!!packs.manifest().packs?.['disc-mount'],driverReady:installed&&fs.existsSync(batchmnt)&&running,standardServiceRunning:running,driverChoice:'standard',reason:running?'':'DISC_STANDARD_DRIVER_REQUIRED',liveVerified:false};},
-  async ensureTools(){return packs.ensure('disc-mount');},
+  async status(){
+   const installed=packs.installed('disc-mount'),running=await standardDriver(),batchmnt=await client();
+   return {installed,batchmntPresent:!!batchmnt,protocolReady:!!packs.manifest().packs?.['disc-mount'],driverReady:!!batchmnt&&running,standardServiceRunning:running,driverChoice:'standard',reason:running?(batchmnt?'':'DISC_TOOLS_MISSING'):'DISC_STANDARD_DRIVER_REQUIRED',liveVerified:false};
+  },
+  async ensureTools(){if(await standardDriver()&&await client())return true;try{return await packs.ensure('disc-mount');}catch{fail('OFFICIAL_DOWNLOAD_FAILED');}},
   async installDriver(){
-   if(!packs.installed('disc-mount')||!fs.existsSync(installer))fail('DRIVER_INSTALLER_MISSING');
+   if(!tools.matches(installer,'installer'))fail('DRIVER_INSTALLER_MISSING');
    // Explicitly chosen interactive standard installer, normal Windows UAC; no silent switches or policy bypass.
    const script="$p=Start-Process -FilePath $env:MEGULIT_DISC_DRIVER_EXE -Verb RunAs -PassThru -Wait;exit $p.ExitCode";
    const r=await new Promise((resolve,reject)=>execFile(path.join(system,'WindowsPowerShell','v1.0','powershell.exe'),['-NoProfile','-NonInteractive','-WindowStyle','Hidden','-Command',script],{windowsHide:true,shell:false,env:{...process.env,MEGULIT_DISC_DRIVER_EXE:installer},timeout:30*60000,maxBuffer:128*1024},(e,stdout,stderr)=>e?reject(Object.assign(Error('DISC_DRIVER_INSTALL_FAILED'),{code:'DISC_DRIVER_INSTALL_FAILED'})):resolve({stdout,stderr})));
