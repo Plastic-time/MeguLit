@@ -99,7 +99,6 @@ $env:LIB = (Join-Path $taskMsvc.FullName 'lib\x64')+';'+(Join-Path $taskSdk.Full
 & $taskCargo rustc $taskCargoNet --locked --release --features custom-protocol --manifest-path (Join-Path $taskRoot 'desktop\Cargo.toml') -- -C "linker=$taskLld" -C linker-flavor=lld-link -L ("native="+(Join-Path $taskMsvc.FullName 'lib\x64')) -L ("native="+(Join-Path $taskSdk.FullName 'ucrt\x64')) -L ("native="+(Join-Path $taskSdk.FullName 'um\x64'))
 if ($LASTEXITCODE -ne 0) { throw 'Independent desktop build failed' }
 $taskBuilt = Join-Path $taskRoot 'desktop\target\release\megulit.exe'
-if ($Check) { Invoke-TaskTests }
 $taskOutput = Join-Path $taskRoot 'MeguLit.exe'
 try { Copy-Item -LiteralPath $taskBuilt -Destination $taskOutput -Force }
 catch [System.IO.IOException] {
@@ -114,3 +113,5 @@ if (-not (Test-Path -LiteralPath $taskLoader) -or (Get-FileHash -LiteralPath $ta
 $taskHash = (Get-FileHash -LiteralPath $taskOutput -Algorithm SHA256).Hash.ToLowerInvariant()
 @{ schema=1; name='MeguLit'; identity='app.megulit'; artifact=[IO.Path]::GetFileName($taskOutput); builtAt=[DateTime]::UtcNow.ToString('o'); sha256=$taskHash; upstreamRuntime=$false } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskRoot 'build-manifest.json') -Encoding utf8
 Write-Output "Built $taskOutput ($taskHash)"
+# Tests may exit 3 and resume with -TestsOnly. Stage the freshly linked host before running them.
+if ($Check) { Invoke-TaskTests }
