@@ -20,10 +20,12 @@ function parseCompletion(body) {
   return text.trim();
 }
 
+const knownProviders=new Set([...Object.keys(ENGINES),'google','gpt','deepseek','bing','deepl']);
+function isKnownProvider(provider){return knownProviders.has(provider);}
 function resolveOptions(options = {}) {
   const provider = options.provider || 'google';
   const engine = ENGINES[provider];
-  if (!engine && !['google','gpt','deepseek','bing','deepl'].includes(provider)) throw new Error('未知翻译引擎，请重新选择');
+  if (!isKnownProvider(provider)) throw new Error('未知翻译引擎，请重新选择');
   if (engine) return { ...options, provider, baseUrl: engine.editable ? normalizeBase(options.baseUrl || engine.baseUrl) : engine.baseUrl, model: (engine.kind === 'llm' ? (options.model || engine.model) : '') };
   if (provider === 'deepseek') return { ...options, provider, baseUrl:'https://api.deepseek.com', model:options.model || 'deepseek-flash' };
   if (provider === 'bing') {
@@ -171,4 +173,4 @@ function createTranslationService(fetcher = fetch, environmentKey = '') {
   }
   return { translate, lookup, setKey, hasKey, observeSource, clearContext };
 }
-module.exports = { normalizeBase, parseCompletion, resolveOptions, createTranslationService };
+module.exports = { normalizeBase, parseCompletion, resolveOptions, createTranslationService, isKnownProvider };

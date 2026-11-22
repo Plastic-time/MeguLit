@@ -78,7 +78,8 @@ const ADAPTERS={
 // E280: engines read as scene files (KiriKiri, Artemis, Ren'Py); their script is the game folder like BGI's.
 const scenes=require('./original-engines/scenes.cjs'),fillLines=require('./original-engines/fill.cjs');
 for(const id of Object.keys(scenes.ENGINES))ADAPTERS[id]={folder:true,scene:true,locate:dir=>scenes.readable(id,dir)?{engine:id,target:dir}:null,
- read:dir=>{const list=scenes.read(id,dir),lines=list.flatMap(x=>x.lines),ruby=list.some(x=>x.ruby)?list.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined;return {engine:id,version:0,codepage:'text',lines,ruby,sizes:list.map(x=>x.lines.length),structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
+ read:dir=>{const list=scenes.read(id,dir),lines=list.flatMap(x=>x.lines),ruby=list.some(x=>x.ruby)?list.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined;const roles=list.some(scene=>scene.roles||scene.scope==='interface')?list.map(scene=>scene.roles||(scene.scope==='interface'?'i':'?').repeat(scene.lines.length)).join(''):undefined;
+  return {engine:id,version:0,codepage:'text',lines,ruby,roles,sizes:list.map(x=>x.lines.length),structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
  fingerprint:dir=>scenes.fingerprint(id,dir)};
 const runningDirOf=runtime=>ADAPTERS[runtime.engine||'system4']?.folder?runtime.file:path.dirname(runtime.file);
 /* 2026-11-21 (DDLC Plus pairing self-test: the generic Unity reader took the folder before vgprompter, so the runtime became its 53 poem lines and the
@@ -95,7 +96,7 @@ function scanRunning(root,id,executable,opts={}){
  const ain=readScript(loc),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length,nonEmpty=ain.lines.filter(prose).length,zhOnly=chineseOnly(ain.lines);
  // An English (or other) original read by a scene engine is neither the Japanese game nor a Chinese build: nothing to do.
  if(ADAPTERS[loc.engine].scene&&!zhOnly){const chinese=ain.lines.filter(t=>prose(t)&&!japaneseLine(t)&&/[一-鿿]{2}/.test(t)).length,latin=ain.lines.filter(latinDialogue).length;if(!nonEmpty||(japanese<nonEmpty*.5||latin>=Math.max(100,japanese*2,chinese*2))&&chinese<nonEmpty*.3)return writeState(root,id,{status:'unsupported',error:'SCRIPT_NOT_JAPANESE',runtime:null,gameDir:dir});}
- const index=writeIndex(root,id,'runtime-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'runtime',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash},structure:ain.structure,lines:ain.lines,...(ain.ruby?{ruby:ain.ruby}:{}),...(ain.sizes?{sizes:ain.sizes}:{})});
+ const index=writeIndex(root,id,'runtime-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'runtime',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash},structure:ain.structure,lines:ain.lines,...(ain.roles?{roles:ain.roles}:{}),...(ain.ruby?{ruby:ain.ruby}:{}),...(ain.sizes?{sizes:ain.sizes}:{})});
  const original=current?.original;const runtime={file,engine:loc.engine,sha256:hash,reader:READER,index,codepage:ain.codepage,version:ain.version,structure:ain.structure,lines:nonEmpty,japaneseLines:japanese};
  // A changed game build invalidates the earlier alignment; the original index itself stays.
  const state=writeState(root,id,{engine:loc.engine,runtime,status:zhOnly&&!original?.index?'chinese-only':!zhOnly&&japanese>=nonEmpty*.5?'native-japanese':original?.index&&current?.runtime?.sha256===hash?current.status:original?.index?'needs-recheck':'awaiting-original'});
@@ -146,8 +147,8 @@ function realign(loc,ain,runtime,runningDir){if(loc.engine!=='bgi'||align(runtim
    scene and sampled again; only a passing pairing is reliable. zh/ja are the two line lists, into says which list's order
    the realigned lines follow ('zh': Japanese lines for the Chinese build, 'ja': Chinese lines for the Japanese build). */
 const sampler=require('./align-sample.cjs');
-function pairCheck(zh,ja,{into='zh',zhSizes,jaSizes,ruby,structureOk=true}={}){
- const v=sampler.verify(zh,ja,{into,zhSizes,jaSizes,ruby,force:!structureOk,added:into==='zh'?ja.added:null,rewritten:into==='zh'?ja.rewritten:null});
+function pairCheck(zh,ja,{into='zh',zhSizes,jaSizes,ruby,keyed,structureOk=true}={}){
+ const v=sampler.verify(zh,ja,{into,zhSizes,jaSizes,ruby,keyed,force:!structureOk,added:into==='zh'?ja.added:null,rewritten:into==='zh'?ja.rewritten:null});
  return {verdict:v,report:sampler.report(v)};
 }
 function importOriginal(root,db,id,dir,{activate=false}={}){
@@ -264,7 +265,7 @@ function buildPatch(runningState,source){
  }else if(scenes.ENGINES[engine]){
   const eng=scenes.ENGINES[engine],base=scenes.read(engine,runningDir);let list;
   if(eng.patchLines)list=eng.patchLines(base,found);
-  if(!list&&eng.patchLines&&!eng.archives)throw Error('PATCH_SCRIPT_NOT_FOUND');
+  if(!list&&eng.patchLines&&(!eng.archives||engine==='siglus'))throw Error('PATCH_SCRIPT_NOT_FOUND');
   if(!list){
    const names=new Set(base.map(x=>x.name.toLowerCase())),overlay=new Map();
    /* 2026-11-14 the running game's own script files are never the patch, wherever they sit under its folder (BRUNS keeps
@@ -290,8 +291,8 @@ function buildPatch(runningState,source){
   }
   list=list.map((scene,i)=>scene.patched?{...scene,lines:scene.lines.map((t,k)=>japaneseLine(t)||base[i].zhSource?.[k]==='filled'&&base[i].zh[k]===t?base[i].lines[k]:t)}:scene);
   const lines=list.flatMap(x=>x.lines);patched=list.filter(x=>x.patched).length;if(!patched)throw Error('PATCH_SCRIPT_NOT_FOUND');
-  translated=list.filter(x=>x.patched).flatMap(x=>x.lines);
-  sections=list.map(scene=>({scope:scene.scope==='interface'?'interface':'script',length:scene.lines.length}));
+  translated=list.flatMap((scene,i)=>!scene.patched?[]:scene.keyed?scene.lines.filter((t,k)=>sampler.translated(t,base[i].lines[k])):scene.lines);
+  sections=list.map(scene=>({scope:scene.scope==='interface'?'interface':'script',length:scene.lines.length,keyed:scene.keyed===true}));
   patchFiles=list.flatMap(scene=>scene.patchFile?[scene.patchFile]:[]);
   script={engine,version:0,codepage:'text',lines,sizes:list.map(x=>x.lines.length),structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};
  }else throw Error('NO_SUPPORTED_SCRIPT');
@@ -342,11 +343,14 @@ function importPatch(root,db,id,source,{auto=false,executable,imageSource}={}){
  let {script}=built;const {patched,sources,sections}=built,runtime=readIndex(state.runtime.index);
  // Lines the patch left in Japanese must equal the running script at the same index (same measure as the original import).
  let alignment=align({...script,structure:script.structure},runtime);
- const pc=pairCheck(script.lines,runtime.lines,{into:'ja',zhSizes:script.sizes,jaSizes:runtime.sizes,structureOk:alignment.sameStructure});
+ const keyed=sections?.some(section=>section.keyed)?sections.flatMap(section=>Array(section.length).fill(section.keyed)):undefined;
+ const pc=pairCheck(script.lines,runtime.lines,{into:'ja',keyed,zhSizes:script.sizes,jaSizes:runtime.sizes,structureOk:alignment.sameStructure});
  if(pc.verdict.lines){script={...script,lines:pc.verdict.lines};alignment=align({...script,structure:script.structure},runtime);}
  alignment={...alignment,reliable:alignment.reliable&&pc.verdict.ok,pairing:pc.report};
  if(!pc.report.total)throw Error('PATCH_NOT_TRANSLATED');
  const coverage=patchCoverage(runtime.lines,script.lines,sections,alignment.reliable);
+ const quality=require('./script-translation-quality.cjs').translationQuality(runtime,alignment.reliable?script.lines:null);
+ if(quality)coverage.translationQuality=quality;
  const patchStatus=!alignment.reliable?'unreliable':coverage.script.paired?'ready':coverage.interface.paired?'interface-only':'unreliable';
  const persistedSource=imageSource||source,hash=patchFingerprint(persistedSource),isDir=fs.statSync(persistedSource).isDirectory();
  const index=writeIndex(root,id,'patch-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'patch',engine:script.engine,version:script.version,codepage:script.codepage,source:{file:source,sha256:hash,sources},structure:script.structure,lines:script.lines});
@@ -402,11 +406,11 @@ function nearbyPatchSources(executable,engine){
 // Bumped when the way patches are read changes; older stored patches are rebuilt before use.
 /* 3: KiriKiri cx Chinese slot found by its text, ASCII-quoted slots take the Japanese brackets (2026-11-13) */
 /* 4: store source coverage and recheck Siglus indexes that counted settings as dialogue */
-const PATCH_VERSION=4;
+const PATCH_VERSION=5;
 function patchCurrent(state){
  const patch=state?.patch;
  if(!patch||patch.runtimeSha&&patch.runtimeSha!==state.runtime?.sha256)return false;
- return patch.version===PATCH_VERSION||patch.version===3&&state.runtime?.engine!=='siglus'&&state.patchAlignment?.pairing?.paired>0;
+ return patch.version===PATCH_VERSION||[3,4].includes(patch.version)&&state.runtime?.engine!=='siglus'&&state.patchAlignment?.pairing?.paired>0;
 }
 function refreshCachedPatchReport(root,id,state){
  if(!patchCurrent(state)||state.patch.version===PATCH_VERSION)return state;
@@ -753,7 +757,7 @@ function staticProvider(root,executable,opts={}){
    // The original's own ruby (BGI <R よみ>漢字</R>) for the restored lines: game readings before dictionary ones.
    const readings=Array.isArray(og.ruby)?og.ruby:null,withRuby=r=>{if(!r||!readings||!Array.isArray(r.indices))return r;const pairs=r.indices.flatMap(i=>Array.isArray(readings[i])?readings[i]:[]);return pairs.length?{...r,ruby:pairs}:r;};
    // A patched game shown in Japanese: the patched line itself is the group's translation of the restored line.
-   return {kind:'original',hasLocalPairs:()=>og.lines.some((ja,i)=>japaneseLine(ja)&&localTranslation(m.rt[i])),position:()=>m.last,save:()=>m.save(),load:v=>m.load(v),resolve:text=>withRuby(m.match(text))};}
+   return {kind:'original',resolveChoice:require('./script-translation-quality.cjs').choiceLookup(og.lines,m.rt,og.roles),hasLocalPairs:()=>og.lines.some((ja,i)=>japaneseLine(ja)&&localTranslation(m.rt[i])),position:()=>m.last,save:()=>m.save(),load:v=>m.load(v),resolve:text=>withRuby(m.match(text))};}
   const patched=state.patchStatus==='ready'&&state.patch?.index&&patchCurrent(state);
   if(!patched&&state.status!=='native-japanese')return null;
   // The Japanese game, with an imported patch or with none: the line stays Japanese; the patch's line at the same place is
@@ -761,7 +765,7 @@ function staticProvider(root,executable,opts={}){
   const rtIndex=readIndex(state.runtime.index),rt=rtIndex.lines,m=new Matcher(rt,patched?readIndex(state.patch.index).lines:rt),fill=fillStore(root,id,scenes.ENGINES[state.runtime.engine]?.live?'live':state.runtime.sha256);
   // The script's own ruby for the matched lines (KiriKiri Z scene files): game readings come before dictionary ones.
   const readings=Array.isArray(rtIndex.ruby)?rtIndex.ruby:null,withRuby=r=>{if(!readings||!Array.isArray(r.indices))return r;const pairs=r.indices.flatMap(i=>Array.isArray(readings[i])?readings[i]:[]);return pairs.length?{...r,ruby:pairs}:r;};
-  const untranslated=i=>!patched||!sampler.translated(inlineTags(m.og[i]),inlineTags(rt[i]));
+  const untranslated=i=>!patched||rtIndex.roles?.[i]==='i'||!sampler.translated(inlineTags(m.og[i]),inlineTags(rt[i]));
   /* E358: an engine that draws from a fixed glyph set (HuneX bitmap fonts) says which characters it has. drawable(text) is
      null when unknown; tableDrawable() is false when the game cannot draw its own translation table (WoH in Japanese draws
      4.9 % of the official Chinese lines in full), so the game is not asked to draw translations it would leave with holes. */
@@ -778,7 +782,9 @@ function staticProvider(root,executable,opts={}){
      of them gives back its Japanese line; built on first use, never when the engine has none */
   let foreignMap,foreignSeqFn;const foreign=(text,opt)=>{if(foreignMap===undefined){foreignMap=null;try{const f=scenes.ENGINES[state.runtime.engine]?.foreign;if(f){const map=f(path.dirname(String(executable)));if(map&&map.size)foreignMap=map;}}catch{}}if(!foreignMap)return '';const k=foreignKey(text),hit=foreignMap.get(k);if(opt?.fuzzy)return (foreignSeqFn||(foreignSeqFn=foreignSeq(foreignMap)))(text);if(hit||!opt?.prefix||k.length<40)return hit||'';/* a truncated stream sample (thread list keeps 110 chars): the one line it starts */let one='';for(const [key,ja] of foreignMap)if(key.startsWith(k)){if(one&&one!==ja)return '';one=ja;}return one;};
   /* position(): the script line read last (core/hook-native.cjs keeps a repeated line's answer only while it is there) */const api={kind:'patch',patch:!!patched,hasLocalPairs:()=>!!patched&&rt.some((ja,i)=>japaneseLine(ja)&&!untranslated(i)&&localTranslation(m.og[i])),fill,drawable,tableDrawable,position:()=>m.last,save:()=>m.save(),load:v=>m.load(v),flowLayout,flowGame,foreign,near:text=>{const i=m.near(text);return i>=0?inlineTags(rt[i]):'';},
-   resolve:text=>withRuby(resolveLine(text))};
+   translationIndex:{runtime:state.runtime.sha256,patch:patchCurrent(state)?state.patch.sha256:null},
+   matchedBody:text=>rtIndex.roles?.[m.last]==='b'&&norm(rt[m.last])===norm(text),
+   resolveChoice:require('./script-translation-quality.cjs').choiceLookup(rt,patched?m.og:[],rtIndex.roles),resolve:text=>withRuby(resolveLine(text))};
   function resolveLine(text){const r=m.match(text);if(r.japanese===undefined)return r;
     // E449 lines the release leaves in Japanese take the filled translation written for them (fill.cjs), marked filled.
     /* line by line: the patch's line, else its filled translation, else the line translated ahead (script-prefetch keeps
@@ -786,7 +792,7 @@ function staticProvider(root,executable,opts={}){
     if(r.indices.some(untranslated)){let machine=false;const parts=r.indices.map(i=>{if(!untranslated(i))return m.og[i];const f=fillLines.lookup(rt[i]);if(f&&f.zh)return f.zh;const t=fill.get(rt[i]);if(t)machine=true;return t||null;});
      if(parts.every(p=>p!=null))return machine?{...r,translation:parts.join(''),japanese:undefined,machine:true}:{...r,translation:parts.join(''),japanese:undefined,filled:true,source:'filled'};
      const t=fill.get(r.indices.map(i=>rt[i]).join(''));return t?{...r,translation:t,japanese:undefined,machine:true}:{status:'none',method:'untranslated',indices:r.indices};}
-    return {...r,translation:r.japanese,japanese:undefined};}
+    return {...r,translation:r.japanese,japanese:undefined,source:'local-script'};}
   return {...api,
    // The next lines after the reading position that still need a translation, each with the lines before it as context.
    upcoming(count=8){if(m.last<0)return [];const out=[];

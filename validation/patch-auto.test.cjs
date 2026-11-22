@@ -86,7 +86,9 @@ test('immersion default on with a one-time switch',()=>{
 // E285 (CLANNAD write-back report): script first, Chinese font, Alt+H leaves write-back on, English and "none" display.
 test('write-back uses the script, a Chinese font, survives Alt+H; display offers English and none',()=>{
  const read=f=>fs.readFileSync(path.join(root,f),'utf8');
- assert.match(read('services/reader.cjs'),/scriptTranslation\?\.\(text\)/);
+ const {Reader}=require('../services/reader.cjs'),returned={};
+ const value=Reader.prototype.localTranslation.call({gal:{hooks:{scriptTranslation(text,result){result.source='patch';return text==='本文'?'译文':'';}}},embedCached(){}},'本文','zh',returned);
+ assert.equal(value,'译文');assert.equal(returned.source,'patch');
  assert.match(read('native/HookBridge.cs'),/TranslateMode\?TranslateFont\(\):""/);
  assert.match(read('core/hook-native.cjs'),/coverEnabled!==false\|\|preferences\.embedTranslation===true/);
  assert.match(read('core/hook-control.cjs'),/m\.matched&&h\.preferences\?\.embedTranslation===true/);

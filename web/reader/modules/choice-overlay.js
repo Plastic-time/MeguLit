@@ -39,8 +39,8 @@
    /* the art-text scan reads the option rows as art text: its copies go while the options are up */
    'body.megulit-choices-up .megulit-art{visibility:hidden!important}';
    if(!st.isConnected)d.head.append(st);}
-  function clear(){d.body.classList.remove('megulit-choice-covers-line','megulit-choices-up');current=null;key='';translations=[];layer?.remove();layer=null;}
-  function translate(texts){if(!translationOn()){translations=[];return;}const id=++b.serial;request=id;send({id,text:texts.join('\n'),options:b.options?.()||{}});}
+  function clear(){d.body.classList.remove('megulit-choice-covers-line','megulit-choices-up');current=null;key='';translations=[];++request;layer?.remove();layer=null;}
+  function translate(texts){if(translationOn())send({type:'choiceTranslations',request:++request,items:texts,options:b.options?.()||{}});}
   function place(){
    if(!current){clear();return;}
    d.body.classList.add('megulit-choices-up');
@@ -56,7 +56,7 @@
     const jp=node.querySelector('.megulit-choice-jp');if(jp.dataset.text!==item.text){jp.dataset.text=item.text;jp.textContent=item.text;
      const ask=item.text;Promise.resolve(b.rubyAnnotations?.(ask)).then(notes=>{if(jp.dataset.text===ask&&Array.isArray(notes)){jp.innerHTML=rubyHtml(ask,notes);if(current)place();}}).catch(()=>{});}
     /* 2026-11-13 the drawn text never runs past the game's own row (ファタ: 35 px text over a 168 px row spilled out) */const fit=()=>{const wide=jp.scrollWidth;if(wide>0&&Math.abs(wide-box.width)>box.width*.04)node.style.fontSize=Math.max(10,Math.min(size*1.4,size*box.width/wide))+'px';};/* the invisible copy spans the game's row, so the ruby lands on the game's glyphs */fit();
-    const cn=node.querySelector('.megulit-choice-cn');/* the translation follows the row's height, not the fitted copy (a row of dots fits a smaller copy) */cn.style.fontSize=Math.max(12,size*.8)+'px';cn.textContent=translations[i]||'';cn.hidden=!translationOn()||!translations[i];
+    const cn=node.querySelector('.megulit-choice-cn'),row=translations[i];cn.style.fontSize=Math.max(12,size*.8)+'px';cn.textContent=row?.text||'';b.markTranslationSource?.(cn,row);cn.title=row?.provider||row?.source||'';cn.hidden=!translationOn()||!row?.text;
     /* a translation on the row must stay inside the game picture: smaller text first, then under the option */if(!cn.hidden&&node.classList.contains('megulit-choice-side')){const game=mapBox({x0:0,y0:0,x1:current.sw,y1:current.sh},current.sw,current.sh,info,dpr),right=game.x+game.width-4;let fs=parseFloat(cn.style.fontSize)||12;while(cn.getBoundingClientRect().right>right&&fs>11){fs-=1;cn.style.fontSize=fs+'px';}if(cn.getBoundingClientRect().right>right)node.classList.remove('megulit-choice-side');}
    });
    for(const extra of nodes.slice(current.items.length))extra.remove();
@@ -65,14 +65,14 @@
   function accept(value){
    if(!value||!Array.isArray(value.items)||value.items.length<1||!(value.sw>0)||!(value.sh>0)){clear();return;}
    const items=value.items.filter(i=>i&&typeof i.text==='string'&&i.x1>i.x0&&i.y1>i.y0).slice(0,12);/* 2026-11-13 one box when the other options are only ellipses (the host decides) */if(items.length<1){clear();return;}
-   const nextKey=items.map(i=>i.text).join('\n');current={items,sw:value.sw,sh:value.sh,unboxed:Number(value.unboxed)||0};
+   const nextKey=JSON.stringify([translationOn(),b.translationTarget?.(),...items.map(i=>i.text)]);current={items,sw:value.sw,sh:value.sh,unboxed:Number(value.unboxed)||0};
    if(nextKey!==key){key=nextKey;translations=[];translate(items.map(i=>i.text));}
    place();
   }
-  const deliverPrevious=b.deliverPageTranslation;
-  b.deliverPageTranslation=(id,text,error,message)=>{
-   if(id===request&&request){request=0;if(!error&&current){const lines=String(text||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);translations=lines.length===current.items.length?lines:[];place();}return true;}
-   return deliverPrevious?deliverPrevious(id,text,error,message):false;};
+  b.deliverChoiceTranslations=(id,result)=>{
+   if(id!==request||!current||b.acceptTranslationTarget?.(result)===false||result?.rows?.length!==current.items.length)return;
+   translations=result.rows.map((row,i)=>row||translations[i]);place();
+  };
   const previous=b.galStatus;
   b.galStatus=m=>{previous?.(m);if(!m||typeof m!=='object')return;
    if(m.type==='gameClosed'||m.hookSource===null){clear();return;}
@@ -98,7 +98,7 @@
   b.galStatus=m=>{statusBefore?.(m);if(!m||typeof m!=='object')return;if(typeof m.hookCheckState==='string')checkState=m.hookCheckState;
    if(typeof m.hookSource==='string'&&m.hookSource.trim()&&m.hookSource!==lastLine){lastLine=m.hookSource;checkState='';clearTimeout(lineTimer);const t=m.hookSource;lineTimer=setTimeout(()=>{if(lastLine===t)lineDiagnostic(t);},2500);}};
   w.addEventListener('resize',()=>{if(current)place();});
-  b.choiceOverlay={accept,clear,active:()=>!!current};
+  b.choiceOverlay={accept,clear,refresh:()=>{if(current)accept(current);},active:()=>!!current};
  }
  if(typeof module!=='undefined'&&module.exports)module.exports={rubyHtml,mapBox,install};
  if(root&&root.document)install(root);

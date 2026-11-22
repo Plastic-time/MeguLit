@@ -223,13 +223,21 @@ const artemis={
 const RPY=n=>/\.rpy$/i.test(n);
 const SAY=/^\s*(?:[A-Za-z_][\w.]*\s+)?(?:[A-Za-z_][\w.]*\s+)*"((?:[^"\\]|\\.)*)"\s*(?:with\s+\w+)?\s*$/;
 const unq=s=>s.replace(/\\n/g,'\n').replace(/\\(.)/g,'$1');
-function parseRpy(buf){const lines=[],anchors=[];let skip=false;
+function parseRpy(buf){const lines=[],anchors=[],roles=[],menus=[];let skip=false;
  for(const raw of decode(buf).split(/\r?\n/)){
   if(/^translate\s/.test(raw)){skip=true;continue;}if(skip&&/^\S/.test(raw))skip=false;if(skip)continue;
   const t=raw.trim();if(!t||t[0]==='#')continue;
-  const m=raw.match(SAY);if(m&&!/^\s*(?:old|new|define|default|\$|image|play|show|scene|jump|call)\b/.test(raw)){lines.push(unq(m[1]));continue;}
+  const indent=raw.match(/^\s*/)[0].replace(/\t/g,'        ').length;
+  while(menus.length&&indent<=menus.at(-1).indent)menus.pop();
+  if(/^menu(?:\s+\w+)?\s*:\s*(?:#.*)?$/.test(t))menus.push({indent,child:null});
+  else if(menus.length){
+   const menu=menus.at(-1);menu.child??=indent;
+   const option=indent===menu.child&&/^"((?:[^"\\]|\\.)*)"(?:\s+if\s+.+?)?\s*:\s*(?:#.*)?$/.exec(t);
+   if(option){lines.push(unq(option[1]));roles.push('c');continue;}
+  }
+  const m=raw.match(SAY);if(m&&!/^\s*(?:old|new|define|default|\$|image|play|show|scene|jump|call)\b/.test(raw)){lines.push(unq(m[1]));roles.push('b');continue;}
   if(ascii(t))anchors.push(t);}
- return {lines,anchors};}
+ return {lines,anchors,roles:roles.join('')};}
 const gameDir=dir=>fs.existsSync(path.join(dir,'game'))?path.join(dir,'game'):dir;
 const outsideTl=file=>!/[\\/]tl[\\/]/i.test(file);
 // Old/new pairs of every language folder under tl/: dialogue blocks (# who "old" then who "new") and string blocks.
@@ -317,10 +325,68 @@ function chineseColumn(table,jp){if(table.rows!==jp.length)return null;
   c.changed=changed;return true;}).sort((a,b)=>b.changed-a.changed||b.han-a.han)[0];
  return c?table.cells.map(r=>String(r[c.index]||'')):null;}
 const siglusDat=dir=>{const d=path.join(dir,'dat');try{return fs.readdirSync(d).some(DBS)?d:'';}catch{return '';}};
+function dbsSceneFile(dir){
+ const packs=fs.readdirSync(dir).filter(n=>/^scene.*\.pck$/i.test(n));
+ if(packs.length===1)return path.join(dir,packs[0]);
+ if(packs.length>1)try{
+  const language=/^\s*Language\s*=\s*(\w+)\s*$/im.exec(fs.readFileSync(path.join(dir,'ds.ini'),'utf8'))?.[1]?.toLowerCase();
+  const name={schinese:'scenezh.pck',english:'sceneen.pck',japanese:'scenejp.pck'}[language];
+  const match=packs.find(n=>n.toLowerCase()===name);
+  if(match)return path.join(dir,match);
+ }catch{}
+ return null;
+}
+let lastSlotLayout;
+function slotLayout(file){
+ const key=file+'|'+stat(file);
+ if(lastSlotLayout?.key===key)return lastSlotLayout;
+ const src=require('./siglus-source.cjs'),files=src.sources(file);
+ const declarations=files.find(s=>/^_system_language\.inc$/i.test(s.name));
+ const defines=declarations?src.decode(declarations.raw):'';
+ const column=lang=>defines.match(new RegExp('^\\s*#define\\s+\\$lang_'+lang+'\\s+(\\d+)\\b','im'))?.[1];
+ const ja=column('jp'),zh=column('ch'),layout=ja!=null&&zh!=null&&ja!==zh?{ja:Number(ja),zh:Number(zh)}:null;
+ return lastSlotLayout={key,slots:src.messageSlots(files),layout};
+}
+// A serial-keyed bilingual patch may omit or reorder rows. In this format both
+// the serial and the Japanese cell must match before accepting its Chinese cell.
+function serialTranslations(scene,table,layout){
+ if(!layout||!scene.rowIds||!/[bc]/.test(scene.roles||''))return null;
+ const serial=serialIndex(table),ja=table.columns.findIndex(c=>c.id===layout.ja&&c.type===0x53);
+ const zh=table.columns.findIndex(c=>c.id===layout.zh&&c.type===0x53);
+ if(serial<0||ja<0||zh<0)return null;
+ const byId=new Map(),duplicates=new Set();
+ for(const row of table.cells){
+  if(byId.has(row[serial]))duplicates.add(row[serial]);
+  byId.set(row[serial],row);
+ }
+ const seen=new Set();
+ for(const id of scene.rowIds){
+  if(seen.has(id))duplicates.add(id);
+  seen.add(id);
+ }
+ const {translated}=require('../align-sample.cjs');
+ return scene.lines.map((text,i)=>{
+  const id=scene.rowIds[i],row=byId.get(id);
+  return text&&!duplicates.has(id)&&row?.[ja]===text&&translated(row[zh],text)?row[zh]:'';
+ });
+}
 const siglus={
  id:'siglus',hint:'dat\*.dbs',
  scenes(dir){const d=siglusDat(dir);if(!d)return [];return fs.readdirSync(d).filter(DBS).sort().map(f=>({name:f,read:()=>fs.readFileSync(path.join(d,f))}));},
- archives:()=>[],sources:dir=>{const d=siglusDat(dir);return d?fs.readdirSync(d).filter(DBS).map(f=>path.join(d,f)):[];},
+ archives:()=>[],sources:dir=>{const d=siglusDat(dir);if(!d)return [];const pck=dbsSceneFile(dir);return [...fs.readdirSync(d).filter(DBS).map(f=>path.join(d,f)),...(pck?[pck]:[])];},
+ annotate(dir,list){
+  list=list.map(scene=>interfaceDbsName(scene.name)?{...scene,scope:'interface'}:scene);
+  const file=dbsSceneFile(dir);
+  if(!file)return list;
+  let info;try{info=slotLayout(file);}catch{return list;}
+  const {slots,layout}=info;
+  if(!slots.size)return list;
+  return list.map(scene=>{
+   if(scene.scope==='interface'||!scene.rowIds||!scene.lines.length)return scene;
+   const roles=scene.lines.map((text,i)=>{const slot=slots.get(scene.rowIds[i]);return text&&slot?.text===text?slot.role:'?';}).join('');
+   return {...scene,roles,layout};
+  });
+ },
  parse:parseDbs,test:DBS,
  // E450 voices: the release's Scene.pck keeps its original sources, where a KOE call comes before each spoken line
  voiceLines:dir=>require('./siglus-source.cjs').voiceLines(dir),
@@ -339,10 +405,16 @@ const siglus={
    for(const d of dirs)for(const name of [scene.name,...CHINESE_DBS_TWINS.map(suffix=>stem+'_'+suffix+'.dbs')]){
     const patchFile=path.join(d,name);let table;try{table=dbsTable(fs.readFileSync(patchFile));}catch{continue;}
     const ids=rowIds(table);
-    if((ids||scene.rowIds)&&(!ids||!scene.rowIds||ids.length!==scene.rowIds.length||ids.some((id,i)=>id!==scene.rowIds[i])))continue;
-    const lines=chineseColumn(table,scene.lines);if(!lines)continue;any=true;
+    let lines=serialTranslations(scene,table,scene.layout);
+    const keyed=!!lines;
+    if(keyed&&!lines.some(Boolean))continue;
+    if(!keyed){
+     if((ids||scene.rowIds)&&(!ids||!scene.rowIds||ids.length!==scene.rowIds.length||ids.some((id,i)=>id!==scene.rowIds[i])))continue;
+     lines=chineseColumn(table,scene.lines);
+    }
+    if(!lines)continue;any=true;
     return {...scene,scope:scene.scope==='interface'||dbsScope(table,name)==='interface'?'interface':'script',patchFile,
-     patched:true,lines:lines.map((t,k)=>t||scene.lines[k])};}
+     patched:true,keyed,lines:lines.map((t,k)=>t||scene.lines[k])};}
    return scene;});
   return any?list:null;
  },
@@ -673,7 +745,8 @@ function detect(dir){if(readable('adapter-pack',dir))return 'adapter-pack';
  for(const id of Object.keys(ENGINES)){if(id==='adapter-pack'||hint.includes(id))continue;if(id==='garbro'&&ownCx(dir))continue;if(readable(id,dir))return id;}return null;}
 function read(id,dir,overlay){const engine=ENGINES[id];
  // E449 a release's Chinese column gets the filled translations of the lines it leaves empty (fill.cjs).
- return engine.scenes(dir).map(s=>{const replaced=overlay?.get(s.name.toLowerCase());let parsed={lines:[],anchors:[]};try{parsed=engine.parse(replaced||s.read());}catch{}return fill.scene({name:s.name,...parsed,patched:!!replaced});});}
+ const list=engine.scenes(dir).map(s=>{const replaced=overlay?.get(s.name.toLowerCase());let parsed={lines:[],anchors:[]};try{parsed=engine.parse(replaced||s.read());}catch{}return fill.scene({name:s.name,...parsed,patched:!!replaced});});
+ return engine.annotate?engine.annotate(dir,list):list;}
 function fingerprint(id,dir){return crypto.createHash('sha256').update(id+'\n'+ENGINES[id].sources(dir).sort().map(f=>path.basename(f)+'|'+stat(f)).join('\n')).digest('hex');}
 /* E294 (user: say that the first use needs 30-90 s of unpacking instead of "not supported"): what a game that cannot
    be read yet is waiting for. 'unpack': its cx archives are being decrypted in the background (started: when);

@@ -6,7 +6,7 @@
   }
   if (window.__tomoyoChinese) return;
   const bridge = window.__tomoyoChinese = { current: '', serial: 0, timer: null };
-  bridge.refresh = () => { bridge.cardinalPair?.refresh();if(bridge.refreshPageTranslations?.())return;bridge.current = ''; bridge.serial++; clearTimeout(bridge.timer); schedule(); };
+  bridge.refresh = () => { bridge.cardinalPair?.refresh();bridge.choiceOverlay?.refresh();if(bridge.refreshPageTranslations?.())return;bridge.current = ''; bridge.serial++; clearTimeout(bridge.timer); schedule(); };
   bridge.sourceText = '';
   let row, output, parent;
   let translationVisible = true;
@@ -25,6 +25,7 @@
     const next = !!value;
     if (next === enabled) return;
     enabled = next;
+    bridge.choiceOverlay?.refresh();
     bridge.cardinalPair?.refresh();
     localStorage.setItem('tomoyo-chinese-enabled', String(enabled));
     bridge.current = '';
@@ -72,7 +73,7 @@
   function settled() { if (!output || output.dataset.state !== 'ready' || !output.textContent.trim() || output.textContent === '翻译中…') return; const prev = output.style.minHeight; output.style.minHeight = ''; const h = output.getBoundingClientRect().height; output.style.minHeight = prev;
     if (h > 0) { recentHeights.push(h); if (recentHeights.length > 3) recentHeights.shift(); if (h > (parseFloat(prev) || 0)) output.style.minHeight = Math.ceil(h) + 'px'; } }
   bridge.markTranslationSource=(node,context)=>{if(!node)return;
-    const source=['script','patch','official','machine','local','api','mt'].includes(context?.source)?context.source:'unknown';
+    const source=['script','patch','official','machine','local','api','mt','filled'].includes(context?.source)?context.source:'unknown';
     Object.assign(node.dataset,{translationSource:context?.cached?'cache':source,translationOrigin:source,translationProvider:context?.provider||''});
   };
   function setText(text, error = false, animate = false, context=null) {

@@ -27,17 +27,20 @@ test('a request reaches the reader, the reply goes back, and only a real transla
  assert.ok(events.some(e=>e.embedTranslating===true));
 });
 
-test('the reader translates a held line once and shares it with the page',async()=>{
+test('the reader translates a held line once and shares it with the page',async t=>{
  const {Reader}=require('../services/reader.cjs'),r=Object.create(Reader.prototype),replies=[];let calls=0;
- Object.assign(r,{root:'Z:/no-root',workPrompt:'',prefs:()=>({provider:'google'}),loadKeys(){},localReady:async()=>{},translator:()=>({translate:async t=>{calls++;return '译:'+t;}}),gal:{hooks:{embedReply:(id,t)=>replies.push([id,t])}}});
+ const root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'embed-held-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ Object.assign(r,{root,runtime:{libraryOnly:()=>false},workPrompt:'',prefs:()=>({provider:'google'}),loadKeys(){},localReady:async()=>{},translator:()=>({hasKey:()=>false,translate:async t=>{calls++;return '译:'+t;}}),gal:{hooks:{embedReply:(id,t)=>replies.push([id,t])}}});
  await r.embedTranslate(1,'「おはよう」');await r.embedTranslate(2,'「おはよう」');
  assert.equal(calls,1,'second time from the cache');assert.deepEqual(replies.map(x=>x[0]),[1,2]);assert.ok(replies.every(x=>x[1].includes('おはよう')));
+ const returned={};
+ assert.equal(await r.translate({id:4,text:'「おはよう」'},returned),replies[0][1]);
+ assert.equal(calls,1);assert.equal(returned.cached,true);assert.equal(returned.source,'mt');
  Object.assign(r,{translator:()=>({translate:async()=>{throw Error('offline');}})});await r.embedTranslate(3,'別の行');
  assert.deepEqual(replies.at(-1),[3,''],'a failure answers empty so the game shows the original');
  const src=fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8');
  assert.match(src,/if\(message\.type==='hookEmbedRequest'\)\{this\.embedTranslate\(message\.id,message\.text\);return;\}/);
- assert.match(src,/this\.gal\?\.hooks\?\.embedReply\(id,hide\?'':trans,/);
- assert.match(src,/\{const cached=this\.embedCached\(text,undefined,\{language:cacheLanguage\}\);if\(cached\)return cached;\}/);
 });
 
 test('the native bridge holds the line, answers with the translation, and lets the original through on timeout',()=>{

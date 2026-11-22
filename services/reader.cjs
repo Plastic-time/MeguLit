@@ -365,6 +365,47 @@ class Reader{
   if(script){returned.source??="script";this.embedCached(text,script,{language,source:returned.source});return script;}
   return this.embedCached(text,undefined,{language,returned})||'';
  }
+ recordTranslation(role,result,index){
+  if(!this.gameId||!index||result.target!=='zh')return;
+  this.logVisibility({type:'translationReturned',game:this.gameId,...index,role,source:result.source||'unknown',provider:result.provider||''});
+ }
+ async choiceTranslations(request){
+  const texts=request.items;
+  if(!Array.isArray(texts)||texts.length>12||texts.some(t=>typeof t!=='string'||!t.trim()||t.length>4000))throw Error('INVALID_READER_TEXT');
+  const options=this.requestOptions(request),target=this.targetLanguage(options),hooks=this.gal?.hooks;
+  const token=this.choiceRequest={},generation=this.visualGeneration,index=hooks?.originalText?.translationIndex;
+  const current=()=>this.choiceRequest===token&&this.gal?.hooks===hooks&&this.visualGeneration===generation&&this.active()&&target===this.targetLanguage();
+  const local=text=>{
+   if(target==='en'||hooks?.scriptAllowed?.()===false)return null;
+   const track=hooks?.trackPairs?.get(text.replace(/\s+/g,''));
+   if(track)return {text:track,source:'official'};
+   const provider=hooks?.originalText;
+   if(!provider)return null;
+   let hit;
+   if(provider.resolveChoice)hit=provider.resolveChoice(text);
+   else{
+    const position=provider.save?.();
+    try{hit=provider.resolve(text);}finally{if(position!==undefined)provider.load?.(position);}
+   }
+   if(hit?.status!=='exact')return null;
+   const translation=hit.translation??(provider.kind==='original'?hit.captured:'');
+   return typeof translation==='string'&&translation.trim()&&
+    !require('./original-text.cjs').japaneseLine(translation)&&translation!==text?
+    {text:translation,source:hit.machine?'machine':hit.filled?'filled':provider.kind==='original'?'official':'patch'}:null;
+  };
+  const rows=texts.map(text=>{try{return local(text);}catch{return null;}});
+  if(rows.some(Boolean)&&rows.includes(null)&&current()){
+   this.emit('reader-event',{type:'call',method:'deliverChoiceTranslations',args:[request.request,{target,rows:rows.slice()}]});
+  }
+  await Promise.all(texts.map(async (text,index)=>{
+   if(rows[index])return;
+   try{const r=await this.chainTranslate(text,options,{current});rows[index]={text:r.text,source:r.source,provider:r.provider};}
+   catch{rows[index]={text:'',source:'unavailable'};}
+  }));
+  if(!current()||hooks?.originalText?.translationIndex!==index)return {target,rows:[]};
+  for(const row of rows)this.recordTranslation('choice',{...row,target},index);
+  return {target,rows};
+ }
  async translate(request,returned={}){const options=this.requestOptions(request),cacheLanguage=this.targetLanguage(options);const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;const current=()=>pageKey?this.pageScope===pageKey:this.latest===request.id;if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();const gameId=this.gameId;
   /* 2026-11-19 (user rule, every game): the script's own translation first (group / official, the same lookup the embed uses); a line it does not
      cover goes down services/translation-chain.cjs (local model, bound API, machine translation); when every source fails the line
@@ -405,6 +446,7 @@ class Reader{
    case 'sentenceDisplayObservation':this.sentenceMarks?.displayed(this.gameId,r);break;
    case 'cardinalPairPolicy':{const result=require('../core/cardinal/tape.cjs').pairPolicy(r,this.cardinalTarget());if(result)reply('cardinalPairScope',result);break;}
    case 'cardinalPair':{const accepted=require('../core/cardinal/tape.cjs').pairObserved(r,this.cardinalTarget());if(accepted)require('./torch-local-trial.cjs').feedback(this,r);this.logVisibility({type:'layoutDiagnostic',kind:'cardinalPair',episode:String(r.episode||'').slice(0,80),scope:String(r.scope||'').slice(0,80),target:String(r.target||'').slice(0,35),observed:r.observed===true,paired:r.paired===true,accepted});break;}
+   case 'choiceTranslations':{const result=await this.choiceTranslations(r);reply('deliverChoiceTranslations',r.request,result);break;}
    case 'pageTranslationScope':this.pageScope=String(r.key||'').slice(0,100);break;
    case 'galSource':if(typeof r.text==='string'&&r.text.length<=4000){this.translator().observeSource(r.text);g?.send({type:'source',text:r.text});}break;
    case 'layoutDiagnostic':/* E407: where the line was drawn against the game's text (ruby rows, offsets, hide state) */{const v={};for(const [k,x]of Object.entries(r))if(k!=='type'&&Object.keys(v).length<40&&(typeof x==='number'&&Number.isFinite(x)||typeof x==='boolean'||typeof x==='string'&&x.length<=200))v[k]=x;this.logVisibility({type:'layoutDiagnostic',...v});}break;
@@ -485,7 +527,8 @@ class Reader{
    case 'dictRepair':this.runtime.learning().install(true,true,Array.isArray(r.only)?r.only.filter(x=>['sudachi','unidic'].includes(x)):null).catch(()=>{});break;
    case 'learningInstall':this.runtime.learning().install(true).catch(()=>{});break;
    case 'galMaskLoaded':case 'galMaskError':if(Number.isSafeInteger(r.id)&&r.id===g?.lastFrameId){const count=Number.isSafeInteger(r.count)&&r.count>=0&&r.count<=4000?r.count:0;g.notify({maskMessage:r.type==='galMaskLoaded'?(r.provisional?'遮罩预览已加载：':'遮罩图片已加载：')+count+' 块原文小区域':'阅读层无法解码遮罩图片，请查看状态诊断'});}break;
-   default:if(Number.isSafeInteger(r.id)){this.latest=r.id;if(r.disabled!==undefined)break;/* ② the compositor draws the Japanese itself: furigana from the shared rule (game ruby in the line, then dictionary-settled readings) */if(g?.compositor&&g.preferences?.furigana!==false&&r.text)require('./example-ruby.cjs').exampleRuby(null,this.runtime.learning(),[{text:String(r.text)}]).then(x=>{const it=x?.items?.[0];if(this.active()&&it?.spans?.length)g.compositor?.ruby?.(it.text,it.spans.map(sp=>[sp.start,sp.end,String(sp.reading||'')]));}).catch(()=>{});try{const target=this.targetLanguage(this.requestOptions(r)),returned={},translated=await this.translate(r,returned);/* ② the compositor draws this translation beside / instead of the line */if(this.active()&&target===this.targetLanguage())g?.compositor?.text(String(r.text||''),translated);reply('deliver',r.id,translated,false,'',{target,...returned});}catch(e){reply('deliver',r.id,'',true,e.message);}}else throw Error('UNKNOWN_READER_ACTION');
+   default:if(Number.isSafeInteger(r.id)){this.latest=r.id;if(r.disabled!==undefined)break;/* ② the compositor draws the Japanese itself: furigana from the shared rule (game ruby in the line, then dictionary-settled readings) */if(g?.compositor&&g.preferences?.furigana!==false&&r.text)require('./example-ruby.cjs').exampleRuby(null,this.runtime.learning(),[{text:String(r.text)}]).then(x=>{const it=x?.items?.[0];if(this.active()&&it?.spans?.length)g.compositor?.ruby?.(it.text,it.spans.map(sp=>[sp.start,sp.end,String(sp.reading||'')]));}).catch(()=>{});try{const target=this.targetLanguage(this.requestOptions(r)),returned={},p=g?.hooks?.originalText,translated=await this.translate(r,returned);
+    if(this.gal===g&&p===g?.hooks?.originalText&&p?.matchedBody?.(r.text))this.recordTranslation('body',{...returned,target},p.translationIndex);/* ② the compositor draws this translation beside / instead of the line */if(this.active()&&target===this.targetLanguage())g?.compositor?.text(String(r.text||''),translated);reply('deliver',r.id,translated,false,'',{target,...returned});}catch(e){reply('deliver',r.id,'',true,e.message);}}else throw Error('UNKNOWN_READER_ACTION');
   }
   return {replies:this.active()?replies:[]};
  }

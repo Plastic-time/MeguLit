@@ -49,9 +49,20 @@ function nameOf(g){const zh=g.names.find(n=>HAN.test(n)&&!KANA.test(n)&&!/[\[\](
 /* the script index of the original-text provider -> {ix, script print, pairing} */
 function scriptOf(g){const rt=g.ot?.runtime,pt=g.ot?.patch;const ix=Scripts.emptyIndex();let lines=0,patch=0;
  const idx=rt?.index?readJson(rt.index):null,pidx=pt?.index?readJson(pt.index):null;
- if(idx&&Array.isArray(idx.lines)){const zh=Array.isArray(pidx?.lines)&&pidx.lines.length===idx.lines.length?pidx.lines:[];lines=idx.lines.length;patch=zh.length;ix.files=1;
-  idx.lines.forEach((s,i)=>{if(typeof s!=='string'||!s)return;ix.dialogue.add(Samples.fold(s));ix.lines++;ix.entries.push({line:s,ruby:idx.ruby?.[i]||null,zh:typeof zh[i]==='string'&&zh[i]!==s?zh[i]:''});});}
- return {ix,script:/^[0-9a-f]{64}$/.test(String(rt?.sha256||''))?rt.sha256:'',pairing:{status:String(g.ot?.status||''),lines,patchLines:pt?.lines||0,aligned:patch}};}
+ const paired=['ready','interface-only'].includes(g.ot?.patchStatus)&&g.ot.patchAlignment?.reliable===true&&rt?.sha256&&pt?.runtimeSha===rt.sha256&&
+  !!rt.reader&&pt.reader===rt.reader&&idx?.source?.sha256===rt.sha256&&pidx?.role==='patch'&&pidx.source?.sha256===pt.sha256&&idx.role==='runtime';
+ let quality=null;
+ if(idx&&Array.isArray(idx.lines)){const zh=paired&&Array.isArray(pidx.lines)&&pidx.lines.length===idx.lines.length?pidx.lines:[];lines=idx.lines.length;ix.files=1;
+  const {translated}=require('../../services/align-sample.cjs');
+  if(idx.role==='runtime'&&idx.source?.sha256===rt.sha256){
+   quality=require('../../services/script-translation-quality.cjs').translationQuality(idx,zh.length?zh:null);
+   if(quality){
+    quality.indexHash=crypto.createHash('sha256').update(JSON.stringify([idx.roles,idx.lines])).digest('hex');
+    quality.patchIndexHash=zh.length?crypto.createHash('sha256').update(JSON.stringify(zh)).digest('hex'):null;
+   }
+  }
+  idx.lines.forEach((s,i)=>{if(typeof s!=='string'||!s||idx.roles?.[i]==='i')return;ix.dialogue.add(Samples.fold(s));ix.lines++;const local=g.ot?.patchStatus==='ready'&&translated(zh[i],s)?zh[i]:'';if(local)patch++;ix.entries.push({line:s,ruby:idx.ruby?.[i]||null,zh:local});});}
+ return {ix,quality,script:/^[0-9a-f]{64}$/.test(String(rt?.sha256||''))?rt.sha256:'',pairing:{status:String(g.ot?.status||''),lines,patchLines:pt?.lines||0,aligned:patch}};}
 
 /* the runtime sample of a game over all installs: the newest launch with at least minLines hook lines (what the current code
    did; an older, longer run shows code that is gone), else the launch with the most lines */
@@ -95,6 +106,11 @@ function langsOf(g){const l=String(g.lang||'').toLowerCase();return [l==='en'?'e
 async function seedOne(g,logs,wins,{out,seed,ownerOk,versionsWritten}){const engine=engineOf(g)||'unknown',name=nameOf(g);const row={name,engine,id:g.id,state:'',look:[]};
  if(!g.exe||!fs.existsSync(g.exe)){row.state='skip';row.look.push('程序不在本机');return row;}
  const sc=scriptOf(g);
+ if(sc.quality){
+  const returned=require('../../services/script-translation-quality.cjs').returnedSources(
+   logs.get(g.root)?.reader,g.id,sc.script,g.ot?.patch?.sha256||null);
+  if(returned)sc.quality.returned=returned;
+ }
  const exeSha=crypto.createHash('sha256').update(fs.readFileSync(g.exe)).digest('hex');
  const prints=GamePrint.prints(g.exe,{exe:exeSha,title:g.title,steamAppId:g.steam,vndb:g.vndb,script:sc.script,engine:engine==='unknown'?'':engine});
  const gid=Probe.gameId(prints);
@@ -143,6 +159,13 @@ async function seedOne(g,logs,wins,{out,seed,ownerOk,versionsWritten}){const eng
     (the languages of the game's own text, BCP 47) are written out; an existing seed's sourceLangs and ext are kept */
  const sourceLangs=old?.sourceLangs||langsOf(g);
  const game={...doc,key:old?.key||Probe.gameId(prints2),prints:prints2,seedFormat:1,status,slug,builds,match,sourceLangs,...(old?.ext?{ext:old.ext}:{})};
+ if(sc.quality&&sc.script){
+  const prior=game.ext?.translationQuality||{},previous=prior[exeSha];
+  if(previous?.returned&&!sc.quality.returned&&previous.indexHash===sc.quality.indexHash&&previous.patchIndexHash===sc.quality.patchIndexHash)
+   sc.quality.returned=previous.returned;
+  if(sc.quality.patchIndexHash||previous?.indexHash!==sc.quality.indexHash||!previous.patchIndexHash)
+   game.ext={...game.ext,translationQuality:{...prior,[exeSha]:{script:sc.script,...sc.quality}}};
+ }
  /* unchanged content: the file stays as it is (its field order and rev too); changed: rev + 1 (a first rev is 1) */
  const bump=(o,n)=>{if(!o)return n;const r=Number.isInteger(o.rev)?o.rev:0;if(sameJson({...o,rev:0},{...n,rev:0})&&r>=1)return o;return {...n,rev:Math.max(1,r+1)};};
  const gameOut=bump(old,{...game,rev:1}),versionOut=bump(oldV,{...version,rev:1});

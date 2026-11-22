@@ -88,9 +88,18 @@ export function zeroPatchReport(locale,state){
  const sections=[w.original(n(c.originalEntries))];
  for(const scope of ['script','interface']){
   const report=c[scope];
+  if(scope==='script'&&c.translationQuality){
+   const labels=locale==='zh'?['正文','选项','本地配对 / 已提取','全作总数未知']:locale==='ja'?['本文','選択肢','ローカル訳 / 抽出件数','作品全体の件数は不明']:['Dialogue','Choices','local pairs / extracted','whole-game totals unknown'];
+   for(const [i,role] of ['body','choice'].entries()){
+    const count=c.translationQuality[role];
+    sections.push(labels[i]+' '+(count.localPaired==null?'?':n(count.localPaired))+' / '+n(count.extracted)+' ('+labels[2]+')');
+   }
+   sections.push(labels[3]);continue;
+  }
   if(report?.originalEntries)sections.push(w[scope]+' '+w.counts(n(report.translations),n(report.paired),n(report.originalEntries)));
  }
  const paths=patch.sources?.length?patch.sources:[patch.source||patch.file].filter(Boolean);
+ if(!c.translationQuality)sections.push(locale==='zh'?'选项未单独统计，全作总数未知':locale==='ja'?'選択肢の個別集計なし、作品全体の件数は不明':'Choices not counted separately, whole-game totals unknown');
  if(paths.length===1)sections.push(w.source(paths[0].split(/[/\\]/).pop()));
  const lead=state.patchStatus==='interface-only'?w.interfaceOnly:state.patchStatus==='ready'?w.ready:(sourceWords[locale]||sourceWords.en).unreliable;
  return {text:[lead,...sections].join(' · '),title:paths.join('\n')};

@@ -101,6 +101,10 @@ test('CLANNAD Japanese-patched install reports the ZH-TW menu table separately a
  const r=ot.importPatch(data,db,'1',clannad,{auto:true});
  assert.equal(r.patchStatus,'interface-only');
  assert.equal(r.patch.coverage.script.paired,0);
+ const quality=r.patch.coverage.translationQuality;
+ assert.ok(quality.body.extracted>0&&quality.choice.extracted>=2);
+ assert.equal(quality.choice.localPaired,0);assert.equal(quality.body.localPaired,0);
+ assert.equal(quality.choice.workTotal,null);assert.equal(quality.body.workTotal,null);
  assert.ok(r.patch.coverage.interface.paired>100);
  assert.equal(r.patch.sources.length,1);
  assert.equal(path.resolve(r.patch.sources[0]).toLowerCase(),path.resolve(file).toLowerCase());
@@ -108,6 +112,15 @@ test('CLANNAD Japanese-patched install reports the ZH-TW menu table separately a
  const p=ot.provider(data,exe);
  assert.strictEqual(p.resolve('（ああ、よくわかんねぇ…）').translation,undefined);
  assert.strictEqual(p.resolve('既読文章を早送り').translation,undefined);
+ const replay=fs.readFileSync(path.join(__dirname,'helpers/choice-replay/clannad.jsonl'),'utf8').trim().split(/\r?\n/).map(JSON.parse);
+ const box=replay.find(row=>row.m.type==='hookChoiceBoxes'&&row.m.status==='found').m;
+ const dbs=scenes.ENGINES.siglus.readDbs(fs.readFileSync(path.join(clannad,'dat','text00.dbs'))).table;
+ const field=id=>dbs.columns.findIndex(c=>c.id===id);
+ for(const [slot,option] of [[2410,box.items[0].text],[2420,box.items[1].text]]){
+  const row=dbs.cells.find(row=>row[field(500)]===slot);
+  assert.equal(row[field(0)],option);assert.equal(row[field(2)],option);
+  assert.equal(p.resolveChoice(option).status,'none');
+ }
  assert.ok(fs.readFileSync(file).equals(before));
  const scan=require('../services/embedded-japanese.cjs').scan(clannad);
  assert.equal(scan.state,'read-only');assert.equal(scan.engine,'SiglusEngine');assert.equal(scan.coverage.localTranslations,0);assert.equal(scan.canRestore,false);
