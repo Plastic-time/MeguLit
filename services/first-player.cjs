@@ -14,7 +14,8 @@ async function state(db,root,id,{wait=2500,fetcher=globalThis.fetch,hash,torchKe
  const auto=require('../core/auto-profile.cjs'),feed=require('./auto-profile-feed.cjs');
  const key=(hash?await timeout(hash(row.executable),wait):await timeout(auto.exeKey(root,row.executable),Math.max(wait,3000)))||'';if(!key)return HIDDEN;
  const seed=require('../core/profiles/seed.cjs').versionOf(key);
- const local=seed?{key,bundled:{source:seed.source,revision:seed.rev}}:{key};
+ const presentation=require('./presentation.cjs').read(root,key);
+ const local=seed?{key,bundled:{source:seed.source,revision:seed.rev}}:{key};if(presentation)local.presentation=presentation;
  const receiver=require('./torch-receive.cjs');
  const receipt=await receiver.installed(root,key,{exe:row.executable,...(torchKeys?{keys:torchKeys}:{})});
  if(receipt)return {...local,state:'received',receipt};

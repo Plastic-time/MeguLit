@@ -60,7 +60,14 @@ class HookNative{
  skipHeld(v){const held=v===true;if(held===this.skipKey)return;if(held&&this.pageQueue?.rest.length){const q=this.pageQueue;this.pageQueue=null;this.source({...q.base,text:q.rest[q.rest.length-1]},q.name);}this.skipKey=held;if(this.process)this.send({type:'skipHeld',held});}
  /* 2026-11-12 (user, ファタモルガーナの館: "这死馆也没有上一句渐暗"): the script guess (flowGame: many multi-sentence pages) is
     overruled by the engine itself: once its page DLL reports lines (with their real places, box or full page), the game is not laid out as a flow page */
- get flowPage(){{const o=this.profile?.page?.flowPage;if(typeof o==='boolean')return o;}if(this._flowPage===true)return true;if(this.pageMode&&this.pageMode.engine!=='ocr')return false;return this.originalText?.flowGame?.()===true;}
+ get flowPage(){const confirmed=this.profile?.page?.presentation;
+  if(confirmed==='adv'||confirmed==='nvl')return confirmed==='nvl';
+  if(confirmed!=='mixed'){const o=this.profile?.page?.flowPage;if(typeof o==='boolean')return o;}const hint=confirmed||this.profile?.vndbLayout;
+  if(hint==='adv'||hint==='nvl'){
+   if(this.pageMode&&this.pageMode.engine!=='ocr')return false;
+   return hint==='nvl';
+  }
+  if(this._flowPage===true)return true;if(this.pageMode&&this.pageMode.engine!=='ocr')return false;return this.originalText?.flowGame?.()===true;}
  set flowPage(v){this._flowPage=v===true;}
  /* 2026-11-12 a KiriKiri page DLL draws the game's own text invisible itself (MeguLitKrkr __megulitKrkrHide): nothing to look at
     before hiding, so the preflight that shows the original first (and stayed in read mode when its check was cancelled) is skipped.

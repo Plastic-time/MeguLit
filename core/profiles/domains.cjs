@@ -15,6 +15,7 @@ const DOMAINS={
  'placement.drawWhileBlanking':{bool:true},
  'placement.translationGrowsDown':{bool:true},'placement.orphanDraw':{bool:true},
  'page.effectFrames':{enum:[null,true,false]},
+ 'page.presentation':{enum:[null,'adv','nvl','mixed'],layer:'version'},
  'page.flowPage':{enum:[null,true,false]},
  'page.holdMs':{number:[0,20000],nullable:true},
  'page.pairByDrawn':{bool:true},

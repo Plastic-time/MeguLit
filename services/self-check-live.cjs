@@ -35,7 +35,10 @@ function readMode(reader,reason){try{const g=reader.gal;if(g&&!g.textEffectsHold
 function profileInput(s,sh){const out={...(s.input||{})};for(const k of ['sharedGame','shared','auto','officialGame','official','officialGameRev','officialRev','sharedGameRev','sharedRev','stepDown','match','prints'])delete out[k];
  if(/^[0-9a-f]{64}$/.test(String(s.key||'')))out.exeSha256=s.key;
  /* the relay's two layers, each official or agreed (services/auto-profile-feed.cjs layer) */
- if(sh){const put=(p,field)=>{if(!p||!p.settings)return;const f=(p.source==='official'?'official':'shared')+field;out[f]=p.settings;out[f+'Rev']=p.rev|0;};put(sh.game,'Game');put(sh.version,'');if(sh.match)out.match=sh.match;}
+ if(sh){const put=(p,field)=>{if(!p||!p.settings)return;const f=(p.source==='official'?'official':'shared')+field;out[f]=p.settings;
+ if(!field&&p.settings.page?.presentation&&(!sh.torchBound||sh.match!=='exe')){
+  const page={...p.settings.page};delete page.presentation;out[f]={...p.settings,page};
+ }out[f+'Rev']=p.rev|0;};put(sh.game,'Game');put(sh.version,'');if(sh.match)out.match=sh.match;}
  /* the game prints let a built-in seed (The Seed/) find its game by archive / script / VNDB / title */
  if(s.prints)out.prints=s.prints;
  return out;}
@@ -45,6 +48,7 @@ function inputOf(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe
  const seedOk=['verified','owner-ok'].includes(s.profile?.seedStatus);
  if(st?.source==='gate'){if(st.settings&&!supersedesGate(out,st))out.stepDown=st.settings;}
  else if(st?.settings&&!seedOk)out.auto=st.settings;
+ if(s.confirmedPresentation)out.auto={...out.auto,page:{...out.auto?.page,presentation:s.confirmedPresentation}};
  return out;}
 function applyLayer(s){try{const p=require('../core/owner-tests.cjs').apply(Profiles.profileFor(inputOf(s)),s.reader.gal?.hooks?.ownerTestGrant,{exe:s.exe,engine:s.profile?.engine});s.profile=p;/* Cardinal's tape keeps the lines this game's rules replay */require('../core/cardinal/tape.cjs').keep(p.cardinal?.lines);s.reader.gal?.setGameProfile?.(p,s.input);}catch{}}
 /* which layer wins (see above) */
@@ -78,7 +82,7 @@ function start(reader,exe,profile=null,input=null,options={}){stop();profile=pro
  if(known)bindKey(s,known);
  else auto.exeKey(reader.root,exe).then(k=>{if(live!==s||!k)return;bindKey(s,k);applyLayer(s);}).catch(()=>{});
  return s;}
-function bindKey(s,key){const {reader}=s;s.key=key;s.stored=auto.load(reader.root,key);s.calibrated=!!s.stored;if(s.stored)s.check.recording=null;
+function bindKey(s,key){const {reader}=s;s.key=key;s.confirmedPresentation=require('./presentation.cjs').read(reader.root,key);s.stored=auto.load(reader.root,key);s.calibrated=!!s.stored;if(s.stored)s.check.recording=null;
  s.shared=s.skipFeed?null:feed.layer(feed.cached(reader.root,key),key,{exe:s.exe});if(s.shared&&feed.rejected(reader.root,key,s.shared))s.shared=null;
  const c=settle(s);
  if(s.stored?.source==='gate'&&c?.from!=='local-gate')reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'gateSuperseded',key,previousAt:s.stored.at,layer:c?.from||'none'});
@@ -143,4 +147,5 @@ const feedTrace=line=>{const s=live;if(!s)return;try{const e=parseTrace(line);if
 const feedReader=msg=>{const s=live;if(!s)return;try{const e=parseReader(msg);if(s.sample&&!s.sample.done&&msg?.type!=='hostFrame'&&msg?.kind!=='selfCheck')s.sample.rawReader(msg);if(!e){if(msg?.kind==='cardinalPair')s.check.reader(msg);return;}sampleEvent(s,e);s.check.event(e);}catch{}};
 /* diagnostics: the running game's record + its windows, for info.json */
 function diagnostic(){const s=live;if(!s)return null;return auto.diagnostic(s.stored,s.check.windows,s.check.w.lines);}
-module.exports={start,stop,recalibrate,feedTrace,feedReader,diagnostic,current:()=>live,choose,inputOf};
+function setPresentation(root,key,mode){if(live?.key===key&&live.reader.root===root){live.confirmedPresentation=mode;applyLayer(live);}}
+module.exports={setPresentation,start,stop,recalibrate,feedTrace,feedReader,diagnostic,current:()=>live,choose,inputOf};

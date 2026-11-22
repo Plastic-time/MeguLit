@@ -42,6 +42,7 @@ module.exports={
   /* the game is laid out as a flow page (several sentences per page, the reader lays them out from the text box): null = kernel
      (script guess, overruled by an engine page DLL); true / false = always / never */
   flowPage:null,
+  presentation:null,
   /* ms a hook line waits for its place on the page before it is dropped: null = kernel (OCR 5000, engines 1500) */
   holdMs:null,
   /* a page line takes the held hook line its drawn text shows (equal, inside, or an effect frame's shuffled characters), a clean

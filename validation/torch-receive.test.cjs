@@ -279,3 +279,48 @@ test('owner launcher to ordinary import, receipt and reader profile with the loc
  assert.deepEqual(aborted,[f.identity.exe,f.identity.exe,originalKey,originalKey]);
  assert.equal(fs.existsSync(path.join(feed.dir(root),originalKey+'.json')),false);
 });
+
+test('explicit layout enters a version contribution and the reviewed release drives offline Reader resolution',async t=>{
+ const f=await setup(t),layout=require('../services/presentation.cjs'),auto=require('../core/auto-profile.cjs');
+ const Profiles=require('../core/profiles/index.cjs'),live=require('../services/self-check-live.cjs');
+ const key=f.identity.exe,mode='nvl',record=auto.record({key,engine:'kirikiri',exe:f.exe,result:{mode:'hide',settings:{},score:{lines:30}}});
+ first.enableSharing(f.root);
+ let candidate;
+ const submit=()=>feed.report(f.root,record,{fetcher:async(_url,req)=>{candidate=JSON.parse(req.body).profile;return reply({ok:true});}});
+ await submit();assert.equal(candidate.settings.page,undefined);
+ await layout.confirm(f.db,f.root,{id:'7',key,mode});
+ await assert.rejects(layout.confirm(f.db,f.root,{id:'7',key:'d'.repeat(64),mode}),/VERSION_CHANGED/);
+ await submit();assert.equal(candidate.settings.page.presentation,mode);
+ const relay=await import('../relay/src/auto-profile.js');
+ const report=relay.validateReport({version:1,profile:candidate});assert.equal(report.ok,true);
+ const settings=report.value.settings;
+ const profile=f.publisher.sign({...f.profile(),settings});
+
+ const review=await f.review(profile);
+ const published=f.publisher.sign({...f.release,profile,review});
+ const got=await R.receive(f.root,'7',{...f.options,fetcher:async()=>reply({release:published,publication:{hash:await P.hash(published),at:f.publication.at}})});
+ assert.equal(got.state,'received');
+ const shared=feed.layer(feed.cached(f.root,key),key,{torchTrust:f.keys,exe:f.exe});
+ const session={reader:{root:f.root},exe:f.exe,input:{exe:f.exe},key,shared};
+ const resolve=()=>Profiles.profileFor(live.inputOf(session));
+ const hook=Object.create(require('../core/hook-native.cjs').HookNative.prototype);
+ hook.profile=resolve();assert.equal(hook.flowPage,true);
+ fs.appendFileSync(f.script,'updated script');assert.equal(resolve().page.presentation,null);
+ assert.equal(Profiles.profileFor({...session.input,exeSha256:'d'.repeat(64),vndbLayout:'nvl',vndbLayoutKey:key}).vndbLayout,null);
+});
+
+
+test('VNDB presentation hints respect tag evidence and the cached version',async t=>{
+ const {layoutFromTags}=require('../services/game-enrichment.cjs'),f=await setup(t);
+ const key=f.identity.exe,row={title:'fixture',executable:f.exe};
+ const tag=(id,rating=3,lie=false)=>({id,rating,lie});
+ assert.equal(layoutFromTags([tag('g32')]),'adv');
+ assert.equal(layoutFromTags([tag('g43')]),'nvl');
+ assert.equal(layoutFromTags([tag('g355')]),'mixed');
+ assert.equal(layoutFromTags([tag('g32'),tag('g43')]),'mixed');
+ assert.equal(layoutFromTags([tag('g32',1),tag('g43',3,true)]),'unknown');
+ const lib={presentation:{key,vnid:'v123',mode:'mixed'}},known=require('../services/presentation.cjs').known;
+ assert.equal(known(f.root,key,row,lib,'v123'),true);
+ assert.equal(known(f.root,'f'.repeat(64),row,lib,'v123'),false);
+ assert.equal(known(f.root,key,row,lib,'v456'),false);
+});

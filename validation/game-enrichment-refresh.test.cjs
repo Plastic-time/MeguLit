@@ -66,3 +66,23 @@ test('a forced refresh asked during a run is not lost',async()=>{
  assert.deepEqual([...new Set(asked)],['v1','v2']);/* the old run, then one for the corrected entry */
  assert.equal(original().library.vndbId,'v2');
 });
+
+test('ordinary import asks for layout once alongside VN metadata and rechecks a different executable',async t=>{
+ const work=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-vn-layout-'));
+ t.after(()=>fs.rmSync(work,{recursive:true,force:true}));
+ const db=store.openStore(work),exe=path.join(work,'unknown.exe'),fields=[];
+ fs.writeFileSync(exe,'version one');
+ db.prepare("INSERT INTO games(id,title,executable,source,original) VALUES('g','Game',?,'folder',?)")
+  .run(exe,JSON.stringify({vndbManual:'v123'}));db.close();
+ const meta=new GameEnrichment(work,()=>{},async(url,req)=>{
+  if(url.endsWith('/kana/vn')){
+   const query=JSON.parse(req.body);fields.push(query.fields);
+   return Response.json({results:[{id:'v123',title:'Game',...(query.fields.includes('tags.id')?{tags:[{id:'g355',rating:3}]}:{})}]});
+  }
+  return new Response('',{status:404});
+ });
+ meta.synopses.get=async()=>null;t.after(()=>meta.stop());
+ await meta.ensure('g','en',true);await meta.ensure('g','en',true);
+ fs.writeFileSync(exe,'different build');await meta.ensure('g','en',true);
+ assert.deepEqual(fields.map(x=>x.includes('tags.id')),[true,false,true]);
+});
