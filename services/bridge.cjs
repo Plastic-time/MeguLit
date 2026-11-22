@@ -256,7 +256,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
      try{state=await waitForVisibleGame(anyProcess,{helper:false,indirect:true,exit:()=>gone?{code:0,signal:null}:null,trace,attempts:2400,timeout:600000});}
      catch(waitError){throw Object.assign(Error('STEAM_LAUNCHER_START'),{detail:waitError.message});}finally{clearInterval(poll);}    }else{
     const LE=require('../core/locale-emulator.cjs'),fallbackExe=textPath?.path==='rgss'?textPath.exe:game.executable;
-    if(error.message!=='GAME_PROCESS_EXITED'||steam||elevation||windowsLaunch||(Date.now()-startedAt>3000&&error.detail!=='HELPER_FINISHED_WITHOUT_GAME')||!LE.x86(fallbackExe)||LE.steamApi(fallbackExe))throw error;
+    if(error.message!=='GAME_PROCESS_EXITED'||steam||elevation||windowsLaunch||((error.absenceStartedAt??Date.now())-startedAt>3000&&error.detail!=='HELPER_FINISHED_WITHOUT_GAME')||!LE.x86(fallbackExe)||LE.steamApi(fallbackExe))throw error;
     const lib=runtime?.library?.()||new(require('../core/library.cjs').Library)(require('../core/layout.cjs'));
     trace('locale-fallback',error.detail?{reason:error.detail}:{});stage='locale-start';const result=await lib.locale.launch(fallbackExe,{trace});if(result.needLocaleEmulator)throw error;
     state={pid:result.gamePid,locale:'japanese'};

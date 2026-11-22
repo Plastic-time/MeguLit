@@ -35,14 +35,15 @@ async function startProcess(file,args,cwd,errorCode,spawnProcess=spawn,env=null)
 }
 async function waitForVisibleGame(query,{attempts=60,interval=250,stableSamples=4,timeout=15000,exit,helper=false,helperError='LE_HELPER_FAILED',checkHelperHandoff=false,indirect=false,trace=()=>{},sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
  let pid=null,stable=0,seenProcess=false,exitLogged=false,answered=false,lastError=null;
- let absentAfterHandoff=0,sawWindow=false;
+ let absentAfterHandoff=0,sawWindow=false,absenceStartedAt;
  const deadline=Date.now()+timeout;
  for(let i=0;i<attempts&&Date.now()<deadline;i++){
   /* A process query can fail on some PCs (security software holding the helper, first-run scan past the timeout).
      One failed sample is no answer, not a failed launch: keep waiting (v1.1.0, Steam games reported as "could not
      check whether the game was running"). */
   // MeguLitLaunch has already resumed the game when it exits successfully. Only count queries started after that exit.
-  const handoffComplete=checkHelperHandoff&&exit?.()?.code===0;
+  const priorExit=exit?.();
+  const handoffComplete=priorExit?.code===0&&!priorExit.signal;
   let processes;try{processes=await query();answered=true;}catch(error){absentAfterHandoff=0;lastError=error;if(!lastError.logged){trace('process-query-failed',{error:error.message});lastError.logged=true;}if(i+1<attempts)await sleep(interval);continue;}
   const visible=processes.filter(p=>p.visible);
   if(processes.length&&!seenProcess){seenProcess=true;trace('game-process-seen',{pid:processes[0].pid});}
@@ -51,13 +52,17 @@ async function waitForVisibleGame(query,{attempts=60,interval=250,stableSamples=
   else{pid=null;stable=0;}
   const ended=exit?.();
   if(ended&&!exitLogged){trace(helper?'launch-helper-exited':'game-process-exited',ended);exitLogged=true;}
-  const checkingMissingChild=checkHelperHandoff&&!sawWindow;
-  if(!processes.length&&((ended&&!helper)||seenProcess&&!indirect&&!checkingMissingChild))throw Error('GAME_PROCESS_EXITED');
+  // A direct launcher may exit cleanly before its replacement is visible to the process query.
+  const directHandoff=!helper&&!indirect&&!sawWindow&&ended?.code===0&&!ended.signal;
+  const checkingMissingChild=(checkHelperHandoff||directHandoff)&&!sawWindow;
+  if(!processes.length&&!checkingMissingChild&&((ended&&!helper)||seenProcess&&!indirect))throw Error('GAME_PROCESS_EXITED');
   if(!processes.length&&helper&&!indirect&&ended&&(ended.code!==0||ended.signal))throw Error(helperError);
   if(processes.length)absentAfterHandoff=0;
   else if(handoffComplete&&checkingMissingChild){
+   if(!absentAfterHandoff)absenceStartedAt=Date.now();
    absentAfterHandoff++;
-   if(absentAfterHandoff>=2)throw Object.assign(Error('GAME_PROCESS_EXITED'),{detail:'HELPER_FINISHED_WITHOUT_GAME'});
+   if(directHandoff&&absentAfterHandoff>=2)throw Object.assign(Error('GAME_PROCESS_EXITED'),{absenceStartedAt});
+   if(!directHandoff&&absentAfterHandoff>=2)throw Object.assign(Error('GAME_PROCESS_EXITED'),{detail:'HELPER_FINISHED_WITHOUT_GAME'});
   }
   if(i+1<attempts)await sleep(interval);
  }

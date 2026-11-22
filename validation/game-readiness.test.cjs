@@ -38,3 +38,20 @@ test('v1.1.0: failed process queries do not fail a launch',async()=>{
  /* never answered: launched but unverified */
  assert.deepEqual(await waitForVisibleGame(async()=>{throw Error('PROCESS_QUERY_FAILED');},opts),{pid:null,unverified:true});
 });
+test('a clean direct exit waits for confirmed absence before retrying the launch',async()=>{
+ const clean={code:0,signal:null};
+ const options={exit:()=>clean,stableSamples:2,sleep:async()=>{}};
+ const samples=[[],[{pid:42,visible:true}],[{pid:42,visible:true}]];
+ assert.deepEqual(await waitForVisibleGame(async()=>samples.shift(),options),{pid:42});
+ let count=0,ended=null;
+ await assert.rejects(waitForVisibleGame(async()=>{
+  count++;
+  if(count===1)ended=clean;
+  if(count===3)throw Error('temporary query failure');
+  return [];
+ },{...options,exit:()=>ended}),e=>e.message==='GAME_PROCESS_EXITED'&&Number.isFinite(e.absenceStartedAt));
+ assert.equal(count,5);
+ count=0;
+ await assert.rejects(waitForVisibleGame(async()=>{count++;return [];},{...options,exit:()=>({code:1})}),/GAME_PROCESS_EXITED/);
+ assert.equal(count,1);
+});
