@@ -64,6 +64,9 @@ test('Senren ADV keeps the first clickable glyph on its game row across a turn a
       // Source events can land inside an animation frame. Inspect at the following paint.
       await new Promise(resolve=>requestAnimationFrame(()=>{source(next,23);queueMicrotask(()=>{sample('source');resolve();});}));
       const start=performance.now();
+      const patch='「这还真有点远啊……也罢，反正好久没来了，边走边逛吧」';
+      b.deliverBackfill(next,patch,'better');
+      await frame();sample('patch');
       const prebox='前一行换成很长的汉化。'.repeat(10);
       let delivered=false;
       while(performance.now()-start<307){
@@ -77,12 +80,13 @@ test('Senren ADV keeps the first clickable glyph on its game row across a turn a
       }
       return samples;
     },{profile,key});
-    console.log('Senren first glyph', JSON.stringify(frames.filter((f,i)=>i===0||i===frames.length-1||f.stage!==frames[i-1].stage||f.y!==frames[i-1].y)));
+    console.log('Senren first glyph', JSON.stringify(frames.filter((f,i)=>i===0||i===frames.length-1||f.stage!==frames[i-1].stage||f.y!==frames[i-1].y||f.cn!==frames[i-1].cn)));
     for(const f of frames){
       assert.equal(f.seq,'23',f.stage);
       assert.equal(f.visible,'visible',f.stage);
       assert.ok(Math.abs(f.x-401)<2 && Math.abs(f.y-827)<2,JSON.stringify(f));
     }
+    assert.ok(frames.some(f=>f.stage==='patch' && f.cn===27),'recorded patch #24 delivered before coordinates');
     assert.deepEqual(frames.filter(f=>f.stage==='translation').map(f=>f.cn),[6, '距离目的地还有一段路，我们就一路走过去吧。'.length*12,3]);
     assert.ok(frames.some(f=>f.stage==='waiting'&&f.cn>80),'long translation displayed before the native rectangles');
     // Leave the real settings panel open after saving, as in the recording.
