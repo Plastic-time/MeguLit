@@ -116,6 +116,10 @@ jobs:
         shell: pwsh
         run: |
           $env:MEGULIT_ROSLYN_CSC = ./native/Build-HookBridge.ps1 -CompilerPathOnly
+          # Use the real temp path for fixtures that reject redirected paths.
+          $env:TEMP = node -p "require('node:fs').realpathSync.native(require('node:os').tmpdir())"
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $env:TEMP -PathType Container)) { throw 'Could not resolve test temp directory' }
+          $env:TMP = $env:TEMP
           $tests = @(Get-ChildItem validation -Filter *.test.cjs -File | ForEach-Object { Join-Path 'validation' $_.Name })
           if (-not $tests.Count) { throw 'No tests found' }
           # --test-force-exit: a test file that leaves a handle open (a browser, a server) still ends when its tests have finished
