@@ -21,7 +21,13 @@ function acquireLock(dir,recover=false){
  try{fs.writeFileSync(owner,JSON.stringify({pid:process.pid,token}),{flag:'wx'});}catch(error){try{fs.rmdirSync(lock);}catch{}throw error;}
  return ()=>{const current=JSON.parse(read(owner,4096));if(current.pid!==process.pid||current.token!==token)throw Error('EMBEDDED_LOCK_CHANGED');fs.rmSync(owner);fs.rmdirSync(lock);};
 }
-function manifest(dir){try{const m=JSON.parse(read(manifestFile(dir),1<<20));return m?.adapter===ADAPTER?m:null;}catch{return null;}}
+function backupManifest(dir){
+ try{
+  if(!fs.lstatSync(folder(dir)).isDirectory()||!fs.lstatSync(manifestFile(dir)).isFile())return null;
+  return JSON.parse(read(manifestFile(dir),1<<20));
+ }catch{return null;}
+}
+function manifest(dir){const m=backupManifest(dir);return m?.adapter===ADAPTER?m:null;}
 function target(dir,relative){
  if(typeof relative!=='string'||path.isAbsolute(relative))throw Error('EMBEDDED_MANIFEST_PATH');
  const file=path.resolve(dir,relative),prefix=path.resolve(dir)+path.sep;
@@ -45,11 +51,11 @@ function coverage(plan){
 }
 function summary(plan){const counts=coverage(plan);return {state:'restorable',adapter:ADAPTER,engine:'Unity (Utage)',scanToken:plan.token,canRestore:plan.writes.length>0,sources:plan.sources,coverage:counts,warnings:counts.missingTranslations?['MISSING_LOCAL_TRANSLATIONS']:[],readBytes:plan.readBytes};}
 function scan(dir,options={}){
- dir=fs.realpathSync(dir);const m=manifest(dir);
- if(m){const ok=valid(dir,m);return {state:ok?'applied':'stale',adapter:ADAPTER,engine:'Unity (Utage)',scanToken:m.scanToken,canRestore:false,sources:m.sources.map(s=>({path:target(dir,s.file),bytes:s.bytes,sha256:s.sha256})),coverage:m.coverage,warnings:ok?[]:['SOURCE_CHANGED']};}
- if(fs.existsSync(folder(dir)))return {state:'unsupported',adapter:ADAPTER,canRestore:false,scanToken:'',sources:[],coverage:{tables:0,rows:0,japaneseLines:0,localTranslations:0,missingTranslations:0},warnings:['EMBEDDED_CONFLICT']};
+ dir=fs.realpathSync(dir);const m=backupManifest(dir),hasBackup=fs.existsSync(folder(dir));
+ if(m?.adapter===ADAPTER){const ok=valid(dir,m);return {state:ok?'applied':'stale',adapter:ADAPTER,engine:'Unity (Utage)',scanToken:m.scanToken,canRestore:false,sources:m.sources.map(s=>({path:target(dir,s.file),bytes:s.bytes,sha256:s.sha256})),coverage:m.coverage,warnings:ok?[]:['SOURCE_CHANGED']};}
+ if(hasBackup&&!['siglus-dbs','yuris-update'].includes(m?.adapter))return {state:'unsupported',adapter:ADAPTER,canRestore:false,scanToken:'',sources:[],coverage:{tables:0,rows:0,japaneseLines:0,localTranslations:0,missingTranslations:0},warnings:['EMBEDDED_CONFLICT']};
  const folderScan=inspectFolder(dir,options);
- if(!folderScan.tryUtage)return folderScan.diagnose();
+ if(hasBackup||!folderScan.tryUtage)return folderScan.diagnose();
  try{return summary(engine.plan(dir,{...options,budgetMs:folderScan.remainingMs()}));}
  catch(error){return folderScan.diagnose(/^EMBEDDED_[A-Z_]+$/.test(error.message)?error.message:'EMBEDDED_SOURCE_UNREADABLE');}
 }

@@ -46,7 +46,8 @@ function score(z,j){
  return s;
 }
 /* A Chinese line that is a translation: prose, not Japanese, not just the Japanese line again. */
-const translated=(z,j)=>typeof z==='string'&&prose(z)&&!japaneseLine(z)&&/[一-鿿]/.test(z)&&String(z).replace(/\s/g,'')!==String(j||'').replace(/\s/g,'');
+const wording=t=>String(t||'').normalize('NFKC').replace(/[\p{P}\s]/gu,'');
+const translated=(z,j)=>typeof z==='string'&&prose(z)&&!japaneseLine(z)&&/[一-鿿]/.test(z)&&wording(z)!==wording(j);
 /* S9 a sound effect written out as a line: Chinese onomatopoeia characters only (咚, 喀啷喀啷, 啪唧, 喀啦啦啦……) or Japanese
    katakana only (ガチャ; not またか), no quote, at most 8 characters. A name (奥兹, 若い男) or a sentence (再一次——) is not one. */
 const ONOMATOPOEIA=/^[咚咣喀啷哧扑啪唧嘎咯咔嚓唰叽磅刹啦呼砰嗖哗咕噗嘭轰叮当铃嘀哒嘟呜吱咻哐锵噔噼啵嗒咂沙哒呱嘶咻]+$/,KANA_ONLY=/^[ァ-ヺーッ]+$/;

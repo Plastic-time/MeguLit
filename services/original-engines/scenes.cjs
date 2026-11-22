@@ -280,20 +280,41 @@ const renpy={
 // gives the lines; the Chinese column comes from the same table before MeguLit's Japanese restore (its backup in
 // .megulit-japanese), from the table itself when it was never restored, or from a <name>_zh.dbs twin.
 const siglusTables=()=>require('../../core/japanese-restore.cjs')._internal;
-const DBS=n=>/\.dbs$/i.test(n)&&!/_(?:en|zh|cn|tw|ko|ru)\.dbs$/i.test(n);
+const DBS=n=>/\.dbs$/i.test(n)&&!/_(?:en|eng|zh|cn|ch|chs|cht|sc|tc|tw|ko|kr|ru)\.dbs$/i.test(n);
+const CHINESE_DBS_TWINS=['zh','cn','ch','chs','cht','sc','tc','tw'];
 const HAN=/[\u4e00-\u9fff]/,KANA1=/[\u3040-\u30ff]/;
-function dbsTable(buf){const t=siglusTables(),d=t.decrypt(buf);return t.parse(d.raw,d.marker);}
+function dbsTable(buf,limits){const t=siglusTables(),d=t.decrypt(buf,limits);limits?.consume?.(d.raw.length);return t.parse(d.raw,d.marker,limits);}
 function columnShares(table){return table.columns.map((c,i)=>{if(c.type!==0x53)return null;let filled=0,kana=0,han=0;for(const r of table.cells){const v=r[i];if(!v)continue;filled++;if(KANA1.test(v))kana++;else if(HAN.test(v))han++;}return {index:i,filled,kana:filled?kana/filled:0,han:filled?han/filled:0};}).filter(Boolean);}
-function parseDbs(buf){const table=dbsTable(buf),cols=columnShares(table).filter(c=>c.filled);const jp=cols.sort((a,b)=>b.kana-a.kana)[0];
- if(!jp||jp.kana<.3)return {lines:[],anchors:[],rows:table.rows};return {lines:table.cells.map(r=>String(r[jp.index]||'')),anchors:[],rows:table.rows};}
+const serialIndex=table=>table.columns.findIndex(c=>c.id===500&&c.type!==0x53);
+const speakerColumn=(table,i)=>serialIndex(table)>=0&&table.columns[i].id===50;
+const rowIds=table=>{const i=serialIndex(table);return i<0?null:table.cells.map(row=>row[i]);};
+const interfaceDbsName=name=>/^(?:config(?:[_.-]|$)|settings?(?:[_.-]|$)|name_replace\.dbs$)/i.test(name||'');
+function dbsScope(table,name){
+ if(interfaceDbsName(name))return 'interface';
+ const locales=new Set();
+ for(const row of table.cells.slice(0,32))for(const value of row){
+  const match=typeof value==='string'&&/^.{1,28}\(([A-Z]{2}(?:-[A-Z]{2})?)\)$/.exec(value);
+  if(match)locales.add(match[1]);
+ }
+ return locales.has('JP')&&locales.size>=3?'interface':'script';
+}
+function readDbs(buf,name,limits){
+ const table=dbsTable(buf,limits),cols=columnShares(table).filter(c=>c.filled&&!speakerColumn(table,c.index)),jp=cols.sort((a,b)=>b.kana-a.kana)[0];
+ const scope=dbsScope(table,name),ids=rowIds(table);
+ const lines=!jp||jp.kana<.3?[]:table.cells.map(r=>String(r[jp.index]||''));
+ return {table,lines,scope,rowIds:ids};
+}
+function parseDbs(buf){const {table,lines,scope,rowIds}=readDbs(buf);return {lines,anchors:[],rows:table.rows,scope,rowIds};}
 /* E286 (user report 2026-11-10, CLANNAD: the speaker name was given as each line's translation and drawn into the
    game): a name column (【朋也】) is all kanji too. A translation column is filled on most rows the Japanese is filled,
    and its values are mostly different from each other; names repeat. */
 function chineseColumn(table,jp){if(table.rows!==jp.length)return null;
  const rowsJp=jp.map((t,r)=>t?r:-1).filter(r=>r>=0);if(!rowsJp.length)return null;
- const c=columnShares(table).filter(c=>{if(c.filled<table.rows*.3||c.kana>=.1||c.han<=.5)return false;
-  let paired=0;const distinct=new Set();for(const r of rowsJp){const v=table.cells[r][c.index];if(!v)continue;paired++;distinct.add(v);}
-  return paired>=rowsJp.length*.6&&distinct.size>=paired*.5;}).sort((a,b)=>b.han-a.han)[0];
+ const {translated}=require('../align-sample.cjs');
+ const c=columnShares(table).filter(c=>{if(c.filled<table.rows*.3||c.kana>=.1||c.han<=.5||speakerColumn(table,c.index))return false;
+  let filled=0,changed=0;const distinct=new Set();for(const r of rowsJp){const v=table.cells[r][c.index];if(!v)continue;filled++;distinct.add(v);if(translated(v,jp[r]))changed++;}
+  if(filled<rowsJp.length*.6||distinct.size<filled*.5||changed<filled*.2)return false;
+  c.changed=changed;return true;}).sort((a,b)=>b.changed-a.changed||b.han-a.han)[0];
  return c?table.cells.map(r=>String(r[c.index]||'')):null;}
 const siglusDat=dir=>{const d=path.join(dir,'dat');try{return fs.readdirSync(d).some(DBS)?d:'';}catch{return '';}};
 const siglus={
@@ -312,15 +333,20 @@ const siglus={
    for(const c of cols){if(c.index===jp.index||c.kana>=.1)continue;for(const r of table.cells){const ja=String(r[jp.index]||''),v=String(r[c.index]||'');if(!ja||!v||!KANA1.test(ja)&&!HAN.test(ja))continue;const k=key(v);if(k.length<2)continue;seq.push([k,ja,v]);const had=out.get(k);/* one translation for several lines: narration before a quoted line (art text is narration) */if(!had||/^[「『（(]/.test(had)&&!/^[「『（(]/.test(ja))out.set(k,ja);}}}
   return out;},
  patchLines(base,found){
-  const dirs=[...new Set(found.dirs.flatMap(d=>[d,path.join(d,'.megulit-japanese','dat'),path.join(d,'dat')]))];let any=false;
-  const list=base.map(scene=>{const stem=scene.name.replace(/\.dbs$/i,'');
-   for(const d of dirs)for(const name of [scene.name,stem+'_zh.dbs',stem+'_cn.dbs',stem+'_tw.dbs']){const file=path.join(d,name);let buf;try{buf=fs.readFileSync(file);}catch{continue;}
-    let lines;try{lines=chineseColumn(dbsTable(buf),scene.lines);}catch{continue;}if(!lines)continue;any=true;
-    return {...scene,patched:true,lines:lines.map((t,k)=>t||scene.lines[k])};}
+  const dirs=[...new Set(found.dirs.flatMap(d=>[d,path.join(d,'dat'),path.join(d,'.megulit-japanese','dat')]))];let any=false;
+  const list=base.map(item=>{
+   const scene=interfaceDbsName(item.name)?{...item,scope:'interface'}:item,stem=scene.name.replace(/\.dbs$/i,'');
+   for(const d of dirs)for(const name of [scene.name,...CHINESE_DBS_TWINS.map(suffix=>stem+'_'+suffix+'.dbs')]){
+    const patchFile=path.join(d,name);let table;try{table=dbsTable(fs.readFileSync(patchFile));}catch{continue;}
+    const ids=rowIds(table);
+    if((ids||scene.rowIds)&&(!ids||!scene.rowIds||ids.length!==scene.rowIds.length||ids.some((id,i)=>id!==scene.rowIds[i])))continue;
+    const lines=chineseColumn(table,scene.lines);if(!lines)continue;any=true;
+    return {...scene,scope:scene.scope==='interface'||dbsScope(table,name)==='interface'?'interface':'script',patchFile,
+     patched:true,lines:lines.map((t,k)=>t||scene.lines[k])};}
    return scene;});
-  // Partial translations count (user, 2026-11-10: CLANNAD's ZH-TW system menu table is a real translation; use what is there).
   return any?list:null;
  },
+ readDbs,dbsName:DBS,
 };
 
 // ---- KiriKiri Z, cx-encrypted (Steam releases: 千恋＊万花, サノバウィッチ, ATRI ...) ---------------------------------

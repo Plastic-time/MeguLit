@@ -21,20 +21,29 @@ const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 function xorKey(buf,offset){const out=Buffer.from(buf.subarray(offset)),n=out.length&~3;for(let i=0;i<n;i++)out[i]^=DBS_KEY[i%4];return out;}
 function route(data){const out=Buffer.alloc(data.length);for(let i=0;i<data.length;i++)out[i]=data[i]^D3_KEYS[D3_ROUTE[(i>>2)%D3_ROUTE.length]][i%4];return out;}
 /* E580 the distance-back LZ shared with Siglus scenes and Interheart (kit.lzDistance) */
-function lzss(src){
+function lzss(src,maxOutputLength=Infinity){
  const end=src.readUInt32LE(0),size=src.readUInt32LE(4);if(end<8||end>src.length||size<=0)throw Error('DBS_COMPRESSION');
+ if(size>maxOutputLength)throw Error('EMBEDDED_BYTE_BUDGET');
  try{return kit.lzDistance(src.subarray(0,end),size,{at:8,strict:true});}catch(e){throw Error(e.message==='LZ_SHORT'?'DBS_TRUNCATED':'DBS_LZ');}}
 function literal(data){ // stored as literal runs; the engine reads it with the same decoder
  const flagBytes=Math.ceil(data.length/8),out=Buffer.alloc(8+data.length+flagBytes);out.writeUInt32LE(out.length,0);out.writeUInt32LE(data.length,4);
  let s=0,d=8;while(s<data.length){const n=Math.min(8,data.length-s);out[d++]=(1<<n)-1;data.copy(out,d,s,s+n);s+=n;d+=n;}return out;}
-function decrypt(file){if(file.length<12)throw Error('DBS_SHORT');return {marker:file.readUInt32LE(0),raw:route(lzss(xorKey(file,4)))};}
+function decrypt(file,{maxOutputLength}={}){if(file.length<12)throw Error('DBS_SHORT');return {marker:file.readUInt32LE(0),raw:route(lzss(xorKey(file,4),maxOutputLength))};}
 function encrypt(marker,raw){const packed=literal(route(raw)),out=Buffer.alloc(packed.length+4);out.writeUInt32LE(marker,0);packed.copy(out,4);for(let i=0,n=packed.length&~3;i<n;i++)out[i+4]^=DBS_KEY[i%4];return out;}
 
-function parse(raw,marker){
+function parse(raw,marker,{maxCells=Infinity,maxStringBytes=Infinity}={}){
  const u=o=>raw.readUInt32LE(o),[size,rows,cols,,fmt,data,text]=[0,4,8,12,16,20,24].map(u);
  if(text<28||text>size||size>raw.length||data+rows*cols*4>text)throw Error('DBS_LAYOUT');
+ if(rows>maxCells||cols>maxCells||rows*cols>maxCells)throw Error('EMBEDDED_ROW_BUDGET');
  const columns=[...Array(cols)].map((_,i)=>({id:u(fmt+i*8),type:u(fmt+i*8+4)})),unicode=marker!==0;
- const str=off=>{let s=text+off,e=s;if(unicode){while(e+1<raw.length&&!(raw[e]===0&&raw[e+1]===0))e+=2;return raw.subarray(s,e).toString('utf16le');}while(e<raw.length&&raw[e])e++;return new TextDecoder('shift_jis').decode(raw.subarray(s,e));};
+ let remaining=maxStringBytes;
+ const str=off=>{
+  const s=text+off;let e=s;
+  if(unicode)while(e+1<raw.length&&!(raw[e]===0&&raw[e+1]===0)){e+=2;if(e-s>remaining)throw Error('EMBEDDED_BYTE_BUDGET');}
+  else while(e<raw.length&&raw[e]){e++;if(e-s>remaining)throw Error('EMBEDDED_BYTE_BUDGET');}
+  remaining-=e-s;
+  return unicode?raw.subarray(s,e).toString('utf16le'):new TextDecoder('shift_jis').decode(raw.subarray(s,e));
+ };
  const cells=[...Array(rows)].map((_,r)=>columns.map((c,ci)=>{const v=u(data+(r*cols+ci)*4);return c.type===0x53?str(v):v;}));
  return {rows,cols,columns,cells,data,text,unicode};
 }

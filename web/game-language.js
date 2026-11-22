@@ -72,6 +72,28 @@ export function zeroActivityLabel(locale,activity){
  if(!activity.enabled)return w.off;
  return activity.english?w.english:w.noPairs;
 }
+const patchReportWords={
+ zh:{ready:'已配对本地正文译文',interfaceOnly:'仅找到界面译文，未启用正文零延迟翻译',original:n=>'原文 '+n+' 个条目',
+  script:'正文',interface:'界面',counts:(translated,paired,total)=>translated+' 条译文、已配对 '+paired+' / '+total+' 个原文条目',source:name=>'来源 '+name},
+ en:{ready:'Local script translations paired',interfaceOnly:'Only interface translations found. Zero-latency script translation is inactive',original:n=>n+' original entries',
+  script:'Script',interface:'Interface',counts:(translated,paired,total)=>translated+' translations, '+paired+' of '+total+' original entries paired',source:name=>'Source '+name},
+ ja:{ready:'ローカルのシナリオ訳を照合済み',interfaceOnly:'画面表示の訳のみが見つかりました。シナリオのゼロ遅延翻訳は無効です',original:n=>'原文 '+n+' 件',
+  script:'本文',interface:'画面表示',counts:(translated,paired,total)=>'訳文 '+translated+' 件、対応 '+paired+' / '+total+' 件',source:name=>'出典 '+name},
+};
+export function zeroPatchReport(locale,state){
+ const patch=state?.patch,c=patch?.coverage;
+ if(!c)return null;
+ const w=patchReportWords[locale]||patchReportWords.en,n=value=>value.toLocaleString(locale);
+ const sections=[w.original(n(c.originalEntries))];
+ for(const scope of ['script','interface']){
+  const report=c[scope];
+  if(report?.originalEntries)sections.push(w[scope]+' '+w.counts(n(report.translations),n(report.paired),n(report.originalEntries)));
+ }
+ const paths=patch.sources?.length?patch.sources:[patch.source||patch.file].filter(Boolean);
+ if(paths.length===1)sections.push(w.source(paths[0].split(/[/\\]/).pop()));
+ const lead=state.patchStatus==='interface-only'?w.interfaceOnly:state.patchStatus==='ready'?w.ready:(sourceWords[locale]||sourceWords.en).unreliable;
+ return {text:[lead,...sections].join(' · '),title:paths.join('\n')};
+}
 function errorCode(error){return String(error?.message||error).match(/[A-Z][A-Z0-9_]{4,}/)?.[0]||'';}
 
 let openDialog=null;
@@ -128,12 +150,16 @@ export function openGameLanguage({id,title,api,invoke,locale,esc,onActivity,onOr
  function paint(s){
   if(!dialog.open)return;
   last=s;clearTimeout(timer);
+  status.removeAttribute('title');
   searchBtn.hidden=originalBtn.hidden=clearBtn.hidden=true;
   example.hidden=!s?.patchHint;
   example.textContent=s?.patchHint?u.example(s.patchHint):'';
   if(activity?.embedded&&activity.hasPairs){status.textContent=u.embedded;originalBtn.hidden=false;return;}
-  if(s?.patchStatus==='ready'){
-   status.textContent=(s.patch?.auto?w.autoReady:w.patchReady)(s.patch?.lines||0)+pairText(s.patchAlignment?.pairing);clearBtn.hidden=false;clearBtn.dataset.kind='patch';return;
+  if(s?.patchStatus==='ready'||s?.patchStatus==='interface-only'||s?.patchStatus==='unreliable'&&s.patch?.coverage){
+   const report=zeroPatchReport(locale,s);
+   status.textContent=report?.text||((s.patch?.auto?w.autoReady:w.patchReady)(s.patch?.lines||0)+pairText(s.patchAlignment?.pairing));
+   if(report?.title)status.title=report.title;
+   clearBtn.hidden=false;clearBtn.dataset.kind='patch';searchBtn.hidden=s.patchStatus==='ready';return;
   }
   if(s?.mode==='original'&&s.status==='ready'){
    status.textContent=w.originalReady+pairText(s.alignment?.pairing);clearBtn.hidden=false;clearBtn.dataset.kind='original';return;

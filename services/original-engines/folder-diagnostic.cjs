@@ -186,13 +186,22 @@ function inspectFolder(dir, { progress = () => {}, budgetMs = 45000 } = {}) {
     const loose = looseScripts(available, files, detected);
     const engine = detected || loose?.engine || '';
     const readNaninovel = engine === 'Unity (Naninovel)';
-    const candidates = readNaninovel ? (addressable.length ? addressable : available.filter(rel => /^[^/]+_Data\/(?:resources|sharedassets\d+)\.assets$/i.test(rel))) : loose?.files || [];
+    const siglus = engine === 'SiglusEngine' ? require('./scenes.cjs').ENGINES.siglus : null;
+    let candidates = loose?.files || [];
+    if (readNaninovel) candidates = addressable.length ? addressable : available.filter(rel => /^[^/]+_Data\/(?:resources|sharedassets\d+)\.assets$/i.test(rel));
+    if (siglus) candidates = available.filter(rel => /^dat\/[^/]+$/i.test(rel) && siglus.dbsName(rel));
     let decoded = false;
     const japaneseLine = candidates.length && !readNaninovel ? require('../original-text.cjs').japaneseLine : null;
     for (const file of candidates) {
       try {
         if (readNaninovel) {
           if (!readLocalization(file)) failed(null, 'EMBEDDED_SCRIPT_LAYOUT');
+        } else if (siglus) {
+          const parsed = siglus.readDbs(source(file, MAX_FILE), path.posix.basename(file), {
+            maxOutputLength: Math.min(MAX_EXPANDED - expanded, MAX_FILE),
+            maxCells: MAX_ROWS, maxStringBytes: MAX_FILE, consume: size => { expanded += size; },
+          });
+          if (parsed.scope === 'script') addRows(parsed.lines, japaneseLine, require('./scenes.cjs').chineseColumn(parsed.table, parsed.lines) || []);
         } else {
           const parsed = loose.parse(source(file));
           addRows(parsed.lines, japaneseLine, parsed.zh);

@@ -2,7 +2,7 @@
 
 The detail-page and Tools restore dialogs share a built-in folder scanner. It reports the detected format, whether it found Japanese dialogue in the scripts it could read, and whether it can restore the files. The only writable adapter handles verified Utage compiled scenario books with Japanese and Chinese columns. Applying its result requires separate confirmation, creates backups, and supports undo
 
-The read-only pass reuses the engine registry's names and file signatures, the Naninovel localization document reader, and the existing loose-script parsers for Ren'Py, KiriKiri, Artemis, TyranoScript, and RPG Maker MV/MZ. It skips runtime capture and archive readers that require external tools or unbounded unpacking. It caps enumeration at 4,096 entries, evidence at 128 files, diagnostic reads at 64 MiB, and UnityFS expansion at 128 MiB. The worker supports cancellation and has a 60-second outer timeout. The UI identifies partial results when a limit or parsing failure cuts the scan short
+The read-only pass reuses the engine registry's names and file signatures, the Naninovel localization document reader, the Siglus DBS table reader, and the existing loose-script parsers for Ren'Py, KiriKiri, Artemis, TyranoScript, and RPG Maker MV/MZ. It skips runtime capture and archive readers that require external tools or unbounded unpacking. It caps enumeration at 4,096 entries, evidence at 128 files, diagnostic reads at 64 MiB, and total expansion at 128 MiB. The worker supports cancellation and has a 60-second outer timeout. The UI identifies partial results when a limit or parsing failure cuts the scan short
 
 ## Reuse decision
 
@@ -36,3 +36,13 @@ The installed Steam `manosaba_game` sample previously returned `EMBEDDED_UNSUPPO
 The synthetic Hoshizora-shaped Utage fixture exercises a base book and its compiled scenario patch. It produces a restore token only after the Japanese text, row identity, speaker and voice match, and restores the exact original hashes on undo
 
 The headless integration harness uses the actual dialog functions, UI module, persistent bridge, child workers and synthetic resources. It does not execute a game. Successful resource reconstruction and a matching undo hash do not prove that a particular game chooses the restored language at runtime, preserves its voice playback, or renders a clickable Japanese overlay; those remain separate game acceptance checks
+
+## CLANNAD local translation source
+
+The old local-source record showed 107,178 indexed entries, 176 translation candidates, and 94 of 100 sampled matches. Its only selected table was `.megulit-japanese/dat/text22.dbs`, which holds interface text. The sample measured the pairing of those settings entries
+
+The installed `SceneZH.pck` contains 228 compiled scenes and 212 `seen*.ss` source scripts. Its language constants select Japanese column 0 or Simplified Chinese column 2. The scene code resolves a message by serial number in column 500 and looks up the string in the selected language column. `GameexeZH.dat` names the external `textNN` databases. The direct `siglus-pck` dialogue reader returned 60 inline lines and no Chinese dialogue candidates for this package. The `siglus` adapter correctly takes precedence when there is a readable `dat` layout
+
+Each of the 106,885 numbered story-table slots with both language columns in the installed `dat` had identical values in columns 0 and 2. The included Japanese patch copy had the same comparison result. The 92,886 comparable slots in the MeguLit backup were also identical. The speaker column is separate. The checked local copies contained no confirmed Simplified Chinese story text to pair
+
+The folder scan now reports 96,208 Japanese entries across 20 readable story tables and zero local Chinese story translations. The zero-latency dialog reports 107,062 source slots, including 106,769 story slots and 293 settings slots. It verifies 174 Traditional Chinese settings pairs, excluding two formatting-only differences. The dialog shows the selected table and reports zero usable story pairs. The before-and-after SHA-256 hashes matched for the 73 inspected files, including the two root language files, configuration, backup manifest, and tables in the install and both local copies
