@@ -472,7 +472,9 @@
       else if (reveal.n < have && nowT - reveal.t >= 8) { reveal.n = Math.min(have, reveal.n + Math.max(1, (have - reveal.n) * (nowT - reveal.t) / 100)); reveal.t = nowT; }
       if (reveal.n < have) schedule(); else reveal.t = nowT;
       const { place, size } = layout(sentence, cur.rects.slice(at, at + Math.floor(reveal.n)).map(map), geom);
-      const row = win.querySelector('.tomoyo-cn-row'), all = [...place.values()];
+      const row = win.querySelector('.tomoyo-cn-row');
+      // The translation follows the reported line even while its Japanese glyphs are revealing.
+      const all = page.engineRows ? cur.rects.slice(at, at + n).filter(Boolean).map(map).filter(r => r && r[2] > 0 && r[3] > 0) : [...place.values()];
       if (row && all.length) {
         const x0 = Math.min(...all.map(r => r[0])), y0 = Math.min(...all.map(r => r[1])), x1 = Math.max(...all.map(r => r[0] + r[2])), y1 = Math.max(...all.map(r => r[1] + r[3]));
         const only = body.classList.contains('tomoyo-gal-zh-only');
