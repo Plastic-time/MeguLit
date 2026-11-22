@@ -19,13 +19,27 @@ Visual plan: preserve the existing black/gold operator console, use a single ful
 
 All endpoints are same-origin and use the existing admin Bearer contract. A token is only retained in a closure, removed from its input on connection, and cleared on disconnect/pagehide. It is never persisted, put in a URL, logged or included in request bodies. Unauthenticated page load makes no admin request
 
-Workflow state `passed` says **本版本核查通过**, separate from `published` saying **已签名下发**. Upload identifier counts are not real-person counts. Missing adoption data says **客户端回报采用会话：暂无数据**. Public counts and repository annotations are not trusted execution or installation evidence
+Workflow state `passed` says **本版本核查通过**, separate from `published` saying **已签名下发**. Upload identifier counts are not real-person counts. Overview separates **收到上传次数**, **不同 Seed 产物数**, **被采用的 Seed** and **采用会话**. Missing historical event values remain unknown/no data. Public counts and repository annotations are not trusted execution or installation evidence
 
 Queue controls require `queueLane: version-retest`, active pending/reviewing state, explicit queue capability, and an unpublished item. BeforeId choices are other active permitted jobs in that same lane, including different games and versions. It is a global ordering anchor, never a replacement for the selected job's identity. The server must independently enforce lane/CAS/anchor validity. `queueScope: exe-current-seed-retest` explicitly says that the current runner retests the EXE's currently available seed, not a specifically requested historical seed revision
 
-Every mutation needs a nonempty bounded reason and an explicit confirmation naming the game/version. The view waits for both a mutation acknowledgement with auditId and a fresh GET showing a later revision before claiming success. Unknown writes are not retried and disable further writes until refresh. Revision conflicts read current details but require a new human action. A 401 clears authorization; a 404 is an unconnected/unknown interface, never an empty production dataset
+Every administrative mutation needs a nonempty single-line reason of at most 200 UTF-16 code units and an explicit confirmation naming the game/version. The view requires an acknowledgement with auditId/item revision, followed by a fresh GET containing that exact auditId, action, beforeRevision, afterRevision and newState. Another administrator's revision alone cannot confirm the operation. Unknown writes are not retried and disable further writes until refresh. Revision conflicts read current details but require a new human action. A 401 clears authorization; a 404 is an unconnected/unknown interface, never an empty production dataset; a 503 explicitly reports interface/database not ready
 
-Published artifacts offer no direct delete or fake revoke button. Repository deletion is labelled remote tombstoning and explicitly preserves GitHub/builtin data. Signed publication/revocation/history validation remain the existing independent protocol and are not implemented by this UI. Management audit history is not presented as signed release history
+Deleted filtering and capability-gated `/restore` return only to pending with the same CAS/audit proof; they do not modify a signed winner. Repository deletion is labelled remote tombstoning and explicitly preserves GitHub/builtin data
+
+## Offline signed revocation
+
+Only a published `trusted-release` with `capabilities.revoke`, exact `revokeProfileHash` and `revokeKey` displays the revocation importer. It exports an unsigned fixed template, and accepts pasted/file JSON up to 8 KiB. Exact keys, schema/version, target profile hash, allowed reason and bounded Ed25519 signature shape are checked before the request. The page never reads a private key or generates a signature
+
+The existing protocol `POST /api/torch-release/revoke` must confirm revoked; `GET /api/torch-release/history?exe=` must contain the exact hash in `revoked`, and the authenticated item must read back `publicationStatus: revoked`. Acknowledgement without that evidence remains unconfirmed and pauses writes. Public-key setup, deployment and server verification are not bypassed. History response reading is capped at the protocol's 8 MiB; other admin responses at 1 MiB
+
+The companion offline CLI candidate supplies `node tools/torch-release.cjs sign-revocation <unsigned-template.json>` using an existing private key outside the repository. Its integration is a root-owned prerequisite; the dashboard does not invoke it. Save its output as UTF-8 or paste JSON, avoiding PowerShell 5's default UTF-16 redirection. A successful local signature does not establish server trust or deployment. Management audit history remains separate from signed release history
+
+## Uploader breakdown
+
+The foldout explicitly loads `GET /api/seed-admin/uploaders?limit=20&cursor=` and displays only safe aliases/current public names, accepted-upload event counts, distinct artifacts and artifact links. Artifact continuation uses the separate `artifactsCursor` parameter and is checked against the uploader id. Following more uploader pages retains already expanded artifact pages. Truncated or missing continuation is disclosed rather than called complete
+
+Artifact links call the existing authenticated detail handler using itemId. Unknown titles remain unknown. Empty new-ingest history does not become historical zero; coverage start and the non-person identifier scope are shown. Refresh clears withdrawn public names from the view. Disconnect clears uploader data along with credentials
 
 ## Validation scope
 
