@@ -53,6 +53,14 @@ Windows Prefetch for the 18:44 CLANNAD run lists the release's `SiglusEngine_Ste
 
 Rebuilding the index in an isolated profile identified 101,489 dialogue slots and 654 choice slots from script instructions. Both groups had zero verified Chinese translations. All 174 local pairs came from the backup interface table `text22.dbs`. When other copies contain complementary translations, the Siglus reader now combines rows verified by the serial and Japanese cell, retaining the earlier source for an already translated slot. A regression test covers partially overlapping tables, a mismatched serial's Japanese text, independent choice lookup and the contributing source list
 
+### CLANNAD Chinese script recovery
+
+Key distributed Simplified Chinese as a language update for the licensed Steam game. The local download history still names the two original Chinese archive volumes and HD archives. Their recorded target files are absent. The active Steam client returned false for both subscription and installation of app 324160. The same checks returned true for an installed control game. [Key release announcement](https://key.visualarts.gr.jp/archives/1990)
+
+Before replacing numbered Siglus tables in a Chinese release with `SceneZH.pck`, the restore tool checks the scene instructions, Japanese row, serial and declared Chinese column. The dialog reports verified dialogue and choice counts. When it cannot verify any Chinese dialogue, it keeps the live tables and reports the missing source. An existing restoration can still be undone using its verified backup.
+
+On a separate copy of the CLANNAD Japanese patch tables, apply stopped before creating a backup or changing a file. The installed and isolated scans each verified 0 of 101,489 dialogue slots and 0 of 654 choices. All 72 inspected original files retained their hashes. A bilingual fixture independently verified that both kinds of translated rows were readable after apply and that undo restored the original bytes.
+
 ### Naninovel shadow launch
 
 Steam's process log and the game's Unity Player log confirm the 17:03 Manosaba session launched the shadow executable. Its `manosaba_Data` junction resolves to the Steam installation. Direct script detection on that shadow previously returned no engine. The verified junction now resolves the same 23 localization bundles and the same script fingerprint as the Steam folder. The latest autosave records `Act01_Chapter01/Act01_Chapter01_Adv01`. Rebuilding from the shadow alone yielded 33,753 paired rows out of 34,368 indexed entries, and the Reader returned the translation in the bundle for `0101Adv01_Narrative001` from that scenario with source `patch` and the machine fallback disabled

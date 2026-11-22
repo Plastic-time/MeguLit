@@ -731,11 +731,18 @@ function japaneseRestore(only){
  d.addEventListener('close',()=>{void scanFlow?.dispose();if(detailChanged)Promise.resolve(only.onChanged?.()).catch(()=>fail(Error('ORIGINAL_SCAN_REFRESH_FAILED')));},{once:true});
  scanFlow=mountOriginalScan(slot,{api,locale,onState:()=>refreshLocks(),onRefreshError:code=>fail(Error(code)),onApplied:async()=>{await restoreChanged();model=await api('home');await show();refreshLocks();}});
 
- const fail=e=>{const c=typeof e==='string'?e:e?.message;toast(t.errs[c]||errorMessage(e));};
+ const fail=e=>{const c=typeof e==='string'?e:e?.message;toast(t.errs[c]||launchReason(c,locale)||errorMessage(e));};
  /* E328 the files moved aside were the translation patch: say when zero-latency translation now uses it */
  const zeroNote=r=>r?.patch?({zh:'；被换下的汉化补丁已用作零延迟翻译',en:'; the translation patch that was moved aside now gives zero-latency translation',ja:'。外した中国語パッチをゼロ遅延翻訳に使います'})[locale]||'':'';
  const show=async()=>{const expected=id;if(!d.open)return;applyBtn.hidden=undoBtn.hidden=importBtn.hidden=steamBtn.hidden=true;const status=body.querySelector('[data-jr-status]');status.dataset.state='checking';status.textContent=t.check;
-  try{const r=await restoreApi('jp_restore_detect',{id});if(!d.open||id!==expected)return;status.dataset.state=t.st[r.state]?r.state:'none';status.textContent=(t.st[r.state]||t.st.none)(r);applyBtn.hidden=r.state!=='restorable';steamBtn.hidden=!(r.adapter==='language-switch'&&r.appid&&(r.state==='steam-guide'||r.mode==='steam'));
+  try{const r=await restoreApi('jp_restore_detect',{id});if(!d.open||id!==expected)return;status.dataset.state=t.st[r.state]?r.state:'none';status.textContent=(t.st[r.state]||t.st.none)(r);
+   if(r.chinese){
+    const c=r.chinese;
+    const note=c.conflict?launchReason('SIGLUS_BACKUP_CONFLICT',locale):!c.body?launchReason('SIGLUS_CHINESE_STORY_MISSING',locale):
+     ({zh:`已核实中文正文 ${c.body}/${c.bodyTotal}，选项 ${c.choice}/${c.choiceTotal}`,en:`Verified Chinese dialogue ${c.body}/${c.bodyTotal}, choices ${c.choice}/${c.choiceTotal}`,ja:`確認済みの中国語本文 ${c.body}/${c.bodyTotal}、選択肢 ${c.choice}/${c.choiceTotal}`})[locale];
+    status.textContent+=' '+note;
+   }
+   applyBtn.hidden=r.state!=='restorable';steamBtn.hidden=!(r.adapter==='language-switch'&&r.appid&&(r.state==='steam-guide'||r.mode==='steam'));
    const canUndo=['imported','applied','applied-unverified'].includes(r.state);
    undoBtn.hidden=!canUndo;jpAutoLine(status,id,show,restoreApi,()=>d.open&&id===expected,refreshLocks);
    importBtn.hidden=canUndo||r.adapter==='language-switch'&&!['language-unverified','language-setting','already','first-run'].includes(r.state);}catch(e){if(id===expected&&d.open){status.dataset.state='';status.textContent='';fail(e);}}finally{refreshLocks();}};

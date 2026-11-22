@@ -429,6 +429,23 @@ const siglus={
    return scene;});
   return any?list:null;
  },
+ // Count only instructions whose serial and Japanese cell agree with the Chinese release.
+ storyProof(dir,tables){
+  const proof={body:0,choice:0,bodyTotal:0,choiceTotal:0,files:[]};
+  for(const scene of this.annotate(dir,tables)){
+   if(!scene.roles)continue;
+   const zh=serialTranslations(scene,scene.table,scene.layout);
+   let paired=false;
+   for(let i=0;i<scene.roles.length;i++){
+    const role=scene.roles[i]==='b'?'body':scene.roles[i]==='c'?'choice':'';
+    if(!role)continue;
+    proof[role+'Total']++;
+    if(zh?.[i]){proof[role]++;paired=true;}
+   }
+   if(paired)proof.files.push(scene.name);
+  }
+  return proof;
+ },
  readDbs,dbsName:DBS,
 };
 

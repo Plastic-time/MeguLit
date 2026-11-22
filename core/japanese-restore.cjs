@@ -82,6 +82,34 @@ function translationColumns(table,langs,jp,nameId=null){
 function shownJapanese(jp,old){const i=jp.indexOf('／');return i>0&&!/[\/／]/.test(String(old||''))?jp.slice(0,i):jp;}
 function datDir(gameDir){const d=path.join(gameDir,'dat');return fs.existsSync(d)&&fs.readdirSync(d).some(f=>/\.dbs$/i.test(f))?d:'';}
 
+function safeFile(root,...parts){
+ const file=require('../services/embedded-japanese.cjs')._internal.target(root,path.join(...parts));
+ if(fs.existsSync(file)&&!fs.lstatSync(file).isFile())throw Error('SIGLUS_BACKUP_CONFLICT');
+ return file;
+}
+function checkedEntry(entry){
+ if(!entry||typeof entry.file!=='string'||!/^([^\\/:]+)\.dbs$/i.test(entry.file)||
+    ![entry.originalSha256,entry.patchedSha256].every(h=>typeof h==='string'&&/^[a-f0-9]{64}$/.test(h)))throw Error('SIGLUS_BACKUP_CONFLICT');
+ return entry;
+}
+function chineseStory(gameDir,manifest){
+ const dat=datDir(gameDir);
+ if(!dat||!fs.existsSync(path.join(gameDir,'SceneZH.pck')))return null;
+ const names=fs.readdirSync(dat).filter(f=>/^text\d+\.dbs$/i.test(f));
+ if(!names.length)return null;
+ const engine=require('../services/original-engines/scenes.cjs').ENGINES.siglus,tables=[],digests=new Map();
+ for(const name of names){
+  const old=manifest?.files?.find(e=>e.file===name);
+  const file=old?safeFile(gameDir,BACKUP_DIR,'dat',name):safeFile(gameDir,'dat',name);
+  if(!fs.existsSync(file))throw Error('SIGLUS_BACKUP_CONFLICT');
+  const bytes=fs.readFileSync(file),hash=sha(bytes);
+  if(old&&checkedEntry(old).originalSha256!==hash)throw Error('SIGLUS_BACKUP_CONFLICT');
+  digests.set(name,hash);tables.push({name,...engine.readDbs(bytes,name)});
+ }
+ const proof=engine.storyProof(gameDir,tables);
+ return {...proof,files:proof.files.map(file=>({file,sha256:digests.get(file)}))};
+}
+
 function siglusPlan(gameDir,options={}){
  const nameId=nameColumn(options);
  const dir=datDir(gameDir);if(!dir)return null;
@@ -146,10 +174,15 @@ function detect(gameDir,options={}){
  if(manifest?.adapter==='yuris-update')return {state:'applied',adapter:'yuris-update',files:manifest.files.length,cells:0,pending:0,manifest:{at:manifest.at,files:manifest.files.length}};
  const yuris=yurisPlan(gameDir);if(yuris&&yuris.updates.length)return {state:'restorable',adapter:'yuris-update',files:yuris.updates.length,cells:0,pending:yuris.updates.length,manifest:null};
  const siglus=siglusPlan(gameDir,options);
+ let chinese;
+ if(siglus){
+  try{chinese=chineseStory(gameDir,manifest);}catch{chinese={conflict:true};}
+  if(chinese&&(chinese.conflict||!chinese.body))return {state:manifest?'applied':'resources',adapter:'siglus-dbs',chinese,files:manifest?.files?.length||0,cells:0,pending:0};
+ }
  /* E373: a third-party Japanese patch (a JapanesePatch folder with its own backups) may already have rewritten some
     tables; MeguLit then backs up those patched files, so undo returns to that patch, not to the Steam original. */
  const externalPatch=['JapanesePatch'].find(n=>fs.existsSync(path.join(gameDir,n,'backup')))||'';
- if(siglus&&(siglus.changes.length||manifest))return {state:manifest?'applied':'restorable',adapter:'siglus-dbs',externalPatch,files:siglus.changes.length,cells:siglus.cells,japaneseColumn:siglus.japaneseColumn,targetColumns:siglus.targetColumns,pending:siglus.changes.length,manifest:manifest&&{at:manifest.at,files:manifest.files.length}};
+ if(siglus&&(siglus.changes.length||manifest))return {state:manifest?'applied':'restorable',adapter:'siglus-dbs',chinese,externalPatch,files:siglus.changes.length,cells:siglus.cells,japaneseColumn:siglus.japaneseColumn,targetColumns:siglus.targetColumns,pending:siglus.changes.length,manifest:manifest&&{at:manifest.at,files:manifest.files.length}};
  /* E294 (user report 2026-11-10: a friend's Steam CLANNAD stayed Chinese after the restore): the Steam release's tables hold
     English and Chinese only; the Japanese text comes from a separate Japanese patch. No Japanese column anywhere means
     there is nothing to restore, not "already Japanese". */
@@ -194,33 +227,79 @@ function gameRunning(gameDir){
 }
 /* E590 a rename can fail for a moment on Windows (antivirus / indexer holding the file, EPERM/EBUSY): wait and retry;
    on a final failure the temp file is removed so nothing half-written stays in the game folder */
-function writeAtomic(file,data){const tmp=file+'.megulit-tmp';fs.writeFileSync(tmp,data);
+function writeAtomic(file,data){const tmp=path.join(path.dirname(file),crypto.randomUUID()+'.'+path.basename(file)+'.megulit-tmp');fs.writeFileSync(tmp,data,{flag:'wx'});
  for(let i=0;;i++){try{fs.renameSync(tmp,file);return;}catch(error){if(i>=8||!['EPERM','EBUSY','EACCES'].includes(error.code)){try{fs.rmSync(tmp,{force:true});}catch{}throw error;}Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,150*(i+1));}}}
 
 function apply(gameDir,options={}){
  gameDir=path.resolve(String(gameDir||''));if(gameRunning(gameDir))throw Error('GAME_RUNNING');
  if(Object.hasOwn(options,'embeddedScanToken'))return require('../services/embedded-japanese.cjs').apply(gameDir,{scanToken:options.embeddedScanToken,progress:options.embeddedProgress});
+ const prior=readManifest(gameDir);
+ if(fs.existsSync(manifestPath(gameDir))&&!prior)throw Error('SIGLUS_BACKUP_CONFLICT');
+ const chinese=chineseStory(gameDir,prior);
+ if(chinese&&!chinese.body)throw Error('SIGLUS_CHINESE_STORY_MISSING');
  const repaired=repairNameColumns(gameDir,options);if(repaired.repaired)return {applied:repaired.applied,cells:repaired.cells||0,repaired:true};
  {const y=readManifest(gameDir)?null:yurisPlan(gameDir);if(y&&y.updates.length)return yurisApply(gameDir,y);}
  const plan=siglusPlan(gameDir,options);if(!plan||!plan.changes.length){if(!readManifest(gameDir)&&langSwitch().detect(gameDir,options).state==='restorable')return langSwitch().apply(gameDir,options);if(!readManifest(gameDir)&&artemis().detect(gameDir).state==='restorable')return artemis().apply(gameDir,{bilingual:options.bilingual});throw Error('NOTHING_TO_RESTORE');}
- const backup=path.join(gameDir,BACKUP_DIR,'dat');fs.mkdirSync(backup,{recursive:true});
- const prior=readManifest(gameDir),entries=prior?prior.files:[],built=[];
- for(const c of plan.changes){ // build and verify every file before any write
+ const release=require('../services/embedded-japanese.cjs')._internal.acquireLock(gameDir,true);
+ try{return applyTables(gameDir,plan,prior,chinese);}finally{release();}
+}
+function applyTables(gameDir,plan,prior,chinese){
+ const journal=safeFile(gameDir,BACKUP_DIR,'manifest.json');
+ if(JSON.stringify(readManifest(gameDir))!==JSON.stringify(prior)||prior&&prior.adapter!=='siglus-dbs')throw Error('SIGLUS_BACKUP_CONFLICT');
+ const entries=(prior?.files||[]).map(e=>({...checkedEntry(e)})),built=[];
+ const byName=new Map(entries.map(e=>[e.file,e]));
+ if(byName.size!==entries.length)throw Error('SIGLUS_BACKUP_CONFLICT');
+ for(const e of entries){
+  const keep=safeFile(gameDir,BACKUP_DIR,'dat',e.file);
+  if(!fs.existsSync(keep)||sha(fs.readFileSync(keep))!==e.originalSha256)throw Error('SIGLUS_BACKUP_CONFLICT');
+ }
+ for(const c of plan.changes){
   const raw=rebuild(c.decoded.raw,c.decoded.marker,c.table,c.next),enc=encrypt(c.decoded.marker,raw),back=decrypt(enc),check=parse(back.raw,back.marker);
   if(back.marker!==c.decoded.marker||!back.raw.equals(raw)||check.rows!==c.table.rows||check.cols!==c.table.cols)throw Error('ROUNDTRIP_FAILED '+c.name);
-  built.push({c,enc});}
+  built.push({name:c.name,before:c.file,after:enc,kind:c.kind,changed:c.changed});
+ }
+ // A partly translated table may have no writable language column. Preserve those verified rows too.
+ for(const f of chinese?.files||[]){
+  const item=built.find(c=>c.name===f.file),old=byName.get(f.file);
+  if(old){if(old.originalSha256!==f.sha256)throw Error('SIGLUS_BACKUP_CONFLICT');continue;}
+  const bytes=item?.before||fs.readFileSync(safeFile(gameDir,'dat',f.file));
+  if(sha(bytes)!==f.sha256)throw Error('SIGLUS_BACKUP_CONFLICT');
+  if(!item)built.push({name:f.file,before:bytes,after:null,kind:'chinese-source',changed:0});
+ }
+ for(const item of built){
+  const old=byName.get(item.name),before=sha(item.before);
+  item.target=safeFile(gameDir,'dat',item.name);item.keep=safeFile(gameDir,BACKUP_DIR,'dat',item.name);
+  if(sha(fs.readFileSync(item.target))!==before||old&&![old.originalSha256,old.patchedSha256,old.previousPatchedSha256].includes(before))throw Error('SIGLUS_BACKUP_CONFLICT');
+  item.original=old?.originalSha256||before;item.patched=item.after?sha(item.after):before;
+  const exists=fs.existsSync(item.keep);
+  if(exists&&sha(fs.readFileSync(item.keep))!==item.original)throw Error('SIGLUS_BACKUP_CONFLICT');
+  const entry={...old,file:item.name,kind:item.kind,changed:item.changed,originalSha256:item.original,patchedSha256:item.patched};
+  if(old&&before!==item.original&&before!==item.patched)entry.previousPatchedSha256=before;
+  if(exists&&!old)entry.keepBackup=true;
+  byName.set(item.name,entry);
+ }
+ fs.mkdirSync(path.join(gameDir,BACKUP_DIR,'dat'),{recursive:true});
+ for(const item of built){
+  if(!fs.existsSync(item.keep)){if(sha(item.before)!==item.original)throw Error('SIGLUS_BACKUP_CONFLICT');fs.writeFileSync(item.keep,item.before,{flag:'wx'});}
+  if(sha(fs.readFileSync(item.keep))!==item.original)throw Error('SIGLUS_BACKUP_CONFLICT');
+ }
+ // Publish the verified undo journal before replacing the first table. After interruption either digest is recoverable.
+ const next={...prior,version:1,adapter:'siglus-dbs',at:new Date().toISOString(),japaneseColumn:plan.japaneseColumn,targetColumns:plan.targetColumns,chinese,files:[...byName.values()]};
+ writeAtomic(journal,Buffer.from(JSON.stringify(next,null,1)));
  const written=[];
- for(const {c,enc} of built){
-  const keep=path.join(backup,c.name),old=entries.find(e=>e.file===c.name);
-  if(!old&&!fs.existsSync(keep))fs.writeFileSync(keep,c.file);
-  /* E590 a write that fails part-way puts back the files already written (no manifest exists yet to undo them) */
-  try{writeAtomic(path.join(plan.dir,c.name),enc);}catch(error){for(const w of written){try{writeAtomic(path.join(plan.dir,w.name),w.file);}catch{}}if(!prior)fs.rmSync(path.join(gameDir,BACKUP_DIR),{recursive:true,force:true});throw error;}
-  written.push(c);
-  const entry={file:c.name,originalSha256:old?old.originalSha256:sha(c.file),patchedSha256:sha(enc),kind:c.kind,changed:c.changed};
-  if(old)Object.assign(old,entry);else entries.push(entry);}
- const manifest={version:1,adapter:'siglus-dbs',at:new Date().toISOString(),japaneseColumn:plan.japaneseColumn,targetColumns:plan.targetColumns,files:entries};
- writeAtomic(manifestPath(gameDir),Buffer.from(JSON.stringify(manifest,null,1)));
- return {applied:built.length,cells:plan.cells};
+ try{
+  for(const item of built){
+   if(!item.after)continue;
+   if(!fs.readFileSync(item.target).equals(item.before)||sha(fs.readFileSync(item.keep))!==item.original)throw Error('SIGLUS_BACKUP_CONFLICT');
+   writeAtomic(item.target,item.after);written.push(item);
+   if(sha(fs.readFileSync(item.target))!==item.patched)throw Error('SIGLUS_WRITE_VERIFY');
+  }
+ }catch(error){
+  for(const item of written.reverse())if(sha(fs.readFileSync(item.target))===item.patched)writeAtomic(item.target,item.before);
+  if(!prior&&built.every(item=>fs.readFileSync(item.target).equals(item.before)))undoTables(gameDir,next);
+  throw error;
+ }
+ return {applied:written.length,cells:plan.cells,chinese};
 }
 
 function restore(gameDir,options={}){
@@ -228,14 +307,34 @@ function restore(gameDir,options={}){
  repairNameColumns(gameDir,options);
  const manifest=readManifest(gameDir);if(!manifest)throw Error('NOT_APPLIED');if(manifest.adapter==='yuris-update')return yurisRestore(gameDir,manifest);if(manifest.adapter==='language-switch')return langSwitch().restore(gameDir,options);if(manifest.adapter==='artemis-pfs')return artemis().restore(gameDir);
  if(manifest.adapter==='utage-embedded')return require('../services/embedded-japanese.cjs').undo(gameDir);
- const dat=path.join(gameDir,'dat'),backup=path.join(gameDir,BACKUP_DIR,'dat'),skipped=[];let restored=0;
- for(const e of manifest.files){const target=path.join(dat,e.file),keep=path.join(backup,e.file);
-  if(!fs.existsSync(keep)){skipped.push(e.file);continue;}
-  const now=fs.existsSync(target)?sha(fs.readFileSync(target)):'';
-  if(now===e.originalSha256){restored++;continue;}
-  if(now!==e.patchedSha256){skipped.push(e.file);continue;} // changed by a game update or another tool: leave it
-  writeAtomic(target,fs.readFileSync(keep));restored++;}
- if(!skipped.length)fs.rmSync(path.join(gameDir,BACKUP_DIR),{recursive:true,force:true});
+ if(manifest.adapter!=='siglus-dbs')throw Error('SIGLUS_BACKUP_CONFLICT');
+ const release=require('../services/embedded-japanese.cjs')._internal.acquireLock(gameDir,true);
+ try{return undoTables(gameDir,manifest);}finally{release();}
+}
+function undoTables(gameDir,manifest){
+ const journal=safeFile(gameDir,BACKUP_DIR,'manifest.json'),skipped=[];
+ if(JSON.stringify(readManifest(gameDir))!==JSON.stringify(manifest))throw Error('SIGLUS_BACKUP_CONFLICT');
+ let restored=0;
+ const entries=manifest.files.map(checkedEntry);
+ if(new Set(entries.map(e=>e.file.toLowerCase())).size!==entries.length)throw Error('SIGLUS_BACKUP_CONFLICT');
+ for(const e of entries){
+  const target=safeFile(gameDir,'dat',e.file),keep=safeFile(gameDir,BACKUP_DIR,'dat',e.file);
+  const bytes=fs.existsSync(keep)&&fs.readFileSync(keep);
+  if(!bytes||sha(bytes)!==e.originalSha256){skipped.push(e.file);continue;}
+  const now=fs.existsSync(target)&&sha(fs.readFileSync(target));
+  if(now!==e.originalSha256){
+   if(!now||now!==e.patchedSha256&&now!==e.previousPatchedSha256){skipped.push(e.file);continue;}
+   writeAtomic(target,bytes);
+   if(sha(fs.readFileSync(target))!==e.originalSha256)throw Error('SIGLUS_WRITE_VERIFY');
+  }
+  restored++;
+ }
+ if(!skipped.length){
+  for(const e of entries){if(sha(fs.readFileSync(safeFile(gameDir,BACKUP_DIR,'dat',e.file)))!==e.originalSha256)throw Error('SIGLUS_BACKUP_CONFLICT');}
+  for(const e of entries)if(!e.keepBackup)fs.unlinkSync(safeFile(gameDir,BACKUP_DIR,'dat',e.file));
+  fs.unlinkSync(journal);
+  for(const dir of [path.join(gameDir,BACKUP_DIR,'dat'),path.join(gameDir,BACKUP_DIR)])if(!fs.readdirSync(dir).length)fs.rmdirSync(dir);
+ }
  return {restored,skipped};
 }
 
@@ -251,8 +350,9 @@ function repairNameColumns(gameDir,options={}){
 function repairShared(gameDir,options={}){
  const repaired=repairNameColumns(gameDir,options);if(repaired.repaired)return repaired;
  gameDir=path.resolve(String(gameDir||''));const manifest=readManifest(gameDir);if(!manifest||manifest.adapter!=='siglus-dbs')return {repaired:false};
- const dat=path.join(gameDir,'dat'),ours=manifest.files.find(e=>{try{return sha(fs.readFileSync(path.join(dat,e.file)))===e.patchedSha256;}catch{return false;}});
+ const dat=path.join(gameDir,'dat'),ours=manifest.files.find(e=>{if(e.kind==='chinese-source')return false;try{return sha(fs.readFileSync(path.join(dat,e.file)))===e.patchedSha256;}catch{return false;}});
  if(!ours||!sharedPool(path.join(dat,ours.file)))return {repaired:false};
+ const chinese=chineseStory(gameDir,manifest);if(chinese&&!chinese.body)return {repaired:false};
  const undone=restore(gameDir,options);if(undone.skipped.length)return {repaired:false,skipped:undone.skipped};
  const done=apply(gameDir,options);return {repaired:true,applied:done.applied};
 }
