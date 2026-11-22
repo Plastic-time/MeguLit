@@ -77,18 +77,23 @@ export function createOriginalScanController({api,recoverJob,makeRequestId=()=>g
   if(!c.jobId&&!disposed)c.reject(Error(errorCode(error)));
   if(disposed){if(++c.cleanupFailures<3)queue(c);else{cleanupIncomplete=true;current=null;c.resolveCleanup(false);c.reject(Error('ORIGINAL_SCAN_CLEANUP_INCOMPLETE'));onRefreshError('ORIGINAL_SCAN_CLEANUP_INCOMPLETE');}}
  }
+ function legacyResult(operation,result){
+  return result&&typeof result==='object'&&!Array.isArray(result)&&(operation==='undo'?count(result.restored)&&Array.isArray(result.skipped):count(result.applied)&&count(result.cells));
+ }
  function accept(c,dto){
   if(!active(c))return;
   if(dto?.retired===true&&dto?.notStarted===true&&dto.state==='cancelled'&&dto.requestId===c.requestId&&dto.operation===c.operation&&!c.jobId){c.terminal=true;c.notifyApplied=false;finish(c,{phase:'error',error:dto.retiredByCapacity===true?'EMBEDDED_REQUEST_LIMIT':'ORIGINAL_SCAN_NOT_STARTED'});return;}
   if(c.allowDirect&&dto&&typeof dto==='object'&&!Object.hasOwn(dto,'jobId')){
-   if(Object.hasOwn(dto,'operation')||['queued','running','cancelling','cancelled','done','failed'].includes(dto.state))throw Error('ORIGINAL_SCAN_PROTOCOL');
-   if(c.operation==='undo'?(!count(dto.restored)||!Array.isArray(dto.skipped)):(!count(dto.applied)||!count(dto.cells)))throw Error('ORIGINAL_SCAN_PROTOCOL');
+   if(Object.hasOwn(dto,'operation')||Object.hasOwn(dto,'legacy')||Object.hasOwn(dto,'requestId')||['queued','running','cancelling','cancelled','done','failed'].includes(dto.state))throw Error('ORIGINAL_SCAN_PROTOCOL');
+   if(!legacyResult(c.operation,dto))throw Error('ORIGINAL_SCAN_PROTOCOL');
    finish(c,{phase:'idle',result:dto});return;
   }
   if(!dto||typeof dto.jobId!=='string'||!dto.jobId||dto.jobId.length>512||c.jobId&&c.jobId!==dto.jobId)throw Error('ORIGINAL_SCAN_PROTOCOL');
   if(dto.operation!==c.operation||dto.requestId!==c.requestId)throw Error('ORIGINAL_SCAN_PROTOCOL');
   c.jobId=dto.jobId;
   if(!['queued','running','cancelling','cancelled','done','failed'].includes(dto.state)||typeof dto.cancellable!=='boolean')throw Error('ORIGINAL_SCAN_PROTOCOL');
+  if(Object.hasOwn(dto,'legacy')&&(dto.legacy!==true||!c.allowDirect||c.operation==='scan'))throw Error('ORIGINAL_SCAN_PROTOCOL');
+  if(c.operation!=='scan'&&dto.cancellable)throw Error('ORIGINAL_SCAN_PROTOCOL');
   c.terminal=['done','failed','cancelled'].includes(dto.state);
   if(dto.state==='failed'){finish(c,{phase:'error',error:typeof dto.error==='string'?dto.error:'ORIGINAL_SCAN_FAILED'});return;}
   if(dto.state==='cancelled'){
@@ -102,10 +107,13 @@ export function createOriginalScanController({api,recoverJob,makeRequestId=()=>g
     finish(c,{phase:preview.state==='applied'?'applied':'preview',result:preview,preview});return;
    }
    const r=dto.result;
+   if(c.allowDirect&&dto.legacy===true){
+    if(!legacyResult(c.operation,r))throw Error('ORIGINAL_SCAN_PROTOCOL');
+    finish(c,{phase:'idle',result:r});return;
+   }
    if(!r||typeof r!=='object'||(c.operation==='restore'&&(!count(r.applied)||!count(r.cells)||r.patch!==true||r.localIndex!==true))||(c.operation==='undo'&&(!count(r.restored)||!Array.isArray(r.skipped))))throw Error('ORIGINAL_SCAN_PROTOCOL');
    finish(c,{phase:c.operation==='restore'?'applied':'idle',result:r,preview:c.operation==='restore'?state.preview:null});return;
   }
-  if(c.operation!=='scan'&&dto.cancellable)throw Error('ORIGINAL_SCAN_PROTOCOL');
   const p=dto.progress,progress=p&&typeof p==='object'?Object.freeze({phase:typeof p.phase==='string'?p.phase.slice(0,80):'',file:typeof p.file==='string'?p.file.slice(0,4096):'',...(byteCount(p.bytes)?{bytes:p.bytes}:{})}):null;
   c.cancellable=dto.cancellable&&p?.cancellable!==false;
   publish({phase:c.operation==='scan'?(c.cancelRequested||dto.state==='cancelling'?'cancelling':'scanning'):'applying',progress,pendingJob:true,cancellable:c.cancellable,recoverable:true,error:''});
