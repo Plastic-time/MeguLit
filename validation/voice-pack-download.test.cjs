@@ -8,6 +8,14 @@ const grant=`${meta}/download?model_type=AIVMX`,source='https://models.example.t
 const bytes=Buffer.alloc(5*1024*1024,0x7a),hash=createHash('sha256').update(bytes).digest('hex');
 const manifest=()=>Response.json({model_files:[{model_type:'AIVMX',license_type:'ACML 1.0',file_size:bytes.length,checksum:hash}]});
 
+function readModel({headers},url){
+ const [,from,end]=/^bytes=(\d+)-(\d*)$/.exec(headers.Range);
+ const start=Number(from),last=end?Number(end):bytes.length-1;
+ const response=new Response(bytes.subarray(start,last+1),{status:206,headers:{'Content-Range':`bytes ${start}-${last}/${bytes.length}`}});
+ if(url)Object.defineProperties(response,{url:{value:url},redirected:{value:true}});
+ return response;
+}
+
 function setup(t,fetch){
  const dir=fs.mkdtempSync(path.join(process.env.MEGULIT_WORK||os.tmpdir(),'megulit-voice-download-'));
  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
@@ -17,20 +25,13 @@ function setup(t,fetch){
 test('voice download uses one AivisHub redirect and reads the checked model in ranges',async t=>{
  let grants=0;
  const ranges=[];
- function readModel({headers}){
-  const [,from,end]=/^bytes=(\d+)-(\d*)$/.exec(headers.Range);
-  const start=Number(from),last=end?Number(end):bytes.length-1;
-  ranges.push([start,last]);
-  return new Response(bytes.subarray(start,last+1),{status:206,headers:{'Content-Range':`bytes ${start}-${last}/${bytes.length}`}});
- }
  const {dir,pack}=setup(t,async(url,opts)=>{
   if(url===meta)return manifest();
+  ranges.push(opts.headers.Range);
   if(url===grant){
    if(++grants>1)return new Response(null,{status:429});
    assert.equal(opts.redirect,'follow');
-   const response=readModel(opts);
-   Object.defineProperties(response,{url:{value:source},redirected:{value:true}});
-   return response;
+   return readModel(opts,source);
   }
   assert.equal(url,source);
   return readModel(opts);
@@ -38,8 +39,53 @@ test('voice download uses one AivisHub redirect and reads the checked model in r
  await pack.download(voice);
  assert.equal(grants,1);
  assert.ok(ranges.length>1,'model contents are fetched separately from the availability probe');
- assert.ok(ranges.some(([start])=>start>0),'the download makes a later range request');
+ assert.ok(ranges.some(range=>!range.startsWith('bytes=0-')),'the download makes a later range request');
  assert.deepEqual(fs.readFileSync(path.join(dir,voice.uuid+'.aivmx')),bytes);
+});
+
+test('voice download shares one renewed link across rejected ranges and verifies the result',async t=>{
+ const renewed=source.replace('=1','=2');
+ const rejected=[],retried=[];
+ let grants=0,allowRenewal;
+ const bothRejected=new Promise(resolve=>{allowRenewal=resolve;});
+ const {dir,pack}=setup(t,async(url,opts)=>{
+  if(url===meta)return manifest();
+  if(url===grant){
+   if(++grants===1)return readModel(opts,source);
+   if(grants>2)return new Response(null,{status:429});
+   assert.equal(opts.headers.Range,'bytes=0-0');
+   await bothRejected;
+   return readModel(opts,renewed);
+  }
+  if(url===source){
+   rejected.push(opts.headers.Range);
+   if(rejected.length===2)allowRenewal();
+   return new Response('',{status:403});
+  }
+  assert.equal(url,renewed);
+  retried.push(opts.headers.Range);
+  return readModel(opts);
+ });
+ await pack.download(voice);
+ assert.equal(grants,2);
+ assert.ok(rejected.length>=2);
+ for(const range of rejected)assert.ok(retried.includes(range),range+' retried on the renewed link');
+ assert.deepEqual(fs.readFileSync(path.join(dir,voice.uuid+'.aivmx')),bytes);
+});
+
+test('a second storage rejection ends the job without requesting another new link',async t=>{
+ let grants=0;
+ const {dir,pack}=setup(t,async(url,opts)=>{
+  if(url===meta)return manifest();
+  if(url===grant){
+   if(++grants>2)return new Response(null,{status:429});
+   return readModel(opts,source+'-'+grants);
+  }
+  return new Response('',{status:403});
+ });
+ await assert.rejects(pack.download(voice),/HTTP 403/);
+ assert.equal(grants,2);
+ assert.deepEqual(fs.readdirSync(dir),[]);
 });
 
 test('voice download reports a grant rate limit without leaving a model or temporary file',async t=>{
