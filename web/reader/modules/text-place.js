@@ -121,8 +121,8 @@
     else if (tr && tr.width) { set(win, 'left', (wr.left + anchor[0] + offX - tr.left) + 'px'); set(win, 'top', (wr.top + anchor[1] + offY - tr.top) + 'px'); set(win, 'right', 'auto'); set(win, 'bottom', 'auto'); set(win, 'margin', '0'); }
     /* 2026-11-19 (user, windowed 千恋＊万花: 「不要再挤压我的汉字了 我窗口化呢 只要显示器上还有位置就不要这样」): the translation keeps the
        user's size and goes on below the game window as long as the monitor's work area has room (the overlay spans the desktop);
-       only a sentence that does not fit above the work-area bottom is made smaller, once and never under 60 %, and if it still
-       does not fit the block moves up just enough, for that sentence. The outline and shadow are always the user's own
+       only a sentence that does not fit above the work-area bottom is made smaller, never below 85 %, and if it still
+       does not fit only the translation scrolls where at least one row fits. The outline and shadow are always the user's own
        (appearance and this game's style profile): 2026-11-19 (user, windowed 千恋＊万花: 「为啥译文一直有投影，很重很烦还关不掉」) the
        automatic heavy shadow over the game's bottom bar is gone. */
     const row = win.querySelector('.tomoyo-cn-row'), parts = row ? [...row.querySelectorAll('*')] : [];
@@ -133,14 +133,11 @@
       if (toks.length) { const l = Math.min(...toks.map(r => r.left)), r = Math.max(...toks.map(r => r.right)), rr = row.getBoundingClientRect(), w = Math.max(r - l, wr.width * .5);
         set(row, 'max-width', Math.ceil(w) + 'px'); if (anchor.center) { set(row, 'margin-left', 'auto'); set(row, 'margin-right', 'auto'); } else set(row, 'margin-left', Math.max(0, Math.round(l - rr.left)) + 'px'); } }
     for (const o of row ? [row, ...parts] : []) o.style.removeProperty('font-size');
-    /* 2026-11-21 release check (chaoschild-layout red since 649b93ef): the floor at 85 % of the user's size (cnBase) is part of 千恋＊万花's
-       translation-grows-down rule (game diff placement.translationGrowsDown); every other game keeps 85 % of the size it has now */
-    const grows = () => window.MeguLitProfile?.get?.('placement.translationGrowsDown', false) === true;
-    const cnBase = row ? parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16 : 16; /* the user's translation size: 85 % of it is the floor of every rule below */
+    const cnBase = row ? parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16 : 16; // All fit passes share the user's 85% floor
     /* 2026-11-20 (CHAOS;CHILD acceptance: a two-row dialogue line put its translation over the game's AUTO/SKIP buttons and under
        the box's bottom edge): a text box's line stays inside the game client above the strip a game keeps under its last text row
        for its own buttons (two glyph rows). What does not fit there: first the Japanese rows close up (ruby on top, no game pitch),
-       then the translation is at most 15 % smaller, then the block moves up, for that sentence only. A centred page is not a box. */
+       then the translation is at most 15 % smaller, then only the translation is constrained, for that sentence only. A centred page is not a box. */
     /* 2026-11-20 release check (user 2026-11-19, windowed 千恋＊万花: 「只要显示器上还有位置就不要这样」): the button-strip rule is for a game that
        fills the screen; when the work area has room for the translation below the game window it goes there at full size (the rule further down) */
     /* 2026-11-21 (owner's second recording, 千恋＊万花: the translation went out of sight below the window): MeguLit's own surface may end before
@@ -150,16 +147,19 @@
        its translation will need (inject.js translationReserve), so the Japanese is placed on the first frame and stays when the text lands */
     /* 2026-11-21 incr9: 18468201 (decide with the reserved translation room) put the Japanese a row up on almost every named line of
        千恋＊万花 (owner: 「现在成必发了」); reverted for every game: the row as it is */
+    if (row) for (const p of ['margin-top', 'max-height', 'overflow-y', 'overscroll-behavior']) row.style.removeProperty(p);
     const rowRect = () => row.getBoundingClientRect();
     const roomBelow = (() => { const wb = workLimit(); return row ? wb - (cy0 + chc) >= rowRect().height : false; })();
     /* 2026-11-20 release check (CHAOS;CHILD rig: with room below the window the strip rule was skipped whole and the Japanese third row
-       sat on AUTO/SKIP). Both rules hold: MeguLit's Japanese never enters the game's button strip (rows close up, the block moves up),
+       sat on AUTO/SKIP). Japanese-only overflow is handled independently of the translation,
        and with room on the monitor the translation keeps its size; when it would land on the strip it goes below the window instead. */
-    if (row) row.style.removeProperty('margin-top');
-    if (row && roomBelow && !anchor.center && tr && tr.height) { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
+    // Fit Japanese against its own extent, never against a late translation.
+    if (!anchor.center && tr && tr.height) { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
       sentence.style.removeProperty('line-height'); let sx = sentence.getBoundingClientRect();
       if (sx.bottom > uiLimit && sentence.querySelector('br.megulit-row-br')) { set(sentence, 'line-height', closeRows(sentence)); sx = sentence.getBoundingClientRect(); }
       if (sx.bottom > uiLimit) { const up = Math.min(sx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); }
+    }
+    if (row && roomBelow && !anchor.center && tr && tr.height) { const glyph = tr.height;
       /* 2026-11-21 (owner's third recording, 千恋＊万花, speaker row + one line: the translation left a box that had a free third row for below
          the window): the two glyph rows kept clear under the last text row are for MeguLit's Japanese (CHAOS;CHILD's AUTO/SKIP); the game's own
          buttons take about one and a half of the game's own glyph rows (千恋＊万花 31 px glyphs: its box keeps a free third row; CHAOS;CHILD 40 px:
@@ -170,7 +170,7 @@
       if (rr.top >= cy0 + chc) below = false; /* already under the window: nothing to move */
       /* (the fit check follows the hysteresis) 2026-11-21 (owner's recording, 千恋＊万花 window almost the whole screen: the translation went under the window onto the taskbar and off the
          screen): below the window only when the whole row fits there above the work area's bottom; otherwise it stays under its Japanese
-         inside the game and the in-window rule (smaller by at most 15 %, then up) keeps it off the button strip */
+         inside the game and the in-window rule makes it at most 15 % smaller */
       else below = below ? over > -glyph * .5 : over > glyph * .25;
       /* 2026-11-21 (owner: works with a negative 原文与译文间距 and drags it there): at a negative gap the translation always stays under its
          Japanese inside the box, whatever the earlier state; the hysteresis only covers positive gaps */
@@ -182,21 +182,19 @@
          landed off by the gap, under the taskbar or past MeguLit's surface at -19..-28) */
       if (below) set(row, 'margin-top', Math.ceil(cy0 + chc - rr.top + 4 + (parseFloat(getComputedStyle(row).marginTop) || 0)) + 'px');
       else if (refused) inWindow(); }
-    else if (row && !roomBelow && !anchor.center && tr && tr.height) { sentence.style.removeProperty('line-height'); inWindow(); }
-    else sentence.style.removeProperty('line-height');
+    else if (row && !roomBelow && !anchor.center && tr && tr.height) inWindow();
     function inWindow() { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
-      if (rowRect().bottom > uiLimit && sentence.querySelector('br.megulit-row-br') && !sentence.style.lineHeight) set(sentence, 'line-height', closeRows(sentence));
       const fsx = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rx = rowRect();
-      if (rx.bottom > uiLimit) { const fs = Math.max(Math.ceil((grows() ? cnBase : fsx) * .85), Math.floor(fsx * Math.max(.85, (uiLimit - rx.top) / Math.max(1, rx.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rx = rowRect(); }
-      /* 2026-11-21 incr9 (owner, 千恋＊万花: two Japanese rows + two translation rows, the Japanese first row pushed to y 750 over the
-         name box 【運転手】 at 787): with the game profile's placement.translationGrowsDown the Japanese stays on the game's own text
-         place, the translation grows down and only shrinks (at most 15 %); every other game keeps moving the block up */
-      if (rx.bottom > uiLimit && !grows()) { const up = Math.min(rx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); } }
+      if (rx.bottom > uiLimit) { const fs = Math.max(Math.ceil(cnBase * .85), Math.floor(fsx * Math.max(.85, (uiLimit - rx.top) / Math.max(1, rx.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rx = rowRect(); }
+    }
     if (row) { const limit = workLimit();
       const fs0 = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rb = row.getBoundingClientRect();
-      if (rb.bottom > limit) { /* 2026-11-20 (user: 「译文为啥都这么小啊 别这么小」): at most 15 % smaller; what still does not fit moves the block up instead */ const fs = Math.max(Math.ceil((grows() ? cnBase : fs0) * .85), Math.floor(fs0 * Math.max(.85, (limit - rb.top) / Math.max(1, rb.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rb = row.getBoundingClientRect(); }
-      /* off the monitor even at 85 %: the block moves up just enough (a translation nobody can see is worse than a moved line) */
-      if (rb.bottom > limit) { const up = Math.min(rb.bottom - limit, Math.max(0, win.getBoundingClientRect().top)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); rb = row.getBoundingClientRect(); }
+      if (rb.bottom > limit) { /* 2026-11-20 (user: 「译文为啥都这么小啊 别这么小」): at most 15 % smaller; remaining overflow belongs to the translation alone */ const fs = Math.max(Math.ceil(cnBase * .85), Math.floor(fs0 * Math.max(.85, (limit - rb.top) / Math.max(1, rb.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rb = row.getBoundingClientRect(); }
+      // The calibrated Japanese baseline wins even when the translation cannot fit.
+      const available = Math.floor(limit - rb.top), oneLine = parseFloat(getComputedStyle(parts[0] || row).lineHeight) || cnBase * 1.4;
+      if (rb.bottom > limit && available >= oneLine) {
+        set(row, 'max-height', available + 'px'); set(row, 'overflow-y', 'auto'); set(row, 'overscroll-behavior', 'contain');
+      }
     }
   }
   function release(fallback = false, repin = true) {
@@ -204,7 +202,7 @@
     document.body.classList.remove('megulit-anchored');
     for (const br of document.querySelectorAll('br.megulit-row-br,br.megulit-cn-br')) br.remove();
     for (const w of document.querySelectorAll('.megulit-anchor-center,.megulit-page-fresh')) w.classList.remove('megulit-anchor-center', 'megulit-page-fresh');
-    for (const w of document.querySelectorAll('.megulit-anchor-window')) { w.classList.remove('megulit-anchor-window'); const cr = w.querySelector('.tomoyo-cn-row'); if (cr) for (const p of ['max-width', 'margin-left', 'margin-right']) cr.style.removeProperty(p); for (const p of ['left', 'top', 'right', 'bottom', 'margin']) w.style.removeProperty(p); w.querySelector('.sentence-text')?.style.removeProperty('line-height'); }
+    for (const w of document.querySelectorAll('.megulit-anchor-window')) { w.classList.remove('megulit-anchor-window'); const cr = w.querySelector('.tomoyo-cn-row'); if (cr) for (const p of ['max-width', 'margin-left', 'margin-right', 'max-height', 'overflow-y', 'overscroll-behavior']) cr.style.removeProperty(p); for (const p of ['left', 'top', 'right', 'bottom', 'margin']) w.style.removeProperty(p); w.querySelector('.sentence-text')?.style.removeProperty('line-height'); }
     document.body.classList.toggle('megulit-place-fallback', fallback === true);
     for (const w of document.querySelectorAll('.megulit-place-window')) {
       w.classList.remove('megulit-place-window');

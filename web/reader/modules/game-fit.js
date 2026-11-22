@@ -17,14 +17,14 @@
     back, user: 「位置不要到处跑」「只有在显示不下中文的时候才小」). jp: {top,bottom} of the Japanese alone. The Japanese stands in for
     the game's own rows: its size and first row never change, long sentences wrap downwards. Only the translation gives way:
     when this sentence's translation does not fit above the client bottom it is made smaller once (down to 60 %, sized from
-    the translation's own height); only if it still does not fit the block moves up just enough, as a last resort. Both are
+    the translation's own height); if it still does not fit, only the translation scrolls where at least one row fits. Both are
     for this sentence only. Without jp (older callers) the block is scaled and moved as before. */
  function plan(win,client,fit,jp){
   const limit=client.bottom-MARGIN,over=win.bottom-limit;
   if(!(over>0))return {fit,shift:0,room:0};
   if(jp&&Number.isFinite(jp.bottom)){const cn=Math.max(0,win.bottom-Math.max(win.top,jp.bottom));
    if(fit>MIN+.005&&cn>0){const next=Math.max(MIN,Math.floor(fit*Math.max(0,cn-over)/cn*100)/100);if(next<fit-.005)return {fit:next,shift:0,room:0};}
-   const up=Math.min(over,Math.max(0,win.top-(client.top+MARGIN)));return {fit,shift:-up,room:over>up?over-up:0};}
+   return {fit,shift:0,room:over};}
   const height=win.bottom-win.top,avail=limit-win.top;
   if(fit>MIN+.005&&height>0&&avail>0){const next=Math.max(MIN,Math.floor(fit*avail/height*100)/100);if(next<fit-.005)return {fit:next,shift:0,room:0};}
   const up=Math.min(over,Math.max(0,win.top-(client.top+MARGIN)));
@@ -44,7 +44,7 @@
   css.textContent=
    'html body.tomoyo-gal-bound.megulit-fit-on'+own+' .sentence-window:not(.tome-island-page) .tomoyo-cn-output{font-size:calc(var(--tomoyo-gal-cn-size,24px) * var(--megulit-fit,1))!important}'+
    'html body.tomoyo-gal-bound.megulit-fit-up'+own+' .sentence-window:not(.tome-island-page){top:calc(var(--tomoyo-reader-y,0px) + var(--megulit-fit-shift,0px))!important}'+
-   'html body.tomoyo-gal-bound.megulit-fit-room'+own+' .sentence-window:not(.tome-island-page) .tomoyo-cn-output{max-height:var(--megulit-fit-room,4em)!important;overflow-y:auto!important;overscroll-behavior:contain}';
+   'html body.tomoyo-gal-bound.megulit-fit-room'+own+' .sentence-window:not(.tome-island-page) .tomoyo-cn-output{min-height:0!important;max-height:var(--megulit-fit-room,4em)!important;overflow-y:auto!important;overscroll-behavior:contain}';
   (d.head||d.documentElement).append(css);
   let fit=1,shift=0,room=0,line='',frame=0;
   const main=()=>[...d.querySelectorAll('.sentence-window')].find(n=>!n.classList.contains('tome-island-page'));
@@ -66,7 +66,7 @@
    const m=measure(win);if(!m)return;const box={top:m.top-shift,bottom:m.bottom-shift};
    const roomNow=room;if(roomNow>0){/* the translation was cut to roomNow: its full height decides */const cn=win.querySelector('.tomoyo-cn-output');if(cn&&cn.scrollHeight>cn.clientHeight)box.bottom+=cn.scrollHeight-cn.clientHeight;}
    const p=plan(box,client,fit,m.jp?{top:m.jp.top-shift,bottom:m.jp.bottom-shift}:null);
-   let nextRoom=0;if(p.room>0){const cn=win.querySelector('.tomoyo-cn-output');if(cn){const full=cn.scrollHeight||cn.getBoundingClientRect().height;nextRoom=Math.max(0,Math.floor(full-p.room));/* less than one row of the translation left: cutting it shows a strip nobody can read, it stays whole */const rowH=parseFloat(w.getComputedStyle(cn).fontSize)*1.1||0;if(nextRoom<rowH)nextRoom=0;}}
+   let nextRoom=0;if(p.room>0){const cn=win.querySelector('.tomoyo-cn-output');if(cn){const full=cn.scrollHeight||cn.getBoundingClientRect().height;nextRoom=Math.max(0,Math.floor(full-p.room));/* less than one row of the translation left: cutting it shows a strip nobody can read, it stays whole */const cnStyle=w.getComputedStyle(cn),rowH=parseFloat(cnStyle.lineHeight)||parseFloat(cnStyle.fontSize)*1.4||0;if(nextRoom<rowH)nextRoom=0;}}
    /* within one sentence the result only tightens (a translation arriving in parts, a resize pass): it never flips back and forth */
    const nf=Math.min(fit,p.fit),ns=Math.min(shift,p.shift),nr=Math.max(room,nextRoom);
    if(nf!==fit||ns!==shift||nr!==room){fit=nf;shift=ns;room=nr;set();schedule();}
