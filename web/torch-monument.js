@@ -23,7 +23,7 @@ import {buildHall,buildStele,HALL} from './torch-hall.js';
 import {loadBaked,withBaked,bakedAO,computeVolumes,applyAO} from './torch-bake.js';
 import {VolumetricPass} from './torch-volumetric.js';
 import {loadGsap} from './gsap-loader.js';
-import {createTorchZoom} from './torch-controls.js';
+import {createTorchZoom,keepTorchCameraAboveFloor} from './torch-controls.js';
 
 /* 2026-11-21 店主: 匿名的传火人用大写数字（传火人壹、贰、叁）；#0 是店主 */
 const cnNo=n=>{n=Math.floor(Number(n)||0);if(n<=0)return "零";const D="零壹贰叁肆伍陆柒捌玖",U=["","拾","佰","仟"],B=["","万","亿","万亿"];const sec=p=>{let o="",z=false;for(let i=3;i>=0;i--){const x=Math.floor(p/10**i)%10;if(x){if(z&&o)o+="零";o+=D[x]+U[i];z=false;}else z=true;}return o;};const parts=[];for(let i=0;n>0;i++){parts.unshift([n%10000,i]);n=Math.floor(n/10000);}let out="",gap=false;for(const [p,i] of parts){if(!p){if(out)gap=true;continue;}if(out&&(gap||p<1000))out+="零";out+=sec(p)+B[i];gap=false;}return out;};
@@ -253,7 +253,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
  const scene=new THREE.Scene();scene.background=new THREE.Color(0x0e0c14);scene.fog=new THREE.FogExp2(0x16131f,0.015);
  const camera=new THREE.PerspectiveCamera(44,1,0.1,160);
  const START={pos:new THREE.Vector3(0,2.6,37),look:new THREE.Vector3(0,27,3)},END={pos:new THREE.Vector3(0,2.3,20.5),look:new THREE.Vector3(0,4.7,0)};
- const view={pos:START.pos.clone(),look:START.look.clone(),yaw:0,pitch:0,yawT:0,pitchT:0,dragYaw:0,dragPitch:0,panX:0,panY:0,px:0,pxT:0,read:null};
+ const view={pos:START.pos.clone(),look:START.look.clone(),yaw:0,pitch:0,yawT:0,pitchT:0,dragYaw:0,dragPitch:0,freeYaw:0,freePitch:0,panX:0,panY:0,px:0,pxT:0,read:null};
  const zoom=createTorchZoom({reduced});
  camera.position.copy(view.pos);camera.lookAt(view.look);
 
@@ -462,13 +462,16 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
   if(reflector){const pr=renderer.getPixelRatio();reflector.getRenderTarget().setSize(Math.round(w*pr*.5),Math.round(h*pr*.5));}
   if(dust)dust.material.uniforms.uScale.value=h/700*renderer.getPixelRatio();}
  const pointer={x:0,y:0,down:false,sx:0,sy:0,yaw0:0,pitch0:0,moved:0};
- const onMove=e=>{const r=host.getBoundingClientRect();pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=((e.clientY-r.top)/r.height)*2-1;
+ const onMove=e=>{const r=host.getBoundingClientRect();
+  if(!pointer.down||!pointer.freeLook){pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=((e.clientY-r.top)/r.height)*2-1;}
   if(pointer.down&&e.pointerId===pointer.id){const dx=(e.clientX-pointer.sx)/r.width,dy=(e.clientY-pointer.sy)/r.height;pointer.moved=Math.max(pointer.moved,Math.abs(dx)+Math.abs(dy));
-   if(pointer.pan){view.panX=THREE.MathUtils.clamp(pointer.panX-dx*20*zoom.value,-8,8);view.panY=THREE.MathUtils.clamp(pointer.panY+dy*14*zoom.value,-3,4);}
+   if(pointer.freeLook){view.freeYaw=pointer.yaw0+dx*4;view.freePitch=THREE.MathUtils.clamp(pointer.pitch0+dy*3,-1.45,1.45);}
+   else if(pointer.pan){view.panX=THREE.MathUtils.clamp(pointer.panX-dx*20*zoom.value,-8,8);view.panY=THREE.MathUtils.clamp(pointer.panY+dy*14*zoom.value,-3,4);}
    else{view.dragYaw=THREE.MathUtils.clamp(pointer.yaw0+dx*.9,-.26,.26);view.dragPitch=THREE.MathUtils.clamp(pointer.pitch0+dy*1.1,-.62,.12);}}};
- const onDown=e=>{if(e.button!==0)return;pointer.down=true;pointer.id=e.pointerId;pointer.moved=0;pointer.sx=e.clientX;pointer.sy=e.clientY;pointer.yaw0=view.dragYaw;pointer.pitch0=view.dragPitch;pointer.pan=zoom.target<.95||!!view.read;pointer.panX=view.panX;pointer.panY=view.panY;dragMoved=false;canvas.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);};
- const onUp=e=>{if(e.pointerId!==pointer.id)return;pointer.down=false;dragMoved=pointer.moved>.012;canvas.classList.remove('is-dragging');if(canvas.hasPointerCapture?.(e.pointerId))canvas.releasePointerCapture(e.pointerId);};
- canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointerup',onUp);canvas.addEventListener('pointercancel',onUp);
+ const onDown=e=>{if(pointer.down||(e.button!==0&&e.button!==2))return;pointer.down=true;pointer.id=e.pointerId;pointer.moved=0;pointer.sx=e.clientX;pointer.sy=e.clientY;pointer.freeLook=e.button===2;pointer.yaw0=pointer.freeLook?view.freeYaw:view.dragYaw;pointer.pitch0=pointer.freeLook?view.freePitch:view.dragPitch;pointer.pan=zoom.target<.95||!!view.read;pointer.panX=view.panX;pointer.panY=view.panY;dragMoved=false;canvas.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);};
+ const onUp=e=>{if(!pointer.down||e.pointerId!==pointer.id)return;pointer.down=false;dragMoved=pointer.moved>.012;canvas.classList.remove('is-dragging');if(canvas.hasPointerCapture?.(e.pointerId))canvas.releasePointerCapture(e.pointerId);};
+ const onContextMenu=e=>e.preventDefault();
+ canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointerup',onUp);canvas.addEventListener('pointercancel',onUp);canvas.addEventListener('lostpointercapture',onUp);canvas.addEventListener('contextmenu',onContextMenu);
  const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
  function pick(x,y){const r=canvas.getBoundingClientRect();ndc.set(((x-r.left)/r.width)*2-1,-((y-r.top)/r.height)*2+1);ray.setFromCamera(ndc,camera);
   const hit=ray.intersectObject(face,false)[0];if(!hit||!hit.uv)return null;const point=stele.worldToLocal(hit.point.clone());const lx=hit.uv.x*FW,ly=(1-hit.uv.y)*FH;
@@ -488,15 +491,16 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
   if(view.read&&introDone){const r=view.read;view.pos.set(THREE.MathUtils.clamp(r.x*.92,-5,5),THREE.MathUtils.clamp(r.y+.05,2.2,4.4),5.2);view.look.set(r.x,r.y,0);}
   view.pos.sub(view.look).multiplyScalar(zoom.step(dt)).add(view.look);
   view.pos.x+=view.panX;view.look.x+=view.panX;view.pos.y+=view.panY;view.look.y+=view.panY;
+  keepTorchCameraAboveFloor(view.pos);
   const settle=introDone?1:Math.max(0,(k-.7)/.3);
-  view.yawT=-pointer.x*.06*settle+view.dragYaw;view.pitchT=-pointer.y*.035*settle-view.dragPitch;view.pxT=pointer.x*.3*settle;
+  view.yawT=-pointer.x*.06*settle+view.dragYaw+view.freeYaw;view.pitchT=THREE.MathUtils.clamp(-pointer.y*.035*settle-view.dragPitch-view.freePitch,-1.5,1.5);view.pxT=pointer.x*.3*settle;
   const a=1-Math.exp(-dt*2.6);view.yaw+=(view.yawT-view.yaw)*a;view.pitch+=(view.pitchT-view.pitch)*a;view.px+=(view.pxT-view.px)*a;
   if(view.smoothPos){view.smoothPos.lerp(view.pos,1-Math.exp(-dt*2.2));view.smoothLook.lerp(view.look,1-Math.exp(-dt*2.2));}else{view.smoothPos=view.pos.clone();view.smoothLook=view.look.clone();}
   camera.position.copy(view.smoothPos);camera.position.x+=view.px;
   tmpDir.copy(view.smoothLook).sub(view.smoothPos).normalize();eul.set(view.pitch,view.yaw,0);tmpDir.applyEuler(eul);camera.lookAt(tmpPos.copy(camera.position).add(tmpDir));}
  function lookAtFocus(){placeGlow();if(glow.userData.on&&glow.userData.world)view.read=glow.userData.world.clone();}
  function setRead(p){view.read=p?new THREE.Vector3(THREE.MathUtils.clamp(p.x,-5.2,5.2),THREE.MathUtils.clamp(p.y,2.2,4.6),0):null;}
- function resetView(){view.read=null;view.dragYaw=0;view.dragPitch=0;view.panX=0;view.panY=0;zoom.reset();}
+ function resetView(){view.read=null;view.dragYaw=0;view.dragPitch=0;view.freeYaw=0;view.freePitch=0;view.panX=0;view.panY=0;zoom.reset();}
 
  /* ---- loop ---- */
  let idle=false,mirrorTick=0;
@@ -527,7 +531,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
  let disposed=false,ready=false,compilePoll=0;
  function dispose(){disposed=true;active=false;if(raf)cancelAnimationFrame(raf);raf=0;if(paintQueued)cancelAnimationFrame(paintQueued);
   if(compilePoll)clearTimeout(compilePoll);introTween?.kill();
-  canvas.removeEventListener('pointermove',onMove);canvas.removeEventListener('pointerdown',onDown);canvas.removeEventListener('pointerup',onUp);canvas.removeEventListener('pointercancel',onUp);
+  canvas.removeEventListener('pointermove',onMove);canvas.removeEventListener('pointerdown',onDown);canvas.removeEventListener('pointerup',onUp);canvas.removeEventListener('pointercancel',onUp);canvas.removeEventListener('lostpointercapture',onUp);canvas.removeEventListener('contextmenu',onContextMenu);
   if(composer){composer.passes.forEach(p=>p.dispose?.());composer.dispose?.();}
   if(reflector){reflector.getRenderTarget().dispose();reflector.material.dispose();}
   if(dust){dust.geometry.dispose();dust.material.dispose();}
