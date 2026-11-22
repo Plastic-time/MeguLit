@@ -3,23 +3,47 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
 
 internal static class CardinalGameCapture {
+    [StructLayout(LayoutKind.Sequential)]
+    struct SecurityAttributes { internal int length; internal IntPtr descriptor; internal int inherit; }
+    [DllImport("user32",SetLastError=true,CharSet=CharSet.Unicode)]
+    static extern IntPtr CreateDesktop(string name,IntPtr device,IntPtr mode,int flags,uint access,ref SecurityAttributes security);
+    [DllImport("user32",SetLastError=true)]
+    static extern bool CloseDesktop(IntPtr desktop);
+
+    static IntPtr CreateGameDesktop(string name,SecurityIdentifier package) {
+        using(var owner=WindowsIdentity.GetCurrent()) {
+            // Only the ephemeral package can use this private desktop alongside the collector.
+            string acl="D:P(A;;GA;;;SY)(A;;GA;;;"+owner.User.Value+")(A;;0x200c7;;;"+package.Value+")S:(ML;;NW;;;LW)";
+            var descriptor=new RawSecurityDescriptor(acl);
+            byte[] data=new byte[descriptor.BinaryLength];
+            descriptor.GetBinaryForm(data,0);
+            var pin=GCHandle.Alloc(data,GCHandleType.Pinned);
+            try {
+                var security=new SecurityAttributes { length=Marshal.SizeOf(typeof(SecurityAttributes)),descriptor=pin.AddrOfPinnedObject() };
+                var result=CreateDesktop(name,IntPtr.Zero,IntPtr.Zero,0,0x10000000,ref security);
+                if(result==IntPtr.Zero)throw new Win32Exception();
+                return result;
+            } finally {pin.Free();}
+        }
+    }
     static void PlainPath(string path) {
         for(string current=path;current!=null;current=Path.GetDirectoryName(current))
             if((File.GetAttributes(current)&FileAttributes.ReparsePoint)!=0)throw new IOException("SAMPLE_REPARSE_POINT");
     }
-    static void CopyAssets(string source,string target,bool top) {
+    static void CopyAssets(string source,string target,string skipDirectory) {
         foreach(var entry in new DirectoryInfo(source).GetFileSystemInfos()) {
             if((entry.Attributes&FileAttributes.ReparsePoint)!=0)throw new IOException("SAMPLE_REPARSE_POINT");
             string dest=Path.Combine(target,entry.Name);
             if(entry is DirectoryInfo) {
-                if(top && entry.Name.Equals("savedata",StringComparison.OrdinalIgnoreCase))continue;
+                if(entry.Name.Equals(skipDirectory,StringComparison.OrdinalIgnoreCase))continue;
                 Directory.CreateDirectory(dest);
-                CopyAssets(entry.FullName,dest,false);
+                CopyAssets(entry.FullName,dest,null);
             } else File.Copy(entry.FullName,dest);
         }
     }
@@ -27,7 +51,7 @@ internal static class CardinalGameCapture {
         using(var input=File.OpenRead(file))
         using(var sha=SHA256.Create())return BitConverter.ToString(sha.ComputeHash(input)).Replace("-","").ToLowerInvariant();
     }
-    internal static string Run(Dictionary<string,object> req,string hostExe,string hostHash,string address) {
+    internal static string Run(Dictionary<string,object> req,string hostExe,string hostHash,string address,string saveDir,string template,string templateHash) {
         var source=Path.GetFullPath(hostExe);
         if(!source.StartsWith(@"F:\",StringComparison.OrdinalIgnoreCase) ||
             !String.Equals(source,Path.GetFullPath((string)req["exe"]),StringComparison.OrdinalIgnoreCase))
@@ -43,15 +67,26 @@ internal static class CardinalGameCapture {
             string probe=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"CardinalIsolationProbe.exe");
             CardinalIsolationProbe.WithIsolation(address,probe,delegate(string root,IntPtr sid) {
                 string game=Directory.CreateDirectory(Path.Combine(root,"game")).FullName;
-                CopyAssets(baseDir,game,true);
+                CopyAssets(baseDir,game,saveDir);
                 string exe=Path.Combine(game,Path.GetFileName(source));
                 if(Digest(exe)!=hostHash)throw new IOException("GAME_COPY_CHANGED");
                 var package=new SecurityIdentifier(sid);
                 CardinalIsolationProbe.Grant(game,package,FileSystemRights.ReadAndExecute);
-                var save=Directory.CreateDirectory(Path.Combine(game,"savedata"));
+                var save=Directory.CreateDirectory(Path.Combine(game,saveDir));
+                if(template!=null) {
+                    string original=Path.Combine(baseDir,saveDir,template);
+                    PlainPath(original);
+                    string copy=Path.Combine(save.FullName,template);
+                    File.Copy(original,copy);
+                    if(Digest(copy)!=templateHash)throw new IOException("GAME_SAVE_TEMPLATE_CHANGED");
+                }
                 CardinalIsolationProbe.Grant(save.FullName,package,FileSystemRights.Modify);
                 int seconds=Math.Max(10,Math.Min(360,Convert.ToInt32(req["budgetMs"])/1000));
-                int code=ColdDesk.Run(new[]{"run",exe,"--seconds",seconds.ToString()},"Cardinal"+Guid.NewGuid().ToString("N"),null,
+                string desktop="Cardinal"+Guid.NewGuid().ToString("N");
+                IntPtr handle=CreateGameDesktop(desktop,package);
+                Console.Error.WriteLine("Game desktop "+desktop);
+                int code;
+                try { code=ColdDesk.Run(new[]{"run",exe,"--seconds",seconds.ToString()},desktop,null,
                     delegate(IntPtr job,int pid) { return false; },
                     delegate(string image,string desk,out IntPtr process,out IntPtr thread,out int pid) {
                         CardinalIsolationProbe.Child child;
@@ -61,7 +96,7 @@ internal static class CardinalGameCapture {
                             throw;
                         }
                         process=child.process;thread=child.thread;pid=child.pid;
-                    });
+                    }); } finally { if(!CloseDesktop(handle))throw new Win32Exception(); }
                 if(code!=0)why="GAME_JOB_FAILED";
                 else if(!ColdDesk.AudioReadback)why="GAME_AUDIO_READBACK_MISSING";
             });

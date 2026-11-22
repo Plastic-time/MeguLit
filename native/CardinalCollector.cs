@@ -154,13 +154,15 @@ internal static class CardinalCollector {
     // The root is a disposable diagnostic installation with no player data.
     // Use the desktop host's real reader_open and reader_connect, without adding
     // messages, translations or a mock invoke transport to the running Reader.
-    static int ReaderProbe(string root,int configuredPort) {
+    static int ReaderProbe(string root,int configuredPort,string desktop=null) {
         root=Path.GetFullPath(root);
         if(!Path.GetPathRoot(root).Equals(@"F:\",StringComparison.OrdinalIgnoreCase) ||
            !File.Exists(Path.Combine(root,"services","server.cjs")) ||
            Directory.Exists(Path.Combine(root,"cache")) || Directory.Exists(Path.Combine(root,"data")))
             throw new IOException("FRESH_F_DRIVE_APP_REQUIRED");
         Environment.SetEnvironmentVariable("MEGULIT_ROOT",root);
+        Environment.SetEnvironmentVariable("MEGULIT_OFFLINE","1");
+        Environment.SetEnvironmentVariable("MEGULIT_COLLECTOR_WINDOWS",desktop==null?null:"1");
         Environment.SetEnvironmentVariable("MEGULIT_SIDE_BY_SIDE","1");
         Environment.SetEnvironmentVariable("MEGULIT_RELAY_BASE","off");
         Environment.SetEnvironmentVariable("MEGULIT_WEBVIEW_ARGS","--remote-debugging-port="+configuredPort+" --remote-debugging-address=127.0.0.1");
@@ -172,12 +174,12 @@ internal static class CardinalCollector {
         using(var pipe=new NamedPipeServerStream("megulit-cardinal-"+session,PipeDirection.InOut,1,
                 PipeTransmissionMode.Byte,PipeOptions.Asynchronous)) {
         var record=ReadRecord(pipe);
-        bool opened=false; string observation=null;
+        bool opened=false,requestedWindows=false; string observation=null;
         var output=Console.Out; Console.SetOut(Console.Error);
         int code;
         try {
             code=ColdDesk.Run(new[]{"run",Path.Combine(root,"MeguLit.exe"),"--seconds","50"},
-                "Cardinal"+Guid.NewGuid().ToString("N"),"--headless-ui-check",delegate(IntPtr job,int rootPid) {
+                desktop ?? ("Cardinal"+Guid.NewGuid().ToString("N")),"--headless-ui-check",delegate(IntPtr job,int rootPid) {
                     string cache=Path.Combine(root,"cache");
                     if(!Directory.Exists(cache))return false;
                     var ports=configuredPort>0 ? new[]{configuredPort} :
@@ -195,18 +197,22 @@ internal static class CardinalCollector {
                                 if(Evaluate(target,"String(window.__TOME_READER_READY__ === true)")!="true")continue;
                                 var sample=Evaluate(target,TranslationExpression);
                                 Verify(browser,job,birth,port);
+                                if(desktop!=null && !requestedWindows){
+                                    Evaluate(target,"window.__TAURI_INTERNALS__.invoke('service',{request:{action:'reader_message',message:{type:'galWindows'}}}).then(()=> 'sent')");
+                                    requestedWindows=true;
+                                }
                                 if(!record.IsCompleted)continue;
                                 uint servicePid;
                                 if(!GetNamedPipeClientProcessId(pipe.SafePipeHandle,out servicePid))throw new IOException("NATIVE_PIPE_IDENTITY");
                                 var frame=Json.Deserialize<Dictionary<string,object>>(record.GetAwaiter().GetResult());
                                 if(!Equals(frame["challenge"],session) || !Equals(frame["servicePid"],(int)servicePid) ||
                                    !Equals(frame["name"],"GalWindowBridge.exe") ||
-                                   !Equals(((Dictionary<string,object>)frame["m"])["type"],"ready"))throw new IOException("NATIVE_BRIDGE_READY");
+                                   !Equals(((Dictionary<string,object>)frame["m"])["type"],desktop==null?"ready":"windows"))throw new IOException("NATIVE_BRIDGE_READY");
                                 using(var service=Process.GetProcessById((int)servicePid))
                                 using(var bridge=Process.GetProcessById((int)frame["bridgePid"])) {
                                     VerifyImage(job,service,Path.Combine(root,"runtime","node.exe"));
                                     VerifyImage(job,bridge,Path.Combine(root,"native","GalWindowBridge.exe"));
-                                    observation=Json.Serialize(new {schema="megulit.reader-diagnostic",readerTargetId=reader["id"],session,bridgePid=bridge.Id,bridgeBirth=bridge.StartTime.ToUniversalTime().Ticks.ToString(),nativeEvent="ready",signed=false,rootPid,browserPid=browser.Id,birth=birth.ToString(),port,translation=sample});
+                                    observation=Json.Serialize(new {schema="megulit.reader-diagnostic",readerTargetId=reader["id"],session,bridgePid=bridge.Id,bridgeBirth=bridge.StartTime.ToUniversalTime().Ticks.ToString(),nativeEvent=desktop==null?"ready":"windows",windows=desktop==null?null:((Dictionary<string,object>)frame["m"])["windows"],signed=false,rootPid,browserPid=browser.Id,birth=birth.ToString(),port,translation=sample});
                                 }
                                 return true;
                             }
@@ -285,11 +291,24 @@ internal static class CardinalCollector {
                 socket.ExclusiveAddressUse=true;
                 try { socket.Start(); } finally { socket.Stop(); }
             }
+            if(args.Length==3 && args[0]=="--reader-windows" && Regex.IsMatch(args[2],@"\ACardinal[a-f0-9]{32}\z"))return ReaderProbe(args[1],port,args[2]);
             if(args.Length==2 && args[0]=="--reader-probe")return ReaderProbe(args[1],port);
             if(args.SequenceEqual(new[]{"--probe"})) {
                 var dir=Path.Combine(@"F:\","cardinal-"+Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(dir);
                 return Probe(dir);
+            }
+            string saveDir="savedata";
+            string template=null,templateHash=null;
+            if(args.Length==9 && args[0]=="--isolated-game" && args[6]=="--save-template") {
+                if(!Regex.IsMatch(args[7],@"\A[A-Za-z0-9_-]{1,64}\.org\z") ||
+                    !Regex.IsMatch(args[8],@"\A[a-f0-9]{64}\z"))throw new IOException("GAME_SAVE_TEMPLATE");
+                template=args[7]; templateHash=args[8]; args=args.Take(6).ToArray();
+            }
+            if(args.Length==6 && args[0]=="--isolated-game" && args[4]=="--save-dir") {
+                if(!new[]{"sav","savedata","savedata_zh","UserData"}.Contains(args[5],StringComparer.OrdinalIgnoreCase))throw new IOException("GAME_SAVE_DIR");
+                saveDir=args[5];
+                args=args.Take(4).ToArray();
             }
             bool isolated=args.Length==4 && args[0]=="--isolated-game" && Regex.IsMatch(args[2],@"\A[a-f0-9]{64}\z");
             if(args.Length!=0 && !isolated)throw new ArgumentException("COLLECTOR_ARGUMENTS");
@@ -301,7 +320,7 @@ internal static class CardinalCollector {
             if(!Equals(req["schema"],"megulit.trusted-capture-request") || !Equals(req["version"],1) ||
                 !Regex.IsMatch((string)req["challenge"],"\\A[a-f0-9]{64}\\z") ||
                 !Regex.IsMatch((string)req["reporter"],"\\A[a-zA-Z0-9_-]{1,80}\\z"))throw new IOException("CAPTURE_REQUEST");
-            string failure=isolated ? CardinalGameCapture.Run(req,args[1],args[2],args[3]) : "OS_SAVE_NETWORK_ISOLATION_UNAVAILABLE";
+            string failure=isolated ? CardinalGameCapture.Run(req,args[1],args[2],args[3],saveDir,template,templateHash) : "OS_SAVE_NETWORK_ISOLATION_UNAVAILABLE";
             Console.WriteLine(Json.Serialize(new {schema="megulit.capture-failure",challenge=req["challenge"],reporter=req["reporter"],
                 reason=failure,signed=false}));
             return 2;

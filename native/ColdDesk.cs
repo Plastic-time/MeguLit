@@ -108,6 +108,24 @@ static class ColdDesk{
  static IntPtr Job,Desk,GameWin;static HashSet<uint> Pids=new HashSet<uint>();static string ImageName="";static DateTime StartedAt;
  static readonly object CleanupLock=new object();static volatile bool Stopping;static bool Cleaned,CleanupSafe=true;static int StopRequested;
  static List<uint> JobPids(){var l=new List<uint>();int size=8+IntPtr.Size*1024;IntPtr buf=Marshal.AllocHGlobal(size);try{if(!QueryInformationJobObject(Job,3,buf,(uint)size,IntPtr.Zero))throw new Exception("Cannot confirm cold job process list");int n=Marshal.ReadInt32(buf,4);for(int i=0;i<n;i++)l.Add((uint)Marshal.ReadIntPtr(buf,8+i*IntPtr.Size).ToInt64());}finally{Marshal.FreeHGlobal(buf);}return l;}
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd,StringBuilder name,int max);
+ [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr hwnd,EnumProc callback,IntPtr data);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern IntPtr SendMessageTimeout(IntPtr hwnd,uint msg,IntPtr length,StringBuilder text,uint flags,uint timeout,out IntPtr result);
+ static void ReadGameDialog(IntPtr window){
+  var cls=new StringBuilder(80);GetClassName(window,cls,cls.Capacity);
+  if(cls.ToString()!="#32770")return;
+  uint owner;GetWindowThreadProcessId(window,out owner);int count=0;
+  EnumChildWindows(window,delegate(IntPtr child,IntPtr data){
+   uint pid;GetWindowThreadProcessId(child,out pid);cls.Clear();GetClassName(child,cls,cls.Capacity);
+   if(pid==owner && cls.ToString()=="Static" && IsWindowVisible(child)){
+    var label=new StringBuilder(1024);IntPtr length;
+    if(SendMessageTimeout(child,13,(IntPtr)label.Capacity,label,2,200,out length)!=IntPtr.Zero && length.ToInt64()>0)
+     Emit("{\"type\":\"gameDialog\",\"text\":"+Q(label.ToString())+"}");
+    count++;
+   }
+   return count<8;
+  },IntPtr.Zero);
+ }
  static IntPtr Biggest(){IntPtr best=IntPtr.Zero;long area=-1;var pids=new HashSet<uint>(JobPids());EnumProc cb=(h,_)=>{uint p;GetWindowThreadProcessId(h,out p);if(!pids.Contains(p)||!IsWindowVisible(h))return true;RECT r;GetWindowRect(h,out r);long s=(long)(r.R-r.L)*(r.B-r.T);if(s>area){area=s;best=h;}return true;};
   EnumDesktopWindows(Desk,cb,IntPtr.Zero);return best;}
  static Dictionary<uint,Process> audioGuards=new Dictionary<uint,Process>();
@@ -196,7 +214,7 @@ static class ColdDesk{
     foreach(var pr in Process.GetProcessesByName(ImageName)){try{if(pr.StartTime.ToUniversalTime()>StartedAt&&!pids.Contains((uint)pr.Id)&&String.Equals(Path.GetFullPath(pr.MainModule.FileName),exe,StringComparison.OrdinalIgnoreCase)){Emit("{\"type\":\"relaunched\",\"pid\":"+pr.Id+"}");why="relaunched";CleanupSafe=false;}}catch{}finally{pr.Dispose();}}
     if(why!="")break;
     if((DateTime.UtcNow-goneAt).TotalSeconds>12){uint code=0;GetExitCodeProcess(pi.hProcess,out code);Emit("{\"type\":\"exited\",\"code\":"+code+"}");why="exited";break;}}
-   var w=Biggest();if(w!=IntPtr.Zero){RECT r;GetClientRect(w,out r);int cw=r.R-r.L,ch=r.B-r.T;if(w!=lastHwnd||cw!=lastW||ch!=lastH){lastHwnd=w;lastW=cw;lastH=ch;GameWin=w;var t=new StringBuilder(256);GetWindowText(w,t,256);Activate();
+   var w=Biggest();if(w!=IntPtr.Zero){RECT r;GetClientRect(w,out r);int cw=r.R-r.L,ch=r.B-r.T;if(w!=lastHwnd||cw!=lastW||ch!=lastH){lastHwnd=w;lastW=cw;lastH=ch;GameWin=w;if(restricted!=null)ReadGameDialog(w);var t=new StringBuilder(256);GetWindowText(w,t,256);Activate();
      Emit("{\"type\":\"window\",\"hwnd\":"+Q(w.ToInt64().ToString())+",\"w\":"+cw+",\"h\":"+ch+",\"title\":"+Q(t.ToString())+"}");}}
    if((DateTime.UtcNow-lastMute).TotalMilliseconds>700){lastMute=DateTime.UtcNow;Mute();}
    if((DateTime.UtcNow-lastPower).TotalSeconds>5){lastPower=DateTime.UtcNow;if(Ac()=="false")Emit("{\"type\":\"power\",\"ac\":false}");int q=Quns();bool full=q>=2&&q<=4;if(full&&!wasFull)Emit("{\"type\":\"fullscreen\",\"on\":true}");wasFull=full;}
