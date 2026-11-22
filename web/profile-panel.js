@@ -6,7 +6,7 @@
    it back. The drawer has a fixed size; only its body changes, with a short fade. */
 import {mountEmailLogin} from './account-ui.js';
 import {mountProfileSettings} from './profile-settings.js';
-import {cropAvatarFile,pickImageFile} from './avatar-crop.js';
+import {avatarCropWords,cropAvatarFile,pickImageFile} from './avatar-crop.js';
 import {readerLevel,rankTitle,SCHOOLS,SCHOOL_LEVEL,classWords,openRite,elementName} from './reader-class.js';
 const T={
  zh:{title:'个人主页',close:'关闭',joinTitle:'注册 / 登录 MeguLit 账号',joinText:'用邮箱收一个 6 位验证码就能登录，第一次登录就是注册，不用密码',
@@ -68,7 +68,11 @@ export async function openProfilePanel({api,locale,esc,toast,onClose=()=>{},open
  };
 
  async function paintHero(hero){
-  const h=HERO[locale]||HERO.zh,d=await heroData(api);if(!hero.isConnected)return;
+  const data=await heroData(api);if(hero.isConnected)renderHero(hero,data);
+ }
+
+ function renderHero(hero,d){
+  const h=HERO[locale]||HERO.zh;
   const nf=new Intl.NumberFormat({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale]||'zh-CN'),st=d.stats||{},sec=Number(st.seconds)||0;
   const time=sec>=3600?`${Math.floor(sec/3600)}<small>${h.h}</small>${Math.floor(sec%3600/60)}<small>${h.m}</small>`:`${Math.floor(sec/60)}<small>${h.m}</small>`;
   const lv=readerLevel(d.stats,d.school),cw=classWords(locale);const initial=esc([...(d.name||'?')][0]||'?');
@@ -83,14 +87,20 @@ ${d.favorites.length?`<div class="profile-hero-fav"><h4>${h.fav}</h4><ol>${d.fav
     same name check as before, and into the local setting otherwise. */
  function bindHero(hero,d,h){
   const board=d.board||{},sync=v=>{const f=body.querySelector('[name=leaderboardName]');if(f)f.value=v;};
-  hero.querySelector('[data-hero-avatar]').onclick=async()=>{
-   const file=await pickImageFile();if(!file)return;let data;try{data=await cropAvatarFile(file,locale);}catch{toast(h.offline);return;}if(!data||!hero.isConnected)return;
-   const btn=hero.querySelector('[data-hero-avatar]');btn.classList.add('is-busy');
+  const avatarBtn=hero.querySelector('[data-hero-avatar]');
+  avatarBtn.onclick=async()=>{
+   const w=avatarCropWords(locale);avatarBtn.disabled=true;
    try{
-    if(!board.joined){toast(h.joining);await api('leaderboard_join',{name:d.name,shareGames:board.shareGames===true,consent:true});}
-    const r=await api('leaderboard_avatar_set',{data});if(r?.state&&r.state!=='ok')toast(h.offline);
+    const file=await pickImageFile();if(!file)return;
+    let data;try{data=await cropAvatarFile(file,locale);}catch(error){toast(w[error.message]||w.unreadable);return;}
+    if(!data||!hero.isConnected)return;
+    avatarBtn.classList.add('is-busy');
+    if(!board.joined){toast(h.joining);await api('leaderboard_join',{name:d.name,shareGames:board.shareGames===true,consent:true});d.board={...board,joined:true};}
+    const r=await api('leaderboard_avatar_set',{data});if(r?.state!=='ok'){toast(h.offline);return;}
+    toast(r.status==='approved'?w.approved:r.status==='rejected'?w.rejected+' · '+w.appealWhere:w.pending);
+    d.pic={status:r.status,image:r.status==='approved'?data:''};if(hero.isConnected)renderHero(hero,d);
    }catch(e){toast(String(e?.message||h.offline));}
-   await paintHero(hero);
+   finally{avatarBtn.disabled=false;avatarBtn.classList.remove('is-busy');}
   };
   const lv0=readerLevel(d.stats,d.school);
   hero.querySelector('[data-class-go]')?.addEventListener('click',()=>openRite({api,locale,esc,toast,current:d.school,pending:lv0.pending,xpTotal:lv0.xp+lv0.pending,
