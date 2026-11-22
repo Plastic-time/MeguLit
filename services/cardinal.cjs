@@ -10,6 +10,7 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const Tape=require('../core/cardinal/tape.cjs'),Score=require('../core/cardinal/score.cjs'),{fromTape}=require('../core/cardinal/timeline.cjs');
 const Profiles=require('../core/profiles/index.cjs');
+const Display=require('../core/cardinal/display.cjs');
 const Identity=require('./cardinal/identity.cjs');
 const KEY=/^[0-9a-f]{64}$/;
 const MIN_LINES=10;
@@ -84,7 +85,7 @@ async function go(job){const {root,key,rules,reader}=job;const started=Date.now(
  const identity={schema:1,digest:job.proof.digest,candidate:job.proof.candidate,configHash:job.proof.config?.digest,scripts:(job.proof.scripts||[]).map(({path,sha256})=>({path,sha256}))};
  const doc={record:rec,why:job.why,identity,applies:result.applies,below:result.below,detail:result.detail,ms:Date.now()-started,lag,unreliable,errors,sent:false};
  try{save(root,key,doc);}catch(error){doc.persistenceError=String(error?.message||error);doc.unreliable=true;trace(reader,'cardinal not uploaded: local score persistence failed key='+key.slice(0,8)+' '+doc.persistenceError);return doc;}
- trace(reader,'cardinal scored key='+key.slice(0,8)+' total='+rec.total+' lines='+rec.lines+' source='+rec.source+' seedRev='+(rec.seedRev||'-')+' '+Score.KEYS.map(k=>k+'='+rec.scores[k]).join(' ')+(lag?' lagP95='+lag.stepP95:'')+(unreliable?(!timing.reliable?' unreliable (timing: '+timing.why+'): not uploaded':!result.detail.pairObservation.reliable?' unreliable (translation display unobserved): not uploaded':o.models===true?' unreliable (modeled visibility): not uploaded':!result.detail.leakObservation.observed?' unreliable (original visibility unobserved): not uploaded':!result.detail.choiceObservation.reliable?' unreliable (unobserved option state): not uploaded':!result.detail.timeline.reliable?' unreliable (missing delivery clock): not uploaded':errors.length?' unreliable (replay errors): not uploaded':' unreliable (busy PC): not uploaded'):''));
+ trace(reader,'cardinal scored key='+key.slice(0,8)+' score='+Display.format(rec.total)+' total='+rec.total+' lines='+rec.lines+' source='+rec.source+' seedRev='+(rec.seedRev||'-')+' '+Score.KEYS.map(k=>k+'='+rec.scores[k]).join(' ')+(lag?' lagP95='+lag.stepP95:'')+(unreliable?(!timing.reliable?' unreliable (timing: '+timing.why+'): not uploaded':!result.detail.pairObservation.reliable?' unreliable (translation display unobserved): not uploaded':o.models===true?' unreliable (modeled visibility): not uploaded':!result.detail.leakObservation.observed?' unreliable (original visibility unobserved): not uploaded':!result.detail.choiceObservation.reliable?' unreliable (unobserved option state): not uploaded':!result.detail.timeline.reliable?' unreliable (missing delivery clock): not uploaded':errors.length?' unreliable (replay errors): not uploaded':' unreliable (busy PC): not uploaded'):''));
  if(unreliable||!require('../core/cardinal/upload.cjs').eligible(doc))return doc;
  try{const r=await require('./auto-profile-feed.cjs').reportScore(root,rec,job.fetcher?{fetcher:job.fetcher}:{});doc.upload={state:r.state,...(r.status?{status:r.status}:{})};if(r.state==='sent')doc.sent=true;save(root,key,doc);}catch{}
  return doc;}
