@@ -8,7 +8,7 @@ const localeWords={zh:['日文环境启动','弹窗或菜单乱码时再开启�
 export const originalLabel=locale=>(labels[locale]||labels.en)[0];
 export function localeToggleHTML(locale,mode){
  const [label,hint]=localeWords[locale]||localeWords.en;
- return `<div class="detail-locale"><label class="locale-toggle"><input type="checkbox" role="switch" data-locale aria-describedby="detail-locale-help" ${mode==='japanese'?'checked':''}><span class="review-switch" aria-hidden="true"></span><strong>${label}</strong></label><small id="detail-locale-help" class="settings-help">${hint}</small><small class="detail-locale-error" role="status"></small></div>`;
+ return `<div class="detail-locale"><label class="locale-toggle"><strong>${label}</strong><input type="checkbox" role="switch" data-locale aria-describedby="detail-locale-help" ${mode==='japanese'?'checked':''}><span class="review-switch" aria-hidden="true"></span></label><small id="detail-locale-help" class="settings-help">${hint}</small><small class="detail-locale-error" role="status"></small></div>`;
 }
 export function bindLocaleToggle(host,{id,api,locale}){
  const box=host.querySelector('[data-locale]'),status=host.querySelector('.detail-locale-error');
