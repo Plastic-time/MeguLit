@@ -37,7 +37,7 @@
       errDownT: '这趟没送到', errDownM: '试了好几条线，都连不上。多半是网络断了，或者被代理拦住了。', errDownTip: '先点「重试」，已经下好的部分不会重下。还不行就点「复制日志」发给我们，或者去官网手动下整包。',
       errInstT: '差一步，有东西占着', errInstM: '有些文件被别的程序占着，覆盖不了。', errInstTip: '先把开着的 MeguLit 关掉，杀毒软件的扫描也停一下，再点「重试」。东西已经下好了，不会重下。',
       retry: '重试', copylog: '复制日志', copied: '已复制', manual: '手动下载',
-      quitT: '货还在路上', quitM: '现在关也行，已经下好的会留着，下次打开接着下。', stay: '等它到', leave: '回头再来',
+      quitCloseT: '退出安装？', quitCloseM: '退出后可重新打开安装程序继续。', quitStay: '继续安装', quitT: '货还在路上', quitM: '现在关也行，已经下好的会留着，下次打开接着下。', stay: '等它到', leave: '回头再来',
       minimize: '最小化', close: '关闭', toDark: '切换到深色', toLight: '切换到浅色'
     },
     en: {
@@ -60,7 +60,7 @@
       errDownT: 'The download stopped', errDownM: 'Every route failed to answer. Usually that is the network or a proxy.', errDownTip: 'Hit Retry first, what is already downloaded is kept. If it still fails, copy the log and send it to us, or grab the full package from the site.',
       errInstT: 'Could not finish installing', errInstM: 'Another program has some of the files open.', errInstTip: 'Close any running MeguLit and pause your antivirus scan, then hit Retry. Nothing gets downloaded twice.',
       retry: 'Retry', copylog: 'Copy log', copied: 'Copied', manual: 'Download manually',
-      quitT: 'Still downloading', quitM: 'You can close it now. What is downloaded is kept and picks up next time.', stay: 'Keep going', leave: 'Close for now',
+      quitCloseT: 'Exit setup?', quitCloseM: 'You can reopen the installer to continue.', quitStay: 'Continue setup', quitT: 'Still downloading', quitM: 'You can close it now. What is downloaded is kept and picks up next time.', stay: 'Keep going', leave: 'Close for now',
       minimize: 'Minimize', close: 'Close', toDark: 'Switch to dark', toLight: 'Switch to light'
     }
   };
@@ -286,9 +286,11 @@
     { const pp = s.phase === 'unpack' || s.phase === 'done' ? 1 : (s.total ? clamp(s.got / s.total) : 0), pr = progCircle && progCircle.querySelector('.prog'); if (pr && cache && cache.pp !== Math.round(pp * 200)) { cache.pp = Math.round(pp * 200); pr.setAttribute('stroke-dashoffset', (471 * (1 - pp)).toFixed(1)); }
       if (bandEl) bandEl.style.backgroundPosition = '0 ' + ((REDUCE ? 0 : (s.t || 0) * 160) % 120).toFixed(0) + 'px'; }
     if (window.GL && GL.ok) { GL.update(lastFrames, { s, t, reveal: lastReveal, prog: s.phase === 'unpack' || s.phase === 'done' ? 1 : (s.total ? clamp(s.got / s.total) : 0) }); GL.draw(); }
-    const waiting = s.phase === 'vc-runtime' || (statusOnly && (s.phase !== 'download' || s.total <= 0));
-    $('#hud').classList.toggle('waiting', waiting);
-    const pct = s.total ? Math.floor(100 * s.got / s.total) : 0;
+    const unpacking = s.phase === 'unpack';
+    const hasBytes = s.total > 0 && s.phase !== 'vc-runtime' && (!statusOnly || s.phase === 'download' || s.phase === 'verify');
+    $('#hud').classList.toggle('waiting', !unpacking && !hasBytes);
+    $('#hud').classList.toggle('unpacking', unpacking);
+    const pct = Math.floor(100 * clamp(unpacking ? s.unpack || 0 : hasBytes ? s.got / s.total : 0));
     $('#pct').textContent = pct; $('#got').textContent = MB(s.got || 0); $('#total').textContent = MB(s.total || 0);
     $('#speed').textContent = s.phase === 'download' || s.phase === 'probe' ? (s.speed > 0 ? (s.speed / 1048576).toFixed(1) + ' MB/s' : tr('probing')) : '';
     $('#eta').textContent = s.eta > 0 ? tr("eta", s.eta) : '';
@@ -322,7 +324,14 @@
   if (Q.get('desk') === '1') document.documentElement.classList.add('deskmode');
   let quitOpen = false;
   Scene.showQuit = (on) => { quitOpen = on; const el = $('#ui-quit'); if (on) { gsap.set(el, { visibility: 'visible' }); gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.2, overwrite: true }); $('#stay').focus(); } else gsap.to(el, { opacity: 0, duration: 0.18, overwrite: true, onComplete() { el.style.visibility = 'hidden'; } }); };
-  $('#btnClose').addEventListener('click', () => { if (last.phase === 'download' || last.phase === 'probe' || last.phase === 'verify' || last.phase === 'prepare' || last.phase === 'unpack') Scene.showQuit(true); else act('close'); });
+  $('#btnClose').addEventListener('click', () => {
+    if (last.phase === 'done' || section === 'done') { act('close'); return; }
+    const downloading = last.phase === 'download' || last.phase === 'verify' || last.phase === 'probe';
+    $('.card.quit h2').textContent = tr(downloading ? 'quitT' : 'quitCloseT');
+    $('.card.quit p').textContent = tr(downloading ? 'quitM' : 'quitCloseM');
+    $('#stay').textContent = tr(downloading ? 'stay' : 'quitStay');
+    Scene.showQuit(true);
+  });
   $('#stay').addEventListener('click', () => Scene.showQuit(false)); $('#leave').addEventListener('click', () => act('close')); $('#btnMin').addEventListener('click', () => act('minimize'));
   $('#drag').addEventListener('mousedown', (e) => { if (e.button === 0) act('dragstart'); });
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (quitOpen) Scene.showQuit(false); else $('#btnClose').click(); } });

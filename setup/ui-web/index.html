@@ -81,9 +81,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);color:v
 .steps i.on{background:var(--red)}
 .steps span{font-size:11px;letter-spacing:2px;color:var(--mute);margin-left:10px;text-transform:uppercase}
 #hud{pointer-events:none}
-#hud.waiting .pct,#hud.waiting .stat{visibility:hidden}
-.startup-progress #boot{inset:auto 0 0;min-height:128px;padding:22px 56px 42px}.startup-progress #boot b{font-size:22px}.startup-progress #boot i,.startup-progress #boot #bootT2{display:none}.startup-progress #boot u{bottom:22px}
-@media (prefers-reduced-motion:reduce){.startup-progress #boot u::after{animation:none;transform:none}}
+#hud.waiting .pct,#hud.waiting .stat,#hud.unpacking .stat{visibility:hidden}
+.startup-progress #boot{inset:auto 0 0;min-height:128px;padding:22px 56px 42px}.startup-progress #boot b{font-size:22px}.startup-progress #boot i,.startup-progress #boot #bootT2,.startup-progress #boot u{display:none}
 .pct{position:absolute;left:30px;bottom:74px;font-size:148px;font-weight:800;letter-spacing:-8px;line-height:.9;font-variant-numeric:tabular-nums}
 .pct small{font-size:44px;letter-spacing:0;margin-left:6px;color:var(--red)}
 .stat{position:absolute;left:36px;bottom:44px;font-size:14px;color:var(--mute);display:flex;gap:22px;font-variant-numeric:tabular-nums}

@@ -37,7 +37,8 @@ function Show-SetupBootStatus([string]$step) {
     'web-layer-start' { '正在启动安装界面…' }
     'skin-window-shown' { '正在连接安装界面…' }
   }
-  if ($message) { $script:bootStatus.AccessibleDescription = $message + ' 按 Esc 取消'; $script:splash.Refresh() }
+  if ($message) { $script:bootStatus.AccessibleDescription = $message + ' 按 Esc 取消' }
+  if ($script:splashStages.ContainsKey($step)) { $script:bootFraction = $script:splashStages[$step][0]; $script:bootStatus.Refresh() }
   Test-SetupBootCancellation
 }
 function Test-SetupBootCancellation {
@@ -49,6 +50,11 @@ Boot-Mark 'script-start'
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 [Windows.Forms.Application]::EnableVisualStyles()
 Boot-Mark 'winforms-loaded'
+function Round-Rect($x, $y, $w, $h) {
+  $r = [math]::Min($h, $w); $gp = New-Object Drawing.Drawing2D.GraphicsPath
+  if ($w -le 0) { return $gp }
+  $gp.AddArc([float]$x, [float]$y, [float]$r, [float]$h, 90, 180); $gp.AddArc([float]($x + $w - $r), [float]$y, [float]$r, [float]$h, 270, 180); $gp.CloseFigure(); $gp
+}
 # Splash: the first frame of the installer's opening clip, on screen before any C# is compiled (each Add-Type -TypeDefinition starts csc.exe,
 # seconds on a busy machine). The real window replaces it (setup-web.ps1 / the classic window's Shown). Only where the web skin is wanted.
 $script:splash = $null; $script:wv2EnvTask = $null
@@ -57,15 +63,18 @@ if ($script:statusOnly) {
   $script:splash = New-Object Windows.Forms.Form
   $script:splash.Text = 'MeguLit 安装'
   $script:splash.FormBorderStyle = 'None'
-  $script:splash.ClientSize = New-Object Drawing.Size(330, 7)
+  $script:splash.ClientSize = New-Object Drawing.Size(144, 3)
   $script:splash.StartPosition = 'CenterScreen'
   $script:splash.ControlBox = $false
   $bootCancel = New-Object Windows.Forms.Button
-  $bootCancel.SetBounds(0, 0, 330, 7)
-  $script:splash.Region = [Drawing.Region]::new($bootCancel.Bounds)
+  $bootCancel.Dock = 'Fill'
+  $track = Round-Rect 0 0 $script:splash.ClientSize.Width $script:splash.ClientSize.Height
+  try { $script:splash.Region = [Drawing.Region]::new($track) } finally { $track.Dispose() }
   $bootCancel.FlatStyle = 'Flat'
   $bootCancel.FlatAppearance.BorderSize = 0
-  $bootCancel.BackColor = [Drawing.Color]::FromArgb(100, 100, 108)
+  $bootCancel.BackColor = [Drawing.Color]::FromArgb(95, 95, 100)
+  $bootCancel.FlatAppearance.MouseOverBackColor = $bootCancel.BackColor
+  $bootCancel.FlatAppearance.MouseDownBackColor = $bootCancel.BackColor
   $bootCancel.AccessibleName = '取消启动安装程序'
   $bootCancel.AccessibleDescription = '正在检查组件清单，按 Esc 或 Enter 取消'
   $bootCancel.add_Click({ $script:startupCancelled = $true })
@@ -74,18 +83,18 @@ if ($script:statusOnly) {
   $script:splash.CancelButton = $bootCancel
   $script:splash.Controls.Add($bootCancel)
   $script:bootStatus = $bootCancel
-  $script:bootStripe = New-Object Windows.Forms.Timer
-  $script:bootStripe.Interval = 30
-  $script:bootStripePosition = 0
+  $script:bootFraction = $script:splashStages['winforms-loaded'][0]
   $bootCancel.add_Paint({
     param($sender, $paint)
-    $width = $script:bootStatus.ClientSize.Width
-    $stripe = [math]::Max(1, [int]($width / 4))
-    $x = $script:bootStripePosition % ($width + $stripe) - $stripe
-    $paint.Graphics.FillRectangle([Drawing.Brushes]::Crimson, [int]$x, 0, $stripe, $script:bootStatus.ClientSize.Height)
+    $width = $sender.ClientSize.Width
+    $height = $sender.ClientSize.Height
+    $fill = [int][math]::Round($width * $script:bootFraction)
+    if ($fill -gt 0) {
+      $shape = Round-Rect 0 0 $fill $height
+      try { $paint.Graphics.SmoothingMode = 'AntiAlias'; $paint.Graphics.FillPath([Drawing.Brushes]::White, $shape) }
+      finally { $shape.Dispose() }
+    }
   })
-  $script:bootStripe.add_Tick({ $script:bootStripePosition += 9; $script:bootStatus.Invalidate() })
-  $script:bootStripe.Start()
   $script:splash.Show()
   [void]$bootCancel.Focus()
   $script:splash.Refresh()
@@ -108,7 +117,6 @@ function Release-NativeSplash([string]$why) { if ($env:MEGULIT_SPLASH_FLAG -and 
     try { if ($script:win) { $script:win.BringFront(); $script:win.FadeIn(14, 280) } } catch { Boot-Mark ('bring-front failed ' + $_) }
     try { [IO.File]::WriteAllText($env:MEGULIT_SPLASH_FLAG, $why) } catch {}; Boot-Mark ('native-splash-released why=' + $why) } }
 function Close-Splash {
-  if ($script:bootStripe) { $script:bootStripe.Stop(); $script:bootStripe.Dispose(); $script:bootStripe = $null }
   if ($script:bootTip) { $script:bootTip.Dispose(); $script:bootTip = $null }
   $script:bootStatus = $null
   if ($script:splash) { try { $script:splash.Close(); $script:splash.Dispose() } catch {}; $script:splash = $null; Boot-Mark 'splash-closed' }
@@ -284,11 +292,6 @@ $status = Label '' 32 80 656 70 9 $false $C.muted $progress
 # Hand-drawn progress bar: rounded dark track, crimson-to-gold fill, a soft shimmer while unpacking.
 $script:barValue = 0; $script:barBusy = $false; $script:barPhase = 0.0
 $bar = New-Object GrimoirePanel; $bar.Location = New-Object Drawing.Point(32,56); $bar.Size = New-Object Drawing.Size(584,14); $bar.BackColor = [Drawing.Color]::Transparent
-function Round-Rect($x, $y, $w, $h) {
-  $r = [math]::Min($h, $w); $gp = New-Object Drawing.Drawing2D.GraphicsPath
-  if ($w -le 0) { return $gp }
-  $gp.AddArc([float]$x, [float]$y, [float]$r, [float]$h, 90, 180); $gp.AddArc([float]($x + $w - $r), [float]$y, [float]$r, [float]$h, 270, 180); $gp.CloseFigure(); $gp
-}
 $bar.add_Paint({ param($s,$e)
   $g = $e.Graphics; $g.SmoothingMode = 'AntiAlias'; $w = $bar.Width - 1; $h = $bar.Height - 1
   $track = Round-Rect 0 0 $w $h

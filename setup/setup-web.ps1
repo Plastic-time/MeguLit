@@ -90,6 +90,11 @@ function Web-State {
   $o
 }
 function Web-Close { $script:webHold = $false; try { $form.Close() } catch {} }
+function Web-ConfirmClose {
+  $script:askAt = $null
+  $choice = [Windows.Forms.MessageBox]::Show($script:win, '确定要退出安装吗？', 'MeguLit 安装', 'YesNo', 'Question', 'Button2')
+  if ($choice -eq 'Yes') { Web-Close }
+}
 function Web-Abort([string]$why) {
   if (-not $script:webActive) { return }
   Web-Log ('cold-start attempt=1 result=fallback reason="' + $why + '"')
@@ -270,7 +275,7 @@ public class SetupWin : Form {
     if (-not $script:statusOnly) { try { $pp = Join-Path $ui 'video\light\intro.jpg'; if (Test-Path $pp) { $ms = New-Object IO.MemoryStream (,[IO.File]::ReadAllBytes($pp)); $pb = New-Object Windows.Forms.PictureBox; $pb.Dock = 'Fill'; $pb.SizeMode = 'StretchImage'; $pb.Image = [Drawing.Image]::FromStream($ms); $win.Controls.Add($pb); $pb.BringToFront(); $script:posterBox = $pb } } catch { Web-Log ('native poster: ' + $_) } }
     $props = New-Object Microsoft.Web.WebView2.WinForms.CoreWebView2CreationProperties; $script:webData = $(if ($env:MEGULIT_SETUP_WEBVIEW2_DATA) { $env:MEGULIT_SETUP_WEBVIEW2_DATA } elseif ($env:WEBVIEW2_USER_DATA_FOLDER) { $env:WEBVIEW2_USER_DATA_FOLDER } else { Join-Path $env:LOCALAPPDATA ('MeguLit\setup-webview2' + $PID) }); $props.UserDataFolder = $script:webData   # one folder per setup process: two setups at once do not fight over it; $web.CreationProperties = $props
     $script:win = $win; $script:webReady = $false
-    $win.AskClose = { $script:askAt = [DateTime]::Now; try { $script:win.Web.CoreWebView2.ExecuteScriptAsync('window.__askClose&&window.__askClose()') | Out-Null } catch { Web-Close } }
+    $win.AskClose = { $script:askAt = [DateTime]::Now; try { $script:win.Web.CoreWebView2.ExecuteScriptAsync('window.__askClose&&window.__askClose()') | Out-Null } catch { Web-ConfirmClose } }
     $navigate = {
       try {
         Web-Log 'WebView2 controller initialized'
@@ -345,7 +350,7 @@ public class SetupWin : Form {
       if (-not $script:webActive) { return }
       try { Web-Post @{ t = 'state'; s = (Web-State) } } catch { Web-Log ('state error: ' + $_) }
       if ($testLog -and (Test-Path ($testLog + '.restore'))) { Remove-Item ($testLog + '.restore') -Force -ErrorAction SilentlyContinue; $script:win.WindowState = 'Normal'; Web-Log ('restored: state=' + $script:win.WindowState) }
-      if ($script:askAt -and ([DateTime]::Now - $script:askAt).TotalSeconds -gt 4) { $script:askAt = $null; Web-Log 'page did not answer the close request: closing'; Web-Close }
+      if ($script:askAt -and ([DateTime]::Now - $script:askAt).TotalSeconds -gt 4) { Web-Log 'page did not answer the close request: showing native confirmation'; Web-ConfirmClose }
     })
     $script:webTimer.Start()
     $script:chkT = New-Object Windows.Forms.Timer; $script:chkT.Interval = 2500; $script:chkT.add_Tick({ $script:chkT.Stop(); Web-Log ('skin window enabled=' + $script:win.Enabled + ' visible=' + $script:win.Visible + ' taskbar: skin=' + $script:win.ShowInTaskbar + ' classic=' + $form.ShowInTaskbar + ' size=' + $script:win.ClientSize.Width + 'x' + $script:win.ClientSize.Height) }); $script:chkT.Start()

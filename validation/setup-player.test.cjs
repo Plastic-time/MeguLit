@@ -60,6 +60,7 @@ test('progress boot keeps real video and sends ready only after first frame and 
     window.__bootMessages = messages;
     window.chrome ||= {};
     const send = data => received.forEach(fn => fn({ data }));
+    window.__sendSetupState = s => send({ t: 'state', s });
     chrome.webview = {
       addEventListener(type, fn) { if (type === 'message') received.push(fn); },
       postMessage(m) {
@@ -80,6 +81,21 @@ test('progress boot keeps real video and sends ready only after first frame and 
     await ev('__replyLocation()');
     await until('__bootMessages.some(m => m.type === "ready")');
     await on('loc');
+    await ev('document.querySelector("#btnClose").click()');
+    await until('getComputedStyle(document.querySelector("#ui-quit")).visibility === "visible"');
+    assert.equal(await ev('__bootMessages.some(m => m.type === "close")'), false);
+    await ev('document.querySelector("#stay").click()');
+    await until('getComputedStyle(document.querySelector("#ui-quit")).visibility === "hidden"');
+    await ev('window.__askClose()');
+    await until('getComputedStyle(document.querySelector("#ui-quit")).visibility === "visible"');
+    assert.equal(await ev('__bootMessages.some(m => m.type === "asked")'), true);
+    await ev('document.querySelector("#leave").click()');
+    assert.equal(await ev('__bootMessages.filter(m => m.type === "close").length'), 1);
+    await ev('void Scene.goTo("unpack", "dive", "loc"); __sendSetupState({ phase: "unpack", unpack: 0.5, n: 1, st: "2", fr: [100], got: 100, total: 100 });');
+    await until('document.querySelector("#pct").textContent === "50" && getComputedStyle(document.querySelector("#pct")).visibility === "visible"');
+    assert.equal(await ev('getComputedStyle(document.querySelector(".stat")).visibility'), 'hidden');
+    await ev('__sendSetupState({ phase: "unpack", unpack: 0.75, n: 1, st: "2", fr: [100], got: 100, total: 100 });');
+    await until('document.querySelector("#pct").textContent === "75"');
     assert.equal(await ev('__bootMessages.some(m => m.what === "poster" || m.type === "fatal")'), false);
   } finally {
     await cdp('Page.removeScriptToEvaluateOnNewDocument', { identifier: result.identifier });
@@ -186,6 +202,7 @@ test('calm native loading screen: real stages from the script, no frame bundle, 
   assert.ok(!fs.existsSync(path.join(repo, 'setup', 'ui-web', 'video', 'splash-frames.bin')), 'the frame bundle is gone from the package');
   assert.match(rs, /\.stage/); assert.match(rs, /MEGULIT_SPLASH_FLAG/); assert.match(rs, /AllowSetForegroundWindow/); assert.match(rs, /exe-splash-closed reason=skin-first-frame/); assert.match(rs, /exe-splash-faded/);
   assert.ok(!/GdipCreateBitmapFromStream|SHCreateMemStream/.test(rs), 'no video/frame decoding in the exe splash');
+  assert.match(rt, /Size\(144, 3\)/); assert.match(rt, /Round-Rect 0 0 \$fill \$height/); assert.match(rt, /Brushes\]::White/); assert.doesNotMatch(rt, /bootStripe/);
   assert.match(rt, /Set-SplashStage/); assert.match(rt, /'page-frame1'/); assert.match(rt, /-not \$env:MEGULIT_NATIVE_SPLASH/);
   assert.match(web, /Release-NativeSplash 'skin-frame1'/); assert.match(rt, /\$script:win\.BringFront\(\)/, 'the skin window is brought to the front before the splash fades'); assert.match(web, /public void BringFront\(\)/);
   assert.match(rs, /913\.0/); assert.match(web, /913 \* \$scale/); assert.match(rt, /Size\(913, 584\)/);

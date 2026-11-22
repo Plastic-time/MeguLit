@@ -13,7 +13,6 @@
   const post = (type) => { try { chrome.webview.postMessage({ type }); } catch (e) { /* no host */ } };
   if (native) {
     const dr = document.getElementById('drag'); if (dr) dr.addEventListener('mousedown', (e) => { if (e.button === 0) post('drag'); });
-    window.__askClose = () => document.getElementById('btnClose').click();
     window.addEventListener('install-failed', () => { const b = document.getElementById('install'); if (b) b.classList.remove('busy'); if (Scene.showInstallError) Scene.showInstallError(); });
     /* edge and corner hot zones (index.html .rz): the host starts the system size loop for the edge pressed */
     /* zone widths in PHYSICAL pixels: the page is zoomed (devicePixelRatio = DPI scale x zoom), so 8 CSS px can be 4 device px or less */
