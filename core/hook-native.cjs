@@ -1169,7 +1169,7 @@ class HookNative{
   return true;
  }
  stop(dispose=true){
-  if(this.state.hookChoices?.scriptGroup)this.clearChoices('hook stopped');
+  if(this.state?.hookChoices?.scriptGroup)this.clearChoices('hook stopped');
   this.sayaOcr?.stop();this.sayaOcr=null;
   require('./danganronpa-pc-source.cjs').clear(this);
   let sourceStop;try{sourceStop=this.textPath?.stopIl2CppSource?.();}catch(error){sourceStop=Promise.reject(error);}sourceStop?.catch(()=>{});
