@@ -69,3 +69,16 @@ No automatic rollback, Git push, repository release or application deployment is
 Dependencies are the existing 0027/0028 routes plus the independently delivered 0029 malware API/publish guard
 The dedicated test suite can use `SEED_RUNNER_RELAY_TARGET` to pin that sealed dependency while this narrow runner branch remains based on the coordinator's 283e822b source
 All integration fixtures use an owned loopback Worker, SQLite, temporary neutral signing keys and an explicitly synthetic scanner verdict; they are not antivirus or game acceptance evidence
+
+## Optional existing DPAPI store
+
+The CLI may use all three options together: `--key-store <absolute-existing-store> --publisher-id <configured-publisher-id> --vault <absolute-KeyVault.exe>`
+Without them it keeps the existing external PEM provider
+Partial or relative-path configuration is rejected
+The module is dynamically loaded only when signing is reached after the real clean gate, never during dry-run or while waiting
+It calls the independently delivered `services/maintainer-signing.cjs` with `createSigner({store,id,role:'publisher',scope:'release',vault:createVault(vault),trust:keys})`
+That module and the already configured store/vault are required for this optional mode; this tool creates no store, keys or configuration
+The adapter test injects a neutral in-memory signer through the same lazy factory and actual localhost publication chain, without executing KeyVault or accessing a real store
+
+The approved canonical proposal is retained separately from a cloned signing input
+A callback that changes its input in place cannot change the approved comparison or authorize publication of another otherwise valid and clean proposal
