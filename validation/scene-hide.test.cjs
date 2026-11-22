@@ -31,8 +31,10 @@ test('every whole-layer hide carries its cause, and the reader host logs it',()=
 // the whole session, so every scene check compared that picture with itself.
 test('a BitBlt picture that stays the same while the screen moves is frozen and read through PrintWindow',()=>{
  const cap=read('native/GameCapture.cs'),probe=read('native/GameSceneProbe.cs'),bridge=read('native/GalWindowBridge.cs');
- assert.match(cap,/if\(!Stale\(c,Signature\(image\),DateTime\.UtcNow,\(\)=>FreezeVote\(hwnd,image,c\)\)\)return true;frozen=true;/,'Into: a frozen picture is not used');
- assert.match(cap,/if\(c\.Blind\|\|frozen\)lock\(Gate\)\{if\(\(DateTime\.UtcNow-c\.Printed\)\.TotalMilliseconds>=PrintGapMs\)\{c\.Printed=DateTime\.UtcNow;round=c\.Round;print=true;\}\}/,'a frozen window is printed under the same rate limit as a blind one, carrying its round');
+ assert.match(cap,/if\(Blt\(hwnd,image\)&&!Blank\(image\)\)\{if\(AcceptBlt\(c,Signature\(image\),DateTime\.UtcNow,\(\)=>FreezeVote\(hwnd,image,c\),out frozen\)\)return true;if\(!frozen\)return false;\}/,'Into: frozen prints, stale skips');
+ assert.match(cap,/if\(!Blank\(image\)\)\{bool f;if\(AcceptBlt\(c,Signature\(image\),DateTime\.UtcNow,\(\)=>FreezeVote\(hwnd,image,c\),out f\)\)return true;Skipped=true;return false;\}/,'BltOnly: frozen or stale skips');
+ assert.match(cap,/if\(!KeepPart\(hwnd,c,round,blank,DateTime\.UtcNow\)\)\{Skipped=true;return false;\}/,'Part checks round and state before delivering a partial BitBlt');
+ assert.match(cap,/if\(c\.Blind\|\|frozen\)lock\(Gate\)\{Choice cur;if\(Choices\.TryGetValue\(hwnd,out cur\)&&cur==c&&\(frozen\?c\.Frozen:c\.Blind\)&&\(DateTime\.UtcNow-c\.Printed\)\.TotalMilliseconds>=PrintGapMs\)\{c\.Printed=DateTime\.UtcNow;round=c\.Round;print=true;\}\}/,'a frozen window is printed under the same rate limit as a blind one, re-checking state and carrying its round');
  assert.match(cap,/case 0:Skipped=true;return false;\s+case 2:return printed;\s+\}\s+FromScreen=true;return ScreenInto\(hwnd,image\);/,'Into does what AfterPrint (self-tested) decides');
  assert.match(cap,/return DeliverPrint\(hwnd,c,round,image,printed,printed&&!Blank\(image\),frozen,screenFallback\);/,'Into delivers PrintWindow results through DeliverPrint');
  assert.match(cap,/switch\(AfterPrint\(printed,good,frozen,screenFallback\)\)\{\s+case 1:if\(!frozen\|\|Keep\(hwnd,c,round,image\)\)return true;Skipped=true;return false;/);
