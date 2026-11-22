@@ -32,7 +32,7 @@ public static class ColdCapture {
  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h,int cmd);
- const uint CREATE_SUSPENDED=4,CREATE_UNICODE_ENVIRONMENT=0x400;const int STARTF_USESHOWWINDOW=1;const short SW_SHOWMINNOACTIVE=7;
+ const uint CREATE_SUSPENDED=4,CREATE_UNICODE_ENVIRONMENT=0x400,CREATE_NO_WINDOW=0x08000000;const int STARTF_USESHOWWINDOW=1;const short SW_SHOWMINNOACTIVE=7;
 
  [StructLayout(LayoutKind.Sequential)] struct LASTINPUTINFO{public uint cbSize,dwTime;}
  [DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
@@ -67,7 +67,7 @@ public static class ColdCapture {
    var si=new STARTUPINFO();si.cb=Marshal.SizeOf(si);si.dwFlags=STARTF_USESHOWWINDOW;si.wShowWindow=SW_SHOWMINNOACTIVE;
    desk=CreateDesktop("MeguLitCapture",IntPtr.Zero,IntPtr.Zero,0,0x10000000,IntPtr.Zero);if(desk==IntPtr.Zero)throw new Exception("Hidden desktop unavailable");si.lpDesktop="WinSta0\\MeguLitCapture";
    job=CreateJobObject(IntPtr.Zero,null);IntPtr limits=Marshal.AllocHGlobal(144);try{for(int n=0;n<144;n++)Marshal.WriteByte(limits,n,0);Marshal.WriteInt32(limits,16,0x2000);if(job==IntPtr.Zero||!SetInformationJobObject(job,9,limits,(uint)(IntPtr.Size==8?144:112)))throw new Exception("Job setup failed");}finally{Marshal.FreeHGlobal(limits);}
-   if(!CreateProcess(exe,new StringBuilder("\""+exe+"\""),IntPtr.Zero,IntPtr.Zero,false,CREATE_SUSPENDED|CREATE_UNICODE_ENVIRONMENT,block.ToString(),Path.GetDirectoryName(exe),ref si,out pi))throw new Exception("Game did not start");
+   if(!CreateProcess(exe,new StringBuilder("\""+exe+"\""),IntPtr.Zero,IntPtr.Zero,false,CREATE_SUSPENDED|CREATE_UNICODE_ENVIRONMENT|CREATE_NO_WINDOW,block.ToString(),Path.GetDirectoryName(exe),ref si,out pi))throw new Exception("Game did not start");
    if(!AssignProcessToJobObject(job,pi.hProcess))throw new Exception("Job assignment failed");
    bool wow;if(!IsWow64Process(pi.hProcess,out wow)||Environment.Is64BitOperatingSystem&&((!wow)!=(IntPtr.Size==8))){word="failed";throw new Exception("Helper bitness differs from the game");}
    audioGuard=Audio.Guard(pi.dwProcessId);ResumeThread(pi.hThread);

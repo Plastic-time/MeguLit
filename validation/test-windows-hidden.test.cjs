@@ -15,6 +15,7 @@ test('every child process a validation test starts is hidden (no console or app 
  const missing=[];
  for(const file of files){const src=fs.readFileSync(file,'utf8');const re=/\b(spawnSync|spawn|execFileSync|execFile|execSync|exec)\(/g;let m;
   while((m=re.exec(src))){const args=call(src,m.index+m[1].length);const first=args.slice(1,80);
+   if(/^[ \t]*\{/.test(src.slice(m.index+m[1].length+args.length)))continue; // mock method declaration
    if(/^\s*(process\.execPath|'git'|"git"|cmd\b|command\b)/.test(first)&&!/^\s*cmd\b/.test(first))continue;
    if(/^\s*edgePath\b|msedge/.test(first)){if(!/--headless/.test(args)&&!/--headless/.test(src))missing.push(path.basename(file)+': Edge without --headless');continue;}
    if(/windowsHide\s*:\s*true/.test(args))continue;

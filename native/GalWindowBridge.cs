@@ -276,7 +276,12 @@ public class GalWindowBridge {
     static void FindOverlay(){
         // Self-test modes run without an overlay process (OverlayPid 0): never adopt, move or raise someone else's window.
         if(OverlayPid<=0){Overlay=IntPtr.Zero;return;}
-        if(PreferredOverlay!=IntPtr.Zero&&IsWindow(PreferredOverlay)){uint owner;GetWindowThreadProcessId(PreferredOverlay,out owner);if(owner==OverlayPid){Overlay=PreferredOverlay;PrepareHostedFrame();return;}}
+        if(PreferredOverlay!=IntPtr.Zero){
+            uint owner;GetWindowThreadProcessId(PreferredOverlay,out owner);
+            Overlay=owner==OverlayPid?PreferredOverlay:IntPtr.Zero;
+            if(Overlay!=IntPtr.Zero)PrepareHostedFrame();
+            return;
+        }
         // Tauri also owns hidden event-loop/tool windows. Select its actual application surface.
         // A minimised main window has an empty client rectangle; retain its identity until it is destroyed.
         if(Overlay!=IntPtr.Zero&&IsWindow(Overlay))return;
@@ -297,7 +302,13 @@ public class GalWindowBridge {
     static void Restore(){Glass.Clear();if(MaskLayer!=null)MaskLayer.Hide();if(TextMask!=null)TextMask.Hide();
         // A region can exist without a capture (bound while in normal mode); always clear it, or the normal UI stays cut into rectangles.
         if(!Captured&&Overlay!=IntPtr.Zero&&IsWindow(Overlay)&&(RegionKey!=""||HitRegions.Count>0)){RegionKey="";HitRegions.Clear();SetWindowRgn(Overlay,IntPtr.Zero,true);}
-        if(!Captured||!IsWindow(Overlay))return;ResetRegion();RestoreFrame();SetWindowLong(Overlay,-16,OriginalStyle);SetWindowPos(Overlay,new IntPtr(-2),OriginalRect.Left,OriginalRect.Top,OriginalRect.Right-OriginalRect.Left,OriginalRect.Bottom-OriginalRect.Top,0x0020|0x0040|0x0010);if(HadLayerAttributes)SetLayeredWindowAttributes(Overlay,OldLayerColor,OldLayerAlpha,OldLayerFlags);Captured=false;IsShown=true;}
+        if(!Captured||!IsWindow(Overlay))return;
+        bool hosted=PreferredOverlay!=IntPtr.Zero;
+        if(hosted)ShowWindow(Overlay,0);
+        ResetRegion();RestoreFrame();SetWindowLong(Overlay,-16,OriginalStyle);
+        SetWindowPos(Overlay,new IntPtr(1),OriginalRect.Left,OriginalRect.Top,OriginalRect.Right-OriginalRect.Left,OriginalRect.Bottom-OriginalRect.Top,0x0020|0x0010);
+        if(HadLayerAttributes)SetLayeredWindowAttributes(Overlay,OldLayerColor,OldLayerAlpha,OldLayerFlags);
+        Captured=false;IsShown=IsWindowVisible(Overlay);}
     public static Rect Place(Rect area,double x,double y,double w,double h){int aw=Math.Max(1,area.Right-area.Left),ah=Math.Max(1,area.Bottom-area.Top);x=Math.Max(0,Math.Min(95,x));y=Math.Max(0,Math.Min(95,y));w=Math.Max(5,Math.Min(100,w));h=Math.Max(5,Math.Min(100,h));int l=area.Left+(int)Math.Round(aw*x/100),t=area.Top+(int)Math.Round(ah*y/100);return new Rect(l,t,l+Math.Max(120,(int)Math.Round(aw*w/100)),t+Math.Max(70,(int)Math.Round(ah*h/100)));}
     public /* 2026-11-19 (user: 只要显示器上还有位置就不要挤压汉字): the bottom of the work area (taskbar excluded) of the monitor the game client is on */
 static int WorkBottom(Rect area){try{return System.Windows.Forms.Screen.FromRectangle(new System.Drawing.Rectangle(area.Left,area.Top,Math.Max(1,area.Right-area.Left),Math.Max(1,area.Bottom-area.Top))).WorkingArea.Bottom;}catch{return area.Bottom;}}
@@ -350,10 +361,10 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
             if(!translation&&Captured&&Target==IntPtr.Zero&&(FloatDX!=0||FloatDY!=0))OriginalRect=new Rect(OriginalRect.Left+FloatDX,OriginalRect.Top+FloatDY,OriginalRect.Right+FloatDX,OriginalRect.Bottom+FloatDY);
             FloatDX=FloatDY=0;Dragging=false;
             TranslationMode=translation;MenuOpen=false;MenuRegionReady=false;MenuFocusPending=false;LookupOpen=false;HitRegions.Clear();Glass.Clear();RegionKey="";HasLastRect=false;FloatingPlaced=false;
-            if(!translation){Restore();if(PreferredOverlay!=IntPtr.Zero){NormalShowUntil=DateTime.MinValue;if(Overlay!=IntPtr.Zero)ShowWindow(Overlay,0);IsShown=false;}else{NormalShowUntil=DateTime.UtcNow.AddMilliseconds(1500);if(Overlay!=IntPtr.Zero){ShowWindow(Overlay,userAction?5:4);IsShown=true;if(userAction)SetForegroundWindow(Overlay);}}}
+            if(!translation){Restore();if(PreferredOverlay!=IntPtr.Zero){NormalShowUntil=DateTime.MinValue;if(Overlay!=IntPtr.Zero)ShowWindow(Overlay,0);IsShown=false;}else{NormalShowUntil=DateTime.UtcNow.AddMilliseconds(1500);if(Overlay!=IntPtr.Zero){if(userAction){ShowWindow(Overlay,5);SetForegroundWindow(Overlay);IsShown=true;}else if(!IsWindowVisible(Overlay))IsShown=TopmostGuard.ShowAtBottom(Overlay);}}}
             else if(userAction&&Target!=IntPtr.Zero)SetForegroundWindow(Target);
             // No game: shrink to the dialogue strip right away (the tick loop runs only every 100 ms without a game).
-            if(PreferredOverlay==IntPtr.Zero&&translation&&Target==IntPtr.Zero){FindOverlay();if(Overlay!=IntPtr.Zero){Capture();Rect r=FloatingBase();SetWindowPos(Overlay,new IntPtr(-2),r.Left+FloatDX,r.Top+FloatDY,r.Right-r.Left,r.Bottom-r.Top,0x0020|0x0010);FloatingPlaced=true;}}
+            if(PreferredOverlay==IntPtr.Zero&&translation&&Target==IntPtr.Zero){FindOverlay();if(Overlay!=IntPtr.Zero){Capture();Rect r=FloatingBase();SetWindowPos(Overlay,new IntPtr(1),r.Left+FloatDX,r.Top+FloatDY,r.Right-r.Left,r.Bottom-r.Top,0x0020|0x0010);FloatingPlaced=true;}}
         }
         Emit(new{type=userAction?"interfaceMode":"bound",interfaceMode=translation?"translation":"normal",bound=translation&&Target!=IntPtr.Zero,gameAttached=Target!=IntPtr.Zero,coverEnabled=CoverEnabled,message=translation?"翻译文本框模式 · Alt+M 绑定当前游戏窗口":"普通 MeguLit 界面 · Alt+M 绑定当前游戏窗口"});
     }
@@ -704,11 +715,11 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
                 SetWindowPos(Overlay,IntPtr.Zero,desktop.Left,desktop.Top,desktop.Width,Math.Max(1,desktop.Height-1),0x0004|0x0010);RegionKey="";
             }
             if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();if(MenuOpen&&MenuRegionReady&&HitRegions.Count>0){Rect menuClient;if(GetClientRect(Overlay,out menuClient))ApplyRegion(menuClient.Right,menuClient.Bottom);if(!IsWindowVisible(Overlay))SetWindowPos(Overlay,IntPtr.Zero,0,0,0,0,0x0001|0x0002|0x0010|0x0040);IsShown=true;AckRegion();FocusMenuOnce();}else{if(IsWindowVisible(Overlay))ShowWindow(Overlay,0);IsShown=false;}return;}
-        if(!TranslationMode){if((GetWindowLong(Overlay,-20)&8)!=0)SetWindowPos(Overlay,new IntPtr(-2),0,0,0,0,0x0001|0x0002|0x0010);if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();if(DateTime.UtcNow<NormalShowUntil&&!IsWindowVisible(Overlay)){ShowWindow(Overlay,4);IsShown=true;}KeepPlacement();return;}
+        if(!TranslationMode){if((GetWindowLong(Overlay,-20)&8)!=0)TopmostGuard.Sink(Overlay,IntPtr.Zero);if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();if(DateTime.UtcNow<NormalShowUntil&&!IsWindowVisible(Overlay))IsShown=TopmostGuard.ShowAtBottom(Overlay);KeepPlacement();return;}
         if(Target==IntPtr.Zero){
-            Capture();if(!FloatingPlaced){Rect r=FloatingBase();SetWindowPos(Overlay,IntPtr.Zero,r.Left+FloatDX,r.Top+FloatDY,r.Right-r.Left,r.Bottom-r.Top,0x0020|0x0010);FloatingPlaced=true;}
+            Capture();if(!FloatingPlaced){Rect r=FloatingBase();SetWindowPos(Overlay,new IntPtr(1),r.Left+FloatDX,r.Top+FloatDY,r.Right-r.Left,r.Bottom-r.Top,0x0020|0x0010);FloatingPlaced=true;}
             Rect floatingClient;if(GetClientRect(Overlay,out floatingClient))ApplyRegion(floatingClient.Right,floatingClient.Bottom);
-            if(!CoverEnabled&&!(MenuOpen&&MenuRegionReady)){if(IsShown)HideReason("floating, cover off");ShowWindow(Overlay,0);IsShown=false;}else if(!IsShown){ShowWindow(Overlay,4);IsShown=true;}
+            if(!CoverEnabled&&!(MenuOpen&&MenuRegionReady)){if(IsShown)HideReason("floating, cover off");ShowWindow(Overlay,0);IsShown=false;}else if(!IsShown){if(MenuOpen&&MenuRegionReady){ShowWindow(Overlay,4);IsShown=true;}else IsShown=TopmostGuard.ShowAtBottom(Overlay);}
             if(IsShown)AckRegion();
             FocusMenuOnce();
         }
@@ -776,6 +787,10 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         NoGhostWindows();
         if(args.Length==3&&args[0]=="--same-image"){Emit(new{type="sameImage",same=SameImage(args[1],args[2]),a=ImageIdentity(args[1]),b=ImageIdentity(args[2])});return 0;}
         if(args.Length>0&&args[0]=="--topmost-guard-self-test")return TopmostGuardSelfTest();
+        if(args.Length>0&&args[0]=="--background-window-self-test"){
+            string failure=TopmostGuard.BackgroundShowSelfTest();
+            Emit(new{type="background-window-selftest",passed=failure=="",failure=failure});return failure==""?0:12;
+        }
         if(args.Length>0&&args[0]=="--layer-policy-self-test"){string failure=ReaderLayerPolicy.SelfTest();Emit(new{type="layer-policy-selftest",passed=failure=="",failure=failure});return failure==""?0:1;}
         if(args.Length>0&&args[0]=="--host-frame-self-test"){
             int original=0x16cf0000,hosted=HostedStyle(original);

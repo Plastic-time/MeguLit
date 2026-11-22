@@ -131,5 +131,5 @@ test('MeguLit menu over a corner of the game: its own windows are painted out be
  assert.match(o,/if \(win == root\) return false;/,'only windows above the game');assert.match(o,/GetWindowRgn\(win, rgn\)/,'the window region: what the reader really paints');
  for(const f of ['native/Build-GalWindowBridge.ps1','native/native-builds.json','tools/build-reader-bridge.ps1'])assert.match(fs.readFileSync(path.join(__dirname,'..',f),'utf8'),/OwnCover\.cs/,f);
  const exe=path.join(__dirname,'..','native','GalWindowBridge.exe');
- if(fs.existsSync(exe)){const out=require('child_process').execFileSync(exe,['--art-scan-mask-test'],{windowsHide:true,encoding:'utf8',timeout:60000});assert.match(out,/PASS art scan mask|SKIP/,out);}
+ if(fs.existsSync(exe)){const out=require('child_process').execFileSync(process.execPath,[path.join(__dirname,'../tools/run-isolated.cjs'),exe,'--art-scan-mask-test'],{windowsHide:true,encoding:'utf8',timeout:60000});assert.match(out,/PASS art scan mask|SKIP/,out);}
 });

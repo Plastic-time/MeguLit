@@ -1,5 +1,4 @@
-/* Cold-start check of the video installer on the REAL desktop, without bothering the user: the setup window is started through
-   NoAct.exe (created at the bottom of the z-order, never activated), test mode keeps it off the taskbar, the mouse is never touched.
+/* Cold-start check of the video installer on a private test desktop, with its WebView2 audio muted.
    Every run: fresh WebView2 profile, no WebView2 process left from the run before, the real setup\setup-runtime.ps1 + setup-web.ps1 of a
    package folder. Timing comes from the host log (setup-web.ps1 writes "cold-start mark=poster|frame1 ms=<since window shown>").
    node tools/setup-cold-video.cjs --root <package folder> [--runs 10] [--work H:\MeguLit-Work\setup-player\cold]
@@ -7,20 +6,24 @@
 const fs = require('fs'), path = require('path'), cp = require('child_process'), http = require('http');
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i < 0 ? d : (process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : true); };
 const ROOT = path.resolve(arg('root', 'H:/MeguLit-Work/setup-player/build/MeguLit')), RUNS = +arg('runs', 10), WORK = path.resolve(arg('work', 'H:/MeguLit-Work/setup-player/cold'));
-const NOACT = process.env.MEGULIT_NOACT || 'H:/MeguLit-Work/overlay-place/rig/NoAct.exe', PS = path.join(process.env.SystemRoot || 'C:/Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe');
+const PS = path.join(process.env.SystemRoot || 'C:/Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const getJ = (u) => new Promise((res, rej) => http.get(u, (r) => { let d = ''; r.on('data', (x) => d += x); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
-function killTree(pid) { try { cp.execFileSync('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore' }); } catch (e) { /* gone */ } }
-function killLeft() { /* WebView2 / PowerShell processes still running from this work folder */
-  try { cp.execFileSync('powershell.exe', ['-NoProfile', '-Command', "$w='" + WORK.replace(/'/g, "''") + "';$r='" + ROOT.replace(/'/g, "''") + "';Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and @('powershell.exe','msedgewebview2.exe','NoAct.exe','cmd.exe') -contains $_.Name -and ($_.CommandLine.Contains($w) -or $_.CommandLine.Contains($r)) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"], { stdio: 'ignore' }); } catch (e) { /* none */ }
+let activeRun;
+function stop() {
+  // The isolated launcher owns the installer and WebView2 in its job.
+  if (activeRun?.pid && activeRun.exitCode === null && activeRun.signalCode === null) {
+    try { cp.execFileSync('taskkill', ['/T', '/F', '/PID', String(activeRun.pid)], { windowsHide: true, stdio: 'ignore' }); } catch (e) { /* gone */ }
+  }
+  activeRun = null;
 }
 function start(i, extraEnv) {
   const dir = path.join(WORK, 'r' + i); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }); fs.mkdirSync(dir, { recursive: true });
   const port = 9500 + i;
   const env = Object.assign({}, process.env, { MEGULIT_SETUP_TEST: path.join(dir, 'events.log'), MEGULIT_SETUP_WEB: '1', MEGULIT_SETUP_WEB_HOLD: '1', MEGULIT_SETUP_UILOG: path.join(dir, 'ui.log'), MEGULIT_SETUP_WEBVIEW2_DATA: path.join(dir, 'wv2'), MEGULIT_SETUP_STAGING: path.join(dir, 'stage'), MEGULIT_SETUP_SUGGEST: ROOT,
     /* a window at the bottom of the z-order counts as occluded: keep it rendering so the timing is the real one */
-    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--disable-features=CalculateNativeWinOcclusion --disable-backgrounding-occluded-windows --remote-debugging-port=' + port }, extraEnv || {});
-  const p = cp.spawn(NOACT, [PS, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', path.join(ROOT, 'setup', 'setup-runtime.ps1'), '-Root', ROOT], { env, stdio: 'ignore', windowsHide: true });
+    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--mute-audio --disable-features=CalculateNativeWinOcclusion --disable-backgrounding-occluded-windows --remote-debugging-port=' + port }, extraEnv || {});
+  const p = activeRun = cp.spawn(process.execPath, [path.join(__dirname, 'run-isolated.cjs'), PS, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', path.join(ROOT, 'setup', 'setup-runtime.ps1'), '-Root', ROOT], { env, stdio: 'ignore', windowsHide: true });
   return { p, dir, port, log: path.join(dir, 'ui.log'), t0: Date.now() };
 }
 const read = (f) => { try { return fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''); } catch (e) { return ''; } };
@@ -39,18 +42,17 @@ async function cdpPage(port) {
 async function coldRuns() {
   const res = [];
   for (let i = 1; i <= RUNS; i++) {
-    killLeft(); await sleep(500);
     const r = start(i); let t = '', out = null;
-    while (Date.now() - r.t0 < 90000) { await sleep(150); t = readRun(r); if (/cold-start mark=frame1/.test(t) || /classic window|result=fallback/.test(t)) break; }
+    while (r.p.exitCode === null && Date.now() - r.t0 < 90000) { await sleep(150); t = readRun(r); if (/cold-start mark=frame1/.test(t) || /classic window|result=fallback/.test(t)) break; }
     await sleep(400); t = readRun(r);
     const fb = /classic window|result=fallback/.test(t);
     out = { run: i, poster: ms(t, 'native-poster') !== null ? ms(t, 'native-poster') : ms(t, 'poster'), pagePoster: ms(t, 'poster'), frame1: ms(t, 'frame1'), fallback: fb, why: fb ? ((/reason="([^"]*)"/.exec(t) || [])[1] || (/classic window[^\n]*/.exec(t) || [''])[0]) : '' };
     out.blank = !fb && (out.poster === null && out.frame1 === null);
-    /* boot steps, ms since the process was launched (spawn time here, `at=` epoch ms in the log) */
-    out.boot = {}; for (const m of t.matchAll(/boot step=(\S+) since_proc=(-?\d+) at=(\d+)/g)) if (!(m[1] in out.boot)) out.boot[m[1]] = +m[3] - r.t0;
+    /* Use the setup process clock so compiling the launcher does not affect the measurements. */
+    out.boot = {}; for (const m of t.matchAll(/boot step=(\S+) since_proc=(-?\d+) at=(\d+)/g)) if (!(m[1] in out.boot)) out.boot[m[1]] = +m[2];
     out.splash = out.boot['splash-shown'] !== undefined ? out.boot['splash-shown'] : null; out.frame1Spawn = out.frame1 !== null && out.boot['skin-window-shown'] !== undefined ? out.boot['skin-window-shown'] + out.frame1 : null;
     { const pg = await cdpPage(r.port); if (pg) { if (i === 1) await pg.shot(path.join(WORK, 'cold-run1.png')); out.nav = await pg.ev('(()=>{const n=performance.getEntriesByType("navigation")[0]||{},p={};performance.getEntriesByType("paint").forEach(e=>p[e.name]=Math.round(e.startTime));return {fetchStart:Math.round(n.fetchStart||0),responseEnd:Math.round(n.responseEnd||0),domInteractive:Math.round(n.domInteractive||0),dcl:Math.round(n.domContentLoadedEventEnd||0),fp:p["first-paint"],fcp:p["first-contentful-paint"],poster:window.__posterAt,m:performance.getEntriesByType("mark").map(e=>e.name+":"+Math.round(e.startTime)).join(" "),res:performance.getEntriesByType("resource").filter(e=>/skin/.test(e.name)).map(e=>Math.round(e.startTime)+"-"+Math.round(e.responseEnd)).join(" ")}})()').catch(() => null); pg.close(); } }
-    killTree(r.p.pid); killLeft();
+    stop();
     console.log(`run ${i}: splash ${out.splash} ms after launch; window->poster ${out.poster} ms, window->first video frame ${out.frame1} ms, launch->first video frame ${out.frame1Spawn} ms; boot ${JSON.stringify(out.boot)}${fb ? ' FALLBACK ' + out.why : ''}${out.blank ? ' BLANK' : ''}`);
     res.push(out);
   }
@@ -61,7 +63,7 @@ async function coldRuns() {
 }
 async function flow() {
   /* one install against a local throttled source (the package's setup\runtime.json was pointed at it by setup-cold-feed.cjs) */
-  killLeft(); const shots = path.join(WORK, 'flow'); fs.mkdirSync(shots, { recursive: true });
+  const shots = path.join(WORK, 'flow'); fs.mkdirSync(shots, { recursive: true });
   const r = start(99, { MEGULIT_SETUP_WEB_HOLD: '1' }); const pg = await cdpPage(r.port); if (!pg) throw new Error('no page');
   const wait = async (expr, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await pg.ev(expr).catch(() => false)) return true; await sleep(200); } return false; };
   const st = () => pg.ev('JSON.stringify({s:Player.state,f:window.__playerFrame,sec:Scene.section})');
@@ -76,6 +78,6 @@ async function flow() {
   await wait('Player.state.cur==="done"', 90000); await sleep(1500); await pg.shot(path.join(shots, '8-done.png')); console.log('done', await st());
   const switches = await pg.ev('JSON.stringify(Player.log.filter(e=>e.k==="switch"||e.k==="want").map(e=>e.k+":"+(e.id||e.section)+(e.how?"/"+e.how:"")+"@"+e.t))'); console.log('timeline', switches);
   fs.writeFileSync(path.join(WORK, 'flow.json'), switches || '[]');
-  pg.close(); killTree(r.p.pid); killLeft();
+  pg.close(); stop();
 }
-(async () => { fs.mkdirSync(WORK, { recursive: true }); if (arg('flow', false)) await flow(); else await coldRuns(); process.exit(0); })().catch((e) => { console.error(e); killLeft(); process.exit(1); });
+(async () => { fs.mkdirSync(WORK, { recursive: true }); if (arg('flow', false)) await flow(); else await coldRuns(); process.exit(0); })().catch((e) => { console.error(e); stop(); process.exit(1); });
