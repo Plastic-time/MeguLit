@@ -86,7 +86,7 @@ function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepa
    hook.notify?.({hookSource:'',hookSpeaker:'',hookSourceRuby:[],hookSourceOrigin:'leave',hookSequence:(hook.state.hookSequence||0)+1,receivedText:false,hookMessage:'Unity 原文已清空'});
   };
  }else{
- s.onSource=m=>{const {sameOwner}=require('./unity-kemco-source.cjs');
+ s.onSource=m=>{if(prepared.path==='web'&&m?.engine==='rpgm')return require('./rpgm-source.cjs').deliver(hook,s,m);const {sameOwner}=require('./unity-kemco-source.cjs');
   if(prepared.path==='rgss'){
    const current=()=>hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&hook.wanted!==false&&!s.stopped&&s.roles&&s.generation===m.generation&&hook.gamePid?.()===m.pid&&s.body.get(m.line)?.text===m.text;
    if(!current()||typeof hook.emitSource!=='function')return false;

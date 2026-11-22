@@ -160,7 +160,7 @@ class Cdp{
 
 /* One game: attaches to every page target, keeps hide / wanted in sync, turns reports into ToMe_CHARS lines. */
 class WebTextPath{
- constructor({port,onChars=()=>{},onStatus=()=>{},onAsk=()=>{},canary=null,now=()=>Date.now()}){Object.assign(this,{port,onChars,onStatus,onAsk,canary,now});this.drawCfg=null;this.pages=new Map();this.on=false;this.wanted='';this.stopped=false;this.armed=false;}
+ constructor({port,onChars=()=>{},onSource=()=>{},onStatus=()=>{},onAsk=()=>{},canary=null,now=()=>Date.now()}){Object.assign(this,{port,onChars,onSource,onStatus,onAsk,canary,now});this.drawCfg=null;this.pages=new Map();this.on=false;this.wanted='';this.stopped=false;this.armed=false;}
  async attach({timeout=60000}={}){const until=this.now()+timeout;
   while(!this.stopped&&this.now()<until){let list=[];try{list=await getJson(this.port,'/json/list');}catch{}
    for(const t of list)if(t.type==='page'&&t.webSocketDebuggerUrl&&!/^(devtools|chrome|chrome-extension):/i.test(t.url||'')&&!this.pages.has(t.id))await this.attachPage(t).catch(e=>this.onStatus('attach '+e.message));
@@ -168,13 +168,13 @@ class WebTextPath{
   return false;}
  attachPage(t){this.attaching??=new Set();const p=this.attachPageInner(t);this.attaching.add(p);p.then(()=>this.attaching.delete(p),()=>this.attaching.delete(p));return p;}
  async attachPageInner(t){if(this.stopped)return;const c=new Cdp(t.webSocketDebuggerUrl);this.connections??=new Set();this.connections.add(c);c.closed.then(()=>{if(this.pages.get(t.id)===c)this.pages.delete(t.id);this.connections.delete(c);});const current=()=>{if(this.stopped)throw Error('READER_DISABLED');};try{await c.ready;current();
-  c.handlers.add(m=>{if(m.method==='Runtime.bindingCalled'&&m.params?.name==='__megulitReport')this.report(m.params.payload);});
-  await c.send('Runtime.enable');current();const bridge=require('./cdp-report.cjs'),channel=await bridge.reporter(c,{report:s=>this.report(s),active:()=>!this.stopped&&!c.isClosed,status:s=>this.onStatus(s)});current();
+  c.handlers.add(m=>{if(m.method==='Runtime.bindingCalled'&&m.params?.name==='__megulitReport')this.report(m.params.payload,c);});
+  await c.send('Runtime.enable');current();const bridge=require('./cdp-report.cjs'),channel=await bridge.reporter(c,{report:s=>this.report(s,c),active:()=>!this.stopped&&!c.isClosed,status:s=>this.onStatus(s)});current();
   await c.send('Page.enable').catch(()=>{});current();c.scriptIds=[];let refresh=channel.legacy;for(const source of [PAGE_SCRIPT,RPGM_SCRIPT]){let result;try{result=await c.send('Page.addScriptToEvaluateOnNewDocument',{source});}catch(error){if(!bridge.missingMethod(error))throw error;refresh=true;}if(result?.identifier)c.scriptIds.push(result.identifier);current();}
-  const install=async()=>{current();await channel.bootstrap();current();await bridge.evaluate(c,PAGE_SCRIPT);current();await bridge.evaluate(c,RPGM_SCRIPT);current();const ready=await bridge.evaluate(c,'!!(window.__megulitText&&window.__megulitRpgm)');if(ready?.result?.value!==true)throw Error('CDP_SCRIPT_REJECTED');current();await this.sync(c);current();await channel.drain();};
+  const resetSource=()=>{const old=c.rpgmSource;if(old&&!old.cleared)this.onSource({engine:'rpgm',clear:true,line:old.line,owner:old.owner});c.rpgmSource=new(require('./rpgm-source.cjs').RpgmSource)();};const install=async()=>{current();resetSource();await channel.bootstrap();current();await bridge.evaluate(c,PAGE_SCRIPT);current();await bridge.evaluate(c,RPGM_SCRIPT);current();const ready=await bridge.evaluate(c,'!!(window.__megulitText&&window.__megulitRpgm)');if(ready?.result?.value!==true)throw Error('CDP_SCRIPT_REJECTED');current();await this.sync(c);current();await channel.drain();};
   await install();current();this.pages.set(t.id,c);
   /* a reload or new document: the page script runs again; give it the current state */
-  c.handlers.add(m=>{if(m.method==='Runtime.executionContextCreated')setTimeout(()=>{if(this.stopped)return;const p=refresh?install():this.sync(c);this.attaching.add(p);p.finally(()=>this.attaching.delete(p)).catch(e=>this.onStatus('reload '+e.message));},300);});}catch(error){if(!this.stopped)c.close();throw error;}}
+  c.handlers.add(m=>{if(m.method==='Runtime.executionContextCreated')setTimeout(()=>{if(this.stopped)return;const p=refresh?install():(resetSource(),this.sync(c));this.attaching.add(p);p.finally(()=>this.attaching.delete(p)).catch(e=>this.onStatus('reload '+e.message));},300);});}catch(error){if(!this.stopped)c.close();throw error;}}
  evaluate(c,expression){return c.send('Runtime.evaluate',{expression,returnByValue:true}).catch(()=>null);}
  sync(c){if(this.stopped)return Promise.resolve();return this.evaluate(c,'window.__megulitText&&(window.__megulitText.want('+JSON.stringify(this.wanted)+'),window.__megulitText.hide('+(this.on?'true':'false')+'));'+(this.drawCfg?'window.__megulitRpgm&&window.__megulitRpgm.config('+JSON.stringify(this.drawCfg)+');window.__megulitText&&window.__megulitText.config&&window.__megulitText.config('+JSON.stringify(this.drawCfg)+')':''));}
  /* engine-draw (core/engine-draw.cjs): roles / embed switches and one sentence's replacement for the RPG Maker reader */
@@ -183,11 +183,11 @@ class WebTextPath{
  async hide(on){this.on=!!on;if(this.on&&this.canary&&!this.canary.allowed('web')){this.on=false;this.onStatus('web invisible drawing off for this game (crash canary)');}
   for(const c of this.pages.values())await this.sync(c);}
  async want(text){this.wanted=String(text||'');for(const c of this.pages.values())await this.sync(c);}
- report(payload){if(this.stopped)return;let o;try{o=JSON.parse(payload);}catch{return;}if(o.status){this.onStatus(o.status);return;}
+ report(payload,connection){if(this.stopped)return;let o;try{o=JSON.parse(payload);}catch{return;}if(o.status){this.onStatus(o.status);return;}
   if(typeof o.ask==='string'&&o.ask){this.onAsk({key:o.ask,text:String(o.text||o.ask),engine:o.engine==='rpgm'?'rpgm':'web'});return;}
   if(!Array.isArray(o.rects))return;
   if(o.hidden&&this.canary){if(!this.armed){this.canary.arm('web');this.armed=true;}else this.canary.alive('web');}
-  this.onChars(formatChars({engine:o.engine==='rpgm'?'rpgm':'web',line:o.line,hidden:o.hidden,sw:o.sw,sh:o.sh,viewport:[0,0,o.sw,o.sh],rects:o.rects,text:o.text,color:o.color,role:o.role,id:o.id,box:o.box,sel:o.sel,emb:o.emb}));}
+  const wire=formatChars({engine:o.engine==='rpgm'?'rpgm':'web',line:o.line,hidden:o.hidden,sw:o.sw,sh:o.sh,viewport:[0,0,o.sw,o.sh],rects:o.rects,text:o.text,color:o.color,role:o.role,id:o.id,box:o.box,sel:o.sel,emb:o.emb});this.onChars(wire);if(connection&&o.engine==='rpgm'){const rec=require('./text-paths.cjs').parseChars(wire),source=rec&&connection.rpgmSource?.feed(rec);if(source)this.onSource(source);}}
  exited(code){if(this.canary&&this.armed)this.canary.exited('web',code);}
  stop(){
   if(this.stopping)return this.stopping;
@@ -200,7 +200,7 @@ class WebTextPath{
     if(result?.exceptionDetails||result?.wasThrown)throw Error('READER_STOP_INCOMPLETE');
     for(const identifier of c.scriptIds||[])await c.send('Page.removeScriptToEvaluateOnNewDocument',{identifier});
    }));
-   if(results.some(r=>r.status==='rejected'))throw Error('READER_STOP_INCOMPLETE');
+   if(results.some(r=>r.status==='rejected'))throw Error('READER_STOP_INCOMPLETE');this.onSource({engine:'rpgm',clear:true,terminal:true});
   })();
   this.stopping=Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('READER_STOP_INCOMPLETE')),2000);})]).finally(()=>{clearTimeout(timer);for(const c of all)c.close();all.clear();this.pages.clear();});
   this.stopping.catch(()=>{});return this.stopping;

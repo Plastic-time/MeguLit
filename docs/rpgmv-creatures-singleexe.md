@@ -1,5 +1,7 @@
 # Creatures MV single-executable runtime path — 2026-11-22
 
+Follow-up: the grant gap and actual minimum source chain described below were subsequently addressed in [the private container/Reader report](rpgmv-container-private-chain-20261122.md). This first report preserves the earlier default-off evidence and its limits
+
 Task began 08:28:47 JST, with a 90-minute deadline at 09:58:47. The actual 15-minute source audit completed after 08:43:47; product implementation and real launches began afterward. New isolated branch/worktree: `codex/rpgmv-creatures-singleexe`, `H:/MeguLit-Work/wt/rpgmv-creatures`. Started from fetched origin/main `25b466ffb46318b192d91cf8dc88e160329ab9df`, then fast-forwarded to root's clean integrated `5cbcb64d1b74a001816d3abe04a77b1b76e9bff6` to retain the awaited CDP restore/removeScript/timeout lifecycle and real `owner-tests` API. No main/CI/PR work.
 
 ## Source audit and boundary

@@ -82,6 +82,10 @@ test('MV Chrome 41 without Array.from still reports Japanese without modifying g
  const r=rig();r.run('Array.from=undefined');r.boot();r.say('今日は晴れ');const line=recs(r).at(-1);assert.equal(line.text,'今日は晴れ');assert.equal(line.rects.length,5);
  r.api.embed('𠮷野',{ruby:[[0,1,'よし']],zh:'吉野'});assert.equal(r.api.state().emb,1,'supplementary characters remain one ruby index');assert.equal(r.run('typeof Array.from'),'undefined');
 });
+test('MV Pixi 2 containers draw their children with renderable=false; dialogue stays until actual visibility changes',()=>{
+ const r=rig();r.run("var PIXI={VERSION:'v2.2.9',DisplayObjectContainer:function(){}};Object.setPrototypeOf(Window_Base.prototype,PIXI.DisplayObjectContainer.prototype);Object.setPrototypeOf(layer,PIXI.DisplayObjectContainer.prototype);layer.renderable=false;msg.renderable=false;");r.boot();r.run('Object.setPrototypeOf(SceneManager._scene,PIXI.DisplayObjectContainer.prototype);SceneManager._scene.renderable=false;');r.say('今日は晴れ');const choice=new r.ctx.Window_ChoiceList(['はい','いいえ']);choice.renderable=false;r.ctx.layer.children.push(choice);r.ctx.timers.at(-1)();let lines=recs(r);assert.equal(lines.filter(x=>!x.role).at(-1).text,'今日は晴れ');assert.equal(lines.filter(x=>x.role==='choice'&&x.text).length,2);
+ r.ctx.layer.visible=false;r.ctx.timers.at(-1)();lines=recs(r);assert.equal(lines.filter(x=>!x.role).at(-1).text,'');assert.equal(lines.filter(x=>x.role==='choice').at(-1).text,'');
+});
 
 test('roles: choice list, title command and name box are reported as UI snapshots, never as dialogue; closing sends an empty one',()=>{
  const r=rig();r.boot();r.api.config({roles:true,embed:false});

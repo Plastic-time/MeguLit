@@ -62,4 +62,32 @@ function read(file,entry){
   const out=Buffer.concat(parts);if(out.length!==entry.original)throw Error('EVB_SIZE_MISMATCH');return out;
  }finally{fs.closeSync(fd);}
 }
-module.exports={list,read,aplib};
+/* Metadata-only legacy inline layout. Unlike list(), this API never guesses the first magic,
+   allocates payload buffers or decompresses members. The caller supplies a PE-validated header. */
+function listInline(file,magic){
+ const fd=fs.openSync(file,'r');
+ try{
+  const before=fs.fstatSync(fd,{bigint:true}),size=Number(before.size);let budget=0,nodes=0;
+  const take=(at,n)=>{if(!Number.isSafeInteger(at)||!Number.isSafeInteger(n)||at<0||n<0||n>65536||at+n>size||(budget+=n)>8*1024*1024)throw Error('EVB_BOUNDS');const b=Buffer.alloc(n);if(fs.readSync(fd,b,0,n,at)!==n)throw Error('EVB_TRUNCATED');return b;};
+  const start=take(magic,83);if(start.toString('latin1',0,4)!=='EVB\0'||start.readUInt32LE(4)!==64||start.readUInt32LE(64)!==15||start.readUInt32LE(76)!==1)throw Error('EVB_INLINE_HEADER');
+  const crypto=require('node:crypto'),metadata=crypto.createHash('sha256');metadata.update(start);
+  let p=magic+83;const stack=[{path:[],left:1}],files=[],seen=new Set();
+  while(stack.length){
+   if(++nodes>16384||stack.length>32)throw Error('EVB_COUNT');
+   const head=take(p,16),len=head.readUInt32LE(0)+4,objects=head.readUInt32LE(12);if(len<20||len>8192||objects>16384)throw Error('EVB_NODE');
+   const b=take(p,len);let q=16;while(q+1<b.length&&(b[q]||b[q+1]))q+=2;
+   if(q+3>b.length)throw Error('EVB_NAME');const name=b.subarray(16,q).toString('utf16le'),type=b[q+2];q+=3;
+   if(!name||name.length>512||/[\x00-\x1f\x7f/\\:]/.test(name)||name==='.'||name==='..'||/[\ud800-\udfff]/u.test(name))throw Error('EVB_NAME');
+   const parent=stack[stack.length-1];if(--parent.left<0)throw Error('EVB_COUNT');
+   const parts=[...parent.path,name],full=parts.join('/').toLowerCase();if(seen.has(full))throw Error('EVB_DUPLICATE');seen.add(full);metadata.update(b);
+   p+=len;
+   if(type===3){if(q+29!==b.length)throw Error('EVB_DIRECTORY');if(parts.length===1&&name!=='%DEFAULT FOLDER%')throw Error('EVB_ROOT');if(objects)stack.push({path:parts,left:objects});}
+   else if(type===2){if(objects!==0||q+49!==b.length||parts[0]!=='%DEFAULT FOLDER%')throw Error('EVB_FILE');const original=Number(b.readBigUInt64LE(q+2)),stored=Number(b.readBigUInt64LE(q+41));if(!Number.isSafeInteger(original)||!Number.isSafeInteger(stored)||original<0||stored<0||original>2*1024**3||stored>2*1024**3||p+stored>size)throw Error('EVB_PAYLOAD');files.push({path:parts.slice(1),offset:p,original,stored});p+=stored;}
+   else throw Error('EVB_TYPE');
+   while(stack.length&&stack[stack.length-1].left===0)stack.pop();
+  }
+  const after=fs.fstatSync(fd,{bigint:true}),stamp=s=>[s.dev,s.ino,s.size,s.mtimeNs,s.ctimeNs].join(':');if(stamp(before)!==stamp(after))throw Error('EVB_CHANGED');
+  return {magic,files,nodes,metadataSHA256:metadata.digest('hex'),end:p,bytesRead:budget};
+ }finally{fs.closeSync(fd);}
+}
+module.exports={list,read,aplib,listInline};
