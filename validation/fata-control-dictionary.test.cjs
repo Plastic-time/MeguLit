@@ -61,7 +61,7 @@ test('exact Seed reports the original KAG choice separately and keeps original d
   assert.deepEqual(roles.map(r=>[r.text,r.hidden]),exeSha256===key?[[choice,false]]:[]);
   if(roles.length){
    const [item]=new UiTracker().feed(roles[0]),events=[];
-   const reader={targetLanguage:()=> 'zh',embedCached:text=>text===choice?'……早上好………………':'',emit:(_,msg)=>events.push(msg)};
+   const reader={targetLanguage:()=> 'zh',localTranslation:text=>text===choice?'……早上好………………':'',emit:(_,msg)=>events.push(msg)};
    await Reader.prototype.artText.call(reader,item);
    assert.deepEqual(events.map(msg=>[msg.source,msg.role,msg.text,msg.translation]),[['engine','choice',choice,'……早上好………………']]);
   }

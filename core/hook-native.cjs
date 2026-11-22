@@ -494,13 +494,14 @@ class HookNative{
   /* One wrapped sentence (TextRender during calibration) is still ADV. Start a page only when the other stream
      demonstrably retains two distinct dialogue lines. An established page may then report its first new line alone. */
   if(!P.pages){
-   if(!prev||prev===cur||k===cur)return;
+   if(k===cur)return;
    const dialogue=raw.replace(/【[^】\n]*】/g,''),flatDialogue=HookNative.flat(dialogue);
    if(!flatDialogue.includes(cur))return;
    const rows=dialogue.split('\n').map(HookNative.flat);
-   const independentRows=rows.includes(prev)&&rows.includes(cur);
+   const independentRows=prev&&prev!==cur&&rows.includes(prev)&&rows.includes(cur);
    // A translated row can repeat punctuation from the previous line. Only an entire row proves it in that case.
-   if(!independentRows&&(!/[\p{L}\p{N}]/u.test(prev)||!HookNative.retainedPrevious(flatDialogue,prev,cur)))return;
+   const additionalDialogue=flatDialogue.split(cur).some(rest=>/[\u3041-\u309f\u30a1-\u30fa]/.test(rest));
+   if(!additionalDialogue&&!independentRows&&(!/[\p{L}\p{N}]/u.test(prev)||!HookNative.retainedPrevious(flatDialogue,prev,cur)))return;
   }
   P.paging=true;P.auxPageAt=this.now();
   if(prev&&prev!==cur&&!k.includes(prev)&&this.pageSaidSame===true&&P.auxResetFor!==cur){P.auxResetFor=cur;this.pageSaidSame=false;this.trace('page turned before this line (the page text no longer holds the line before it)');this.emit({type:'hookPage',engine:'text',reset:true,at:this.now()});}}catch{}}
