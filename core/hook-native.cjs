@@ -103,7 +103,31 @@ class HookNative{
     state and the target, never in this.state (the hook's notify state); reading this.state.gameProcessId gave 0, so the engine-draw
     control file (%TEMP%\MeguLit\draw\<pid>.txt) was never written */
  gamePid(){return Number(this.target?.pid||this.windowState?.gameProcessId||this.state?.gameProcessId)||0;}
- configure(preferences,state){if(this.disposed)return;this.preferences=preferences;this.windowState=state;this.capGiveWay();const pid=Number(state.gameProcessId),hwnd=String(state.gameHwnd||'');this.wanted=(preferences.hookAutoStart||['hook','local'].includes(preferences.maskMode))&&preferences.bindEnabled===true&&preferences.hookProfile!=='off';if(this.nativeRuby&&(this.nativeRuby.pid!==pid||this.nativeRuby.started!==String(state.gameStarted||'')))this.clearNativeRuby();this.target=Number.isSafeInteger(pid)&&pid>0&&/^\d{1,19}$/.test(hwnd)?{pid,hwnd,name:String(state.processName||''),started:String(state.gameStarted||'')}:null;if(this.ownerTestGrant&&(!this.target||!require('./owner-tests.cjs').bind(this.ownerTestGrant,{pid:this.target.pid,birth:this.target.started})))require('./owner-tests.cjs').revoke(this.ownerTestGrant);if(this.profile&&this.gamePid()!==(this.drawPid||0)){this.drawPid=this.gamePid();try{this.drawSync();}catch{}}/* a profile that came before the game's pid writes its control file now */
+ resetSourceSession(){
+  // Page and OCR history belong to the bound process, even if no HookBridge could start for it.
+  clearTimeout(this.ocr?.timer);
+  this.ocr=null;
+  this.pageText=null;
+  this.pageSaidSame=false;
+  this.hookRecent=[];
+  this.recentSources=[];
+  this.loopGuard=null;
+  this.pageQueue=null;
+  this.advanceTimes=[];
+  clearTimeout(this.nativeLog?.timer);
+  this.nativeLog=null;
+  clearTimeout(this.boxBlink?.timer);
+  this.boxBlink=null;
+  this.engineDialog=undefined;
+  this.unityBox=null;
+  this.lastSource='';
+  this.lastSourceAt=0;
+ }
+ configure(preferences,state){if(this.disposed)return;this.preferences=preferences;this.windowState=state;this.capGiveWay();const pid=Number(state.gameProcessId),hwnd=String(state.gameHwnd||'');this.wanted=(preferences.hookAutoStart||['hook','local'].includes(preferences.maskMode))&&preferences.bindEnabled===true&&preferences.hookProfile!=='off';if(this.nativeRuby&&(this.nativeRuby.pid!==pid||this.nativeRuby.started!==String(state.gameStarted||'')))this.clearNativeRuby();
+  const previous=this.target;
+  this.target=Number.isSafeInteger(pid)&&pid>0&&/^\d{1,19}$/.test(hwnd)?{pid,hwnd,name:String(state.processName||''),started:String(state.gameStarted||'')}:null;
+  if(previous?.pid!==this.target?.pid||previous?.started!==this.target?.started){this.resetSourceSession();this.finishStreamProbe('');}
+  if(this.ownerTestGrant&&(!this.target||!require('./owner-tests.cjs').bind(this.ownerTestGrant,{pid:this.target.pid,birth:this.target.started})))require('./owner-tests.cjs').revoke(this.ownerTestGrant);if(this.profile&&this.gamePid()!==(this.drawPid||0)){this.drawPid=this.gamePid();try{this.drawSync();}catch{}}/* a profile that came before the game's pid writes its control file now */
   if(!this.wanted||!this.target){this.stop(false);return;}if(this.process&&(this.pid!==pid||this.started!==this.target.started))this.stop(false);
   /* E285 (user: Alt+H also switched off the translation the game draws itself): Alt+H hides MeguLit's own layers; the
      game keeps drawing the written-back translation until its own switch is turned off. */
@@ -135,7 +159,10 @@ class HookNative{
  embedReply(id,trans,o={}){if(!this.process||!Number.isSafeInteger(id))return;const hide=o?.hide===true||!!trans&&this.fixedSizeEmbed();this.send({type:'embedReply',id,trans:hide?'':String(trans||'').slice(0,4000),...(hide?{hide:true}:{})});if(!this.embedModeSent||!(hide||trans))return;
   if(hide&&!this.glyphNoted){this.glyphNoted=true;this.trace?.('embed fallback: the game font has no glyphs for the translation; the game hides the line and MeguLit draws it');}
   this.notify({embedTranslating:!hide,embedLine:{source:String(o?.source||''),text:hide?'':String(o?.text||trans||''),drawn:!hide}});}
- tick(){if(this.ownerTestGrant)this.drawSync();if(this.gaveUp&&this.target&&this.gaveUp!==this.target.pid+'|'+this.target.started){this.gaveUp=null;this.attempt=0;this.retryAt=0;}/* #468 (寒蝉 rig, 2026-11-20: the bridge waits up to 12 s for the hook loader while it injects and sends nothing; a Unity game busy starting took that long, the 12 s heartbeat ended the bridge mid-handshake, the DLL stayed injected but never connected again and the game hung): until the bridge reports the process attached it gets HOOK_ATTACH_GRACE_MS */if(this.process&&this.now()-this.lastHeartbeat>(this.state.processAttached===true?12000:HOOK_ATTACH_GRACE_MS)){const old=this.process;this.process=null;++this.serial;old.kill();this.retry('Hook 通信无响应');}if(!this.process&&this.wanted&&this.target&&this.now()>=this.retryAt)this.start(this.target);}
+ tick(){if(this.ownerTestGrant)this.drawSync();
+  if(this.streamProbe?.until&&this.now()>=this.streamProbe.until){this.streamProbe.until=0;this.notify({hookReselectState:'timedOut'});}
+  if(!this.disposed&&!this.stopPending&&this.stopError&&this.clearExitedBridgeStop())this.stop(false);
+  if(this.gaveUp&&this.target&&this.gaveUp!==this.target.pid+'|'+this.target.started){this.gaveUp=null;this.attempt=0;this.retryAt=0;}/* #468 (寒蝉 rig, 2026-11-20: the bridge waits up to 12 s for the hook loader while it injects and sends nothing; a Unity game busy starting took that long, the 12 s heartbeat ended the bridge mid-handshake, the DLL stayed injected but never connected again and the game hung): until the bridge reports the process attached it gets HOOK_ATTACH_GRACE_MS */if(this.process&&this.now()-this.lastHeartbeat>(this.state.processAttached===true?12000:HOOK_ATTACH_GRACE_MS)){const old=this.process;this.process=null;++this.serial;old.kill();this.retry('Hook 通信无响应');}if(!this.process&&this.wanted&&this.target&&this.now()>=this.retryAt)this.start(this.target);}
  /* the engine's text window state (ToMe_DIALOG); lines held during a moment's hide are dialogue when it comes back */
  dialogState(visible){this.engineDialog=visible;this.engineDialogAt=this.now();if(visible&&this.boxBlink){const b=this.boxBlink;this.boxBlink=null;clearTimeout(b.timer);this.trace('line kept as dialogue: the text window was hidden only for a moment');for(const x of b.lines)this.source(x.m,x.name);}}
  retry(message){this.pageReset();this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.enabled=false;this.retryAt=this.now()+Math.min(30000,1000*2**Math.min(this.attempt++,5));/* #468 (live: a bridge that could not reach the hook DLL again said 「LunaHook 未连接当前游戏」 every 45 s for ever): after HOOK_RETRY_MAX failures in a row without a line from the game, this game process is given up on with a clear state; a new game process, or a line, starts over */if(this.attempt>=HOOK_RETRY_MAX&&this.target){this.gaveUp=this.target.pid+'|'+this.target.started;this.retryAt=Infinity;this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,hookRecovering:false,hookGaveUp:true,hookMessage:'钩子连续 '+this.attempt+' 次没能接上这局游戏，已停止重连；重启游戏后会重新连接，期间由画面识别兜底'});this.trace('hook reconnect given up after '+this.attempt+' attempts ('+message+')');return;}this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookSource:this.lastSource||null,hookRecovering:!!this.lastSource,hookThreads:[],hookMessage:message+'；正在自动重连'});}
@@ -191,15 +218,18 @@ class HookNative{
    if(m.type==='hookRender'){this.notify({hookDrawCount:Number(m.count)||0,hookDrawAt:Number(m.at)||0});return;}
    if(m.type==='waitMarkerDrawn'){this.emit({type:'waitMarkerDrawn'});return;}
    if(m.type==='waitMarkerStatus'){this.notify({waitMarkerMessage:String(m.message||'').slice(0,300),waitMarkerHookActive:m.active===true});return;}
-   if(m.type==='hookSource'&&typeof m.text==='string'&&m.text.length<=4000){if(!require('./danganronpa-pc-source.cjs').receive(this,m,name))this.sourcePage(m,name);return;}
+   if(m.type==='hookSource'&&typeof m.text==='string'&&m.text.length<=4000){
+    if(this.streamProbe&&(m.streamProbe!==this.streamProbe.id||m.origin==='history'))return;
+    if(!require('./danganronpa-pc-source.cjs').receive(this,m,name))this.sourcePage({...m,bridgeSerial:serial},name);return;}
    // v1.1.4: speaker names from a name-role stream, for every engine that reports one (user: the log showed every line as narration).
    if(m.type==='hookPageText'&&typeof m.text==='string'){this.auxPage(m);return;}if(m.type==='hookAuxText'&&typeof m.text==='string'&&m.text.length<=400){this.auxText(m);return;}
    if(m.type==='hookName'&&typeof m.text==='string'){const n=speakerName(m.text);if(n){this.speaker={text:n,at:this.now()};this.noteSpeaker(n);/* a name flushed just after its line belongs to that line (core/sentence-pieces.cjs) */this.sentencePieces?.nameAfter(n,this.speaker.at);}return;}
    if(m.type==='hookThreads'&&Array.isArray(m.hookThreads)){// Unity games create a stream per String-method call site (often 100+); keep the selected and embeddable ones
    // ahead of the cut so a late dialogue stream such as Naninovel's printer is never dropped.
-   const rank=t=>(t&&t.selected===true?2:0)+(t&&t.embeddable===true?1:0);this.notify({hookAvailable:true,hookThreads:m.hookThreads.slice().sort((a,b)=>rank(b)-rank(a)).slice(0,100).filter(t=>typeof t.id==='string'&&t.id.length<100).map(t=>({id:t.id,name:String(t.name||'').slice(0,100),code:String(t.code||'').slice(0,1000),sample:String(t.sample||'').slice(0,110),selected:t.selected===true,embeddable:t.embeddable===true,...(t.hideTrying===true?{hideTrying:true}:{}),...(t.hideOnly===true?{hideOnly:true}:{})}))});this.syncEmbedMode();this.syncGlyphMode?.();this.leaveCheck();if(this.preferredThread&&this.state.hookThreads.some(t=>t.id===this.preferredThread)){const id=this.preferredThread;this.preferredThread=null;this.select(id);}else if(!this.foreignPick()){this.unselectedChinese();this.flowStreamCheck();}return;}
-   if(['hookStatus','hookError','hookHeartbeat'].includes(m.type)){const value={};for(const k of ['processAttached','streamSelected','receivedText'])if(typeof m[k]==='boolean')value[k]=m[k];if(typeof m.replacementState==='string')value.replacementState=this.verified&&this.enabled?'user-verified':m.replacementState;if(typeof m.hookActive==='boolean')value.hookActive=m.hookActive;if(m.hookMessage)value.hookMessage=String(m.hookMessage).slice(0,400);if(m.type!=='hookError'&&(value.receivedText??this.state.receivedText)&&(value.processAttached??this.state.processAttached)&&(value.streamSelected??this.state.streamSelected))value.hookMessage='已收到真实游戏台词；'+((value.replacementState||this.state.replacementState)==='user-verified'?'原文隐藏已由用户确认':'原文替换状态请见分阶段诊断');this.notify(value);if(m.type==='hookError')this.retryAt=this.now()+1000;this.syncMarker();}
+   const rank=t=>(t&&t.selected===true?2:0)+(t&&t.embeddable===true?1:0);this.notify({hookAvailable:true,hookThreads:m.hookThreads.slice().sort((a,b)=>rank(b)-rank(a)).slice(0,100).filter(t=>typeof t.id==='string'&&t.id.length<100).map(t=>({id:t.id,name:String(t.name||'').slice(0,100),code:String(t.code||'').slice(0,1000),sample:String(t.sample||'').slice(0,110),selected:t.selected===true,embeddable:t.embeddable===true,...(t.hideTrying===true?{hideTrying:true}:{}),...(t.hideOnly===true?{hideOnly:true}:{})}))});this.syncEmbedMode();this.syncGlyphMode?.();if(this.streamProbe)return;this.leaveCheck();if(this.preferredThread&&this.state.hookThreads.some(t=>t.id===this.preferredThread)){const id=this.preferredThread;this.preferredThread=null;this.select(id);}else if(!this.foreignPick()){this.unselectedChinese();this.flowStreamCheck();}return;}
+   if(['hookStatus','hookError','hookHeartbeat'].includes(m.type)){const value={};for(const k of ['processAttached','streamSelected','receivedText'])if(typeof m[k]==='boolean')value[k]=m[k];if(this.streamProbe)value.receivedText=false;if(typeof m.replacementState==='string')value.replacementState=this.verified&&this.enabled?'user-verified':m.replacementState;if(typeof m.hookActive==='boolean')value.hookActive=m.hookActive;if(m.hookMessage)value.hookMessage=String(m.hookMessage).slice(0,400);if(m.type!=='hookError'&&(value.receivedText??this.state.receivedText)&&(value.processAttached??this.state.processAttached)&&(value.streamSelected??this.state.streamSelected))value.hookMessage='已收到真实游戏台词；'+((value.replacementState||this.state.replacementState)==='user-verified'?'原文隐藏已由用户确认':'原文替换状态请见分阶段诊断');this.notify(value);if(m.type==='hookError')this.retryAt=this.now()+1000;this.syncMarker();}
   });this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookSource:this.lastSource||null,hookRecovering:!!this.lastSource,hookFramework:this.state.hookFramework||null,hookMessage:'正在连接 LunaHook；等待实际文本流'});
+  this.sendStreamProbe();
  }
  // Japanese original for a translated build (services/original-text.cjs). Only an exact or position-confirmed match
  // replaces the captured line; anything else, or any error, keeps the captured text so the dialogue never goes missing.
@@ -567,7 +597,7 @@ class HookNative{
   const next=q.rest.shift();if(!q.rest.length)this.pageQueue=null;
   this.trace('page part advance '+JSON.stringify(next.slice(0,20)));this.source({...q.base,text:next},q.name);return true;
  }
- source(m,name){if(require('./danganronpa-pc-source.cjs').shouldBlock(this,m))return;if(require('./unity-il2cpp-source.cjs').shouldBlock(this.textPath,m,this.target))return;if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,m,this.target)||require('./artemis-session.cjs').shouldBlock(this.textPath,m,this.target,undefined,this.wanted!==false))return;if(m&&/textrender/i.test(String(m.sourceName||'')))this.trSeen=this.gamePid();
+ source(m,name){if(m?.bridgeSerial!==undefined&&m.bridgeSerial!==this.serial)return;if(require('./danganronpa-pc-source.cjs').shouldBlock(this,m))return;if(require('./unity-il2cpp-source.cjs').shouldBlock(this.textPath,m,this.target))return;if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,m,this.target)||require('./artemis-session.cjs').shouldBlock(this.textPath,m,this.target,undefined,this.wanted!==false))return;if(m&&/textrender/i.test(String(m.sourceName||'')))this.trSeen=this.gamePid();
   /* E560 Unity setter streams: typewriter steps and whole NVL pages become the one paragraph the game is on (core/unity-source.cjs) */
   {const code=String(m.sourceCode||'');if(code.endsWith(':JIT:UNITY')&&!m.unityBoxed&&typeof m.text==='string'&&!this.skipKey){const {UnityBox}=require('./unity-source.cjs');(this.unityBox||(this.unityBox=new UnityBox(()=>this.now(),(line,p)=>this.source({...p.m,text:line,unityBoxed:true},p.name)))).feed(code,cleanSource(m.text,name,code),{m,name});return;}}
   /* 2026-11-14 (ダストマニア・グロテスク, Chinese patch): Shift-JIS read as GBK (or any Japanese read with the wrong code page:
@@ -674,6 +704,7 @@ class HookNative{
    if(!replay){end(false);stash.length=0;}L.lastKey=key;L.progressAt=now;if(forward&&!repeatCurrent){recent.push(key);if(recent.length>40)recent.shift();}L.seen.delete(key);L.seen.set(key,now);if(L.seen.size>3000)L.seen.delete(L.seen.keys().next().value);}
   // Scene/chapter keys and asset ids ("10_1", "bg_01.png", "Chapter2") from engine string streams are never dialogue.
   if(identifierNoise(text)){this.trace('drop identifier text '+JSON.stringify(text.slice(0,60)));return;}
+  if(this.streamProbe&&m.streamProbe===this.streamProbe.id&&m.origin!=='history')this.finishStreamProbe('recovered');
   if(ruby.length){const map=this.sourceRuby||(this.sourceRuby=new Map());map.set(text,ruby);if(map.size>64)map.delete(map.keys().next().value);}
   if(m.sourceName==='EmbedToMeCS2_DrawPreserve'){if(m.origin==='history'&&this.state.receivedText)return;this.queueIslandSource(text,m.origin);return;}
   if(require('./danganronpa-pc-source.cjs').tagged(m)){if(this.pageNvl())return;this.deliverSource(text,m.origin,'',0,m);return;}
@@ -1034,6 +1065,29 @@ class HookNative{
  gdilessSelected(sel){const t=sel||(this.state?.hookThreads||[]).find(x=>x.selected)||(this.state?.hookThreads||[]).find(x=>this.selectedId&&x.id===this.selectedId);return /:JIT:UNITY$|IL2CPP/i.test(String(t?.code||''));}
  select(id,manual){this.verified=false;if(manual)this.manualThread=id;if(this.process&&typeof id==='string'&&this.state.hookThreads.some(t=>t.id===id)){this.trace('select id='+id+' replace='+this.enabled);this.selectedId=id;this.send({type:'select',id,replace:this.enabled,...(manual?{manual:true}:{})});}else{this.trace('select rejected id='+String(id));this.notify({hookMessage:'文本流尚未就绪，请重新扫描后选择'});}}
  rescan(){this.send({type:'rescan'});}
+ reprobeText(){
+  if(this.disposed||!this.target||this.windowState?.bound!==true)return this.finishStreamProbe('unbound');
+  if(!this.wanted)return this.finishStreamProbe('disabled');
+  if(this.streamProbe&&this.now()<this.streamProbe.until)return 'waiting';
+  const id=this.streamProbeId=(this.streamProbeId||0)+1;
+  this.streamProbe={id,until:this.now()+30000};
+  this.preferredThread=null;
+  this.manualThread=null;
+  this.gaveUp=null;
+  this.retryAt=0;
+  this.attempt=0;
+  this.notify({hookReselectState:'waiting',receivedText:false});
+  this.trace('fresh text stream probe '+id+' gamePid='+this.target.pid);
+  if(this.process)this.sendStreamProbe();
+  else this.tick();
+  return 'waiting';
+ }
+ sendStreamProbe(){if(this.streamProbe)this.send({type:'probeStreams',id:this.streamProbe.id});}
+ finishStreamProbe(state){
+  this.streamProbe=null;
+  if(state||this.state.hookReselectState)this.notify({hookReselectState:state});
+  return state;
+ }
  // E246: style sampling pauses the embed replacement so the game draws one original line, then resumes it.
  /* E578 hide probe (live beta38, ダストマニア: a stream that cannot write back left the reader in read mode, so the host never switched it on and the
     generic GDI / glyph hide never ran): while hiding is wanted the selected read-only stream is switched on in the game anyway; the hook
@@ -1057,6 +1111,25 @@ class HookNative{
  drawLog(raw){try{const seen=this.drawSeen||(this.drawSeen=new Set());if(seen.has(raw))return;seen.add(raw);if(seen.size>64)seen.delete(seen.values().next().value);
   const file=path.join(this.layout.logs||path.join(this.folder,'..','logs'),'engine-draw.log');require('./log-sink.cjs').append(file,new Date().toISOString()+' '+String(raw).replace(/[\r\n]/g,' ')+'\n',{rotate:4194304});}catch{}}
  drawEmbedReply(key,o){this.engineDraw?.put(key,o);try{this.textPath?.drawEmbed?.(key,o);}catch{}}
+ static gameProcessGone(pid){
+  if(!Number.isSafeInteger(pid)||pid<=0)return false;
+  try{process.kill(pid,0);}catch(error){return error.code==='ESRCH';}
+  return false;
+ }
+ clearExitedBridgeStop(){
+  const stopped=this.stoppingBridge;
+  if(!stopped||!this.ownedStops?.has(stopped.child))return false;
+  const {child,pid,started}=stopped;
+  // An abnormal bridge exit can leave hooks in a live game. Once both processes are gone,
+  // that specific bridge can no longer own hooks and must not block another game session.
+  if(child.exitCode==null&&child.signalCode==null)return false;
+  const reused=this.target?.pid===pid&&/^\d{10,20}$/.test(this.target.started)&&this.target.started!==started;
+  if(!reused&&!HookNative.gameProcessGone(pid))return false;
+  this.ownedStops.delete(child);
+  this.stoppingBridge=null;
+  this.trace('hook stop recovered: previous game and bridge exited gamePid='+pid);
+  return true;
+ }
  stop(dispose=true){
   this.sayaOcr?.stop();this.sayaOcr=null;
   require('./danganronpa-pc-source.cjs').clear(this);
@@ -1073,7 +1146,12 @@ class HookNative{
   tasks.push(attempt(()=>{this.embedModeSent=undefined;this.probing=false;if(this.lineUnreadable){this.lineUnreadable=false;this.notify({hookLineUnreadable:false});}if(this.state?.scriptSource)this.notify({scriptSource:false});if(this.state?.embedTranslating)this.notify({embedTranslating:false});clearTimeout(this.skipBurst?.timer);this.skipBurst=null;this.pageReset();this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.retryAt=0;this.attempt=0;this.markerKey='';this.waitTarget=null;}));
   // Even failed control revocation must request and await the owned helper's shutdown.
   // HookBridge checks game exit and releases the hide layers before its final stdout drain (up to 2 s).
-  tasks.push(attempt(()=>require('./owned-exit.cjs').trackStop(this,old,()=>{try{this.send({type:'quit'});}finally{old.stdin.end();}},{graceMs:8000})));
+  if(old)this.stoppingBridge={child:old,pid:this.pid,started:this.started};
+  tasks.push(attempt(()=>require('./owned-exit.cjs').trackStop(this,old,()=>{try{this.send({type:'quit'});}finally{old.stdin.end();}},{graceMs:8000})).then(()=>{
+   this.stoppingBridge=null;
+  },error=>{
+   if(this.disposed||!this.clearExitedBridgeStop()||this.ownedStops.size)throw error;
+  }));
   this.process=null;if(old)++this.serial;this.enabled=false;
   tasks.push(attempt(()=>this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'disabled',hookSource:null,hookThreads:[],hookDrawCount:0,hookDrawAt:0})));
   Promise.allSettled(tasks).then(results=>{this.stopPending=null;const failed=results.find(r=>r.status==='rejected');

@@ -29,3 +29,20 @@ test('a late native embed result is not written into another game using the same
  const r={gal:owner,targetLanguage:()=> 'zh',embedCached:()=>'',baseOptions:()=>({}),chainTranslate:()=>new Promise(resolve=>{finish=resolve;}),emit(){}};
  Object.setPrototypeOf(r,Reader.prototype);const work=Reader.prototype.embedTranslate.call(r,1,'これは中性の台詞です。');assert.equal(typeof finish,'function');reset(r);finish({text:'旧游戏译文'});await work;assert.deepEqual(writes,[]);
 });
+test('a late translation guard for a closed process cannot paint the same text in a reopened game',async()=>{
+ const events=[],cached=[];
+ let finish,stillCurrent;
+ const r=Object.assign(Object.create(Reader.prototype),{
+  active:()=>true,emit:(_type,m)=>events.push(m),targetLanguage:()=> 'zh',baseOptions:()=>({}),
+  localTranslation:()=>'',embedCached:(...args)=>cached.push(args),
+  chainTranslate:(_text,_options,{current})=>new Promise(resolve=>{finish=resolve;stillCurrent=current;}),
+ });
+ await r.message({type:'translateGuard',text:'俺たちは登り始める。'});
+ assert.equal(stillCurrent(),true);
+ reset(r);
+ assert.equal(stillCurrent(),false);
+ finish({text:'旧局译文',source:'mt'});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(cached,[]);
+ assert.ok(!events.some(m=>m.method==='deliverBackfill'));
+});

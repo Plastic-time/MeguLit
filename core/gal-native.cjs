@@ -58,6 +58,7 @@ class GalNative {
       if(message.type==='hookChoiceBoxes'){this.hooks.choiceBoxes?.(message);return;}
       if(message.type==='pageLocateStatus'){this.hooks.trace?.('ocr page '+message.status);return;}
       /* 2026-11-19 (素晴らしき日々: the opening quotes are pictures) what the art scan reads becomes a read-only line of the reader (hook-native ocrLine); drawing it over the picture stays with 文字图片翻译 (artText) */
+      if(message.type==='artText'&&!this.state.gameProcessId)return;
       if(message.type==='artText'&&this.hooks.sayaOcrGroup(message))return;
       if(message.type==='artText'){if(this.preferences?.artText===true&&message.once!==true)this.onEvent(message);this.hooks.ocrLine(message);return;}
       if(message.type==='markerTarget'){this.hooks.markerTarget(message);this.onEvent({type:'markerDebug',markerDebug:message.active?`found at ${message.x},${message.y} ${message.width}x${message.height} in ${message.clientWidth}x${message.clientHeight}`:'not active'});return;}
@@ -125,7 +126,7 @@ class GalNative {
     // A script-confirmed pixel reading cannot establish that the native stream hid a line
     // or that the calibration preview can be dismissed.
     if(message.hookSourceEngine==='saya-page-ocr'&&message.hookSourceOrigin==='ocr')return;
-    if((Array.isArray(message.hookThreads)&&message.hookThreads.length)||Object.prototype.hasOwnProperty.call(message,'hookFramework'))this.controller.apply();if(message.hookActive===true&&typeof message.hookSource==='string'&&!message.hookRecovering){if(message.hookSourceOrigin!=='history')this.rememberLine(message.hookSource);this.controller.source(message.hookSource);this.styleSync.observe(message.hookSource,message.hookSourceRead,message.hookSourceEngine);this.styleSync.lineStyle(message.hookSource,message.hookSourceOrigin!=='history',this.hooks.enabled===true&&this.hooks.preflight!==true);if(this.controller.styleAwaitLive&&message.hookSourceOrigin!=='history'&&this.hooks.enabled){this.controller.styleAwaitLive=false;this.onEvent({gameStylePreview:false});}}}
+    if(!this.hooks.streamProbe&&((Array.isArray(message.hookThreads)&&message.hookThreads.length)||Object.prototype.hasOwnProperty.call(message,'hookFramework')||message.hookReselectState==='recovered'))this.controller.apply();if(message.hookActive===true&&typeof message.hookSource==='string'&&!message.hookRecovering){if(message.hookSourceOrigin!=='history')this.rememberLine(message.hookSource);this.controller.source(message.hookSource);this.styleSync.observe(message.hookSource,message.hookSourceRead,message.hookSourceEngine);this.styleSync.lineStyle(message.hookSource,message.hookSourceOrigin!=='history',this.hooks.enabled===true&&this.hooks.preflight!==true);if(this.controller.styleAwaitLive&&message.hookSourceOrigin!=='history'&&this.hooks.enabled){this.controller.styleAwaitLive=false;this.onEvent({gameStylePreview:false});}}}
   /* Launcher-style games (a settings window first, then the game window in the same process): when the bound window goes
      away while its process lives on, bind that process again every 1.5 s for 20 s so its next main window is taken. Also
      called when the compositor sees its window close (the reader may still report the old window as bound). */

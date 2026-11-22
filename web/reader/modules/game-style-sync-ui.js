@@ -207,7 +207,15 @@
   last={...last,...m};paint();
  };
  const oldStatus=b.galStatus;b.galStatus=m=>{oldStatus?.(m);if(typeof m.gameStylePreview==='boolean')document.body.classList.toggle('tome-style-probing',m.gameStylePreview);if(typeof m.gameStyleReveal==='boolean')document.body.classList.toggle('megulit-original-shown',m.gameStyleReveal);
+  if('hookReselectState' in m)paintStreamProbe();
   if(m.type==='gameClosed'){measurementSerial++;clearInterval(correctionTimer);aligning=false;document.body.classList.remove('tome-style-probing');}};
+ function paintStreamProbe(){
+  const value=b.hookReselectText?.()||'';
+  for(const state of document.querySelectorAll('[data-calibrate-stream-status]')){
+   if(state.textContent!==value)state.textContent=value;
+   state.hidden=!value;
+  }
+ }
  b.calibrationMenuOpened=dialog=>{if(!session.key)session.load('',session.name,values(),getMap(),0,[]);wire(dialog);buildImports(dialog);send({type:'gameStyleImportList'});
   paint();};
  // Two import groups (user, 2026-11-02): text appearance, and position/wrapping with its coordinate map. Each previews a
@@ -270,8 +278,9 @@
     undo.textContent=({en:'Undo last calibration',ja:'直前の個別校正を戻す'})[lang()]||'撤销上次单项校准';
     undo.disabled=!itemUndo||!!saving;
     let streamButton=box.querySelector('[data-calibrate-stream]');if(!streamButton){streamButton=document.createElement('button');streamButton.type='button';streamButton.dataset.calibrateStream='';
-     streamButton.dataset.noI18n='';streamButton.onclick=()=>send({type:'hookReselect'});box.append(streamButton);}streamButton.textContent=({en:'Re-pick text stream',
+     streamButton.dataset.noI18n='';streamButton.onclick=()=>send({type:'hookReselect'});const state=document.createElement('small');state.dataset.calibrateStreamStatus='';state.dataset.noI18n='';state.setAttribute('role','status');box.append(streamButton,state);}streamButton.textContent=({en:'Re-pick text stream',
      ja:'テキストストリームを選び直す'})[document.documentElement.lang?.slice(0,2)]||'重新选取文本流';
+    paintStreamProbe();
     const label=box.querySelector('.tome-auto-style-switch');if(label){label.dataset.noI18n='';const n=[...label.childNodes].find(n=>n.nodeType===3);if(n&&n.textContent!==t('automatic'))n.textContent=t('automatic');
      }
     /* E349: on a full-screen page the box position is the page's FIRST line; calibrating on a later line moved the whole page. */let flowHint=box.querySelector('[data-flow-hint]');

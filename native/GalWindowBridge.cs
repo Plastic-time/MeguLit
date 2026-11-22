@@ -314,7 +314,7 @@ public class GalWindowBridge {
 static int WorkBottom(Rect area){try{return System.Windows.Forms.Screen.FromRectangle(new System.Drawing.Rectangle(area.Left,area.Top,Math.Max(1,area.Right-area.Left),Math.Max(1,area.Bottom-area.Top))).WorkingArea.Bottom;}catch{return area.Bottom;}}
 static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){return scan.IsEmpty?reader:new Rect(Math.Min(reader.Left,game.Left+scan.Left),Math.Min(reader.Top,game.Top+scan.Top),Math.Max(reader.Right,game.Left+scan.Right),Math.Max(reader.Bottom,game.Top+scan.Bottom));}
     static string ExecutableHash(uint pid){try{using(var sha=System.Security.Cryptography.SHA256.Create())using(var input=File.OpenRead(Process.GetProcessById((int)pid).MainModule.FileName))return BitConverter.ToString(sha.ComputeHash(input)).Replace("-","").ToLowerInvariant();}catch{return "";}}
-    static void Bind(IntPtr target,bool activate=false){Scene.Reset();GameUi.Clear();if(target==IntPtr.Zero||target==Overlay||!IsWindow(target))throw new Exception("请选择有效的游戏窗口");FindOverlay();if(Overlay==IntPtr.Zero)throw new Exception("MeguLit 窗口尚未准备好，请稍后再绑定");if(TranslationMode)Capture();Target=target;HasLastRect=false;uint pid;GetWindowThreadProcessId(target,out pid);ForgetGame();TrackedGame=Process.GetProcessById((int)pid);TrackedGameStarted=TrackedGame.StartTime.ToUniversalTime().Ticks;WindowGoneAt=DateTime.MinValue;WantedProcess=ProcessName(pid);string executableHash=ExecutableHash(pid);Dialog.Reset();DialogVisible=true;if(activate){CoverEnabled=true;RevealGame(Target);
+    static void Bind(IntPtr target,bool activate=false){Scene.Reset();GameUi.Clear();if(target==IntPtr.Zero||target==Overlay||!IsWindow(target))throw new Exception("请选择有效的游戏窗口");FindOverlay();if(Overlay==IntPtr.Zero)throw new Exception("MeguLit 窗口尚未准备好，请稍后再绑定");if(TranslationMode)Capture();Target=target;HasLastRect=false;uint pid;GetWindowThreadProcessId(target,out pid);ForgetGame();TrackedGame=Process.GetProcessById((int)pid);TrackedGameStarted=TrackedGame.StartTime.ToUniversalTime().Ticks;ResetPageLocator(true);WindowGoneAt=DateTime.MinValue;WantedProcess=ProcessName(pid);string executableHash=ExecutableHash(pid);Dialog.Reset();DialogVisible=true;if(activate){CoverEnabled=true;RevealGame(Target);
             // Binding from the menu keeps the menu open (and the keyboard on it); the game only comes forward without one.
             if(!MenuOpen)SetForegroundWindow(GetAncestor(Target,2));LastZCheck=DateTime.MinValue;}if(AudioWanted)Audio.Start(pid);var gameCaption=new StringBuilder(512);GetWindowText(target,gameCaption,gameCaption.Capacity);Emit(new{type="bound",activateGame=activate,coverEnabled=CoverEnabled,bound=TranslationMode,gameProcessId=pid,gameStarted=Process.GetProcessById((int)pid).StartTime.ToUniversalTime().Ticks.ToString(),gameHwnd=target.ToInt64().ToString(),gameStyleKey=executableHash,gameTitle=gameCaption.ToString(),hookExact474=executableHash=="e77a11486b6d94a42f9d7d39fd768b4e763f163b977d3eaed94cf9e13217f995",interfaceMode=TranslationMode?"translation":"normal",processName=WantedProcess,gameExecutable=ProcessImage(pid),message="游戏窗口已记住；在游戏里按 Alt+M 可重新绑定当前窗口"});}
     // The game's own sound for Anki (GameAudio.cs): recorded only while MeguLit asks for it and a game is bound.
@@ -327,7 +327,20 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         if(GameOffScreen(r.Left,r.Top,r.Right,r.Bottom,desktop.Left,desktop.Top,desktop.Right,desktop.Bottom)){var work=System.Windows.Forms.Screen.PrimaryScreen.WorkingArea;SetWindowPos(root,IntPtr.Zero,work.Left+Math.Max(0,(work.Width-(r.Right-r.Left))/2),work.Top+Math.Max(0,(work.Height-(r.Bottom-r.Top))/2),0,0,0x0001|0x0004|0x0010);}
     }catch{}}
     public static bool GameOffScreen(int left,int top,int right,int bottom,int dl,int dt,int dr,int db){int visibleW=Math.Min(right,dr)-Math.Max(left,dl),visibleH=Math.Min(bottom,db)-Math.Max(top,dt);return visibleW<48||visibleH<32;}
-    static void ForgetGame(){Audio.Stop();if(TrackedGame!=null){TrackedGame.Dispose();TrackedGame=null;}TrackedGameStarted=0;WindowGoneAt=DateTime.MinValue;}
+    static void ResetPageLocator(bool bind=false){
+        lock(OutputLock){
+            if(PageLocate!=null)PageLocate.Dispose();
+            PageLocate=null;
+            if(!bind)return;
+            PageLocator locator=null;
+            locator=new PageLocator(message=>{
+                lock(OutputLock){if(Object.ReferenceEquals(PageLocate,locator))Emit(message);}
+            });
+            locator.OwnPids=new uint[]{(uint)OverlayPid,(uint)Process.GetCurrentProcess().Id};
+            PageLocate=locator;
+        }
+    }
+    static void ForgetGame(){ResetPageLocator();Audio.Stop();if(TrackedGame!=null){TrackedGame.Dispose();TrackedGame=null;}TrackedGameStarted=0;WindowGoneAt=DateTime.MinValue;}
     static DateTime WindowGoneAt=DateTime.MinValue;
     static bool HasGameWindow(uint pid){bool found=false;EnumWindows(delegate(IntPtr hwnd,IntPtr unused){uint owner;GetWindowThreadProcessId(hwnd,out owner);if(owner==pid&&GetWindowTextLength(hwnd)>0){found=true;return false;}return true;},IntPtr.Zero);return found;}
     static bool HasVisibleWindow(uint pid){bool found=false;EnumWindows(delegate(IntPtr hwnd,IntPtr unused){uint owner;GetWindowThreadProcessId(hwnd,out owner);if(owner==pid&&IsWindowVisible(hwnd)){found=true;return false;}return true;},IntPtr.Zero);return found;}
@@ -852,7 +865,7 @@ if(args.Length==2&&args[0]=="--art-scan-file"){Console.OutputEncoding=Encoding.U
         }
         if((args.Length!=1&&args.Length!=2)||!Int32.TryParse(args[0],out OverlayPid))return 2;
         if(args.Length==2){long handle;if(!Int64.TryParse(args[1],out handle))return 2;PreferredOverlay=new IntPtr(handle);uint owner;GetWindowThreadProcessId(PreferredOverlay,out owner);if(owner!=OverlayPid)return 2;}
-        HookVerifier=new GameHookVerifier(Emit);MaskLayer=new NativeMaskLayer();TextMask=new GameTextMask(MaskOutput);PageLocate=new PageLocator(Emit);PageLocate.OwnPids=new uint[]{(uint)OverlayPid,(uint)System.Diagnostics.Process.GetCurrentProcess().Id};
+        HookVerifier=new GameHookVerifier(Emit);MaskLayer=new NativeMaskLayer();TextMask=new GameTextMask(MaskOutput);
         WaitMarker=new GameWaitMarker(Emit);
         try{SetProcessDpiAwarenessContext(new IntPtr(-4));}catch{}
         PointerGate=new ReaderPointerGate(Emit);
