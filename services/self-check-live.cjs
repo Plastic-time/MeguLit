@@ -17,6 +17,7 @@
 const {SelfCheck,traceLine,windowEvidence,reasonText,parseTrace,parseReader}=require('../core/self-check.cjs');
 const auto=require('../core/auto-profile.cjs');
 const Profiles=require('../core/profiles/index.cjs');
+const {supersedesGate}=require('../core/profiles/fata-morgana.cjs');
 const feed=require('./auto-profile-feed.cjs');
 const {RuntimeSample}=require('./runtime-sample.cjs');
 
@@ -31,25 +32,30 @@ function readMode(reader,reason){try{const g=reader.gal;if(g&&!g.textEffectsHold
    shared (the players' agreed diff) <- auto (this PC's calibration) <- official (the maintainer's diff) <- stepDown (this PC's
    gate step-down, always last so a game that broke here can always fall back). choose() still names the deciding one (reason,
    read mode, whether to calibrate). */
-function inputOf(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe||s.exe),out={...(s.input||{})};for(const k of ['sharedGame','shared','auto','officialGame','official','officialGameRev','officialRev','sharedGameRev','sharedRev','stepDown','match','prints'])delete out[k];
+function profileInput(s,sh){const out={...(s.input||{})};for(const k of ['sharedGame','shared','auto','officialGame','official','officialGameRev','officialRev','sharedGameRev','sharedRev','stepDown','match','prints'])delete out[k];
  if(/^[0-9a-f]{64}$/.test(String(s.key||'')))out.exeSha256=s.key;
  /* the relay's two layers, each official or agreed (services/auto-profile-feed.cjs layer) */
  if(sh){const put=(p,field)=>{if(!p||!p.settings)return;const f=(p.source==='official'?'official':'shared')+field;out[f]=p.settings;out[f+'Rev']=p.rev|0;};put(sh.game,'Game');put(sh.version,'');if(sh.match)out.match=sh.match;}
  /* the game prints let a built-in seed (The Seed/) find its game by archive / script / VNDB / title */
  if(s.prints)out.prints=s.prints;
+ return out;}
+function inputOf(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe||s.exe),out=profileInput(s,sh);
  /* a verified / owner-ok built-in seed is official: this PC's calibration is not layered under it (its unpinned calibrate.* would
-    still say read); a gate step-down always is */
+    still say read); the active gate step-down stays last */
  const seedOk=['verified','owner-ok'].includes(s.profile?.seedStatus);
- if(st&&st.settings){if(st.source==='gate')out.stepDown=st.settings;else if(!seedOk)out.auto=st.settings;}return out;}
+ if(st?.source==='gate'){if(st.settings&&!supersedesGate(out,st))out.stepDown=st.settings;}
+ else if(st?.settings&&!seedOk)out.auto=st.settings;
+ return out;}
 function applyLayer(s){try{const p=require('../core/owner-tests.cjs').apply(Profiles.profileFor(inputOf(s)),s.reader.gal?.hooks?.ownerTestGrant,{exe:s.exe,engine:s.profile?.engine});s.profile=p;/* Cardinal's tape keeps the lines this game's rules replay */require('../core/cardinal/tape.cjs').keep(p.cardinal?.lines);s.reader.gal?.setGameProfile?.(p,s.input);}catch{}}
 /* which layer wins (see above) */
 function choose(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe||s.exe);
- if(st&&st.source==='gate')return {from:'local-gate',mode:'read',settings:st.settings,reason:st.reason||''};
+ const gate=st?.source==='gate',superseded=gate&&supersedesGate(profileInput(s,sh),st);
+ if(gate&&!superseded)return {from:'local-gate',mode:'read',settings:st.settings,reason:st.reason||''};
  if(sh&&sh.source==='official')return {from:'official',mode:sh.mode,settings:sh.settings,reason:sh.mode==='read'?'官方差分：这部游戏只显示译文':''};
  /* 2026-11-21 (1.4.22 test, ファタモルガーナの館: a calibration this PC stored as read mode took the game out of the hide mode the
     owner confirmed) a built-in seed that is verified or owner-ok is official too: this PC's own calibration does not override it
     (the gate's step-down above still does) */
- {const ss=s.profile?.seedStatus;if(ss==='verified'||ss==='owner-ok'||ss==='read')return {from:'seed',mode:ss==='read'?'read':'hide',settings:null,reason:ss==='read'?'内置 seed：这部游戏只显示译文':''};}
+ {const ss=superseded?'owner-ok':s.profile?.seedStatus;if(ss==='verified'||ss==='owner-ok'||ss==='read')return {from:'seed',mode:ss==='read'?'read':'hide',settings:null,reason:ss==='read'?'内置 seed：这部游戏只显示译文':''};}
  if(st)return {from:'local',mode:st.mode,settings:st.settings,reason:st.reason||''};
  if(sh)return {from:'shared',mode:sh.mode,settings:sh.settings,reason:sh.mode==='read'?'多数玩家在这部游戏上自检未过线':''};
  return null;}
@@ -75,6 +81,7 @@ function start(reader,exe,profile=null,input=null,options={}){stop();profile=pro
 function bindKey(s,key){const {reader}=s;s.key=key;s.stored=auto.load(reader.root,key);s.calibrated=!!s.stored;if(s.stored)s.check.recording=null;
  s.shared=s.skipFeed?null:feed.layer(feed.cached(reader.root,key),key,{exe:s.exe});if(s.shared&&feed.rejected(reader.root,key,s.shared))s.shared=null;
  const c=settle(s);
+ if(s.stored?.source==='gate'&&c?.from!=='local-gate')reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'gateSuperseded',key,previousAt:s.stored.at,layer:c?.from||'none'});
  reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'bound',key,pid:s.pid,birth:s.birth,layer:s.from||'none',mode:c?.mode||'',calibrating:!s.calibrated});
  hookTrace(reader,'selfCheck key='+key+' layer='+(s.from||'none')+(c?' mode='+c.mode:'')+(s.calibrated?'':' calibrating (first '+s.check.t.window+' lines)'));
  /* the relay's copy is refreshed in the background (hot update: a new diff applies at once) */
