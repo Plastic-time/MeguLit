@@ -9,12 +9,12 @@ const labels=read('game-detail.js').slice(read('game-detail.js').indexOf('const 
 const original={zh:'日文原版与恢复',ja:'日本語版と復元',en:'Japanese original & restore'};
 const zero={zh:'零延迟翻译',ja:'ゼロ遅延翻訳',en:'Zero-latency translation'};
 const languageUI=read('game-language.js');
-const {localeToggleHTML,localeHelpText}=vm.runInNewContext(languageUI.slice(languageUI.indexOf('const localeWords='),languageUI.indexOf('export function bindLocaleToggle')).replaceAll('export ','')+'\n({localeToggleHTML,localeHelpText})');
+const {localeToggleHTML}=vm.runInNewContext(languageUI.slice(languageUI.indexOf('const localeWords='),languageUI.indexOf('export function bindLocaleToggle')).replaceAll('export ','')+'\n({localeToggleHTML})');
 const durationSource=read('detail-sessions.js').split(/\r?\n/);
 const durationStart=durationSource.findIndex(line=>line.startsWith('export function durHTML'));
 const durHTML=vm.runInNewContext(durationSource.slice(durationStart,durationStart+2).join('\n').replace('export ','')+'\ndurHTML');
 function hero(locale,title){
- const context={main:{},game:{title,available:true,engine:'KiriKiri',readingSeconds:137520,characters:412906,learnedWords:1284},data:{counts:{sessions:57}},locale,embed:{kind:'pending'},hook:'未测',esc:s=>String(s??''),cover:()=>'<div class="cover"></div>',icon:()=>'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6Z"/></svg>',relativeTime:()=>'',originalLabel:()=>original[locale],zeroLatencyLabel:()=>zero[locale],zeroActivityLabel:()=>'',localeToggleHTML,localeHelpText,launchReason:()=>'',durHTML,number:String};
+ const context={main:{},game:{title,available:true,engine:'KiriKiri',readingSeconds:137520,characters:412906,learnedWords:1284},data:{counts:{sessions:57}},locale,embed:{kind:'pending'},hook:'未测',esc:s=>String(s??''),cover:()=>'<div class="cover"></div>',icon:()=>'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6Z"/></svg>',relativeTime:()=>'',originalLabel:()=>original[locale],zeroLatencyLabel:()=>zero[locale],zeroActivityLabel:()=>'',localeToggleHTML,launchReason:()=>'',durHTML,number:String};
  // The production template and its localized labels are used without starting the app or a game
  vm.runInNewContext(labels+'\nconst w=labels[locale];'+template,context);
  return context.main.innerHTML;
@@ -102,14 +102,16 @@ test('detail hero layout, launch motion and memories scrollbar styles',async()=>
     await page.evaluate(()=>document.fonts.ready.then(()=>true));
     const result=await page.evaluate(()=>{
      const main=document.querySelector('main'),h=document.querySelector('.detail-title>h1'),actions=document.querySelector('.detail-actions'),b=actions.querySelector('[data-play]'),label=b.querySelector('span'),svg=b.querySelector('svg'),r=e=>e.getBoundingClientRect(),t=r(h),a=r(actions),p=r(b),l=r(label),i=r(svg),style=getComputedStyle(b);
-     const tools=[...actions.children].map(e=>({width:e.clientWidth,scroll:e.scrollWidth,rect:r(e).toJSON(),font:parseFloat(getComputedStyle(e).fontSize)}));
+     const caption=actions.querySelector(".detail-locale-help"),toggle=actions.querySelector(".detail-locale");
+     const tools=[...actions.children].filter(e=>e!==caption).map(e=>({width:e.clientWidth,scroll:e.scrollWidth,rect:r(e).toJSON(),font:parseFloat(getComputedStyle(e).fontSize)}));
      const stats=[...document.querySelectorAll('.detail-statistics .stat-card strong')].map(e=>{const range=document.createRange();range.selectNodeContents(e);return {card:r(e.parentElement).toJSON(),box:r(e).toJSON(),text:range.getBoundingClientRect().toJSON()};});
      const beyond=[...main.querySelectorAll('.game-detail-hero *')].filter(e=>!actions.contains(e)&&r(e).right>r(main).right+1)
       .slice(0,10).map(e=>[e.tagName,String(e.className),e.textContent.slice(0,40),Math.round(r(e).right)]);
      actions.scrollLeft=actions.scrollWidth;
-     const lastReachable=r(actions.lastElementChild).right<=a.right+1;
+     const lastReachable=r(toggle).right<=a.right+1;
+     const help=r(caption),switchRect=r(toggle);
      const cover=r(main.querySelector('.detail-cover'));
-     return {overflow:main.scrollWidth>main.clientWidth+1,beyond,titleScroll:h.scrollHeight,titleHeight:h.clientHeight,titleRight:t.right,mainRight:r(main).right,actionsTop:a.top,titleBottom:t.bottom,labelLeft:l.left,labelRight:l.right,iconRight:i.right,launchRight:p.right,launchHeight:p.height,clip:style.clipPath,radius:style.borderTopRightRadius,tools,stats,lastReachable,actionRight:a.right,tabsGap:r(main.querySelector('.detail-tabs')).top-a.bottom,coverBottom:cover.bottom,coverRight:cover.right};
+     return {help:help.toJSON(),switchRect:switchRect.toJSON(),helpFits:caption.scrollWidth<=caption.clientWidth+1,overflow:main.scrollWidth>main.clientWidth+1,beyond,titleScroll:h.scrollHeight,titleHeight:h.clientHeight,titleRight:t.right,mainRight:r(main).right,actionsTop:a.top,titleBottom:t.bottom,labelLeft:l.left,labelRight:l.right,iconRight:i.right,launchRight:p.right,launchHeight:p.height,clip:style.clipPath,radius:style.borderTopRightRadius,tools,stats,lastReachable,actionRight:a.right,tabsGap:r(main.querySelector('.detail-tabs')).top-a.bottom,coverBottom:cover.bottom,coverRight:cover.right};
     });
     const tag=width+'/'+locale+'/'+title;
     assert.equal(result.overflow,false,tag+' no hero overflow '+JSON.stringify(result.beyond));assert.ok(result.titleScroll<=result.titleHeight+1,tag+' complete title height');assert.ok(result.titleRight<=result.mainRight+1,tag+' title inside main');assert.ok(result.actionsTop>=result.titleBottom,tag+' title does not overlap actions');
@@ -117,6 +119,9 @@ test('detail hero layout, launch motion and memories scrollbar styles',async()=>
     assert.equal(result.clip,'none',tag+' the launch label is unclipped');assert.equal(result.radius,'10px',tag+' rounded launch');
     assert.ok(result.launchHeight>=(width>1000?48:38),tag+' launch remains the primary action');
     assert.equal(result.tools.length,5,tag+' five controls');assert.ok(result.lastReachable,tag+' last control reachable');
+    assert.ok(result.helpFits&&result.help.right<=result.actionRight+1,tag+' complete caption reachable');
+    assert.ok(result.help.top>=result.switchRect.bottom&&result.help.top-result.switchRect.bottom<=10,tag+' caption just below switch');
+    assert.ok(Math.abs(result.help.left+(width<=660?0:6)-result.switchRect.left)<=1,tag+' caption left-aligned with switch');
     assert.ok(result.tabsGap<=22,tag+' tabs sit close to the actions');
     const center=t=>(t.rect.top+t.rect.bottom)/2;
     for(const t of result.tools){assert.ok(t.scroll<=t.width+1,tag+' tool label fits');assert.ok(t.font>=13,tag+' tool text stays readable');assert.ok(t.rect.height>=38,tag+' tool has a full hit target');assert.ok(Math.abs(center(t)-center(result.tools[0]))<=1,tag+' controls stay in one row');}
