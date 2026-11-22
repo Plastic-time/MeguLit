@@ -675,11 +675,28 @@ function providerEntry(root,dir,id,{runtimeOnly=false}={}){
  return Object.entries(readState(root)).find(([key,s])=>(id===undefined||id===key)&&
   (s?.runtime?.file?runningDirOf(s.runtime).toLowerCase()===dir:!runtimeOnly&&String(s?.gameDir||'').toLowerCase()===dir));
 }
-function providerKey(root,executable,id){const dir=path.dirname(String(executable||'')).toLowerCase();if(!dir||dir==='.')return '';const embedded=require('./embedded-japanese.cjs').stamp(path.dirname(String(executable)));if(embedded)return 'embedded|'+embedded;const entry=providerEntry(root,dir,id);if(!entry)return 'none|'+dir;const [entryId,s]=entry;return JSON.stringify([entryId,s.status||'',s.mode||'',s.runtime?.sha256||'',s.runtime?.index||'',s.patchStatus||'',s.patch?.index||'',s.patch?.version??'',s.patch?.runtimeSha||'',s.original?.index||'']);}
+function providerKey(root,executable,id){const folder=path.dirname(String(executable||'')),dir=folder.toLowerCase();if(!dir||dir==='.')return '';
+ const imported=require('../core/japanese-import-original.cjs'),archive=imported.archiveManifest(folder);
+ if(archive)return 'archive|'+imported.archiveStamp(executable,archive);
+ const embedded=require('./embedded-japanese.cjs').stamp(folder);if(embedded)return 'embedded|'+embedded;const entry=providerEntry(root,dir,id);if(!entry)return 'none|'+dir;const [entryId,s]=entry;return JSON.stringify([entryId,s.status||'',s.mode||'',s.runtime?.sha256||'',s.runtime?.index||'',s.patchStatus||'',s.patch?.index||'',s.patch?.version??'',s.patch?.runtimeSha||'',s.original?.index||'']);}
+function archiveProvider(imported,executable,manifest){
+ const index=imported.localArchive(executable,manifest);
+ if(!index)return null;
+ const matcher=new Matcher(index.rows.map(row=>row[0]),index.rows.map(row=>row[1]));
+ return {kind:'patch',archiveImport:true,isCurrent:index.valid,hasLocalPairs:()=>index.valid()&&index.coverage.paired>0,
+  position:()=>matcher.last,save:()=>matcher.save(),load:value=>matcher.load(value),resolve(text){
+   if(!index.valid())return {status:'none',method:'source-changed'};
+   const result=matcher.match(text);
+   if(['guess','position','recent','near-back'].includes(result.method))return {status:'uncertain',method:'ambiguous',indices:result.indices};
+   return result.japanese!==undefined?{...result,japanese:undefined,translation:result.japanese,source:'archive-local'}:result;
+  }};
+}
 /* opts.indexOnly (tools/patch-pair-selftest.cjs): the stored script alone, without checking the game files against it (a game since
    removed or moved); the running game never uses it */
 function provider(root,executable,opts={}){
  const embedded=require('./embedded-japanese.cjs'),embeddedDir=path.dirname(String(executable));
+ const imported=require('../core/japanese-import-original.cjs'),archive=imported.archiveManifest(embeddedDir);
+ if(archive)return archiveProvider(imported,executable,archive);
  if(embedded.manifest(embeddedDir))return embedded.provider(embeddedDir);
  const dir=path.dirname(String(executable)).toLowerCase(),entry=providerEntry(root,dir,opts.id);
  /* 2026-11-13 no imported script: the script harvested at run time (services/script-harvest.cjs), when there is one */
@@ -780,6 +797,8 @@ function localPairs(root,db,id){
  const {executable}=gameRow(db,id);
  if(!executable||!fs.existsSync(executable))return {hasPairs:false,embedded:false};
  const embedded=require('./embedded-japanese.cjs'),dir=path.dirname(executable);
+ const imported=require('../core/japanese-import-original.cjs'),archive=imported.archiveManifest(dir);
+ if(archive){const index=imported.localArchive(executable,archive);return {hasPairs:index?.coverage.paired>0,embedded:false,perGame:!!index};}
  if(embedded.manifest(dir))return {hasPairs:embedded.provider(dir)?.hasLocalPairs?.()===true,embedded:true};
  return {hasPairs:staticProvider(root,executable,{id:String(id)})?.hasLocalPairs?.()===true,embedded:false};
 }

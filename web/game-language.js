@@ -154,7 +154,10 @@ export function openGameLanguage({id,title,api,invoke,locale,esc,onActivity,onOr
   searchBtn.hidden=originalBtn.hidden=clearBtn.hidden=true;
   example.hidden=!s?.patchHint;
   example.textContent=s?.patchHint?u.example(s.patchHint):'';
-  if(activity?.embedded&&activity.hasPairs){status.textContent=u.embedded;originalBtn.hidden=false;return;}
+  if((activity?.embedded||activity?.perGame)&&activity.hasPairs){
+   status.textContent=activity.perGame?({zh:'已为本作品启用导入时配对的原汉化译文，可从「日文原版与恢复」撤销',en:'Paired translations from the original Chinese script are enabled for this game. Undo is available in Japanese original & restore',ja:'この作品では取り込み時に照合した中国語訳が有効です。「日本語版と復元」から元に戻せます'})[locale]||u.embedded:u.embedded;
+   originalBtn.hidden=false;return;
+  }
   if(s?.patchStatus==='ready'||s?.patchStatus==='interface-only'||s?.patchStatus==='unreliable'&&s.patch?.coverage){
    const report=zeroPatchReport(locale,s);
    status.textContent=report?.text||((s.patch?.auto?w.autoReady:w.patchReady)(s.patch?.lines||0)+pairText(s.patchAlignment?.pairing));

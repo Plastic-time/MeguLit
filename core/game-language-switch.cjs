@@ -140,24 +140,25 @@ function preferenceLanguageKey(managed){
  enumMemo.set(stamp,key);return key;}
 function unityPlan(gameDir,env){
  const data=unityData(gameDir);if(!data)return null;
- const {company,product}=appInfo(data),assets=japaneseAssets(data),items=[];let found=false;
+ const {company,product}=appInfo(data),assets=japaneseAssets(data),items=[],japaneseSettings=[];let found=false;
  if(company&&product){
   const regKey='HKCU\\Software\\'+company+'\\'+product;
   for(const v of env.registry.query(regKey)){const name=v.name.replace(/_h\d+$/,'');if(!LANG_KEY.test(name)||SKIP_KEY.test(name))continue;found=true;
-   if(v.type==='REG_BINARY'){const cur=hexText(v.data),to=japaneseLike(cur);if(to)items.push({kind:'registry',key:regKey,name:v.name,type:v.type,original:v.data,patched:textHex(to),from:cur,to});}}
+   if(v.type==='REG_BINARY'){const cur=hexText(v.data),to=japaneseLike(cur);japaneseSettings.push(JA_VALUE.test(cur));if(to)items.push({kind:'registry',key:regKey,name:v.name,type:v.type,original:v.data,patched:textHex(to),from:cur,to});}
+   else japaneseSettings.push(false);}
   const low=path.join(env.localLow,company,product),files=[];
   for(const d of [low,...list(low).map(n=>path.join(low,n)).filter(isDir)])for(const n of list(d)){const f=path.join(d,n);if(isFile(f))files.push(f);}
   const prefKey=files.some(f=>/\.(sav|dat|bin)$/i.test(f))?(env.prefKeyFor||preferenceLanguageKey)(path.join(data,'Managed')):null;
   for(const f of files.slice(0,200)){let buf;try{if(fs.statSync(f).size>256<<10)continue;buf=fs.readFileSync(f);}catch{continue;}
-   if(/\.(json|txt|ini|cfg|xml|nson)$/i.test(f)&&!buf.includes(0)){const text=buf.toString('utf8'),ch=jsonChanges(text);if(ch.length)found=true;const todo=ch.filter(c=>c.next!==c.match);
+   if(/\.(json|txt|ini|cfg|xml|nson)$/i.test(f)&&!buf.includes(0)){const text=buf.toString('utf8'),ch=jsonChanges(text);if(ch.length){found=true;japaneseSettings.push(ch.every(c=>c.already));}const todo=ch.filter(c=>c.next!==c.match);
     if(todo.length){let next=text;for(const c of todo)next=next.replace(c.match,()=>c.next);items.push({kind:'file',file:f,buf,next:Buffer.from(next,'utf8'),from:todo[0].from,to:todo[0].to,key:todo[0].key,changes:todo.map(c=>({key:c.key,from:c.from,to:c.to})),format:'json'});}continue;}
-   if(prefKey!=null){const pairs=prefPairs(buf,prefKey);if(!pairs.length)continue;found=true;const next=Buffer.from(buf);let changed=false;
+   if(prefKey!=null){const pairs=prefPairs(buf,prefKey);if(!pairs.length)continue;found=true;japaneseSettings.push(pairs.every(p=>p.value===UNITY_JAPANESE));const next=Buffer.from(buf);let changed=false;
     for(const p of pairs){if(p.value===UNITY_JAPANESE)continue;if(p.kind==='Single')next.writeFloatLE(UNITY_JAPANESE,p.offset);else next.writeInt32LE(UNITY_JAPANESE,p.offset);changed=true;}
     if(changed)items.push({kind:'file',file:f,buf,next,from:pairs[0].value,to:UNITY_JAPANESE,key:'Language',format:'pref',prefKey});}}
  }
  let steamDriven=false;try{const meta=path.join(data,'il2cpp_data','Metadata','global-metadata.dat'),asm=path.join(data,'Managed','Assembly-CSharp.dll');const f=[meta,asm].find(isFile);
   if(f&&fs.statSync(f).size<200<<20)steamDriven=fs.readFileSync(f).includes(Buffer.from('GetCurrentGameLanguage','latin1'));}catch{}
- return {engine:'unity',found,items:assets.length?items:[],japaneseAssets:assets,steamDriven,company,product};
+ return {engine:'unity',found,already:japaneseSettings.length>0&&japaneseSettings.every(Boolean),items:assets.length?items:[],japaneseAssets:assets,steamDriven,company,product};
 }
 
 /* ---- Steam ------------------------------------------------------------------------------------------------- */
@@ -189,17 +190,27 @@ function plan(gameDir,options={}){
  const steamDriven=!!(krkr?.steamDriven||unity?.steamDriven);
  /* a game whose own setting already says Japanese needs no Steam change (the in-game choice wins over Steam's default) */
  const steamSwitch=steam&&!found&&japanese&&env.steamJapanese!==false&&steamDriven&&!/^japanese$/i.test(steam.current)?steam:null;
- return {engine,found,japanese,items,steam,steamSwitch,steamDriven,japaneseAssets:unity?.japaneseAssets||[],env};
+ return {engine,found,already:krkr?found:unity?.already,japanese,items,steam,steamSwitch,steamDriven,japaneseAssets:unity?.japaneseAssets||[],env};
 }
 function detect(gameDir,options={}){
  gameDir=path.resolve(String(gameDir||''));const m=readManifest(gameDir);
- if(m)return {state:'applied',adapter:ADAPTER,engine:m.engine,files:m.entries.length,cells:0,pending:0,manifest:{at:m.at,files:m.entries.length}};
+ if(m){
+  const env=environment(options),entries=Array.isArray(m.entries)?m.entries:[];
+  const verified=entries.length>0&&entries.every(e=>{try{
+   if(e.kind==='registry')return env.registry.query(e.key).some(v=>v.name===e.name&&v.type===e.type&&v.data.toUpperCase()===e.patched.toUpperCase());
+   if(fs.statSync(e.file).size>4<<20)return false;
+   const data=fs.readFileSync(e.file);
+   return e.key==='steam'?/"UserConfig"\s*\{[^}]*"language"\s+"japanese"/i.test(data.toString('utf8')):sha(data)===e.patchedSha256;
+  }catch{return false;}});
+  return {state:verified?'applied':'applied-unverified',adapter:ADAPTER,engine:m.engine,files:entries.length,cells:0,pending:0,manifest:{at:m.at,files:entries.length}};
+ }
  let p;try{p=plan(gameDir,options);}catch{return {state:'none'};}
  if(!p.engine&&!p.steamSwitch)return {state:'none'};
  const base={adapter:ADAPTER,engine:p.engine,appid:p.steam?.appid||'',steamLanguage:p.steam?.current||'',cells:0};
  if(p.items.length)return {...base,state:'restorable',mode:'setting',files:p.items.length,pending:p.items.length,changes:p.items.map(i=>({kind:i.kind,where:i.kind==='registry'?i.key+'\\'+i.name:i.file,key:i.key||i.name,from:i.from,to:i.to}))};
  if(p.steamSwitch){const running=p.env.steamRunning();return {...base,state:running?'steam-guide':'restorable',mode:'steam',files:1,pending:1,steamRunning:running};}
- if(p.found)return {...base,state:'already'};
+ if(p.already)return {...base,state:p.engine==='unity'?'language-setting':'already'};
+ if(p.found)return {...base,state:'language-unverified'};
  if(p.engine&&p.japanese)return {...base,state:'first-run'};
  return {state:'none',engine:p.engine};
 }

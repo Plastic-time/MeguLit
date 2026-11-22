@@ -110,7 +110,7 @@ test('launch notice: misread Japanese or a known Japanese install never says the
  assert.strictEqual(run(SIMPLIFIED,null),true,'a Chinese build is still reported');
  assert.strictEqual(run(SIMPLIFIED,true),false,'the shared check knows this install has Japanese');
  const src=fs.readFileSync(path.join(root,'core/hook-native.cjs'),'utf8');assert.match(src,/const ja=HookNative\.sjisAsGbk\(m\.text\);if\(ja\)/,'the line itself is decoded again');
- assert.match(fs.readFileSync(path.join(root,'services/reader.cjs'),'utf8'),/hooks\.japaneseInstall=game\?\.id\?require\('\.\/japanese-presence\.cjs'\)\.verdict/);
+ assert.match(fs.readFileSync(path.join(root,'services/reader.cjs'),'utf8'),/hooks\.japaneseInstall=game\?\.id&&!archive\?require\('\.\/japanese-presence\.cjs'\)\.verdict/);
 });
 test('one shared "has Japanese" answer: script state, captured history, else undecided',()=>{
  const p=require('../services/japanese-presence.cjs'),data=tmp('jp-');
@@ -122,6 +122,6 @@ test('one shared "has Japanese" answer: script state, captured history, else und
  fs.mkdirSync(path.join(data,'data','config'),{recursive:true});fs.writeFileSync(path.join(data,'data','config','original-text.json'),JSON.stringify({h:{status:'native-japanese'},c:{status:'chinese-only'}}));
  assert.deepStrictEqual(p.verdict(data,db,'h'),{japanese:true,by:'script'});assert.strictEqual(p.verdict(data,db,'c').japanese,false);
  const bridge=fs.readFileSync(path.join(root,'services/bridge.cjs'),'utf8'),app=fs.readFileSync(path.join(root,'web/app.js'),'utf8');
- assert.match(bridge,/japanese-presence\.cjs'\)\.verdict\(root,db,id\);if\(v\.japanese===true\)return \{state:'already',by:v\.by,executable:row\.executable\}/);
- for(const w of ['已是日文原版，不需要恢复','Already the Japanese original','すでに日本語版です'])assert.ok(app.includes(w),w);
+ assert.doesNotMatch(bridge,/japanese-presence\.cjs'\)\.verdict\(root,db,id\)/,'cached presence does not decide the restore state');
+ for(const w of ['游戏实际显示的正文语言尚未验证','The displayed dialogue language is unverified','ゲームで表示される本文の言語は未確認です'])assert.ok(app.includes(w),w);
 });

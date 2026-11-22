@@ -320,10 +320,10 @@ function importedExecutable(db,id,file,language){
   db.prepare('UPDATE games SET original=? WHERE id=?').run(JSON.stringify(original),id);
 }
 function scriptSettings(){return new(require('./settings.cjs').Settings)(root);}
-function scriptActivity({hasPairs,embedded=false}){
+function scriptActivity({hasPairs,embedded=false,perGame=false}){
  const prefs=scriptSettings().read('translation');
  const enabled=prefs.scriptTranslation!==false,english=prefs.learnerLanguage==='en';
- return {hasPairs,enabled,english,embedded,active:hasPairs&&enabled&&!english};
+ return {hasPairs,enabled,english,embedded,...(perGame?{perGame:true}:{}),active:hasPairs&&(enabled||perGame)&&!english};
 }
 function enableRestoredTranslation(pairing,runtime){
  try{
@@ -498,17 +498,33 @@ async function dispatch(request,runtime=null) {
           zero-latency translation from them at once and report whether it worked */
        const withPatch=async r=>({...r,patch:await pairRestoredTranslation(id,runtime)});
        /* E327 import from a Japanese original the user has: folder, program or archive; preview first, then apply */
-       if(request.action==='jp_import_preview')return jio.preview(dir,String(request.source||''));
+       if(request.action==='jp_import_preview'){
+        if(request.discoverArchive===true)return jio.discoverArchive(dir,row.executable);
+        return imported?.state==='importable'&&/\.exe$/i.test(String(request.source||''))?
+         ji.preview(dir,row.executable,String(request.source||'')):jio.preview(dir,String(request.source||''),row.executable);
+       }
        if(request.action==='jp_import_cancel'){jio.cleanup(dir);return {ok:true};}
        /* E339: show the .iso made from an installer disc in Explorer (selected, not opened) */
        if(request.action==='jp_import_reveal'){const file=require('node:path').resolve(String(request.path||''));if(!/\.iso$/i.test(file)||!fs.existsSync(file))throw Error('IMPORT_SOURCE_MISSING');const child=spawn('explorer.exe',['/select,'+file],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {ok:true};}
-       if(request.action==='jp_import_apply'&&imported?.state!=='importable'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');return jio.apply(dir,String(request.source||''),row.executable).then(r=>{try{r.sourceHidden=require('./import-source.cjs').link(db,id,String(request.source||'')).length;}catch{}if(r.separate){importedExecutable(db,id,r.exe,'ja');return withPatch(r);}if(r.exe&&require('node:path').basename(r.exe).toLowerCase()!==require('node:path').basename(row.executable).toLowerCase())importedExecutable(db,id,r.exe,'ja');else if(changedFiles(r))importedExecutable(db,id,row.executable,'ja');return withPatch(r);});}
-       if(request.action==='jp_restore_undo'&&generic){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=jio.restore(dir);if(!r.skipped.length)importedExecutable(db,id,r.exe&&r.exe.toLowerCase()!==row.executable.toLowerCase()?r.exe:row.executable,'zh');return r;}
-       if(request.action==='jp_restore_detect'){const r=jr.detect(dir,lsOptions);if(imported&&(imported.state==='imported'||['none','unsupported'].includes(r.state)))return imported;
-        /* 2026-11-14 one shared "does this install have Japanese" (japanese-presence.cjs): a script read as Japanese, or
-           Japanese captured while playing, means already Japanese (BRUNS gameplay.exe), not "no Japanese script found" */
+       if(request.action==='jp_import_apply'&&(imported?.state!=='importable'||request.archiveToken||!/\.exe$/i.test(String(request.source||'')))){
+        const beforeWrite=()=>{if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');};
+        beforeWrite();
+        return jio.apply(dir,String(request.source||''),row.executable,{archiveToken:request.archiveToken,beforeWrite}).then(r=>{
+         if(r.archive){let patch=false;try{runtime?.reader?.refreshTextSource?.();const paired=jio.localArchive(row.executable);
+          patch=scriptActivity({hasPairs:paired?.coverage.paired>0,perGame:true}).active;}catch{}
+          return {...r,patch};}
+         try{r.sourceHidden=require('./import-source.cjs').link(db,id,String(request.source||'')).length;}catch{}
+         if(r.separate){importedExecutable(db,id,r.exe,'ja');return withPatch(r);}
+         if(r.exe&&require('node:path').basename(r.exe).toLowerCase()!==require('node:path').basename(row.executable).toLowerCase())importedExecutable(db,id,r.exe,'ja');else if(changedFiles(r))importedExecutable(db,id,row.executable,'ja');return withPatch(r);
+        });}
+       if(request.action==='jp_restore_undo'&&generic){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=jio.restore(dir);if(!r.archive&&!r.skipped.length)importedExecutable(db,id,r.exe&&r.exe.toLowerCase()!==row.executable.toLowerCase()?r.exe:row.executable,'zh');return r;}
+       if(request.action==='jp_restore_detect'){
+        const archive=generic&&jio.archiveManifest(dir);
+        if(archive)return {state:'imported',archive:true,verified:!!jio.localArchive(row.executable,archive),coverage:archive.coverage};
+        const r=jr.detect(dir,lsOptions);if(imported&&(imported.state==='imported'||['none','unsupported'].includes(r.state)))return imported;
+        if(r.state==='already'&&r.adapter==='siglus-dbs')return {...r,state:'resources'};
+        /* Cached script indexes and reading history cannot establish what the selected launcher loads now. */
         if(['none','unsupported'].includes(r.state)){const tl=require('../core/translated-launcher.cjs').inspect(row.executable);if(tl.translated)return {state:'translated',executable:row.executable,original:tl.original};}
-        if(['none','unsupported'].includes(r.state)){const v=require('./japanese-presence.cjs').verdict(root,db,id);if(v.japanese===true)return {state:'already',by:v.by,executable:row.executable};}
         return r;}
        if(request.action==='jp_import_apply'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=ji.apply(dir,row.executable,request.source);importedExecutable(db,id,r.exe,'ja');try{r.sourceHidden=require('./import-source.cjs').link(db,id,String(request.source||'')).length;}catch{}return withPatch(r);}
        if(request.action==='jp_restore_undo'&&imported?.state==='imported'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=ji.restore(dir);if(!r.skipped.length)importedExecutable(db,id,r.exe,'zh');return r;}
