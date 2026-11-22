@@ -5,10 +5,15 @@ const labels={
  ja:['日本語版と復元','日本語版 EXE を探す','日本語版 EXE を選ぶ','閉じる','現在の日本語版実行ファイル','実行ファイルを保存しました','日本語版の実行ファイルを探しています…','日本語版フォルダから照合','手元の日本語版フォルダを読み、現在の翻訳版と照合します。ゲームファイルは書き換えません','日本語版のシナリオを照合しました','利用できる対訳が見つかりませんでした。既存の翻訳方法で補います']
 };
 const localeWords={zh:['日文环境启动','游戏标题、菜单或对白乱码，或点读层收到的日文全是乱码时，开启后重新启动本作。文字正常时可保持关闭','保存失败，已恢复原设置'],en:['Japanese locale','If the title, menus, dialogue, or all Japanese text in the reader looks garbled, turn this on and restart this game. Leave it off if text displays normally.','Could not save. The previous setting was restored.'],ja:['日本語環境で起動','タイトル・メニュー・台詞が文字化けする場合や、読み取り結果がすべて文字化けする場合は、オンにしてゲームを再起動してください。正常に表示される場合はオフのままで構いません。','設定を保存できなかったため元に戻しました']};
+const localeCaptions={
+ zh:'????????????????????????',
+ en:'Garbled text? Turn on and restart.',
+ ja:'???????????????????????????'
+};
 export const originalLabel=locale=>(labels[locale]||labels.en)[0];
 export function localeToggleHTML(locale,mode){
  const [label,hint]=localeWords[locale]||localeWords.en;
- return `<label class="locale-toggle detail-locale" title="${hint}"><strong>${label}</strong><input type="checkbox" role="switch" data-locale aria-describedby="detail-locale-help" ${mode==='japanese'?'checked':''}><span class="review-switch" aria-hidden="true"></span></label><small id="detail-locale-help" class="detail-locale-help">${hint}</small>`;
+ return `<label class="locale-toggle detail-locale" title="${hint}"><strong>${label}</strong><input type="checkbox" role="switch" data-locale aria-describedby="detail-locale-help" ${mode==='japanese'?'checked':''}><span class="review-switch" aria-hidden="true"></span></label><small id="detail-locale-help" class="detail-locale-help">${localeCaptions[locale]||localeCaptions.en}</small>`;
 }
 export function bindLocaleToggle(host,{id,api,locale}){
  const box=host.querySelector('[data-locale]'),status=host.querySelector('.detail-locale-error');

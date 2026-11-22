@@ -95,7 +95,7 @@ test('detail hero layout, launch motion and memories scrollbar styles',async()=>
   await page.evaluate(read('primary-buttons.js').replace('export function ','function '));
   await page.evaluate(()=>document.fonts.ready.then(()=>true));
   await assertLaunchMotion(page);
-  for(const width of [1360,1100,800,620,500]){
+  for(const width of [1360,1244,1101,1100,1024,800,620,500]){
    await page.c.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
    for(const locale of ['zh','ja','en'])for(const title of ['海市蜃楼之馆','ファタモルガーナの館 — The House in Fata Morgana — 長い作品名の折り返し確認']){
     await page.evaluate(html=>{document.querySelector('main').innerHTML=html;decoratePrimaryButtons(document.querySelector('main'));},hero(locale,title));
@@ -107,11 +107,18 @@ test('detail hero layout, launch motion and memories scrollbar styles',async()=>
      const stats=[...document.querySelectorAll('.detail-statistics .stat-card strong')].map(e=>{const range=document.createRange();range.selectNodeContents(e);return {card:r(e.parentElement).toJSON(),box:r(e).toJSON(),text:range.getBoundingClientRect().toJSON()};});
      const beyond=[...main.querySelectorAll('.game-detail-hero *')].filter(e=>!actions.contains(e)&&r(e).right>r(main).right+1)
       .slice(0,10).map(e=>[e.tagName,String(e.className),e.textContent.slice(0,40),Math.round(r(e).right)]);
+     const text=document.createRange();
+     text.selectNodeContents(caption);
+     const textFits=()=>[...text.getClientRects()].every(box=>box.left>=a.left-1&&box.right<=a.right+1);
+     const beforeHelpFits=textFits(),beforeText=[...text.getClientRects()].map(box=>[box.left,box.right]);
      actions.scrollLeft=actions.scrollWidth;
      const lastReachable=r(toggle).right<=a.right+1;
      const help=r(caption),switchRect=r(toggle);
+     const textBoxes=[...text.getClientRects()];
+     const helpLines=new Set(textBoxes.map(box=>box.top)).size;
+     const helpFits=beforeHelpFits&&textFits();
      const cover=r(main.querySelector('.detail-cover'));
-     return {help:help.toJSON(),switchRect:switchRect.toJSON(),helpFits:caption.scrollWidth<=caption.clientWidth+1,overflow:main.scrollWidth>main.clientWidth+1,beyond,titleScroll:h.scrollHeight,titleHeight:h.clientHeight,titleRight:t.right,mainRight:r(main).right,actionsTop:a.top,titleBottom:t.bottom,labelLeft:l.left,labelRight:l.right,iconRight:i.right,launchRight:p.right,launchHeight:p.height,clip:style.clipPath,radius:style.borderTopRightRadius,tools,stats,lastReachable,actionRight:a.right,tabsGap:r(main.querySelector('.detail-tabs')).top-a.bottom,coverBottom:cover.bottom,coverRight:cover.right};
+     return {beforeText,afterText:textBoxes.map(box=>[box.left,box.right]),help:help.toJSON(),switchRect:switchRect.toJSON(),helpFits,helpLines,actionsWidth:a.width,actionsLeft:a.left,overflow:main.scrollWidth>main.clientWidth+1,beyond,titleScroll:h.scrollHeight,titleHeight:h.clientHeight,titleRight:t.right,mainRight:r(main).right,actionsTop:a.top,titleBottom:t.bottom,labelLeft:l.left,labelRight:l.right,iconRight:i.right,launchRight:p.right,launchHeight:p.height,clip:style.clipPath,radius:style.borderTopRightRadius,tools,stats,lastReachable,actionRight:a.right,tabsGap:r(main.querySelector('.detail-tabs')).top-a.bottom,coverBottom:cover.bottom,coverRight:cover.right};
     });
     const tag=width+'/'+locale+'/'+title;
     assert.equal(result.overflow,false,tag+' no hero overflow '+JSON.stringify(result.beyond));assert.ok(result.titleScroll<=result.titleHeight+1,tag+' complete title height');assert.ok(result.titleRight<=result.mainRight+1,tag+' title inside main');assert.ok(result.actionsTop>=result.titleBottom,tag+' title does not overlap actions');
@@ -119,14 +126,20 @@ test('detail hero layout, launch motion and memories scrollbar styles',async()=>
     assert.equal(result.clip,'none',tag+' the launch label is unclipped');assert.equal(result.radius,'10px',tag+' rounded launch');
     assert.ok(result.launchHeight>=(width>1000?48:38),tag+' launch remains the primary action');
     assert.equal(result.tools.length,5,tag+' five controls');assert.ok(result.lastReachable,tag+' last control reachable');
-    assert.ok(result.helpFits&&result.help.right<=result.actionRight+1,tag+' complete caption reachable');
+    assert.ok(result.helpFits&&result.help.right<=result.actionRight+1,tag+' caption text stays inside the scroll viewport '+JSON.stringify([result.beforeText,result.afterText,result.actionsLeft,result.actionRight]));
     assert.ok(result.help.top>=result.switchRect.bottom&&result.help.top-result.switchRect.bottom<=10,tag+' caption just below switch');
-    assert.ok(Math.abs(result.help.left+(width<=660?0:6)-result.switchRect.left)<=1,tag+' caption left-aligned with switch');
+    if(result.actionsWidth>=(width>1100?794:774)){
+     assert.equal(result.helpLines,1,tag+' wide caption fits on one line');
+     assert.ok(Math.abs(result.help.left-result.switchRect.left)<=1,tag+' caption left-aligned with switch');
+    }else{
+     assert.ok(result.helpLines<=(width>=620?1:2),tag+' narrow caption uses the whole row');
+     assert.ok(Math.abs(result.help.left-result.actionsLeft-3)<=1,tag+' narrow caption starts at the row inset');
+    }
     assert.ok(result.tabsGap<=22,tag+' tabs sit close to the actions');
     const center=t=>(t.rect.top+t.rect.bottom)/2;
     for(const t of result.tools){assert.ok(t.scroll<=t.width+1,tag+' tool label fits');assert.ok(t.font>=13,tag+' tool text stays readable');assert.ok(t.rect.height>=38,tag+' tool has a full hit target');assert.ok(Math.abs(center(t)-center(result.tools[0]))<=1,tag+' controls stay in one row');}
     assert.ok(result.tools[0].rect.left>=result.coverRight,tag+' controls sit to the right of the cover');
-    if(width>=1100||width>=620&&locale==='zh')assert.ok(result.tools.at(-1).rect.right<=result.actionRight+1,tag+` full row is visible (${result.tools.at(-1).rect.right} vs ${result.actionRight})`);
+    if(width>=1100&&result.actionsWidth>=660||width>=620&&locale==='zh')assert.ok(result.tools.at(-1).rect.right<=result.actionRight+1,tag+` full row is visible (${result.tools.at(-1).rect.right} vs ${result.actionRight})`);
     if((width>=800||width===620&&locale==='zh')&&title.length<20)assert.ok(Math.abs(result.tools[0].rect.bottom-result.coverBottom)<=9,tag+` buttons align with the cover bottom (${result.tools[0].rect.bottom} vs ${result.coverBottom})`);
     for(const s of result.stats)assert.ok(s.text.right<=s.box.right+1,tag+' statistic does not run into the next column');
     for(const [i,s] of result.stats.entries()){

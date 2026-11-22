@@ -22,7 +22,7 @@
 /* Legacy detail rules have ID-weighted !important selectors; a scoped important layer
    resolves this surface without increasing selector weight or changing the title bar */
 @layer story-detail-responsive{
- .main[data-kids~="dtv-bg"] .game-detail-hero{--dcw:200px;display:grid!important;grid-template-columns:var(--dcw) minmax(0,1fr)!important;grid-template-rows:auto auto auto auto minmax(0,1fr) auto auto auto!important;height:auto!important;min-height:0!important;row-gap:0!important;column-gap:34px!important;align-items:start!important;padding:20px 0 10px!important;margin-bottom:0!important}
+ .main[data-kids~="dtv-bg"] .game-detail-hero{--dcw:200px;--detail-cover-gap:34px;--detail-stats-width:0px;container:detail-hero / inline-size;display:grid!important;grid-template-columns:var(--dcw) minmax(0,1fr)!important;grid-template-rows:auto auto auto auto minmax(0,1fr) auto auto auto!important;height:auto!important;min-height:0!important;row-gap:0!important;column-gap:var(--detail-cover-gap)!important;align-items:start!important;padding:20px 0 10px!important;margin-bottom:0!important}
  .main[data-kids~="dtv-bg"] .game-detail-hero .detail-cover{grid-row:1/7!important;width:var(--dcw)!important;height:calc(var(--dcw)*4/3)!important;align-self:start!important;aspect-ratio:3/4!important}
  .main[data-kids~="dtv-bg"] .game-detail-hero .detail-title{display:grid!important;grid-template-columns:minmax(0,1fr) 174px!important;grid-row:1/-1!important;grid-template-rows:subgrid!important;column-gap:24px!important;row-gap:0!important;height:auto!important;min-width:0!important}
  .main[data-kids~="dtv-bg"] .detail-title>.detail-engine{grid-column:1!important;grid-row:1!important;margin:0!important;letter-spacing:.05em!important}
@@ -30,7 +30,8 @@
  .main[data-kids~="dtv-bg"] .detail-title>p.settings-help{grid-column:1!important;grid-row:3!important;margin:6px 0 0!important;letter-spacing:normal!important}
  .main[data-kids~="dtv-bg"] .detail-title>p.settings-help[role=status]{grid-row:4!important}
  .main[data-kids~="dtv-bg"] .detail-title>.detail-action-strip{grid-column:1/-1!important;grid-row:6/-1!important;display:grid;grid-template-rows:subgrid;min-width:0}
- .main[data-kids~="dtv-bg"] .detail-action-strip>.detail-actions{display:grid!important;grid-row:1/3;grid-template-rows:subgrid;grid-template-columns:repeat(5,max-content);align-items:center!important;column-gap:8px!important;row-gap:0!important;margin:0!important;padding:4px 3px 0!important;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin}
+ .main[data-kids~="dtv-bg"] .detail-action-strip>.detail-actions{display:grid!important;grid-row:1/3;grid-template-rows:subgrid;grid-template-columns:repeat(4,max-content) minmax(max-content,1fr);align-items:center!important;column-gap:8px!important;row-gap:0!important;margin:0!important;padding:4px 3px 0!important;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin}
+ .main[data-kids~="dtv-bg"] .detail-actions>.detail-locale{justify-self:start}
  .main[data-kids~="dtv-bg"] .detail-actions>button{flex:none;height:auto!important;min-height:40px!important;padding:8px 13px!important;white-space:nowrap!important;letter-spacing:normal!important;font-size:14px!important}
  .main[data-kids~="dtv-bg"] .detail-actions>button:is([data-edit],.detail-tool){min-height:48px!important;border-radius:10px!important}
  .main[data-kids~="dtv-bg"] .detail-actions>button[data-edit]{padding-inline:18px!important}
@@ -40,14 +41,14 @@
  .main[data-kids~="dtv-bg"] .detail-statistics .stat-card span{font-size:11px!important;letter-spacing:normal!important;white-space:normal!important}
  .main[data-kids~="dtv-bg"] .detail-tabs{margin-top:0!important;padding-top:2px!important}
  @media(min-width:1101px){
-  .main[data-kids~="dtv-bg"] .game-detail-hero{padding-top:32px!important}
+  .main[data-kids~="dtv-bg"] .game-detail-hero{--detail-stats-width:152px;padding-top:32px!important}
   .main[data-kids~="dtv-bg"] .game-detail-hero .detail-title{grid-template-columns:minmax(0,1fr) 138px!important;column-gap:14px!important}
   .main[data-kids~="dtv-bg"] .detail-title>.detail-action-strip{grid-column:1!important}
   .main[data-kids~="dtv-bg"] .detail-title>.detail-statistics{grid-row:1/7!important;height:calc(var(--dcw)*4/3);box-sizing:border-box;align-content:space-between!important}
   .main[data-kids~="dtv-bg"] .detail-statistics .stat-card strong{font-size:30px!important}
  }
  @media(max-width:1100px){
-  .main[data-kids~="dtv-bg"] .game-detail-hero{--dcw:160px;column-gap:26px!important}
+  .main[data-kids~="dtv-bg"] .game-detail-hero{--dcw:160px;--detail-cover-gap:26px}
   .main[data-kids~="dtv-bg"] .detail-title>.detail-statistics{gap:4px!important}
   .main[data-kids~="dtv-bg"] .detail-statistics .stat-card{display:grid!important;grid-template-columns:max-content minmax(0,1fr);align-items:baseline;gap:4px!important}
   .main[data-kids~="dtv-bg"] .detail-statistics .stat-card span{grid-area:1/1;font-size:10px!important;white-space:nowrap!important}
@@ -58,7 +59,7 @@
   .main[data-kids~="dtv-bg"] .detail-actions>button:is([data-edit],.detail-tool){min-height:38px!important;padding-inline:9px!important;font-size:13px!important}
  }
  @media(max-width:800px){
-  .main[data-kids~="dtv-bg"] .game-detail-hero{--dcw:120px;column-gap:20px!important}
+  .main[data-kids~="dtv-bg"] .game-detail-hero{--dcw:120px;--detail-cover-gap:20px}
   .main[data-kids~="dtv-bg"] .detail-title>h1{font-size:32px!important}
   .main[data-kids~="dtv-bg"] .game-detail-hero .detail-title{grid-template-columns:minmax(0,1fr) 150px!important}
  }
@@ -72,7 +73,7 @@
   .main[data-kids~="dtv-bg"] .detail-actions>button[data-edit] svg{display:none}
  }
  @media(max-width:500px){
-  .main[data-kids~="dtv-bg"] .game-detail-hero{--dcw:84px;column-gap:14px!important;padding-top:14px!important}
+  .main[data-kids~="dtv-bg"] .game-detail-hero{--dcw:84px;--detail-cover-gap:14px;padding-top:14px!important}
   .main[data-kids~="dtv-bg"] .detail-title>h1{font-size:22px!important;line-height:1.3!important}
   .main[data-kids~="dtv-bg"] .detail-title>.detail-engine{font-size:10px!important;letter-spacing:normal!important}
   .main[data-kids~="dtv-bg"] .detail-statistics .stat-card span{font-size:10px!important}
@@ -80,11 +81,21 @@
 }
 .story-chevron{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;margin-left:auto}.story-gallery-heading[aria-expanded=false] .story-chevron{transform:rotate(-90deg)}
 
-/* Keep the caption in the same horizontal scroll area as its switch.
-   Subgrid lets the cover end at the controls row before the caption starts. */
+/* Let the controls scroll on narrow layouts while the help stays in view. */
 .main .detail-locale-help{
- grid-row:2;grid-column:5;align-self:start;
- width:0;min-width:100%;box-sizing:border-box;padding-inline-start:6px;
+ grid-row:2;grid-column:1/-1;align-self:start;justify-self:start;
+ position:sticky;inset-inline-start:3px;inline-size:calc(100cqi - var(--dcw) - var(--detail-cover-gap) - var(--detail-stats-width) - 6px);
  text-align:start;overflow-wrap:anywhere;line-height:1.45;font-size:12px;color:var(--g-t2);
 }
-@media(max-width:660px){.main .detail-locale-help{padding-inline-start:0}}
+@container detail-hero (min-width:1180px){
+ .main .detail-locale-help{
+  grid-column:5/-1;position:static;inline-size:auto;margin-inline-start:6px;
+ }
+}
+@media(max-width:1100px){
+ @container detail-hero (min-width:960px){
+  .main .detail-locale-help{
+   grid-column:5/-1;position:static;inline-size:auto;margin-inline-start:6px;
+  }
+ }
+}
