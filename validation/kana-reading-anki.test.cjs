@@ -60,3 +60,14 @@ test('full-width minute count keeps its counter reading across digit tokens',asy
  const word=await model.word({text:'２０分待つ',start:0,end:3});
  assert.equal(word.reading,'ニジュップン');
 });
+
+test('word-card duration and fraction before の use the following token in context',async()=>{
+ const {Reader}=require('../services/reader.cjs');
+ for(const [suffix,numeric,expected] of [['休憩',false,'ニジュップン'],['一休み',false,'ニジュップン'],['一',true,'ニジュウブン']]){
+  const text='２０分の'+suffix;
+  const model=learning([tok(0,2,'２０','ニジュウ'),tok(2,3,'分','ブン'),tok(3,4,'の','ノ'),{...tok(4,[...text].length,suffix,''),grammar:['名詞',numeric?'数詞':'普通名詞']}]);
+  const reader=Object.assign(Object.create(Reader.prototype),{active:()=>true,runtime:{config:()=>({}),learning:()=>model}});
+  const {replies}=await reader.message({type:'v4',action:'word',args:{text,start:0,end:3},id:1});
+  assert.equal(replies[0].args[1].reading,expected);assert.equal(replies[0].args[1].ambiguous,false);
+ }
+});

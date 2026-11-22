@@ -169,10 +169,12 @@ class LocalLearning{
   return [...new Set(matches.flatMap(e=>e.readings).map(kana))];
  }
  load(){
-  if(this.index)return;this.index=new Map();this.byId=new Map();this.english=new Map();const root=require('./paths.cjs').resources;
-  for(const entry of JSON.parse(fs.readFileSync(path.join(root,'jmdict.json'),'utf8'))){this.byId.set(entry.id,entry);for(const key of [...entry.spellings,...entry.readings]){const ids=this.index.get(key)||[];ids.push(entry.id);this.index.set(key,ids);}}
+  if(this.index)return;
+  const root=require('./paths.cjs').resources,index=new Map(),byId=new Map(),english=new Map();
+  for(const entry of JSON.parse(fs.readFileSync(path.join(root,'jmdict.json'),'utf8'))){byId.set(entry.id,entry);for(const key of [...entry.spellings,...entry.readings]){const ids=index.get(key)||[];ids.push(entry.id);index.set(key,ids);}}
   const backup=path.join(root,'jmdict.english.json'); // English senses for the English learner mode
-  if(fs.existsSync(backup))for(const entry of JSON.parse(fs.readFileSync(backup,'utf8')))this.english.set(entry.id,entry);
+  if(fs.existsSync(backup))for(const entry of JSON.parse(fs.readFileSync(backup,'utf8')))english.set(entry.id,entry);
+  Object.assign(this,{index,byId,english});
  }
  adapt(entry,language){
   this.load();const selected=language==='en'?(this.english.get(entry.id)||entry):(this.byId.get(entry.id)||entry);
@@ -221,11 +223,14 @@ class LocalLearning{
   let phrase=false;if(!chosen&&!fixed){const inside=tokens.filter(t=>t.start>=args.start&&t.end<=args.end).sort((a,b)=>a.start-b.start);if(inside.length>1&&inside[0].start===args.start&&inside.at(-1).end===args.end&&inside.every((t,i)=>i===0||inside[i-1].end===t.start)&&inside.every(t=>t.reading||!/[一-龯々]/.test(t.surface))){reading=inside.map(t=>t.reading||t.surface).join('');surface=[...args.text].slice(args.start,args.end).join('');phrase=true;pronunciationForm='phrase';}}
   // Separate digit tokens lose the counter pronunciation in a multi-digit minute count.
   const minute = /^([1-9][0-9]?)分$/u.exec(selected.normalize('NFKC'));
-  if (minute && !/^の/u.test([...args.text].slice(args.end).join(''))) {
+  if (minute) {
     const n = Number(minute[1]), tens = Math.floor(n / 10), ones = n % 10;
     const digits = ['', 'イチ', 'ニ', 'サン', 'ヨン', 'ゴ', 'ロク', 'ナナ', 'ハチ', 'キュウ'];
     const minutes = ['ジュップン','イップン','ニフン','サンプン','ヨンプン','ゴフン','ロップン','ナナフン','ハップン','キュウフン'];
-    reading = (tens > 1 ? digits[tens] : '') + (tens && ones ? 'ジュウ' : '') + minutes[ones];
+    const fraction = [...args.text][args.end] === 'の' && tokens.some(t=>t.start===args.end+1 && t.grammar?.[1]==='数詞');
+    const prefix = tens > 1 ? digits[tens] : '';
+    reading = fraction ? prefix + (tens ? 'ジュウ' : '') + digits[ones] + 'ブン'
+                       : prefix + (tens && ones ? 'ジュウ' : '') + minutes[ones];
     surface = selected; chosen = null; phrase = true; pronunciationForm = 'phrase';
   }
   const ambiguous=!reading||!!chosen?.reading_ambiguous||!phrase&&!fixed&&!!entry&&!entry.readings?.some(r=>kana(r)===kana(reading));

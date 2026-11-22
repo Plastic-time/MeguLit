@@ -44,14 +44,34 @@
   css.textContent=
    'html body.tomoyo-gal-bound.megulit-fit-on'+own+' .sentence-window:not(.tome-island-page) .tomoyo-cn-output{font-size:calc(var(--tomoyo-gal-cn-size,24px) * var(--megulit-fit,1))!important}'+
    'html body.tomoyo-gal-bound.megulit-fit-up'+own+' .sentence-window:not(.tome-island-page){top:calc(var(--tomoyo-reader-y,0px) + var(--megulit-fit-shift,0px))!important}'+
-   'html body.tomoyo-gal-bound.megulit-fit-room'+own+' .sentence-window:not(.tome-island-page) .tomoyo-cn-output{min-height:0!important;max-height:var(--megulit-fit-room,4em)!important;overflow-y:auto!important;overscroll-behavior:contain}';
+   'html body.tomoyo-gal-bound.megulit-fit-room'+own+' .sentence-window:not(.tome-island-page) .tomoyo-cn-output{min-height:0!important;max-height:var(--megulit-fit-room,4em)!important;overflow-y:auto!important;overscroll-behavior:contain}'+
+   'html body.tomoyo-gal-bound'+own+' .sentence-window.megulit-ocr-notice{translate:0 var(--notice-shift,0px)!important;box-sizing:border-box!important;max-height:var(--notice-height)!important;overflow-y:auto!important;overscroll-behavior:contain}';
   (d.head||d.documentElement).append(css);
   let fit=1,shift=0,room=0,line='',frame=0;
+  let notice=false,noticeWindow=null,noticeShift=0;
   const main=()=>[...d.querySelectorAll('.sentence-window')].find(n=>!n.classList.contains('tome-island-page'));
   function set(){const r=d.documentElement.style,c=d.body.classList;
    r.setProperty('--megulit-fit',String(fit));r.setProperty('--megulit-fit-shift',shift+'px');r.setProperty('--megulit-fit-room',Math.max(0,room)+'px');
    c.toggle('megulit-fit-on',fit<1);c.toggle('megulit-fit-up',shift<0);c.toggle('megulit-fit-room',room>0);w.__tomoyoHitRegionsRefresh?.();}
-  function reset(){if(fit===1&&shift===0&&room===0)return;fit=1;shift=0;room=0;set();}
+  function clearNotice(){
+   if(!noticeWindow)return;
+   noticeWindow.classList.remove('megulit-ocr-notice');
+   noticeWindow.style.removeProperty('--notice-height');noticeWindow.style.removeProperty('--notice-shift');
+   noticeWindow.scrollTop=0;noticeWindow=null;noticeShift=0;
+   w.__tomoyoHitRegionsRefresh?.();
+  }
+  function reset(){clearNotice();if(fit===1&&shift===0&&room===0)return;fit=1;shift=0;room=0;set();}
+  // OCR joins the paragraphs of an opening notice into one screen. Place the whole clickable block inside the client.
+  function fitNotice(win,client){
+   if(noticeWindow!==win){clearNotice();noticeWindow=win;}
+   const height=Math.max(1,client.bottom-client.top-2*MARGIN);
+   win.style.setProperty('--notice-height',height+'px');win.classList.add('megulit-ocr-notice');
+   const box=win.getBoundingClientRect(),naturalTop=box.top-noticeShift;
+   const top=Math.max(client.top+MARGIN,Math.min(naturalTop,client.bottom-MARGIN-box.height));
+   if(Math.abs(top-box.top)>.1){
+    noticeShift=top-naturalTop;win.style.setProperty('--notice-shift',noticeShift+'px');w.__tomoyoHitRegionsRefresh?.();
+   }
+  }
   function measure(win){let top=Infinity,bottom=-Infinity;
    for(const n of [win,...win.querySelectorAll('.sentence-text,.tomoyo-cn-output')]){if(n.hidden)continue;const r=n.getBoundingClientRect();if(!(r.height>0))continue;top=Math.min(top,r.top);bottom=Math.max(bottom,r.bottom);}
    let jt=Infinity,jb=-Infinity;for(const n of win.querySelectorAll('.sentence-text')){if(n.hidden)continue;const r=n.getBoundingClientRect();if(!(r.height>0))continue;jt=Math.min(jt,r.top);jb=Math.max(jb,r.bottom);}
@@ -62,6 +82,7 @@
    if(d.body.classList.contains('megulit-placed')||d.body.classList.contains('megulit-anchored')||b.textPlaceOwns?.()===true){reset();return;}/* 2026-11-20 (user, CHAOS;CHILD: 「译文为啥都这么小」): a line anchored on the game's own place is fitted by text-place.js against the monitor's work area (translation at most 15 % smaller); fitting it again to the game client shrank two-row sentences' translation to 60 % */
    const info=b.galLayoutInfo?.(),win=main();if(!win||!info||!(info.clientHeight>0))return;
    const dpr=Math.max(.5,Number(w.devicePixelRatio)||1),client={top:info.clientY/dpr,bottom:(info.clientY+info.clientHeight)/dpr};
+   if(notice){fitNotice(win,client);return;}
    /* measured with the current shift taken out, so moving up is decided again from the real place */
    const m=measure(win);if(!m)return;const box={top:m.top-shift,bottom:m.bottom-shift};
    const roomNow=room;if(roomNow>0){/* the translation was cut to roomNow: its full height decides */const cn=win.querySelector('.tomoyo-cn-output');if(cn&&cn.scrollHeight>cn.clientHeight)box.bottom+=cn.scrollHeight-cn.clientHeight;}
@@ -76,7 +97,12 @@
   const watch=()=>{const win=main();if(win&&win!==watched&&ro){if(watched)ro.unobserve(watched);ro.observe(win);for(const n of win.querySelectorAll('.sentence-text,.tomoyo-cn-output'))ro.observe(n);watched=win;}};
   const before=b.galStatus;
   b.galStatus=m=>{before?.(m);if(!m||typeof m!=='object')return;
-   if(typeof m.hookSource==='string'&&m.hookSource!==line){line=m.hookSource;reset();}
+   if(m.type==='gameClosed'||m.hookSource===null){notice=false;line='';reset();}
+   if(typeof m.hookSource==='string'&&m.hookSource!==line){line=m.hookSource;reset();notice=false;}
+   if(typeof m.hookSource==='string'&&typeof m.hookSourceOrigin==='string'){
+    const next=m.hookSourceOrigin==='ocr'&&line.includes('\n');
+    if(next!==notice){notice=next;reset();}
+   }
    watch();schedule();};
   const layoutBefore=b.galLayout;
   if(typeof layoutBefore==='function')b.galLayout=layout=>{const r=layoutBefore(layout);watch();schedule();return r;};

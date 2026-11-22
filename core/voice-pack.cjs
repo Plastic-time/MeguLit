@@ -33,15 +33,23 @@ class VoicePack{
  sweep(){for(const v of VOICES){const tmp=path.join(this.dir,v.uuid+'.aivmx.tome-download');if(!this.jobs.has(v.uuid))try{fs.unlinkSync(tmp);}catch{}}}
  installed(){let names=[];try{names=fs.readdirSync(this.dir);}catch{}return VOICES.filter(v=>names.includes(v.uuid+'.aivmx')).map(v=>v.uuid);}
  // Per voice: installed, or its own download job with progress / error (user picks voices one by one, 2026-11-02).
- status(){const installed=this.installed();return {...this.state,installed,voices:VOICES.map(v=>{const job=this.jobs.get(v.uuid);return {name:v.name,gender:v.gender,uuid:v.uuid,recommended:v.recommended===true,installed:installed.includes(v.uuid),running:!!job?.running,bytes:job?.bytes||0,size:job?.size||0,error:job?.error||''};})};}
+ status(){const installed=this.installed(),current=this.jobs.get(this.currentUuid);return {...this.state,bytes:current?.bytes??this.state.bytes,size:current?.size??this.state.size,installed,voices:VOICES.map(v=>{const job=this.jobs.get(v.uuid);return {name:v.name,gender:v.gender,uuid:v.uuid,recommended:v.recommended===true,installed:installed.includes(v.uuid),running:!!job?.running,bytes:job?.bytes||0,size:job?.size||0,error:job?.error||''};})};}
  // Starts (or joins) the background download of every missing voice; progress is read with status().
  start(onDone){if(this.job)return this.status();const missing=VOICES.filter(v=>!this.installed().includes(v.uuid));this.state={running:true,done:0,total:missing.length,current:'',bytes:0,size:0,error:'',installed:[]};
-  this.job=(async()=>{try{fs.mkdirSync(this.dir,{recursive:true});for(const voice of missing){this.state.current=voice.name;await this.download(voice);this.state.done++;}this.state.current='';if(missing.length)await onDone?.();}
-   catch(e){this.state.error=String(e.message||e).slice(0,300);this.log('[ToMe] voice pack: '+this.state.error);}finally{this.state.running=false;this.job=null;}})();return this.status();}
+  if(!missing.length){this.state.running=false;return this.status();}
+  this.job=(async()=>{try{for(const voice of missing){
+    this.state.current=voice.name;this.currentUuid=voice.uuid;
+    this.startOne(voice.uuid);
+    const item=this.jobs.get(voice.uuid);await item?.completion;
+    if(item?.error)throw Error(item.error);
+    if(item?.controller.signal.aborted)break;
+    this.state.bytes=item?.bytes||0;this.state.size=item?.size||0;this.state.done++;
+   }this.state.current='';if(this.state.done)await onDone?.();}
+   catch(e){this.state.error=String(e.message||e).slice(0,300);this.log('[ToMe] voice pack: '+this.state.error);}finally{this.currentUuid=null;this.state.running=false;this.job=null;}})();return this.status();}
  // One voice: its own job and AbortController, so several voices download side by side and each can be cancelled.
  startOne(uuid,onDone){const voice=VOICES.find(v=>v.uuid===uuid);if(!voice)throw Error('未知的声音');if(this.installed().includes(uuid)||this.jobs.get(uuid)?.running)return this.status();
   const job={running:true,bytes:0,size:0,error:'',controller:new AbortController()};this.jobs.set(uuid,job);
-  (async()=>{try{fs.mkdirSync(this.dir,{recursive:true});await this.download(voice,job);await onDone?.();}
+  job.completion=(async()=>{try{fs.mkdirSync(this.dir,{recursive:true});await this.download(voice,job);await onDone?.();}
    catch(e){job.error=job.controller.signal.aborted?'':String(e.message||e).slice(0,300);if(job.error)this.log('[ToMe] voice '+voice.name+': '+job.error);}
    finally{job.running=false;if(!job.error)this.jobs.delete(uuid);}})();return this.status();}
  // Cancel really stops the transfer; download() then deletes the partly written file.
@@ -55,10 +63,33 @@ class VoicePack{
   const metadata=await this.fetchVoice(API+voice.uuid,{signal:job?AbortSignal.any([job.controller.signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)});if(metadata.ok===false)throw Error(voice.name+' 下载失败 HTTP '+metadata.status);const meta=await metadata.json();const file=(meta.model_files||[]).find(f=>f.model_type==='AIVMX');
   if(!file||!/^[a-f0-9]{64}$/i.test(String(file.checksum||''))||!(file.file_size>0))throw Error('AivisHub 没有 '+voice.name+' 的 AIVMX 文件信息');
   if(!['ACML 1.0','CC0'].includes(file.license_type))throw Error(voice.name+' 的许可已变为 '+file.license_type+'，已跳过');
-  /* 2026-11-19: core/fast-download.cjs pulls the file in parallel Range pieces when AivisHub's answer allows it (one
-     connection otherwise); a silent connection is dropped after 15 s. Size and checksum still decide. */
   const target=path.join(this.dir,voice.uuid+'.aivmx'),tmp=target+'.tome-download';progress.bytes=0;progress.size=file.file_size;
-  try{await require('./fast-download.cjs').download({urls:[API+voice.uuid+'/download?model_type=AIVMX'],dest:tmp,size:file.file_size,sha256:String(file.checksum).toLowerCase(),fetch:(url,opts)=>this.fetchVoice(url,opts),signal,onProgress:p=>{progress.bytes=p.received;}});fs.renameSync(tmp,target);this.log('[ToMe] voice installed: '+voice.name);}
-  catch(e){for(const f of [tmp,tmp+'.part',tmp+'.part.json'])try{fs.unlinkSync(f);}catch{}if(/^(HASH|SIZE)_MISMATCH$/.test(e.code||''))throw Error(voice.name+' 校验失败');if(e.code==='DOWNLOAD_FAILED')throw Error(voice.name+' 下载失败 '+String((e.last&&e.last.message)||''));throw e;}}
+  try{
+   await require('./fast-download.cjs').download({
+    urls:[API+voice.uuid+'/download?model_type=AIVMX'],dest:tmp,size:file.file_size,sha256:String(file.checksum).toLowerCase(),
+    // Each Range goes through the rate-limited Hub before reaching storage. Keep one resumable stream per voice.
+    connections:1,maxConnections:1,segment:file.file_size,probeCapMs:90000,
+    fetch:async(url,opts)=>{
+     const response=await this.fetchVoice(url,opts);
+     if(response.status===429){
+      await response.body?.cancel?.();
+      throw Object.assign(Error('HTTP 429'),{fatal:true});
+     }
+     return response;
+    },
+    signal,onProgress:p=>{progress.bytes=p.received;}
+   });
+   fs.renameSync(tmp,target);this.log('[ToMe] voice installed: '+voice.name);
+  }catch(e){
+   const corrupt=['HASH_MISMATCH','SIZE_MISMATCH'].includes(e.code);
+   // Explicit cancellation discards the download. Transport errors keep the hash-bound Range checkpoint for retry.
+   if(corrupt||job?.controller.signal.aborted){
+    for(const f of [tmp,tmp+'.part',tmp+'.part.json'])try{fs.unlinkSync(f);}catch{}
+   }
+   if(corrupt)throw Error(voice.name+' 校验失败');
+   if(e.code==='DOWNLOAD_FAILED')throw Error(voice.name+' 下载失败 '+String(e.last?.message||e.message));
+   throw e;
+  }
+ }
 }
 module.exports={VoicePack,VOICES};
