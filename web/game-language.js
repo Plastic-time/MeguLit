@@ -194,6 +194,7 @@ export function openGameLanguage({id,title,api,invoke,locale,esc,onActivity,onOr
   }
   if(!s||s.status==='failed'){status.textContent=u.failed;return;}
   if(s.status==='unsupported'){status.textContent=u.errors.NO_SUPPORTED_SCRIPT;return;}
+  if(s.status==='chinese-only'){status.textContent=w.chineseOnly;originalBtn.hidden=false;return;}
   if(s.status!=='native-japanese'){
    status.textContent=s.status==='unreliable'?w.unreliable+pairText(s.alignment?.pairing):w.patched;
    originalBtn.hidden=false;return;
