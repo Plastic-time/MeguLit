@@ -40,7 +40,7 @@ const PROFILES=Object.fromEntries(RAW.profiles.map(p=>[p.id,compile(p)]));
 /* ---- detection ------------------------------------------------------------------------------------------------- */
 /* f: the registry's listing (has / sub / magicAny / peek / probe); a plain folder path is listed here */
 function cond(f,c){if(c.all)return c.all.every(x=>cond(f,x));if(c.any)return c.any.some(x=>cond(f,x));
- if(c.find)return kit.walk(path.join(f.dir,c.find[0]),c.find[2]??3,n=>rx(c.find[1],'i').test(n)).length>0;
+ if(c.find)return f.inspect(dir=>kit.walk(path.join(dir,c.find[0]),c.find[2]??3,n=>rx(c.find[1],'i').test(n)).length>0);
  if(c.has)return f.has(rx(c.has,'i'));if(c.sub)return f.sub(c.sub[0],rx(c.sub[1],'i'));if(c.magic)return f.magicAny(rx(c.magic[0],'i'),c.magic[1]);
  if(c.peek)return f.peek(c.peek[0],rx(c.peek[1]),4096);if(c.table){const p=PROFILES[c.table];return f.probe(p.table.name,file=>!!tableList(p,file));}return false;}
 function matches(f,id){const p=PROFILES[id];if(!p?.match)return false;if(typeof f==='string')f=require('./registry.cjs').listing(f);

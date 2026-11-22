@@ -34,7 +34,7 @@ function enhance(ul){
   if(drag){}
   else if(glide!==null){pos+=(glide-pos)*ease(.24,dt);if(Math.abs(glide-pos)<.5){pos=glide;glide=null;}}
   else if(Math.abs(vel)>.05){pos+=vel*dt*60;vel*=Math.pow(pos<0||pos>m?.55:.9,dt*60);}
-  else if(!calm&&!hover&&now>idle){
+  else if(!calm&&!hover&&now>idle&&!ul.matches(':focus')){
    if(back){pos+=(0-pos)*ease(.05,dt);if(pos<.5){pos=0;back=false;idle=now+1800;}}
    else if(pos>=m-.5){if(!rest)rest=now+2400;else if(now>rest){back=true;rest=0;}}
    else pos=Math.min(m,pos+SPEED*dt);

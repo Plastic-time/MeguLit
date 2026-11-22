@@ -6,13 +6,14 @@
    core/profiles/domains.cjs, core/game-diff.cjs). No network, no game. */
 process.env.MEGULIT_RELAY_BASE='https://relay.test';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),zlib=require('node:zlib'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
+const {malwareClean}=require('./helpers/torch-release.cjs');
 const relayDir=path.join(__dirname,'..','relay'),MIGRATION=fs.readdirSync(path.join(relayDir,'migrations')).filter(f=>f.endsWith('.sql')).sort().map(f=>fs.readFileSync(path.join(relayDir,'migrations',f),'utf8')).join('');
-function d1(){const db=new DatabaseSync(':memory:');db.exec(MIGRATION);const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>{db.prepare(sql).run(...args);return {success:true};}});return {prepare:sql=>stmt(sql),raw:db};}
+function d1(){const db=new DatabaseSync(':memory:');db.exec(MIGRATION);const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>({success:true,meta:{changes:Number(db.prepare(sql).run(...args).changes)}}),_run:()=>({meta:{changes:Number(db.prepare(sql).run(...args).changes)}})});return {prepare:sql=>stmt(sql),raw:db,batch:async statements=>{db.exec('BEGIN IMMEDIATE');try{const results=statements.map(s=>s._run());db.exec('COMMIT');return results;}catch(e){db.exec('ROLLBACK');throw e;}}};}
 function r2(){const store=new Map();return {store,put:async(k,b)=>{store.set(k,Buffer.from(b));},get:async k=>store.has(k)?{body:store.get(k)}:null,delete:async k=>{store.delete(k);}};}
 let mod;const relay=async()=>mod??=await import(pathToFileURL(path.join(relayDir,'src','worker.js')).href);
 const ENV={DB:d1(),BUCKET:r2(),HASH_SALT:'salt',ADAPTER_ADMIN_TOKEN:'admin-token'};
 const user=ip=>async(url,init={})=>{const {handle}=await relay();return handle(new Request(url,{method:init.method||'GET',headers:{'cf-connecting-ip':ip,...(init.headers||{})},body:init.body}),ENV,new Date());};
-const maint=async(method,route,body)=>{const {handle}=await relay();return handle(new Request('https://relay.test'+route,{method,headers:{authorization:'Bearer admin-token','content-type':'application/json'},body:body?JSON.stringify(body):undefined}),ENV,new Date());};
+const maint=async(method,route,body)=>{if(route==='/api/game-profile/signed'&&body?.diff?.signature&&require('../core/game-diff.cjs').validate(body.diff).ok)await malwareClean(ENV.DB,body.diff,ENV,new Date());const {handle}=await relay();return handle(new Request('https://relay.test'+route,{method,headers:{authorization:'Bearer admin-token','content-type':'application/json'},body:body?JSON.stringify(body):undefined}),ENV,new Date());};
 const tmp=()=>fs.mkdtempSync(path.join(process.env.MEGULIT_TMP||os.tmpdir(),'autoprof-'));
 const ap=require('../core/auto-profile.cjs'),feed=require('../services/auto-profile-feed.cjs'),gameDiff=require('../core/game-diff.cjs'),domains=require('../core/profiles/domains.cjs'),tool=require('../tools/sign-profile.cjs');
 /* our signing key: a PEM outside the repository, named by the environment, as on our PC */
@@ -20,7 +21,7 @@ const KEYDIR=tmp(),PEM=path.join(KEYDIR,'megulit-profile-p1.pem');{const {privat
  feed._trust([{id:'p1',alg:'ed25519',publicKey:publicKey.export({format:'der',type:'spki'}).toString('base64')}]);}
 const TOOLENV={MEGULIT_PROFILE_KEY:PEM,MEGULIT_PROFILE_KEY_ID:'p1',MEGULIT_ADMIN_TOKEN:'admin-token'};
 const OURS=tool.privateKey(TOOLENV),EVIL=crypto.generateKeyPairSync('ed25519').privateKey;
-const toolFetch=async(url,init={})=>{const {handle}=await relay();return handle(new Request(url,{method:init.method||'GET',headers:init.headers||{},body:init.body}),ENV,new Date());};
+const toolFetch=async(url,init={})=>{if(new URL(url).pathname==='/api/game-profile/signed'){const d=JSON.parse(init.body).diff;await malwareClean(ENV.DB,d,ENV,new Date());}const {handle}=await relay();return handle(new Request(url,{method:init.method||'GET',headers:init.headers||{},body:init.body}),ENV,new Date());};
 const H=c=>c.repeat(64),KA=H('a'),KB=H('b'),KC=H('c');
 const HIDE={calibrate:{positionSource:'engine',textBox:{x:374,y:707,w:31,h:31,client:[1535,863]},hideMethod:'hide'},page:{effectFrames:null},hide:{textEffectsRead:false}};
 const rec=(key,mode,settings,cost=0,extra={})=>({schema:1,key,engine:'krkr',exe:'senrenbanka.exe',version:'1.4.21',at:new Date().toISOString(),source:'calibration',mode,reason:'',settings,score:{metrics:{dropRate:0},cost},candidates:[],...extra});
@@ -28,6 +29,16 @@ const post=(ip,record)=>user(ip)('https://relay.test/api/game-profile/report',{m
 const get=async key=>{const r=await user('9.9.9.9')('https://relay.test/api/game-profile/'+key);return {status:r.status,body:await r.json()};};
 const signRun=async()=>tool.signPicks('https://relay.test',path.join(KEYDIR,'signed'),{upload:true,fetcher:toolFetch,env:TOOLENV});
 
+test('same executable and reporter retain separate reviewed contributions for different scripts',async()=>{
+ const key=H('6'),profile=ap.diagnostic(rec(key,'hide',HIDE)).profile;
+ for(const script of [H('7'),H('8')]){
+  const res=await user('12.8.2.1')('https://relay.test/api/game-profile/report',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({version:1,profile,prints:{script}})});
+  assert.equal(res.status,201);
+ }
+ const rows=ENV.DB.raw.prepare('SELECT reporter,settings_hash,prints FROM auto_profile_reports WHERE game_key=?').all(key);
+ assert.equal(new Set(rows.map(r=>r.reporter)).size,2);assert.equal(new Set(rows.map(r=>r.settings_hash)).size,2);
+ assert.equal(ENV.DB.raw.prepare('SELECT count(*) AS n FROM auto_profile_picks WHERE game_key=?').get(key).n,0);
+});
 test('domains: every kernel key has a value domain and its default is in it; anything else is dropped',()=>{const D=require('../core/profiles/defaults.cjs');
  for(const leaf of domains.leaves(D)){assert.ok(domains.DOMAINS[leaf],'no domain for '+leaf);const v=leaf.split('.').reduce((o,k)=>o[k],D);assert.ok(domains.okValue(domains.DOMAINS[leaf],v),'default out of domain: '+leaf);}
  const c=domains.clean({placement:{firstLineAnchor:'glyph',lineOffsetY:9999,evil:'x'},choice:{filters:['(a+)+$','^…$']},hide:{textEffectsRead:'yes'},code:{run:'process.exit()'}});

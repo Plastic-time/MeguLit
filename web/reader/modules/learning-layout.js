@@ -5,11 +5,17 @@
  const busy=new Set(['resolve','download','cached','install','verify']),labels={idle:'尚未安装',resolve:'准备下载',download:'正在下载',cached:'使用已下载文件',install:'正在安装',verify:'检查词典',ready:'本地词典已就绪',error:'安装未完成'};
  const locale={zh:{idle:'尚未安装',resolve:'准备下载',download:'正在下载',cached:'使用已下载文件',install:'正在安装',verify:'检查词典',ready:'本地词典已就绪',error:'安装未完成',file:'当前文件',preparing:'正在准备本地词典…',retry:'重试安装',repair:'检查 / 修复词典',add:'安装 SudachiDict Full',progress:'当前文件下载进度',attention:'本地词典需要检查',running:'实际运行：',zh:'中文释义、词性与动词类别',en:'英文释义与语法'},en:{idle:'Not installed',resolve:'Preparing download',download:'Downloading',cached:'Using downloaded files',install:'Installing',verify:'Checking dictionaries',ready:'Local dictionaries ready',error:'Setup incomplete',file:'Current file',preparing:'Preparing local dictionaries…',retry:'Retry setup',repair:'Check / repair dictionaries',add:'Install SudachiDict Full',progress:'Current file download progress',attention:'Local dictionaries need attention',running:'Running: ',zh:'Chinese definitions, parts of speech and verb types',en:'English definitions and grammar'},ja:{idle:'未インストール',resolve:'ダウンロード準備中',download:'ダウンロード中',cached:'取得済みファイルを使用',install:'インストール中',verify:'辞書を確認中',ready:'ローカル辞書の準備完了',error:'セットアップ未完了',file:'現在のファイル',preparing:'ローカル辞書を準備中…',retry:'再インストール',repair:'辞書を確認・修復',add:'SudachiDict Full をインストール',progress:'現在のファイルの取得状況',attention:'ローカル辞書を確認してください',running:'実行中：',zh:'中国語の語義・品詞・動詞分類',en:'英語の語義と文法'}};
  const lang=()=>window.__tomeI18n?.get?.()||'zh',words=()=>locale[lang()]||locale.zh;
- function localizedStatus(panel){const w=words(),node=panel.querySelector('[data-learning-status]');if(!node)return;node.dataset.noI18n='';const raw=bridge.localLearningMessage||'',ready=raw.startsWith('实际运行：');const value=lang()==='zh'?raw:ready?w.running+raw.slice(5).replace('本机',lang()==='ja'?'ローカル':'local'):w.attention;if(node.textContent!==value)node.textContent=value;node.title=raw;for(const option of panel.querySelectorAll('[data-learner-language] option')){option.dataset.noI18n='';const text=w[option.value];if(text&&option.textContent!==text)option.textContent=text;}}
+ function localizedStatus(panel){const w=words(),node=panel.querySelector('[data-learning-status]');if(!node)return;node.dataset.noI18n='';const raw=bridge.localLearningMessage||'',ready=raw.startsWith('实际运行：');
+  let value=raw;
+  if(lang()!=='zh'&&raw){
+   const stage=bridge.localLearningProgress?.stage;
+   value=ready?w.running+raw.slice(5).replace('本机',lang()==='ja'?'ローカル':'local'):stage==='error'?w.attention:w[stage]||raw;
+  }
+  if(node.textContent!==value)node.textContent=value;node.title=raw;for(const option of panel.querySelectorAll('[data-learner-language] option')){option.dataset.noI18n='';const text=w[option.value];if(text&&option.textContent!==text)option.textContent=text;}}
  const bytes=n=>n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(0,n/1024).toFixed(0)+' KB';
  function update(panel){
   localizedStatus(panel);const labels=words();
-  const p=bridge.localLearningProgress||{stage:bridge.localLearningReady?'ready':'idle'},stage=p.stage||'idle',track=panel.querySelector('[data-learning-progress]');if(!track)return;
+  const p=bridge.localLearningProgress||{stage:'verify'},stage=p.stage||'verify',track=panel.querySelector('[data-learning-progress]');if(!track)return;
   const percent=Number.isFinite(p.percent)?Math.max(0,Math.min(100,p.percent)):null;
   track.dataset.stage=stage;track.classList.toggle('indeterminate',busy.has(stage)&&percent===null);track.firstElementChild.style.width=percent===null?'36%':percent+'%';
   if(percent===null)track.removeAttribute('aria-valuenow');else track.setAttribute('aria-valuenow',String(Math.round(percent)));

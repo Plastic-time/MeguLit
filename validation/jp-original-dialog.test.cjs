@@ -40,18 +40,57 @@ test('script work runs in a worker thread; the service thread stays free',async(
  assert.strictEqual(s.status,'native-japanese');assert.ok(ticks>0,'event loop kept running while the worker read the script');
  await assert.rejects(off.run(data,'nope',[]),/INVALID_TEXT_SOURCE_TASK/);
  const bridge=fs.readFileSync(path.join(root,'services/bridge.cjs'),'utf8'),ot=fs.readFileSync(path.join(root,'services/original-text.cjs'),'utf8');
- assert.match(bridge,/text-source-worker\.cjs'\)\.run\(root,'status',\[id\]\)/);assert.match(bridge,/off\.run\(root,'importPatch',\[id,dir\]\)/);
+ assert.match(bridge,/text-source-worker\.cjs'\)\.run\(root,'status',\[id\],\{cachedOnly:request\.passive===true\}\)/);assert.match(bridge,/off\.run\(root,'importPatch',\[id,dir\],\{cachedOnly:true\}\)/);
  assert.match(ot,/function autoPatchLater[^]*?text-source-worker\.cjs'\)\.run\(root,'autoPatch'/);
 });
 
 test('dialog: opens once, buttons go busy on the click and drop clicks while busy',()=>{
  const ui=fs.readFileSync(path.join(root,'web/game-language.js'),'utf8').replace(/\r\n/g,'\n');
  assert.match(ui,/if\(openDialog\)return;/,'a second open while one is up is ignored');
- assert.ok(ui.indexOf('dialog.showModal()')<ui.indexOf("await api('game_original_executable',{id})"),'the dialog shows before the service answers');
+ assert.ok(ui.indexOf('dialog.showModal()')<ui.indexOf("await api('text_source_activity',{id})"),'the dialog shows before the service answers');
  assert.match(ui,/const once=fn=>async\(\)=>\{if\(working\)return;busy\(true\)/);
- for(const b of ['patchBtn','originalBtn','searchBtn','clearBtn'])assert.match(ui,new RegExp(b+'\\.onclick=once\\('));
- assert.match(ui,/async function save\(mode\)\{\n  if\(working\)return;setBusy\(true\)/);
+ for(const b of ['fileBtn','folderBtn','searchBtn','clearBtn'])assert.match(ui,new RegExp(b+'\\.onclick=once\\('));
+ assert.match(ui,/async function save\(mode\)\{\n  if\(working\|\|isBusy\(\)\)return;setBusy\(true\)/);
  for(const lang of ['zh','en','ja']){const block=ui.slice(ui.indexOf('\n '+lang+':{'),ui.indexOf("},failed:",ui.indexOf('\n '+lang+':{')));assert.match(block,/launcher:\(f,h\)=>/,lang);assert.match(block,/PATCH_PACKED_LAUNCHER:/,lang);}
+});
+
+test('source worker validates a script pick and reads ISO data without a mount or a program launch',async t=>{
+ const data=tmp('translation-disc-'),src=path.join(data,'chinese'),exe=game(path.join(data,'japanese'),JA),id='works';
+ t.after(()=>fs.rmSync(data,{recursive:true,force:true}));
+ game(src,ZH);
+ const db=require('../services/store.cjs').openStore(data),worker=require('../services/text-source-worker.cjs');
+ try{db.prepare("INSERT INTO games(id,title,executable) VALUES(?,?,?)").run(id,'Fixture',exe);}finally{db.close();}
+ const call=(task,...args)=>worker.run(data,task,[id,...args],{cachedOnly:true});
+ const unrelated=path.join(src,'readme.pdf');fs.writeFileSync(unrelated,'unrelated');
+ await assert.rejects(call('importPatch',unrelated),/PATCH_SOURCE_TYPE/);
+ const missing=path.join(data,'missing.cue');fs.writeFileSync(missing,'FILE "missing.bin" BINARY');
+ await assert.rejects(call('importPatch',missing),/PATCH_DISC_DATA_MISSING/);
+ const bad=path.join(data,'bad.iso');fs.writeFileSync(bad,'not a disc');
+ await assert.rejects(call('importPatch',bad),/PATCH_DISC_UNREADABLE/);
+ const files=fs.readdirSync(path.join(src,'scene')).map(name=>[name,fs.readFileSync(path.join(src,'scene',name))]);
+ const image=path.join(data,'translation.iso');
+ function writeIso(files){
+  const bytes=Buffer.alloc((19+files.length)*2048),pvd=bytes.subarray(16*2048),end=bytes.subarray(17*2048),contents=[];
+  pvd[0]=1;pvd.write('CD001',1);pvd[156]=34;pvd.writeUInt32LE(18,158);pvd.writeUInt32LE(2048,166);pvd[181]=2;
+  end[0]=255;end.write('CD001',1);
+  files.forEach(([name,file],i)=>{
+   const id=Buffer.from(name+';1'),entry=Buffer.alloc(33+id.length+(id.length%2?0:1));
+   assert.ok(file.length<=2048);
+   entry[0]=entry.length;entry.writeUInt32LE(19+i,2);entry.writeUInt32LE(file.length,10);entry[32]=id.length;id.copy(entry,33);
+   contents.push(entry);file.copy(bytes,(19+i)*2048);
+  });
+  Buffer.concat(contents).copy(bytes,18*2048);fs.writeFileSync(image,bytes);
+ }
+ writeIso([['setup.exe',Buffer.from('MZ synthetic installer')]]);
+ await assert.rejects(call('importPatch',image),/PATCH_DISC_NO_SCRIPT/);
+ assert.equal((await call('localPairs')).hasPairs,false);
+ writeIso(files);
+ const paired=await call('importPatch',image);
+ assert.equal(paired.patchStatus,'ready');assert.equal(paired.patch.source,image);
+ assert.equal((await call('localPairs')).hasPairs,true);
+ assert.deepEqual(fs.readdirSync(path.join(data,'cache')).filter(name=>name.startsWith('translation-disc-')),[]);
+ await call('clear','patch');
+ assert.equal((await call('localPairs')).hasPairs,false);
 });
 
 /* 2026-11-14 same game, launch with 以日文系统环境启动: the first lines arrived as Shift-JIS read with the Chinese code page
@@ -71,7 +110,7 @@ test('launch notice: misread Japanese or a known Japanese install never says the
  assert.strictEqual(run(SIMPLIFIED,null),true,'a Chinese build is still reported');
  assert.strictEqual(run(SIMPLIFIED,true),false,'the shared check knows this install has Japanese');
  const src=fs.readFileSync(path.join(root,'core/hook-native.cjs'),'utf8');assert.match(src,/const ja=HookNative\.sjisAsGbk\(m\.text\);if\(ja\)/,'the line itself is decoded again');
- assert.match(fs.readFileSync(path.join(root,'services/reader.cjs'),'utf8'),/hooks\.japaneseInstall=game\?\.id\?require\('\.\/japanese-presence\.cjs'\)\.verdict/);
+ assert.match(fs.readFileSync(path.join(root,'services/reader.cjs'),'utf8'),/hooks\.japaneseInstall=game\?\.id&&!archive\?require\('\.\/japanese-presence\.cjs'\)\.verdict/);
 });
 test('one shared "has Japanese" answer: script state, captured history, else undecided',()=>{
  const p=require('../services/japanese-presence.cjs'),data=tmp('jp-');
@@ -83,6 +122,6 @@ test('one shared "has Japanese" answer: script state, captured history, else und
  fs.mkdirSync(path.join(data,'data','config'),{recursive:true});fs.writeFileSync(path.join(data,'data','config','original-text.json'),JSON.stringify({h:{status:'native-japanese'},c:{status:'chinese-only'}}));
  assert.deepStrictEqual(p.verdict(data,db,'h'),{japanese:true,by:'script'});assert.strictEqual(p.verdict(data,db,'c').japanese,false);
  const bridge=fs.readFileSync(path.join(root,'services/bridge.cjs'),'utf8'),app=fs.readFileSync(path.join(root,'web/app.js'),'utf8');
- assert.match(bridge,/japanese-presence\.cjs'\)\.verdict\(root,db,id\);if\(v\.japanese===true\)return \{state:'already',by:v\.by,executable:row\.executable\}/);
- for(const w of ['已是日文原版，不需要恢复','Already the Japanese original','すでに日本語版です'])assert.ok(app.includes(w),w);
+ assert.doesNotMatch(bridge,/japanese-presence\.cjs'\)\.verdict\(root,db,id\)/,'cached presence does not decide the restore state');
+ for(const w of ['游戏实际显示的正文语言尚未验证','The displayed dialogue language is unverified','ゲームで表示される本文の言語は未確認です'])assert.ok(app.includes(w),w);
 });

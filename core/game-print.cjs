@@ -13,11 +13,7 @@
    prints(executable,{title,steamAppId,vndb,script,engine}) reads files synchronously (the probe worker, the diff maker);
    check(p) keeps only well-formed values: the relay (relay/src/auto-profile.js) and the app use the same rules. Nothing here is
    a path or a name: every print is a hash, an id or a version. */
-const LEVELS=['exe','head','pe','pack','script','steam','vndb','title'];
-const VERSION_KINDS=['exe','head','pe'],GAME_KINDS=['pack','script','steam','vndb','title'];
-const HEX=/^[0-9a-f]{64}$/;
-const RULES={exe:HEX,head:HEX,pack:HEX,script:HEX,title:HEX,pe:/^\d{1,5}\.\d{1,5}\.\d{1,5}\.\d{1,5}@[0-9a-f]{8}$/,steam:/^\d{1,10}$/,vndb:/^v\d{1,7}$/,engine:/^[a-z0-9-]{1,32}$/};
-function check(p){const out={};if(!p||typeof p!=='object')return out;for(const [k,re] of Object.entries(RULES)){const v=p[k]==null?'':String(p[k]).trim().toLowerCase();if(v&&re.test(v))out[k]=v;}return out;}
+const {LEVELS,VERSION_KINDS,GAME_KINDS,RULES,check}=require('./game-print-schema.cjs');
 const fold=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/[\s　・*＊\-_:：!！?？~〜「」『』【】()（）\[\]'"`.,、。]/g,'');
 /* Node-only parts below: required lazily so the relay can import check/LEVELS without node:fs */
 function sha(...bufs){const h=require('node:crypto').createHash('sha256');for(const b of bufs)h.update(b);return h.digest('hex');}

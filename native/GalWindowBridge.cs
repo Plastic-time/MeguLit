@@ -276,7 +276,12 @@ public class GalWindowBridge {
     static void FindOverlay(){
         // Self-test modes run without an overlay process (OverlayPid 0): never adopt, move or raise someone else's window.
         if(OverlayPid<=0){Overlay=IntPtr.Zero;return;}
-        if(PreferredOverlay!=IntPtr.Zero&&IsWindow(PreferredOverlay)){uint owner;GetWindowThreadProcessId(PreferredOverlay,out owner);if(owner==OverlayPid){Overlay=PreferredOverlay;PrepareHostedFrame();return;}}
+        if(PreferredOverlay!=IntPtr.Zero){
+            uint owner;GetWindowThreadProcessId(PreferredOverlay,out owner);
+            Overlay=owner==OverlayPid?PreferredOverlay:IntPtr.Zero;
+            if(Overlay!=IntPtr.Zero)PrepareHostedFrame();
+            return;
+        }
         // Tauri also owns hidden event-loop/tool windows. Select its actual application surface.
         // A minimised main window has an empty client rectangle; retain its identity until it is destroyed.
         if(Overlay!=IntPtr.Zero&&IsWindow(Overlay))return;
@@ -297,13 +302,19 @@ public class GalWindowBridge {
     static void Restore(){Glass.Clear();if(MaskLayer!=null)MaskLayer.Hide();if(TextMask!=null)TextMask.Hide();
         // A region can exist without a capture (bound while in normal mode); always clear it, or the normal UI stays cut into rectangles.
         if(!Captured&&Overlay!=IntPtr.Zero&&IsWindow(Overlay)&&(RegionKey!=""||HitRegions.Count>0)){RegionKey="";HitRegions.Clear();SetWindowRgn(Overlay,IntPtr.Zero,true);}
-        if(!Captured||!IsWindow(Overlay))return;ResetRegion();RestoreFrame();SetWindowLong(Overlay,-16,OriginalStyle);SetWindowPos(Overlay,new IntPtr(-2),OriginalRect.Left,OriginalRect.Top,OriginalRect.Right-OriginalRect.Left,OriginalRect.Bottom-OriginalRect.Top,0x0020|0x0040|0x0010);if(HadLayerAttributes)SetLayeredWindowAttributes(Overlay,OldLayerColor,OldLayerAlpha,OldLayerFlags);Captured=false;IsShown=true;}
+        if(!Captured||!IsWindow(Overlay))return;
+        bool hosted=PreferredOverlay!=IntPtr.Zero;
+        if(hosted)ShowWindow(Overlay,0);
+        ResetRegion();RestoreFrame();SetWindowLong(Overlay,-16,OriginalStyle);
+        SetWindowPos(Overlay,new IntPtr(1),OriginalRect.Left,OriginalRect.Top,OriginalRect.Right-OriginalRect.Left,OriginalRect.Bottom-OriginalRect.Top,0x0020|0x0010);
+        if(HadLayerAttributes)SetLayeredWindowAttributes(Overlay,OldLayerColor,OldLayerAlpha,OldLayerFlags);
+        Captured=false;IsShown=IsWindowVisible(Overlay);}
     public static Rect Place(Rect area,double x,double y,double w,double h){int aw=Math.Max(1,area.Right-area.Left),ah=Math.Max(1,area.Bottom-area.Top);x=Math.Max(0,Math.Min(95,x));y=Math.Max(0,Math.Min(95,y));w=Math.Max(5,Math.Min(100,w));h=Math.Max(5,Math.Min(100,h));int l=area.Left+(int)Math.Round(aw*x/100),t=area.Top+(int)Math.Round(ah*y/100);return new Rect(l,t,l+Math.Max(120,(int)Math.Round(aw*w/100)),t+Math.Max(70,(int)Math.Round(ah*h/100)));}
     public /* 2026-11-19 (user: 只要显示器上还有位置就不要挤压汉字): the bottom of the work area (taskbar excluded) of the monitor the game client is on */
 static int WorkBottom(Rect area){try{return System.Windows.Forms.Screen.FromRectangle(new System.Drawing.Rectangle(area.Left,area.Top,Math.Max(1,area.Right-area.Left),Math.Max(1,area.Bottom-area.Top))).WorkingArea.Bottom;}catch{return area.Bottom;}}
 static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){return scan.IsEmpty?reader:new Rect(Math.Min(reader.Left,game.Left+scan.Left),Math.Min(reader.Top,game.Top+scan.Top),Math.Max(reader.Right,game.Left+scan.Right),Math.Max(reader.Bottom,game.Top+scan.Bottom));}
     static string ExecutableHash(uint pid){try{using(var sha=System.Security.Cryptography.SHA256.Create())using(var input=File.OpenRead(Process.GetProcessById((int)pid).MainModule.FileName))return BitConverter.ToString(sha.ComputeHash(input)).Replace("-","").ToLowerInvariant();}catch{return "";}}
-    static void Bind(IntPtr target,bool activate=false){Scene.Reset();GameUi.Clear();if(target==IntPtr.Zero||target==Overlay||!IsWindow(target))throw new Exception("请选择有效的游戏窗口");FindOverlay();if(Overlay==IntPtr.Zero)throw new Exception("MeguLit 窗口尚未准备好，请稍后再绑定");if(TranslationMode)Capture();Target=target;HasLastRect=false;uint pid;GetWindowThreadProcessId(target,out pid);ForgetGame();TrackedGame=Process.GetProcessById((int)pid);TrackedGameStarted=TrackedGame.StartTime.ToUniversalTime().Ticks;WindowGoneAt=DateTime.MinValue;WantedProcess=ProcessName(pid);string executableHash=ExecutableHash(pid);Dialog.Reset();DialogVisible=true;if(activate){CoverEnabled=true;RevealGame(Target);
+    static void Bind(IntPtr target,bool activate=false){Scene.Reset();GameUi.Clear();if(target==IntPtr.Zero||target==Overlay||!IsWindow(target))throw new Exception("请选择有效的游戏窗口");FindOverlay();if(Overlay==IntPtr.Zero)throw new Exception("MeguLit 窗口尚未准备好，请稍后再绑定");if(TranslationMode)Capture();Target=target;HasLastRect=false;uint pid;GetWindowThreadProcessId(target,out pid);ForgetGame();TrackedGame=Process.GetProcessById((int)pid);TrackedGameStarted=TrackedGame.StartTime.ToUniversalTime().Ticks;ResetPageLocator(true);WindowGoneAt=DateTime.MinValue;WantedProcess=ProcessName(pid);string executableHash=ExecutableHash(pid);Dialog.Reset();DialogVisible=true;if(activate){CoverEnabled=true;RevealGame(Target);
             // Binding from the menu keeps the menu open (and the keyboard on it); the game only comes forward without one.
             if(!MenuOpen)SetForegroundWindow(GetAncestor(Target,2));LastZCheck=DateTime.MinValue;}if(AudioWanted)Audio.Start(pid);var gameCaption=new StringBuilder(512);GetWindowText(target,gameCaption,gameCaption.Capacity);Emit(new{type="bound",activateGame=activate,coverEnabled=CoverEnabled,bound=TranslationMode,gameProcessId=pid,gameStarted=Process.GetProcessById((int)pid).StartTime.ToUniversalTime().Ticks.ToString(),gameHwnd=target.ToInt64().ToString(),gameStyleKey=executableHash,gameTitle=gameCaption.ToString(),hookExact474=executableHash=="e77a11486b6d94a42f9d7d39fd768b4e763f163b977d3eaed94cf9e13217f995",interfaceMode=TranslationMode?"translation":"normal",processName=WantedProcess,gameExecutable=ProcessImage(pid),message="游戏窗口已记住；在游戏里按 Alt+M 可重新绑定当前窗口"});}
     // The game's own sound for Anki (GameAudio.cs): recorded only while MeguLit asks for it and a game is bound.
@@ -316,7 +327,20 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         if(GameOffScreen(r.Left,r.Top,r.Right,r.Bottom,desktop.Left,desktop.Top,desktop.Right,desktop.Bottom)){var work=System.Windows.Forms.Screen.PrimaryScreen.WorkingArea;SetWindowPos(root,IntPtr.Zero,work.Left+Math.Max(0,(work.Width-(r.Right-r.Left))/2),work.Top+Math.Max(0,(work.Height-(r.Bottom-r.Top))/2),0,0,0x0001|0x0004|0x0010);}
     }catch{}}
     public static bool GameOffScreen(int left,int top,int right,int bottom,int dl,int dt,int dr,int db){int visibleW=Math.Min(right,dr)-Math.Max(left,dl),visibleH=Math.Min(bottom,db)-Math.Max(top,dt);return visibleW<48||visibleH<32;}
-    static void ForgetGame(){Audio.Stop();if(TrackedGame!=null){TrackedGame.Dispose();TrackedGame=null;}TrackedGameStarted=0;WindowGoneAt=DateTime.MinValue;}
+    static void ResetPageLocator(bool bind=false){
+        lock(OutputLock){
+            if(PageLocate!=null)PageLocate.Dispose();
+            PageLocate=null;
+            if(!bind)return;
+            PageLocator locator=null;
+            locator=new PageLocator(message=>{
+                lock(OutputLock){if(Object.ReferenceEquals(PageLocate,locator))Emit(message);}
+            });
+            locator.OwnPids=new uint[]{(uint)OverlayPid,(uint)Process.GetCurrentProcess().Id};
+            PageLocate=locator;
+        }
+    }
+    static void ForgetGame(){ResetPageLocator();Audio.Stop();if(TrackedGame!=null){TrackedGame.Dispose();TrackedGame=null;}TrackedGameStarted=0;WindowGoneAt=DateTime.MinValue;}
     static DateTime WindowGoneAt=DateTime.MinValue;
     static bool HasGameWindow(uint pid){bool found=false;EnumWindows(delegate(IntPtr hwnd,IntPtr unused){uint owner;GetWindowThreadProcessId(hwnd,out owner);if(owner==pid&&GetWindowTextLength(hwnd)>0){found=true;return false;}return true;},IntPtr.Zero);return found;}
     static bool HasVisibleWindow(uint pid){bool found=false;EnumWindows(delegate(IntPtr hwnd,IntPtr unused){uint owner;GetWindowThreadProcessId(hwnd,out owner);if(owner==pid&&IsWindowVisible(hwnd)){found=true;return false;}return true;},IntPtr.Zero);return found;}
@@ -350,10 +374,10 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
             if(!translation&&Captured&&Target==IntPtr.Zero&&(FloatDX!=0||FloatDY!=0))OriginalRect=new Rect(OriginalRect.Left+FloatDX,OriginalRect.Top+FloatDY,OriginalRect.Right+FloatDX,OriginalRect.Bottom+FloatDY);
             FloatDX=FloatDY=0;Dragging=false;
             TranslationMode=translation;MenuOpen=false;MenuRegionReady=false;MenuFocusPending=false;LookupOpen=false;HitRegions.Clear();Glass.Clear();RegionKey="";HasLastRect=false;FloatingPlaced=false;
-            if(!translation){Restore();if(PreferredOverlay!=IntPtr.Zero){NormalShowUntil=DateTime.MinValue;if(Overlay!=IntPtr.Zero)ShowWindow(Overlay,0);IsShown=false;}else{NormalShowUntil=DateTime.UtcNow.AddMilliseconds(1500);if(Overlay!=IntPtr.Zero){ShowWindow(Overlay,userAction?5:4);IsShown=true;if(userAction)SetForegroundWindow(Overlay);}}}
+            if(!translation){Restore();if(PreferredOverlay!=IntPtr.Zero){NormalShowUntil=DateTime.MinValue;if(Overlay!=IntPtr.Zero)ShowWindow(Overlay,0);IsShown=false;}else{NormalShowUntil=DateTime.UtcNow.AddMilliseconds(1500);if(Overlay!=IntPtr.Zero){if(userAction){ShowWindow(Overlay,5);SetForegroundWindow(Overlay);IsShown=true;}else if(!IsWindowVisible(Overlay))IsShown=TopmostGuard.ShowAtBottom(Overlay);}}}
             else if(userAction&&Target!=IntPtr.Zero)SetForegroundWindow(Target);
             // No game: shrink to the dialogue strip right away (the tick loop runs only every 100 ms without a game).
-            if(PreferredOverlay==IntPtr.Zero&&translation&&Target==IntPtr.Zero){FindOverlay();if(Overlay!=IntPtr.Zero){Capture();Rect r=FloatingBase();SetWindowPos(Overlay,new IntPtr(-2),r.Left+FloatDX,r.Top+FloatDY,r.Right-r.Left,r.Bottom-r.Top,0x0020|0x0010);FloatingPlaced=true;}}
+            if(PreferredOverlay==IntPtr.Zero&&translation&&Target==IntPtr.Zero){FindOverlay();if(Overlay!=IntPtr.Zero){Capture();Rect r=FloatingBase();SetWindowPos(Overlay,new IntPtr(1),r.Left+FloatDX,r.Top+FloatDY,r.Right-r.Left,r.Bottom-r.Top,0x0020|0x0010);FloatingPlaced=true;}}
         }
         Emit(new{type=userAction?"interfaceMode":"bound",interfaceMode=translation?"translation":"normal",bound=translation&&Target!=IntPtr.Zero,gameAttached=Target!=IntPtr.Zero,coverEnabled=CoverEnabled,message=translation?"翻译文本框模式 · Alt+M 绑定当前游戏窗口":"普通 MeguLit 界面 · Alt+M 绑定当前游戏窗口"});
     }
@@ -481,11 +505,14 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         /* 2026-11-15 overlay placement (core/glyph-locate-host.cjs): one lossless BGRA picture of the game window (GameCapture:
            window DC first, rate-limited PrintWindow, never the screen) written raw to a .megulit-frame file under the cache;
            asked twice per line and only while a game's text position is being learned */
-        else if(type=="rawFrame"){string id=Str(d,"id"),file=Str(d,"file");IntPtr target=Target;
+        else if(type=="rawFrame"){string id=Str(d,"id"),file=Str(d,"file");IntPtr target=Target,overlay=Overlay;
             ThreadPool.QueueUserWorkItem(delegate{bool ok=false;int w=0,h=0;try{Rect rect;if(target!=IntPtr.Zero&&file.EndsWith(".megulit-frame",StringComparison.OrdinalIgnoreCase)&&GetClientRect(target,out rect)&&rect.Right>0&&rect.Bottom>0&&rect.Right<=8192&&rect.Bottom<=8192){w=rect.Right;h=rect.Bottom;
                 using(var bmp=new System.Drawing.Bitmap(w,h,System.Drawing.Imaging.PixelFormat.Format32bppArgb)){if(GameCapture.Picture(target,bmp)){var data=bmp.LockBits(new System.Drawing.Rectangle(0,0,w,h),System.Drawing.Imaging.ImageLockMode.ReadOnly,System.Drawing.Imaging.PixelFormat.Format32bppArgb);
                 var bytes=new byte[w*h*4];try{for(int y=0;y<h;y++)Marshal.Copy(new IntPtr(data.Scan0.ToInt64()+(long)y*data.Stride),bytes,y*w*4,w*4);}finally{bmp.UnlockBits(data);}File.WriteAllBytes(file,bytes);ok=true;}}}}catch{}
-                try{Emit(new{type="rawFrame",id=id,ok=ok,file=ok?file:"",width=w,height=h});}catch{}});}
+                Point gameOrigin=new Point(),overlayOrigin=new Point();int[] clientOrigin=null;
+                if(ok&&overlay!=IntPtr.Zero&&ClientToScreen(target,ref gameOrigin)&&ClientToScreen(overlay,ref overlayOrigin))
+                    clientOrigin=new[]{gameOrigin.X-overlayOrigin.X,gameOrigin.Y-overlayOrigin.Y};
+                try{Emit(new{type="rawFrame",id=id,ok=ok,file=ok?file:"",width=w,height=h,clientOrigin=clientOrigin});}catch{}});}
         else if(type=="sceneFrame"){string id=Str(d,"id");IntPtr target=Target;
             ThreadPool.QueueUserWorkItem(delegate{string jpeg="",hash="";double score=0;try{Rect rect;if(target!=IntPtr.Zero&&GetClientRect(target,out rect))jpeg=GameAudio.SceneFrame(target,rect.Right,rect.Bottom,out score,out hash);}catch{}
                 try{Emit(new{type="sceneFrame",id=id,jpeg=jpeg,score=score,topHash=hash});}catch{}});}
@@ -701,11 +728,11 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
                 SetWindowPos(Overlay,IntPtr.Zero,desktop.Left,desktop.Top,desktop.Width,Math.Max(1,desktop.Height-1),0x0004|0x0010);RegionKey="";
             }
             if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();if(MenuOpen&&MenuRegionReady&&HitRegions.Count>0){Rect menuClient;if(GetClientRect(Overlay,out menuClient))ApplyRegion(menuClient.Right,menuClient.Bottom);if(!IsWindowVisible(Overlay))SetWindowPos(Overlay,IntPtr.Zero,0,0,0,0,0x0001|0x0002|0x0010|0x0040);IsShown=true;AckRegion();FocusMenuOnce();}else{if(IsWindowVisible(Overlay))ShowWindow(Overlay,0);IsShown=false;}return;}
-        if(!TranslationMode){if((GetWindowLong(Overlay,-20)&8)!=0)SetWindowPos(Overlay,new IntPtr(-2),0,0,0,0,0x0001|0x0002|0x0010);if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();if(DateTime.UtcNow<NormalShowUntil&&!IsWindowVisible(Overlay)){ShowWindow(Overlay,4);IsShown=true;}KeepPlacement();return;}
+        if(!TranslationMode){if((GetWindowLong(Overlay,-20)&8)!=0)TopmostGuard.Sink(Overlay,IntPtr.Zero);if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();if(DateTime.UtcNow<NormalShowUntil&&!IsWindowVisible(Overlay))IsShown=TopmostGuard.ShowAtBottom(Overlay);KeepPlacement();return;}
         if(Target==IntPtr.Zero){
-            Capture();if(!FloatingPlaced){Rect r=FloatingBase();SetWindowPos(Overlay,IntPtr.Zero,r.Left+FloatDX,r.Top+FloatDY,r.Right-r.Left,r.Bottom-r.Top,0x0020|0x0010);FloatingPlaced=true;}
+            Capture();if(!FloatingPlaced){Rect r=FloatingBase();SetWindowPos(Overlay,new IntPtr(1),r.Left+FloatDX,r.Top+FloatDY,r.Right-r.Left,r.Bottom-r.Top,0x0020|0x0010);FloatingPlaced=true;}
             Rect floatingClient;if(GetClientRect(Overlay,out floatingClient))ApplyRegion(floatingClient.Right,floatingClient.Bottom);
-            if(!CoverEnabled&&!(MenuOpen&&MenuRegionReady)){if(IsShown)HideReason("floating, cover off");ShowWindow(Overlay,0);IsShown=false;}else if(!IsShown){ShowWindow(Overlay,4);IsShown=true;}
+            if(!CoverEnabled&&!(MenuOpen&&MenuRegionReady)){if(IsShown)HideReason("floating, cover off");ShowWindow(Overlay,0);IsShown=false;}else if(!IsShown){if(MenuOpen&&MenuRegionReady){ShowWindow(Overlay,4);IsShown=true;}else IsShown=TopmostGuard.ShowAtBottom(Overlay);}
             if(IsShown)AckRegion();
             FocusMenuOnce();
         }
@@ -773,6 +800,10 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         NoGhostWindows();
         if(args.Length==3&&args[0]=="--same-image"){Emit(new{type="sameImage",same=SameImage(args[1],args[2]),a=ImageIdentity(args[1]),b=ImageIdentity(args[2])});return 0;}
         if(args.Length>0&&args[0]=="--topmost-guard-self-test")return TopmostGuardSelfTest();
+        if(args.Length>0&&args[0]=="--background-window-self-test"){
+            string failure=TopmostGuard.BackgroundShowSelfTest();
+            Emit(new{type="background-window-selftest",passed=failure=="",failure=failure});return failure==""?0:12;
+        }
         if(args.Length>0&&args[0]=="--layer-policy-self-test"){string failure=ReaderLayerPolicy.SelfTest();Emit(new{type="layer-policy-selftest",passed=failure=="",failure=failure});return failure==""?0:1;}
         if(args.Length>0&&args[0]=="--host-frame-self-test"){
             int original=0x16cf0000,hosted=HostedStyle(original);
@@ -834,7 +865,7 @@ if(args.Length==2&&args[0]=="--art-scan-file"){Console.OutputEncoding=Encoding.U
         }
         if((args.Length!=1&&args.Length!=2)||!Int32.TryParse(args[0],out OverlayPid))return 2;
         if(args.Length==2){long handle;if(!Int64.TryParse(args[1],out handle))return 2;PreferredOverlay=new IntPtr(handle);uint owner;GetWindowThreadProcessId(PreferredOverlay,out owner);if(owner!=OverlayPid)return 2;}
-        HookVerifier=new GameHookVerifier(Emit);MaskLayer=new NativeMaskLayer();TextMask=new GameTextMask(MaskOutput);PageLocate=new PageLocator(Emit);PageLocate.OwnPids=new uint[]{(uint)OverlayPid,(uint)System.Diagnostics.Process.GetCurrentProcess().Id};
+        HookVerifier=new GameHookVerifier(Emit);MaskLayer=new NativeMaskLayer();TextMask=new GameTextMask(MaskOutput);
         WaitMarker=new GameWaitMarker(Emit);
         try{SetProcessDpiAwarenessContext(new IntPtr(-4));}catch{}
         PointerGate=new ReaderPointerGate(Emit);

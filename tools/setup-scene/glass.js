@@ -327,7 +327,7 @@
       const ghost = new THREE.Mesh(new THREE.ShapeGeometry(shape, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: NIGHT ? 0.035 : 0.1, depthWrite: false })); ghost.renderOrder = 0;
       line.visible = false; const g3 = new THREE.Group(); g3.add(glass, ghost, glow, line); scene.add(g3);
       const core = idx < nCore, dpt = core ? 900 + Math.pow(rr(), 1.1) * 2700 : 700 + rr() * 2900, k = (dpt + P) / P;
-      gplates.push({ g3, glass, ghost, glowMat, edgeMat, mat, core, area: Math.abs(area2(q)), w: x1 - x0, h: y1 - y0, cx, cy, d: dpt, k, thr: rr(), X: FINAL.cx + ((cx - MW / 2) * FU) * k, Y: FINAL.cy + ((cy - MH / 2) * FU + LCYg) * k, Z: FINAL.cz - dpt,
+      gplates.push({ g3, glass, ghost, ghostOpacity: ghost.material.opacity, glowMat, edgeMat, mat, core, area: Math.abs(area2(q)), w: x1 - x0, h: y1 - y0, cx, cy, d: dpt, k, thr: rr(), X: FINAL.cx + ((cx - MW / 2) * FU) * k, Y: FINAL.cy + ((cy - MH / 2) * FU + LCYg) * k, Z: FINAL.cz - dpt,
         rx: (rr() < 0.5 ? -1 : 1) * (28 + rr() * 58), ry: (rr() < 0.5 ? -1 : 1) * (28 + rr() * 58), rz: (rr() - 0.5) * 130, ph: rr() * 6.28, amp: 24 + rr() * 90, spin: 0.1 + rr() * 0.25 });
     });
     gplates.filter((p) => p.core).sort((a, b) => a.cx - b.cx).forEach((p, i) => { p.order = i; }); byArea = gplates.map((_, i) => i).sort((a, b) => gplates[b].area - gplates[a].area); merged = true;
@@ -353,8 +353,12 @@
           else { lit = prog > p.thr ? 1 : 0; f = lit; }
           const ox = OSC(Math.sin, 0.5, p.ph, ft) * p.amp * damp * br, oy = OSC(Math.cos, 0.4, p.ph, ft) * p.amp * damp * br, oz = OSC(Math.sin, 0.6, p.ph * 2, ft) * p.amp * 2 * damp * br;
           p.g3.position.set(p.X + ox, -(p.Y + oy), p.Z + oz); p.g3.rotation.set(-(p.rx + OSC(Math.sin, p.spin, p.ph, ft) * 8 * br) * kk * D2R, (p.ry + OSC(Math.cos, p.spin, p.ph, ft) * 8 * br) * kk * D2R, -p.rz * kk * D2R, 'ZYX'); p.g3.scale.setScalar(p.k * FU);
-          const inten = lit ? 1 : f > 0 ? 0.3 + 0.7 * f : 0.16; if (p.mat.normalScale) p.mat.normalScale.set(1.5 * inten, 1.5 * inten); p.ghost.visible = !lit && f <= 0;
-          p.glowMat.uniforms.prog.value = f; p.glowMat.uniforms.lit.value = p.core ? lit : 0; p.glowMat.uniforms.time.value = m.t; p.glowMat.uniforms.uGain.value = p.core ? (m.reveal > 0.5 ? 0.55 : 1) : 0;
+          const mix = s.etchMix ?? 1;
+          const inten = lit ? 0.16 + 0.84 * mix : f > 0 ? 0.3 + 0.7 * f : 0.16;
+          if (p.mat.normalScale) p.mat.normalScale.setScalar(1.5 * inten);
+          p.ghost.visible = mix < 1 || (!lit && f <= 0);
+          p.ghost.material.opacity = p.ghostOpacity * (lit ? 1 - mix : 1);
+          p.glowMat.uniforms.prog.value = f; p.glowMat.uniforms.lit.value = p.core ? lit : 0; p.glowMat.uniforms.time.value = m.t; p.glowMat.uniforms.uGain.value = p.core ? mix * (m.reveal > 0.5 ? 0.55 : 1) : 0;
           p.edgeMat.opacity = lit ? (m.reveal > 0.5 ? 0.22 : 0.5) : f > 0 ? 0.18 + 0.4 * f : 0.05; });
          return; }
       if (MODE === 'A') { if (!fragBuilt) buildFragments(); if (!fragBuilt) return; const s = m.s, N = s.st.length, K = frags.length, br = REDUCE ? 0 : 1, ft = m.t * br, damp = 1 - m.reveal, kk = 1 - m.reveal;
@@ -379,7 +383,7 @@
     themed.forEach((f) => f(m)); scene.environment = d ? envNight : envDay;
     lineMats.forEach((x) => x.color.copy(col(0x1c212b, 0xeaf2ff, m)));
     edgeMats.forEach((x) => { x.blending = d ? THREE.AdditiveBlending : THREE.NormalBlending; x.color.copy(col(0x24324f, 0xe9f2ff, m)); x.needsUpdate = true; });
-    gplates.forEach((p) => { p.mat.envMapIntensity = 1.7 + (1.5 - 1.7) * m; p.ghost.material.opacity = 0.12 + (0.035 - 0.12) * m; });
+    gplates.forEach((p) => { p.mat.envMapIntensity = 1.7 + (1.5 - 1.7) * m; p.ghostOpacity = 0.12 + (0.035 - 0.12) * m; });
     if (plateDark !== d) { plateDark = d; logoImg.src = 'logos/logo-C-' + (d ? 'white' : 'black') + '.svg'; plates.forEach(redrawPlate); } }
   GL.setMix = (m) => { applyTheme(m); GL.draw(); }; applyTheme(night);
   GL.dbg = { get plates() { return gplates; } };

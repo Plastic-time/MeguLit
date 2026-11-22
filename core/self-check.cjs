@@ -52,6 +52,11 @@ function parseReader(msg){let v=msg;if(typeof v==='string'){try{v=JSON.parse(v);
  return null;}
 
 const median=a=>{if(!a.length)return 0;const s=a.slice().sort((x,y)=>x-y),i=s.length>>1;return s.length%2?s[i]:(s[i-1]+s[i])/2;};
+/* Cardinal validates the episode and scope before logging accepted. A receipt witnesses DOM text at that instant. */
+function parseDisplayReceipt(v){
+ if(v?.type!=='layoutDiagnostic'||v.kind!=='cardinalPair'||v.accepted!==true||v.observed!==true||!v.episode||!v.scope)return null;
+ return {kind:'displayReceipt',at:Date.parse(v.at),paired:v.paired===true};
+}
 function emptyWindow(n){return {n,lines:0,drops:0,redrawn:0,checked:new Map(),drawn:[],repeats:0,choices:[],positions:[],glyphs:[],pair:null,patch:0,effects:0,firstAt:NaN,lastAt:NaN};}
 
 class SelfCheck{
@@ -60,8 +65,10 @@ class SelfCheck{
  constructor({thresholds={},onWindow=null,record=true}={}){this.t={...DEFAULTS};for(const [k,v] of Object.entries(thresholds||{}))if(k in DEFAULTS&&Number.isFinite(+v))this.t[k]=+v;
   this.onWindow=onWindow;this.record=record;this.windows=[];this.w=emptyWindow(1);this.recording=record?[]:null;this.lastBox=null;this.prevPair=null;this.tripped=null;}
  trace(line){const e=parseTrace(line);if(e)this.event(e);return e;}
- reader(msg){const e=parseReader(msg);if(e)this.event(e);return e;}
- event(e){const w=this.w;if(Number.isFinite(e.at)){if(!Number.isFinite(w.firstAt))w.firstAt=e.at;w.lastAt=e.at;}
+ reader(msg){if(typeof msg==='string'){try{msg=JSON.parse(msg);}catch{return null;}}const e=parseReader(msg)||parseDisplayReceipt(msg);if(e)this.event(e);return e;}
+ event(e){const w=this.w;
+  if(e.kind==='displayReceipt'){w.bodyDOMObserved=true;if(e.paired)w.translationDOMObserved=true;return null;}
+  if(Number.isFinite(e.at)){if(!Number.isFinite(w.firstAt))w.firstAt=e.at;w.lastAt=e.at;}
   if(this.recording&&this.recording.length<4000&&this.windows.length===0)this.recording.push(e);
   switch(e.kind){
    case 'line':w.lines++;break;
@@ -97,7 +104,7 @@ class SelfCheck{
   if(v.positionPx!=null&&v.positionPx>posLimit)over.push('positionPx');
   if(v.pairRate!=null&&v.pairRate<t.pairRate)over.push('pairRate');
   for(const k of ['hideVisible','dropRate','repeatRate','pairRate'])if(v[k]!=null)v[k]=Math.round(v[k]*1000)/1000;
-  return {window:w.n,lines:w.lines,drops:w.drops,redrawn:w.redrawn,checked:checked.length,drawn:w.drawn.length,choices:w.choices.length,effects:w.effects,positionLimit:posLimit,metrics:v,over,pass:over.length===0};}
+  return {window:w.n,lines:w.lines,drops:w.drops,redrawn:w.redrawn,checked:checked.length,drawn:w.drawn.length,choices:w.choices.length,choiceOffers:w.choices.filter(c=>c.raw>=2).length,bodyDOMObserved:w.bodyDOMObserved===true,translationDOMObserved:w.translationDOMObserved===true,effects:w.effects,positionLimit:posLimit,metrics:v,over,pass:over.length===0};}
  /* closes the current window (also at game end with >= minLines lines): the result goes to onWindow */
  close(final=false){const w=this.w;if(final&&w.lines<this.t.minLines)return null;const r=this.score(w);r.final=!!final;this.windows.push(r);this.w=emptyWindow(w.n+1);
   if(!r.pass&&!this.tripped)this.tripped={window:r.window,over:r.over,metrics:r.metrics,reason:reasonText(r.over)};
@@ -106,11 +113,16 @@ class SelfCheck{
  summary(){const all=this.windows;return {windows:all.length,lines:all.reduce((a,r)=>a+r.lines,0),tripped:this.tripped,last:all[all.length-1]||null};}
 }
 function reasonText(over){return (over||[]).map(k=>REASONS[k]||k).join('；');}
+/* Thresholds describe logged events. Even a fully measured window has no current-line screen acceptance. */
+function windowEvidence(r){
+ const unmeasured=METRICS.filter(k=>!Number.isFinite(r.metrics[k])||r.metrics[k]<0||k==='choiceMismatch'&&!(r.choiceOffers>0));
+ return {thresholdResult:r.over.length?'exceeded':'withinLimits',unmeasured,layoutReports:r.drawn,hideChecks:r.checked,bodyDOM:r.bodyDOMObserved?'observed':'unobserved',translationDOM:r.translationDOMObserved?'observed':'unobserved',gameplayAcceptance:'unverified'};
+}
 /* the one trace line per window (hook-events.log) */
-function traceLine(r){const m=r.metrics,f=v=>v==null?'-':v;return 'selfCheck window='+r.window+' lines='+r.lines+' hide='+f(m.hideVisible)+' drop='+f(m.dropRate)+' repeat='+f(m.repeatRate)+' choice='+m.choiceMismatch+' pos='+f(m.positionPx)+' pair='+f(m.pairRate)+(r.redrawn?' redrawn='+r.redrawn:'')+(r.pass?' pass':' over='+r.over.join(','));}
+function traceLine(r){const m=r.metrics,f=v=>v==null?'-':v,e=windowEvidence(r);return 'selfCheck window='+r.window+' lines='+r.lines+' hide='+f(m.hideVisible)+' drop='+f(m.dropRate)+' repeat='+f(m.repeatRate)+' choice='+m.choiceMismatch+' pos='+f(m.positionPx)+' pair='+f(m.pairRate)+(r.redrawn?' redrawn='+r.redrawn:'')+' threshold='+e.thresholdResult+(r.over.length?' over='+r.over.join(','):'')+' unmeasured='+(e.unmeasured.join(',')||'-')+' gameplay=unverified';}
 /* replay of log text (hook-events.log + reader-host.log, any order): events merged by time, between from and to (ISO, optional) */
 function replay(hookEvents,readerHost,{from='',to='',thresholds}={}){const ev=[];
  for(const l of String(hookEvents||'').split(/\r?\n/)){const at=l.slice(0,24);if(!TS.test(l)||(from&&at<from)||(to&&at>=to))continue;const e=parseTrace(l);if(e)ev.push(e);}
- for(const l of String(readerHost||'').split(/\r?\n/)){if(!l.startsWith('{'))continue;let v;try{v=JSON.parse(l);}catch{continue;}const at=String(v.at||'');if((from&&at<from)||(to&&at>=to))continue;const e=parseReader(v);if(e)ev.push(e);}
+ for(const l of String(readerHost||'').split(/\r?\n/)){if(!l.startsWith('{'))continue;let v;try{v=JSON.parse(l);}catch{continue;}const at=String(v.at||'');if((from&&at<from)||(to&&at>=to))continue;const e=parseReader(v)||parseDisplayReceipt(v);if(e)ev.push(e);}
  ev.sort((a,b)=>(a.at||0)-(b.at||0));const sc=new SelfCheck({thresholds});for(const e of ev)sc.event(e);sc.flush();return sc;}
-module.exports={SelfCheck,DEFAULTS,METRICS,REASONS,parseTrace,parseReader,effectFrame,reasonText,traceLine,replay};
+module.exports={SelfCheck,DEFAULTS,METRICS,REASONS,parseTrace,parseReader,effectFrame,reasonText,windowEvidence,traceLine,replay};

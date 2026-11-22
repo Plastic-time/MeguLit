@@ -13,6 +13,26 @@ const dir=path.join(__dirname,'helpers','selfcheck-replay');
 const he=fs.readFileSync(path.join(dir,'incr9-hook-events.log'),'utf8'),rh=fs.readFileSync(path.join(dir,'incr9-reader-host.log'),'utf8');
 const FATA=['2026-11-20T22:51:03','2026-11-20T22:53:42'],SENREN=['2026-11-20T22:53:42',''];
 
+/* Twenty sources can satisfy the gate even if the Reader never records a displayed pair. */
+{
+ const sc=new SelfCheck(),receipt={type:'layoutDiagnostic',kind:'cardinalPair',episode:'fixture:1',scope:'fixture:0',accepted:true,observed:true,paired:true};
+ sc.reader({...receipt,accepted:false});
+ sc.reader({...receipt,observed:false});
+ const complete=()=>{for(let seq=1;seq<=20;seq++)sc.trace('source chars=12 sequence='+seq);return ap.diagnostic(null,sc.windows).windows.at(-1);};
+ const empty=complete();
+ assert.strictEqual(empty.pass,true);
+ assert.deepStrictEqual(empty.evidence.unmeasured,['hideVisible','repeatRate','choiceMismatch','positionPx','pairRate']);
+ assert.strictEqual(empty.evidence.thresholdResult,'withinLimits');
+ assert.strictEqual(empty.evidence.bodyDOM,'unobserved');
+ assert.strictEqual(empty.evidence.translationDOM,'unobserved');
+ sc.reader({...receipt,paired:false});
+ const bodyOnly=complete();
+ assert.strictEqual(bodyOnly.evidence.bodyDOM,'observed');
+ assert.strictEqual(bodyOnly.evidence.translationDOM,'unobserved');
+ assert.strictEqual(complete().evidence.bodyDOM,'unobserved');
+ assert.ok(sc.recording.every(e=>e.kind==='line'));
+}
+
 /* parser */
 assert.deepStrictEqual(parseTrace('2026-11-20T22:51:56.031Z choice options filtered 3 -> 0'),{kind:'choice',at:Date.parse('2026-11-20T22:51:56.031Z'),raw:3,shown:0});
 assert.strictEqual(parseTrace('2026-11-20T22:51:55.204Z krkr page: hook line drawn nowhere on the page, dropped chars=16').kind,'drop');
@@ -61,13 +81,22 @@ try{
  const profiles=[];const gal={setGameProfile(p){profiles.push(p);},textEffectsHold:null,textEffects(on,why){calls.push([on,why]);this.textEffectsHold=on?{why}:null;},hooks:{pageMode:{engine:'krkr'},trace:l=>traced.push(l)}};
  const reader={root,gal,gameExe:exe,logVisibility:e=>logged.push(e)};
  live.start(reader,reader.gameExe);assert.strictEqual(live.current().key,key);
+ assert.strictEqual(live.diagnostic().windowState,'noClosedWindow');
+ assert.strictEqual(live.diagnostic().pendingLines,0);
+ live.feedReader({type:'layoutDiagnostic',kind:'cardinalPair',accepted:true,observed:true,paired:true,episode:'fixture:1',scope:'fixture:0'});
  for(const l of he.split('\n'))if(l>=FATA[0]&&l<FATA[1])live.feedTrace(l);
  const stored=ap.load(root,key);
+ const firstWindow=logged.find(e=>e.what==='window');
+ assert.strictEqual(firstWindow.thresholdResult,'exceeded');
+ assert.strictEqual(firstWindow.translationDOM,'observed');
+ assert.strictEqual(firstWindow.gameplayAcceptance,'unverified');
+ assert.strictEqual(live.diagnostic().windows[0].evidence.translationDOM,'observed');
  assert.ok(stored,'calibration stored');assert.strictEqual(stored.mode,'read');assert.strictEqual(calls.length,1);assert.strictEqual(calls[0][0],true);assert.ok(calls[0][1].length>0,'Alt+T shows why');
  assert.ok(traced.some(l=>l.startsWith('selfCheck window=1')),'window traced');const top=profiles[profiles.length-1];assert.ok(/\+auto(\+seed-game)?$/.test(top.layers),'the calibration is the top layer under a built-in seed: '+top.layers);assert.strictEqual(top.hide.textEffectsRead,true);assert.strictEqual(top.calibrate.hideMethod,'read');assert.ok(logged.some(e=>e.kind==='selfCheck'&&e.what==='calibrated'));
  /* the runtime sample of the first window */
  const sample=JSON.parse(fs.readFileSync(path.join(root,'data','runtime-samples',key,'sample.json'),'utf8'));assert.strictEqual(sample.schema,'megulit.runtime-sample');assert.ok(sample.lines.length>=20);assert.ok(sample.boxes.length>0);assert.ok(sample.drops.length>0);assert.strictEqual(sample.exe,'game_x.exe');
  live.stop();gal.textEffectsHold=null;calls.length=0;
+ assert.ok(logged.some(e=>e.what==='sessionEnd'&&e.closedWindows>0));
  live.start(reader,reader.gameExe);assert.strictEqual(calls.length,1,'stored read mode applies at the next start');
  gal.textEffectsHold=null;live.recalibrate(reader);assert.strictEqual(ap.load(root,key),null,'重新校准 forgets the stored diff');assert.ok(live.current().check.recording,'and records again');
  live.stop();

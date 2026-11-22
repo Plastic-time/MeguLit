@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+/* A receipt describes an installed adaptation, never the player's save or story progress. */
+const HEX=/^[a-f0-9]{64}$/;
+const plain=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
+export function receiptTime(value){
+ if(typeof value!=='string')return null;
+ const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?Z$/.exec(value);if(!m)return null;
+ const d=new Date(value);if(!Number.isFinite(d.getTime()))return null;
+ const expected=[+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6],+(m[7]||'').padEnd(3,'0')];
+ const actual=[d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),d.getUTCHours(),d.getUTCMinutes(),d.getUTCSeconds(),d.getUTCMilliseconds()];
+ return expected.every((v,i)=>v===actual[i])?d:null;
+}
+function credit(value){if(!plain(value)||!Number.isSafeInteger(value.torchNo)||value.torchNo<0)return null;
+ const text=v=>{if(typeof v==='string'){const s=v.trim();if(s&&[...s].length<=30&&!/[\p{Cc}\p{Cf}]/u.test(s))return s;}return null;};
+ return {torchNo:value.torchNo,name:text(value.name),alias:text(value.alias)};
+}
+export function installedReceipt(dto){const r=dto?.receipt;
+ if(!plain(r)||r.version!==1||r.status!=='installed'||r.verified!==true||!HEX.test(r.key)||r.key!==dto.key||!HEX.test(r.hash)||!Number.isSafeInteger(r.revision)||r.revision<1)return null;
+ return {key:r.key,hash:r.hash,revision:r.revision,origin:['torch-release','legacy-feed','ordinary-seed'].includes(r.origin)?r.origin:null,serverTime:receiptTime(r.serverTime)?.toISOString()||null,credit:credit(r.credit),cardinalRev:typeof r.cardinalRev==='string'&&/^[A-Za-z0-9._-]{1,40}$/.test(r.cardinalRev)?r.cardinalRev:null};
+}
+const COPY={
+ zh:{installed:'已安装此版本的适配',unconfirmed:'适配数据已收到，尚未确认本机安装',installing:'正在匹配并安装适配',failed:'适配安装未完成，稍后会再检查',from:'传火来源',unknown:'来源未提供',time:'发布时间',noTime:'时间未提供',revision:'适配版本',hash:'内容校验值',cardinal:'Cardinal 修订'},
+ ja:{installed:'このバージョンの適応をインストール済み',unconfirmed:'適応データを受信しました。この PC へのインストールは未確認です',installing:'適応を照合してインストール中',failed:'適応のインストールは未完了です。後ほど再確認します',from:'火の提供元',unknown:'提供元は未登録',time:'公開日時',noTime:'日時は未登録',revision:'適応リビジョン',hash:'内容の検証値',cardinal:'Cardinal リビジョン'},
+ en:{installed:'Adaptation installed for this version',unconfirmed:'Adaptation data received; installation on this PC is not yet confirmed',installing:'Matching and installing the adaptation',failed:'Adaptation installation is incomplete; it will be checked again later',from:'Flame shared by',unknown:'Source not provided',time:'Published',noTime:'Time not provided',revision:'Adaptation revision',hash:'Content checksum',cardinal:'Cardinal revision'}
+};
+const LOOKUP_COPY={
+ zh:{missing:'此版本暂无可接收的已发布适配',unavailable:'暂时无法查询传火服务，稍后会再检查'},
+ ja:{missing:'このバージョンで受け取れる公開済みの適応はありません',unavailable:'伝火サービスに問い合わせできませんでした。後でもう一度確認します'},
+ en:{missing:'No published adaptation is available for this version',unavailable:'The relay could not be reached. It will be checked again later'}
+};
+const SECURITY_COPY={
+ zh:{TORCH_SIGNATURE:'公开适配的签名验证失败',TORCH_REVOKED:'此版本的公开适配已撤销',TORCH_RELEASE_CONFLICT:'传火服务返回了冲突的发布记录'},
+ ja:{TORCH_SIGNATURE:'公開適応の署名を検証できませんでした',TORCH_REVOKED:'このバージョンの公開適応は取り消されました',TORCH_RELEASE_CONFLICT:'伝火サービスから矛盾する公開記録が返されました'},
+ en:{TORCH_SIGNATURE:'The public adaptation failed signature verification',TORCH_REVOKED:'The public adaptation for this version was revoked',TORCH_RELEASE_CONFLICT:'The relay returned conflicting publication records'}
+};
+const ORIGIN_COPY={
+ zh:{seed:'此版本已有内置 The Seed 适配',public:'已验证的公开传火发布',ordinary:'已验签的普通校准 Seed',legacy:'已验证的旧版共享适配',eligible:'此版本可作为首个公开传火贡献，普通校准通过病毒扫描后自动签名发布',sharing:'隔离测试版已开启普通校准收发',isolated:'隔离测试模式已禁用提交',bundled:'内置适配已提供设置，普通游玩不会触发首次自动校准',unknown:'公开传火状态尚未确认'},
+ ja:{seed:'このバージョンには組み込みの The Seed 適応があります',public:'検証済みの公開リリース',ordinary:'署名を検証した通常の調整データ',legacy:'検証済みの旧形式の共有適応',eligible:'このバージョンで最初の公開貢献の候補になれます。通常の調整データはウイルス検査後に自動公開されます',sharing:'分離テスト版で通常の調整データを送受信できます',isolated:'分離テストモードでは送信できません',bundled:'組み込みの適応があるため、通常のプレイでは初回の自動調整は行われません',unknown:'公開状況はまだ確認できていません'},
+ en:{seed:'This version has a bundled The Seed adaptation',public:'Verified public flame release',ordinary:'Verified signed calibration',legacy:'Verified legacy shared adaptation',eligible:'Eligible for this version’s first public contribution, with automated virus scanning before publication',sharing:'Ordinary calibration sharing is enabled for this isolated installation',isolated:'Submission is disabled in isolated test mode',bundled:'The bundled adaptation supplies the settings. Normal play skips first-time automatic calibration',unknown:'Public release status is unconfirmed'}
+};
+export function receiptView(dto,{locale='zh',esc}={}){const w=COPY[locale]||COPY.zh,r=installedReceipt(dto),state=dto?.state;
+ const lookup=LOOKUP_COPY[locale]||LOOKUP_COPY.zh,origin=ORIGIN_COPY[locale]||ORIGIN_COPY.zh;
+ const seed=Number.isSafeInteger(dto?.bundled?.revision)&&dto.bundled.revision>0?`${origin.seed} · rev ${dto.bundled.revision}`:'';
+ const security=SECURITY_COPY[locale]||SECURITY_COPY.zh;
+ const failure=dto?.code==='TORCH_RELAY_UNAVAILABLE'?lookup.unavailable:Object.hasOwn(security,dto?.code)?security[dto.code]:w.failed;
+ const text=state==='bundled'?origin.unknown:state==='not-published'?lookup.missing:state==='installing'?w.installing:state==='install-failed'?failure:r?w.installed:w.unconfirmed;
+ const note=[seed,state==='not-published'&&dto.eligible===true&&origin.eligible,state==='not-published'&&dto.submission==='isolated'&&origin.isolated,state==='not-published'&&dto.submission==='isolated-sharing'&&origin.sharing,state==='not-published'&&dto.submission==='bundled'&&origin.bundled].filter(Boolean);
+ const notes=note.map(line=>`<p class="first-player-receipt-source">${esc(line)}</p>`).join('');
+ if(state!=='received'||!r)return {signature:JSON.stringify([state,text,note]),html:`<p class="first-player-from" role="status">${esc(text)}</p>${notes}`};
+ const label=r.origin==='torch-release'?origin.public:r.origin==='legacy-feed'?origin.legacy:r.origin==='ordinary-seed'?origin.ordinary:'';
+ const who=r.credit?.name||r.credit?.alias||w.unknown;
+ const date=r.serverTime?new Date(r.serverTime).toLocaleString(({zh:'zh-CN',ja:'ja-JP',en:'en-US'})[locale]||'zh-CN',{dateStyle:'medium',timeStyle:'short'}):w.noTime;
+ const rows=[[w.revision,String(r.revision)],[w.hash,r.hash],...(r.cardinalRev?[[w.cardinal,r.cardinalRev]]:[])];
+ return {signature:JSON.stringify([r,note]),html:`<p class="first-player-from">${esc(text)}</p>${label?`<p class="first-player-receipt-source">${esc(label)}</p>`:''}<p class="first-player-receipt-source">${esc(w.from)} · ${esc(who)}</p><p class="first-player-receipt-time">${esc(w.time)} · ${r.serverTime?`<time datetime="${esc(r.serverTime)}">${esc(date)}</time>`:esc(date)}</p><details class="first-player-receipt-details"><summary>${esc(w.hash)} · ${esc(r.hash.slice(0,12))}</summary><dl>${rows.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl></details>${notes}`};
+}

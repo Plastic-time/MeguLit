@@ -67,6 +67,83 @@ function placementRig() {
   return { p, sent, feed: raw => { const before = sent.length; p.hook(tp.parseChars(raw)); return sent.slice(before); } };
 }
 
+test('owner 06:05:27: glyph fragments and an unarmed observer do not take over the native page', () => {
+  const { p, sent } = placementRig();
+  const recovered = [];
+  p.hidden = line => recovered.push(line.text);
+  p.profile = require('../core/profiles/index.cjs').profileFor({ exe: 'D:/Games/fata_jp.exe', engine: 'KiriKiri' });
+  assert.equal(p.profile.page.engineRows, true);
+  const nativeLine = (line, text, y) => ({
+    type: 'hookCharRects', engine: 'krkr', line, hidden: true, text, sw: 800, sh: 600,
+    rects: [...text].map((_, i) => [70 + i * 19, y, 19, 22])
+  });
+  const first = 'うふふ……', full = 'いやだ、わたくしったら、ついついはしゃいでしまいました。';
+  p.hook(nativeLine(63, first, 488));
+  const glyph = (seq, text) => p.glyph({
+    seq, text, dots: [...text].map((ch, i) => ({ i, ch, h: 22, a: 19, k: 'd', at: { space: 'c', x: 172 + i * 19, y: 486 } }))
+  });
+  glyph(54, 'だ、');
+  p.hook({ ...nativeLine(57, 'い', 486), engine: 'gpu', hidden: false });
+  p.hook(nativeLine(64, full, 517));
+  glyph(56, 'たくしった');
+  p.page({ type: 'hookGpuPage', awake: true, armed: false, lines: [] });
+  assert.deepEqual(recovered, [first, full]);
+  assert.deepEqual(sent.at(-1).lines.map(row => row.text), [first, full]);
+  p.hook({ ...nativeLine(64, '', 517), hidden: false });
+  assert.deepEqual(sent.at(-1).lines, [], 'the current native line still clears the whole page');
+  p.configure({}, { bound: true, gameProcessId: 99, clientWidth: 804, clientHeight: 604 });
+  glyph(1, '次の行');
+  assert.equal(sent.at(-1).text, '次の行', 'glyph fallback works before a new binding has an engine page');
+});
+
+test('native character rows have one reader view and place its Chinese below the current Japanese', async t => {
+  let chromium;
+  try { ({ chromium } = require(process.env.MEGULIT_PLAYWRIGHT || 'H:/MeguLit-Work/pw/node_modules/playwright-core')); }
+  catch { t.skip('no playwright-core'); return; }
+  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await page.setContent('<body class="tomoyo-gal-bound tomoyo-ui-translation"><div class="sentence-window"></div></body>');
+    await page.evaluate(() => {
+      window.MeguLitProfile = { get: key => key === 'page.engineRows' };
+      window.__tomoyoChinese = {
+        galStatus() {},
+        galLayoutInfo: () => ({ clientX: 236, clientY: 235, clientWidth: 804, clientHeight: 604, workBottom: 900 })
+      };
+    });
+    for (const file of ['island-page.js', 'hook-reader.js', 'text-place.js']) {
+      await page.addScriptTag({ path: path.join(root, 'web', 'reader', 'modules', file) });
+    }
+    await page.evaluate(() => {
+      const b = window.__tomoyoChinese;
+      const first = 'うふふ……', current = 'いやだ、わたくしったら、ついついはしゃいでしまいました。';
+      b.textPlaceMode({ on: true, game: '48972' });
+      b.galStatus({ hookActive: true, hookSource: current, hookSourceEngine: 'krkr', hookSourceLine: 128, hookSequence: 66 });
+      const row = document.createElement('div');
+      row.className = 'tomoyo-cn-row';
+      row.textContent = '哎呀，我太得意忘形了';
+      document.querySelector('.tomoyo-hook-reader').append(row);
+      const line = (id, text, y) => ({ id, text, rects: [...text].map((_, i) => [70 + i * 19, y, 19, 22]) });
+      b.textPlacePage({ awake: true, armed: true, client: [804, 604], lines: [line('krkr:63', first, 491), line('krkr:64', current, 520)] });
+    });
+    await page.waitForFunction(() => {
+      const tokens = [...document.querySelectorAll('.tomoyo-hook-reader .sentence-text:not(.megulit-old-line) .char-token')];
+      return tokens.length === 28 && tokens.every(token => !token.classList.contains('megulit-unplaced'));
+    });
+    const result = await page.evaluate(() => {
+      const jp = document.querySelector('.tomoyo-hook-reader .sentence-text .char-token').getBoundingClientRect();
+      const cn = document.querySelector('.tomoyo-hook-reader .tomoyo-cn-row').getBoundingClientRect();
+      return {
+        spatial: document.querySelectorAll('.tome-island-page').length,
+        previous: document.querySelector('.megulit-old-line').textContent,
+        translationX: cn.left,
+        belowJapanese: cn.top >= jp.bottom
+      };
+    });
+    assert.deepEqual(result, { spatial: 0, previous: 'うふふ……', translationX: 306, belowJapanese: true });
+  } finally { await browser.close(); }
+});
+
 test('placement: the real line 25, then the clear: the placement lets it go; the next line is placed as before', () => {
   const { feed } = placementRig();
   const placed = feed(REC[25]); assert.equal(placed.length, 1); assert.equal(placed[0].text, textOf(25)); assert.equal(placed[0].rects.length, 20);
@@ -123,5 +200,64 @@ test('replay 02:57Z: no line comes back after a click, the reader keeps drawing 
     const race = await run(true, true);
     assert.deepEqual(race.back, [], 'the clear before the reader moves on: the same');
     assert.deepEqual(race.fx, { paired: 6, orphan: 0, sent: false });
+  } finally { await browser.close(); }
+});
+
+test('18:34 native clear and wrapped line keep the translation off the fallback box on every paint', async t => {
+  let chromium;
+  try { ({ chromium } = require(process.env.MEGULIT_PLAYWRIGHT || 'H:/MeguLit-Work/pw/node_modules/playwright-core')); }
+  catch { t.skip('no playwright-core'); return; }
+  const [first, clear, wrapped] = require('./fixtures/games/fata-morgana/translation-page-turn.json');
+  const { p, feed } = placementRig();
+  p.profile = require('../core/profiles/index.cjs').profileFor({ exe: 'D:/Games/fata_jp.exe', engine: 'KiriKiri' });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await page.setContent('<style>.sentence-window{position:fixed;left:160px;top:450px}</style><main><div class="sentence-window tomoyo-hook-reader"><div class="sentence-text"></div><div class="tomoyo-cn-row"></div></div></main>');
+    await page.evaluate(() => {
+      window.__tomoyoChinese = { galLayoutInfo: () => ({ clientX: 50, clientY: 20, clientWidth: 804, clientHeight: 604 }) };
+    });
+    await page.addScriptTag({ path: path.join(root, 'web/reader/modules/text-place.js') });
+    await page.clock.install({ time: new Date('2026-11-22T09:34:00Z') });
+    await page.clock.pauseAt(new Date('2026-11-22T09:34:01Z'));
+    await page.evaluate(() => window.__tomoyoChinese.textPlaceMode({ on: true }));
+    const show = async (raw, cn) => {
+      const messages = feed(raw);
+      await page.evaluate(({ messages, cn }) => {
+        if (cn) {
+          const text = messages.find(m => m.type === 'textPlace').text;
+          document.querySelector('.sentence-text').replaceChildren(...[...text].map(c => {
+            const span = document.createElement('span'); span.className = 'char-token'; span.textContent = c; return span;
+          }));
+          document.querySelector('.tomoyo-cn-row').textContent = cn;
+        }
+        for (const m of messages) window.__tomoyoChinese[m.type](m);
+      }, { messages, cn });
+    };
+    const sample = () => page.locator('.tomoyo-cn-row').evaluate(row => {
+      const rect = row.getBoundingClientRect();
+      return { visible: row.checkVisibility({ visibilityProperty: true, opacityProperty: true }), x: rect.x, y: rect.y };
+    });
+    await show(first, '早安，老爷……');
+    await page.clock.runFor(550);
+    assert.equal((await sample()).x, 120);
+    await show(clear);
+    await page.clock.runFor(16);
+    const cleared = await sample();
+    await page.locator('.tomoyo-cn-row').evaluate(row => { row.textContent += '?'; });
+    await page.clock.runFor(32);
+    assert.equal((await sample()).visible, false, 'a late translation cannot repaint the retired line');
+    await show(first.replace('line=44 ', 'line=45 '), '???????');
+    await page.clock.runFor(16);
+    assert.equal((await sample()).visible, true, 'a new report can show the same sentence again');
+    await show(wrapped, '直直地盯着下仆……');
+    const frames = [];
+    for (let i = 0; i < 34; ++i) {
+      await page.clock.runFor(16);
+      frames.push(await sample());
+    }
+    assert.deepEqual({ cleared: cleared.visible, uniquePositions: [...new Set(frames.map(f => f.x + ',' + f.y))] },
+      { cleared: false, uniquePositions: [frames.at(-1).x + ',' + frames.at(-1).y] });
+    assert.ok(frames.every(f => f.visible && f.x === 120 && f.y > 20 + 520 + 22));
   } finally { await browser.close(); }
 });

@@ -12,7 +12,7 @@ const REPO = path.resolve(__dirname, '..'), HID = process.env.MEGULIT_HIDDESK ||
 const ROOT = path.resolve(arg('root', path.join(WORK, 'root')));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function killOrphans() { /* leftovers of an earlier (crashed) run: anything started from this tool's work folder, never node itself */
-  try { cp.execFileSync('powershell.exe', ['-NoProfile', '-Command', "$w = '" + WORK.replace(/'/g, "''") + "'; Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.Name -ne 'node.exe' -and $_.ProcessId -ne $PID -and $_.CommandLine.Contains($w) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"], { stdio: 'ignore' }); } catch (e) { /* none */ }
+  try { cp.execFileSync('powershell.exe', ['-NoProfile', '-Command', "$w = '" + WORK.replace(/'/g, "''") + "'; Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.Name -ne 'node.exe' -and $_.ProcessId -ne $PID -and $_.CommandLine.Contains($w) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"], { windowsHide: true, stdio: 'ignore' }); } catch (e) { /* none */ }
 }
 function prepareRoot() {
   killOrphans();
@@ -36,7 +36,7 @@ async function probePage(port, waitMs) {
   const code = "(function(){var o={gl:!!(window.GL&&GL.ok),dom:!document.getElementById('gl'),std:-1,renderer:'?'};try{var g=document.getElementById('gl');if(g){var x=g.getContext('webgl2')||g.getContext('webgl');var ex=x&&x.getExtension('WEBGL_debug_renderer_info');if(ex)o.renderer=String(x.getParameter(ex.UNMASKED_RENDERER_WEBGL)).slice(0,80);var c=document.createElement('canvas');c.width=48;c.height=30;var c2=c.getContext('2d');c2.drawImage(g,0,0,48,30);var d=c2.getImageData(0,0,48,30).data,m=0,n=d.length/4,i;for(i=0;i<d.length;i+=4)m+=d[i]+d[i+1]+d[i+2];m/=n*3;var v=0;for(i=0;i<d.length;i+=4){var a=(d[i]+d[i+1]+d[i+2])/3-m;v+=a*a}o.std=+Math.sqrt(v/n).toFixed(2)}}catch(e){o.err=String(e)}return JSON.stringify(o)})()";
   const out = JSON.parse(await ev(code) || '{}'); try { ws.close(); } catch (e) { /* ignore */ } return out;
 }
-function killTree(pid) { try { cp.execFileSync('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore' }); } catch (e) { /* gone */ } }
+function killTree(pid) { try { cp.execFileSync('taskkill', ['/T', '/F', '/PID', String(pid)], { windowsHide: true, stdio: 'ignore' }); } catch (e) { /* gone */ } }
 function readLine(log) { try { const t = fs.readFileSync(log, 'utf8').replace(/^\uFEFF/, ''); const all = t.split(/\r?\n/).filter((x) => /cold-start /.test(x)); const fin = all.filter((x) => !/result=retry/.test(x)).pop(); return fin ? { line: fin, retries: all.filter((x) => /result=retry/.test(x)).length } : null; } catch (e) { return null; } }
 function parse(line) { const o = {}; const re = /(\w+)=("([^"]*)"|\S+)/g; let m; while ((m = re.exec(line))) o[m[1]] = m[3] !== undefined ? m[3] : m[2]; return o; }
 async function oneRun(i) {
@@ -47,7 +47,7 @@ async function oneRun(i) {
   if (arg('query', '')) env.MEGULIT_SETUP_WEB_QUERY = arg('query', '');
   if (RELEASE) { delete env.MEGULIT_SETUP_UILOG; delete env.MEGULIT_SETUP_WEBVIEW2_DATA; env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=' + (9400 + (i % 50)); }
   const cmd = path.join(dir, 'run.cmd'); fs.writeFileSync(cmd, ['@echo off', ...Object.entries(env).map(([k, v]) => `set "${k}=${v}"`), `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${path.join(ROOT, 'setup', 'setup-runtime.ps1')}" -Root "${ROOT}"`, ''].join('\r\n'));
-  const t0 = Date.now(); let pid = 0, h; if (REAL) { /* the user's own desktop (only with --real-desktop, and only when the user agreed): a normal process */ h = cp.spawn('cmd.exe', ['/c', cmd], { stdio: 'ignore', windowsHide: true }); pid = h.pid; } else { h = cp.spawn(HID, ['run', cmd], { stdio: ['ignore', 'pipe', 'ignore'] }); h.stdout.on('data', (d) => { const m = /(\d+)/.exec(String(d)); if (m && !pid) pid = +m[1]; }); }
+  const t0 = Date.now(); let pid = 0, h; if (REAL) { /* the user's own desktop (only with --real-desktop, and only when the user agreed): a normal process */ h = cp.spawn('cmd.exe', ['/c', cmd], { stdio: 'ignore', windowsHide: true }); pid = h.pid; } else { h = cp.spawn(HID, ['run', cmd], { windowsHide:true, stdio: ['ignore', 'pipe', 'ignore'] }); h.stdout.on('data', (d) => { const m = /(\d+)/.exec(String(d)); if (m && !pid) pid = +m[1]; }); }
   let line = null;
   if (RELEASE) {
     const UL = path.join(process.env.LOCALAPPDATA, 'MeguLit', 'setup-ui.log'); const port = 9400 + (i % 50);

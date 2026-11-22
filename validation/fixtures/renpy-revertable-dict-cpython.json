@@ -1,0 +1,268 @@
+{
+  "python": "3.13.15 (tags/v3.13.15:4061bc4, Aug  5 2026, 13:05:39) [MSC v.1944 64 bit (AMD64)]",
+  "scope": "ordinary CPython neutral dict subclass, not an imported RenPy class, compiler or game bytes; dumps only, no loads",
+  "fixtures": [
+    {
+      "protocol": 2,
+      "shape": "empty",
+      "bytes": 42,
+      "sha256": "0bb6aec774e3c72277e9e0f88bf4ccec89f0dd31a1084441181f18a63d14dd03",
+      "base64": "gAJjcmVucHkucmV2ZXJ0YWJsZQpSZXZlcnRhYmxlRGljdApxACmBcQEu",
+      "opcodes": [
+        "BINPUT",
+        "EMPTY_TUPLE",
+        "GLOBAL",
+        "NEWOBJ",
+        "PROTO",
+        "STOP"
+      ]
+    },
+    {
+      "protocol": 2,
+      "shape": "items",
+      "bytes": 83,
+      "sha256": "533e76c6e8933b0f8908ad8e1a7f6255d4220719001fd74d3747efc9f101b854",
+      "base64": "gAJjcmVucHkucmV2ZXJ0YWJsZQpSZXZlcnRhYmxlRGljdApxACmBcQEoWAUAAABhbHBoYXECXXEDKEsBSwJlSwdOWAUAAABlbXB0eXEEXXEFdS4=",
+      "opcodes": [
+        "APPENDS",
+        "BININT1",
+        "BINPUT",
+        "BINUNICODE",
+        "EMPTY_LIST",
+        "EMPTY_TUPLE",
+        "GLOBAL",
+        "MARK",
+        "NEWOBJ",
+        "NONE",
+        "PROTO",
+        "SETITEMS",
+        "STOP"
+      ]
+    },
+    {
+      "protocol": 2,
+      "shape": "attributes",
+      "bytes": 200,
+      "sha256": "da9193cadbe5cddeacde8c3d18710bcdcdd20da2016a43cc70558abc543deac1",
+      "base64": "gAJjcmVucHkucmV2ZXJ0YWJsZQpSZXZlcnRhYmxlRGljdApxACmBcQFYBAAAAGtpbmRxAlgKAAAAZW50cnlfb25seXEDc31xBChoAlgOAAAAYXR0cmlidXRlX29ubHlxBVgJAAAAY2xhc3NOYW1lcQZoBVgHAAAAZW50cmllc3EHaAVYBQAAAHN0YXRlcQhoBVgKAAAAc3RhdGVTaGFwZXEJaAVYBgAAAF9jbGVhbnEKaAVYCQAAAF9fcHJvdG9fX3ELaAV1Yi4=",
+      "opcodes": [
+        "BINGET",
+        "BINPUT",
+        "BINUNICODE",
+        "BUILD",
+        "EMPTY_DICT",
+        "EMPTY_TUPLE",
+        "GLOBAL",
+        "MARK",
+        "NEWOBJ",
+        "PROTO",
+        "SETITEM",
+        "SETITEMS",
+        "STOP"
+      ]
+    },
+    {
+      "protocol": 2,
+      "shape": "cycle",
+      "bytes": 111,
+      "sha256": "f2c320b1101c9967be6b48e1a98fa4216f79d73db2064839325df0bcd5b56f3b",
+      "base64": "gAJjcmVucHkucmV2ZXJ0YWJsZQpSZXZlcnRhYmxlRGljdApxACmBcQEoWAQAAABzZWxmcQJoAVgFAAAAZmlyc3RxA11xBChLAUsCZVgGAAAAc2Vjb25kcQVoBHV9cQZYBAAAAGxpbmtxB2gBc2Iu",
+      "opcodes": [
+        "APPENDS",
+        "BINGET",
+        "BININT1",
+        "BINPUT",
+        "BINUNICODE",
+        "BUILD",
+        "EMPTY_DICT",
+        "EMPTY_LIST",
+        "EMPTY_TUPLE",
+        "GLOBAL",
+        "MARK",
+        "NEWOBJ",
+        "PROTO",
+        "SETITEM",
+        "SETITEMS",
+        "STOP"
+      ]
+    },
+    {
+      "protocol": 4,
+      "shape": "empty",
+      "bytes": 53,
+      "sha256": "4f0cd8183b9cbee45d2ad00760285cb06f2f51cd5d496c9bb4c7a6c39b30e006",
+      "base64": "gASVKgAAAAAAAACMEHJlbnB5LnJldmVydGFibGWUjA5SZXZlcnRhYmxlRGljdJSTlCmBlC4=",
+      "opcodes": [
+        "EMPTY_TUPLE",
+        "FRAME",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP"
+      ]
+    },
+    {
+      "protocol": 4,
+      "shape": "items",
+      "bytes": 84,
+      "sha256": "6f6186f668055eee329d5a5d878e6a73ed259a591344d56023aece84b12684e7",
+      "base64": "gASVSQAAAAAAAACMEHJlbnB5LnJldmVydGFibGWUjA5SZXZlcnRhYmxlRGljdJSTlCmBlCiMBWFscGhhlF2UKEsBSwJlSwdOjAVlbXB0eZRdlHUu",
+      "opcodes": [
+        "APPENDS",
+        "BININT1",
+        "EMPTY_LIST",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "NONE",
+        "PROTO",
+        "SETITEMS",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP"
+      ]
+    },
+    {
+      "protocol": 4,
+      "shape": "attributes",
+      "bytes": 174,
+      "sha256": "80801f9b6405afc7e60f9982e9a48375eb853793ce7e42e7f6f26f639305fd93",
+      "base64": "gASVowAAAAAAAACMEHJlbnB5LnJldmVydGFibGWUjA5SZXZlcnRhYmxlRGljdJSTlCmBlIwEa2luZJSMCmVudHJ5X29ubHmUc32UKGgEjA5hdHRyaWJ1dGVfb25seZSMCWNsYXNzTmFtZZRoB4wHZW50cmllc5RoB4wFc3RhdGWUaAeMCnN0YXRlU2hhcGWUaAeMBl9jbGVhbpRoB4wJX19wcm90b19flGgHdWIu",
+      "opcodes": [
+        "BINGET",
+        "BUILD",
+        "EMPTY_DICT",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SETITEM",
+        "SETITEMS",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP"
+      ]
+    },
+    {
+      "protocol": 4,
+      "shape": "cycle",
+      "bytes": 104,
+      "sha256": "3a95886fdf1e792355847a2f232086c6864479b500dd995392f195dd520d8b5e",
+      "base64": "gASVXQAAAAAAAACMEHJlbnB5LnJldmVydGFibGWUjA5SZXZlcnRhYmxlRGljdJSTlCmBlCiMBHNlbGaUaAOMBWZpcnN0lF2UKEsBSwJljAZzZWNvbmSUaAZ1fZSMBGxpbmuUaANzYi4=",
+      "opcodes": [
+        "APPENDS",
+        "BINGET",
+        "BININT1",
+        "BUILD",
+        "EMPTY_DICT",
+        "EMPTY_LIST",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SETITEM",
+        "SETITEMS",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP"
+      ]
+    },
+    {
+      "protocol": 5,
+      "shape": "empty",
+      "bytes": 53,
+      "sha256": "481a68873ffd74b1345b2912db7168e3ffa404c49159af57331bf6b11b4dd6b3",
+      "base64": "gAWVKgAAAAAAAACMEHJlbnB5LnJldmVydGFibGWUjA5SZXZlcnRhYmxlRGljdJSTlCmBlC4=",
+      "opcodes": [
+        "EMPTY_TUPLE",
+        "FRAME",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP"
+      ]
+    },
+    {
+      "protocol": 5,
+      "shape": "items",
+      "bytes": 84,
+      "sha256": "50181c38f0f9236c995b40a06ae8866c40bb410b148f8ada3704305c5a93daf9",
+      "base64": "gAWVSQAAAAAAAACMEHJlbnB5LnJldmVydGFibGWUjA5SZXZlcnRhYmxlRGljdJSTlCmBlCiMBWFscGhhlF2UKEsBSwJlSwdOjAVlbXB0eZRdlHUu",
+      "opcodes": [
+        "APPENDS",
+        "BININT1",
+        "EMPTY_LIST",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "NONE",
+        "PROTO",
+        "SETITEMS",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP"
+      ]
+    },
+    {
+      "protocol": 5,
+      "shape": "attributes",
+      "bytes": 174,
+      "sha256": "8a394463ab44ce188c81fe4a02cbfc4a34f39064e268a77ff809c8dc82e596b5",
+      "base64": "gAWVowAAAAAAAACMEHJlbnB5LnJldmVydGFibGWUjA5SZXZlcnRhYmxlRGljdJSTlCmBlIwEa2luZJSMCmVudHJ5X29ubHmUc32UKGgEjA5hdHRyaWJ1dGVfb25seZSMCWNsYXNzTmFtZZRoB4wHZW50cmllc5RoB4wFc3RhdGWUaAeMCnN0YXRlU2hhcGWUaAeMBl9jbGVhbpRoB4wJX19wcm90b19flGgHdWIu",
+      "opcodes": [
+        "BINGET",
+        "BUILD",
+        "EMPTY_DICT",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SETITEM",
+        "SETITEMS",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP"
+      ]
+    },
+    {
+      "protocol": 5,
+      "shape": "cycle",
+      "bytes": 104,
+      "sha256": "708c6b3c7dc6edf359319c9bbddd0dad4364d523e388eb368a873066ddda4101",
+      "base64": "gAWVXQAAAAAAAACMEHJlbnB5LnJldmVydGFibGWUjA5SZXZlcnRhYmxlRGljdJSTlCmBlCiMBHNlbGaUaAOMBWZpcnN0lF2UKEsBSwJljAZzZWNvbmSUaAZ1fZSMBGxpbmuUaANzYi4=",
+      "opcodes": [
+        "APPENDS",
+        "BINGET",
+        "BININT1",
+        "BUILD",
+        "EMPTY_DICT",
+        "EMPTY_LIST",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SETITEM",
+        "SETITEMS",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP"
+      ]
+    }
+  ]
+}

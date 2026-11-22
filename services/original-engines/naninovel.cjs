@@ -17,10 +17,31 @@
 const fs=require('node:fs'),path=require('node:path'),unityfs=require('./unityfs.cjs');
 const memo=new Map();
 const {stat}=require('./file-key.cjs');
-function dataDirs(dir){let names;try{names=fs.readdirSync(dir,{withFileTypes:true});}catch{return [];}return names.filter(e=>e.isDirectory()&&/_Data$/i.test(e.name)).map(e=>path.join(dir,e.name));}
+function dataDirs(dir){
+ let entries;try{entries=fs.readdirSync(dir,{withFileTypes:true});}catch{return [];}
+ const result=[];
+ for(const entry of entries){
+  if(!/_Data$/i.test(entry.name))continue;
+  const data=path.join(dir,entry.name);
+  if(entry.isDirectory()){result.push(data);continue;}
+  if(!entry.isSymbolicLink())continue;
+  // Unity reads the original player's data through this junction when MeguLit launches a shadow.
+  try{
+   const manifest=path.join(dir,'megulit-shadow.json'),info=fs.lstatSync(manifest);
+   if(!info.isFile()||info.size>4096)continue;
+   const {game,exe}=JSON.parse(fs.readFileSync(manifest,'utf8'));
+   if(!path.isAbsolute(game)||exe!==path.basename(exe)||!/^.+\.exe$/i.test(exe)||entry.name.toLowerCase()!==path.parse(exe).name.toLowerCase()+'_data')continue;
+   if(!fs.statSync(path.join(dir,exe)).isFile()||!fs.statSync(path.join(game,exe)).isFile())continue;
+   const source=path.join(game,entry.name),target=fs.realpathSync(data);
+   if(fs.lstatSync(source).isDirectory()&&path.relative(fs.realpathSync(source),target)==='')result.push(target);
+  }catch{}
+ }
+ return result;
+}
 function bundleDir(dir){for(const d of dataDirs(dir)){const b=path.join(d,'StreamingAssets','aa','StandaloneWindows64');if(fs.existsSync(b))return b;}return '';}
+const isLocalizationBundle=f=>/-localization-[a-z-]+-scripts-.*\.bundle$/i.test(f)&&!/-scripts-debug/i.test(f);
 function localizationBundles(dir){const d=bundleDir(dir);if(!d)return [];let files;try{files=fs.readdirSync(d);}catch{return [];}
- const loc=files.filter(f=>/-localization-[a-z-]+-scripts-.*\.bundle$/i.test(f)&&!/-scripts-debug/i.test(f));if(!loc.length)return [];
+ const loc=files.filter(isLocalizationBundle);if(!loc.length)return [];
  const lang=f=>(/-localization-([a-z-]+?)-scripts-/i.exec(f)||[])[1]||'';
  const order=['zhhans','zh-hans','zhcn','zhhant','zh-hant','zhtw'];const langs=[...new Set(loc.map(lang))].sort((a,b)=>((order.indexOf(a)+1)||99)-((order.indexOf(b)+1)||99));
  return loc.filter(f=>lang(f)===langs[0]).sort().map(f=>path.join(d,f));}
@@ -54,12 +75,17 @@ function printed(b,from,to){const out=[];let p=from&~3;const str=q=>{if(q+4>to)r
  const byLine=[];let next=0;for(const x of texts.sort((a,c)=>a.line-c.line)){const t=registry.slice(next,next+x.count).filter(s=>typeof s==='string');next+=x.count;const c=lines.get(x.line-1);byLine.push({line:x.line,text:t.join(''),comment:c&&c.comment!=null?c.comment:null});}
  if(next!==registry.length)byLine.length=0;
  out.comments=comments;out.byLine=byLine.sort((a,c)=>a.line-c.line);return out;}
-function scan(b,out){let at=0;
- while((at=b.indexOf(DOC,at))>=0){let start=at;while(start>0&&b[start-1]>=0x20)start--;at+=DOC.length;
+function scan(b,out,{blocksOnly=false,check=()=>{}}={}){let at=0;
+ while((at=b.indexOf(DOC,at))>=0){
+  check();
+  let start=at;const min=blocksOnly?Math.max(0,at-1024):0;
+  while(start>min&&b[start-1]>=0x20)start--;
+  at+=DOC.length;
   if(start<4)continue;const n=b.readUInt32LE(start-4);if(n<DOC.length||start+n>b.length)continue;
-  const text=b.toString('utf8',start,start+n),m=HEAD.exec(text);if(!m)continue;
+  if(blocksOnly&&(start===min&&min>0||n>2<<20))continue;
+  const text=b.toString('utf8',start,start+n),m=HEAD.exec(text.split('\n',1)[0]);if(!m)continue;
   const doc={name:path.basename(m[3])+'.nani',src:(m[1]||'ja').toLowerCase(),dst:(m[2]||'').toLowerCase(),script:!/managed text/i.test(m[4]),text};
-  if(doc.script&&!/\n# /.test(text)){const next=b.indexOf(DOC,at),end=next<0?Math.min(b.length,start+n+4e6):next;doc.prints=printed(b,start+n,end);
+  if(!blocksOnly&&doc.script&&!/\n# /.test(text)){const next=b.indexOf(DOC,at),end=next<0?Math.min(b.length,start+n+4e6):next;doc.prints=printed(b,start+n,end);
    // E450 entries by document line (source comment at L, translation at L + 1), so pairing never shifts at a gap
    try{doc.entries=require('./naninovel-voice.cjs').docEntries(b,start+n,end);}catch{doc.entries=null;}}
   out.push(doc);}
@@ -129,6 +155,6 @@ const naninovel={
  // E450 voices: auto-voice clips aligned to the printed lines (naninovel-voice.cjs)
  voiceLines:dir=>require('./naninovel-voice.cjs').voiceLines(dir),
  patchLines(base){let any=false;const list=base.map(scene=>{const zh=scene.zh||[];if(!zh.some(Boolean))return scene;any=true;return {...scene,patched:true,lines:scene.lines.map((t,k)=>zh[k]||t)};});return any?list:null;},
- _internal:{documents,localizationBundles,tidy,combine,scan},
+ _internal:{dataDirs,bundleDir,documents,localizationBundles,isLocalizationBundle,tidy,combine,scan,blocks},
 };
 module.exports=naninovel;

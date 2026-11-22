@@ -5,6 +5,14 @@ const installer=require('../core/python-installer.cjs');
 const {LocalLearning}=require('../core/learning-native.cjs');
 
 let root,previousRoot;
+test('a failed first JMdict load retries after the dictionary appears in the configured runtime',()=>{
+ const folder=path.join(root,'runtime','dictionaries');
+ const learning=new LocalLearning(root);
+ assert.throws(()=>learning.load(),{code:'ENOENT'});
+ fs.mkdirSync(folder,{recursive:true});
+ fs.writeFileSync(path.join(folder,'jmdict.json'),JSON.stringify([{id:7,spellings:['休憩'],readings:['きゅうけい']}]));
+ learning.load();assert.deepEqual(learning.index.get('休憩'),[7]);
+});
 test.before(()=>{
  previousRoot=process.env.MEGULIT_ROOT;
  root=fs.mkdtempSync(path.join(os.tmpdir(),'dictionary-install-'));process.env.MEGULIT_ROOT=root;

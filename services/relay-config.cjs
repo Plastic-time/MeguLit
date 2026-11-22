@@ -44,6 +44,7 @@ function maybeRace(env){
  raceAt=Date.now();racing=raceDefault().catch(()=>null).finally(()=>{racing=null;});
 }
 function relayBase(root,env=process.env){
+ if(require('../core/owner-tests.cjs').privateMode(root,env))return '';
  const off=String(env.MEGULIT_RELAY_BASE||'').trim().toLowerCase()==='off';
  const fromEnv=normalizeBase(env.MEGULIT_RELAY_BASE||'');if(fromEnv)return fromEnv;
  const saved=root?normalizeBase(readJSON(onlineFile(root)).relayUrl||''):'';if(saved)return saved;
@@ -58,4 +59,12 @@ function endpoints(root,route,env=process.env){
  const first=raced&&chosen===DEFAULT_RELAY_BASE?DEFAULT_RELAY_BASE:CN_RELAY_BASE;
  return [first,...DEFAULT_CANDIDATES.filter(b=>b!==first)].map(b=>b+route);
 }
-module.exports={endpoints,DEFAULT_RELAY_BASE,CN_RELAY_BASE,raceDefault,relayBase,endpoint,normalizeBase,onlineFile,readJSON};
+// Only the dedicated Seed callers use these bases. General relay APIs stay disabled in owner tests.
+function seedBases(root,permission,env=process.env){
+ if(!require('../core/owner-tests.cjs').privateMode(root,env))return module.exports.endpoints(root,'',env);
+ if(env.MEGULIT_OFFLINE==='1'||env.MEGULIT_CARDINAL_REPLAY==='1')return [];
+ if(permission==='receive'&&env.MEGULIT_OWNER_TORCH_RECEIVE==='1'||
+    permission==='report'&&env.MEGULIT_OWNER_SEED_REPORT==='1')return [CN_RELAY_BASE,DEFAULT_RELAY_BASE];
+ return [];
+}
+module.exports={seedBases,endpoints,DEFAULT_RELAY_BASE,CN_RELAY_BASE,raceDefault,relayBase,endpoint,normalizeBase,onlineFile,readJSON};

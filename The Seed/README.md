@@ -4,8 +4,11 @@
 
 ```
 The Seed/<engine>/<slug>/game.json                  游戏层：core/game-diff.cjs 文档，layer game，key = 游戏身份，prints = pack / script / steam / vndb / title
+The Seed/<engine>/<slug>/story.json                 可选作品结构：独立 megulit.story schema，不属于 profile domains，不含玩家进度或存档值
 The Seed/<engine>/<slug>/versions/<exeSha256>.json  版本层：layer version，key = exe 整文件 SHA-256，prints = exe / head / pe，只含版本层的键，不带 mode
 ```
+
+`story.json` 由 `services/story-data.cjs` 独立严格读取，完整内容身份在低优先级 worker 核对后才允许解释本机只读存档。通用规则分析与支持边界见 [剧情进度文档](../docs/story-progress.md)。作品数据可随普通 App hotbundle 更新；尚未实现独立作品规则投稿或分发接口
 
 - 游戏身份 key = relay 的 gidFor：SHA-256(`'game|'+种类+':'+指纹`)，种类取 pack → script → steam → vndb → title 里最强的一个（`core/game-print.cjs`）
 - 同一个 exe 被几部游戏共用时（同一程序的不同发行），版本层只出一份，放在 slug 排第一的那部下面，其他游戏在 `builds` 里引用它
@@ -52,3 +55,31 @@ The Seed/<engine>/<slug>/versions/<exeSha256>.json  版本层：layer version，
 ## English
 
 The Seed holds MeguLit's built-in game diffs: per game a `game.json` (game layer, every build) and per exe a `versions/<exe SHA-256>.json` (version layer, that build only). They ship with GitHub main, live in `MeguLit/The Seed/` of the installer and come with hot updates; fixing a game means changing its seed only. Each file is a `megulit.game-diff` document (`core/game-diff.cjs`) with fingerprints from `core/game-print.cjs`; `game.json` adds `status` (`verified` / `owner-ok` used directly, `read` read mode, `skeleton` identity and pinned values with the self-check gate deciding), `slug` (its folder), `builds`, `seedFormat` (1), `sourceLangs` (BCP 47, default `["ja"]`) and optionally `match` (readable exe names and titles) and `ext` (an extension area). Language-dependent settings live in `settings.lang.<bcp47>` (`annotation` ruby / ipa / pinyin / none, `pairing`, `dictionary`, `fontFallback`); the client takes the block of the language it reads, else the language-free settings. Unknown fields, extensions and settings keys are ignored (forward compatible); known ones are checked strictly. Pure data: no code, no paths, no user names. Built-in seeds are official without a signature; diffs downloaded at run time to `data/The Seed/` must be signed. Full interface: `docs/diff-layers.md` ("当前权威接口")
+
+### Reader compatibility and repeatable scene checks
+
+The `observe` command accepts the following optional observation fields. Scene and choice indices are zero-based. A scene can also be identified by a SHA-256 text fingerprint in `textHash`. Actions run in array order. Expectations describe what the tester checks in the game.
+
+```json
+{
+  "scenarios": [{
+    "scene": 4,
+    "choice": 1,
+    "steps": ["restore-japanese", "offline", "advance", "select-choice"],
+    "expect": ["choices-complete", "local-pair"]
+  }],
+  "trials": [{
+    "reader": "1.4.23",
+    "revision": 2,
+    "localStream": {"code": "FixtureHook", "ctx": "a", "ctx2": "0"},
+    "results": {
+      "read": {"passed": true, "source": "engine"},
+      "replace": {"passed": false, "source": "operator", "failure": "original-visible"}
+    }
+  }]
+}
+```
+
+`localStream` is a local input. Only its digest enters the signed profile. An observation must name the profile revision being tested. A later observation updates only the supplied capabilities for that reader, stream and revision. An explicit scenarios list replaces the regression checklist. Use the original Seed signing and reviewed release workflow after observation.
+
+To find a rollback target offline, run `node tools/torch-release.cjs compatible-target history.json context.json`. Supply the signed release history export and a context containing `originalExe`, `runtimeExe`, `script`, `reader`, `stream` (digest), and `capability`. The command returns the latest eligible previous release hash and profile revision, or null. Use the returned hash with the existing reviewed rollback flow. Seed receipt updates the profile cache and leaves personal settings in their original store.

@@ -5,6 +5,7 @@ const {dispatch}=require('./bridge.cjs'),{Runtime}=require('./runtime.cjs');
 const root=(process.env.MEGULIT_ROOT||process.env.TOME_FINAL_ROOT)?path.resolve(process.env.MEGULIT_ROOT||process.env.TOME_FINAL_ROOT):path.resolve(__dirname,'..');
 const reply=value=>process.stdout.write(JSON.stringify(value)+'\n');
 const runtime=new Runtime(root,(event,data)=>reply({event,data}));let closing=false,active=0,maintenance=false;
+runtime.stopSeedLive=require('./seed-live.cjs').subscribe(root);
 const input=readline.createInterface({input:process.stdin,crlfDelay:Infinity});
 async function handle(line){
  let id=null,counted=false,exclusive=false;
@@ -32,6 +33,7 @@ try{require('./probe-auto.cjs').start(root,()=>require('./store.cjs').openStore(
    library.coldTest); never while MeguLit has a game bound */
 require('./background-games.cjs').configure(()=>!!runtime.reader?.gamePid);
 try{require('./cold-test.cjs').start(root,()=>require('./store.cjs').openStore(root),{isPlaying:()=>{try{const r=runtime.reader;return !!(r&&r.gamePid);}catch{return false;}}});}catch{}
+require('./yui.cjs').start(root);
 input.on('line',line=>{handle(line).catch(()=>{});});
 /* E426 the host is gone once stdin closes: a stop that never settles must not leave node.exe and its bridges behind */
 input.on('close',()=>{closing=true;setTimeout(()=>process.exit(0),6000).unref();try{require('./cold-test.cjs').stop();}catch{}runtime.stop().finally(()=>process.exit(0));});

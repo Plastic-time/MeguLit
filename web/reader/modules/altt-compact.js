@@ -134,7 +134,15 @@
    const sk='megulit-altt-subtab-'+id,save=()=>{try{localStorage.setItem(sk,String(state.i));}catch{}};
    try{const v=Number(localStorage.getItem(sk));if(Number.isInteger(v)&&v>=0&&v<items.length)state.i=v;}catch{}
    bar.addEventListener('keydown',e=>{const k=e.key;if(!['ArrowRight','ArrowLeft','Home','End'].includes(k))return;const n=k==='Home'?0:k==='End'?items.length-1:(state.i+(k==='ArrowRight'?1:items.length-1))%items.length;state.i=n;paint();save();bar.children[n].focus();bar.children[n].scrollIntoView({block:'nearest',inline:'nearest'});e.preventDefault();});}
-  function paint(){[...bar.children].forEach((b,i)=>{const full=items[i].label(),t=SHORT[full]||full;if(b.textContent!==t)b.textContent=t;if(t!==full)b.title=full;else b.removeAttribute('title');b.setAttribute('aria-selected',String(i===state.i));b.tabIndex=i===state.i?0:-1;});
+  function paint(){[...bar.children].forEach((b,i)=>{
+   const full=items[i].label();
+   // The locale observer can translate both the label and its tooltip after this paint.
+   if(b.__compactLabel!==full){
+    b.__compactLabel=full;const label=SHORT[full]||full;b.textContent=label;
+    if(label!==full)b.title=full;else b.removeAttribute('title');
+   }
+   b.setAttribute('aria-selected',String(i===state.i));b.tabIndex=i===state.i?0:-1;
+  });
    items.forEach((it,i)=>{for(const n of it.nodes()){n.classList.toggle('tome-ac-off',i!==state.i);if(n.tagName==='DETAILS'&&it.pane){n.classList.add('tome-ac-pane');const sm=n.querySelector(':scope>summary');if(sm)sm.style.setProperty('display','none','important');if(i===state.i){n.open=true;for(const d of n.querySelectorAll('details'))if(!d.dataset.acOpened){d.dataset.acOpened='1';d.open=true;}}}}});}
   paint();return bar;}
  window.__megulitSubTabs={mount:chips};

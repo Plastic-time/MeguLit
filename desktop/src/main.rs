@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod broker;
+mod yui;
 mod runtime_setup;
 mod single_instance;
 mod clipboard;
@@ -23,7 +24,7 @@ use tauri_plugin_dialog::DialogExt;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
-struct DesktopState { root: PathBuf, exiting: AtomicBool, headless: bool, splash: Option<PathBuf>, window_memory:window_memory::WindowMemory,reader_background:AtomicBool,home_transition:home_transition::HomeTransition }
+struct DesktopState { root: PathBuf, exiting: AtomicBool, headless: bool, main_ready: AtomicBool, splash: Option<PathBuf>, window_memory:window_memory::WindowMemory,reader_background:AtomicBool,home_transition:home_transition::HomeTransition }
 struct TrayItems { language:std::sync::Mutex<String> }
 
 // Open the provider's own dialog, including its verification and QR flow.
@@ -137,8 +138,9 @@ async fn hot_reload(app:tauri::AppHandle,dry_run:Option<bool>)->Result<bool,Stri
     if let Some(reader)=app.get_webview_window("reader"){if reader.is_visible().unwrap_or(false){return Err("READER_OPEN".into());}}
     if dry_run==Some(true){return Ok(true);}
     let root=app.state::<DesktopState>().root.clone();
+    yui::mark("hot-reload");
     let on=hot_assets::refresh(&root);
-    tauri::async_runtime::spawn_blocking(broker::shutdown).await.map_err(|e|e.to_string())?;
+    tauri::async_runtime::spawn_blocking(broker::restart).await.map_err(|e|e.to_string())?.inspect_err(|_|yui::mark("hot-reload-failed"))?;
     for label in ["reader","tray-menu","main"]{if let Some(window)=app.get_webview_window(label){let _=window.eval("location.reload()");}}
     Ok(on)
 }
@@ -150,6 +152,7 @@ fn app_exit_for_update(window:tauri::WebviewWindow){
 
 #[tauri::command]
 async fn reader_open(app:tauri::AppHandle,background:Option<bool>)->Result<(),String>{
+    if reader_library_only(&app).await?{if let Some(window)=app.get_webview_window("reader"){window.close().map_err(|e|e.to_string())?;}return Ok(());}
     reader_log(&app.state::<DesktopState>().root,"open-request","");
     if let Some(window)=app.get_webview_window("reader"){if background!=Some(true){app.state::<DesktopState>().reader_background.store(false,Ordering::SeqCst);window.show().map_err(|e|e.to_string())?;}return Ok(());}
     let state=app.state::<DesktopState>();
@@ -162,6 +165,8 @@ async fn reader_open(app:tauri::AppHandle,background:Option<bool>)->Result<(),St
         .map(|w|{window_policy::no_accent_border(&w);window_policy::chromeless(&w);})?;reader_log(&state.root,"window-created","");Ok(())
 }
 
+async fn reader_library_only(app:&tauri::AppHandle)->Result<bool,String>{let root=app.state::<DesktopState>().root.clone();let status=tauri::async_runtime::spawn_blocking(move||run_service(root,json!({"action":"reader_status"}))).await.map_err(|e|e.to_string())??;Ok(status.get("libraryOnly").and_then(Value::as_bool)==Some(true))}
+
 #[tauri::command]
 async fn reader_connect(window:tauri::WebviewWindow,state:State<'_,DesktopState>)->Result<Value,String>{
     if window.label()!="reader"{return Err("INVALID_READER_WINDOW".into());}
@@ -169,13 +174,14 @@ async fn reader_connect(window:tauri::WebviewWindow,state:State<'_,DesktopState>
     #[cfg(not(windows))] let hwnd=String::from("0");
     reader_log(&state.root,"connect-request","");
     let root=state.root.clone();let result=tauri::async_runtime::spawn_blocking(move||run_service(root,json!({"action":"reader_attach","pid":std::process::id(),"hwnd":hwnd}))).await.map_err(|e|e.to_string())??;
+    if result.get("libraryOnly").and_then(Value::as_bool)==Some(true){window.close().map_err(|e|e.to_string())?;return Ok(result);}
     reader_log(&state.root,"native-attached","");
     if !state.reader_background.load(Ordering::SeqCst){window.show().map_err(|e|e.to_string())?;}Ok(result)
 }
 
 fn reader_log(root:&std::path::Path,phase:&str,error:&str){use std::io::Write;let _=std::fs::create_dir_all(root.join("logs"));if let Ok(mut file)=std::fs::OpenOptions::new().create(true).append(true).open(root.join("logs/reader-native.log")){let _=writeln!(file,"{}",json!({"phase":phase,"error":error,"pid":std::process::id()}));}}
 #[tauri::command]
-async fn reader_restart(app:tauri::AppHandle)->Result<(),String>{let root=app.state::<DesktopState>().root.clone();tauri::async_runtime::spawn_blocking(move||run_service(root,json!({"action":"reader_detach"}))).await.map_err(|e|e.to_string())??;if let Some(window)=app.get_webview_window("reader"){window.eval("location.reload()").map_err(|e|e.to_string())?;Ok(())}else{reader_open(app,Some(true)).await}}
+async fn reader_restart(app:tauri::AppHandle)->Result<(),String>{if reader_library_only(&app).await?{if let Some(window)=app.get_webview_window("reader"){window.close().map_err(|e|e.to_string())?;}return Ok(());}let root=app.state::<DesktopState>().root.clone();tauri::async_runtime::spawn_blocking(move||run_service(root,json!({"action":"reader_detach"}))).await.map_err(|e|e.to_string())??;if let Some(window)=app.get_webview_window("reader"){window.eval("location.reload()").map_err(|e|e.to_string())?;Ok(())}else{reader_open(app,Some(true)).await}}
 
 #[tauri::command]
 async fn pick_executable(app:tauri::AppHandle,directory:Option<String>) -> Result<Option<String>,String> {
@@ -348,8 +354,17 @@ fn animate_home(handle:tauri::AppHandle,ticket:u64,leaving:bool){
 
 #[tauri::command]
 async fn window_action(action: String, window: tauri::WebviewWindow, state: State<'_, DesktopState>) -> Result<(), String> {
+    if (action=="enter_overlay"||window.label()=="reader"&&action=="ready")&&reader_library_only(window.app_handle()).await?{if window.label()=="reader"{window.close().map_err(|e|e.to_string())?;}return Ok(());}
     match action.as_str() {
         "ready" => {
+            if window.label()=="main"{
+                if state.main_ready.swap(true,Ordering::SeqCst) && !state.headless {
+                    // The same window survived a page reload. The startup island has already left.
+                    window.emit("home-revealed","reloaded").map_err(|e|e.to_string())?;
+                    return Ok(());
+                }
+                yui::mark("first-window-ready");
+            }
             if window.label()=="main"&&!state.headless{state.window_memory.enable();}
             if state.headless {
                 let status=json!({"host":"app.megulit","frontend":true,"visible":false});
@@ -363,9 +378,10 @@ async fn window_action(action: String, window: tauri::WebviewWindow, state: Stat
                 std::thread::spawn(move || { std::thread::sleep(std::time::Duration::from_millis(450));let _=std::fs::write(&flag,"1");
                     let revealed=std::path::PathBuf::from(format!("{}.revealed",flag.display()));
                     for _ in 0..200 {if revealed.is_file(){break;}std::thread::sleep(std::time::Duration::from_millis(25));}
-                    let _=std::fs::remove_file(&revealed);let _=app.emit("home-revealed","splash"); });
-            } else { window.show().map_err(|e| e.to_string())?;let _=window.app_handle().emit("home-revealed","shown"); }
+                    if revealed.is_file(){yui::mark("window-revealed");}let _=std::fs::remove_file(&revealed);let _=app.emit("home-revealed","splash"); });
+            } else { window.show().map_err(|e| e.to_string())?;if window.label()=="main"{yui::mark("window-revealed");}let _=window.app_handle().emit("home-revealed","shown"); }
         },
+        "reader_disabled" => {if window.label()=="reader"&&reader_library_only(window.app_handle()).await?{window.close().map_err(|e|e.to_string())?;}},
         "enter_overlay" => begin_home_exit(window.app_handle())?,
         "hide_home" => {state.home_transition.cancel();hide_home(window.app_handle())?;},
         "show_home" => reveal(window.app_handle()),
@@ -434,7 +450,8 @@ fn reveal(app: &tauri::AppHandle) {
 
 // E384 startup timeline: one line per stage with the time since launch, so a slow start says which step waited.
 static STARTED:std::sync::OnceLock<std::time::Instant>=std::sync::OnceLock::new();
-fn startup_mark(root:&std::path::Path,label:&str){
+fn startup_mark(root:&std::path::Path,label:&'static str){
+    yui::mark(label);
     let since=STARTED.get_or_init(std::time::Instant::now).elapsed().as_millis();
     let file=root.join(if std::env::args().any(|a|a=="--headless-check"){"logs/startup-timeline-headless.log"}else{"logs/startup-timeline.log"});let _=std::fs::create_dir_all(root.join("logs"));
     if std::fs::metadata(&file).map(|m|m.len()>256*1024).unwrap_or(false){let _=std::fs::remove_file(&file);}
@@ -469,8 +486,9 @@ fn main() {
     #[cfg(windows)]
     {let args:Vec<String>=std::env::args().collect();if args.get(1).map(|a|a=="--spawn-outside-job").unwrap_or(false){std::process::exit(spawn_outside_job(&args[2..]));}}
     STARTED.get_or_init(std::time::Instant::now);
-    window_policy::no_ghost_windows();
     let root = root_directory();
+    if !std::env::args().any(|arg|matches!(arg.as_str(),"--stop-instance"|"--service-self-test"|"--home-window-self-test")){yui::begin(&root);}
+    window_policy::no_ghost_windows();
     if std::env::args().any(|arg|arg=="--home-window-self-test"){
         let result=window_policy::native_hide_self_test();let _=std::fs::create_dir_all(root.join("validation"));
         let _=std::fs::write(root.join("validation/home-native-hide.json"),serde_json::to_vec_pretty(&json!({"ok":result.is_ok(),"error":result.as_ref().err(),"scope":"native hide on an isolated offscreen HWND, not game acceptance"})).unwrap());std::process::exit(if result.is_ok(){0}else{1});
@@ -482,9 +500,11 @@ fn main() {
     }
     let control=if std::env::args().any(|arg|arg=="--stop-instance"){Some("exit")}else{None};
     let isolated=std::env::args().any(|arg|arg=="--headless-check"||arg=="--headless-ui-check");
-    let _instance_lease=if isolated{None}else{match single_instance::acquire(&root,control){Ok(single_instance::Acquisition::Owner(lease))=>{if control.is_none()&&std::env::var("MEGULIT_SIDE_BY_SIDE").map(|v|v!="1").unwrap_or(true){single_instance::retire_other_installations(&root);}Some(lease)},Ok(_)=>return,Err(error)=>{let _=std::fs::create_dir_all(root.join("logs"));let _=std::fs::write(root.join("logs/instance-error.log"),error);return;}}};
+    let _instance_lease=if isolated{None}else{match single_instance::acquire(&root,control){Ok(single_instance::Acquisition::Owner(lease))=>{if control.is_none()&&std::env::var("MEGULIT_SIDE_BY_SIDE").map(|v|v!="1").unwrap_or(true){single_instance::retire_other_installations(&root);}Some(lease)},Ok(_)=>{yui::mark("closed");return},Err(error)=>{yui::mark("instance-failed");let _=std::fs::create_dir_all(root.join("logs"));let _=std::fs::write(root.join("logs/instance-error.log"),error);return;}}};
     startup_mark(&root,"process-start");
-    if !isolated&&!runtime_setup::ensure(&root){return;}
+    if !isolated&&!runtime_setup::ensure(&root){yui::mark("runtime-unavailable");return;}
+    #[cfg(windows)]
+    if !runtime_setup::check_webview(&root, !isolated){std::process::exit(1);}
     startup_mark(&root,"runtime-ready");
     let diagnostic_root=root.clone();
     std::panic::set_hook(Box::new(move |info| {
@@ -514,9 +534,9 @@ fn main() {
         startup_mark(&root,"splash-start");if command.spawn().is_ok() {let _=std::fs::write(format!("{}.pid",flag.display()),std::process::id().to_string());let _=std::fs::write(format!("{}.progress",flag.display()),"20");Some(flag)}else{None}
     }else{None};
     let window_memory=window_memory::WindowMemory::new(&root);
-    let state = DesktopState { root, exiting: AtomicBool::new(false), headless, splash,window_memory,reader_background:AtomicBool::new(true),home_transition:home_transition::HomeTransition::default() };
+    let state = DesktopState { root, exiting: AtomicBool::new(false), headless, main_ready: AtomicBool::new(false), splash,window_memory,reader_background:AtomicBool::new(true),home_transition:home_transition::HomeTransition::default() };
     tauri::Builder::default().manage(state).plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![service, tray_menu::tray_menu_action, window_action, pick_executable, pick_patch_file, pick_image, pick_directories, pick_backup, set_tray_language, reader_open, reader_connect, reader_restart, read_clipboard, moji_login, kanji_go_open, kanji_go_embed, kanji_go_hide, app_exit_for_update, hot_reload])
+        .invoke_handler(tauri::generate_handler![yui::yui_stage, service, tray_menu::tray_menu_action, window_action, pick_executable, pick_patch_file, pick_image, pick_directories, pick_backup, set_tray_language, reader_open, reader_connect, reader_restart, read_clipboard, moji_login, kanji_go_open, kanji_go_embed, kanji_go_hide, app_exit_for_update, hot_reload])
         .setup(move |app| {
             broker::attach(app.handle().clone());
             if !headless{single_instance::watch(app.handle().clone(),app.state::<DesktopState>().root.clone());}
@@ -532,9 +552,10 @@ fn main() {
                 state.window_memory.prepare(saved);
             }
             tauri::WebviewWindowBuilder::from_config(app,&config)?.data_directory(profile.clone()).visible(false).shadow(false)
+                .initialization_script(include_str!("yui-init.js"))
                 .initialization_script("document.addEventListener('contextmenu',function(event){event.preventDefault();},true);")
                 .build()
-                .map_err(|error| {let _=std::fs::write(&stage,format!("WebView creation failed: {error:?}"));error})?;
+                .map_err(|error| {yui::mark("webview-failed");let _=std::fs::write(&stage,format!("WebView creation failed: {error:?}"));error})?;
             let _=std::fs::write(&stage,"WebView created");startup_mark(&state.root,"webview-built");
             if let Some(home)=app.get_webview_window("main"){window_policy::configure_home_frame(&home);}
             if !headless {
@@ -579,5 +600,5 @@ fn main() {
                 if close_to_tray { api.prevent_close(); let _=window.hide(); }
             }
         }})
-        .build(context).expect("MeguLit desktop startup failed").run(|app,event|{if matches!(event,tauri::RunEvent::Exit){app.state::<DesktopState>().window_memory.flush();broker::shutdown();}});
+        .build(context).inspect_err(|_|yui::mark("desktop-failed")).expect("MeguLit desktop startup failed").run(|app,event|{if matches!(event,tauri::RunEvent::Exit){app.state::<DesktopState>().window_memory.flush();broker::shutdown();yui::mark("closed");}});
 }

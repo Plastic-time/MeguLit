@@ -116,3 +116,53 @@ test('bridge and UI are wired',()=>{
  assert.match(fs.readFileSync(path.join(__dirname,'../web/app.js'),'utf8'),/openAdaptationOverview\(/);
  assert.match(fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8'),/diagnostics\.css/);
 });
+test('lookup card pins the selected occurrence locally and both diagnostic ZIP builders serialize only allowed mark fields',async t=>{
+ const {root,db}=fixture(t);try{
+ const {Session,read}=require('../services/sentence-marks.cjs'),{Reader}=require('../services/reader.cjs');
+ const session=new Session(),reader={root,gameId:'a',sentenceMarks:session,active:()=>true,v4:Reader.prototype.v4,runtime:{config:()=>({})}};
+ const first=session.observe('a','same:1',{hookSequence:1,scriptCursor:20},'v4.g2');
+ const second=session.observe('a','same:2',{hookSequence:2,scriptCursor:21},'v4.g2');
+ const bridge={},actions=[],nodes=[],window={__tomoyoChinese:bridge,__tomoyoTranslateRequest:raw=>{
+  const {id,action,args}=JSON.parse(raw);actions.push(action);
+  if(action==='markSentence')Reader.prototype.message.call(reader,{type:'v4',id,action,args}).then(v=>bridge.v4Deliver(...v.replies[0].args));
+ }};
+ function element(){const n={dataset:{},append(){},setAttribute(){},querySelector(){return null;}};nodes.push(n);return n;}
+ const document={documentElement:{},head:element(),createElement:element,querySelector:()=>null,querySelectorAll:()=>[]};
+ require('node:vm').runInNewContext(fs.readFileSync(require.resolve('../web/reader/modules/v4.js'),'utf8'),{
+  window,document,setTimeout:()=>1,clearTimeout(){},addEventListener(){},MutationObserver:class{observe(){}}
+ });
+ const card={querySelector:s=>s==='footer'?{before(){}}:null};
+ bridge.decorateWordActions(card,{text:'PRIVATE-TEXT',sentenceMark:{episode:first,translationSource:'cache',translationOrigin:'official',save:'PRIVATE-SAVE',path:root}},{});
+ const mark=nodes.find(n=>n.className==='tomoyo-mark-sentence');assert.ok(mark);
+ Reader.prototype.event.call({...reader,active:()=>true},{type:'sentenceHideObservation',episode:first,original:'visible'});
+ await Reader.prototype.message.call(reader,{type:'sentenceDisplayObservation',episode:first,rect:{x:12,y:23,width:400,height:30},translationSource:'cache',translationOrigin:'official'});
+ assert.equal(session.rows.get(second).original,undefined);
+ await mark.onclick();
+ assert.deepEqual(actions,['load','word','markSentence']);
+ assert.equal(fs.existsSync(path.join(root,'data','diagnostics')),false);
+ session.rows.get(first).original='hidden';
+ session.observe('b','same:1',{hookSequence:1},'v7');
+ assert.throws(()=>session.mark(root,'b',{episode:first}),/EXPIRED/);
+ const snapshot=read(root,'a')[0];assert.equal(snapshot.original,'visible');assert.equal(snapshot.current.scriptCursor,20);
+ assert.equal(snapshot.current.rect.x,12);assert.equal(snapshot.after.sequence,2);assert.equal(snapshot.seedRevision,'v4.g2');assert.equal(snapshot.translationSource,'cache');
+ assert.equal(snapshot.translationOrigin,'official');assert.deepEqual(read(root,'b'),[]);
+ for(const pack of [diag.build(root,db,'a'),diag.buildAll(root,db)]){
+  const data=diag.zipEntries(fs.readFileSync(pack.path)).find(e=>e.name==='sentence-marks.json').data.toString();
+  assert.doesNotMatch(data,/PRIVATE|path|episode|[A-Za-z]:\\/);
+  const report=JSON.parse(data);assert.deepEqual(report.marks||report.games[0].marks,[snapshot]);
+ }
+ }finally{db.close();}
+});
+test('session and marked history stay bounded and serialization revalidates saved fields',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-marks-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const {Session,read}=require('../services/sentence-marks.cjs'),session=new Session();
+ let oldest,latest;
+ for(let i=0;i<110;i++){latest=session.observe('game','line'+i,{hookSequence:i},'private-seed');oldest??=latest;
+  session.mark(root,'game',{episode:latest,translationSource:'private-text',save:'private-save'});}
+ assert.equal(session.rows.size,96);assert.throws(()=>session.mark(root,'game',{episode:oldest}),/EXPIRED/);
+ const dir=path.join(root,'data','sentence-marks'),file=path.join(dir,fs.readdirSync(dir)[0]),raw=JSON.parse(fs.readFileSync(file));
+ raw[0].text=root;raw[0].current.rect={x:0,y:0,width:1,height:1,path:root};fs.writeFileSync(file,JSON.stringify(raw));
+ const marks=read(root,'game');assert.equal(marks.length,24);assert.equal(marks[23].current.sequence,109);
+ assert.equal(marks[23].original,'unknown');assert.equal(marks[23].translationSource,'unknown');assert.equal(marks[23].seedRevision,null);
+ assert.doesNotMatch(JSON.stringify(marks),/private|path|megulit-marks/);
+});

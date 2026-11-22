@@ -55,7 +55,8 @@ class PageText {
     if (best === k.length) {
       if (parts >= 2) return this.ended = true, this.paging = true, { drop: 'page drawn again (' + parts + ' lines)' };
       /* the current line again (its new part, after it was shown joined to the line before) */
-      if (newest && (k.length >= 6 || now - this.recent[lastPart].at < 650)) return this.ended = true, this.paging = true, { drop: 'current line again' };
+      // A repaint of one ADV sentence is not evidence that several sentences share a page
+      if (newest && (k.length >= 6 || now - this.recent[lastPart].at < 650)) return this.ended = true, { drop: 'current line again' };
       /* one earlier line alone again: the current line is another one, and it was shown only a moment ago */
       /* (only the line just before: a game started again from the title shows its first lines again, and they are read) */
       if (lastPart === this.recent.length - 2 && k.length >= 6 && now - this.recent[lastPart].at < REDRAW_MS) return { drop: 'earlier line drawn again' };

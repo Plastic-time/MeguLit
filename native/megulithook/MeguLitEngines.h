@@ -5,6 +5,7 @@
 #include "engine32/ToMeIslandDraw.h"
 #include "MeguLitMatch.h"
 #include "MagesDraw.h" /* engine-draw 2026-11-21: STEINS;GATE takes the generic MAGES draw reader too (opt-in) */
+#include "DanganronpaPc.h"
 namespace megulit_sg_hookmages { bool MAGES(); }
 /* ISLAND (CatSystem2): ISLAND.exe whose whole file has the supported SHA-256 (ToMeIslandDraw::ExactFile) */
 class ToMeIsland : public ENGINE {
@@ -24,4 +25,10 @@ public:
     };
   }
   bool attach_function() override { MagesDraw::Arm(processStartAddress); return megulit_sg_hookmages::MAGES(); }
+};
+/* An explicit private input grant, exact PC executable and exact Japanese resources are required. */
+class ToMeDanganronpaPc : public ENGINE {
+public:
+  ToMeDanganronpaPc() { check_by=CHECK_BY::CUSTOM;check_by_target=[](){return DanganronpaPc::Match();}; }
+  bool attach_function() override { return DanganronpaPc::Install(); }
 };

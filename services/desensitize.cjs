@@ -20,6 +20,7 @@
    verify(original, output) is the gate before anything is uploaded: every character any detector finds in the original
    must be gone from the output at its offset, and the output may contain no text run of its own. */
 const zlib=require('node:zlib');
+const structure=require('./probe-structure.cjs');
 
 const KEPT=new Set([...'「」『』（）【】〔〕〈〉《》、。，．！？…‥―─　・：；～〜']);
 const isHira=c=>c>=0x3041&&c<=0x309f;
@@ -208,23 +209,27 @@ const BLOCK=4096,OPAQUE=7.2;
    compress (E596, 2026-11-14 user: send whole scripts and indexes, placeholders compress to almost nothing): the part
    bytes are gzip-compressed (gzip: base64 of the gzip stream, packed: its size, len: the size it inflates to; read with
    partBytes()). Width is kept: every offset in the sample is the offset in the file. */
-function sample(input,{max=64*1024,tail=0,compress=false}={}){
+function sampleResult(input,{max=64*1024,tail=0,compress=false}={}){
  const buf=Buffer.from(input),take=r=>buf.subarray(r[0],r[1]);
+ const plan=structure.inspect(buf),drop=reason=>({sample:null,reason,structure:plan.kind});
+ if(plan.reason)return drop(plan.reason);
  const ranges=[[0,Math.min(buf.length,max)]];if(tail&&buf.length>max)ranges.push([Math.max(max,buf.length-tail),buf.length]);
  const parts=[],opaque=[];
  for(const r of ranges){const src=Buffer.from(take(r));const out=Buffer.alloc(src.length),dark=new Uint8Array(Math.ceil(src.length/BLOCK));
   for(let at=0,i=0;at<src.length;at+=BLOCK,i++){const blk=src.subarray(at,Math.min(src.length,at+BLOCK)),h=entropy(blk);if(blk.length>=256&&h>OPAQUE){opaque.push({at:r[0]+at,len:blk.length,entropy:Math.round(h*100)/100});dark[i]=1;}}
   let encoding='',best=0;
   for(let i=0;i<dark.length;){if(dark[i]){i++;continue;}let j=i;while(j<dark.length&&!dark[j])j++;const a=i*BLOCK,b=Math.min(src.length,j*BLOCK),seg=src.subarray(a,b);
-   const d=desensitize(seg),v=verify(seg,d.bytes);if(!v.ok)return null;d.bytes.copy(out,a);if(b-a>best){best=b-a;encoding=d.encoding;}i=j;}
+   const d=desensitize(seg),v=verify(seg,d.bytes);if(!v.ok)return drop('VERIFY');d.bytes.copy(out,a);if(b-a>best){best=b-a;encoding=d.encoding;}i=j;}
   parts.push({at:r[0],bytes:out,encoding:encoding||'sjis'});}
  /* 2026-11-19 (runtime-harvest live stand-in, once in many runs under load: 「ぴやがご」 read back out of a sample although
     the kana sweep covers every encoding and offset on its own). Last line: the sample is read the way an outside reader
     would (every decoder below, UTF-16 at both parities); a part that still shows three kana in a row is not shared. */
- if(parts.some(p=>residualKana(p.bytes)))return null;
+ if(parts.some(p=>residualKana(p.bytes)))return drop('VERIFY');
+ const damaged=structure.compare(plan,buf,parts);if(damaged)return drop(damaged);
  const pack=p=>{if(!compress)return {at:p.at,len:p.bytes.length,encoding:p.encoding,base64:p.bytes.toString('base64')};const z=zlib.gzipSync(p.bytes,{level:9});return {at:p.at,len:p.bytes.length,encoding:p.encoding,packed:z.length,gzip:z.toString('base64')};};
- return {size:buf.length,parts:parts.map(pack),opaque,entropy:Math.round(entropy(buf.subarray(0,Math.min(buf.length,1<<20)))*100)/100};
+ return {sample:{size:buf.length,parts:parts.map(pack),opaque,entropy:Math.round(entropy(buf.subarray(0,Math.min(buf.length,1<<20)))*100)/100},reason:null,structure:plan.kind};
 }
+function sample(input,options){return sampleResult(input,options).sample;}
 /* three or more kana in a row (placeholders aside) in any reading an outside reader might try */
 const RESIDUAL_DECODERS=['shift_jis','utf-8','utf-16le','gbk','euc-jp'].map(e=>{try{return new TextDecoder(e);}catch{return null;}}).filter(Boolean);
 const PLACEHOLDER_CHARS=new Set([...'あア亜Ａ０□가ｱĀ啊']);
@@ -277,4 +282,4 @@ function keyCandidates(entries,{limit=8}={}){
  return out.sort((a,b)=>b.confidence-a.confidence).slice(0,limit);
 }
 
-module.exports={kanaSweep,residualKana,desensitize,verify,sample,partBytes,sampleSizes,keyCandidates,maskString,textRuns,detect,targets,entropy,primary,PLACEHOLDER_CPS,KEPT};
+module.exports={kanaSweep,residualKana,desensitize,verify,sample,sampleResult,partBytes,sampleSizes,keyCandidates,maskString,textRuns,detect,targets,entropy,primary,PLACEHOLDER_CPS,KEPT};

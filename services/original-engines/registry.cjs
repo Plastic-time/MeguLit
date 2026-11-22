@@ -19,7 +19,7 @@ const ENGINES=[
  {name:'CatSystem2',hook:true,test:f=>f.has(/^cs2conf\.dll$/i)||(f.has(/\.int$/i)&&f.has(/^cs2.*\.exe$/i))},
  {name:'Artemis',hook:true,test:f=>f.has(/\.pfs(\.\d+)?$/i)},
  /* E578 or a data*.dat / *.lib that opens as a Malie archive (plain LIB / LIBU, or LIBP with one of the known title keys) */
- {name:'Malie',hook:true,test:f=>f.has(/^malie\.ini$/i)||f.has(/\.lib$/i)&&f.has(/^malie.*\.exe$/i)||(f.has(/^data\d*\.dat$|\.lib$/i)||f.sub('data',/^data\d*\.dat$|\.lib$/i))&&require('./malie.cjs').probe(f.dir)},
+ {name:'Malie',hook:true,test:f=>f.has(/^malie\.ini$/i)||f.has(/\.lib$/i)&&f.has(/^malie.*\.exe$/i)||(f.has(/^data\d*\.dat$|\.lib$/i)||f.sub('data',/^data\d*\.dat$|\.lib$/i))&&f.inspect(dir=>require('./malie.cjs').probe(dir))},
  {name:'AdvHD / WillPlus',hook:true,test:f=>f.has(/^rio\.arc$/i)||f.has(/^advhd\.exe$/i)},
  {name:'Kogado (HyPack)',hook:null,test:f=>f.magicAny(/\.pak$/i,'HyPack')},
  {name:'Majiro',hook:true,test:f=>f.has(/^scenario\.arc$/i)&&f.has(/\.arc$/i)},
@@ -50,26 +50,26 @@ const ENGINES=[
  {name:'Nitroplus (NPA)',hook:true,test:f=>f.has(/^(nss|system|cg|sound)\.npa$/i)||f.names.filter(n=>/\.npa$/i.test(n)).length>=2},
  {name:"Ren'Py",hook:true,test:f=>f.has(/^renpy$/i)||f.sub('game',/\.rp[ay]c?$/i)},
  /* E610 F1 bundled assets (web / NW.js / Electron / zip): webbundle.cjs profiles. Before TyranoScript, whose package.nw clause would otherwise claim any NW.js bundle */
- {name:'Visual Novel Maker',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'vnmaker')},
- {name:'Twine / SugarCube',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'twine')},
- {name:'WebGAL',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'webgal')},
- {name:'Monogatari',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'monogatari')},
- {name:'RenJS',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'renjs')},
- {name:'Narrat',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'narrat')},
- {name:'ink (inkle)',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'ink')},
- {name:'Bitsy',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'bitsy')},
- {name:'GB Studio',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'gbstudio')},
- {name:'GDevelop',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'gdevelop')},
- {name:'Construct',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'construct')},
- {name:'Decker',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'decker')},
- {name:'Cocos2d',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'cocos')},
- {name:'LÖVE',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'love')},
- {name:'Defold',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'defold')},
- {name:'Corona / Solar2D',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'solar2d')},
+ {name:'Visual Novel Maker',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'vnmaker'))},
+ {name:'Twine / SugarCube',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'twine'))},
+ {name:'WebGAL',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'webgal'))},
+ {name:'Monogatari',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'monogatari'))},
+ {name:'RenJS',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'renjs'))},
+ {name:'Narrat',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'narrat'))},
+ {name:'ink (inkle)',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'ink'))},
+ {name:'Bitsy',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'bitsy'))},
+ {name:'GB Studio',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'gbstudio'))},
+ {name:'GDevelop',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'gdevelop'))},
+ {name:'Construct',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'construct'))},
+ {name:'Decker',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'decker'))},
+ {name:'Cocos2d',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'cocos'))},
+ {name:'LÖVE',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'love'))},
+ {name:'Defold',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'defold'))},
+ {name:'Corona / Solar2D',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'solar2d'))},
  /* E567 TyranoScript: loose (tyrano/ or index.html beside data/scenario), Electron app.asar whose index names the scenario,
     NW.js package.nw or an executable containing both the Tyrano runtime and scenario */
  {name:'TyranoScript',hook:true,test:f=>f.sub('data',/^scenario$/i)&&(f.has(/^tyrano$/i)||f.has(/^index\.html$/i))||f.sub('resources',/^app\.asar$/i)&&f.peek('resources/app.asar',/data\/scenario|"scenario"/,65536)||f.has(/^package\.nw$/i)&&!f.sub('www',/./)
-    ||tyrano.legacyExeBundles(f.dir,f.names).length>0},
+    ||f.inspect(dir=>tyrano.legacyExeBundles(dir,f.names).length>0)},
  /* E569 engines MeguLit reads but did not recognise (the library showed them as unknown): FAVORITE FVP (<name>.hcb),
     Innocent Grey IGA, Musica PAZ (ぱれっと: scr.dat + sys.dat + st/bg.dat), Bruns (scene/*.bso), HuneX (.hfa),
     Majiro archives under any name */
@@ -81,7 +81,7 @@ const ENGINES=[
  {name:'Majiro',hook:true,test:f=>f.magicAny(/\.arc$/i,'MajiroArcV')},
  /* E569 engines MeguLit did not know at all: named so the library is not "unknown"; text goes through the general hook and
     is confirmed on first play (hook:null) */
- {name:'CMVS (Purple Software)',hook:true,test:f=>f.magicAny(/\.cpz$/i,'CPZ')||require('./cmvs.cjs').packed(f.dir)||f.has(/^cmvs(32|64)\.exe$/i)||f.has(/^cmvs\.cfg$/i)&&f.has(/\.exe$/i)},
+ {name:'CMVS (Purple Software)',hook:true,test:f=>f.magicAny(/\.cpz$/i,'CPZ')||f.inspect(dir=>require('./cmvs.cjs').packed(dir))||f.has(/^cmvs(32|64)\.exe$/i)||f.has(/^cmvs\.cfg$/i)&&f.has(/\.exe$/i)},
  {name:'EAGLS',hook:true,test:f=>f.has(/^eagles\.dll$/i)||f.has(/^scpack\.(pak|idx)$/i)||f.sub('script',/^scpack\.(pak|idx)$/i)},
  {name:'Ikura GDL',hook:null,test:f=>f.magicAny(/^[A-Za-z0-9_]{2,12}$/,'SM2MPX10')},
  {name:"Silky's",hook:null,test:f=>f.magicAny(/\.ifl$/i,'IFLS')||f.has(/^ai[56]win\.exe$/i)},
@@ -94,7 +94,7 @@ const ENGINES=[
  /* E585 no-magic archives are recognised by their index: Tmr-Hiro srp.pac (.pac with a script entry), Interheart .fpk, NekoSDK NEKOPACK4 .pak / 0xCACACA .dat (ADVSCRIPT2) */
  {name:'Tmr-Hiro ADV',hook:null,test:f=>f.probe(/\.pac$/i,p=>require('./tmrhiro.cjs').isPac(p))},
  /* E700 FPD containers (fz engine: Fate/stay night REMASTERED obb/*.bin) */
- {name:'FPD (fz engine)',hook:null,test:f=>require('./fpd.cjs').archives(f.dir).length>0},
+ {name:'FPD (fz engine)',hook:null,test:f=>f.inspect(dir=>require('./fpd.cjs').archives(dir).length>0)},
  {name:'Interheart (FPK)',hook:null,test:f=>f.magicAny(/\.fpk$/i,'FPK 2.00')||f.probe(/\.fpk$/i,p=>require('./interheart.cjs').isArchive(p))},
  {name:'NekoSDK',hook:null,test:f=>f.magicAny(/\.pak$/i,'NEKOPACK4')||f.probe(/\.dat$/i,p=>require('./nekosdk.cjs').isArchive(p))},
  {name:'KaGuYa',hook:null,test:f=>f.has(/\.ari$/i)&&f.has(/\.arc$/i)||f.peek('message.dat',/^\[SCR-MESSAGE\]/,16)||f.peek('params.dat',/^\[SCR-PARAMS\]/,16)||f.magicAny(/\.arc$/i,'WFL1')||f.magicAny(/\.arc$/i,'LINK')},
@@ -108,7 +108,7 @@ const ENGINES=[
  ...require('./plaintext.cjs').RAW.profiles.filter(p=>p.match).map(p=>({name:p.engine,hook:null,test:f=>require('./plaintext.cjs').matches(f,p.id)})),
  /* E660–E669 F4b proprietary engines (research: H:\MeguLit-Work\f4b, notes E660–E669). Readers: Circus (adv32) and Whale
     complete; DDSystem, SystemAoi, KID archive + generic scan. The rest are named from GARbro's archive fingerprints only */
- {name:'Circus (adv32)',hook:null,test:f=>f.sub('advdata',/\.(mes|pck|dat|crx)$|^(mes|grp|dat)$/i)&&require('./circus.cjs').probe(f.dir)||f.has(/\.mes$/i)&&require('./circus.cjs').probe(f.dir)},
+ {name:'Circus (adv32)',hook:null,test:f=>f.sub('advdata',/\.(mes|pck|dat|crx)$|^(mes|grp|dat)$/i)&&f.inspect(dir=>require('./circus.cjs').probe(dir))||f.has(/\.mes$/i)&&f.inspect(dir=>require('./circus.cjs').probe(dir))},
  {name:'Whale',hook:null,test:f=>f.probe(/\.dat$/i,p=>(require('./whale.cjs').list(p)||[]).length>=3,6)},
  {name:'DDSystem',hook:null,test:f=>f.magicAny(/\.dat$/i,'DDP2',8)||f.magicAny(/\.dat$/i,'DDP3',8)},
  {name:'SystemAoi',hook:null,test:f=>f.magicAny(/\.box$/i,'AOIB')||f.magicAny(/\.box$/i,'AOIMY01\0')||f.magicAny(/\.box$/i,'A\0O\0I\0M\0')||f.has(/\.vfs$/i)&&f.magicAny(/\.vfs$/i,'VF')},
@@ -146,7 +146,7 @@ const ENGINES=[
  /* E640–E654 family F4a (round two): engines with public tools or GARbro formats */
  {name:'SLG System',hook:null,test:f=>f.magicAny(/\.szs$/i,'SZS')||f.has(/\.spd$/i)&&f.magicAny(/\.spl$/i,'SFP\0')},
  {name:'STCM2',hook:null,test:f=>f.probe(/\.(dat|bin)$|^[^.]+$/i,p=>require('./stcm2.cjs').isStcm(p),8)},
- {name:'Willadv',hook:null,test:f=>f.has(/\.arc$/i)&&require('./advhd.cjs').engine.sources(f.dir).length>0},
+ {name:'Willadv',hook:null,test:f=>f.has(/\.arc$/i)&&f.inspect(dir=>require('./advhd.cjs').engine.sources(dir).length>0)},
  {name:'Tanuki Engine',hook:null,test:f=>f.magicAny(/\.tac$/i,'TArc')},
  {name:'Yaneurao',hook:null,test:f=>f.magicAny(/\.dat$/i,'yanepk')||f.magicAny(/\.sda$/i,'SQDARC')},
  {name:'Rits',hook:null,test:f=>f.probe(/\.saf$/i,p=>!!require('./archive-scan.cjs').safList(p))},
@@ -184,7 +184,7 @@ const ENGINES=[
  {name:'Unity (Yarn Spinner)',hook:null,test:f=>f.managed(/^YarnSpinner/i)},
  {name:'Unity (Game Creator)',hook:null,test:f=>f.managed(/^GameCreator/i)},
  {name:'Unity (Adventure Creator)',hook:null,test:f=>f.managed(/^AC(\.|Runtime)|AdventureCreator/i)},
- {name:'Unity (Aokana)',hook:null,test:f=>require('./aokana.cjs').probe(f.dir)},
+ {name:'Unity (Aokana)',hook:null,test:f=>f.inspect(dir=>require('./aokana.cjs').probe(dir))},
  {name:'DxLib',hook:true,generic:true,test:f=>f.has(/\.dxa$/i)},
  // Unity games read through LunaHook's Mono/IL2CPP hooks for many, not all, titles: verified on first play.
  // A Unity build keeps <Name>_Data beside <Name>.exe. A folder that only holds something named *_Data (a library
@@ -195,7 +195,7 @@ const ENGINES=[
  {name:'NVLMaker',hook:null,generic:true,test:f=>f.names.some(n=>/nvlmaker/i.test(n))},
  {name:'CloudNovel',hook:null,generic:true,test:f=>f.names.some(n=>/cloudnovel/i.test(n))},
  {name:'HTMLVN',hook:null,generic:true,test:f=>f.names.some(n=>/htmlvn/i.test(n))},
- {name:'HTML5 / Electron / NW.js',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'html5')},
+ {name:'HTML5 / Electron / NW.js',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'html5'))},
 ];
 /* the readers of each engine */
 const READERS={"BGI / Ethornell":["bgi"],
@@ -298,8 +298,9 @@ function listing(dir){let names=[];try{names=fs.readdirSync(dir);}catch{}const c
  const peek=(rel,re,n=4096)=>{try{const fd=fs.openSync(path.join(dir,rel),'r'),b=Buffer.alloc(n);let got;try{got=fs.readSync(fd,b,0,n,0);}finally{fs.closeSync(fd);}return re.test(b.toString('latin1',0,got));}catch{return false;}};
  /* E585 probe: one of the first few files matching re passes a structure check (archives with no magic: Tmr-Hiro .pac, Interheart .fpk, NekoSDK .dat) */
  const probe=(re,check,max=4)=>names.filter(x=>re.test(x)).slice(0,max).some(n=>{try{return !!check(path.join(dir,n));}catch{return false;}});
- return {dir,names,magic,magicAny,peek,probe,managed,has:re=>names.some(n=>re.test(n)),sub:(name,re)=>{const real=names.find(n=>n.toLowerCase()===name.toLowerCase());if(!real)return false;if(!(real in cache))try{cache[real]=fs.readdirSync(path.join(dir,real));}catch{cache[real]=[];}return cache[real].some(n=>re.test(n));}};}
-function engineOf(dir){const f=listing(dir);for(const e of ENGINES)if(e.test(f))return e;return null;}
+ return {dir,names,magic,magicAny,peek,probe,managed,inspect:fn=>fn(dir),has:re=>names.some(n=>re.test(n)),sub:(name,re)=>{const real=names.find(n=>n.toLowerCase()===name.toLowerCase());if(!real)return false;if(!(real in cache))try{cache[real]=fs.readdirSync(path.join(dir,real));}catch{cache[real]=[];}return cache[real].some(n=>re.test(n));}};}
+function identify(f){return ENGINES.find(e=>e.test(f))||null;}
+function engineOf(dir){return identify(listing(dir));}
 /* the readers to try first for a folder: those of the engine the fingerprints name */
 function readersFor(dir){const e=engineOf(dir);return e?e.readers:[];}
-module.exports={ENGINES,READERS,listing,engineOf,readersFor};
+module.exports={ENGINES,READERS,listing,identify,engineOf,readersFor};

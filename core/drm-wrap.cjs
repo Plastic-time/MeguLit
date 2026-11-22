@@ -19,6 +19,7 @@ const RULE=Object.fromEntries(RULES.map(r=>[r.kind,r]));
 const SCAN_MAX=48*1024*1024;
 // Never launchers: installers, uninstallers, settings tools, runtimes.
 const NOT_LAUNCHER=/^(unins|uninstall|setup|install|config|settings?|crash|unitycrashhandler|dxsetup|vc_?redist|dotnet|redist|notification_helper|steamerrorreporter|update|register|7z|python|pythonw)|(卸载|卸載|アンインストール|設定|设置|设定|installer|fontinst)/i;
+const VERSIONED_UPDATER=/updat(?:e(?:r)?|a)[-_. ]?v?\d+(?:[._-]\d+)*\.exe$/i;
 // Crack / translation launcher names (打开游戏.exe, 启动游戏.exe, Loader.exe, *_crack.exe, 2DJGAME.exe).
 /* The player-facing starter (打开游戏.exe) ranks above a crack group's helper (2DJGAME.exe): live test, the helper alone shows 起動エラー(SRP). */
 const LAUNCHER_FIRST=/(打开游戏|打開遊戲|開啟遊戲|开始游戏|開始遊戲|启动游戏|啟動遊戲|游戏启动|ゲーム起動|ゲーム開始|^启动|^起動|^start(game)?$|^play$)/i;
@@ -58,7 +59,7 @@ function classify(dir){
   else if(e.c.kind){role='protected';kind=e.c.kind;reason='text';}
   return {name:e.name,file:e.file,size:e.size,role,kind,reason};});
 }
-const usable=(e,allowTranslated)=>e.role==='clean'&&!NOT_LAUNCHER.test(e.name)&&(allowTranslated||!TRANSLATED_NAME.test(e.name.replace(/\.exe$/i,'')))&&e.size>=20000;
+const usable=(e,allowTranslated)=>e.role==='clean'&&!NOT_LAUNCHER.test(e.name)&&!VERSIONED_UPDATER.test(e.name)&&(allowTranslated||!TRANSLATED_NAME.test(e.name.replace(/\.exe$/i,'')))&&e.size>=20000;
 /* A small clean program beside a protected one starts it (crack / translation launcher); a clean one of about the same
    size is the engine program itself with the protection removed. Named launchers first, then the larger file. */
 function launchersFor(list,target,allowTranslated){
@@ -68,21 +69,32 @@ function launchersFor(list,target,allowTranslated){
 function replacementFor(list,target,allowTranslated){return list.filter(e=>usable(e,allowTranslated)&&e.size>=target.size*.5).sort((a,b)=>b.size-a.size)[0]||null;}
 /* The program to record and the one to start for `exe`. Returns null when nothing about it is wrapped.
    {kind, name:{zh,en,ja}, executable, launchVia, original, wrapped, changed, launcherNames, alternatives} */
-function plan(exe,{allowTranslated=true,source=''}={}){
+function plan(exe,{allowTranslated=true,source='',savedDrm}={}){
  exe=String(exe||'');if(!/\.exe$/i.test(exe)||!stat(exe))return null;
- const dir=path.dirname(exe),list=classify(dir),self=list.find(e=>e.name.toLowerCase()===path.basename(exe).toLowerCase());if(!self)return null;
+ const dir=path.dirname(exe),selected=path.basename(exe);
+ // Repair an old automatic correction only while its original launcher and wrapper still match.
+ if(VERSIONED_UPDATER.test(selected)&&typeof savedDrm?.from==='string'&&typeof savedDrm?.wrapped==='string'&&
+    path.isAbsolute(savedDrm.from)&&path.resolve(path.dirname(savedDrm.from)).toLowerCase()===path.resolve(dir).toLowerCase()){
+  const restored=plan(savedDrm.from,{allowTranslated,source});
+  if(restored&&restored.kind===savedDrm.kind&&path.resolve(restored.wrapped).toLowerCase()===path.resolve(savedDrm.wrapped).toLowerCase()&&
+     restored.ignoredUpdaters?.some(name=>name.toLowerCase()===selected.toLowerCase())){
+   return {...restored,original:exe,changed:true,restoredFromUpdater:true};
+  }
+ }
+ const list=classify(dir),self=list.find(e=>e.name.toLowerCase()===selected.toLowerCase());if(!self)return null;
+ const ignoredUpdaters=list.filter(e=>e.role==='clean'&&VERSIONED_UPDATER.test(e.name)).map(e=>e.name);
  const engines=list.filter(e=>e.role==='protected').sort((a,b)=>b.size-a.size);
  let target=null;
  if(self.role==='protected')target=self;
  else if(self.role==='stub'){const named=engines.find(e=>contents(self.file)?.names.some(n=>n.replace(/_srp\.exe$/,'.exe')===e.name.toLowerCase()));target=named||engines[0]||null;
-  if(!target){const clean=list.filter(e=>usable(e,allowTranslated)).sort((a,b)=>b.size-a.size)[0];const kind=self.kind;return {kind,name:RULE[kind]?.name||RULE.softdenchi.name,original:exe,wrapped:exe,executable:clean?clean.file:exe,launchVia:'',changed:!!clean,launcherNames:[],alternatives:clean?[clean.name]:[]};}}
+  if(!target){const clean=list.filter(e=>usable(e,allowTranslated)).sort((a,b)=>b.size-a.size)[0];const kind=self.kind;return {kind,name:RULE[kind]?.name||RULE.softdenchi.name,original:exe,wrapped:exe,executable:clean?clean.file:exe,launchVia:'',changed:!!clean,launcherNames:[],alternatives:clean?[clean.name]:[],ignoredUpdaters};}}
  else if(engines.length&&self.size<engines[0].size*.5&&usable(self,true)){target=engines[0];
   return {kind:target.kind,name:RULE[target.kind]?.name,original:exe,wrapped:target.file,executable:target.file,launchVia:exe,changed:true,launcherNames:[self.name],alternatives:[]};}
  if(!target)return null;
  // A Steam game is started through Steam, which handles its own DRM.
  if(target.kind==='steam'&&source==='steam')return null;
  const replacement=replacementFor(list,target,allowTranslated),launchers=launchersFor(list,target,allowTranslated);
- const base={kind:target.kind,name:RULE[target.kind]?.name,original:exe,wrapped:target.file,launcherNames:launchers.map(e=>e.name),alternatives:[replacement,...launchers].filter(Boolean).map(e=>e.name)};
+ const base={kind:target.kind,name:RULE[target.kind]?.name,original:exe,wrapped:target.file,launcherNames:launchers.map(e=>e.name),alternatives:[replacement,...launchers].filter(Boolean).map(e=>e.name),ignoredUpdaters};
  if(replacement)return {...base,executable:replacement.file,launchVia:'',changed:true};
  if(launchers.length)return {...base,executable:target.file,launchVia:launchers[0].file,changed:true};
  return {...base,executable:exe,launchVia:'',changed:false};

@@ -13,6 +13,7 @@
   const Q = new URLSearchParams(location.search);
   if (Q.get('prerender') === '1') return;   /* the renderer page runs the real 3D scene instead */
   const view = document.getElementById('view'); if (!view) return;
+  const progressBoot = Q.get('boot') === 'progress';
   const REDUCE = Q.get('reduce') === '1' || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const VBASE = (Q.get('vbase') || 'video/').replace(/\/?$/, '/'), TIMEOUT = +(Q.get('vto') || 8000), FADE = 250, HOLD_MAX = 4;
   const LOOP = { welcome: 'welcome', loc: 'loc', field: 'field', unpack: 'unpack', done: 'done' };
@@ -175,16 +176,18 @@
       v0.addEventListener('error', () => fatal('video decode/load error ' + first.theme + ' intro code=' + (v0.error && v0.error.code)));
       first.el.replaceChild(v0, old); first.vids[0] = v0; first.front = 1; note('adopted-v0', { rs: v0.readyState });
     } else if (v0) v0.remove();
-    /* poster first: a real frame on screen before any video is decoded */
-    first.poster.src = VBASE + first.theme + '/intro.jpg'; first.poster.classList.add('on');
-    /* the poster is a real frame: it replaces the boot screen at once, and the host logs when (cold-start timing) */
-    const posterUp = () => { const b = document.getElementById('boot'); if (b && !b.classList.contains('gone')) { b.classList.add('gone'); setTimeout(() => b.remove(), 800); } mark('poster'); };
-    if (window.__posterAt) marks.poster = window.__posterAt;   /* the static poster in index.html was first */
-    if (first.poster.complete && first.poster.naturalWidth) posterUp(); else first.poster.addEventListener('load', posterUp, { once: true });
+    if (!progressBoot) {
+      /* The legacy entry uses the opening frame while the video decodes. */
+      first.poster.src = VBASE + first.theme + '/intro.jpg'; first.poster.classList.add('on');
+      /* the poster is a real frame: it replaces the boot screen at once, and the host logs when (cold-start timing) */
+      const posterUp = () => { const b = document.getElementById('boot'); if (b && !b.classList.contains('gone')) { b.classList.add('gone'); setTimeout(() => b.remove(), 800); } mark('poster'); };
+      if (window.__posterAt) marks.poster = window.__posterAt;   /* the static poster in index.html was first */
+      if (first.poster.complete && first.poster.naturalWidth) posterUp(); else first.poster.addEventListener('load', posterUp, { once: true });
+    }
     const timer = setTimeout(() => { if (!firstFrame) fatal('no video frame within ' + TIMEOUT + ' ms'); }, TIMEOUT);
     try { await Promise.all(THEMES.map((t) => load(layers[t]).catch((e) => { if (layers[t] === first) throw e; note('manifest-missing', { t, e: e.message }); }))); }
     catch (e) { clearTimeout(timer); fatal(e.message); return; }
-    if (first.man.segments[0] && first.man.segments[0].poster) first.poster.src = url(first, segOf(first, 'intro') ? segOf(first, 'intro').poster : first.man.segments[0].poster);
+    if (!progressBoot && first.man.segments[0] && first.man.segments[0].poster) first.poster.src = url(first, segOf(first, 'intro') ? segOf(first, 'intro').poster : first.man.segments[0].poster);
     GL.ok = true; started = true; note('manifest', { theme: first.theme, draft: !!first.man.draft, segs: first.man.segments.length });
     if (REDUCE) await switchTo('welcome', 'cut'); else await switchTo('intro', 'cut');
     clearTimeout(timer);

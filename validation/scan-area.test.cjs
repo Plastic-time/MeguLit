@@ -10,6 +10,14 @@ test('full-screen text-page games scan the whole window',()=>{
  assert.deepEqual(area({gameProcess:'WoH.exe'}),{scanX:0,scanY:0,scanWidth:100,scanHeight:100});
  assert.deepEqual(area({gameProcess:'BGI.exe'},true),{scanX:0,scanY:0,scanWidth:100,scanHeight:100});
 });
+test('legacy Saya scans its top-aligned page using the bound process name',()=>{
+ const box={x:20,y:76,width:60,height:27};
+ const page={scanX:0,scanY:0,scanWidth:100,scanHeight:100};
+ assert.deepEqual(area(box,false,'saya'),page);
+ assert.deepEqual(apply(box,false,'Saya.exe'),{...box,...page});
+ assert.deepEqual(area(box,false,'Saya_Steam.exe'),area(box));
+ assert.equal(area({...box,scanAuto:false,scanY:42},false,'saya').scanY,42);
+});
 test('turning the automatic area off keeps the hand-set numbers',()=>{
  assert.deepEqual(area({scanAuto:false,scanX:5,scanY:50,scanWidth:90,scanHeight:45,gameProcess:'WoH.exe'}),{scanX:5,scanY:50,scanWidth:90,scanHeight:45});
  assert.equal(apply({type:'configure',x:4,y:70,width:92,height:27}).type,'configure');

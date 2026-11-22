@@ -8,15 +8,16 @@ const W={
  en:{veil:'Adult content · shown when enabled in Settings',tip:'Click to see only this one for now',askTitle:'Are you 18 or older?',askBody:'Adult covers can contain nudity or violence. Turn this on only if you are 18 or older (or of legal age where you live).',yes:'I am 18 or older, turn on',no:'Cancel'},
  ja:{veil:'成人向け · 設定でオンにすると表示',tip:'クリックでこの 1 枚だけ一時的に表示',askTitle:'18 歳以上ですか？',askBody:'成人向けの表紙には露骨な表現や暴力表現が含まれることがあります。18 歳以上（またはお住まいの地域の成人年齢以上）の方だけオンにしてください。',yes:'18 歳以上です。オンにする',no:'キャンセル'}};
 const TAG='#r18';
-const state={on:false,revealed:new Set()};
+const state={on:false,setting:false,revealed:new Set()};
 let words=W.zh,observer=null,timer=0,retries=0,started=false,seeded=false;
 export const nsfwOn=()=>state.on;
 const tagged=src=>typeof src==='string'&&src.endsWith(TAG);
-const veiledSrc=src=>!state.on&&tagged(src)&&!state.revealed.has(src);
+/* Story CGs follow the NSFW switch; the recording filter keeps its existing cover behaviour. */
+const veiledSrc=(src,element)=>!(element?.closest?.('[data-story-nsfw]')?state.setting:state.on)&&tagged(src)&&!state.revealed.has(src);
 /* the picture is veiled: blur + a button with one line; the veil goes away when the picture is shown */
 function mask(img){
  const src=img.getAttribute('src');if(!tagged(src))return;
- const veil=veiledSrc(src);img.classList.toggle('nsfw-masked',veil);
+ const veil=veiledSrc(src,img);img.classList.toggle('nsfw-masked',veil);
  const next=img.nextElementSibling,has=next&&next.classList.contains('nsfw-veil');
  if(!veil){if(has)next.remove();return;}
  if(has)return;
@@ -29,7 +30,7 @@ function mask(img){
 function maskBackground(el){
  const style=el.dataset.nsfwStyle!==undefined?el.dataset.nsfwStyle:el.getAttribute('style')||'';if(!style.includes(TAG))return;
  const m=/url\((?:&quot;|"|')?(data:[^)"']+?#r18)(?:&quot;|"|')?\)/.exec(style);if(!m)return;
- if(veiledSrc(m[1])){if(el.dataset.nsfwStyle===undefined){el.dataset.nsfwStyle=style;el.setAttribute('style',style.replace(/url\([^)]*\)/g,'none'));}}
+ if(veiledSrc(m[1],el)){if(el.dataset.nsfwStyle===undefined){el.dataset.nsfwStyle=style;el.setAttribute('style',style.replace(/url\([^)]*\)/g,'none'));}}
  else if(el.dataset.nsfwStyle!==undefined){el.setAttribute('style',el.dataset.nsfwStyle);delete el.dataset.nsfwStyle;}
 }
 function scan(root){
@@ -38,11 +39,11 @@ function scan(root){
  for(const img of root.querySelectorAll('img'))mask(img);
  for(const el of root.querySelectorAll('[style*="r18"],[data-nsfw-style]'))maskBackground(el);
  /* a veil whose picture was replaced or is shown now goes away */
- for(const v of root.querySelectorAll('.nsfw-veil')){const img=v.previousElementSibling;if(!img||img.tagName!=='IMG'||!veiledSrc(img.getAttribute('src'))){v.remove();img?.classList.remove('nsfw-masked');}}
+ for(const v of root.querySelectorAll('.nsfw-veil')){const img=v.previousElementSibling;if(!img||img.tagName!=='IMG'||!veiledSrc(img.getAttribute('src'),img)){v.remove();img?.classList.remove('nsfw-masked');}}
 }
 async function load(api){
  let s=null;try{s=await api('nsfw_state',{});}catch{s=null;}if(!s||typeof s!=='object')return;
- const was=state.on;state.on=s.on===true;document.documentElement.classList.toggle('nsfw-on',state.on);scan(document);
+ const was=state.on;state.on=s.on===true;state.setting=s.setting===true;document.documentElement.classList.toggle('nsfw-on',state.on);scan(document);
  /* VNDB's ratings arrived after the pictures were drawn: the app draws them again, now tagged */
  if(s.changed&&seeded)dispatchEvent(new Event('megulit-covers-changed'));
  seeded=true;

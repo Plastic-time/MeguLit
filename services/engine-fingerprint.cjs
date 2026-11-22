@@ -23,12 +23,12 @@ const MAGIC_ENGINES=[
  ['SM2MPX10','mpx','ikura'],['IFLS','ifl','silkys'],['Entis\x1a','entis','entis'],['vff\0','vff','livemaker'],['PAC ','softpal-pac','softpal'],
  ['LPK1','lpk','lucifen'],['GAMEDAT PAC','pjadv-pac','pjadv'],['DDP2','ddp','ddsystem'],['DDP3','ddp','ddsystem'],['ESC-ARC','escude-arc','escude'],
  ['HUNEXGGEFA10','hfa','hunex'],['SDTS','sdts','srpg'],['FORM','gamemaker','gamemaker'],['RPA-3.0','rpa','renpy'],['RPA-2.0','rpa','renpy'],
- ['RGSSAD\0','rgssad','rpgmaker'],['WOLF','wolf','wolf-rpg'],['AFAH','afa','system4'],['ALK0','alk','system4'],['VERS','ain','system4'],
+ ['RGSSAD\0','rgssad','rgss'],['WOLF','wolf','wolf-rpg'],['AFAH','afa','system4'],['ALK0','alk','system4'],['VERS','ain','system4'],
  ['ARC2','arc2','advhd'],['HyPack','hypack','kogado'],['ONS2','ons2','nscripter'],['AGAR','wad','spike-chunsoft'],['LINK','kaguya-link','kaguya'],['GPK2','gpk','gpk'],
  ['PACK','qlie-pack','qlie'],['FilePackVer','qlie-pack','qlie'],['EPK ','epk','ethornell'],['DXA','dxa','dxlib'],['AR2','ar2','tenco'],
  ['MRG\0','mrg','mrg'],['NNK','nnk','nnk'],['ARCX','arcx','arcx'],['SNPA','snpa','snpa'],['TCR','tcr','tcr'],
 ];
-const MAGIC_HEX=MAGIC_ENGINES.map(([m,format,engine])=>[Buffer.from(m,'latin1').toString('hex'),format,engine]);
+const MAGIC_HEX=MAGIC_ENGINES.map(([m,format,engine])=>[[...m].map(c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join(''),format,engine]);
 
 /* name rules: [regex on the relative path, engine, resource-only] — resource-only files never hold the script */
 const NAME_ENGINES=[
@@ -38,7 +38,7 @@ const NAME_ENGINES=[
  [/(^|\/)rio\d*\.arc$/i,'advhd',false],[/\.rio(\.\d+)?$/i,'age',false],[/\.rio\.(ici|ruo\d*)$/i,'age',true],[/\.ruo\d*$/i,'age',true],
  [/\.pck$/i,null,false],/* engine from the magic: Leaf Filename / Siglus scene.pck */
  [/(^|\/)scene\.pck$/i,'siglus',false],[/(^|\/)gameexe\.dat$/i,'siglus',false],
- [/\.rpa$/i,'renpy',false],[/\.rgss(ad|2a|3a)$/i,'rpgmaker',false],[/\.wolf$/i,'wolf-rpg',false],[/\.xp3$/i,'kirikiri',false],
+ [/\.rpa$/i,'renpy',false],[/\.rgss(ad|2a|3a)$/i,'rgss',false],[/\.wolf$/i,'wolf-rpg',false],[/\.xp3$/i,'kirikiri',false],
  [/\.ypf$/i,'yu-ris',false],[/\.ain$/i,'system4',false],[/\.(cpz)$/i,'cmvs',false],[/\.iga$/i,'innocent-grey',false],
 ];
 /* markers seen while walking the folder (names only) */

@@ -1,4 +1,8 @@
+import {openPlayReader} from './library-mode.js';
 import './idle-gate.js';
+import {mountOriginalScan} from './original-scan.js';
+import {mountOriginalExecutable,originalLabel} from './game-language.js';
+import {openDiscInstall,discImagePaths,bindDiscDrop} from './disc-install.js';
 import {fitLibraryGrid} from './library-grid-fit.js';
 import {formatDefinition} from './dictionary-format.js';
 import './primary-buttons.js';
@@ -170,6 +174,7 @@ document.addEventListener('focusin',e=>{const t=e.target;if(t?.matches?.('input:
  'off');});
 function setAppearance(preferences=model.preferences){
   locale=['zh','ja','en'].includes(preferences.language)?preferences.language:'zh';text=messages[locale];
+  torchMonument?.invalidateTorchMonument(locale);
   document.documentElement.lang=locales[locale];
   {const theme=preferences.themeMode||'dark',was=document.documentElement.dataset.theme;document.documentElement.dataset.theme=theme;if(was&&was!==theme&&typeof themeBackground==='function')themeBackground();
    }
@@ -235,7 +240,7 @@ function readerNotice(error){const panel=document.querySelector('#reader-notice'
   copy.textContent={zh:'已复制，可粘贴到反馈里',en:'Copied',ja:'コピーしました'}[locale];}catch{}};panel.querySelector('.reader-notice-actions').append(copy);}
 }
 let readerWaits=0;
-async function waitReader(){let state;const deadline=Date.now()+(readerWaits++?20000:45000);do{state=await api('reader_status');if(state.error)throw Error(state.error);
+async function waitReader(){let state;const deadline=Date.now()+(readerWaits++?20000:45000);do{state=await api('reader_status');if(state.libraryOnly)return state;if(state.error)throw Error(state.error);
  if(state.ready){readerNotice('');return state;}await new Promise(resolve=>setTimeout(resolve,120));}while(Date.now()<deadline);throw Error('READER_START_TIMEOUT');
  }
 async function retryReader(button){button.disabled=true;try{await invoke('reader_restart');await waitReader();}catch(error){readerFailures++;readerNotice(error.message||error);
@@ -246,7 +251,7 @@ function shell(){
     <header class="titlebar"><div class="grimoire-glow" aria-hidden="true"></div>
     <img class="brand-logo" src="assets/megulit-logo.svg" alt="MeguLit" width="3424" height="1452" draggable="false">
     <nav class="nav-history" aria-label="${({zh:'页面历史',ja:'ページ履歴',en:'Page history'})[locale]}"><button type="button" class="nav-step" data-nav-step="-1" disabled aria-label="${({zh:'返回上一页',ja:'前のページへ',en:'Back'})[locale]}" title="${({zh:'返回上一页',ja:'前のページへ',en:'Back'})[locale]} (Alt+←)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6.5 9 12l5.5 5.5"/></svg></button><button type="button" class="nav-step" data-nav-step="1" disabled aria-label="${({zh:'前往下一页',ja:'次のページへ',en:'Forward'})[locale]}" title="${({zh:'前往下一页',ja:'次のページへ',en:'Forward'})[locale]} (Alt+→)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6.5 15 12l-5.5 5.5"/></svg></button></nav>
-    <span class="tab-ink" aria-hidden="true"></span>${(tabButton=>`<nav class="top-tabs top-tabs-main" aria-label="MeguLit">${['home','library','history','learning'].map(tabButton).join('')}<span class="top-sep" aria-hidden="true"></span>${['leaderboard','daily'].map(tabButton).join('')}</nav>`)(item=>`<button class="top-tab" data-route="${item}" ${route===item?'aria-current="page"':''}>${item==='daily'?(dailyLabel[locale]||dailyLabel.zh)/* E415 */:item==='tools'?(grimoireWords[locale]||grimoireWords.zh).tools/* E377 */:item==='leaderboard'?(leaderboardLabel[locale]||leaderboardLabel.zh):item==='about'?(aboutLabel[locale]||aboutLabel.zh):text[item]}</button>`)}<div class="bar-tools" id="bar-tools"></div><div class="titlebar-end"><nav class="top-tabs top-tabs-util" aria-label="MeguLit"><button type="button" class="top-tab" data-top-torch>${({zh:'传火碑',ja:'継火の碑',en:'Monument'})[locale]||'传火碑'}</button><button type="button" class="top-tab" data-top-feedback>${({zh:'反馈',ja:'不具合報告',en:'Report'})[locale]||'反馈'}</button><button type="button" class="top-tab" data-top-guide>${({zh:'教程',ja:'チュートリアル',en:'Tutorial'})[locale]||'教程'}</button>${['tools','settings','about'].map(item=>`<button class="top-tab" data-route="${item}" ${route===item?'aria-current="page"':''}>${item==='daily'?(dailyLabel[locale]||dailyLabel.zh)/* E415 */:item==='tools'?(grimoireWords[locale]||grimoireWords.zh).tools/* E377 */:item==='leaderboard'?(leaderboardLabel[locale]||leaderboardLabel.zh):item==='about'?(aboutLabel[locale]||aboutLabel.zh):text[item]}</button>`).join('')}</nav><button type="button" class="top-me" data-top-me aria-label="${({zh:'个人主页',ja:'プロフィール',en:'Profile'})[locale]}" title="${({zh:'个人主页',ja:'プロフィール',en:'Profile'})[locale]}"><span class="leaderboard-avatar is-default" aria-hidden="true"></span><span class="top-me-name">${({zh:'个人主页',ja:'プロフィール',en:'Profile'})[locale]}</span></button><div class="window-actions">${[['minimize','minus'],['maximize','maximize'],['close','close']].map(([action,symbol])=>`<button class="window-action" data-window="${action}" aria-label="${text[action]}" title="${text[action]}">${icon(symbol)}</button>`).join('')}</div></div></header><aside class="reader-notice" id="reader-notice" hidden role="status"><span class="reader-notice-title"></span><div class="reader-notice-actions"><button type="button">${{zh:'重新连接',en:'Reconnect',ja:'再接続'}[locale]}</button></div></aside>
+    <span class="tab-ink" aria-hidden="true"></span>${(tabButton=>`<nav class="top-tabs top-tabs-main" aria-label="MeguLit">${['home','library','history','learning'].map(tabButton).join('')}<span class="top-sep" aria-hidden="true"></span>${['leaderboard','daily','torch'].map(tabButton).join('')}</nav>`)(item=>`<button class="top-tab" data-route="${item}" ${route===item?'aria-current="page"':''}>${item==='torch'?({zh:'传火碑',ja:'継火の碑',en:'Monument'})[locale]:item==='daily'?(dailyLabel[locale]||dailyLabel.zh)/* E415 */:item==='tools'?(grimoireWords[locale]||grimoireWords.zh).tools/* E377 */:item==='leaderboard'?(leaderboardLabel[locale]||leaderboardLabel.zh):item==='about'?(aboutLabel[locale]||aboutLabel.zh):text[item]}</button>`)}<div class="bar-tools" id="bar-tools"></div><div class="titlebar-end"><nav class="top-tabs top-tabs-util" aria-label="MeguLit"><button type="button" class="top-tab" data-top-feedback>${({zh:'反馈',ja:'不具合報告',en:'Report'})[locale]||'反馈'}</button><button type="button" class="top-tab" data-top-guide>${({zh:'教程',ja:'チュートリアル',en:'Tutorial'})[locale]||'教程'}</button>${['tools','settings','about'].map(item=>`<button class="top-tab" data-route="${item}" ${route===item?'aria-current="page"':''}>${item==='daily'?(dailyLabel[locale]||dailyLabel.zh)/* E415 */:item==='tools'?(grimoireWords[locale]||grimoireWords.zh).tools/* E377 */:item==='leaderboard'?(leaderboardLabel[locale]||leaderboardLabel.zh):item==='about'?(aboutLabel[locale]||aboutLabel.zh):text[item]}</button>`).join('')}</nav><button type="button" class="top-me" data-top-me aria-label="${({zh:'个人主页',ja:'プロフィール',en:'Profile'})[locale]}" title="${({zh:'个人主页',ja:'プロフィール',en:'Profile'})[locale]}"><span class="leaderboard-avatar is-default" aria-hidden="true"></span><span class="top-me-name">${({zh:'个人主页',ja:'プロフィール',en:'Profile'})[locale]}</span></button><div class="window-actions">${[['minimize','minus'],['maximize','maximize'],['close','close']].map(([action,symbol])=>`<button class="window-action" data-window="${action}" aria-label="${text[action]}" title="${text[action]}">${icon(symbol)}</button>`).join('')}</div></div></header><aside class="reader-notice" id="reader-notice" hidden role="status"><span class="reader-notice-title"></span><div class="reader-notice-actions"><button type="button">${{zh:'重新连接',en:'Reconnect',ja:'再接続'}[locale]}</button></div></aside>
     <div class="workspace"><div class="stage-cover" aria-hidden="true" hidden><i class="dtv-glyph"></i><span class="stage-marks"><i></i><i></i><i></i><i></i></span></div><main class="main" id="main" tabindex="-1"></main></div></div>`;
   document.querySelectorAll('[data-window]').forEach(button=>button.addEventListener('click',async()=>{try{if(route==='settings')await flushSettings().catch(()=>{
    });if(button.dataset.window==='close'&&model.preferences.closeAsk!==false){const choice=await closeDialog(locale);if(!choice)return;const values={closeToTray:choice.tray};
@@ -258,8 +263,6 @@ function shell(){
   import('./developer.js').then(m=>m.initLibraryDevelopers({api,locale,esc})).catch(()=>{});
   addEventListener('megulit-covers-changed',async()=>{try{model=await api('home');if(['home','library','series'].includes(route)&&!document.querySelector('dialog[open]'))renderRoute();}catch{}});
   document.querySelector('[data-top-feedback]')?.addEventListener('click',()=>openFeedback({api,locale,esc,toast,version:VERSION}));
-  /* 2026-11-21 传火碑: a 3D page, loaded (three.js) only when opened, torn down when closed */
-  document.querySelector('[data-top-torch]')?.addEventListener('click',()=>import('./torch-monument.js').then(m=>m.openTorchMonument({api,locale,esc,toast})).catch(error=>toast(errorMessage(error))));
   if(model.preferences.homeBackground)api('background').then(image=>{if(!backgroundPreview)applyBackground(image);}).catch(()=>{});
   document.querySelector('#reader-notice button').onclick=event=>retryReader(event.currentTarget);
   /* E273 (user: the close button did nothing when maximized): the invisible top-right resize corner sat over the close
@@ -388,7 +391,7 @@ async function startGame(id,button){
  launchInFlight=true;if(button)button.disabled=true;markLaunching(button,true);const tracker=trackLaunch(button,id);
  let started=false,failed=false;
  try{
-  await invoke('reader_open',{background:true});
+  await openPlayReader({api,invoke});
   const result=await api('launch',{id});started=true;await waitReader();
   toast(result.action==='focused'?text.focusDone:result.action==='running'?text.runningDone:text.launchDone);
   /* v1.1.6 (user): launching a game no longer hides the home window; the game is just brought to the front */
@@ -411,11 +414,10 @@ async function startGame(id,button){
    add.onclick=async()=>{add.disabled=true;add.textContent=words[1];try{await api('windows_feature_install',{id});dialog.close();startGame(id,button);}catch{add.disabled=false;
     add.textContent=words[0];const p=dialog.querySelector('p');if(p)p.textContent=words[2];}};
    dialog.querySelector('.dialog-actions').append(add);}
-  if(code==='JAPANESE_EXECUTABLE_REQUIRED'){
-   const {gameLanguageLabel,openGameLanguage}=await import('./game-language.js');
-   if(dialog.open){const choose=document.createElement('button');choose.className='secondary';choose.textContent=gameLanguageLabel(locale);choose.onclick=()=>{dialog.close();
-    openGameLanguage({id,api,invoke,locale,esc,toast,onChanged:async()=>{model=await api('home');renderRoute();}}).catch(()=>toast(text.serviceFailed));};dialog.querySelector('.dialog-actions').append(choose);
-    }
+  if(code==='JAPANESE_EXECUTABLE_REQUIRED'&&dialog.open){
+   const choose=document.createElement('button');choose.className='secondary';choose.textContent=originalLabel(locale);
+   choose.onclick=()=>{dialog.close();japaneseRestore({id,title:model.games.find(game=>game.id===id)?.title,onChanged:async()=>{model=await api('home');renderRoute();}});};
+   dialog.querySelector('.dialog-actions').append(choose);
   }
  }finally{launchInFlight=false;tracker.stop();if(button)button.disabled=false;if(failed&&button)setTimeout(()=>markLaunching(button,false),2600);else{if(button)button.style.setProperty('--lp-progress','1');setTimeout(()=>markLaunching(button,false),button?260:0);}}
 }
@@ -664,7 +666,7 @@ function japaneseRestore(only){
  const w={zh:{title:'日文原版恢复',search:'搜索游戏',nomatch:'没有匹配的游戏',sub:'游戏自带日文数据时，把显示的文字换回日文。会先备份，可以随时还原。请先关闭游戏',pick:'选择游戏',none:'游戏库里没有找到带日文数据的游戏',check:'检测中…',apply:'恢复日文',
   undo:'还原',close:'关闭',working:'处理中…',
   st:{'steam-guide':n=>(lsWords[locale]||lsWords.zh).steam(n),'first-run':n=>(lsWords[locale]||lsWords.zh).firstRun(n),restorable:n=>n.adapter==='overlay-patch'?'这是汉化版（汉化补丁 '+(n.overlays||[]).join('、')+' 覆盖在原版上）。点「恢复日文」会先把汉化补丁移到 MeguLit 的备份文件夹，原版日文就会生效，随时可以还原':n.adapter==='language-switch'?(lsWords[locale]||lsWords.zh).restorable(n):n.adapter==='yuris-update'?'可以恢复：找到汉化补丁 '+n.files+' 个，会移到备份里，游戏改读自带的日文剧本':'可以恢复：'+n.files+' 个文件，'+n.cells.toLocaleString()+' 处文字',applied:n=>n?.adapter==='language-switch'?(lsWords[locale]||lsWords.zh).applied(n):'已经恢复为日文',
-   translated:r=>'这是汉化版启动程序 '+String(r?.executable||'').split(/[/\\]/).pop()+(r?.original?'，日文原版就在同目录：直接启动 '+String(r.original||'').split(/[/\\]/).pop()+' 即可（游戏页的语言里可以切换）':'，同目录没找到日文原版程序；手上有日文原版的话，点「从日文原版导入」选它'),already:r=>r?.executable?'已是日文原版，不需要恢复：直接启动 '+String(r.executable).split(/[\/]/).pop()+' 即可':'已经是日文，不需要恢复',unsupported:()=>'这个游戏按语言分文件存放，暂不支持',none:r=>r?.reason==='NO_JAPANESE_TEXT'?'这份游戏文件里没有日文文本，没有可恢复的内容（Steam 版 CLANNAD 就是这样）。需要自己准备这部作品的日文原版或日文化补丁，然后点「从日文原版导入」选它（压缩包、程序或文件夹都行）'+jpSourceNote():'游戏目录里没有扫描到日文剧本。手上有日文原版的话，可以点「从日文原版导入」手动添加（压缩包、程序或文件夹都行）'+jpSourceNote(),
+   translated:r=>'这是汉化版启动程序 '+String(r?.executable||'').split(/[/\\]/).pop()+(r?.original?'，日文原版就在同目录：直接启动 '+String(r.original||'').split(/[/\\]/).pop()+' 即可（游戏页的语言里可以切换）':'，同目录没找到日文原版程序；手上有日文原版的话，点「从日文原版导入」选它'),unsupported:()=>'这个游戏按语言分文件存放，暂不支持',none:r=>r?.reason==='NO_JAPANESE_TEXT'?'这份游戏文件里没有日文文本，没有可恢复的内容（Steam 版 CLANNAD 就是这样）。需要自己准备这部作品的日文原版或日文化补丁，然后点「从日文原版导入」选它（压缩包、程序或文件夹都行）'+jpSourceNote():'快速检测暂未确认日文剧本，可以先点「扫描游戏文件夹」进一步检查；也可以从已有的日文原版导入（压缩包、程序或文件夹都行）'+jpSourceNote(),
    missing:()=>'找不到游戏目录','translated-only':()=>'这是纯汉化包，里面没有日文文字，没法恢复。请安装日文原版'+jpSourceNote(),importable:()=>'这是纯汉化包，里面没有日文文字。有日文原版的话，点「从日文原版导入」选择原版的启动程序，会把原版剧本导进来（先备份，可以还原）'+jpSourceNote(),
    imported:()=>'已从日文原版导入剧本'},
   done:n=>'已恢复 '+n.applied+' 个文件',undone:n=>n.skipped.length?'已还原 '+n.restored+' 个，'+n.skipped.length+' 个文件被游戏更新改过，保留未动':'已还原 '+n.restored+' 个文件',import:'从日文原版导入',
@@ -673,7 +675,7 @@ function japaneseRestore(only){
   en:{title:'Restore Japanese original',search:'Search games',nomatch:'No matching game',sub:'When a game ships its Japanese text, switch the displayed text back to Japanese. Backed up first; undo any time. Close the game first',
    pick:'Game',none:'No game in the library ships Japanese data',check:'Checking…',apply:'Restore Japanese',undo:'Undo',close:'Close',working:'Working…',
   st:{'steam-guide':n=>(lsWords[locale]||lsWords.zh).steam(n),'first-run':n=>(lsWords[locale]||lsWords.zh).firstRun(n),restorable:n=>n.adapter==='overlay-patch'?'This is a Chinese build (the patch '+(n.overlays||[]).join(', ')+' lies over the Japanese release). Restore Japanese moves the patch into the MeguLit backup folder so the Japanese release shows again; undo any time':n.adapter==='language-switch'?(lsWords[locale]||lsWords.zh).restorable(n):n.adapter==='yuris-update'?'Restorable: '+n.files+' Chinese patch archive(s) will be moved to the backup so the game reads its own Japanese scripts':'Restorable: '+n.files+' files, '+n.cells.toLocaleString()+' strings',
-   applied:n=>n?.adapter==='language-switch'?(lsWords[locale]||lsWords.zh).applied(n):'Restored to Japanese',translated:r=>'This is a Chinese translation launcher ('+String(r?.executable||'').split(/[/\\]/).pop()+(r?.original?'). The Japanese original is in the same folder: start '+String(r.original||'').split(/[/\\]/).pop()+' (switch it under the game page language)':'). No Japanese launcher in its folder; if you have the Japanese original, use Import from Japanese original'),already:r=>r?.executable?'Already the Japanese original, nothing to restore: just start '+String(r.executable).split(/[\/]/).pop():'Already Japanese',unsupported:()=>'This game stores each language in separate files; not supported yet',none:r=>r?.reason==='NO_JAPANESE_TEXT'?'These game files contain no Japanese text, so there is nothing to restore (the Steam CLANNAD is like this). Get the Japanese release or Japanese patch of this game yourself, then choose Import from Japanese release and pick it (archive, program or folder)'+jpSourceNote():'No Japanese script was found in the game folder. If you have the Japanese release, add it by hand with Import from Japanese release (an archive, the program or a folder all work)'+jpSourceNote(),
+   applied:n=>n?.adapter==='language-switch'?(lsWords[locale]||lsWords.zh).applied(n):'Restored to Japanese',translated:r=>'This is a Chinese translation launcher ('+String(r?.executable||'').split(/[/\\]/).pop()+(r?.original?'). The Japanese original is in the same folder: start '+String(r.original||'').split(/[/\\]/).pop()+' (switch it under the game page language)':'). No Japanese launcher in its folder; if you have the Japanese original, use Import from Japanese original'),unsupported:()=>'This game stores each language in separate files; not supported yet',none:r=>r?.reason==='NO_JAPANESE_TEXT'?'These game files contain no Japanese text, so there is nothing to restore (the Steam CLANNAD is like this). Get the Japanese release or Japanese patch of this game yourself, then choose Import from Japanese release and pick it (archive, program or folder)'+jpSourceNote():'The quick check could not confirm a Japanese script. Try Scan game folder for a deeper check, or import an existing Japanese release (archive, program or folder)'+jpSourceNote(),
    missing:()=>'Game folder not found','translated-only':()=>'This is a Chinese-only package with no Japanese text to restore. Install the Japanese release',importable:()=>'This is a Chinese-only package with no Japanese text. If you have the Japanese release, choose Import from Japanese release and pick its game program; its script files are copied in (backed up, can be undone)',
    imported:()=>'Script imported from the Japanese release'},
   done:n=>'Restored '+n.applied+' files',undone:n=>n.skipped.length?'Undid '+n.restored+'; '+n.skipped.length+' files changed by a game update were left alone':'Undid '+n.restored+' files',
@@ -684,7 +686,7 @@ function japaneseRestore(only){
   ja:{title:'日本語原版に戻す',search:'ゲームを検索',nomatch:'一致するゲームがありません',sub:'ゲームに日本語データが入っている場合、表示テキストを日本語に戻します。先にバックアップし、いつでも元に戻せます。先にゲームを閉じてください',pick:'ゲーム',none:'日本語データを含むゲームが見つかりません',
    check:'確認中…',apply:'日本語に戻す',undo:'元に戻す',close:'閉じる',working:'処理中…',
   st:{'steam-guide':n=>(lsWords[locale]||lsWords.zh).steam(n),'first-run':n=>(lsWords[locale]||lsWords.zh).firstRun(n),restorable:n=>n.adapter==='overlay-patch'?'中国語版です（中国語パッチ '+(n.overlays||[]).join('、')+' が日本語版に上書きされています）。「日本語に戻す」でパッチを MeguLit のバックアップへ移し、日本語版が表示されます。いつでも元に戻せます':n.adapter==='language-switch'?(lsWords[locale]||lsWords.zh).restorable(n):n.adapter==='yuris-update'?'復元できます：中国語パッチ '+n.files+' 個をバックアップへ移し、ゲーム本来の日本語スクリプトを読ませます':'復元できます：'+n.files+' ファイル、'+n.cells.toLocaleString()+' 箇所',
-   applied:n=>n?.adapter==='language-switch'?(lsWords[locale]||lsWords.zh).applied(n):'日本語に戻してあります',translated:r=>'中国語訳の起動プログラムです（'+String(r?.executable||'').split(/[/\\]/).pop()+(r?.original?'）。日本語版は同じフォルダにあります：'+String(r.original||'').split(/[/\\]/).pop()+' を起動してください':'）。同じフォルダに日本語版が見つかりません。日本語版をお持ちなら「日本語版から取り込む」で選んでください'),already:r=>r?.executable?'すでに日本語版です。復元は不要で、'+String(r.executable).split(/[\/]/).pop()+' を起動するだけです':'すでに日本語です',unsupported:()=>'言語ごとにファイルが分かれているため、まだ対応していません',none:r=>r?.reason==='NO_JAPANESE_TEXT'?'このゲームファイルには日本語テキストが入っていないため、復元できる内容がありません（Steam 版 CLANNAD など）。この作品の日本語版か日本語化パッチを用意し、「日本語版から取り込む」で選んでください（圧縮ファイル・実行ファイル・フォルダのいずれも可）'+jpSourceNote():'ゲームフォルダに日本語のスクリプトが見つかりませんでした。日本語版をお持ちなら「日本語版から取り込む」で手動で追加できます（圧縮ファイル・実行ファイル・フォルダのいずれも可）'+jpSourceNote(),
+   applied:n=>n?.adapter==='language-switch'?(lsWords[locale]||lsWords.zh).applied(n):'日本語に戻してあります',translated:r=>'中国語訳の起動プログラムです（'+String(r?.executable||'').split(/[/\\]/).pop()+(r?.original?'）。日本語版は同じフォルダにあります：'+String(r.original||'').split(/[/\\]/).pop()+' を起動してください':'）。同じフォルダに日本語版が見つかりません。日本語版をお持ちなら「日本語版から取り込む」で選んでください'),unsupported:()=>'言語ごとにファイルが分かれているため、まだ対応していません',none:r=>r?.reason==='NO_JAPANESE_TEXT'?'このゲームファイルには日本語テキストが入っていないため、復元できる内容がありません（Steam 版 CLANNAD など）。この作品の日本語版か日本語化パッチを用意し、「日本語版から取り込む」で選んでください（圧縮ファイル・実行ファイル・フォルダのいずれも可）'+jpSourceNote():'簡易確認では日本語スクリプトを確認できませんでした。「ゲームフォルダをスキャン」で詳しく調べるか、お持ちの日本語版を取り込んでください（圧縮ファイル・実行ファイル・フォルダのいずれも可）'+jpSourceNote(),
    missing:()=>'ゲームフォルダが見つかりません','translated-only':()=>'中国語だけのパッケージで、日本語テキストが入っていません。日本語版をインストールしてください'+jpSourceNote(),importable:()=>'中国語だけのパッケージで、日本語テキストが入っていません。日本語版があれば「日本語版から取り込む」で実行ファイルを選ぶと、シナリオを取り込みます（バックアップあり、元に戻せます）',
    imported:()=>'日本語版からシナリオを取り込みました'},
   done:n=>n.applied+' ファイルを戻しました',undone:n=>n.skipped.length?n.restored+' ファイルを戻しました。更新で変わった '+n.skipped.length+' ファイルはそのままです':n.restored+' ファイルを元に戻しました',import:'日本語版から取り込む',
@@ -692,23 +694,63 @@ function japaneseRestore(only){
    IMPORT_SOURCE_NO_SCRIPT:'シナリオファイル（nss.npa）がありません。完全な日本語版を選んでください',IMPORT_EXE_CONFLICT:'同じ名前の別の実行ファイルがあるため取り込みませんでした',IMPORT_FILE_TOO_LARGE:'ファイルが大きすぎるため取り込みませんでした',
    GAME_RUNNING:'ゲームが起動中です。先に閉じてください',NOTHING_TO_RESTORE:'戻す内容がありません',NOT_APPLIED:'まだ戻していません'}}};
  const t=w[locale]||w.zh;
- const d=modal(`<header class="jr-head"><span class="jr-eyebrow">${({zh:'工具',en:'Tool',ja:'ツール'})[locale]||'工具'}</span><h2>${t.title}</h2>${only?`<p class="jr-game">${esc(only.title||'')}</p>`:`<p class="settings-help">${t.sub}</p>`}</header><p class="tool-key-note">${only?(({zh:'Steam 上只显示中文 / 英文的游戏，要先在这里恢复日文',en:'Steam games that only show Chinese or English need this first',ja:'Steam 版で中国語・英語しか出ないゲームは先にここで戻してください'})[locale]||''):(({zh:'在 Steam 买的、只显示中文 / 英文的游戏（比如 Key 社的 Summer Pockets），一定要先运行这个工具，否则 MeguLit 读到的是中文或英文，用不了',en:'Games bought on Steam that only show Chinese or English (such as Key’s Summer Pockets) must go through this tool first, otherwise MeguLit only gets the translated text',ja:'Steam 版で中国語・英語しか表示されないゲーム（Key の Summer Pockets など）は、先にこのツールを実行してください。実行しないと翻訳文しか取得できません'})[locale]||'')}</p><div data-jr-body><p class="muted">${t.check}</p></div><div class="dialog-actions"><button type="button" class="secondary jr-close" data-jr-close>${t.close}</button><button type="button" class="secondary" data-jr-undo hidden>${t.undo}</button><button type="button" class="primary" data-jr-import hidden>${t.import}</button><button type="button" class="secondary" data-jr-steam hidden>${(lsWords[locale]||lsWords.zh).open}</button><button type="button" class="primary" data-jr-apply hidden>${t.apply}</button></div>`);
+ const d=modal(`<header class="jr-head">${only?'':`<span class="jr-eyebrow">${({zh:'工具',en:'Tool',ja:'ツール'})[locale]||'工具'}</span>`}<h2 id="jr-title">${only?originalLabel(locale):t.title}</h2>${only?`<p class="jr-game">${esc(only.title||'')}</p>`:`<p class="settings-help">${t.sub}</p>`}</header><p class="tool-key-note">${only?(({zh:'Steam 上只显示中文 / 英文的游戏，要先在这里恢复日文',en:'Steam games that only show Chinese or English need this first',ja:'Steam 版で中国語・英語しか出ないゲームは先にここで戻してください'})[locale]||''):(({zh:'在 Steam 买的、只显示中文 / 英文的游戏（比如 Key 社的 Summer Pockets），一定要先运行这个工具，否则 MeguLit 读到的是中文或英文，用不了',en:'Games bought on Steam that only show Chinese or English (such as Key’s Summer Pockets) must go through this tool first, otherwise MeguLit only gets the translated text',ja:'Steam 版で中国語・英語しか表示されないゲーム（Key の Summer Pockets など）は、先にこのツールを実行してください。実行しないと翻訳文しか取得できません'})[locale]||'')}</p><div data-jr-body><p class="muted">${t.check}</p></div><div class="dialog-actions"><button type="button" class="secondary jr-close" data-jr-close>${t.close}</button><button type="button" class="secondary" data-jr-undo hidden>${t.undo}</button><button type="button" class="primary" data-jr-import hidden>${t.import}</button><button type="button" class="secondary" data-jr-steam hidden>${(lsWords[locale]||lsWords.zh).open}</button><button type="button" class="primary" data-jr-apply hidden>${t.apply}</button></div>`);
+ d.setAttribute('aria-labelledby','jr-title');
  d.classList.add('jr-dialog'); /* E271 (user: the window behind the tool card needs the same care) */
- d.showModal();d.querySelector('[data-jr-close]').onclick=()=>d.close();
- let lastState='';const body=d.querySelector('[data-jr-body]'),applyBtn=d.querySelector('[data-jr-apply]'),undoBtn=d.querySelector('[data-jr-undo]'),importBtn=d.querySelector('[data-jr-import]'),steamBtn=d.querySelector('[data-jr-steam]');
+ d.showModal();d.querySelector('[data-jr-close]').onclick=()=>void closeOwned();
+ const body=d.querySelector('[data-jr-body]'),applyBtn=d.querySelector('[data-jr-apply]'),undoBtn=d.querySelector('[data-jr-undo]'),importBtn=d.querySelector('[data-jr-import]'),steamBtn=d.querySelector('[data-jr-steam]');
   let id='';
- const fail=e=>{const c=typeof e==='string'?e:e?.message;toast(t.errs[c]||errorMessage(e));};
+ let scanFlow=null,legacyBusy=0,closing=false,detailChanged=false;
+ const program=document.createElement('section');program.className='jr-program';
+ if(only)d.insertBefore(program,body);
+ async function restoreChanged(){
+  if(!only)return;
+  detailChanged=true;
+  await only.onActivity?.();
+ }
+ const slot=document.createElement('div');slot.dataset.jrFolderScan='';d.insertBefore(slot,d.querySelector('.dialog-actions'));
+ const refreshLocks=()=>{const busy=!!scanFlow?.busy()||legacyBusy>0;for(const b of [applyBtn,undoBtn,importBtn,steamBtn])b.disabled=busy;
+  body.querySelectorAll('.jr-grid button,.jr-import button,[data-jr-auto-off],[data-jr-auto-undo]').forEach(b=>{b.disabled=busy;});slot.inert=legacyBusy>0;program.inert=busy;};
+ const restoreApi=async(action,params)=>{
+  if(['jp_restore_detect','jp_restore_list','jp_auto_status','home'].includes(action))return api(action,params);
+  if(!d.open||legacyBusy||scanFlow?.busy()||params?.id!==id)throw Error('ORIGINAL_SCAN_BUSY');
+  if(['jp_restore_apply','jp_restore_undo'].includes(action))return scanFlow.runExisting(action,params);
+  legacyBusy++;refreshLocks();
+  try{
+   const result=await api(action,params);
+   if(['jp_import_apply','jp_auto_undo'].includes(action))await restoreChanged();
+   return result;
+  }finally{legacyBusy--;refreshLocks();}
+ };
+ async function closeOwned(){if(closing||legacyBusy||!scanFlow?.canClose())return;closing=true;
+  const complete=await scanFlow.dispose();if(complete)d.close();else{closing=false;fail(Error('ORIGINAL_SCAN_CLEANUP_INCOMPLETE'));}}
+ d.addEventListener('cancel',event=>{event.preventDefault();void closeOwned();});
+ d.addEventListener('click',event=>{if(event.target!==d)return;const r=d.getBoundingClientRect();if(event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom)return;
+  event.preventDefault();event.stopImmediatePropagation();void closeOwned();},true);
+ d.addEventListener('click',event=>{if((scanFlow?.busy()||legacyBusy)&&event.target.closest?.('[data-jr-import-panel],[data-jr-auto-undo],[data-jr-auto-off]')){event.preventDefault();event.stopImmediatePropagation();}},true);
+ d.addEventListener('close',()=>{void scanFlow?.dispose();if(detailChanged)Promise.resolve(only.onChanged?.()).catch(()=>fail(Error('ORIGINAL_SCAN_REFRESH_FAILED')));},{once:true});
+ scanFlow=mountOriginalScan(slot,{api,locale,onState:()=>refreshLocks(),onRefreshError:code=>fail(Error(code)),onApplied:async()=>{await restoreChanged();model=await api('home');await show();refreshLocks();}});
+
+ const fail=e=>{const c=typeof e==='string'?e:e?.message;toast(t.errs[c]||launchReason(c,locale)||errorMessage(e));};
  /* E328 the files moved aside were the translation patch: say when zero-latency translation now uses it */
  const zeroNote=r=>r?.patch?({zh:'；被换下的汉化补丁已用作零延迟翻译',en:'; the translation patch that was moved aside now gives zero-latency translation',ja:'。外した中国語パッチをゼロ遅延翻訳に使います'})[locale]||'':'';
- const show=async()=>{applyBtn.hidden=undoBtn.hidden=importBtn.hidden=steamBtn.hidden=true;const status=body.querySelector('[data-jr-status]');status.dataset.state='checking';status.textContent=t.check;
-  try{const r=await api('jp_restore_detect',{id});status.dataset.state=t.st[r.state]?r.state:'none';status.textContent=(t.st[r.state]||t.st.none)(r);applyBtn.hidden=r.state!=='restorable';steamBtn.hidden=!(r.adapter==='language-switch'&&r.appid&&(r.state==='steam-guide'||r.mode==='steam'));
-   undoBtn.hidden=r.state!=='applied'&&r.state!=='imported';lastState=r.state;jpAutoLine(status,id,show);importBtn.hidden=['imported','applied'].includes(r.state)||r.adapter==='language-switch';}catch(e){status.dataset.state='';
-   status.textContent='';fail(e);}};
- const run=async(action,button,message)=>{applyBtn.disabled=undoBtn.disabled=true;const label=button.textContent;button.textContent=t.working;
-  try{const r=await api(action,{id});toast(message(r)+zeroNote(r));}catch(e){fail(e);}finally{button.textContent=label;applyBtn.disabled=undoBtn.disabled=false;
+ const show=async()=>{const expected=id;if(!d.open)return;applyBtn.hidden=undoBtn.hidden=importBtn.hidden=steamBtn.hidden=true;const status=body.querySelector('[data-jr-status]');status.dataset.state='checking';status.textContent=t.check;
+  try{const r=await restoreApi('jp_restore_detect',{id});if(!d.open||id!==expected)return;status.dataset.state=t.st[r.state]?r.state:'none';status.textContent=(t.st[r.state]||t.st.none)(r);
+   if(r.chinese){
+    const c=r.chinese;
+    const note=c.conflict?launchReason('SIGLUS_BACKUP_CONFLICT',locale):!c.body?launchReason('SIGLUS_CHINESE_STORY_MISSING',locale):
+     ({zh:`已核实中文正文 ${c.body}/${c.bodyTotal}，选项 ${c.choice}/${c.choiceTotal}`,en:`Verified Chinese dialogue ${c.body}/${c.bodyTotal}, choices ${c.choice}/${c.choiceTotal}`,ja:`確認済みの中国語本文 ${c.body}/${c.bodyTotal}、選択肢 ${c.choice}/${c.choiceTotal}`})[locale];
+    status.textContent+=' '+note;
+   }
+   applyBtn.hidden=r.state!=='restorable';steamBtn.hidden=!(r.adapter==='language-switch'&&r.appid&&(r.state==='steam-guide'||r.mode==='steam'));
+   const canUndo=['imported','applied','applied-unverified'].includes(r.state);
+   undoBtn.hidden=!canUndo;jpAutoLine(status,id,show,restoreApi,()=>d.open&&id===expected,refreshLocks);
+   importBtn.hidden=canUndo||r.adapter==='language-switch'&&!['language-unverified','language-setting','already','first-run'].includes(r.state);}catch(e){if(id===expected&&d.open){status.dataset.state='';status.textContent='';fail(e);}}finally{refreshLocks();}};
+ const run=async(action,button,message)=>{if(scanFlow.busy()||legacyBusy)return;applyBtn.disabled=undoBtn.disabled=true;const label=button.textContent;button.textContent=t.working;
+  try{const r=await restoreApi(action,{id});toast(message(r)+zeroNote(r));}catch(e){fail(e);}finally{button.textContent=label;refreshLocks();
    show();}};
  applyBtn.onclick=()=>run('jp_restore_apply',applyBtn,r=>r?.mode?(lsWords[locale]||lsWords.zh).done(r):t.done(r));
- steamBtn.onclick=()=>api('jp_restore_steam',{id}).catch(fail);
+ steamBtn.onclick=()=>restoreApi('jp_restore_steam',{id}).catch(fail);
  /* E280: Chinese-only package, the user picks the Japanese original's program and its script archives are copied in */
  /* E327 import from a Japanese original the user already has: an archive (zip/7z/rar), its game program or its folder.
     The files to swap are listed first; nothing is written until the user confirms. Nitroplus Chinese-only packages keep
@@ -718,7 +760,7 @@ function japaneseRestore(only){
   list:'查看文件列表',confirm:'确认导入',cancel:'取消',done:n=>'已导入：替换 '+n.replaced+' 个，新增 '+n.added+' 个，移走 '+n.removed+' 个',kinds:{replace:'替换',add:'新增',remove:'移到备份'},errs:{
   IMPORT_SOURCE_NO_MATCH:'没在里面找到这个游戏的文件，请确认选的是同一部作品的日文原版',IMPORT_SAYA_NEEDS_PAK:'Steam 版沙耶之歌要从 2003 年日文原版移植剧本：请选原版文件夹（里面有 script.pak 和 saya.exe）或它的压缩包',SAYA_VERIFY_HASH:'生成的日文剧本校验失败，游戏文件没有改动',
   RESTORE_HASH_MISMATCH:'还原后的 script.npk 和备份的原文件不一致，请勿启动游戏并反馈',IMPORT_DISC_UNREADABLE:'读不出这个光盘镜像的内容，可以先用虚拟光驱挂载后选里面的文件夹',IMPORT_DISC_INSTALLER:'这张光盘里是安装程序，请先安装游戏再选安装好的文件夹',
-  IMPORT_DISC_IMAGE:'这是光盘镜像（bin / cue / iso 等），里面是安装程序，不是游戏本体。请先用虚拟光驱挂载（iso 可以直接双击）并安装游戏，再在这里选安装好的文件夹或游戏程序',IMPORT_SOURCE_TYPE:'请选择压缩包（zip / 7z / rar）、游戏程序或文件夹',
+  IMPORT_DISC_IMAGE:'这是光盘镜像，请选择镜像文件进入挂载安装流程，装好后再选择游戏目录',IMPORT_SOURCE_TYPE:'请选择压缩包（zip / 7z / rar）、游戏程序或文件夹',
   IMPORT_SOURCE_MISSING:'找不到选择的文件',IMPORT_EXTRACT_FAILED:'解压失败（可能有密码或文件损坏），可以先自己解压，再选解压后的文件夹',IMPORT_TOO_LARGE:'需要新增的文件超过 4 GB，看起来不是同一个游戏，没有导入',IMPORT_TOO_MANY_FILES:'文件太多，看起来选的不是单个游戏',
   NOTHING_TO_IMPORT:'日文原版和现在的文件一样，不需要导入',ALREADY_IMPORTED:'已经导入过，先还原再重新导入'}},
   en:{lead:'Pick the Japanese release you have: a downloaded archive (zip / 7z / rar), its game program, or its unpacked folder. MeguLit lists the files to swap first and only replaces them after you confirm; every replaced file is backed up and can be undone'+jpSourceNote(),
@@ -728,7 +770,7 @@ function japaneseRestore(only){
    add:'add',remove:'move aside'},errs:{IMPORT_SOURCE_NO_MATCH:'No files of this game were found there; pick the Japanese release of the same title',IMPORT_SAYA_NEEDS_PAK:'Steam The Song of Saya takes its Japanese script from the 2003 release: pick that folder (with script.pak and saya.exe) or its archive',
    SAYA_VERIFY_HASH:'The generated Japanese script failed its check; game files were not changed',RESTORE_HASH_MISMATCH:'The restored script.npk does not match the backed-up original; do not start the game and report this',
    IMPORT_DISC_UNREADABLE:'This disc image could not be read; mount it with a virtual drive and pick the folder inside',IMPORT_DISC_INSTALLER:'This disc holds an installer; install the game first and pick the installed folder',
-   IMPORT_DISC_IMAGE:'This is a disc image (bin / cue / iso and similar) holding an installer, not the game. Mount it with a virtual drive (an iso opens with a double-click), install the game, then pick the installed folder or game program here',
+   IMPORT_DISC_IMAGE:'Choose the disc image to mount it and open its installer, then select the installed game folder',
    IMPORT_SOURCE_TYPE:'Pick an archive (zip / 7z / rar), the game program or a folder',IMPORT_SOURCE_MISSING:'The selected file was not found',IMPORT_EXTRACT_FAILED:'Could not unpack (password or damaged archive); unpack it yourself and pick the folder',
    IMPORT_TOO_LARGE:'More than 4 GB would be added, which does not look like the same game; nothing imported',IMPORT_TOO_MANY_FILES:'Too many files; that does not look like a single game',
    NOTHING_TO_IMPORT:'The Japanese release matches the current files; nothing to import',ALREADY_IMPORTED:'Already imported; undo first to import again'}},
@@ -737,34 +779,52 @@ function japaneseRestore(only){
    list:'ファイル一覧',confirm:'取り込む',cancel:'キャンセル',done:n=>'取り込み完了：置き換え '+n.replaced+'、追加 '+n.added+'、移動 '+n.removed,kinds:{replace:'置き換え',add:'追加',remove:'移動'},errs:{
    IMPORT_SOURCE_NO_MATCH:'このゲームのファイルが見つかりません。同じ作品の日本語版を選んでください',IMPORT_SAYA_NEEDS_PAK:'Steam 版『沙耶の唄』は 2003 年の日本語版からシナリオを移植します。script.pak と saya.exe のあるフォルダかその圧縮ファイルを選んでください',
    SAYA_VERIFY_HASH:'生成した日本語シナリオの検証に失敗しました。ゲームファイルは変更していません',RESTORE_HASH_MISMATCH:'復元した script.npk がバックアップの元ファイルと一致しません。ゲームを起動せず報告してください',IMPORT_DISC_UNREADABLE:'このディスクイメージを読めません。仮想ドライブでマウントして中のフォルダを選んでください',
-   IMPORT_DISC_INSTALLER:'このディスクはインストーラーです。先にインストールしてからインストール先のフォルダを選んでください',IMPORT_DISC_IMAGE:'これはディスクイメージ（bin / cue / iso など）で、中身はインストーラーです。仮想ドライブでマウントして（iso はダブルクリックで開けます）インストールしてから、インストール先のフォルダか実行ファイルを選んでください',
+   IMPORT_DISC_INSTALLER:'このディスクはインストーラーです。先にインストールしてからインストール先のフォルダを選んでください',IMPORT_DISC_IMAGE:'ディスクイメージを選んでマウントとインストールを進め、完了後にゲームのフォルダーを選んでください',
    IMPORT_SOURCE_TYPE:'圧縮ファイル（zip / 7z / rar）、実行ファイル、フォルダのいずれかを選んでください',IMPORT_SOURCE_MISSING:'選択したファイルが見つかりません',IMPORT_EXTRACT_FAILED:'展開できませんでした（パスワード付きか破損）。先に展開してフォルダを選んでください',
    IMPORT_TOO_LARGE:'追加が 4 GB を超えるため、同じゲームではなさそうです。取り込みませんでした',IMPORT_TOO_MANY_FILES:'ファイルが多すぎます。単体のゲームではなさそうです',NOTHING_TO_IMPORT:'日本語版と現在のファイルが同じため、取り込む必要はありません',
    ALREADY_IMPORTED:'取り込み済みです。元に戻してから再度取り込んでください'}}})[locale]||null;
- const IWD=iw||{};Object.assign(t.errs,IWD.errs||{});
+ const archiveWords=({
+  zh:{lead:'也可选择未加密的 Nitroplus .npa，或仅含这一个档案的 ZIP。必须与当前版本的脚本结构吻合',file:'选 NPA、压缩包或程序',title:'选择日文 NPA、压缩包或启动程序',
+   counts:c=>'日文正文 '+c.japaneseLines+' 条，已配对 '+c.paired+' 条，未配对 '+c.missing+' 条',done:'已替换并校验剧本和本地译文索引，启动后的正文语言待确认',stale:'导入文件或译文索引未通过校验，请检查后使用「还原」',
+   resources:'找到日文资源，当前启动程序读取的正文语言尚未验证',setting:'语言设置显示为日文，游戏实际显示的正文语言尚未验证',unverified:'找到语言设置，暂未确认可以切换到日文正文',saved:'已写入语言设置，启动后的正文语言待确认',
+   errors:{IMPORT_NPA_UNSUPPORTED:'此档案格式不支持单文件恢复。请选择完整的同版本日文游戏目录',IMPORT_NPA_ENCRYPTED:'NPA 或 ZIP 已加密，无法验证单文件替换，请选择完整的同版本日文游戏目录',IMPORT_NPA_ZIP:'ZIP 的文件名、压缩方式或校验值不受支持，请重新打包',IMPORT_NPA_ZIP_CONTENTS:'ZIP 必须只包含一个 NPA。完整的日文版请解压后选择游戏目录',IMPORT_NPA_TARGET:'未找到当前启动程序引用的同名档案，请核对游戏版本或选择完整日文版目录',IMPORT_NPA_IDENTITY:'现有脚本缺少可核对的游戏专用引用或中日正文。请选择完整的同版本日文游戏目录',IMPORT_NPA_MISMATCH:'档案条目、剧本指令或消息结构与当前版本不一致，未导入',IMPORT_NPA_NO_JAPANESE:'选中的档案未读到足量的日文正文',IMPORT_NPA_LIMIT:'档案超过单文件校验的资源上限，未导入',IMPORT_NPA_CORRUPT:'NPA 容器或条目损坏，未导入',IMPORT_NPA_CONFIRM:'预览已失效，请重新选择并确认',IMPORT_NPA_STALE:'档案或启动程序已变化，请重新预览',IMPORT_NPA_VERIFY:'写入内容未通过校验，导入失败',IMPORT_NPA_RECOVERY:'导入校验失败，已保留备份。请先使用「还原」检查恢复结果'}},
+  en:{lead:'You can also choose an unencrypted Nitroplus .npa or a ZIP containing only that archive. Its script structure must match the installed build',file:'Choose NPA, archive or program',title:'Choose a Japanese NPA, archive or program',
+   counts:c=>c.japaneseLines+' Japanese dialogue entries, '+c.paired+' paired, '+c.missing+' unpaired',done:'Script and local translation index verified on disk. Dialogue language is pending launch verification',stale:'The imported script or its index failed verification. Check the files and use Undo',
+   resources:'Japanese resources found. The dialogue loaded by the selected program is unverified',setting:'The language setting is Japanese. The displayed dialogue language is unverified',unverified:'A language setting was found. Japanese dialogue and a usable switch are unverified',saved:'Language setting saved. Dialogue language is pending launch verification',
+   errors:{IMPORT_NPA_UNSUPPORTED:'This format is unsupported for single-file restore. Choose the complete matching Japanese game folder',IMPORT_NPA_ENCRYPTED:'The NPA or ZIP is encrypted. Choose the complete matching Japanese game folder',IMPORT_NPA_ZIP:'Unsupported ZIP name, compression or checksum. Recreate the ZIP',IMPORT_NPA_ZIP_CONTENTS:'The ZIP must contain exactly one NPA. For a full release, choose the extracted game folder',IMPORT_NPA_TARGET:'No matching archive is referenced by the selected program. Check the build or choose the complete Japanese game folder',IMPORT_NPA_IDENTITY:'The script lacks matching game-specific references or dialogue. Choose the complete matching Japanese game folder',IMPORT_NPA_MISMATCH:'Archive entries, commands or message layout differ from the installed build',IMPORT_NPA_NO_JAPANESE:'The archive contains too little verifiable Japanese dialogue',IMPORT_NPA_LIMIT:'This archive exceeds the single-file verification limits',IMPORT_NPA_CORRUPT:'The NPA container or an entry is corrupt',IMPORT_NPA_CONFIRM:'The preview expired. Select the source again and confirm',IMPORT_NPA_STALE:'The archive or program changed. Preview it again',IMPORT_NPA_VERIFY:'The written data failed verification',IMPORT_NPA_RECOVERY:'Import verification failed. The backup was retained. Use Undo before starting the game'}},
+  ja:{lead:'暗号化されていない Nitroplus の .npa、またはそれだけを含む ZIP も選べます。インストール済みのシナリオ構造と一致する必要があります',file:'NPA・圧縮ファイル・実行ファイル',title:'日本語版の NPA・圧縮ファイル・実行ファイルを選択',
+   counts:c=>'日本語本文 '+c.japaneseLines+' 件、照合済み '+c.paired+' 件、未照合 '+c.missing+' 件',done:'シナリオと対訳索引を検証しました。起動後の本文言語は未確認です',stale:'取り込んだシナリオまたは対訳索引を検証できません。ファイルを確認し、元に戻してください',
+   resources:'日本語データが見つかりました。選択した実行ファイルが読み込む本文の言語は未確認です',setting:'言語設定は日本語です。ゲームで表示される本文の言語は未確認です',unverified:'言語設定を検出しました。日本語本文への切り替えは未確認です',saved:'言語設定を保存しました。起動後の本文言語は未確認です',
+   errors:{IMPORT_NPA_UNSUPPORTED:'単体で取り込めない形式です。同じバージョンの日本語版フォルダーを選んでください',IMPORT_NPA_ENCRYPTED:'NPA または ZIP が暗号化されています。同じバージョンの日本語版フォルダーを選んでください',IMPORT_NPA_ZIP:'ZIP の名前・圧縮方式・チェックサムを確認できません。作り直してください',IMPORT_NPA_ZIP_CONTENTS:'ZIP には NPA を一つだけ入れてください。製品全体は展開済みフォルダーを選んでください',IMPORT_NPA_TARGET:'選択中の実行ファイルが参照する対応アーカイブを確認できません',IMPORT_NPA_IDENTITY:'作品固有の参照や対応する本文を確認できません。同じバージョンの日本語版フォルダーを選んでください',IMPORT_NPA_MISMATCH:'アーカイブ内容、命令または本文の構造がインストール済みの版と一致しません',IMPORT_NPA_NO_JAPANESE:'検証できる日本語本文が十分にありません',IMPORT_NPA_LIMIT:'単体アーカイブの検証上限を超えています',IMPORT_NPA_CORRUPT:'NPA または内部ファイルが破損しています',IMPORT_NPA_CONFIRM:'プレビューが無効です。選び直して確認してください',IMPORT_NPA_STALE:'アーカイブまたは実行ファイルが変更されました。再度プレビューしてください',IMPORT_NPA_VERIFY:'書き込んだデータを検証できませんでした',IMPORT_NPA_RECOVERY:'取り込みの検証に失敗しました。バックアップを保持しています。ゲームの起動前に元に戻してください'}}
+ })[locale]||{};
+ const IWD={...iw,lead:(iw?.lead||'')+'\n'+archiveWords.lead,file:archiveWords.file,title:archiveWords.title};
+ const localArchiveWords=({
+  zh:{search:'在游戏目录找日文 NPA',errors:{IMPORT_NPA_NOT_FOUND:'游戏目录内未找到可验证的同版本 NPA，可手动选择档案或完整日文目录',IMPORT_NPA_MULTIPLE:'找到多个版本证据吻合的 NPA，请手动选择要预览的档案',IMPORT_NPA_SEARCH_LIMIT:'已达到目录内搜索上限，请手动选择日文档案'}},
+  en:{search:'Find Japanese NPA in game folder',errors:{IMPORT_NPA_NOT_FOUND:'No matching Japanese NPA was verified in the game folder. Choose an archive or complete Japanese folder',IMPORT_NPA_MULTIPLE:'Several distinct matching NPAs were found. Choose the archive to preview',IMPORT_NPA_SEARCH_LIMIT:'The folder search reached its limit. Choose the archive manually'}},
+  ja:{search:'ゲームフォルダー内の日本語 NPA を探す',errors:{IMPORT_NPA_NOT_FOUND:'同じ版の NPA を確認できませんでした。アーカイブまたは日本語版フォルダーを選んでください',IMPORT_NPA_MULTIPLE:'適合する異なる NPA が複数あります。プレビューするファイルを選んでください',IMPORT_NPA_SEARCH_LIMIT:'検索上限に達しました。ファイルを手動で選んでください'}}
+ })[locale];
+ Object.assign(t.errs,IWD.errs||{},archiveWords.errors,localArchiveWords.errors);
+ const restoredFiles={zh:'恢复文件已记录，启动后的正文语言待确认',en:'Restored files recorded. Dialogue language is pending launch verification',ja:'復元ファイルを記録しました。起動後の本文言語は未確認です'}[locale];
+ const staleSetting={zh:'当前语言设置和保存的恢复记录不一致，可检查并还原',en:'Current language settings differ from the restore record. Undo is available',ja:'現在の言語設定は復元時の記録と異なります。元に戻せます'}[locale];
+ Object.assign(t.st,{resources:()=>archiveWords.resources,'language-unverified':()=>archiveWords.unverified,'language-setting':()=>archiveWords.setting,'applied-unverified':()=>staleSetting,
+  already:()=>archiveWords.setting,applied:r=>r.adapter==='language-switch'?archiveWords.saved:restoredFiles,importable:()=>IWD.lead,
+  imported:r=>r.archive?r.verified?archiveWords.done+' · '+archiveWords.counts(r.coverage):archiveWords.stale:restoredFiles});
  const panel=()=>body.querySelector('[data-jr-import-panel]');
  const closePanel=()=>{const el=panel();if(el){el.hidden=true;el.innerHTML='';}};
- const previewFrom=async source=>{const el=panel();if(!source||!el)return;el.innerHTML=`<p class="settings-help">${IWD.reading}</p>`;
-  try{const p=await api('jp_import_preview',{id,source});
+ const previewFrom=async(source,discoverArchive=false)=>{if(!d.open||scanFlow.busy()||legacyBusy)return;const expected=id;const el=panel();if((!source&&!discoverArchive)||!el)return;if(source&&discImagePaths([source]).length){await installDisc([source],'japanese');return;}el.innerHTML=`<p class="settings-help">${IWD.reading}</p>`;
+  try{const p=await restoreApi('jp_import_preview',{id,source,...(discoverArchive?{discoverArchive:true}:{})});if(!d.open||id!==expected)return;
+   if(discoverArchive){if(!p.archive||typeof p.source!=='string'||!p.source)throw Error('IMPORT_NPA_NOT_FOUND');source=p.source;}
    /* E338: a Japanese release of another build (Steam Saya vs the 2003 disc) shares no files: set it up as its own copy */
-   /* E339: the disc holds an installer: it was turned into an .iso the user mounts and installs from */
-   if(p.state==='installer'){const IT=({zh:{text:x=>'这张光盘里是安装程序（游戏本体装在安装包里），不能直接拿来用。已经转换成「'+x.iso+'」：双击它就能像光盘一样打开，运行里面的 Setup.exe 安装游戏，装好后回到这里点「选文件夹」，选安装好的游戏文件夹',
-    show:'在文件夹中显示'},en:{text:x=>'This disc holds an installer (the game is packed inside it), so it cannot be used directly. It has been turned into "'+x.iso+'": double-click it to open it like a disc, run Setup.exe inside to install the game, then come back, choose Folder and pick the installed game folder',
-    show:'Show in folder'},ja:{text:x=>'このディスクの中身はインストーラーで（ゲーム本体はパッケージ内）、そのままでは使えません。「'+x.iso+'」に変換しました。ダブルクリックでディスクとして開けるので、中の Setup.exe でインストールしてから、ここで「フォルダ」を選びインストール先を指定してください',
-    show:'フォルダで表示'}})[locale]||null;
-    el.innerHTML=`<p class="jr-import-sum">${esc(IT.text(p))}</p><div class="jr-import-actions"><button type="button" class="secondary" data-jr-cancel>${IWD.cancel}</button><button type="button" class="primary" data-jr-reveal>${IT.show}</button></div>`;
-    el.querySelector('[data-jr-cancel]').onclick=()=>{api('jp_import_cancel',{id}).catch(()=>{});closePanel();};
-    el.querySelector('[data-jr-reveal]').onclick=()=>api('jp_import_reveal',{id,path:p.iso}).catch(fail);
-    return;}
+   if(p.state==='installer'){if(!p.image)throw Error('IMPORT_DISC_UNREADABLE');await installDisc([p.image],'japanese');closePanel();return;}
    /* E409: Steam Saya + the 2003 Japanese script.pak: the Japanese script is ported into the Steam script.npk (HD kept) */
    if(p.state==='port'){const pct=x=>(Math.round((x.rate||0)*1000)/10)+'%',PT=({zh:{text:x=>'识别到 Steam 版《沙耶之歌》和 2003 年日文原版：可以把原版的日文剧本移植进 Steam 版的 script.npk，保留高清画面和现在的启动程序。Steam 版 '+x.textLines+' 句里对上了 '+x.matched+' 句（'+pct(x)+'）'+(x.cut?'；原版另有 '+x.cut+' 句是 Steam 版删减的内容，无法加入':'')+'。原来的 script.npk 会先备份，随时可以还原',
     ok:'移植日文剧本',done:x=>'已移植日文剧本（对齐 '+pct(x)+'）'},en:{text:x=>'Steam The Song of Saya and the 2003 Japanese release found: the Japanese script can be ported into the Steam script.npk, keeping the HD pictures and the current program. '+x.matched+' of '+x.textLines+' Steam lines matched ('+pct(x)+')'+(x.cut?'; '+x.cut+' Japanese lines belong to scenes the Steam release cut and cannot be added':'')+'. The current script.npk is backed up and can be restored any time',
     ok:'Port Japanese script',done:x=>'Japanese script ported ('+pct(x)+' aligned)'},ja:{text:x=>'Steam 版『沙耶の唄』と 2003 年の日本語版を検出しました。日本語版のシナリオを Steam 版の script.npk に移植でき、HD 画質と今の実行ファイルはそのままです。Steam 版 '+x.textLines+' 行中 '+x.matched+' 行が一致（'+pct(x)+'）'+(x.cut?'。日本語版の '+x.cut+' 行は Steam 版でカットされた場面のため追加できません':'')+'。今の script.npk はバックアップされ、いつでも戻せます',
     ok:'日本語シナリオを移植',done:x=>'日本語シナリオを移植しました（一致 '+pct(x)+'）'}})[locale]||null;
     el.innerHTML=`<p class="jr-import-sum">${esc(PT.text(p))}</p><div class="jr-import-actions"><button type="button" class="secondary" data-jr-cancel>${IWD.cancel}</button><button type="button" class="primary" data-jr-confirm>${esc(PT.ok)}</button></div>`;
-    el.querySelector('[data-jr-cancel]').onclick=()=>{api('jp_import_cancel',{id}).catch(()=>{});closePanel();};
-    el.querySelector('[data-jr-confirm]').onclick=async event=>{const b=event.currentTarget;b.disabled=true;b.textContent=t.working;
-     try{const r=await api('jp_import_apply',{id,source});toast(PT.done(r)+zeroNote(r));model=await api('home');closePanel();}catch(e){fail(e);b.disabled=false;
+    el.querySelector('[data-jr-cancel]').onclick=()=>{if(!d.open||id!==expected||panel()!==el||!el.isConnected)return;restoreApi('jp_import_cancel',{id}).catch(()=>{});closePanel();};
+    el.querySelector('[data-jr-confirm]').onclick=async event=>{if(!d.open||id!==expected||panel()!==el||!el.isConnected)return;const b=event.currentTarget;b.disabled=true;b.textContent=t.working;
+     try{const r=await restoreApi('jp_import_apply',{id,source});toast(PT.done(r)+zeroNote(r));model=await restoreApi('home');closePanel();}catch(e){fail(e);b.disabled=false;
       b.textContent=PT.ok;}finally{show();}};
     return;}
    if(p.state==='separate'){const SW=({zh:{text:x=>'这个日文原版和你现在的游戏不是同一个版本（文件完全不同），没法逐个替换。'+(x.copy?'可以把它解压到「'+x.target+'」':'可以直接使用这个文件夹')+'，以后这部作品就用它的 '+x.exe+' 以日文环境启动；原来的游戏文件不动，随时可以在「日文原版启动程序」里换回去',
@@ -772,42 +832,43 @@ function japaneseRestore(only){
     ok:x=>x.copy?'Unpack and use as Japanese release':'Use as Japanese release',done:x=>'Japanese release set: '+x.exe},ja:{text:x=>'この日本語版は現在のゲームと別のビルドで、共通のファイルがないため置き換えできません。'+(x.copy?'「'+x.target+'」に展開し':'このフォルダをそのまま使い')+'、以後この作品は '+x.exe+' を日本語環境で起動します。今のゲームファイルはそのままで、「日本語版の実行ファイル」からいつでも戻せます',
     ok:x=>x.copy?'展開して日本語版に設定':'日本語版に設定',done:x=>'日本語版に設定しました：'+x.exe}})[locale]||null;
     el.innerHTML=`<p class="jr-import-sum">${esc(SW.text(p))}</p><div class="jr-import-actions"><button type="button" class="secondary" data-jr-cancel>${IWD.cancel}</button><button type="button" class="primary" data-jr-confirm>${esc(SW.ok(p))}</button></div>`;
-    el.querySelector('[data-jr-cancel]').onclick=()=>{api('jp_import_cancel',{id}).catch(()=>{});closePanel();};
-    el.querySelector('[data-jr-confirm]').onclick=async event=>{const b=event.currentTarget;b.disabled=true;b.textContent=t.working;
-     try{const r=await api('jp_import_apply',{id,source});toast(SW.done(r));model=await api('home');closePanel();}catch(e){fail(e);b.disabled=false;b.textContent=SW.ok(p);
+    el.querySelector('[data-jr-cancel]').onclick=()=>{if(!d.open||id!==expected||panel()!==el||!el.isConnected)return;restoreApi('jp_import_cancel',{id}).catch(()=>{});closePanel();};
+    el.querySelector('[data-jr-confirm]').onclick=async event=>{if(!d.open||id!==expected||panel()!==el||!el.isConnected)return;const b=event.currentTarget;b.disabled=true;b.textContent=t.working;
+     try{const r=await restoreApi('jp_import_apply',{id,source});toast(SW.done(r));model=await restoreApi('home');closePanel();}catch(e){fail(e);b.disabled=false;b.textContent=SW.ok(p);
       }finally{show();}};
     return;}
    const rows=[...p.replace.map(f=>['replace',f]),...p.remove.map(f=>['remove',f]),...p.add.map(f=>['add',f])];
-   el.innerHTML=`<p class="jr-import-sum">${esc(IWD.sum(p))}</p><details class="jr-import-list"><summary>${IWD.list}</summary><ul>${rows.slice(0,300).map(([k,f])=>`<li><span class="jr-kind" data-kind="${k}">${IWD.kinds[k]}</span>${esc(f.file)}</li>`).join('')}${rows.length>300?`<li>… ${rows.length-300}</li>`:''}</ul></details><div class="jr-import-actions"><button type="button" class="secondary" data-jr-cancel>${IWD.cancel}</button><button type="button" class="primary" data-jr-confirm ${p.changes?'':'disabled'}>${IWD.confirm}</button></div>`;
-   el.querySelector('[data-jr-cancel]').onclick=()=>{api('jp_import_cancel',{id}).catch(()=>{});closePanel();};
-   el.querySelector('[data-jr-confirm]').onclick=async event=>{const b=event.currentTarget;b.disabled=true;b.textContent=t.working;
-    try{const r=await api('jp_import_apply',{id,source});toast(IWD.done(r)+zeroNote(r));model=await api('home');closePanel();}catch(e){fail(e);b.disabled=false;
+   el.innerHTML=`<p class="jr-import-sum">${esc(IWD.sum(p))}${p.archive?' · '+esc(archiveWords.counts(p.coverage)):''}</p><details class="jr-import-list" ${p.archive?'open':''}><summary>${IWD.list}</summary><ul>${rows.slice(0,300).map(([k,f])=>`<li><span class="jr-kind" data-kind="${k}">${IWD.kinds[k]}</span>${esc(f.file)}</li>`).join('')}${rows.length>300?`<li>… ${rows.length-300}</li>`:''}</ul></details><div class="jr-import-actions"><button type="button" class="secondary" data-jr-cancel>${IWD.cancel}</button><button type="button" class="primary" data-jr-confirm ${p.changes?'':'disabled'}>${IWD.confirm}</button></div>`;
+   el.querySelector('[data-jr-cancel]').onclick=()=>{if(!d.open||id!==expected||panel()!==el||!el.isConnected)return;restoreApi('jp_import_cancel',{id}).catch(()=>{});closePanel();};
+   el.querySelector('[data-jr-confirm]').onclick=async event=>{const b=event.currentTarget;if(!d.open||id!==expected||panel()!==el||!el.contains(b))return;b.disabled=true;b.textContent=t.working;
+    try{const r=await restoreApi('jp_import_apply',{id,source,...(p.archive?{archiveToken:p.archiveToken}:{})});toast(r.archive?archiveWords.done+' · '+archiveWords.counts(r.coverage):IWD.done(r)+zeroNote(r));model=await restoreApi('home');closePanel();}catch(e){fail(e);b.disabled=false;
      b.textContent=IWD.confirm;}finally{show();}};}
-  catch(e){closePanel();fail(e);}};
- importBtn.onclick=async()=>{
-  if(lastState==='importable'){let source='';try{source=await invoke('pick_executable',{});}catch(e){fail(e);return;}if(!source)return;importBtn.disabled=true;const label=importBtn.textContent;
-   importBtn.textContent=t.working;
-   try{const r=await api('jp_import_apply',{id,source});toast(t.imported(r)+zeroNote(r));model=await api('home');}catch(e){fail(e);}finally{importBtn.textContent=label;
-    importBtn.disabled=false;show();}return;}
-  const el=panel();if(!el)return;el.hidden=false;el.innerHTML=`<p class="settings-help">${IWD.lead}</p><div class="jr-import-actions"><button type="button" class="secondary" data-jr-folder>${IWD.folder}</button><button type="button" class="primary" data-jr-file>${IWD.file}</button></div>`;
-  el.querySelector('[data-jr-file]').onclick=async()=>{let source='';try{source=await invoke('pick_patch_file',{title:IWD.title});}catch(e){fail(e);return;}previewFrom(source);
+  catch(e){if(d.open&&id===expected){closePanel();fail(e);}}};
+ importBtn.onclick=async()=>{if(scanFlow.busy()||legacyBusy||!d.open)return;
+  const el=panel();if(!el)return;el.hidden=false;el.innerHTML=`<p class="settings-help">${IWD.lead}</p><div class="jr-import-actions"><button type="button" class="secondary" data-jr-find-npa>${localArchiveWords.search}</button><button type="button" class="secondary" data-jr-folder>${IWD.folder}</button><button type="button" class="primary" data-jr-file>${IWD.file}</button></div>`;
+  el.querySelector('[data-jr-find-npa]').onclick=()=>previewFrom('',true);
+  el.querySelector('[data-jr-file]').onclick=async()=>{const pickedFor=id;let source='';try{source=await invoke('pick_patch_file',{title:IWD.title});}catch(e){fail(e);return;}if(pickedFor===id&&d.open)previewFrom(source);
    };
-  el.querySelector('[data-jr-folder]').onclick=async()=>{let list=[];try{list=await invoke('pick_directories',{multiple:false});}catch(e){fail(e);return;}previewFrom(list?.[0]);
+  el.querySelector('[data-jr-folder]').onclick=async()=>{const pickedFor=id;let list=[];try{list=await invoke('pick_directories',{multiple:false});}catch(e){fail(e);return;}if(pickedFor===id&&d.open)previewFrom(list?.[0]);
    };};
  undoBtn.onclick=()=>run('jp_restore_undo',undoBtn,t.undone);
 
  /* detail page: this game only, no picker */
- if(only){d.classList.add('jr-single');body.innerHTML=`<p data-jr-status class="settings-help" role="status"></p><div class="jr-import" data-jr-import-panel hidden></div>`;id=String(only.id);show();return;}
- api('jp_restore_list').then(list=>{if(!list.length){body.innerHTML=`<p class="muted">${t.none}</p>`;return;}
+ if(only){d.classList.add('jr-single');body.innerHTML=`<p data-jr-status class="settings-help" role="status"></p><div class="jr-import" data-jr-import-panel hidden></div>`;id=String(only.id);scanFlow.selectGame(id);show();
+  mountOriginalExecutable(program,{id,api,invoke,locale,toast,isBusy:()=>!!legacyBusy||scanFlow.busy(),onBusy:on=>{
+   legacyBusy+=on?1:-1;refreshLocks();if(on)program.inert=false;
+  },onChanged:async()=>{await restoreChanged();await show();}});
+  return;}
+ restoreApi('jp_restore_list').then(list=>{if(!d.open)return;if(!list.length){body.innerHTML=`<p class="muted">${t.none}</p>`;return;}
   // E238 picker: a small searchable library (covers, title filter) instead of a long select
   const games=list.map(g=>({...g,...(model.games.find(m=>m.id===g.id)||{})}));
   body.innerHTML=`<input type="search" class="jr-search" placeholder="${t.search}" aria-label="${t.search}" autocomplete="off"><div class="jr-grid" role="listbox" aria-label="${t.pick}"></div><p data-jr-status class="settings-help" role="status"></p><div class="jr-import" data-jr-import-panel hidden></div>`;
   const grid=body.querySelector('.jr-grid'),search=body.querySelector('.jr-search');
-  const pick=gid=>{id=gid;grid.querySelectorAll('[role=option]').forEach(o=>o.setAttribute('aria-selected',String(o.dataset.id===gid)));show();};
+  const pick=gid=>{if(legacyBusy||!scanFlow.selectGame(String(gid)))return;closePanel();id=gid;grid.querySelectorAll('[role=option]').forEach(o=>o.setAttribute('aria-selected',String(o.dataset.id===gid)));show();};
   const draw=()=>{const q=search.value.trim().toLowerCase(),shown=games.filter(g=>!q||String(g.title).toLowerCase().includes(q));
    grid.innerHTML=shown.length?shown.map(g=>`<button type="button" role="option" class="jr-item" data-id="${esc(g.id)}" aria-selected="${g.id===id}"><span class="jr-art">${cover(g,'jr-cover')}<i class="jr-check" aria-hidden="true"></i></span><span class="jr-name">${esc(g.title)}</span></button>`).join(''):`<p class="muted">${t.nomatch}</p>`;
    grid.querySelectorAll('[role=option]').forEach(o=>o.onclick=()=>pick(o.dataset.id));};
-  search.oninput=draw;id=games[0].id;draw();show();}).catch(fail);
+  search.oninput=draw;id=games[0].id;scanFlow.selectGame(String(id));draw();show();}).catch(fail);
 }
 function modal(html){const dialog=document.createElement('dialog');dialog.innerHTML=html;document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove(),
  {once:true});dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();
@@ -844,6 +905,7 @@ let contextMenu=null;
 function closeContextMenu(){contextMenu?.remove();contextMenu=null;}
 document.addEventListener('contextmenu',event=>{
   event.preventDefault();closeContextMenu();
+  if(route==='torch')return;
   const card=event.target.closest('[data-game],[data-edit],[data-launch]');
   const id=card?.dataset.game||card?.dataset.edit||card?.dataset.launch||event.target.closest('.hero')?.querySelector('[data-launch]')?.dataset.launch;
   const items=id?[
@@ -869,6 +931,9 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape')closeContext
  const buttons=[...contextMenu.querySelectorAll('button')];let index=buttons.indexOf(document.activeElement);buttons[(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length].focus();
  }});
 addEventListener('blur',closeContextMenu);addEventListener('resize',closeContextMenu);addEventListener('scroll',closeContextMenu,true);
+async function installDisc(paths=[],context='library'){
+ return openDiscInstall({paths,api,invoke,locale,esc,context,onLibraryChanged:async()=>{model=await api('home');await renderRoute();}});
+}
 function editGame(id){
   const game=model.games.find(g=>g.id===id);
   /* E281 (user: polish the add game dialog): the program comes first as one large card that shows the file name and its
@@ -886,17 +951,17 @@ function editGame(id){
    dialog.querySelector('[data-exe-name]').textContent=value?parts.at(-1):words.pick;dialog.querySelector('[data-exe-dir]').textContent=value?parts.slice(0,-1).join('\\'):words.pickSub;
    dialog.querySelector('[data-exe-action]').textContent=value?words.change:({zh:'浏览…',en:'Browse…',ja:'参照…'})[locale];};
   const folderName=value=>{const parts=String(value).split(/[\\/]+/).filter(Boolean);return (parts.at(-2)||'').trim();};
-  exeInput.addEventListener('input',showExe);showExe();
+  exeInput.addEventListener('input',()=>{titleInput.required=!discImagePaths([exeInput.value.trim()]).length;showExe();});showExe();
   dialog.querySelector('#cancel-game').addEventListener('click',()=>dialog.close());
   // A picked cover is saved at once, like a series cover; automatic metadata refresh keeps it.
   dialog.querySelector('#pick-cover')?.addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{const path=await invoke('pick_image');
    if(!path)return;const result=await api('game_cover',{id,path});const preview=dialog.querySelector('#game-cover-preview');preview.src=result.cover;preview.hidden=!result.cover;
    model=await api('home');renderRoute();toast(text.saved);}catch(error){toast(errorMessage(error));}finally{button.disabled=false;}});
   dialog.querySelector('#pick-exe').addEventListener('click',async()=>{try{const directory=game?(await api('game_original_executable',{id})).directory:undefined;
-   const file=await invoke('pick_executable',{directory});if(file){exeInput.value=file;showExe();if(!titleInput.value.trim()){titleInput.value=folderName(file);
+   const file=await invoke(game?'pick_executable':'pick_patch_file',{directory,title:({zh:'选择游戏程序或光盘镜像',en:'Choose a game program or disc image',ja:'実行ファイルまたはディスクイメージを選択'})[locale]});if(file){if(!game&&discImagePaths([file]).length){dialog.close();await installDisc([file]);return;}exeInput.value=file;showExe();if(!titleInput.value.trim()){titleInput.value=folderName(file);
    }}}catch{toast(text.serviceFailed);}});
   // The VNDB entry is sent only when it was edited; a new entry refreshes the game's metadata right away.
-  dialog.querySelector('#game-form').addEventListener('submit',async event=>{event.preventDefault();try{const vndbInput=dialog.querySelector('#game-vndb'),vndb=vndbInput&&vndbInput.value.trim()!==(game?.vndbId||'')?vndbInput.value:undefined;
+  dialog.querySelector('#game-form').addEventListener('submit',async event=>{event.preventDefault();try{const paths=discImagePaths([exeInput.value.trim()]);if(!game&&paths.length){dialog.close();await installDisc(paths);return;}const vndbInput=dialog.querySelector('#game-vndb'),vndb=vndbInput&&vndbInput.value.trim()!==(game?.vndbId||'')?vndbInput.value:undefined;
    const saved=await api('save_game',{id,title:dialog.querySelector('#game-title').value,executable:dialog.querySelector('#game-exe').value,vndb});dialog.close();
    model=await api('home');renderRoute();toast(text.gameSaved);if(saved?.vndbChanged)api('game_enrich',{id,locale,refresh:true}).then(async()=>{model=await api('home');
    renderRoute();}).catch(()=>{});}catch(error){toast(errorMessage(error));}});
@@ -1264,7 +1329,9 @@ function syncStage(){const main=document.querySelector('#main'),layer=document.q
  }layer.dataset.glyphStage=stage;}
 let stageWatch=null;function watchStage(){const main=document.querySelector('#main');if(!main||stageWatch?.main===main)return;stageWatch?.observer.disconnect();
  const observer=new MutationObserver(syncStage);observer.observe(main,{childList:true});stageWatch={main,observer};}
+let stopDetailPage=()=>{},torchMonument=null;
 async function renderRoute(){watchStage();
+  stopDetailPage();stopDetailPage=()=>{};
   stopHistoryTranslations();stopHistoryTranslations=()=>{};
   const token=++pageToken,main=document.querySelector('#main');document.documentElement.dataset.stage=stageFor(route);applyVeil(model.preferences);syncStage();{
    const group=route==='statistics'?'learning':route,leaving=!!main.dataset.lastRoute&&main.dataset.lastRoute!==group,out=!leaving?null:main.querySelector(':scope>.tv-home')||(main.querySelector(':scope>.dtv-bg')?main:null);
@@ -1273,14 +1340,33 @@ async function renderRoute(){watchStage();
    fill:'forwards'}).finished.catch(()=>{}))),new Promise(r=>setTimeout(r,260))]);if(token!==pageToken)return;}}main.classList.toggle('home-page',route==='home');
    if(route!=='home'){stopShelf();stopShelf=()=>{};main.onscroll=null;if(route==='game'){const g=model.games.find(x=>x.id===selectedGameId);paintGlow(g?.cover||'');
    }else stopGlow();main.closest('.workspace')?.classList.remove('home-fade','fade-off');}if(route!=='library'){stopSimpleGrid();stopSimpleGrid=()=>{};stopField();
-   main.classList.remove('searching','field-page','field-list','field-selecting','field-single');}main.classList.toggle('statistics-page',route==='statistics');
+   main.classList.remove('searching','field-page','field-list','field-selecting','field-single');}main.classList.toggle('statistics-page',route==='statistics');main.classList.toggle('torch-page',route==='torch');
    if(route!=='learning'&&route!=='statistics')main.classList.remove('review-page');if(route!=='learning'&&route!=='statistics')delete main.dataset.page;main.scrollTop=0;
+  const showFailure=error=>{
+   if(token!==pageToken)return;window.megulitYuiStage?.('route-failed');console.error('renderRoute',route,error);main.innerHTML=empty(text.loadingFailed,'refresh');
+   (main.querySelector('.empty-state')||main).insertAdjacentHTML('beforeend',`<button class="primary" id="retry">${text.retry}</button>`);
+   main.querySelector('#retry').addEventListener('click',renderRoute);
+  };
+  let reusedTorch=false;
   try{
-    if(route==='home')home();else if(route==='library')library();else if(route==='series')seriesUI.renderDetail(main,selectedSeriesId);else if(route==='game'){main.innerHTML=loading();
-     await renderGamePage({main,id:selectedGameId,tab:(t=>(gameTab='',t))(gameTab),api,invoke,locale,text,esc,icon,cover,duration,datetime,relativeTime,number,definitions,isCurrent:()=>token===pageToken,
+    if(route==='torch'){
+     if(!torchMonument){
+      main.innerHTML=loading();const started=performance.now();
+      torchMonument=await import('./torch-monument.js');
+      if(token!==pageToken)return;
+      performance.measure('torch:modules',{start:started,end:performance.now()});
+     }
+     reusedTorch=torchMonument.hasTorchMonument(locale);
+     if(reusedTorch)main.classList.remove('g-enter');
+     main.replaceChildren();
+     stopDetailPage=torchMonument.suspendTorchMonument;
+     const hall=await torchMonument.openTorchMonument({api,locale,esc,toast,mount:main,onContextLost:()=>showFailure(Error('Torch WebGL context lost'))});
+     if(!hall||token!==pageToken)return;
+    }else if(route==='home')home();else if(route==='library')library();else if(route==='series')seriesUI.renderDetail(main,selectedSeriesId);else if(route==='game'){main.innerHTML=loading();
+     const detailCleanup=await renderGamePage({main,id:selectedGameId,tab:(t=>(gameTab='',t))(gameTab),api,invoke,locale,text,esc,icon,cover,duration,datetime,relativeTime,number,definitions,isCurrent:()=>token===pageToken,
      onBack:()=>navigate(gameOrigin),onLaunch:startGame,onEdit:editGame,onJapaneseRestore:only=>japaneseRestore(only),onRemove:removeGame,onForum:game=>{setForumFilter({game:String(game?.title||''),engine:'',
      tag:'',mine:false});setLeaderboardView({tab:'forum'});navigate('leaderboard');},onLookup:word=>{pendingLookup=word;navigate('learning','dictionary');},onOriginalChanged:async()=>{model=await api('home');if(token===pageToken)renderRoute();
-     },toast});}else if(route==='history')await history(token);else if(route==='learning')await learning(token);else if(route==='settings')await settings(token);
+     },toast});if(typeof detailCleanup==='function'){if(token===pageToken)stopDetailPage=detailCleanup;else detailCleanup();}}else if(route==='history')await history(token);else if(route==='learning')await learning(token);else if(route==='settings')await settings(token);
      else if(route==='leaderboard')await mountLeaderboard(main,{api,locale,esc,toast,isCurrent:()=>token===pageToken,lookup:word=>{pendingLookup=word;navigate('learning',
      'dictionary');},openSettings:section=>{settingsSection=section;settingsProfile='';try{localStorage.setItem('megulit-settings-section',section);}catch{}navigate('settings');
      }});else if(route==='daily')await mountDaily(main,{api,locale,esc,toast,isCurrent:()=>token===pageToken,lookup:word=>{pendingLookup=word;navigate('learning',
@@ -1289,13 +1375,10 @@ async function renderRoute(){watchStage();
      main.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>b.dataset.tool==='0'?japaneseRestore():toast((grimoireWords[locale]||grimoireWords.zh).toolPending)));
      }else if(route==='statistics')await statistics(token);
     if(token===pageToken){enhanceSelects(main);dockPageTools(main);moveTabInk();alignSubtabs();{const group=route==='statistics'?'learning':route,view=group+':'+subtab;
-     if(!main.querySelector(':scope>.tabs'))tabsGroup=null;if(main.dataset.lastRoute!==group){main.dataset.lastRoute=group;if(!document.documentElement.classList.contains('app-boot-pre'))pageEnter(main);
+     if(!main.querySelector(':scope>.tabs'))tabsGroup=null;if(main.dataset.lastRoute!==group){main.dataset.lastRoute=group;if(!reusedTorch&&!document.documentElement.classList.contains('app-boot-pre'))pageEnter(main);
      }else if(main.dataset.lastView!==view&&(group==='learning'||group==='history')){subpageEnter(main.querySelector(group==='learning'?'#learning-content':'#history-content'));
      }main.dataset.lastView=view;}requestAnimationFrame(()=>setupMarquees(main));}
-  }catch(error){if(token!==pageToken)return;console.error('renderRoute',route,error);main.innerHTML=empty(text.loadingFailed,'refresh');
-   /* 2026-11-14 the retry button sits inside the empty state, centred under the message (it used to land alone at the far left of #main) */
-   (main.querySelector('.empty-state')||main).insertAdjacentHTML('beforeend',`<button class="primary" id="retry">${text.retry}</button>`);main.querySelector('#retry').addEventListener('click',
-   renderRoute);}
+  }catch(error){showFailure(error);}
 }
 const navStack=[];let navIndex=-1,pageState=null;
 /* page: a view inside the page (语法 list / lesson / map) that the page pushed through page-nav.js */
@@ -1319,6 +1402,7 @@ async function navigate(next,tab='',replay=false){if(next!=='learning'||tab!=='k
  'page');else button.removeAttribute('aria-current');});renderRoute();}
 async function start(){
   app.innerHTML=loading();
+  if(!window.__megulitDiscDropBound){window.__megulitDiscDropBound=true;bindDiscDrop({invoke,internals:window.__TAURI_INTERNALS__,onImages:paths=>{installDisc(paths).catch(error=>toast(errorMessage(error)));}}).catch(()=>{window.__megulitDiscDropBound=false;});}
   try{
     const saved=await api('ui_state');
     for(const[key,value]of Object.entries(saved))if(localStorage.getItem(key)===null)localStorage.setItem(key,value);
@@ -1326,9 +1410,9 @@ async function start(){
      }
     await api('preserve_ui',{values:recovered});
     model=await api('home');setAppearance();document.documentElement.classList.add('app-boot-pre');shell();await renderRoute();bootEntrance();
-    /* E394 the website's "still in development" notice, once per version, after the entrance has played */
-    {const notice=()=>{if(document.documentElement.classList.contains('app-boot-pre'))return setTimeout(notice,400);setTimeout(()=>{if(route==='home'&&!document.querySelector('dialog[open]'))mountDevNotice({
-     api,locale,esc,toast,version:VERSION});},1800);};notice();}
+    // Prepare the card while the native window is still hidden, including on throttled WebViews.
+    const canShow=()=>route==='home'&&!document.querySelector('dialog[open]');
+    mountDevNotice({api,locale,esc,toast,version:VERSION,canShow});
     /* v1.1.0: look for a new release once per start; silent unless there is one */
     if(!window.__megulitUpdateChecked){window.__megulitUpdateChecked=true;/* a silent hot update just reloaded this page: one line in the corner */setTimeout(()=>{try{showHotDone();}catch{}},900);setTimeout(()=>checkForUpdates({api,invoke,version:VERSION,toast}),4000);}
     const callback=window.__TAURI_INTERNALS__?.transformCallback(response=>{playHomeMotion(response.payload);if(response.payload==='hidden'&&pendingHomeGame){const id=pendingHomeGame;
@@ -1340,26 +1424,25 @@ async function start(){
      ja:'ゲームウィンドウを待機中です。Alt+T で手動選択できます'})[locale]);});if(pendingCallback)await invoke('plugin:event|listen',{event:'reader-event',target:{kind:'Any'},handler:pendingCallback});
      await invoke('window_action',{action:'ready'});const metadataCallback=window.__TAURI_INTERNALS__?.transformCallback(async()=>{try{model=await api('home');if(route==='library')renderGames();
      else if(route==='home')home();else if(route==='series')seriesUI.renderDetail(document.querySelector('#main'),selectedSeriesId);}catch{}});if(metadataCallback)await invoke('plugin:event|listen',
-     {event:'library-updated',target:{kind:'Any'},handler:metadataCallback});window.__TOME_READY__=true;refreshLibrary({startup:true}).catch(()=>{});invoke('reader_open',
-     {background:true}).then(()=>waitReader()).catch(error=>readerNotice(error.message||error)); 
+     {event:'library-updated',target:{kind:'Any'},handler:metadataCallback});window.__TOME_READY__=true;requestAnimationFrame(()=>requestAnimationFrame(()=>{if(document.querySelector('#main')?.childElementCount)window.megulitYuiStage?.('content-painted');}));refreshLibrary({startup:true}).catch(()=>{});openPlayReader({api,invoke,wait:waitReader}).catch(error=>readerNotice(error.message||error));
   }
-  catch(error){app.innerHTML=`<div class="loading-screen"><div>${text.loadingFailed}<button class="primary" id="startup-retry">${text.retry}</button></div></div>`;
+  catch(error){window.megulitYuiStage?.('startup-failed');app.innerHTML=`<div class="loading-screen"><div>${text.loadingFailed}<button class="primary" id="startup-retry">${text.retry}</button></div></div>`;
    document.querySelector('#startup-retry').addEventListener('click',start);await invoke('window_action',{action:'ready'}).catch(()=>{});}
 }
 addEventListener('focus',()=>{refreshFocusedHome().catch(()=>{});});
-/* E590 automatic Japanese: state line in 日文原版恢复 (自动已恢复 / 已是日文 / 没有日文数据), undo, per-game off */
-const jpAutoWords={zh:{auto:'自动已恢复为日文',japanese:'已是日文',none:'没有日文数据',translated:'这是汉化版启动程序，日文原版在同目录，不用自动切换',overlay:'汉化补丁覆盖在原版上；要换回日文，点上面的「恢复日文」（不会自动改）',unsupported:'有日文数据，但还不能自动切换；阅读时 MeguLit 仍读取日文原句',reverted:'自动切换为日文后游戏没有显示文字（黑屏或卡住），已自动改回原样',undone:'已撤销自动切换，这个游戏不再自动切换',undo:'撤销自动切换',off:'这个游戏不自动切换',done:'已自动切换为日文',undid:'已撤销，游戏恢复原来的语言'},
- en:{auto:'Switched to Japanese automatically',japanese:'Already Japanese',none:'No Japanese data',translated:'This is a Chinese translation launcher; the Japanese original sits in the same folder, so nothing is switched',overlay:'A Chinese patch lies over the release; use Restore Japanese above to turn it off (never automatic)',unsupported:'Japanese data found but cannot be switched automatically yet; MeguLit still reads the Japanese lines',reverted:'The game showed no text after the automatic switch (black screen or hang), so it was put back',undone:'Automatic switch undone; this game is left alone from now on',undo:'Undo automatic switch',off:'Do not switch this game automatically',done:'Switched to Japanese automatically',undid:'Undone; the game is back to its earlier language'},
- ja:{auto:'自動で日本語に戻しました',japanese:'すでに日本語です',none:'日本語データがありません',translated:'中国語訳の起動プログラムです。日本語版は同じフォルダにあるので切り替えは不要です',overlay:'中国語パッチが上書きされています。上の「日本語に戻す」で外せます（自動では変更しません）',unsupported:'日本語データはありますが、まだ自動では切り替えられません。読み取りは日本語原文で行います',reverted:'自動切り替え後にテキストが表示されなかったため（黒い画面・停止）、元に戻しました',undone:'自動切り替えを取り消しました。このゲームは今後切り替えません',undo:'自動切り替えを取り消す',off:'このゲームは自動で切り替えない',done:'日本語に自動で切り替えました',undid:'取り消しました。ゲームは元の言語に戻りました'}};
-async function jpAutoLine(status,id,refresh){
+/* E590 automatic Japanese: state line for the automatic switch, undo, per-game off */
+const jpAutoWords={zh:{auto:'自动已恢复为日文',japanese:'已是日文',none:'暂未找到可自动切换的日文版本',translated:'这是汉化版启动程序，日文原版在同目录，不用自动切换',overlay:'汉化补丁覆盖在原版上；要换回日文，点上面的「恢复日文」（不会自动改）',unsupported:'有日文数据，但还不能自动切换；阅读时 MeguLit 仍读取日文原句',reverted:'自动切换为日文后游戏没有显示文字（黑屏或卡住），已自动改回原样',undone:'已撤销自动切换，这个游戏不再自动切换',undo:'撤销自动切换',off:'这个游戏不自动切换',done:'已自动切换为日文',undid:'已撤销，游戏恢复原来的语言'},
+ en:{auto:'Switched to Japanese automatically',japanese:'Already Japanese',none:'No Japanese version found for automatic switching yet',translated:'This is a Chinese translation launcher; the Japanese original sits in the same folder, so nothing is switched',overlay:'A Chinese patch lies over the release; use Restore Japanese above to turn it off (never automatic)',unsupported:'Japanese data found but cannot be switched automatically yet; MeguLit still reads the Japanese lines',reverted:'The game showed no text after the automatic switch (black screen or hang), so it was put back',undone:'Automatic switch undone; this game is left alone from now on',undo:'Undo automatic switch',off:'Do not switch this game automatically',done:'Switched to Japanese automatically',undid:'Undone; the game is back to its earlier language'},
+ ja:{auto:'自動で日本語に戻しました',japanese:'すでに日本語です',none:'自動切り替えに使える日本語版はまだ見つかっていません',translated:'中国語訳の起動プログラムです。日本語版は同じフォルダにあるので切り替えは不要です',overlay:'中国語パッチが上書きされています。上の「日本語に戻す」で外せます（自動では変更しません）',unsupported:'日本語データはありますが、まだ自動では切り替えられません。読み取りは日本語原文で行います',reverted:'自動切り替え後にテキストが表示されなかったため（黒い画面・停止）、元に戻しました',undone:'自動切り替えを取り消しました。このゲームは今後切り替えません',undo:'自動切り替えを取り消す',off:'このゲームは自動で切り替えない',done:'日本語に自動で切り替えました',undid:'取り消しました。ゲームは元の言語に戻りました'}};
+async function jpAutoLine(status,id,refresh,request=api,isCurrent=()=>true,onReady=()=>{}){
  const w=jpAutoWords[locale]||jpAutoWords.zh;let line=status.parentElement.querySelector('[data-jr-auto]');
  if(!line){line=document.createElement('div');line.className='jr-auto';line.dataset.jrAuto='';status.after(line);}
- let r;try{r=await api('jp_auto_status',{id});}catch{line.textContent='';return;}
+ let r;try{r=await request('jp_auto_status',{id});}catch{if(isCurrent())line.textContent='';return;}if(!isCurrent())return;
  const label=r.detail==='OVERLAY_PATCH_MANUAL'?w.overlay:{auto:w.auto,japanese:w.japanese,'no-japanese':w.none,translated:w.translated,unsupported:w.unsupported,reverted:w.reverted,undone:w.undone}[r.state]||'';
  line.innerHTML=`<p class="settings-help" data-state="${esc(r.state)}">${esc(label)}</p>`+(r.state==='auto'?`<button type="button" class="secondary" data-jr-auto-undo>${esc(w.undo)}</button>`:'')+
   `<label class="settings-row"><span class="settings-label">${esc(w.off)}</span><input type="checkbox" class="switch" data-jr-auto-off ${r.gameOff?'checked':''}></label>`;
- line.querySelector('[data-jr-auto-off]').onchange=e=>api('jp_auto_set',{id,off:e.target.checked}).catch(er=>toast(errorMessage(er)));
- const u=line.querySelector('[data-jr-auto-undo]');if(u)u.onclick=async()=>{u.disabled=true;try{await api('jp_auto_undo',{id});toast(w.undid);}catch(er){toast(errorMessage(er));}refresh?.();};
+ line.querySelector('[data-jr-auto-off]').onchange=e=>request('jp_auto_set',{id,off:e.target.checked}).catch(er=>toast(errorMessage(er)));
+ const u=line.querySelector('[data-jr-auto-undo]');if(u)u.onclick=async()=>{u.disabled=true;try{await request('jp_auto_undo',{id});toast(w.undid);}catch(er){toast(errorMessage(er));}refresh?.();};onReady();
 }
 /* one notice per automatic switch, with an undo action; checked at start, on focus and every minute */
 async function jpAutoNotices(){

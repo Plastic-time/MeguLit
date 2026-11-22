@@ -12,6 +12,14 @@ routes = [
 ]
 
 [vars]
+# Exact-version ordinary Seed signer. Set the HTTPS gateway and its matching public keys
+# at deployment, and provision ORDINARY_SCAN_TOKEN with wrangler secret put.
+ORDINARY_SCAN_URL = "https://megulit-ordinary-scan.egu-it--it.workers.dev/scan"
+ORDINARY_PUBLIC_KEYS = '[{"id":"ordinary-windows-01","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAooGygGN5ckXDPPv408UDa9UJiEvPVGYF9UoOeodGexY="}]'
+# Public trust only; private signing material stays in the local DPAPI store
+PROFILE_PUBLIC_KEYS = '[{"id":"seed-publisher-20261122","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAQUS2OCwp7pAFytVwXx/C5lU90TW4+BpJVB0NMx5Rw+U="}]'
+TORCH_RELEASE_PUBLIC_KEYS = '[{"id":"seed-publisher-20261122","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAQUS2OCwp7pAFytVwXx/C5lU90TW4+BpJVB0NMx5Rw+U="}]'
+CARDINAL_REVIEW_PUBLIC_KEYS = '[{"id":"seed-reviewer-20261122","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAGhFzVt5Ps4h3Mkv2Ei1SFT/BLHBP4U4Nok6cOSLBtcc="}]'
 GITHUB_REPO = "ilynthn/MeguLit"
 LINK_DAYS = "30"
 # the website forms (src/feedback.js) post from these origins
@@ -115,3 +123,11 @@ name = "RL_FORUM_GET"
 type = "ratelimit"
 namespace_id = "1009"
 simple = { limit = 120, period = 60 }
+
+[[durable_objects.bindings]]
+name = "SEED_NOTIFICATIONS"
+class_name = "SeedNotifications"
+
+[[migrations]]
+tag = "seed-notifications-v1"
+new_sqlite_classes = ["SeedNotifications"]

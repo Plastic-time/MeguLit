@@ -13,8 +13,12 @@
   const post = (type) => { try { chrome.webview.postMessage({ type }); } catch (e) { /* no host */ } };
   if (native) {
     const dr = document.getElementById('drag'); if (dr) dr.addEventListener('mousedown', (e) => { if (e.button === 0) post('drag'); });
-    window.__askClose = () => document.getElementById('btnClose').click();
-    window.addEventListener('install-failed', () => { const b = document.getElementById('install'); if (b) b.classList.remove('busy'); if (Scene.showInstallError) Scene.showInstallError(); });
+    window.addEventListener('install-failed', () => {
+      installed = false;
+      document.getElementById('install').classList.remove('busy');
+      goTo('loc', 'skim');
+      check(pathEl.value);
+    });
     /* edge and corner hot zones (index.html .rz): the host starts the system size loop for the edge pressed */
     /* zone widths in PHYSICAL pixels: the page is zoomed (devicePixelRatio = DPI scale x zoom), so 8 CSS px can be 4 device px or less */
     const fitZones = () => { const d = window.devicePixelRatio || 1, st = document.documentElement.style; st.setProperty('--rz', Math.max(6, 9 / d).toFixed(1) + 'px'); st.setProperty('--rzc', Math.max(12, 18 / d).toFixed(1) + 'px'); st.setProperty('--rzg', Math.max(16, 24 / d).toFixed(1) + 'px'); };
@@ -28,7 +32,12 @@
   const clock = () => performance.now() / 1000;
   async function check(p) { const c = await api('checkpath', { path: p }); Scene.setFree(c.free || 0, c.need || (info && info.need) || 0, c.state === 'protected' ? 'protected' : c.state === 'readonly' ? 'readonly' : 'ok'); return c; }
   /* in-page folder picker (the native window only): disks with free space, usual places, recent choices, one level of folders, new folder, and the modern Explorer dialog as a side door */
-  const EN = new URLSearchParams(location.search).get('lang') === 'en', L = (zh, en) => (EN ? en : zh);
+  const params = new URLSearchParams(location.search), statusOnly = params.get('boot') === 'progress';
+  const EN = params.get('lang') === 'en', L = (zh, en) => (EN ? en : zh);
+  const deployment = document.getElementById('install-confirm');
+  document.getElementById('confirm-install-title').textContent = L('确认安装到此路径？', 'Confirm installation to this location?');
+  document.getElementById('confirm-install-back').textContent = L('返回', 'Back');
+  document.getElementById('confirm-install-go').textContent = L('确认安装', 'Confirm installation');
   const pk = document.getElementById('picker'), pkSide = document.getElementById('pkSide'), pkMain = document.getElementById('pkMain'), pkCrumb = document.getElementById('pkCrumb'), pkMsg = document.getElementById('pkMsg'), pkNew = document.getElementById('pkNew');
   let pkCur = '';
   const gb = (b) => (b / 1073741824 >= 100 ? Math.round(b / 1073741824) : (b / 1073741824).toFixed(1)) + ' GB';
@@ -64,23 +73,52 @@
   Scene.onAction = async (m) => {
     if (m.type === 'checkpath') { clearTimeout(checkTimer); checkTimer = setTimeout(() => check(m.path), 250); }
     else if (m.type === 'browse') { if (native) openPicker(); else { const r = await api('browse'); if (r.path) { pathEl.value = r.path; check(r.path); } } }
-    else if (m.type === 'install') { const c = await api('install', { path: pathEl.value, desktop: m.desktop, menu: m.menu }); const b = document.getElementById('install'); if (c.state && c.state !== 'ok') { if (b) b.classList.remove('busy'); Scene.setFree(c.free || 0, c.need || 0, c.state === 'protected' ? 'protected' : 'readonly'); return; } installed = true; goTo('field', 'under'); }   /* the host answers at once (the heavy copy runs after the reply); a later failure comes as install-failed */
+    else if (m.type === 'install') {
+      const button = document.getElementById('install');
+      if (section !== 'loc' || deployment.open || installed) return;
+      const path = m.path.trim();
+      if (native) {
+        const location = await check(path);
+        if (location.state !== 'ok' || !location.target || path !== pathEl.value.trim() || section !== 'loc') {
+          button.classList.remove('busy');
+          return;
+        }
+        document.getElementById('confirm-install-path').textContent = location.target;
+        deployment.returnValue = '';
+        deployment.showModal();
+        if (!await new Promise(resolve => deployment.addEventListener('close', () => resolve(deployment.returnValue === 'install'), { once: true }))) {
+          button.classList.remove('busy');
+          return;
+        }
+        m.target = location.target;
+      }
+      const c = await api('install', { path, target: m.target, desktop: m.desktop, menu: m.menu });
+      if (c.state !== 'ok') {
+        button.classList.remove('busy');
+        Scene.setFree(c.free || 0, c.need || 0, c.state === 'protected' ? 'protected' : 'readonly');
+        return;
+      }
+      installed = true;
+      goTo('field', 'under');
+    }
     else if (m.type === 'retry') { api('retry'); }
     else if (m.type === 'copylog') api('copylog'); else if (m.type === 'manual') api('manual'); else if (m.type === 'launch') api('launch'); else if (m.type === 'minimize') { if (!native) api('minimize'); } else if (m.type === 'close') { api('close'); if (!native) setTimeout(() => window.close(), 400); }
   };
   function goTo(name, move) { if (section === name) return; Scene.goTo(name, move, section); section = name; }
   /* the engine's JSON becomes a scene snapshot */
   function snapshot() {
-    let s = state; if (!s || !s.n) return null; if (!st || st.length !== s.n) { N = s.n; st = new Int8Array(N); fr = new Float32Array(N); doneAt = new Float32Array(N); }
+    let s = state; if (!s || (!statusOnly && !s.n && s.phase !== 'vc-runtime' && s.kind !== 'vc-runtime')) return null; if (!st || st.length !== s.n) { N = s.n; st = new Int8Array(N); fr = new Float32Array(N); doneAt = new Float32Array(N); }
     const t = clock(); for (let i = 0; i < N; i++) { const v = +s.st[i] || 0; if (v === 2 && st[i] !== 2) doneAt[i] = t; st[i] = v; fr[i] = (s.fr[i] || 0) / 100; }
     /* the engine reports 0 / no source for a moment while it re-ranks sources: hold the last real values for 2.5 s so the text does not flicker */
     const tn = clock(); if (s.speed > 0) { held.speed = s.speed; held.t = tn; } if (s.src) { held.src = s.src; held.srcN = s.srcN; held.ts = tn; }
     if (!(s.speed > 0) && s.phase === 'download' && tn - held.t < 2.5) s = Object.assign({}, s, { speed: held.speed });
     if (!s.src && s.phase === 'download' && tn - held.ts < 2.5) s = Object.assign({}, s, { src: held.src, srcN: held.srcN });
     const speed = s.speed || 0, total = s.total || 0, got = s.got || 0;
-    let phase = s.phase === 'download' || s.phase === 'probe' ? (s.got > 0 || s.phase === 'download' ? 'download' : 'probe') : s.phase === 'downloaded' ? 'download' : s.phase === 'unpack' ? 'unpack' : s.phase === 'done' ? 'done' : 'probe';
+    let phase = s.phase === 'download' || s.phase === 'probe' ? (s.phase === 'download' || (!statusOnly && s.got > 0) ? 'download' : 'probe') : s.phase === 'downloaded' ? (statusOnly ? 'prepare' : 'download') : s.phase === 'verify' ? 'verify' : s.phase === 'unpack' ? 'unpack' : s.phase === 'done' ? 'done' : s.phase === 'idle' ? 'idle' : 'probe';
     const out = { t: t, st, fr, doneAt, got, total, speed, eta: speed > 0 ? (total - got) / speed : 0, pack: s.pack || '', src: s.src || '', srcN: s.srcN || 0, dir: s.dir || '', phase, unpack: s.unpack || 0 };
-    if (s.phase === 'failed') { out.err = { kind: s.kind || 'download' }; }
+    if (s.phase === 'vc-runtime') out.phase = s.phase;
+    if (s.phase === 'prepare') out.phase = s.phase;
+    if (s.phase === 'failed') { out.err = { kind: s.kind || 'download', message: s.message }; }
     return out;
   }
   async function poll() {
@@ -88,13 +126,17 @@
     setTimeout(poll, 150);
     if (!state) return; const p = state.phase;
     if (installed && (p === 'unpack') && section !== 'unpack' && section !== 'done') goTo('unpack', 'dive');
-    if (p === 'done' && section !== 'done') { if (section === 'loc' || section === 'welcome') { installed = true; } goTo('done', 'pull'); }
+    if (installed && p === 'done' && section !== 'done') goTo('done', 'pull');
     if (p === 'downloaded' && installed && section === 'field') { /* waiting for the engine to start unpacking */ }
   }
   function frame() { const s = snapshot(); if (s) Scene.render(s); setTimeout(() => requestAnimationFrame(frame), 33); }
   (async () => {
     info = await (await fetch('/api/info')).json(); pathEl.value = info.defaultTarget; Scene.setDrives(info.drives || []); await check(info.defaultTarget);
     poll(); requestAnimationFrame(frame);
-    setTimeout(() => { if (section === 'welcome') goTo('loc', 'skim'); }, 2200);
+    if (statusOnly) {
+      // The media bridge releases the loading layer only after a decoded frame.
+      window.__installLocationChecked = true;
+      goTo('loc', 'skim');
+    } else setTimeout(() => { if (section === 'welcome') goTo('loc', 'skim'); }, 2200);
   })();
 })();

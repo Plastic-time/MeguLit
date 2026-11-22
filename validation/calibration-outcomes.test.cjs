@@ -150,14 +150,27 @@ test('dark text never gets a dark outline, whatever set the two colours; the tra
 
 /* 2026-11-21 (owner, test pack v5 ファタ 03:32:53Z: the measurement was cancelled and hiding never came back): a give way lasts
    HookNative.GIVE_WAY_MS at most, whatever the measurement does: then the hide and the replacement are back, the calibration ends */
-test('a give way is capped: no answer from the probe, hiding is back within 2 s and the calibration ends as timed out',t=>{
+test('a stalled calibration restores hiding at its deadline, including a manual wait for the next line',t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  for(const manual of [true,false]){const r=rig({engine:'',publish:false});const before=r.hide();r.control.beginStyleSync(manual,'all');
   assert.deepEqual(r.switches(),[{type:'disable',reason:'reader-preflight'}]);
-  t.mock.timers.tick(1999);assert.equal(r.hook.enabled,false,'still measuring');
+  t.mock.timers.tick((manual?90000:2000)-1);assert.equal(r.hook.enabled,false,'still waiting for the player or the probe');
   t.mock.timers.tick(1);assert.deepEqual(r.hide(),before,'hide state restored');assert.equal(r.switches().at(-1).type,'enable');
   assert.equal(r.control.styleCalibration,false);assert.equal(r.style.statuses.at(-1),'timeout');}
  /* the screen baseline preflight is capped the same way */
  const r=rig({engine:''});r.hook.preflight=true;r.hook.calibrating=true;r.hook.configure(r.control.host.preferences,r.control.host.state);assert.equal(r.hook.enabled,false);
  t.mock.timers.tick(2000);assert.equal(r.hook.preflight,false);assert.equal(r.hook.enabled,true);
+});
+test('saving the calibrated translation gap and its undo through Reader survives reopening the work',async t=>{
+ const {GameStyleSync}=require('../core/game-style-sync.cjs'),{Reader}=require('../services/reader.cjs');
+ const config=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'mgl-calibration-')),key='a'.repeat(64);
+ t.after(()=>fs.rmSync(config,{recursive:true,force:true}));
+ const open=()=>{const sync=new GameStyleSync({config},()=>{});sync.configure({},{gameProcessId:123,gameStarted:'1',gameStyleKey:key});return sync;};
+ const reader=Object.assign(Object.create(Reader.prototype),{active:()=>true,gal:{styleSync:open()},saveWorkPrompt(){}});
+ const original={japaneseSize:39,furigana:false,rubyScale:.61,hookHide:false,anchorDX:4,gap:15};
+ for(const gap of [15,-2,15]){
+  await reader.message({type:'gameStyleConfirm',key,part:'all',prefs:{...original,gap},saveId:String(gap)});
+  reader.gal.styleSync=open();
+  assert.deepEqual(reader.gal.styleSync.profile.prefs,{...original,gap});
+ }
 });

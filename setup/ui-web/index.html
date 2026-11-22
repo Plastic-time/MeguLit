@@ -20,9 +20,10 @@ html,body{background:transparent!important}
 #win{position:absolute;left:var(--M);top:var(--M);right:var(--M);bottom:var(--M)}
 #shadow{position:absolute;left:var(--M);top:var(--M);right:var(--M);bottom:var(--M);border-radius:22px;box-shadow:0 34px 90px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.04);display:none}
 .deskmode #shadow{display:block}
-.native{--M:0px}.native #app{border-radius:0;box-shadow:none}.native #shadow,.native #desk{display:none}
+.native{--M:0px}.native #app{border-radius:0}.native #shadow,.native #desk{display:none}
 #app{position:absolute;inset:0;border-radius:22px;overflow:hidden;background:var(--bg2);box-shadow:0 0 0 1px rgba(0,0,0,.18)}
 :root[data-theme=night] #app{box-shadow:0 0 0 1px rgba(255,255,255,.1)}
+:root.native #app,:root.native[data-theme=night] #app{box-shadow:none}
 #chrome{position:absolute;inset:0;pointer-events:none}
 /* window resize hot zones + a visible corner grip, only in the real (native) window */
 .rz,.rzg{display:none}.native .rz{display:block;position:absolute;z-index:60;pointer-events:auto}.native .rzg{display:block;position:absolute;right:3px;bottom:3px;width:14px;height:14px;z-index:59;pointer-events:none;opacity:.55}
@@ -36,8 +37,12 @@ html,body{background:transparent!important}
 #chrome .tab button:focus-visible{outline:2px solid #fff;outline-offset:-3px}
 #chrome .notch{position:absolute;left:-10px;top:150px;width:10px;height:70px;background:var(--red);pointer-events:none}
 .scrim{position:absolute;inset:0;background:rgba(10,12,16,.45);pointer-events:auto}
+#install-confirm{margin:auto;width:min(460px,90vw);padding:24px;background:var(--bg2);color:var(--ink);border:1px solid var(--line)}
+#install-confirm::backdrop{background:rgba(10,12,16,.45)}
+#install-confirm p{margin:14px 0 24px;overflow-wrap:anywhere}
+#install-confirm .acts .go,#install-confirm .acts .btn{height:42px}
 .card.quit{right:auto;left:50%;top:50%;width:440px;margin:-130px 0 0 -220px;pointer-events:auto}
-.card.quit p{font-size:14px;margin-top:16px;line-height:1.6}.card.quit .acts{display:flex;gap:8px;margin-top:20px}.card.quit .acts .go{margin:0;flex:1;width:auto;height:46px;font-size:15px}
+.card.quit p{font-size:14px;margin-top:16px;line-height:1.6}.card.quit .acts{display:flex;align-items:flex-end;gap:8px;margin-top:20px}.card.quit .acts .go{margin:0;flex:1;width:auto;height:46px;font-size:15px}
 /* glass shards (inline svg per shard; edges, bevel and thickness are drawn in the svg) */
 .shard{position:absolute;overflow:visible;transform-style:flat}
 .shard .edge{filter:none}
@@ -80,6 +85,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);color:v
 .steps i.on{background:var(--red)}
 .steps span{font-size:11px;letter-spacing:2px;color:var(--mute);margin-left:10px;text-transform:uppercase}
 #hud{pointer-events:none}
+#hud.waiting .pct,#hud.waiting .stat,#hud.unpacking .stat{visibility:hidden}
+.startup-progress #boot{inset:auto 0 0;min-height:128px;padding:22px 56px 42px}.startup-progress #boot b{font-size:22px}.startup-progress #boot i,.startup-progress #boot #bootT2,.startup-progress #boot u{display:none}
 .pct{position:absolute;left:30px;bottom:74px;font-size:148px;font-weight:800;letter-spacing:-8px;line-height:.9;font-variant-numeric:tabular-nums}
 .pct small{font-size:44px;letter-spacing:0;margin-left:6px;color:var(--red)}
 .stat{position:absolute;left:36px;bottom:44px;font-size:14px;color:var(--mute);display:flex;gap:22px;font-variant-numeric:tabular-nums}
@@ -198,11 +205,11 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 <script>try{var b=new URLSearchParams(location.search).get("btn");if(b)document.documentElement.setAttribute("data-btn",b)}catch(e){}</script>
 </head>
 <body>
-<div id="boot"><div><i></i><b id="bootT1"></b><b id="bootT2"></b></div><u></u></div><script>try{var en=new URLSearchParams(location.search).get('lang')==='en';document.getElementById('bootT1').textContent=en?'Welcome to MeguLit':'欢迎使用MeguLit';document.getElementById('bootT2').textContent=en?'Let us get it installed':'现在开始安装'}catch(e){}</script>
+<div id="boot" role="status"><div><i></i><b id="bootT1"></b><b id="bootT2"></b></div><u></u></div><script>try{var params=new URLSearchParams(location.search), en=params.get('lang')==='en';if(params.get('boot')==='progress'){document.documentElement.classList.add('startup-progress');document.getElementById('bootT1').textContent=en?'Preparing the installer…':'正在准备安装界面…';}else{document.getElementById('bootT1').textContent=en?'Welcome to MeguLit':'欢迎使用MeguLit';document.getElementById('bootT2').textContent=en?'Let us get it installed':'现在开始安装'}}catch(e){}</script>
 <div id="desk"></div>
 <div id="shadow"></div>
 <div id="win"><div id="app">
-<div id="view"><img id="vposter" alt="" decoding="sync" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:4" onload="try{var b=document.getElementById('boot');if(b)b.classList.add('gone');window.__posterAt=Math.round(performance.now());if(window.chrome&&chrome.webview)chrome.webview.postMessage({type:'mark',what:'poster',at:window.__posterAt})}catch(e){}"><script>/* the first frame of the opening clip, in the first paint: no script has to run before the window shows the scene */try{var q=new URLSearchParams(location.search),vb=(q.get("vbase")||"video/").replace(/\/?$/,"/"),dk=q.get("theme")?q.get("theme")==="night":localStorage.getItem("megulit.setup.theme")==="dark";if(q.get("prerender")!=="1")document.getElementById("vposter").src=vb+(dk?"dark":"light")+"/intro.jpg";else document.getElementById("vposter").remove()}catch(e){}</script><video id="v0" muted playsinline preload="auto" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;opacity:0"></video><script>/* the opening clip starts decoding in the first moments; player.js takes this element over */try{var q0=new URLSearchParams(location.search);if(q0.get("prerender")!=="1"&&q0.get("reduce")!=="1"&&!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)){var v0=document.getElementById("v0"),vb0=(q0.get("vbase")||"video/").replace(/\/?$/,"/"),dk0=q0.get("theme")?q0.get("theme")==="night":localStorage.getItem("megulit.setup.theme")==="dark";v0.dataset.theme=dk0?"dark":"light";v0.src=vb0+v0.dataset.theme+"/intro.mp4";v0.load()}else document.getElementById("v0").remove()}catch(e){}</script><div id="world"></div></div>
+<div id="view"><img id="vposter" alt="" decoding="sync" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:4" onload="try{var b=document.getElementById('boot');if(b)b.classList.add('gone');window.__posterAt=Math.round(performance.now());if(window.chrome&&chrome.webview)chrome.webview.postMessage({type:'mark',what:'poster',at:window.__posterAt})}catch(e){}"><script>try{var q=new URLSearchParams(location.search),poster=document.getElementById("vposter");if(q.get("boot")==="progress"||q.get("prerender")==="1")poster.remove();else{var vb=(q.get("vbase")||"video/").replace(/\/?$/,"/"),dk=q.get("theme")?q.get("theme")==="night":localStorage.getItem("megulit.setup.theme")==="dark";poster.src=vb+(dk?"dark":"light")+"/intro.jpg"}}catch(e){}</script><video id="v0" muted playsinline preload="auto" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;opacity:0"></video><script>/* the opening clip starts decoding in the first moments; player.js takes this element over */try{var q0=new URLSearchParams(location.search);if(q0.get("prerender")!=="1"&&q0.get("reduce")!=="1"&&!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)){var v0=document.getElementById("v0"),vb0=(q0.get("vbase")||"video/").replace(/\/?$/,"/"),dk0=q0.get("theme")?q0.get("theme")==="night":localStorage.getItem("megulit.setup.theme")==="dark";v0.dataset.theme=dk0?"dark":"light";v0.src=vb0+v0.dataset.theme+"/intro.mp4";v0.load()}else document.getElementById("v0").remove()}catch(e){}</script><div id="world"></div></div>
 <div id="fx"><div id="vig"></div><div id="streaks"></div><div id="flash"></div></div>
 <div class="layer" id="ui-top" style="opacity:1;visibility:visible"><div class="top"><img id="topLogo" src="logos/logo-orig.svg" alt="MeguLit"><div class="steps" id="steps"><i></i><i></i><i></i><i></i><span id="stepname"></span></div></div></div>
 <div class="scrimb layer" id="scrimb" style="opacity:1;visibility:visible;pointer-events:none"></div>
@@ -223,6 +230,7 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 <div class="layer" id="ui-done"><div class="big"><span id="doneT"></span><small id="doneEn">All set</small></div><div class="launch"><button class="go" id="launch">开读</button></div></div>
 <div class="layer" id="ui-mini" style="opacity:1;visibility:visible"><div id="mini"></div></div>
 </div>
+<dialog id="install-confirm" aria-labelledby="confirm-install-title"><form method="dialog"><h2 id="confirm-install-title"></h2><p id="confirm-install-path"></p><div class="acts"><button type="submit" class="btn" value="back" id="confirm-install-back" autofocus></button><button type="submit" class="go" value="install" id="confirm-install-go"></button></div></form></dialog>
 <div id="picker" role="dialog" aria-modal="true" aria-label="choose install location"><div class="pk"><div class="pkh"><b id="pkT"></b><span class="crumb" id="pkCrumb"></span><button class="pkx" id="pkClose" aria-label="close">×</button></div><div class="pkl" id="pkSide"></div><div class="pkm" id="pkMain"></div><div class="pkf"><input id="pkNew" maxlength="80" spellcheck="false"><button id="pkMk"></button><span class="pkmsg" id="pkMsg"></span><span class="sp"></span><button id="pkMore"></button><button id="pkCancel"></button><button class="ok" id="pkOk"></button></div></div></div>
 <div id="chrome"><div id="drag"></div><i class="rz" data-e="l"></i><i class="rz" data-e="r"></i><i class="rz" data-e="t"></i><i class="rz" data-e="b"></i><i class="rz" data-e="tl"></i><i class="rz" data-e="tr"></i><i class="rz" data-e="bl"></i><i class="rz" data-e="br"></i><svg class="rzg" viewBox="0 0 14 14" aria-hidden="true"><path d="M13 3 3 13M13 7 7 13M13 11 11 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg><div class="tab"><button id="btnTheme" aria-pressed="false"></button><button id="btnMin" aria-label="最小化 Minimize"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.6"/></svg></button><button id="btnClose" aria-label="关闭 Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.6"/></svg></button></div><div class="notch"></div></div>
 <div class="layer" id="ui-quit"><div class="scrim"></div><div class="card quit"><h2>货还在路上</h2><div class="en">Download in progress</div><p>现在关掉也没关系：已经下好的碎片会保留，下次打开接着下。</p><div class="acts"><button class="go" id="stay">等它到</button><button class="btn" id="leave">回头再来</button></div></div></div>

@@ -1,0 +1,114 @@
+{
+  "schema": "megulit.exhibit-stock-evidence.v1",
+  "scope": "Static exact publisher files and retained stock adapter contract only; no game execution or Reader acceptance",
+  "engine": "ExHIBIT RLD / Retouch runtime, separate from WillPlus/AdvHD",
+  "publisherGameVersion": "1.00",
+  "engineCompilerVersionProven": false,
+  "modules": [
+    {
+      "relativePath": "LoveSweets体験版.exe",
+      "bytes": 1249280,
+      "sha256": "e06707c306487467ef0de1a065fa05a296e6e2f2bd4f192dfcc75a3e6e2b48c3"
+    },
+    {
+      "relativePath": "resident.dll",
+      "bytes": 3379200,
+      "sha256": "ed248db8db465fbec0db749b773063b1f3c9ef6f831924100e65a8f70f421eb6"
+    },
+    {
+      "relativePath": "sc00.dll",
+      "bytes": 561152,
+      "sha256": "eca01ff6e322f239d65f4713ebea373b3c08df8fff556f98c130b1ee9d3ddb21"
+    },
+    {
+      "relativePath": "ExHIBIT.ini",
+      "bytes": 944,
+      "sha256": "6315e6092211ca3cf147ff5427b9638d6d9f1c258556e747fbdb9011ca07bbc2"
+    },
+    {
+      "relativePath": "rld/0_0419_01.rld",
+      "bytes": 43699,
+      "sha256": "8e795216c823b774b75b3e3e3aaa2a76e7eff6d6b3acdd4f20d0ceaf25f4b878"
+    },
+    {
+      "relativePath": "rld/0_0420_01.rld",
+      "bytes": 294,
+      "sha256": "b0f5112b0df6f5c68d319da81290f2f30f345e9ede48b33d42f55892558b5c82"
+    }
+  ],
+  "ordinaryEntries": [
+    {
+      "hook": "Retouch1",
+      "symbol": "?printSub@RetouchPrintManager@@AAE_NPBDAAVUxPrintData@@K@Z",
+      "rva": 325712,
+      "forwarder": null,
+      "prefixHex": "83ec085355568b74241cf6462c01578bd9c6442413007404"
+    },
+    {
+      "hook": "Retouch2",
+      "symbol": "?printSub@RetouchPrintManager@@AAEXPBDKAAH1@Z",
+      "rva": 284528,
+      "forwarder": null,
+      "prefixHex": "8b4424085356578bf883effff7df1bff33db23f88bf10f86"
+    }
+  ],
+  "exeLoader": {
+    "residentNameRva": 832936,
+    "residentName": "resident.dll",
+    "sites": [
+      {
+        "rva": 283697,
+        "hex": "68a8b54c00",
+        "kind": "push-default-resident-name"
+      },
+      {
+        "rva": 283708,
+        "hex": "e8cf2f0200",
+        "kind": "call-loader-wrapper"
+      },
+      {
+        "rva": 427041,
+        "hex": "e88a01ffff",
+        "kind": "call-loader"
+      },
+      {
+        "rva": 361925,
+        "hex": "ff157ce14b00",
+        "kind": "call-LoadLibraryExA-IAT"
+      }
+    ],
+    "wrapperRva": 427024,
+    "loaderRva": 361904,
+    "loadLibraryExAIatRva": 778620,
+    "defaultNameCanBeOverridden": true,
+    "executionProven": false
+  },
+  "scenario": {
+    "file": "sc00.dll",
+    "entry": "start",
+    "entryRva": 4432,
+    "importsResident": true
+  },
+  "stockSource": {
+    "Retouch.cpp": {
+      "sha256": "bc24ddbf371cbfb7d090b23912edeb4b20cf03a604021739a2f3c07181af0668",
+      "gitBlob": "0b730c31fabeec3224470992cb3b89c3fed67fab"
+    },
+    "Retouch.h": {
+      "sha256": "671c12738b83d54455d410eae825d8a1b6e2055fb4100bb29842d5c2e4bb42d0",
+      "gitBlob": "7e30066f2c46e6edef4e0a775d1a33e33470f3f4"
+    }
+  },
+  "sourceCommit": "7772ec7bb186bd3773bb534dcbc8655a4a364150",
+  "newHookImplementation": false,
+  "runtimeVerified": false,
+  "readerVerified": false,
+  "historyEntry": {
+    "hook": "RetouchHistory",
+    "patternHex": "8b4424046a026a006a006a0050e8",
+    "matchRva": 1849824,
+    "targetRva": 1847952,
+    "prefixHex": "8b4424046a026a006a006a0050e89ef8ffff",
+    "runtimeRoleProven": false
+  }
+}

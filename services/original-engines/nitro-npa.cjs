@@ -47,6 +47,31 @@ function parse(buf){const nsb=nsbText(buf);if(nsb)return nsb.length?parsePre(dec
   if(!text||!JP.test(text)){anchors.push(t.slice(0,40));continue;}
   if(name){lines.push(name);ruby.push(null);}lines.push(text);ruby.push(pairs.length?pairs:null);}
  return {lines,anchors,ruby};}
+// For replacement, preserve every command, label, speaker tag and control outside plain PRE text.
+function importLayout(bytes){
+ if(bytes[0]===0xfe&&bytes[1]===0xfe&&bytes[2]<=2)throw Error('IMPORT_NPA_UNSUPPORTED');
+ const text=decode(bytes).replace(/\r\n?/g,'\n');
+ if(/[\x00-\x08\x0b\x0c\x0e-\x1f\ufffd]/.test(text))throw Error('IMPORT_NPA_UNSUPPORTED');
+ const dialogue=[];
+ const block=/<PRE\b[^>]*>([\s\S]*?)<\/PRE>/gi;
+ const code=text.replace(block,'');
+ if(/<\/?PRE\b/i.test(code))throw Error('IMPORT_NPA_UNSUPPORTED');
+ const commands=code.replace(/^\s*\/\/.*$/gm,'');
+ const references=[...new Set([...commands.matchAll(/\b[A-Za-z_]\w*\s*\([^()\r\n]*"([^"\r\n]{8,})"/g)]
+  .map(match=>match[1]).filter(value=>/[\\/]|\.[a-z0-9]{2,5}$/i.test(value)))];
+ const structure=text.replace(block,(section,body)=>{
+  if(/<\/?PRE\b/i.test(body))throw Error('IMPORT_NPA_UNSUPPORTED');
+  const shape=body.split('\n').map(line=>{
+   const tags=[];
+   const prose=line.trim().replace(/^(<voice\b[^>]+>)/i,(_,tag)=>{tags.push(tag);return '';}).trim()
+    .replace(/<RUBY\s+text="[ぁ-ゖァ-ヺー・ ]+">([^<>]+)<\/RUBY>/gi,'$1');
+   if(!/^[\p{L}\p{M}\p{N}\p{Zs}\p{P}\p{S}]+$/u.test(prose)||!JP.test(prose)||/[<>\[\]{}\\@%$&]/.test(prose)||prose.startsWith('//'))return ['literal',line];
+   dialogue.push(prose);return ['dialogue',tags];
+  });
+  return section.slice(0,section.indexOf('>')+1)+JSON.stringify(shape)+'</PRE>';
+ });
+ return {dialogue,structure,references};
+}
 const engine=kit.engine({id:'nitro-npa',hint:'nss.npa',overlay:false,
  archives:{name:/\.npa$/i,subs:['','..'],list,entry:/\.ns[sb]$/i,sort:false},parse,test:n=>/\.ns[sb]$/i.test(n)});
-module.exports={list,parse,nsbText,engine};
+module.exports={list,parse,nsbText,importLayout,engine};

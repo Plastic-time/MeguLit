@@ -100,4 +100,23 @@ function scenePck(dir){const found=scenePckLaunched(dir);if(found)return found;c
 // Lines with a voice number in a game folder: [{text, ref:'koe:<n>'}].
 function voiceLines(dir){const f=scenePck(dir);if(!f)return [];let list=[];try{list=sources(f);}catch{return [];}
  return list.filter(s=>/\.ss$/i.test(s.name)).flatMap(s=>voiced(decode(s.raw))).filter(x=>x.koe!==null).map(x=>({text:x.text,ref:'koe:'+x.koe}));}
-module.exports={sources,voiced,voiceLines,scenePck,_internal:{smd5,lzss,tileCopy,chunk}};
+// A serial can recur in another scene. Keep the role only when the source also
+// agrees on the Japanese text. A table can contain UI and unused rows as well.
+function messageSlots(list){
+ const slots=new Map();
+ for(const {name,raw} of list){
+  if(!/\.ss$/i.test(name))continue;
+  const text=decode(raw).replace(/\/\*[\s\S]*?\*\//g,'');
+  for(const line of text.split(/\r?\n/)){
+   const code=line.split(/;|\/\//,1)[0];
+   for(const match of code.matchAll(/@mes(_sel|_par[0-3])?\s*\(\s*(\d+)\s*,[^,]*,\s*([^()\r\n]*?)\)/gi)){
+    const id=Number(match[2]),role=match[1]?.toLowerCase()==='_sel'?'c':'b';
+    const value=(match[1]?.toLowerCase().startsWith('_par')?match[3].replace(/,[^,]*$/,''):match[3]).trim();
+    const old=slots.get(id);
+    slots.set(id,old===undefined||old?.role===role&&old.text===value?{role,text:value}:null);
+   }
+  }
+ }
+ return slots;
+}
+module.exports={sources,decode,voiced,voiceLines,scenePck,messageSlots,_internal:{smd5,lzss,tileCopy,chunk}};

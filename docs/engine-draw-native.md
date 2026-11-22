@@ -6,6 +6,13 @@
 
 ## 静态普查（店主本机的 exe）
 
+GDI `DrawSites` 诊断只接受控制文件首个完整 `#cfg` 行里唯一、精确的 `roles=1` 字段，默认关闭
+观察器整个进程生命周期约每 2 秒复查一次权限，删除文件、读取失败或 `roles=0` 会停止读取与输出，并丢弃尚未输出的 run；重新开启从新 run 开始
+撤权与读取共用锁，撤权完成后不会继续读取先前调用的参数；已安装的跳板保留，原游戏调用继续原样执行，避免运行中卸钩
+这是只读诊断的权限边界，不授予原文隐藏、译文替换、角色或屏幕坐标能力；各游戏仍需独立实机验收
+GDI gate 在调用观察器前保存 x87/SSE 状态并清方向标志，观察器返回或受保护异常后还原，再继续原 API
+真实 MinHook 小型回放检查栈、整数寄存器、DF/CF、XMM0/XMM7、x87 值与控制字、MXCSR，也覆盖观察器先破坏浮点状态再抛异常；它不证明 AVX 上半部或完整游戏显示行为
+
 | 游戏 | exe | 位数 | 文字 API 调用点（导入表 → 代码里的 call 数） | 图形 |
 |---|---|---|---|---|
 | CLANNAD | SiglusEngine_Steam.exe | x86 | GetGlyphOutlineW ×2、GetGlyphOutlineA ×1、TextOutW ×1、ExtTextOutW/A ×1、GetTextExtentPoint32W ×2、CreateFontW ×4 | d3d9 |
@@ -53,7 +60,14 @@
 | 运行时钩子 | `native/megulithook/BgiDraw.h`（`BGI::attach_function` 找到 BGI 文字钩子后 `BgiDraw::Arm`）。默认不挂：控制文件 `roles=1` 才在挂链调用点和释放函数头装 MinHook；挂链点不是正好一处就不挂（`off: N glyph link matches`）。新键 `draw.viaRoles`（版本层，默认 `[]`）经 `core/engine-draw.cjs` 写成控制文件的 `#role` 行 |
 
 #### 店主测试清单（BGI，素晴日 HD）
-1. 在 `The Seed/bgi/subahibi/game.json` 把 `draw.roles` 改成 `true`（或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`，UTF-16LE，内容 `#cfg roles=1`）
+
+权限回归：BGI 现在只接受 UTF-16LE 首条完整 `#cfg` 行（支持 transport 的 BOM），`roles=1` 必须是唯一且精确的 token，正文伪 cfg、重复键、截断及畸形宽字符均不能授权
+watcher 安装后继续每两秒刷新；撤权、控制文件缺失或读取失败会丢弃 pending row/end 与角色映射，重开只记录新文字，原 link/free 始终透传
+`#role` 行保留 `draw.viaRoles` 的六种角色、1..8 位小写 hex RVA、最多六段前缀合同，并只读取数据行前的有效 metadata
+在途日志可能已交给 logger，撤权不是撤回已发送日志的确认；权限代次避免在 logger 内发生 off-on 后，旧调用重建 pending 数据
+`selftest/run-bgi-permission.cmd` 使用真实 JS transport 文件、生产 ReadControl 和小型真 MinHook 调用点/free 回放；它是 native-builds `ci:false` 下的本地自检，不代表真实游戏验收或普通 CI 已跑 native gate
+
+1. 在 `The Seed/bgi/subahibi/game.json` 把 `draw.roles` 改成 `true`（或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`，UTF-16LE，首行内容 `#cfg roles=1` 并以换行结束）
 2. 开游戏，新游戏推 5 句（有名字的句子）、走到第一个选项、开一次系统菜单
 3. 看 `logs\hook-diagnostics.log`：
    - 有一行 `ToMe_DRAWRUN engine=bgi on: link ... node=3 ch=[esp+30] prev=[esp+a0] color=[ebp+2c] free=...` = 钩子装上了
@@ -111,7 +125,17 @@
 - 没做：按钮 / 系统菜单（Siglus 的系统菜单多是图片按钮，不走 moji，【推测】）；竖排注音（现在只按 x 配底字）
 
 #### 店主测试清单（SiglusEngine：CLANNAD、Summer Pockets）
-1. 在 The Seed 里给这部游戏的游戏差分（`The Seed/siglus/clannad/game.json` 或 `summer-pockets/game.json`）把 `"draw":{"roles":false}` 改成 `true`；或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE 或 UTF-8，内容 `#cfg roles=1`）
+
+权限回归：只接受首条完整 ASCII `#cfg` 行里的唯一精确 `roles=1`，支持实际 transport 的 UTF-16LE BOM，同时保留旧 UTF-16LE、ASCII、UTF-8 BOM 格式及空格 / tab 分隔
+安装和观察分开；安装后仍每两秒检查权限，关闭、文件缺失、读失败或畸形首行会在同一把锁内清空文字、ruby、角色 / 来源、颜色、坐标原点和去重状态
+OnPush 的快照读取与 Handle、Clear、Frame、FlushIdle 都受观察权限保护；转换或 logger 回调发生重入 off-on 时，epoch 阻止旧缓冲复活
+三个 gate 保存 GPR、flags、ESP 和 FXSAVE 状态，观察器异常不能跳过原 push / clear / frame；开启时保留原有 150ms idle flush，关闭时只做两秒权限轮询
+这是异步轮询，不是同步关闭 ACK；已经通过最终权限检查的观察回调可能完成 logger，已写日志不能撤回
+`selftest/run-siglus-permission.cmd` 直接读取真实 JS transport 文件，运行实际 MinHook 三门、台词 / 名字 / 选项 / ruby 和撤权反例；它接入手动自检，普通 CI 不编译此 Windows native gate
+纯签名匹配器按 x86 EIP32 计算相对 CALL，即使自检编译在 x64 host 也一样；双 host 的真实字节自检不代表支持 x64 Siglus 游戏
+本轮没有新增 seed 或允许名单，没有重编完整 DLL，也没有游戏实机验收
+
+1. 获得该游戏版本的实测授权后，才临时开启版本差分里的 `draw.roles`；或写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE 或 UTF-8，首行 `#cfg roles=1`，必须以换行结束）
 2. 开游戏，开新游戏推 5 句（带一句有注音的、一句有名字的），出一次选项，开一次回想（backlog）再关掉
 3. 看 `logs\hook-diagnostics.log`：
    - 有一行 `ToMe_DRAWRUN engine=siglus on: push … add_msg … clear …`
@@ -122,6 +146,7 @@
    - 截一句已读（再读一次）和一句未读的对话框：字色一样 = 「Siglus 没有已读变色」的推测成立
 4. 游戏照常显示、推进不卡、不崩、日志不刷屏（同一句不会每帧重复出现，`origin` 只在窗口挪动后出现）= 过
 5. 不过时发：`hook-diagnostics.log`（含 `on:` 或 `off:` 那一行）、`hook-events.log`、exe 版本；`off: push count differs` 之类 = 这个版本签名没对上
+6. 在一行仍待 idle flush 时关闭 roles，等待轮询确认 run / clear / origin 不再新增；恢复后仅记录新文字，原点重新稳定后再报，旧半句和 ruby 不能回来
 
 ### MAGES.（已做：画字层，2026-11-21，feat/re-mages）
 - 现有：`native/megulithook/MagesEngine.cpp`、`MeguLitSg.cpp`、`native/mages/`（SC3 串解码含注音；STEINS;GATE 按 PE 时间戳精确匹配的串钩子 + 内嵌）。这些都是「读 SC3 字符串」，不是画字
@@ -276,10 +301,19 @@
 坐标是窗口文字画布上的像素，不是屏幕：下一步由探针 / diff-maker 用 DRAWRUN 和已有的字形点 / GPU 位置配出每部游戏「画布 → 屏幕」的偏移写进版本层差分，角色由 DRAWRUN 的文字和 hook 流的 ctx2（台词 / 名字 / 其他）对上。内嵌仍走现有写回
 
 ### 店主测试清单（YU-RIS）
-1. 在 The Seed 里给 euphoria（或 女装山脈 / サイコロジック）的游戏差分设 `"draw":{"roles":true}`，或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，内容 `#cfg roles=1`）
+
+权限回归：运行时只接受 UTF-16LE 首条完整 ASCII `#cfg` 行，支持 transport 的 BOM，且必须只有一个精确的 `roles=1` token
+安装与观察分开；安装后仍每 2 秒检查控制文件，关闭、缺失、读失败或畸形授权会在同一把锁内清空未输出文字、连续指针和坐标状态
+恢复权限会开启新 epoch，日志回调中的重入 off-on 不能使旧缓冲复活；原 blitter 始终透传，观察器保存 GPR、flags、ESP 和 FXSAVE 状态
+已经交给 logger 的记录无法收回，2 秒轮询及临界区完成前也不算同步撤权 ACK；这里没有增加这样的 ACK 协议
+`selftest/run-yuris-permission.cmd` 用真实 JS transport 文件、生产读取函数和实际 MinHook CALL 点回放验证这些边界，两架构签名仍用原有实字节夹具
+它已接入手动 `selftest/run.cmd`，普通 CI 不编译这份 Windows 原生 gate；上述自检不代表真实游戏验收，也没有新增 seed 或允许名单
+
+1. 获得该游戏版本的实测授权后，才临时开启版本差分中的 `draw.roles`，或写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，首行 `#cfg roles=1`，必须以换行结束）
 2. 开游戏推 5 句、出一次选项
 3. 看 `logs\hook-diagnostics.log`：有一行 `ToMe_DRAWRUN engine=yuris on: call ...`，之后每句有 `ToMe_DRAWRUN engine=yuris run=` 带这句的文字；名字和选项也各有自己的 run
 4. 游戏照常显示、不卡、不崩 = 过。没有 `on:` 行而有 `off: N dialogue loop matches` = 这个版本签名没对上，把那行和 exe 发来
+5. 在一段文字尚未输出时关闭 roles，等待轮询确认日志不再新增；恢复后只应看到新文字，不能带回关闭前的半句，再检查锁定或暂时移走控制文件时同样停止观察
 
 ## 建议的推进方式
 
@@ -302,7 +336,7 @@
 
 现在的签名（每个都在店主本机文件上正好命中 count 次，在其他引擎的文件里不命中）：
 
-**注意：字形缓存（re-bgi 在素晴日 BGI 上确认的情况）**：很多引擎的 GetGlyphOutline / TextOut 调用点在「字形缓存」函数里，一个字只在第一次进缓存时画一次（画在缓存位图的 0,0），之后再显示同一个字不再调用。这种点的记录只有「这次新进缓存的字」，拼不出整句，也没有画布坐标。DrawSites 适合的是每次显示都调用、带笔位的点（AVG32 的 TextOutA 每个字都画进文字 DIB）。AdvHD 本机版本已静态确认缓存命中绕过旧点，输入诊断见下节。其余 GetGlyphOutline 签名（Softpal、CMVS、FVP、minori、Musica、沙耶两版）以及 NScripter 的字形小图都还没确认是不是缓存：实机看同一个字在第二句里还出不出现就知道。是缓存的，就要像 re-bgi 那样往上找排版函数（BGI 的字节点链）再签，GDI 点只留作「字形 → 例程」的旁证
+**注意：字形缓存（re-bgi 在素晴日 BGI 上确认的情况）**：很多引擎的 GetGlyphOutline / TextOut 调用点在「字形缓存」函数里，一个字只在第一次进缓存时画一次（画在缓存位图的 0,0），之后再显示同一个字不再调用。这种点的记录只有「这次新进缓存的字」，拼不出整句，也没有画布坐标。DrawSites 适合的是每次显示都调用、带笔位的点（AVG32 的 TextOutA 每个字都画进文字 DIB）。AdvHD 与 CMVS 的本机版本已静态确认缓存命中绕过旧点，输入诊断见下节。其余 GetGlyphOutline 签名（Softpal、FVP、minori、Musica、沙耶两版）以及 NScripter 的字形小图都还没确认是不是缓存：实机看同一个字在第二句里还出不出现就知道。是缓存的，就要像 re-bgi 那样往上找排版函数（BGI 的字节点链）再签，GDI 点只留作「字形 → 例程」的旁证
 
 ### 给其他逆向会话：GDI 类引擎直接加签名，不要各写一套钩子
 BGI、Siglus 等只要画字最终经过 TextOut / ExtTextOut / DrawText / GetGlyphOutline（A 或 W），就复用 DrawSites：
@@ -340,6 +374,8 @@ e-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4
 - 后续验收清单：先静态追踪调用者的页面合成坐标和角色，再进入全局单游戏实测队列；隐藏桌面验证重复字、模式和角色覆盖。未证明前不写角色或页面坐标，不把一次签名命中当完整逆向
 
 ### Innocent Grey（虚ノ少女）：MFC 的 CDC 文字包装
+- 2026-11-22 更正：下述三点属于 `Innocentsetup.exe` 的 MFC 补丁安装界面，不能作为游戏正文入口。真实日文宿主是 231936 字节的 `虚ノ少女.exe`，动态加载 `plugin/Himorogi.dll`、`Script.dll`、`D3D9Font.dll`；后者通过 GetGlyphOutlineW 栅格化再走 D3D9
+- 固定版本的缓存前 CP932 输入候选及默认关闭的普通 Luna 流见 [re-iga-runtime.md](../side-session-notes/re-iga-runtime.md)。它不产生 ToMe_CHARS，也不授予名字、选项、坐标、注音、隐藏或嵌入能力
 - 点：Innocentsetup.exe 里 MFC 的 CDC::TextOutW（0x41adc7）、CDC::ExtTextOutW（0x41a849）、CDC::DrawTextW（0x41a808），三个都是把参数原样转给 GDI、DC 取 `[ecx+4]` 的薄包装，有 EBP 帧
 - 程序经 CDC 画的字都从这里过（游戏自己的界面也是），via 是调用 CDC 的那个游戏例程，用它分台词 / 名字 / 菜单。这段是 MFC 自带代码，别的 MFC 程序也会命中，所以签名名叫 mfc-*，不叫游戏名
 - 店主测试清单：同 AVG32，行里是 `engine=mfc-textoutw` / `mfc-exttextoutw` / `mfc-drawtextw`；推一句后看哪个 via 带着台词
@@ -354,6 +390,8 @@ e-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4
 ### CMVS（青い鳥，Steam）
 - 点：cmvs32.exe 0x46145e，字形例程 0x4613b0（EBP 帧，2 个调用者）里每个字一次 `GetGlyphOutlineA(hdc, 字, GGO_GRAY4, &gm, 0, NULL, &mat)`（0x4614b7 是栅格化那次，不签）。字形进 D3D11 纹理，没有笔位，via / via2 是调用者
 - 店主测试清单：同 AVG32，行里是 `engine=cmvs`
+- 缓存限制已静态确认：0x414010 命中时绕过上述 GDI 点，0x461b20 的度量缓存、0x461bb0 的已有字形参数、0x43abb0 的节点位图也存在复用路径，不能据旧点重组完整画面文字
+- 新增 `CmvsDraw.h` 只诊断两个全文绘制入口 0x464850 / 0x465720，二者均为 ECX=this、arg1 完整串、arg2 结构、callee ret8。SHA256 `3a2ec3af6a16a4f36d72faf9e7cb14e2bcc883fbf22fb31da5d69434cc53727e`、1061728 字节、两个唯一 RVA 必须全部验证；`draw.cmvsInput=false` 默认关闭，不授予角色、屏幕坐标、隐藏、嵌入或 reader 原文能力，没有 seed 开启。0x463810 测量入口是负例，不能当作绘制。详见 [re-cmvs-input.md](re-cmvs-input.md)
 
 ### FVP（いろとりどりのヒカリ 中文版 Hikari.exe / HD 版 irohika_HD.exe，两个是同一套布局）
 - 点：字形例程（Hikari 0x430d10 / HD 0x432790 附近）按第三个参数走两条路：只要 `GetGlyphOutlineA(.., GGO_METRICS, ..)`（Hikari 0x430d6f），或 GGO_BITMAP 先量再画（画那次 Hikari 0x430e2c）。各签一条：`fvp` 和 `fvp-bitmap`
@@ -416,6 +454,9 @@ e-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4
 后续实机采集须经游戏适配单队列排期，先 MuteProc 再 HidDesk run，并在 finally 关闭自己启动的进程和恢复静音。临时允许名单和 seed 开关只为这一部游戏建立。推进至少 20 句，重复出现相同字验证缓存命中仍完整，分别记录正文、名字、选项、菜单和 ruby，截图与 DRAWRUN 对齐以确定画布原点和角色调用者。观察层开启、关闭都回放原始句序，确认其他游戏不受影响。补第二个 Majiro 版本后才谈泛化；现在不把原生 stand-in 回放当成游戏实测
 
 ### 静态做不出签名的（写清缺什么，不硬交）
+
+RGSS XP/VX/VX Ace 的本轮状态另见 [engine-rgss.md](engine-rgss.md)。只为固定《魔女の家》VX 1.09a 建立默认关闭的 Ruby 副本观察，不新增原生 DrawSites，也不从任意后台线程调用 RGSSEval。完整归档核对与 Ruby API 回放通过；真实游戏、原版 Ruby 和 Reader 尚未验收，XP/Ace、名字、内嵌和游戏 ruby 未完成
+
 | 引擎 / 游戏 | 静态看到的 | 缺什么 | 下一步 |
 |---|---|---|---|
 | Leaf / AQUAPLUS：WHITE ALBUM2（WA2.exe） | 导入表和代码里没有任何 GDI 文字 API，也没有经寄存器的调用；字是 fnt.pak / fon.pak 里的预渲染字库图集，D3D9 + d3dx9_41 画四边形。游戏目录里另有一个 d3d9.dll（中文补丁带的代理） | 送字函数（从剧本串取字 → 查图集 → 出四边形）在哪，只能运行中看 | 位置已经能走现有的层 4 GPU 字形四边形（native/gpuhide）；台词 / 名字 / 选项要在实机里对四边形的纹理坐标找图集查表函数，再出签名 |
@@ -440,6 +481,16 @@ e-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4
 4. 对 LunaHook 给出的字符串第一字节下硬件读断点：第一个读它的函数是排版 / 送字函数，记录参数（笔位、窗口、字号）
 5. 第 2–4 步交叉得到排版函数的 RVA 和参数布局，取调用点前后字节进夹具，再照 MAGES 的六件套出静态签名（DR1 / DR2 各一份，结构应一致）
 V3（x64）不在这一步。
+
+### TyranoScript DOM 补全（2026-11-22，静态 / 替身单测）
+
+`core/text-paths-web.cjs` 沿用现有 CDP 注入，不增加 native hook。实际存在 `TYRANO.kag` 时，只读 `getMessageInnerLayer()` 的当前层/页；getter 失败时不改抓其他可见消息。无运行时对象的 DOM 兼容检测仍保留。Tyrano 的 `.char` 只取规范底字，排除 `.stroke/.dummy` 装饰副本和 opacity-zero 的未显现字，读取实际 Range 字框与 DPR；祖先隐藏、同文新页、断开与清页都会撤回旧行证明，超过共享 4000 UTF-16 预算的页保留游戏原文
+
+名字来自 `.chara_name_area` 或引擎配置的名字区域；选项来自 `.glink_button` 或明确的 `data-event-tag=glink/link`（包括改成 button_graphic 的 glink），逐字框保留换行。角色关闭或停止时发空快照。所有 UI 保持原字和原点击；消息中混有链接或名字区域时不隐藏/内嵌整层。`.tyrano_button_text` 仅保留旧兼容选择器，不据此宣称图片按钮支持
+
+内嵌须显式开启且正在读，Tyrano 的 `is_adding_text` 为真或底字尚未显现时不改 DOM。游戏原生 `<ruby>` 优先，字典读音不覆盖或嵌套它。撤权只拆 MeguLit 拥有的 ruby/中文节点，保留游戏元素身份与事件；中文关闭会重建当前内嵌，旧页晚到回复不会写进新页。清页回归包含实际 WebTextPath → HookNative → HiddenGate → OverlayPlacement.gone 链
+
+本轮未找到本机 Tyrano 样本，没有运行游戏、Reader 或 HidDesk，静态/浏览器单测不是实机通过。图片按钮、原生 ruby 读音向 Reader 的公共 wire 转换仍未覆盖，不能把七格标全内。官方引擎是自定义条款，不能由第三方依赖的 MIT credits 推断本体许可；只查接口，不分发引擎源码/素材。固定源版本、相关验证及店主清单见 [限定报告](engine-tyrano/result.md)
 
 **みにくいモジカの子（丑小鸭与文字祸.exe，Enigma Protector）**
 1. 游戏启动到标题画面（Enigma 此时已解开代码），用 native/runtimedump 一类的方式只读取出主模块内存镜像（ReadProcessMemory，整段 SizeOfImage），存到 H:\MeguLit-Work

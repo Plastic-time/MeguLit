@@ -424,4 +424,17 @@ async function handle(root,request,options){
 }
 function status(root){return accountFor(root).status();}
 function token(root){return accountFor(root).token();}
-module.exports={relinkGames,accountExtras,Account,handle,status,token,relayBase,normalizeBase,normalizeEmail,newerRecord,cleanSettings,looksLikePath,hashData,stable,kinds,scan,applyRemote,pendingRecords,ensureState,chunks,KINDS,DEFAULT_KINDS,RECORD_CAP};
+async function torchRequest(root,url,init,fetcher){
+ const relay=require('./relay-config.cjs'),target=new URL(url);
+ const official=[relay.DEFAULT_RELAY_BASE,relay.CN_RELAY_BASE];
+ const trusted=official.includes(target.origin)&&!target.username&&!target.password
+  &&['/api/game-profile/report','/api/game-profile/credit','/api/torch/me'].includes(target.pathname)
+  &&!require('../core/owner-tests.cjs').privateMode(root);
+ const account=trusted?accountFor(root):null,session=account&&official.includes(account.base())?account.token():null;
+ if(!session)return fetcher(url,init);
+ const response=await fetcher(url,{...init,redirect:'error',credentials:'omit',headers:{...init.headers,authorization:'Bearer '+session}});
+ const rotated=response.headers?.get?.('x-megulit-token');
+ if(/^mgl_[A-Za-z0-9_-]{43}$/.test(rotated||'')&&account.token()===session)account.setToken(rotated);
+ return response;
+}
+module.exports={torchRequest,relinkGames,accountExtras,Account,handle,status,token,relayBase,normalizeBase,normalizeEmail,newerRecord,cleanSettings,looksLikePath,hashData,stable,kinds,scan,applyRemote,pendingRecords,ensureState,chunks,KINDS,DEFAULT_KINDS,RECORD_CAP};

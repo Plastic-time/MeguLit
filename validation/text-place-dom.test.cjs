@@ -103,7 +103,9 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
       assert.ok(one <= 24 && one >= 14, 'size from the Japanese glyphs, not the stylesheet (' + one + ')');
       await put(3, '衣服破破烂烂，皮肤上满是擦伤，连续走了好几个小时的双腿已经开始失去知觉。'.repeat(3)); await frame();
       const [, t3, , h3] = await box('.tomoyo-cn-row'); assert.ok(await rowFs() <= one, 'a long translation is only ever made smaller');
-      assert.ok(t3 + h3 <= Math.min(720 - 32 * 1.3, 512 + 32 * 1.6) + 2, 'inside the text box, not over the UI under it (bottom ' + (t3 + h3) + ')');
+      assert.ok(t3 >= 512 && t3 + h3 <= 720 - 32 * 1.3 + 2, 'below the last glyph and above the game controls (bottom ' + (t3 + h3) + ')');
+      assert.strictEqual(await rowFs(), one, 'the complete translation fits at the configured size');
+      assert.ok(await page.locator('.tomoyo-cn-row').evaluate(n => n.scrollHeight <= n.clientHeight + 1), 'available space shows every row');
       await put(1, '今天是晴天'); await frame(); assert.strictEqual(await rowFs(), one, 'the next short line has the same size again');
       assert.ok(big >= one, 'size never grows past the box size');
       await page.evaluate(() => { document.querySelector('.tomoyo-cn-row').textContent = '在百货商店购物，在餐厅用餐，在公园悠闲地度过……'.repeat(2); window.__tomoyoChinese.textPlace({ text: '今日は晴れ', client: [1280, 720], rects: [0, 1, 2, 3, 4].map(i => [100 + i * 32, 600, 32, 32]) }); }); await frame();

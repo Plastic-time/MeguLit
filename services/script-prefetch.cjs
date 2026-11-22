@@ -18,7 +18,7 @@ function translator(reader){
 async function ahead(reader,{count=AHEAD}={}){
  const provider=reader?.gal?.hooks?.originalText;if(!provider?.upcoming||!provider.fill)return 0;
  // One language per store (Chinese); an English display keeps translating line by line as before.
- if(reader.displayLanguage?.()==='en')return 0;
+ if(reader.zeroLatencyEnabled?.(reader.targetLanguage())||reader.displayLanguage?.()==='en')return 0;
  const prefs=reader.prefs?.()||{};if(prefs.scriptPrefetch===false)return 0;
  const t=translator(reader);if(t.running)return 0;t.running=true;let done=0;
  try{
@@ -30,7 +30,7 @@ async function ahead(reader,{count=AHEAD}={}){
    if(provider.fill.has(item.text))continue;
    t.service.clearContext?.();for(const line of item.context)t.service.observeSource?.(line);
    /* 2026-11-16 (死に逝く君、館に芽吹く憎悪: 「然后%p-1;%fMS 哥特;——」): a script line's engine tags never go to the translator */const source=require('../core/language-tracks.cjs').engineMarkup(item.text);let text='';try{text=normalizeTranslation(await t.service.translate(source,options,()=>true));}catch{break;}
-   if(!text)continue;provider.fill.set(item.text,text);reader.embedCached?.(item.text,text,{language:options.learnerLanguage==='en'?'en':''});done++;
+   if(!text)continue;provider.fill.set(item.text,text);if(provider===reader.gal?.hooks?.originalText)reader.embedCached?.(item.text,text,{language:options.learnerLanguage==='en'?'en':'',source:'machine'});done++;
   }
  }finally{t.running=false;}
  return done;

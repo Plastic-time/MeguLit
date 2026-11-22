@@ -28,7 +28,7 @@ body{margin:0;background:#000}.tyrano_base{position:relative;width:1280px;height
   await page.setContent(html);await page.addScriptTag({content:PAGE_SCRIPT});
   const reports=()=>page.evaluate(()=>window.__reports);
   const wait=ms=>page.waitForTimeout(ms);
-  await page.evaluate(()=>window.__megulitText.config({roles:true,embed:true,zh:true}));
+  await page.evaluate(()=>{window.__megulitText.config({roles:true,embed:true,zh:true});window.__megulitText.hide(true);});
   await wait(700);
   let r=await reports();
   assert.deepEqual(r.filter(o=>o.ask).map(o=>[o.ask,o.engine]),[['今日は晴れ','web']],'asked once for the still line');

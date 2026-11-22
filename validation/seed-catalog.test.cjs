@@ -250,3 +250,18 @@ test('page: names from VNDB are escaped; a hidden cover carries no VNDB id to lo
  assert.ok(catalogHTML(games,'zh','normal',esc).includes('已确认'));
  assert.equal(catalogHTML(games,'zh','normal',esc,'zzz'),'<p class="sc-empty">没有找到</p>');
 });
+
+test('a public torch cover can resolve a cold VNDB ID and reuse its safe cached thumbnail',async()=>{
+ const root=tmp(),{fetch,calls}=stubVndb();
+ try{
+  assert.equal(await sc.cover(root,'v1',{fetch}),null);
+  const first=await sc.cover(root,'v1',{fetch,resolveMissing:true});
+  assert.match(first,/^data:image\/jpeg;base64,/);
+  assert.equal(await sc.cover(root,'v1',{fetch,resolveMissing:true}),first);
+  assert.equal(await sc.cover(root,'v2',{fetch,resolveMissing:true}),null);
+  assert.equal(await sc.cover(root,'v4',{fetch,resolveMissing:true}),null);
+  assert.equal(await sc.cover(root,'v4',{fetch,resolveMissing:true}),null);
+  assert.deepEqual(calls.filter(c=>c.body).map(c=>c.body.filters[2]),['v1','v2','v4']);
+  assert.deepEqual(calls.filter(c=>!c.body).map(c=>c.url),[vn.v1.image.thumbnail]);
+ }finally{rm(root);}
+});

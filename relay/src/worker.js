@@ -11,6 +11,7 @@ import {LIMITS,validateLeaderboard,validateBoardQuery,validateAdaptationRecord,v
 /* E379 accounts (relay/ACCOUNTS.md) and community features (avatars, hot words) */
 import {handleAccounts,isAccountsPath,authenticate,ROTATED} from './accounts.js';
 /* website game-request and feedback forms → GitHub issues */
+import {yuiPost,syncYui} from './yui.js';
 import {feedbackPost,syncPendingFeedback} from './feedback.js';
 /* E397 public profiles, follows, 同好 */
 import {profileOwn,profileCard,followEdit,followingFeed,kindred,socialDeletes,profileReport,profileAppeal} from './social.js';
@@ -20,11 +21,20 @@ import {forumRoute,forumDeletes,cleanupForumImages} from './forum.js';
 import {newsGet,hotWordsDailyGet,refreshDaily,imageGet,articleGet} from './daily.js';
 /* E562 adapter packs, before/after reports, desensitized probe uploads */
 import {adaptersRoute} from './adapters.js';
+import {probeIssueWebhook,probeIssueMarkdown,repoOf,resolveRegisteredGameRequests} from './probe-issues.js';
+import {gameRequestEvidence} from './game-requests.js';
 import {contribRoute,cleanupContrib} from './contrib.js';
 /* 2026-11-21 game diffs per exe hash: calibration reports in, our signed diffs out (relay/src/auto-profile.js) */
 import {profileRoute} from './auto-profile.js';
 /* 2026-11-21 Cardinal replay scores in, auto diffs verified / sent to the repair queue (relay/src/cardinal.js) */
 import {cardinalRoute} from './cardinal.js';
+export {SeedNotifications} from './seed-notifications.js';
+import {notifier} from './seed-notifications.js';
+import {torchReleaseRoute} from './torch-release.js';
+import {seedMalwareRoute} from './seed-malware.js';
+import {seedAdminRoute,seedUsageRoute,seedAdminAuthorized} from './seed-admin.js';
+import {retryJobs,ordinaryPolicyRoute} from './ordinary-seed.js';
+import {rosterOwner} from './torch-roster.js';
 import {monumentGet,monthsGet,findGet,meGet} from './torch-credit.js';
 
 /* requests per window; key prefix → [limit, seconds] */
@@ -33,7 +43,7 @@ import {monumentGet,monthsGet,findGet,meGet} from './torch-credit.js';
    internet café or a school behind one IP no longer share 120 a minute; 'ip-shared' still caps one IP as a whole.
    Old: ip 120/60 s, lb-get 60, adapt-get 120/h, avatar-get 600, hot 60, daily 60, daily-img 240, release 30,
    social-get 120, forum-get 120. */
-export const RATE={ip:[600,60],user:[600,60],'ip-shared':[3000,60],'adapt-feed':[60,3600],'adapt-pack':[1200,3600],'adapt-report':[30,3600],'autoprof-report':[30,3600],'cardinal-score':[60,3600],'autoprof-credit':[30,3600],'profile-runtime':[6,3600],probe:[64,3600],contrib:[96,3600],'probe-full':[300,3600],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[300,60],'adapt-post':[30,3600],'adapt-get':[600,3600],diag:[20,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[1200,60],report:[20,3600],hot:[300,60],daily:[300,60],'daily-img':[900,60],release:[120,60],appeal:[3,86400],profile:[30,3600],'social-get':[600,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400],'forum-get':[600,60],'forum-post':[5,3600],'forum-reply':[30,3600],'forum-day':[60,86400],'forum-ip':[40,3600],'forum-img':[60,3600]};
+export const RATE={'seed-usage':[60,3600],ip:[600,60],user:[600,60],'ip-shared':[3000,60],'adapt-feed':[60,3600],'adapt-pack':[1200,3600],'adapt-report':[30,3600],'autoprof-report':[30,3600],'cardinal-score':[60,3600],'autoprof-credit':[30,3600],'profile-runtime':[6,3600],probe:[64,3600],contrib:[96,3600],'probe-full':[300,3600],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[300,60],'adapt-post':[30,3600],'adapt-get':[600,3600],diag:[20,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[1200,60],report:[20,3600],hot:[300,60],daily:[300,60],'daily-img':[900,60],release:[120,60],appeal:[3,86400],profile:[30,3600],'social-get':[600,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400],'forum-get':[600,60],'forum-post':[5,3600],'forum-reply':[30,3600],'forum-day':[60,86400],'forum-ip':[40,3600],'forum-img':[60,3600]};
 const encoder=new TextEncoder();
 const hex=buffer=>[...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');
 export async function sha256(value){return hex(await crypto.subtle.digest('SHA-256',typeof value==='string'?encoder.encode(value):value));}
@@ -294,20 +304,30 @@ export async function handle(request,env,now=new Date(),ctx=null){
   else if(isAccountsPath(path))response=await handleAccounts(request,env,now,ctx)||fail('NOT_FOUND',404);
   else if(path==='/api/adaptation')response=request.method==='POST'?await adaptationPost(request,env,ip,now):request.method==='GET'?await adaptationGet(url,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/adaptation/query')response=request.method==='POST'?await adaptationQuery(request,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/yui')response=request.method==='POST'?await yuiPost(request,env,{readJSON,fail,json,hit},ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/feedback')response=request.method==='POST'?await feedbackPost(request,env,{readJSON,fail,json,hit},ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/diagnostics')response=request.method==='POST'?await diagnosticsPost(request,env,ip,url,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path.startsWith('/api/diagnostics/download/')&&request.method==='GET')response=await diagnosticsDownload(url,env,ip,now);
   /* 2026-11-15 adaptation contribution packages, consented in the app (relay/src/contrib.js) */
   else if(path.startsWith('/api/contrib/'))response=await contribRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else if((path==='/dashboard'||path==='/probe/dashboard')&&request.method==='GET')response=new Response(DASHBOARD_HTML,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'public, max-age=60','x-content-type-options':'nosniff'}});
+  else if(path==='/api/seed-admin/malware')response=await seedMalwareRoute(request,env,now,url,path,{json,fail,readJSON})||fail('NOT_FOUND',404);
+  else if(path==='/api/seed-admin/probe-backlog')response=await probeIssueMarkdown(request,env,url,{fail});
+  else if(path==='/api/seed-admin/game-request-evidence')response=await gameRequestEvidence(request,env,repoOf(env),now,url,{json,fail,readJSON,onRegistered:selector=>resolveRegisteredGameRequests(env,now,selector)});
+  else if(path==='/api/seed-admin/ordinary-policy')response=seedAdminAuthorized(request,env)?await ordinaryPolicyRoute(request,env,now,ctx,{json,fail,readJSON}):fail('UNAUTHORIZED',401);
+  else if(path.startsWith('/api/seed-admin/'))response=await seedAdminRoute(request,env,now,url,path,{json,fail,readJSON})||fail('NOT_FOUND',404);
+  else if(path==='/api/seed/usage')response=await seedUsageRoute(request,env,ip,now,url,path,{json,fail,readJSON,hit})||fail('NOT_FOUND',404);
   else if(path==='/api/seed/stats'&&(request.method==='GET'||request.method==='HEAD')){const r=await seedStatsGet(env,{json,fail},ctx,now);response=request.method==='HEAD'?new Response(null,{status:r.status,headers:r.headers}):r;}
   else if(path==='/api/probe/stats'&&request.method==='GET')response=await probeStats(env,now,{json,fail},ctx);
   else if(path==='/api/torch/months')response=request.method==='GET'?await monthsGet(env,url,{json,fail},ctx):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/torch/find')response=request.method==='GET'?await findGet(env,url,{json,fail},ctx):fail('METHOD_NOT_ALLOWED',405);
-  else if(path==='/api/torch/me')response=request.method==='GET'?await meGet(env,url,ip,{json,fail},/^[0-9a-f]{64}$/):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/torch/me')response=request.method==='GET'?await meGet(env,url,await rosterOwner(request,env,now),{json,fail},/^[0-9a-f]{64}$/):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/torch/monument')response=request.method==='GET'?await monumentGet(env,url,{json,fail},ctx):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/torch-release/events'&&request.method==='GET')return notifier(env).fetch(request);
+  else if(path==='/api/torch-release'||path.startsWith('/api/torch-release/'))response=await torchReleaseRoute(request,env,now,url,path,{json,fail})||fail('NOT_FOUND',404);
   else if(path.startsWith('/api/cardinal/'))response=await cardinalRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
-  else if(path==='/api/game-profile'||path.startsWith('/api/game-profile/'))response=await profileRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
+  else if(path==='/api/game-profile'||path.startsWith('/api/game-profile/'))response=await profileRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON,ctx})||fail('NOT_FOUND',404);
+  else if(path==='/api/probe/issue-webhook')response=await probeIssueWebhook(request,env,now,{json,fail});
   else if(path.startsWith('/api/adapters/')||path==='/api/probe'||path.startsWith('/api/probe/'))response=await adaptersRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else response=fail('NOT_FOUND',404);
   /* 2026-11-16 live-usage pulse: a MeguLit client touched the relay (probe-stats.js); aggregate, no identity kept */
@@ -319,9 +339,10 @@ export async function handle(request,env,now=new Date(),ctx=null){
 }
 /* Cron (wrangler.toml [triggers]): Monday 00:00 UTC+8 settles last week's hot words. */
 export async function scheduled(event,env,ctx){
+ if(event?.cron==='*/30 * * * *'&&env.ORDINARY_SCAN_URL){const retry=retryJobs(env,new Date(event.scheduledTime||Date.now()));if(ctx?.waitUntil)ctx.waitUntil(retry);else await retry;}
  /* every 30 minutes: website feedback still waiting for its GitHub issue; the weekly cron settles hot words */
  if(event?.cron==='20 21 * * *'){const job=refreshDaily(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
- if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null),cleanupForumImages(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupContrib(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeFull(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeStats(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),refreshSeedStatsSafe(env,new Date(event?.scheduledTime||Date.now()))]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
+ if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncYui(env).catch(()=>0),syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null),cleanupForumImages(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupContrib(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeFull(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeStats(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),refreshSeedStatsSafe(env,new Date(event?.scheduledTime||Date.now()))]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
  const when=new Date(event?.scheduledTime||Date.now());const job=settleDue(env,when).then(async done=>{await cleanupAvatars(env,when).catch(()=>0);return done;});if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
 /* a token rotated while answering any request goes back on that answer, whichever endpoint it was */
 export default {fetch:async(request,env,ctx)=>{const response=await handle(request,env,new Date(),ctx);const token=ROTATED.get(request);if(!token||response.headers.get('x-megulit-token'))return response;const copy=new Response(response.body,response);copy.headers.set('x-megulit-token',token);return copy;},scheduled};

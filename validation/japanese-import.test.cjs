@@ -73,6 +73,6 @@ test('restore tool is wired: list, detect, import, undo and the launch message',
   assert.match(bridge, /case 'jp_import_apply'/);
   assert.match(bridge, /ji\.apply\(dir,row\.executable,request\.source\);importedExecutable\(db,id,r\.exe,'ja'\)/);
   const app = fs.readFileSync(path.join(__dirname, '..', 'web', 'app.js'), 'utf8');
-  assert.match(app, /api\('jp_import_apply',\{id,source\}\)/);
+  assert.match(app, /restoreApi\('jp_import_apply',\{id,source,\.\.\.\(p\.archive\?\{archiveToken:p\.archiveToken\}:\{\}\)\}\)/);
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'web', 'launch-feedback.js'), 'utf8'), /纯汉化包/);
 });

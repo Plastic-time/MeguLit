@@ -28,6 +28,39 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>.sentence-
     await page.evaluate(() => window.__tomoyoChinese.textPlaceMode({ on: true, game: '48964' }));
     const b2 = await show('夏の強烈な日射しを受けて、', false);
     assert.ok(!b2.anchored, 'another game has no place yet: its unplaced line is at the reader\'s own place ' + JSON.stringify(b2));
+    // A short placed sentence teaches the host an origin. Its ink width is not the next sentence's wrap width.
+    const { OverlayPlacement } = require('../core/overlay-placement.cjs');
+    let output;
+    const host = new OverlayPlacement({ send: m => { output = m; } });
+    host.configure({}, { bound: true, clientWidth: 1535, clientHeight: 863 });
+    const dialogue = 'すべての山を切り開けば、どれだけ楽に登校できるだろうか。';
+    host.hook({ type: 'hookCharRects', engine: 'native', hidden: true, line: 1, text: '引き上げる。', rects: Array.from({ length: 6 }, (_, i) => [120+i*30,490,30,30]) });
+    const table = { seq: 2, text: dialogue, dots: [{ k: 'd', i: 0, ch: dialogue[0], h: 30, a: 30 }] };
+    host.glyph(table);
+    const fragment = output;
+    table.dots.push({ k:'d', i:dialogue.length-1, ch:dialogue.at(-1), h:30, a:30 });
+    host.glyph(table);
+    const complete = output;
+    assert.ok(fragment.approx && complete.approx && new Set(complete.rects.map(r=>r[1])).size>2);
+    const frames = await page.evaluate(async ({ fragment, complete }) => {
+      const b=window.__tomoyoChinese, win=document.querySelector('.sentence-window'), sentence=win.querySelector('.sentence-text');
+      win.style.width='900px';sentence.replaceChildren(...[...complete.text].map(c=>{const t=document.createElement('span');t.className='char-token';t.textContent=c;return t;}));
+      const report=async m=>{b.textPlace(m);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+        const r=sentence.querySelector('.char-token').getBoundingClientRect();
+        return {left:r.left,top:r.top,width:sentence.getBoundingClientRect().width,breaks:sentence.querySelectorAll('br.megulit-row-br').length};};
+      const before=await report(fragment);
+      const ruby=document.createElement('ruby'),rt=document.createElement('rt'),tok=sentence.firstChild;
+      tok.replaceWith(ruby);ruby.append(tok,rt);rt.textContent='よみ';
+      win.querySelector('.tomoyo-cn-row').textContent='訳'.repeat(200);
+      const after=await report(complete);
+      const moved=await report({...complete,approx:false,rects:complete.rects.map((_,i)=>[220+i%12*30,320+Math.floor(i/12)*42,30,30])});
+      return {before,after,moved};
+    }, { fragment, complete });
+    assert.equal(frames.after.breaks,0,'estimated rows leave wrapping to the reader');
+    assert.equal(frames.after.width,frames.before.width);
+    assert.ok(Math.abs(frames.after.left-frames.before.left)<=1 && Math.abs(frames.after.top-frames.before.top)<=1,JSON.stringify(frames));
+    assert.ok(frames.moved.breaks>=1 && frames.moved.left>frames.after.left+60 && frames.moved.top<frames.after.top-100,JSON.stringify(frames));
+    host.stop();
     await page.evaluate(() => { window.__tomoyoChinese.textPlaceMode({ on: false }); window.__tomoyoChinese.textPlaceMode({ on: true, game: '48964' }); });
     console.log('ok anchor other game');
   } finally { await browser.close(); }

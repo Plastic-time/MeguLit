@@ -44,6 +44,9 @@ rem engine-draw GDI draw sites, the run-time gate (DrawSites.h) driven like MinH
 cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 /I stub drawsites-gate.cpp /Fe:"%TEMP%\megulit-gdihide32\drawsites-gate.exe" /Fo"%TEMP%\megulit-gdihide32\\" user32.lib gdi32.lib >nul" || exit /b 1
 "%TEMP%\megulit-gdihide32\drawsites-gate.exe"
  if errorlevel 1 exit /b 1
+rem Permission toggles and SEH use a real MinHook patch and relocated trampoline in this self-test process.
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 /I ..\..\shared\minhook\include drawsites-permission.cpp ..\..\shared\minhook\src\buffer.c ..\..\shared\minhook\src\hook.c ..\..\shared\minhook\src\trampoline.c ..\..\shared\minhook\src\hde\hde32.c /Fe:"%TEMP%\megulit-gdihide32\drawsites-permission.exe" /Fo"%TEMP%\megulit-gdihide32\\" user32.lib gdi32.lib >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\drawsites-permission.exe" || exit /b 1
 rem engine-draw SiglusEngine signature (SiglusDrawSig.h) on the windows of CLANNAD and Summer Pockets
 cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 siglusdraw.cpp /Fe:"%TEMP%\megulit-gdihide32\siglusdraw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
 "%TEMP%\megulit-gdihide32\siglusdraw.exe"
@@ -83,5 +86,19 @@ rem Majiro complete-string observer: signatures and real MinHook gate, x86 and x
 call "%~dp0run-majiro.cmd" || exit /b 1
 rem AdvHD version-pinned diagnostic input, custom EAX + eleven-word ABI and x64 no-op.
 call "%~dp0run-advhd.cmd" || exit /b 1
+rem CMVS paired full-input diagnostics, real ECX/two-word callee-cleaned ABI.
+call "%~dp0run-cmvs.cmd" || exit /b 1
+rem FVP raw append diagnostics, real ECX/one-word ret4 ABI.
+call "%~dp0run-fvp.cmd" || exit /b 1
+rem BGI trusted UTF16 control and reversible observation, real link-call/free detours.
+call "%~dp0run-bgi-permission.cmd" || exit /b 1
+rem YU-RIS trusted UTF16 control and reversible observation, real glyph-call detour.
+call "%~dp0run-yuris-permission.cmd" || exit /b 1
+
+rem minori exact English-build byte-string input observer, default off; no game execution.
+call "%~dp0run-minori.cmd" || exit /b 1
+rem Siglus trusted control, reversible Push/Clear/Frame observation and idle flush.
+call "%~dp0run-siglus-permission.cmd" || exit /b 1
+
 rem MAGES strict control, persistent permission epochs, TLS return ownership and actual cdecl gates.
 call "%~dp0run-mages-permission.cmd" || exit /b 1

@@ -36,14 +36,17 @@ test('BGI lines follow code order; patch scenes are checked on shared identifier
  assert.match(src,/refs\.push\(off\)/);
  assert.match(ot,/skipped:'operands'/);
  assert.match(ot,/'bgi-code-order\\n'/,'old BGI indexes are rebuilt');
- assert.match(ot,/runningDirOf\(s\.runtime\)\.toLowerCase\(\)===path\.dirname\(String\(executable\)\)/,'folder engines are looked up by the game folder');assert.match(ot,/bgi:\{folder:true,/);
+ assert.match(ot,/providerEntry\(root,path\.dirname\(String\(executable\)\)\.toLowerCase\(\),opts\.id/,'the runtime provider is looked up by game folder');
+ assert.match(ot,/runningDirOf\(s\.runtime\)\.toLowerCase\(\)===dir/);assert.match(ot,/bgi:\{folder:true,/);
 });
 
-test('search runs on its own: dialog status, game start, and a picker that names the file',()=>{
+test('the detail dialog searches locally on request; game start keeps its automatic search',()=>{
  const bridge=fs.readFileSync(path.join(root,'services/bridge.cjs'),'utf8'),reader=fs.readFileSync(path.join(root,'services/reader.cjs'),'utf8'),ui=fs.readFileSync(path.join(root,'web/game-language.js'),'utf8'),rs=fs.readFileSync(path.join(root,'desktop/src/main.rs'),'utf8');
- assert.match(bridge,/case 'text_source_status':\{const ot=require\('\.\/original-text\.cjs'\),id=String\(request\.id\);ot\.autoPatchLater/);
+ assert.match(bridge,/if\(request\.passive!==true\)ot\.autoPatchLater/);
+ assert.match(bridge,/else if\(request\.search\)\{\s*await require\('\.\/text-source-worker\.cjs'\)\.run\(root,'autoPatch',\[id,\{force:true,drives:false\}\],\{cachedOnly:true\}\)/);
  assert.match(reader,/this\.findTextSource\(this\.gameId\)/);
- assert.match(ui,/invoke\('pick_patch_file',\{title:w\.pickTitle/);
+ assert.match(ui,/invoke\('pick_patch_file',\{title:u\.file/);
+ assert.match(ui,/u\.example\(s\.patchHint\)/);
  assert.match(rs,/fn pick_patch_file/);assert.match(rs,/pick_executable, pick_patch_file,/);
 });
 
@@ -83,7 +86,9 @@ test('immersion default on with a one-time switch',()=>{
 // E285 (CLANNAD write-back report): script first, Chinese font, Alt+H leaves write-back on, English and "none" display.
 test('write-back uses the script, a Chinese font, survives Alt+H; display offers English and none',()=>{
  const read=f=>fs.readFileSync(path.join(root,f),'utf8');
- assert.match(read('services/reader.cjs'),/scriptTranslation\?\.\(text\)/);
+ const {Reader}=require('../services/reader.cjs'),returned={};
+ const value=Reader.prototype.localTranslation.call({gal:{hooks:{scriptTranslation(text,result){result.source='patch';return text==='本文'?'译文':'';}}},embedCached(){}},'本文','zh',returned);
+ assert.equal(value,'译文');assert.equal(returned.source,'patch');
  assert.match(read('native/HookBridge.cs'),/TranslateMode\?TranslateFont\(\):""/);
  assert.match(read('core/hook-native.cjs'),/coverEnabled!==false\|\|preferences\.embedTranslation===true/);
  assert.match(read('core/hook-control.cjs'),/m\.matched&&h\.preferences\?\.embedTranslation===true/);

@@ -19,7 +19,7 @@ function controlReplay(){
   .replace(/\bvoid\b/g,'undefined');
  const state={ctlRaw:'',embRestore(){}};
  let lines=[];
- new Function('st','global','load',js)(state,{__megulitKrkrCtlPath:'fixture'},()=>lines);
+ new Function('st','global','load',js)(state,{__megulitKrkrCtlPath:'fixture',RegExp},()=>lines);
  return {state,read(text){lines=text.split(/\r?\n/);state.ctl();return state.cfg;}};
 }
 

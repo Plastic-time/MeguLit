@@ -50,9 +50,3 @@
 .upd-done-notes h4{margin:8px 0 2px;font:500 13px var(--g-serif,serif);color:var(--u-t1)}
 .upd-done-notes p{margin:3px 0;font-size:12px;line-height:1.6;color:var(--u-t2)}
 @media (prefers-reduced-motion:reduce){.upd-done{transition:none}}
-/* 2026-11-15 adaptation contribution consent: last thing in the notes, same quiet type as the notes, never a dark plate */
-.upd-consent{margin-top:12px;padding-top:10px;border-top:1px dashed var(--u-rule)}
-.upd-notes .upd-consent h4{margin:0 0 4px;font:500 13px var(--g-serif,serif);color:var(--u-t1)}
-.upd-notes .upd-consent p{padding-left:0;font-size:12px;line-height:1.65;color:var(--u-t2)}.upd-notes .upd-consent p::before{display:none}
-.upd-consent-no{margin-top:6px;font-size:12px;color:var(--u-t3);text-decoration:underline;text-underline-offset:3px;padding:2px 0}.upd-consent-no:hover{color:var(--u-t1)}
-.upd-notes .upd-consent-done{color:var(--u-t1)}

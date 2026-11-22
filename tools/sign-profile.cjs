@@ -14,6 +14,11 @@
                                                                    game layer: key = the game identity (the relay's 'game' of a report,
                                                                    or any 64 hex), prints = pack / script / steam / vndb / title
                                                                    (core/game-print.cjs) - every build with one of them gets it
+   node tools/sign-profile.cjs observe <profile.json> <observation.json> --original <exe> --script <relative script file>
+                                    [--authorized-runtime <exe>] > updated.json
+                                                                   observation: {results:{read:{passed:true,source:"operator"}}}
+                                                                   optional textBox: {source,box:{x,y,width,height},client:{width,height}}
+                                                                   file paths stay local; inspect and sign the updated profile separately
    node tools/sign-profile.cjs sign <diff.json> > signed.json      sign one document (official or auto)
    node tools/sign-profile.cjs picks <relay base> <out folder> [--upload]
                                                                    the relay's agreed picks waiting for a signature (MEGULIT_ADMIN_TOKEN):
@@ -27,6 +32,29 @@ function privateKey(env=process.env){const f=String(env.MEGULIT_PROFILE_KEY||'')
 const keyId=(env=process.env)=>String(env.MEGULIT_PROFILE_KEY_ID||'p1');
 function signDoc(doc,key,id){const body=gameDiff.unsigned(doc);const v=gameDiff.validate(body);if(!v.ok)throw Error('invalid: '+v.error);
  return {...body,signature:{alg:'ed25519',keyId:id,value:crypto.sign(null,Buffer.from(gameDiff.canonical(body)),key).toString('base64')}};}
+async function observe(profile, observation, original, scriptFile, authorizedRuntime) {
+ const files=require('../services/torch-receive.cjs'), evidence=require('../core/seed-evidence.cjs');
+ const originalExe=await files.fileHash(original), script=await files.fileHash(files.scriptPath(original,scriptFile));
+ if(profile.layer!=='version'||profile.key!==originalExe||profile.prints?.script&&profile.prints.script!==script)throw Error('SEED_EVIDENCE_IDENTITY');
+ const runtimeExe=authorizedRuntime?await files.fileHash(authorizedRuntime):originalExe;
+ // A copy can have its own installation directory. Bind the container actually used there too.
+ if(authorizedRuntime&&await files.fileHash(files.scriptPath(authorizedRuntime,scriptFile))!==script)throw Error('SEED_EVIDENCE_IDENTITY');
+ const patch={originalExe,script,scriptFile,runtimeExe,results:observation.results??{}};
+ if(observation.scenarios !== undefined) patch.scenarios=observation.scenarios;
+ if(observation.trials !== undefined) {
+  if(!Array.isArray(observation.trials)||observation.trials.some(t=>t?.revision!==profile.rev)) throw Error('SEED_TRIAL_REVISION');
+  patch.trials=observation.trials.map(trial=>{
+   if (!Object.hasOwn(trial,'localStream')) return trial;
+   const {localStream,...record}=trial;
+   if (record.stream!==undefined) throw Error('SEED_TRIAL_STREAM');
+   return {...record,stream:require('../services/shared-adaptation.cjs').streamDigest(localStream)};
+  });
+ }
+ if(observation.textBox){const {box,client,source}=observation.textBox;patch.textBox=evidence.normalizeBox(box,client,source);}
+ const updated={...gameDiff.unsigned(profile),prints:{...profile.prints,exe:originalExe,script},evidence:evidence.merge(profile.evidence,patch)};
+ if(!gameDiff.validate(updated).ok)throw Error('SEED_EVIDENCE_PROFILE');
+ return updated;
+}
 /* the relay's picks, signed; written to out, posted back with upload */
 async function signPicks(base,out,{upload=false,fetcher=globalThis.fetch,env=process.env}={}){const token=String(env.MEGULIT_ADMIN_TOKEN||'');if(!token)throw Error('MEGULIT_ADMIN_TOKEN is not set');
  const key=privateKey(env),id=keyId(env),auth={authorization:'Bearer '+token,'user-agent':'MeguLit-sign-profile'},root=String(base).replace(/\/$/,'');
@@ -45,9 +73,10 @@ if(require.main===module){const [cmd,a,b]=process.argv.slice(2);const arg=(n,f)=
   else if(cmd==='make'){const r=clean(JSON.parse(fs.readFileSync(b,'utf8')));if(r.rejected.length)console.error('dropped: '+r.rejected.join(', '));
    const prints=arg('prints','')?JSON.parse(fs.readFileSync(arg('prints'),'utf8')):undefined;
    const d=gameDiff.build({key:a,layer:arg('layer','version'),prints,rev:Number(arg('rev','1'))||1,source:'official',mode:arg('mode','hide'),settings:r.value,exe:arg('exe',''),engine:arg('engine','')});const v=gameDiff.validate(d);if(!v.ok)throw Error('invalid: '+v.error);console.log(JSON.stringify(d,null,1));}
+  else if(cmd==='observe')console.log(JSON.stringify(await observe(JSON.parse(fs.readFileSync(a,'utf8')),JSON.parse(fs.readFileSync(b,'utf8')),arg('original'),arg('script'),arg('authorized-runtime')),null,1));
   else if(cmd==='sign')console.log(JSON.stringify(signDoc(JSON.parse(fs.readFileSync(a,'utf8')),privateKey(),keyId()),null,1));
   else if(cmd==='picks')console.log(JSON.stringify(await signPicks(a,b,{upload:process.argv.includes('--upload')}),null,1));
   else if(cmd==='check'){const d=JSON.parse(fs.readFileSync(a,'utf8'));const v=gameDiff.validate(d);const feed=require('../services/auto-profile-feed.cjs');const ok=v.ok&&feed.verify(d,feed.keys());console.log(v.ok?(ok?'ok':'bad signature'):'invalid: '+v.error);process.exitCode=ok?0:1;}
   else{console.error('usage: keygen <dir> | key <exe> | make <exeHash> <settings.json> | sign <diff.json> | picks <relay> <out> [--upload] | check <signed.json>');process.exitCode=2;}
  })().catch(e=>{console.error(e.message);process.exitCode=1;});}
-module.exports={signDoc,signPicks,privateKey,keyId,inRepo};
+module.exports={observe,signDoc,signPicks,privateKey,keyId,inRepo};

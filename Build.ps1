@@ -18,7 +18,7 @@ function Invoke-TaskTests {
  $taskConcurrency = 2; if ($env:MEGULIT_TEST_CONCURRENCY -match '^\d+$' -and [int]$env:MEGULIT_TEST_CONCURRENCY -ge 1 -and [int]$env:MEGULIT_TEST_CONCURRENCY -le 32) { $taskConcurrency = [int]$env:MEGULIT_TEST_CONCURRENCY }
  # Paths relative to the repository root: 544 absolute paths passed 32767 characters and Windows refused to start node ("filename or extension is too long").
  Push-Location -LiteralPath $taskRoot
- try { $taskTestOutput = & $taskNode --test --test-force-exit "--test-concurrency=$taskConcurrency" @($taskRun | ForEach-Object { $_.Replace('/','\') }) 2>&1 } finally { Pop-Location }
+ try { $taskTestOutput = & $taskNode (Join-Path $taskRoot 'tools/run-isolated.cjs') $taskNode --test --test-force-exit "--test-concurrency=$taskConcurrency" @($taskRun | ForEach-Object { $_.Replace('/','\') }) 2>&1 } finally { Pop-Location }
  $taskTestExit = $LASTEXITCODE
  $taskTestOutput | Set-Content -LiteralPath (Join-Path $taskRoot 'validation/automated-results.txt') -Encoding utf8
  & $taskNode (Join-Path $taskRoot 'tools/test-resume.cjs') record $taskState $taskRoot $taskList (Join-Path $taskRoot 'validation/automated-results.txt') $taskTestExit
@@ -54,12 +54,19 @@ $env:MEGULIT_VS = $taskVsDev; Remove-Item Env:MEGULIT_FONT_OUT -ErrorAction Sile
 function Invoke-TaskCmd([string]$Script) {
  if ($Script -like '*.ps1') { & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '$Script' 2>&1; exit `$LASTEXITCODE" | Out-Host; return $LASTEXITCODE }
  & cmd /c ('""' + $Script + '" 2>&1"') | Out-Host; return $LASTEXITCODE }
+function Invoke-TaskSelfTest([string]$Script) {
+ $body = "& '" + $Script.Replace("'","''") + "' 2>&1; exit `$LASTEXITCODE"
+ $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($body))
+ $powerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+ & $taskNode (Join-Path $taskRoot 'tools/run-isolated.cjs') $powerShell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded | Out-Host
+ return $LASTEXITCODE
+}
 foreach ($taskNb in (Get-Content -LiteralPath (Join-Path $taskRoot 'native/native-builds.json') -Raw | ConvertFrom-Json)) {
  if ($taskNb.requires -and -not (Test-Path -LiteralPath $taskNb.requires)) { Write-Warning "native $($taskNb.name): $($taskNb.requires) not on this machine, not rebuilt"; continue }
  if ((Invoke-TaskCmd (Join-Path $taskRoot $taskNb.build)) -ne 0) { throw "Native build failed: $($taskNb.name) ($($taskNb.build))" }
  foreach ($taskSt in @($taskNb.selftests)) { if (-not $taskSt) { continue }
   if ($taskNb.selftestNeeds -eq 'python' -and -not (Get-Command python.exe -ErrorAction SilentlyContinue)) { Write-Warning "native $($taskNb.name): no python on PATH, $taskSt skipped"; continue }
-  if ((Invoke-TaskCmd (Join-Path $taskRoot $taskSt)) -ne 0) { throw "Native self-test failed: $($taskNb.name) ($taskSt)" } }
+  if ((Invoke-TaskSelfTest (Join-Path $taskRoot $taskSt)) -ne 0) { throw "Native self-test failed: $($taskNb.name) ($taskSt)" } }
 }
 $taskStaleArgs = @(); if ($env:GITHUB_ACTIONS -eq 'true') { $taskStaleArgs = @('--ci') }  # CI has no LunaHook tree: entries with "ci": false may be missing
 & $taskNode (Join-Path $taskRoot 'tools/native-stale.cjs') @taskStaleArgs; if ($LASTEXITCODE -ne 0) { throw 'A shipped native binary is older than its sources (tools/native-stale.cjs)' }

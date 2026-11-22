@@ -74,7 +74,13 @@ async function renderTheme(theme) {
     const cent = []; const glassOf = async () => { if (!sg.glass) return; const o = await ev('GL.outlines(1000,640)'); polys.push((o || []).map((p) => p ? p.map((v) => Math.round(v * (1280 / 1000) * 4)) : null)); };
     if (sg.kind === 'transition') {
       const ff = spawn(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-', '-vf', scaleF].concat(encArgs(file)), { stdio: ['pipe', 'ignore', 'inherit'] }); const done = new Promise((r) => ff.on('close', r));
-      for (let i = 0; i < n; i++) { const buf = await shot(sg, sg.t0 + (sg.t1 - sg.t0) * i / (n - 1), G + i / FPS, true, null, sg.train ? -6500 + 9000 * i / (n - 1) : undefined); { const q = await ev('(function(){var c=GL.camera;return [c.position.x,c.position.y,c.position.z,c.quaternion.x,c.quaternion.y,c.quaternion.z,c.quaternion.w]})()'); cams.push(q); }
+      for (let i = 0; i < n; i++) {
+        let opt = sg.opt;
+        if (sg.id === 'to-done' && i < 0.2 * FPS) {
+          const t = i / (0.2 * FPS);
+          opt = { ...opt, etchMix: t * t * (3 - 2 * t) };
+        }
+        const buf = await shot(sg, sg.t0 + (sg.t1 - sg.t0) * i / (n - 1), G + i / FPS, true, null, sg.train ? -6500 + 9000 * i / (n - 1) : undefined, opt); { const q = await ev('(function(){var c=GL.camera;return [c.position.x,c.position.y,c.position.z,c.quaternion.x,c.quaternion.y,c.quaternion.z,c.quaternion.w]})()'); cams.push(q); }
       if (i === 0) first = buf; if (i === 1) second = buf; if (i === n - 1) last = buf; if (i === 0) fs.writeFileSync(path.join(dir, sg.id + '.jpg'), buf); if (!ff.stdin.write(buf)) await new Promise((res) => ff.stdin.once('drain', res)); await glassOf(); }
       ff.stdin.end(); await done; var tEnd = G + (n - 1) / FPS; const lin = [], ang = []; for (let k = 1; k < cams.length; k++) { const a = cams[k - 1], b = cams[k]; lin.push(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2])); const dot = Math.abs(a[3] * b[3] + a[4] * b[4] + a[5] * b[5] + a[6] * b[6]); ang.push(2 * Math.acos(Math.min(1, dot))); }
       const stat = (v) => { const avg = v.reduce((x, y) => x + y, 0) / v.length, pk = Math.max(...v); return { avg: +avg.toFixed(4), peak: +pk.toFixed(4), ratio: avg > 1e-9 ? +(pk / avg).toFixed(2) : null }; }; motion[sg.id] = { linear: stat(lin), angular: stat(ang) }; log(`motion ${sg.id}: peak/avg linear ${motion[sg.id].linear.ratio}, angular ${motion[sg.id].angular.ratio}`);

@@ -22,6 +22,7 @@ const fs=require('node:fs'),path=require('node:path');
 const Profiles=require('../../core/profiles/index.cjs'),GamePrint=require('../../core/game-print.cjs'),Domains=require('../../core/profiles/domains.cjs'),SeedFormat=require('../../core/profiles/seed.cjs'),crypto=require('node:crypto');
 const GameDiff=require('../../core/game-diff.cjs'),Samples=require('./samples.cjs'),Scripts=require('./scripts.cjs'),Search=require('./search.cjs'),Emit=require('./emit.cjs'),Probe=require('./probe.cjs');
 const {REASONS}=require('../../core/self-check.cjs');
+const {parseSelector}=require('../../core/game-request-selector.cjs');
 const ROOT=path.join(__dirname,'..','..');
 const readJson=f=>{try{return JSON.parse(fs.readFileSync(f,'utf8').replace(/^\uFEFF/,''));}catch{return null;}};
 const readText=f=>{try{return fs.readFileSync(f,'utf8');}catch{return '';}};
@@ -49,9 +50,20 @@ function nameOf(g){const zh=g.names.find(n=>HAN.test(n)&&!KANA.test(n)&&!/[\[\](
 /* the script index of the original-text provider -> {ix, script print, pairing} */
 function scriptOf(g){const rt=g.ot?.runtime,pt=g.ot?.patch;const ix=Scripts.emptyIndex();let lines=0,patch=0;
  const idx=rt?.index?readJson(rt.index):null,pidx=pt?.index?readJson(pt.index):null;
- if(idx&&Array.isArray(idx.lines)){const zh=Array.isArray(pidx?.lines)&&pidx.lines.length===idx.lines.length?pidx.lines:[];lines=idx.lines.length;patch=zh.length;ix.files=1;
-  idx.lines.forEach((s,i)=>{if(typeof s!=='string'||!s)return;ix.dialogue.add(Samples.fold(s));ix.lines++;ix.entries.push({line:s,ruby:idx.ruby?.[i]||null,zh:typeof zh[i]==='string'&&zh[i]!==s?zh[i]:''});});}
- return {ix,script:/^[0-9a-f]{64}$/.test(String(rt?.sha256||''))?rt.sha256:'',pairing:{status:String(g.ot?.status||''),lines,patchLines:pt?.lines||0,aligned:patch}};}
+ const paired=['ready','interface-only'].includes(g.ot?.patchStatus)&&g.ot.patchAlignment?.reliable===true&&rt?.sha256&&pt?.runtimeSha===rt.sha256&&
+  !!rt.reader&&pt.reader===rt.reader&&idx?.source?.sha256===rt.sha256&&pidx?.role==='patch'&&pidx.source?.sha256===pt.sha256&&idx.role==='runtime';
+ let quality=null;
+ if(idx&&Array.isArray(idx.lines)){const zh=paired&&Array.isArray(pidx.lines)&&pidx.lines.length===idx.lines.length?pidx.lines:[];lines=idx.lines.length;ix.files=1;
+  const {translated}=require('../../services/align-sample.cjs');
+  if(idx.role==='runtime'&&idx.source?.sha256===rt.sha256){
+   quality=require('../../services/script-translation-quality.cjs').translationQuality(idx,zh.length?zh:null);
+   if(quality){
+    quality.indexHash=crypto.createHash('sha256').update(JSON.stringify([idx.roles,idx.lines])).digest('hex');
+    quality.patchIndexHash=zh.length?crypto.createHash('sha256').update(JSON.stringify(zh)).digest('hex'):null;
+   }
+  }
+  idx.lines.forEach((s,i)=>{if(typeof s!=='string'||!s||idx.roles?.[i]==='i')return;ix.dialogue.add(Samples.fold(s));ix.lines++;const local=g.ot?.patchStatus==='ready'&&translated(zh[i],s)?zh[i]:'';if(local)patch++;ix.entries.push({line:s,ruby:idx.ruby?.[i]||null,zh:local});});}
+ return {ix,quality,script:/^[0-9a-f]{64}$/.test(String(rt?.sha256||''))?rt.sha256:'',pairing:{status:String(g.ot?.status||''),lines,patchLines:pt?.lines||0,aligned:patch}};}
 
 /* the runtime sample of a game over all installs: the newest launch with at least minLines hook lines (what the current code
    did; an older, longer run shows code that is gone), else the launch with the most lines */
@@ -92,10 +104,28 @@ const STATUS=['verified','owner-ok','read','skeleton'];
    zh -> zh-Hans; anything else, or nothing, is Japanese (the format's default) */
 function langsOf(g){const l=String(g.lang||'').toLowerCase();return [l==='en'?'en':l==='zh'||l==='zh-hans'?'zh-Hans':'ja'];}
 /* one game -> its seed (always written to <seed> unless the program is missing) and its report row */
-async function seedOne(g,logs,wins,{out,seed,ownerOk,versionsWritten}){const engine=engineOf(g)||'unknown',name=nameOf(g);const row={name,engine,id:g.id,state:'',look:[]};
+async function seedOne(g,logs,wins,options){
+ const job=options.requestJob;
+ if(!job||!g.exe||!fs.existsSync(g.exe)||g.vndb!==job.work||engineOf(g)!==job.engine||g.lang?.toLowerCase()!==job.lang||g.ot?.runtime?.sha256!==job.script){
+  return generateSeed(g,logs,wins,options);
+ }
+ const exeSha=crypto.createHash('sha256').update(fs.readFileSync(g.exe)).digest('hex');
+ if(exeSha!==job.exe)return generateSeed(g,logs,wins,options);
+ const ref=crypto.randomUUID();
+ try{await job.update(ref,false);}catch(e){console.error('Seed generation receipt:',e.message);}
+ try{return await generateSeed(g,logs,wins,options,exeSha);}
+ finally{try{await job.update(ref,true);}catch(e){console.error('Seed generation finish receipt:',e.message);}}
+}
+
+async function generateSeed(g,logs,wins,{out,seed,ownerOk,versionsWritten},knownExeSha){const engine=engineOf(g)||'unknown',name=nameOf(g);const row={name,engine,id:g.id,state:'',look:[]};
  if(!g.exe||!fs.existsSync(g.exe)){row.state='skip';row.look.push('程序不在本机');return row;}
  const sc=scriptOf(g);
- const exeSha=crypto.createHash('sha256').update(fs.readFileSync(g.exe)).digest('hex');
+ if(sc.quality){
+  const returned=require('../../services/script-translation-quality.cjs').returnedSources(
+   logs.get(g.root)?.reader,g.id,sc.script,g.ot?.patch?.sha256||null);
+  if(returned)sc.quality.returned=returned;
+ }
+ const exeSha=knownExeSha||crypto.createHash('sha256').update(fs.readFileSync(g.exe)).digest('hex');
  const prints=GamePrint.prints(g.exe,{exe:exeSha,title:g.title,steamAppId:g.steam,vndb:g.vndb,script:sc.script,engine:engine==='unknown'?'':engine});
  const gid=Probe.gameId(prints);
  const exeName=path.basename(g.exe);const input={exe:exeName,title:g.title,engine,steamAppId:g.steam,folder:path.dirname(g.exe)};
@@ -143,6 +173,13 @@ async function seedOne(g,logs,wins,{out,seed,ownerOk,versionsWritten}){const eng
     (the languages of the game's own text, BCP 47) are written out; an existing seed's sourceLangs and ext are kept */
  const sourceLangs=old?.sourceLangs||langsOf(g);
  const game={...doc,key:old?.key||Probe.gameId(prints2),prints:prints2,seedFormat:1,status,slug,builds,match,sourceLangs,...(old?.ext?{ext:old.ext}:{})};
+ if(sc.quality&&sc.script){
+  const prior=game.ext?.translationQuality||{},previous=prior[exeSha];
+  if(previous?.returned&&!sc.quality.returned&&previous.indexHash===sc.quality.indexHash&&previous.patchIndexHash===sc.quality.patchIndexHash)
+   sc.quality.returned=previous.returned;
+  if(sc.quality.patchIndexHash||previous?.indexHash!==sc.quality.indexHash||!previous.patchIndexHash)
+   game.ext={...game.ext,translationQuality:{...prior,[exeSha]:{script:sc.script,...sc.quality}}};
+ }
  /* unchanged content: the file stays as it is (its field order and rev too); changed: rev + 1 (a first rev is 1) */
  const bump=(o,n)=>{if(!o)return n;const r=Number.isInteger(o.rev)?o.rev:0;if(sameJson({...o,rev:0},{...n,rev:0})&&r>=1)return o;return {...n,rev:Math.max(1,r+1)};};
  const gameOut=bump(old,{...game,rev:1}),versionOut=bump(oldV,{...version,rev:1});
@@ -170,10 +207,28 @@ function summary(rows,out){const by=s=>rows.filter(r=>r.state===s);const eng={};
   lines.push('## '+STATUS_ZH[s],'','| 游戏 | 引擎 | slug / 指纹 | 样本 | 自检分数 | 模式 | 需人看 |','|---|---|---|---|---|---|---|',...list.map(row),'');}
  fs.writeFileSync(path.join(out,'report.md'),lines.join('\n'));return lines.join('\n');}
 
+function requestJobOf(selector,origin){
+ if(!selector&&!origin)return null;
+ const token=process.env.ADAPTER_ADMIN_TOKEN,relay=new URL(origin);
+ if(!selector||!token||relay.username||relay.password||
+    (relay.protocol!=='https:'&&!(relay.protocol==='http:'&&['127.0.0.1','localhost'].includes(relay.hostname)))){
+  throw Error('SEED_REQUEST_JOB_CONFIG');
+ }
+ const identity=parseSelector(selector);
+ if(!identity)throw Error('SEED_REQUEST_SELECTOR');
+ const url=new URL('/api/seed-admin/game-request-evidence',relay);
+ return {...identity,async update(ref,ended){
+  const response=await fetch(url,{method:'POST',redirect:'error',signal:AbortSignal.timeout(20000),
+   headers:{authorization:'Bearer '+token,'content-type':'application/json'},
+   body:JSON.stringify({selector:identity.key,kind:'generating',ref,ended})});
+  if(!response.ok)throw Error('SEED_REQUEST_JOB_HTTP_'+response.status);
+ }};
+}
 async function main(argv){const args=argv.slice(2);const all=n=>{const out=[];for(let i=args.indexOf(n);i>=0;i=args.indexOf(n)){out.push(args[i+1]);args.splice(i,2);}return out;};
  const roots=all('--root');if(!roots.length)roots.push('E:\\MeguLit-Test-1421','E:\\MeguLit');
  const seedArg=all('--seed')[0]||'',out=all('--out')[0]||'H:\\MeguLit-Work\\The Seed',seed=seedArg||path.join(ROOT,'The Seed'),only=all('--only')[0]||'';
  const ownerOk=new Set((readJson(all('--owner-ok')[0]||path.join(__dirname,'owner-ok.json'))||[]).map(String));
+ const requestJob=requestJobOf(all('--request-selector')[0],all('--request-relay')[0]);
  fs.mkdirSync(out,{recursive:true});
  const logs=new Map(),games=new Map();
  for(const r of roots){if(!fs.existsSync(r)){console.error('skip '+r+' (not found)');continue;}
@@ -182,7 +237,7 @@ async function main(argv){const args=argv.slice(2);const all=n=>{const out=[];fo
   for(const g of library(r)){const k=g.exe.toLowerCase()||g.id;const cur=games.get(k)||{...g,wins:[]};cur.wins.push(...(launch.get(g.id)||[]).map(w=>({...w,root:r})));if(!cur.ot&&g.ot)cur.ot=g.ot;games.set(k,cur);}}
  const versionsWritten=new Map();const list=[...games.values()].map(g=>({g,slug:(()=>{try{return slugOf(g,Profiles.profileFor({exe:path.basename(g.exe),title:g.title}).gameKey);}catch{return g.title;}})()})).sort((a,b)=>a.slug<b.slug?-1:1);
  const rows=[];for(const {g} of list){if(only&&!g.title.includes(only))continue;
-  try{rows.push(await seedOne(g,logs,g.wins,{out,seed,ownerOk,versionsWritten}));}catch(e){rows.push({name:nameOf(g),engine:engineOf(g)||'unknown',state:'skip',look:['出错：'+e.message]});}}
+  try{rows.push(await seedOne(g,logs,g.wins,{out,seed,ownerOk,versionsWritten,requestJob}));}catch(e){rows.push({name:nameOf(g),engine:engineOf(g)||'unknown',state:'skip',look:['出错：'+e.message]});}}
  const dup=new Map();for(const r of rows)if(r.slug){const k=r.engine+'/'+r.slug;if(dup.has(k))r.look.push('slug 和 '+dup.get(k)+' 重复：在 tools/diff-maker/slugs.json 里分开');dup.set(k,r.name);}
  const order=['verified','owner-ok','read','skeleton','skip'];rows.sort((a,b)=>order.indexOf(a.state)-order.indexOf(b.state)||(a.engine<b.engine?-1:a.engine>b.engine?1:0));
  summary(rows,out);const n=s=>rows.filter(r=>r.state===s).length;

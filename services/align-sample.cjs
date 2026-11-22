@@ -46,7 +46,8 @@ function score(z,j){
  return s;
 }
 /* A Chinese line that is a translation: prose, not Japanese, not just the Japanese line again. */
-const translated=(z,j)=>typeof z==='string'&&prose(z)&&!japaneseLine(z)&&/[一-鿿]/.test(z)&&String(z).replace(/\s/g,'')!==String(j||'').replace(/\s/g,'');
+const wording=t=>String(t||'').normalize('NFKC').replace(/[\p{P}\s]/gu,'');
+const translated=(z,j)=>typeof z==='string'&&prose(z)&&!japaneseLine(z)&&/[一-鿿]/.test(z)&&wording(z)!==wording(j);
 /* S9 a sound effect written out as a line: Chinese onomatopoeia characters only (咚, 喀啷喀啷, 啪唧, 喀啦啦啦……) or Japanese
    katakana only (ガチャ; not またか), no quote, at most 8 characters. A name (奥兹, 若い男) or a sentence (再一次——) is not one. */
 const ONOMATOPOEIA=/^[咚咣喀啷哧扑啪唧嘎咯咔嚓唰叽磅刹啦呼砰嗖哗咕噗嘭轰叮当铃嘀哒嘟呜吱咻哐锵噔噼啵嗒咂沙哒呱嘶咻]+$/,KANA_ONLY=/^[ァ-ヺーッ]+$/;
@@ -67,14 +68,14 @@ function census(zh,ja,addedIdx,rewrittenIdx){
  return {total,paired,unpaired:total-paired,reasons,added};
 }
 /* Up to n sample positions spread evenly over the translated lines, deterministic (same script, same sample). */
-function pick(zh,ja,n){
- const cand=[];for(let i=0;i<zh.length;i++)if(translated(zh[i],ja[i])&&typeof ja[i]==='string'&&prose(ja[i]))cand.push(i);
+function pick(zh,ja,n,keyed){
+ const cand=[];for(let i=0;i<zh.length;i++)if(!keyed?.[i]&&translated(zh[i],ja[i])&&typeof ja[i]==='string'&&prose(ja[i]))cand.push(i);
  if(cand.length<=n)return cand;const out=[];for(let k=0;k<n;k++){const lo=Math.floor(k*cand.length/n),hi=Math.floor((k+1)*cand.length/n);let h=2166136261;for(const c of String(zh[cand[lo]]))h=Math.imul(h^c.charCodeAt(0),16777619);out.push(cand[lo+((h>>>0)%Math.max(1,hi-lo))]);}
  return out;
 }
 /* Sample n pairs and judge the pairing. */
-function sample(zh,ja,{n=100,voice}={}){
- const at=pick(zh,ja,n),F=new Map(),f=(side,i)=>{const key=side+i;if(!F.has(key)){const lines=side==='z'?zh:ja;F.set(key,i<0||i>=lines.length||typeof lines[i]!=='string'||!lines[i].trim()?null:features(lines[i],voice?.[side==='z'?'zh':'ja']?.[i]));}return F.get(key);};
+function sample(zh,ja,{n=100,voice,keyed}={}){
+ const at=pick(zh,ja,n,keyed),F=new Map(),f=(side,i)=>{const key=side+i;if(!F.has(key)){const lines=side==='z'?zh:ja;F.set(key,i<0||i>=lines.length||typeof lines[i]!=='string'||!lines[i].trim()?null:features(lines[i],voice?.[side==='z'?'zh':'ja']?.[i]));}return F.get(key);};
  let matched=0,mismatched=0,weak=0,own=0,shifted=0;const drift={},bad=[];
  for(const i of at){const z=f('z',i),s0=score(z,f('j',i));let best=-Infinity,bestK=0;
   for(const k of SHIFTS){const s=score(z,f('j',i+k));if(s>best){best=s;bestK=k;}}
@@ -144,7 +145,7 @@ function realign(zh,ja,{zhSizes,jaSizes,ruby,band=6,voice,into='zh'}={}){
 function verify(zh,ja,options={}){
  const first=sample(zh,ja,options);let lines=null,ruby=null,realigned=null,final=first;
  /* force: the structure check already failed (scenes of different lengths), so the index pairing is not trusted at all */
- if(!first.ok||options.force){const r=realign(zh,ja,options);
+ if(!options.keyed&&(!first.ok||options.force)){const r=realign(zh,ja,options);
   if(r&&r.scenes){const [z,j]=options.into==='ja'?[r.lines,ja]:[zh,r.lines],again=sample(z,j,options);
    realigned={scenes:r.scenes,moved:r.moved,dropped:r.dropped,accepted:again.ok,before:summary(first)};if(again.ok){lines=r.lines;ruby=r.ruby;}final=again;}}
  const c=options.into==='ja'?census(lines||zh,ja):census(zh,lines||ja,lines?null:options.added,lines?null:options.rewritten);

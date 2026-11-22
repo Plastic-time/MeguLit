@@ -96,7 +96,29 @@ class ChoiceCapture{
     else if(left!==x.key&&(left.length<2||this.lines.some(l=>l.includes(left)))){/* only dialogue lines glued together */this.items.splice(this.items.indexOf(x),1);changed=true;}}
   if(!changed)break;}}
  onlyNames(key){const names=[...this.names,...(this.extraNames?.()||[])].filter(n=>n.length>=2).sort((a,b)=>b.length-a.length);if(!names.length)return false;let rest=key;while(rest){const n=names.find(n=>rest.startsWith(n));if(!n)return false;rest=rest.slice(n.length);}return true;}
+ // Siglus emits /A, ABA/ and AB on adjacent streams for the same two-row menu.
+ noteSiglusFrame(raw){
+  const text=String(raw||'').trim(), now=this.now();
+  if(!text||text.length>180)return;
+  this.siglusFrames=(this.siglusFrames||[]).filter(f=>now-f.at<1000).slice(-23);
+  this.siglusFrames.push({text,at:now});
+ }
+ siglusOptions(){
+  const frames=new Set((this.siglusFrames||[]).filter(f=>this.now()-f.at<1500).map(f=>f.text));
+  for(const frame of frames){
+   if(!frame.startsWith('／'))continue;
+   const first=frame.slice(1);
+   if(!first||first.includes('／'))continue;
+   for(const pair of frames){
+    if(!pair.startsWith(first)||pair.length<=first.length||!frames.has(pair+first+'／'))continue;
+    const second=pair.slice(first.length);
+    if(first!==second&&japanese(second)&&!/[／【】]/.test(second))return [first,second];
+   }
+  }
+  return null;
+ }
  options(){
+  const siglus=this.siglusOptions();if(siglus)return siglus;
   /* one candidate is enough when the frame came twice in one string (「AB AB」): AB holds the options, OCR cuts it at the rows */
   if(this.items.length===1&&this.items[0].doubled)return [this.items[0].text];
   /* 2026-11-13 (CLANNAD 「朋也」「春原春原朋也」 next to its two options): speaker names, alone or run together, go when two or more
@@ -109,7 +131,7 @@ class ChoiceCapture{
   const order=this.order||[],rank=x=>{const i=order.indexOf(x.key);return i<0?order.length+items.indexOf(x):i;};
   return items.slice().sort((a,b)=>rank(a)-rank(b)).map(x=>x.text);}
  /* keep: candidates younger than this many ms survive (the choices often arrive in the same instant as the line before them) */
- reset(keep=0,line=''){const now=this.now(),l=plain(line);this.items=keep>0?this.items.filter(x=>now-x.at<keep&&x.key!==l&&!(x.key.length>6&&l.includes(x.key))):[];/* the line itself, sent on a side stream a moment earlier, is not kept */if(!this.items.length)this.order=null;this.active=false;}
+ reset(keep=0,line=''){if(!keep)this.siglusFrames=[];const now=this.now(),l=plain(line);this.items=keep>0?this.items.filter(x=>now-x.at<keep&&x.key!==l&&!(x.key.length>6&&l.includes(x.key))):[];/* the line itself, sent on a side stream a moment earlier, is not kept */if(!this.items.length)this.order=null;this.active=false;}
 }
 /* OCR boxes -> the boxes drawn. Boxes that cover one another keep the shorter text (a glued list over its own options).
    When the options' order is known (a separated list) and two or more were found on evenly spaced rows, a missed option

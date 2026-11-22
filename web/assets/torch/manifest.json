@@ -1,5 +1,5 @@
 {
- "hash": "db6317fc4bdcf42936eeea7f",
+ "hash": "e74e75532c430ffa2f9a02fb",
  "textures": {
   "ashlar": {
    "map": "ashlar.map.webp",
@@ -18,10 +18,6 @@
   "domeCoffers": {
    "map": "domeCoffers.map.webp",
    "normal": "domeCoffers.normal.webp"
-  },
-  "halfDome": {
-   "map": "halfDome.map.webp",
-   "normal": "halfDome.normal.webp"
   },
   "naveVault": {
    "map": "naveVault.map.webp",
@@ -66,7 +62,11 @@
   "steleMarble": {
    "map": "steleMarble.map.webp",
    "rough": "steleMarble.rough.webp",
-   "normal": "steleMarble.normal.webp"
+   "normal": "steleMarble.normal.png"
+  },
+  "plinthRelief": {
+   "map": "plinthRelief.map.webp",
+   "normal": "plinthRelief.normal.png"
   }
  },
  "ao": {

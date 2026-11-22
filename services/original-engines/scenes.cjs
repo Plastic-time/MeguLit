@@ -223,13 +223,21 @@ const artemis={
 const RPY=n=>/\.rpy$/i.test(n);
 const SAY=/^\s*(?:[A-Za-z_][\w.]*\s+)?(?:[A-Za-z_][\w.]*\s+)*"((?:[^"\\]|\\.)*)"\s*(?:with\s+\w+)?\s*$/;
 const unq=s=>s.replace(/\\n/g,'\n').replace(/\\(.)/g,'$1');
-function parseRpy(buf){const lines=[],anchors=[];let skip=false;
+function parseRpy(buf){const lines=[],anchors=[],roles=[],menus=[];let skip=false;
  for(const raw of decode(buf).split(/\r?\n/)){
   if(/^translate\s/.test(raw)){skip=true;continue;}if(skip&&/^\S/.test(raw))skip=false;if(skip)continue;
   const t=raw.trim();if(!t||t[0]==='#')continue;
-  const m=raw.match(SAY);if(m&&!/^\s*(?:old|new|define|default|\$|image|play|show|scene|jump|call)\b/.test(raw)){lines.push(unq(m[1]));continue;}
+  const indent=raw.match(/^\s*/)[0].replace(/\t/g,'        ').length;
+  while(menus.length&&indent<=menus.at(-1).indent)menus.pop();
+  if(/^menu(?:\s+\w+)?\s*:\s*(?:#.*)?$/.test(t))menus.push({indent,child:null});
+  else if(menus.length){
+   const menu=menus.at(-1);menu.child??=indent;
+   const option=indent===menu.child&&/^"((?:[^"\\]|\\.)*)"(?:\s+if\s+.+?)?\s*:\s*(?:#.*)?$/.exec(t);
+   if(option){lines.push(unq(option[1]));roles.push('c');continue;}
+  }
+  const m=raw.match(SAY);if(m&&!/^\s*(?:old|new|define|default|\$|image|play|show|scene|jump|call)\b/.test(raw)){lines.push(unq(m[1]));roles.push('b');continue;}
   if(ascii(t))anchors.push(t);}
- return {lines,anchors};}
+ return {lines,anchors,roles:roles.join('')};}
 const gameDir=dir=>fs.existsSync(path.join(dir,'game'))?path.join(dir,'game'):dir;
 const outsideTl=file=>!/[\\/]tl[\\/]/i.test(file);
 // Old/new pairs of every language folder under tl/: dialogue blocks (# who "old" then who "new") and string blocks.
@@ -280,26 +288,105 @@ const renpy={
 // gives the lines; the Chinese column comes from the same table before MeguLit's Japanese restore (its backup in
 // .megulit-japanese), from the table itself when it was never restored, or from a <name>_zh.dbs twin.
 const siglusTables=()=>require('../../core/japanese-restore.cjs')._internal;
-const DBS=n=>/\.dbs$/i.test(n)&&!/_(?:en|zh|cn|tw|ko|ru)\.dbs$/i.test(n);
+const DBS=n=>/\.dbs$/i.test(n)&&!/_(?:en|eng|zh|cn|ch|chs|cht|sc|tc|tw|ko|kr|ru)\.dbs$/i.test(n);
+const CHINESE_DBS_TWINS=['zh','cn','ch','chs','cht','sc','tc','tw'];
 const HAN=/[\u4e00-\u9fff]/,KANA1=/[\u3040-\u30ff]/;
-function dbsTable(buf){const t=siglusTables(),d=t.decrypt(buf);return t.parse(d.raw,d.marker);}
+function dbsTable(buf,limits){const t=siglusTables(),d=t.decrypt(buf,limits);limits?.consume?.(d.raw.length);return t.parse(d.raw,d.marker,limits);}
 function columnShares(table){return table.columns.map((c,i)=>{if(c.type!==0x53)return null;let filled=0,kana=0,han=0;for(const r of table.cells){const v=r[i];if(!v)continue;filled++;if(KANA1.test(v))kana++;else if(HAN.test(v))han++;}return {index:i,filled,kana:filled?kana/filled:0,han:filled?han/filled:0};}).filter(Boolean);}
-function parseDbs(buf){const table=dbsTable(buf),cols=columnShares(table).filter(c=>c.filled);const jp=cols.sort((a,b)=>b.kana-a.kana)[0];
- if(!jp||jp.kana<.3)return {lines:[],anchors:[],rows:table.rows};return {lines:table.cells.map(r=>String(r[jp.index]||'')),anchors:[],rows:table.rows};}
+const serialIndex=table=>table.columns.findIndex(c=>c.id===500&&c.type!==0x53);
+const speakerColumn=(table,i)=>serialIndex(table)>=0&&table.columns[i].id===50;
+const rowIds=table=>{const i=serialIndex(table);return i<0?null:table.cells.map(row=>row[i]);};
+const interfaceDbsName=name=>/^(?:config(?:[_.-]|$)|settings?(?:[_.-]|$)|name_replace\.dbs$)/i.test(name||'');
+function dbsScope(table,name){
+ if(interfaceDbsName(name))return 'interface';
+ const locales=new Set();
+ for(const row of table.cells.slice(0,32))for(const value of row){
+  const match=typeof value==='string'&&/^.{1,28}\(([A-Z]{2}(?:-[A-Z]{2})?)\)$/.exec(value);
+  if(match)locales.add(match[1]);
+ }
+ return locales.has('JP')&&locales.size>=3?'interface':'script';
+}
+function readDbs(buf,name,limits){
+ const table=dbsTable(buf,limits),cols=columnShares(table).filter(c=>c.filled&&!speakerColumn(table,c.index)),jp=cols.sort((a,b)=>b.kana-a.kana)[0];
+ const scope=dbsScope(table,name),ids=rowIds(table);
+ const lines=!jp||jp.kana<.3?[]:table.cells.map(r=>String(r[jp.index]||''));
+ return {table,lines,scope,rowIds:ids};
+}
+function parseDbs(buf){const {table,lines,scope,rowIds}=readDbs(buf);return {lines,anchors:[],rows:table.rows,scope,rowIds};}
 /* E286 (user report 2026-11-10, CLANNAD: the speaker name was given as each line's translation and drawn into the
    game): a name column (【朋也】) is all kanji too. A translation column is filled on most rows the Japanese is filled,
    and its values are mostly different from each other; names repeat. */
 function chineseColumn(table,jp){if(table.rows!==jp.length)return null;
  const rowsJp=jp.map((t,r)=>t?r:-1).filter(r=>r>=0);if(!rowsJp.length)return null;
- const c=columnShares(table).filter(c=>{if(c.filled<table.rows*.3||c.kana>=.1||c.han<=.5)return false;
-  let paired=0;const distinct=new Set();for(const r of rowsJp){const v=table.cells[r][c.index];if(!v)continue;paired++;distinct.add(v);}
-  return paired>=rowsJp.length*.6&&distinct.size>=paired*.5;}).sort((a,b)=>b.han-a.han)[0];
+ const {translated}=require('../align-sample.cjs');
+ const c=columnShares(table).filter(c=>{if(c.filled<table.rows*.3||c.kana>=.1||c.han<=.5||speakerColumn(table,c.index))return false;
+  let filled=0,changed=0;const distinct=new Set();for(const r of rowsJp){const v=table.cells[r][c.index];if(!v)continue;filled++;distinct.add(v);if(translated(v,jp[r]))changed++;}
+  if(filled<rowsJp.length*.6||distinct.size<filled*.5||changed<filled*.2)return false;
+  c.changed=changed;return true;}).sort((a,b)=>b.changed-a.changed||b.han-a.han)[0];
  return c?table.cells.map(r=>String(r[c.index]||'')):null;}
 const siglusDat=dir=>{const d=path.join(dir,'dat');try{return fs.readdirSync(d).some(DBS)?d:'';}catch{return '';}};
+function dbsSceneFile(dir){
+ const packs=fs.readdirSync(dir).filter(n=>/^scene.*\.pck$/i.test(n));
+ if(packs.length===1)return path.join(dir,packs[0]);
+ if(packs.length>1)try{
+  const language=/^\s*Language\s*=\s*(\w+)\s*$/im.exec(fs.readFileSync(path.join(dir,'ds.ini'),'utf8'))?.[1]?.toLowerCase();
+  const name={schinese:'scenezh.pck',english:'sceneen.pck',japanese:'scenejp.pck'}[language];
+  const match=packs.find(n=>n.toLowerCase()===name);
+  if(match)return path.join(dir,match);
+ }catch{}
+ return null;
+}
+let lastSlotLayout;
+function slotLayout(file){
+ const key=file+'|'+stat(file);
+ if(lastSlotLayout?.key===key)return lastSlotLayout;
+ const src=require('./siglus-source.cjs'),files=src.sources(file);
+ const declarations=files.find(s=>/^_system_language\.inc$/i.test(s.name));
+ const defines=declarations?src.decode(declarations.raw):'';
+ const column=lang=>defines.match(new RegExp('^\\s*#define\\s+\\$lang_'+lang+'\\s+(\\d+)\\b','im'))?.[1];
+ const ja=column('jp'),zh=column('ch'),layout=ja!=null&&zh!=null&&ja!==zh?{ja:Number(ja),zh:Number(zh)}:null;
+ return lastSlotLayout={key,slots:src.messageSlots(files),layout};
+}
+// A serial-keyed bilingual patch may omit or reorder rows. In this format both
+// the serial and the Japanese cell must match before accepting its Chinese cell.
+function serialTranslations(scene,table,layout){
+ if(!layout||!scene.rowIds||!/[bc]/.test(scene.roles||''))return null;
+ const serial=serialIndex(table),ja=table.columns.findIndex(c=>c.id===layout.ja&&c.type===0x53);
+ const zh=table.columns.findIndex(c=>c.id===layout.zh&&c.type===0x53);
+ if(serial<0||ja<0||zh<0)return null;
+ const byId=new Map(),duplicates=new Set();
+ for(const row of table.cells){
+  if(byId.has(row[serial]))duplicates.add(row[serial]);
+  byId.set(row[serial],row);
+ }
+ const seen=new Set();
+ for(const id of scene.rowIds){
+  if(seen.has(id))duplicates.add(id);
+  seen.add(id);
+ }
+ const {translated}=require('../align-sample.cjs');
+ return scene.lines.map((text,i)=>{
+  const id=scene.rowIds[i],row=byId.get(id);
+  return text&&!duplicates.has(id)&&row?.[ja]===text&&translated(row[zh],text)?row[zh]:'';
+ });
+}
 const siglus={
  id:'siglus',hint:'dat\*.dbs',
  scenes(dir){const d=siglusDat(dir);if(!d)return [];return fs.readdirSync(d).filter(DBS).sort().map(f=>({name:f,read:()=>fs.readFileSync(path.join(d,f))}));},
- archives:()=>[],sources:dir=>{const d=siglusDat(dir);return d?fs.readdirSync(d).filter(DBS).map(f=>path.join(d,f)):[];},
+ archives:()=>[],sources:dir=>{const d=siglusDat(dir);if(!d)return [];const pck=dbsSceneFile(dir);return [...fs.readdirSync(d).filter(DBS).map(f=>path.join(d,f)),...(pck?[pck]:[])];},
+ annotate(dir,list){
+  list=list.map(scene=>interfaceDbsName(scene.name)?{...scene,scope:'interface'}:scene);
+  const file=dbsSceneFile(dir);
+  if(!file)return list;
+  let info;try{info=slotLayout(file);}catch{return list;}
+  const {slots,layout}=info;
+  if(!slots.size)return list;
+  return list.map(scene=>{
+   if(scene.scope==='interface'||!scene.rowIds||!scene.lines.length)return scene;
+   const roles=scene.lines.map((text,i)=>{const slot=slots.get(scene.rowIds[i]);return text&&slot?.text===text?slot.role:'?';}).join('');
+   return {...scene,roles,layout};
+  });
+ },
  parse:parseDbs,test:DBS,
  // E450 voices: the release's Scene.pck keeps its original sources, where a KOE call comes before each spoken line
  voiceLines:dir=>require('./siglus-source.cjs').voiceLines(dir),
@@ -312,15 +399,54 @@ const siglus={
    for(const c of cols){if(c.index===jp.index||c.kana>=.1)continue;for(const r of table.cells){const ja=String(r[jp.index]||''),v=String(r[c.index]||'');if(!ja||!v||!KANA1.test(ja)&&!HAN.test(ja))continue;const k=key(v);if(k.length<2)continue;seq.push([k,ja,v]);const had=out.get(k);/* one translation for several lines: narration before a quoted line (art text is narration) */if(!had||/^[「『（(]/.test(had)&&!/^[「『（(]/.test(ja))out.set(k,ja);}}}
   return out;},
  patchLines(base,found){
-  const dirs=[...new Set(found.dirs.flatMap(d=>[d,path.join(d,'.megulit-japanese','dat'),path.join(d,'dat')]))];let any=false;
-  const list=base.map(scene=>{const stem=scene.name.replace(/\.dbs$/i,'');
-   for(const d of dirs)for(const name of [scene.name,stem+'_zh.dbs',stem+'_cn.dbs',stem+'_tw.dbs']){const file=path.join(d,name);let buf;try{buf=fs.readFileSync(file);}catch{continue;}
-    let lines;try{lines=chineseColumn(dbsTable(buf),scene.lines);}catch{continue;}if(!lines)continue;any=true;
-    return {...scene,patched:true,lines:lines.map((t,k)=>t||scene.lines[k])};}
+  const dirs=[...new Set(found.dirs.flatMap(d=>[d,path.join(d,'dat'),path.join(d,'.megulit-japanese','dat')]))];let any=false;
+  const list=base.map(item=>{
+   const scene=interfaceDbsName(item.name)?{...item,scope:'interface'}:item,stem=scene.name.replace(/\.dbs$/i,'');
+   let keyedLines;
+   const patchFiles=[];
+   for(const d of dirs)for(const name of [scene.name,...CHINESE_DBS_TWINS.map(suffix=>stem+'_'+suffix+'.dbs')]){
+    const patchFile=path.join(d,name);let table;try{table=dbsTable(fs.readFileSync(patchFile));}catch{continue;}
+    const verified=serialTranslations(scene,table,scene.layout);
+    if(verified){
+     // A partially restored table and its backup can contain different surviving slots.
+     // Keep the first verified translation of each serial, and record only files that contribute.
+     if(!verified.some((text,i)=>text&&!keyedLines?.[i])||dbsScope(table,name)==='interface')continue;
+     keyedLines=keyedLines?keyedLines.map((text,i)=>text||verified[i]):verified;
+     patchFiles.push(patchFile);
+     continue;
+    }
+    if(keyedLines)continue;
+    const ids=rowIds(table);
+    if((ids||scene.rowIds)&&(!ids||!scene.rowIds||ids.length!==scene.rowIds.length||ids.some((id,i)=>id!==scene.rowIds[i])))continue;
+    const lines=chineseColumn(table,scene.lines);
+    if(!lines)continue;any=true;
+    return {...scene,scope:scene.scope==='interface'||dbsScope(table,name)==='interface'?'interface':'script',patchFile,
+     patched:true,keyed:false,lines:lines.map((t,k)=>t||scene.lines[k])};}
+   if(keyedLines){
+    any=true;
+    return {...scene,patched:true,keyed:true,patchFiles,lines:keyedLines.map((text,i)=>text||scene.lines[i])};
+   }
    return scene;});
-  // Partial translations count (user, 2026-11-10: CLANNAD's ZH-TW system menu table is a real translation; use what is there).
   return any?list:null;
  },
+ // Count only instructions whose serial and Japanese cell agree with the Chinese release.
+ storyProof(dir,tables){
+  const proof={body:0,choice:0,bodyTotal:0,choiceTotal:0,files:[]};
+  for(const scene of this.annotate(dir,tables)){
+   if(!scene.roles)continue;
+   const zh=serialTranslations(scene,scene.table,scene.layout);
+   let paired=false;
+   for(let i=0;i<scene.roles.length;i++){
+    const role=scene.roles[i]==='b'?'body':scene.roles[i]==='c'?'choice':'';
+    if(!role)continue;
+    proof[role+'Total']++;
+    if(zh?.[i]){proof[role]++;paired=true;}
+   }
+   if(paired)proof.files.push(scene.name);
+  }
+  return proof;
+ },
+ readDbs,dbsName:DBS,
 };
 
 // ---- KiriKiri Z, cx-encrypted (Steam releases: 千恋＊万花, サノバウィッチ, ATRI ...) ---------------------------------
@@ -332,9 +458,12 @@ const MEDIA_XP3=/^(?:bg|fg|ev|sd)?image|^(?:bgm|voice|sound|se|movie|video|thum|
 const cxArchives=dir=>{try{return fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f)&&!MEDIA_XP3.test(f)).map(f=>path.join(dir,f));}catch{return [];}};
 const cxCache=file=>{const st=fs.statSync(file);return path.join(os.tmpdir(),'megulit-cx',crypto.createHash('sha256').update(path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+'|6').digest('hex').slice(0,24)+'.json');};
 const cxBuilds=new Map(),cxMemo=new Map(),cxQueue=[],cxStarted=new Map();let cxRunning=false;
+let cxProbe=null;
+function withCxProbe(fn){const previous=cxProbe;cxProbe={deferred:false};try{return fn();}finally{cxProbe=previous;}}
 function cxDocs(file){
  let out;try{out=cxCache(file);}catch{return null;}
  try{const st=fs.statSync(out),hit=cxMemo.get(out);if(hit&&hit.at===st.mtimeMs)return hit.docs;const docs=JSON.parse(fs.readFileSync(out,'utf8')).docs||[];cxMemo.set(out,{at:st.mtimeMs,docs});return docs;}catch{}
+ if(cxProbe)return null;
  if(!cxBuilds.has(out)){
   // Only archives that look like cx KiriKiri (encrypted entries) are worth a worker; one worker at a time.
   /* E595 a translation's patch.xp3 keeps its scene files unencrypted (each byte XOR-ed, which the worker undoes) */
@@ -348,9 +477,22 @@ function cxDocs(file){
    the missing caches in this thread, within a deadline; the probe calls it before reading. */
 function cxPrepareSync(dir,{deadline=Infinity}={}){let built=0;
  const size=f=>{try{return fs.statSync(f).size;}catch{return 0;}},order=cxArchives(dir).sort((a,b)=>(/^scn/i.test(path.basename(b))-/^scn/i.test(path.basename(a)))||size(a)-size(b));
- for(const file of order){if(Date.now()>deadline)break;let out;try{out=cxCache(file);}catch{continue;}if(fs.existsSync(out))continue;
-  let list;try{list=xp3.list(file);}catch{list=null;}if(!list||!list.files.some(e=>e.encrypted||/\.scn$/i.test(e.name)))continue;
-  try{const r=require('./cx-worker.cjs').build(file);fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out+'.tmp',JSON.stringify({schema:1,file,...r}));fs.renameSync(out+'.tmp',out);built++;}catch{}}
+ for(const file of order){let out;try{out=cxCache(file);}catch{continue;}if(fs.existsSync(out)||cxBuilds.has(out))continue;
+  if(Date.now()>=deadline){if(cxProbe)cxProbe.deferred=true;break;}
+  const attempt=out+'.'+process.pid+'.'+crypto.randomUUID()+'.tmp';
+  if(Number.isFinite(deadline)){
+   const left=Math.floor(deadline-Date.now());if(left<=0){if(cxProbe)cxProbe.deferred=true;break;}
+   const signal=new Int32Array(new SharedArrayBuffer(4));let worker,cleanExited;
+   try{
+    const {Worker}=require('node:worker_threads');worker=new Worker(path.join(__dirname,'cx-worker.cjs'),{workerData:{prepare:true,file,attempt,signal:signal.buffer}});worker.on('error',()=>{});worker.unref();cxBuilds.set(out,worker);cxStarted.set(out,Date.now());
+    const owned=worker;cleanExited=()=>{if(cxBuilds.get(out)===owned)cxBuilds.delete(out);try{fs.rmSync(attempt,{force:true});}catch{}};worker.once('exit',cleanExited);
+    const remaining=Math.floor(deadline-Date.now());if(remaining>0&&Atomics.load(signal,0)===0)Atomics.wait(signal,0,0,remaining);
+    const status=Atomics.load(signal,0);
+    if(Date.now()>=deadline||status===0){if(cxProbe)cxProbe.deferred=true;break;}
+    if(status===1){if(cxCache(file)!==out||Date.now()>=deadline){if(cxProbe)cxProbe.deferred=true;break;}fs.renameSync(attempt,out);built++;}
+   }catch{}finally{if(worker)try{worker.terminate().then(cleanExited,()=>{});}catch{}}
+  }else try{if(require('./cx-worker.cjs').prepare(file,attempt)){fs.renameSync(attempt,out);built++;}}catch{}finally{try{fs.rmSync(attempt,{force:true});}catch{}}
+ }
  return built;}
 function cxNext(){
  if(cxRunning||!cxQueue.length)return;const {file,out}=cxQueue.shift();cxRunning=true;
@@ -631,12 +773,14 @@ function detect(dir){if(readable('adapter-pack',dir))return 'adapter-pack';
  for(const id of Object.keys(ENGINES)){if(id==='adapter-pack'||hint.includes(id))continue;if(id==='garbro'&&ownCx(dir))continue;if(readable(id,dir))return id;}return null;}
 function read(id,dir,overlay){const engine=ENGINES[id];
  // E449 a release's Chinese column gets the filled translations of the lines it leaves empty (fill.cjs).
- return engine.scenes(dir).map(s=>{const replaced=overlay?.get(s.name.toLowerCase());let parsed={lines:[],anchors:[]};try{parsed=engine.parse(replaced||s.read());}catch{}return fill.scene({name:s.name,...parsed,patched:!!replaced});});}
+ const list=engine.scenes(dir).map(s=>{const replaced=overlay?.get(s.name.toLowerCase());let parsed={lines:[],anchors:[]};try{parsed=engine.parse(replaced||s.read());}catch{}return fill.scene({name:s.name,...parsed,patched:!!replaced});});
+ return engine.annotate?engine.annotate(dir,list):list;}
 function fingerprint(id,dir){return crypto.createHash('sha256').update(id+'\n'+ENGINES[id].sources(dir).sort().map(f=>path.basename(f)+'|'+stat(f)).join('\n')).digest('hex');}
 /* E294 (user: say that the first use needs 30-90 s of unpacking instead of "not supported"): what a game that cannot
    be read yet is waiting for. 'unpack': its cx archives are being decrypted in the background (started: when);
    'capture': strongly encrypted KiriKiri archives, read while the game runs (kirikiri-dump), nothing saved yet. */
 function preparing(dir){
+ if(cxProbe?.deferred)return {kind:'budget'};
  const viaGarbro=(()=>{try{return garbro.preparing(dir);}catch{return null;}})();if(viaGarbro)return viaGarbro;
  let started=0;for(const file of cxArchives(dir)){let out;try{out=cxCache(file);}catch{continue;}if(cxBuilds.has(out))started=Math.min(started||Infinity,cxStarted.get(out)||Date.now());}
  if(started)return {kind:'unpack',startedAt:started};
@@ -646,4 +790,4 @@ function preparing(dir){
 }
 /* E375 why a recognised game cannot be read (an engine's own check, e.g. encrypted WOLF archives), or null. */
 function unsupportedReason(dir){for(const e of Object.values(ENGINES)){if(typeof e.unsupported!=='function')continue;let code='';try{code=e.unsupported(dir);}catch{}if(code)return {engine:e.id,code,detail:e.REASONS?.[code]||''};}return null;}
-module.exports={layerOriginal,sceneLanguage,cxChineseOnly,cxPrepareSync,ownCx,unquoteSlot,unsupportedReason,preparing,cxBuilds,chineseColumn,ENGINES,detect,readable,read,fingerprint,parseKs,parseAst,parseRpy,pfsList,pfsRead,tlPairs,decode};
+module.exports={layerOriginal,sceneLanguage,cxChineseOnly,cxPrepareSync,withCxProbe,ownCx,unquoteSlot,unsupportedReason,preparing,cxBuilds,chineseColumn,ENGINES,detect,readable,read,fingerprint,parseKs,parseAst,parseRpy,pfsList,pfsRead,tlPairs,decode};

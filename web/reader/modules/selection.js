@@ -12,7 +12,7 @@
   };
  const explain=(args,mode)=>new Promise((resolve,reject)=>{const id=++serial,timer=setTimeout(()=>{pending.delete(id);reject(Error('学习 API 等待超时，请稍后重试'));},45000);
   pending.set(id,{resolve,reject,timer});send({type:'lookupExplain',id,args,mode,options:b.options()});});
- function close(keepSurface=false){if(!keepSurface)try{getSelection()?.removeAllRanges();}catch{}pointSerial++;serial++;card?.remove();card=null;current=null;b.selectionActive=false;
+ function close(keepSurface=false){if(!keepSurface)try{getSelection()?.removeAllRanges();}catch{}b.refreshTranslationOrigin=null;pointSerial++;serial++;card?.remove();card=null;current=null;b.selectionActive=false;
   for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('选区已关闭'));}pending.clear();document.body.classList.remove('tomoyo-selection-open');try{send({
   type:'lookupCancel'});if(!keepSurface)send({type:'galLookup',open:false});}catch{}}
  function textBlock(word){const root=anchor?.closest?.('.sentence-text,.tome-log-src');if(!root)return word;const own=root.getBoundingClientRect(),parent=root.parentElement?.getBoundingClientRect?.();
@@ -142,13 +142,20 @@
    const replacement={...result,entries:[result.entries[Number(select.value)]]};sub.replaceChildren();wordHeader(replacement,replacement.entries[0],sub);senses(replacement.entries[0],
    sub);b.decorateWordActions?.(host.closest('.tomoyo-selection-card'),current,replacement);place();};label.append(select);host.append(label);}}
  }
- async function show(args,at,result){if(current&&card&&current.text===args.text&&current.start===args.start&&current.end===args.end){anchor=at;place();return;}close(true);
+ async function show(args,at,result){const container=at?.startContainer;
+  const mark=args.sentenceMark??b.cardinalPair?.selection?.(container?.nodeType===1?container:container?.parentElement,args.text);
+  args={...args,sentenceMark:mark};if(current?.sentenceMark?.episode===mark?.episode&&current&&card&&current.text===args.text&&current.start===args.start&&current.end===args.end){anchor=at;place();return;}close(true);
   current=args;anchor=at;b.selectionActive=true;const mine=current;card=el('section','tomoyo-selection-card word-image-preview-portal');{const shot=b.precaptureReader?.();
   if(shot)card.__megulitShot=shot;/* game-only picture: the card is never hidden for it */}card.setAttribute('role','dialog');card.setAttribute('aria-label',
   '本地查词与选区解释');const top=el('header');dragCard(top);if(typeof ResizeObserver==='function'){const watched=card;new ResizeObserver(()=>{if(card===watched&&watched.isConnected)place();
   }).observe(watched);}top.append(el('span',''),button('×',()=>close()));const body=el('div','tomoyo-selection-body'),status=el('div','tomoyo-muted','本地查询中…'),actions=el('footer'),
   ai=el('div','tomoyo-ai-result');ai.hidden=true;actions.append(button('上下文解释',()=>askAI('explain')),button('AI 归纳义项',()=>askAI('summary')));body.append(status);
-  card.append(top,actions,ai,body);document.body.append(card);document.body.classList.add('tomoyo-selection-open');send({type:'galLookup',open:true});place();
+  const anchorNode=at?.startContainer;const pair=(anchorNode?.parentElement||anchorNode)?.closest?.(".tome-island-pair");
+  const origin=el('small','tomoyo-muted tomoyo-translation-origin');
+  b.refreshTranslationOrigin=()=>{const data=pair?.querySelector('.tomoyo-cn-output')?.dataset,r=b.returnedTranslation,hit=pair?{source:data?.translationOrigin,cached:data?.translationSource==='cache',provider:data?.translationProvider}:r&&r.id===b.serial&&r.target===b.translationTarget?.()&&r.line===args.text?r:null;
+   const names={script:'剧本',official:'官方译文',api:'API',unknown:'未知',patch:'补丁',machine:'机器翻译',mt:'机器翻译',local:'本地模型'};
+   origin.textContent='本句译文来源 · '+(hit?.cached?'缓存 · ':'')+(names[hit?.source]||'未知')+(hit?.provider?' · '+hit.provider:'');};
+  b.refreshTranslationOrigin();card.append(top,actions,ai,body,origin);document.body.append(card);document.body.classList.add('tomoyo-selection-open');send({type:'galLookup',open:true});place();
   // Short entrance (user, 2026-11-02): compositor-only translate/scale on the card (its CSS pins opacity/transform/animation)
   // and a fade on its contents, ~140 ms; the window region is refreshed once it settles.
   if(!['glass','both'].includes(document.documentElement.dataset.tomeCardSurface)&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const ease='cubic-bezier(.2,.7,.2,1)';
@@ -168,14 +175,14 @@
  }
  /* ② capture compositor: MeguLit draws the line itself and reports a click on one of its glyphs (screen px, char index
     in the drawn line); the same word card opens there, anchored on the click. */
- b.compositorLookup=async m=>{const text=String(m?.text||''),index=Number(m?.index);if(!text||!Number.isInteger(index)||index<0)return;const ticket=++pointSerial;
+ b.compositorLookup=async m=>{const text=String(m?.text||''),index=Number(m?.index);if(!text||!Number.isInteger(index)||index<0)return;const ticket=++pointSerial,sentenceMark=b.cardinalPair?.currentSelection?.(text);
   try{const result=await b.localLookup('lookup_at_position',{text,position:index});if(!result||ticket!==pointSerial)return;const dpr=devicePixelRatio||1,x=Number(m.x)/dpr-screenX,
-   y=Number(m.y)/dpr-screenY,r={left:x-10,right:x+10,top:y-14,bottom:y+14,width:20,height:28};r.__megulitPoint={x,y};lastPoint={x,y};show({text,start:result.start,end:result.end},r,result);}
+   y=Number(m.y)/dpr-screenY,r={left:x-10,right:x+10,top:y-14,bottom:y+14,width:20,height:28};r.__megulitPoint={x,y};lastPoint={x,y};show({text,sentenceMark,start:result.start,end:result.end},r,result);}
   catch(e){if(ticket===pointSerial)b.learningStatus?.({learningMessage:e.message||'本地点词失败'});}};
- async function showPoint(token){const ticket=++pointSerial;const {chars,text}=paragraphText(token),index=chars.indexOf(token);if(index<0)return;const position=chars.slice(0,
+ async function showPoint(token){const ticket=++pointSerial;const {chars,text}=paragraphText(token),index=chars.indexOf(token),sentenceMark=b.cardinalPair?.selection?.(token,text);if(index<0)return;const position=chars.slice(0,
   index).reduce((n,t)=>n+[...t.textContent].length,0);try{const result=await b.localLookup('lookup_at_position',{text,position});if(result&&ticket===pointSerial&&token.isConnected&&paragraphText(token).text===text){
   const range=document.createRange();let n=0,first=null,last=null;for(const c of chars){const len=[...c.textContent].length;if(n+len>result.start&&n<result.end){
-  first=first||c;last=c;}n+=len;}if(first){range.setStartBefore(first);range.setEndAfter(last);}else range.selectNode(token);show({text,start:result.start,end:result.end},
+  first=first||c;last=c;}n+=len;}if(first){range.setStartBefore(first);range.setEndAfter(last);}else range.selectNode(token);show({text,sentenceMark,start:result.start,end:result.end},
   range,result);}}catch(e){if(ticket===pointSerial)b.learningStatus?.({learningMessage:e.message||'本地点词失败'});}}
  for(const type of ['mouseover','mousemove'])document.addEventListener(type,e=>{if(card&&e.target.closest?.('.sentence-text'))e.stopImmediatePropagation();},true);
  /* E427 The styled dropdown list (.mg-select-pop) sits on <body>, outside the card: picking another homograph there must not count as a click outside, which closed the card before the switch ran. */

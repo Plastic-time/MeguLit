@@ -203,7 +203,10 @@ $names=New-Object 'System.Collections.Generic.SortedSet[string]' ([StringCompare
 function Get-DroppedPaths([string[]]$Paths){$gone=@{};foreach($f in (git log --diff-filter=D --name-only --format= -- core services web setup native 'The Seed')){if($f){$gone[$f]=1}};$live=@{};foreach($f in (git ls-files)){$live[$f]=1};@($Paths | Where-Object {$gone.ContainsKey($_) -and -not $live.ContainsKey($_) -and -not (Test-Path -LiteralPath (Join-Path $Root ($_ -replace '/','\')))})}
 $prevNames=@(foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and $e.FullName -ne 'MeguLit/build-shell.txt' -and -not $e.FullName.EndsWith('/') -and $e.FullName -notmatch '\.(lib|obj|pdb|exp|ilk|iobj|ipdb)$' -and $e.FullName -notmatch '/build/'){$e.FullName.Substring(8)}})
 $dropped=Get-DroppedPaths $prevNames
-foreach($n in $prevNames){if($dropped -contains $n){Write-Host "  dropped deleted $n"}else{[void]$names.Add($n)}}
+. (Join-Path $Root 'tools/package-vc-runtime.ps1')
+$vcFiles = New-VcRuntimeReleaseFiles $work
+foreach($n in $prevNames){if($vcFiles.ContainsKey($n)){continue};if($dropped -contains $n){Write-Host "  dropped deleted $n"}else{[void]$names.Add($n)}}
+[void]$names.Add('Install MeguLit.cmd')
 # --others: files added in this release are not tracked yet when the list is built (-IncludeWorkingChanges)
 <# 2026-11-21 The Seed/ (owner): the built-in game diffs ship with the code, one folder in MeguLit/ #>
 foreach($f in (git ls-files --cached --others --exclude-standard core services web setup 'The Seed')){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
@@ -235,6 +238,7 @@ $zipPath=Join-Path $work $Asset
 $out=[IO.Compression.ZipFile]::Open($zipPath,'Create')
 try{
  foreach($n in $names){
+  if ($vcFiles.ContainsKey($n)) { continue }
   $local=Join-Path $Root ($n -replace '/','\')
   if(Test-Path -LiteralPath $local -PathType Leaf){[void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($out,$local,"MeguLit/$n",[IO.Compression.CompressionLevel]::Optimal)}
   else{
@@ -244,9 +248,17 @@ try{
    Write-Host "  carried over $n"
   }
  }
+ foreach ($n in $vcFiles.Keys) {
+  [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($out,$vcFiles[$n],"MeguLit/$n",[IO.Compression.CompressionLevel]::Optimal)
+ }
  [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($out,$shellFile,'MeguLit/build-shell.txt',[IO.Compression.CompressionLevel]::Optimal)
 }finally{$out.Dispose();$old.Dispose()}
 $check=[IO.Compression.ZipFile]::OpenRead($zipPath)
+try {
+ foreach ($required in 'Install MeguLit.cmd','setup/setup-vc-runtime.ps1','setup/setup-runtime.ps1','setup/vc-runtime.json','setup/vc_redist.x64.exe') {
+  if (-not $check.GetEntry("MeguLit/$required")) { throw "Package has no $required (setup prerequisite)" }
+ }
+} catch { $check.Dispose(); throw }
 try{if(-not $check.GetEntry('MeguLit/MeguLit.exe')){throw 'Package has no MeguLit.exe'};foreach($u in 'MeguLit/setup/uninstall.ps1','MeguLit/services/uninstall.cjs'){if(-not $check.GetEntry($u)){throw "Package has no $u (uninstaller)"}};if($check.Entries | Where-Object {$_.FullName -like 'MeguLit/data/*'}){throw 'Package contains data/'};$count=$check.Entries.Count}finally{$check.Dispose()}
 $hash=(Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower();$size=(Get-Item $zipPath).Length
 Write-Host "$Asset  $count files  $size bytes  sha256 $hash"
@@ -268,7 +280,7 @@ if(-not $Beta){
      counting them meant no release ever got a small package. A hot install simply keeps the previous copies. #>
   if(-not $why){foreach($e in $zb.Entries){$n=$e.FullName;if($n.EndsWith('/') -or $n -eq 'MeguLit/MeguLit.exe' -or $n -eq 'MeguLit/build-shell.txt' -or $n -match '^MeguLit/[^/]+\.md$'){continue}
    $h=EntryHash $e;$o=$za.GetEntry($n);if($o -and $o.Length -eq $e.Length -and (EntryHash $o) -eq $h){continue}
-   $rel=$n.Substring(8);if($rel -notmatch '^(web|services|core|setup|The Seed)/' -or $rel -match '\.html?$'){$why="$rel changed";break}
+   $rel=$n.Substring(8);if($rel -notmatch '^(web|services|core|setup|The Seed)/' -or $rel -match '\.html?$' -or $vcFiles.ContainsKey($rel)){$why="$rel changed";break}
    $changed+=[pscustomobject]@{path=$rel;sha256=$h;entry=$e}}}
   if(-not $why -and -not $changed.Count){$why='no file changed'}
   if(-not $why){

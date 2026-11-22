@@ -1,0 +1,260 @@
+{
+  "python": "3.13.15 (tags/v3.13.15:4061bc4, Aug  5 2026, 13:05:39) [MSC v.1944 64 bit (AMD64)]",
+  "scope": "ordinary CPython serializer with neutral fake PyCode __getstate__ tuples, not RenPy compiler or game bytes",
+  "fixtures": [
+    {
+      "protocol": 2,
+      "stateLength": 4,
+      "bytes": 94,
+      "base64": "gAJjcmVucHkuYXN0ClB5Q29kZQpxACmBcQEoSwFYEQAAAG5ldXRyYWxfdmFsdWUgPSAxcQJYDQAAAHN5bnRoZXRpYy5ycHlxA0sMhnEEWAQAAABleGVjcQV0cQZiLg==",
+      "opcodes": [
+        "BININT1",
+        "BINPUT",
+        "BINUNICODE",
+        "BUILD",
+        "EMPTY_TUPLE",
+        "GLOBAL",
+        "MARK",
+        "NEWOBJ",
+        "PROTO",
+        "STOP",
+        "TUPLE",
+        "TUPLE2"
+      ]
+    },
+    {
+      "protocol": 2,
+      "stateLength": 5,
+      "bytes": 96,
+      "base64": "gAJjcmVucHkuYXN0ClB5Q29kZQpxACmBcQEoSwFYEQAAAG5ldXRyYWxfdmFsdWUgPSAxcQJYDQAAAHN5bnRoZXRpYy5ycHlxA0sMhnEEWAQAAABldmFscQVLA3RxBmIu",
+      "opcodes": [
+        "BININT1",
+        "BINPUT",
+        "BINUNICODE",
+        "BUILD",
+        "EMPTY_TUPLE",
+        "GLOBAL",
+        "MARK",
+        "NEWOBJ",
+        "PROTO",
+        "STOP",
+        "TUPLE",
+        "TUPLE2"
+      ]
+    },
+    {
+      "protocol": 2,
+      "stateLength": 6,
+      "bytes": 105,
+      "base64": "gAJjcmVucHkuYXN0ClB5Q29kZQpxACmBcQEoSwFYEQAAAG5ldXRyYWxfdmFsdWUgPSAxcQJYDQAAAHN5bnRoZXRpYy5ycHlxA0sMhnEEWAYAAABzaW5nbGVxBUsDigX/////AHRxBmIu",
+      "opcodes": [
+        "BININT1",
+        "BINPUT",
+        "BINUNICODE",
+        "BUILD",
+        "EMPTY_TUPLE",
+        "GLOBAL",
+        "LONG1",
+        "MARK",
+        "NEWOBJ",
+        "PROTO",
+        "STOP",
+        "TUPLE",
+        "TUPLE2"
+      ]
+    },
+    {
+      "protocol": 2,
+      "stateLength": 7,
+      "bytes": 105,
+      "base64": "gAJjcmVucHkuYXN0ClB5Q29kZQpxACmBcQEoSwFYEQAAAG5ldXRyYWxfdmFsdWUgPSAxcQJYDQAAAHN5bnRoZXRpYy5ycHlxA0sMhnEEWAQAAABleGVjcQVLA4oF/////wBLEXRxBmIu",
+      "opcodes": [
+        "BININT1",
+        "BINPUT",
+        "BINUNICODE",
+        "BUILD",
+        "EMPTY_TUPLE",
+        "GLOBAL",
+        "LONG1",
+        "MARK",
+        "NEWOBJ",
+        "PROTO",
+        "STOP",
+        "TUPLE",
+        "TUPLE2"
+      ]
+    },
+    {
+      "protocol": 4,
+      "stateLength": 4,
+      "bytes": 91,
+      "base64": "gASVUAAAAAAAAACMCXJlbnB5LmFzdJSMBlB5Q29kZZSTlCmBlChLAYwRbmV1dHJhbF92YWx1ZSA9IDGUjA1zeW50aGV0aWMucnB5lEsMhpSMBGV4ZWOUdJRiLg==",
+      "opcodes": [
+        "BININT1",
+        "BUILD",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE",
+        "TUPLE2"
+      ]
+    },
+    {
+      "protocol": 4,
+      "stateLength": 5,
+      "bytes": 93,
+      "base64": "gASVUgAAAAAAAACMCXJlbnB5LmFzdJSMBlB5Q29kZZSTlCmBlChLAYwRbmV1dHJhbF92YWx1ZSA9IDGUjA1zeW50aGV0aWMucnB5lEsMhpSMBGV2YWyUSwN0lGIu",
+      "opcodes": [
+        "BININT1",
+        "BUILD",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE",
+        "TUPLE2"
+      ]
+    },
+    {
+      "protocol": 4,
+      "stateLength": 6,
+      "bytes": 102,
+      "base64": "gASVWwAAAAAAAACMCXJlbnB5LmFzdJSMBlB5Q29kZZSTlCmBlChLAYwRbmV1dHJhbF92YWx1ZSA9IDGUjA1zeW50aGV0aWMucnB5lEsMhpSMBnNpbmdsZZRLA4oF/////wB0lGIu",
+      "opcodes": [
+        "BININT1",
+        "BUILD",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "LONG1",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE",
+        "TUPLE2"
+      ]
+    },
+    {
+      "protocol": 4,
+      "stateLength": 7,
+      "bytes": 102,
+      "base64": "gASVWwAAAAAAAACMCXJlbnB5LmFzdJSMBlB5Q29kZZSTlCmBlChLAYwRbmV1dHJhbF92YWx1ZSA9IDGUjA1zeW50aGV0aWMucnB5lEsMhpSMBGV4ZWOUSwOKBf////8ASxF0lGIu",
+      "opcodes": [
+        "BININT1",
+        "BUILD",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "LONG1",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE",
+        "TUPLE2"
+      ]
+    },
+    {
+      "protocol": 5,
+      "stateLength": 4,
+      "bytes": 91,
+      "base64": "gAWVUAAAAAAAAACMCXJlbnB5LmFzdJSMBlB5Q29kZZSTlCmBlChLAYwRbmV1dHJhbF92YWx1ZSA9IDGUjA1zeW50aGV0aWMucnB5lEsMhpSMBGV4ZWOUdJRiLg==",
+      "opcodes": [
+        "BININT1",
+        "BUILD",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE",
+        "TUPLE2"
+      ]
+    },
+    {
+      "protocol": 5,
+      "stateLength": 5,
+      "bytes": 93,
+      "base64": "gAWVUgAAAAAAAACMCXJlbnB5LmFzdJSMBlB5Q29kZZSTlCmBlChLAYwRbmV1dHJhbF92YWx1ZSA9IDGUjA1zeW50aGV0aWMucnB5lEsMhpSMBGV2YWyUSwN0lGIu",
+      "opcodes": [
+        "BININT1",
+        "BUILD",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE",
+        "TUPLE2"
+      ]
+    },
+    {
+      "protocol": 5,
+      "stateLength": 6,
+      "bytes": 102,
+      "base64": "gAWVWwAAAAAAAACMCXJlbnB5LmFzdJSMBlB5Q29kZZSTlCmBlChLAYwRbmV1dHJhbF92YWx1ZSA9IDGUjA1zeW50aGV0aWMucnB5lEsMhpSMBnNpbmdsZZRLA4oF/////wB0lGIu",
+      "opcodes": [
+        "BININT1",
+        "BUILD",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "LONG1",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE",
+        "TUPLE2"
+      ]
+    },
+    {
+      "protocol": 5,
+      "stateLength": 7,
+      "bytes": 102,
+      "base64": "gAWVWwAAAAAAAACMCXJlbnB5LmFzdJSMBlB5Q29kZZSTlCmBlChLAYwRbmV1dHJhbF92YWx1ZSA9IDGUjA1zeW50aGV0aWMucnB5lEsMhpSMBGV4ZWOUSwOKBf////8ASxF0lGIu",
+      "opcodes": [
+        "BININT1",
+        "BUILD",
+        "EMPTY_TUPLE",
+        "FRAME",
+        "LONG1",
+        "MARK",
+        "MEMOIZE",
+        "NEWOBJ",
+        "PROTO",
+        "SHORT_BINUNICODE",
+        "STACK_GLOBAL",
+        "STOP",
+        "TUPLE",
+        "TUPLE2"
+      ]
+    }
+  ]
+}

@@ -29,7 +29,7 @@ test('background retry results write their original target even after a display 
 test('bilingual display uses the resolved learner target for cache, script choice and request overrides',async()=>{
  const {r}=reader();r.prefs=()=>({provider:'google',learnerLanguage:'en'});r.gal.hooks.scriptTranslation=()=> '旧中文脚本';let called=0;r.chainTranslate=async(text,options)=>{called++;assert.equal(options.learnerLanguage,'en');return {text:'English answer'};};
  assert.equal(await r.translate({id:1,text:'本文'}),'English answer');assert.equal(called,1);assert.equal(r.embedCache.get('en|'+Reader.normKey('本文')),'English answer');assert.equal(r.embedCache.has(Reader.normKey('本文')),false);assert.equal(r.embedCached('本文'),'English answer');
- assert.equal(await r.translate({id:2,text:'本文',options:{learnerLanguage:'zh'}}),'旧中文脚本');assert.equal(r.embedCache.get(Reader.normKey('本文')),'旧中文脚本');assert.equal(r.targetLanguage(),'en');
+ assert.equal(await r.translate({id:2,text:'本文',options:{learnerLanguage:'zh'}}),'旧中文脚本');assert.equal(r.embedCache.get(Reader.normKey('本文')),'旧中文脚本');assert.equal(r.cardinalTarget(),'en');
 });
 
 test('actual Reader replies and late fills carry their request target through a language switch',async()=>{

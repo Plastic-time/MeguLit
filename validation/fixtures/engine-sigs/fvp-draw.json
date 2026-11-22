@@ -1,0 +1,1259 @@
+{
+ "scope": "Actual static bytes, append input only; no roles, final coordinates, repaint or game acceptance",
+ "primarySha256": "b3bd78f53f53627766d8b447b59f2eb00dff3794ab01d20aeb10b1797676de0f",
+ "prefixHex": "83ec0c5556578bf98d44240c8db774050000508bce897c2418c744241001000000",
+ "corpus": {
+  "prefixHex": "83ec0c5556578bf98d44240c8db774050000508bce897c2418c744241001000000",
+  "prefixBytes": 33,
+  "uniqueFiles": 16,
+  "uniqueSha256": 15,
+  "missing": [],
+  "matches": [
+   {
+    "path": "E:\\GAL\\[120831][FAVORITE] いろとりどりのヒカリ\\五彩斑斓的曙光\\Hikari.exe",
+    "sha256": "1d0f37a6f22dc77780621982f5466d4e9e9d19e1b901f0ea4f8422b2e6a75b83",
+    "va": "0x431bb0",
+    "rva": "0x31bb0"
+   },
+   {
+    "path": "E:\\GAL\\[220930][FAVORITE] いろとりどりのヒカリHD\\いろとりどりのヒカリHD\\irohika_HD.exe",
+    "sha256": "adb556478ad608a3a0321f7d3b6e7e3c8394c648ca4758fea80e2ac0c683a492",
+    "va": "0x433610",
+    "rva": "0x33610"
+   }
+  ],
+  "scope": "Two pinned input setters in a finite local corpus only; no role, drawing coverage, hook or live acceptance"
+ },
+ "samples": [
+  {
+   "path": "E:\\GAL\\[120831][FAVORITE] いろとりどりのヒカリ\\五彩斑斓的曙光\\Hikari.exe",
+   "sha256": "1d0f37a6f22dc77780621982f5466d4e9e9d19e1b901f0ea4f8422b2e6a75b83",
+   "fileBytes": 719360,
+   "imageBase": 4194304,
+   "entry": {
+    "va": 4398000,
+    "hex": "83ec0c5556578bf98d44240c8db774050000508bce897c2418c744241001000000e88aefffff8d8f90050000518d8fb8050000e8e8efffff8b6c241c8a450084c00f848c00000053eb068d9b00000000660fb6d00fb7da0fb7c350895c242445e80348010083c40485c07413660fb64d00c1e308660bd90fb7db895c2420458b4e0c85c9750433c0eb078b46142bc1d1f88b7e108bd72bd1d1fa3bd0730b66891f83c702897e10eb1e3bcf7605e8004501008b068d4c24205157508d54241c528bcee8f9e8ffff8a450084c075828b7c24185b8d44241c508bcec74424207e000000e8c9eeffff6a016a006a008bcfe85cf4ffff5f5e5d83c40cc20400"
+   },
+   "inputLoad": {
+    "va": 4398056,
+    "hex": "8b6c241c"
+   },
+   "ret": {
+    "va": 4398250,
+    "hex": "c20400"
+   },
+   "slotReuse": {
+    "va": 4398218,
+    "hex": "c74424207e000000"
+   },
+   "layoutCall": {
+    "va": 4398231,
+    "hex": "6a016a006a008bcfe85cf4ffff"
+   },
+   "caller": {
+    "va": 4435246,
+    "hex": "568bcde87a6effff"
+   },
+   "layout": 4395264,
+   "functions": {
+    "upstream": {
+     "entry": "0x43ac70",
+     "count": 88,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "51538bd98b8340c6650069c0280b0000578b7c2410803f028d8c18303f6400894c24080f85e60000008b470485c00f8cdb00000083f81f0f8fd20000008b1528",
+     "ret": [
+      {
+       "va": "0x43ad82",
+       "hex": "c20400",
+       "asm": "ret 4"
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x43ace1",
+       "hex": "ff15c0b04500",
+       "asm": "call dword ptr [0x45b0c0]"
+      },
+      {
+       "va": "0x43acf3",
+       "hex": "e8ddab0000",
+       "asm": "call 0x4458d5"
+      },
+      {
+       "va": "0x43ad0f",
+       "hex": "e80ca6feff",
+       "asm": "call 0x425320"
+      },
+      {
+       "va": "0x43ad31",
+       "hex": "e87a6effff",
+       "asm": "call 0x431bb0"
+      },
+      {
+       "va": "0x43ad29",
+       "hex": "e84bb60000",
+       "asm": "call 0x446379"
+      }
+     ]
+    },
+    "relayout": {
+     "entry": "0x431cb0",
+     "count": 101,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "83ec0c53568bf133db389ed40500000f84240100008d4e04e8b321ffff8b86200500003bc374200fbf8ede0500000fbf96dc0500000fafca03c903c9515350e8",
+     "ret": [
+      {
+       "va": "0x431dee",
+       "hex": "c3",
+       "asm": "ret "
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x431cc8",
+       "hex": "e8b321ffff",
+       "asm": "call 0x423e80"
+      },
+      {
+       "va": "0x431cef",
+       "hex": "e84c3b0100",
+       "asm": "call 0x445840"
+      },
+      {
+       "va": "0x431d13",
+       "hex": "e84a440100",
+       "asm": "call 0x446162"
+      },
+      {
+       "va": "0x431d2a",
+       "hex": "e833440100",
+       "asm": "call 0x446162"
+      },
+      {
+       "va": "0x431d44",
+       "hex": "e877cfffff",
+       "asm": "call 0x42ecc0"
+      },
+      {
+       "va": "0x431d77",
+       "hex": "e884f3ffff",
+       "asm": "call 0x431100"
+      },
+      {
+       "va": "0x431d98",
+       "hex": "e82324ffff",
+       "asm": "call 0x4241c0"
+      },
+      {
+       "va": "0x431da5",
+       "hex": "e8b8430100",
+       "asm": "call 0x446162"
+      },
+      {
+       "va": "0x431dbc",
+       "hex": "e8a1430100",
+       "asm": "call 0x446162"
+      },
+      {
+       "va": "0x431dd6",
+       "hex": "e8e5ceffff",
+       "asm": "call 0x42ecc0"
+      }
+     ]
+    },
+    "pixelCopy": {
+     "entry": "0x424340",
+     "count": 199,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "83ec14807c2420008b54241c0fbf81ea050000538b9a006600008b54241c550fbfa9e805000056570fb67a02896c241889442410895c241474060fb67a04eb18",
+     "ret": [
+      {
+       "va": "0x4245d8",
+       "hex": "c20c00",
+       "asm": "ret 0xc"
+      },
+      {
+       "va": "0x4245c0",
+       "hex": "c20c00",
+       "asm": "ret 0xc"
+      }
+     ],
+     "calls": []
+    },
+    "upload": {
+     "entry": "0x4241c0",
+     "count": 100,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "83ec08558be980bd08050000000f840f0100008b44241c8b4c2420538b5c2414578b7c241c8944241c894c241885db7d0803d8895c241c33db85ff7d0803f989",
+     "ret": [
+      {
+       "va": "0x4242e6",
+       "hex": "c21400",
+       "asm": "ret 0x14"
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x42425e",
+       "hex": "ffd0",
+       "asm": "call eax"
+      },
+      {
+       "va": "0x4242aa",
+       "hex": "e8f1190200",
+       "asm": "call 0x445ca0"
+      },
+      {
+       "va": "0x4242dd",
+       "hex": "ffd1",
+       "asm": "call ecx"
+      }
+     ]
+    },
+    "flush": {
+     "entry": "0x42f3e0",
+     "count": 221,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "83ec0853558be98b8d240600002b8d20060000568db514060000b8abaaaa2af7e9d1fa578b7c241c8bc2c1e81f85ff0f85fc00000003c20f84410200008d4900",
+     "ret": [
+      {
+       "va": "0x42f68a",
+       "hex": "c20800",
+       "asm": "ret 8"
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x42f438",
+       "hex": "e8256d0100",
+       "asm": "call 0x446162"
+      },
+      {
+       "va": "0x42f45d",
+       "hex": "e85e4dffff",
+       "asm": "call 0x4241c0"
+      },
+      {
+       "va": "0x42f46a",
+       "hex": "e8f36c0100",
+       "asm": "call 0x446162"
+      },
+      {
+       "va": "0x42f4aa",
+       "hex": "e8b36c0100",
+       "asm": "call 0x446162"
+      },
+      {
+       "va": "0x42f4df",
+       "hex": "e87e6c0100",
+       "asm": "call 0x446162"
+      },
+      {
+       "va": "0x42f559",
+       "hex": "e8046c0100",
+       "asm": "call 0x446162"
+      },
+      {
+       "va": "0x42f598",
+       "hex": "e8234cffff",
+       "asm": "call 0x4241c0"
+      },
+      {
+       "va": "0x42f5b2",
+       "hex": "e8ab6b0100",
+       "asm": "call 0x446162"
+      },
+      {
+       "va": "0x42f5c2",
+       "hex": "e899f9ffff",
+       "asm": "call 0x42ef60"
+      },
+      {
+       "va": "0x42f5e3",
+       "hex": "e8985cffff",
+       "asm": "call 0x425280"
+      },
+      {
+       "va": "0x42f63a",
+       "hex": "e8814bffff",
+       "asm": "call 0x4241c0"
+      }
+     ]
+    },
+    "tint": {
+     "entry": "0x4242f0",
+     "count": 32,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "568bf18b4e0485c9743f0fbf56200fbf4614538b5c2414570fbf7e160fafd750528b542418508b44242053505251e86dfcffff8a44242c8a4c243083c41c5f88",
+     "ret": [
+      {
+       "va": "0x42433a",
+       "hex": "c20c00",
+       "asm": "ret 0xc"
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x42431e",
+       "hex": "e86dfcffff",
+       "asm": "call 0x423f90"
+      }
+     ]
+    },
+    "pixelTint": {
+     "entry": "0x423f90",
+     "count": 101,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "83ec088b4424208b4c240c890c2485c00f8e180100008b542424538b5c2418558b6c241803d25603d2578b7c24288954241489442430eb088da4240000000090",
+     "ret": [
+      {
+       "va": "0x4240c1",
+       "hex": "c3",
+       "asm": "ret "
+      }
+     ],
+     "calls": []
+    },
+    "clearTiles": {
+     "entry": "0x423e80",
+     "count": 67,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "558bec83e4f883ec1880b90805000000535556570f84950000008d81080400008944241c8da9480400008d5904c7442418100000008b4c241c894c2410c74424",
+     "ret": [
+      {
+       "va": "0x423f36",
+       "hex": "c3",
+       "asm": "ret "
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x423edd",
+       "hex": "ffd2",
+       "asm": "call edx"
+      },
+      {
+       "va": "0x423ef8",
+       "hex": "e843190200",
+       "asm": "call 0x445840"
+      },
+      {
+       "va": "0x423f14",
+       "hex": "ffd0",
+       "asm": "call eax"
+      }
+     ]
+    },
+    "tick": {
+     "entry": "0x42fb90",
+     "count": 89,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "5153568bf133db389ed60500000f8431010000389eda0500000f8525010000578bbee00500003bfb7d1a8b0d28f347005381c15c040000e8e45b00008bf869ff",
+     "ret": [
+      {
+       "va": "0x42fcd7",
+       "hex": "c3",
+       "asm": "ret "
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x42fbc7",
+       "hex": "e8e45b0000",
+       "asm": "call 0x4357b0"
+      },
+      {
+       "va": "0x42fc9e",
+       "hex": "e83df7ffff",
+       "asm": "call 0x42f3e0"
+      }
+     ]
+    },
+    "frameDriver": {
+     "entry": "0x43d900",
+     "count": 195,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "81ec0c010000a188d4470033c489842408010000a128f34700568bf18b888c000000e80908ffff84c00f84f9020000a128f347008b88dcdd650053518b88a4dd",
+     "ret": [
+      {
+       "va": "0x43dc3d",
+       "hex": "c3",
+       "asm": "ret "
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x43d922",
+       "hex": "e80908ffff",
+       "asm": "call 0x42e130"
+      },
+      {
+       "va": "0x43d942",
+       "hex": "e8e91c0000",
+       "asm": "call 0x43f630"
+      },
+      {
+       "va": "0x43d95c",
+       "hex": "e86fc2feff",
+       "asm": "call 0x429bd0"
+      },
+      {
+       "va": "0x43d963",
+       "hex": "e83899ffff",
+       "asm": "call 0x4372a0"
+      },
+      {
+       "va": "0x43d976",
+       "hex": "e805f7feff",
+       "asm": "call 0x42d080"
+      },
+      {
+       "va": "0x43d986",
+       "hex": "e805dcfeff",
+       "asm": "call 0x42b590"
+      },
+      {
+       "va": "0x43dc32",
+       "hex": "e81d7a0000",
+       "asm": "call 0x445654"
+      },
+      {
+       "va": "0x43dbcf",
+       "hex": "ff15ecb24500",
+       "asm": "call dword ptr [0x45b2ec]"
+      },
+      {
+       "va": "0x43d9be",
+       "hex": "e89d1f0000",
+       "asm": "call 0x43f960"
+      },
+      {
+       "va": "0x43d9c3",
+       "hex": "ff15ecb24500",
+       "asm": "call dword ptr [0x45b2ec]"
+      },
+      {
+       "va": "0x43da0a",
+       "hex": "e8715a0000",
+       "asm": "call 0x443480"
+      },
+      {
+       "va": "0x43da39",
+       "hex": "e85221ffff",
+       "asm": "call 0x42fb90"
+      },
+      {
+       "va": "0x43da5b",
+       "hex": "e8007affff",
+       "asm": "call 0x435460"
+      },
+      {
+       "va": "0x43da94",
+       "hex": "e817e9feff",
+       "asm": "call 0x42c3b0"
+      },
+      {
+       "va": "0x43daa0",
+       "hex": "e83b87feff",
+       "asm": "call 0x4261e0"
+      },
+      {
+       "va": "0x43daac",
+       "hex": "e8bf8bfeff",
+       "asm": "call 0x426670"
+      },
+      {
+       "va": "0x43dab8",
+       "hex": "e8738dfeff",
+       "asm": "call 0x426830"
+      },
+      {
+       "va": "0x43dac4",
+       "hex": "e8c78ffeff",
+       "asm": "call 0x426a90"
+      },
+      {
+       "va": "0x43dad0",
+       "hex": "e82b93feff",
+       "asm": "call 0x426e00"
+      },
+      {
+       "va": "0x43dadc",
+       "hex": "e87f96feff",
+       "asm": "call 0x427160"
+      },
+      {
+       "va": "0x43dae8",
+       "hex": "e8b3a6feff",
+       "asm": "call 0x4281a0"
+      },
+      {
+       "va": "0x43daf4",
+       "hex": "e8c797feff",
+       "asm": "call 0x4272c0"
+      },
+      {
+       "va": "0x43db04",
+       "hex": "e8c7c0feff",
+       "asm": "call 0x429bd0"
+      },
+      {
+       "va": "0x43db0d",
+       "hex": "e8ee97ffff",
+       "asm": "call 0x437300"
+      },
+      {
+       "va": "0x43db1e",
+       "hex": "e86ddafeff",
+       "asm": "call 0x42b590"
+      },
+      {
+       "va": "0x43db4a",
+       "hex": "e831e5ffff",
+       "asm": "call 0x43c080"
+      },
+      {
+       "va": "0x43db8a",
+       "hex": "e8e88c0000",
+       "asm": "call 0x446877"
+      },
+      {
+       "va": "0x43db99",
+       "hex": "e8b249ffff",
+       "asm": "call 0x432550"
+      },
+      {
+       "va": "0x43dba8",
+       "hex": "e8f38cffff",
+       "asm": "call 0x4368a0"
+      },
+      {
+       "va": "0x43dbaf",
+       "hex": "e81ca1ffff",
+       "asm": "call 0x437cd0"
+      },
+      {
+       "va": "0x43dbb4",
+       "hex": "ff15ecb24500",
+       "asm": "call dword ptr [0x45b2ec]"
+      },
+      {
+       "va": "0x43dbfe",
+       "hex": "e85df6ffff",
+       "asm": "call 0x43d260"
+      },
+      {
+       "va": "0x43dc22",
+       "hex": "e86902ffff",
+       "asm": "call 0x42de90"
+      }
+     ]
+    }
+   },
+   "witnesses": {
+    "targetSlot": {
+     "va": 4435073,
+     "hex": "8b7c2410803f028d8c18303f6400894c24080f85e60000008b470485c00f8cdb00000083f81f0f8fd20000008b1528f34700558bac8298000000"
+    },
+    "rebuildWithoutInput": {
+     "va": 4398409,
+     "hex": "668b8eac050000535366898ee805000033d2538bce668996ea050000889ed8050000889ed6050000899e40060000e884f3ffff"
+    },
+    "all32Targets": {
+     "va": 4446761,
+     "hex": "bf980000008bff8b1528f347008b0c17e85221ffff83c70481ff180100007ce7"
+    },
+    "resourceAndLock": {
+     "va": 4342345,
+     "hex": "8b45048b08566a006a008d542418526a00508b414cffd0"
+    },
+    "resourceUnlock": {
+     "va": 4342481,
+     "hex": "8b6d048b45008b48506a0055ffd1"
+    },
+    "rawPixelQueue": {
+     "va": 4387901,
+     "hex": "8b460c0fbf50060fbf4804528b9520050000510fbf4802520fbf1051528d4d04e85e4dffff"
+    }
+   },
+   "helperCalls": [
+    {
+     "va": 4398033,
+     "hex": "e88aefffff"
+    },
+    {
+     "va": 4398051,
+     "hex": "e8e8efffff"
+    }
+   ],
+   "helperReturns": [
+    {
+     "entry": 4393824,
+     "rets": [
+      {
+       "va": 4393883,
+       "hex": "c20400"
+      },
+      {
+       "va": 4393921,
+       "hex": "c20400"
+      }
+     ]
+    },
+    {
+     "entry": 4393936,
+     "rets": [
+      {
+       "va": 4394052,
+       "hex": "c20400"
+      },
+      {
+       "va": 4394091,
+       "hex": "c20400"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "E:\\GAL\\[220930][FAVORITE] いろとりどりのヒカリHD\\いろとりどりのヒカリHD\\irohika_HD.exe",
+   "sha256": "adb556478ad608a3a0321f7d3b6e7e3c8394c648ca4758fea80e2ac0c683a492",
+   "fileBytes": 817664,
+   "imageBase": 4194304,
+   "entry": {
+    "va": 4404752,
+    "hex": "83ec0c5556578bf98d44240c8db774050000508bce897c2418c744241001000000e88aefffff8d8f90050000518d8fb8050000e8e8efffff8b6c241c8a450084c00f848c00000053eb068d9b00000000660fb6d00fb7da0fb7c350895c242445e8da4d010083c40485c07413660fb64d00c1e308660bd90fb7db895c2420458b4e0c85c9750433c0eb078b46142bc1d1f88b7e108bd72bd1d1fa3bd0730b66891f83c702897e10eb1e3bcf7605e8644a01008b068d4c24205157508d54241c528bcee8f9e8ffff8a450084c075828b7c24185b8d44241c508bcec74424207e000000e8c9eeffff6a016a006a008bcfe85cf4ffff5f5e5d83c40cc20400"
+   },
+   "inputLoad": {
+    "va": 4404808,
+    "hex": "8b6c241c"
+   },
+   "ret": {
+    "va": 4405002,
+    "hex": "c20400"
+   },
+   "slotReuse": {
+    "va": 4404970,
+    "hex": "c74424207e000000"
+   },
+   "layoutCall": {
+    "va": 4404983,
+    "hex": "6a016a006a008bcfe85cf4ffff"
+   },
+   "caller": {
+    "va": 4442958,
+    "hex": "568bcde8ba6affff"
+   },
+   "layout": 4402016,
+   "functions": {
+    "upstream": {
+     "entry": "0x43ca90",
+     "count": 88,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "51538bd98b83d0666a0069c0280b0000578b7c2410803f028d8c18c0df6800894c24080f85e60000008b470485c00f8cdb00000083f81f0f8fd20000008b1568",
+     "ret": [
+      {
+       "va": "0x43cba2",
+       "hex": "c20400",
+       "asm": "ret 4"
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x43cb01",
+       "hex": "ff15c0d04500",
+       "asm": "call dword ptr [0x45d0c0]"
+      },
+      {
+       "va": "0x43cb13",
+       "hex": "e8edb00000",
+       "asm": "call 0x447c05"
+      },
+      {
+       "va": "0x43cb2f",
+       "hex": "e8bc8dfeff",
+       "asm": "call 0x4258f0"
+      },
+      {
+       "va": "0x43cb51",
+       "hex": "e8ba6affff",
+       "asm": "call 0x433610"
+      },
+      {
+       "va": "0x43cb49",
+       "hex": "e82eb80000",
+       "asm": "call 0x44837c"
+      }
+     ]
+    },
+    "relayout": {
+     "entry": "0x433710",
+     "count": 101,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "83ec0c53568bf133db389ed40500000f84240100008d4e04e86309ffff8b86200500003bc374200fbf8ede0500000fbf96dc0500000fafca03c903c9515350e8",
+     "ret": [
+      {
+       "va": "0x43384e",
+       "hex": "c3",
+       "asm": "ret "
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x433728",
+       "hex": "e86309ffff",
+       "asm": "call 0x424090"
+      },
+      {
+       "va": "0x43374f",
+       "hex": "e81c440100",
+       "asm": "call 0x447b70"
+      },
+      {
+       "va": "0x433773",
+       "hex": "e8ae490100",
+       "asm": "call 0x448126"
+      },
+      {
+       "va": "0x43378a",
+       "hex": "e897490100",
+       "asm": "call 0x448126"
+      },
+      {
+       "va": "0x4337a4",
+       "hex": "e8e7c8ffff",
+       "asm": "call 0x430090"
+      },
+      {
+       "va": "0x4337d7",
+       "hex": "e884f3ffff",
+       "asm": "call 0x432b60"
+      },
+      {
+       "va": "0x4337f8",
+       "hex": "e8d30bffff",
+       "asm": "call 0x4243d0"
+      },
+      {
+       "va": "0x433805",
+       "hex": "e81c490100",
+       "asm": "call 0x448126"
+      },
+      {
+       "va": "0x43381c",
+       "hex": "e805490100",
+       "asm": "call 0x448126"
+      },
+      {
+       "va": "0x433836",
+       "hex": "e855c8ffff",
+       "asm": "call 0x430090"
+      }
+     ]
+    },
+    "pixelCopy": {
+     "entry": "0x424550",
+     "count": 199,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "83ec14807c2420008b54241c0fbf81ea050000538b9a006600008b54241c550fbfa9e805000056570fb67a02896c241889442410895c241474060fb67a04eb18",
+     "ret": [
+      {
+       "va": "0x4247e8",
+       "hex": "c20c00",
+       "asm": "ret 0xc"
+      },
+      {
+       "va": "0x4247d0",
+       "hex": "c20c00",
+       "asm": "ret 0xc"
+      }
+     ],
+     "calls": []
+    },
+    "upload": {
+     "entry": "0x4243d0",
+     "count": 100,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "83ec08558be980bd08050000000f840f0100008b44241c8b4c2420538b5c2414578b7c241c8944241c894c241885db7d0803d8895c241c33db85ff7d0803f989",
+     "ret": [
+      {
+       "va": "0x4244f6",
+       "hex": "c21400",
+       "asm": "ret 0x14"
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x42446e",
+       "hex": "ffd0",
+       "asm": "call eax"
+      },
+      {
+       "va": "0x4244ba",
+       "hex": "e841330200",
+       "asm": "call 0x447800"
+      },
+      {
+       "va": "0x4244ed",
+       "hex": "ffd1",
+       "asm": "call ecx"
+      }
+     ]
+    },
+    "flush": {
+     "entry": "0x430890",
+     "count": 221,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "83ec0853558be98b8d240600002b8d20060000568db514060000b8abaaaa2af7e9d1fa578b7c241c8bc2c1e81f85ff0f85fc00000003c20f84410200008d4900",
+     "ret": [
+      {
+       "va": "0x430b3a",
+       "hex": "c20800",
+       "asm": "ret 8"
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x4308e8",
+       "hex": "e839780100",
+       "asm": "call 0x448126"
+      },
+      {
+       "va": "0x43090d",
+       "hex": "e8be3affff",
+       "asm": "call 0x4243d0"
+      },
+      {
+       "va": "0x43091a",
+       "hex": "e807780100",
+       "asm": "call 0x448126"
+      },
+      {
+       "va": "0x43095a",
+       "hex": "e8c7770100",
+       "asm": "call 0x448126"
+      },
+      {
+       "va": "0x43098f",
+       "hex": "e892770100",
+       "asm": "call 0x448126"
+      },
+      {
+       "va": "0x430a09",
+       "hex": "e818770100",
+       "asm": "call 0x448126"
+      },
+      {
+       "va": "0x430a48",
+       "hex": "e88339ffff",
+       "asm": "call 0x4243d0"
+      },
+      {
+       "va": "0x430a62",
+       "hex": "e8bf760100",
+       "asm": "call 0x448126"
+      },
+      {
+       "va": "0x430a72",
+       "hex": "e8b9f8ffff",
+       "asm": "call 0x430330"
+      },
+      {
+       "va": "0x430a93",
+       "hex": "e8484dffff",
+       "asm": "call 0x4257e0"
+      },
+      {
+       "va": "0x430aea",
+       "hex": "e8e138ffff",
+       "asm": "call 0x4243d0"
+      }
+     ]
+    },
+    "tint": {
+     "entry": "0x424500",
+     "count": 32,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "568bf18b4e0485c9743f0fbf56200fbf4614538b5c2414570fbf7e160fafd750528b542418508b44242053505251e86dfcffff8a44242c8a4c243083c41c5f88",
+     "ret": [
+      {
+       "va": "0x42454a",
+       "hex": "c20c00",
+       "asm": "ret 0xc"
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x42452e",
+       "hex": "e86dfcffff",
+       "asm": "call 0x4241a0"
+      }
+     ]
+    },
+    "pixelTint": {
+     "entry": "0x4241a0",
+     "count": 101,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "83ec088b4424208b4c240c890c2485c00f8e180100008b542424538b5c2418558b6c241803d25603d2578b7c24288954241489442430eb088da4240000000090",
+     "ret": [
+      {
+       "va": "0x4242d1",
+       "hex": "c3",
+       "asm": "ret "
+      }
+     ],
+     "calls": []
+    },
+    "clearTiles": {
+     "entry": "0x424090",
+     "count": 67,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "558bec83e4f883ec1880b90805000000535556570f84950000008d81080400008944241c8da9480400008d5904c7442418100000008b4c241c894c2410c74424",
+     "ret": [
+      {
+       "va": "0x424146",
+       "hex": "c3",
+       "asm": "ret "
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x4240ed",
+       "hex": "ffd2",
+       "asm": "call edx"
+      },
+      {
+       "va": "0x424108",
+       "hex": "e8633a0200",
+       "asm": "call 0x447b70"
+      },
+      {
+       "va": "0x424124",
+       "hex": "ffd0",
+       "asm": "call eax"
+      }
+     ]
+    },
+    "tick": {
+     "entry": "0x431040",
+     "count": 89,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "5153568bf133db389ed60500000f8431010000389eda0500000f8525010000578bbee00500003bfb7d1a8b0d681348005381c15c040000e8946100008bf869ff",
+     "ret": [
+      {
+       "va": "0x431187",
+       "hex": "c3",
+       "asm": "ret "
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x431077",
+       "hex": "e894610000",
+       "asm": "call 0x437210"
+      },
+      {
+       "va": "0x43114e",
+       "hex": "e83df7ffff",
+       "asm": "call 0x430890"
+      }
+     ]
+    },
+    "frameDriver": {
+     "entry": "0x43f570",
+     "count": 201,
+     "cutoff": false,
+     "unknown": [],
+     "overlap": [],
+     "entryBytes": "81ec0c010000a188f4470033c489842408010000a168134800568bf18b888c000000e859fdfeff84c00f8411030000a1681348008b886c7e6a0053518b88347e",
+     "ret": [
+      {
+       "va": "0x43f8c5",
+       "hex": "c3",
+       "asm": "ret "
+      }
+     ],
+     "calls": [
+      {
+       "va": "0x43f592",
+       "hex": "e859fdfeff",
+       "asm": "call 0x42f2f0"
+      },
+      {
+       "va": "0x43f5b2",
+       "hex": "e8991d0000",
+       "asm": "call 0x441350"
+      },
+      {
+       "va": "0x43f5cc",
+       "hex": "e8efb0feff",
+       "asm": "call 0x42a6c0"
+      },
+      {
+       "va": "0x43f5d3",
+       "hex": "e8e896ffff",
+       "asm": "call 0x438cc0"
+      },
+      {
+       "va": "0x43f5e6",
+       "hex": "e895eafeff",
+       "asm": "call 0x42e080"
+      },
+      {
+       "va": "0x43f5f6",
+       "hex": "e8b5cefeff",
+       "asm": "call 0x42c4b0"
+      },
+      {
+       "va": "0x43f8ba",
+       "hex": "e8557d0000",
+       "asm": "call 0x447614"
+      },
+      {
+       "va": "0x43f857",
+       "hex": "ff15ecd24500",
+       "asm": "call dword ptr [0x45d2ec]"
+      },
+      {
+       "va": "0x43f62e",
+       "hex": "e84d200000",
+       "asm": "call 0x441680"
+      },
+      {
+       "va": "0x43f633",
+       "hex": "ff15ecd24500",
+       "asm": "call dword ptr [0x45d2ec]"
+      },
+      {
+       "va": "0x43f67a",
+       "hex": "e8c15d0000",
+       "asm": "call 0x445440"
+      },
+      {
+       "va": "0x43f6a9",
+       "hex": "e89219ffff",
+       "asm": "call 0x431040"
+      },
+      {
+       "va": "0x43f6cb",
+       "hex": "e8f077ffff",
+       "asm": "call 0x436ec0"
+      },
+      {
+       "va": "0x43f704",
+       "hex": "e8a7dcfeff",
+       "asm": "call 0x42d3b0"
+      },
+      {
+       "va": "0x43f710",
+       "hex": "e86b70feff",
+       "asm": "call 0x426780"
+      },
+      {
+       "va": "0x43f71c",
+       "hex": "e8ef74feff",
+       "asm": "call 0x426c10"
+      },
+      {
+       "va": "0x43f728",
+       "hex": "e86377feff",
+       "asm": "call 0x426e90"
+      },
+      {
+       "va": "0x43f734",
+       "hex": "e81779feff",
+       "asm": "call 0x427050"
+      },
+      {
+       "va": "0x43f740",
+       "hex": "e8bb7bfeff",
+       "asm": "call 0x427300"
+      },
+      {
+       "va": "0x43f74c",
+       "hex": "e8af7ffeff",
+       "asm": "call 0x427700"
+      },
+      {
+       "va": "0x43f758",
+       "hex": "e8e38ffeff",
+       "asm": "call 0x428740"
+      },
+      {
+       "va": "0x43f764",
+       "hex": "e8f780feff",
+       "asm": "call 0x427860"
+      },
+      {
+       "va": "0x43f770",
+       "hex": "e82b23ffff",
+       "asm": "call 0x431aa0"
+      },
+      {
+       "va": "0x43f77c",
+       "hex": "e81f23ffff",
+       "asm": "call 0x431aa0"
+      },
+      {
+       "va": "0x43f78c",
+       "hex": "e82faffeff",
+       "asm": "call 0x42a6c0"
+      },
+      {
+       "va": "0x43f795",
+       "hex": "e88695ffff",
+       "asm": "call 0x438d20"
+      },
+      {
+       "va": "0x43f7a6",
+       "hex": "e805cdfeff",
+       "asm": "call 0x42c4b0"
+      },
+      {
+       "va": "0x43f7d2",
+       "hex": "e8b9e6ffff",
+       "asm": "call 0x43de90"
+      },
+      {
+       "va": "0x43f812",
+       "hex": "e8a0900000",
+       "asm": "call 0x4488b7"
+      },
+      {
+       "va": "0x43f821",
+       "hex": "e88a47ffff",
+       "asm": "call 0x433fb0"
+      },
+      {
+       "va": "0x43f830",
+       "hex": "e8cb8affff",
+       "asm": "call 0x438300"
+      },
+      {
+       "va": "0x43f837",
+       "hex": "e8b49effff",
+       "asm": "call 0x4396f0"
+      },
+      {
+       "va": "0x43f83c",
+       "hex": "ff15ecd24500",
+       "asm": "call dword ptr [0x45d2ec]"
+      },
+      {
+       "va": "0x43f886",
+       "hex": "e805f6ffff",
+       "asm": "call 0x43ee90"
+      },
+      {
+       "va": "0x43f8aa",
+       "hex": "e8a1f7feff",
+       "asm": "call 0x42f050"
+      }
+     ]
+    }
+   },
+   "witnesses": {
+    "targetSlot": {
+     "va": 4442785,
+     "hex": "8b7c2410803f028d8c18c0df6800894c24080f85e60000008b470485c00f8cdb00000083f81f0f8fd20000008b1568134800558bac8298000000"
+    },
+    "rebuildWithoutInput": {
+     "va": 4405161,
+     "hex": "668b8eac050000535366898ee805000033d2538bce668996ea050000889ed8050000889ed6050000899e40060000e884f3ffff"
+    },
+    "all32Targets": {
+     "va": 4454041,
+     "hex": "bf980000008bff8b15681348008b0c17e89219ffff83c70481ff180100007ce7"
+    },
+    "resourceAndLock": {
+     "va": 4342873,
+     "hex": "8b45048b08566a006a008d542418526a00508b414cffd0"
+    },
+    "resourceUnlock": {
+     "va": 4343009,
+     "hex": "8b6d048b45008b48506a0055ffd1"
+    },
+    "rawPixelQueue": {
+     "va": 4393197,
+     "hex": "8b460c0fbf50060fbf4804528b9520050000510fbf4802520fbf1051528d4d04e8be3affff"
+    }
+   },
+   "helperCalls": [
+    {
+     "va": 4404785,
+     "hex": "e88aefffff"
+    },
+    {
+     "va": 4404803,
+     "hex": "e8e8efffff"
+    }
+   ],
+   "helperReturns": [
+    {
+     "entry": 4400576,
+     "rets": [
+      {
+       "va": 4400635,
+       "hex": "c20400"
+      },
+      {
+       "va": 4400673,
+       "hex": "c20400"
+      }
+     ]
+    },
+    {
+     "entry": 4400688,
+     "rets": [
+      {
+       "va": 4400804,
+       "hex": "c20400"
+      },
+      {
+       "va": 4400843,
+       "hex": "c20400"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -33,10 +33,21 @@ const PROBE=`(async()=>{const w=ms=>new Promise(r=>setTimeout(r,ms)),frames=()=>
  const pr=()=>{const p=b.galPreferences();return [p.anchorDX,p.anchorDY,p.x,p.y];};out.afterCal={pos:tok(),prefs:pr()};
  b.toggleGalMenu();await w(400);const d=document.querySelector('.tomoyo-cn-dialog[open]');d.querySelector('[data-menu-key=calibrate]').click();await w(300);
  const q=s=>d.querySelector(s),y=q('[name=galY]');out.fieldY=Number(y.value);y.value=String(Number(y.value)+2);y.dispatchEvent(new Event('input',{bubbles:true}));await frames();await w(100);out.afterSlider={pos:tok(),prefs:pr()};
- let saved=null;b.saveGameProfileFromMenu=p=>{saved=[p.anchorDX,p.anchorDY];return true;};q('[data-gal-anchor-reset]').click();await frames();await w(100);out.afterReset={pos:tok(),prefs:pr(),saved,field:Number(y.value)};
- d.close?.();await w(200);
+ const saveProfile=b.saveGameProfileFromMenu;let saved=null;b.saveGameProfileFromMenu=p=>{saved=[p.anchorDX,p.anchorDY];return true;};q('[data-gal-anchor-reset]').click();await frames();await w(100);out.afterReset={pos:tok(),prefs:pr(),saved,field:Number(y.value)};
+ b.saveGameProfileFromMenu=saveProfile;d.close?.();await w(200);
  b.gameStyleStatus({gameStyleState:'profile',gameStyleKey:KEY_B,gameStyleIdentity:'2|2',gameStyleEffectivePrefs:eff({})});place();await frames();await w(200);out.gameB={pos:tok(),prefs:pr()};
  b.gameStyleStatus({gameStyleState:'profile',gameStyleKey:KEY_A,gameStyleIdentity:'3|3',gameStyleEffectivePrefs:eff({anchorDX:4,anchorDY:-10})});place();await frames();await w(200);out.backA={pos:tok(),prefs:pr()};
+ b.toggleGalMenu();await w(350);
+ const reopened=document.querySelector('.tomoyo-cn-dialog[open]');
+ reopened.querySelector('[data-menu-key=calibrate]').click();await w(150);
+ const requests=[],transport=window.__tomoyoTranslateRequest;
+ window.__tomoyoTranslateRequest=raw=>{requests.push(JSON.parse(raw));return transport(raw);};
+ reopened.querySelector('[data-game-style-sync]').click();await frames();
+ out.click=requests.map(r=>r.type);const start=requests.find(r=>r.type==='gameStyleSync');
+ b.gameStyleStatus({gameStyleState:'measured',gameStyleKey:KEY_A,gameStyleOwner:start.owner,gameStylePurpose:start.part,gameStyle:{width:W,height:H,inkLeft:300,inkTop:420,style:{x:16,y:40,width:45,textColor:'#f2f2f2'}}});
+ await w(1000);reopened.querySelector('footer button[type=submit]').click();await frames();
+ out.confirm=requests.filter(r=>r.type==='gameStyleConfirm').map(r=>[r.key,r.prefs.textColor]);
+ window.__tomoyoTranslateRequest=transport;
  out.W=W;out.H=H;return out;})()`;
 test('anchored chain: calibrate -> slider -> 回到游戏原字位置 -> another game -> back',{skip:!hasEdge&&'Edge not installed',timeout:120000},async()=>{
  const temp=fs.mkdtempSync(path.join(process.env.MEGULIT_WORK||os.tmpdir(),'megulit-anchor-chain-'));let server,cdp;
@@ -57,5 +68,7 @@ test('anchored chain: calibrate -> slider -> 回到游戏原字位置 -> another
   near(s.afterReset.pos,s.p0,2,'回到游戏原字位置: on the engine place');assert.deepEqual(s.afterReset.saved,[0,0]);assert.equal(s.afterReset.field,0);
   near(s.gameB.pos,s.p0,2,'another game starts on its engine place');assert.deepEqual(s.gameB.prefs.slice(0,2),[0,0]);
   near(s.backA.pos,[s.p0[0]+4*s.W/100,s.p0[1]-10*s.H/100],3,'back to the first game: its saved offset');
+  assert.ok(s.click.includes('gameStyleSync'));assert.ok(!s.click.includes('gameStyleConfirm'),'measuring must not save the previous settings');
+  assert.deepEqual(s.confirm,[['a'.repeat(64),'#f2f2f2']],'explicit save commits the measured preview once');
  }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });

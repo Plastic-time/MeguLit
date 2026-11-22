@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 const hints={
+ 'library|libraryOnly':['只管理、启动和游玩游戏，不连接伴读、不遮住原文、不自动翻译，也不自动切换成日文。已有的阅读设置会保留；已还原过的游戏语言不会自动改回。关闭此项后，下次启动游戏时恢复伴读','Manage and play games without connecting the reader, covering source text, automatic translation or automatic Japanese conversion. Reading preferences are kept; earlier game-language changes are not automatically undone. Turn this off to read again on the next game launch','ゲームの管理・起動・プレイのみを行い、読書接続・原文の遮蔽・自動翻訳・日本語への自動切替を停止します。読書設定は保持し、以前の言語変更は自動で戻しません。オフにすると次回のゲーム起動時から読書を再開します'],
  word_review_count:['「学习 → 复习」里一轮最多出多少张单词卡；到期的卡会优先，做完这一轮再开下一轮','How many word cards one review round in Learning → Review holds; due cards come first','「学習 → 復習」で 1 回に出す単語カードの上限。期限の来たカードが先に出ます'],
  sentence_review_count:['一轮最多复习多少条收藏的句子（句子页里的台词）','How many saved lines (from Sentences) one review round holds','1 回に復習する保存済みの文（セリフ）の上限'],
  word_sentence_count:['单词卡和单词页里，每个词最多附带几条你在游戏里读到的例句','How many lines from your games are shown with each word on cards and in Words','カードや単語ページで、1 語につき表示するゲーム中の例文の数'],

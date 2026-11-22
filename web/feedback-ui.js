@@ -9,6 +9,7 @@
 import { successHTML, guideHTML, GUIDE } from './guide-content.js';
 import { fillGuideLevel } from './guide-levels.js';
 import { seedPageHTML, seedWords, seedSeen, markSeedSeen, fillSeedCount } from './the-seed.js';
+import { feedbackIssueLabels } from './first-player.js';
 
 const T = {
   zh: {
@@ -45,7 +46,7 @@ const T = {
     noticeKicker: 'notice', noticeTag: 'megulit · in development', noticeTitle: 'MeguLit is still in development', noticeTitle2: 'Most engines already work. After you submit a game, feel free to just start playing it',
     noticeText: 'Some games are not supported yet. Type the name of a game you want to play and submit it; it usually takes half a day, a week at most',
     upd: (y, m, d, title) => `${new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })} · embedded mode for ${title} improved`, updNote: 'These were only partly tested on the author’s own machine. If anything still goes wrong when you play, please keep telling us and we’ll fix it',
-    gamePlaceholder: 'Full game title (original or store name)', gameRule: 'Please write the full, exact title: the original Japanese title or the name on Steam or DLsite. Avoid abbreviations and nicknames, they make it hard to find the right game', gameShort: 'This name is very short and may be an abbreviation. Please write the full title; if this is the full title, press Submit again', submit: 'Submit', gameSent: 'Got it; support is on the way',
+    gamePlaceholder: 'Full game title (original or store name)', gameRule: 'Please write the full, exact title: the original Japanese title or the name on Steam or DLsite. Avoid abbreviations and nicknames, they make it hard to find the right game. For an exact build, use VNDB ID | engine | source language | EXE SHA-256 | script SHA-256', gameShort: 'This name is very short and may be an abbreviation. Please write the full title; if this is the full title, press Submit again', submit: 'Submit', gameSent: 'Got it; support is on the way',
     noticeMore: 'If something goes wrong, open About and use Report a problem: say what happened, briefly or in detail, and the logs come along. Ideas or just a hello are welcome too. Thanks for the support!',
     report: 'Report a problem', ok: 'Got it', next: 'Next: how to use', back: 'Back', done: 'Done', guideKicker: 'guide', guide: 'Tutorial',
     tabUpdates: 'Updates', tabGuide: 'How to use', tabReport: 'Report', tabGame: 'Request a game', reportText: 'Say what went wrong, briefly or in detail; recent logs go to the author with it.', gameText: 'Type a game you want to play and submit it; it usually takes half a day, a week at most', close: 'Close', noUpdates: 'Could not load the updates; try again when online',
@@ -79,8 +80,15 @@ const probeAfterReport = ({ api, locale, esc, toast }) => import('./adapter-prob
 
 export function openFeedback({ api, locale = 'zh', esc, toast, version = '' }) {
   const t = words(locale), dialog = document.createElement('dialog');
+  const [issueLabel, issueHint, issueEmpty] = ({
+    zh: ['遇到的问题（可多选）', '选择问题类型，或在下方补充说明。提交时会附上最近的日志', '请至少选一个问题，或写一句说明'],
+    ja: ['不具合の種類（複数選択可）', '該当する不具合を選ぶか、下に詳しく書いてください。最近のログも一緒に送られます', '不具合を選ぶか、状況をひとこと書いてください'],
+    en: ['What went wrong? Select all that apply', 'Select the problems you encountered or add details below. Recent logs are included with your report.', 'Select at least one problem or tell us what happened.'],
+  })[locale] || ['遇到的问题（可多选）', t.hint, t.empty];
   dialog.className = 'game-dialog feedback-dialog';
-  dialog.innerHTML = `<div class="game-dialog-head"><span class="game-dialog-kicker">${esc(t.kicker)}</span><h2>${esc(t.title)}</h2><p>${esc(t.hint)}</p></div>
+  dialog.innerHTML = `<div class="game-dialog-head"><span class="game-dialog-kicker">${esc(t.kicker)}</span><h2>${esc(t.title)}</h2><p>${esc(issueHint)}</p></div>
+<fieldset class="feedback-issues"><legend>${esc(issueLabel)}</legend><div class="feedback-issue-options">${feedbackIssueLabels(locale).map(label=>`<button type="button" class="feedback-issue" aria-pressed="false">${esc(label)}</button>`).join('')}</div></fieldset>
+<label><input type="checkbox" data-yui disabled> ${esc(({zh:'允许 Yui 自动发送故障类型、上一阶段、启动耗时和匿名去重编号，同类故障会汇总到 GitHub',ja:'Yui に障害の種類、直前の処理、起動からの経過時間、匿名の重複防止 ID の自動送信を許可する（GitHub に種類別に集計）',en:'Allow Yui to send failure types, preceding stages, elapsed startup time and anonymous report IDs for automatic summaries on GitHub'})[locale])}</label>
 <textarea class="feedback-text" rows="6" maxlength="1800" placeholder="${esc(t.placeholder)}"></textarea>
 <input class="feedback-contact" maxlength="120" placeholder="${esc(t.contact)}">
 <p class="feedback-privacy">${esc(t.privacy)}</p>
@@ -90,22 +98,32 @@ export function openFeedback({ api, locale = 'zh', esc, toast, version = '' }) {
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
   dialog.showModal();
   const text = dialog.querySelector('.feedback-text'), contact = dialog.querySelector('.feedback-contact'), status = dialog.querySelector('.feedback-status'), send = dialog.querySelector('[data-send]');
+  const toggle=dialog.querySelector('[data-yui]');
+  Promise.resolve().then(()=>api('yui_consent')).then(v=>{toggle.checked=v.enabled===true;toggle.disabled=false;}).catch(()=>{});
+  toggle.onchange=async()=>{const enabled=toggle.checked;toggle.disabled=true;try{await api('yui_consent_set',{enabled});}catch{toggle.checked=!enabled;toast?.(t.failed);}finally{toggle.disabled=false;}};
+  const issues = [...dialog.querySelectorAll('.feedback-issue')];
+  for (const issue of issues) issue.onclick = () => issue.setAttribute('aria-pressed', String(issue.getAttribute('aria-pressed') !== 'true'));
   dialog.querySelector('[data-cancel]').onclick = () => dialog.close();
   send.onclick = async () => {
-    const reason = text.value.trim();
-    if (!reason) { status.textContent = t.empty; status.dataset.state = 'bad'; text.focus(); return; }
-    send.disabled = true; send.textContent = t.sending; status.textContent = ''; delete status.dataset.state;
+    const selected = issues.filter(issue => issue.getAttribute('aria-pressed') === 'true').map(issue => issue.textContent);
+    const reason = [selected.join(' / '), text.value.trim()].filter(Boolean).join('\n\n');
+    if (!reason) { status.textContent = issueEmpty; status.dataset.state = 'bad'; text.focus(); return; }
+    send.disabled = true; for (const issue of issues) issue.disabled = true;
+    send.textContent = t.sending; status.textContent = ''; delete status.dataset.state;
     const outcome = await report({ api, reason, contact: contact.value.trim(), locale, version });
     if (!dialog.isConnected) return;
     send.textContent = t.send;
     if (outcome) { toast && toast(outcome === 'full' ? t.sent : t.sentTextOnly); dialog.close(); probeAfterReport({ api, locale, esc, toast }); return; }
-    send.disabled = false; status.textContent = t.failed; status.dataset.state = 'bad';
+    send.disabled = false; for (const issue of issues) issue.disabled = false;
+    status.textContent = t.failed; status.dataset.state = 'bad';
   };
   text.focus();
 }
 
 /* E416 every start (once per launch), with the website's recent adaptations (megulit.com/assets/updates.json) */
 let shownThisLaunch = false;
+const launchNoticeKey = 'megulit.startupNoticeShown';
+try { shownThisLaunch = globalThis.sessionStorage?.getItem(launchNoticeKey) === '1'; } catch { /* storage disabled */ }
 /* (user 2026-11-13: the list appeared only after a while and opening the notice stuttered) the last list is kept in
    localStorage and drawn in the first frame; the service answer (its own cache, then the site) replaces it only when it differs.
    Only the first rows are built at once, the rest when the browser is idle, so opening never builds 300 rows in one go */
@@ -130,11 +148,11 @@ export function drawUpdates(dialog, locale, items) {
   list.hidden = note.hidden = !rows.length;
   return rows.length;
 }
-async function fillUpdates(dialog, locale, api) {
-  const cached = cachedUpdates(), first = cached ? JSON.stringify(cached.slice(0, 300)) : "";
+async function fillUpdates(dialog, locale, api, cached = cachedUpdates()) {
+  const first = cached ? JSON.stringify(cached.slice(0, 300)) : "";
   if (cached) drawUpdates(dialog, locale, cached);
   try {
-    const items = await api('site_updates', {});
+    const items = await api('site_updates', { cachedHead: cached?.[0], cachedRelease: cached?.find(row => /^\d+\.\d+\.\d+\s*[:：]/.test(row?.text)) });
     if (!Array.isArray(items) || !items.length || !dialog.isConnected) return;
     const fresh = JSON.stringify(items.slice(0, 300));
     try { globalThis.localStorage?.setItem(UPDATES_KEY, fresh); } catch { /* storage full or blocked: fine */ }
@@ -142,16 +160,19 @@ async function fillUpdates(dialog, locale, api) {
   } catch { /* offline: the cached list (or none) stays */ }
 }
 
-export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', force = false }) {
-  if ((shownThisLaunch && !force) || document.querySelector('.dev-notice')) return;
-  shownThisLaunch = true;
+export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', force = false, canShow = () => true }) {
+  if ((shownThisLaunch && !force) || document.querySelector('.dev-notice') || !canShow()) return;
   const t = words(locale), dialog = document.createElement('dialog');
-  dialog.className = 'game-dialog dev-notice seed-flow';
-  dialog.innerHTML = `<div class="dev-notice-page" data-page="1"><div class="dev-notice-top"><span>${esc(t.noticeKicker)}</span><span>${esc(t.noticeTag)}</span></div>
+  const loadingUpdates = { zh: '正在读取更新日志…', ja: '更新履歴を読み込み中…', en: 'Loading update notes…' };
+  dialog.className = 'game-dialog dev-notice seed-flow startup-notice';
+  dialog.setAttribute('aria-label', t.noticeTitle);
+  dialog.innerHTML = `<button type="button" class="startup-notice-close" data-notice-close autofocus title="${esc(t.close)} (Esc)">${esc(t.close)}</button>
+<div class="dev-notice-page" data-page="1"><div class="dev-notice-top"><span>${esc(t.noticeKicker)}</span><span>${esc(t.noticeTag)}</span></div>
 <h2>${esc(t.noticeTitle)}</h2><h2 class="dev-notice-title2">${esc(t.noticeTitle2)}</h2>${successHTML(locale, esc)}<p class="dev-notice-text">${esc(t.noticeText)}</p>
-<form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="secondary">${esc(t.submit)}</button></form><p class="dev-notice-rule">${esc(t.gameRule)}</p>
+<form class="dev-notice-form"><input class="dev-notice-game" maxlength="256" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="secondary">${esc(t.submit)}</button></form><p class="dev-notice-rule">${esc(t.gameRule)}</p>
 <p class="feedback-status" role="status" aria-live="polite"></p>
-<ul class="dev-notice-updates" hidden></ul><p class="dev-notice-updates-note" hidden></p>
+<ul class="dev-notice-updates" tabindex="0" aria-label="${esc(t.tabUpdates)}" hidden></ul><p class="dev-notice-updates-note" hidden></p>
+<p class="startup-updates-empty" role="status">${esc(loadingUpdates[locale] || loadingUpdates.zh)}</p>
 <p class="dev-notice-more">${esc(t.noticeMore)}</p>
 <div class="dev-notice-actions"><button type="button" class="text-button" data-report>${esc(t.report)}</button><button type="button" class="primary" data-next>${esc(seedWords(locale).next)}</button></div></div>
 <div class="dev-notice-page" data-page="seed" hidden>${seedPageHTML(locale, esc, { left: `<button type="button" class="text-button" data-back>${esc(t.back)}</button>`, right: `<button type="button" class="primary" data-next-guide>${esc(t.next)}</button>` })}</div>
@@ -160,7 +181,6 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
 <div class="dev-notice-actions"><button type="button" class="text-button" data-back>${esc(t.back)}</button><button type="button" class="secondary" data-ok>${esc(t.done)}</button></div></div>`;
   document.body.append(dialog);
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  fillUpdates(dialog, locale, api);
   const form = dialog.querySelector('form'), game = dialog.querySelector('.dev-notice-game'), status = dialog.querySelector('.feedback-status');
   form.onsubmit = async event => {
     event.preventDefault();
@@ -184,13 +204,34 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
     if (n === 2) two.querySelector('[data-page-no]').textContent = total === 3 ? '3 / 3' : '2 / 2';
     shown.querySelector('.secondary, .primary').focus();
   };
-  fillSeedCount(seed, locale, api);
   dialog.querySelector('[data-next]').onclick = () => { if (seedSeen()) { trail.push(2); page(2); } else { markSeedSeen(); trail.push('seed'); page('seed'); } };
   dialog.querySelector('[data-next-guide]').onclick = () => { trail.push(2); page(2); };
   dialog.querySelectorAll('[data-back]').forEach(b => { b.onclick = () => { trail.pop(); page(trail[trail.length - 1] || 1); }; });
   dialog.querySelector('[data-ok]').onclick = () => dialog.close();
+  dialog.querySelector('[data-notice-close]').onclick = () => dialog.close();
   dialog.querySelector('[data-report]').onclick = () => { dialog.close(); openFeedback({ api, locale, esc, toast, version }); };
   dialog.showModal();
+  window.megulitYuiStage?.('notice-open');
+  const markVisible=()=>{
+    if(!dialog.open)return;
+    const title=dialog.querySelector('h2');
+    if(title?.getBoundingClientRect().height>0 && title.checkVisibility({opacityProperty:true,visibilityProperty:true})){
+      window.megulitYuiStage?.('notice-painted');
+    }else if(dialog.isConnected && performance.now()<deadline){requestAnimationFrame(markVisible);}
+  };
+  const deadline=performance.now()+15000;
+  if(window.megulitYuiStage)requestAnimationFrame(()=>requestAnimationFrame(markVisible));
+  dialog.addEventListener('close',()=>window.megulitYuiStage?.('notice-closed'),{once:true});
+  shownThisLaunch = true;
+  try { globalThis.sessionStorage?.setItem(launchNoticeKey, '1'); } catch { /* in-memory guard still applies */ }
+  const empty = dialog.querySelector('.startup-updates-empty'), list = dialog.querySelector('.dev-notice-updates');
+  fillUpdates(dialog, locale, api).then(() => {
+    if (!dialog.open) return;
+    empty.hidden = !list.hidden;
+    empty.textContent = t.noUpdates;
+  });
+  empty.hidden = !list.hidden; /* fillUpdates draws the browser cache before its first await */
+  fillSeedCount(seed, locale, api);
   fillGuideLevel(dialog, { api, locale, esc }); /* the by-level part of the guide follows the chosen level */
 }
 
@@ -205,7 +246,7 @@ export function openGuide({ api, locale = 'zh', esc, toast, version = '', tab = 
 <div class="dev-notice-scroll" data-pane="updates"><ul class="dev-notice-updates" hidden></ul><p class="dev-notice-updates-note" hidden></p><p class="guide-empty">${esc(t.noUpdates)}</p></div>
 <div class="dev-notice-scroll" data-pane="guide">${guideHTML(locale, esc)}</div>
 <div class="dev-notice-scroll" data-pane="report"><p class="dev-notice-text">${esc(t.reportText)}</p><textarea class="feedback-text" rows="6" maxlength="1800" placeholder="${esc(t.placeholder)}"></textarea><input class="feedback-contact" maxlength="120" placeholder="${esc(t.contact)}"><p class="feedback-privacy">${esc(t.privacy)}</p><p class="feedback-status" role="status" aria-live="polite"></p><div class="dev-notice-actions"><button type="button" class="primary" data-report>${esc(t.send)}</button></div></div>
-<div class="dev-notice-scroll" data-pane="game"><p class="dev-notice-text">${esc(t.gameText)}</p><form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="primary">${esc(t.submit)}</button></form><p class="dev-notice-rule">${esc(t.gameRule)}</p><p class="feedback-status" role="status" aria-live="polite"></p></div>
+<div class="dev-notice-scroll" data-pane="game"><p class="dev-notice-text">${esc(t.gameText)}</p><form class="dev-notice-form"><input class="dev-notice-game" maxlength="256" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="primary">${esc(t.submit)}</button></form><p class="dev-notice-rule">${esc(t.gameRule)}</p><p class="feedback-status" role="status" aria-live="polite"></p></div>
 <div class="dev-notice-actions"><button type="button" class="secondary" data-ok>${esc(t.close)}</button></div>`;
   document.body.append(dialog);
   dialog.addEventListener('close', () => dialog.remove(), { once: true });

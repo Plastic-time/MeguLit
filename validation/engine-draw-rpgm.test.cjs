@@ -15,7 +15,7 @@ var document={querySelector:function(){return null;}};
 var Utils={RPGMAKER_NAME:'MV'};
 var Graphics={width:816,height:624,_canvas:{getBoundingClientRect:function(){return {left:0,top:0,width:816,height:624};}}};
 function Bitmap(w,h){this.width=w;this.height=h;this.fontSize=28;this.outlineWidth=4;}
-Bitmap.prototype.measureTextWidth=function(t){return Array.from(String(t)).length*this.fontSize;};
+Bitmap.prototype.measureTextWidth=function(t){return String(t).length*this.fontSize;};
 Bitmap.prototype.drawText=function(t,x,y,mw,lh,al){draws.push({t:String(t),x:x,y:y,mw:mw,lh:lh,al:al,fs:this.fontSize,bmp:this});};
 function Window_Base(x,y,w,h){this.x=x;this.y=y;this.width=w;this.height=h;this.padding=18;this.visible=true;this.openness=255;this.contents=new Bitmap(w-36,h-36);
  this._windowContentsSprite={worldTransform:{tx:x+18,ty:y+18}};this.worldTransform={tx:x,ty:y};}
@@ -55,10 +55,11 @@ Window_NameBox.prototype=Object.create(Window_Base.prototype);
 var $gameMessage={_t:'',allText:function(){return this._t;}};
 var msg=new Window_Message(),layer={children:[msg]},SceneManager={_scene:null};
 `;
-function rig(){
+function rig(beforePage=''){
  const ctx={};vm.createContext(ctx);vm.runInContext(STANDIN,ctx);
  ctx.originals={draw:ctx.Bitmap.prototype.drawText,start:ctx.Window_Message.prototype.startMessage,update:ctx.Window_Message.prototype.updateMessage};
  ctx.window=ctx;ctx.__megulitReport=s=>ctx.reports.push(JSON.parse(s));
+ if(beforePage)vm.runInContext(beforePage,ctx);
  vm.runInContext(RPGM_SCRIPT,ctx);
  const boot=(cfg={roles:true,embed:false})=>{ctx.SceneManager._scene={children:[ctx.layer]};ctx.__megulitRpgm.config(cfg);};
  const say=(t)=>{ctx.$gameMessage._t=t;ctx.msg.startMessage();return ctx.msg.updateMessage();};
@@ -76,6 +77,15 @@ test('patches only once the game booted (plugins loaded), then reports each mess
  assert.deepEqual([line.engine,line.text,line.hidden,line.rects.length,line.emb],['rpgm','今日は晴れ\n二行目',false,8,undefined]);
  assert.deepEqual(line.rects[0],[18,444+18+4,28,28],'contents origin + the glyph box (line height = size + 8, glyph centred in it)');
  assert.deepEqual(line.rects[5],[18,444+18+36+4,28,28].map((v,i)=>i===1?444+18+36+4:v),'second row');
+});
+
+test('MV Chrome 41 without Array.from still reports Japanese without modifying global built-ins',()=>{
+ const r=rig();r.run('Array.from=undefined');r.boot();r.say('今日は晴れ');const line=recs(r).at(-1);assert.equal(line.text,'今日は晴れ');assert.equal(line.rects.length,5);
+ r.api.embed('𠮷野',{ruby:[[0,1,'よし']],zh:'吉野'});assert.equal(r.api.state().emb,1,'supplementary characters remain one ruby index');assert.equal(r.run('typeof Array.from'),'undefined');
+});
+test('MV Pixi 2 containers draw their children with renderable=false; dialogue stays until actual visibility changes',()=>{
+ const r=rig();r.run("var PIXI={VERSION:'v2.2.9',DisplayObjectContainer:function(){}};Object.setPrototypeOf(Window_Base.prototype,PIXI.DisplayObjectContainer.prototype);Object.setPrototypeOf(layer,PIXI.DisplayObjectContainer.prototype);layer.renderable=false;msg.renderable=false;");r.boot();r.run('Object.setPrototypeOf(SceneManager._scene,PIXI.DisplayObjectContainer.prototype);SceneManager._scene.renderable=false;');r.say('今日は晴れ');const choice=new r.ctx.Window_ChoiceList(['はい','いいえ']);choice.renderable=false;r.ctx.layer.children.push(choice);r.ctx.timers.at(-1)();let lines=recs(r);assert.equal(lines.filter(x=>!x.role).at(-1).text,'今日は晴れ');assert.equal(lines.filter(x=>x.role==='choice'&&x.text).length,2);
+ r.ctx.layer.visible=false;r.ctx.timers.at(-1)();lines=recs(r);assert.equal(lines.filter(x=>!x.role).at(-1).text,'');assert.equal(lines.filter(x=>x.role==='choice').at(-1).text,'');
 });
 
 test('roles: choice list, title command and name box are reported as UI snapshots, never as dialogue; closing sends an empty one',()=>{
@@ -115,6 +125,48 @@ test('embed: timeout or no applied ruby/Chinese keeps the original message and r
  assert.equal(recs(r).at(-1).emb,undefined,'four rows leave no room and no ruby was applied');assert.ok(!r.ctx.draws.some(x=>x.t==='很'));
 });
 
+const bufferedMZ=String.raw`
+Utils.RPGMAKER_NAME='MZ';
+Window_Message.prototype.updateMessage=function(){
+ var ts=this._textState;if(!ts)return false;
+ while(ts.index<ts.text.length){
+  var run=/^[^\n\x1b]+/.exec(ts.text.slice(ts.index));
+  if(run){this.contents.drawText(run[0],0,ts.y,600,ts.height);ts.index+=run[0].length;continue;}
+  if(ts.text[ts.index++]==='\n'){ts.y+=ts.height;continue;}
+  var code=/^[A-Z]+/i.exec(ts.text.slice(ts.index))[0];ts.index+=code.length;
+  this.processEscapeCharacter(code.toUpperCase(),ts);
+ }
+ this.startPause();this._textState=null;return true;
+};`;
+for(const engine of ['MV','MZ'])test(engine+' delivers the complete cached Reader translation to the bitmap before acknowledging it',async()=>{
+ const {Reader}=require('../services/reader.cjs'),{HookNative}=require('../core/hook-native.cjs');
+ const r=rig(engine==='MZ'?bufferedMZ:''),path=new W.WebTextPath({port:1}),receipts=[];
+ const cache=new Map([['体力が戻った','HP恢复了'],['もう一度','再来一次']]);
+ const reader=Object.assign(Object.create(Reader.prototype),{runtime:{libraryOnly:()=>false,learning:()=>null},targetLanguage:()=>'zh',embedCached:key=>cache.get(key)});
+ const hook={attachTextPath(p){this.textPath=p;},emit:m=>reader.event(m),drawEmbedReply:HookNative.prototype.drawEmbedReply,charRects(line){
+  const rec=TP.parseChars(line);receipts.push({text:rec.text,emb:rec.emb,draws:Array.from(r.ctx.draws,d=>d.t).join('')});
+ }};
+ reader.gal={hooks:hook};require('../core/text-paths-launch.cjs').attach({path:'web',session:path},hook);
+ path.pages.set('game',{send:async(method,params)=>({result:{value:r.run(params.expression)}})});
+ r.ctx.__megulitReport=payload=>path.report(payload);
+ for(const [text,zh] of cache){
+  r.ctx.draws.length=0;receipts.length=0;
+  await path.drawConfig({roles:true,embed:true,zh:true});r.boot({roles:true,embed:true,zh:true});
+  r.say(text);await new Promise(resolve=>setImmediate(resolve));r.ctx.msg.updateMessage();
+  const ack=receipts.filter(row=>row.emb===2);
+  assert.deepEqual(ack,[{text,emb:2,draws:text+zh}]);
+  assert.ok(receipts.some(row=>!row.emb&&row.draws===text));
+ }
+});
+
+test('a translation interrupted after layout never claims an embedded translation',()=>{
+ const r=rig();r.boot({embed:true});r.api.embed('本文',{zh:'可以看见'});
+ r.ctx.$gameMessage._t='本文';r.ctx.msg.startMessage();
+ r.ctx.msg._textState.text=r.ctx.msg._textState.text.slice(0,-1);
+ r.ctx.msg.updateMessage();assert.ok(r.ctx.draws.some(d=>d.t==='看'));
+ assert.ok(recs(r).length);assert.ok(recs(r).every(line=>line.emb!==2));
+});
+
 test('web path wiring: the RPG Maker reader rides along, asks go to onAsk, config and replacements go to the page',async()=>{
  const asks=[],lines=[],p=new W.WebTextPath({port:1,onAsk:a=>asks.push(a),onChars:l=>lines.push(l)});
  p.report(JSON.stringify({ask:'今日は',text:'今日は',engine:'rpgm'}));assert.deepEqual(asks,[{key:'今日は',text:'今日は',engine:'rpgm'}]);
@@ -124,8 +176,8 @@ test('web path wiring: the RPG Maker reader rides along, asks go to onAsk, confi
  await p.drawConfig({roles:true,embed:true,zh:true});await p.drawConfig({roles:true,embed:true,zh:true});
  assert.equal(evals.filter(j=>j.includes('__megulitRpgm.config({"roles":true,"embed":true,"zh":true})')).length,1,'sent once per change');
  await p.drawEmbed('今日は',{ruby:[[0,2,'きょう']],zh:'今天'});assert.ok(evals.at(-1).includes('__megulitRpgm.embed("今日は",{"ruby":[[0,2,"きょう"]],"zh":"今天"})'));
- const prof=require('../core/profiles/index.cjs');assert.deepEqual(prof.profileFor({engine:'RPG Maker MV/MZ'}).draw,{roles:false,advhdInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]},'RPG Maker canvas detection does not grant wrapper or embed permission');
- assert.deepEqual(prof.profileFor({engine:'KiriKiri'}).draw,{roles:false,advhdInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]});
+ const prof=require('../core/profiles/index.cjs');assert.deepEqual(prof.profileFor({engine:'RPG Maker MV/MZ'}).draw,{roles:false,advhdInput:false,cmvsInput:false,fvpInput:false,minoriInput:false,spikechunsoftInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]},'RPG Maker canvas detection does not grant wrapper or embed permission');
+ assert.deepEqual(prof.profileFor({engine:'KiriKiri'}).draw,{roles:false,advhdInput:false,cmvsInput:false,fvpInput:false,minoriInput:false,spikechunsoftInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]});
 });
 
 test('MZ: text drawn in buffered runs (flushTextState) still gives one box per character; rows use the window line height',()=>{
@@ -259,7 +311,7 @@ test('large drawn pages remain valid protocol records, including newline and sup
 
 test('every engine profile consumes the full default-off draw contract, including kemcoSprites, without cross-profile permission leaks',()=>{
  const fs=require('node:fs'),path=require('node:path'),P=require('../core/profiles/index.cjs');
- const expected={roles:false,advhdInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]};
+ const expected={roles:false,advhdInput:false,cmvsInput:false,fvpInput:false,minoriInput:false,spikechunsoftInput:false,kemcoSprites:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]};
  const engines=fs.readdirSync(P.ENGINE_DIR).filter(f=>f.endsWith('.cjs')).map(f=>require(path.join(P.ENGINE_DIR,f)).engine);
  assert.ok(engines.includes('rpgmaker'));
  for(const engine of engines)assert.deepEqual(P.profileFor({engine}).draw,expected,engine+' must not inherit another renderer permission');

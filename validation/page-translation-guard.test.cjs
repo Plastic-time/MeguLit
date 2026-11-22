@@ -19,6 +19,18 @@ test('page lines without a translation are asked by text and filled; the Japanes
       <div><span class="tome-page-char">「おかげさまで」</span><div class="tome-page-tr"></div></div><div><span class="tome-page-char">「で？　１人？」</span><div class="tome-page-tr"></div></div></div><div class="sentence-text">「じゃあ、行ってみるか」</div></div></main>
       <script>window.__sent=[];window.__ans={'「おかげさまで」':'「托你的福啦」','「で？　１人？」':'「话说，你是一个人来的？」'};window.__tomoyoTranslateRequest=s=>{const m=JSON.parse(s);window.__sent.push(m);if(m.type==='translateGuard'&&window.__ans[m.text]){const t=m.text;setTimeout(()=>window.__tomoyoChinese.deliverBackfill(t,window.__ans[t],'guard'),50);}};</script></body>`);
     await page.addScriptTag({ content: read('web/reader/modules/inject.js') });
+    await page.evaluate(()=>{window.__tomoyoChinese.localLookup=async()=>({});});
+    await page.addScriptTag({content:read('web/reader/modules/selection.js')});
+    await page.waitForFunction(()=>window.__sent.some(m=>m.id&&m.text));
+    const evidence=await page.evaluate(async()=>{
+      const b=window.__tomoyoChinese,req=window.__sent.findLast(m=>m.id&&m.text);
+      b.deliver(req.id,'译文',false,'',{target:'zh',source:'mt',provider:'bing',cached:true});
+      await b.openLocalSelection({text:req.text,start:1,end:2});
+      const row=document.querySelector('.tomoyo-cn-output');
+      const result=[row.dataset.translationSource,row.dataset.translationOrigin,row.dataset.translationProvider,document.querySelector('.tomoyo-selection-card small')?.textContent];
+      b.closeLocalSelection();return result;
+    });
+    assert.deepEqual(evidence,['cache','mt','bing','本句译文来源 · 缓存 · 机器翻译 · bing']);
     /* hook-reader's fill, as on main: by text into the row */
     await page.evaluate(() => { window.__tomoyoChinese.pageTranslationFill = (t, tr) => { let hit = false; for (const d of document.querySelectorAll('.tome-page-lines > div')) if (d.querySelector('.tome-page-char').textContent === t) { d.querySelector('.tome-page-tr').textContent = tr; hit = true; } return hit; }; });
     const tops = () => page.evaluate(() => [...document.querySelectorAll('.tome-page-char')].map(c => Math.round(c.getBoundingClientRect().top)));

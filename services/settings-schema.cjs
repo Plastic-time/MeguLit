@@ -73,7 +73,7 @@ choice('text','rubyFont','注音字体','Furigana font','ふりがなフォン�
 choice('text','shadow','文字阴影','Text shadow','文字の影',['outline','soft','none'].map(v=>option(v,...({outline:['描边','Outline','縁取り'],soft:['柔和阴影','Soft shadow','柔らかい影'],
  none:['关闭','Off','なし']}[v]))));
 
-choice('embedding','textRenderer','文字显示','Text drawing','文字の描画',[option('overlay','阅读窗口','Reader window','リーダーウィンドウ'),option('compositor','画进游戏画面','Into the game picture','ゲーム画面に描く')]);
+field('embedding','textRenderer','文字显示','Text drawing','文字の描画','select',{globalOnly:true,options:[option('overlay','阅读窗口','Reader window','リーダーウィンドウ'),option('compositor','画进游戏画面','Into the game picture','ゲーム画面に描く')]});
 choice('embedding','hookProfile','Hook 模式','Hook mode','Hook モード',[option('read','读取原文','Read source','原文を取得'),option('embed','内嵌','Embedding','埋め込み'),option('euphoria474',
  'euphoria 0.474'),option('off','关闭','Off','オフ')]);
 for(const[key,zh,en,ja]of [['hookAutoStart','绑定后自动启动 Hook','Start Hook after binding','紐付け後に Hook を開始'],['hookHide','隐藏游戏原文','Hide game source','ゲームの原文を隠す'],['hookFast',
@@ -129,6 +129,7 @@ bool('library','probeUpload','自动上传读不出的游戏的脱敏结构（�
 bool('library','adapterContrib','后台上传读不好的游戏的剧本和启动程序（只用于改进适配，用完即删，可随时关）','Upload scripts and program code of games that do not read well (for adaptation only, deleted after use)','うまく読めないゲームのスクリプトと実行ファイルを送信（適応の改善のみ・使用後に削除）');
 /* 2026-11-21 (owner: 闲时冷测试，默认开) the idle-time cold test for The Seed (services/cold-test.cjs, docs/cold-test.md): on unless the
    user turned it off; pictures only for a failed or borderline game, and never with coldTestShots off */
+bool('library','libraryOnly','仅使用游戏库（不启用伴读、翻译或自动切换日文）','Library only (no reading, translation or automatic Japanese switch)','ライブラリのみ（読書・翻訳・日本語への自動切替なし）');
 bool('library','coldTest','闲时帮 The Seed 测游戏（后台隐藏桌面，可关）','Test games for The Seed while the PC is idle (hidden desktop)','PC が空いているときに The Seed のためにゲームをテスト（非表示デスクトップ）');
 bool('library','coldTestShots','冷测试没过线时附带游戏画面（2 到 3 张，只截游戏窗口）','Send game pictures when a cold test fails (2-3, game window only)','コールドテスト不合格時にゲーム画面を添える（2〜3 枚、ゲームウィンドウのみ）');
 for(const engine of ['ollama','lmstudio'])fields.find(f=>f.scope==='translation'&&f.key==='provider').options.push(engine==='ollama'?option(engine,'Ollama（本地模型）',

@@ -31,11 +31,14 @@ do
 		return megulit_tbf(p, mode)
 	end
 	local megulit_loop = mw_textloop
-	function mw_textloop(p)
+	local function megulit_pack(...) return {n=select("#", ...), ...} end
+	function mw_textloop(p, ...)
+		local previous = megulit_pass
 		megulit_pass = (type(p) == "table" and p.lang == MEGULIT_SUB) and MEGULIT_SUB or nil
-		local ok, err = pcall(megulit_loop, p)
-		megulit_pass = nil
-		if not ok then error(err, 0) end
+		local result = megulit_pack(pcall(megulit_loop, p, ...))
+		megulit_pass = previous
+		if not result[1] then error(result[2], 0) end
+		return unpack(result, 2, result.n)
 	end
 
 	-- a sub window font the game never defined (subNN): its main window font (advNN) in the sub language, smaller, no ruby

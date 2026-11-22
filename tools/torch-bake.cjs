@@ -10,17 +10,17 @@
    manifest's hash no longer matches the sources. */
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),crypto=require('node:crypto'),os=require('node:os'),{spawn}=require('node:child_process');
 const ROOT=path.resolve(__dirname,'..'),WEB=path.join(ROOT,'web'),OUT=path.join(WEB,'assets','torch');
-const SOURCES=['torch-hall.js','torch-textures.js','torch-bake.js'];
+const SOURCES=['torch-hall.js','torch-ground.js','torch-textures.js','torch-bake.js'];
 function sourceHash(root=ROOT){const txt=SOURCES.map(f=>fs.readFileSync(path.join(root,'web',f),'utf8').replace(/\r\n/g,'\n')).join('\n--\n');
  return crypto.createHash('sha256').update(txt,'utf8').digest('hex').slice(0,24);}
 const BROWSERS=['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Microsoft/Edge/Application/msedge.exe'];
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.woff2':'font/woff2','.webp':'image/webp','.svg':'image/svg+xml','.bin':'application/octet-stream'};
-const PAGE=`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/web/torch-monument.css"><body style="margin:0;width:1280px;height:720px">
+const PAGE=`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/web/torch-monument.css"><body style="position:relative;margin:0;width:1280px;height:720px">
 <script type="module">
 window.__TORCH_BAKE=true;window.__TORCH_HOUR=12;try{localStorage.setItem('megulit-torch-quality','high');}catch{}
 const m=await import('/web/torch-monument.js');
 const api=async a=>a==='torch_page'?{ok:true,total:0,items:[],next:null}:{ok:true,available:false,items:[],months:[]};
-await m.openTorchMonument({api,locale:'zh'});
+await m.openTorchMonument({api,locale:'zh',mount:document.body});
 let host;for(let i=0;i<600&&!(host=document.querySelector('.torch-monument'))?.__torch;i++)await new Promise(r=>setTimeout(r,100));
 const {exportBake}=await import('/web/torch-bake.js');
 window.__bake=await exportBake(host.__torch.debug.scene,host.__torch.debug.torchPoints,host.__torch.debug.steleEmit);
@@ -30,7 +30,7 @@ async function main(){const browser=BROWSERS.find(b=>fs.existsSync(b));if(!brows
  const srv=http.createServer((q,r)=>{const u=decodeURIComponent(q.url.split('?')[0]);if(u==='/bake.html'){r.writeHead(200,{'content-type':'text/html'});r.end(PAGE);return;}
   const f=path.join(ROOT,u);if(!f.startsWith(ROOT)){r.writeHead(403);r.end();return;}fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);r.end();return;}r.writeHead(200,{'content-type':MIME[path.extname(f)]||'application/octet-stream'});r.end(d);});});
  await new Promise(r=>srv.listen(0,'127.0.0.1',r));const port=srv.address().port,dport=20000+Math.floor(Math.random()*9000),prof=fs.mkdtempSync(path.join(os.tmpdir(),'torch-bake-'));
- const proc=spawn(browser,['--headless=new','--no-first-run','--disable-extensions','--use-angle=d3d11','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--remote-debugging-port='+dport,'--user-data-dir='+prof,'--window-size=1280,720','about:blank'],{stdio:'ignore'});
+ const proc=spawn(browser,['--headless=new','--mute-audio','--no-first-run','--disable-extensions','--use-angle=d3d11','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--remote-debugging-port='+dport,'--user-data-dir='+prof,'--window-size=1280,720','about:blank'],{stdio:'ignore',windowsHide:true});
  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  try{let tabs;for(let i=0;i<100;i++){try{tabs=await (await fetch('http://127.0.0.1:'+dport+'/json')).json();break;}catch{await sleep(200);}}
   const ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j;});

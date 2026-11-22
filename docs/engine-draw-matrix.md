@@ -26,16 +26,17 @@ KiriKiri 分两条跟踪：普通 KAG3 `processCh` 的角色与内嵌实现已�
 
 下面各引擎的画字钩子都已合进 main。默认全部不挂：只有这部游戏的 seed 打开 `draw.roles`（MeguLit 写出控制文件 `#cfg roles=1`）才装钩子；现在没有任何游戏 seed 打开它。这一点由 `validation/engine-draw-opt-in.test.cjs` 钉住：钩子只在 `Install()` 里装，`Install()` 只在 roles=1 检查之后调，启动时 `Arm()` 从不挂钩；内核默认不写控制文件；seed 要开得先加进测试里的允许名单
 
-AdvHD 新增的单版本输入诊断使用独立、默认 false 的 `draw.advhdInput`，不授予上段角色或渲染能力，也没有 seed 开启，详见下表及诊断文档
+AdvHD、CMVS 与 FVP 输入诊断分别使用独立、默认 false 的 `draw.advhdInput` / `draw.cmvsInput` / `draw.fvpInput`，不授予上段角色或渲染能力，也没有 seed 开启，详见下表及诊断文档
 
 | 引擎 | 部件（native/megulithook） | 状态 |
 |---|---|---|
 | ReaLive / AVG32（涙、Air） | DrawSites（GDI 画字点）签名 `avg32` | 已进 main，默认不挂 |
 | Softpal（レイライン 1 / 2） | DrawSites `softpal`、`softpal-2` | 已进 main，默认不挂 |
 | NScripter（月姬 v1.4 / v1.6，同一 exe） | DrawSites `nscripter`（mode 1 字形点） | 默认不挂；页面坐标、角色、mode 0/2 和样本编码尚未验收 |
-| Innocent Grey（虚ノ少女，MFC） | DrawSites `mfc-textoutw` / `mfc-exttextoutw` / `mfc-drawtextw` | 已进 main，默认不挂 |
+| Innocent Grey（虚ノ少女） | 旧 `mfc-*` 是补丁安装器界面；游戏实际为 Himorogi/Script/D3D9Font | 私测普通流默认关闭；三次未注入隐藏基线均先在 Himorogi+5a2c 崩溃，无 live 正文；服务回放通过，见 re-iga-runtime.md，不授予画字角色 |
 | AdvHD / WillPlus（Under The Moon） | DrawSites `advhd`；AdvhdDraw 输入诊断 | 默认不挂；诊断钉住单一 exe，仅完整原始输入，不授予正文角色、隐藏或嵌入能力 |
-| CMVS（青い鳥） | DrawSites `cmvs` | 已进 main，默认不挂 |
+| CMVS（青い鳥） | DrawSites `cmvs`；CmvsDraw 双入口输入诊断 | 默认不挂；两个全文绘制入口必须一起通过版本与签名校验，仅原始输入，不支持角色、屏幕坐标或渲染 |
+| FVP（いろとりどりのヒカリ / HD） | DrawSites `fvp`；FvpDraw 原始追加诊断 | 默认不挂；两个版本各自 exact pin 单入口，仅追加 raw bytes，不覆盖缓存重绘或正文角色，见 [FVP 诊断交付](re-fvp-input.md) |
 | FVP（ヒカリ 中文版 / HD） | DrawSites `fvp`、`fvp-bitmap` | 已进 main，默认不挂 |
 | minori（eden 英文版） | DrawSites `minori` | 已进 main，默认不挂 |
 | Musica（ましろ色シンフォニー） | DrawSites `musica` | 已进 main，默认不挂 |
@@ -51,6 +52,8 @@ AdvHD 新增的单版本输入诊断使用独立、默认 false 的 `draw.advhdI
 | Silky's、LiveMaker、System4、Escu:de、Kaguya 等 | 无 | 没做：本机没有样本 |
 
 AdvHD 的本机样本已静态确认缓存命中会绕过旧 GetGlyphOutline 点，新输入诊断在缓存判断之前，尚未游戏实测，见 [AdvHD 诊断交付](re-advhd-input.md)。其余 GetGlyphOutline 类签名和 NScripter 字形小图仍需确认缓存覆盖，见 engine-draw-native.md「注意：字形缓存」
+
+CMVS 本机版本同样确认字形、度量与节点缓存会绕过旧点；双入口只交付全文输入诊断，缓存节点重绘覆盖仍未验收，见 [CMVS 诊断交付](re-cmvs-input.md)
 
 ## Majiro 本轮交付
 
@@ -86,8 +89,8 @@ AdvHD 的本机样本已静态确认缓存命中会绕过旧 GetGlyphOutline 点
 | KiriKiri Z（TextRender 插件，柚子社等） | krkrtext trDone；默认关闭，生产函数回放 | 内（getCharacters） | 内（glyph逐字框/分行）；实机原点待验 | 内（processName/nameLayer，空值退休） | 内（hotspot内字/选择态，混合层保持可见） | 内（既有文字ButtonLayer）；图片菜单无 | 内（既有MessageLayer附绘，非render输入替换） | 无（底字范围未知，无端到端producer） | 本机实际点读/选项译文/清页/OP待店主，静态不是实机 | L | 固定文件/版本/许可见 side-session-notes/TextRender-roles-result-ec6a304b.md |
 | Ren'Py | MeguLitRenpy.py | 内 | 内（Layout 字形） | 内（实际 say/who widget，仅隔离 8.4 fixture） | 内（store.menu 与 action 身份，仅隔离 fixture） | 未验证 | 内（Text.set_text，撤权恢复原切片；隔离 fixture） | 内（替换 ruby 标签；非原游戏 ruby 全覆盖） | 真实 Reader 已收 10 句、译文和本地词卡 DOM，但隐藏桌面 front=Foreign 阻止屏上显示，物理点读/选项译文/用户真实游戏仍待验；默认关闭，详见 [实测边界](re-renpy-live.md) | S | Ren'Py 自带翻译框架、unrpyc |
 | RPG Maker MV / MZ | CDP实际注入 `core/text-paths-rpgm.cjs`；默认不包函数，明确draw.roles/embed才安装；**候选；MZ本机静态正文已核，MV单EXE正文仍缺** | 内（Window_Message内容Bitmap，VM回放） | 内（字体格四角、PIXI仿射/frame、CSS/DPR；非字形墨迹，待实机） | 内（标准MZ Window_NameBox）；无（MV非标准名字插件） | 内（Window_ChoiceList文字项/选中态，VM回放） | 内（Window_Command的_list及数据项name；图片按钮/自绘菜单无） | 内（本窗口追加中文/注音，超时或未实际应用回阅读层；VM回放） | 无（游戏原有ruby未读）；内（生成读音绘制，VM回放） | MZルイーゼ真实reader提取2238正文/203选项，未运行；MV包装尚未读到目录正文；二级核分页、缩放滚动、点读、名字与选项及插件兼容；原生lunajspatch资源未改/未重编译 | S | 有序审计版本及许可见分支result.md；MV官方corescript和MZ官方Window.js仅参考API，未复制第三方代码 |
-| RPG Maker VX Ace / VX / XP | rgss.cjs 只读剧本 | 外（LunaHook RGSS 流） | 外（字形点） | 无 | 无 | 无 | 无 | 无 | RGSS30x.dll 导出 `RGSSEval`：注入 Ruby 包 Window_Message#process_normal_character / Window_ChoiceList，和 MV 同一套角色逻辑 | M | RGSS 默认脚本（Scripts.rvdata2 里）、rvpacker、MTool 的做法 |
-| TyranoScript | text-paths-web（DOM） | 内 | 内（getClientRects） | 无（`.chara_name_area` 没按名字报） | 无（`.glink_button` 没报） | 无 | 无（CSS 透明隐藏） | 无（<ruby> 被跳过） | 名字容器、glink/button 按角色报 rect；内嵌 = 改 `.message_inner` 的 DOM（加 <ruby> 和中文行），浏览器就是游戏自己的渲染 | S | TyranoScript 源码（MIT）、tyrano 翻译插件 |
+| RPG Maker VX Ace / VX / XP | rgss.cjs 只读剧本；固定 VX 默认关闭；XP/Ace 精确完整样本仅私测加载 | 内（固定 VX 回放通过；XP/Ace 私测正文候选，实机待验） | 内（字体单元逻辑坐标，非墨迹验收） | 无 | 内（固定 VX Window_Choice，回放通过） | 内（Selectable/Help 文字框，回放通过） | 无 | 无 | 固定 EXE/DLL/INI/数据/Scripts/Main 身份，XP/Ace 需 opaque grant；Lumina 动态 loader 拒绝。原版 Ruby/WinSock、真实 Reader 与完整七项未验，隐藏启动遇音频 Guard 阻断，见 [范围与验收](engine-rgss.md) | M | 成熟源码与完整样本实际类核对，无新第三方代码复制，生产 Seed 未开 |
+| TyranoScript | text-paths-web（DOM，静态/替身单测） | 内（当前消息层，过滤未显现字和描边副本） | 内（Range.getClientRects，DPR/换行） | 内（`.chara_name_area` / 配置名字区） | 内（`.glink_button` / event-tag glink/link） | 图片按钮未覆盖；旧 text-class 兼容保留 | 内（DOM ruby+中文，撤权恢复；混合链接不替换） | 保留原生 ruby、字典不覆盖；未把原生读音传给 Reader | 无本机样本，实际隐藏、点读、译文、清页待店主；七格不计全内，见 [限定报告](engine-tyrano/result.md) | S | TyranoScript 自定义条款（不是本体 MIT）；Luna GPL 仅思路参考，无新复制 |
 | Artemis | LunaHook（Artemis 钩子 + 内嵌） | 外（流） | 外（GPU 四边形 / 字形点） | 外（ctx2） | 外 | 无 | 外（LunaHook 写回字符串） | 无 | 引擎是 Lua：找到 lua_State 后调 Lua 包 `e:tag` 文本函数；或按 Artemis「散文件优先于 pfs」的加载规则放影子目录脚本（不碰游戏目录） | L | artemis 解包工具、LunaHook Artemis 钩子 |
 | Unity | unitytext（BepInEx，Mono / IL2CPP） | 内（组件） | 内（TMP characterInfo / TextGenerator） | 无 | 无 | 无 | 无（alpha 0 隐藏） | 无 | 组件角色：按挂的 Button / Toggle / Selectable 判按钮，按框架（Utage / Naninovel / ADV 自研）判名字和选项；内嵌 = 改 TMP.text（加 `<size>` 行和 ruby 标签） | M | XUnity.AutoTranslator（文本替换、TMP 字体、各 UI 框架钩子）、BepInEx、Il2CppInterop |
 | SiglusEngine | megulithook Siglus.cpp（LunaHook 内嵌 + ctx2）+ SiglusDraw.h（画字签名，默认关） | 内（moji push_back，seed draw.roles 开） | 内（文字区像素 + msg::frame 屏幕原点 ox/oy，推测是 #SCREEN_SIZE 坐标） | 内（名字窗 / 消息里的名字） | 内（mwnd.sel / selmsg / selbtn 的项） | 无（系统菜单是图片按钮） | 外（写回 role=1 的流，游戏自己画） | 内（mwnd.ruby 的读音 + 底字范围） | 选项项的屏幕原点；内嵌（接入点已定位：msg::add_msg 的 mwnd.print 调用，按段调原函数 + 引擎 ruby 开始/结束）；颜色号 → RGB 已做（rgb=） | L | SiglusSceneScriptUtility（元素号）、SiglusExtract、LunaHook Siglus |
@@ -136,7 +139,7 @@ AdvHD 的本机样本已静态确认缓存命中会绕过旧 GetGlyphOutline 点
 | Musica / ぱれっと（1） | ましろ色シンフォニー | mashiroiro.exe | x86 | 只有 CreateFontA ×1（字形 API 不在导入表：运行时 GetProcAddress 或自绘） | DirectDraw | 无 | Palette.cpp | 中：先找动态取的 API |
 | minori（1） | eden*（Steam 英文版） | eden_en.exe | x86 | GetGlyphOutlineA ×3、CreateFontA ×2 | D3D9 + DirectDraw | 无 | Minori.cpp | 中 |
 | Leaf / AQUAPLUS（1） | WHITE ALBUM2 | WA2.exe | x86 | 没有任何 GDI 文字 API | D3D9 + D3DX（自绘字库） | 无 | Leaf.cpp | 难：和 MAGES 一样是字库图集，要找送字函数 |
-| Innocent Grey（1） | 虚ノ少女 | Innocentsetup.exe（98 MB，资源打在 exe 里） | x86 | DrawTextW ×1、ExtTextOutW ×1、TextOutW ×1 | GDI | 无 | 无专用（通用 GDI） | 易：3 个 W 调用点 |
+| Innocent Grey（1） | 虚ノ少女 | 虚ノ少女.exe（231936B）+ plugin/Himorogi.dll、Script.dll、D3D9Font.dll | x86 | 字体插件 GetGlyphOutlineW ×3；EXE 无正文文字 API | D3D9 | 普通 PE | 私测 IGA_Text 候选 | 原 MFC 三点属于补丁安装器，不能证明正文 |
 | BRUNS（1） | ダストマニア・グロテスク | gameplay.exe（121 KB 启动）+ umut.dll + libscr.dll | x86 | umut.dll 没有文字 API；libscr.dll TextOutW ×1（中文补丁的库） | GDI DIB | 无 | Bruns.cpp | 中：画字可能在中文补丁库里，原版走自绘 |
 | AdvHD / WillPlus（1） | Under The Moon（seed 里是 ディスコード！，本机只有同引擎的 utmoon.exe） | utmoon.exe | x86 | GetGlyphOutlineA ×2、TextOutA ×3、CreateFontIndirectA ×1 | DirectDraw | 无 | WillPlus.cpp（本仓库另有 Euphoria HD 474 精确匹配） | 易 |
 

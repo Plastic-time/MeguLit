@@ -21,6 +21,11 @@ const shortLines = ['お客さん', '……ぁ？', 'お客さんってば'];
   out.length = 0;
   p.hook({ type: 'hookCharRects', engine: 'krkr', line: 100001, hidden: false, sw: 1535, sh: 863, viewport: [0, 0, 1535, 863], rects: [[374, 707, 31, 31], [405, 707, 31, 31]], text: 'はい' });
   assert.strictEqual(out.shift()?.fallback, true, 'an engine line reported unhidden while the stream is blanked: the reader draws it');
+  p.hook({ type: 'hookCharRects', engine: 'krkr', line: 100001, hidden: false, sw: 1535, sh: 863, viewport: [0, 0, 1535, 863], rects: [[374, 707, 31, 31], [405, 707, 31, 31]], text: 'はい', color: '#eedefe', read: false });
+  const sample = out.shift();
+  assert.equal(sample?.color, '#eedefe', 'late native colour reaches the clickable fallback line');
+  assert.equal(sample?.read, false, 'an explicit unread report survives fallback');
+  assert.deepEqual(sample?.rects?.[0], [374, 707, 31, 31], 'calibration can follow the glyph fallback’s TextRender boxes');
   p.hook({ type: 'hookCharRects', engine: 'gpu', line: 7, hidden: false, sw: 1535, sh: 863, viewport: [0, 0, 1535, 863], rects: [[374, 707, 31, 31]], text: 'え' });
   assert.strictEqual(out.shift()?.visible, true, 'the GPU layer decides per frame: unhidden stays the game\'s');
 }

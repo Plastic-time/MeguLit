@@ -33,23 +33,32 @@ async function startProcess(file,args,cwd,errorCode,spawnProcess=spawn,env=null)
  });
  child.unref();return state;
 }
-async function waitForVisibleGame(query,{attempts=60,interval=250,stableSamples=4,timeout=15000,exit,helper=false,helperError='LE_HELPER_FAILED',indirect=false,trace=()=>{},sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
+async function waitForVisibleGame(query,{attempts=60,interval=250,stableSamples=4,timeout=15000,exit,helper=false,helperError='LE_HELPER_FAILED',checkHelperHandoff=false,indirect=false,trace=()=>{},sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
  let pid=null,stable=0,seenProcess=false,exitLogged=false,answered=false,lastError=null;
+ let absentAfterHandoff=0,sawWindow=false;
  const deadline=Date.now()+timeout;
  for(let i=0;i<attempts&&Date.now()<deadline;i++){
   /* A process query can fail on some PCs (security software holding the helper, first-run scan past the timeout).
      One failed sample is no answer, not a failed launch: keep waiting (v1.1.0, Steam games reported as "could not
      check whether the game was running"). */
-  let processes;try{processes=await query();answered=true;}catch(error){lastError=error;if(!lastError.logged){trace('process-query-failed',{error:error.message});lastError.logged=true;}if(i+1<attempts)await sleep(interval);continue;}
+  // MeguLitLaunch has already resumed the game when it exits successfully. Only count queries started after that exit.
+  const handoffComplete=checkHelperHandoff&&exit?.()?.code===0;
+  let processes;try{processes=await query();answered=true;}catch(error){absentAfterHandoff=0;lastError=error;if(!lastError.logged){trace('process-query-failed',{error:error.message});lastError.logged=true;}if(i+1<attempts)await sleep(interval);continue;}
   const visible=processes.filter(p=>p.visible);
   if(processes.length&&!seenProcess){seenProcess=true;trace('game-process-seen',{pid:processes[0].pid});}
   const game=visible.find(p=>p.pid===pid)||visible[0];
-  if(game){stable=pid===game.pid?stable+1:1;pid=game.pid;if(stable>=stableSamples)return {pid};}
+  if(game){sawWindow=true;stable=pid===game.pid?stable+1:1;pid=game.pid;if(stable>=stableSamples)return {pid};}
   else{pid=null;stable=0;}
   const ended=exit?.();
   if(ended&&!exitLogged){trace(helper?'launch-helper-exited':'game-process-exited',ended);exitLogged=true;}
-  if(!processes.length&&((ended&&!helper)||seenProcess&&!indirect))throw Error('GAME_PROCESS_EXITED');
+  const checkingMissingChild=checkHelperHandoff&&!sawWindow;
+  if(!processes.length&&((ended&&!helper)||seenProcess&&!indirect&&!checkingMissingChild))throw Error('GAME_PROCESS_EXITED');
   if(!processes.length&&helper&&!indirect&&ended&&(ended.code!==0||ended.signal))throw Error(helperError);
+  if(processes.length)absentAfterHandoff=0;
+  else if(handoffComplete&&checkingMissingChild){
+   absentAfterHandoff++;
+   if(absentAfterHandoff>=2)throw Object.assign(Error('GAME_PROCESS_EXITED'),{detail:'HELPER_FINISHED_WITHOUT_GAME'});
+  }
   if(i+1<attempts)await sleep(interval);
  }
  /* Never got a single answer: the game was started, MeguLit just cannot see processes. Let the reader attach on its own. */
