@@ -18,6 +18,22 @@ The upload response includes `ordinary: {id,state,revision}`. The game card read
 4. Apply the relay D1 migrations in order, including `0031_torch_changes.sql`, `0032_yui.sql` and `0033_ordinary_seeds.sql`. Configure `ORDINARY_SCAN_URL` with the gateway's HTTPS `/scan` URL, `ORDINARY_PUBLIC_KEYS` with the same ordinary public-key array, and `ORDINARY_SCAN_TOKEN` using Wrangler secret provisioning. Deploy the Worker with the existing cron trigger. Both desktop relay hosts reach the same Worker and database. Keep the token and private key out of client builds and source control
 5. Check a harmless calibration on the deployed path, its receipt, exact-version offline reuse and a signed revocation on a test version. An account's deployed quotas, scan-host uptime and trust rotation remain operational responsibilities. To pause new signing, stop the scan service. Pending jobs remain available for retry
 
+### Scan host archive and release check
+
+From a clean release checkout, build the portable scanner archive with the following command. The destination needs Node 22 or later and a running clamd with maintained definitions. The archive contains the server, its JavaScript dependencies, license and systemd unit. It can be extracted into `/opt/megulit` without npm or a repository checkout. The service account reads its own key and environment file under `/etc/megulit`
+
+```sh
+git -c core.autocrlf=false -c core.eol=lf archive -o ordinary-scan-host.tar.gz HEAD LICENSE docs/ordinary-seed.md core/ordinary-seed.cjs core/game-diff.cjs core/game-print-schema.cjs core/seed-evidence.cjs core/profiles/domains.cjs relay/scan-service
+```
+
+Apply all relay migrations through `0035_torch_alias_search.sql` for the roster. Migration 0034 updates the fallback aliases separately from explicit signatures. A normal client's first anonymous upload may nominate one catalogued protagonist from its visible local library. The catalog matches exact VNDB IDs, with the manual mapping taking precedence. Only the selected original name goes on the wire. An existing number keeps its assigned alias. The isolated test launcher omits this field
+
+On the release workstation, set the gateway bearer in the process environment and install the locked relay dependencies. Run the check below with the intended Wrangler configuration and the trust file from the distributed receiver. It posts one synthetic calibration directly to the gateway and verifies its scan receipt and Ed25519 signature against the Worker and receiver pins. It prints the key ID and hashes without writing to the roster or publishing a Seed. A deployment must also verify an ordinary upload and a separate receiving client through each actual relay hostname
+
+```sh
+node relay/check-ordinary.mjs relay/wrangler.toml /path/to/installed/services/ordinary-seed-keys.json
+```
+
 ## Local integration
 
 Run `node --test validation/ordinary-seed.test.cjs` for the normal protocol suite. Its default clamd peer is a test fixture. For the real-engine variant use an isolated clamd with fresh official definitions and add a local NDB signature with name `Seed.Test.Marker`, target `0`, offset `*`, and the hex encoding of 64 ASCII lowercase b characters. Set `MEGULIT_TEST_CLAMD_PORT` to that daemon's loopback port. Use a separate database directory for this test signature

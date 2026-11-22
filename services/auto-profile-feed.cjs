@@ -144,7 +144,20 @@ const CREDIT_MAX=30;
 const BAD_CP=c=>c<32||c===127||c===0x2028||c===0x2029||(c>=0x202a&&c<=0x202e)||(c>=0x2066&&c<=0x2069);
 function cleanName(v){if(typeof v!=='string')return null;const t=[...v].map(ch=>BAD_CP(ch.codePointAt(0))?' ':ch).join('').replace(/\s+/g,' ').trim();const c=[...t].slice(0,CREDIT_MAX).join('').trim();return c||null;}
 /* what the relay says about a credit: {torchNo, name|null, at} or null */
-const {displayAlias}=require('../core/torch-alias.cjs');
+const {displayAlias,protagonists}=require('../core/torch-alias.cjs');
+function libraryAlias(root){
+ const filename=path.join(root,'data',require('./brand-migration.cjs').databaseName);
+ if(!fs.existsSync(filename))return null;
+ let db;
+ try{
+  db=new (require('node:sqlite').DatabaseSync)(filename,{readOnly:true});
+  const rows=db.prepare(`SELECT DISTINCT CASE WHEN json_valid(original) THEN
+    coalesce(nullif(json_extract(original,'$.vndbManual'),''),json_extract(original,'$.library.vndbId'))
+    END AS vn FROM games WHERE removed_at IS NULL AND hidden_at IS NULL`).all();
+  const names=rows.filter(({vn})=>Object.hasOwn(protagonists,vn)).map(({vn})=>protagonists[vn]);
+  return names.length?names[crypto.randomInt(names.length)]:null;
+ }catch{return null;}finally{db?.close();}
+}
 function cleanCredit(c){if(!c||typeof c!=='object')return null;const no=c.torchNo;if(typeof no!=='number'&&(typeof no!=='string'||!/^\d+$/.test(no)))return null;const n=Number(no);if(!Number.isSafeInteger(n)||n<0)return null;const at=typeof c.at==='string'||Number.isFinite(c.at)?c.at:'',name=cleanName(c.name);return {torchNo:n,name,at,...(!name?{alias:displayAlias(cleanName(c.alias),n)}:{})};}
 /* this PC's credit of the diff it sent: the relay's last answer, or the local one still waiting for the relay */
 function creditOf(root,key){const m=readSent(root,key);if(!m)return null;const c=cleanCredit(m.credit)||cleanCredit(m);
@@ -170,7 +183,8 @@ async function report(root,record,{fetcher=globalThis.fetch,prints=null,credit:c
  if(isolated&&(!candidate||block.source==='gate'))return {state:'skipped'};
  const profile=isolated?{...candidate,source:'calibration'}:block;
  const sharedPrints=isolated?(pr?.script?{script:pr.script}:null):pr;
- const body=JSON.stringify({version:1,profile,...(candidate?{ordinary:candidate}:{}),...(!isolated&&credit?{credit:{name:credit}}:{}),...(sharedPrints&&Object.keys(sharedPrints).length?{prints:sharedPrints}:{})});
+ const alias=!isolated&&!credit&&!sent(root,block.key)?libraryAlias(root):null;
+ const body=JSON.stringify({version:1,profile,...(candidate?{ordinary:candidate}:{}),...(!isolated&&credit?{credit:{name:credit}}:{}),...(alias?{libraryAlias:alias}:{}),...(sharedPrints&&Object.keys(sharedPrints).length?{prints:sharedPrints}:{})});
  for(const url of reportEndpoints(root,'/api/game-profile/report')){try{const r=await fetcher(url,{method:'POST',redirect:'error',credentials:'omit',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok){let j=null;try{j=await r.clone().json();}catch{}const c=cleanCredit(j&&(j.credit||j));markSent(root,block.key,c);if(gameDiff.KEY.test(j?.ordinary?.id||''))writeSent(root,block.key,{...readSent(root,block.key),ordinary:{id:j.ordinary.id,state:j.ordinary.state}});return {state:'sent',...(c?{credit:c}:{})};}if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
  return {state:'failed'};}
 /* 2026-11-21 Cardinal (services/cardinal.cjs): POST /api/cardinal/score, the body is the record as core/cardinal/score.cjs record made it

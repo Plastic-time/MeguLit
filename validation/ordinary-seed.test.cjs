@@ -6,7 +6,7 @@ const {once}=require('node:events');
 const {database,fixture}=require('./helpers/torch-release.cjs');
 const ordinary=require('../core/ordinary-seed.cjs'), diff=require('../core/game-diff.cjs');
 const feed=require('../services/auto-profile-feed.cjs'), receiver=require('../services/torch-receive.cjs');
-const {server}=require('../relay/scan-service/server.cjs');
+const {server}=require(process.env.MEGULIT_TEST_SCAN_SERVICE||'../relay/scan-service/server.cjs');
 const marker='b'.repeat(64), clean={key:'a'.repeat(64),mode:'hide',settings:{page:{presentation:'adv'}}};
 test('ordinary schema accepts bounded calibrations only',()=>{
   assert.deepEqual(ordinary.normalize(clean),clean);
@@ -83,16 +83,36 @@ async function setup(t,{live=false}={}) {
     body:JSON.stringify({version:1,profile:{...input,source:'calibration'},ordinary:input})});
   const find=async(id,state)=>{for(let i=0;i<100;i++){const row=await store.prepare('SELECT * FROM ordinary_seed_jobs WHERE id=?').bind(id).first();
     if(row.state===state&&!row.lease&&(state!=='pending'||row.retry_at>0))return row;await new Promise(r=>setTimeout(r,50));}assert.fail('missing state '+state);};
-  return {root,config,publicKey,request,fetcher,submit,find,store,retry,f,socketBase};
+  return {root,config,publicKey,request,fetcher,submit,find,store,retry,f,socketBase,gateway};
 }
 test('player upload, scanner retry, quarantine, signature, offline install and signed revocation',async t=>{
-  const {root,config,publicKey,request,fetcher,submit,find,store,retry,f}=await setup(t);
+  const {root,config,publicKey,request,fetcher,submit,find,store,retry,f,gateway}=await setup(t);
+  if(process.env.MEGULIT_TEST_WORKER_BUNDLE){
+    const {checkGateway}=await import('../relay/check-ordinary.mjs');
+    const vars={ORDINARY_SCAN_URL:gateway,ORDINARY_PUBLIC_KEYS:JSON.stringify([publicKey])};
+    const receipt=await checkGateway(vars,[publicKey],config.ORDINARY_SCAN_TOKEN);
+    assert.equal(receipt.keyId,publicKey.id);
+    await assert.rejects(checkGateway(vars,[],config.ORDINARY_SCAN_TOKEN),/matching ordinary/);
+    await assert.rejects(checkGateway({...vars,PROFILE_PUBLIC_KEYS:JSON.stringify([publicKey])},[publicKey],config.ORDINARY_SCAN_TOKEN),/dedicated/);
+  }
   const exe=path.join(root,'game.exe');fs.writeFileSync(exe,'inert version identity');
   const key=await receiver.fileHash(exe,{}),rec={...clean,key,source:'calibration',reason:'diagnostic only',candidates:[]};
+  const library=require('../services/store.cjs').openStore(root);
+  const add=library.prepare('INSERT INTO games(id,title,original,hidden_at,removed_at) VALUES(?,?,?,?,?)');
+  add.run('1','private library title',JSON.stringify({vndbManual:'v4',library:{vndbId:'v7771'}}),null,null);
+  add.run('2','hidden',JSON.stringify({library:{vndbId:'v19073'}}),1,null);
+  add.run('3','removed',JSON.stringify({library:{vndbId:'v7771'}}),null,1);
+  add.run('4','corrupt','{',null,null);library.close();
   assert.equal((await submit({...clean,settings:{draw:{engineTable:{}}}})).status,422);
   const large=await request('/api/game-profile/report',{method:'POST',body:' '.repeat(16385)});assert.equal(large.status,413);
   const realPort=config.CLAMD_PORT;config.CLAMD_PORT=1;
-  assert.equal((await feed.report(root,rec,{fetcher})).state,'sent');
+  const posted=await feed.report(root,rec,{fetcher:async(url,init)=>{
+    const body=JSON.parse(init.body);
+    assert.equal(body.libraryAlias,'岡崎朋也');
+    assert.doesNotMatch(init.body,/private library title|v7771|v19073|"v4"/);
+    return fetcher(url,init);
+  }});
+  assert.equal(posted.state,'sent');assert.equal(posted.credit.alias,'岡崎朋也');
   const [{id}]=(await store.prepare('SELECT id FROM ordinary_seed_jobs').all()).results;
   await find(id,'pending');assert.equal((await request('/api/game-profile?exe='+key)).status,404);
   config.CLAMD_PORT=realPort;

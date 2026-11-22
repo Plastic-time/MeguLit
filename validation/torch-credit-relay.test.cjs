@@ -152,13 +152,19 @@ test('0030 preserves manual signatures and assigns dispersed official Japanese a
  assert.equal(rows[0].alias,'ユージオ');
  assert.equal(rows[1].name,'惠惠');
  for(const row of rows){
-  assert.equal(row.alias,fallbackAlias(row.torch_no));
+  assert.equal(require('../core/torch-alias.cjs').displayAlias(row.alias,row.torch_no),fallbackAlias(row.torch_no));
   assert.match(row.alias,/^[\p{Script=Hiragana}\p{Script=Katakana}ー・]+$/u);
   assert.doesNotMatch(row.alias,/めぐみん|メグミン|惠惠|恵恵|megumin/iu);
  }
  assert.equal(new Set(rows.slice(0,24).map(r=>r.alias)).size,24);
  assert.equal(new Set(rows.slice(24,48).map(r=>r.alias)).size,24);
  assert.ok(rows.slice(1).every((r,i)=>r.alias!==rows[i].alias));
+ db.exec(fs.readFileSync(path.join(dir,'0034_torch_original_names.sql'),'utf8'));
+ for(const row of db.prepare('SELECT torch_no,name,alias FROM torch_credits').all()){
+  assert.equal(row.name,row.torch_no===1?'惠惠':null);
+  assert.equal(row.alias,fallbackAlias(row.torch_no));
+ }
+ db.close();
 });
 
 test('anonymous #0 is searchable and consistent through monument, me, reupload and withdrawal',async()=>{
@@ -167,7 +173,10 @@ test('anonymous #0 is searchable and consistent through monument, me, reupload a
  const find=name=>get('/api/torch/find?name='+encodeURIComponent(name));
  await report(ip,KA,{name:'Manual signature'});
  ENV.DB.raw.exec("DELETE FROM torch_names WHERE torch_no=1; UPDATE torch_credits SET torch_no=0, name=NULL, alias='ユージオ' WHERE torch_no=1");
- for(const result of [await get('/api/torch/monument'),await get('/api/torch/me?key='+KA),await find('ﾕｰ')]){
+ assert.equal((await find('ﾕｰ')).items[0].torchNo,0);
+ ENV.DB.raw.exec(fs.readFileSync(path.join(relayDir,'migrations/0034_torch_original_names.sql'),'utf8'));
+ assert.deepEqual((await find('ﾕｰ')).items,[]);
+ for(const result of [await get('/api/torch/monument'),await get('/api/torch/me?key='+KA),await find('桐ヶ谷')]){
   assert.equal(result.items[0].torchNo,0);
   assert.equal(result.items[0].name,null);
   assert.equal(result.items[0].alias,alias);
@@ -182,4 +191,23 @@ test('anonymous #0 is searchable and consistent through monument, me, reupload a
  assert.deepEqual((await find('MY E')).items,[]);
  assert.equal((await find(alias)).items[0].alias,alias);
  assert.equal((await report('5.5.5.5',KB,{alias:'アクア',candidates:['private library']})).status,400);
+});
+
+test('the relay keeps one verified library alias, including across reupload and explicit signatures',async()=>{
+ const {call,ENV}=mk(),ip='6.6.6.6';
+ const upload=libraryAlias=>call(ip,'POST','/api/game-profile/report',{
+  version:1,libraryAlias,profile:{key:KA,engine:'krkr',source:'calibration',mode:'hide',settings:{}}
+ });
+ assert.equal((await upload('unverified speaker')).status,400);
+ const first=await (await upload('岡崎朋也')).json();
+ assert.equal(first.credit.alias,'岡崎朋也');
+ assert.deepEqual((await (await upload('北原春希')).json()).credit,first.credit);
+ const find=async name=>(await (await call(ip,'GET','/api/torch/find?name='+encodeURIComponent(name))).json()).items;
+ assert.equal((await find('岡崎'))[0].alias,'岡崎朋也');
+ await call(ip,'PUT','/api/game-profile/credit',{key:KA,name:'Manual'});
+ assert.deepEqual(await find('岡崎'),[]);
+ await call(ip,'PUT','/api/game-profile/credit',{key:KA,name:null});
+ assert.equal((await find('岡崎'))[0].torchNo,first.torchNo);
+ ENV.DB.raw.prepare('UPDATE torch_credits SET alias=? WHERE torch_no=?').run('Kirito',first.torchNo);
+ assert.equal((await find('ＫＩ ｒ'))[0].alias,'Kirito');
 });
