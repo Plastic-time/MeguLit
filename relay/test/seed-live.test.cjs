@@ -9,6 +9,26 @@ const sessions=require('../../services/self-check-live.cjs'),{subscribe}=require
 const sha=v=>crypto.createHash('sha256').update(v).digest('hex');
 async function until(check){for(let i=0;i<300;i++){if(check())return;await new Promise(r=>setTimeout(r,20));}assert.fail('timed out awaiting observed state');}
 
+test('an HTTPS mirror replays the change log when it refuses the socket upgrade',async t=>{
+ const key=sha('mirror test'),applied=[],cursors=[];
+ class RefusedSocket{
+  constructor(){queueMicrotask(()=>this.onerror());}
+  close(){}
+ }
+ const stop=subscribe('isolated-client',{base:'https://mirror.test',Socket:RefusedSocket,
+  fetcher:async url=>{
+   const cursor=new URL(url).searchParams.get('after');cursors.push(cursor);
+   const changes=cursor==='0'?Array.from({length:128},(_,i)=>({seq:i+1,game_key:key})):[{seq:129,game_key:key}];
+   return Response.json({changes});
+  },
+  apply:async(_root,rows)=>applied.push(...rows.map(row=>row.seq))
+ });
+ t.after(stop);
+ await until(()=>applied.length===129);
+ assert.deepEqual(cursors,['0','128']);
+ assert.deepEqual(applied,Array.from({length:129},(_,i)=>i+1));
+});
+
 test('publish, live delivery, offline revocation replay and next-dialogue application',async t=>{
  const f=fixture(),db=database(),now=new Date('2026-11-21T01:00:00Z');
  const {torchReleaseRoute,propose}=await import('../src/torch-release.js');

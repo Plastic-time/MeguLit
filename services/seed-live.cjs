@@ -24,13 +24,30 @@ function subscribe(root,{base,Socket=globalThis.WebSocket,fetcher=fetch,apply=re
  const bases=base?[base]:relay.seedBases(root,'receive');
  if(!bases.length)return;
  const owner=new AbortController();
+ const fallbackAfter=new Map();
  let cursor=0;
+ async function replay(base,signal){
+  let more;
+  do{
+   const res=await fetcher(base+'/api/torch-release/changes?after='+cursor,{signal:AbortSignal.any([signal,AbortSignal.timeout(15000)]),redirect:'error',cache:'no-store'});
+   if(!res.ok)throw Error('changes unavailable');
+   const {changes}=await receiver.body(res);
+   if(!Array.isArray(changes)||changes.length>128)throw Error('invalid changes');
+   let end=cursor;
+   for(const row of changes){
+    if(!Number.isSafeInteger(row.seq)||row.seq<=end||!/^[a-f0-9]{64}$/.test(row.game_key))throw Error('invalid revision');
+    end=row.seq;
+   }
+   if(changes.length)await apply(root,changes,signal);
+   signal.throwIfAborted();cursor=end;more=changes.length===128;
+  }while(more);
+ }
  async function run(){
   let delay=1000,attempt=0;
   while(!owner.signal.aborted){
    const base=bases[attempt++%bases.length];
    const connection=new AbortController(),signal=AbortSignal.any([owner.signal,connection.signal]);
-   let socket,work,dirty=false;
+   let socket,work,dirty=false,opened=false;
    try{
     socket=new Socket(base.replace(/^http/,'ws')+'/api/torch-release/events');
     const closed=new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));
@@ -38,18 +55,7 @@ function subscribe(root,{base,Socket=globalThis.WebSocket,fetcher=fetch,apply=re
     async function drain(){
      while(dirty&&!signal.aborted){
       dirty=false;
-      const res=await fetcher(base+'/api/torch-release/changes?after='+cursor,{signal:AbortSignal.any([signal,AbortSignal.timeout(15000)]),redirect:'error',cache:'no-store'});
-      if(!res.ok)throw Error('changes unavailable');
-      const {changes}=await receiver.body(res);
-      if(!Array.isArray(changes)||changes.length>128)throw Error('invalid changes');
-      let end=cursor;
-      for(const row of changes){
-       if(!Number.isSafeInteger(row.seq)||row.seq<=end||!/^[a-f0-9]{64}$/.test(row.game_key))throw Error('invalid revision');
-       end=row.seq;
-      }
-      if(changes.length)await apply(root,changes,signal);
-      signal.throwIfAborted();cursor=end;
-      if(changes.length===128)dirty=true;
+      await replay(base,signal);
       delay=1000;
      }
     }
@@ -58,6 +64,7 @@ function subscribe(root,{base,Socket=globalThis.WebSocket,fetcher=fetch,apply=re
      if(!work)work=drain().catch(()=>connection.abort()).finally(()=>{work=null;if(dirty&&!signal.aborted)wake();});
     }
     socket.onopen=()=>{
+     opened=true;
      clearTimeout(timeout);
      // Renew an idle transport so an undetected broken proxy or lost broadcast can recover.
      timeout=setTimeout(()=>connection.abort(),(25+Math.random()*10)*60000);
@@ -67,6 +74,11 @@ function subscribe(root,{base,Socket=globalThis.WebSocket,fetcher=fetch,apply=re
     socket.onerror=socket.onclose=()=>connection.abort();
     await closed;clearTimeout(timeout);
    }finally{connection.abort();socket?.close(1000,'reconnect');await work;}
+   // Some mirrors serve the change log over HTTPS but refuse WebSocket upgrades.
+   if(!opened&&!owner.signal.aborted&&Date.now()>=(fallbackAfter.get(base)||0)){
+    fallbackAfter.set(base,Date.now()+60000);
+    await replay(base,owner.signal).catch(()=>{});
+   }
    if(!owner.signal.aborted)await wait(delay,null,{signal:owner.signal,ref:false});
    delay=Math.min(delay*2,60000);
   }
