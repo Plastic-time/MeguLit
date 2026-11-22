@@ -23,8 +23,14 @@ const COPY={
  ja:{installed:'このバージョンの適応をインストール済み',unconfirmed:'適応データを受信しました。この PC へのインストールは未確認です',installing:'適応を照合してインストール中',failed:'適応のインストールは未完了です。後ほど再確認します',from:'火の提供元',unknown:'提供元は未登録',time:'公開日時',noTime:'日時は未登録',revision:'適応リビジョン',hash:'内容の検証値',cardinal:'Cardinal リビジョン'},
  en:{installed:'Adaptation installed for this version',unconfirmed:'Adaptation data received; installation on this PC is not yet confirmed',installing:'Matching and installing the adaptation',failed:'Adaptation installation is incomplete; it will be checked again later',from:'Flame shared by',unknown:'Source not provided',time:'Published',noTime:'Time not provided',revision:'Adaptation revision',hash:'Content checksum',cardinal:'Cardinal revision'}
 };
+const LOOKUP_COPY={
+ zh:{missing:'此版本暂无可接收的已发布适配',unavailable:'暂时无法查询传火服务，稍后会再检查'},
+ ja:{missing:'このバージョンで受け取れる公開済みの適応はありません',unavailable:'伝火サービスに問い合わせできませんでした。後でもう一度確認します'},
+ en:{missing:'No published adaptation is available for this version',unavailable:'The relay could not be reached. It will be checked again later'}
+};
 export function receiptView(dto,{locale='zh',esc,torch=n=>'#'+n}={}){const w=COPY[locale]||COPY.zh,r=installedReceipt(dto),state=dto?.state;
- const text=state==='installing'?w.installing:state==='install-failed'?w.failed:r?w.installed:w.unconfirmed;
+ const lookup=LOOKUP_COPY[locale]||LOOKUP_COPY.zh;
+ const text=state==='not-published'?lookup.missing:state==='installing'?w.installing:state==='install-failed'?(dto.code==='TORCH_RELAY_UNAVAILABLE'?lookup.unavailable:w.failed):r?w.installed:w.unconfirmed;
  if(state!=='received'||!r)return {signature:JSON.stringify([state,text]),html:`<p class="first-player-from" role="status">${esc(text)}</p>`};
  const who=r.credit?(r.credit.name||torch(r.credit.torchNo)):w.unknown;
  const date=r.serverTime?new Date(r.serverTime).toLocaleString(({zh:'zh-CN',ja:'ja-JP',en:'en-US'})[locale]||'zh-CN',{dateStyle:'medium',timeStyle:'short'}):w.noTime;

@@ -27,3 +27,12 @@ test('receipt signature changes with winner/hash/revision but stays equal for no
  assert.equal(receiptView({...base,fetchedAt:Date.now()},{esc}).signature,a);
  for(const patch of [{hash:'c'.repeat(64)},{revision:3},{credit:{torchNo:3,name:null}},{serverTime:'2026-11-22T00:00:00Z'}])assert.notEqual(receiptView({...base,receipt:{...base.receipt,...patch}},{esc}).signature,a);
 });
+test('an answered miss and an unavailable relay show distinct status without a receipt',async()=>{
+ const {receiptView}=await modulePromise;
+ for(const locale of ['zh','ja','en']){
+  const missing=receiptView({state:'not-published',key},{locale,esc});
+  const unavailable=receiptView({state:'install-failed',key,code:'TORCH_RELAY_UNAVAILABLE'},{locale,esc});
+  assert.notEqual(missing.html,unavailable.html);
+  for(const {html} of [missing,unavailable])assert.doesNotMatch(html,/first-player-receipt-source|<time/);
+ }
+});

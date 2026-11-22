@@ -53,3 +53,124 @@ test('owner launcher can receive an exact signed fire without opening the genera
  assert.deepEqual(urls,[relay.CN_RELAY_BASE+'/api/torch-release?exe='+f.identity.exe]);
  assert.ok(fs.existsSync(f.cache()));
 });
+
+test('owner launcher to ordinary import, receipt and reader profile with the local database',async t=>{
+ const f=await setup(t),root=fs.realpathSync.native(f.root);
+ const launcher=require('../tools/owner-tests-launch.cjs'),owner=require('../core/owner-tests.cjs');
+ const libraryFile=path.join(root,'data','config','library.json'),onlineFile=path.join(root,'data','config','online.json');
+ const library=JSON.stringify({sharedAdaptation:false,autoProfileShare:false,runtimeSampleShare:false});
+ const online=JSON.stringify({relayUrl:''});
+ fs.mkdirSync(path.dirname(libraryFile),{recursive:true});
+ fs.writeFileSync(libraryFile,library);
+ fs.writeFileSync(onlineFile,online);
+ fs.mkdirSync(path.join(root,'cache'));
+ fs.mkdirSync(path.join(root,'logs'));
+ fs.writeFileSync(path.join(root,'MeguLit.exe'),'inert launcher fixture');
+ fs.writeFileSync(path.join(root,'data','config','owner-tests.json'),JSON.stringify({
+  schema:'megulit.owner-tests',version:1,root,entries:[{
+   id:'neutral-fixture',engine:'kirikiri',exe:f.exe,sha256:f.identity.exe,
+   files:[{path:'data.xp3',bytes:fs.statSync(f.script).size,sha256:f.identity.script}],
+   draw:{roles:true},capabilities:['roles']
+  }]
+ }));
+ const prior=process.env;
+ process.env=launcher.environment(root,prior);
+ const live=require('../services/self-check-live.cjs');
+ t.after(async()=>{live.stop();await R.stop(root);process.env=prior;});
+ const started=await launcher.launch(root,{spawnProcess:(exe,args,{cwd,env})=>{
+  assert.equal(exe,path.join(root,'MeguLit.exe'));
+  assert.deepEqual(args,[]);
+  assert.equal(cwd,root);
+  process.env=env;
+  const child=new (require('node:events').EventEmitter)();
+  queueMicrotask(()=>child.emit('spawn'));
+  return child;
+ }});
+ assert.equal(started.preparedEntries,1);
+ assert.equal(owner.privateMode(root),true);
+ const reviewFile=require.resolve('../services/torch-review-keys.json'),read=fs.readFileSync;
+ t.mock.method(fs,'readFileSync',(file,...args)=>file===reviewFile?JSON.stringify({keys:f.keys.reviewKeys}):read(file,...args));
+ const relay=require('../services/relay-config.cjs'),calls=[];
+ assert.deepEqual(relay.endpoints(root,'/api/diagnostics'),[]);
+ const profile=f.publisher.sign({...f.profile(2),settings:{placement:{lineOffsetY:77}}});
+ const signed=f.publisher.sign({...f.release,profile,review:await f.review(profile)});
+ const publication={hash:await P.hash(signed),at:f.publication.at};
+ let phase='offline';
+ const notFound=()=>Response.json({ok:false,error:'NOT_FOUND'},{status:404});
+ t.mock.method(globalThis,'fetch',async(url,request)=>{
+  const target=new URL(url);
+  const release=target.pathname==='/api/torch-release';
+  assert.ok(release||target.pathname==='/api/game-profile');
+  assert.ok([relay.CN_RELAY_BASE,relay.DEFAULT_RELAY_BASE].includes(target.origin));
+  assert.deepEqual([...target.searchParams],[['exe',f.identity.exe]]);
+  assert.equal(request.method,'GET');
+  assert.equal(request.redirect,'error');
+  assert.equal(request.body,undefined);
+  assert.equal(request.headers.authorization,undefined);
+  calls.push([target.origin,target.pathname]);
+  if(phase==='offline'){
+   if(target.origin===relay.CN_RELAY_BASE)throw new TypeError('fixture connection refused');
+   return new Response('edge error page',{status:404});
+  }
+  if(phase==='missing')return notFound();
+  if(phase==='legacy')return release?notFound():reply({
+   schema:'megulit.game-diff-feed',version:2,key:f.identity.exe,
+   versionLayer:{match:'exe',key:f.identity.exe,diff:f.profile()},
+   gameLayer:{match:'title',key:'unrelated'},credit:{torchNo:999}
+  });
+  if(target.origin===relay.CN_RELAY_BASE)return new Response(null,{status:503});
+  return reply({release:signed,publication});
+ });
+ const {dispatch}=require('../services/bridge.cjs');
+ const imported=await dispatch({action:'save_game',title:'Neutral import fixture',executable:f.exe});
+ const id=imported.id,dbFile=path.join(root,'data');
+ async function settled(){
+  const end=Date.now()+3000;
+  while(Date.now()<end){
+   const s=R.status(root,id);
+   if(s&&s.state!=='installing')return dispatch({action:'first_player',id,poll:true});
+   await new Promise(r=>setTimeout(r,10));
+  }
+  assert.fail('ordinary import did not finish torch lookup');
+ }
+ assert.equal((await settled()).code,'TORCH_RELAY_UNAVAILABLE');
+ assert.deepEqual(calls.map(([,route])=>route),['/api/torch-release','/api/torch-release']);
+ assert.equal(fs.existsSync(f.cache()),false);
+ async function reimport(next){
+  await R.stop(root);
+  R.resume(root);
+  phase=next;
+  const prev=R.status(root,id);
+  await dispatch({action:'save_game',id,title:'Neutral import fixture',executable:f.exe});
+  for(let i=0;i<300&&R.status(root,id)===prev;i++)await new Promise(r=>setTimeout(r,10));
+  assert.notEqual(R.status(root,id),prev);
+  return settled();
+ }
+ assert.equal((await reimport('missing')).state,'not-published');
+ assert.equal(fs.existsSync(f.cache()),false);
+ const legacy=await reimport('legacy');
+ assert.equal(legacy.state,'received');
+ assert.equal(legacy.receipt.credit,null);
+ assert.equal(legacy.receipt.serverTime,null);
+ assert.equal(legacy.receipt.cardinalRev,null);
+ assert.equal(feed.cached(root,f.identity.exe).gameLayer,undefined);
+ const latest=await reimport('release');
+ assert.equal(latest.state,'received');
+ assert.equal(latest.receipt.hash,publication.hash);
+ assert.equal(latest.receipt.serverTime,publication.at);
+ const db=require('../services/store.cjs').openStore(root);
+ let game;
+ try{game=db.prepare('SELECT * FROM games WHERE id=?').get(id);}finally{db.close();}
+ const applied=[];
+ const {Reader}=require('../services/reader.cjs');
+ Reader.prototype.applyGameProfile.call({root,gameExe:f.exe,gal:{setGameProfile:p=>applied.push(p)}},f.exe,game);
+ assert.equal(applied.at(-1)?.placement.lineOffsetY,77);
+ assert.equal(live.choose(live.current()).from,'official');
+ assert.equal(feed.sharing(root),false);
+ assert.equal((await dispatch({action:'first_player_share'})).on,false);
+ assert.equal((await feed.report(root,{})).state,'skipped');
+ assert.equal((await feed.reportScore(root,{schema:'megulit.cardinal-score',key:f.identity.exe})).state,'skipped');
+ assert.equal(fs.readFileSync(libraryFile,'utf8'),library);
+ assert.equal(fs.readFileSync(onlineFile,'utf8'),online);
+ assert.equal(path.dirname(feed.dir(root)),dbFile);
+});

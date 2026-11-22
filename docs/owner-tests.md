@@ -65,6 +65,10 @@ The launcher must clear inherited provider credentials and old root overrides an
 This isolates MeguLit's data, settings, database, caches and logs
 It does not isolate an external game's saves, registry or Steam Cloud; the game catalog must state whether a game uses its existing save or a separately verified fixture
 
+The owner-test launcher enables read-only flame reception. Import a game or open its details to query the two official relay hosts. The queries send only the executable SHA-256 as game identity. The client verifies the signed release and local executable and script identity, then stores the result under the isolated root's `data/The Seed`. The legacy fallback accepts an exact signed executable profile with unknown publication time and source.
+
+For manual acceptance, use a game version with a known published release. Wait for the installed receipt in the game details, then launch from the isolated library and check the applied adaptation. Keep the isolated `logs/reader-host.log` if the profile differs. Both lookup routes must return the relay's `NOT_FOUND` response before the card says no adaptation is available. If the relay cannot answer, the card shows that the lookup failed and retries later.
+
 Limits are 1 MiB manifest, 128 entries, 16 resources per entry, 2 GiB per file and 4 GiB total including the executable
 Hashing uses at most two active file handles and 32 waiting hash operations, with 256 KiB buffers and a 45-second public deadline
 Hash work is asynchronous; cancellation, supersession or stop prevents a late result from authorizing anything

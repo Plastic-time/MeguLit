@@ -16,6 +16,9 @@ async function state(db,root,id,{wait=2500,fetcher=globalThis.fetch,hash,torchKe
  const receiver=require('./torch-receive.cjs'),pending=receiver.status(root,id);
  const receipt=await receiver.installed(root,key,{exe:row.executable,...(torchKeys?{keys:torchKeys}:{})});if(receipt)return {state:'received',key,receipt};
  if(pending?.key===key&&['installing','install-failed'].includes(pending.state))return {...pending,key};
+ if(require('../core/owner-tests.cjs').privateMode(root)){
+  return pending?.key===key&&pending.code==='TORCH_NOT_PUBLISHED'?{state:'not-published',key}:HIDDEN;
+ }
  let storedEngine=row.engine||'';try{storedEngine=JSON.parse(row.original||'{}').library?.engine||storedEngine;}catch{}
  const engine=engineKnown(storedEngine);
  let answer=feed.cached(root,key);
@@ -34,6 +37,6 @@ async function setCredit(db,root,id,name,{fetcher=globalThis.fetch,hash}={}){
  const feed=require('./auto-profile-feed.cjs'),key=(hash?await hash(row.executable):await require('../core/auto-profile.cjs').exeKey(root,row.executable))||'';
  return feed.setCredit(root,key,name,{fetcher});}
 /* the switch on the card: 共享适配 and the calibration upload (library.json sharedAdaptation + autoProfileShare) */
-function enableSharing(root){const f=path.join(root,'data','config','library.json');let lib={};try{lib=JSON.parse(fs.readFileSync(f,'utf8'))||{};}catch{}
+function enableSharing(root){if(require('../core/owner-tests.cjs').privateMode(root))return false;const f=path.join(root,'data','config','library.json');let lib={};try{lib=JSON.parse(fs.readFileSync(f,'utf8'))||{};}catch{}
  fs.mkdirSync(path.dirname(f),{recursive:true});const tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify({...lib,sharedAdaptation:true,autoProfileShare:true},null,2));fs.renameSync(tmp,f);return require('./auto-profile-feed.cjs').sharing(root);}
 module.exports={state,setCredit,enableSharing,engineKnown};
