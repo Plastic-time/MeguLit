@@ -26,11 +26,14 @@ public static class GameCapture{
  // Proven: BitBlt has shown this window's picture. Blind: BitBlt keeps giving a blank picture while the screen shows
  // the game, so only PrintWindow can read it. Votes: screen checks in a row that said "blind".
  // #714 review (pictures delivered out of order): readers run in parallel and read outside Gate, so a reader can come back
- // with an older picture after another reader delivered a newer one. Every read takes a ticket (NextTicket) under Gate before
- // it reads; a picture is delivered, and changes what the window is known to show (Prove, a new round, Keep's print), only
- // with a ticket newer than the last one delivered (Accepted), checked and recorded in the same lock. An overtaken read is
- // Skipped and changes nothing. Round and VoteId only say which freeze vote is current: a vote counts for its round when no
- // newer vote started, whichever read delivers. Dropped: Drop() removed this window; reads still under way change nothing.
+ // with an older picture after another reader changed what the window is known to show. Every read takes a ticket
+ // (NextTicket) under Gate before it reads. Accepted is the ticket of the last read that changed it: a new round (another
+ // signature), a freeze, a kept print. A read whose ticket is not newer than that was overtaken: it is Skipped and changes
+ // nothing, so an old picture never starts a round, clears a newer baseline or is delivered after it. Reads that only
+ // confirm the current picture (the same signature, a part, a blank picture, the screen, a blind print) are checked the same
+ // way but do not move Accepted: readers in parallel (the wait marker's part every frame, a slower whole read for a saved
+ // picture) do not void each other, and ProvenAt never moves back. Round and VoteId only say which freeze vote is current: a
+ // vote counts for its round when no newer vote started. Dropped: Drop() removed this window; reads under way change nothing.
  sealed class Choice{public bool Proven,Blind,Dropped;public int Votes;public DateTime Printed,ProvenAt;public bool HasSig,Frozen;public int Sig,Round,VoteId,FrozenVotes;public long NextTicket,Accepted;public DateTime SigAt,VoteAfter;public int[] Screen;public Bitmap Last;public DateTime LastAt;}
  // 2026-11-21 (user, Aokana: 「画面都切换了译文还存在上一句」): a Unity window gave BitBlt one old picture for the whole session
  // (not blank, so it counted as proven) while the screen showed the game moving on; every scene and box check compared that
@@ -48,8 +51,9 @@ public static class GameCapture{
  static long TakeTicket(IntPtr hwnd,out Choice c){
   lock(Gate){if(!Choices.TryGetValue(hwnd,out c)){if(Choices.Count>16)Drop();c=new Choice();Choices[hwnd]=c;}return ++c.NextTicket;}
  }
- static bool AcceptTicket(IntPtr hwnd,Choice c,long ticket){
-  lock(Gate){Choice cur;if(c.Dropped||!Choices.TryGetValue(hwnd,out cur)||cur!=c||ticket<=c.Accepted)return false;c.Accepted=ticket;return true;}
+ // A read that changes nothing may be delivered: the window is still this one and nothing changed it since the ticket.
+ static bool Current(IntPtr hwnd,Choice c,long ticket){
+  lock(Gate){Choice cur;return !c.Dropped&&Choices.TryGetValue(hwnd,out cur)&&cur==c&&ticket>c.Accepted;}
  }
  static void Release(Choice c){if(c.Last!=null){c.Last.Dispose();c.Last=null;}}
  // PrintWindow with PW_RENDERFULLCONTENT makes a DirectX game present an extra frame, seen as a whole black or white
@@ -96,7 +100,7 @@ public static class GameCapture{
  }
  // A blank BitBlt picture is delivered only for a window BitBlt has shown and that is not frozen, with a ticket not overtaken.
  static bool KeepBlank(IntPtr hwnd,Choice c,long ticket){
-  lock(Gate){Choice cur;if(c.Dropped||!Choices.TryGetValue(hwnd,out cur)||cur!=c||!c.Proven||c.Frozen||ticket<=c.Accepted)return false;c.Accepted=ticket;return true;}
+  lock(Gate){Choice cur;return !c.Dropped&&Choices.TryGetValue(hwnd,out cur)&&cur==c&&c.Proven&&!c.Frozen&&ticket>c.Accepted;}
  }
  // screenFallback: some DirectX/Unity windows give a blank picture to both BitBlt and PrintWindow (style sync then saw
  // "ocrLines=0"). Only callers that hide MeguLit's own text first (style measurement) may read the screen instead: it
@@ -116,9 +120,9 @@ public static class GameCapture{
  }
  static bool DeliverPrint(IntPtr hwnd,Choice c,long ticket,Bitmap image,bool printed,bool good,bool frozen,bool screenFallback){
   switch(AfterPrint(printed,good,frozen,screenFallback)){
-   case 1:if(frozen?Keep(hwnd,c,ticket,image):AcceptTicket(hwnd,c,ticket))return true;Skipped=true;return false;
+   case 1:if(frozen?Keep(hwnd,c,ticket,image):Current(hwnd,c,ticket))return true;Skipped=true;return false;
    case 0:Skipped=true;return false;
-   case 2:if(printed&&!AcceptTicket(hwnd,c,ticket)){Skipped=true;return false;}return printed;
+   case 2:if(printed&&!Current(hwnd,c,ticket)){Skipped=true;return false;}return printed;
   }
   FromScreen=true;return ScreenInto(hwnd,image);
  }
@@ -152,9 +156,9 @@ public static class GameCapture{
  // 0: BitBlt the part (the whole picture is proven and not frozen). 1: skip this round (frozen and its print is not due:
  // a whole-window read would only BitBlt the frozen picture again, 16-33 times a second). 2: read the whole window (Into).
  static int PartRoute(Choice c,DateTime now){if(c.Frozen)return (now-c.Printed).TotalMilliseconds<PrintGapMs?1:2;return c.Proven&&!c.Blind?0:2;}
- // Checks in the lock that the window was not dropped, replaced, frozen, marked blind, or overtaken by a newer ticket during BltPart.
+ // Checks in the lock that the window was not dropped, replaced, frozen, marked blind, or overtaken (a new round) during BltPart.
  static bool KeepPart(IntPtr hwnd,Choice c,long ticket,bool blank,DateTime now){
-  lock(Gate){Choice cur;if(c.Dropped||!Choices.TryGetValue(hwnd,out cur)||cur!=c||c.Frozen||c.Blind||!c.Proven||ticket<=c.Accepted)return false;c.Accepted=ticket;if(!blank)c.ProvenAt=now;return true;}
+  lock(Gate){Choice cur;if(c.Dropped||!Choices.TryGetValue(hwnd,out cur)||cur!=c||c.Frozen||c.Blind||!c.Proven||ticket<=c.Accepted)return false;if(!blank&&now>c.ProvenAt)c.ProvenAt=now;return true;}
  }
  [ThreadStatic]static Bitmap ScratchBitmap;
  static Bitmap Scratch(int w,int h){var b=ScratchBitmap;if(b==null||b.Width!=w||b.Height!=h){if(b!=null)b.Dispose();b=ScratchBitmap=new Bitmap(w,h,PixelFormat.Format32bppArgb);}return b;}
@@ -225,9 +229,9 @@ public static class GameCapture{
  static double Apart(int[] a,int[] b){int n=0,open=0;for(int i=0;i<a.Length;i++){if(a[i]<0||b[i]<0)continue;open++;if(Math.Abs((a[i]&255)-(b[i]&255))+Math.Abs((a[i]>>8&255)-(b[i]>>8&255))+Math.Abs((a[i]>>16&255)-(b[i]>>16&255))>72)n++;}return open*2<a.Length?-1:n/(double)open;}
  // Calibration only: after the renderer acknowledges its reader/menu are hidden, prefer what the user actually sees.
  public static bool ScreenInto(IntPtr hwnd,Bitmap image){
-  Choice c;long ticket=TakeTicket(hwnd,out c);
+  Skipped=false;Choice c;long ticket=TakeTicket(hwnd,out c);
   if(!ScreenBlt(hwnd,image))return false;
-  if(AcceptTicket(hwnd,c,ticket))return true;Skipped=true;return false;
+  if(Current(hwnd,c,ticket))return true;Skipped=true;return false;
  }
  static bool ScreenBlt(IntPtr hwnd,Bitmap image){
   if(Busy(hwnd))return false;
@@ -267,7 +271,7 @@ public static class GameCapture{
    if(c.Dropped||ticket<=c.Accepted)return 2;
    if(!c.HasSig||sig!=c.Sig){c.HasSig=true;c.Sig=sig;c.Round++;c.SigAt=now;c.Frozen=false;c.FrozenVotes=0;c.VoteAfter=DateTime.MinValue;c.Screen=null;Release(c);Prove(c,now);c.Accepted=ticket;return 0;}
    if(c.Frozen)return 1;
-   if((now-c.SigAt).TotalMilliseconds<FreezeMs||now<c.VoteAfter){Prove(c,now);c.Accepted=ticket;return 0;}
+   if((now-c.SigAt).TotalMilliseconds<FreezeMs||now<c.VoteAfter){Prove(c,now);return 0;}
    c.VoteAfter=now.AddMilliseconds(FreezeVoteGapMs);round=c.Round;voteId=++c.VoteId;
   }
   int v=vote(round,voteId);
@@ -275,15 +279,14 @@ public static class GameCapture{
    /* the vote belongs to its round and is the newest one: another reader saw a new picture or started a newer vote meanwhile, so leave that state intact */
    if(c.Dropped||c.Round!=round||c.VoteId!=voteId)return 2;
    if(c.Frozen)return 1;
-   if(v>0){if(++c.FrozenVotes>=3){c.Frozen=true;c.Proven=false;return 1;}}else if(v<0){c.FrozenVotes=0;c.VoteAfter=now.AddMilliseconds(FreezeIdleMs);}
+   /* nothing moved Accepted since this read's ticket: a new round or a freeze changes Round or VoteId, a kept print needs Frozen */
+   if(v>0){if(++c.FrozenVotes>=3){c.Frozen=true;c.Proven=false;c.Accepted=ticket;return 1;}}else if(v<0){c.FrozenVotes=0;c.VoteAfter=now.AddMilliseconds(FreezeIdleMs);}
    else c.VoteAfter=now.AddMilliseconds(FreezeUnsureMs);
-   /* the vote counts, but a newer read of the same picture was delivered while it ran: this older picture is not delivered after it */
-   if(ticket<=c.Accepted)return 2;
-   Prove(c,now);c.Accepted=ticket;
+   Prove(c,now);
   }
   return 0;
  }
- static void Prove(Choice c,DateTime at){c.Proven=true;c.Blind=false;c.Votes=0;c.ProvenAt=at;}
+ static void Prove(Choice c,DateTime at){c.Proven=true;c.Blind=false;c.Votes=0;if(at>c.ProvenAt)c.ProvenAt=at;}
  // Any change of the picture changes this (about 6000 sampled pixels).
  static int Signature(Bitmap image){
   int w=image.Width,h=image.Height;unchecked{int s=(int)2166136261;
@@ -315,11 +318,25 @@ public static class GameCapture{
   // in-order BitBlt: A delivers then B delivers, both accepted
   long t1=tick(ord);Skipped=false;if(!AcceptBlt(ord,t1,3,t.AddMilliseconds(300),differs,out fA)||fA||Skipped||ord.Sig!=3||ord.Accepted!=t1)return false;
   long t2=tick(ord);Skipped=false;if(!AcceptBlt(ord,t2,4,t.AddMilliseconds(400),differs,out fB)||fB||Skipped||ord.Sig!=4||ord.Accepted!=t2)return false;
-  // a newer read of the same picture is delivered while A's freeze vote runs: A's vote still counts (readers that poll often
-  // must not keep every vote from counting), but A's older picture is not delivered after the newer one
-  var during=new Choice();Stale(during,tick(during),1,t,differs);long dA=tick(during),dB=0;
-  Func<int,int,int> overtaken=(_,__)=>{dB=tick(during);if(Stale(during,dB,1,t.AddMilliseconds(3150),differs)!=0)return 0;return 1;};
-  if(Stale(during,dA,1,t.AddMilliseconds(3100),overtaken)!=2||during.FrozenVotes!=1||during.Accepted!=dB||during.ProvenAt!=t.AddMilliseconds(3150))return false;
+  // a newer read of the same picture is delivered while A's freeze vote runs: readers that only confirm the picture do not
+  // void each other, so A's vote counts and A's picture (the same one) is delivered too; ProvenAt does not move back
+  var during=new Choice();Stale(during,tick(during),1,t,differs);long dStart=during.Accepted,dA=tick(during);
+  Func<int,int,int> overtaken=(_,__)=>{if(Stale(during,tick(during),1,t.AddMilliseconds(3150),differs)!=0)return 0;return 1;};
+  if(Stale(during,dA,1,t.AddMilliseconds(3100),overtaken)!=0||during.FrozenVotes!=1||during.Accepted!=dStart||during.ProvenAt!=t.AddMilliseconds(3150))return false;
+  // many slow whole reads and a part read every frame on another thread: none of them voids the others (#714 review: the wait
+  // marker's part read must not leave a saved picture without its picture)
+  {var par=new Choice();var pk2=new IntPtr(-81);lock(Gate)Choices[pk2]=par;
+   try{Stale(par,tick(par),1,t,differs);long slowRead=tick(par);
+    for(int i=0;i<5;i++)if(!KeepPart(pk2,par,tick(par),false,t.AddMilliseconds(100+i)))return false;
+    if(Stale(par,tick(par),1,t.AddMilliseconds(200),differs)!=0||Stale(par,slowRead,1,t.AddMilliseconds(210),differs)!=0)return false;
+    // ...but once a new picture started a round, a read with an older ticket is skipped, whatever it carries
+    long old=tick(par);if(Stale(par,tick(par),2,t.AddMilliseconds(300),differs)!=0||Stale(par,old,2,t.AddMilliseconds(310),differs)!=2||KeepPart(pk2,par,old,false,t.AddMilliseconds(320)))return false;}
+   finally{lock(Gate)Choices.Remove(pk2);}}
+  // a freeze changes what the window is known to show too: a read taken before it that comes back with another picture is
+  // skipped, it does not start a round and unfreeze the window
+  {var fz=new Choice();Stale(fz,tick(fz),1,t,differs);long beforeFreeze=tick(fz);
+   foreach(int ms in new[]{3100,3700,4300})Stale(fz,tick(fz),1,t.AddMilliseconds(ms),differs);
+   if(!fz.Frozen||Stale(fz,beforeFreeze,2,t.AddMilliseconds(4400),differs)!=2||!fz.Frozen||fz.Sig!=1)return false;}
   // a vote that comes back after another reader saw a new picture is stale (2): skipped, never delivered or printed
   var raced=new Choice();Stale(raced,tick(raced),3,t,differs);Func<int,int,int> late=(_,__)=>{Stale(raced,tick(raced),4,t.AddMilliseconds(3150),differs);return 1;};
   if(Stale(raced,tick(raced),3,t.AddMilliseconds(3100),late)!=2||raced.FrozenVotes!=0||raced.Sig!=4)return false;
@@ -388,10 +405,10 @@ public static class GameCapture{
    // in-order Part: A then B both accepted; blank does not update ProvenAt
    long p1=tick(pc);if(!KeepPart(pk,pc,p1,false,t.AddMilliseconds(200))||pc.ProvenAt!=t.AddMilliseconds(200))return false;
    long p2=tick(pc);if(!KeepPart(pk,pc,p2,true,t.AddMilliseconds(250))||pc.ProvenAt!=t.AddMilliseconds(200))return false;
-   // out-of-order Part: A takes ticket -> B takes ticket and delivers -> A arrives late and is rejected
+   // two parts of the same picture out of order: both delivered, ProvenAt never moves back
    long pA=tick(pc),pB=tick(pc);
    if(!KeepPart(pk,pc,pB,false,t.AddMilliseconds(270))||pc.ProvenAt!=t.AddMilliseconds(270))return false;
-   if(KeepPart(pk,pc,pA,false,t.AddMilliseconds(280))||pc.ProvenAt!=t.AddMilliseconds(270))return false;
+   if(!KeepPart(pk,pc,pA,false,t.AddMilliseconds(260))||pc.ProvenAt!=t.AddMilliseconds(270))return false;
    pc.Blind=true;if(KeepPart(pk,pc,tick(pc),false,t.AddMilliseconds(290)))return false;pc.Blind=false;
    long pBeforeNew=tick(pc);Stale(pc,tick(pc),2,t.AddMilliseconds(300),differs);
    if(KeepPart(pk,pc,pBeforeNew,false,t.AddMilliseconds(400))||pc.ProvenAt!=t.AddMilliseconds(300))return false;
@@ -402,10 +419,11 @@ public static class GameCapture{
    if(KeepPart(pk,pc,p3,false,t.AddMilliseconds(4900)))return false;
    lock(Gate)Drop();if(KeepPart(pk,pc2,tick(pc2),false,t.AddMilliseconds(5000)))return false;}
   finally{lock(Gate){Choices.Remove(pk);Release(pc);}}
-  // BltOnly's blank picture: B delivers first, older A is skipped; a window BitBlt has not shown or a frozen one gets nothing
+  // BltOnly's blank picture: a read taken before the round that proved the window is skipped, a later one delivered (and moves
+  // nothing); a window BitBlt has not shown or a frozen one gets nothing
   var bk=new IntPtr(-80);var bc=new Choice();lock(Gate)Choices[bk]=bc;
-  try{long bA=tick(bc);if(KeepBlank(bk,bc,tick(bc)))return false;Stale(bc,tick(bc),1,t,differs);
-   long bB=tick(bc);if(!KeepBlank(bk,bc,bB)||bc.Accepted!=bB||KeepBlank(bk,bc,bA)||bc.Accepted!=bB)return false;
+  try{long bA=tick(bc);if(KeepBlank(bk,bc,tick(bc)))return false;Stale(bc,tick(bc),1,t,differs);long bRound=bc.Accepted;
+   long bB=tick(bc);if(!KeepBlank(bk,bc,bB)||bc.Accepted!=bRound||KeepBlank(bk,bc,bA))return false;
    bc.Frozen=true;if(KeepBlank(bk,bc,tick(bc)))return false;}
   finally{lock(Gate)Choices.Remove(bk);}
   // ...and Part itself leaves such a window alone (a whole read would take a new picture of it: its signature and freeze change).
@@ -449,12 +467,12 @@ public static class GameCapture{
    // an unfrozen window skips delivery and keeps nothing even with a fresh ticket
    if(Stale(lk,tick(lk),3,t.AddMilliseconds(9000),differs)!=0||lk.Frozen)return false;
    Skipped=false;if(DeliverPrint(lateKey,lk,tick(lk),p,true,true,true,false)||!Skipped||lk.Last!=null)return false;
-   // out-of-order non-frozen (blind) PrintWindow: B delivers first, older A is skipped; newer C delivers
-   long bptA=tick(lk),bptB=tick(lk);
-   Skipped=false;if(!DeliverPrint(lateKey,lk,bptB,p,true,true,false,false)||Skipped||lk.Accepted!=bptB)return false;
-   Skipped=false;if(DeliverPrint(lateKey,lk,bptA,p,true,true,false,false)||!Skipped||lk.Accepted!=bptB)return false;
+   // non-frozen (blind) PrintWindow: a print started before a new round is skipped, one started after it is delivered
+   long bptA=tick(lk);if(Stale(lk,tick(lk),4,t.AddMilliseconds(9100),differs)!=0)return false;long bptB=tick(lk);
+   Skipped=false;if(!DeliverPrint(lateKey,lk,bptB,p,true,true,false,false)||Skipped)return false;
+   Skipped=false;if(DeliverPrint(lateKey,lk,bptA,p,true,true,false,false)||!Skipped)return false;
    // a dropped or replaced window skips delivery and keeps nothing
-   foreach(int ms in new[]{12100,12700,13300})Stale(lk,tick(lk),3,t.AddMilliseconds(ms),differs);
+   foreach(int ms in new[]{12100,12700,13300})Stale(lk,tick(lk),4,t.AddMilliseconds(ms),differs);
    if(!lk.Frozen)return false;
    var newer=new Choice{Frozen=true};lock(Gate)Choices[lateKey]=newer;
    Skipped=false;if(DeliverPrint(lateKey,lk,tick(lk),p,true,true,true,false)||!Skipped||lk.Last!=null||newer.Last!=null)return false;
