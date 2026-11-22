@@ -12,7 +12,7 @@ driver 使用同一清单复制配置，复制前、逐文件读取时、复制�
 
 ## 来源与边界
 
-- 脚本定位优先使用现有 torch release 的 exe/engine/scriptFile/script 摘要，其余复用原文引擎 `ENGINES[engine].sources`，不按最大压缩包猜脚本
+- 脚本集合始终使用原文引擎 `ENGINES[engine].sources` 的完整清单，torch release 的 exe/engine/scriptFile/script 只为清单内对应文件附加 expected hash，不能缩减集合；引擎没有可靠集合、集合为空或 locator 不在集合内时延期，不按最大压缩包猜脚本
 - 没有可靠来源、越界、reparse、输入过大或来源消失都会明确延期；不改变游戏适配数据，不写游戏文件或个人存档
 - 原始输入只在本地做哈希，proof 只含相对文件名、字节数、摘要、文件身份及公开作品上下文，不含脚本文本或配置值
 - 配置仅取 replay 使用的 JSON，跳过 secrets/account/credentials/token/API key/backup/temp/lock 等名称；auto-profiles 与旧 feed 子目录只取当前 exe 的文件，主数据库、学习记录和游戏存档不在清单中

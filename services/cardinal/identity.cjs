@@ -24,11 +24,14 @@ function configManifest(data,key){const entries=[];let total=0,visited=0;
  entries.sort((a,b)=>a.path.localeCompare(b.path));return {entries,digest:hashObject(entries)};
 }
 function scriptSources(root,game,engine){const dir=path.dirname(game.exe),cache=path.join(root,'data','The Seed',game.sha+'.json');
- if(fs.existsSync(cache)){const value=JSON.parse(checkedRead(cache,FILE_MAX).bytes.toString('utf8'));const identity=value.torchRelease?.review?.identity;
-  if(identity){if(identity.exe!==game.sha||identity.engine!==engine||!require('../../core/torch-release.cjs').identity(identity))fail('CARDINAL_IDENTITY_CANDIDATE');return [{file:path.join(dir,identity.scriptFile),expected:identity.script}];}}
  const sources=require('../original-engines/scenes.cjs').ENGINES[engine]?.sources;
  if(typeof sources!=='function')fail('CARDINAL_IDENTITY_NO_SCRIPT');
- const files=sources(dir);if(!Array.isArray(files)||!files.length||files.length>FILES_MAX)fail('CARDINAL_IDENTITY_NO_SCRIPT');return [...new Set(files.map(file=>path.resolve(file)))].map(file=>({file,expected:null}));
+ const files=sources(dir);if(!Array.isArray(files)||!files.length||files.length>FILES_MAX)fail('CARDINAL_IDENTITY_NO_SCRIPT');
+ const canonicalFile=file=>{noLinks(file);return fs.realpathSync(file);},all=[...new Set(files.map(canonicalFile))].map(file=>({file,expected:null}));
+ if(fs.existsSync(cache)){const value=JSON.parse(checkedRead(cache,FILE_MAX).bytes.toString('utf8'));const identity=value.torchRelease?.review?.identity;
+  if(identity){if(identity.exe!==game.sha||identity.engine!==engine||!require('../../core/torch-release.cjs').identity(identity))fail('CARDINAL_IDENTITY_CANDIDATE');
+   const file=canonicalFile(path.join(dir,identity.scriptFile)),entry=all.find(entry=>entry.file===file);if(!entry)fail('CARDINAL_IDENTITY_NO_SCRIPT');entry.expected=identity.script;}}
+ return all;
 }
 function capture({root,game,profile,source,seedRev,context={}}){noLinks(game.exe);const data=path.join(root,'data'),base=fs.realpathSync(path.dirname(game.exe));
  const scripts=scriptSources(root,game,profile.engine).map(({file,expected})=>{noLinks(file);return {path:relative(base,fs.realpathSync(file)),stamp:stamp(file),expected};}).sort((a,b)=>a.path.localeCompare(b.path));
