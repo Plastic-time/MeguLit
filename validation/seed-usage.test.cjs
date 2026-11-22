@@ -81,3 +81,30 @@ test('signed Torch usage rechecks the installed directory, scripts and live prof
  f.s.exe=f.s.input.exe=f.reader.gameExe=exe;f.s.key=f.identity.exe;f.s.prints={exe:f.identity.exe,script:f.identity.script};f.s.shared=feed.layer(feed.cached(f.root,f.s.key),f.s.key,{exe,torchTrust:f.keys});f.reader.gal.profile=Profiles.profileFor(live.inputOf(f.s));await usage.observe(f.reader,undefined,{fetcher:f.fetcher,now:100000});assert.equal(f.sent.length,1);assert.equal(f.sent[0].seedHash,sha(diff.canonical(profile)));
  fs.writeFileSync(path.join(folder,'data.xp3'),'changed script B');f.s.birth=f.reader.gameBirth=f.reader.gal.state.gameStarted='998877';await usage.observe(f.reader,undefined,{fetcher:f.fetcher,now:200000});assert.equal(f.sent.length,1);
 });
+test('local first-dialogue trials use Reader events and authenticated DOM pairs, independent of sharing',async t=>{
+ const {Reader}=require('../services/reader.cjs'),tape=require('../core/cardinal/tape.cjs');
+ const f=setup(t),r=Object.assign(Object.create(Reader.prototype),f.reader),events=[],records=[];
+ f.s.reader=r;f.s.ver='1.4.22';process.env.MEGULIT_RELAY_BASE='off';
+ Object.assign(r,{runtime:{config:()=>({}),services:()=>({gameEvent:async()=>{}}),emit(){}},
+  emit:(name,msg)=>events.push(msg),prefs:()=>({learnerLanguage:'zh'}),cardinalTarget:()=>'zh',embedCached:()=>null,
+  immersion:{source(){}},stats:{line(){}},logVisibility:m=>{if(m.kind==='torchLocalTrial')records.push(m);}});
+ const thread={id:'1',code:'HA',selected:true};Object.assign(r.gal,{preferences:{},hooks:{serial:1,state:{hookThreads:[thread]}},send(){},controller:{seq:10}});
+ const next=n=>{r.event({hookSource:'fixture line '+n,hookSequence:n,hookActive:true,processAttached:true});return events.at(-1).cardinalPair;};
+ assert.equal(records.length,0);const first=next(1);assert.equal(records.length,1);
+ assert.deepEqual(records[0].results,{read:'unknown',hide:'unknown',replace:'unknown',pointRead:'unknown'});
+ const policy=await r.message({type:'cardinalPairPolicy',schema:1,client:'dom-fixture',revision:1,target:'zh',enabled:true,visible:true});
+ const descriptor=policy.replies[0].args[0].descriptor;tape.liveTranslation(first.body,'fixture translation',{target:'zh'});
+ const feedback={...descriptor,type:'cardinalPair',enabled:true,visible:true,observed:true,paired:true,translation:'fixture translation'};
+ await r.message(feedback);await r.message(feedback);assert.equal(records.length,2);assert.equal(records.at(-1).results.replace,'passed');
+ r.event({type:'hookCheck',hookCheckState:'checking'});r.event({type:'hookCheck',hookCheckState:'visible'});
+ assert.equal(records.at(-1).results.hide,'failed');
+ await r.message({...descriptor,type:'lookupViewed',surface:'fixture',operationId:'fixture-view-1'});
+ assert.equal(records.at(-1).results.pointRead,'passed');
+ thread.id='2';await r.message(feedback);assert.equal(records.length,4);
+ const second=next(2);assert.equal(records.at(-1).index,1);assert.notEqual(first.episode,second.episode);
+ await r.message(feedback);assert.equal(records.at(-1).results.read,'unknown');
+ r.gal.controller.styleCalibration=true;r.event({gameStyleReveal:true});next(3);assert.equal(records.length,5);
+ r.gal.controller.styleCalibration=false;
+ for(let n=4;n<12;n++)next(n);assert.equal(records.at(-1).index,5);
+ const before=records.length;r.gameBirth='999';next(13);assert.equal(records.length,before);
+});

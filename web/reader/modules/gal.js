@@ -590,6 +590,19 @@
    syncOpenForm(applied); if(!options.preview)localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...preferences,translationPrompt:undefined,anchorDX:undefined,anchorDY:undefined})); if(options.preview)send({
    type:'galPreview',settings:preferences});else if(options.persist!==false)send({ type:'galConfigure', settings:preferences }); apply(); return { ...preferences };
    };
+  // Measure the current pair in CSS pixels, then convert the correction to the game's gap units.
+  bridge.calibratedTranslationGap = () => {
+    if(document.body.classList.contains('megulit-original-shown')||document.body.classList.contains('tome-style-probing'))return null;
+    const source=[...document.querySelectorAll('.sentence-text')].reverse().find(n=>n.getBoundingClientRect().height>0);
+    const pair=source?.closest('.tome-island-pair,.sentence-window');
+    const translation=pair?.querySelector('.tomoyo-cn-output');
+    if(!source?.textContent.trim()||!translation?.textContent.trim()||!translation.getBoundingClientRect().height||!(gameScale>0))return null;
+    const range=document.createRange();range.selectNodeContents(translation);
+    const translated=range.getBoundingClientRect();
+    range.selectNodeContents(source);const original=range.getBoundingClientRect();
+    if(!translated.height||!original.height)return null;
+    return Math.max(-28,Math.min(40,Math.round(preferences.gap+(original.bottom+2-translated.top)/gameScale)));
+  };
   bridge.galPreferences = () => ({ ...preferences });
   /* 2026-11-12 values the engine told us (its own font): applied and kept like a choice in the menu */
   bridge.enginePreferences=m=>{try{if(m&&m.values&&typeof m.values==='object')bridge.applyGalPreferences(m.values,{persist:true});}catch{}};

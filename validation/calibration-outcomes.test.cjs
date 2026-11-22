@@ -161,3 +161,16 @@ test('a stalled calibration restores hiding at its deadline, including a manual 
  const r=rig({engine:''});r.hook.preflight=true;r.hook.calibrating=true;r.hook.configure(r.control.host.preferences,r.control.host.state);assert.equal(r.hook.enabled,false);
  t.mock.timers.tick(2000);assert.equal(r.hook.preflight,false);assert.equal(r.hook.enabled,true);
 });
+test('saving the calibrated translation gap and its undo through Reader survives reopening the work',async t=>{
+ const {GameStyleSync}=require('../core/game-style-sync.cjs'),{Reader}=require('../services/reader.cjs');
+ const config=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'mgl-calibration-')),key='a'.repeat(64);
+ t.after(()=>fs.rmSync(config,{recursive:true,force:true}));
+ const open=()=>{const sync=new GameStyleSync({config},()=>{});sync.configure({},{gameProcessId:123,gameStarted:'1',gameStyleKey:key});return sync;};
+ const reader=Object.assign(Object.create(Reader.prototype),{active:()=>true,gal:{styleSync:open()},saveWorkPrompt(){}});
+ const original={japaneseSize:39,furigana:false,rubyScale:.61,hookHide:false,anchorDX:4,gap:15};
+ for(const gap of [15,-2,15]){
+  await reader.message({type:'gameStyleConfirm',key,part:'all',prefs:{...original,gap},saveId:String(gap)});
+  reader.gal.styleSync=open();
+  assert.deepEqual(reader.gal.styleSync.profile.prefs,{...original,gap});
+ }
+});

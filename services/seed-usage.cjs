@@ -14,7 +14,8 @@ function read(root){const file=fileOf(root);try{const st=fs.lstatSync(file);if(!
 function write(root,value){const bytes=JSON.stringify(value);if(Buffer.byteLength(bytes)>MAX_BYTES)throw Error('USAGE_STORE_LIMIT');const file=fileOf(root),tmp=file+'.'+process.pid+'.'+crypto.randomUUID()+'.tmp';fs.mkdirSync(path.dirname(file),{recursive:true});try{fs.writeFileSync(tmp,bytes,{flag:'wx'});fs.renameSync(tmp,file);}finally{try{fs.unlinkSync(tmp);}catch{}}}
 function current(reader,token){const state=reader.gal?.state;return reader.active?.()===true&&reader.root===token.root&&reader.gameExe===token.exe&&reader.gamePid===token.pid&&String(reader.gameBirth||'')===token.birth&&state?.bound===true&&Number(state.gameProcessId)===token.pid&&String(state.gameStarted||'')===token.birth&&reader.gal.profile===token.profile;}
 function tokenFor(reader){const state=reader.gal?.state,pid=Number(reader.gamePid),birth=String(reader.gameBirth||'');if(!reader.root||!reader.gameExe||!Number.isSafeInteger(pid)||pid<1||!/^[1-9]\d{0,29}$/.test(birth)||!state||!reader.gal.profile)return null;return {root:reader.root,exe:reader.gameExe,pid,birth,profile:reader.gal.profile};}
-function adopted(reader,token){if(!current(reader,token)||!permitted(token.root))return [];
+function adopted(reader,token){return permitted(token.root)?localDocuments(reader,token):[];}
+function localDocuments(reader,token=tokenFor(reader)){if(!token||!current(reader,token))return [];
  const live=require('./self-check-live.cjs'),s=live.current();if(!s||s.reader!==reader||s.exe!==token.exe||s.pid!==token.pid||s.birth!==token.birth||!HEX.test(s.key)||!['official','shared'].includes(s.from))return [];
  const input=live.inputOf(s),actual=reader.gal.profile,layers=String(actual.layers||'').split('+');if(layers.includes('stepdown')||layers.includes('owner-test')||diff.canonical(Profiles.profileFor(input))!==diff.canonical(actual))return [];
  const shared=feed.forExe(s.shared,s.key,token.exe);if(!shared?.exact||shared.match!=='exe')return [];
@@ -42,4 +43,4 @@ async function observe(reader,token=tokenFor(reader),options={}){if(!token||!cur
   if(changed)(options.save||write)(root,state);await flush(root,state,options);return {state:'recorded'};
  }).catch(()=>({state:'failed'}));queues.set(root,work);try{return await work;}finally{if(queues.get(root)===work)queues.delete(root);}}
 function note(reader){const token=tokenFor(reader);if(!token)return;const last=recent.get(reader),now=Date.now();if(last&&last.pid===token.pid&&last.birth===token.birth&&last.profile===token.profile&&now-last.at<RETRY_MS)return;if(scheduled.has(reader))return;scheduled.add(reader);setImmediate(()=>{scheduled.delete(reader);recent.set(reader,{...token,at:now});void observe(reader,token).catch(()=>{});});}
-module.exports={note,observe,adopted,read,fileOf,validEvent,ROUTE,MAX_BYTES,MAX_RECORDS};
+module.exports={localDocuments,note,observe,adopted,read,fileOf,validEvent,ROUTE,MAX_BYTES,MAX_RECORDS};

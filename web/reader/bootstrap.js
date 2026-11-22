@@ -86,7 +86,7 @@ try{
   await new Promise((resolve,reject)=>{const failed=error=>{removeEventListener('error',failed);reject(Error(name+': '+(error.message||'Script load failed')));};addEventListener('error',failed);script.onload=()=>{removeEventListener('error',failed);resolve();};script.onerror=failed;document.head.append(script);});
  }
  // Record actual opened cards separately from the original lookup implementation.
- const viewed=new WeakSet();new MutationObserver(()=>{for(const card of document.querySelectorAll('.tomoyo-selection-card')){if(viewed.has(card))continue;const surface=card.querySelector('.tomoyo-word-heading strong')?.textContent?.trim();if(surface){viewed.add(card);api('reader_message',{message:{type:'lookupViewed',surface,operationId:crypto.randomUUID()}}).catch(()=>{});}}}).observe(document.body,{childList:true,subtree:true});
+ const viewed=new WeakSet();new MutationObserver(()=>{for(const card of document.querySelectorAll('.tomoyo-selection-card')){if(viewed.has(card))continue;const surface=card.querySelector('.tomoyo-word-heading strong')?.textContent?.trim();if(surface){viewed.add(card);api('reader_message',{message:{type:'lookupViewed',surface,...window.__tomoyoChinese?.cardinalPair?.takeLookup(surface),operationId:crypto.randomUUID()}}).catch(()=>{});}}}).observe(document.body,{childList:true,subtree:true});
  await import('./word-status.js');installLearningNotice(window.__tomoyoChinese);loaded=true;for(const message of queued.splice(0))event(message);
  installHostRegions(message=>api('reader_message',{message}).catch(error=>{status.textContent=String(error);}));
  installGameUiScan(window.__tomoyoChinese);
