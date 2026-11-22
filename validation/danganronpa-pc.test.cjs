@@ -70,6 +70,10 @@ test('withdrawal clears only a source actually delivered by this engine',()=>{
  h.state.hookSourceOrigin='live';assert.equal(D.clear(h),false);assert.equal(out.length,1);
 });
 test('shared glue is an exact incremental transform and includes source/deferred/final gates',()=>{
- const source=hookSource(read('core/hook-native.cjs'));assert.equal((source.match(/danganronpa-pc-source\.cjs/g)||[]).length,4);assert.match(source,/cfg\.spikechunsoftInput===true/);
+ const {HookNative}=require('../core/hook-native.cjs'),source=read('core/hook-native.cjs');
+ assert.match(HookNative.prototype.start.toString(),/danganronpa-pc-source\.cjs'\)\.receive\(this,m,name\)/);
+ for(const method of ['source','deliverSource','emitSource'])assert.match(HookNative.prototype[method].toString(),/danganronpa-pc-source\.cjs'\)\.shouldBlock\(this,/);
+ assert.match(HookNative.prototype.setOwnerTestGrant.toString(),/danganronpa-pc-source\.cjs'\)\.clear\(this\)/);
+ assert.match(source,/cfg\.spikechunsoftInput===true/);
  assert.throws(()=>hookSource(source),/DR1_GLUE_ANCHOR/);assert.equal(ownerSource('const DRAW=new Set([\'roles\']);'),"const DRAW=new Set(['spikechunsoftInput','roles']);");
 });

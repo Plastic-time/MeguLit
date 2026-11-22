@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const Profiles=require('./profiles/index.cjs');
 const LIMITS=Object.freeze({manifest:1024*1024,entries:128,files:16,fileBytes:2*1024**3,totalBytes:4*1024**3,deadline:45000,preparedMs:60000});
-const DRAW=new Set(['roles','embed','embedTranslation','advhdInput','cmvsInput','fvpInput','minoriInput','kemcoSprites']);
+const DRAW=new Set(['spikechunsoftInput','roles','embed','embedTranslation','advhdInput','cmvsInput','fvpInput','minoriInput','kemcoSprites']);
 const CAPS=new Set(['roles','embed','diagnostic-input','lua-input']);
 const tokens=new WeakMap(),derived=new WeakMap(),current=new Map(),generations=new Map(),pending=new Map();let serial=0;
 const fold=p=>process.platform==='win32'?p.toLowerCase():p;

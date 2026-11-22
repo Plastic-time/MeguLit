@@ -4,8 +4,8 @@
 const NAME='DanganronpaPcText',ENGINE='spikechunsoft',ORIGIN='danganronpa-pc',AUTH=Symbol('DR1-PC-source');
 const sessions=new WeakMap();
 const tagged=m=>!!m&&(/^DanganronpaPc/.test(String(m.sourceName||''))||m.origin===ORIGIN||!!m[AUTH]);
-function allowed(h,owner){
- try{return h?.profile?.engine===ENGINE&&h.profile.draw?.spikechunsoftInput===true&&h.target?.pid>0&&
+function allowed(h,owner=ownerAPI()){
+ try{return h?.disposed!==true&&!h?.stopPending&&!h?.stopError&&h?.wanted!==false&&h?.profile?.engine===ENGINE&&h.profile.draw?.spikechunsoftInput===true&&h.target?.pid>0&&
   owner.allowed(h.ownerTestGrant,{exe:h.profileInput?.exe,engine:ENGINE,capability:'diagnostic-input'})===true&&
   owner.matches(h.ownerTestGrant,{pid:h.target.pid,birth:h.target.started})===true;}catch{return false;}
 }
@@ -26,6 +26,7 @@ function receive(h,m,name,owner=ownerAPI()){
 }
 function clear(h){
  if(h?.state?.hookSourceOrigin!==ORIGIN)return false;
- h.lastSource='';h.lastSourceAt=0;h.notify({hookSource:'',hookSpeaker:'',hookActive:false,receivedText:false,hookSourceOrigin:'danganronpa-revoked',hookSequence:(h.state.hookSequence||0)+1});return true;
+ h.lastSource='';h.lastSourceAt=0;try{h.notify({hookSource:'',hookSpeaker:'',hookActive:false,receivedText:false,hookSourceOrigin:'danganronpa-revoked',hookSequence:(h.state.hookSequence||0)+1});return true;}
+ catch{try{h.trace?.('Danganronpa private source clear notification failed');}catch{}return false;}
 }
-module.exports={NAME,ENGINE,ORIGIN,receive,shouldBlock,allowed,clear};
+module.exports={NAME,ENGINE,ORIGIN,tagged,receive,shouldBlock,allowed,clear};
