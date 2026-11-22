@@ -53,11 +53,11 @@ async function main(){
    await mouse('mouseMoved',end,button,mask);
    await mouse('mouseReleased',end,button,0);
   }
-  await drag('middle',4,380,890);
+  await drag('right',2,380,890);
   await wait('heading()[0]>.8');
   await evaluate('hall.resetView()');
   await wait('heading()[2]<-.95');
-  await drag('right',2,380,780);
+  await drag('middle',4,380,780);
   await wait('Math.abs(heading()[0])>.1&&Math.abs(heading()[0])<.35');
   await evaluate('hall.resetView()');
   await wait('heading()[2]<-.95');
@@ -70,7 +70,7 @@ async function main(){
    const meadow=object('Meadow grass');
    return {tier:hall.tier,baked:d.ao.baked,roof:wall.geometry.boundingBox.max.y,grass:meadow.count,
     opacity:glass.opacity,seeThrough:glass.transparent&&!glass.depthWrite,
-    badge:!!object('Megumin eyepatch')&&!!object('Eyepatch gold cross')&&!!object('Eyepatch strap'),
+    friezeCount:d.scene.getObjectsByProperty('name','Plinth carved frieze').length,
     relief:[frieze.map.image.width,frieze.map.image.height,frieze.normalMap.image.width,frieze.normalMap.image.height],
     aniso:frieze.normalMap.anisotropy};
   })()`);
@@ -79,7 +79,7 @@ async function main(){
   assert.ok(facts.roof<24);
   assert.ok(facts.grass>0&&facts.grass<=(tier==='low'?800:1760));
   assert.equal(facts.opacity,.65);
-  assert.ok(facts.seeThrough&&facts.badge);
+  assert.ok(facts.seeThrough&&facts.friezeCount===2);
   const relief=tier==='low'?[2048,256]:[4096,512];
   assert.deepEqual(facts.relief,[...relief,...relief]);
   assert.equal(facts.aniso,tier==='low'?4:16);
@@ -123,7 +123,7 @@ async function main(){
    fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(photo.data,'base64'));
   }
   const width=await evaluate('canvas.clientWidth');
-  const turn=()=>drag('middle',4,70,Math.round(70+Math.PI*width/4));
+  const turn=()=>drag('right',2,70,Math.round(70+Math.PI*width/4));
   await turn();await wait('heading()[2]>.97');
   await evaluate(`for(let i=0;i<100;i++)canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:-120,bubbles:true,cancelable:true}));true`);
   await wait('d.camera.position.z>420');
@@ -150,7 +150,7 @@ async function main(){
    await capture(period+'-portal',JSON.stringify([[0,5.5,72],[0,6,39]]));
    await capture(period+'-meadow',JSON.stringify([[25,2,11],[17,1.8,19]]));
    await capture(period+'-plinth-oblique',JSON.stringify([[6.4,1.57,3.3],[4.2,1.25,.44]]));
-   await capture(period+'-badge',JSON.stringify([[.68,1.58,2.22],[0,1.23,.44]]));
+   await capture(period+'-plinth',JSON.stringify([[.68,1.58,2.22],[0,1.23,.44]]));
    await capture(period+'-default','null');
    await capture(period+'-cover','coverPose()');
    assert.ok(await evaluate(`d.sun.position.clone().sub(d.sun.target.position).normalize()
