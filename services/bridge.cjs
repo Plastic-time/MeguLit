@@ -739,8 +739,9 @@ async function dispatch(request,runtime=null) {
       case 'history':return db.prepare('SELECT s.*,g.title FROM reading_sessions s LEFT JOIN games g ON s.game_id=g.id ORDER BY s.started_at DESC LIMIT 500').all();
       case 'dialogue':return require('./history-view.cjs').dialogue(db);
       case 'update_check':return await require('./update.cjs').check(String(request.current||''),fetch,root);
+      case 'update_required_status':return require('./relay-gate.cjs').requiredStatus();
       case 'update_apply':return await require('./update.cjs').apply(root,String(request.current||''));
-      case 'update_start':{const u=require('./update.cjs');u.start(root,String(request.current||''));return u.status();}
+      case 'update_start':{const u=require('./update.cjs');u.start(root,String(request.current||''),fetch,{forceLatest:request.forceLatest===true});return u.status();}
       case 'update_status':return require('./update.cjs').status();
       case 'update_install':return await require('./update.cjs').install(root);
       /* 2026-11-15 adaptation contribution consent (services/adapter-contrib.cjs): the update card's 同意并下一步 / 不参与, the beta note */

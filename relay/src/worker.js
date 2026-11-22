@@ -36,6 +36,7 @@ import {seedAdminRoute,seedUsageRoute,seedAdminAuthorized} from './seed-admin.js
 import {retryJobs,ordinaryPolicyRoute} from './ordinary-seed.js';
 import {rosterOwner} from './torch-roster.js';
 import {monumentGet,monthsGet,findGet,meGet} from './torch-credit.js';
+import {updatePolicy,updateGuard} from './update-policy.js';
 
 /* requests per window; key prefix → [limit, seconds] */
 /* 2026-11-13 (user: 限制太大了; api.megulit.com answered 429 to a whole IP for over a minute): reads are loosened, writes,
@@ -62,10 +63,10 @@ function json(data,status=200,extra={}){return new Response(JSON.stringify(data)
 const fail=(error,status=400,extra)=>json({ok:false,error},status,extra);
 
 /* ---- rate limiting (fixed windows in D1) ----------------------------------------------------------------------- */
-async function releaseGet(which,env){
+async function releaseGet(which,env,forceRefresh=false){
  const now=Math.floor(Date.now()/1000);let row=null;try{row=await env.DB.prepare('SELECT body,fetched_at FROM release_cache WHERE which=?').bind(which).first();}catch{}
  const out=(body,age)=>new Response(body,{status:200,headers:{'content-type':'application/json; charset=utf-8','cache-control':'public, max-age=120','x-release-age':String(age)}});
- if(row&&now-row.fetched_at<600)return out(row.body,now-row.fetched_at);
+ if(!forceRefresh&&row&&now-row.fetched_at<600)return out(row.body,now-row.fetched_at);
  const fresh=await refreshRelease(env,which).catch(()=>null);if(fresh)return out(fresh,0);
  if(row)return out(row.body,now-row.fetched_at);
  return new Response(JSON.stringify({error:'RELEASE_UNAVAILABLE'}),{status:503,headers:{'content-type':'application/json; charset=utf-8'}});
@@ -266,12 +267,16 @@ const social={json,fail,readJSON,hit,sha256,authenticate,avatarsFor,signReview};
 export async function handle(request,env,now=new Date(),ctx=null){
  const url=new URL(request.url),cors=corsHeaders(request,env),path=url.pathname.replace(/\/+$/,'')||'/';
  if(request.method==='OPTIONS')return new Response(null,{status:Object.keys(cors).length?204:403,headers:cors});
+ /* Reject before rate-limit D1 writes, upload storage, issue forwarding and the usage pulse */
+ const rejected=await updateGuard(request,env,path,now.getTime());
+ if(rejected){for(const[k,v]of Object.entries(cors))rejected.headers.set(k,v);return rejected;}
  const ip=await clientKey(request,env);
  let response;
  try{
   refusedFor=0;
   if(!await overall(request,env,ip,now))response=fail('RATE_LIMITED',429);
   else if(path==='/api/health'&&request.method==='GET')response=json({ok:true,service:'megulit-relay'});
+  else if(path==='/api/update/policy'&&request.method==='GET'){try{response=json(await updatePolicy(env,now.getTime()));}catch{response=fail('RELEASE_UNAVAILABLE',503);}}
   else if(path==='/api/leaderboard')response=request.method==='POST'?await leaderboardPost(request,env,ip,now):request.method==='GET'?await leaderboardGet(url,env,ip,now):request.method==='DELETE'?await leaderboardDelete(request,url,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/leaderboard/avatar/appeal'&&request.method==='POST'){const who=await subjects(request,env,url.searchParams.get('id'),now);response=await hit(env,'appeal',who.primary||ip,now.getTime())?await avatarAppeal(request,env,who.primary,url,now):fail('RATE_LIMITED',429);}
   else if(/^\/api\/avatar\/[0-9a-f]{32}\/review$/.test(path)&&request.method==='GET')response=await hit(env,'diag-dl',ip,now.getTime())?await avatarReview(url,env,now):fail('RATE_LIMITED',429);
@@ -293,7 +298,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
   else if(path==='/api/forum'||path.startsWith('/api/forum/'))response=await forumRoute(request,env,ip,now,social,path);
   /* E461 (user: players in mainland China cannot reach api.github.com, so the update check failed) GitHub's release
      JSON for MeguLit only, cached 5 minutes at the edge; the app still checks the package against GitHub's digest */
-  else if(/^\/api\/release\/(latest|tags\/v\d+\.\d+\.\d+[a-z]?)$/.test(path)&&request.method==='GET')response=await hit(env,'release',ip,now.getTime())?await releaseGet(path.slice(13),env):fail('RATE_LIMITED',429);
+  else if(/^\/api\/release\/(latest|tags\/v\d+\.\d+\.\d+[a-z]?)$/.test(path)&&request.method==='GET')response=await hit(env,'release',ip,now.getTime())?await releaseGet(path.slice(13),env,/no-cache/i.test(request.headers.get('cache-control')||'')):fail('RATE_LIMITED',429);
   /* E415 每日 page (relay/src/daily.js) */
   else if(path==='/api/news'&&request.method==='GET')response=await hit(env,'daily',ip,now.getTime())?await newsGet(env,{json},now,url):fail('RATE_LIMITED',429);
   else if(/^\/api\/news\/img\/[0-9a-f]{32}$/.test(path)&&request.method==='GET')response=await hit(env,'daily-img',ip,now.getTime())?await imageGet(env,path.slice(14)):fail('RATE_LIMITED',429);

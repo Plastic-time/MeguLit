@@ -20,6 +20,9 @@ ORDINARY_PUBLIC_KEYS = '[{"id":"ordinary-windows-01","alg":"ed25519","publicKey"
 PROFILE_PUBLIC_KEYS = '[{"id":"seed-publisher-20261122","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAQUS2OCwp7pAFytVwXx/C5lU90TW4+BpJVB0NMx5Rw+U="}]'
 TORCH_RELEASE_PUBLIC_KEYS = '[{"id":"seed-publisher-20261122","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAQUS2OCwp7pAFytVwXx/C5lU90TW4+BpJVB0NMx5Rw+U="}]'
 CARDINAL_REVIEW_PUBLIC_KEYS = '[{"id":"seed-reviewer-20261122","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAGhFzVt5Ps4h3Mkv2Ei1SFT/BLHBP4U4Nok6cOSLBtcc="}]'
+FORCE_UPDATE_ENABLED = "false"
+# Enable only after 1.4.23 is published AND its cn-dl/dl mirrors are downloadable
+MIN_APP_VERSION_OVERRIDE = ""
 GITHUB_REPO = "ilynthn/MeguLit"
 LINK_DAYS = "30"
 # the website forms (src/feedback.js) post from these origins

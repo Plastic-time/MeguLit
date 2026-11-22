@@ -57,13 +57,12 @@ test('silent: the service marks a fitting small package as silent, a full packag
  u.reset();
 });
 
-test('silent: a hot update is applied without rendering the card, the done note is kept for after the reload',async()=>{
- const {checkForUpdates}=await notice();
- const svc=fakeService(),keep=memory();let rendered=0,job;
- const info=await checkForUpdates({api:async(a,b)=>a==='update_check'?{newer:true,silent:true,hot:true,current:'1.5.1',latest:'1.5.2',notes:'- 修复A'}:svc.api(a,b),invoke:svc.invoke,version:'1.5.1',
-  show:()=>{rendered++;},silent:(i,deps)=>{job=import('../web/update-notice.js').then(m=>m.silentHotUpdate(i,{...deps,sleep:async()=>{},busy:()=>'',keep:()=>keep}));}});
- assert.equal(info.silent,true);const r=await job;
- assert.equal(rendered,0,'no card');assert.deepEqual(r,{done:true});
+test('silent: the legacy hot-update helper keeps the done note for after the reload',async()=>{
+ const {silentHotUpdate}=await notice();
+ const svc=fakeService(),keep=memory();
+ const info={newer:true,silent:true,hot:true,current:'1.5.1',latest:'1.5.2',notes:'- 修复A'};
+ const r=await silentHotUpdate(info,{api:svc.api,invoke:svc.invoke,sleep:async()=>{},busy:()=>'',keep:()=>keep});
+ assert.deepEqual(r,{done:true});
  assert.deepEqual(svc.calls.filter(c=>c.startsWith('update_')),['update_start','update_status','update_install']);
  assert.deepEqual(svc.invokes,['hot_reload:dry','hot_reload'],'asks first, then restarts the service and reloads');
  assert.equal(JSON.parse(keep.getItem('megulit.hotUpdateDone')).version,'1.5.2');
@@ -170,7 +169,7 @@ test('1.4.23 startup checks updates without reading or recording adaptation cons
  };
  assert.deepEqual(await run(()=>({newer:false})),[]);
  assert.deepEqual(await run(()=>{throw Error('offline');}),[]);
- assert.deepEqual(await run(()=>({newer:true,silent:true})),['silent']);
+ assert.deepEqual(await run(()=>({newer:true,silent:true})),['full']);
  assert.deepEqual(await run(()=>({newer:true,silent:false})),['full']);
 });
 

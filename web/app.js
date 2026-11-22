@@ -34,11 +34,12 @@ import {aboutHTML,aboutLabel,mountAbout,VERSION} from './about.js';
 import {dailyLabel,mountDaily} from './daily-view.js';
 import {mountDevNotice,openGuide,openFeedback} from './feedback-ui.js';
 import {openAdaptationOverview,overviewLabel} from './adaptation-overview.js';
-import {checkForUpdates,showHotDone} from './update-notice.js';
+import {checkForUpdates,showHotDone,updateIsBlocking,updateIsRequired,afterStartupUpdate} from './update-notice.js';
 import {leaderboardLabel,mountLeaderboard,setView as setLeaderboardView} from './leaderboard-view.js';
 import {setForumFilter} from './forum-view.js';
 import {maybeFirstRun} from './first-run.js';
 let selectedGameId='',gameOrigin='library',selectedSeriesId='';
+let startupDialogsReady=false;
 /* 2026-11-13 the detail tab a page asked the game page to open on (学习 › 句子 书架 → 收录句子); used once */
 let gameTab='';
 import {renderSettings} from './settings.js';
@@ -352,7 +353,7 @@ function home(){
   homeSignature=signature;stopShelf();stopShelf=()=>{};
   renderHomeTV(main,{model,api,locale,esc,icon,number,duration,relativeTime,greeting,navigate,onLaunch:(id,button)=>startGame(id,button),onDetail:id=>gameDetail(id),
    onAdd:()=>editGame(),onGame:g=>paintGlow(g.cover||''),savePreferences:values=>api('save_preferences',{values}).catch(error=>toast(errorMessage(error)))});
-  maybeFirstRun({gamesCount:model.games.length,api,invoke,locale,esc,toast,onDone:()=>renderRoute()});
+  if(startupDialogsReady&&!updateIsBlocking())maybeFirstRun({gamesCount:model.games.length,api,invoke,locale,esc,toast,onDone:()=>renderRoute()});
 }
 const homeView=()=>route==='home'?pageToken:null;
 const refreshHomeActivity=createHomeRefresh({load:()=>{const target=document.querySelector('#home-activity'),date=target?.dataset.activityDate,range=target?.dataset.activityRange;
@@ -1409,12 +1410,19 @@ async function start(){
     const recovered={};for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(/^(tome|tomoyo)-/.test(key)&&!/key|token|secret|password/i.test(key))recovered[key]=localStorage.getItem(key);
      }
     await api('preserve_ui',{values:recovered});
-    model=await api('home');setAppearance();document.documentElement.classList.add('app-boot-pre');shell();await renderRoute();bootEntrance();
-    // Prepare the card while the native window is still hidden, including on throttled WebViews.
-    const canShow=()=>route==='home'&&!document.querySelector('dialog[open]');
-    mountDevNotice({api,locale,esc,toast,version:VERSION,canShow});
-    /* v1.1.0: look for a new release once per start; silent unless there is one */
-    if(!window.__megulitUpdateChecked){window.__megulitUpdateChecked=true;/* a silent hot update just reloaded this page: one line in the corner */setTimeout(()=>{try{showHotDone();}catch{}},900);setTimeout(()=>checkForUpdates({api,invoke,version:VERSION,toast}),4000);}
+    model=await api('home');setAppearance();document.documentElement.classList.add('app-boot-pre');shell();
+    /* P0: start the check immediately; the update owns the startup queue until it is dismissed */
+    if(!window.__megulitUpdateChecked){window.__megulitUpdateChecked=true;
+     const updates=checkForUpdates({api,invoke,version:VERSION,toast});
+     afterStartupUpdate(updates,{notice:()=>{showHotDone();return route==='home'?mountDevNotice({api,locale,esc,toast,version:VERSION,canShow:()=>route==='home'&&!document.querySelector('dialog[open]')}):null;},
+      ready:()=>{startupDialogsReady=true;if(route==='home')maybeFirstRun({gamesCount:model.games.length,api,invoke,locale,esc,toast,onDone:()=>renderRoute()});}
+     }).catch(()=>{startupDialogsReady=true;});
+     let showingRequired=false;
+     const timer=setInterval(async()=>{if(showingRequired||updateIsRequired())return;try{const policy=await api('update_required_status');if(!policy)return;showingRequired=true;
+      await checkForUpdates({api,invoke,version:VERSION,toast,requiredPolicy:policy});
+     }catch{}finally{showingRequired=false;}},3000);window.addEventListener('pagehide',()=>clearInterval(timer),{once:true});
+    }
+    await renderRoute();bootEntrance();
     const callback=window.__TAURI_INTERNALS__?.transformCallback(response=>{playHomeMotion(response.payload);if(response.payload==='hidden'&&pendingHomeGame){const id=pendingHomeGame;
      pendingHomeGame='';api('focus_game',{id}).catch(error=>toast(errorMessage(error)));}});if(callback)await invoke('plugin:event|listen',{event:'overlay-home',
      target:{kind:'Any'},handler:callback});const healthCallback=window.__TAURI_INTERNALS__?.transformCallback(response=>{const state=response.payload;if(state.ready)readerNotice('');

@@ -233,6 +233,7 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
   empty.hidden = !list.hidden; /* fillUpdates draws the browser cache before its first await */
   fillSeedCount(seed, locale, api);
   fillGuideLevel(dialog, { api, locale, esc }); /* the by-level part of the guide follows the chosen level */
+  return dialog;
 }
 
 /* E458 top bar 指南: everything from the start notice, any time (updates, the tutorial, a report, a game request) */
