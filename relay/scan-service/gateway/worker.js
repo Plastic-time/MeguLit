@@ -27,31 +27,35 @@ export default {
   const path=new URL(request.url).pathname;
   const scan=path==='/scan'&&request.method==='POST';
   const connect=path==='/connect'&&request.method==='GET'&&request.headers.get('upgrade')?.toLowerCase()==='websocket';
-  if(!scan&&!connect)return new Response(null,{status:404});
-  if(!await authorized(request,scan?env.PUBLISHER_TOKEN:env.CONNECTOR_TOKEN))return new Response(null,{status:401});
+  const health=path==='/health'&&request.method==='GET';
+  if(!scan&&!connect&&!health)return new Response(null,{status:404});
+  if(!await authorized(request,connect?env.CONNECTOR_TOKEN:env.PUBLISHER_TOKEN))return new Response(null,{status:401});
   return env.SCANNER.get(env.SCANNER.idFromName('ordinary')).fetch(request);
  }
 };
 export class OrdinaryScanner {
  constructor(state){this.state=state;this.pending=new Map();}
  async fetch(request){
-  if(request.method==='GET'){
+  const health=new URL(request.url).pathname==='/health';
+  if(request.method==='GET'&&!health){
    const [client,host]=Object.values(new WebSocketPair());
    for(const old of this.state.getWebSockets()){this.disconnect(old);old.close(1000,'reconnected');}
    this.state.acceptWebSocket(host);
    return new Response(null,{status:101,webSocket:client});
   }
   let doc;
-  try{doc=await readDocument(request);}catch{return new Response(null,{status:400});}
-  if(!doc)return new Response(null,{status:413});
+  if(!health){
+   try{doc=await readDocument(request);}catch{return new Response(null,{status:400});}
+   if(!doc)return new Response(null,{status:413});
+  }
   const [host]=this.state.getWebSockets();
-  if(!host||this.pending.size>=2)return unavailable();
+  if(!host||this.pending.size>=2)return health?Response.json({scanner:host?'busy':'offline'},{headers:{'cache-control':'no-store'}}):unavailable();
   const id=crypto.randomUUID();
   return new Promise(resolve=>{
    const finish=response=>{clearTimeout(timer);this.pending.delete(id);resolve(response);};
-   const timer=setTimeout(()=>finish(unavailable()),20000);
+   const timer=setTimeout(()=>finish(unavailable()),health?3500:20000);
    this.pending.set(id,{host,finish});
-   try{host.send(JSON.stringify({id,doc}));}catch{finish(unavailable());}
+   try{host.send(JSON.stringify(health?{id,health:true}:{id,doc}));}catch{finish(unavailable());}
   });
  }
  webSocketMessage(host,raw){

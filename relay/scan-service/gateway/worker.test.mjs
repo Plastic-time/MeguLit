@@ -18,6 +18,8 @@ test('scanner disconnect, authentication, request correlation and recovery',asyn
  assert.equal((await scan('{}',connector)).status,401);
  assert.equal((await connect(publisher)).status,401);
  assert.equal((await scan('{}')).status,503);
+ assert.deepEqual(await (await request('/health',publisher,{method:'GET'})).json(),{scanner:'offline'});
+ assert.equal((await request('/health',connector,{method:'GET'})).status,401);
  assert.equal((await scan('x'.repeat(4097))).status,413);
  const response=await connect(connector);
  assert.equal(response.status,101);

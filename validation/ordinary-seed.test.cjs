@@ -42,6 +42,7 @@ async function setup(t,{live=false}={}) {
   const db=database();
   db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0031_torch_changes.sql'),'utf8'));
   db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0033_ordinary_seeds.sql'),'utf8'));
+  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0038_ordinary_publish_policy.sql'),'utf8'));
   db.raw.exec('CREATE TABLE rate_limits(bucket TEXT PRIMARY KEY,count INTEGER,reset_at INTEGER)');
   t.after(()=>db.raw.close());
   const worker=await import('../relay/src/worker.js');
@@ -49,13 +50,15 @@ async function setup(t,{live=false}={}) {
   if(process.env.MEGULIT_TEST_WORKER_BUNDLE){
     const {Miniflare,convertV4MiniflareOptions}=require('../relay/node_modules/miniflare');
     const mf=new Miniflare(convertV4MiniflareOptions({modules:[{type:'ESModule',path:'worker.mjs',contents:fs.readFileSync(process.env.MEGULIT_TEST_WORKER_BUNDLE,'utf8')}],compatibilityDate:'2026-10-01',
-      bindings:env,d1Databases:['DB'],durableObjects:{SEED_NOTIFICATIONS:{className:'SeedNotifications',useSQLite:true}},outboundService:async r=>{
-        assert.equal(r.url,gateway);return fetch(gateway,{method:r.method,body:await r.arrayBuffer(),headers:{
+      bindings:{...env,ORDINARY_SCAN_URL:'https://scan.test/scan'},d1Databases:['DB'],durableObjects:{SEED_NOTIFICATIONS:{className:'SeedNotifications',useSQLite:true}},outboundService:async r=>{
+        if(r.url==='https://scan.test/health'&&r.method==='GET')return fetch(new URL('health',gateway),{headers:{authorization:r.headers.get('authorization')}});
+        assert.equal(r.url,'https://scan.test/scan');return fetch(gateway,{method:r.method,body:await r.arrayBuffer(),headers:{
           authorization:r.headers.get('authorization'),'content-type':r.headers.get('content-type')}});
       }}));
     t.after(()=>mf.dispose());store=await mf.getD1Database('DB');
     for(const row of db.raw.prepare("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY rowid").all())await store.prepare(row.sql).run();
     for(const row of db.raw.prepare('SELECT slot,name FROM torch_alias_pool').all())await store.prepare('INSERT INTO torch_alias_pool(slot,name) VALUES(?,?)').bind(row.slot,row.name).run();
+    await store.prepare('INSERT INTO ordinary_publish_policy VALUES(1,1,1,NULL)').run();
     await store.prepare('INSERT INTO torch_counter(id,total) VALUES(1,0)').run();
     socketBase=(await mf.ready).origin;
     fetcher=(url,init)=>mf.dispatchFetch(url,init);
@@ -87,6 +90,8 @@ async function setup(t,{live=false}={}) {
 test('player upload, scanner retry, quarantine, signature, offline install and signed revocation',async t=>{
   const {root,config,publicKey,request,fetcher,submit,find,store,retry,f,gateway}=await setup(t);
   if(process.env.MEGULIT_TEST_WORKER_BUNDLE){
+    const policy=await request('/api/seed-admin/ordinary-policy',{headers:{authorization:'Bearer '+f.env.ADAPTER_ADMIN_TOKEN}});
+    assert.equal(policy.status,200);assert.equal((await policy.json()).scanner,'online');
     const {checkGateway}=await import('../relay/check-ordinary.mjs');
     const vars={ORDINARY_SCAN_URL:gateway,ORDINARY_PUBLIC_KEYS:JSON.stringify([publicKey])};
     const receipt=await checkGateway(vars,[publicKey],config.ORDINARY_SCAN_TOKEN);
@@ -158,6 +163,7 @@ test('indeterminate receipts and untrusted publisher keys leave the job pending'
   const db=database();t.after(()=>db.raw.close());
   db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0031_torch_changes.sql'),'utf8'));
   db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0033_ordinary_seeds.sql'),'utf8'));
+  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0038_ordinary_publish_policy.sql'),'utf8'));
   const f=fixture(),thing=await jobs.enqueue(db,clean,new Date()),row=await db.prepare('SELECT * FROM ordinary_seed_jobs').first();
   const doc=ordinary.document(clean,thing.revision,row.issued_at);
   const signer=require('./helpers/torch-release.cjs').signer('ordinary-untrusted'),signed=signer.sign(doc);
@@ -261,4 +267,32 @@ test('private calibration publish wakes a second library, matches script and rep
     process.env.MEGULIT_OFFLINE='1';assert.equal((await feed.report(root,record)).state,'skipped');
     assert.deepEqual(relay.seedBases(root,'receive'),[]);
   }finally{await Promise.all(stops.map(stop=>stop?.()));sessions.stop();process.env=prior;}
+});
+
+test('policy pause fences in-flight scans across resume and keeps accepted uploads and published revisions',async t=>{
+ const {enqueue,processJob,retryJobs,ordinaryPolicyRoute}=await import('../relay/src/ordinary-seed.js');
+ const P=require('../core/torch-release.cjs'),signer=require('./helpers/torch-release.cjs').signer('ordinary-fixture');
+ const db=database();t.after(()=>db.raw.close());
+ for(const f of ['0031_torch_changes.sql','0033_ordinary_seeds.sql','0038_ordinary_publish_policy.sql'])db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations',f),'utf8'));
+ const env={DB:db,ORDINARY_SCAN_URL:'https://scanner.invalid/scan',ORDINARY_SCAN_TOKEN:'fixture',ORDINARY_PUBLIC_KEYS:JSON.stringify([signer.public])};
+ const h={json:x=>Response.json(x),fail:(error,status)=>Response.json({error},{status}),readJSON:async r=>({value:await r.json()})};
+ const change=(enabled,revision)=>ordinaryPolicyRoute(new Request('https://fixture/policy',{method:'POST',body:JSON.stringify({enabled,revision})}),env,new Date(),null,h);
+ const job=await enqueue(db,clean,new Date()),get=()=>db.raw.prepare('SELECT * FROM ordinary_seed_jobs WHERE id=?').get(job.id);
+ let entered,release,calls=0;const started=new Promise(r=>{entered=r;}),hold=new Promise(r=>{release=r;});
+ t.mock.method(global,'fetch',async(url,init)=>{
+  const doc=JSON.parse(init.body),signed=signer.sign(doc);if(++calls===1){entered();await hold;}
+  return Response.json({state:'clean',subject:await P.hash(doc),artifact:await P.hash(signed),signature:signed.signature,scanner:'ClamAV',version:'1.5.5',definitions:'1',scannedAt:new Date().toISOString()});
+ });
+ const inFlight=processJob(env,job.id);await started;
+ assert.equal((await change(false,1)).status,200);assert.equal(get().lease,null);
+ const other=await enqueue(db,{...clean,key:marker},new Date());
+ await Promise.all([retryJobs(env),processJob(env,other.id)]);assert.equal(calls,1);
+ assert.equal((await change(true,1)).status,409);assert.equal((await change(false,1)).status,200);
+ assert.equal((await change(true,2)).status,200);release();await inFlight;
+ assert.equal(get().state,'pending');assert.equal(db.raw.prepare('SELECT count(*) n FROM game_diffs').get().n,0);
+ await retryJobs(env);await retryJobs(env);assert.equal(get().state,'published');assert.equal(calls,3);
+ assert.equal(db.raw.prepare('SELECT count(*) n FROM torch_changes').get().n,2);
+ await change(false,3);const row=db.raw.prepare('SELECT * FROM game_diffs LIMIT 1').get();
+ assert.throws(()=>db.raw.prepare('UPDATE game_diffs SET rev=rev+1 WHERE game_key=?').run(row.game_key),/ORDINARY_PUBLISH_PAUSED/);
+ assert.equal(db.raw.prepare('SELECT count(*) n FROM game_diffs WHERE withdrawn_at IS NULL').get().n,2);
 });

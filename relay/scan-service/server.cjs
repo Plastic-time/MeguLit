@@ -34,13 +34,17 @@ async function scan(connection, bytes) {
   if (result === 'stream: OK') return 'clean';
   throw Error('indeterminate clamd reply');
 }
-async function inspect(doc, bytes, config) {
+async function scannerInfo(config) {
   const connection = {host:config.CLAMD_HOST || '127.0.0.1', port:Number(config.CLAMD_PORT || 3310)};
   const version = await command(connection, Buffer.from('zVERSION\0'));
   const match = /^ClamAV ([\d.]+)\/(\d+)\/(.+)$/.exec(version);
   const age = Date.now() - Date.parse(match?.[3]);
   if (!match || !Number.isFinite(age) || age < -3600000 || age > 7*86400000) throw Error('clamd definitions unavailable');
-  const receipt = {subject:hash(bytes), scanner:'ClamAV', version:match[1], definitions:match[2], scannedAt:new Date().toISOString()};
+  return {connection,version:match[1],definitions:match[2]};
+}
+async function inspect(doc, bytes, config) {
+  const {connection,version,definitions}=await scannerInfo(config);
+  const receipt = {subject:hash(bytes), scanner:'ClamAV',version,definitions,scannedAt:new Date().toISOString()};
   if (await scan(connection, bytes) === 'infected') return {...receipt,state:'infected'};
   if (!ordinary.keyId(config.ORDINARY_KEY_ID)) throw Error('publisher unavailable');
   const key = crypto.createPrivateKey(fs.readFileSync(config.ORDINARY_PRIVATE_KEY_FILE));
@@ -56,8 +60,10 @@ function server(config) {
   let active = 0;
   return http.createServer({requestTimeout:15000,headersTimeout:10000}, async (req,res) => {
     const send = (status,value) => { res.writeHead(status,{'content-type':'application/json','cache-control':'no-store'}); res.end(JSON.stringify(value)); };
-    if (req.method !== 'POST' || req.url !== '/scan') return send(404,{});
+    const health=req.method==='GET'&&req.url==='/health';
+    if (!health && (req.method !== 'POST' || req.url !== '/scan')) return send(404,{});
     if (!crypto.timingSafeEqual(auth,Buffer.from(hash(req.headers.authorization || '')))) return send(401,{});
+    if(health){try{await scannerInfo(config);return send(200,{scanner:'online'});}catch{return send(200,{scanner:'unready'});}}
     if (active >= 2) return send(503,{});
     active++;
     try {

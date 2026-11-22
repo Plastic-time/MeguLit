@@ -58,7 +58,8 @@ export async function scan(env, doc) {
 export async function processJob(env,id,now=new Date()) {
   const db = env.DB, time = Math.floor(now.getTime()/1000), lease = crypto.randomUUID();
   const row = await db.prepare(`UPDATE ordinary_seed_jobs SET lease=?,retry_at=?,retry_reason=NULL
-    WHERE id=? AND state='pending' AND retry_at<=? RETURNING *`).bind(lease,time+120,id,time).first();
+    WHERE id=? AND state='pending' AND retry_at<=? AND (SELECT enabled FROM ordinary_publish_policy WHERE id=1)=1
+    RETURNING *`).bind(lease,time+120,id,time).first();
   if (!row) return;
   try {
     const input = JSON.parse(row.candidate), doc = ordinary.document(input,row.revision,row.issued_at);
@@ -79,7 +80,8 @@ export async function processJob(env,id,now=new Date()) {
                (d.rev>=? OR (d.withdrawn_at IS NULL AND (d.source='official' OR NOT EXISTS
                  (SELECT 1 FROM ordinary_seed_jobs j WHERE j.game_key=d.game_key AND j.revision=d.rev AND j.state IN ('published','blocked')
                   AND json_extract(d.body,'$.signature.keyId') LIKE 'ordinary-%'))))) THEN 'superseded'
-        ELSE 'published' END, scan=?,profile_hash=? WHERE id=? AND lease=? AND state='pending'`)
+        ELSE 'published' END, scan=?,profile_hash=? WHERE id=? AND lease=? AND state='pending'
+          AND (SELECT enabled FROM ordinary_publish_policy WHERE id=1)=1`)
         .bind(result.hash,result.hash,...block.args,doc.key,doc.key,doc.rev,result.receipt,result.hash,id,lease),
       db.prepare(`INSERT INTO game_diffs(layer,game_key,source,body,rev,updated_at)
         SELECT 'version',?,'auto',?,?,? FROM ordinary_seed_jobs WHERE id=? AND lease=? AND state='published'
@@ -95,6 +97,39 @@ export async function processJob(env,id,now=new Date()) {
 }
 export async function retryJobs(env,now=new Date()) {
   if (!env.ORDINARY_SCAN_URL) return;
-  const rows = await env.DB.prepare("SELECT id FROM ordinary_seed_jobs WHERE state='pending' AND retry_at<=? ORDER BY retry_at,id LIMIT 2").bind(Math.floor(now.getTime()/1000)).all();
+  const rows = await env.DB.prepare("SELECT id FROM ordinary_seed_jobs WHERE state='pending' AND retry_at<=? AND (SELECT enabled FROM ordinary_publish_policy WHERE id=1)=1 ORDER BY retry_at,id LIMIT 2").bind(Math.floor(now.getTime()/1000)).all();
   await Promise.all(rows.results.map(row=>processJob(env,row.id,now)));
+}
+
+async function scannerState(env){
+  if(!env.ORDINARY_SCAN_URL||!env.ORDINARY_SCAN_TOKEN)return 'unconfigured';
+  try{
+    const url=new URL('health',env.ORDINARY_SCAN_URL);
+    if(url.protocol!=='https:'||url.username||url.password)return 'unknown';
+    const response=await fetch(url,{headers:{authorization:'Bearer '+env.ORDINARY_SCAN_TOKEN},redirect:'manual',signal:AbortSignal.timeout(4500)});
+    if(!response.ok){await response.body?.cancel();return 'unknown';}
+    const {value}=await boundedJSON(response,256);
+    return ['online','offline','busy','unready'].includes(value?.scanner)?value.scanner:'unknown';
+  }catch{return 'unknown';}
+}
+export async function ordinaryPolicyRoute(request,env,now,ctx,{json,fail,readJSON}){
+  const db=env.DB;
+  if(request.method==='POST'){
+    const body=await readJSON(request,512),v=body.value;
+    if(body.error||!v||typeof v.enabled!=='boolean'||!Number.isSafeInteger(v.revision)||v.revision<1||Object.keys(v).length!==2)return fail('INVALID_POLICY',400);
+    const change=await db.prepare('UPDATE ordinary_publish_policy SET enabled=?, revision=revision+1, changed_at=? WHERE id=1 AND revision=? AND enabled<>?')
+      .bind(+v.enabled,Math.floor(now.getTime()/1000),v.revision,+v.enabled).run();
+    if(!change.meta.changes){
+      const current=await db.prepare('SELECT enabled FROM ordinary_publish_policy WHERE id=1').first();
+      if(current?.enabled!==+v.enabled)return fail('REVISION_CONFLICT',409);
+    }else if(v.enabled&&ctx?.waitUntil)ctx.waitUntil(retryJobs(env,now));
+    return json({ok:true});
+  }
+  if(request.method!=='GET')return fail('METHOD_NOT_ALLOWED',405);
+  const [row,scanner]=await Promise.all([db.prepare(`SELECT enabled,revision,changed_at,
+    (SELECT count(*) FROM ordinary_seed_jobs WHERE state='pending') AS pending,
+    (SELECT count(*) FROM ordinary_seed_jobs WHERE state='pending' AND lease IS NOT NULL AND retry_at>?) AS scanning
+    FROM ordinary_publish_policy WHERE id=1`).bind(Math.floor(now.getTime()/1000)).first(),scannerState(env)]);
+  if(!row)return fail('NOT_CONFIGURED',503);
+  return json({enabled:!!row.enabled,revision:row.revision,changedAt:row.changed_at,pending:row.pending,scanning:row.scanning,scanner});
 }

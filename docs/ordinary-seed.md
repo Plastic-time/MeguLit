@@ -38,6 +38,12 @@ While the signer is stopped, authenticated scans return 503. Check the same job 
 
 Deploy the gateway separately with `relay/scan-service/gateway/wrangler.toml`. On the main relay, changes limited to gateway credentials can use `wrangler versions secret bulk` on the current production version. Compare the staged script ETag, runtime and unrelated bindings with the live version before promotion. The desktop verification key and the public Worker pin must match. A rollback to the previous Worker version leaves the D1 queue intact
 
+### Dashboard control
+
+Open `/dashboard#seed-admin` on either relay and connect with the administrator credential. **自动处理普通 Seed** controls the ordinary publication queue on both domains. New installations default to enabled with migration `0038_ordinary_publish_policy.sql`. A clean, verified eligible upload publishes automatically. An infected candidate is quarantined. Temporary scan failures stay pending for retry
+
+Pausing invalidates active publication leases while preserving queued uploads and published versions. Resuming starts processing again. The scanner indicator independently probes the authenticated gateway, Windows service and ClamAV definitions. An offline scanner leaves uploads queued. **高级管理 → 历史审核目录** contains the separate catalog of repository snapshots, reports, candidates and signed records
+
 ### Scan host archive and release check
 
 From a clean release checkout, build the portable scanner archive with the following command. The destination needs Node 22 or later and a running clamd with maintained definitions. The archive contains the server, its JavaScript dependencies, license and systemd unit. It can be extracted into `/opt/megulit` without npm or a repository checkout. The service account reads its own key and environment file under `/etc/megulit`

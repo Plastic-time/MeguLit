@@ -201,7 +201,7 @@ async function picksGet(env,url,{json}){
  const rows=(await env.DB.prepare('SELECT body FROM auto_profile_picks WHERE stamp<>signed_stamp ORDER BY updated_at DESC LIMIT ?').bind(PROFILE_LIMITS.picks).all()).results||[];
  const picks=[];for(const r of rows){let d;try{d=JSON.parse(r.body);}catch{continue;}if(!await blockedProfile(env.DB,d))picks.push(d);}return json({picks});}
 async function signedPost(request,env,now,{json,fail,readJSON}){const body=await readJSON(request,PROFILE_LIMITS.signed);if(body.error)return fail(body.error,400);const d=body.value?.diff;
- const v=validate(d);if(!v.ok)return fail('INVALID_DIFF_'+v.error);if(!SIGNED(d.signature))return fail('UNSIGNED');const t=sec(now),layer=d.layer||'version';
+ const v=validate(d);if(!v.ok)return fail('INVALID_DIFF_'+v.error);if(!SIGNED(d.signature))return fail('UNSIGNED');if(ordinary.signed(d))return fail('ORDINARY_QUEUE_REQUIRED',409);const t=sec(now),layer=d.layer||'version';
  if(await blockedProfile(env.DB,d))return fail('SEED_DELETED',410);
  const previous=await env.DB.prepare('SELECT body FROM game_diffs WHERE layer=? AND game_key=? AND source=? AND withdrawn_at IS NULL').bind(layer,d.key,d.source).first();let known=null;try{if(previous&&canonical(JSON.parse(previous.body))===canonical(d))known=previous.body;}catch{}let malware=null;if(!known){try{malware=await cleanForProfile(env.DB,d);}catch(e){return fail(e.code||'TORCH_MALWARE_UNAVAILABLE',e.status||503);}}
  if(d.source==='auto'){const p=await env.DB.prepare('SELECT stamp FROM auto_profile_picks WHERE layer=? AND game_key=?').bind(layer,d.key).first();
