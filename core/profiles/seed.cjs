@@ -21,7 +21,7 @@ const SEED_FIELDS=['status','slug','builds','match','sourceLangs','seedFormat','
    ext: an extension area ({<name>: anything}) a client that does not know <name> ignores. Unknown top-level fields and unknown
    settings keys are ignored too (an older client reading a newer seed); known fields and keys are checked strictly. */
 const SEED_FORMAT=1;
-const GAME_DIFF_FIELDS=new Set(['schema','version','key','layer','prints','rev','source','mode','settings','exe','engine','app','issuedAt','agree','reporters','cost','signature']);
+const GAME_DIFF_FIELDS=new Set(['evidence','schema','version','key','layer','prints','rev','source','mode','settings','exe','engine','app','issuedAt','agree','reporters','cost','signature']);
 const {clean,DOMAINS}=require('./domains.cjs');
 /* the document as this client understands it: known fields only, settings without unknown keys; ignored = what was left out */
 function known(d){const ignored=[],doc={};for(const [k,v] of Object.entries(d)){if(GAME_DIFF_FIELDS.has(k)||SEED_FIELDS.includes(k))doc[k]=v;else ignored.push(k);}
@@ -57,7 +57,7 @@ function check(d0,{engine,slug,file}={}){const e=[];const bad=m=>e.push(m);
   if(d.layer!=='version')bad('layer');
   for(const k of SEED_FIELDS)if(k in d)bad(k+' belongs to game.json');
   if(!HEX.test(String(d.key||'')))bad('key');else if(file&&file!==d.key+'.json')bad('file name is not <key>.json');
-  if(d.prints&&(d.prints.exe!==undefined&&d.prints.exe!==d.key||['pack','script','steam','vndb','title'].some(k=>k in d.prints)))bad('a version seed has its own exe prints only');
+  if(d.prints&&(d.prints.exe!==undefined&&d.prints.exe!==d.key||['pack','steam','vndb','title'].some(k=>k in d.prints)||d.prints.script&&!d.evidence))bad('a version seed has its own exe prints only');
   if(d.exe&&/[\\/]/.test(d.exe))bad('exe is a file name');}
  if(d.prints!==undefined){const p=gamePrint.check(d.prints);if(Object.keys(p).length!==Object.keys(d.prints).length)bad('prints');}
  if(PRIVATE.test(JSON.stringify(d)))bad('a path, user folder or address');

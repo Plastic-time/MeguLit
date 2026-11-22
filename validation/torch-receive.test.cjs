@@ -324,3 +324,27 @@ test('VNDB presentation hints respect tag evidence and the cached version',async
  assert.equal(known(f.root,'f'.repeat(64),row,lib,'v123'),false);
  assert.equal(known(f.root,key,row,lib,'v456'),false);
 });
+test('signed sparse observations bind the original, authorized runtime copy and script across DPI',async t=>{
+ const f=await setup(t), {observe}=require('../tools/sign-profile.cjs'), E=require('../core/seed-evidence.cjs');
+ const runtime=path.join(f.root,'review-copy.exe');fs.writeFileSync(runtime,'neutral runtime copy');
+ const base=f.publisher.sign({...f.profile(),settings:{placement:{lineOffsetY:3}}}), observeHere=(profile,patch)=>observe(profile,patch,f.exe,'data.xp3',runtime);
+ const one=await observeHere(base,{results:{read:{passed:true,source:'engine'},hide:{passed:false,source:'operator'}},
+  textBox:{box:{x:80,y:360,width:640,height:180},client:{width:800,height:600},source:'live-display'}});
+ const two=await observeHere(one,{results:{replace:{passed:true,source:'operator'},pointRead:{passed:false,source:'operator'}}});
+ assert.equal(require('../core/profiles/seed.cjs').check(two,{file:two.key+'.json'}).ok,true);
+ for(const extra of [{originalExe:'0'.repeat(64)},{script:'0'.repeat(64)},{scriptFile:f.script},{results:{read:{passed:true,source:f.exe}}}]){
+  assert.equal(require('../core/game-diff.cjs').validate({...two,evidence:{...two.evidence,...extra}}).ok,false);
+ }
+ assert.deepEqual(two.settings,base.settings);assert.deepEqual(two.evidence.results.hide,one.evidence.results.hide);
+ assert.deepEqual(E.clientBox(two.evidence.textBox,{width:1200,height:900}),{x:120,y:540,width:960,height:270});
+ assert.equal(E.forSession(two.evidence,{...two.evidence,runtimeExe:base.key},{width:1200,height:900}),null);
+ assert.equal(E.forSession(two.evidence,two.evidence,{width:1200,height:900}).textBox.source,'live-display');
+ assert.equal(two.evidence.runtimeExe,sha(fs.readFileSync(runtime)));assert.ok(!JSON.stringify(two).includes('review-copy'));
+ const profile=f.publisher.sign(two),release=f.publisher.sign({...f.release,profile,review:await f.review(profile)}),publication={...f.publication,hash:await P.hash(release)};
+ const got=await R.receive(f.root,'7',{...f.options,fetcher:async()=>reply({release,publication})});
+ assert.equal(got.state,'received');assert.deepEqual(got.receipt.evidence,two.evidence);
+ assert.equal(feed.layer({schema:'megulit.game-diff-feed',version:1,key:base.key,diff:profile},base.key),null);
+ fs.writeFileSync(runtime,'another runtime');await assert.rejects(observeHere(two,{results:one.evidence.results}),/SEED_EVIDENCE_IDENTITY/);
+ fs.writeFileSync(f.script,'another script');assert.equal(await R.installed(f.root,f.identity.exe,{keys:f.keys,exe:f.exe}),null);
+ await assert.rejects(observeHere(two,{results:one.evidence.results}),/SEED_EVIDENCE_IDENTITY/);
+});

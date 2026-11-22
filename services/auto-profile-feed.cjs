@@ -43,6 +43,8 @@ const part=d=>({source:d.source,mode:d.mode||'hide',settings:d.settings||{},rev:
 const torchLayers=new WeakMap(),cachedRoots=new WeakMap(),layerDocuments=new WeakMap();
 function forExe(value,key,exe){if(!value?.torchBound)return value;const binding=torchLayers.get(value);if(!binding||binding.key!==key||!binding.root)return null;const answer=cached(binding.root,key);return answer?.torchRelease?layer(answer,key,{exe,torchTrust:binding.torchTrust}):null;}
 function layer(answer,key,{torchTrust,exe}={}){if(!answer||answer.schema!=='megulit.game-diff-feed'||answer.key!==key)return null;
+ // An observation-bearing profile needs the checked release's local script binding.
+ if(answer.versionLayer?.diff?.evidence||answer.diff?.evidence&&(!answer.torchRelease||answer.version!==1))return null;
  if(answer.torchRelease&&!require('./torch-receive.cjs').compatibleCached(answer,key,torchTrust,{exe}))return null;
  let v=null,g=null,vm='',gm='';
  if(answer.version===2){const V=answer.versionLayer,G=answer.gameLayer;
