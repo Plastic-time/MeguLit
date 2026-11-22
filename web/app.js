@@ -898,6 +898,7 @@ let contextMenu=null;
 function closeContextMenu(){contextMenu?.remove();contextMenu=null;}
 document.addEventListener('contextmenu',event=>{
   event.preventDefault();closeContextMenu();
+  if(route==='torch')return;
   const card=event.target.closest('[data-game],[data-edit],[data-launch]');
   const id=card?.dataset.game||card?.dataset.edit||card?.dataset.launch||event.target.closest('.hero')?.querySelector('[data-launch]')?.dataset.launch;
   const items=id?[
