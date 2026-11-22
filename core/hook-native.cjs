@@ -86,10 +86,12 @@ class HookNative{
  notify(v){if(Object.entries(v).every(([k,value])=>this.state[k]===value))return;this.state={...this.state,...v};this.emit({type:'hook',...v});}
  /* 2026-11-21 (owner, test pack v5 ファタモルガーナの館 03:32:53Z: 「校准当前句」 gave way to measure the original, the measurement was
     cancelled and the hide never came back: the Japanese gone, the original showing, the calibration stuck at 正在测量当前句…).
-    Every give way for a preflight (calibration, the screen baseline) lasts GIVE_WAY_MS at most, whatever happens to the measurement:
+    Automatic preflight uses the short baseline cap. A player-requested measurement supplies its own bounded window:
     then preflight is off, the hide and the replacement are back (onGiveWayCapped tells the controller to finish). */
- capGiveWay(){if(this.preflight!==true){clearTimeout(this.giveWayTimer);this.giveWayTimer=null;return;}if(this.giveWayTimer)return;
-  this.giveWayTimer=setTimeout(()=>{this.giveWayTimer=null;if(this.preflight!==true)return;this.preflight=false;this.calibrating=false;try{this.trace('preflight give way capped at '+HookNative.GIVE_WAY_MS+' ms: hiding and replacement restored');}catch{}try{this.onGiveWayCapped?.();}catch{}if(this.preferences&&this.windowState)this.configure(this.preferences,this.windowState);},HookNative.GIVE_WAY_MS);this.giveWayTimer?.unref?.();}
+ capGiveWay(){if(this.preflight!==true){clearTimeout(this.giveWayTimer);this.giveWayTimer=null;return;}const limit=this.manualStyleWindow||HookNative.GIVE_WAY_MS;
+  if(this.giveWayTimer&&this.giveWayLimit===limit)return;
+  clearTimeout(this.giveWayTimer);this.giveWayLimit=limit;
+  this.giveWayTimer=setTimeout(()=>{this.giveWayTimer=null;if(this.preflight!==true)return;this.preflight=false;this.calibrating=false;try{this.trace('preflight give way capped at '+limit+' ms: hiding and replacement restored');}catch{}try{this.onGiveWayCapped?.();}catch{}if(this.preferences&&this.windowState)this.configure(this.preferences,this.windowState);},limit);this.giveWayTimer?.unref?.();}
  /* 2026-11-21 (engine-draw, Fata v5: #choiceframe and #clearline never reached the game): the game's pid lives in configure()'s window
     state and the target, never in this.state (the hook's notify state); reading this.state.gameProcessId gave 0, so the engine-draw
     control file (%TEMP%\MeguLit\draw\<pid>.txt) was never written */

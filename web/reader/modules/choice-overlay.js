@@ -88,6 +88,8 @@
    send({type:'layoutDiagnostic',chars:[...text].length,furigana:jp.classList.contains('tomoyo-furigana'),rubyNodes:jp.querySelectorAll('[data-tomoyo-reading]').length,gameRuby:gameRuby.join(',').slice(0,200),
     lineHeight:parseFloat(cs.lineHeight)||0,paddingTop:parseFloat(cs.paddingTop)||0,marginBottom:parseFloat(cs.marginBottom)||0,fontSize:parseFloat(cs.fontSize)||0,
     textTop:Math.round(box.top*10)/10,firstGlyphTop:first?Math.round(first.top*10)/10:-1,firstGlyphHeight:first?Math.round(first.height*10)/10:-1,
+    textWidth:Math.round(box.width),settingWidth:p.width,firstGlyphLeft:first?Math.round(first.left):-1,
+    engineRowBreaks:jp.querySelectorAll('br.megulit-row-br').length,estimatedPlacement:b.textPlaceStatus?.().line?.approx===true,
     readerY:parseFloat(root.getPropertyValue('--tomoyo-reader-y'))||0,readerYGame:Number.isFinite(info.readerY)?info.readerY/dpr:-1,clientY:Number.isFinite(info.clientY)?info.clientY/dpr:-1,
     rubyLift:parseFloat(jp.querySelector('[data-tomoyo-reading]')?.style.getPropertyValue('--megulit-ruby-lift'))||0,settingY:Number(p.y)||0,settingLineHeight:Number(p.lineHeight)||0,
     hideCheck:checkState,readMarked:d.body.classList.contains('tome-line-read'),text:text.slice(0,60)});

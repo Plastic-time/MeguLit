@@ -150,11 +150,11 @@ test('dark text never gets a dark outline, whatever set the two colours; the tra
 
 /* 2026-11-21 (owner, test pack v5 ファタ 03:32:53Z: the measurement was cancelled and hiding never came back): a give way lasts
    HookNative.GIVE_WAY_MS at most, whatever the measurement does: then the hide and the replacement are back, the calibration ends */
-test('a give way is capped: no answer from the probe, hiding is back within 2 s and the calibration ends as timed out',t=>{
+test('a stalled calibration restores hiding at its deadline, including a manual wait for the next line',t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  for(const manual of [true,false]){const r=rig({engine:'',publish:false});const before=r.hide();r.control.beginStyleSync(manual,'all');
   assert.deepEqual(r.switches(),[{type:'disable',reason:'reader-preflight'}]);
-  t.mock.timers.tick(1999);assert.equal(r.hook.enabled,false,'still measuring');
+  t.mock.timers.tick((manual?90000:2000)-1);assert.equal(r.hook.enabled,false,'still waiting for the player or the probe');
   t.mock.timers.tick(1);assert.deepEqual(r.hide(),before,'hide state restored');assert.equal(r.switches().at(-1).type,'enable');
   assert.equal(r.control.styleCalibration,false);assert.equal(r.style.statuses.at(-1),'timeout');}
  /* the screen baseline preflight is capped the same way */

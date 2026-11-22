@@ -954,7 +954,7 @@
      };
     dragButton.onclick = () => { const on = !document.body.classList.contains('tome-box-dragging'); dragMode(on); if (!on) save(); };
     dragLabel(false); dialog.addEventListener('close', () => dragMode(false), { once:true });
-    bridge.galAnchorOffsetReset = () => anchorReset.onclick?.(); /* 校准当前句 / 仅校准位置 put the line back on the game's own place */
+    bridge.galAnchorOffsetReset = () => { if (anchoredNow()) bridge.applyGalPreferences({ anchorDX: 0, anchorDY: 0 }, { preview: true }); }; /* 校准当前句 / 仅校准位置 put the line back on the game's own place */
     anchorReset.onclick = () => { if (!anchoredNow()) return; if (bridge.gameStyleCommitReady?.() === false) return; preferences = { ...current(), anchorDX: 0, anchorDY: 0 };
      if (fieldsAreOffset) { const was = syncingForm; syncingForm = true; try { f('galX').value = 0; f('galY').value = 0; for (const update of sliderOutputs) update(); } finally { syncingForm = was; } }
      committed = { ...preferences }; send({ type: 'galConfigure', settings: preferences }); bridge.saveGameProfileFromMenu?.(preferences); apply(); };

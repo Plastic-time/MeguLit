@@ -39,7 +39,7 @@ test('03:32:53Z replay: 校准当前句 on the KiriKiri page keeps the hide, the
 });
 test('a give way elsewhere (no engine boxes; the 03:32:47Z baseline) is back within 1-2 s whatever the probe does',t=>{
  t.mock.timers.enable({apis:['setTimeout']});
- const r=rig('');r.control.host.placement={current:null};r.control.beginStyleSync(true,'all');
+ const r=rig('');r.control.host.placement={current:null};r.control.beginStyleSync(false,'all');
  assert.deepEqual(r.switches(),[{type:'disable',reason:'reader-preflight'}]);
  t.mock.timers.tick(2000);assert.equal(r.switches().at(-1).type,'enable','hide and replacement back');assert.equal(r.hook.preflight,false);
  assert.equal(r.style.statuses.at(-1),'timeout');assert.ok(r.traces.some(l=>/give way capped/.test(l)));

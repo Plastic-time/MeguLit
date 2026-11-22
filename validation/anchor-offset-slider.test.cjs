@@ -10,7 +10,7 @@ const assert = require('node:assert'), fs = require('node:fs'), path = require('
 const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 const gal = read('web/reader/modules/gal.js'), sync = read('web/reader/modules/game-style-sync-ui.js');
 assert.match(gal, /const anchoredNow = \(\) => typeof bridge\.textPlaceAnchorActive === 'function'/, 'the settings page asks text-place for the mode');
-assert.match(gal, /bridge\.galAnchorOffsetReset = \(\) => anchorReset\.onclick/, 'a calibration can reset the offset');
+assert.match(gal, /bridge\.galAnchorOffsetReset = [^\n]*applyGalPreferences\(\{ anchorDX: 0, anchorDY: 0 \}, \{ preview: true \}/, 'a calibration can reset the offset');
 assert.match(sync, /galAnchorOffsetReset\?\.\(\);send\(\{type:'hookReselect'/, '校准当前句 resets the offset');
 assert.match(sync, /positionButton\.onclick=\(\)=>\{window\.__tomoyoChinese\?\.galAnchorOffsetReset\?\.\(\);resync\('position'\)/, '仅校准位置 resets the offset');
 let chromium;

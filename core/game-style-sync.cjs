@@ -59,7 +59,7 @@ class GameStyleSync{
  configure(p,s){const identity=String(s.gameProcessId||'')+'|'+String(s.gameStarted||'');if(identity!==this.identity){this.identity=identity;this.generation++;this.source='';this.latest=null;this.profileKey=null;this.samples=[];this.lastAt=0;this.calibrating=false;clearTimeout(this.timer);}this.p=p;this.s=s;
   const key=/^[a-f0-9]{64}$/i.test(String(s.gameStyleKey||''))?String(s.gameStyleKey).toLowerCase():null;
   this.gameName=String(s.gameTitle||s.processName||p.gameProcess||'').trim().slice(0,180);
-  if(key&&key!==this.profileKey){this.profileKey=key;const entry=this.profile;if(entry?.textSavedAt)this.latest={profile:true};this.status('profile',{gameStyleProfile:entry?.prefs||{},gameStyleEffectivePrefs:this.effective(entry),gameStylePositionMap:this.maps[key]||null});}
+  if(key&&key!==this.profileKey){this.profileKey=key;const entry=this.profile;if(entry?.textSavedAt||entry?.positionSavedAt)this.latest={profile:true};this.status('profile',{gameStyleProfile:entry?.prefs||{},gameStyleEffectivePrefs:this.effective(entry),gameStylePositionMap:this.maps[key]||null});}
   this.enabled=p.autoGameStyle!==false;if(!this.enabled&&!this.calibrating){clearTimeout(this.timer);this.generation++;}}
  snapshot(){const e=this.profile;return {gameStyleIdentity:this.identity||'',gameStyleKey:this.profileKey,gameStyleGameName:this.gameName||e?.name||'',gameStyleTextSavedAt:e?.textSavedAt||0,gameStylePositionSavedAt:e?.positionSavedAt||0,gameStyleSavedAt:e?.savedAt||0,gameStyleHistory:(e?.history||[]).slice(0,7)};}
  // Calibration import lists: other saved works on this PC, names and save times only. importFrom reads one group
@@ -94,7 +94,7 @@ class GameStyleSync{
   next.history=[{id:String(now),savedAt:now,prefs:profileTools.pick({...this.base(),...next.prefs}),positionMap:currentMap||null},...oldHistory].slice(0,7);
   const entries={...this.profiles,[key]:next};if(!this.writeProfiles(entries)){this.status('saveFailed',{gameStyleSavedPart:kind,gameStyleSaveId:saveId});return false;}
   if(kind!=='text'&&map!==undefined&&!this.savePositionMap(map,key)){this.writeProfiles(this.profiles);this.status('saveFailed',{gameStyleSavedPart:kind,gameStyleSaveId:saveId});return false;}
-  this.profiles=entries;if(next.textSavedAt)this.latest={profile:true};
+  this.profiles=entries;if(next.textSavedAt||next.positionSavedAt)this.latest={profile:true};
   this.status('saved',{gameStyleSavedAt:now,gameStyleSavedPart:kind,gameStyleSaveId:saveId,gameStyleProfile:next.prefs,gameStyleEffectivePrefs:{...this.base(),...next.prefs},gameStylePositionMap:currentMap||null});return true;
  }
  updateProfile(prefs){const entry=this.profile;if(!entry)return;const values={};for(const k of Object.keys(entry.prefs))if(prefs[k]!==undefined)values[k]=prefs[k];return this.saveProfile(values,'all');}

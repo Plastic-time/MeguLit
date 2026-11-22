@@ -25,11 +25,64 @@ test('native KiriKiri NVL reports remain authoritative, including real same-page
 });
 function calibration(t){
  t.mock.timers.enable({apis:['setTimeout']});const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-calibration-adv-'));fs.writeFileSync(path.join(dir,'GameStyleProbe.exe'),'fixture');const r=hook(),events=[],child=new EventEmitter();child.stdout=new PassThrough();child.stdin=new PassThrough();child.kill=()=>{child.killed=true;child.emit('exit',0);};
- const style=new GameStyleSync({native:dir},m=>{events.push(m);if(['timeout','unavailable','unmatched'].includes(m.gameStyleState))control.finishStyleSync(false);},()=>child),state={bound:true,gameProcessId:123,gameStarted:'1',gameHwnd:'456',coverEnabled:true},preferences={hookProfile:'embed',hookHide:true,hookAutoStart:true,bindEnabled:true,maskMode:'hook',autoGameStyle:true};
+ const style=new GameStyleSync({native:dir,config:dir},m=>{events.push(m);if(m.gameStyleState==='measured')control.finishStyleSync(true);else if(['timeout','unavailable','unmatched'].includes(m.gameStyleState))control.finishStyleSync(false);},()=>child),state={bound:true,gameProcessId:123,gameStarted:'1',gameHwnd:'456',coverEnabled:true},preferences={hookProfile:'embed',hookHide:true,hookAutoStart:true,bindEnabled:true,maskMode:'hook',autoGameStyle:true};
  const host={hooks:r.h,styleSync:style,state,preferences,onEvent:m=>events.push(m),notify(){},send(){},save(){},placement:{current:null}},control=new HookControl(host,()=>1000);control.running=true;control.plan='embed';r.h.ownTextFn=()=>true;r.h.compositedFn=()=>false;r.h.process={};r.h.pid=123;r.h.started='1';r.h.enabled=true;r.h.route='embed';r.h.configure(preferences,state);style.configure(preferences,state);r.feed(A);r.feed(B);style.observe(B);t.after(()=>{control.finishStyleSync(false,true);style.stop();child.stdout.end();child.stdin.end();fs.rmSync(dir,{recursive:true,force:true});});return {...r,style,control,child,events};
 }
+// Use the installed version identities. The helper reply is controlled so we can put it on either side of the baseline cap.
+const manualCases = [
+ ['clannad','116a1b6ab5902bb6dc49e25086b1ef6f07d941dbb090b497fb7a158e997dea2d',1050,'glyph'],
+ ['senren-banka','fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3',2035,'fallback'],
+ ['magical-girl-witch-trials','8bccd5415151accc86f2f6e093b45fac29da2a7bfdf06df953e62edf5b17c5be',1355,'none'],
+ ['summer-pockets','c9c5d963570f417620a445828c8c66a12718430726e81ad8b7e5d2f4fd0f392a',250,'none'],
+ ['doki-doki-literature-club-plus','b17b6a1e21e7beae66b256da045c02a5bf624e0c3ed3d7590167ee4d2f3cb7c5',250,'none']
+];
+for(const [game,key,advanceMs,placement] of manualCases)test(game+' manual calibration waits for a visible line, measures and restores hiding',async t=>{
+ const r=calibration(t),gal=r.control.host;
+ r.h.profile=require('../core/profiles/index.cjs').profileFor({exeSha256:key});
+ assert.equal(r.h.profile.gameKey,game);
+ gal.state.gameStyleKey=key;
+ r.style.configure(gal.preferences,gal.state);
+ if(placement==='glyph')gal.placement.current={engine:'glyph',text:B,rects:[[20,500,30,30]]};
+ if(placement==='fallback')gal.placement.current={fallback:true,text:B};
+ const reader={active:()=>true,gal:{...gal,controller:r.control}};
+ await Reader.prototype.message.call(reader,{type:'gameStyleSync',key,part:'all',owner:'reader'});
+ assert.equal(r.control.styleCalibration,true);
+ t.mock.timers.tick(advanceMs);
+ assert.equal(r.style.waitNext,true);
+ r.control.source(C);r.style.observe(C);
+ t.mock.timers.tick(500);
+ const capture=r.style.pending;
+ assert.equal(capture?.request.source,C);
+ assert.equal(capture.sent,true);
+ t.mock.timers.tick(advanceMs<1000?300:1200);
+ r.child.stdout.write(JSON.stringify({id:capture.id,result:{valid:true,width:1280,height:720,inkLeft:120,inkTop:480,style:{x:9.375,y:66.67,width:48,japaneseSize:30,textColor:'#ffffff'}}})+'\n');
+ const measured=r.events.find(m=>m.gameStyleState==='measured');
+ assert.equal(measured?.gameStyleOwner,'reader');assert.equal(measured?.gameStyle.inkLeft,120);
+ assert.deepEqual(r.events.filter(m=>'gameStyleReveal' in m).map(m=>m.gameStyleReveal),[true,false]);
+ assert.equal(r.control.styleCalibration,false);assert.equal(r.h.enabled,true);assert.equal(r.h.route,'embed');
+ assert.equal(r.style.profile,null,'preview does not create a saved profile');
+ await Reader.prototype.message.call(reader,{type:'gameStyleConfirm',key,part:'position',prefs:{x:9.375,y:66.67,width:60},saveId:'confirmed'});
+ const dir=r.style.layout.config;
+ fs.writeFileSync(path.join(dir,'gal-preferences.json'),JSON.stringify(gal.preferences));
+ const {GalNative}=require('../core/gal-native.cjs');
+ const reopened=new GalNative({native:dir,hook:dir,config:dir,logs:dir},0,()=>{});
+ clearInterval(reopened.hooks.timer);clearInterval(reopened.artScanTimer);
+ // Keep the process boundary offline; configuration and route selection still run in HookNative.
+ reopened.hooks.start=()=>{};reopened.hooks.send=()=>{};
+ Object.assign(reopened.hooks,{pid:gal.state.gameProcessId,started:'2',process:{kill(){}},enabled:false,route:'read'});
+ try{
+  reopened.state={...reopened.state,...gal.state,gameStarted:'2'};
+  reopened.save(reopened.preferences,false); // bound handler loads the version-keyed profile before attaching
+  assert.deepEqual(reopened.styleSync.profile.prefs,{x:9.375,y:66.67,width:60});
+  assert.equal(reopened.preferences.width,60);
+  assert.equal(reopened.hooks.preflight,false,'saved settings skip the launch baseline');
+  reopened.controller.source(D);
+  assert.notEqual(reopened.controller.styleCalibration,true);assert.equal(reopened.controller.stage,'hidden');
+  assert.equal(reopened.styleSync.latest?.profile,true);
+ }finally{reopened.hooks.process=null;await reopened.stop();}
+});
 for(const terminal of ['give-way-cap','cancel','timeout'])test('wrapped ADV during calibration -> '+terminal+' -> next dialogue; stale helper/capture/timeout cannot apply',t=>{
- const r=calibration(t);r.control.beginStyleSync(true,'all');r.style.observe(C);r.feed(C);t.mock.timers.tick(500);const pending={...r.style.pending};assert.ok(pending.id);r.h.auxPage({text:'「中性の第三\n文です。」',sourceName:'TextRender'});
+ const r=calibration(t);r.control.beginStyleSync(terminal!=='give-way-cap','all');r.style.observe(C);r.feed(C);t.mock.timers.tick(500);const pending={...r.style.pending};assert.ok(pending.id);r.h.auxPage({text:'「中性の第三\n文です。」',sourceName:'TextRender'});
  if(terminal==='give-way-cap')t.mock.timers.tick(1500);else if(terminal==='cancel')r.control.finishStyleSync(false,true);else{r.h.preflight=false;clearTimeout(r.h.giveWayTimer);r.h.giveWayTimer=null;t.mock.timers.tick(8000);}
  assert.equal(r.control.styleCalibration,false);assert.equal(r.h.preflight,false);assert.equal(r.h.calibrating,false);assert.equal(r.style.pending,null);assert.ok(r.style.generation>pending.generation);assert.equal(r.style.captureReady(pending.id),false);assert.equal(r.h.enabled,true);
  const before=r.events.filter(m=>m.gameStyleState==='measured').length;r.child.stdout.write(JSON.stringify({id:pending.id,result:{valid:true,width:1280,height:720,style:{x:40,y:30,width:50,textColor:'#ffffff'}}})+'\n');t.mock.timers.tick(10000);assert.equal(r.events.filter(m=>m.gameStyleState==='measured').length,before);r.feed(D);assert.equal(r.h.pageText.pages,false);assert.equal(r.events.filter(m=>m.type==='hookPage').length,0);assert.ok(r.style.latest==null);

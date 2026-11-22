@@ -5,6 +5,7 @@ const streamRank=t=>naninovelStream(t)?300:/^Embed/.test(t.name||'')||t.embeddab
 const HIDDEN_REDRAWN='原文已隐藏：游戏的字由 MeguLit 在原位重画';
 const READ_ON_PURPOSE=why=>why?'自检未过线，已自动改为只显示译文：'+why:'这部游戏的文字特效和隐藏原文冲突，已自动改为只显示译文';
 const EMBED_FEEDBACK='这个游戏暂时不能隐藏原文：请在「关于」里提交反馈，附上游戏名和截图，一般一天内就能适配';
+const MANUAL_SAMPLE_MS=25000,MANUAL_ADVANCE_MS=90000;
 class HookControl{
  /* the original is kept off screen another way than write-back (or shown on purpose): the status line for it, else '' */
  hiddenWithoutEmbed(){const h=this.host,k=h.hooks||{};if(h.textEffectsHold)return READ_ON_PURPOSE(h.textEffectsHold.why);
@@ -34,11 +35,15 @@ class HookControl{
   const h=this.host;if(!h.styleSync||!h.state.bound){this.styleCalibration=false;h.styleSync?.status('waiting');return;}
   /* 2026-11-21 (owner, test pack v5 ファタモルガーナの館): a game whose engine reports every character's box (KiriKiri page DLL,
      ファタ / 千恋＊万花) is placed from those boxes: calibration never gives way to measure the original, it follows the engine */
-  {const cur=h.placement?.current,engineBoxes=!!(cur&&!cur.fallback&&Array.isArray(cur.rects)&&cur.rects.length)||h.hooks?.drawsHidden===true;
-   if(engineBoxes){clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');h.styleSync.calibrating=false;h.hooks.calibrating=false;if(h.hooks.preflight){h.hooks.preflight=false;h.hooks.configure?.(h.preferences,h.state);}try{h.hooks.trace?.('calibration: engine boxes, no give way (following the engine coordinates)');}catch{}h.styleSync.status('following');return;}}
+  {const cur=h.placement?.current,engineBoxes=!!(cur&&!cur.fallback&&Array.isArray(cur.rects)&&cur.rects.length);
+   // Glyph placement can be reconstructed from a previous line. It cannot complete a manual screen measurement.
+   const readerPlaced=cur&&(cur.fallback||cur.engine==='glyph'||cur.approx);
+   if((engineBoxes||h.hooks?.drawsHidden===true)&&!(manual&&readerPlaced)){clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');h.styleSync.calibrating=false;h.hooks.calibrating=false;if(h.hooks.preflight){h.hooks.preflight=false;h.hooks.configure?.(h.preferences,h.state);}try{h.hooks.trace?.('calibration: engine boxes, no give way (following the engine coordinates)');}catch{}h.styleSync.status('following');return;}}
   h.hooks.onGiveWayCapped=()=>this.giveWayCapped();
   this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');clearTimeout(this.styleTimer);this.styleManual=manual;this.styleRetryLine=null;this.styleAwaitLive=false;this.styleCalibration=true;this.styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleRestore=['embed','euphoria474'].includes(this.plan)&&h.preferences.hookHide!==false;
   h.styleSync.calibrating=true;h.styleSync.waitNext=this.styleRestore||h.hooks.drawsHidden===true;h.hooks.calibrating=true; // E246.1: embedding cleared the current line, so measure the next original line
+   // A button press can wait for the player to advance. Keep its bounded deadline independent of the startup baseline.
+   h.hooks.manualStyleWindow=manual?(h.styleSync.waitNext?MANUAL_ADVANCE_MS:MANUAL_SAMPLE_MS):0;
    h.hooks.preflight=true;h.hooks.configure?.(h.preferences,h.state);h.onEvent?.({gameStylePreview:false});h.styleSync.automatic=!manual;h.styleSync.owner=owner;if(!h.styleSync.source){const source=h.state.hookSource||h.hooks.lastSource;if(source?.trim()){h.styleSync.source=source;h.styleSync.sourceRead=h.state.hookSourceRead===true;}}h.styleSync.status('revealing');
   h.styleSync.begin?.(purpose);h.styleSync.request(true);
   // A visible current sentence completes calibration; a bounded deadline restores normal reading on failure.
@@ -46,7 +51,7 @@ class HookControl{
      that line had already been replaced, so it waited for the next original line; its 12 s ran out from the begin, the user
      advanced 19 s later and one miss gave up for the whole launch. Waiting for the next line is not counted: the 12 s run
      from when that line arrives. A miss tries again on the next line; after 3 misses in a row it stops and says so. */
-  const identity=this.styleIdentity,deadline=manual?(h.styleSync.waitNext?90000:25000):12000,began=this.now();let lineAt=!manual&&h.styleSync.waitNext?0:began;
+  const identity=this.styleIdentity,deadline=manual?h.hooks.manualStyleWindow:12000,began=this.now();let lineAt=!manual&&h.styleSync.waitNext?0:began;
   const arm=ms=>{clearTimeout(this.styleTimer);this.styleTimer=setTimeout(tick,Math.max(0,ms));this.styleTimer.unref?.();};
   const tick=()=>{if(!this.styleCalibration)return;
    if(!manual&&!lineAt){if(h.styleSync.waitNext&&this.now()-began<300000){arm(1000);return;}lineAt=this.now();}
@@ -64,7 +69,7 @@ class HookControl{
  giveWayCapped(){const h=this.host;if(this.styleCalibration){if(h.styleSync?.publish?.())return;this.finishStyleSync(false);h.styleSync?.status('timeout');return;}
   if(this.running&&!this.baseline){this.stage='switching';this.status({hookCheckState:'switching',hookCheckMessage:'原文检查超过 2 秒，已恢复隐藏'});}}
  finishStyleSync(success,cancel=false){
-  if(!this.styleCalibration)return;clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;const h=this.host;if(this.styleRevealed){this.styleRevealed=false;h.onEvent?.({gameStyleReveal:false});}h.hooks.calibrating=false;h.hooks.preflight=false;h.styleSync.calibrating=false;clearTimeout(h.styleSync.timer);h.styleSync.cancel?.();if(cancel){/* the calibration showed the original (hide paused): a cancelled one hides again at once, not at the next settings save */h.hooks.configure?.(h.preferences,h.state);}h.onEvent?.({gameStylePreview:false});
+  if(!this.styleCalibration)return;clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;const h=this.host;h.hooks.manualStyleWindow=0;if(this.styleRevealed){this.styleRevealed=false;h.onEvent?.({gameStyleReveal:false});}h.hooks.calibrating=false;h.hooks.preflight=false;h.styleSync.calibrating=false;clearTimeout(h.styleSync.timer);h.styleSync.cancel?.();if(cancel){/* the calibration showed the original (hide paused): a cancelled one hides again at once, not at the next settings save */h.hooks.configure?.(h.preferences,h.state);}h.onEvent?.({gameStylePreview:false});
   const same=this.styleIdentity===String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleRetryAt=this.now()+15000;
   if(same&&!cancel){h.hooks.preflight=false;h.hooks.configure?.(h.preferences,h.state);this.styleAwaitLive=false;h.styleSync.status(success?'applied':'retrying');}
   if(!same||cancel||!this.styleRestore){this.styleAwaitLive=false;h.onEvent?.({gameStylePreview:false});}
@@ -76,7 +81,11 @@ class HookControl{
   /* 2026-11-19 (user, 素晴らしき日々: double text while calibrating): from the first line the game draws in the original during a
      calibration until the calibration ends, the reader's own Japanese and translation step aside (gameStyleReveal), so the
      original is never covered by a second text; while the calibration only waits for that line the reader stays */
-  if(this.styleCalibration&&this.host.hooks?.preflight&&!this.styleRevealed){this.styleRevealed=true;this.host.onEvent?.({gameStyleReveal:true});}
+  if(this.styleCalibration&&this.host.hooks?.preflight&&!this.styleRevealed){
+   const hooks=this.host.hooks;
+   if(this.styleManual&&hooks.manualStyleWindow===MANUAL_ADVANCE_MS){hooks.manualStyleWindow=MANUAL_SAMPLE_MS;hooks.capGiveWay?.();}
+   this.styleRevealed=true;this.host.onEvent?.({gameStyleReveal:true});
+  }
   /* E351: a flow page (WoH) is laid out on the game's own page grid; the automatic box calibration measured the current
      sentence mid-page (left 56 / top 53 / width 44) and paused hiding while it measured, so it never runs there. */
   const h=this.host;/* 2026-11-15 layer 4 page model (overlay-placement page()): the layer itself says which glyphs it left out; the per-line screen check (capture + OCR at +0.3 / +1 / +1.7 s) held the bridge and the page's place messages stopped for up to 2 s in the middle of a sentence */if(h.placement?.paged){this.seq++;this.sourceAt=this.now();this.stage='read';this.status({hookCapturedAt:this.sourceAt,hookCaptureCharacters:text.length,hookVisualVerified:true,hookCheckState:'captured',hookCheckMessage:'台词捕捉成功，由 MeguLit 原位绘制'});return;}/* capture compositor: MeguLit draws the text itself, no screen OCR (no verify, no style measuring, no mask) */if(h.compositor?.wanted?.(h.preferences)){this.seq++;this.sourceAt=this.now();this.stage='read';this.status({hookCapturedAt:this.sourceAt,hookCaptureCharacters:text.length,hookVisualVerified:false,hookCheckState:'captured',hookCheckMessage:'台词捕捉成功，由 MeguLit 接管绘制'});return;}if(!this.styleCalibration&&!(h.hooks?.flowPage&&h.hooks?.flowGridName)/* E414: only a page with a measured grid skips box calibration */&&!h.hooks?.remembered/* E520: a game that embedded before is never paused on its first lines to measure the original */&&(this.styleCalibrationIdentity!==String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'')||this.styleRetryLine===String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||''))&&this.plan!=='off'&&h.preferences.autoGameStyle!==false&&h.styleSync&&!h.styleSync.latest&&this.now()>=(this.styleRetryAt||0)&&this.styleGiveUp!==String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||''))this.beginStyleSync(false);this.seq++;this.sourceAt=this.now();
@@ -168,6 +177,7 @@ class HookControl{
     to measure the original) are both warm-ups that let the first lines through; neither runs for such a game. The saved hiding plan
     is switched on at once; when the remembered stream turns out stale the bridge re-learns it (StaleMemory) as before. */
  remembered(){const h=this.host;if(!this.running||!['embed','euphoria474'].includes(this.plan)||h.preferences.hookHide===false)return false;
+  if(this.styleCalibration&&this.styleManual)return false;
   this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');if(this.styleCalibration)this.finishStyleSync(false,true);
   if(!h.hooks.preflight&&this.baseline)return true;this.baseline=true;h.hooks.preflight=false;this.stage='switching';h.hooks.configure(h.preferences,h.state);
   this.status({hookBaselineVerified:true,hookCheckState:'switching',hookCheckMessage:'上次内嵌成功的设置已恢复，从第一句开始替换'});return true;}
