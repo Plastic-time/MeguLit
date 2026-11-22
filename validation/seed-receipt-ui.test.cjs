@@ -60,7 +60,7 @@ test('bundled Seed, first public contribution and isolated submission are distin
  assert.match(isolated,/首个公开传火贡献/);
  assert.match(isolated,/隔离测试模式已禁用提交/);
  assert.doesNotMatch(isolated,/button|内容校验值/);
- for(const [origin,label] of [['torch-release','已验证的公开传火发布'],['legacy-feed','已验证的旧版共享适配']]){
+ for(const [origin,label] of [['torch-release','已验签的 Seed'],['ordinary-seed','已验签的 Seed'],['legacy-feed','已验证的旧版共享适配']]){
   const receipt={...dto().receipt,origin};
   const html=view({state:'received',receipt});
   assert.ok(html.includes(label));
