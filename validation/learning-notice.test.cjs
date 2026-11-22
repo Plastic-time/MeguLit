@@ -25,3 +25,10 @@ test('repeated tokenizer errors expire while settings keep their status; recover
  assert.equal(node,null);assert.equal(setting,failure.learningMessage);bridge.learningStatus(failure);assert.equal(node,null);
  bridge.learningStatus({learningRecovered:'ruby'});bridge.learningStatus(failure);assert.ok(node);assert.equal(node.style.opacity,'1');assert.equal(timers.size,1);
 });
+test('identical text from a different operation keeps its own expiry despite another operation recovering',async()=>{
+ const {installLearningNotice}=await import('../web/reader/learning-notice.js');let node,id=0;const timers=new Map();
+ const bridge={learningStatus:m=>{if(m.learningRecovered){if(node?.op===m.learningRecovered)node=null;return;}if(m.learningNotice===false)return;node??={isConnected:true,style:{},remove(){this.isConnected=false;node=null;}};node.op=m.learningOperation;node.textContent=m.learningMessage;}};
+ installLearningNotice(bridge,{doc:{querySelector:()=>node},timeout:fn=>{const key=++id;timers.set(key,{fn});return key;},cancel:key=>timers.delete(key)});
+ bridge.learningStatus({learningMessage:'same error',learningOperation:'ruby'});bridge.learningStatus({learningMessage:'same error',learningOperation:'lookup'});bridge.learningStatus({learningRecovered:'ruby'});
+ assert.equal(node.op,'lookup');assert.equal(timers.size,1);const hold=[...timers.values()][0];timers.clear();hold.fn();const fade=[...timers.values()][0];fade.fn();assert.equal(node,null);
+});
