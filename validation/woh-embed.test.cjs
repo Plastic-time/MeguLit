@@ -160,7 +160,7 @@ test('E358 wiring: the reader checks the game glyphs before writing back; the br
  assert.match(reader,/hide=this\.gal\?\.hooks\?\.originalText\?\.drawable\?\.\(trans\)===false/);
  assert.match(reader,/embedReply\(id,hide\?'':trans,\{hide,source:text,text:trans\}\)/);
  assert.match(bridge,/string reply=hide\?\(p\.hidden\?\?""\):EmbedTextPolicy\.Writeback\(p\.text,trans\);/);
- assert.match(bridge,/new PendingEmbed\{tp=tp,text=text,hidden=replacement(,code=candidate\.code)?\}/);
+ assert.match(bridge,/new PendingEmbed\{tp=tp,text=text,hidden=replacement,code=candidate\.code,selected=Selected,leaveGen=LeaveGen,askedState=askedState\}/,'a pending line remembers the selection it was asked for (#696: an answer after a stream switch is dropped, a reselection of the same stream keeps it) and the state it was asked under (its answer is remembered only if nothing changed)');
  assert.match(bridge,/d\.TryGetValue\("hide",out hv\)&&Convert\.ToBoolean\(hv\)/);
  assert.match(text,/const api=\{kind:'patch',patch:!!patched,fill,drawable,tableDrawable,/);
 });
@@ -263,7 +263,7 @@ test('E411 WoH flow page: the translation is indented only when its sentence sta
 // E422 (user, WoH 1.3.8: the original still showed now and then, the layer still hid by itself, the drag frame flew away).
 test('E422: lines a page shows together are hidden; only a held skip key or a run past the longest group passes through',()=>{
  const bridge=read('native/HookBridge.cs');
- assert.match(bridge,/bool quick=\(embedNow-LastEmbedAt\)\.TotalMilliseconds<250&&text!=LastEmbedText&&!TypewriterStep\(LastEmbedText,text\);BurstRun=quick\?BurstRun\+1:0;bool burst=quick&&\(SkipHeld\|\|BurstRun>=BurstSkipLines\);/);
+ assert.match(bridge,/bool quick=\(embedNow-LastDecidedAt\)\.TotalMilliseconds<250&&text!=LastEmbedText&&!TypewriterStep\(LastEmbedText,text\);BurstRun=quick\?BurstRun\+1:0;bool burst=quick&&\(SkipHeld\|\|BurstRun>=BurstSkipLines\);/);
  assert.match(bridge,/const int BurstSkipLines=8;/);/* the skip key goes through SetSkipHeld (it also takes the hide layers down on a press) */assert.match(bridge,/type=="skipHeld"\)\{object hv;SetSkipHeld\(d\.TryGetValue\("held",out hv\)&&Convert\.ToBoolean\(hv\)\);\}/);assert.match(bridge,/public static void SetSkipHeld\(bool held\)\{bool was=SkipHeld;SkipHeld=held;/);
  assert.match(read('services/reader.cjs'),/this\.gal\?\.hooks\?\.skipHeld\?\.\(message\.skipHeld\)/);
 });

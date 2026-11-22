@@ -61,8 +61,8 @@ test('HookBridge: MODE on connect and on change, LunaHook GDI hide off for dot s
  assert.ok(b.includes('static string GlyphModeName(string m){return m=="dot"?"dot":"blank";}'),'blank reports too (place = blank)');
  assert.ok(b.includes('else if(type=="glyphMode"){object mv,av,bv;GlyphAll=d.TryGetValue("all",out av)&&Convert.ToBoolean(av);GlyphBlind=d.TryGetValue("blind",out bv)&&Convert.ToBoolean(bv);GlyphModeSet('));
  assert.ok(b.includes('static bool DotsOwn(Candidate c){return c!=null&&c.gdiProbe;}')&&b.includes('public static bool GlyphAllOk(string text){')&&b.includes('&&!SameHookNewContext(cur,rv)&&!EngineDialogueSibling(cur,rv)&&')&&b.includes('static bool EngineDialogueSibling(Candidate cur,Candidate sib){return cur!=null&&sib!=null&&cur.role==1&&sib.role==0&&cur.code!=null&&cur.code==sib.code&&cur.tp.addr==sib.tp.addr;}')&&b.includes('if(!GdiFontSeen){GlyphAllNote("no GDI glyphs seen from this game yet");return false;}')&&b.includes('if(!GlyphAllSelfTest()){Console.Error.WriteLine("FAIL glyph pass-through')/* 1.4.9 regression (SoftPal: nothing hid the original): pass-through only with a proven hide layer */&&b.includes('if(GlyphAll&&Selected!=""&&tp.Key()==Selected&&GlyphAllOk(text)){GlyphLine(text);GlyphDrain(8);try{Luna_EmbedCallback(tp,text,text);}')&&b.includes('lock(Gate){ReceivedText=true;ReplacementCallback=true;}RememberStream();'));
- assert.ok(b.includes('on=(ReplacementEnabled||ProbeWanted)&&!DotsOwn(c);'),'probe never arms the GDI hide in dot mode');
- assert.ok(b.includes('&&!DotsOwn(Candidates[Selected]))Luna_UseEmbed(Candidates[Selected].tp,true);'),'nor does a reconnect');
+ assert.ok(b.includes('on=(ReplacementEnabled||ProbeWanted)&&!DotsOwn(c);')&&b.includes('if(key==Selected)return Armed(c)&&(ReplacementEnabled||ProbeWanted&&c.gdiProbe)&&!DotsOwn(c);'),'probe never arms the GDI hide in dot mode');
+ assert.ok(b.includes('if(Selected!="")MarkEmbedDirty(Selected);}FlushEmbedSync();'),'nor does a reconnect');
  assert.ok(b.includes('else if(line.StartsWith("ToMe_GLYPHDOT ",StringComparison.Ordinal))GlyphDots(line.Substring(14));'));
  assert.ok(b.includes('Emit(new{type="hookGlyphDots",state="dots",seq='));});
 

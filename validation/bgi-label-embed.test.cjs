@@ -14,8 +14,8 @@ test('a label on the selected stream switches the embed off only for a probe str
  const label=/if\(selected&&EmbedTextPolicy\.Label\(text\)&&!SpokenPiece\(text\)\)\{([\s\S]*?)Diagnostic\("label not shown/.exec(bridge);
  assert.ok(label,'label branch');
  assert.match(label[1],/probeOnly=LabelStopsEmbed\(lc\)/);
- assert.match(label[1],/if\(probeOnly\)Luna_UseEmbed\(tp,false\)/);
- assert.doesNotMatch(label[1].replace(/if\(probeOnly\)Luna_UseEmbed\(tp,false\)/,''),/Luna_UseEmbed\(tp,false\)/,'no unconditional embed off');
+ assert.match(label[1],/if\(probeOnly\)\{MarkEmbedDirty\(tp\.Key\(\)\);FlushEmbedSync\(\);\}/);
+ assert.doesNotMatch(label[1].replace(/if\(probeOnly\)\{MarkEmbedDirty\(tp\.Key\(\)\);FlushEmbedSync\(\);\}/,''),/MarkEmbedDirty\(|_?Luna_UseEmbed\(/,'no unconditional embed off');
  const rule=/static bool LabelStopsEmbed\(Candidate c\)\{return (.*?);\}/.exec(bridge)[1];
  const stops=c=>Function('c','return '+rule)(c);
  assert.equal(stops({embed:true}),false,'writable EmbedBGI keeps its embed');
