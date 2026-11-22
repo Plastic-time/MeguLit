@@ -24,6 +24,15 @@ test('a clean exit without a replacement still fails promptly, and crashes still
   assert.equal(waits,4);
  }
 });
+test('a replacement that disappears before showing a window has no clean launcher exit time',async t=>{
+ t.mock.timers.enable({apis:['Date']});
+ for(const prefix of [[],[[]]]){
+  const samples=[...prefix,[{pid:42,visible:false}],[]];
+  await assert.rejects(waitForVisibleGame(async()=>samples.shift(),{exit:()=>({code:0,signal:null}),sleep:async ms=>t.mock.timers.tick(ms)}),
+   error=>error.message==='GAME_PROCESS_EXITED'&&error.exitedAt===undefined);
+  assert.equal(samples.length,0);
+ }
+});
 test('v1.1.0: failed process queries do not fail a launch',async()=>{
  const opts={attempts:5,interval:1,sleep:async()=>{}};let n=0;
  /* a few failures, then the window shows */

@@ -52,6 +52,7 @@ async function waitForVisibleGame(query,{attempts=60,interval=250,stableSamples=
    /* A successful direct launcher can exit before the game appears in the process list. */
    if(!helper&&!indirect&&ended.code===0&&!ended.signal)cleanExitAt=Date.now();
   }
+  if(processes.length)cleanExitAt=null;
   if(!processes.length&&((ended&&!helper)||seenProcess&&!indirect)){
    if(cleanExitAt===null||Date.now()-cleanExitAt>=1000||i+1===attempts||Date.now()+interval>=deadline){
     const error=Error('GAME_PROCESS_EXITED');if(cleanExitAt!==null)error.exitedAt=cleanExitAt;throw error;
