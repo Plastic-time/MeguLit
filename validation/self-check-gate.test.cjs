@@ -3,7 +3,7 @@
 /* 2026-11-21 (owner: 游戏差分全自动生成) replay of the owner's incr9 run (E:\MeguLit-Test-1421\logs, trimmed to the lines the gate reads):
    - ファタモルガーナの館 (22:51:03-22:53:42Z): lines drawn nowhere and dropped, choices filtered to nothing -> the gate steps it down,
      and the first-play calibration finds no hide combination that passes -> read mode.
-   - 千恋＊万花 (22:53:42Z on): no window over a threshold, calibration keeps hide + redraw.
+   - 千恋＊万花 (22:53:42Z on): no measured failure, but missing position observations cannot validate hide calibration.
    Then the live service on a fake reader: calibration stored, read mode with the reason, 重新校准 records again. */
 process.env.MEGULIT_RELAY_BASE='off';/* no relay: the shared result and the report stay local */
 const assert=require('node:assert'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
@@ -53,7 +53,9 @@ const cf=ap.calibrate(fata.recording),cs=ap.calibrate(senren.recording);
 assert.strictEqual(cf.mode,'read','no hide combination fixes Fata: '+JSON.stringify(cf.candidates.map(c=>[c.params,c.over])));
 assert.ok(cf.reason.length>0);assert.strictEqual(cf.settings.hide.textEffectsRead,true);
 assert.ok(cf.candidates.some(c=>c.params.effectFrames===true&&c.over.includes('hideVisible')),'effect frames as one line still leave the game painting its original');
-assert.strictEqual(cs.mode,'hide');assert.strictEqual(cs.settings.calibrate.hideMethod,'hide');assert.strictEqual(cs.settings.calibrate.positionSource,'engine');
+assert.strictEqual(cs.mode,'read');assert.strictEqual(cs.settings.calibrate.hideMethod,'read');assert.strictEqual(cs.settings.calibrate.positionSource,null);
+assert.match(cs.reason,/观测不足：位置测量/);assert.strictEqual(senren.windows[0].metrics.positionPx,null);
+assert.ok(cs.candidates.filter(c=>c.params.hideMethod==='hide').every(c=>!c.pass&&c.missing.includes('positionPx')));
 assert.strictEqual(cs.settings.page.effectFrames,null,'the least change wins among passing ones');assert.ok(!cs.settings.choice,'kernel choice filters kept');
 
 /* thresholds come from the profile layers */
@@ -101,10 +103,12 @@ try{
  gal.textEffectsHold=null;live.recalibrate(reader);assert.strictEqual(ap.load(root,key),null,'重新校准 forgets the stored diff');assert.ok(live.current().check.recording,'and records again');
  live.stop();
  /* a stored hide diff that fails later steps down */
- ap.store(root,key,ap.record({key,engine:'krkr',exe:reader.gameExe,version:'x',result:cs}));calls.length=0;live.start(reader,reader.gameExe);assert.strictEqual(calls.length,0);
+ /* Explicit historic stored-hide fixture: the unmeasured Senren recording above no longer creates one. */
+ const historicHide={mode:'hide',settings:{calibrate:{hideMethod:'hide'},hide:{textEffectsRead:false}},score:{cost:0},reason:''};
+ ap.store(root,key,ap.record({key,engine:'krkr',exe:reader.gameExe,version:'x',result:historicHide}));calls.length=0;live.start(reader,reader.gameExe);assert.strictEqual(calls.length,0);
  for(const l of he.split('\n'))if(l>=FATA[0]&&l<FATA[1])live.feedTrace(l);
  const down=ap.load(root,key);assert.strictEqual(down.mode,'read');assert.strictEqual(down.source,'gate');assert.ok(down.gate.over.includes('dropRate'));assert.strictEqual(down.previous.mode,'hide');assert.strictEqual(calls.length,1);
  live.stop();
 }finally{fs.rmSync(root,{recursive:true,force:true});}
-console.log('self-check gate: Fata steps down (window 1: '+fata.tripped.over.join(',')+'), calibration -> read; Senren '+senren.windows.length+' window(s) pass, calibration -> hide');
+console.log('self-check gate: Fata steps down (window 1: '+fata.tripped.over.join(',')+'), calibration -> read; Senren '+senren.windows.length+' window(s) have no measured failure, hide calibration unverified (missing position)');
 })().catch(e=>{console.error(e);process.exit(1);});

@@ -69,18 +69,27 @@ function cost(r,t){const m=r.metrics;let c=0;
  c+=m.choiceMismatch/Math.max(1,t.choiceMismatch);if(m.positionPx!=null)c+=m.positionPx/(r.positionLimit||t.positionPx);if(m.pairRate!=null)c+=(1-m.pairRate)/(1-t.pairRate);return Math.round(c*1000)/1000;}
 function textBox(recording){const b=recording.filter(e=>e.kind==='box');if(b.length<3)return null;const x=Math.min(...b.map(e=>e.x)),y=Math.min(...b.map(e=>e.y)),r=Math.max(...b.map(e=>e.x+e.w)),bt=Math.max(...b.map(e=>e.y+e.h));return {x,y,w:r-x,h:bt-y,client:[b[0].cw,b[0].ch]};}
 
+/* A non-failing window is not proof that hiding worked: absent sensors stay null. Choice coverage is only
+   required when choices exist; the ordinary choice mismatch threshold still applies to those events. */
+function missingHideObservations(r,t){const missing=[];
+ if(r.lines<t.minLines)missing.push('lines');if(!r.drawn)missing.push('drawn');
+ for(const k of ['hideVisible','positionPx','pairRate'])if(r.metrics[k]==null)missing.push(k);
+ return missing;}
+const OBSERVATIONS={lines:'正文行数',drawn:'阅读层绘制',hideVisible:'隐藏检测',positionPx:'位置测量',pairRate:'配对测量'};
+
 /* the calibration: returns {mode,settings,score,candidates,reason} */
 function calibrate(recording,{thresholds={}}={}){const t={...DEFAULTS};for(const [k,v] of Object.entries(thresholds||{}))if(k in DEFAULTS&&Number.isFinite(+v))t[k]=+v;
  const sources=recording.some(e=>e.kind==='box')?['engine']:[];
- const all=candidates(sources).map(c=>{const r=predict(recording,c,t);return {params:c,metrics:r.metrics,over:r.over,pass:r.pass,lines:r.lines,cost:cost(r,t)};});
+ const all=candidates(sources).map(c=>{const r=predict(recording,c,t),missing=c.hideMethod==='hide'?missingHideObservations(r,t):[];return {params:c,metrics:r.metrics,over:r.over,missing,pass:r.pass&&missing.length===0,lines:r.lines,cost:cost(r,t)};});
  const hide=all.filter(c=>c.params.hideMethod==='hide'),passing=hide.filter(c=>c.pass).sort((a,b)=>a.cost-b.cost||changes(a.params)-changes(b.params));
  const best=passing[0]||null,read=all.find(c=>c.params.hideMethod==='read');
  const pick=best||read;const p=pick.params;
  const settings={calibrate:{positionSource:p.positionSource,textBox:textBox(recording),hideMethod:p.hideMethod},page:{effectFrames:p.effectFrames},hide:{textEffectsRead:p.hideMethod==='read'}};
  if(p.filters==='none')settings.choice={filters:[]};/* the kernel reads the anchor from placement.firstLineAnchor; 'engine' is the kernel's own first choice (krkr-state 2026-11-21) */if(p.positionSource==='glyph')settings.placement={firstLineAnchor:'glyph'};else if(p.positionSource==='ocr')settings.placement={firstLineAnchor:'box'};
  const worst=hide.slice().sort((a,b)=>a.cost-b.cost)[0];
- return {mode:p.hideMethod,settings,score:{metrics:pick.metrics,cost:pick.cost,lines:pick.lines},reason:best?'':reasonText(worst?.over||[]),
-  candidates:all.sort((a,b)=>a.cost-b.cost).slice(0,8).map(c=>({params:c.params,pass:c.pass,cost:c.cost,over:c.over,metrics:c.metrics}))};}
+ const reason=best?'':[reasonText(worst?.over||[]),worst?.missing.length?'观测不足：'+worst.missing.map(k=>OBSERVATIONS[k]).join('、'):''].filter(Boolean).join('；');
+ return {mode:p.hideMethod,settings,score:{metrics:pick.metrics,cost:pick.cost,lines:pick.lines},reason,
+  candidates:all.sort((a,b)=>a.cost-b.cost).slice(0,8).map(c=>({params:c.params,pass:c.pass,cost:c.cost,over:c.over,missing:c.missing,metrics:c.metrics}))};}
 const changes=p=>(p.effectFrames!==null)+(p.filters!=='kernel');
 
 /* the stored record (also the upload payload, see docs/auto-profile.md) */
