@@ -111,12 +111,21 @@ public static class GameCapture{
   bool frozen=false;
   if(Blt(hwnd,image)&&!Blank(image)){if(AcceptBlt(c,ticket,Signature(image),DateTime.UtcNow,(r,v)=>FreezeVote(hwnd,image,c,r,v),out frozen))return true;if(!frozen)return false;}
   if(!frozen&&!c.Proven&&!c.Blind&&!c.Frozen&&!c.HasSig){int vote=BlindVote(hwnd,image);lock(Gate){if(!c.Dropped&&!c.Proven&&!c.Blind&&!c.Frozen&&!c.HasSig&&ticket>c.Accepted){if(vote>0){if(++c.Votes>=3)c.Blind=true;}else if(vote<0)c.Votes=0;}}}
-  bool print=false;long printTicket=0;if(c.Blind||frozen)lock(Gate){Choice cur;if(!c.Dropped&&Choices.TryGetValue(hwnd,out cur)&&cur==c&&(frozen?c.Frozen:c.Blind)&&(DateTime.UtcNow-c.Printed).TotalMilliseconds>=PrintGapMs){c.Printed=DateTime.UtcNow;printTicket=++c.NextTicket;print=true;}}
+  long printTicket;bool print=PrintTurn(hwnd,c,ticket,DateTime.UtcNow,out frozen,out printTicket);
   if(!print){if(screenFallback&&!c.Proven&&ScreenInto(hwnd,image)){FromScreen=true;return true;}Skipped=true;return false;}
   /* a frozen window is printed client area only (PW_CLIENTONLY), as BitBlt read it: every reader gets the same framing and
      can share the kept print. Blind windows keep the caller's flags. */
   bool printed;using(var g=Graphics.FromImage(image)){IntPtr dc=g.GetHdc();try{printed=PrintWindow(hwnd,dc,frozen?printFlags|1:printFlags);}finally{g.ReleaseHdc(dc);}}
   return DeliverPrint(hwnd,c,printTicket,image,printed,printed&&!Blank(image),frozen,screenFallback);
+ }
+ // Whether this read prints now, decided in the lock from the window's own state, not from what this read's BitBlt saw: a
+ // frozen window whose BitBlt now fails or comes back blank is still printed when its turn is due (#714 review: it never
+ // printed again, and the scene probe ran out of pictures). The read must not be overtaken (its own freeze moved Accepted
+ // to its ticket). frozen: printed as a frozen window (client area, kept for Recent); else as a blind one.
+ static bool PrintTurn(IntPtr hwnd,Choice c,long ticket,DateTime now,out bool frozen,out long printTicket){
+  frozen=false;printTicket=0;
+  lock(Gate){Choice cur;if(c.Dropped||!Choices.TryGetValue(hwnd,out cur)||cur!=c||!(c.Frozen||c.Blind)||ticket<c.Accepted||(now-c.Printed).TotalMilliseconds<PrintGapMs)return false;
+   frozen=c.Frozen;c.Printed=now;printTicket=++c.NextTicket;return true;}
  }
  static bool DeliverPrint(IntPtr hwnd,Choice c,long ticket,Bitmap image,bool printed,bool good,bool frozen,bool screenFallback){
   switch(AfterPrint(printed,good,frozen,screenFallback)){
@@ -480,6 +489,19 @@ public static class GameCapture{
    Skipped=false;if(DeliverPrint(lateKey,lk,tick(lk),p,true,true,true,false)||!Skipped||lk.Last!=null)return false;
    Skipped=false;if(DeliverPrint(lateKey,lk,tick(lk),p,true,true,false,false)||!Skipped)return false;}}
   finally{lock(Gate){Choices.Remove(lateKey);Release(lk);}}
+  // frozen, then BitBlt keeps failing or comes back blank (Stale never runs): the print turn is still taken once it is due, the
+  // print is kept and delivered; not before PrintGapMs, not for an overtaken read, and a blind window prints as blind
+  var fk=new IntPtr(-82);var fc=new Choice();lock(Gate)Choices[fk]=fc;
+  try{using(var p=new Bitmap(8,8,PixelFormat.Format32bppArgb)){
+   Stale(fc,tick(fc),1,t,differs);long early=tick(fc);foreach(int ms in new[]{3100,3700,4300})Stale(fc,tick(fc),1,t.AddMilliseconds(ms),differs);
+   if(!fc.Frozen)return false;bool pf;long pt;DateTime now0=DateTime.UtcNow;
+   if(PrintTurn(fk,fc,early,now0,out pf,out pt))return false;
+   if(!PrintTurn(fk,fc,tick(fc),now0,out pf,out pt)||!pf)return false;
+   Skipped=false;if(!DeliverPrint(fk,fc,pt,p,true,true,pf,false)||Skipped||fc.Last==null)return false;
+   if(PrintTurn(fk,fc,tick(fc),now0.AddMilliseconds(PrintGapMs-1),out pf,out pt))return false;
+   if(!PrintTurn(fk,fc,tick(fc),now0.AddMilliseconds(PrintGapMs),out pf,out pt)||!pf)return false;
+   var bl=new Choice{Blind=true};lock(Gate)Choices[fk]=bl;if(!PrintTurn(fk,bl,tick(bl),now0,out pf,out pt)||pf)return false;}}
+  finally{lock(Gate){Choices.Remove(fk);Release(fc);}}
   return true;
  }
  // A picture with almost no variation (all black or one colour) means BitBlt cannot see this window's content.
