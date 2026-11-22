@@ -15,12 +15,12 @@ function sourceHash(root=ROOT){const txt=SOURCES.map(f=>fs.readFileSync(path.joi
  return crypto.createHash('sha256').update(txt,'utf8').digest('hex').slice(0,24);}
 const BROWSERS=['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Microsoft/Edge/Application/msedge.exe'];
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.woff2':'font/woff2','.webp':'image/webp','.svg':'image/svg+xml','.bin':'application/octet-stream'};
-const PAGE=`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/web/torch-monument.css"><body style="margin:0;width:1280px;height:720px">
+const PAGE=`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/web/torch-monument.css"><body style="position:relative;margin:0;width:1280px;height:720px">
 <script type="module">
 window.__TORCH_BAKE=true;window.__TORCH_HOUR=12;try{localStorage.setItem('megulit-torch-quality','high');}catch{}
 const m=await import('/web/torch-monument.js');
 const api=async a=>a==='torch_page'?{ok:true,total:0,items:[],next:null}:{ok:true,available:false,items:[],months:[]};
-await m.openTorchMonument({api,locale:'zh'});
+await m.openTorchMonument({api,locale:'zh',mount:document.body});
 let host;for(let i=0;i<600&&!(host=document.querySelector('.torch-monument'))?.__torch;i++)await new Promise(r=>setTimeout(r,100));
 const {exportBake}=await import('/web/torch-bake.js');
 window.__bake=await exportBake(host.__torch.debug.scene,host.__torch.debug.torchPoints,host.__torch.debug.steleEmit);

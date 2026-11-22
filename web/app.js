@@ -1292,8 +1292,9 @@ async function renderRoute(){watchStage();
    main.classList.remove('searching','field-page','field-list','field-selecting','field-single');}main.classList.toggle('statistics-page',route==='statistics');main.classList.toggle('torch-page',route==='torch');
    if(route!=='learning'&&route!=='statistics')main.classList.remove('review-page');if(route!=='learning'&&route!=='statistics')delete main.dataset.page;main.scrollTop=0;
   try{
-    if(route==='torch'){main.replaceChildren();const monument=await import('./torch-monument.js');if(token!==pageToken)return;
-     stopDetailPage=()=>monument.closeTorchMonument(true);await monument.openTorchMonument({api,locale,esc,toast,mount:main});if(token!==pageToken)return;
+    if(route==='torch'){main.innerHTML=loading();const started=performance.now();const monument=await import('./torch-monument.js');if(token!==pageToken)return;
+     performance.measure('torch:modules',{start:started,end:performance.now()});main.replaceChildren();
+     stopDetailPage=monument.closeTorchMonument;await monument.openTorchMonument({api,locale,esc,toast,mount:main});if(token!==pageToken)return;
     }else if(route==='home')home();else if(route==='library')library();else if(route==='series')seriesUI.renderDetail(main,selectedSeriesId);else if(route==='game'){main.innerHTML=loading();
      const detailCleanup=await renderGamePage({main,id:selectedGameId,tab:(t=>(gameTab='',t))(gameTab),api,invoke,locale,text,esc,icon,cover,duration,datetime,relativeTime,number,definitions,isCurrent:()=>token===pageToken,
      onBack:()=>navigate(gameOrigin),onLaunch:startGame,onEdit:editGame,onJapaneseRestore:only=>japaneseRestore(only),onRemove:removeGame,onForum:game=>{setForumFilter({game:String(game?.title||''),engine:'',

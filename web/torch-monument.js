@@ -20,7 +20,7 @@ import {ShaderPass} from './vendor/three/addons/postprocessing/ShaderPass.js';
 import {SMAAPass} from './vendor/three/addons/postprocessing/SMAAPass.js';
 import {rng,canvas2d,glowSprite} from './torch-textures.js';
 import {buildHall,buildStele,HALL} from './torch-hall.js';
-import {loadBaked,bakedAO,computeVolumes,applyAO} from './torch-bake.js';
+import {loadBaked,withBaked,bakedAO,computeVolumes,applyAO} from './torch-bake.js';
 import {VolumetricPass} from './torch-volumetric.js';
 import {loadGsap} from './gsap-loader.js';
 import {createTorchZoom} from './torch-controls.js';
@@ -31,15 +31,15 @@ const cnParse=q=>{const D="零壹贰叁肆伍陆柒捌玖",U={"拾":10,"佰":100
 const COPY={
  zh:{title:'传火碑',sub:'分享过校准结果的玩家，名字都刻在这里',count:n=>'已刻 '+n+' 人',monthCount:(m,n)=>m+' · '+n+' 人',range:(a,b)=>'第 '+a+'–'+b+' 位',all:'全部',
   anon:n=>'传火人'+cnNo(n),empty:'还没有人刻下名字',find:'找名字',findGo:'查找',me:'我的名字',meNone:'这台电脑还没有传过火',quality:{high:'画质 标准',low:'画质 省电'},
-  close:'关闭',prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',loading:'正在读取…',preparing:'正在准备殿堂…',nth:n=>n===0?'#0':'第 '+n+' 位',more:'只显示前 50 个',
+  prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',loading:'正在读取…',preparing:'正在准备殿堂…',nth:n=>n===0?'#0':'第 '+n+' 位',more:'只显示前 50 个',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')},
  en:{title:'Monument',sub:'Everyone who shared a calibration is carved here',count:n=>n+' names',monthCount:(m,n)=>m+' · '+n,range:(a,b)=>'#'+a+'–'+b,all:'All',
   anon:n=>'Torch bearer #'+n,empty:'No names carved yet',find:'Find a name',findGo:'Find',me:'My name',meNone:'This PC has not shared yet',quality:{high:'Quality: full',low:'Quality: light'},
-  close:'Close',prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',loading:'Loading…',preparing:'Preparing the hall…',nth:n=>'#'+n,more:'First 50 only',
+  prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',loading:'Loading…',preparing:'Preparing the hall…',nth:n=>'#'+n,more:'First 50 only',
   ym:m=>m},
  ja:{title:'継火の碑',sub:'キャリブレーションを共有した人の名前が刻まれています',count:n=>n+' 名',monthCount:(m,n)=>m+' · '+n+' 名',range:(a,b)=>a+'–'+b+' 番目',all:'すべて',
   anon:n=>'火を継ぐ人 #'+n,empty:'まだ誰の名前も刻まれていません',find:'名前を探す',findGo:'探す',me:'自分の名前',meNone:'この PC からはまだ共有していません',quality:{high:'画質 標準',low:'画質 軽量'},
-  close:'閉じる',prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',loading:'読み込み中…',preparing:'聖堂を準備しています…',nth:n=>n===0?'#0':n+' 番目',more:'最初の 50 件のみ',
+  prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',loading:'読み込み中…',preparing:'聖堂を準備しています…',nth:n=>n===0?'#0':n+' 番目',more:'最初の 50 件のみ',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')}};
 const QUALITY_KEY='megulit-torch-quality';
 const FONT='"Torch Serif","Noto Serif SC","Source Han Serif SC","Noto Serif JP","Songti SC","SimSun","Yu Mincho",serif';
@@ -49,13 +49,14 @@ const FW=4096,FH=984,BAND_Y0=14,BAND_Y1=100,RULE_Y=112,AREA_X0=90,AREA_X1=4006,A
 const NAME_PX=40,NAME_ADV=42,SIDE_PX=15,SIDE_ADV=16,DATE_PX=14,GAP=30;
 
 let current=null;
-export function closeTorchMonument(now=false){if(current)current.close(now);}
-export function torchMonumentOpen(){return !!current;}
+export function closeTorchMonument(){current?.close();}
 
-export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),toast=()=>{},mount=null}={}){
+export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),toast=()=>{},mount}){
  if(current){current.focus();return current;}
+ const opened=performance.now();
+ const timing=(name,start)=>performance.measure('torch:'+name,{start,end:performance.now()});
  const t=COPY[locale]||COPY.zh;
- const host=document.createElement('div');host.className='torch-monument'+(mount?' tm-page':'');host.setAttribute('role',mount?'region':'dialog');if(!mount)host.setAttribute('aria-modal','true');host.setAttribute('aria-label',t.title);
+ const host=document.createElement('div');host.className='torch-monument';host.setAttribute('role','region');host.setAttribute('aria-label',t.title);
  host.innerHTML=`<canvas class="tm-canvas" aria-hidden="true"></canvas><div class="tm-veil" aria-hidden="true"></div>
   <header class="tm-head"><h2 class="tm-title">${esc(t.title)}</h2><p class="tm-sub">${esc(t.sub)}</p></header>
   <p class="tm-count" aria-live="polite"></p>
@@ -67,27 +68,24 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
    <form class="tm-find" hidden><input type="search" maxlength="30" autocomplete="off" spellcheck="false" placeholder="${esc(t.find)}" aria-label="${esc(t.find)}"><button type="submit" class="tm-btn tm-text">${esc(t.findGo)}</button><ul class="tm-results" hidden></ul></form>
    <button type="button" class="tm-btn tm-text tm-me" hidden>${esc(t.me)}</button>
    <span class="tm-sep" aria-hidden="true"></span>
-   <button type="button" class="tm-btn tm-text tm-quality" aria-pressed="false"></button>
-   <button type="button" class="tm-btn tm-text tm-close">${esc(t.close)}</button>
+   <button type="button" class="tm-btn tm-text tm-quality" aria-pressed="false" disabled></button>
   </footer>`;
- const frame=mount||document.querySelector('.app-frame')||document.body;frame.append(host);
- const place=()=>{if(mount)return;const bar=document.querySelector('.titlebar');const top=bar?Math.round(bar.getBoundingClientRect().bottom):0;host.style.top=top+'px';};place();
+ mount.append(host);
  const $=s=>host.querySelector(s);
  const state={month:'',months:[],monthsOn:false,findOn:false,mine:[],mineAt:0,items:[],off:0,next:null,atStart:true,total:0,loading:false,offline:false,focusNo:null,fit:0,layout:null,
   bandWindow:0,hover:null,hoverMonth:null};
- let disposed=false,scene=null,gsap=null,ro=null,onKey=()=>{},onVis=()=>{},onBlur=()=>{},onFocus=()=>{},onLaunch=()=>{};
- const ctl={close,focus:()=>mount?$('.tm-canvas').focus():$('.tm-close').focus()};current=ctl;
+ let disposed=false,scene=null,sceneReady=false,gsap=null,ro=null,onKey=()=>{},onVis=()=>{},onBlur=()=>{},onFocus=()=>{};
+ const ctl={close,focus:()=>$('.tm-canvas').focus()};current=ctl;
  $('.tm-canvas').tabIndex=0;$('.tm-canvas').setAttribute('aria-label',({zh:'传火碑视图，滚轮缩放，按住拖动，双击复位',ja:'継火の碑。ホイールで拡大縮小、ドラッグで移動',en:'Monument view. Scroll to zoom, hold and drag, double-click to reset'})[locale]);
- if(mount)$('.tm-close').hidden=true;
  const quality=()=>{let q='auto';try{q=localStorage.getItem(QUALITY_KEY)||'auto';}catch{}return q==='high'||q==='low'?q:'auto';};
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
  /* ---------- data ---------- */
- const call=(a,p)=>api(a,p).catch(()=>({ok:false}));
- async function loadAt({month=state.month,cursor=''}={}){state.loading=true;
+ const call=async(a,p)=>{try{return await api(a,p);}catch{return {ok:false};}};
+ async function loadAt({month=state.month,cursor=''}={}){state.loading=true;updateStatus();
   const r=await call('torch_page',{month,cursor,limit:PAGE});state.loading=false;if(disposed)return false;
-  if(!r||!r.ok){state.offline=true;state.items=[];state.total=0;status(t.offline);redraw();return false;}
-  state.offline=false;status('');state.month=r.month||month||'';state.items=r.items||[];state.next=r.next;state.total=r.total|0;state.off=0;
+  if(!r||!r.ok){state.offline=true;state.items=[];state.total=0;updateStatus();redraw();return false;}
+  state.offline=false;updateStatus();state.month=r.month||month||'';state.items=r.items||[];state.next=r.next;state.total=r.total|0;state.off=0;
   state.atStart=!cursor||cursor==='0'||!state.items.length;return true;}
  async function ahead(){if(state.loading||!state.next||state.off+state.fit+60<state.items.length)return;state.loading=true;
   const r=await call('torch_page',{month:state.month,cursor:state.next,limit:PAGE});state.loading=false;if(disposed||!r?.ok)return;
@@ -109,13 +107,14 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
 
  /* ---------- UI ---------- */
  function status(msg){const el=$('.tm-status');el.textContent=msg||'';el.hidden=!msg;}
+ function updateStatus(){status(!sceneReady?t.preparing:state.offline?t.offline:state.loading?t.loading:'');}
  function updateChrome(){const L=state.layout,n=state.total;
   $('.tm-count').textContent=state.month?t.monthCount(t.ym(state.month),n):n?t.count(n):'';
   const first=L?.entries[0]?.item,last=L?.entries[L.entries.length-1]?.item;
   $('.tm-range').textContent=first?t.range(first.torchNo,last.torchNo):'';
   $('.tm-pager').hidden=!first;
   $('.tm-prev').disabled=!state.off&&state.atStart;$('.tm-next').disabled=!(L&&state.off+L.entries.length<state.items.length)&&!state.next;
-  const q=scene?.tier||'high';const qb=$('.tm-quality');qb.textContent=t.quality[q];qb.setAttribute('aria-pressed',String(q==='low'));}
+  const q=scene?.tier||tier;const qb=$('.tm-quality');qb.textContent=t.quality[q];qb.setAttribute('aria-pressed',String(q==='low'));}
  async function step(dir,cols=false){if(!state.layout)return;
   if(dir>0){const L=state.layout;const n=cols?Math.max(1,L.firstColumnCount):Math.max(1,L.entries.length);if(state.off+n>=state.items.length&&!state.next)return;
    state.off=Math.min(state.items.length-1,state.off+n);redraw();await ahead();redraw();}
@@ -146,23 +145,38 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
  function layoutNow(){state.layout=layoutFrom(state.off);state.fit=state.layout.entries.length;return state.layout;}
  function redraw(force){if(disposed)return;layoutNow();updateChrome();scene?.paintFace(force);}
 
- /* ---------- scene ---------- */
- await document.fonts.load('44px "Torch Serif"','传火碑人').catch(()=>{});
- gsap=await loadGsap().catch(()=>null);
- const bake=await loadBaked(pickTier(quality())==='low');
- if(disposed)return null;
- scene=buildScene({host,canvas:$('.tm-canvas'),state,t,tier:pickTier(quality()),reduced,gsap,onTier:()=>updateChrome(),bakeInfo:bake});if(typeof window.__TORCH_HOUR==='number')host.__torch=scene;
+ /* Prepare the visible shell before the renderer, overlapping data and local assets. */
+ const tier=pickTier(quality());
+ const timed=async(name,work)=>{const start=performance.now();try{return await work();}finally{timing(name,start);}};
+ addEventListener('megulit-game-launch',close);
+ updateStatus();redraw();
+ const fontReady=timed('font',()=>document.fonts.load('44px "Torch Serif"','传火碑人').catch(()=>{}));
+ const gsapReady=reduced?null:timed('gsap',()=>loadGsap().catch(()=>null));
+ const bakeReady=timed('bake-assets',()=>loadBaked(tier==='low'));
+ const firstLoad=timed('first-page',()=>loadAt({})).then(()=>{if(!disposed)return ahead();}).then(()=>{
+  if(!disposed){updateStatus();redraw();}
+ });
+ try{
+  const [bake,motion]=await Promise.all([bakeReady,gsapReady,fontReady]);
+  await new Promise(resolve=>setTimeout(resolve,0));
+  if(disposed)return null;
+  gsap=motion;
+  layoutNow();
+  const start=performance.now();
+  const {ok,reason}=bake;
+  scene=withBaked(bake,()=>buildScene({host,canvas:$('.tm-canvas'),state,t,tier,reduced,gsap,onTier:updateChrome,bakeInfo:{ok,reason},onFirstFrame:()=>timing('first-frame',opened)}));
+  timing(ok?'build-scene':'build-scene-fallback',start);
+  if(typeof window.__TORCH_HOUR==='number')host.__torch=scene;
+ }catch(error){close();throw error;}
+ updateChrome();
 
- /* first data: page 1, then the side routes (their buttons stay hidden until the relay has them) */
- status(t.loading);redraw();
- const firstLoad=loadAt({}).then(()=>{redraw(true);return ahead();}).then(()=>redraw());
+ /* Side requests follow the first page request. */
  call('torch_months').then(r=>{if(disposed||!r?.ok)return;state.monthsOn=r.available!==false;state.months=r.months||[];state.bandWindow=Math.max(0,state.months.length-12);redraw();});
  call('torch_find',{name:'',probe:true}).then(r=>{if(disposed)return;state.findOn=!!(r&&r.available!==false);$('.tm-find').hidden=!state.findOn;});
  call('torch_me').then(async r=>{if(disposed||!r?.ok)return;state.mine=r.items||[];$('.tm-me').hidden=!(r.available!==false&&state.mine.length);
   if(state.mine.length){await firstLoad;redraw(true);}});
 
  /* controls */
- $('.tm-close').addEventListener('click',()=>close());
  $('.tm-prev').addEventListener('click',()=>step(-1));$('.tm-next').addEventListener('click',()=>step(1));
  $('.tm-quality').addEventListener('click',()=>{const next=scene.tier==='low'?'high':'low';try{localStorage.setItem(QUALITY_KEY,next);}catch{}scene.setTier(next);updateChrome();});
  $('.tm-me').addEventListener('click',()=>{if(!state.mine.length){toast(t.meNone);return;}const it=state.mine[state.mineAt%state.mine.length];state.mineAt++;jumpTo(it);});
@@ -174,7 +188,8 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
   if(!list.length){toast(t.none);return;}if(list.length===1){jumpTo(list[0]);return;}
   results.innerHTML=list.map((it,i)=>`<li><button type="button" data-i="${i}"><b>${esc(it.name||t.anon(it.torchNo))}</b><span>${esc(dateText(it.at,true))} · ${esc(t.nth(it.torchNo))}</span></button></li>`).join('')+(list.length>=50?`<li class="tm-results-more">${esc(t.more)}</li>`:'');
   results.hidden=false;results.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{results.hidden=true;jumpTo(list[Number(b.dataset.i)]);}));});
- onKey=e=>{if(e.key==='Escape'){e.preventDefault();if(!results.hidden){results.hidden=true;return;}if(scene.reading()){scene.resetView();return;}if(!mount)close();return;}
+ onKey=e=>{if(!host.contains(e.target))return;
+  if(e.key==='Escape'){if(!results.hidden){e.preventDefault();results.hidden=true;}else if(scene.reading()){e.preventDefault();scene.resetView();}return;}
   if(e.target.closest?.('input,textarea'))return;
   if(e.key==='+'||e.key==='='){e.preventDefault();scene.zoomBy(-120,0);return;}if(e.key==='-'){e.preventDefault();scene.zoomBy(120,0);return;}if(e.key==='0'){e.preventDefault();scene.resetView();return;}
   if(e.key==='PageDown'||e.key==='ArrowLeft'){e.preventDefault();step(1);}else if(e.key==='PageUp'||e.key==='ArrowRight'){e.preventDefault();step(-1);}};
@@ -185,7 +200,7 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
  const canvas=$('.tm-canvas');
  canvas.addEventListener('pointermove',e=>{const hit=scene.pick(e.clientX,e.clientY);let cursor='';state.hoverMonth=null;
   if(hit&&hit.band){state.hoverMonth=hit.band;cursor='pointer';showTip(null);}else if(hit&&hit.entry){cursor='grab';showTip(hit.entry,e.clientX,e.clientY);}else{cursor='grab';showTip(null);}
-  canvas.style.cursor=cursor||'';});
+  canvas.dataset.cursor=cursor;});
  canvas.addEventListener('pointerleave',()=>showTip(null));
  canvas.addEventListener('click',async e=>{if(scene.dragged())return;const hit=scene.pick(e.clientX,e.clientY);
   if(!hit||!hit.band)return;const b=hit.band;
@@ -195,39 +210,40 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
  canvas.addEventListener('dblclick',e=>{e.preventDefault();scene.resetView();});
  onVis=()=>scene.setActive(!document.hidden&&document.hasFocus());
  onBlur=()=>scene.setActive(false);onFocus=()=>scene.setActive(!document.hidden);
- onLaunch=()=>close(true);
- document.addEventListener('visibilitychange',onVis);addEventListener('blur',onBlur);addEventListener('focus',onFocus);addEventListener('megulit-game-launch',onLaunch);
- addEventListener('resize',place);
+ document.addEventListener('visibilitychange',onVis);addEventListener('blur',onBlur);addEventListener('focus',onFocus);
  ro=new ResizeObserver(()=>scene.resize());ro.observe(host);
 
  /* entrance */
- const veil=$('.tm-veil'),chrome=[...host.querySelectorAll('.tm-head,.tm-count,.tm-bar')];
- if(gsap&&!reduced)gsap.set(chrome,{autoAlpha:0,y:8});
- let preparing=true;setTimeout(()=>{if(preparing&&!disposed)status(t.preparing);},400);
- scene.ready.then(()=>{preparing=false;if(disposed)return;if($('.tm-status').textContent===t.preparing)status(state.offline?t.offline:'');
-  if(gsap&&!reduced){gsap.to(veil,{autoAlpha:0,duration:1.6,ease:'power2.out'});gsap.to(chrome,{autoAlpha:1,y:0,duration:.9,ease:'power3.out',stagger:.12,delay:scene.introSeconds*0.62});}
-  else veil.style.opacity='0';
-  scene.intro();});
- if(!mount)$('.tm-close').focus({preventScroll:true});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ if(disposed)return null;
+ const veil=$('.tm-veil'),compileStart=performance.now();
+ try{
+  scene.prepare(()=>{if(disposed)return;
+   sceneReady=true;$('.tm-quality').disabled=false;updateStatus();timing('shader-ready',compileStart);timing('ready',opened);
+   if(gsap)gsap.to(veil,{autoAlpha:0,duration:1.6,ease:'power2.out'});
+   else veil.style.opacity='0';
+   scene.intro();});
+ }catch(error){close();throw error;}
 
- function close(now=false){if(disposed)return;disposed=true;if(current===ctl)current=null;
+ function close(){if(disposed)return;disposed=true;if(current===ctl)current=null;
   removeEventListener('keydown',onKey,true);document.removeEventListener('visibilitychange',onVis);removeEventListener('blur',onBlur);removeEventListener('focus',onFocus);
-  removeEventListener('megulit-game-launch',onLaunch);removeEventListener('resize',place);ro?.disconnect();
-  scene?.setActive(false);
-  const done=()=>{scene?.dispose();host.remove();};
-  if(now||!gsap||reduced){done();return;}
-  gsap.to(host,{autoAlpha:0,duration:.35,ease:'power2.in',onComplete:done});}
+  removeEventListener('megulit-game-launch',close);ro?.disconnect();
+  if(gsap)gsap.killTweensOf($('.tm-veil'));
+  scene?.dispose();host.remove();}
  return ctl;
 }
 
 /* weak machines start on the light tier: few cores, little memory, or a software renderer */
-function pickTier(q){if(q!=='auto')return q;const cores=navigator.hardwareConcurrency||4,mem=navigator.deviceMemory||8;
+let autoQuality;
+function pickTier(q){if(q!=='auto')return q;if(autoQuality)return autoQuality;
+ const cores=navigator.hardwareConcurrency||4,mem=navigator.deviceMemory||8;
+ if(cores<=2||mem<=2)return autoQuality='low';
  let soft=false;try{const gl=document.createElement('canvas').getContext('webgl2');const ext=gl&&gl.getExtension('WEBGL_debug_renderer_info');
   const name=ext?String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)):'';soft=/swiftshader|basic render|llvmpipe|software/i.test(name);gl?.getExtension('WEBGL_lose_context')?.loseContext();}catch{}
- return soft||cores<=2||mem<=2?'low':'high';}
+ return autoQuality=soft?'low':'high';}
 
 /* ================= the scene ================= */
-function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}){
+function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,onFirstFrame}){
  let aoInfo=null;
  const bag=new Set();const keep=o=>{bag.add(o);return o;};
  const tex=(c,srgb=true,rep=1)=>{const x=keep(new THREE.CanvasTexture(c));x.colorSpace=srgb?THREE.SRGBColorSpace:THREE.NoColorSpace;x.wrapS=x.wrapT=THREE.RepeatWrapping;x.repeat.set(rep,rep);x.anisotropy=8;return x;};
@@ -372,7 +388,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
   gE.setTransform(1,0,0,1,0,0);
   faceTex.map.needsUpdate=faceTex.emissive.needsUpdate=faceTex.rough.needsUpdate=true;placeGlow();}
  let paintQueued=0,lastHoverKey='';
- function queuePaint(){if(paintQueued)return;paintQueued=requestAnimationFrame(()=>{paintQueued=0;paintFace();if(!active)draw();});}
+ function queuePaint(){if(paintQueued)return;paintQueued=requestAnimationFrame(()=>{paintQueued=0;paintFace();});}
  function placeGlow(){const e=state.layout?.entries.find(x=>x.item.torchNo===state.focusNo);if(!e){glow.userData.on=false;return;}
   const cx=e.x+38,cy=e.y+Math.max(e.box.len,e.box.sideLen)/2+6,u=cx/FW,v=cy/FH;glow.position.x=(u-.5)*faceW;glow.position.y=faceY+(.5-v)*faceH;
   glow.scale.set(COL_W/FW*faceW*2.2,(e.box.len+80)/FH*faceH*1.35,1);glow.userData.on=true;glow.userData.t0=performance.now();
@@ -442,7 +458,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
   camera.aspect=w/h;camera.fov=w/h<1.45?52:44;camera.updateProjectionMatrix();
   if(composer){composer.setSize(w,h);}
   if(reflector){const pr=renderer.getPixelRatio();reflector.getRenderTarget().setSize(Math.round(w*pr*.5),Math.round(h*pr*.5));}
-  if(dust)dust.material.uniforms.uScale.value=h/700*renderer.getPixelRatio();if(!active)draw();}
+  if(dust)dust.material.uniforms.uScale.value=h/700*renderer.getPixelRatio();}
  const pointer={x:0,y:0,down:false,sx:0,sy:0,yaw0:0,pitch0:0,moved:0};
  const onMove=e=>{const r=host.getBoundingClientRect();pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=((e.clientY-r.top)/r.height)*2-1;
   if(pointer.down&&e.pointerId===pointer.id){const dx=(e.clientX-pointer.sx)/r.width,dy=(e.clientY-pointer.sy)/r.height;pointer.moved=Math.max(pointer.moved,Math.abs(dx)+Math.abs(dy));
@@ -459,9 +475,9 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
   const e=state.layout?.entries.find(e=>lx>=e.x&&lx<e.x+COL_W&&ly>=e.y-6&&ly<e.y+e.box.h);return {entry:e||null,point};}
 
  /* intro: from the far end of the nave looking up into the dome, a slow push that tilts down to the stone */
- const INTRO=reduced?0:7.2;let introT=reduced?1:0,introStart=0;
+ const INTRO=reduced?0:7.2;let introT=reduced?1:0,introStart=0,introTween;
  function intro(){if(reduced){introT=1;introDone=true;return;}introStart=performance.now();
-  if(gsap){const o={t:0};gsap.to(o,{t:1,duration:INTRO,ease:'power2.inOut',onUpdate:()=>{introT=o.t;},onComplete:()=>{introDone=true;}});}}
+  if(gsap){const o={t:0};introTween=gsap.to(o,{t:1,duration:INTRO,ease:'power2.inOut',onUpdate:()=>{introT=o.t;},onComplete:()=>{introDone=true;}});}}
  const ease=x=>x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;
  const tmpDir=new THREE.Vector3(),tmpPos=new THREE.Vector3(),eul=new THREE.Euler(0,0,0,'YXZ');
  function updateCamera(dt){if(!gsap&&!introDone&&introStart){introT=Math.min(1,(performance.now()-introStart)/1000/INTRO);if(introT>=1)introDone=true;}
@@ -499,14 +515,16 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
     if(aoUni)aoUni.uSteleLevels.value.copy(L).multiplyScalar(auraU.uI.value);}motes.material.uniforms.uPx.value=renderer.domElement.height/520;
   if(glow.userData.on){const p=(now-glow.userData.t0)/1000;const o=Math.min(1,p/1.2)*(.42+.1*Math.sin(p*1.6));glow.material.opacity=o;glowLight.intensity=o*2.2;}else{glow.material.opacity*=.9;glowLight.intensity*=.9;}
   updateCamera(dt);draw();
+  if(onFirstFrame){onFirstFrame();onFirstFrame=null;}
   /* slow frames on the full tier for ~3 s after the intro: switch to the light tier (only in auto mode) */
   if(introDone&&tier==='high'&&autoTier){frames++;if(dt>.045)slow++;if(frames>=180){if(slow>120){setTier('low',true);}frames=0;slow=0;}}
   raf=requestAnimationFrame(frame);}
  let autoTier=(()=>{try{return !localStorage.getItem(QUALITY_KEY)||localStorage.getItem(QUALITY_KEY)==='auto';}catch{return true;}})();
  function setActive(on){if(disposed)return;active=!!on&&ready;if(active&&!raf){last=performance.now();raf=requestAnimationFrame(frame);}if(!active&&raf){cancelAnimationFrame(raf);raf=0;}}
  function setTier(next,auto=false){if(next===tier)return;tier=next;if(!auto)autoTier=false;applyTier();scene.traverse(o=>{const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];ms.forEach(m=>m.needsUpdate=true);});onTier?.();}
- let disposed=false;
+ let disposed=false,ready=false,compilePoll=0;
  function dispose(){disposed=true;active=false;if(raf)cancelAnimationFrame(raf);raf=0;if(paintQueued)cancelAnimationFrame(paintQueued);
+  if(compilePoll)clearTimeout(compilePoll);introTween?.kill();
   canvas.removeEventListener('pointermove',onMove);canvas.removeEventListener('pointerdown',onDown);canvas.removeEventListener('pointerup',onUp);canvas.removeEventListener('pointercancel',onUp);
   if(composer){composer.passes.forEach(p=>p.dispose?.());composer.dispose?.();}
   if(reflector){reflector.getRenderTarget().dispose();reflector.material.dispose();}
@@ -521,9 +539,17 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
  let aoUni=null;{ const t0=performance.now(),vols=bakedAO()||(window.__TORCH_BAKE?null:computeVolumes(scene,H.torchPoints,steleEmit));if(vols){const r=applyAO(scene,vols);r.textures.forEach(keep);aoUni=r.uniforms;}
   aoInfo={baked:!!bakedAO(),ms:Math.round(performance.now()-t0),bake:bakeInfo};}
  applyTier();paintFace();
- /* compile every shader before the first frame (in parallel where the driver allows), so the intro never starts with a stall */
- let ready=false;
- /* the bake (tools/torch-bake.cjs) only needs the scene built: no shaders, no frames */
- const whenReady=window.__TORCH_BAKE?Promise.resolve():(renderer.compileAsync?renderer.compileAsync(scene,camera):Promise.resolve()).catch(()=>{}).then(()=>{ready=true;if(!disposed)setActive(true);});
- return {get tier(){return tier;},ready:whenReady,introSeconds:INTRO,intro,setActive,setTier,resize,pick,dispose,paintFace:()=>queuePaint(),lookAtFocus,setRead,resetView,zoomBy:(delta,mode)=>zoom.wheel(delta,mode),reading:()=>!!view.read||Math.abs(zoom.target-1)>.001,dragged:()=>dragMoved,debug:{renderer,scene,camera,zoom,buildMs,torchPoints:H.torchPoints,steleEmit,get ao(){return aoInfo;}}};
+ function prepare(onReady){
+  if(window.__TORCH_BAKE)return;
+  /* Use the bundled r168 program readiness check with a poll owned by this route. */
+  renderer.compile(scene,camera);
+  const programs=renderer.info.programs.slice();
+  const poll=()=>{
+   if(disposed)return;
+   if(programs.some(program=>!program.isReady())){compilePoll=setTimeout(poll,10);return;}
+   ready=true;onReady();setActive(!document.hidden&&document.hasFocus());
+  };
+  poll();
+ }
+ return {get tier(){return tier;},prepare,intro,setActive,setTier,resize,pick,dispose,paintFace:()=>queuePaint(),lookAtFocus,setRead,resetView,zoomBy:(delta,mode)=>zoom.wheel(delta,mode),reading:()=>!!view.read||Math.abs(zoom.target-1)>.001,dragged:()=>dragMoved,debug:{renderer,scene,camera,zoom,buildMs,torchPoints:H.torchPoints,steleEmit,get ao(){return aoInfo;}}};
 }

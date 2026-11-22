@@ -24,18 +24,35 @@ export async function sourceHash(){const parts=await Promise.all(BAKE_SOURCES.ma
 const shrink=img=>{const c=document.createElement('canvas');c.width=Math.max(1,img.width>>1);c.height=Math.max(1,img.height>>1);c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c;};
 async function inflate(buf){return new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());}
 
-/* load the bake if it matches this build; `low` halves the big textures (less GPU memory on the light tier) */
-export async function loadBaked(low){baked=null;record=window.__TORCH_BAKE?new Map():null;if(record)return {ok:false,reason:'baking'};
- try{const man=await (await fetch(new URL('manifest.json',BASE),{cache:'no-store'})).json(),hash=await sourceHash();if(!man||man.hash!==hash)return {ok:false,reason:'stale'};
+/* Keep one tier's CPU assets across route visits. GPU textures are owned by the scene. */
+let cached=null;
+export function loadBaked(low){
+ if(window.__TORCH_BAKE)return Promise.resolve({ok:false,reason:'baking'});
+ if(cached?.low===low)return cached.promise;
+ const entry={low,promise:readBaked(low).then(result=>{if(!result.ok&&cached===entry)cached=null;return result;})};
+ cached=entry;
+ return entry.promise;
+}
+async function readBaked(low){
+ try{const [man,hash]=await Promise.all([fetch(new URL('manifest.json',BASE),{cache:'no-store'}).then(r=>r.json()),sourceHash()]);
+  if(!man||man.hash!==hash)return {ok:false,reason:'stale'};
   const tex={};
-  await Promise.all(Object.entries(man.textures).map(async([key,fields])=>{tex[key]={};await Promise.all(Object.entries(fields).map(async([f,file])=>{
+  const textures=Promise.all(Object.entries(man.textures).map(async([key,fields])=>{tex[key]={};await Promise.all(Object.entries(fields).map(async([f,file])=>{
    const img=new Image();img.decoding='async';img.src=new URL(file,BASE).href;await img.decode();tex[key][f]=low&&img.width>=512?shrink(img):img;}));}));
-  const ao=await inflate(await (await fetch(new URL(man.ao.file,BASE))).arrayBuffer());
-  if(ao.length!==man.ao.dims[0]*man.ao.dims[1]*man.ao.dims[2])return {ok:false,reason:'ao-size'};
-  const tl=await inflate(await (await fetch(new URL(man.torch.file,BASE))).arrayBuffer());if(tl.length!==man.torch.dims[0]*man.torch.dims[1]*man.torch.dims[2])return {ok:false,reason:'torch-size'};
-  const st=await inflate(await (await fetch(new URL(man.stele.file,BASE))).arrayBuffer());if(st.length!==man.stele.dims[0]*man.stele.dims[1]*man.stele.dims[2]*4)return {ok:false,reason:'stele-size'};
-  baked={tex,ao:{data:ao,dims:man.ao.dims,box:man.ao.box},torch:{data:tl,dims:man.torch.dims,box:man.torch.box},stele:{data:st,dims:man.stele.dims,box:man.stele.box}};return {ok:true};}
+  const volume=async(key,channels=1)=>{const {file,dims,box}=man[key];
+   const data=await inflate(await (await fetch(new URL(file,BASE))).arrayBuffer());
+   if(data.length!==dims[0]*dims[1]*dims[2]*channels)throw Error(key+'-size');
+   return {data,dims,box};};
+  const [ao,torch,stele]=await Promise.all([volume('ao'),volume('torch'),volume('stele',4),textures]);
+  return {ok:true,assets:{tex,ao,torch,stele}};}
  catch(e){return {ok:false,reason:String(e&&e.message||e)};}}
+
+/* Hall builders read these assets synchronously. A cancelled visit can never install them. */
+export function withBaked(result,build){
+ baked=result.assets||null;
+ record=window.__TORCH_BAKE?new Map():null;
+ try{return build();}finally{baked=null;}
+}
 /* a set of maps by name: the baked images when there are some, else drawn now (and noted when baking) */
 export function maps(key,make){if(baked&&baked.tex[key])return baked.tex[key];const t0=performance.now();const o=make();if(record){record.set(key,o);console.log('BAKESTEP texture',key,Math.round(performance.now()-t0),'ms');}return o;}
 export function bakedAO(){return baked?{ao:baked.ao,torch:baked.torch,stele:baked.stele}:null;}
