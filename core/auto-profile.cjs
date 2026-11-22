@@ -21,7 +21,7 @@
    The stored file (data/config/auto-profiles/<key>.json, schema in docs/auto-profile.md) is newest-wins: a new calibration or a
    gate trip replaces it; 重新校准 deletes it. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const {SelfCheck,DEFAULTS,reasonText,effectFrame}=require('./self-check.cjs');
+const {SelfCheck,DEFAULTS,reasonText,effectFrame,windowEvidence}=require('./self-check.cjs');
 const SCHEMA=1;
 /* only keys and values core/profiles/domains.cjs allows: a stored or uploaded diff is data the kernel already understands */
 const cleanSettings=s=>require('./profiles/domains.cjs').clean(s).value;
@@ -90,7 +90,7 @@ function stepDown(prev,{key,engine,exe,version,trip,window}){const base=prev||{s
  at:new Date().toISOString(),source:'gate',mode:'read',reason:trip.reason,settings:cleanSettings({...base.settings,calibrate:{...(base.settings?.calibrate||{}),hideMethod:'read'},hide:{...(base.settings?.hide||{}),textEffectsRead:true}}),
  score:{metrics:window?.metrics||trip.metrics,over:trip.over,lines:window?.lines||0},candidates:base.candidates||[],gate:{window:trip.window,over:trip.over,metrics:trip.metrics},previous:prev?{mode:prev.mode,source:prev.source,at:prev.at}:null};}
 /* the block the one-click diagnostic adds (info.json autoProfile): only what the server aggregates, no paths */
-function diagnostic(rec,windows=[]){if(!rec&&!windows.length)return null;return {schema:SCHEMA,profile:rec?{key:rec.key,engine:rec.engine,exe:rec.exe,version:rec.version,at:rec.at,source:rec.source,mode:rec.mode,reason:rec.reason,settings:rec.settings,score:rec.score,gate:rec.gate||null,candidates:(rec.candidates||[]).slice(0,4),...(rec.cold?{cold:rec.cold}:{})}:null,
- windows:windows.slice(-10).map(w=>({window:w.window,lines:w.lines,metrics:w.metrics,over:w.over,pass:w.pass}))};}
+function diagnostic(rec,windows=[],pendingLines=null){if(!rec&&!windows.length&&pendingLines===null)return null;return {schema:SCHEMA,windowState:windows.length?'scored':pendingLines===null?'noWindowEvidence':'noClosedWindow',pendingLines,gameplayAcceptance:'unverified',profile:rec?{key:rec.key,engine:rec.engine,exe:rec.exe,version:rec.version,at:rec.at,source:rec.source,mode:rec.mode,reason:rec.reason,settings:rec.settings,score:rec.score,gate:rec.gate||null,candidates:(rec.candidates||[]).slice(0,4),...(rec.cold?{cold:rec.cold}:{})}:null,
+ windows:windows.slice(-10).map(w=>({window:w.window,lines:w.lines,metrics:w.metrics,over:w.over,pass:w.pass,evidence:windowEvidence(w)}))};}
 function list(root){try{return fs.readdirSync(dir(root)).filter(f=>f.endsWith('.json')).map(f=>load(root,f.slice(0,-5))).filter(Boolean);}catch{return [];}}
 module.exports={SCHEMA,KEY,dir,keyFor,exeKey,exeKeySync,load,store,clear,list,candidates,predict,calibrate,record,stepDown,diagnostic};

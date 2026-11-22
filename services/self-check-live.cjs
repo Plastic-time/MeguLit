@@ -14,7 +14,7 @@
    This PC calibrates (records its first window) unless an official diff exists or the shared verdict is read mode. A step-down
    is reported with its reason, which puts the exe in the maintainer's repair queue, and asks the automatic probe to run (with
    the runtime sample of services/runtime-sample.cjs). Read mode is never switched here: GalNative.textEffects(true, reason) only shows the hint in Alt+T (owner 2026-11-21). */
-const {SelfCheck,traceLine,reasonText,parseTrace,parseReader}=require('../core/self-check.cjs');
+const {SelfCheck,traceLine,windowEvidence,reasonText,parseTrace,parseReader}=require('../core/self-check.cjs');
 const auto=require('../core/auto-profile.cjs');
 const Profiles=require('../core/profiles/index.cjs');
 const feed=require('./auto-profile-feed.cjs');
@@ -75,7 +75,7 @@ function start(reader,exe,profile=null,input=null,options={}){stop();profile=pro
 function bindKey(s,key){const {reader}=s;s.key=key;s.stored=auto.load(reader.root,key);s.calibrated=!!s.stored;if(s.stored)s.check.recording=null;
  s.shared=s.skipFeed?null:feed.layer(feed.cached(reader.root,key),key,{exe:s.exe});if(s.shared&&feed.rejected(reader.root,key,s.shared))s.shared=null;
  const c=settle(s);
- reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'bound',key,layer:s.from||'none',mode:c?.mode||'',calibrating:!s.calibrated});
+ reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'bound',key,pid:s.pid,birth:s.birth,layer:s.from||'none',mode:c?.mode||'',calibrating:!s.calibrated});
  hookTrace(reader,'selfCheck key='+key+' layer='+(s.from||'none')+(c?' mode='+c.mode:'')+(s.calibrated?'':' calibrating (first '+s.check.t.window+' lines)'));
  /* the relay's copy is refreshed in the background (hot update: a new diff applies at once) */
  /* the relay is asked with every fingerprint (core/game-print.cjs): exe, head, pe, main archive, Steam, VNDB, title, engine */
@@ -88,7 +88,7 @@ function bindKey(s,key){const {reader}=s;s.key=key;s.stored=auto.load(reader.roo
 function windowDone(s,r){if(live!==s)return;const {reader}=s;
  if(!s.key){s.pending=r;return;}
  hookTrace(reader,traceLine(r));
- reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'window',key:s.key,window:r.window,lines:r.lines,pass:r.pass,over:r.over.join(','),layer:s.from||'none',...Object.fromEntries(Object.entries(r.metrics).map(([k,v])=>[k,v==null?-1:v]))});
+ reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'window',key:s.key,pid:s.pid,birth:s.birth,...windowEvidence(r),window:r.window,lines:r.lines,pass:r.pass,over:r.over.join(','),layer:s.from||'none',...Object.fromEntries(Object.entries(r.metrics).map(([k,v])=>[k,v==null?-1:v]))});
  if(r.window===1&&s.sample){/* the fingerprints the relay matches diffs by (core/game-print.cjs); the exe hash is known, the rest is small reads */
   let prints=null;try{prints=require('../core/game-print.cjs').prints(s.exe,{exe:s.key,title:s.input?.title||'',steamAppId:s.input?.steamAppId||'',engine:engineOf(s)});}catch{}
   /* the window's verdict decides whether its pictures may leave this PC (runtime-sample.cjs shotPolicy) */
@@ -123,7 +123,9 @@ function windowDone(s,r){if(live!==s)return;const {reader}=s;
  /* the repair queue: the report carries the reason; the automatic probe (with the runtime sample) is asked to run */
  feed.report(reader.root,rec,{prints:s.prints}).catch(()=>{});try{require('./probe-auto.cjs').kick(reader.root);}catch{}}
 
-function stop(){const s=live;live=null;if(!s)return null;try{s.check.flush();}catch{}return s;}
+function stop(){const s=live;live=null;if(!s)return null;
+ try{if(s.key)s.reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'sessionEnd',key:s.key,pid:s.pid,birth:s.birth,closedWindows:s.check.windows.length,pendingLines:s.check.w.lines,gameplayAcceptance:'unverified'});}catch{}
+ try{s.check.flush();}catch{}return s;}
 /* 重新校准: forget this PC's diff, ignore the relay for this run, record the next window again */
 function recalibrate(reader){const s=live;const exe=s?.exe||reader.gameExe;if(!exe)return false;const input=s?.input||{exe};const base=Profiles.profileFor(input);const key=s?.key||auto.exeKeySync(reader.root,exe);
  if(key)auto.clear(reader.root,key);hookTrace(reader,'selfCheck recalibrate key='+(key||'?'));live=null;const n=start(reader,exe,base,input,{skipFeed:true,key});if(n){n.layer=null;applyLayer(n);}return true;}
@@ -131,7 +133,7 @@ const speakerOf=()=>{try{return String(live?.reader?.gal?.hooks?.state?.hookSpea
 function sampleEvent(s,e){if(!e||!s.sample||s.sample.done)return;const want=s.sample.event(e,speakerOf());if(want==='shot'){try{const g=s.reader.gal;/* the whole client area: full size for this PC, a small copy that may be uploaded (runtime-sample.cjs) */if(g?.clientShot)g.clientShot().then(m=>{if(m?.full)s.sample.shot(m.full,m.small);}).catch(()=>{});else g?.sceneShot?.().then(m=>{if(m?.jpeg)s.sample.shot(m.jpeg);}).catch(()=>{});}catch{}}}
 /* the sample sees each event before the check, so the line that closes the first window is in it */
 const feedTrace=line=>{const s=live;if(!s)return;try{const e=parseTrace(line);if(s.sample&&!s.sample.done&&!String(line).startsWith('selfCheck'))s.sample.rawTrace(line);if(!e)return;sampleEvent(s,e);s.check.event(e);}catch{}};
-const feedReader=msg=>{const s=live;if(!s)return;try{const e=parseReader(msg);if(s.sample&&!s.sample.done&&msg?.type!=='hostFrame'&&msg?.kind!=='selfCheck')s.sample.rawReader(msg);if(!e)return;sampleEvent(s,e);s.check.event(e);}catch{}};
+const feedReader=msg=>{const s=live;if(!s)return;try{const e=parseReader(msg);if(s.sample&&!s.sample.done&&msg?.type!=='hostFrame'&&msg?.kind!=='selfCheck')s.sample.rawReader(msg);if(!e){if(msg?.kind==='cardinalPair')s.check.reader(msg);return;}sampleEvent(s,e);s.check.event(e);}catch{}};
 /* diagnostics: the running game's record + its windows, for info.json */
-function diagnostic(){const s=live;if(!s)return null;return auto.diagnostic(s.stored,s.check.windows);}
+function diagnostic(){const s=live;if(!s)return null;return auto.diagnostic(s.stored,s.check.windows,s.check.w.lines);}
 module.exports={start,stop,recalibrate,feedTrace,feedReader,diagnostic,current:()=>live,choose,inputOf};

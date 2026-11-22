@@ -106,7 +106,7 @@ function originalTextState(root,id){
 }
 /* 2026-11-21 the game diff calibrated on this PC and the self-check windows of the running game (docs/auto-profile.md): the
    upload format the server aggregates; no paths, the program name only */
-function autoProfile(root,executable,engine){try{const ap=require('../core/auto-profile.cjs');const key=executable?ap.exeKeySync(root,executable):'';if(!key)return null;let windows=[];try{const cur=require('./self-check-live.cjs').current();if(cur&&cur.key===key)windows=cur.check.windows;}catch{}return ap.diagnostic(ap.load(root,key),windows);}catch{return null;}}
+function autoProfile(root,executable,engine){try{const ap=require('../core/auto-profile.cjs');const key=executable?ap.exeKeySync(root,executable):'';if(!key)return null;const cur=require('./self-check-live.cjs').current();const check=cur?.reader.root===root&&cur.key===key?cur.check:null;return ap.diagnostic(ap.load(root,key),check?.windows,check?.w.lines??null);}catch{return null;}}
 function osInfo(){let version='';try{version=os.version();}catch{}return {platform:process.platform,release:os.release(),version,arch:process.arch,node:process.version,locale:Intl.DateTimeFormat().resolvedOptions().locale};}
 function findScreenshot(root,executable,maxAgeMs=6*3600*1000){
  const dirs=[path.join(root,'data','screenshots'),path.join(root,'logs','screenshots'),path.join(root,'logs')];const base=executable?path.basename(executable,path.extname(executable)).toLowerCase():'';let best=null;
