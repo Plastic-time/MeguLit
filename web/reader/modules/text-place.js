@@ -52,6 +52,7 @@
     'body.megulit-place-game-drawn .sentence-window.tomoyo-hook-reader .tomoyo-cn-row{visibility:visible!important}',
     'body.megulit-place-game-drawn.megulit-game-embedded .sentence-window.tomoyo-hook-reader .tomoyo-cn-row{visibility:hidden!important}',
     /* layer 4 page model: older lines of the page (their own .sentence-text, placed like the current one) */
+    'body.megulit-cleared-translation .tomoyo-hook-reader .tomoyo-cn-row{display:none!important}',
     'body.megulit-place-asleep .sentence-window.tomoyo-hook-reader{visibility:hidden!important}',
     'body:not(.megulit-placed) .megulit-old-line{display:none!important}',
     '#megulit-page-ahead{position:fixed;left:0;top:0;width:0;height:0;pointer-events:none}','#megulit-page-ahead>i{position:fixed;display:block;pointer-events:none;background:none}',
@@ -384,12 +385,15 @@
     for (const [p, v] of [['-webkit-text-fill-color', 'transparent'], ['-webkit-text-stroke-width', '0px'], ['text-shadow', 'none'], ['paint-order', 'normal']]) t.style.setProperty(p, v, 'important');
   }
   const DASH = /^[‒-―─━⸺⸻]+$/;
+  function glyphSize(shown, boxes) {
+    const cjk = boxes.filter((r, j) => r && shown[j] && /[^\x00-\x7f｡-ﾟ]/.test(shown[j].textContent)).map(r => r[2]);
+    return Math.max(6, median(cjk) || median(boxes.filter(Boolean).map(r => r[3])));
+  }
   /* put a sentence's character tokens on their boxes (boxes[j] for the j-th shown token; a missing box = not drawn yet) */
   function layout(sentence, boxes, geom) {
     const tokens = [...sentence.querySelectorAll('.char-token')].filter(t => !t.closest('.tome-page-lines'));
     const shown = tokens.filter(t => !t.hasAttribute('data-tomoyo-leading-space') && !blank(t.textContent));
-    const cjk = boxes.filter((r, j) => r && shown[j] && /[^\x00-\x7f｡-ﾟ]/.test(shown[j].textContent)).map(r => r[2]);
-    const size = Math.max(6, median(cjk) || median(boxes.filter(Boolean).map(r => r[3])));
+    const size = glyphSize(shown, boxes);
     for (const t of tokens) if (!shown.includes(t)) t.classList.add('megulit-unplaced');
     const place = new Map();
     shown.forEach((t, j) => { const r = boxes[j]; if (!r) { t.classList.add('megulit-unplaced'); return; } t.classList.remove('megulit-unplaced'); place.set(t, r); });
@@ -471,11 +475,14 @@
       if (reveal.n > have) reveal.n = have;
       else if (reveal.n < have && nowT - reveal.t >= 8) { reveal.n = Math.min(have, reveal.n + Math.max(1, (have - reveal.n) * (nowT - reveal.t) / 100)); reveal.t = nowT; }
       if (reveal.n < have) schedule(); else reveal.t = nowT;
-      const { place, size } = layout(sentence, cur.rects.slice(at, at + Math.floor(reveal.n)).map(map), geom);
+      const visible = Math.floor(reveal.n);
+      const boxes = cur.rects.slice(at, at + (page.engineRows ? have : visible)).map(map);
+      const revealed = layout(sentence, boxes.slice(0, visible), geom);
       const row = win.querySelector('.tomoyo-cn-row');
-      // The translation follows the reported line even while its Japanese glyphs are revealing.
-      const all = page.engineRows ? cur.rects.slice(at, at + n).filter(Boolean).map(map).filter(r => r && r[2] > 0 && r[3] > 0) : [...place.values()];
+      // Anchor and size a native row's translation from its report, including the still-unrevealed glyphs.
+      const all = page.engineRows ? boxes.filter(Boolean) : [...revealed.place.values()];
       if (row && all.length) {
+        const size = page.engineRows ? glyphSize(revealed.shown, boxes) : revealed.size;
         const x0 = Math.min(...all.map(r => r[0])), y0 = Math.min(...all.map(r => r[1])), x1 = Math.max(...all.map(r => r[0] + r[2])), y1 = Math.max(...all.map(r => r[1] + r[3]));
         const only = body.classList.contains('tomoyo-gal-zh-only');
         set(row, 'left', x0 + 'px'); set(row, 'top', (only ? y0 : y1 + size * .25) + 'px');
@@ -629,6 +636,11 @@
     frame = 0;
     if (waits.size) flushWaits();
     drawExtras();
+    // A native clear can precede retirement of the reader sentence and its asynchronous translation.
+    const cleared = on && page?.engineRows && !page.lines.length && goneText;
+    const reader = cleared ? readerLine() : null;
+    const hideTranslation = !!cleared && (!reader || reader === goneText || reader === page.retiredReader);
+    document.body.classList.toggle('megulit-cleared-translation', hideTranslation);
     if (page) return applyPage();
     if (!on || !line) { document.body.classList.remove('megulit-place-garbled'); release(); gameDrawn(); return; }
     if (line.cleared) {
@@ -830,7 +842,30 @@
   const pageGone = () => { for (const n of document.querySelectorAll('.megulit-old-line')) n.remove(); clones.clear(); document.body.classList.remove('megulit-place-asleep'); };
   /* 2026-11-15 `elsewhere` (core/overlay-placement.cjs page()): the layer is not armed and another path hides the game's
      line (write-back, glyph layer); the page says nothing about the line, so the reader places it as without a page */
-  b.textPlacePage = m => { const had = !!page; if (m?.elsewhere === true || !m || !Array.isArray(m.lines)) { if (pageOwn) { pageOwn = false; briefSync(false); } } if (m?.elsewhere === true) { page = null; drawnByGame = ''; if (had) { pageGone(); dropOld(null); document.getElementById('megulit-page-ahead')?.replaceChildren(); document.body.classList.remove('megulit-place-game-drawn'); } schedule(); return; } page = m && Array.isArray(m.lines) ? { awake: m.awake === true, armed: m.armed === true, lines: m.lines.filter(l => l && typeof l.text === 'string' && Array.isArray(l.rects)), client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] } : null; if (page) { line = null; drawnByGame = ''; } else if (had) pageGone(); schedule(); };
+  b.textPlacePage = m => {
+    const had = !!page;
+    if (m?.elsewhere === true || !Array.isArray(m?.lines)) {
+      if (pageOwn) { pageOwn = false; briefSync(false); }
+    }
+    if (m?.elsewhere === true) {
+      page = null; drawnByGame = '';
+      if (had) { pageGone(); dropOld(null); document.getElementById('megulit-page-ahead')?.replaceChildren(); document.body.classList.remove('megulit-place-game-drawn'); }
+      schedule(); return;
+    }
+    page = Array.isArray(m?.lines) ? {
+      awake: m.awake === true, armed: m.armed === true, engineRows: m.engineRows === true,
+      lines: m.lines.filter(l => l && typeof l.text === 'string' && Array.isArray(l.rects)),
+      client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight]
+    } : null;
+    if (page) {
+      if (page.engineRows && !page.lines.length && goneText) {
+        const reader = readerLine();
+        if (goneText.includes(reader)) page.retiredReader = reader;
+      }
+      line = null; drawnByGame = '';
+    } else if (had) pageGone();
+    schedule();
+  };
   b.textPlaceExtra = m => { extras = { items: Array.isArray(m?.items) ? m.items.filter(i => i && typeof i.text === 'string' && Array.isArray(i.rects)) : [], client: Array.isArray(m?.client) ? m.client : null }; schedule(); };
   let modeGame = null;
   b.textPlaceMode = m => { on = m?.on === true; document.body.classList.toggle('megulit-anchor-mode', on && anchorMode); if (on) bindAdvance(); if (!on) stale.clear(); if (!on) waits.clear(); if (!on) { orphans = []; orphanWait = null; } const g = m && 'game' in m ? String(m.game || '') : modeGame; if (!on || g !== modeGame) { anchor = null; anchorLine = ''; cnBelow = { key: null, below: false }; } modeGame = g; if (!on) { document.body.classList.remove('megulit-place-gone'); if (pageOwn) { pageOwn = false; briefSync(false); } line = null; drawnByGame = ''; if (page) { page = null; pageGone(); } } schedule(); };

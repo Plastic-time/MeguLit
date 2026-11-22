@@ -202,3 +202,62 @@ test('replay 02:57Z: no line comes back after a click, the reader keeps drawing 
     assert.deepEqual(race.fx, { paired: 6, orphan: 0, sent: false });
   } finally { await browser.close(); }
 });
+
+test('18:34 native clear and wrapped line keep the translation off the fallback box on every paint', async t => {
+  let chromium;
+  try { ({ chromium } = require(process.env.MEGULIT_PLAYWRIGHT || 'H:/MeguLit-Work/pw/node_modules/playwright-core')); }
+  catch { t.skip('no playwright-core'); return; }
+  const [first, clear, wrapped] = require('./fixtures/games/fata-morgana/translation-page-turn.json');
+  const { p, feed } = placementRig();
+  p.profile = require('../core/profiles/index.cjs').profileFor({ exe: 'D:/Games/fata_jp.exe', engine: 'KiriKiri' });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await page.setContent('<style>.sentence-window{position:fixed;left:160px;top:450px}</style><main><div class="sentence-window tomoyo-hook-reader"><div class="sentence-text"></div><div class="tomoyo-cn-row"></div></div></main>');
+    await page.evaluate(() => {
+      window.__tomoyoChinese = { galLayoutInfo: () => ({ clientX: 50, clientY: 20, clientWidth: 804, clientHeight: 604 }) };
+    });
+    await page.addScriptTag({ path: path.join(root, 'web/reader/modules/text-place.js') });
+    await page.clock.install({ time: new Date('2026-11-22T09:34:00Z') });
+    await page.clock.pauseAt(new Date('2026-11-22T09:34:01Z'));
+    await page.evaluate(() => window.__tomoyoChinese.textPlaceMode({ on: true }));
+    const show = async (raw, cn) => {
+      const messages = feed(raw);
+      await page.evaluate(({ messages, cn }) => {
+        if (cn) {
+          const text = messages.find(m => m.type === 'textPlace').text;
+          document.querySelector('.sentence-text').replaceChildren(...[...text].map(c => {
+            const span = document.createElement('span'); span.className = 'char-token'; span.textContent = c; return span;
+          }));
+          document.querySelector('.tomoyo-cn-row').textContent = cn;
+        }
+        for (const m of messages) window.__tomoyoChinese[m.type](m);
+      }, { messages, cn });
+    };
+    const sample = () => page.locator('.tomoyo-cn-row').evaluate(row => {
+      const rect = row.getBoundingClientRect();
+      return { visible: row.checkVisibility({ visibilityProperty: true, opacityProperty: true }), x: rect.x, y: rect.y };
+    });
+    await show(first, '早安，老爷……');
+    await page.clock.runFor(550);
+    assert.equal((await sample()).x, 120);
+    await show(clear);
+    await page.clock.runFor(16);
+    const cleared = await sample();
+    await page.locator('.tomoyo-cn-row').evaluate(row => { row.textContent += '?'; });
+    await page.clock.runFor(32);
+    assert.equal((await sample()).visible, false, 'a late translation cannot repaint the retired line');
+    await show(first.replace('line=44 ', 'line=45 '), '???????');
+    await page.clock.runFor(16);
+    assert.equal((await sample()).visible, true, 'a new report can show the same sentence again');
+    await show(wrapped, '直直地盯着下仆……');
+    const frames = [];
+    for (let i = 0; i < 34; ++i) {
+      await page.clock.runFor(16);
+      frames.push(await sample());
+    }
+    assert.deepEqual({ cleared: cleared.visible, uniquePositions: [...new Set(frames.map(f => f.x + ',' + f.y))] },
+      { cleared: false, uniquePositions: [frames.at(-1).x + ',' + frames.at(-1).y] });
+    assert.ok(frames.every(f => f.visible && f.x === 120 && f.y > 20 + 520 + 22));
+  } finally { await browser.close(); }
+});
