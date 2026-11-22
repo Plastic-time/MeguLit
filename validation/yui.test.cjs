@@ -27,7 +27,7 @@ test('consent, startup history, bounded offline retry and revocation',async t=>{
 });
 test('relay validates fields and merges concurrent deliveries including ambiguous GitHub create',async()=>{
  const {yuiPost,syncYui}=await import('../relay/src/yui.js');
- const sql=new DatabaseSync(':memory:');sql.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0031_yui.sql'),'utf8'));
+ const sql=new DatabaseSync(':memory:');sql.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0032_yui.sql'),'utf8'));
  const issues=[],env={GITHUB_TOKEN:'mock',DB:{prepare:q=>({bind:(...v)=>({run:()=>sql.prepare(q).run(...v),first:()=>sql.prepare(q).get(...v),all:()=>({results:sql.prepare(q).all(...v)})})})},fetch:async(url,{method,body})=>{
   if(method==='GET')return {ok:true,json:async()=>issues};
   if(method==='POST'){issues.push({...JSON.parse(body),number:42});throw Error('simulated lost response');}
