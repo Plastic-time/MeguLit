@@ -21,7 +21,7 @@
 /* The eden* launch treatment is local to game details. The progress uses the existing launch tracker. */
 @layer story-detail-responsive{
  .main[data-kids~="dtv-bg"] .detail-actions>button.detail-launch{
-  position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;overflow:hidden;
+  position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;overflow:hidden;isolation:isolate;
   min-width:min(128px,100%);min-height:48px!important;padding:8px 16px!important;
   border:1px solid #ae8159!important;border-radius:10px!important;
   color:#fff0df!important;background:radial-gradient(ellipse at 20% 45%,#8a2535,#551d28 56%,#302022)!important;
@@ -32,10 +32,11 @@
  .main[data-kids~="dtv-bg"] .detail-launch:active:not(:disabled){background:#571c29!important}
  .main[data-kids~="dtv-bg"] .detail-launch:focus-visible{outline:2px solid var(--g-gold,#edb56e)!important;outline-offset:3px!important}
  .main[data-kids~="dtv-bg"] .detail-launch:disabled:not([aria-busy=true]):not([data-launch-state=failed]){opacity:.55!important}
- .main[data-kids~="dtv-bg"] .detail-launch[aria-busy=true]::after{
-  content:"";position:absolute;inset:auto auto 2px 3px;height:2px;width:calc((100% - 6px) * var(--lp-progress,0));
-  border-radius:1px;background:#edb56e;
+ .main[data-kids~="dtv-bg"] .detail-launch[aria-busy=true]::before{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:#edb56e38;transform-origin:left;transform:scaleX(var(--lp-progress,0));
  }
+ .main[data-kids~="dtv-bg"] .detail-launch[data-launch-state=failed]::before{background:#190d1366}
  .main[data-kids~="dtv-bg"] .detail-launch[data-launch-state=failed]{border-color:#db6673!important}
  @media(max-width:1000px){
   .main[data-kids~="dtv-bg"] .detail-actions>button.detail-launch{min-width:auto;min-height:38px!important;padding:8px 12px!important;gap:6px;font-size:14px!important}
@@ -45,6 +46,21 @@
  }
 }
 .detail-actions .detail-launch-mark{width:12px;height:12px;flex:none;fill:#ffd7a0;filter:drop-shadow(0 0 3px #ffd7a080)}
+@media (prefers-reduced-motion:no-preference){
+ .detail-actions .detail-launch-mark{transform-origin:center;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+ .detail-actions .detail-launch:hover:not(:disabled,[aria-busy=true],[data-launch-state=failed]) .detail-launch-mark{
+  transform:rotate(90deg) scale(1.2);
+ }
+ .detail-actions .detail-launch:hover:not(:disabled,[aria-busy=true],[data-launch-state=failed])::after{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:var(--star-seal-dust);animation:detail-launch-stardust .7s ease-out both;
+ }
+}
+@keyframes detail-launch-stardust{
+ from{opacity:0;transform:translate(-8px,3px)}
+ 30%{opacity:1}
+ to{opacity:0;transform:translate(5px,-3px)}
+}
 .main[data-kids~="dtv-bg"] .detail-title>.detail-engine{
  display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;
 }

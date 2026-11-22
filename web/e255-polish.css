@@ -1,6 +1,12 @@
 /* E255 魔导书星章按钮、设置页对齐与主题同步（最后加载，覆盖旧层） */
 
 /* ---------- 1. 主按钮：星章魔导书签 ---------- */
+:root{
+ --star-seal-dust:
+  radial-gradient(1.2px 1.2px at 78% 28%,rgba(255,226,180,.9),transparent 70%),
+  radial-gradient(1px 1px at 88% 66%,rgba(255,226,180,.7),transparent 70%),
+  radial-gradient(1px 1px at 64% 78%,rgba(255,226,180,.5),transparent 70%);
+}
 body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button){
  position:relative!important;isolation:isolate;overflow:hidden!important;
  height:48px!important;min-height:48px!important;min-width:128px!important;
@@ -8,9 +14,7 @@ body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button){
  border:0!important;border-radius:10px!important;clip-path:none!important;color:#fbeedd!important;
  font-size:16px!important;letter-spacing:.08em;font-weight:600;
  background:
-  radial-gradient(1.2px 1.2px at 78% 28%,rgba(255,226,180,.9),transparent 70%),
-  radial-gradient(1px 1px at 88% 66%,rgba(255,226,180,.7),transparent 70%),
-  radial-gradient(1px 1px at 64% 78%,rgba(255,226,180,.5),transparent 70%),
+  var(--star-seal-dust),
   radial-gradient(120% 140% at 0% 50%,rgba(196,40,58,.55),transparent 62%),
   linear-gradient(135deg,#3a1720 0%,#2a1219 45%,#1d1016 100%)!important;
  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold-accent,#edb56e) 42%,transparent),inset 0 0 0 3px rgba(20,10,12,.55),inset 0 0 0 4px color-mix(in srgb,var(--gold-accent,#edb56e) 14%,transparent),

@@ -19,7 +19,74 @@ function hero(locale,title){
  vm.runInNewContext(labels+'\nconst w=labels[locale];'+template,context);
  return context.main.innerHTML;
 }
-test('detail hero keeps actions in one row and statistics in one column',async()=>{
+async function assertLaunchMotion(page){
+ await page.evaluate(html=>{document.querySelector('main').innerHTML=html;},hero('zh','海市蜃楼之馆'));
+ const center=await page.evaluate(()=>{
+  const {x,y,width,height}=document.querySelector('.detail-launch').getBoundingClientRect();
+  return {x:x+width/2,y:y+height/2};
+ });
+ const move=point=>page.c.send('Input.dispatchMouseEvent',{type:'mouseMoved',...point});
+ const motion=()=>page.evaluate(()=>{
+  const button=document.querySelector('.detail-launch'),star=button.querySelector('svg'),dust=getComputedStyle(button,'::after');
+  return {hover:button.matches(':hover'),turn:getComputedStyle(star).transform,dust:dust.animationName,paint:dust.backgroundImage};
+ });
+ await page.c.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+ await move(center);
+ const hover=await motion();
+ assert.equal(hover.hover,true);
+ assert.equal(hover.dust,'detail-launch-stardust');
+ assert.match(hover.paint,/radial-gradient/);
+ await page.waitForFunction(()=>getComputedStyle(document.querySelector('.detail-launch-mark')).transform==='matrix(0, 1.2, -1.2, 0, 0, 0)');
+ await page.c.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+ const reduced=await motion();
+ assert.equal(reduced.turn,'none');
+ assert.equal(reduced.dust,'none');
+ const app=read('app.js');
+ await page.evaluate(app.slice(app.indexOf('const LAUNCHING='),app.indexOf('async function startGame'))+
+  '\nconst locale="zh";markLaunching(document.querySelector(".detail-launch"),true);');
+ const progress=await page.evaluate(()=>{
+  const button=document.querySelector('.detail-launch'),label=button.querySelector('span');
+  button.disabled=true;
+  return [.25,.75].map(value=>{
+   button.style.setProperty('--lp-progress',value);
+   const overlay=getComputedStyle(button,'::before');
+   return {
+    scale:new DOMMatrix(overlay.transform).a,
+    fullHeight:parseFloat(overlay.height)===button.clientHeight,
+    paint:overlay.backgroundColor,
+    belowLabel:overlay.zIndex==='-1'&&getComputedStyle(button).isolation==='isolate',
+    label:label.textContent
+   };
+  });
+ });
+ assert.deepEqual(progress.map(state=>state.scale),[.25,.75]);
+ for(const state of progress){
+  assert.equal(state.fullHeight,true);
+  assert.equal(state.belowLabel,true);
+  assert.equal(state.paint,'rgba(237, 181, 110, 0.22)');
+  assert.equal(state.label,'启动中…');
+ }
+ await move({x:0,y:0});
+}
+async function assertMemoriesScrollbars(page){
+ const results=await page.evaluate(()=>{
+  const host=document.querySelector('main');
+  host.innerHTML='<div class="story-ending-list"></div><div class="story-page"></div><div class="tomoyo-selection-card"></div>';
+  return ['dark','light'].map(theme=>{
+   document.documentElement.dataset.theme=theme;
+   return [...host.children].map(el=>{
+    const style=getComputedStyle(el),bar=getComputedStyle(el,'::-webkit-scrollbar'),thumb=getComputedStyle(el,'::-webkit-scrollbar-thumb');
+    return [style.scrollbarWidth,style.scrollbarColor,bar.width,bar.height,thumb.backgroundColor];
+   });
+  });
+ });
+ for(const [index,thumb] of ['rgba(255, 255, 255, 0.42)','rgba(0, 0, 0, 0.38)'].entries()){
+  assert.deepEqual(results[index][0],['auto','auto','12px','12px',thumb],'horizontal ending list');
+  assert.deepEqual(results[index][1],['auto','auto','12px','12px',thumb],'vertical memories viewport');
+  assert.deepEqual(results[index][2].slice(0,4),['none','auto','0px','0px'],'selection overlay');
+ }
+}
+test('detail hero layout, launch motion and memories scrollbar styles',async()=>{
  const browser=await launch({viewport:{width:1360,height:900}}),page=browser.page;
  try{
   page.route(url=>{const u=new URL(url);if(u.origin!=='https://detail.invalid')return 'abort';const file=path.resolve(web,'.'+decodeURIComponent(u.pathname));if(!file.startsWith(web+path.sep)||!fs.existsSync(file))return 'abort';return {body:fs.readFileSync(file),headers:{'content-type':file.endsWith('.css')?'text/css':'application/octet-stream'}};});
@@ -27,6 +94,7 @@ test('detail hero keeps actions in one row and statistics in one column',async()
   await page.goto('data:text/html;charset=utf-8,'+encodeURIComponent(html));
   await page.evaluate(read('primary-buttons.js').replace('export function ','function '));
   await page.evaluate(()=>document.fonts.ready.then(()=>true));
+  await assertLaunchMotion(page);
   for(const width of [1360,1100,800,620,500]){
    await page.c.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
    for(const locale of ['zh','ja','en'])for(const title of ['海市蜃楼之馆','ファタモルガーナの館 — The House in Fata Morgana — 長い作品名の折り返し確認']){
@@ -62,5 +130,6 @@ test('detail hero keeps actions in one row and statistics in one column',async()
     }
    }
   }
+  await assertMemoriesScrollbars(page);
  }finally{await browser.close();console.log('Detail layout headless browser closed: '+browser.pid);}
 });

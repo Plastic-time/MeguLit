@@ -16,7 +16,6 @@ html{color-scheme:dark;background:transparent}html,body{margin:0!important;width
 #card-content.compact-eggroll .SentenceList{min-height:0!important;padding-block:10px!important;margin-block:4px!important}
 #card-content.compact-eggroll [data-tome-duplicate]{display:none!important}
 #media-error{position:fixed;bottom:8px;left:8px;right:8px;padding:8px 12px;border-radius:8px;background:#4b2230;color:#ffe2ea;font:13px/1.5 sans-serif;pointer-events:none}
-::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:#ffffff30;border-radius:8px}
 
 /* The answer shows the kanji word's hiragana reading on its own line above part of speech and meaning (user). */
 @media(min-width:1000px) and (min-height:620px){
