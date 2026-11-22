@@ -352,7 +352,7 @@ if (-not $webview) {
   $choice.Controls.Add($link)
 }
 $confirm = New-Object Windows.Forms.Button; $confirm.Text = '安装 Install'; $confirm.Location = New-Object Drawing.Point(508,196); $confirm.Size = New-Object Drawing.Size(180,38)
-$confirm.Font = New-Object Drawing.Font($ui, 11, [Drawing.FontStyle]::Bold); Style-Button $confirm $true; $choice.Controls.Add($confirm); $form.AcceptButton = $confirm
+$confirm.Font = New-Object Drawing.Font($ui, 11, [Drawing.FontStyle]::Bold); Style-Button $confirm $true; $choice.Controls.Add($confirm)
 
 # Space the chosen drive needs: unpacked packs (+ the program when it is copied there), plus whatever still has to
 # be downloaded when the staging folder is on that same drive (packs are deleted right after they are unpacked).
@@ -1123,15 +1123,21 @@ function Save-FetchLog($f, $id) {
 # ---- Install: copy MeguLit to the chosen folder, then unpack each pack there as soon as it is downloaded ----
 # Resolve the chosen folder; copy MeguLit there when it is not this folder. Returns $false (and says why) when it cannot.
 $script:moved = $false
+function Resolve-InstallTarget([string]$raw) {
+  $raw = $raw.Trim().Trim('"')
+  if (-not $raw -or -not [IO.Path]::IsPathRooted($raw)) { throw '请填写完整的安装位置，例如 D:\MeguLit' }
+  $target = [IO.Path]::GetFullPath($raw).TrimEnd('\')
+  if ($target -eq $sourceRoot) { return $target }
+  if ($target.StartsWith($sourceRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { throw '安装位置不能放在当前 MeguLit 文件夹里面' }
+  if ((Test-Path $target) -and -not (Test-Path (Join-Path $target 'MeguLit.exe')) -and @(Get-ChildItem -Force $target -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne $stageName }).Count -gt 0) { $target = Join-Path $target 'MeguLit' }
+  $target
+}
 function Use-Target {
   $raw = $pathBox.Text.Trim().Trim('"')
   try { Assert-SetupPath $raw 'installed' -Tree } catch { Say ('隔离测试只能安装到测试目录：' + $_.Exception.Message); return $false }
-  try { $target = [IO.Path]::GetFullPath($raw).TrimEnd('\') } catch { $target = $null }
-  if (-not $raw -or -not $target -or -not [IO.Path]::IsPathRooted($raw)) { Say '请填写完整的安装位置，例如 D:\MeguLit'; return $false }
+  try { $target = Resolve-InstallTarget $raw } catch { Say $_.Exception.Message; return $false }
+  if ($script:webActive -and $target -ine $script:confirmedInstallTarget) { Say '安装路径已变化，请重新确认'; return $false }
   if ($target -ieq $sourceRoot) { return $true }
-  if ($target.StartsWith($sourceRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { Say '安装位置不能放在当前 MeguLit 文件夹里面，换一个位置吧'; return $false }
-  # The staging folder may already live in the suggested folder; it does not make that folder "taken".
-  if ((Test-Path $target) -and -not (Test-Path (Join-Path $target 'MeguLit.exe')) -and @(Get-ChildItem -Force $target -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne $stageName }).Count -gt 0) { $target = Join-Path $target 'MeguLit' }
   try { Assert-SetupPath $sourceRoot 'source' -Tree; Assert-SetupPath $target 'installed' -Tree } catch { Say ('隔离测试路径不安全：' + $_.Exception.Message); return $false }
   if (-not (Writable $target)) { Say ('这个位置不能写入：' + $target + "`n换一个位置吧，例如 D:\MeguLit（Program Files 需要管理员权限）"); return $false }
   $script:copying = $true; Show-State; Note 'copy-start' @{ target = $target }

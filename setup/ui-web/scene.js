@@ -315,7 +315,7 @@
   /* ---------- actions out ---------- */
   const Scene = { cam, onAction: null, goTo, render, THEME, REDUCE, get section() { return section; }, showInstallError() { showError({ kind: 'install' }); }, init(opts) { if (opts && opts.count) buildField(opts.count); apply(); setSteps(); } };
   function act(type, extra) { const m = Object.assign({ type }, extra || {}); if (window.chrome && chrome.webview) chrome.webview.postMessage(m); if (Scene.onAction) Scene.onAction(m); }
-  $('#install').addEventListener('click', () => { $('#install').classList.add('busy'); act('install', { path: $('#path').value, desktop: $('#swDesk').getAttribute('aria-checked') === 'true', menu: $('#swMenu').getAttribute('aria-checked') === 'true' }); });   /* instant press feedback: the button reacts in the same frame, whatever the host does next */
+  $('#install').addEventListener('click', () => { if ($('#install').classList.contains('busy')) return; $('#install').classList.add('busy'); act('install', { path: $('#path').value, desktop: $('#swDesk').getAttribute('aria-checked') === 'true', menu: $('#swMenu').getAttribute('aria-checked') === 'true' }); });   /* instant press feedback: the button reacts in the same frame, whatever the host does next */
   $('#browse').addEventListener('click', () => act('browse')); $('#retry').addEventListener('click', () => act('retry'));
   $('#copylog').addEventListener('click', () => { act('copylog'); $('#copylog').textContent = tr('copied'); }); $('#manual').addEventListener('click', () => act('manual')); $('#launch').addEventListener('click', () => act('launch'));
   document.querySelectorAll('.sw').forEach((b) => b.addEventListener('click', () => b.setAttribute('aria-checked', b.getAttribute('aria-checked') !== 'true')));
@@ -325,6 +325,7 @@
   let quitOpen = false;
   Scene.showQuit = (on) => { quitOpen = on; const el = $('#ui-quit'); if (on) { gsap.set(el, { visibility: 'visible' }); gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.2, overwrite: true }); $('#stay').focus(); } else gsap.to(el, { opacity: 0, duration: 0.18, overwrite: true, onComplete() { el.style.visibility = 'hidden'; } }); };
   $('#btnClose').addEventListener('click', () => {
+    if ($('#install-confirm').open) $('#install-confirm').close('back');
     if (last.phase === 'done' || section === 'done') { act('close'); return; }
     const downloading = last.phase === 'download' || last.phase === 'verify' || last.phase === 'probe';
     $('.card.quit h2').textContent = tr(downloading ? 'quitT' : 'quitCloseT');
@@ -334,7 +335,7 @@
   });
   $('#stay').addEventListener('click', () => Scene.showQuit(false)); $('#leave').addEventListener('click', () => act('close')); $('#btnMin').addEventListener('click', () => act('minimize'));
   $('#drag').addEventListener('mousedown', (e) => { if (e.button === 0) act('dragstart'); });
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (quitOpen) Scene.showQuit(false); else $('#btnClose').click(); } });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#install-confirm').open) { if (quitOpen) Scene.showQuit(false); else $('#btnClose').click(); } });
   { const t = document.getElementById('topLogo'); if (t) t.src = 'logos/logo-orig.svg'; }
   { const map = { '#ui-loc .card h2': 'locT', '#browse': 'change', '#install': 'install', '#ui-loc .note': 'locNote', '#retry': 'retry', '#copylog': 'copylog', '#manual': 'manual', '#doneT': 'doneT', '#launch': 'launch', '.card.quit h2': 'quitT', '.card.quit p': 'quitM', '#stay': 'stay', '#leave': 'leave' };
     for (const [sel, k] of Object.entries(map)) { const el = $(sel); if (el) el.textContent = tr(k === 'locNote' && (window.__waitConfirm || window.__noPrefetch) ? 'locNoteWait' : k); }

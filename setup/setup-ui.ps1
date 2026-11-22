@@ -168,7 +168,7 @@ $optHint = ULabel $opt '' 8.5 $pal.muted
 foreach ($b in $button, $confirm) { $b.Visible = $false }
 $button = New-Btn '取消 Cancel' 9.5 $true $false; $surf.Controls.Add($button)
 $confirm = New-Btn '开始安装 Install' 11 $true $true; $surf.Controls.Add($confirm); $confirm.add_Click({ Confirm-Install })
-$form.AcceptButton = $confirm; $form.CancelButton = $null
+$form.AcceptButton = $null; $form.CancelButton = $null
 
 # error card (replaces the progress block when something fails)
 $err = New-Object MCard; $err.Fill = [Drawing.Color]::FromArgb(44,31,36); $err.Edge = [Drawing.Color]::FromArgb(120,44,62); $err.Outer = $pal.bg; $err.Visible = $false; $surf.Controls.Add($err)

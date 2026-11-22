@@ -37,6 +37,10 @@ html,body{background:transparent!important}
 #chrome .tab button:focus-visible{outline:2px solid #fff;outline-offset:-3px}
 #chrome .notch{position:absolute;left:-10px;top:150px;width:10px;height:70px;background:var(--red);pointer-events:none}
 .scrim{position:absolute;inset:0;background:rgba(10,12,16,.45);pointer-events:auto}
+#install-confirm{margin:auto;width:min(460px,90vw);padding:24px;background:var(--bg2);color:var(--ink);border:1px solid var(--line)}
+#install-confirm::backdrop{background:rgba(10,12,16,.45)}
+#install-confirm p{margin:14px 0 24px;overflow-wrap:anywhere}
+#install-confirm .acts .go,#install-confirm .acts .btn{height:42px}
 .card.quit{right:auto;left:50%;top:50%;width:440px;margin:-130px 0 0 -220px;pointer-events:auto}
 .card.quit p{font-size:14px;margin-top:16px;line-height:1.6}.card.quit .acts{display:flex;align-items:flex-end;gap:8px;margin-top:20px}.card.quit .acts .go{margin:0;flex:1;width:auto;height:46px;font-size:15px}
 /* glass shards (inline svg per shard; edges, bevel and thickness are drawn in the svg) */
@@ -226,6 +230,7 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 <div class="layer" id="ui-done"><div class="big"><span id="doneT"></span><small id="doneEn">All set</small></div><div class="launch"><button class="go" id="launch">开读</button></div></div>
 <div class="layer" id="ui-mini" style="opacity:1;visibility:visible"><div id="mini"></div></div>
 </div>
+<dialog id="install-confirm" aria-labelledby="confirm-install-title"><form method="dialog"><h2 id="confirm-install-title"></h2><p id="confirm-install-path"></p><div class="acts"><button type="submit" class="btn" value="back" id="confirm-install-back" autofocus></button><button type="submit" class="go" value="install" id="confirm-install-go"></button></div></form></dialog>
 <div id="picker" role="dialog" aria-modal="true" aria-label="choose install location"><div class="pk"><div class="pkh"><b id="pkT"></b><span class="crumb" id="pkCrumb"></span><button class="pkx" id="pkClose" aria-label="close">×</button></div><div class="pkl" id="pkSide"></div><div class="pkm" id="pkMain"></div><div class="pkf"><input id="pkNew" maxlength="80" spellcheck="false"><button id="pkMk"></button><span class="pkmsg" id="pkMsg"></span><span class="sp"></span><button id="pkMore"></button><button id="pkCancel"></button><button class="ok" id="pkOk"></button></div></div></div>
 <div id="chrome"><div id="drag"></div><i class="rz" data-e="l"></i><i class="rz" data-e="r"></i><i class="rz" data-e="t"></i><i class="rz" data-e="b"></i><i class="rz" data-e="tl"></i><i class="rz" data-e="tr"></i><i class="rz" data-e="bl"></i><i class="rz" data-e="br"></i><svg class="rzg" viewBox="0 0 14 14" aria-hidden="true"><path d="M13 3 3 13M13 7 7 13M13 11 11 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg><div class="tab"><button id="btnTheme" aria-pressed="false"></button><button id="btnMin" aria-label="最小化 Minimize"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.6"/></svg></button><button id="btnClose" aria-label="关闭 Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.6"/></svg></button></div><div class="notch"></div></div>
 <div class="layer" id="ui-quit"><div class="scrim"></div><div class="card quit"><h2>货还在路上</h2><div class="en">Download in progress</div><p>现在关掉也没关系：已经下好的碎片会保留，下次打开接着下。</p><div class="acts"><button class="go" id="stay">等它到</button><button class="btn" id="leave">回头再来</button></div></div></div>

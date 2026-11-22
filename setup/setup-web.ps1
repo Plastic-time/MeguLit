@@ -34,7 +34,8 @@ function Web-Check([string]$p) {
   $ok = $true; try { [void][IO.Path]::GetFullPath($p); if (-not [IO.Path]::IsPathRooted($p)) { $ok = $false } } catch { $ok = $false }
   if (-not $ok) { return @{ state = 'readonly'; free = 0; need = (Need-Bytes $pathBox.Text) } }
   try { $need = Need-Bytes $p } catch { return @{ state = 'readonly'; free = 0; need = (Need-Bytes $pathBox.Text) } }   # e.g. a drive letter that does not exist
-  @{ state = $(if (Web-Writable $p) { 'ok' } else { 'readonly' }); free = (Drive-Free $p); need = $need }
+  try { $target = Resolve-InstallTarget $p; Assert-SetupPath $target 'installed' -Tree } catch { return @{ state = 'readonly'; free = 0; need = $need } }
+  @{ state = $(if (Web-Writable $target) { 'ok' } else { 'readonly' }); free = (Drive-Free $target); need = $need; target = $target }
 }
 # ---- in-page folder picker (index.html #picker): drives, usual places, recent choices, folders of one level, new folder ----
 function Web-RecentFile { Join-Path $env:LOCALAPPDATA 'MeguLit\setup-recent.json' }
@@ -142,11 +143,18 @@ function Web-Act($m) {
         if ($shim) {
           # variable names here must not collide (case-insensitively) with the logic's own: $C is its colour table, read by the handlers called below
           $chk = Web-Check ([string]$m.path)
+          if ($chk.state -eq 'ok' -and ($chk.target -ine [string]$m.target -or $script:installRequestPending -or $script:confirmed)) {
+            $chk.state = 'readonly'
+          }
           # Answer at once and run the heavy part (copy, shortcuts, starting the unpack) from a timer tick: not inside this web-message callback, so the
           # page's other messages (window drag, resize, close) keep being delivered while it works.
-          if ($chk.state -eq 'ok') { Web-AddRecent ([string]$m.path); $pathBox.Text = [string]$m.path; $deskCheck.Checked = [bool]$m.desktop; $menuCheck.Checked = [bool]$m.menu
+          if ($chk.state -eq 'ok') {
+            $script:installRequestPending = $true
+            $script:confirmedInstallTarget = $chk.target
+            Note 'install-accepted' @{ target = $chk.target }
+            Web-AddRecent ([string]$m.path); $pathBox.Text = [string]$m.path; $deskCheck.Checked = [bool]$m.desktop; $menuCheck.Checked = [bool]$m.menu
             if (-not $script:installTimer) { $script:installTimer = New-Object Windows.Forms.Timer; $script:installTimer.Interval = 30
-              $script:installTimer.add_Tick({ $script:installTimer.Stop(); $t1 = [DateTime]::Now; try { $confirm.PerformClick() } catch { Web-Log ('install failed: ' + $_) }
+              $script:installTimer.add_Tick({ $script:installTimer.Stop(); $t1 = [DateTime]::Now; try { $confirm.PerformClick() } catch { Web-Log ('install failed: ' + $_) } finally { $script:installRequestPending = $false }
                 Web-Log ('install: confirm took ' + [int]([DateTime]::Now - $t1).TotalMilliseconds + ' ms, confirmed=' + $script:confirmed); if (-not $script:confirmed -and $script:mode -ne 'failed') { Web-Post @{ t = 'installfail' } } }) }
             $script:installTimer.Start() }
           Web-Post @{ t = 'reply'; id = $m.id; r = $chk }

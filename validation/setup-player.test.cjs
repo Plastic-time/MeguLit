@@ -66,7 +66,12 @@ test('progress boot keeps real video and sends ready only after first frame and 
       postMessage(m) {
         messages.push(m);
         if (m.type === 'hello') queueMicrotask(() => send({ t: 'info', i: { defaultTarget: 'H:/Fixture' } }));
-        if (m.type === 'checkpath') window.__replyLocation = () => send({ t: 'reply', id: m.id, r: { state: 'ok' } });
+        if (m.type === 'checkpath') {
+          const reply = () => send({ t: 'reply', id: m.id, r: { state: 'ok', target: 'H:/Fixture/MeguLit' } });
+          if (!window.__replyLocation) window.__replyLocation = reply;
+          else queueMicrotask(reply);
+        }
+        if (m.via === 'shim' && m.type === 'install') queueMicrotask(() => send({ t: 'reply', id: m.id, r: { state: 'ok' } }));
       }
     };
   })();`;
@@ -91,7 +96,24 @@ test('progress boot keeps real video and sends ready only after first frame and 
     assert.equal(await ev('__bootMessages.some(m => m.type === "asked")'), true);
     await ev('document.querySelector("#leave").click()');
     assert.equal(await ev('__bootMessages.filter(m => m.type === "close").length'), 1);
-    await ev('void Scene.goTo("unpack", "dive", "loc"); __sendSetupState({ phase: "unpack", unpack: 0.5, n: 1, st: "2", fr: [100], got: 100, total: 100 });');
+    await ev('Scene.showQuit(false); __sendSetupState({ phase: "done", confirmed: true, n: 0, st: "", fr: [] })');
+    await sleep(350);
+    assert.equal(await ev('Scene.section'), 'loc', 'a done snapshot cannot skip path selection');
+    await ev('document.querySelector("#install").click()');
+    await until('document.querySelector("#install-confirm").open');
+    assert.equal(await ev('document.activeElement.id'), 'confirm-install-back');
+    assert.equal(await ev('document.querySelector("#confirm-install-path").textContent'), 'H:/Fixture/MeguLit');
+    assert.equal(await ev('__bootMessages.some(m => m.type === "install" && m.via === "shim")'), false);
+    await ev('document.querySelector("#confirm-install-back").click()');
+    await until('!document.querySelector("#install-confirm").open && !document.querySelector("#install").classList.contains("busy")');
+    assert.equal(await ev('__bootMessages.some(m => m.type === "install" && m.via === "shim")'), false);
+    await ev('__sendSetupState({ phase: "idle", n: 0, st: "", fr: [] }); document.querySelector("#install").click()');
+    await until('document.querySelector("#install-confirm").open');
+    await ev('document.querySelector("#confirm-install-go").click()');
+    await until('Scene.section === "field"');
+    assert.equal(await ev('__bootMessages.find(m => m.type === "install" && m.via === "shim").target'), 'H:/Fixture/MeguLit');
+    assert.equal(await ev('__bootMessages.filter(m => m.type === "install" && m.via === "shim").length'), 1);
+    await ev('__sendSetupState({ phase: "unpack", unpack: 0.5, n: 1, st: "2", fr: [100], got: 100, total: 100 });');
     await until('document.querySelector("#pct").textContent === "50" && getComputedStyle(document.querySelector("#pct")).visibility === "visible"');
     assert.equal(await ev('getComputedStyle(document.querySelector(".stat")).visibility'), 'hidden');
     await ev('__sendSetupState({ phase: "unpack", unpack: 0.75, n: 1, st: "2", fr: [100], got: 100, total: 100 });');

@@ -29,6 +29,10 @@
   /* in-page folder picker (the native window only): disks with free space, usual places, recent choices, one level of folders, new folder, and the modern Explorer dialog as a side door */
   const params = new URLSearchParams(location.search), statusOnly = params.get('boot') === 'progress';
   const EN = params.get('lang') === 'en', L = (zh, en) => (EN ? en : zh);
+  const deployment = document.getElementById('install-confirm');
+  document.getElementById('confirm-install-title').textContent = L('确认安装到此路径？', 'Confirm installation to this location?');
+  document.getElementById('confirm-install-back').textContent = L('返回', 'Back');
+  document.getElementById('confirm-install-go').textContent = L('确认安装', 'Confirm installation');
   const pk = document.getElementById('picker'), pkSide = document.getElementById('pkSide'), pkMain = document.getElementById('pkMain'), pkCrumb = document.getElementById('pkCrumb'), pkMsg = document.getElementById('pkMsg'), pkNew = document.getElementById('pkNew');
   let pkCur = '';
   const gb = (b) => (b / 1073741824 >= 100 ? Math.round(b / 1073741824) : (b / 1073741824).toFixed(1)) + ' GB';
@@ -64,7 +68,34 @@
   Scene.onAction = async (m) => {
     if (m.type === 'checkpath') { clearTimeout(checkTimer); checkTimer = setTimeout(() => check(m.path), 250); }
     else if (m.type === 'browse') { if (native) openPicker(); else { const r = await api('browse'); if (r.path) { pathEl.value = r.path; check(r.path); } } }
-    else if (m.type === 'install') { const c = await api('install', { path: pathEl.value, desktop: m.desktop, menu: m.menu }); const b = document.getElementById('install'); if (c.state && c.state !== 'ok') { if (b) b.classList.remove('busy'); Scene.setFree(c.free || 0, c.need || 0, c.state === 'protected' ? 'protected' : 'readonly'); return; } installed = true; goTo('field', 'under'); }   /* the host answers at once (the heavy copy runs after the reply); a later failure comes as install-failed */
+    else if (m.type === 'install') {
+      const button = document.getElementById('install');
+      if (section !== 'loc' || deployment.open || installed) return;
+      const path = m.path.trim();
+      if (native) {
+        const location = await check(path);
+        if (location.state !== 'ok' || !location.target || path !== pathEl.value.trim() || section !== 'loc') {
+          button.classList.remove('busy');
+          return;
+        }
+        document.getElementById('confirm-install-path').textContent = location.target;
+        deployment.returnValue = '';
+        deployment.showModal();
+        if (!await new Promise(resolve => deployment.addEventListener('close', () => resolve(deployment.returnValue === 'install'), { once: true }))) {
+          button.classList.remove('busy');
+          return;
+        }
+        m.target = location.target;
+      }
+      const c = await api('install', { path, target: m.target, desktop: m.desktop, menu: m.menu });
+      if (c.state !== 'ok') {
+        button.classList.remove('busy');
+        Scene.setFree(c.free || 0, c.need || 0, c.state === 'protected' ? 'protected' : 'readonly');
+        return;
+      }
+      installed = true;
+      goTo('field', 'under');
+    }
     else if (m.type === 'retry') { api('retry'); }
     else if (m.type === 'copylog') api('copylog'); else if (m.type === 'manual') api('manual'); else if (m.type === 'launch') api('launch'); else if (m.type === 'minimize') { if (!native) api('minimize'); } else if (m.type === 'close') { api('close'); if (!native) setTimeout(() => window.close(), 400); }
   };
@@ -89,7 +120,7 @@
     setTimeout(poll, 150);
     if (!state) return; const p = state.phase;
     if (installed && (p === 'unpack') && section !== 'unpack' && section !== 'done') goTo('unpack', 'dive');
-    if (p === 'done' && section !== 'done') { if (section === 'loc' || section === 'welcome') { installed = true; } goTo('done', 'pull'); }
+    if (installed && p === 'done' && section !== 'done') goTo('done', 'pull');
     if (p === 'downloaded' && installed && section === 'field') { /* waiting for the engine to start unpacking */ }
   }
   function frame() { const s = snapshot(); if (s) Scene.render(s); setTimeout(() => requestAnimationFrame(frame), 33); }
