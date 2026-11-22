@@ -24,8 +24,14 @@ test('18:32 legacy Saya OCR selects the script page and clears it on an unreadab
   group(3, partial, {once:true});
   hook.sayaOcr.flush();
   assert.equal(events.filter(e => e.hookSource).length, 0);
+  const provider = hook.originalText;
+  hook.originalText = null;
   group(4, partial);
   hook.sayaOcr.flush();
+  assert.equal(events.filter(e => e.hookSource).length, 0);
+  hook.originalText = provider;
+  hook.artScanState();
+  assert.equal(hook.state.hookSource,line);
   group(4, partial);
   hook.sayaOcr.flush();
   const sources = events.filter(e => e.hookSource);

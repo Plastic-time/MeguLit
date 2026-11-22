@@ -380,7 +380,7 @@ class HookNative{
   (this.sayaOcr??=new SayaPageOcr(this)).update(m);
   return true;
  }
- artScanState(now=this.now(),quiet=2000){const hidden=this.engineDialog===false,line=String(this.lastSource||'').trim(),own=!!line&&(this.ocr?.lastText===line||this.state?.hookSourceEngine==='saya-page-ocr'),current=!!line&&!hidden&&!own;
+ artScanState(now=this.now(),quiet=2000){this.sayaOcr?.providerReady();const hidden=this.engineDialog===false,line=String(this.lastSource||'').trim(),own=!!line&&(this.ocr?.lastText===line||this.state?.hookSourceEngine==='saya-page-ocr'),current=!!line&&!hidden&&!own;
   const on=hidden||!line||own||now-(this.lastSourceAt||0)>quiet;
   return {on,dialog:current?line.slice(0,600):'',speaker:current?String(this.state?.hookSpeaker||'').slice(0,40):'',band:current,foreign:this.foreignArtReady()};}
  /* 2026-11-19 (素晴らしき日々: the opening quotes 「私（あるいはこれを読むあなた）は世界に属さない。」 are pictures, no stream carries them; every

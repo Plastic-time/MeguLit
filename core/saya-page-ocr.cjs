@@ -45,6 +45,9 @@ function scriptLookup(lines) {
 class SayaPageOcr {
  constructor(hook) { this.hook = hook; this.visible = new Map(); }
  stop() { clearTimeout(this.timer); this.visible.clear(); }
+ providerReady() {
+  if (this.visible.size && this.provider !== this.hook.originalText) this.flush();
+ }
  update(m) {
   if (m.once || m.id == null) return;
   if (m.visible && m.text && !m.dialogSeen) this.visible.set(m.id, m.text);
@@ -56,8 +59,17 @@ class SayaPageOcr {
  flush() {
   const h = this.hook;
   if (!legacyExe(h.target?.name) || !h.windowState?.bound) return;
+  this.provider = h.originalText;
   const own = h.state.hookSourceEngine === 'saya-page-ocr' && h.state.hookSourceOrigin === 'ocr';
-  if (!own && h.lastSource && h.now() - h.lastSourceAt < 5000) return;
+  const quiet = h.now() - h.lastSourceAt;
+  if (!own && h.lastSource && quiet < 5000) {
+   if (this.visible.size) {
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.flush(), 5000 - quiet);
+    this.timer.unref?.();
+   }
+   return;
+  }
   const lines = new Set();
   for (const text of this.visible.values()) {
    const line = h.originalText?.sayaPageLine?.(text);
