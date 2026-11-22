@@ -82,12 +82,12 @@ class HookNative{
  trace(message){try{const file=path.join(this.layout.logs||path.join(this.folder,"..","logs"),"hook-events.log");require("./log-sink.cjs").append(file,new Date().toISOString()+" "+message+"\n",{rotate:1048576});}catch{}/* 2026-11-21 the live self-check (services/self-check-live.cjs) reads every trace line */try{HookNative.traceTap?.(String(message));}catch{}}
  /* 2026-11-21 layered game profile (core/profiles): kernel <- engine diff <- game diff. Every per-engine / per-game branch of the
     kernel reads this.profile (never the program name); the reader gets the same object as hookState gameProfile. */
- setProfile(profile,input){if(!profile||typeof profile!=='object')return;const before=JSON.stringify(this.bridgeProfile());if(input!==undefined)this.profileInput=input&&typeof input==='object'?input:null;this.profile=require('./owner-tests.cjs').apply(profile,this.ownerTestGrant,{exe:this.profileInput?.exe,engine:profile.engine});this.drawSync();this.trace(Profiles.traceLine(this.profile));this.notify({gameProfile:this.profile});
+ setProfile(profile,input){if(!profile||typeof profile!=='object')return;const before=JSON.stringify(this.bridgeProfile());if(input!==undefined)this.profileInput=input&&typeof input==='object'?input:null;this.profile=require('./owner-tests.cjs').apply(profile,this.ownerTestGrant,{exe:this.profileInput?.exe,engine:profile.engine});this.sadisticPage=require('./sadistic-blood-layout.cjs').load(this.profileInput?.exe,this.profile.exeSha256);this.drawSync();this.trace(Profiles.traceLine(this.profile));this.notify({gameProfile:this.profile});
   /* HookBridge reads hide.engineTrial.* (native/HookBridge.cs ApplyProfile): at spawn from MEGULIT_PROFILE, afterwards as a message */
   const now=this.bridgeProfile();if(this.process&&JSON.stringify(now)!==before)this.send({type:'profile',...now});}
  setOwnerTestGrant(token){const O=require('./owner-tests.cjs');if(token&&!O.identity(token,this.profileInput?.exe))return false;if(this.ownerTestGrant===token)return;require('./danganronpa-pc-source.cjs').clear(this);this.ownerTestCleanup?.();if(this.ownerTestGrant)O.revoke(this.ownerTestGrant);this.ownerTestGrant=token||null;if(!token)return;const target=this.target;if(!target||!O.bind(token,{pid:target.pid,birth:target.started})){O.revoke(token);this.ownerTestGrant=null;return;}this.ownerTestCleanup=O.onRevoke(token,()=>{this.ownerTestGrant=null;require('./danganronpa-pc-source.cjs').clear(this);this.profile=O.apply(this.profile,null,{});this.enabled=false;this.send({type:'disable',reason:'owner-test-revoked'});this.drawSync();});this.drawSync();}
  /* the part of the profile the bridge reads; keys left at null (kernel rule) are not sent */
- bridgeProfile(){const t=this.profile?.hide?.engineTrial||{},out={};for(const k of ['enabled','unconfirmedLines','clickMs','skipAside'])if(t[k]!==null&&t[k]!==undefined)out[k]=t[k];const profile={engineTrial:out};if(this.profile?.engine==='artemis'&&this.profile?.source?.artemisQuoteSpans===true)profile.artemisQuoteSpans=true;return profile;}
+ bridgeProfile(){const t=this.profile?.hide?.engineTrial||{},out={};for(const k of ['enabled','unconfirmedLines','clickMs','skipAside'])if(t[k]!==null&&t[k]!==undefined)out[k]=t[k];const profile={engineTrial:out};if(this.sadisticPage)profile.sadisticTrialLayout=true;if(this.profile?.engine==='artemis'&&this.profile?.source?.artemisQuoteSpans===true)profile.artemisQuoteSpans=true;return profile;}
  /* a game the library knows no engine for: the first page record of an engine text path (krkr -> kirikiri) adds that engine's diff */
  learnEngine(name){try{if(this.profile?.engine!=='unknown')return;const id=Profiles.engineId(name);if(!id||!Profiles.loadEngine(id))return;this.setProfile(Profiles.profileFor({...(this.profileInput||{}),engine:id}));}catch{}}
  notify(v){if(Object.entries(v).every(([k,value])=>this.state[k]===value))return;this.state={...this.state,...v};this.emit({type:'hook',...v});}
@@ -479,7 +479,7 @@ class HookNative{
  static retainedPrevious(page,previous,current){if(!previous||!current)return false;let end=0;for(let at=page.indexOf(current);at>=0;at=page.indexOf(current,at+1)){if(at>end&&page.slice(end,at).includes(previous))return true;end=Math.max(end,at+current.length);}return page.slice(end).includes(previous);}
  /* share of the character pairs of `flat` found in the hooked lines of the last ten minutes (0 when nothing to compare) */
  static hookOverlap(flat,recent,now){const t=String(flat||'');if([...t].length<4||!Array.isArray(recent))return 0;const hay=recent.filter(r=>now-r.at<600000).map(r=>r.key).join(String.fromCharCode(10));if(!hay)return 0;const ch=[...t];let n=0,hit=0;for(let i=0;i+1<ch.length;i++){n++;if(hay.includes(ch[i]+ch[i+1]))hit++;}return n?hit/n:0;}
- auxText(m){this.auxPage(m);{const sp=splitSpeaker(m?.text,this.knownSpeakers);if(sp.name&&!sp.text.trim()){this.speaker={text:sp.name,at:this.now()};this.noteSpeaker(sp.name);return;}}/* 2026-11-15 (沙耶の唄, user: 「ocr遮挡又出来了」): the dialogue hook sends each line on two thread contexts; the one not selected
+ auxText(m){if(this.sadisticPage&&['TextOutA','NNNhook'].includes(m.sourceName)&&this.sadisticPage.isRedraw(m.text))return;this.auxPage(m);{const sp=splitSpeaker(m?.text,this.knownSpeakers);if(sp.name&&!sp.text.trim()){this.speaker={text:sp.name,at:this.now()};this.noteSpeaker(sp.name);return;}}/* 2026-11-15 (沙耶の唄, user: 「ocr遮挡又出来了」): the dialogue hook sends each line on two thread contexts; the one not selected
     came here as aux text, went to the art path and its translation was drawn over the game's own line. A line from the same hook
     as the dialogue stream is dialogue, never art text. */
   if(m.sourceName&&this.dialogueHook&&String(m.sourceName)===this.dialogueHook)return;/* nor choice text (user: 「不是选项」) */
@@ -679,6 +679,7 @@ class HookNative{
   if(require('./danganronpa-pc-source.cjs').tagged(m)){if(this.pageNvl())return;this.deliverSource(text,m.origin,'',0,m);return;}
   if(require('./unity-il2cpp-source.cjs').tagged(m)){this.deliverSource(text,m.origin,'',0,m);return;}
   if((require('./unity-kemco-source.cjs').isTaggedSource(m)||require('./artemis-session.cjs').isTaggedSource(m))&&this.pageNvl())return;
+  if(m.sourceName==='NNNhook'&&Number.isInteger(this.sadisticPage?.row(text))){this.deliverSource(text,m.origin,'',0,m);return;}
   this.locatePage(text,m.origin);
   if(this.pageRoute(text,m.origin))return;
   if(!/EmbedToMeCS2_DrawPreserve|EmbedEuphoria474_DrawHide/.test(m.sourceName||'')){this.deliverSource(text,m.origin,'',0,m);return;}
@@ -708,7 +709,7 @@ class HookNative{
  }
  pageLine(m){
   // E320: a flow page (WoH) is laid out by the reader from the text box; the screen OCR locator placed the same lines again (doubles, jumps).
-  if(this.flowPage&&m.engine==='ocr')return;
+  if(m.engine==='ocr'&&(this.flowPage||this.sadisticPage?.isRedraw(m.text)))return;
   this.learnEngine(m.engine);
   if(!Number.isSafeInteger(m.line)||m.line<1||!['begin','end'].includes(m.phase))return;
   const now=this.now(),engine=m.engine,K=this.pageState&&this.pageState.engine===engine?this.pageState:(this.pageReset(),this.pageState={engine,lines:new Map(),held:[],timer:null});

@@ -36,7 +36,7 @@ class HookControl{
   /* 2026-11-21 (owner, test pack v5 ファタモルガーナの館): a game whose engine reports every character's box (KiriKiri page DLL,
      ファタ / 千恋＊万花) is placed from those boxes: calibration never gives way to measure the original, it follows the engine */
   {const cur=h.placement?.current,engineBoxes=!!(cur&&(!cur.fallback||cur.engine==='krkr')&&Array.isArray(cur.rects)&&cur.rects.length);
-   const readerPlaced=cur&&(cur.engine==='glyph'||cur.approx||(cur.fallback&&cur.engine!=='krkr'));
+   const readerPlaced=cur&&(cur.engine==='glyph'||cur.id==='systemnnn-row'||cur.approx||(cur.fallback&&cur.engine!=='krkr'));
    // A blanked ADV dialogue is typeset by the reader. Its engine cells supply the
    // origin, but cannot measure the font, spacing or ink requested in the menu.
    const profile=h.hooks?.profile;
@@ -50,6 +50,7 @@ class HookControl{
     if(h.hooks.preflight){h.hooks.preflight=false;h.hooks.configure?.(h.preferences,h.state);}
     h.hooks.trace?.('calibration: engine boxes, no give way (following the engine coordinates)');
     h.styleSync.status('following');return;}}
+  if (manual) h.placement?.endScriptRow?.();
   h.hooks.onGiveWayCapped=()=>this.giveWayCapped();
   this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');clearTimeout(this.styleTimer);this.styleManual=manual;this.styleRetryLine=null;this.styleAwaitLive=false;this.styleCalibration=true;this.styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleRestore=['embed','euphoria474'].includes(this.plan)&&h.preferences.hookHide!==false;
   h.styleSync.calibrating=true;h.styleSync.waitNext=this.styleRestore||h.hooks.drawsHidden===true;h.hooks.calibrating=true; // E246.1: embedding cleared the current line, so measure the next original line
@@ -106,7 +107,9 @@ class HookControl{
   if(stage==='baseline'&&this.styleCalibration)h.styleSync?.status('measuring');
   this.stage=stage;this.status({hookCapturedAt:this.sourceAt,hookCaptureCharacters:text.length,hookVisualVerified:false,hookCheckState:stage==='baseline'?'baseline':stage==='hidden'?'checking':'captured',hookCheckMessage:stage==='baseline'?'已抓到台词，正在检查游戏中的原文':stage==='hidden'?'台词已捕捉，正在检查游戏原文是否消失':'台词捕捉成功，正在检查游戏画面'});
   this.diagnosticEpisode=h.sentenceDiagnosticEpisode;
-  h.send({type:'hookVerify',source:text,sequence:this.seq,stage,...require('./scan-area.cjs').area(h.preferences,h.hooks?.flowPage||h.flowPage||undefined,h.state?.processName)});
+  const scriptArea = h.preferences.scanAuto !== false && h.hooks?.sadisticPage?.scanArea(text);
+  const area = scriptArea || require('./scan-area.cjs').area(h.preferences,h.hooks?.flowPage||h.flowPage||undefined,h.state?.processName);
+  h.send({type:'hookVerify',source:text,sequence:this.seq,stage,...area});
  }
  visual(m){
   if(!this.running||m.sequence!==this.seq||m.stage!==this.stage)return;

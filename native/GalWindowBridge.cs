@@ -481,11 +481,14 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         /* 2026-11-15 overlay placement (core/glyph-locate-host.cjs): one lossless BGRA picture of the game window (GameCapture:
            window DC first, rate-limited PrintWindow, never the screen) written raw to a .megulit-frame file under the cache;
            asked twice per line and only while a game's text position is being learned */
-        else if(type=="rawFrame"){string id=Str(d,"id"),file=Str(d,"file");IntPtr target=Target;
+        else if(type=="rawFrame"){string id=Str(d,"id"),file=Str(d,"file");IntPtr target=Target,overlay=Overlay;
             ThreadPool.QueueUserWorkItem(delegate{bool ok=false;int w=0,h=0;try{Rect rect;if(target!=IntPtr.Zero&&file.EndsWith(".megulit-frame",StringComparison.OrdinalIgnoreCase)&&GetClientRect(target,out rect)&&rect.Right>0&&rect.Bottom>0&&rect.Right<=8192&&rect.Bottom<=8192){w=rect.Right;h=rect.Bottom;
                 using(var bmp=new System.Drawing.Bitmap(w,h,System.Drawing.Imaging.PixelFormat.Format32bppArgb)){if(GameCapture.Picture(target,bmp)){var data=bmp.LockBits(new System.Drawing.Rectangle(0,0,w,h),System.Drawing.Imaging.ImageLockMode.ReadOnly,System.Drawing.Imaging.PixelFormat.Format32bppArgb);
                 var bytes=new byte[w*h*4];try{for(int y=0;y<h;y++)Marshal.Copy(new IntPtr(data.Scan0.ToInt64()+(long)y*data.Stride),bytes,y*w*4,w*4);}finally{bmp.UnlockBits(data);}File.WriteAllBytes(file,bytes);ok=true;}}}}catch{}
-                try{Emit(new{type="rawFrame",id=id,ok=ok,file=ok?file:"",width=w,height=h});}catch{}});}
+                Point gameOrigin=new Point(),overlayOrigin=new Point();int[] clientOrigin=null;
+                if(ok&&overlay!=IntPtr.Zero&&ClientToScreen(target,ref gameOrigin)&&ClientToScreen(overlay,ref overlayOrigin))
+                    clientOrigin=new[]{gameOrigin.X-overlayOrigin.X,gameOrigin.Y-overlayOrigin.Y};
+                try{Emit(new{type="rawFrame",id=id,ok=ok,file=ok?file:"",width=w,height=h,clientOrigin=clientOrigin});}catch{}});}
         else if(type=="sceneFrame"){string id=Str(d,"id");IntPtr target=Target;
             ThreadPool.QueueUserWorkItem(delegate{string jpeg="",hash="";double score=0;try{Rect rect;if(target!=IntPtr.Zero&&GetClientRect(target,out rect))jpeg=GameAudio.SceneFrame(target,rect.Right,rect.Bottom,out score,out hash);}catch{}
                 try{Emit(new{type="sceneFrame",id=id,jpeg=jpeg,score=score,topHash=hash});}catch{}});}

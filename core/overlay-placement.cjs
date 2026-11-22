@@ -33,6 +33,8 @@ class OverlayPlacement {
   configure(preferences, state) {
     /* GalWindowBridge reports the client size in its layout message (state.layout); older callers passed it flat */
     const size = state?.layout?.clientWidth ? state.layout : state;
+    if (this.scriptLine && (preferences?.hookHide === false || preferences?.hookProfile === 'off' ||
+        (size?.clientHeight && Math.abs(size.clientWidth / size.clientHeight - 16 / 9) > .02))) this.endScriptRow();
     if (size?.clientWidth && size?.clientHeight) this.client = [size.clientWidth, size.clientHeight];
     const on = this.wanted(preferences) && state?.bound === true;
     /* 2026-11-19 (user, 千恋＊万花: "有时候原文还是会出来一下，就一下，然后又没了"; log 11:20:44-48Z: the reader left for 3 s, the engine side
@@ -156,13 +158,70 @@ class OverlayPlacement {
   }
   rowsCleared(id) { if (!this.rowPage || !this.rowPage.length) return; this.why('rowsgone:' + id, 'page: cleared by the game with ' + id + ', its ' + this.rowPage.length + ' row(s) go'); this.rowPage = [];
     if (require('./profiles/index.cjs').get(this.profile, 'page.engineRows', null) === true) this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: [] }, { engineRows: true }); else this.rowsUnpage(); }
+  scriptRow(text, layout, sequence, frame) {
+    // The window bridge publishes its first positioned layout when the reader becomes
+    // visible. Before that, report the script's reference space; mapper scales it
+    // when the real client arrives, including a bind that started in the background.
+    const client = this.client[0] && this.client[1] ? this.client : [1280, 720];
+    const rects = this.on && layout?.grid(text, client);
+    if (!rects) { this.endScriptRow(); return; }
+    const key = sequence + '|' + text;
+    if (this.scriptLine?.key === key) return;
+    const previous = this.scriptLine;
+    clearTimeout(previous?.timer);
+    const page = layout.page?.(text), start = layout.row?.(text);
+    const samePage = page != null && previous?.page === page && start >= previous.start;
+    const history = samePage ? previous.records.filter(r => layout.row(r.text) < start) : [];
+    const record = {text: text.replace(/[\r\n]/g, ''), ink: rects.map(() => true)};
+    const row = this.scriptLine = {key, page, start, records: [...history, record]};
+    const publish = () => {
+      const previousCells = [];
+      for (const r of history) {
+        const boxes = layout.grid(r.text, client);
+        if (boxes) [...r.text].forEach((ch, i) => { if (!r.ink[i] && ch.trim()) previousCells.push([ch, boxes[i]]); });
+      }
+      const line = {type:'textPlace', id:'systemnnn-row', text:record.text, rects, nativeCells:record.ink, previousCells, frameLayout:row.frameLayout, client:client.slice()};
+      const signature = JSON.stringify(line);
+      if (this.current && this.lastKey === signature) return;
+      this.current = line; this.lastKey = signature; this.send(line);
+    };
+    // Keep earlier missing cells on the same NVL page. The next stable native frame
+    // may restore those glyphs from cache; each new source checks their ink again.
+    if (this.client[0] && this.client[1]) publish();
+    let attempts = 0;
+    const sample = async () => {
+      if (this.scriptLine !== row) return;
+      let image;
+      try { image = await frame?.(); } catch {}
+      if (this.scriptLine !== row || !this.on) return;
+      const size = image && [image.width, image.height];
+      if (image?.clientOrigin?.length === 2) row.frameLayout = {clientX:image.clientOrigin[0], clientY:image.clientOrigin[1], clientWidth:image.width, clientHeight:image.height};
+      let settled = true;
+      for (const r of row.records) {
+        const boxes = size && layout.grid(r.text, size);
+        const ink = boxes && require('./sadistic-blood-layout.cjs').nativeInk(image, size, boxes);
+        if (ink && r.sample && ink.every((v, i) => v === r.sample[i])) r.ink = ink;
+        else settled = false;
+        r.sample = ink;
+      }
+      if (row.frameLayout || this.client[0] && this.client[1]) publish();
+      if (!settled && ++attempts < 4) row.timer = setTimeout(sample, 260);
+    };
+    if (frame) row.timer = setTimeout(sample, 220);
+  }
+  endScriptRow() {
+    clearTimeout(this.scriptLine?.timer);
+    this.scriptLine = null;
+    if (this.current?.id === 'systemnnn-row') this.clear();
+  }
   /* ① MeguLitFont blank mode (record spec 3): the current line's table (hook-native state.hookGlyphDots) with a cell
      origin per character. Spaces: c = client px, m<W>x<H> / t<W>x<H> = a surface of that size (scaled to the client),
      g / - = no device position (not placeable). A character the engine drew from its glyph cache has no record: it sits
      right after the previous placed one on the same row (advance), as long as a later character of the line was drawn. */
-  glyph(table) {
+  glyph(table, scriptLayout) {
     if (table && typeof table.text === 'string' && table.text && !this.on) this.why('goff:' + (Number(table.seq) || 0), 'off: glyph line ' + (Number(table.seq) || 0) + ' not placed (文字显示 is not 画进游戏画面, or no window bound)');
     if (!this.on || !table || typeof table.text !== 'string' || !table.text) return;
+    if (this.scriptLine && scriptLayout?.isRedraw(table.text)) return;
     const chars = [...table.text], { rects, drawn: recorded, sizes } = this.rectsOf(table, ['d', 'c']);
     const id = 'glyph:' + (Number(table.seq) || 0);
     // A glyph fragment from the same draw can otherwise replace the native page's source.
@@ -385,6 +444,7 @@ class OverlayPlacement {
     this.send({ type: 'textPlace', ...line });
   }
   stop() {
+    this.endScriptRow();
     this.on = false;
     clearTimeout(this.doneTimer);
     this.typing = null;

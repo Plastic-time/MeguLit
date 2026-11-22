@@ -24,6 +24,7 @@
     'body.megulit-placed .sentence-window.megulit-place-window::before,body.megulit-placed .sentence-window.megulit-place-window::after{display:none!important}',
     'body.megulit-placed .tome-box-deco,body.megulit-placed .sentence-window:not(.megulit-place-window){display:none!important}',
     'body.megulit-placed .megulit-place-window .sentence-text{position:absolute!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;margin:0!important;padding:0!important;transform:none!important;overflow:visible!important}',
+    'body.megulit-native-cells .megulit-place-window .char-token.megulit-native-cell{opacity:0!important}',
     'body.megulit-placed .megulit-place-window .tome-page-lines{display:none!important}',
     /* 2026-11-21 (ファタ two-row page: every placed row 11 px under its box): the reader's line-height margin (gal.js, a more specific
        selector) moved the full-window sentence off the surface's top; a placed page's sentence sits exactly at 0,0 */
@@ -203,6 +204,8 @@
     }
   }
   function release(fallback = false, repin = true) {
+    document.querySelector('.megulit-script-history')?.remove();
+    document.body.classList.remove('megulit-native-cells');
     if (!page) document.body.classList.remove('megulit-placed');
     document.body.classList.remove('megulit-anchored');
     for (const br of document.querySelectorAll('br.megulit-row-br,br.megulit-cn-br')) br.remove();
@@ -220,8 +223,8 @@
   }
   /* record px are game-client px; the reader surface may be larger than the game (galLayoutInfo: client origin and size
      in physical px), CSS px = physical / devicePixelRatio */
-  function mapper(client) {
-    const info = b.galLayoutInfo?.(), dpr = devicePixelRatio || 1, cw = client?.[0] || innerWidth, ch = client?.[1] || innerHeight;
+  function mapper(client, frameLayout) {
+    const layout = b.galLayoutInfo?.(), info = layout?.clientWidth ? layout : frameLayout, dpr = devicePixelRatio || 1, cw = client?.[0] || innerWidth, ch = client?.[1] || innerHeight;
     const ox = info?.clientWidth ? (info.clientX || 0) / dpr : 0, oy = info?.clientHeight ? (info.clientY || 0) / dpr : 0;
     const k = info?.clientWidth ? info.clientWidth / cw / dpr : innerWidth / cw, ky = info?.clientHeight ? info.clientHeight / ch / dpr : innerHeight / ch;
     /* the game client on the reader surface: nothing is ever drawn outside it (a box with no size, not finite or
@@ -644,8 +647,9 @@
     const reader = cleared ? readerLine() : null;
     const hideTranslation = !!cleared && (!reader || reader === goneText || reader === page.retiredReader);
     document.body.classList.toggle('megulit-cleared-translation', hideTranslation);
-    if (page) return applyPage();
+    if (page) { document.body.classList.remove('megulit-native-cells'); return applyPage(); }
     if (!on || !line) { document.body.classList.remove('megulit-place-garbled'); release(); gameDrawn(); return; }
+    if (line.nativeCells && readerLine() !== line.text.replace(/\s/g, '')) { release(); return; }
     if (line.cleared) {
       gameDrawn();
       release(true);
@@ -711,7 +715,7 @@
     if (document.body.classList.contains('megulit-place-game-drawn')) { document.body.classList.remove('megulit-place-game-drawn'); window.__tomoyoHitRegionsRefresh?.(true); }
     /* record px are game-client px; the reader surface may be larger than the game (galLayoutInfo: client origin and size
        in physical px), CSS px = physical / devicePixelRatio */
-    const map = mapper(line.client);
+    const map = mapper(line.client, line.frameLayout);
     const boxes = shown.map((t, j) => { const k = idx[j]; if (k == null) return null; const r = placeRects[Math.floor(k)]; if (!r) return null; const m = map(r); /* half cells: two reader dashes on one game dash */ return m && k % 1 ? [m[0] + m[2] / 2, m[1], m[2] / 2, m[3]] : m && idx[j + 1] === k + .5 ? [m[0], m[1], m[2] / 2, m[3]] : m; });
     const cjk = boxes.filter((r, j) => r && /[^\x00-\x7f｡-ﾟ]/.test(shown[j].textContent)).map(r => r[2]);
     const size = Math.max(6, median(cjk) || median(boxes.filter(Boolean).map(r => r[3])));
@@ -723,7 +727,7 @@
        user's own font size and wrap width; only its place comes from the game: the top-left of the game's first character,
        taken once per line (typing never moves it) and kept while a new line starts within a few px of it (the same text
        box). A box that really moved (another text box, a different scene layout) moves it. */
-    if (anchorMode) {
+    if (anchorMode && !line.nativeCells) {
       /* 2026-11-20 (user, CHAOS;CHILD: 「排版要贴近游戏」 — narration centred mid-screen, a dialogue box left-aligned): the game's rows
          decide where the reader breaks the line and whether the block is centred; size and wrap width stay the user's.
          A sentence whose first part the game drew earlier (core/page-text.cjs `continues`) keeps the place that part had. */
@@ -752,13 +756,32 @@
       return;
     }
     document.body.classList.remove('megulit-place-fallback');
+    document.body.classList.toggle('megulit-native-cells', !!line.nativeCells);
     document.body.classList.add('megulit-placed');
     win.classList.add('megulit-place-window');
     for (const w of document.querySelectorAll('.megulit-place-window')) if (w !== win) w.classList.remove('megulit-place-window');
     const geom = [];
     for (const t of tokens) if (!shown.includes(t)) t.classList.add('megulit-unplaced');
     const place = new Map();
-    shown.forEach((t, j) => { const r = boxes[j]; if (!r) { t.classList.add('megulit-unplaced'); return; } t.classList.remove('megulit-unplaced'); place.set(t, r); });
+    // Older NVL rows can still be blank in the game after the active sentence
+    // moves on. Only their confirmed missing characters remain on the reader.
+    let older = document.querySelector('.megulit-script-history');
+    const history = line.previousCells || [];
+    const oldText = history.map(cell => cell[0]).join('');
+    if (!oldText || older?.textContent !== oldText || older?.parentElement !== win) {
+      older?.remove();
+      older = null;
+      if (oldText) {
+        older = plain(oldText);
+        older.classList.add('megulit-old-line','megulit-script-history');
+        win.append(older);
+      }
+    }
+    if (older) layout(older, history.map(cell => map(cell[1])), geom);
+    const ink = line.nativeCells?.filter((_, i) => !blank(chars[i]));
+    shown.forEach((t, j) => {
+      t.classList.toggle('megulit-native-cell', ink?.[idx[j]] === true);
+      const r = boxes[j]; if (!r) { t.classList.add('megulit-unplaced'); return; } t.classList.remove('megulit-unplaced'); place.set(t, r); });
     /* ruby bases: absolute at the union of their tokens; tokens inside are placed relative to the base */
     for (const base of sentence.querySelectorAll('.megulit-ruby-base')) {
       const rs = [...base.querySelectorAll('.char-token')].map(t => place.get(t)).filter(Boolean);
@@ -839,8 +862,8 @@
     if (cur && nt.length > cur.length && nt.endsWith(cur)) { document.body.classList.add('megulit-place-gone'); line = null; schedule(); return; } }
     document.body.classList.remove('megulit-place-gone'); if (m?.clear) line = null; else if (m?.text && (m.fallback || Array.isArray(m.rects))) {
       const text = String(m.text);
-      if (!m.fallback && line && line.text !== text) noteReplaced(line);
-      line = { text, fallback: m.fallback === true, approx: m.approx === true, rects: m.rects, client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] };
+      if (!m.fallback && line && !line.nativeCells && line.text !== text) noteReplaced(line);
+      line = { text, frameLayout: m.frameLayout, previousCells: Array.isArray(m.previousCells) ? m.previousCells : null, nativeCells: Array.isArray(m.nativeCells) && m.nativeCells.length === [...text].length ? m.nativeCells : null, fallback: m.fallback === true, approx: m.approx === true, rects: m.rects, client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] };
     } schedule(); };
   const pageGone = () => { for (const n of document.querySelectorAll('.megulit-old-line')) n.remove(); clones.clear(); document.body.classList.remove('megulit-place-asleep'); };
   /* 2026-11-15 `elsewhere` (core/overlay-placement.cjs page()): the layer is not armed and another path hides the game's
