@@ -68,7 +68,7 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
  const timing=(name,start)=>performance.measure('torch:'+name,{start,end:performance.now()});
  const t=COPY[locale]||COPY.zh;
  const host=document.createElement('div');host.className='torch-monument';host.setAttribute('role','region');host.setAttribute('aria-label',t.title);
- host.innerHTML=`<canvas class="tm-canvas" aria-hidden="true"></canvas><div class="tm-veil" aria-hidden="true"></div>
+ host.innerHTML=`<canvas class="tm-canvas"></canvas><div class="tm-veil" aria-hidden="true"></div>
   <header class="tm-head"><h2 class="tm-title">${esc(t.title)}</h2><p class="tm-sub">${esc(t.sub)}</p></header>
   <p class="tm-count" aria-live="polite"></p>
   <div class="tm-tip" role="tooltip" hidden><b class="tm-tip-name"></b><span class="tm-tip-meta"></span></div>
@@ -196,10 +196,10 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
  /* Paging stays on the arrows; wheel input walks along the current view. */
  const onWheel=e=>{if(!sceneReady||e.target.closest?.('.tm-bar,.tm-results'))return;e.preventDefault();scene.walkBy(e.deltaY||e.deltaX,e.deltaMode);};
  host.addEventListener('wheel',onWheel,{passive:false});
- canvas.addEventListener('pointermove',e=>{const hit=scene.pick(e.clientX,e.clientY);let cursor='';state.hoverMonth=null;
+ canvas.addEventListener('pointermove',e=>{const hit=scene?.pick(e.clientX,e.clientY);let cursor='';state.hoverMonth=null;
   if(hit&&hit.band){state.hoverMonth=hit.band;cursor='pointer';showTip(null);}else if(hit&&hit.entry){cursor='grab';showTip(hit.entry,e.clientX,e.clientY);}else{cursor='grab';showTip(null);}
   canvas.dataset.cursor=cursor;});
- canvas.addEventListener('pointerleave',()=>showTip(null));
+ canvas.addEventListener('pointerleave',()=>{scene?.clearCoverHover();showTip(null);});
  canvas.addEventListener('click',async e=>{if(scene.dragged())return;const hit=scene.pick(e.clientX,e.clientY);
   if(!hit||!hit.band)return;const b=hit.band;
   if(b.kind==='shift'){state.bandWindow=Math.max(0,Math.min(Math.max(0,state.months.length-12),state.bandWindow+b.dir*6));redraw();return;}
@@ -573,13 +573,18 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
     pointer.lastX=e.clientX;pointer.lastY=e.clientY;
    }
    else{view.dragYaw=THREE.MathUtils.clamp(pointer.yaw0-dx*.9,-.26,.26);view.dragPitch=THREE.MathUtils.clamp(pointer.pitch0+dy*1.1,-.62,.12);}}};
- const onDown=e=>{if(pointer.down||![0,1,2].includes(e.button))return;if(e.button===1)e.preventDefault();pointer.down=true;pointer.id=e.pointerId;pointer.moved=0;pointer.sx=e.clientX;pointer.sy=e.clientY;pointer.freeLook=e.button===0;pointer.yaw0=pointer.freeLook?view.freeYaw:view.dragYaw;pointer.pitch0=pointer.freeLook?view.freePitch:view.dragPitch;pointer.pan=e.button===1||(e.button===2&&!!view.read);pointer.lastX=e.clientX;pointer.lastY=e.clientY;dragMoved=false;canvas.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);};
+ const clearPointerFocus=()=>{delete canvas.dataset.pointerFocus;};
+ canvas.addEventListener('blur',clearPointerFocus);
+ const onDown=e=>{if(pointer.down||![0,1,2].includes(e.button))return;e.preventDefault();canvas.dataset.pointerFocus="";canvas.focus({preventScroll:true});covers.point(null);pointer.down=true;pointer.id=e.pointerId;pointer.moved=0;pointer.sx=e.clientX;pointer.sy=e.clientY;pointer.freeLook=e.button===0;pointer.yaw0=pointer.freeLook?view.freeYaw:view.dragYaw;pointer.pitch0=pointer.freeLook?view.freePitch:view.dragPitch;pointer.pan=e.button===1||(e.button===2&&!!view.read);pointer.lastX=e.clientX;pointer.lastY=e.clientY;dragMoved=false;canvas.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);};
  const onUp=e=>{if(!pointer.down||e.pointerId!==pointer.id)return;pointer.down=false;dragMoved=pointer.moved>.012;canvas.classList.remove('is-dragging');if(canvas.hasPointerCapture?.(e.pointerId))canvas.releasePointerCapture(e.pointerId);};
  const onContextMenu=e=>e.preventDefault();
  canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointerup',onUp);canvas.addEventListener('pointercancel',onUp);canvas.addEventListener('lostpointercapture',onUp);canvas.addEventListener('contextmenu',onContextMenu);
  const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
  function pick(x,y){const r=canvas.getBoundingClientRect();ndc.set(((x-r.left)/r.width)*2-1,-((y-r.top)/r.height)*2+1);ray.setFromCamera(ndc,camera);
-  const hit=ray.intersectObject(face,false)[0];if(!hit||!hit.uv)return null;const point=stele.worldToLocal(hit.point.clone());const lx=hit.uv.x*FW,ly=(1-hit.uv.y)*FH;
+  const hit=ray.intersectObject(face,false)[0];
+  const cover=!pointer.down&&ray.intersectObjects(covers.group.children,false)[0];
+  covers.point(cover&&(!hit||cover.distance<hit.distance)?cover:null);
+  if(!hit||!hit.uv)return null;const point=stele.worldToLocal(hit.point.clone());const lx=hit.uv.x*FW,ly=(1-hit.uv.y)*FH;
   if(ly<RULE_Y){const b=(state.band||[]).find(b=>Math.abs(lx-b.x)<b.w/2);if(b){const key=b.kind+b.month+b.dir;if(key!==lastHoverKey){lastHoverKey=key;state.hoverMonth=b;queuePaint();}}else if(lastHoverKey){lastHoverKey='';state.hoverMonth=null;queuePaint();}return b?{band:b}:null;}
   if(lastHoverKey){lastHoverKey='';state.hoverMonth=null;queuePaint();}
   const e=state.layout?.entries.find(e=>lx>=e.x&&lx<e.x+COL_W&&ly>=e.y-6&&ly<e.y+e.box.h);return {entry:e||null,point};}
@@ -636,7 +641,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
   { const L=auraU.uLv.value,b=breathPhase;for(let i=0;i<4;i++){const v=.5+.5*Math.sin(time*.23*b[i][2]+b[i][0]),w=.5+.5*Math.sin(time*.13*b[i][2]+b[i][1]);L.setComponent(i,Math.pow(Math.min(1,v*.75+w*.45),2.2));}
     if(aoUni)aoUni.uSteleLevels.value.copy(L).multiplyScalar(auraU.uI.value);}motes.material.uniforms.uPx.value=renderer.domElement.height/520;
   if(glow.userData.on){const p=(now-glow.userData.t0)/1000;const o=Math.min(1,p/1.2)*(.42+.1*Math.sin(p*1.6));glow.material.opacity=o;glowLight.intensity=o*2.2;}else{glow.material.opacity*=.9;glowLight.intensity*=.9;}
-  updateCamera(dt);courtyard.update(camera,H.state);covers.update(time);draw();
+  updateCamera(dt);courtyard.update(camera,H.state);covers.update(time,dt);draw();
   if(onFirstFrame&&!renderer.getContext().isContextLost()){onFirstFrame();onFirstFrame=null;}
   /* slow frames on the full tier for ~3 s after the intro: switch to the light tier (only in auto mode) */
   if(introDone&&tier==='high'&&autoTier){frames++;if(dt>.045)slow++;if(frames>=180){if(slow>120){setTier('low',true);}frames=0;slow=0;}}
@@ -657,6 +662,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
  let disposed=false,ready=false,compilePoll=0;
  function dispose(){covers.clear();disposed=true;active=false;if(raf)cancelAnimationFrame(raf);raf=0;if(paintQueued)cancelAnimationFrame(paintQueued);
   if(compilePoll)clearTimeout(compilePoll);introTween?.kill();
+  canvas.removeEventListener('blur',clearPointerFocus);
   canvas.removeEventListener('pointermove',onMove);canvas.removeEventListener('pointerdown',onDown);canvas.removeEventListener('pointerup',onUp);canvas.removeEventListener('pointercancel',onUp);canvas.removeEventListener('lostpointercapture',onUp);canvas.removeEventListener('contextmenu',onContextMenu);
   if(composer){composer.passes.forEach(p=>p.dispose?.());composer.dispose?.();}
   if(reflector){reflector.getRenderTarget().dispose();reflector.material.dispose();}
@@ -683,5 +689,5 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
   };
   poll();
  }
- return {get tier(){return tier;},loadCovers:covers.load,prepare,intro,setActive,suspend,setTier,resize,pick,dispose,paintFace:()=>queuePaint(),lookAtFocus,setRead,resetView,walkBy:(delta,mode)=>walk.wheel(delta,mode),reading:()=>!!view.read,dragged:()=>dragMoved,debug:{renderer,scene,camera,sun:H.sun,courtyard,covers,buildMs,torchPoints:H.torchPoints,steleEmit,get ao(){return aoInfo;}}};
+ return {get tier(){return tier;},clearCoverHover:()=>covers.point(null),loadCovers:covers.load,prepare,intro,setActive,suspend,setTier,resize,pick,dispose,paintFace:()=>queuePaint(),lookAtFocus,setRead,resetView,walkBy:(delta,mode)=>walk.wheel(delta,mode),reading:()=>!!view.read,dragged:()=>dragMoved,debug:{renderer,scene,camera,sun:H.sun,courtyard,covers,buildMs,torchPoints:H.torchPoints,steleEmit,get ao(){return aoInfo;}}};
 }

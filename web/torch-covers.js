@@ -25,9 +25,10 @@ export async function publicTorchWorks(api,live){
 
 export function createTorchCovers(parent,{east,west,reduced}){
  const group=new THREE.Group();group.name='Public torch covers';parent.add(group);
- let generation=0;
+ let generation=0,hover=null;
+ const tilt=new THREE.Vector2();
  function clear(){
-  generation++;
+  generation++;hover=null;
   for(const mesh of [...group.children]){
    group.remove(mesh);mesh.geometry.dispose();mesh.material.map.dispose();mesh.material.dispose();
   }
@@ -68,13 +69,23 @@ export function createTorchCovers(parent,{east,west,reduced}){
    group.add(mesh);
   }
  }
- function update(time){
-  if(reduced)return;
+ function point(hit){
+  hover=hit?.object||null;
+  if(hit?.uv)tilt.set(hit.uv.x-.5,hit.uv.y-.5);
+ }
+ function update(time,dt){
   for(const mesh of group.children){
    const {height,yaw,phase}=mesh.userData;
+   const selected=hover===mesh;
+   mesh.material.opacity=selected ? .9 : .65;
+   if(reduced)continue;
+   const blend=1-Math.exp(-12*dt);
+   const scale=mesh.scale.x+((selected?1.12:1)-mesh.scale.x)*blend;
+   mesh.scale.setScalar(scale);
+   mesh.rotation.x+=((selected?-tilt.y*.32:0)-mesh.rotation.x)*blend;
    mesh.position.y=height+Math.sin(time*.48+phase)*.22;
-   mesh.rotation.y=yaw+Math.sin(time*.3+phase)*.10;
+   mesh.rotation.y+=(yaw+Math.sin(time*.3+phase)*.10+(selected?tilt.x*.45:0)-mesh.rotation.y)*blend;
   }
  }
- return {group,load,clear,update};
+ return {group,load,clear,update,point};
 }
