@@ -15,7 +15,7 @@ export function validateFeedback(body) {
   if (clean(body.website, 200)) return { ok: false, error: 'REJECTED' };              // honeypot
   const kind = String(body.kind || '');
   if (!FEEDBACK_KINDS[kind]) return { ok: false, error: 'INVALID_KIND' };
-  const text = clean(body.text, kind === 'game' ? 200 : 2000);
+  const text = clean(body.text, kind === 'game' ? 256 : 2000);
   if (!text) return { ok: false, error: 'EMPTY' };
   const contact = clean(body.contact, 120);
   const lang = LANGS.has(body.lang) ? body.lang : 'zh';

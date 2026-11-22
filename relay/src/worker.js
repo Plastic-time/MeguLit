@@ -20,7 +20,8 @@ import {forumRoute,forumDeletes,cleanupForumImages} from './forum.js';
 import {newsGet,hotWordsDailyGet,refreshDaily,imageGet,articleGet} from './daily.js';
 /* E562 adapter packs, before/after reports, desensitized probe uploads */
 import {adaptersRoute} from './adapters.js';
-import {probeIssueWebhook,probeIssueMarkdown,retryProbeIssues} from './probe-issues.js';
+import {probeIssueWebhook,probeIssueMarkdown,retryProbeIssues,repoOf,resolveRegisteredGameRequests} from './probe-issues.js';
+import {gameRequestEvidence} from './game-requests.js';
 import {contribRoute,cleanupContrib} from './contrib.js';
 /* 2026-11-21 game diffs per exe hash: calibration reports in, our signed diffs out (relay/src/auto-profile.js) */
 import {profileRoute} from './auto-profile.js';
@@ -306,6 +307,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
   else if((path==='/dashboard'||path==='/probe/dashboard')&&request.method==='GET')response=new Response(DASHBOARD_HTML,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'public, max-age=60','x-content-type-options':'nosniff'}});
   else if(path==='/api/seed-admin/malware')response=await seedMalwareRoute(request,env,now,url,path,{json,fail,readJSON})||fail('NOT_FOUND',404);
   else if(path==='/api/seed-admin/probe-backlog')response=await probeIssueMarkdown(request,env,url,{fail});
+  else if(path==='/api/seed-admin/game-request-evidence')response=await gameRequestEvidence(request,env,repoOf(env),now,url,{json,fail,readJSON,onRegistered:selector=>resolveRegisteredGameRequests(env,now,selector)});
   else if(path.startsWith('/api/seed-admin/'))response=await seedAdminRoute(request,env,now,url,path,{json,fail,readJSON})||fail('NOT_FOUND',404);
   else if(path==='/api/seed/usage')response=await seedUsageRoute(request,env,ip,now,url,path,{json,fail,readJSON,hit})||fail('NOT_FOUND',404);
   else if(path==='/api/seed/stats'&&(request.method==='GET'||request.method==='HEAD')){const r=await seedStatsGet(env,{json,fail},ctx,now);response=request.method==='HEAD'?new Response(null,{status:r.status,headers:r.headers}):r;}

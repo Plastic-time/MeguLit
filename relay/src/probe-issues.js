@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import {enqueueProbeDrafts, probeDraft, probeStep} from './probe-seed.js';
+import {gameRequestSelector, retryGameRequests, resolveGameRequest, trackGameRequest} from './game-requests.js';
 import {seedAdminAuthorized} from './seed-admin.js';
 
 const DEFAULT_REPO = 'ilynthn/MeguLit';
-const repoOf = env => env.GITHUB_REPO || DEFAULT_REPO;
+export const repoOf = env => env.GITHUB_REPO || DEFAULT_REPO;
 const sizeLimit = 512 * 1024;
 const encoder = new TextEncoder();
 const hex = bytes => Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
@@ -22,6 +23,7 @@ function isAdapterProbe(issue, env, repo, number) {
 function github(env, repo, number, method = 'GET') {
   return (env.fetch || fetch)(`https://api.github.com/repos/${repo}/issues/${number}`, {
     method,
+    signal: AbortSignal.timeout(15000),
     headers: {authorization: 'Bearer ' + env.GITHUB_TOKEN, 'user-agent': 'megulit-relay',
       accept: 'application/vnd.github+json', 'content-type': 'application/json'},
     ...(method === 'PATCH' ? {body: JSON.stringify({state: 'closed', state_reason: 'not_planned'})} : {})
@@ -57,6 +59,7 @@ export async function retryProbeIssues(env, now) {
   if (!env.ADAPTER_PROBE_WEBHOOK_SECRET || !env.GITHUB_TOKEN) return;
   const {results} = await env.DB.prepare(`SELECT repo,issue FROM probe_issue_disposition
     WHERE repo=? AND closed_at IS NULL ORDER BY last_attempt_at,created_at LIMIT 10`).bind(repoOf(env)).all();
+  await retryGameRequests(env, repoOf(env), now, github);
   for (const row of results) {
     try {
       if (!await closeIssue(env, row.repo, row.issue, now)) console.error('PROBE_ISSUE_CLOSE_PENDING', row.issue);
@@ -64,6 +67,10 @@ export async function retryProbeIssues(env, now) {
       console.error('PROBE_ISSUE_CLOSE_PENDING', row.issue);
     }
   }
+}
+
+export async function resolveRegisteredGameRequests(env, now, selector) {
+  if (env.ADAPTER_PROBE_WEBHOOK_SECRET && env.GITHUB_TOKEN) await retryGameRequests(env, repoOf(env), now, github, selector);
 }
 
 async function readStoredDrafts(env, url) {
@@ -110,10 +117,17 @@ export async function probeIssueWebhook(request, env, now, {json, fail}) {
   let event;
   try { event = JSON.parse(new TextDecoder().decode(bytes)); } catch { return fail('INVALID_JSON', 400); }
   const repo = repoOf(env), issue = event?.issue, number = issue?.number;
-  if (event?.repository?.full_name !== repo || !['opened', 'labeled', 'reopened'].includes(event.action) ||
-      !Number.isSafeInteger(number) || number < 1 || !isAdapterProbe(issue, env, repo, number)) {
+  if (event?.repository?.full_name !== repo || !Number.isSafeInteger(number) || number < 1) {
     return json({ok: true, ignored: true});
   }
+  const openEvent = ['opened', 'labeled', 'reopened'].includes(event.action);
+  const selector = (openEvent || event.action === 'edited') && gameRequestSelector(issue, env, repo, number);
+  if (selector) {
+    await trackGameRequest(env, repo, number, selector, now);
+    const state = await resolveGameRequest(env, repo, number, now, github);
+    return state === 'retry' ? fail('GAME_REQUEST_CLOSE_PENDING', 502) : json({ok: true, gameRequest: state});
+  }
+  if (!openEvent || !isAdapterProbe(issue, env, repo, number)) return json({ok: true, ignored: true});
   const db = env.DB;
   const prior = await db.prepare('SELECT markdown FROM probe_issue_disposition WHERE repo=? AND issue=?').bind(repo, number).first();
   if (!prior) {

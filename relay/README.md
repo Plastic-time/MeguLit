@@ -384,6 +384,16 @@ For legacy issue events, migration `0030_probe_issue_disposition.sql` stores the
 
 The relay stores packs but cannot sign them: apps only load packs signed with a key in `services/adapter-pack-keys.json`.
 
+### Exact game request resolution
+
+The same GitHub issues webhook handles `game-request` from both forms. Set `GAME_REQUEST_ISSUE_AUTHOR` if the relay creates these issues under a different login from the repository default. The exact input is `v123 | kirikiri | ja | <full EXE SHA-256> | <script SHA-256>`. The language field describes the build's source text. Title-only requests stay open for identification.
+
+An authenticated producer or maintainer binds verified work/build identity through `POST /api/seed-admin/game-request-evidence` with `{selector, kind, ref}`. References are the current trusted release hash for `available`, the review item ID for `skeleton`, or the adapter-probe issue number as a string for `backlog`. A probe identity or head fingerprint alone carries no work or locale binding. Register only after verifying the full tuple against the source record.
+
+`seed-all` can record a `generating` job with an explicit verified `--request-selector` and `--request-relay`, using `ADAPTER_ADMIN_TOKEN` from the environment. The generator compares the selector with the library's VNDB ID, explicit source language, engine, computed full EXE hash and indexed script digest. The relay stores a six-hour generation lease by job UUID and the generator ends it on exit. Trusted producers may use the same API and send `ended: true` to end their binding.
+
+The relay persists the exact match before asking GitHub to close. The authenticated `GET /api/seed-admin/game-request-evidence?issue=<number>` returns the resolution kind, source reference and recorded closure time. Evidence registration wakes matching webhook jobs, and the existing cron retries pending closures. Existing issues enter this flow only through a verified event or delivery replay.
+
 Deploy (once):
 
 ```bash
