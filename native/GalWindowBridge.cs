@@ -729,7 +729,7 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
                 SetWindowPos(Overlay,IntPtr.Zero,desktop.Left,desktop.Top,desktop.Width,Math.Max(1,desktop.Height-1),0x0004|0x0010);RegionKey="";
             }
             if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();if(MenuOpen&&MenuRegionReady&&HitRegions.Count>0){Rect menuClient;if(GetClientRect(Overlay,out menuClient))ApplyRegion(menuClient.Right,menuClient.Bottom);if(!IsWindowVisible(Overlay))SetWindowPos(Overlay,IntPtr.Zero,0,0,0,0,0x0001|0x0002|0x0010|0x0040);IsShown=true;AckRegion();FocusMenuOnce();}else{if(IsWindowVisible(Overlay))ShowWindow(Overlay,0);IsShown=false;}return;}
-        if(!TranslationMode){if((GetWindowLong(Overlay,-20)&8)!=0)TopmostGuard.Sink(Overlay,IntPtr.Zero);if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();if(DateTime.UtcNow<NormalShowUntil&&!IsWindowVisible(Overlay))IsShown=TopmostGuard.ShowAtBottom(Overlay);KeepPlacement();return;}
+        if(!TranslationMode){if((GetWindowLong(Overlay,-20)&8)!=0&&ReaderLayerPolicy.SinkOnLeave(IsWindowVisible(Overlay)))TopmostGuard.Sink(Overlay,IntPtr.Zero);if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();if(DateTime.UtcNow<NormalShowUntil&&!IsWindowVisible(Overlay))IsShown=TopmostGuard.ShowAtBottom(Overlay);KeepPlacement();return;}
         if(Target==IntPtr.Zero){
             Capture();if(!FloatingPlaced){Rect r=FloatingBase();SetWindowPos(Overlay,new IntPtr(1),r.Left+FloatDX,r.Top+FloatDY,r.Right-r.Left,r.Bottom-r.Top,0x0020|0x0010);FloatingPlaced=true;}
             Rect floatingClient;if(GetClientRect(Overlay,out floatingClient))ApplyRegion(floatingClient.Right,floatingClient.Bottom);

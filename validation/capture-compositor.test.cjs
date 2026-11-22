@@ -95,7 +95,7 @@ test('runtime: textRenderer setting, compositor with the bound game, overlay dia
   assert.strictEqual(require('../core/game-style.js').clean({}).textRenderer, undefined, 'no default in per-game styles: absent = overlay');
   assert.match(read('core/gal-native.cjs'), /if\(value&&value\.textRenderer===undefined\)/, 'reader saves keep the app-wide choice');
   assert.strictEqual(require('../core/game-style.js').clean({ textRenderer: 'compositor' }).textRenderer, 'compositor');
-  assert.match(read('services/settings-schema.cjs'), /choice\('embedding','textRenderer'/);
+  assert.match(read('services/settings-schema.cjs'), /field\('embedding','textRenderer'/);
   assert.match(read('core/gal-native.cjs'), /this\.compositor\?\.hook\(message,this\.hooks\.state\?\.hookGlyphDots\)/);
   assert.match(read('services/reader.cjs'), /g\?\.compositor\?\.text\(String\(r\.text\|\|''\),translated\)/);
   assert.match(read('web/reader/modules/gal.js'), /classList\.toggle\('megulit-composited',message\.compositorDrawing\)/);

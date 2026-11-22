@@ -42,7 +42,7 @@ test('OCR noise from a fading menu is no item',()=>{
 });
 test('reader: each menu row gets its own translation, never the script snap',async()=>{
  const R=require('../services/reader.cjs').Reader;
- const r=Object.create(R.prototype),out=[];r.runtime={emit:(_,m)=>out.push(m)};
+ const r=Object.create(R.prototype),out=[];r.runtime={libraryOnly:()=>false,emit:(_,m)=>out.push(m)};
  const cache=new Map();r.embedCached=(k,v)=>{if(v!==undefined)cache.set(k,v);return cache.get(k)||'';};
  r.displayLanguage=()=>'zh';r.prefs=()=>({});r.workPrompt='';r.loadKeys=()=>{};r.localReady=async()=>{};r.langOptions=o=>o;
  let snapped=0;r.gal={hooks:{ocrSnap:()=>{snapped++;return '待ってたよ、早くおいで。';},scriptTranslation:()=>'久等了，快过来趟。',trace(){}}};

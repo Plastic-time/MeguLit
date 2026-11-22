@@ -41,7 +41,7 @@ test('the pre-launch repair leaves folders without a MeguLit restore untouched a
 });
 test('a Steam launch accepts a game process from another program in the install folder',()=>{
  const src=fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8');
- assert.match(src,/const anyProcess=async\(\)=>\{const own=await gameProcesses\(root,game\.executable\)/);
+ assert.match(src,/const anyProcess=async\(\)=>\{if\(ownerSteam\)return gameProcesses\(root,ownerSteam\.exe\);const own=await gameProcesses\(root,game\.executable\)/);
  assert.match(src,/waitForVisibleGame\(anyProcess,\{helper:steam/);
 });
 
