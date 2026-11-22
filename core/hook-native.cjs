@@ -420,17 +420,28 @@ class HookNative{
     page rules (core/page-text.cjs) never knew it was a page game. Another stream of the same game that carries the text box as the
     game holds it (several lines, the current line among them: TMP set_text of the whole page) is that evidence: the game pages,
     and a page that holds the current line but no longer the one before it was turned before this line. Any engine. */
- auxPage(m){try{const P=this.pageText;if(!P||typeof m?.text!=='string'||!m.text.includes(String.fromCharCode(10)))return;const k=HookNative.flat(m.text.replace(/<[^>]*>/g,'')),R=this.hookRecent||[],cur=R.length?R[R.length-1].key:'';if(cur.length<2||!k.includes(cur))return;
-  /* 2026-11-21 (user, Aokana: 「文字到处乱跳」): text that holds the current line and no other Japanese is no page. Aokana sends
-     the current line alone on several streams: its typewriter sets the whole line once per frame (LunaHook buffers the frames
-     into one output, every row the line again) and its script streams carry the line with its English and Chinese, one of them
-     with 【speaker】 tags. Taken as a page, each line was drawn under the one before it, the reset came up to half a second later,
-     and the layout fitted to the stacked block kept the line moved up. A page game shows its paging as soon as its page holds
-     kana beyond the current line, often before the next line reaches the hook; once it does, a page holding just the current
-     line still turns it. */
-  if(!P.paging&&!/[\u3041-\u309f\u30a1-\u30fa]/.test(k.split(cur).join('').replace(/【[^】]*】/g,'')))return;
-  P.paging=true;P.auxPageAt=this.now();const prev=R.length>=2?R[R.length-2].key:'';
+ auxPage(m){try{const P=this.pageText;if(!P||typeof m?.text!=='string'||!m.text.includes(String.fromCharCode(10)))return;const raw=m.text.replace(/<[^>]*>/g,''),k=HookNative.flat(raw),R=this.hookRecent||[],cur=R.length?R[R.length-1].key:'';if(cur.length<2||!k.includes(cur))return;
+  const prev=R.length>=2?R[R.length-2].key:'';
+  // Strip speaker labels before looking for independent dialogue. A retained hook
+  // line proves the page even when that line contains only kanji.
+  if(!P.paging){
+   const dialogue=raw.replace(/\u3010[^\u3011]*\u3011/g,'');
+   const flattened=HookNative.flat(dialogue);
+   const previousRetained=prev!==cur&&/\p{Script=Han}/u.test(prev)&&
+    dialogue.split('\n').some(row=>HookNative.flat(row)===prev)&&HookNative.retainedPrevious(flattened,prev,cur);
+   if(!previousRetained&&!/[\u3041-\u309f\u30a1-\u30fa]/.test(flattened.split(cur).join('')))return;
+  }
+  P.paging=true;P.auxPageAt=this.now();
   if(prev&&prev!==cur&&!k.includes(prev)&&this.pageSaidSame===true&&P.auxResetFor!==cur){P.auxResetFor=cur;this.pageSaidSame=false;this.trace('page turned before this line (the page text no longer holds the line before it)');this.emit({type:'hookPage',engine:'text',reset:true,at:this.now()});}}catch{}}
+ // Overlapping redraws may spell a complete earlier sentence inside copies of the current line.
+ static retainedPrevious(page,previous,current){
+  let end=0;
+  for(let at=page.indexOf(current);at>=0;at=page.indexOf(current,at+1)){
+   if(at>end&&page.slice(end,at).includes(previous))return true;
+   end=Math.max(end,at+current.length);
+  }
+  return page.slice(end).includes(previous);
+ }
  /* share of the character pairs of `flat` found in the hooked lines of the last ten minutes (0 when nothing to compare) */
  static hookOverlap(flat,recent,now){const t=String(flat||'');if([...t].length<4||!Array.isArray(recent))return 0;const hay=recent.filter(r=>now-r.at<600000).map(r=>r.key).join(String.fromCharCode(10));if(!hay)return 0;const ch=[...t];let n=0,hit=0;for(let i=0;i+1<ch.length;i++){n++;if(hay.includes(ch[i]+ch[i+1]))hit++;}return n?hit/n:0;}
  auxText(m){this.auxPage(m);/* 2026-11-15 (沙耶の唄, user: 「ocr遮挡又出来了」): the dialogue hook sends each line on two thread contexts; the one not selected

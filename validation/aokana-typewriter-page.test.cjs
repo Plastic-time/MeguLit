@@ -16,3 +16,25 @@ test('streams that hold only the current line (typewriter frames, script text wi
  const shown=r.events.filter(e=>typeof e?.hookSource==='string'&&e.hookSource).map(e=>e.hookSource);
  for(const l of ['「ああ、じゃあ元気で」','……','「……ぐすっ」','「おい、泣くなよ。さっき言ったろ、そういうのはナシだって」','「でも……」'])assert.ok(shown.includes(l),l+' reaches the reader: '+JSON.stringify(shown));
 });
+
+test('a retained kanji-only hook line proves an NVL page',()=>{
+ const {HookNative}=require('../core/hook-native.cjs');
+ const h=Object.create(HookNative.prototype);
+ h.pageText={};
+ h.now=()=>123;
+ h.hookRecent=[{key:'\u6628\u65e5\u3002'},{key:'\u660e\u65e5\u306f\u6674\u308c\u308b\u304b\u306a\u3002'}];
+ h.auxPage({type:'hookPageText',text:h.hookRecent.map(line=>line.key).join('\n')});
+ assert.equal(h.pageText.paging,true);
+ assert.equal(h.pageText.auxPageAt,123);
+});
+
+test('a kanji-only name or part of the redrawn sentence does not establish paging',()=>{
+ const {HookNative}=require('../core/hook-native.cjs');
+ const h=Object.create(HookNative.prototype);
+ h.pageText={};
+ h.now=()=>123;
+ const prev='\u6628\u65e5',cur='\u6628\u65e5\u306f\u6674\u308c\u3066\u3044\u305f\u3002';
+ h.hookRecent=[{key:prev},{key:cur}];
+ h.auxPage({type:'hookPageText',text:['\u3010'+prev+'\u3011',cur,cur].join('\n')});
+ assert.equal(h.pageText.paging,undefined);
+});
