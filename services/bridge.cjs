@@ -292,9 +292,29 @@ function importedExecutable(db,id,file,language){
   const row=db.prepare('SELECT original FROM games WHERE id=?').get(id),original=JSON.parse(row?.original||'{}'),lib=original.library||{};
   /* #376 a Steam folder (steam_api beside the program) keeps its start mode; undo puts back the mode the restore replaced */
   const LE=require('../core/locale-emulator.cjs');
-  if(language==='ja'){const next=LE.x86(file)&&!LE.steamApi(file)?'japanese':lib.localeMode||'off';original.library={...lib,localeMode:next,...(next!==(lib.localeMode||'')&&lib.localeBeforeJapanese===undefined?{localeBeforeJapanese:lib.localeMode||''}:{})};}
-  else{original.library={...lib,exe:file,contentLanguage:'zh',originalExecutableVerified:false};if(lib.localeBeforeJapanese!==undefined){original.library.localeMode=lib.localeBeforeJapanese;delete original.library.localeBeforeJapanese;}db.prepare('UPDATE games SET executable=? WHERE id=?').run(file,id);}
+  if(language==='ja'){
+    if(!lib.localeUserSet){const next=LE.x86(file)&&!LE.steamApi(file)?'japanese':lib.localeMode||'off';original.library={...lib,localeMode:next,...(next!==(lib.localeMode||'')&&lib.localeBeforeJapanese===undefined?{localeBeforeJapanese:lib.localeMode||''}:{})};}
+  }else{original.library={...lib,exe:file,contentLanguage:'zh',originalExecutableVerified:false};if(lib.localeBeforeJapanese!==undefined){original.library.localeMode=lib.localeBeforeJapanese;delete original.library.localeBeforeJapanese;}db.prepare('UPDATE games SET executable=? WHERE id=?').run(file,id);}
   db.prepare('UPDATE games SET original=? WHERE id=?').run(JSON.stringify(original),id);
+}
+function scriptSettings(){return new(require('./settings.cjs').Settings)(root);}
+function scriptActivity({hasPairs,embedded=false}){
+ const prefs=scriptSettings().read('translation');
+ const enabled=prefs.scriptTranslation!==false,english=prefs.learnerLanguage==='en';
+ return {hasPairs,enabled,english,embedded,active:hasPairs&&enabled&&!english};
+}
+function enableRestoredTranslation(pairing,runtime){
+ try{
+  if(pairing.hasPairs&&!scriptActivity(pairing).enabled)scriptSettings().setScriptTranslation(true);
+  return scriptActivity(pairing).active;
+ }finally{runtime?.reader?.refreshTextSource?.();}
+}
+async function pairRestoredTranslation(id,runtime){
+ const worker=require('./text-source-worker.cjs');
+ try{
+  if(!(await worker.run(root,'localPairs',[id])).hasPairs)await worker.run(root,'autoPatch',[id,{force:true,drives:false}],{cachedOnly:true});
+  return enableRestoredTranslation(await worker.run(root,'localPairs',[id]),runtime);
+ }catch{return false;}
 }
 function restoreWord(db,id) {
   const entry=db.prepare('SELECT * FROM word_trash WHERE id=?').get(id);
@@ -357,40 +377,72 @@ async function dispatch(request,runtime=null) {
       case 'game_reviews':if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');return runtime.reviews().page(String(request.id),String(request.platform),request.page,request.size,String(request.lang||'all'));
       case 'reviews_translate':if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');return runtime.reviews().translate(request.texts,String(request.target),String(request.source||'auto'));
       case 'open_source':{const url=new URL(String(request.url));if(url.protocol!=='https:'||!['vndb.org','store.steampowered.com','steamcommunity.com','bgm.tv','2dfan.com','erogamescape.dyndns.org','github.com','plicy.net','megulit.com','platform.deepseek.com','cloud.siliconflow.cn','bailian.console.aliyun.com','aistudio.google.com','apps.ankiweb.net','ankiweb.net'].includes(url.hostname)||url.username||url.password)throw Error('INVALID_SOURCE_URL');const child=spawn('explorer.exe',[url.href],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {opened:true};}
-      case 'game_locale_mode':{const row=db.prepare('SELECT original FROM games WHERE id=? AND removed_at IS NULL').get(String(request.id));if(!row)throw Error('GAME_NOT_FOUND');let original={};try{original=JSON.parse(row.original||'{}')||{};}catch{}original.library={...original.library,localeMode:request.japanese===true?'japanese':'off'};db.prepare('UPDATE games SET original=? WHERE id=?').run(JSON.stringify(original),String(request.id));return {japanese:request.japanese===true};}
+      case 'game_locale_mode':{
+        const id=String(request.id),row=db.prepare('SELECT original FROM games WHERE id=? AND removed_at IS NULL').get(id);
+        if(!row)throw Error('GAME_NOT_FOUND');
+        if(typeof request.japanese!=='boolean')throw Error('INVALID_LOCALE_MODE');
+        const original=JSON.parse(row.original||'{}')||{};
+        original.library={...original.library,localeMode:request.japanese?'japanese':'off',localeUserSet:true};
+        delete original.library.localeBeforeJapanese;
+        db.prepare('UPDATE games SET original=? WHERE id=?').run(JSON.stringify(original),id);
+        return {japanese:request.japanese};}
       // Script sources for zero-latency bilingual: a Chinese patch for the Japanese game, or the Japanese original
       // for a patched game. Both are lined up with the installed script; the running reader picks the change up.
       // E280: opening the dialog also looks for a Chinese patch already on this computer (never downloads anything).
       // Read-only: how much of the work is read, {total, read, ratio, source} (services/read-progress.cjs); ids for several at once.
       case 'read_progress':{const rp=require('./read-progress.cjs');if(Array.isArray(request.ids))return {items:request.ids.map(i=>{try{return rp.progress(root,db,i);}catch(e){return {id:String(i),total:null,read:null,ratio:null,source:null,error:String(e.message||e)};}})};return rp.progress(root,db,request.id);}
-      case 'text_source_status':{const ot=require('./original-text.cjs'),id=String(request.id);ot.autoPatchLater(root,id,()=>runtime?.reader?.refreshTextSource?.(),{force:!!request.search});
+      case 'text_source_activity':{
+        const pairing=await require('./text-source-worker.cjs').run(root,'localPairs',[String(request.id)]);
+        return scriptActivity(pairing);}
+      case 'text_source_toggle':{
+        if(typeof request.enabled!=='boolean')throw Error('INVALID_TEXT_SOURCE');
+        const pairing=await require('./text-source-worker.cjs').run(root,'localPairs',[String(request.id)]);
+        scriptSettings().setScriptTranslation(request.enabled);
+        await runtime?.settingsSaved?.({scope:'translation',values:{scriptTranslation:request.enabled}});
+        return scriptActivity(pairing);}
+      case 'text_source_status':{const ot=require('./original-text.cjs'),id=String(request.id);
+        if(request.passive!==true)ot.autoPatchLater(root,id,()=>runtime?.reader?.refreshTextSource?.(),{force:!!request.search});
+        else if(request.search){
+          await require('./text-source-worker.cjs').run(root,'autoPatch',[id,{force:true,drives:false}],{cachedOnly:true});
+          runtime?.reader?.refreshTextSource?.();
+        }
         /* E297 Hxv4 KiriKiri games: the cold run reads the scripts through the game; 重新查找 retries a failed one */
         const cold=require('./kirikiri-cold.cjs'),row=db.prepare('SELECT id,executable FROM games WHERE id=? AND removed_at IS NULL').get(id),coldOn=require('../core/preferences.cjs').cleanPreferences(require('./store.cjs').readJSON?.(path.join(root,'data','config','preferences.json'))||{}).scriptColdRun!==false;
-        if(row)cold.consider(root,row,{enabled:coldOn,force:!!request.search});
+        if(row&&request.passive!==true)cold.consider(root,row,{enabled:coldOn,force:!!request.search});
         /* 2026-11-14 reading and lining up scripts runs in a worker thread so the service keeps answering (text-source-worker.cjs) */
-        return {...await require('./text-source-worker.cjs').run(root,'status',[id]),cold:row?cold.status(root,row.executable):null};}
-      case 'text_source_import':{const ot=require('./original-text.cjs'),id=String(request.id),dir=String(request.dir||'');
+        return {...await require('./text-source-worker.cjs').run(root,'status',[id],{cachedOnly:request.passive===true}),cold:row?cold.status(root,row.executable):null};}
+      case 'text_source_import':{const id=String(request.id),dir=String(request.dir||'');
         const off=require('./text-source-worker.cjs');
-        if(request.kind==='patch'){const r=await off.run(root,'importPatch',[id,dir]);if(r.patchStatus!=='ready'){runtime?.reader?.refreshTextSource?.();return off.run(root,'status',[id]);}}else if(request.kind==='original')await off.run(root,'importOriginal',[id,dir]);else throw Error('INVALID_TEXT_SOURCE');
-        runtime?.reader?.refreshTextSource?.();return off.run(root,'status',[id]);}
-      case 'text_source_clear':{const ot=require('./original-text.cjs'),id=String(request.id);if(request.kind==='patch')ot.clearPatch(root,id);else ot.setMode(root,id,'off');runtime?.reader?.refreshTextSource?.();return ot.status(root,db,id);}
+        if(request.kind==='patch')await off.run(root,'importPatch',[id,dir],{cachedOnly:true});
+        else if(request.kind==='original'){
+          await off.run(root,'importOriginal',[id,dir,{activate:true}],{cachedOnly:true});
+          try{enableRestoredTranslation(await off.run(root,'localPairs',[id]),runtime);}catch{}
+        }else throw Error('INVALID_TEXT_SOURCE');
+        runtime?.reader?.refreshTextSource?.();return off.run(root,'status',[id],{cachedOnly:true});}
+      case 'text_source_clear':{
+        const result=await require('./text-source-worker.cjs').run(root,'clear',[String(request.id),request.kind],{cachedOnly:true});
+        runtime?.reader?.refreshTextSource?.();return result;}
       /* 2026-11-12 Chinese-build guide on the game page: checks, then the one-click fixes the existing code can do */
       case 'first_player':require('./torch-receive.cjs').enqueue(root,[String(request.id)],{priority:'user',cooldown:true});return await require('./first-player.cjs').state(db,root,String(request.id),{wait:request.poll===true?0:2500});
       case 'first_player_credit':return await require('./first-player.cjs').setCredit(db,root,String(request.id),typeof request.name==='string'?request.name:null);
       case 'first_player_share':return {on:require('./first-player.cjs').enableSharing(root)};
       case 'cn_version_guide':{const g=require('./cn-version-guide.cjs').guide(db,root,String(request.id));return g;}
       case 'cn_guide_fix':{const id=String(request.id),cg=require('./cn-version-guide.cjs'),row=db.prepare('SELECT executable,original FROM games WHERE id=? AND removed_at IS NULL').get(id);if(!row?.executable)throw Error('GAME_NOT_FOUND');const dir=require('./patch-swap.cjs').gameDirectory(root,id,row.executable,JSON.parse(row.original||'{}').library?.dir);
-        if(request.kind==='swap')return require('./game-language.cjs').select(db,id,'ja',undefined,root);
+        if(request.kind==='swap'){const result=require('./game-language.cjs').select(db,id,'ja',undefined,root);
+          return {...result,patch:result.changed?await pairRestoredTranslation(id,runtime):false};}
         if(request.kind==='reveal'){const file=require('node:path').resolve(String(request.path||''));if(!cg.revealable(dir,file))throw Error('CN_GUIDE_PATH');const child=spawn('explorer.exe',['/select,'+file],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {ok:true};}
         throw Error('CN_GUIDE_FIX');}
-      case 'game_original_executable':{const result=require('./game-language.cjs').originalExecutable(db,String(request.id),root,request.mode,request.executable);require('./torch-receive.cjs').enqueue(root,[String(request.id)],{force:true,priority:'user'});const row=db.prepare('SELECT original FROM games WHERE id=?').get(String(request.id));return {...result,localeJapanese:JSON.parse(row?.original||'{}').library?.localeMode==='japanese'};}
+      case 'game_original_executable':{const id=String(request.id),result=require('./game-language.cjs').originalExecutable(db,id,root,request.mode,request.executable);
+        if(request.mode)require('./torch-receive.cjs').enqueue(root,[id],{force:true,priority:'user'});
+        const row=db.prepare('SELECT original FROM games WHERE id=?').get(id);
+        return {...result,patch:result.changed?await pairRestoredTranslation(id,runtime):false,localeJapanese:JSON.parse(row?.original||'{}').library?.localeMode==='japanese'};}
       // E237 Japanese restore (Tools page): list library games that ship Japanese data, then apply or undo per game.
       /* E590 automatic Japanese: notices, global and per-game switch, status, undo */
       case 'jp_auto_notices':{const ja=require('../core/japanese-auto.cjs');return ja.takeNotices(root).map(n=>({...n,title:db.prepare('SELECT title FROM games WHERE id=?').get(n.id)?.title||''}));}
       case 'jp_auto_get':return {enabled:require('../core/japanese-auto.cjs').read(root).enabled};
       case 'jp_auto_set':{const ja=require('../core/japanese-auto.cjs');if(request.id!=null){ja.setGameOff(root,String(request.id),request.off===true);return {ok:true};}return ja.setEnabled(root,request.enabled!==false);}
       case 'jp_auto_status':case 'jp_auto_undo':{const id=String(request.id),row=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(id);if(!row?.executable)throw Error('GAME_NOT_FOUND');const dir=path.dirname(row.executable),ja=require('../core/japanese-auto.cjs');
-       if(request.action==='jp_auto_status')return ja.status(root,id,dir,{executable:row.executable,...require('./japanese-restore-options.cjs').forExecutable(row.executable)});return require('./embedded-japanese-jobs.cjs').runLegacy(id,dir,{operation:'undo',requestId:request.requestId},async()=>{if(require('../core/japanese-restore.cjs')._internal.gameRunning(dir))throw Error('GAME_RUNNING');return ja.undo(root,id,dir,{options:require('./japanese-restore-options.cjs').forExecutable(row.executable)});});}
+       if(request.action==='jp_auto_status')return ja.status(root,id,dir,{executable:row.executable,...require('./japanese-restore-options.cjs').forExecutable(row.executable)});return require('./embedded-japanese-jobs.cjs').runLegacy(id,dir,{operation:'undo',requestId:request.requestId},async()=>{if(require('../core/japanese-restore.cjs')._internal.gameRunning(dir))throw Error('GAME_RUNNING');const result=ja.undo(root,id,dir,{options:require('./japanese-restore-options.cjs').forExecutable(row.executable)});runtime?.reader?.refreshTextSource?.();return result;});}
       case 'jp_restore_scan':case 'jp_restore_scan_status':case 'jp_restore_scan_cancel':{
        const id=String(request.id),row=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(id);if(!row?.executable)throw Error('GAME_NOT_FOUND');
        const jobs=require('./embedded-japanese-jobs.cjs');
@@ -400,7 +452,12 @@ async function dispatch(request,runtime=null) {
        return jobs.start(id,path.dirname(row.executable),{requestId:String(request.requestId||'')});}
       case 'jp_restore_list':{const fs=require('node:fs'),path=require('node:path');return db.prepare('SELECT id,title,executable FROM games WHERE removed_at IS NULL ORDER BY title').all().map(g=>{const dir=g.executable?path.dirname(g.executable):'';let hint='';try{if(dir&&(fs.existsSync(path.join(dir,'.megulit-japanese'))||fs.existsSync(path.join(dir,'.megulit-japanese-import'))))hint='applied';else if(dir&&require('../core/japanese-import.cjs').translatedOnly(dir,g.executable))hint='translated';else if(dir&&fs.existsSync(path.join(dir,'dat'))&&fs.readdirSync(path.join(dir,'dat')).some(f=>/\.dbs$/i.test(f)))hint='candidate';else if(dir&&fs.readdirSync(dir).some(n=>/^(scene|gameexe)(jp|ja|en|zh|cn|tw)?\.(pck|dat)$/i.test(n)||/_(jp|ja)\.(xp3|pck|arc|dat)$/i.test(n)))hint='unsupported';}catch{}return dir?{id:g.id,title:g.title,hint:hint||'import',dir:dir.toLowerCase()}:null;}).filter(Boolean).filter((g,i,all)=>all.findIndex(o=>o.dir===g.dir)===i).map(({dir,...g})=>g);}
       case 'jp_restore_steam':case 'jp_restore_detect':case 'jp_restore_apply':case 'jp_restore_undo':case 'jp_import_apply':case 'jp_import_preview':case 'jp_import_cancel':case 'jp_import_reveal':{const id=String(request.id),row=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(id);if(!row?.executable)throw Error('GAME_NOT_FOUND');const dir=require('node:path').dirname(row.executable),jr=require('../core/japanese-restore.cjs'),ji=require('../core/japanese-import.cjs');
-       if(request.action==='jp_restore_apply'&&request.embedded===true)return require('./embedded-japanese-jobs.cjs').start(id,dir,{operation:'restore',requestId:String(request.requestId||''),scanToken:String(request.scanToken||''),onDone:()=>runtime?.reader?.refreshTextSource?.()});
+       if(request.action==='jp_restore_apply'&&request.embedded===true)return require('./embedded-japanese-jobs.cjs').start(id,dir,{operation:'restore',requestId:String(request.requestId||''),scanToken:String(request.scanToken||''),onDone:result=>{
+        result.patch=false;
+        if(result.already)return;
+        const provider=require('./embedded-japanese.cjs').provider(dir);
+        result.patch=enableRestoredTranslation({hasPairs:provider?.hasLocalPairs?.()===true,embedded:true},runtime);
+       }});
        const jobService=require('./embedded-japanese-jobs.cjs'),knownRequest=request.action==='jp_restore_undo'?jobService.known(id,request.requestId):null;
        if(request.action==='jp_restore_undo'&&(require('./embedded-japanese.cjs').manifest(dir)||knownRequest&&!knownRequest.legacy&&knownRequest.operation==='undo'))return jobService.start(id,dir,{operation:'undo',requestId:String(request.requestId||''),onDone:()=>runtime?.reader?.refreshTextSource?.()});
        const perform=async()=>{
@@ -411,13 +468,13 @@ async function dispatch(request,runtime=null) {
        const imported=ji.detect(dir,row.executable),jio=require('../core/japanese-import-original.cjs'),generic=jio.readManifest(dir)?.adapter===jio.ADAPTER;
        /* E328 after the game is switched to Japanese, the files moved aside are the translation patch: build the
           zero-latency translation from them at once and report whether it worked */
-       const withPatch=async r=>{let patch=false;try{const ot=require('./original-text.cjs'),done=await ot.autoPatch(root,db,id,{force:true,drives:false});patch=!!(done?.found||done?.kept||done?.rebuilt);runtime?.reader?.refreshTextSource?.();}catch{}return {...r,patch};};
+       const withPatch=async r=>({...r,patch:await pairRestoredTranslation(id,runtime)});
        /* E327 import from a Japanese original the user has: folder, program or archive; preview first, then apply */
        if(request.action==='jp_import_preview')return jio.preview(dir,String(request.source||''));
        if(request.action==='jp_import_cancel'){jio.cleanup(dir);return {ok:true};}
        /* E339: show the .iso made from an installer disc in Explorer (selected, not opened) */
        if(request.action==='jp_import_reveal'){const file=require('node:path').resolve(String(request.path||''));if(!/\.iso$/i.test(file)||!fs.existsSync(file))throw Error('IMPORT_SOURCE_MISSING');const child=spawn('explorer.exe',['/select,'+file],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {ok:true};}
-       if(request.action==='jp_import_apply'&&imported?.state!=='importable'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');return jio.apply(dir,String(request.source||''),row.executable).then(r=>{try{r.sourceHidden=require('./import-source.cjs').link(db,id,String(request.source||'')).length;}catch{}if(r.separate){importedExecutable(db,id,r.exe,'ja');return r;}if(r.exe&&require('node:path').basename(r.exe).toLowerCase()!==require('node:path').basename(row.executable).toLowerCase())importedExecutable(db,id,r.exe,'ja');else if(changedFiles(r))importedExecutable(db,id,row.executable,'ja');return withPatch(r);});}
+       if(request.action==='jp_import_apply'&&imported?.state!=='importable'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');return jio.apply(dir,String(request.source||''),row.executable).then(r=>{try{r.sourceHidden=require('./import-source.cjs').link(db,id,String(request.source||'')).length;}catch{}if(r.separate){importedExecutable(db,id,r.exe,'ja');return withPatch(r);}if(r.exe&&require('node:path').basename(r.exe).toLowerCase()!==require('node:path').basename(row.executable).toLowerCase())importedExecutable(db,id,r.exe,'ja');else if(changedFiles(r))importedExecutable(db,id,row.executable,'ja');return withPatch(r);});}
        if(request.action==='jp_restore_undo'&&generic){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=jio.restore(dir);if(!r.skipped.length)importedExecutable(db,id,r.exe&&r.exe.toLowerCase()!==row.executable.toLowerCase()?r.exe:row.executable,'zh');return r;}
        if(request.action==='jp_restore_detect'){const r=jr.detect(dir,lsOptions);if(imported&&(imported.state==='imported'||['none','unsupported'].includes(r.state)))return imported;
         /* 2026-11-14 one shared "does this install have Japanese" (japanese-presence.cjs): a script read as Japanese, or
@@ -430,7 +487,11 @@ async function dispatch(request,runtime=null) {
        /* E595 a Chinese patch over the release: turned off by the import's backed-up remove step (undo = jp_restore_undo) */
        if(request.action==='jp_restore_apply'&&jr.detect(dir,lsOptions).adapter==='overlay-patch'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');return jio.apply(dir,dir,row.executable).then(r=>{if(changedFiles(r))importedExecutable(db,id,r.exe||row.executable,'ja');return withPatch({...r,applied:r.imported,cells:0});});}
        return request.action==='jp_restore_apply'?withPatch(jr.apply(dir,lsOptions)):jr.restore(dir,lsOptions);
-       };return ['jp_restore_apply','jp_restore_undo','jp_import_apply'].includes(request.action)?jobService.runLegacy(id,dir,{operation:request.action==='jp_restore_undo'?'undo':'restore',requestId:request.requestId},perform):perform();}
+       };
+       if(!['jp_restore_apply','jp_restore_undo','jp_import_apply'].includes(request.action))return perform();
+       return jobService.runLegacy(id,dir,{operation:request.action==='jp_restore_undo'?'undo':'restore',requestId:request.requestId},async()=>{
+        const result=await perform();if(request.action==='jp_restore_undo')runtime?.reader?.refreshTextSource?.();return result;
+       });}
       case 'game_cover':return require('./game-cover.cjs').setCover(db,root,String(request.id),request.path);
       /* E362 adaptation overview + one-click diagnostic package (built locally; shown to the user before any upload) */
       case 'adaptation_overview':return require('./adaptation-overview.cjs').overview(db,root);

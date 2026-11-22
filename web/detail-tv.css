@@ -15,8 +15,57 @@
 .main[data-kids~="dtv-bg"] .detail-engine{font-family:var(--dtv-mono)!important;font-size:12px!important;letter-spacing:.35em!important;text-transform:uppercase;color:var(--g-gold)!important}
 .main[data-kids~="dtv-bg"] .detail-title h1{font-family:var(--g-serif-ja)!important;font-weight:400!important;font-size:clamp(44px,5.6vw,96px)!important;line-height:1.08!important;letter-spacing:-.01em;text-shadow:0 6px 40px #000a}
 .main[data-kids~="dtv-bg"] .detail-title>.settings-help{font-family:var(--dtv-mono);font-size:12px;letter-spacing:.14em;color:var(--g-t2)}
-.main[data-kids~="dtv-bg"] .detail-actions>button:not(.primary){border-radius:0!important;background:color-mix(in srgb,var(--bg) 40%,transparent)!important;border:1px solid color-mix(in srgb,var(--g-t1) 26%,transparent)!important;letter-spacing:.12em;backdrop-filter:blur(10px)}
-.main[data-kids~="dtv-bg"] .detail-actions>button:not(.primary):hover{border-color:var(--g-gold)!important;color:var(--g-gold)!important}
+.main[data-kids~="dtv-bg"] .detail-actions>button[data-edit]{background:color-mix(in srgb,var(--bg) 55%,transparent)!important;border:1px solid color-mix(in srgb,var(--g-t1) 24%,transparent)!important}
+.main[data-kids~="dtv-bg"] .detail-actions>button[data-edit]:hover{border-color:var(--g-gold)!important;color:var(--g-gold)!important}
+
+/* The eden* launch treatment is local to game details. The progress uses the existing launch tracker. */
+@layer story-detail-responsive{
+ .main[data-kids~="dtv-bg"] .detail-actions>button.detail-launch{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;overflow:hidden;
+  min-width:min(128px,100%);min-height:48px!important;padding:8px 16px!important;
+  border:1px solid #ae8159!important;border-radius:10px!important;
+  color:#fff0df!important;background:radial-gradient(ellipse at 20% 45%,#8a2535,#551d28 56%,#302022)!important;
+  box-shadow:inset 0 0 0 2px #2a181bb3,inset 0 0 0 3px #edb56e38,0 4px 17px #70273147!important;
+  font:600 16px/1.25 var(--g-serif-ja,serif)!important;overflow-wrap:anywhere;
+ }
+ .main[data-kids~="dtv-bg"] .detail-launch:hover:not(:disabled){border-color:#edb56e!important;background:radial-gradient(ellipse at 20% 45%,#a03042,#601d2b 64%,#392528)!important}
+ .main[data-kids~="dtv-bg"] .detail-launch:active:not(:disabled){background:#571c29!important}
+ .main[data-kids~="dtv-bg"] .detail-launch:focus-visible{outline:2px solid var(--g-gold,#edb56e)!important;outline-offset:3px!important}
+ .main[data-kids~="dtv-bg"] .detail-launch:disabled:not([aria-busy=true]):not([data-launch-state=failed]){opacity:.55!important}
+ .main[data-kids~="dtv-bg"] .detail-launch[aria-busy=true]::after{
+  content:"";position:absolute;inset:auto auto 2px 3px;height:2px;width:calc((100% - 6px) * var(--lp-progress,0));
+  border-radius:1px;background:#edb56e;
+ }
+ .main[data-kids~="dtv-bg"] .detail-launch[data-launch-state=failed]{border-color:#db6673!important}
+}
+.detail-actions .detail-launch-mark{width:12px;height:12px;flex:none;fill:#ffd7a0;filter:drop-shadow(0 0 3px #ffd7a080)}
+.main[data-kids~="dtv-bg"] .detail-title>.detail-engine{
+ display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;
+}
+.main[data-kids~="dtv-bg"] .detail-zero-indicator,
+.main[data-kids~="dtv-bg"] .detail-tool-links>button{
+ display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:100%;
+ padding:4px 0;border:0;background:none;color:var(--g-t1);font:inherit;text-align:start;overflow-wrap:anywhere;
+}
+.main[data-kids~="dtv-bg"] .detail-zero-indicator{
+ min-height:28px;padding-inline:4px;border-radius:4px;
+ font:500 12px/1.35 var(--mgc-ui,sans-serif);text-transform:none;letter-spacing:normal;
+}
+.detail-zero-indicator:hover,.detail-tool-links>button:hover{text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--g-gold)}
+.detail-zero-dot{width:8px;height:8px;flex:none;border-radius:50%;background:#8b8582}
+.detail-zero-indicator[data-active=true] .detail-zero-dot{background:#68bc83;box-shadow:0 0 0 2px #68bc8330}
+:root[data-theme=light] .detail-zero-indicator[data-active=true] .detail-zero-dot{background:#267343}
+.detail-game-tools{width:fit-content;max-width:100%;margin-top:2px;padding-top:4px;border-top:1px solid var(--mgc-line)}
+.detail-tool-links{display:flex;flex-wrap:wrap;gap:0 20px}
+.main[data-kids~="dtv-bg"] .detail-tool-links>button{min-height:40px;font:500 14px/1.4 var(--mgc-ui,sans-serif)}
+.detail-locale .locale-toggle{width:fit-content;align-items:center;margin:3px 0 1px;min-height:28px}
+.detail-locale .review-switch{margin:0}
+.detail-locale .settings-help,.detail-locale-error{display:block;margin:0 0 0 39px;font-size:12px;line-height:1.5}
+.detail-locale-error,.zero-source-error{color:var(--mgc-red-ink,#e8b4b4)}
+.detail-locale-error:empty,.zero-source-error:empty{display:none}
+.detail-locale input:focus-visible+.review-switch,.zero-source-dialog input:focus-visible+.review-switch{
+ outline:2px solid var(--g-gold,#edb56e);outline-offset:3px;
+}
 .main[data-kids~="dtv-bg"] .detail-statistics{border-left:1px solid color-mix(in srgb,var(--g-t1) 14%,transparent)!important}
 .main[data-kids~="dtv-bg"] .detail-statistics .stat-card{background:none!important;border:0!important;box-shadow:none!important}
 .main[data-kids~="dtv-bg"] .detail-statistics .stat-card strong{font-family:var(--g-serif)!important;font-weight:400!important;font-size:clamp(28px,2.6vw,44px)!important;line-height:1!important;font-variant-numeric:tabular-nums lining-nums;color:var(--g-t1)!important}

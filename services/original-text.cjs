@@ -150,13 +150,14 @@ function pairCheck(zh,ja,{into='zh',zhSizes,jaSizes,ruby,structureOk=true}={}){
  const v=sampler.verify(zh,ja,{into,zhSizes,jaSizes,ruby,force:!structureOk,added:into==='zh'?ja.added:null,rewritten:into==='zh'?ja.rewritten:null});
  return {verdict:v,report:sampler.report(v)};
 }
-function importOriginal(root,db,id,dir){
+function importOriginal(root,db,id,dir,{activate=false}={}){
  const row=gameRow(db,id);if(typeof dir!=='string'||!path.isAbsolute(dir)||!fs.statSync(dir,{throwIfNoEntry:false})?.isDirectory())throw Error('INVALID_ORIGINAL_DIRECTORY');
  if(path.resolve(dir).toLowerCase()===path.dirname(row.executable).toLowerCase())throw Error('ORIGINAL_IS_RUNNING_COPY');
  writeState(root,id,{status:'scanning',error:''});
  try{
   const state=scanRunning(root,id,row.executable,{noBackup:true});if(!state.runtime)throw Error(state.error||'NO_SUPPORTED_SCRIPT');
-  return importInto(root,id,state,dir,path.parse(row.executable).name,false);
+  const result=importInto(root,id,state,dir,path.parse(row.executable).name,false);
+  return activate&&result.status==='ready'?setMode(root,id,'original'):result;
  }catch(error){writeState(root,id,{status:'failed',error:String(error.message||error)});throw error;}
 }
 /* the import itself: the user's folder (importOriginal) or a Japanese release found inside the game folder (auto) */
@@ -308,7 +309,7 @@ function packedLauncher(source,executable){
  if(path.resolve(source).toLowerCase()===path.resolve(executable).toLowerCase())return false;
  return sameDir(path.dirname(source),path.dirname(executable));
 }
-function importPatch(root,db,id,source,{auto=false,executable}={}){
+function importPatch(root,db,id,source,{auto=false,executable,imageSource}={}){
  const row=executable?{executable}:gameRow(db,id);if(typeof source!=='string'||!path.isAbsolute(source)||!fs.statSync(source,{throwIfNoEntry:false}))throw Error('INVALID_PATCH_DIRECTORY');
  // A picked script file stands for its folder (the folder may hold more than that one file).
  const picked=source;if(fs.statSync(source).isFile()&&!/\.exe$/i.test(source))source=path.dirname(source);
@@ -330,9 +331,44 @@ function importPatch(root,db,id,source,{auto=false,executable}={}){
  const pc=pairCheck(script.lines,runtime.lines,{into:'ja',zhSizes:script.sizes,jaSizes:runtime.sizes,structureOk:alignment.sameStructure});
  if(pc.verdict.lines){script={...script,lines:pc.verdict.lines};alignment=align({...script,structure:script.structure},runtime);}
  alignment={...alignment,reliable:alignment.reliable&&pc.verdict.ok,pairing:pc.report};
- const hash=patchFingerprint(source),isDir=fs.statSync(source).isDirectory();
+ const persistedSource=imageSource||source,hash=patchFingerprint(persistedSource),isDir=fs.statSync(persistedSource).isDirectory();
  const index=writeIndex(root,id,'patch-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'patch',engine:script.engine,version:script.version,codepage:script.codepage,source:{file:source,sha256:hash,sources},structure:script.structure,lines:script.lines});
- return writeState(root,id,{patch:{dir:isDir?source:path.dirname(source),source,file:source,sha256:hash,index,lines:script.lines.length,scenes:patched,fontMapped:!!script.fontMapped,auto,runtimeSha:state.runtime.sha256,reader:state.runtime.reader||'',version:PATCH_VERSION},patchAlignment:alignment,patchStatus:alignment.reliable?'ready':'unreliable',patchSearch:{...state.patchSearch,running:false,declined:false},error:''});
+ return writeState(root,id,{patch:{dir:isDir?persistedSource:path.dirname(persistedSource),source:persistedSource,file:persistedSource,sha256:hash,index,lines:script.lines.length,scenes:patched,fontMapped:!!script.fontMapped,auto,runtimeSha:state.runtime.sha256,reader:state.runtime.reader||'',version:PATCH_VERSION},patchAlignment:alignment,patchStatus:alignment.reliable?'ready':'unreliable',patchSearch:{...state.patchSearch,running:false,declined:false},error:''});
+}
+
+/* A drive already mounted by the user is a directory. Image files go through the local
+   ISO reader, so even a disc containing setup.exe is only inspected as data. */
+async function importPatchSource(root,db,id,source,options={}){
+ const st=path.isAbsolute(source)&&fs.statSync(source,{throwIfNoEntry:false});
+ if(!st||!st.isFile()&&!st.isDirectory())throw Error('INVALID_PATCH_DIRECTORY');
+ if(st.isDirectory()||/\.exe$/i.test(source))return importPatch(root,db,id,source,options);
+ const disc=require('../core/disc-image.cjs');
+ if(!disc.IMAGE.test(source)){
+  const row=gameRow(db,id),state=scanRunning(root,id,row.executable);
+  const engine=state.runtime?.engine,name=path.basename(source),adapter=scenes.ENGINES[engine],hintExt=path.extname(patchHint(state.runtime)).toLowerCase();
+  const matchesHint=hintExt&&path.extname(source).toLowerCase()===hintExt;
+  let looseBgi=false;
+  if(engine==='bgi'&&!matchesHint){
+   const fd=fs.openSync(source,'r'),header=Buffer.alloc(32);
+   try{fs.readSync(fd,header,0,header.length,0);looseBgi=bgi.isScript(header);}finally{fs.closeSync(fd);}
+  }
+  if(!(matchesHint||looseBgi||adapter?.test?.(name)||evbData(source)))throw Error('PATCH_SOURCE_TYPE');
+  return importPatch(root,db,id,source,options);
+ }
+ const cue=/\.cue$/i.test(source);
+ if(cue&&st.size>1024*1024)throw Error('PATCH_DISC_UNREADABLE');
+ const data=disc.imageOf(source);
+ if(cue&&(data===source||!sameDir(path.dirname(data),path.dirname(source))))throw Error('PATCH_DISC_DATA_MISSING');
+ const cache=path.join(root,'cache');
+ fs.mkdirSync(cache,{recursive:true});
+ const dir=fs.mkdtempSync(path.join(cache,'translation-disc-'));
+ try{
+  try{if(!await disc.extract(data,dir,{bounded:true}))throw Error('EMPTY_DISC');}catch{throw Error('PATCH_DISC_UNREADABLE');}
+  try{return importPatch(root,db,id,dir,{...options,imageSource:source});}catch(error){
+   if(error.message==='PATCH_SCRIPT_NOT_FOUND')throw Error('PATCH_DISC_NO_SCRIPT');
+   throw error;
+  }
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
 }
 // Where a patch may already be on this computer, nearest first: the game folder (packed programs, loose scenes, patch
 // subfolders), the other folders next to it, then the same script elsewhere on local drives.
@@ -377,7 +413,7 @@ function autoPatch(root,db,id,options={}){
      restore was undone, 2026-11-13) pairs nothing; when its source folder is gone too it is searched for again. */
   const stale=state.patch&&state.patch.version!==PATCH_VERSION,outdated=!!state.patch&&(state.patch.runtimeSha!==state.runtime.sha256||(state.patch.reader?state.patch.reader!==(state.runtime.reader||''):!!state.patch.source&&fs.existsSync(state.patch.source)));
   if(state.patch?.source&&(stale||state.patchStatus!=='ready'||outdated)&&fs.existsSync(state.patch.source)){
-   try{const r=importPatch(root,db,id,state.patch.source,{auto:!!state.patch.auto});if(r.patchStatus==='ready')return {found:state.patch.source,rebuilt:true};}catch{}
+   try{const r=await importPatchSource(root,db,id,state.patch.source,{auto:!!state.patch.auto});if(r.patchStatus==='ready')return {found:state.patch.source,rebuilt:true};}catch{}
    if((stale||state.patchStatus==='ready')&&state.patch.auto){state=writeState(root,id,{patch:null,patchAlignment:null,patchStatus:'none',patchSearch:{...state.patchSearch,at:0}});options={...options,force:true};}}
   else if(state.patch?.auto&&(stale||outdated)&&state.patchStatus==='ready'){state=writeState(root,id,{patch:null,patchAlignment:null,patchStatus:'none',patchSearch:{...state.patchSearch,at:0}});options={...options,force:true};}
   if(state.patchStatus==='ready')return {kept:true};
@@ -417,7 +453,7 @@ function brief(root,id){const s=readState(root)[String(id)];if(!s)return 'unknow
  if(s.status==='preparing')return 'preparing';return 'none';}
 function status(root,db,id){
  const row=gameRow(db,id),saved=readState(root)[id];let state=saved;
- try{if(!saved?.runtime||!fs.existsSync(saved.runtime.file)||saved.runtime.sha256!==fingerprint({engine:saved.runtime.engine||'system4',target:saved.runtime.file}))state=scanRunning(root,id,row.executable);}catch(error){state={...saved,status:'failed',error:String(error.message||error)};}
+ try{if(!saved?.runtime||!sameDir(runningDirOf(saved.runtime),path.dirname(row.executable))||!fs.existsSync(saved.runtime.file)||saved.runtime.sha256!==fingerprint({engine:saved.runtime.engine||'system4',target:saved.runtime.file}))state=scanRunning(root,id,row.executable);}catch(error){state={...saved,status:'failed',error:String(error.message||error)};}
  /* Live test 2026-11-13 (Summer Pockets, 魔法少女ノ魔女裁判, DDLC Plus): patches aligned before E496 had no pairing report, so the
     game page could not say total/paired/unpaired. Sample it once from the saved indexes; the verdict is reported, the state kept. */
  try{if(state?.patchStatus==='ready'&&state.patch?.index&&state.runtime?.index&&state.patchAlignment&&!state.patchAlignment.pairing){const z=readIndex(state.patch.index),j=readIndex(state.runtime.index);if(z.lines.length===j.lines.length){const pc=pairCheck(z.lines,j.lines,{into:'ja',zhSizes:z.sizes,jaSizes:j.sizes,structureOk:state.patchAlignment.sameStructure!==false});state=writeState(root,id,{patchAlignment:{...state.patchAlignment,pairing:pc.report}});}}}catch{}
@@ -557,7 +593,7 @@ function liveProvider(root,id,executable){
     if(eng.patchLines&&state.status==='native-japanese'&&!fresh)try{importPatch(root,null,id,dir,{auto:true,executable});}catch{}
     if(eng.originalLines&&state.status!=='native-japanese')try{state=adoptOriginal(root,id,state,dir);}catch{}
     pruneIndexes(root,id);}
-   inner=staticProvider(root,executable);}catch{inner=null;}
+   inner=staticProvider(root,executable,{id});}catch{inner=null;}
   return true;};
  const later=()=>{if(timer)return;timer=setTimeout(()=>{timer=null;rebuild();},400);timer.unref?.();};
  const changed=()=>{checked=Date.now();return engine.stamp(dir)!==stamp;};
@@ -590,13 +626,17 @@ function adoptOriginal(root,id,state,dir){
  return writeState(root,id,{original:{dir,file:dir,sha256:hash,index,codepage:'text',lines:lines.length,executable:'',auto:true},alignment,status:alignment.reliable?'ready':'unreliable',mode:state.mode||(alignment.reliable?'original':'off'),error:''});
 }
 /* E545 what the provider for this program is built from: the reader keeps a provider whose key has not changed (its reading position too) and rebuilds one whose script, patch or mode changed while the game runs */
-function providerKey(root,executable){const dir=path.dirname(String(executable||'')).toLowerCase();if(!dir||dir==='.')return '';const embedded=require('./embedded-japanese.cjs').stamp(path.dirname(String(executable)));if(embedded)return 'embedded|'+embedded;const entry=Object.entries(readState(root)).find(([,s])=>s?.runtime?.file?runningDirOf(s.runtime).toLowerCase()===dir:String(s?.gameDir||'').toLowerCase()===dir);if(!entry)return 'none|'+dir;const [id,s]=entry;return JSON.stringify([id,s.status||'',s.mode||'',s.runtime?.sha256||'',s.runtime?.index||'',s.patchStatus||'',s.patch?.index||'',s.patch?.version??'',s.patch?.runtimeSha||'',s.original?.index||'']);}
+function providerEntry(root,dir,id,{runtimeOnly=false}={}){
+ return Object.entries(readState(root)).find(([key,s])=>(id===undefined||id===key)&&
+  (s?.runtime?.file?runningDirOf(s.runtime).toLowerCase()===dir:!runtimeOnly&&String(s?.gameDir||'').toLowerCase()===dir));
+}
+function providerKey(root,executable,id){const dir=path.dirname(String(executable||'')).toLowerCase();if(!dir||dir==='.')return '';const embedded=require('./embedded-japanese.cjs').stamp(path.dirname(String(executable)));if(embedded)return 'embedded|'+embedded;const entry=providerEntry(root,dir,id);if(!entry)return 'none|'+dir;const [entryId,s]=entry;return JSON.stringify([entryId,s.status||'',s.mode||'',s.runtime?.sha256||'',s.runtime?.index||'',s.patchStatus||'',s.patch?.index||'',s.patch?.version??'',s.patch?.runtimeSha||'',s.original?.index||'']);}
 /* opts.indexOnly (tools/patch-pair-selftest.cjs): the stored script alone, without checking the game files against it (a game since
    removed or moved); the running game never uses it */
 function provider(root,executable,opts={}){
  const embedded=require('./embedded-japanese.cjs'),embeddedDir=path.dirname(String(executable));
  if(embedded.manifest(embeddedDir))return embedded.provider(embeddedDir);
- const dir=path.dirname(String(executable)).toLowerCase(),entry=Object.entries(readState(root)).find(([,s])=>s?.runtime?.file?runningDirOf(s.runtime).toLowerCase()===dir:String(s?.gameDir||'').toLowerCase()===dir);
+ const dir=path.dirname(String(executable)).toLowerCase(),entry=providerEntry(root,dir,opts.id);
  /* 2026-11-13 no imported script: the script harvested at run time (services/script-harvest.cjs), when there is one */
  if(!entry){try{const h=require('./script-harvest.cjs');return h.report(path.dirname(String(executable)))?.total?h.provider(path.dirname(String(executable))):null;}catch{return null;}}
  const gameDir=path.dirname(String(executable));
@@ -619,14 +659,14 @@ function scriptPairs(root,executable){
 }
 function staticProvider(root,executable,opts={}){
  // BGI's and scene engines' script is the whole game folder, AIN is a file in it.
- const entry=Object.entries(readState(root)).find(([,s])=>s?.runtime?.file&&runningDirOf(s.runtime).toLowerCase()===path.dirname(String(executable)).toLowerCase());
- if(!entry)return null;const [id,state]=entry;
+ const entry=providerEntry(root,path.dirname(String(executable)).toLowerCase(),opts.id,{runtimeOnly:true});
+ if(!entry?.[1]?.runtime?.file)return null;const [id,state]=entry;
  try{if(!opts.indexOnly&&fingerprint({engine:state.runtime.engine||'system4',target:state.runtime.file})!==state.runtime.sha256)return null;
   if(state.mode==='original'&&state.status==='ready'&&state.original?.index){const og=readIndex(state.original.index),m=new Matcher(readIndex(state.runtime.index).lines,og.lines);
    // The original's own ruby (BGI <R よみ>漢字</R>) for the restored lines: game readings before dictionary ones.
    const readings=Array.isArray(og.ruby)?og.ruby:null,withRuby=r=>{if(!r||!readings||!Array.isArray(r.indices))return r;const pairs=r.indices.flatMap(i=>Array.isArray(readings[i])?readings[i]:[]);return pairs.length?{...r,ruby:pairs}:r;};
    // A patched game shown in Japanese: the patched line itself is the group's translation of the restored line.
-   return {kind:'original',position:()=>m.last,save:()=>m.save(),load:v=>m.load(v),resolve:text=>withRuby(m.match(text))};}
+   return {kind:'original',hasLocalPairs:()=>og.lines.some((ja,i)=>japaneseLine(ja)&&localTranslation(m.rt[i])),position:()=>m.last,save:()=>m.save(),load:v=>m.load(v),resolve:text=>withRuby(m.match(text))};}
   const patched=state.patchStatus==='ready'&&state.patch?.index&&state.patch.version===PATCH_VERSION&&(!state.patch.runtimeSha||state.patch.runtimeSha===state.runtime.sha256);
   if(!patched&&state.status!=='native-japanese')return null;
   // The Japanese game, with an imported patch or with none: the line stays Japanese; the patch's line at the same place is
@@ -652,7 +692,7 @@ function staticProvider(root,executable,opts={}){
   /* 2026-11-13 the same script in the game's other languages (scene engines with parallel tables): a captured line in one
      of them gives back its Japanese line; built on first use, never when the engine has none */
   let foreignMap,foreignSeqFn;const foreign=(text,opt)=>{if(foreignMap===undefined){foreignMap=null;try{const f=scenes.ENGINES[state.runtime.engine]?.foreign;if(f){const map=f(path.dirname(String(executable)));if(map&&map.size)foreignMap=map;}}catch{}}if(!foreignMap)return '';const k=foreignKey(text),hit=foreignMap.get(k);if(opt?.fuzzy)return (foreignSeqFn||(foreignSeqFn=foreignSeq(foreignMap)))(text);if(hit||!opt?.prefix||k.length<40)return hit||'';/* a truncated stream sample (thread list keeps 110 chars): the one line it starts */let one='';for(const [key,ja] of foreignMap)if(key.startsWith(k)){if(one&&one!==ja)return '';one=ja;}return one;};
-  /* position(): the script line read last (core/hook-native.cjs keeps a repeated line's answer only while it is there) */const api={kind:'patch',patch:!!patched,fill,drawable,tableDrawable,position:()=>m.last,save:()=>m.save(),load:v=>m.load(v),flowLayout,flowGame,foreign,near:text=>{const i=m.near(text);return i>=0?inlineTags(rt[i]):'';},
+  /* position(): the script line read last (core/hook-native.cjs keeps a repeated line's answer only while it is there) */const api={kind:'patch',patch:!!patched,hasLocalPairs:()=>!!patched&&rt.some((ja,i)=>japaneseLine(ja)&&!untranslated(i)&&localTranslation(m.og[i])),fill,drawable,tableDrawable,position:()=>m.last,save:()=>m.save(),load:v=>m.load(v),flowLayout,flowGame,foreign,near:text=>{const i=m.near(text);return i>=0?inlineTags(rt[i]):'';},
    resolve:text=>withRuby(resolveLine(text))};
   function resolveLine(text){const r=m.match(text);if(r.japanese===undefined)return r;
     // E449 lines the release leaves in Japanese take the filled translation written for them (fill.cjs), marked filled.
@@ -692,4 +732,12 @@ async function discover(root,db,id,options={}){
  writeState(root,id,{status:state.original?.index?(state.alignment?.reliable?'ready':'unreliable'):status,lastSearch:{at:Date.now(),found:search.found.length,complete:search.complete,searched:search.searched,checked}});
  return {notFound:true,search:{found:search.found.length,complete:search.complete,searched:search.searched,checked}};
 }
-module.exports={backupOriginal,_fillStore:fillStore,providerKey,foreignKey,foreignNear,foreignSeq,scriptPairs,brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,clearPatch,locate,readScript,ADAPTERS,readAin,_ain:{mtXor,inflateAin},align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,chineseOnly,norm,discover,findCandidates};
+const localTranslation=text=>typeof text==='string'&&prose(text)&&!japaneseLine(text);
+function localPairs(root,db,id){
+ const {executable}=gameRow(db,id);
+ if(!executable||!fs.existsSync(executable))return {hasPairs:false,embedded:false};
+ const embedded=require('./embedded-japanese.cjs'),dir=path.dirname(executable);
+ if(embedded.manifest(dir))return {hasPairs:embedded.provider(dir)?.hasLocalPairs?.()===true,embedded:true};
+ return {hasPairs:staticProvider(root,executable,{id:String(id)})?.hasLocalPairs?.()===true,embedded:false};
+}
+module.exports={backupOriginal,_fillStore:fillStore,providerKey,foreignKey,foreignNear,foreignSeq,scriptPairs,brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,importPatchSource,clearPatch,locate,readScript,ADAPTERS,readAin,_ain:{mtXor,inflateAin},align,Matcher,importOriginal,status,setMode,provider,localPairs,scanRunning,japaneseLine,chineseOnly,norm,discover,findCandidates};

@@ -216,11 +216,18 @@ class Reader{
     launched (selectGame) before its first line, adopted by the game process when it binds, checked again while the game
     runs (a stale patch rebuilt in the background, the start-up script prewarm, a cold run) and on every settings save;
     an unchanged key keeps the provider and its reading position, a changed one rebuilds it. force rebuilds anyway. */
- refreshTextSource({force=true,exe=this.textExe||this.gameExe||'',pid=this.gamePid||0}={}){try{const hooks=this.gal?.hooks;if(!hooks)return;/* E330 the 零延迟翻译 switch in the translation settings */hooks.scriptAllowed=()=>this.prefs().scriptTranslation!==false;
-  if(!exe){hooks.originalText=null;hooks.textSourceKey='';return;}const ot=require('./original-text.cjs'),key=String(exe).toLowerCase()+'|'+ot.providerKey(this.root,exe);
-  if(!force&&hooks.originalText&&hooks.textSourceKey===key)return;hooks.originalText=ot.provider(this.root,exe);hooks.textSourceKey=key;hooks.textSourcePid=pid;
+ refreshTextSource({force=true,exe=this.textExe||this.gameExe||'',pid=this.gamePid||0}={}){try{const hooks=this.gal?.hooks;if(!hooks)return;/* E330 the 零延迟翻译 switch in the translation settings */
+  hooks.scriptAllowed=()=>{const prefs=this.prefs();return prefs.scriptTranslation!==false&&prefs.learnerLanguage!=='en';};
+  const allowed=hooks.scriptAllowed();
+  let game;try{const db=require('./store.cjs').openStore(this.root);try{game=require('./library.cjs').activeGameForProgram(db,exe);}finally{db.close();}}catch{}
+  const ot=require('./original-text.cjs'),key=exe?String(exe).toLowerCase()+'|'+ot.providerKey(this.root,exe,game?.id):'';
+  if(hooks.textSourceAllowed!==allowed||hooks.textSourceKey!==key){
+   this.embedCache?.clear();this.humanLines?.clear();hooks.textSourceAllowed=allowed;
+  }
+  if(!exe){hooks.originalText=null;hooks.textSourceKey='';return;}
+  if(!force&&hooks.originalText&&hooks.textSourceKey===key)return;hooks.originalText=ot.provider(this.root,exe,{id:game?.id});hooks.textSourceKey=key;hooks.textSourcePid=pid;
   /* 2026-11-14 the launch notice asks the shared check first: an install known to have Japanese never gets "the script is Chinese" */
-  try{const db=require('./store.cjs').openStore(this.root);try{const game=require('./library.cjs').activeGameForProgram(db,exe);hooks.japaneseInstall=game?.id?require('./japanese-presence.cjs').verdict(this.root,db,game.id).japanese:null;const lib=JSON.parse(game?.original||'{}').library||{};hooks.setSourceLanguage?.(lib.contentLanguage==='zh'?'zh!':lib.contentLanguage==='ja'||hooks.japaneseInstall===true?'ja':hooks.japaneseInstall===false?'zh':'');}finally{db.close();}}catch{hooks.japaneseInstall=null;}}catch{}}
+  try{const db=require('./store.cjs').openStore(this.root);try{hooks.japaneseInstall=game?.id?require('./japanese-presence.cjs').verdict(this.root,db,game.id).japanese:null;const lib=JSON.parse(game?.original||'{}').library||{};hooks.setSourceLanguage?.(lib.contentLanguage==='zh'?'zh!':lib.contentLanguage==='ja'||hooks.japaneseInstall===true?'ja':hooks.japaneseInstall===false?'zh':'');}finally{db.close();}}catch{hooks.japaneseInstall=null;}}catch{}}
  /* E545 the game process binds: a provider built at launch for this same program is kept (no reading-position reset) */
  /* 2026-11-21 layered game profile (core/profiles): which game diff and engine diff this run uses, from the program path, the
     library row (title, detected engine) and the folder (Steam app id, fingerprint files); handed to gal-native setGameProfile */

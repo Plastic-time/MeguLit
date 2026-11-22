@@ -99,6 +99,7 @@ function extractMatchSync(file,out,match,{timeout=90000,maxBytes=200*1048576,lim
   let json=null;try{json=JSON.parse(String(r.stdout||'').trim().split(/\r?\n/).pop()||'');}catch{}
   if(!json||json.error||!Array.isArray(json.files))return [];return json.files.map(f=>path.join(out,typeof f==='string'?f:(f.name||''))).filter(f=>{try{return fs.statSync(f).isFile();}catch{return false;}});
  }catch{return [];}}
+const cacheOnly=new (require('node:async_hooks').AsyncLocalStorage)();
 const queue=[];let busy=false;
 function schedule(file){if(jobs.has(file))return;jobs.set(file,{state:'queued',startedAt:Date.now(),error:''});queue.push(file);pump();}
 async function pump(){if(busy)return;busy=true;try{while(queue.length){const file=queue.shift(),job=jobs.get(file);job.state='running';
@@ -114,7 +115,7 @@ const engine={id:'garbro',
   for(const file of archives(dir)){let c;try{c=cacheDir(file);}catch{continue;}const info=readJson(path.join(c,'done.json'));
    if(info){for(const rel of info.files)out.push({name:path.basename(file)+'/'+rel.replace(/\\/g,'/'),read:()=>fs.readFileSync(path.join(c,rel))});continue;}
    if(readJson(path.join(c,'failed.json'))?.version===version())continue;
-   schedule(file);
+   if(!cacheOnly.getStore())schedule(file);
   }
   return out;
  },
@@ -124,4 +125,4 @@ const engine={id:'garbro',
   const startedAt=Math.min(...files.map(f=>jobs.get(f).startedAt)),pj=installed()?null:packs().status().packs.find(p=>p.id===PACK)?.job;
   return pj?{kind:'garbro',stage:'download',startedAt,received:pj.received,total:pj.total}:{kind:'garbro',stage:'unpack',startedAt};},
 };
-module.exports={engine,archives,unpack,unpackSync,extractMatchSync,run,decodeRuns,cacheDir,schedule,installed,version,readJson,MATCH,PACK,jobs};
+module.exports={engine,archives,unpack,unpackSync,extractMatchSync,run,decodeRuns,cacheDir,schedule,installed,version,readJson,MATCH,PACK,jobs,withCached:fn=>cacheOnly.run(true,fn)};

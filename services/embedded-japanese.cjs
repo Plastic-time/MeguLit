@@ -129,7 +129,7 @@ function provider(dir){
   if(candidates.includes(position+1)&&!candidates.includes(position+2))return position+1;
   return undefined;
  };
- return {kind:'patch',embedded:true,position:()=>position,save:()=>position,load:value=>{position=Number.isSafeInteger(value)?value:-1;},cacheKey(text){
+ return {kind:'patch',embedded:true,hasLocalPairs:()=>pairs.some(pair=>key(pair.japanese)&&key(pair.chinese)&&!require('./original-text.cjs').japaneseLine(pair.chinese)),position:()=>position,save:()=>position,load:value=>{position=Number.isSafeInteger(value)?value:-1;},cacheKey(text){
   if(stamp(dir)!==initial)return '';
   const k=key(text),candidates=byText.get(k)||[];if(!candidates.length)return '';
   if(new Set(candidates.map(i=>pairs[i].chinese)).size===1)return m.indexSha256+'|text|'+k;

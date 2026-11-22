@@ -36,12 +36,19 @@ test('embedded restore cannot use legacy marker or omit its confirmed local inde
   assert.equal(f.applied(),0);
  }
 });
-test('actual overlay bridge branch preserves import counters and adds canonical restore counts',async()=>{
+test('actual overlay bridge branch preserves restoration counts and enables only usable pairings',async()=>{
  const raw={imported:2,replaced:0,added:0,removed:2,exe:''};let writes=0,closed=false,refreshes=0;
+ let hasPairs=false,enabled=false,enabledWrites=0,searches=0;
  const db={prepare(){return {get:()=>({id:'g1',executable:'H:/neutral/game.exe',original:'{}'}),run:()=>({changes:1})};},close(){closed=true;}};
  const deps={'node:fs':{},'./store.cjs':{openStore:()=>db},'./relay-gate.cjs':{install(){}},'./embedded-japanese-jobs.cjs':{known:()=>null,runLegacy:async(id,dir,opts,perform)=>perform()},'./embedded-japanese.cjs':{manifest:()=>null},
-  '../core/japanese-restore.cjs':{_internal:{gameRunning:()=>false},detect:()=>({adapter:'overlay-patch'})},'../core/japanese-import.cjs':{detect:()=>null},'../core/game-language-switch.cjs':{_internal:{steamApp:()=>null}},'./japanese-restore-options.cjs':{forExecutable:()=>({})},'../core/profiles/index.cjs':{profileFor:()=>({}),get:()=>false},'../core/japanese-import-original.cjs':{readManifest:()=>null,async apply(){writes++;return raw;}},'./game-language.cjs':{originalExecutable(){}},'../core/locale-emulator.cjs':{x86:()=>false,steamApi:()=>false},'./original-text.cjs':{autoPatch:async()=>({kept:true})}};
+  '../core/japanese-restore.cjs':{_internal:{gameRunning:()=>false},detect:()=>({adapter:'overlay-patch'})},'../core/japanese-import.cjs':{detect:()=>null},'../core/game-language-switch.cjs':{_internal:{steamApp:()=>null}},'./japanese-restore-options.cjs':{forExecutable:()=>({})},'../core/profiles/index.cjs':{profileFor:()=>({}),get:()=>false},'../core/japanese-import-original.cjs':{readManifest:()=>null,async apply(){writes++;return raw;}},'./game-language.cjs':{originalExecutable(){}},'../core/locale-emulator.cjs':{x86:()=>false,steamApi:()=>false},
+  './settings.cjs':{Settings:class {read(){return {scriptTranslation:enabled};}setScriptTranslation(value){enabled=value;enabledWrites++;}}},
+  './text-source-worker.cjs':{run:async(_,task)=>{if(task==='localPairs')return {hasPairs};assert.equal(task,'autoPatch');searches++;return {kept:true};}}};
  const module={exports:{}},req=id=>{if(Object.hasOwn(deps,id))return deps[id];if(id.startsWith('node:'))return require(id);throw Error('UNEXPECTED_DEPENDENCY:'+id);};req.main=null;
  vm.runInNewContext('(function(require,module,exports,__dirname,process){'+fs.readFileSync(path.join(sourceRoot,'services/bridge.cjs'),'utf8')+'\n})',{Buffer,console,setTimeout,clearTimeout},{filename:'actual-bridge.cjs'})(req,module,module.exports,path.join(sourceRoot,'services'),{env:{MEGULIT_ROOT:'H:/neutral-root'}});
- const result=await module.exports.dispatch({action:'jp_restore_apply',id:'g1',requestId:'legacy-nonce-001'},{reader:{refreshTextSource(){refreshes++;}}});assert.equal(result.applied,2);assert.equal(result.cells,0);for(const key of ['imported','replaced','added','removed','exe'])assert.equal(result[key],raw[key]);assert.equal(result.patch,true);assert.equal(writes,1);assert.equal(refreshes,1);assert.equal(closed,true);assert.equal(Object.hasOwn(raw,'applied'),false);
+ const dispatch=requestId=>module.exports.dispatch({action:'jp_restore_apply',id:'g1',requestId},{reader:{refreshTextSource(){refreshes++;}}});
+ const result=await dispatch('legacy-nonce-001');assert.equal(result.applied,2);assert.equal(result.cells,0);for(const key of ['imported','replaced','added','removed','exe'])assert.equal(result[key],raw[key]);
+ assert.equal(result.patch,false);assert.equal(searches,1);assert.equal(enabledWrites,0);
+ hasPairs=true;
+ const paired=await dispatch('legacy-nonce-002');assert.equal(paired.patch,true);assert.equal(enabled,true);assert.equal(enabledWrites,1);assert.equal(writes,2);assert.equal(refreshes,2);assert.equal(closed,true);assert.equal(Object.hasOwn(raw,'applied'),false);
 });

@@ -36,14 +36,17 @@ test('BGI lines follow code order; patch scenes are checked on shared identifier
  assert.match(src,/refs\.push\(off\)/);
  assert.match(ot,/skipped:'operands'/);
  assert.match(ot,/'bgi-code-order\\n'/,'old BGI indexes are rebuilt');
- assert.match(ot,/runningDirOf\(s\.runtime\)\.toLowerCase\(\)===path\.dirname\(String\(executable\)\)/,'folder engines are looked up by the game folder');assert.match(ot,/bgi:\{folder:true,/);
+ assert.match(ot,/providerEntry\(root,path\.dirname\(String\(executable\)\)\.toLowerCase\(\),opts\.id/,'the runtime provider is looked up by game folder');
+ assert.match(ot,/runningDirOf\(s\.runtime\)\.toLowerCase\(\)===dir/);assert.match(ot,/bgi:\{folder:true,/);
 });
 
-test('search runs on its own: dialog status, game start, and a picker that names the file',()=>{
+test('the detail dialog searches locally on request; game start keeps its automatic search',()=>{
  const bridge=fs.readFileSync(path.join(root,'services/bridge.cjs'),'utf8'),reader=fs.readFileSync(path.join(root,'services/reader.cjs'),'utf8'),ui=fs.readFileSync(path.join(root,'web/game-language.js'),'utf8'),rs=fs.readFileSync(path.join(root,'desktop/src/main.rs'),'utf8');
- assert.match(bridge,/case 'text_source_status':\{const ot=require\('\.\/original-text\.cjs'\),id=String\(request\.id\);ot\.autoPatchLater/);
+ assert.match(bridge,/if\(request\.passive!==true\)ot\.autoPatchLater/);
+ assert.match(bridge,/else if\(request\.search\)\{\s*await require\('\.\/text-source-worker\.cjs'\)\.run\(root,'autoPatch',\[id,\{force:true,drives:false\}\],\{cachedOnly:true\}\)/);
  assert.match(reader,/this\.findTextSource\(this\.gameId\)/);
- assert.match(ui,/invoke\('pick_patch_file',\{title:w\.pickTitle/);
+ assert.match(ui,/invoke\('pick_patch_file',\{title:u\.file/);
+ assert.match(ui,/u\.example\(s\.patchHint\)/);
  assert.match(rs,/fn pick_patch_file/);assert.match(rs,/pick_executable, pick_patch_file,/);
 });
 

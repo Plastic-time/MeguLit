@@ -375,6 +375,20 @@ dialog.exe-dialog .exe-bilingual-actions{display:flex;gap:8px;flex-wrap:wrap;mar
 dialog.exe-dialog .exe-bilingual-actions button{height:34px;padding:0 14px;border-radius:9px;white-space:nowrap;background:rgba(255,236,214,.05);border:1px solid rgba(255,236,214,.12);color:#e6d4c4;font-weight:600}
 dialog.exe-dialog .exe-bilingual-actions .text-button{background:none;border:0;color:#bfae9f}
 dialog.exe-dialog .exe-bilingual-actions button:disabled{opacity:.5}
+dialog.zero-source-dialog{box-sizing:border-box;overflow:auto}
+dialog.zero-source-dialog .locale-toggle{width:fit-content;margin-top:12px}
+dialog.zero-source-dialog [data-ts-activity]{margin:4px 0 0}
+dialog.zero-source-dialog .exe-bilingual{padding-inline:0;border:0;border-radius:0;border-top:1px solid var(--mgc-line);background:none}
+dialog.zero-source-dialog .exe-bilingual .settings-help{margin:8px 0}
+dialog.zero-source-dialog .exe-bilingual-actions button{max-width:100%;height:auto;min-height:38px;white-space:normal}
+:root[data-theme=light] dialog.zero-source-dialog{background:#fbf6f1;color:#2a1e1a}
+:root[data-theme=light] dialog.zero-source-dialog>p:not(.exe-path){color:#6e5a50}
+.jr-dialog .jr-program{padding:0 28px 12px}
+.jr-program .exe-path{margin:4px 0 6px;overflow-wrap:anywhere;color:var(--g-t1)}
+.jr-program-actions{display:flex;flex-wrap:wrap;gap:8px}
+.jr-program button{min-height:38px;max-width:100%;white-space:normal}
+.jr-program details{margin:12px 0 0}
+.jr-program summary{width:fit-content;cursor:pointer}
 /* E327 import from a Japanese original: picker, summary and file list */
 .jr-dialog .jr-import{margin:4px 0 12px;padding:12px 14px;border-radius:12px;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 18%,transparent);background:rgba(255,255,255,.03)}
 .jr-dialog .jr-import .settings-help{margin:0 0 10px}

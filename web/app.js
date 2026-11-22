@@ -1,6 +1,7 @@
 import {openPlayReader} from './library-mode.js';
 import './idle-gate.js';
 import {mountOriginalScan} from './original-scan.js';
+import {mountOriginalExecutable,originalLabel} from './game-language.js';
 import {openDiscInstall,discImagePaths,bindDiscDrop} from './disc-install.js';
 import {fitLibraryGrid} from './library-grid-fit.js';
 import {formatDefinition} from './dictionary-format.js';
@@ -412,11 +413,10 @@ async function startGame(id,button){
    add.onclick=async()=>{add.disabled=true;add.textContent=words[1];try{await api('windows_feature_install',{id});dialog.close();startGame(id,button);}catch{add.disabled=false;
     add.textContent=words[0];const p=dialog.querySelector('p');if(p)p.textContent=words[2];}};
    dialog.querySelector('.dialog-actions').append(add);}
-  if(code==='JAPANESE_EXECUTABLE_REQUIRED'){
-   const {gameLanguageLabel,openGameLanguage}=await import('./game-language.js');
-   if(dialog.open){const choose=document.createElement('button');choose.className='secondary';choose.textContent=gameLanguageLabel(locale);choose.onclick=()=>{dialog.close();
-    openGameLanguage({id,api,invoke,locale,esc,toast,onChanged:async()=>{model=await api('home');renderRoute();}}).catch(()=>toast(text.serviceFailed));};dialog.querySelector('.dialog-actions').append(choose);
-    }
+  if(code==='JAPANESE_EXECUTABLE_REQUIRED'&&dialog.open){
+   const choose=document.createElement('button');choose.className='secondary';choose.textContent=originalLabel(locale);
+   choose.onclick=()=>{dialog.close();japaneseRestore({id,title:model.games.find(game=>game.id===id)?.title,onChanged:async()=>{model=await api('home');renderRoute();}});};
+   dialog.querySelector('.dialog-actions').append(choose);
   }
  }finally{launchInFlight=false;tracker.stop();if(button)button.disabled=false;if(failed&&button)setTimeout(()=>markLaunching(button,false),2600);else{if(button)button.style.setProperty('--lp-progress','1');setTimeout(()=>markLaunching(button,false),button?260:0);}}
 }
@@ -693,20 +693,33 @@ function japaneseRestore(only){
    IMPORT_SOURCE_NO_SCRIPT:'シナリオファイル（nss.npa）がありません。完全な日本語版を選んでください',IMPORT_EXE_CONFLICT:'同じ名前の別の実行ファイルがあるため取り込みませんでした',IMPORT_FILE_TOO_LARGE:'ファイルが大きすぎるため取り込みませんでした',
    GAME_RUNNING:'ゲームが起動中です。先に閉じてください',NOTHING_TO_RESTORE:'戻す内容がありません',NOT_APPLIED:'まだ戻していません'}}};
  const t=w[locale]||w.zh;
- const d=modal(`<header class="jr-head"><span class="jr-eyebrow">${({zh:'工具',en:'Tool',ja:'ツール'})[locale]||'工具'}</span><h2>${t.title}</h2>${only?`<p class="jr-game">${esc(only.title||'')}</p>`:`<p class="settings-help">${t.sub}</p>`}</header><p class="tool-key-note">${only?(({zh:'Steam 上只显示中文 / 英文的游戏，要先在这里恢复日文',en:'Steam games that only show Chinese or English need this first',ja:'Steam 版で中国語・英語しか出ないゲームは先にここで戻してください'})[locale]||''):(({zh:'在 Steam 买的、只显示中文 / 英文的游戏（比如 Key 社的 Summer Pockets），一定要先运行这个工具，否则 MeguLit 读到的是中文或英文，用不了',en:'Games bought on Steam that only show Chinese or English (such as Key’s Summer Pockets) must go through this tool first, otherwise MeguLit only gets the translated text',ja:'Steam 版で中国語・英語しか表示されないゲーム（Key の Summer Pockets など）は、先にこのツールを実行してください。実行しないと翻訳文しか取得できません'})[locale]||'')}</p><div data-jr-body><p class="muted">${t.check}</p></div><div class="dialog-actions"><button type="button" class="secondary jr-close" data-jr-close>${t.close}</button><button type="button" class="secondary" data-jr-undo hidden>${t.undo}</button><button type="button" class="primary" data-jr-import hidden>${t.import}</button><button type="button" class="secondary" data-jr-steam hidden>${(lsWords[locale]||lsWords.zh).open}</button><button type="button" class="primary" data-jr-apply hidden>${t.apply}</button></div>`);
+ const d=modal(`<header class="jr-head">${only?'':`<span class="jr-eyebrow">${({zh:'工具',en:'Tool',ja:'ツール'})[locale]||'工具'}</span>`}<h2 id="jr-title">${only?originalLabel(locale):t.title}</h2>${only?`<p class="jr-game">${esc(only.title||'')}</p>`:`<p class="settings-help">${t.sub}</p>`}</header><p class="tool-key-note">${only?(({zh:'Steam 上只显示中文 / 英文的游戏，要先在这里恢复日文',en:'Steam games that only show Chinese or English need this first',ja:'Steam 版で中国語・英語しか出ないゲームは先にここで戻してください'})[locale]||''):(({zh:'在 Steam 买的、只显示中文 / 英文的游戏（比如 Key 社的 Summer Pockets），一定要先运行这个工具，否则 MeguLit 读到的是中文或英文，用不了',en:'Games bought on Steam that only show Chinese or English (such as Key’s Summer Pockets) must go through this tool first, otherwise MeguLit only gets the translated text',ja:'Steam 版で中国語・英語しか表示されないゲーム（Key の Summer Pockets など）は、先にこのツールを実行してください。実行しないと翻訳文しか取得できません'})[locale]||'')}</p><div data-jr-body><p class="muted">${t.check}</p></div><div class="dialog-actions"><button type="button" class="secondary jr-close" data-jr-close>${t.close}</button><button type="button" class="secondary" data-jr-undo hidden>${t.undo}</button><button type="button" class="primary" data-jr-import hidden>${t.import}</button><button type="button" class="secondary" data-jr-steam hidden>${(lsWords[locale]||lsWords.zh).open}</button><button type="button" class="primary" data-jr-apply hidden>${t.apply}</button></div>`);
+ d.setAttribute('aria-labelledby','jr-title');
  d.classList.add('jr-dialog'); /* E271 (user: the window behind the tool card needs the same care) */
  d.showModal();d.querySelector('[data-jr-close]').onclick=()=>void closeOwned();
  let lastState='';const body=d.querySelector('[data-jr-body]'),applyBtn=d.querySelector('[data-jr-apply]'),undoBtn=d.querySelector('[data-jr-undo]'),importBtn=d.querySelector('[data-jr-import]'),steamBtn=d.querySelector('[data-jr-steam]');
   let id='';
- let scanFlow=null,legacyBusy=0,closing=false;
+ let scanFlow=null,legacyBusy=0,closing=false,detailChanged=false;
+ const program=document.createElement('section');program.className='jr-program';
+ if(only)d.insertBefore(program,body);
+ async function restoreChanged(){
+  if(!only)return;
+  detailChanged=true;
+  await only.onActivity?.();
+ }
  const slot=document.createElement('div');slot.dataset.jrFolderScan='';d.insertBefore(slot,d.querySelector('.dialog-actions'));
  const refreshLocks=()=>{const busy=!!scanFlow?.busy()||legacyBusy>0;for(const b of [applyBtn,undoBtn,importBtn,steamBtn])b.disabled=busy;
-  body.querySelectorAll('.jr-grid button,.jr-import button,[data-jr-auto-off],[data-jr-auto-undo]').forEach(b=>{b.disabled=busy;});slot.inert=legacyBusy>0;};
+  body.querySelectorAll('.jr-grid button,.jr-import button,[data-jr-auto-off],[data-jr-auto-undo]').forEach(b=>{b.disabled=busy;});slot.inert=legacyBusy>0;program.inert=busy;};
  const restoreApi=async(action,params)=>{
-  if(['jp_restore_detect','jp_restore_list','home'].includes(action))return api(action,params);
+  if(['jp_restore_detect','jp_restore_list','jp_auto_status','home'].includes(action))return api(action,params);
   if(!d.open||legacyBusy||scanFlow?.busy()||params?.id!==id)throw Error('ORIGINAL_SCAN_BUSY');
   if(['jp_restore_apply','jp_restore_undo'].includes(action))return scanFlow.runExisting(action,params);
-  legacyBusy++;refreshLocks();try{return await api(action,params);}finally{legacyBusy--;refreshLocks();}
+  legacyBusy++;refreshLocks();
+  try{
+   const result=await api(action,params);
+   if(['jp_import_apply','jp_auto_undo'].includes(action))await restoreChanged();
+   return result;
+  }finally{legacyBusy--;refreshLocks();}
  };
  async function closeOwned(){if(closing||legacyBusy||!scanFlow?.canClose())return;closing=true;
   const complete=await scanFlow.dispose();if(complete)d.close();else{closing=false;fail(Error('ORIGINAL_SCAN_CLEANUP_INCOMPLETE'));}}
@@ -714,8 +727,8 @@ function japaneseRestore(only){
  d.addEventListener('click',event=>{if(event.target!==d)return;const r=d.getBoundingClientRect();if(event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom)return;
   event.preventDefault();event.stopImmediatePropagation();void closeOwned();},true);
  d.addEventListener('click',event=>{if((scanFlow?.busy()||legacyBusy)&&event.target.closest?.('[data-jr-import-panel],[data-jr-auto-undo],[data-jr-auto-off]')){event.preventDefault();event.stopImmediatePropagation();}},true);
- d.addEventListener('close',()=>{void scanFlow?.dispose();},{once:true});
- scanFlow=mountOriginalScan(slot,{api,locale,onState:()=>refreshLocks(),onRefreshError:code=>fail(Error(code)),onApplied:async()=>{model=await api('home');await show();refreshLocks();}});
+ d.addEventListener('close',()=>{void scanFlow?.dispose();if(detailChanged)Promise.resolve(only.onChanged?.()).catch(()=>fail(Error('ORIGINAL_SCAN_REFRESH_FAILED')));},{once:true});
+ scanFlow=mountOriginalScan(slot,{api,locale,onState:()=>refreshLocks(),onRefreshError:code=>fail(Error(code)),onApplied:async()=>{await restoreChanged();model=await api('home');await show();refreshLocks();}});
 
  const fail=e=>{const c=typeof e==='string'?e:e?.message;toast(t.errs[c]||errorMessage(e));};
  /* E328 the files moved aside were the translation patch: say when zero-latency translation now uses it */
@@ -808,7 +821,11 @@ function japaneseRestore(only){
  undoBtn.onclick=()=>run('jp_restore_undo',undoBtn,t.undone);
 
  /* detail page: this game only, no picker */
- if(only){d.classList.add('jr-single');body.innerHTML=`<p data-jr-status class="settings-help" role="status"></p><div class="jr-import" data-jr-import-panel hidden></div>`;id=String(only.id);scanFlow.selectGame(id);show();return;}
+ if(only){d.classList.add('jr-single');body.innerHTML=`<p data-jr-status class="settings-help" role="status"></p><div class="jr-import" data-jr-import-panel hidden></div>`;id=String(only.id);scanFlow.selectGame(id);show();
+  mountOriginalExecutable(program,{id,api,invoke,locale,toast,isBusy:()=>!!legacyBusy||scanFlow.busy(),onBusy:on=>{
+   legacyBusy+=on?1:-1;refreshLocks();if(on)program.inert=false;
+  },onChanged:async()=>{await restoreChanged();await show();}});
+  return;}
  restoreApi('jp_restore_list').then(list=>{if(!d.open)return;if(!list.length){body.innerHTML=`<p class="muted">${t.none}</p>`;return;}
   // E238 picker: a small searchable library (covers, title filter) instead of a long select
   const games=list.map(g=>({...g,...(model.games.find(m=>m.id===g.id)||{})}));

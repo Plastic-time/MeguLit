@@ -24,6 +24,10 @@ function libraryForSave(file){
 class Settings{
  constructor(root){this.root=root;this.folder=path.join(root,'data','config');fs.mkdirSync(this.folder,{recursive:true});}
  file(name){return path.join(this.folder,name);}
+ setScriptTranslation(enabled){
+  const file=this.file('preferences.json');
+  atomic(file,{...libraryForSave(file),scriptTranslation:enabled});
+ }
  ui(){return readJSON(path.join(this.root,'data','ui-state.json'));}
  uiObject(name,fallback){try{return {...fallback,...JSON.parse(this.ui()[name]||'{}')};}catch{return {...fallback};}}
  read(scope,profile='',libraryConfig){

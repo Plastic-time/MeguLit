@@ -11,10 +11,24 @@ test.after(()=>fs.rmSync(root,{recursive:true,force:true}));
 function game(id){const f=install(path.join(root,id));const db=store.openStore(root);try{db.prepare('INSERT INTO games(id,title,executable) VALUES(?,?,?)').run(id,'Fixture',f.exe);}finally{db.close();}return f;}
 async function completed(id,dto){await jobs._internal.jobs.get(dto.jobId).closed;const status=await dispatch({action:'jp_restore_scan_status',id,jobId:dto.jobId});assert.equal(status.state,'done',status.error);assert.equal(jobs._internal.jobs.get(dto.jobId).child,null);return status.result;}
 
+test('Japanese locale saves and reloads independently for each work',async()=>{
+ game('locale-a');game('locale-b');
+ await dispatch({action:'game_locale_mode',id:'locale-a',japanese:true});
+ assert.equal((await dispatch({action:'game_original_executable',id:'locale-a'})).localeJapanese,true);
+ assert.equal((await dispatch({action:'game_original_executable',id:'locale-b'})).localeJapanese,false);
+ await assert.rejects(dispatch({action:'game_locale_mode',id:'locale-a',japanese:'false'}),/INVALID_LOCALE_MODE/);
+ assert.equal((await dispatch({action:'game_original_executable',id:'locale-a'})).localeJapanese,true);
+ await dispatch({action:'game_locale_mode',id:'locale-a',japanese:false});
+ const db=store.openStore(root);
+ try{assert.equal(store.games(db,root).find(work=>work.id==='locale-a').localeMode,'off');}
+ finally{db.close();}
+});
+
 test('production bridge → scan worker → explicit core restore → provider → undo is complete',async()=>{
  const f=game('chain'),db=store.openStore(root);try{db.prepare('UPDATE games SET original=? WHERE id=?').run(JSON.stringify({library:{contentLanguage:'zh'}}),'chain');assert.equal(require('../services/game-language.cjs').originalExecutable(db,'chain',root).blocked,true);}finally{db.close();}
  const scanning=await dispatch({action:'jp_restore_scan',id:'chain'});assert.equal(scanning.state,'running');
  const scan=await completed('chain',scanning);assert.equal(scan.state,'restorable');assert.equal(scan.coverage.rows,36);
+ assert.equal((await dispatch({action:'text_source_toggle',id:'chain',enabled:false})).active,false);
  await assert.rejects(dispatch({action:'jp_restore_apply',id:'chain',embedded:true}),/INVALID_SCAN_TOKEN/);
  let refreshed=0;const runtime={reader:{refreshTextSource(){refreshed++;}}};
  const applying=await dispatch({action:'jp_restore_apply',id:'chain',embedded:true,scanToken:scan.scanToken},runtime);
@@ -23,12 +37,16 @@ test('production bridge → scan worker → explicit core restore → provider �
  for(const action of ['jp_import_apply','jp_restore_apply','jp_restore_undo','jp_auto_undo','launch'])await assert.rejects(dispatch({action,id:'chain'}),/EMBEDDED_JOB_BUSY/);
  const recovered=await dispatch({action:'jp_restore_scan_status',id:'chain',requestId:applying.requestId});assert.equal(recovered.jobId,applying.jobId);assert.equal(recovered.operation,'restore');
  assert.equal((await dispatch({action:'jp_restore_apply',id:'chain',embedded:true,scanToken:scan.scanToken,requestId:applying.requestId})).jobId,applying.jobId);
- const restored=await completed('chain',applying);assert.equal(restored.applied,2);assert.equal(restored.localIndex,true);assert.equal(refreshed,1);
+ const restored=await completed('chain',applying);assert.equal(restored.applied,2);assert.equal(restored.localIndex,true);assert.equal(restored.patch,true);assert.equal(refreshed,1);
+ assert.deepEqual(await dispatch({action:'text_source_activity',id:'chain'}),{hasPairs:true,enabled:true,english:false,embedded:true,active:true});
+ assert.equal((await dispatch({action:'text_source_toggle',id:'chain',enabled:false})).active,false);
  const state=await dispatch({action:'jp_restore_detect',id:'chain'});assert.equal(state.adapter,'utage-embedded');assert.equal(state.state,'applied');
  const ready=store.openStore(root);try{assert.equal(require('../services/game-language.cjs').originalExecutable(ready,'chain',root).blocked,false);}finally{ready.close();}
  assert.equal(require('../services/original-text.cjs').provider(root,f.exe).resolve('これから最初の旅に出ます。').translation,'从这里出发踏上旅程。');
  const again=await completed('chain',await dispatch({action:'jp_restore_apply',id:'chain',embedded:true,scanToken:scan.scanToken}));assert.equal(again.already,true);assert.equal(again.cells,scan.coverage.rows);assert.equal(again.applied,0);
+ assert.equal((await dispatch({action:'text_source_activity',id:'chain'})).enabled,false);
  const undoJob=await dispatch({action:'jp_restore_undo',id:'chain'},runtime),undo=await completed('chain',undoJob);assert.equal(undo.restored,2);assert.deepEqual(undo.skipped,[]);assert.equal(refreshed,2);assert.equal(embedded.manifest(f.dir),null);
+ assert.equal((await dispatch({action:'text_source_activity',id:'chain'})).hasPairs,false);
  const recoveredUndo=await dispatch({action:'jp_restore_scan_status',id:'chain',requestId:undoJob.requestId,operation:'undo',retireIfMissing:true});assert.equal(recoveredUndo.state,'done');assert.equal(recoveredUndo.result.restored,2);
  assert.equal((await dispatch({action:'jp_restore_undo',id:'chain',requestId:undoJob.requestId})).jobId,undoJob.jobId);
  const after=store.openStore(root);try{assert.equal(require('../services/game-language.cjs').originalExecutable(after,'chain',root).blocked,true);}finally{after.close();}
