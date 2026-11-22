@@ -12,6 +12,10 @@ routes = [
 ]
 
 [vars]
+# Public trust only; private signing material stays in the local DPAPI store
+PROFILE_PUBLIC_KEYS = '[{"id":"seed-publisher-20261122","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAQUS2OCwp7pAFytVwXx/C5lU90TW4+BpJVB0NMx5Rw+U="}]'
+TORCH_RELEASE_PUBLIC_KEYS = '[{"id":"seed-publisher-20261122","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAQUS2OCwp7pAFytVwXx/C5lU90TW4+BpJVB0NMx5Rw+U="}]'
+CARDINAL_REVIEW_PUBLIC_KEYS = '[{"id":"seed-reviewer-20261122","alg":"ed25519","publicKey":"MCowBQYDK2VwAyEAGhFzVt5Ps4h3Mkv2Ei1SFT/BLHBP4U4Nok6cOSLBtcc="}]'
 GITHUB_REPO = "ilynthn/MeguLit"
 LINK_DAYS = "30"
 # the website forms (src/feedback.js) post from these origins

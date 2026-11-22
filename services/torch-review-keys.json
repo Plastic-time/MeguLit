@@ -1,1 +1,9 @@
-{"keys":[]}
+{
+  "keys": [
+    {
+      "id": "seed-reviewer-20261122",
+      "alg": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEAGhFzVt5Ps4h3Mkv2Ei1SFT/BLHBP4U4Nok6cOSLBtcc="
+    }
+  ]
+}
