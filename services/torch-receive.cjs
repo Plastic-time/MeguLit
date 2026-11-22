@@ -2,7 +2,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),os=require('node:os');
 const protocol=require('../core/torch-release.cjs'),diff=require('../core/game-diff.cjs'),feed=require('./auto-profile-feed.cjs');
-const {fallbackAlias}=require('../core/torch-alias.cjs');
+const {displayAlias}=require('../core/torch-alias.cjs');
 const jobs=new Map(),states=new Map(),last=new Map(),locks=new Map(),queues=new Map(),controllers=new Map();
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 const idKey=(root,id)=>path.resolve(root)+'\0'+String(id);
@@ -21,7 +21,7 @@ function credit(c,n){
  const name=feed.cleanName(bound?.name),alias=feed.cleanName(bound?.alias);
  // Zero is also the review protocol's official-release sentinel. Use an alias
  // for it only when the relay found the founder record for this executable.
- const anonymous=!name&&(alias||(n>0?fallbackAlias(n):null));
+ const anonymous=!name&&(alias||n>0?displayAlias(alias,n):null);
  return {torchNo:n,name,...(anonymous?{alias:anonymous}:{})};
 }
 const exactProfile=(answer,key)=>answer?.version===2&&answer.versionLayer?.match==='exe'&&answer.versionLayer.diff?.key===key?answer.versionLayer.diff:answer?.diff?.key===key?answer.diff:null;
