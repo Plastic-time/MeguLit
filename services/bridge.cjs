@@ -99,8 +99,9 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
      beside it starts it (core/drm-wrap.cjs). The game's process and window stay the engine program's. */
   let launchVia='';
   if(privatePublisherPolicy){ownerPreparation=(async()=>{const token=await Owner.resolve(root,{exe:game.executable,engine:ownerEngine,signal:ownerAbort.signal});ownerPublisherGrant=token;if(ownerAbort.signal.aborted){if(token)Owner.revoke(token);throw Error('OWNER_PUBLISHER_CANCELLED');}const p=Owner.publisherLaunch(token,{exe:game.executable,engine:ownerEngine});if(!p)throw Error('OWNER_PUBLISHER_IDENTITY_UNVERIFIED');return p;})();ownerPublisher=await ownerPreparation;launchVia=ownerPublisher.launcher;}
-  if(!privateLaunchPolicy){let plan=null;try{plan=require('../core/drm-wrap.cjs').plan(game.executable,{allowTranslated:require('../core/library.cjs').isTranslated(path.dirname(game.executable))||profile.contentLanguage==='zh',source:steamAppid?'steam':profile.source});}catch(error){trace('drm-check-failed',{error:String(error?.message||error).slice(0,160)});}
+  if(!privateLaunchPolicy){let plan=null;try{plan=require('../core/drm-wrap.cjs').plan(game.executable,{allowTranslated:require('../core/library.cjs').isTranslated(path.dirname(game.executable))||profile.contentLanguage==='zh',source:steamAppid?'steam':profile.source,savedDrm:profile.drm});}catch(error){trace('drm-check-failed',{error:String(error?.message||error).slice(0,160)});}
    if(plan){drmPlan=plan;trace('drm-wrapped',{kind:plan.kind,wrapped:path.basename(plan.wrapped||''),executable:path.basename(plan.executable||''),launcher:path.basename(plan.launchVia||''),changed:plan.changed});
+    if(plan.ignoredUpdaters?.length)trace('drm-updaters-ignored',{files:plan.ignoredUpdaters,restoredPreviousLauncher:plan.restoredFromUpdater===true});
     if(plan.changed&&plan.executable&&fs.existsSync(plan.executable)){
      const before=String(game.executable),same=before.toLowerCase()===plan.executable.toLowerCase(),record=profile.drm||{};
      if(!same||String(profile.launchVia||'')!==plan.launchVia||record.kind!==plan.kind){
