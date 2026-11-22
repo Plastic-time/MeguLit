@@ -71,7 +71,13 @@ async function evaluate(report,context,reporter,challenge){
  const sources=run.steps.filter(x=>x.hb?.type==='hookSource');if(sources.length<30||sources.some(x=>['history','ocr','replay','fixture'].includes(x.hb.origin)||x.hb.recovering||x.hb.hookRecovering)||run.o.sourceEpisodes.some(x=>x.pid!==p.pid||x.birth!==p.birth))fail('TRUSTED_SOURCE_BINDING');
  const acks=report.domAcks;if(!Array.isArray(acks)||acks.length!==sources.length)fail('TRUSTED_DOM_ACK');const episodes=new Set();
  for(let i=0;i<sources.length;i++){const st=sources[i],e=run.o.sourceEpisodes[i],a=acks[i];if(!e||!a||a.line!==st.line||typeof a.episode!=='string'||!a.episode||episodes.has(a.episode)||a.sourceKey!==Pairs.key(st.hb.text)||a.observed!==true||a.paired!==true||a.enabled!==true||a.visible!==true||!Number.isFinite(a.at)||a.at<e.at||a.at>=(run.o.sourceEpisodes[i+1]?.at??Infinity)||a.at>run.o.timing?.durationMs||!run.o.timing?.wallChecks?.some(c=>Math.abs(c.at-a.at)<.01)||typeof a.translation!=='string'||!Pairs.normalize(a.translation))fail('TRUSTED_DOM_ACK');episodes.add(a.episode);
-  if(!run.o.samples.some(s=>Math.abs(s.at-a.at)<=context.profile.cardinal.sampleMs+context.profile.cardinal.maxLagMs&&Pairs.key(s.hookSource)===a.sourceKey&&(s.cn||[]).some(cn=>Pairs.normalize(cn.text)===Pairs.normalize(a.translation))))fail('TRUSTED_DOM_TRANSLATION');
+  const nextAt=run.o.sourceEpisodes[i+1]?.at??Infinity;
+  const hasVisibleTranslation=run.o.samples.some(sample=>{
+   if(!Number.isFinite(sample.at)||sample.at<e.at||sample.at>=nextAt||Math.abs(sample.at-a.at)>context.profile.cardinal.sampleMs+context.profile.cardinal.maxLagMs)return false;
+   if(Pairs.key(sample.hookSource)!==a.sourceKey)return false;
+   return (sample.cn||[]).some(cn=>Pairs.normalize(cn.text)===Pairs.normalize(a.translation)&&Number.isFinite(cn.rect?.w)&&cn.rect.w>0&&Number.isFinite(cn.rect?.h)&&cn.rect.h>0);
+  });
+  if(!hasVisibleTranslation)fail('TRUSTED_DOM_TRANSLATION');
  }
  const livePairing={source:'live-display',schema:1,shown:sources.length,paired:acks.length,unpaired:0,excluded:0,unobserved:0,reliable:true},result=Score.score({...run,livePairing},context.profile.cardinal),timing=Timing.check({steps:run.steps,o:run.o,rules:context.profile.cardinal});result.detail.timing=timing;
  const doc={record:Score.record({key:context.request.identity.exe,result,cardinalRev:P.REV}),detail:result.detail,unreliable:false,errors:[]};
