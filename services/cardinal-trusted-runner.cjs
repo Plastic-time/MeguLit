@@ -109,9 +109,9 @@ async function runHost(request,policy,dependencies={}){
   context=await prepare(request,policy,{signal:dependencies.signal,resourceCheck});collectorHash(policy);slot=lease(policy);const results=[];
   for(const reporter of policy.reporters.slice(0,3)){
    if(dependencies.signal?.aborted)fail('TRUSTED_CANCELLED');if(!resourceCheck())fail('TRUSTED_RESOURCE_GATE');collectorHash(policy);await Identity.verify(context.proof,{data:context.data,game:context.game,signal:dependencies.signal});
-   const challenge=crypto.randomBytes(32).toString('hex');unsafe=true;const report=await collect(context,reporter,challenge,{signal:dependencies.signal,resourceCheck});
-   if(!report||report.challenge!==challenge||report.reporter!==reporter.id||!verifyCapture(report,reporter)||report.cleanup?.treeExited!==true||report.cleanup?.audioRestored!==true||report.cleanup?.ownershipReleased!==true)fail('TRUSTED_CAPTURE_CLEANUP_UNCONFIRMED');unsafe=false;
-   const result=await evaluate(report,context,reporter,challenge);if(results.some(r=>r.runId===result.runId))fail('TRUSTED_DUPLICATE_RUN');results.push(result);
+   const challenge=crypto.randomBytes(32).toString('hex');await dependencies.observer?.start(challenge);unsafe=true;const report=await collect(context,reporter,challenge,{signal:dependencies.signal,resourceCheck});
+   if(!report||report.challenge!==challenge||report.reporter!==reporter.id||!verifyCapture(report,reporter)||report.cleanup?.treeExited!==true||report.cleanup?.audioRestored!==true||report.cleanup?.ownershipReleased!==true)fail('TRUSTED_CAPTURE_CLEANUP_UNCONFIRMED');await dependencies.observer?.exited(structuredClone(report.process));unsafe=false;
+   const result=await evaluate(report,context,reporter,challenge);await dependencies.observer?.check(structuredClone(report),challenge);if(results.some(r=>r.runId===result.runId))fail('TRUSTED_DUPLICATE_RUN');results.push(result);
    collectorHash(policy);await Identity.verify(context.proof,{data:context.data,game:context.game,signal:dependencies.signal});
   }
   const lines=results.reduce((n,r)=>n+r.lines,0),mean=results.reduce((n,r)=>n+r.total*r.lines,0)/lines,floor=Math.min(...results.map(r=>r.total));
