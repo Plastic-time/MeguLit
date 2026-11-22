@@ -305,14 +305,16 @@
       const text = sourceText(sentence);
       if (!preferences.furigana || !text) { paint([], sentence, false); continue; }
       const cacheKey = (bridge.options?.().readingEngine || 'sudachi') + '\0' + text;
-      if (sentence.__tomeRubyText === text && sentence.__tomeRubyKey === cacheKey && tokenCache.has(cacheKey)) { paint(tokenCache.get(cacheKey), sentence, false);
+      if (sentence.__tomeRubyText === text && sentence.__tomeRubyKey === cacheKey && tokenCache.has(cacheKey)) { paint(tokenCache.get(cacheKey), sentence, false); bridge.learningStatus?.({learningRecovered:'ruby'});
        continue; }
       try {
         const tokens = await rubyTokens(text);
-        if (id !== renderSerial) return;
+        if (id !== renderSerial || !preferences.furigana) return;
         if (!sentence.isConnected || sourceText(sentence) !== text) continue;
         sentence.__tomeRubyText = text; sentence.__tomeRubyKey = cacheKey; paint(tokens, sentence, false);
-      } catch(error) { clearRuby(sentence); bridge.learningStatus?.({learningMessage:error.message||'Full 注音尚未就绪'}); if (dialogFields) dialogFields.state.textContent = error.message||'本地注音暂未就绪';
+        bridge.learningStatus?.({learningRecovered:'ruby'});
+      } catch(error) { if (id !== renderSerial || !preferences.furigana || !sentence.isConnected || sourceText(sentence) !== text) return;
+       clearRuby(sentence); bridge.learningStatus?.({learningMessage:error.message||'Full 注音尚未就绪',learningOperation:'ruby'}); if (dialogFields) dialogFields.state.textContent = error.message||'本地注音暂未就绪';
        return; }
     }
     bridge.islandPage?.refresh?.(); // furigana changes each pair's height and reserved band
@@ -331,8 +333,8 @@
   bridge.prepareRuby = async sentence => {
     const text = sourceText(sentence);if (!preferences.furigana || !text) return false;
     const key = rubyKey(text), tokens = await rubyTokens(text);
-    if (!sentence.isConnected || sourceText(sentence) !== text) return false;
-    sentence.__tomeRubyText = text; sentence.__tomeRubyKey = key; paint(tokens, sentence, false); bridge.islandPage?.refresh?.(); return true;
+    if (!preferences.furigana || !sentence.isConnected || sourceText(sentence) !== text) return false;
+    sentence.__tomeRubyText = text; sentence.__tomeRubyKey = key; paint(tokens, sentence, false); bridge.learningStatus?.({learningRecovered:'ruby'}); bridge.islandPage?.refresh?.(); return true;
   };
   // The backlog annotates past lines with the same readings as the current one: the game's own ruby first, then the
   // tokenizer with its whole-word dictionary readings (E138). null while furigana is off.
@@ -359,10 +361,10 @@
     const current=()=>id===renderSerial&&preferences.furigana&&document.querySelector('.sentence-text')===sentence&&sourceText(sentence)===text;
     try {
       const tokens=await rubyTokens(text);
-      if(current()){lastText=text;paint(tokens,sentence);}
+      if(current()){lastText=text;paint(tokens,sentence);bridge.learningStatus?.({learningRecovered:'ruby'});}
     } catch(error) {
       if(!current())return;
-      clearRuby(sentence);bridge.learningStatus?.({learningMessage:error.message||'Furigana unavailable'});
+      clearRuby(sentence);bridge.learningStatus?.({learningMessage:error.message||'Furigana unavailable',learningOperation:'ruby'});
       if(dialogFields)dialogFields.state.textContent=error.message||'Furigana unavailable';
     }
   }

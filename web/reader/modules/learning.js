@@ -6,12 +6,13 @@
  const send=m=>window.__tomoyoTranslateRequest(JSON.stringify(m));
  const request=m=>new Promise((resolve,reject)=>{const id=++serial;const timer=setTimeout(()=>{requests.delete(id);reject(Error('本地辞书尚未就绪，请在设置中查看组件安装状态'));},600000);requests.set(id,{resolve,reject,timer});try{send({...m,type:'learningRequest',id});}catch(e){clearTimeout(timer);requests.delete(id);reject(e);}});
  bridge.learningDeliver=(id,result,error)=>{const p=requests.get(id);if(!p)return;clearTimeout(p.timer);requests.delete(id);error?p.reject(Error(error)):p.resolve(result);};
- bridge.learningStatus=message=>{if(message.learningMessage){
+ bridge.learningStatus=message=>{if(message.learningRecovered){const notice=document.querySelector('.tomoyo-learning-notice');if(notice?.dataset?.learningOperation===message.learningRecovered)notice.remove();return;}if(message.learningMessage){
   bridge.localLearningMessage=message.learningMessage;for(const n of document.querySelectorAll('[data-learning-status]'))n.textContent=message.learningMessage;
+  if(message.learningNotice===false)return;
   const ready=message.learningMessage.startsWith('实际运行：'),parent=document.querySelector('.sentence-window');let notice=document.querySelector('.tomoyo-learning-notice');
   if(ready){notice?.remove();return;}
   if(parent&&!notice){notice=document.createElement('div');notice.className='tomoyo-learning-notice';notice.setAttribute('role','status');notice.style.cssText='font:12px/1.6 Meiryo,"Microsoft YaHei",sans-serif;color:var(--theme-textSecondary,#aaa);margin-top:8px;pointer-events:none;text-shadow:none;-webkit-text-stroke:0;';parent.appendChild(notice);}
-  if(notice&&notice.textContent!==message.learningMessage)notice.textContent=message.learningMessage;
+  if(notice){notice.dataset.learningOperation=message.learningOperation||'';if(notice.textContent!==message.learningMessage)notice.textContent=message.learningMessage;}
  }};
  const commands=new Set(['tokenize_text','lookup_at_position','lookup_exact','scan_sentence']);
  bridge.localTokenize=text=>request({command:'tokenize_text',args:{text},language:bridge.options?.().learnerLanguage||'zh',engine:'sudachi'});
