@@ -72,7 +72,7 @@ test('real body and name call bytes target the same narrow setter but preserve s
 test('normal NewHook data has an existing host callback and Reader route, not a draw diagnostic route', () => {
   const bridge = read('native/HookBridge.cs');
   assert.match(bridge, /OutputEvent output=OnOutput/);
-  assert.match(bridge, /OutputFrame\(code,name,tp,text\)/);
+  assert.match(bridge, /OutputFrame\(code,name,tp,text,probe\)/);
   assert.ok(bridge.includes('type="hookSource"'));
   const kernel = read('core/hook-native.cjs');
   assert.match(kernel, /m\.type==='hookSource'/);

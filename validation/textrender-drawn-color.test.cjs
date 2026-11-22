@@ -61,7 +61,7 @@ test('the KiriKiri text path samples the drawn glyphs and the reader is wired to
  const s=read('native/krkrtext/script.inc');
  assert.match(s,/st\.trSample=function\(\)\{/);assert.match(s,/T\.getMainPixel\(x,y\)/);assert.match(s,/try \{this\.trSample\(\);\}/);
  assert.match(s,/this\.trTailA\+' color='\+h\+this\.trTailB/);
- assert.match(read('web/reader/modules/text-place.js'),/b\.lineColorDrawn\?\.\(m\.text, m\.color\)/);
+ assert.match(read('web/reader/modules/text-place.js'),/b\.lineColorDrawn\?\.\(m\.text, m\.color, draw\)/);
 });
 
 test('a source with ruby readings or a stage note still matches the drawn line; an unrelated line does not',()=>{

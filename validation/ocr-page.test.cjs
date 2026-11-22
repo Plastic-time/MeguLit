@@ -87,7 +87,7 @@ test('gal-native forwards OCR reports to hook-native and sends pageLocate for ea
 
 test('the native pieces stay wired: PageLocator in GalWindowBridge, its self-tests in the build, the reader sets',()=>{
  const bridge=read('native/GalWindowBridge.cs'),locator=read('native/PageLocator.cs'),build=read('native/Build-GalWindowBridge.ps1');
- assert.match(bridge,/type=="pageLocate"/);assert.match(bridge,/PageLocate=new PageLocator\(Emit\)/);assert.match(bridge,/--page-locator-self-test/);assert.match(bridge,/--page-locator-ocr-test/);
+ assert.match(bridge,/type=="pageLocate"/);assert.match(bridge,/locator=new PageLocator\(message=>\{\s*lock\(OutputLock\)\{if\(Object.ReferenceEquals\(PageLocate,locator\)\)Emit\(message\)/);assert.match(bridge,/PageLocate=locator;/);assert.match(bridge,/--page-locator-self-test/);assert.match(bridge,/--page-locator-ocr-test/);
  for(const name of ['OcrEngine.TryCreateFromLanguage(new Language("ja"))','GameCapture.Into','engine = "ocr"','public static Found Find','public static bool SelfTest','public static string OcrSelfTest'])assert.ok(locator.includes(name),name);
  assert.match(build,/'PageLocator\.cs'/);assert.match(build,/--page-locator-self-test/);
  for(const f of ['web/reader/modules/island-page.js','core/island-page.js'])assert.match(read(f),/\(\?:krkr\|renpy\|ocr\)_screen_v1/,f);

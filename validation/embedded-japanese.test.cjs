@@ -71,7 +71,7 @@ test('the restored index reaches original-text, HookNative and Reader.translate 
  const hooks=Object.create(HookNative.prototype);Object.assign(hooks,{originalText:provider,scriptAllowed:()=>true,trace:()=>{},emit:event=>events.push(event)});const events=[];
  assert.equal(hooks.scriptTranslation('そうですね。'),'');
  const reader=Object.create(Reader.prototype);let online=0;
- Object.assign(reader,{gal:{hooks},requestOptions:()=>({provider:'google'}),targetLanguage:()=>'zh',embedNote:()=>{},chainTranslate:async()=>{online++;return {text:'fallback'};},translationRetries:()=>({add(){}})});
+ Object.assign(reader,{runtime:{libraryOnly:()=>false},gal:{hooks},requestOptions:()=>({provider:'google'}),targetLanguage:()=>'zh',embedNote:()=>{},chainTranslate:async()=>{online++;return {text:'fallback'};},translationRetries:()=>({add(){}})});
  assert.equal(await reader.translate({id:1,text:'これから最初の旅に出ます。'}),'从这里出发踏上旅程。');
  assert.equal(await reader.translate({id:2,text:'そうですね。'}),'是的。');
  assert.equal(await reader.translate({id:3,text:'今から次の場所へ行きます。'}),'现在去下一个地方。');

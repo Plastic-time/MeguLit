@@ -458,6 +458,7 @@ const MEDIA_XP3=/^(?:bg|fg|ev|sd)?image|^(?:bgm|voice|sound|se|movie|video|thum|
 const cxArchives=dir=>{try{return fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f)&&!MEDIA_XP3.test(f)).map(f=>path.join(dir,f));}catch{return [];}};
 const cxCache=file=>{const st=fs.statSync(file);return path.join(os.tmpdir(),'megulit-cx',crypto.createHash('sha256').update(path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+'|6').digest('hex').slice(0,24)+'.json');};
 const cxBuilds=new Map(),cxMemo=new Map(),cxQueue=[],cxStarted=new Map();let cxRunning=false;
+const finishedCxWorkers=new WeakSet();
 let cxProbe=null;
 function withCxProbe(fn){const previous=cxProbe;cxProbe={deferred:false};try{return fn();}finally{cxProbe=previous;}}
 function cxDocs(file){
@@ -489,6 +490,8 @@ function cxPrepareSync(dir,{deadline=Infinity}={}){let built=0;
     const remaining=Math.floor(deadline-Date.now());if(remaining>0&&Atomics.load(signal,0)===0)Atomics.wait(signal,0,0,remaining);
     const status=Atomics.load(signal,0);
     if(Date.now()>=deadline||status===0){if(cxProbe)cxProbe.deferred=true;break;}
+    // The worker has finished its attempt; only teardown is still pending.
+    finishedCxWorkers.add(worker);
     if(status===1){if(cxCache(file)!==out||Date.now()>=deadline){if(cxProbe)cxProbe.deferred=true;break;}fs.renameSync(attempt,out);built++;}
    }catch{}finally{if(worker)try{worker.terminate().then(cleanExited,()=>{});}catch{}}
   }else try{if(require('./cx-worker.cjs').prepare(file,attempt)){fs.renameSync(attempt,out);built++;}}catch{}finally{try{fs.rmSync(attempt,{force:true});}catch{}}
@@ -782,7 +785,7 @@ function fingerprint(id,dir){return crypto.createHash('sha256').update(id+'\n'+E
 function preparing(dir){
  if(cxProbe?.deferred)return {kind:'budget'};
  const viaGarbro=(()=>{try{return garbro.preparing(dir);}catch{return null;}})();if(viaGarbro)return viaGarbro;
- let started=0;for(const file of cxArchives(dir)){let out;try{out=cxCache(file);}catch{continue;}if(cxBuilds.has(out))started=Math.min(started||Infinity,cxStarted.get(out)||Date.now());}
+ let started=0;for(const file of cxArchives(dir)){let out;try{out=cxCache(file);}catch{continue;}if(cxBuilds.has(out)&&!finishedCxWorkers.has(cxBuilds.get(out)))started=Math.min(started||Infinity,cxStarted.get(out)||Date.now());}
  if(started)return {kind:'unpack',startedAt:started};
  const archives=cxArchives(dir);if(!archives.length)return null;
  let encrypted=false;for(const file of archives){try{if(xp3.list(file)?.files.some(e=>e.encrypted)){encrypted=true;break;}}catch{}}

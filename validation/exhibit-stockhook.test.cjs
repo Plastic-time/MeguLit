@@ -48,8 +48,8 @@ test('retained custom callback splits are thread identities and are not Reader r
  const runtime=source('native/megulithook/texthook.cc');assert.match(runtime,/text_fun\(context, &hp, &buff, &lpSplit\)/);assert.match(runtime,/ThreadParam tp\{GetCurrentProcessId\(\), address, lpRetn, lpSplit\}/);assert.match(runtime,/TextOutput\(tp, hp, buffer, buff.size\)/);
 });
 test('ordinary output reaches the existing hookSource interface without an RLD reader dependency',()=>{
- const bridge=source('native/HookBridge.cs');assert.match(bridge,/OutputFrame\(code,name,tp,text\)/);assert.ok(bridge.includes('type="hookSource"'));
- const host=source('core/hook-native.cjs');assert.match(host,/m.type==='hookSource'.*this.sourcePage\(m,name\)/);
+ const bridge=source('native/HookBridge.cs');assert.match(bridge,/OutputFrame\(code,name,tp,text,probe\)/);assert.ok(bridge.includes('type="hookSource"'));
+ const host=source('core/hook-native.cjs');assert.match(host,/m\.type==='hookSource'[^}]*?this\.sourcePage\(\{\.\.\.m,bridgeSerial:serial\},name\)/);
  const runtime=source('native/megulithook/enginecontrol.cpp');assert.match(runtime,/matched = m->check_function\(\)/);assert.match(runtime,/attached = m->attach_function\(\)/);
  /* This is a source trace only, not an assertion that output reached a real Reader */
  assert.equal(fixture.readerVerified,false);
