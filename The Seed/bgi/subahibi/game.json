@@ -12,6 +12,7 @@
    "translationGrowsDown": false
   },
   "page": {
+   "flowPage": false,
    "pairByDrawn": false,
    "keepHeld": false
   },
