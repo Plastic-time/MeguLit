@@ -37,7 +37,13 @@ int wmain(int argc, wchar_t **argv) {
  // a big writable region: every scan walks it under the scan lock
  size_t big = 512u << 20; uint8_t *mem = (uint8_t *)VirtualAlloc(NULL, big, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE); if (!mem) { printf("FAIL alloc\n"); return 1; }
  for (size_t i = 0; i < big; i += 4096) mem[i] = 1;
- if (!LoadLibraryW(argv[1])) { printf("FAIL load %lu\n", GetLastError()); return 1; }
+ // The DLL installs its read hook asynchronously and signals this event when ready.
+ wchar_t readyName[64]; swprintf_s(readyName, L"MeguLitFontReady-%lu", GetCurrentProcessId());
+ HANDLE ready = CreateEventW(NULL, TRUE, FALSE, readyName);
+ if (!ready) { printf("FAIL create readiness event %lu\n", GetLastError()); return 1; }
+ if (!LoadLibraryW(argv[1])) { printf("FAIL load %lu\n", GetLastError()); CloseHandle(ready); return 1; }
+ DWORD wait = WaitForSingleObject(ready, 10000); CloseHandle(ready);
+ if (wait != WAIT_OBJECT_0) { printf("FAIL font hook readiness wait %lu\n", wait); return 1; }
  int fails = 0;
  HANDLE h = CreateFileW(copy, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
  std::vector<uint8_t> whole(orig.size()); n = 0; ReadFile(h, whole.data(), (DWORD)whole.size(), &n, NULL);
