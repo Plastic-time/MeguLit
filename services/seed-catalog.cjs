@@ -96,9 +96,17 @@ function imageType(b){
 }
 /* a data: URL of one game's cover, or null. nsfw must be true (and the R18 filter off) for a cover VNDB does not rate safe;
    that check runs before anything is read or fetched, so a cover saved in NSFW mode never shows in normal mode. */
-async function cover(root,id0,{nsfw=false,fetch:fetcher=fetch,timeout=TIMEOUT}={}){
+async function cover(root,id0,{nsfw=false,resolveMissing=false,fetch:fetcher=fetch,timeout=TIMEOUT}={}){
  const id=vid(id0);if(!id||id!==String(id0))return null;
- const v=readCache(root).vn[id],img=v&&!v.miss?v.image:null;
+ let cache=readCache(root);
+ if(resolveMissing&&process.env.MEGULIT_OFFLINE!=='1'&&(!cache.vn[id]||(cache.vn[id].miss&&Date.now()-cache.vn[id].at>=MISS))){
+  if(refreshing.has(root)){await refreshing.get(root);cache=readCache(root);}
+  const now=Date.now();
+  if(now-cache.failedAt>=RETRY&&(!cache.vn[id]||(cache.vn[id].miss&&now-cache.vn[id].at>=MISS))){
+   await refresh(root,[id],{fetch:fetcher,timeout,now});cache=readCache(root);
+  }
+ }
+ const v=cache.vn[id],img=v&&!v.miss?v.image:null;
  if(!img)return null;
  if(!safe(img)&&(nsfw!==true||safeOnly(root)))return null;
  const store=require('./store.cjs'),base=`seed-${id}-${crypto.createHash('sha256').update(img.url).digest('hex').slice(0,12)}`;

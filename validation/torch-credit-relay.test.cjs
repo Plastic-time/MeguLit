@@ -84,8 +84,8 @@ test('传火碑 GET /api/torch/monument: oldest first, cursor paging, total, wit
  const page=async q=>{const r=await call('7.7.7.7','GET','/api/torch/monument'+q);assert.equal(r.status,200);assert.match(r.headers.get('cache-control'),/max-age=60/);return r.json();};
  let a=await page('?limit=3');assert.equal(a.total,7);assert.deepEqual(a.items.map(i=>i.torchNo),[1,2,3]);assert.equal(a.next,'3');
  assert.equal(a.items[0].name,null);assert.equal(a.items[0].display,fallbackAlias(1));assert.equal(a.items[0].alias,a.items[0].display);assert.equal(a.items[1].name,'传火2');
- assert.equal(a.items[1].game,'千恋＊万花');assert.equal(a.items[2].game,null,'KA has no known title');
- for(const it of a.items)assert.deepEqual(Object.keys(it).sort(),[...(it.name?[]:['alias']),'at','display','game','name','torchNo']);
+ assert.equal(a.items[1].game,'千恋＊万花');assert.equal(a.items[1].gameVndb,'v17');assert.equal(a.items[2].game,null,'KA has no known title');
+ for(const it of a.items)assert.deepEqual(Object.keys(it).sort(),[...(it.name?[]:['alias']),'at','display','game',...(it.game?['gameVndb']:[]),'name','torchNo']);
  assert.doesNotMatch(JSON.stringify(a),/aaaaaaaa|bbbbbbbb|reporter|1\.1\.1/);
  let b=await page('?cursor='+a.next+'&limit=3');assert.deepEqual(b.items.map(i=>i.torchNo),[4,5,6]);assert.equal(b.items[0].display,fallbackAlias(4));
  let c=await page('?cursor='+b.next+'&limit=3');assert.deepEqual(c.items.map(i=>i.torchNo),[7]);assert.equal(c.next,null);

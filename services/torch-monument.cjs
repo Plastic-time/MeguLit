@@ -34,7 +34,7 @@ function cleanItem(r){if(!r||typeof r!=='object')return null;const no=r.torchNo;
  if(typeof no!=='number'&&(typeof no!=='string'||!/^\d+$/.test(no)))return null;
  const n=Number(no);if(!Number.isSafeInteger(n)||n<0)return null;const at=seconds(r.at);
  const name=cleanText(r.name,NAME_MAX);
- return {torchNo:n,name,...(!name?{alias:displayAlias(cleanText(r.alias,NAME_MAX),n)}:{}),at,game:cleanText(r.game,GAME_MAX),month:MONTH.test(String(r.month||''))?r.month:monthOf(at)};}
+ return {torchNo:n,name,...(!name?{alias:displayAlias(cleanText(r.alias,NAME_MAX),n)}:{}),at,game:cleanText(r.game,GAME_MAX),...(/^v\d{1,7}$/.test(r.gameVndb)?{gameVndb:r.gameVndb}:{}),month:MONTH.test(String(r.month||''))?r.month:monthOf(at)};}
 /* GET on each relay host in turn: {status:'ok',json} | {status:'missing'} (route not deployed) | {status:'failed'} */
 async function get(root,route,{fetch:fetcher=globalThis.fetch,env=process.env}={}){if(!fetcher)return {status:'failed'};let missing=false;
  const isolated=owner.privateMode(root,env);

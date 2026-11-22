@@ -23,7 +23,9 @@ import {buildHall,buildStele,HALL} from './torch-hall.js';
 import {loadBaked,withBaked,bakedAO,computeVolumes,applyAO} from './torch-bake.js';
 import {VolumetricPass} from './torch-volumetric.js';
 import {loadGsap} from './gsap-loader.js';
-import {createTorchZoom,keepTorchCameraAboveFloor} from './torch-controls.js';
+import {createTorchCovers} from './torch-covers.js';
+import {buildCourtyard} from './torch-courtyard.js';
+import {createTorchWalk,keepTorchCameraAboveFloor} from './torch-controls.js';
 
 /* Legacy number queries still jump to the original internal ID. */
 const cnParse=q=>{const D="零壹贰叁肆伍陆柒捌玖",U={"拾":10,"佰":100,"仟":1000},B={"万":1e4,"亿":1e8};if(!/^[零壹贰叁肆伍陆柒捌玖拾佰仟万亿]+$/.test(q))return null;let total=0,sec=0,d=0;for(const c of q){const v=D.indexOf(c);if(v>=0){d=v;continue;}if(U[c]){sec+=(d||1)*U[c];d=0;continue;}if(B[c]){total=(total+sec+d)*B[c];sec=0;d=0;}}return total+sec+d;};
@@ -189,10 +191,10 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
  const onKey=e=>{if(!mounted||!sceneReady||!host.contains(e.target))return;
   if(e.key==='Escape'){if(!results.hidden){e.preventDefault();results.hidden=true;}else if(scene.reading()){e.preventDefault();scene.resetView();}return;}
   if(e.target.closest?.('input,textarea'))return;
-  if(e.key==='+'||e.key==='='){e.preventDefault();scene.zoomBy(-120,0);return;}if(e.key==='-'){e.preventDefault();scene.zoomBy(120,0);return;}if(e.key==='0'){e.preventDefault();scene.resetView();return;}
+  if(e.key==='+'||e.key==='='){e.preventDefault();scene.walkBy(-120,0);return;}if(e.key==='-'){e.preventDefault();scene.walkBy(120,0);return;}if(e.key==='0'){e.preventDefault();scene.resetView();return;}
   if(e.key==='PageDown'||e.key==='ArrowLeft'){e.preventDefault();step(1);}else if(e.key==='PageUp'||e.key==='ArrowRight'){e.preventDefault();step(-1);}};
- /* Paging stays on the arrows; the wheel changes only the camera distance */
- const onWheel=e=>{if(!sceneReady||e.target.closest?.('.tm-bar,.tm-results'))return;e.preventDefault();scene.zoomBy(e.deltaY||e.deltaX,e.deltaMode);};
+ /* Paging stays on the arrows; wheel input walks along the current view. */
+ const onWheel=e=>{if(!sceneReady||e.target.closest?.('.tm-bar,.tm-results'))return;e.preventDefault();scene.walkBy(e.deltaY||e.deltaX,e.deltaMode);};
  host.addEventListener('wheel',onWheel,{passive:false});
  canvas.addEventListener('pointermove',e=>{const hit=scene.pick(e.clientX,e.clientY);let cursor='';state.hoverMonth=null;
   if(hit&&hit.band){state.hoverMonth=hit.band;cursor='pointer';showTip(null);}else if(hit&&hit.entry){cursor='grab';showTip(hit.entry,e.clientX,e.clientY);}else{cursor='grab';showTip(null);}
@@ -220,6 +222,7 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
   addEventListener('blur',onBlur);addEventListener('focus',syncActive);
   if(scene){
    scene.resize();ro?.observe(host);
+   scene.loadCovers?.(call);
    if(faceDirty){faceDirty=false;scene.paintFace();}
    syncActive();
   }
@@ -288,6 +291,7 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
    const {ok,reason}=bake;
    scene=withBaked(bake,()=>buildScene({host,canvas:$('.tm-canvas'),state,t,tier,reduced,gsap,onTier:updateChrome,bakeInfo:{ok,reason},onFirstFrame}));
    timing(ok?'build-scene':'build-scene-fallback',start);
+   if(!window.__TORCH_BAKE)scene.loadCovers?.(call);
    ro=new ResizeObserver(()=>{if(mounted)scene.resize();});ro.observe(host);
    if(typeof window.__TORCH_HOUR==='number')host.__torch=scene;
   }catch(error){close();throw error;}
@@ -339,10 +343,11 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
  const tex=(c,srgb=true,rep=1)=>{const x=keep(new THREE.CanvasTexture(c));x.colorSpace=srgb?THREE.SRGBColorSpace:THREE.NoColorSpace;x.wrapS=x.wrapT=THREE.RepeatWrapping;x.repeat.set(rep,rep);x.anisotropy=8;return x;};
  let renderer,composer=null,bloom=null,grade=null,vol=null,reflector=null,active=true,raf=0,last=performance.now(),slow=0,frames=0,introDone=false,dragMoved=false;
  const scene=new THREE.Scene();scene.background=new THREE.Color(0x0e0c14);scene.fog=new THREE.FogExp2(0x16131f,0.015);
- const camera=new THREE.PerspectiveCamera(44,1,0.1,160);
- const START={pos:new THREE.Vector3(0,2.6,37),look:new THREE.Vector3(0,27,3)},END={pos:new THREE.Vector3(0,2.3,20.5),look:new THREE.Vector3(0,4.7,0)};
- const view={pos:START.pos.clone(),look:START.look.clone(),yaw:0,pitch:0,yawT:0,pitchT:0,dragYaw:0,dragPitch:0,freeYaw:0,freePitch:0,panX:0,panY:0,px:0,pxT:0,read:null};
- const zoom=createTorchZoom({reduced});
+ const camera=new THREE.PerspectiveCamera(44,1,0.1,900);
+ const START={pos:new THREE.Vector3(0,2.6,37),look:new THREE.Vector3(0,27,3)},END={pos:new THREE.Vector3(0,5.45,20.5),look:new THREE.Vector3(0,3.95,0)};
+ const view={pos:START.pos.clone(),look:START.look.clone(),yaw:0,pitch:0,yawT:0,pitchT:0,dragYaw:0,dragPitch:0,freeYaw:0,freePitch:0,px:0,pxT:0,read:null};
+ const walk=createTorchWalk({reduced});
+ const travel=new THREE.Vector3(),screenRight=new THREE.Vector3();
  camera.position.copy(view.pos);camera.lookAt(view.look);
 
  /* ---- environment for reflections: a dim stone room with a few bright windows (scaled with the daylight, see frame) ---- */
@@ -355,7 +360,9 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
   const rt=pm.fromScene(es,.02);es.traverse(o=>{o.geometry?.dispose();o.material?.dispose?.();});pm.dispose();return keep(rt);}
 
  /* ---- the hall (web/torch-hall.js) ---- */
- const tBuild=performance.now();const H=buildHall({scene,keep,tex,tier,maxAniso:8});const buildMs=performance.now()-tBuild;const {skipInMirror,floorMat,FL_W,FL_L,FL_Z}=H;
+ const tBuild=performance.now();const H=buildHall({scene,keep,tex,tier,maxAniso:8});const buildMs=performance.now()-tBuild;
+ const courtyard=buildCourtyard(scene,HALL.NZ1);
+ const covers=createTorchCovers(courtyard.group,{east:HALL.BACK,west:HALL.NZ1,reduced});const {skipInMirror,floorMat,FL_W,FL_L,FL_Z}=H;
 
  /* ---- the stele (web/torch-hall.js) ---- */
  const {stele,slab,SW,SH,SD,basaltBody,bas,emit:steleEmit}=buildStele({scene,keep,tier});
@@ -559,9 +566,14 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
   if(!pointer.down||!pointer.freeLook){pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=((e.clientY-r.top)/r.height)*2-1;}
   if(pointer.down&&e.pointerId===pointer.id){const dx=(e.clientX-pointer.sx)/r.width,dy=(e.clientY-pointer.sy)/r.height;pointer.moved=Math.max(pointer.moved,Math.abs(dx)+Math.abs(dy));
    if(pointer.freeLook){view.freeYaw=pointer.yaw0-dx*4;view.freePitch=THREE.MathUtils.clamp(pointer.pitch0+dy*3,-1.45,1.45);}
-   else if(pointer.pan){view.panX=THREE.MathUtils.clamp(pointer.panX-dx*20*zoom.value,-8,8);view.panY=THREE.MathUtils.clamp(pointer.panY+dy*14*zoom.value,-3,4);}
+   else if(pointer.pan){
+    screenRight.setFromMatrixColumn(camera.matrixWorld,0);
+    travel.addScaledVector(screenRight,(pointer.lastX-e.clientX)*20/r.width);
+    travel.y+=(e.clientY-pointer.lastY)*14/r.height;
+    pointer.lastX=e.clientX;pointer.lastY=e.clientY;
+   }
    else{view.dragYaw=THREE.MathUtils.clamp(pointer.yaw0-dx*.9,-.26,.26);view.dragPitch=THREE.MathUtils.clamp(pointer.pitch0+dy*1.1,-.62,.12);}}};
- const onDown=e=>{if(pointer.down||![0,1,2].includes(e.button))return;if(e.button===1)e.preventDefault();pointer.down=true;pointer.id=e.pointerId;pointer.moved=0;pointer.sx=e.clientX;pointer.sy=e.clientY;pointer.freeLook=e.button===2;pointer.yaw0=pointer.freeLook?view.freeYaw:view.dragYaw;pointer.pitch0=pointer.freeLook?view.freePitch:view.dragPitch;pointer.pan=e.button===1||zoom.target<.95||!!view.read;pointer.panX=view.panX;pointer.panY=view.panY;dragMoved=false;canvas.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);};
+ const onDown=e=>{if(pointer.down||![0,1,2].includes(e.button))return;if(e.button===1)e.preventDefault();pointer.down=true;pointer.id=e.pointerId;pointer.moved=0;pointer.sx=e.clientX;pointer.sy=e.clientY;pointer.freeLook=e.button===2;pointer.yaw0=pointer.freeLook?view.freeYaw:view.dragYaw;pointer.pitch0=pointer.freeLook?view.freePitch:view.dragPitch;pointer.pan=e.button===1||(e.button===0&&!!view.read);pointer.lastX=e.clientX;pointer.lastY=e.clientY;dragMoved=false;canvas.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);};
  const onUp=e=>{if(!pointer.down||e.pointerId!==pointer.id)return;pointer.down=false;dragMoved=pointer.moved>.012;canvas.classList.remove('is-dragging');if(canvas.hasPointerCapture?.(e.pointerId))canvas.releasePointerCapture(e.pointerId);};
  const onContextMenu=e=>e.preventDefault();
  canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointerup',onUp);canvas.addEventListener('pointercancel',onUp);canvas.addEventListener('lostpointercapture',onUp);canvas.addEventListener('contextmenu',onContextMenu);
@@ -582,18 +594,29 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
   const k=gsap?introT:ease(introT);
   view.pos.lerpVectors(START.pos,END.pos,k);view.pos.y+=Math.sin(k*Math.PI)*.5;view.look.lerpVectors(START.look,END.look,k);
   if(view.read&&introDone){const r=view.read;view.pos.set(THREE.MathUtils.clamp(r.x*.92,-5,5),THREE.MathUtils.clamp(r.y+.05,2.2,4.4),5.2);view.look.set(r.x,r.y,0);}
-  view.pos.sub(view.look).multiplyScalar(zoom.step(dt)).add(view.look);
-  view.pos.x+=view.panX;view.look.x+=view.panX;view.pos.y+=view.panY;view.look.y+=view.panY;
-  keepTorchCameraAboveFloor(view.pos);
   const settle=introDone?1:Math.max(0,(k-.7)/.3);
   view.yawT=-pointer.x*.06*settle+view.dragYaw+view.freeYaw;view.pitchT=THREE.MathUtils.clamp(-pointer.y*.035*settle-view.dragPitch-view.freePitch,-1.5,1.5);view.pxT=pointer.x*.3*settle;
-  const a=1-Math.exp(-dt*2.6);view.yaw+=(view.yawT-view.yaw)*a;view.pitch+=(view.pitchT-view.pitch)*a;view.px+=(view.pxT-view.px)*a;
-  if(view.smoothPos){view.smoothPos.lerp(view.pos,1-Math.exp(-dt*2.2));view.smoothLook.lerp(view.look,1-Math.exp(-dt*2.2));}else{view.smoothPos=view.pos.clone();view.smoothLook=view.look.clone();}
-  camera.position.copy(view.smoothPos);camera.position.x+=view.px;
-  tmpDir.copy(view.smoothLook).sub(view.smoothPos).normalize();eul.set(view.pitch,view.yaw,0);tmpDir.applyEuler(eul);camera.lookAt(tmpPos.copy(camera.position).add(tmpDir));}
- function lookAtFocus(){placeGlow();if(glow.userData.on&&glow.userData.world)view.read=glow.userData.world.clone();}
- function setRead(p){view.read=p?new THREE.Vector3(THREE.MathUtils.clamp(p.x,-5.2,5.2),THREE.MathUtils.clamp(p.y,2.2,4.6),0):null;}
- function resetView(){view.read=null;view.dragYaw=0;view.dragPitch=0;view.freeYaw=0;view.freePitch=0;view.panX=0;view.panY=0;zoom.reset();}
+  const a=reduced?1:1-Math.exp(-dt*2.6);view.yaw+=(view.yawT-view.yaw)*a;view.pitch+=(view.pitchT-view.pitch)*a;view.px+=(view.pxT-view.px)*a;
+  if(view.smoothPos){const follow=reduced?1:1-Math.exp(-dt*2.2);view.smoothPos.lerp(view.pos,follow);view.smoothLook.lerp(view.look,follow);}else{view.smoothPos=view.pos.clone();view.smoothLook=view.look.clone();}
+  tmpDir.copy(view.smoothLook).sub(view.smoothPos).normalize();
+  eul.set(view.pitch,view.yaw,0);tmpDir.applyEuler(eul);
+  travel.addScaledVector(tmpDir,walk.step(dt));
+  camera.position.copy(view.smoothPos).add(travel);camera.position.x+=view.px;
+  keepTorchCameraAboveFloor(camera.position);travel.y=camera.position.y-view.smoothPos.y;
+  camera.lookAt(tmpPos.copy(camera.position).add(tmpDir));
+ }
+ function lookAtFocus(){placeGlow();if(glow.userData.on&&glow.userData.world)setRead(glow.userData.world);}
+ function setRead(p){
+  if(!p){view.read=null;return;}
+  const from=camera.position.clone(),look=camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(5).add(from);
+  resetView();view.smoothPos=from;view.smoothLook=look;
+  view.read=new THREE.Vector3(THREE.MathUtils.clamp(p.x,-5.2,5.2),THREE.MathUtils.clamp(p.y,2.2,4.6),0);
+ }
+ function resetView(){
+  view.read=null;view.dragYaw=view.dragPitch=view.freeYaw=view.freePitch=view.px=0;
+  view.yaw=view.pitch=0;pointer.x=pointer.y=0;travel.set(0,0,0);walk.reset();
+  introTween?.kill();introT=1;introDone=true;view.smoothPos=null;
+ }
 
  /* ---- loop ---- */
  let idle=false,mirrorTick=0;
@@ -613,7 +636,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
   { const L=auraU.uLv.value,b=breathPhase;for(let i=0;i<4;i++){const v=.5+.5*Math.sin(time*.23*b[i][2]+b[i][0]),w=.5+.5*Math.sin(time*.13*b[i][2]+b[i][1]);L.setComponent(i,Math.pow(Math.min(1,v*.75+w*.45),2.2));}
     if(aoUni)aoUni.uSteleLevels.value.copy(L).multiplyScalar(auraU.uI.value);}motes.material.uniforms.uPx.value=renderer.domElement.height/520;
   if(glow.userData.on){const p=(now-glow.userData.t0)/1000;const o=Math.min(1,p/1.2)*(.42+.1*Math.sin(p*1.6));glow.material.opacity=o;glowLight.intensity=o*2.2;}else{glow.material.opacity*=.9;glowLight.intensity*=.9;}
-  updateCamera(dt);draw();
+  updateCamera(dt);courtyard.update(camera,H.state);covers.update(time);draw();
   if(onFirstFrame&&!renderer.getContext().isContextLost()){onFirstFrame();onFirstFrame=null;}
   /* slow frames on the full tier for ~3 s after the intro: switch to the light tier (only in auto mode) */
   if(introDone&&tier==='high'&&autoTier){frames++;if(dt>.045)slow++;if(frames>=180){if(slow>120){setTier('low',true);}frames=0;slow=0;}}
@@ -621,7 +644,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
  let autoTier=(()=>{try{return !localStorage.getItem(QUALITY_KEY)||localStorage.getItem(QUALITY_KEY)==='auto';}catch{return true;}})();
  function setActive(on){if(disposed)return;active=!!on&&ready;if(active&&!raf){last=performance.now();raf=requestAnimationFrame(frame);}if(!active&&raf){cancelAnimationFrame(raf);raf=0;}}
  function suspend(){
-  setActive(false);
+  setActive(false);covers.clear();
   const needsPaint=!!(paintQueued||lastHoverKey);
   if(paintQueued){cancelAnimationFrame(paintQueued);paintQueued=0;}
   lastHoverKey='';
@@ -632,7 +655,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
  }
  function setTier(next,auto=false){if(next===tier)return;tier=next;if(!auto)autoTier=false;applyTier();scene.traverse(o=>{const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];ms.forEach(m=>m.needsUpdate=true);});onTier?.();}
  let disposed=false,ready=false,compilePoll=0;
- function dispose(){disposed=true;active=false;if(raf)cancelAnimationFrame(raf);raf=0;if(paintQueued)cancelAnimationFrame(paintQueued);
+ function dispose(){covers.clear();disposed=true;active=false;if(raf)cancelAnimationFrame(raf);raf=0;if(paintQueued)cancelAnimationFrame(paintQueued);
   if(compilePoll)clearTimeout(compilePoll);introTween?.kill();
   canvas.removeEventListener('pointermove',onMove);canvas.removeEventListener('pointerdown',onDown);canvas.removeEventListener('pointerup',onUp);canvas.removeEventListener('pointercancel',onUp);canvas.removeEventListener('lostpointercapture',onUp);canvas.removeEventListener('contextmenu',onContextMenu);
   if(composer){composer.passes.forEach(p=>p.dispose?.());composer.dispose?.();}
@@ -660,5 +683,5 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null,
   };
   poll();
  }
- return {get tier(){return tier;},prepare,intro,setActive,suspend,setTier,resize,pick,dispose,paintFace:()=>queuePaint(),lookAtFocus,setRead,resetView,zoomBy:(delta,mode)=>zoom.wheel(delta,mode),reading:()=>!!view.read||Math.abs(zoom.target-1)>.001,dragged:()=>dragMoved,debug:{renderer,scene,camera,zoom,buildMs,torchPoints:H.torchPoints,steleEmit,get ao(){return aoInfo;}}};
+ return {get tier(){return tier;},loadCovers:covers.load,prepare,intro,setActive,suspend,setTier,resize,pick,dispose,paintFace:()=>queuePaint(),lookAtFocus,setRead,resetView,walkBy:(delta,mode)=>walk.wheel(delta,mode),reading:()=>!!view.read,dragged:()=>dragMoved,debug:{renderer,scene,camera,sun:H.sun,courtyard,covers,buildMs,torchPoints:H.torchPoints,steleEmit,get ao(){return aoInfo;}}};
 }

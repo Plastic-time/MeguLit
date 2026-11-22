@@ -92,7 +92,7 @@ async function titlesFor(env,keys){const out=new Map();if(!keys.length)return ou
    for(const r of rows){try{const v=JSON.parse(r.prints||'{}').vndb;if(typeof v==='string'&&/^v\d{1,7}$/.test(v))vndbOf.set(r.game_key,v);}catch{}}}
   const ids=[...new Set(vndbOf.values())],title=new Map();
   for(const c of chunks(ids)){const rows=(await env.DB.prepare("SELECT vndb,title FROM probe_full WHERE title<>'' AND vndb IN ("+c.map(()=>'?').join(',')+') ORDER BY updated_at ASC').bind(...c).all()).results||[];for(const r of rows)title.set(r.vndb,String(r.title).slice(0,120));}
-  for(const [k,v] of vndbOf)if(title.has(v))out.set(k,title.get(v));}catch{}
+  for(const [k,v] of vndbOf)if(title.has(v))out.set(k,{game:title.get(v),gameVndb:v});}catch{}
  return out;}
 /* edge cache (Cache API, 60 s): one D1 read per page per data centre per minute */
 async function cached(ck,ctx,make){const c=globalThis.caches?.default;
@@ -102,7 +102,7 @@ const PUBLIC={'access-control-allow-origin':'*','cache-control':'public, max-age
 const MONTH=/^\d{4}-(0[1-9]|1[0-2])$/;
 const monthRange=m=>{const [y,mo]=m.split('-').map(Number);return [Date.UTC(y,mo-1,1)/1000,Date.UTC(y,mo,1)/1000];};
 const totalOf=async env=>(await env.DB.prepare('SELECT total FROM torch_counter WHERE id=1').first())?.total|0;
-const shape=(r,titles)=>({...creditOut(r),game:titles?.get(r.game_key)??null,display:r.name||r.alias||null});
+const shape=(r,titles)=>({...creditOut(r),game:null,...titles?.get(r.game_key),display:r.name||r.alias||null});
 
 export async function monumentGet(env,url,{json,fail},ctx=null){
  if(!env.DB)return fail('NOT_CONFIGURED',503);
