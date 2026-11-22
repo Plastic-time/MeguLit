@@ -46,7 +46,14 @@ class VoicePack{
   /* 2026-11-19: core/fast-download.cjs pulls the file in parallel Range pieces when AivisHub's answer allows it (one
      connection otherwise); a silent connection is dropped after 15 s. Size and checksum still decide. */
   const target=path.join(this.dir,voice.uuid+'.aivmx'),tmp=target+'.tome-download';progress.bytes=0;progress.size=file.file_size;
-  try{await require('./fast-download.cjs').download({urls:[API+voice.uuid+'/download?model_type=AIVMX'],dest:tmp,size:file.file_size,sha256:String(file.checksum).toLowerCase(),fetch:this.fetch,signal,onProgress:p=>{progress.bytes=p.received;}});fs.renameSync(tmp,target);this.log('[ToMe] voice installed: '+voice.name);}
+  const endpoint=API+voice.uuid+'/download?model_type=AIVMX';let source=endpoint;
+  // Reuse the HTTPS URL reached by the initial request so later ranges don't each request a new AivisHub link.
+  const fetchModel=async(_url,options)=>{
+   const response=await this.fetch(source,options);
+   if(source===endpoint&&response.ok&&response.redirected&&response.url.startsWith('https://'))source=response.url;
+   return response;
+  };
+  try{await require('./fast-download.cjs').download({urls:[endpoint],dest:tmp,size:file.file_size,sha256:String(file.checksum).toLowerCase(),fetch:fetchModel,signal,onProgress:p=>{progress.bytes=p.received;}});fs.renameSync(tmp,target);this.log('[ToMe] voice installed: '+voice.name);}
   catch(e){for(const f of [tmp,tmp+'.part',tmp+'.part.json'])try{fs.unlinkSync(f);}catch{}if(/^(HASH|SIZE)_MISMATCH$/.test(e.code||''))throw Error(voice.name+' 校验失败');if(e.code==='DOWNLOAD_FAILED')throw Error(voice.name+' 下载失败 '+String((e.last&&e.last.message)||''));throw e;}}
 }
 module.exports={VoicePack,VOICES};
