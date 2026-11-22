@@ -26,3 +26,30 @@ test('low resources or lost explicit focus prevents even starting exe hash and n
 test('revoked or ambiguous reviewer keys cannot grant cached official permission',async t=>{const f=await setup(t);await R.receive(f.root,'7',f.options);const answer=feed.cached(f.root,f.identity.exe);for(const reviewKeys of [[{...f.keys.reviewKeys[0],revoked:true}],[...f.keys.reviewKeys,...f.keys.reviewKeys]]){const keys={...f.keys,reviewKeys};assert.equal(feed.layer(answer,f.identity.exe,{torchTrust:keys,exe:f.exe}),null);await assert.rejects(P.checked(f.release,keys),/TORCH_SIGNATURE/);}});
 test('resources measures only actual application/game paths, never assumes Windows E/H volumes exist',async t=>{const f=await setup(t),seen=new Set(),known=new Set([f.root,f.exe,f.script]),statfs=file=>{assert.ok(known.has(file),'unexpected volume probe: '+file);seen.add(file);return {bavail:4096,bsize:4096};};const result=await R.receive(f.root,'7',{...f.options,resources:(root,options)=>R.resources(root,{...options,freemem:()=>256*1024**2,statfs})});assert.equal(result.state,'received');assert.deepEqual(seen,known);});
 test('resource measurement errors, invalid numbers and real low capacity defer instead of silently allowing a job',()=>{const root='C:/OnlyExistingVolume',good={freemem:()=>256*1024**2,statfs:()=>({bavail:4096,bsize:4096})};assert.equal(R.resources(root,good),true);for(const patch of [{freemem:()=>256*1024**2-1},{freemem:()=>NaN},{statfs:()=>({bavail:4095,bsize:4096})},{statfs:()=>({bavail:NaN,bsize:4096})},{statfs:()=>{throw Error('volume unavailable');}}])assert.equal(R.resources(root,{...good,...patch}),false);assert.equal(R.resources(root,{...good,paths:['D:/actual-game/game.exe'],statfs:file=>{if(file!==root)throw Error('game volume unavailable');return {bavail:4096,bsize:4096};}}),false);});
+
+
+test('owner launcher can receive an exact signed fire without opening the general relay',async t=>{
+ const f=await setup(t),launcher=require('../tools/owner-tests-launch.cjs');
+ const env=launcher.environment(f.root,{MEGULIT_RELAY_BASE:'https://ignored.invalid'});
+ const previous=Object.fromEntries([...Object.keys(env),'MEGULIT_OFFLINE'].map(key=>[key,process.env[key]]));
+ t.after(()=>{for(const [key,value] of Object.entries(previous)){if(value===undefined)delete process.env[key];else process.env[key]=value;}});
+ Object.assign(process.env,env);
+ const urls=[],options={...f.options,urls:undefined,fetcher:async(url,request)=>{
+  urls.push(url);
+  assert.equal(request.method,'GET');
+  assert.equal(request.redirect,'error');
+  assert.equal(request.body,undefined);
+  return reply({release:f.release,publication:f.publication});
+ }};
+ const relay=require('../services/relay-config.cjs');
+ assert.deepEqual(relay.endpoints(f.root,'/api/diagnostics'),[]);
+ assert.equal(feed.sharing(f.root),false);
+ process.env.MEGULIT_OFFLINE='1';
+ assert.equal((await R.receive(f.root,'7',options)).state,'hidden');
+ assert.deepEqual(urls,[]);
+ delete process.env.MEGULIT_OFFLINE;
+ const result=await R.receive(f.root,'7',options);
+ assert.equal(result.state,'received');
+ assert.deepEqual(urls,[relay.CN_RELAY_BASE+'/api/torch-release?exe='+f.identity.exe]);
+ assert.ok(fs.existsSync(f.cache()));
+});
