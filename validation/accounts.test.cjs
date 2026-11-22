@@ -163,20 +163,15 @@ test('client sync uploads a long bilingual saved sentence with the other pending
  assert.deepEqual(rows.map(row=>[row.text,row.translation]),[[text,translation],['短い文','短句']]);
 });
 
-test('migrated saved sentences keep their original sync key across retries and deletion',async t=>{
- const {handleAccounts}=await load(),r=relay(),clock={now:T0.getTime()},A=device(t,r,clock),B=device(t,r,clock);
- const text='読'.repeat(3001),key='s:'+require('node:crypto').createHash('sha256').update(text).digest('hex').slice(0,32);
+test('raising the cap never admits a truncated migrated sentence under the original text key',async t=>{
+ const r=relay(),clock={now:T0.getTime()},A=device(t,r,clock),B=device(t,r,clock);
+ const text='読'.repeat(3001);
  A.run(db=>db.prepare("INSERT INTO saved_sentences(text,created_at,original) VALUES(?,1,'{}')").run(text));
  await signIn(A,r);clock.now+=61000;await signIn(B,r);
- const stale=await handleAccounts(req('PUT','/api/sync/sentences',{records:[{key,updated_at:clock.now,data:{text:text.slice(0,3000)}}]},
-  {authorization:'Bearer '+A.a.token()}),r.env,new Date(clock.now));
- assert.equal(stale.status,413,'an older client must not upload a mismatched long record');
- assert.equal((await A.a.sync()).summary.sentences.pushed,1);
+ await assert.rejects(A.a.sync(),{code:'RECORD_TOO_LARGE'});
+ assert.equal(A.a.status().pending.sentences,1);
+ assert.equal(A.run(db=>db.prepare('SELECT text FROM saved_sentences').get().text),text);
  await B.a.sync();
- assert.equal(B.run(db=>db.prepare('SELECT text FROM saved_sentences').get().text),text);
- assert.equal((await B.a.sync()).summary.sentences.pushed,0);
- A.run(db=>db.exec('DELETE FROM saved_sentences'));
- clock.now+=1000;await A.a.sync();await B.a.sync();
  assert.equal(B.run(db=>db.prepare('SELECT COUNT(*) AS n FROM saved_sentences').get().n),0);
 });
 

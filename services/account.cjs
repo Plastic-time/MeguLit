@@ -170,11 +170,7 @@ const kinds={
  sentences:{
   collect(db){
    const titles=gameTitles(db),out=new Map();
-   for(const s of db.prepare('SELECT game_id,text,translation,created_at,source,original FROM saved_sentences ORDER BY created_at,id').all()){
-    const key='s:'+sha(s.text,32);if(out.has(key))continue;
-    /* A migrated sentence may exceed the reader's save limit. Its original text must match the sync key. */
-    out.set(key,{text:s.text,translation:String(s.translation||'').slice(0,3000),created_at:s.created_at,game:titles.get(s.game_id)||syncedTitle(s.original),...(s.source==='auto'?{source:'auto'}:{})});
-   }
+   for(const s of db.prepare('SELECT game_id,text,translation,created_at,source,original FROM saved_sentences ORDER BY created_at,id').all()){const key='s:'+sha(s.text,32);if(!out.has(key))out.set(key,{text:s.text.slice(0,3000),translation:String(s.translation||'').slice(0,3000),created_at:s.created_at,game:titles.get(s.game_id)||syncedTitle(s.original),/* only auto rows carry it, so older (manual) records keep their hash */...(s.source==='auto'?{source:'auto'}:{})});}
    return out;
   },
   apply(db,key,record){
