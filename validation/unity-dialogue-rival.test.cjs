@@ -25,7 +25,7 @@ test('a second writable stream that repeats the selected line is hidden with it'
  assert.match(s,/if\(last==0\|\|Bare\(rows\[last\]\)!=b\)return false;for\(int i=0;i<last;i\+\+\)\{string r=Bare\(rows\[i\]\);if\(r\.Length>0&&!b\.StartsWith\(r,StringComparison\.Ordinal\)\)return false;\}return true;/,'a typewriter buffer: every row a start of the line, the last the line; a backlog page is no twin');
  assert.match(s,/if\(!TwinSelfTest\(\)\)\{Console\.Error\.WriteLine\("FAIL japanese twins/,'HookBridge --self-test runs the twin rules (built by Build-HookBridge.ps1)');
  assert.match(s,/if\(id!=Selected\)LeaveSelected\(\);/,'Select leaves the old line state behind (#696 review)');
- assert.match(s,/static void LeaveSelected\(\)\{foreach\(var k in JaTwins\)MarkEmbedDirty\(k\);foreach\(var k in TwinEmbed\)MarkEmbedDirty\(k\);JaTwins\.Clear\(\);[^\n]*LastEmbedText="";LastEmbedCovered=false;\}/,'the twins of the stream left are forgotten and marked dirty for the embed reconciler, and its line forgotten (#696 review)');
+ assert.match(s,/static void LeaveSelected\(\)\{LeaveGen\+\+;foreach\(var k in JaTwins\)MarkEmbedDirty\(k\);foreach\(var k in TwinEmbed\)MarkEmbedDirty\(k\);JaTwins\.Clear\(\);[^\n]*LastEmbedText="";LastEmbedCovered=false;\}/,'the twins of the stream left are forgotten and marked dirty for the embed reconciler, and its line forgotten (#696 review)');
 });
 
 test('E610 the twin is hidden only after the selected stream wrote the same line back; the remembered stream comes back on its first line',()=>{
