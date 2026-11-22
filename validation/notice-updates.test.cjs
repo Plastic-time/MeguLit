@@ -52,7 +52,15 @@ test('a long update list builds only the first rows at once, the rest when idle'
   assert.strictEqual(list.children[0].children[0].textContent, '11.01');
 });
 
-test('startup notice opens immediately on a cold cache and updates its log in the background', async () => {
+test('startup notice opens immediately on a cold cache and updates its log in the background', async t => {
+  const oldWindow = globalThis.window;
+  globalThis.window = {};
+  t.after(() => { if (oldWindow === undefined) delete globalThis.window; else globalThis.window = oldWindow; });
+  const session = new Map(), previousSession = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: {
+    getItem: key => session.get(key) ?? null, setItem: (key, value) => session.set(key, value)
+  } });
+  t.after(() => { if (previousSession) Object.defineProperty(globalThis, 'sessionStorage', previousSession); else delete globalThis.sessionStorage; });
   const { mountDevNotice } = await import(pathToFileURL(path.join(web, 'feedback-ui.js')).href);
   const { dialog, list, note } = fakeDom();
   const game = new El('input'), form = new El('form'), button = new El('button'), close = new El('button'), seed = { querySelector: () => null };
@@ -107,8 +115,9 @@ test('startup notice opens immediately on a cold cache and updates its log in th
   assert.strictEqual(empty.hidden, true);
   close.onclick();
   assert.strictEqual(dialog.open, false);
-  mountDevNotice(options);
-  assert.strictEqual(requests, 1);
+  const reloaded = await import(pathToFileURL(path.join(web, 'feedback-ui.js')).href + '?reload');
+  reloaded.mountDevNotice(options);
+  assert.strictEqual(requests, 1, 'a hot reload keeps the notice closed in the same window session');
 
   mountDevNotice({ ...options, force: true });
   assert.strictEqual(list.children.length, 5, 'a warm cache is drawn immediately');

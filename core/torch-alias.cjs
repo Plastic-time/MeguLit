@@ -24,4 +24,11 @@ function fallbackAlias(torchNo){
  return POOL[slot];
 }
 
-module.exports={fallbackAlias,displayAlias};
+// Keyed by the exact VNDB ID stored in the library. Sources identify the protagonist in Japanese.
+const protagonists=Object.freeze({
+ v4:'岡崎朋也',       // https://www.prot.co.jp/ps3/clannad/
+ v19073:'有地将臣',   // https://store.steampowered.com/app/1144400/?l=japanese
+ v7771:'北原春希'     // https://aquaplus.jp/wa2/character.html
+});
+
+module.exports={fallbackAlias,displayAlias,protagonists};

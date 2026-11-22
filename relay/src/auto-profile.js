@@ -45,6 +45,7 @@ import protocol from '../../core/torch-release.cjs';
 import domains from '../../core/profiles/domains.cjs';
 import gamePrint from '../../core/game-print-schema.cjs';
 import {parseCredit,noteUpload,creditOfDiff,creditPut} from './torch-credit.js';
+import torchAliases from '../../core/torch-alias.cjs';
 import {cleanForProfile} from './seed-malware.js';
 import {reportAllowed,noteSeedUpload,blockedProfile,profileBlock,retestOrder} from './seed-admin.js';
 const {canonical,validate,build,unsigned,KEY}=gameDiff;
@@ -137,6 +138,8 @@ async function report(request,env,ip,now,{json,fail,ctx}){
  const v=validateReport(body.value);if(!v.ok)return fail(v.error);const r=v.value,t=sec(now);
  /* 2026-11-21 传火署名: credit:{name?} next to profile (or inside it); refused whole when it is not a clean name (relay/src/torch-credit.js) */
  const cr=parseCredit(body.value.credit!==undefined?body.value.credit:body.value.profile?.credit,env);if(!cr.ok)return fail('INVALID_CREDIT');
+ const alias=body.value.libraryAlias;
+ if(alias!==undefined&&!Object.values(torchAliases.protagonists).includes(alias))return fail('INVALID_CREDIT');
  const variant=r.prints.script||'';
  if(candidate&&variant)candidate={...candidate,prints:{script:variant}};
  const hash=(await sha256(r.mode+'|'+canonical(r.settings)+(variant?'|'+variant:''))).slice(0,32);
@@ -146,7 +149,7 @@ async function report(request,env,ip,now,{json,fail,ctx}){
   .bind(r.key,variant?await sha256(ip+'|'+variant):ip,gid,JSON.stringify(r.prints),hash,canonical(r.settings),r.mode,r.source,r.cost,JSON.stringify(r.metrics),r.engine,r.exe,r.app,t).run();
  await env.DB.prepare('DELETE FROM auto_profile_reports WHERE game_key=? AND reporter NOT IN (SELECT reporter FROM auto_profile_reports WHERE game_key=? ORDER BY updated_at DESC LIMIT ?)').bind(r.key,r.key,PROFILE_LIMITS.reportsPerKey).run();
  await register(env,'version',r.key,r.prints,['head','pe'],t);if(gid)await register(env,'game',gid,r.prints,['exe',...GAME_KINDS],t);
- const credit=await noteUpload(env,r.key,ip,cr,now);
+ const credit=await noteUpload(env,r.key,ip,cr,now,alias);
  const uploadId=candidate?await protocol.hash({ordinary:candidate,reporter:ip}):undefined;
  await noteSeedUpload(env.DB,r,hash,ip,credit.torchNo,now,uploadId);
  /* 2026-11-21 kind: 'newVersion' = a shared diff found by head / pe / the game (not this exe) failed its first window here (the

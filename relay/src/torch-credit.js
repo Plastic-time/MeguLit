@@ -44,13 +44,13 @@ async function setNameKey(env,torchNo,name){if(name)await env.DB.prepare('INSERT
 export const creditOut=r=>r?{torchNo:r.torch_no,name:r.name??null,at:r.at|0,...(!r.name&&r.alias?{alias:r.alias}:{})}:null;
 
 /* file the upload: first time → the next number; later → the same number, the name only when mentioned */
-export async function noteUpload(env,key,reporter,credit,now){const t=sec(now);let fresh=false;
+export async function noteUpload(env,key,reporter,credit,now,libraryAlias=null){const t=sec(now);let fresh=false;
  const old=await env.DB.prepare('SELECT torch_no,name,alias,at FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();
  if(old){if(credit.present&&credit.name!==undefined)await env.DB.prepare('UPDATE torch_credits SET name=? WHERE game_key=? AND reporter_hash=?').bind(credit.name,key,reporter).run();
   if(credit.present&&credit.name!==undefined)await setNameKey(env,old.torch_no,credit.name);
   return creditOut({...old,name:credit.present&&credit.name!==undefined?credit.name:old.name});}
  for(let i=0;i<5;i++){try{/* the number is taken inside the insert; the unique index catches two uploads racing for the same one */
-  await env.DB.prepare('INSERT INTO torch_credits(game_key,reporter_hash,torch_no,name,at) VALUES(?,?,(SELECT COALESCE(MAX(torch_no),0)+1 FROM torch_credits),?,?)').bind(key,reporter,credit.name??null,t).run();fresh=true;break;}
+  await env.DB.prepare('INSERT INTO torch_credits(game_key,reporter_hash,torch_no,name,at,alias) VALUES(?,?,(SELECT COALESCE(MAX(torch_no),0)+1 FROM torch_credits),?,?,?)').bind(key,reporter,credit.name??null,t,credit.name?null:libraryAlias).run();fresh=true;break;}
   catch(e){const again=await env.DB.prepare('SELECT 1 AS x FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();if(again)break;if(i===4)throw e;}}
  const row=await env.DB.prepare('SELECT torch_no,name,alias,at FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();
  if(fresh){/* the counters follow the insert: the total and the month the number belongs to */
@@ -130,11 +130,11 @@ export async function findGet(env,url,{json,fail},ctx=null){
  if(!env.DB)return fail('NOT_CONFIGURED',503);
  const raw=String(url.searchParams.get('name')||'').replace(ZERO_WIDTH,'').replace(CONTROL,' ').slice(0,60),k=nameKey(raw);
  if(!k||[...k].length>MAX_NAME)return fail('INVALID_NAME');
- return cached('https://megulit-relay.internal/torch/find/v2/'+encodeURIComponent(k),ctx,async()=>{
+ return cached('https://megulit-relay.internal/torch/find/v3/'+encodeURIComponent(k),ctx,async()=>{
   const end=k+'￿';
   const rows=(await env.DB.prepare(
    'SELECT c.torch_no,c.name,NULL AS alias,c.at,n.name_key FROM torch_names n JOIN torch_credits c ON c.torch_no=n.torch_no WHERE n.name_key>=? AND n.name_key<? AND c.name IS NOT NULL '+
-   'UNION ALL SELECT torch_no,NULL,alias,at,alias FROM torch_credits WHERE name IS NULL AND alias>=? AND alias<? ORDER BY name_key,torch_no LIMIT 50'
+   'UNION ALL SELECT torch_no,NULL,alias,at,lower(alias) FROM torch_credits WHERE name IS NULL AND lower(alias)>=? AND lower(alias)<? ORDER BY name_key,torch_no LIMIT 50'
   ).bind(k,end,k,end).all()).results||[];
   return json({ok:true,items:rows.filter(r=>nameKey(r.name||r.alias).startsWith(k)).map(r=>({...creditOut(r),month:monthOf(r.at)}))},200,PUBLIC);});}
 

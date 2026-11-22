@@ -1403,10 +1403,9 @@ async function start(){
      }
     await api('preserve_ui',{values:recovered});
     model=await api('home');setAppearance();document.documentElement.classList.add('app-boot-pre');shell();await renderRoute();bootEntrance();
-    /* E394 show the development notice once per launch, after the home entrance. */
-    {const canShow=()=>route==='home'&&!document.querySelector('dialog[open]');
-     const notice=()=>{if(document.documentElement.classList.contains('app-boot-pre'))return setTimeout(notice,400);setTimeout(()=>{if(canShow())mountDevNotice({
-      api,locale,esc,toast,version:VERSION,canShow});},2000);};notice();}
+    // Prepare the card while the native window is still hidden, including on throttled WebViews.
+    const canShow=()=>route==='home'&&!document.querySelector('dialog[open]');
+    mountDevNotice({api,locale,esc,toast,version:VERSION,canShow});
     /* v1.1.0: look for a new release once per start; silent unless there is one */
     if(!window.__megulitUpdateChecked){window.__megulitUpdateChecked=true;/* a silent hot update just reloaded this page: one line in the corner */setTimeout(()=>{try{showHotDone();}catch{}},900);setTimeout(()=>checkForUpdates({api,invoke,version:VERSION,toast}),4000);}
     const callback=window.__TAURI_INTERNALS__?.transformCallback(response=>{playHomeMotion(response.payload);if(response.payload==='hidden'&&pendingHomeGame){const id=pendingHomeGame;

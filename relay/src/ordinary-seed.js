@@ -34,7 +34,7 @@ export async function enqueue(db, data, now) {
 }
 export const status = (db,id) => db.prepare('SELECT id,state,revision,retry_reason AS retryReason FROM ordinary_seed_jobs WHERE id=?').bind(id).first();
 
-async function scan(env, doc) {
+export async function scan(env, doc) {
   const url = URL.canParse(env.ORDINARY_SCAN_URL) ? new URL(env.ORDINARY_SCAN_URL) : null;
   if (!url || (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1','[::1]'].includes(url.hostname))) ||
       url.username || url.password || url.search || url.hash || !env.ORDINARY_SCAN_TOKEN) throw Error('scan configuration');

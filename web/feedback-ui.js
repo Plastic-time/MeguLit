@@ -122,6 +122,8 @@ export function openFeedback({ api, locale = 'zh', esc, toast, version = '' }) {
 
 /* E416 every start (once per launch), with the website's recent adaptations (megulit.com/assets/updates.json) */
 let shownThisLaunch = false;
+const launchNoticeKey = 'megulit.startupNoticeShown';
+try { shownThisLaunch = globalThis.sessionStorage?.getItem(launchNoticeKey) === '1'; } catch { /* storage disabled */ }
 /* (user 2026-11-13: the list appeared only after a while and opening the notice stuttered) the last list is kept in
    localStorage and drawn in the first frame; the service answer (its own cache, then the site) replaces it only when it differs.
    Only the first rows are built at once, the rest when the browser is idle, so opening never builds 300 rows in one go */
@@ -221,6 +223,7 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
   if(window.megulitYuiStage)requestAnimationFrame(()=>requestAnimationFrame(markVisible));
   dialog.addEventListener('close',()=>window.megulitYuiStage?.('notice-closed'),{once:true});
   shownThisLaunch = true;
+  try { globalThis.sessionStorage?.setItem(launchNoticeKey, '1'); } catch { /* in-memory guard still applies */ }
   const empty = dialog.querySelector('.startup-updates-empty'), list = dialog.querySelector('.dev-notice-updates');
   fillUpdates(dialog, locale, api).then(() => {
     if (!dialog.open) return;
