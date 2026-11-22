@@ -27,6 +27,10 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install relay test dependencies
+        working-directory: relay
+        run: npm ci --ignore-scripts --include=dev
+
       - name: JavaScript syntax
         shell: pwsh
         run: |
