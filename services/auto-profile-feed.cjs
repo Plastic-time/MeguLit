@@ -52,10 +52,20 @@ function layer(answer,key,{torchTrust,exe}={}){if(!answer||answer.schema!=='megu
   if(G&&G.diff&&GAME_MATCH.includes(G.match)&&G.diff.layer==='game'&&docOk(G.diff)){const {split}=require('../core/profiles/domains.cjs');if(!Object.keys(split(G.diff.settings).version).length){g=G.diff;gm=G.match;}}}
  if(!v&&!g&&answer.diff){const d=answer.diff;if(d.layer==='game'){if(docOk(d)){g=d;gm='title';}}else if(d.key===key&&docOk(d)){v=d;vm='exe';}}
  if(!v&&!g)return null;
- const P={version:v?{...part(v),...(answer.torchRelease?{source:'official'}:{})}:null,game:g?part(g):null};const lead=P.version||P.game;
+ let capabilityStatus;
+ if (v?.evidence?.trials) {
+  const root=cachedRoots.get(answer), shared=require('./shared-adaptation.cjs');
+  const context={originalExe:key,runtimeExe:key,script:answer.torchRelease.review.identity.script,
+   reader:root && shared.appVersion(root),stream:root && shared.streamDigest(shared.readStream(root,exe))};
+  const evidence=require('../core/seed-evidence.cjs');
+  capabilityStatus=evidence.status(v,context);
+ }
+ const P={version:v?{...part(v),...(answer.torchRelease?{source:'official'}:{})}:null,game:g?part(g):null};
+ if (capabilityStatus) P.version=require('../core/seed-evidence.cjs').applyStatus(P.version,capabilityStatus);
+ const lead=P.version||P.game;
  const merged=JSON.parse(JSON.stringify(P.game?.settings||{}));const deep=(a,b)=>{for(const [k,x] of Object.entries(b||{}))a[k]=x&&typeof x==='object'&&!Array.isArray(x)&&a[k]&&typeof a[k]==='object'?deep(a[k],x):x;return a;};deep(merged,P.version?.settings);
  const mode=(P.version&&P.version.mode==='read')||(P.game&&P.game.mode==='read')?'read':'hide';
- const result={source:lead.source,mode,match:v?vm:VERSION_MATCH.includes(gm)?gm:'game:'+gm,exact:vm==='exe'||!v&&gm==='exe',settings:merged,version:P.version,game:P.game,agree:lead.agree,reporters:lead.reporters,issuedAt:lead.issuedAt,
+ const result={...(capabilityStatus?{capabilityStatus}:{}),source:lead.source,mode,match:v?vm:VERSION_MATCH.includes(gm)?gm:'game:'+gm,exact:vm==='exe'||!v&&gm==='exe',settings:merged,version:P.version,game:P.game,agree:lead.agree,reporters:lead.reporters,issuedAt:lead.issuedAt,
   stamp:(v?v.key+'@'+(v.rev|0)+'@'+(v.issuedAt||''):'-')+'|'+(g?g.key+'@'+(g.rev|0)+'@'+(g.issuedAt||''):'-')};if(answer.torchRelease){result.torchBound=true;torchLayers.set(result,{answer,key,torchTrust,root:cachedRoots.get(answer)});}layerDocuments.set(result,{snapshot:gameDiff.canonical(result),documents:[...(v?[{document:v,slot:'version',match:vm}]:[]),...(g?[{document:g,slot:'game',match:gm}]:[])]});return result;}
 function documentsFor(value,key,exe){const current=forExe(value,key,exe),proof=current&&layerDocuments.get(current);return proof&&proof.snapshot===gameDiff.canonical(current)?proof.documents.filter(x=>docOk(x.document)):[];}
 /* a candidate (not this exe's own hash) the self-check gate refused on this PC: not applied again until the relay hands out another */

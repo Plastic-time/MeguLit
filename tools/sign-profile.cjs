@@ -40,6 +40,16 @@ async function observe(profile, observation, original, scriptFile, authorizedRun
  // A copy can have its own installation directory. Bind the container actually used there too.
  if(authorizedRuntime&&await files.fileHash(files.scriptPath(authorizedRuntime,scriptFile))!==script)throw Error('SEED_EVIDENCE_IDENTITY');
  const patch={originalExe,script,scriptFile,runtimeExe,results:observation.results??{}};
+ if(observation.scenarios !== undefined) patch.scenarios=observation.scenarios;
+ if(observation.trials !== undefined) {
+  if(!Array.isArray(observation.trials)||observation.trials.some(t=>t?.revision!==profile.rev)) throw Error('SEED_TRIAL_REVISION');
+  patch.trials=observation.trials.map(trial=>{
+   if (!Object.hasOwn(trial,'localStream')) return trial;
+   const {localStream,...record}=trial;
+   if (record.stream!==undefined) throw Error('SEED_TRIAL_STREAM');
+   return {...record,stream:require('../services/shared-adaptation.cjs').streamDigest(localStream)};
+  });
+ }
  if(observation.textBox){const {box,client,source}=observation.textBox;patch.textBox=evidence.normalizeBox(box,client,source);}
  const updated={...gameDiff.unsigned(profile),prints:{...profile.prints,exe:originalExe,script},evidence:evidence.merge(profile.evidence,patch)};
  if(!gameDiff.validate(updated).ok)throw Error('SEED_EVIDENCE_PROFILE');

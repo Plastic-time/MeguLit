@@ -32,10 +32,10 @@ function readMode(reader,reason){try{const g=reader.gal;if(g&&!g.textEffectsHold
    shared (the players' agreed diff) <- auto (this PC's calibration) <- official (the maintainer's diff) <- stepDown (this PC's
    gate step-down, always last so a game that broke here can always fall back). choose() still names the deciding one (reason,
    read mode, whether to calibrate). */
-function profileInput(s,sh){const out={...(s.input||{})};for(const k of ['sharedGame','shared','auto','officialGame','official','officialGameRev','officialRev','sharedGameRev','sharedRev','stepDown','match','prints'])delete out[k];
+function profileInput(s,sh){const out={...(s.input||{})};for(const k of ['sharedGame','shared','auto','officialGame','official','officialGameRev','officialRev','sharedGameRev','sharedRev','stepDown','match','prints','verifiedTrialRevision'])delete out[k];
  if(/^[0-9a-f]{64}$/.test(String(s.key||'')))out.exeSha256=s.key;
  /* the relay's two layers, each official or agreed (services/auto-profile-feed.cjs layer) */
- if(sh){const put=(p,field)=>{if(!p||!p.settings)return;const f=(p.source==='official'?'official':'shared')+field;out[f]=p.settings;
+ if(sh){if(sh.torchBound && sh.capabilityStatus)out.verifiedTrialRevision=sh.version?.rev;const put=(p,field)=>{if(!p||!p.settings)return;const f=(p.source==='official'?'official':'shared')+field;out[f]=p.settings;
  if(!field&&p.settings.page?.presentation&&(!sh.torchBound||sh.match!=='exe')){
   const page={...p.settings.page};delete page.presentation;out[f]={...p.settings,page};
  }out[f+'Rev']=p.rev|0;};put(sh.game,'Game');put(sh.version,'');if(sh.match)out.match=sh.match;}

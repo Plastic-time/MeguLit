@@ -98,6 +98,11 @@ function find(root,fp){if(!fp?.key)return null;const r=read(root).records[fp.key
 /* ---- game-side files ------------------------------------------------------------------------------------------ */
 /* Same key as HookBridge.MemoryFile (E244): file name with unsafe characters replaced, then the size. */
 function streamFile(root,executable,size){const name=path.win32.basename(String(executable)).replace(/[^A-Za-z0-9._-]/g,'_');return path.join(root,'data','hook-streams',name+'-'+size+'.json');}
+// Hook code and contexts identify a stream without publishing labels or process addresses.
+function streamDigest(stream) {
+ if (!stream?.code) return null;
+ return sha(JSON.stringify([String(stream.code),...['ctx','ctx2'].map(k=>String(stream[k]??'0').toLowerCase().replace(/^0x|^0+(?=.)/g,''))]));
+}
 function readStream(root,executable){try{const st=fs.statSync(executable);const v=readJSON(streamFile(root,executable,st.size));return v.code?{name:v.name,code:v.code,addr:v.addr,ctx:v.ctx,ctx2:v.ctx2}:null;}catch{return null;}}
 /* Zero-latency adapter for the game folder (data/config/original-text.json). */
 function zeroLatencyOf(root,executable){try{const dir=path.dirname(String(executable)).toLowerCase(),all=readJSON(path.join(root,'data','config','original-text.json'));
@@ -142,4 +147,4 @@ function exportFor(root,{executable,engine='',library=null,hooks=null,styleSync=
 }
 function appVersion(root){try{const v=readJSON(path.join(root,'data','update-installed.json')).version;if(v)return String(v);}catch{}try{const m=/^version\s*=\s*"([^"]+)"/m.exec(fs.readFileSync(path.join(root,'desktop','Cargo.toml'),'utf8'));if(m)return m[1];}catch{}return '';}
 
-module.exports={SCHEMA,VERSION,fingerprint,clean,build,save,find,read,enabled,importFor,exportFor,takeNotice,streamFile,readStream,zeroLatencyOf,appVersion,storeFile,safe,empty};
+module.exports={streamDigest,SCHEMA,VERSION,fingerprint,clean,build,save,find,read,enabled,importFor,exportFor,takeNotice,streamFile,readStream,zeroLatencyOf,appVersion,storeFile,safe,empty};

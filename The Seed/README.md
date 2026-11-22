@@ -55,3 +55,31 @@ The Seed/<engine>/<slug>/versions/<exeSha256>.json  版本层：layer version，
 ## English
 
 The Seed holds MeguLit's built-in game diffs: per game a `game.json` (game layer, every build) and per exe a `versions/<exe SHA-256>.json` (version layer, that build only). They ship with GitHub main, live in `MeguLit/The Seed/` of the installer and come with hot updates; fixing a game means changing its seed only. Each file is a `megulit.game-diff` document (`core/game-diff.cjs`) with fingerprints from `core/game-print.cjs`; `game.json` adds `status` (`verified` / `owner-ok` used directly, `read` read mode, `skeleton` identity and pinned values with the self-check gate deciding), `slug` (its folder), `builds`, `seedFormat` (1), `sourceLangs` (BCP 47, default `["ja"]`) and optionally `match` (readable exe names and titles) and `ext` (an extension area). Language-dependent settings live in `settings.lang.<bcp47>` (`annotation` ruby / ipa / pinyin / none, `pairing`, `dictionary`, `fontFallback`); the client takes the block of the language it reads, else the language-free settings. Unknown fields, extensions and settings keys are ignored (forward compatible); known ones are checked strictly. Pure data: no code, no paths, no user names. Built-in seeds are official without a signature; diffs downloaded at run time to `data/The Seed/` must be signed. Full interface: `docs/diff-layers.md` ("当前权威接口")
+
+### Reader compatibility and repeatable scene checks
+
+The `observe` command accepts the following optional observation fields. Scene and choice indices are zero-based. A scene can also be identified by a SHA-256 text fingerprint in `textHash`. Actions run in array order. Expectations describe what the tester checks in the game.
+
+```json
+{
+  "scenarios": [{
+    "scene": 4,
+    "choice": 1,
+    "steps": ["restore-japanese", "offline", "advance", "select-choice"],
+    "expect": ["choices-complete", "local-pair"]
+  }],
+  "trials": [{
+    "reader": "1.4.23",
+    "revision": 2,
+    "localStream": {"code": "FixtureHook", "ctx": "a", "ctx2": "0"},
+    "results": {
+      "read": {"passed": true, "source": "engine"},
+      "replace": {"passed": false, "source": "operator", "failure": "original-visible"}
+    }
+  }]
+}
+```
+
+`localStream` is a local input. Only its digest enters the signed profile. An observation must name the profile revision being tested. A later observation updates only the supplied capabilities for that reader, stream and revision. An explicit scenarios list replaces the regression checklist. Use the original Seed signing and reviewed release workflow after observation.
+
+To find a rollback target offline, run `node tools/torch-release.cjs compatible-target history.json context.json`. Supply the signed release history export and a context containing `originalExe`, `runtimeExe`, `script`, `reader`, `stream` (digest), and `capability`. The command returns the latest eligible previous release hash and profile revision, or null. Use the returned hash with the existing reviewed rollback flow. Seed receipt updates the profile cache and leaves personal settings in their original store.

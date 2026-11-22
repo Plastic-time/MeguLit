@@ -17,6 +17,17 @@ async function checkHistory(document,{keys}={}){
  if(document.winner!==previous)fail('TORCH_EXPORT_WINNER');
  return {rows,byHash};
 }
+// Resolve a target hash for the existing reviewed rollback command. Never install historical settings locally.
+async function compatibleTarget(document, context, capability, keys) {
+ const {rows}=await checkHistory(document,{keys});
+ const evidence=require('../core/seed-evidence.cjs');
+ for (const entry of rows.slice(0,-1).reverse()) {
+  const {profile,review}=entry.release;
+  if (!document.revoked.includes(review.candidateHash) && evidence.verdict(profile,context,capability)==='passed')
+   return {targetHash:entry.hash,revision:profile.rev};
+ }
+ return null;
+}
 function writeAtomic(file,value){const tmp=file+'.'+crypto.randomUUID()+'.tmp';try{fs.writeFileSync(tmp,D.canonical(value),{flag:'wx'});fs.renameSync(tmp,file);}finally{try{fs.unlinkSync(tmp);}catch{}}}
 async function exportHistory(document,seedDir,{keys}={}){
  const {rows,byHash}=await checkHistory(document,{keys});
@@ -37,5 +48,5 @@ async function checkRepositoryHistory(seedDir,{keys}={}){const home=path.join(se
  }return {games:names.length,releases};
 }
 function read(file,max=MAX_EXPORT){if(!file||fs.statSync(file).size>max)fail('TORCH_FILE_LIMIT');try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{fail('TORCH_FILE_SHAPE');}}
-if(require.main===module){const [command,input,destination]=process.argv.slice(2);(async()=>{if(command==='sign-revocation'){if(process.argv.length!==4)fail('TORCH_TOOL_USAGE');const template=revocationTemplate(read(input,4096)),tool=require('./sign-profile.cjs'),key=tool.privateKey(),id=tool.keyId();if(key.asymmetricKeyType!=='ed25519'||!id||id.length>80)fail('TORCH_REVOCATION_KEY');const publicKey=crypto.createPublicKey(key).export({format:'der',type:'spki'}).toString('base64'),document=await signRevocation(template,{keys:{releaseKeys:[{id,alg:'ed25519',publicKey}]},sign:body=>({...body,signature:{alg:'ed25519',keyId:id,value:crypto.sign(null,Buffer.from(D.canonical(body)),key).toString('base64')}})});process.stdout.write(D.canonical(document));return;}const feed=require('../services/auto-profile-feed.cjs'),keys={profileKeys:feed.keys(),releaseKeys:feed.keys(),reviewKeys:read(path.join(__dirname,'../services/torch-review-keys.json')).keys};if(command==='sign'){const tool=require('./sign-profile.cjs'),key=tool.privateKey(),id=tool.keyId();const release=await signProposal(read(input,P.MAX_BYTES),{keys,sign:proposal=>({...proposal,signature:{alg:'ed25519',keyId:id,value:crypto.sign(null,Buffer.from(D.canonical(D.unsigned(proposal))),key).toString('base64')}})});process.stdout.write(D.canonical(release));}else if(command==='export')console.log(JSON.stringify(await exportHistory(read(input),destination,{keys})));else fail('TORCH_TOOL_USAGE');})().catch(e=>{console.error(/^TORCH_[A-Z_]+$/.test(e.code||'')?e.code:'TORCH_TOOL_FAILED');process.exitCode=1;});}
-module.exports={exportHistory,checkHistory,checkRepositoryHistory,signProposal,signRevocation,revocationTemplate,MAX_EXPORT};
+if(require.main===module){const [command,input,destination]=process.argv.slice(2);(async()=>{if(command==='sign-revocation'){if(process.argv.length!==4)fail('TORCH_TOOL_USAGE');const template=revocationTemplate(read(input,4096)),tool=require('./sign-profile.cjs'),key=tool.privateKey(),id=tool.keyId();if(key.asymmetricKeyType!=='ed25519'||!id||id.length>80)fail('TORCH_REVOCATION_KEY');const publicKey=crypto.createPublicKey(key).export({format:'der',type:'spki'}).toString('base64'),document=await signRevocation(template,{keys:{releaseKeys:[{id,alg:'ed25519',publicKey}]},sign:body=>({...body,signature:{alg:'ed25519',keyId:id,value:crypto.sign(null,Buffer.from(D.canonical(body)),key).toString('base64')}})});process.stdout.write(D.canonical(document));return;}const feed=require('../services/auto-profile-feed.cjs'),keys={profileKeys:feed.keys(),releaseKeys:feed.keys(),reviewKeys:read(path.join(__dirname,'../services/torch-review-keys.json')).keys};if(command==='compatible-target'){const {capability,...context}=read(destination,4096);console.log(JSON.stringify(await compatibleTarget(read(input),context,capability,keys)));}else if(command==='sign'){const tool=require('./sign-profile.cjs'),key=tool.privateKey(),id=tool.keyId();const release=await signProposal(read(input,P.MAX_BYTES),{keys,sign:proposal=>({...proposal,signature:{alg:'ed25519',keyId:id,value:crypto.sign(null,Buffer.from(D.canonical(D.unsigned(proposal))),key).toString('base64')}})});process.stdout.write(D.canonical(release));}else if(command==='export')console.log(JSON.stringify(await exportHistory(read(input),destination,{keys})));else fail('TORCH_TOOL_USAGE');})().catch(e=>{console.error(/^TORCH_[A-Z_]+$/.test(e.code||'')?e.code:'TORCH_TOOL_FAILED');process.exitCode=1;});}
+module.exports={compatibleTarget,exportHistory,checkHistory,checkRepositoryHistory,signProposal,signRevocation,revocationTemplate,MAX_EXPORT};

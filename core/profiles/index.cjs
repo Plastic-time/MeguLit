@@ -96,7 +96,13 @@ function profileFor(input={}){input=input||{};const hit=findGame(input);const ga
  const seedVersion=/^[0-9a-f]{64}$/.test(String(input.exeSha256||''))?require('./seed.cjs').versionOf(input.exeSha256):null;
  const take=(seedDoc,field,rev)=>seedDoc&&(!plain(input[field])||!(Number(input[rev])>Number(seedDoc.rev||0)));
  const seedGame=game?.seed&&game.status!=='skeleton'?game:null;
- const slots={officialGame:take(seedGame,'officialGame','officialGameRev')?['seed-game',game.settings]:null,official:take(seedVersion,'official','officialRev')?['seed',seedVersion.settings]:null};
+ // A bundled revision has no checked runtime/script binding at this stage.
+ const evidence=require('../seed-evidence.cjs');
+ const scoped=seedVersion?.evidence?.trials;
+ const bundled=scoped ? evidence.applyStatus(seedVersion,evidence.status(seedVersion,null)) : seedVersion;
+ const useBundled=take(seedVersion,'official','officialRev') &&
+  !(scoped && input.verifiedTrialRevision===seedVersion.rev && input.officialRev===seedVersion.rev);
+ const slots={officialGame:take(seedGame,'officialGame','officialGameRev')?['seed-game',game.settings]:null,official:useBundled?['seed',bundled.settings]:null};
  for(const [field,name0] of OUTSIDE){let v=input[field],name=name0;if(slots[field]){[name,v]=slots[field];}if(!plain(v))continue;const c=clean(v);if(c.rejected.length){rejected.push(name+': '+c.rejected.slice(0,3).join(','));continue;}s=merge(s,c.value);layers.push(name);}
  const exe=/^[0-9a-f]{64}$/.test(String(input.exeSha256||''))?String(input.exeSha256):'';
  /* how the game was recognised, most exact first (docs/diff-layers.md): input.match is the relay's ('exe' | 'bin' | 'game:<basis>');

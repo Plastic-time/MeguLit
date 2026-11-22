@@ -348,3 +348,38 @@ test('signed sparse observations bind the original, authorized runtime copy and 
  fs.writeFileSync(f.script,'another script');assert.equal(await R.installed(f.root,f.identity.exe,{keys:f.keys,exe:f.exe}),null);
  await assert.rejects(observeHere(two,{results:one.evidence.results}),/SEED_EVIDENCE_IDENTITY/);
 });
+
+test('scoped regression evidence survives signing, receive, reader selection and reviewed rollback',async t=>{
+ const f=await setup(t), shared=require('../services/shared-adaptation.cjs'), {observe}=require('../tools/sign-profile.cjs');
+ const {compatibleTarget}=require('../tools/torch-release.cjs');
+ const streamRecord={code:'NeutralHook',ctx:'a',ctx2:'0'}, stream=shared.streamDigest(streamRecord);
+ const reader='1.4.23', context={reader,stream,originalExe:f.identity.exe,runtimeExe:f.identity.exe,script:f.identity.script};
+ const prefs=shared.streamFile(f.root,f.exe,fs.statSync(f.exe).size);
+ fs.mkdirSync(path.dirname(prefs),{recursive:true});fs.writeFileSync(prefs,JSON.stringify(streamRecord));
+ const versionFile=path.join(f.root,'data','update-installed.json');fs.writeFileSync(versionFile,JSON.stringify({version:reader}));
+ const scenario={scene:4,choice:1,steps:['offline','advance','select-choice'],expect:['choices-complete','local-pair']};
+ const check=(revision,passed)=>observe(f.profile(revision),{scenarios:[scenario],trials:[{reader,stream,revision,
+  results:{read:{passed:true,source:'engine'},replace:{passed,source:'operator',...(!passed?{failure:'original-visible'}:{})}}}]},f.exe,'data.xp3');
+ const before=fs.readFileSync(prefs);
+ const good=f.publisher.sign(await check(1,true)),bad=f.publisher.sign(await check(2,false));
+ await assert.rejects(observe(bad,{scenarios:[{...scenario,text:'private prose'}]},f.exe,'data.xp3'),/EVIDENCE/);
+ const first=f.publisher.sign({...f.release,profile:good,review:await f.review(good)});
+ const second=f.publisher.sign({...first,revision:2,previous:await P.hash(first),profile:bad,
+  reason:'higher-reviewed-score',review:await f.review(bad,first,{mean:.95})});
+ const publishedAt=f.publication.at;
+ const install=async release=>R.receive(f.root,'7',{...f.options,fetcher:async()=>reply({release,publication:{at:publishedAt,hash:await P.hash(release)}})});
+ const got=await install(second);
+ assert.deepEqual(got.receipt.evidence.scenarios,[scenario]);
+ assert.equal(got.receipt.capabilityStatus.replace,'failed');assert.equal(got.receipt.capabilityStatus.read,'passed');
+ const layer=()=>feed.layer(feed.cached(f.root,bad.key),bad.key,{torchTrust:f.keys,exe:f.exe});
+ assert.equal(layer().version.settings.draw.embedTranslation,false);
+ fs.writeFileSync(versionFile,JSON.stringify({version:'1.4.24'}));assert.equal(layer().capabilityStatus.read,'untested');
+ fs.writeFileSync(versionFile,JSON.stringify({version:reader}));
+ const releases=await Promise.all([first,second].map(async release=>({release,publishedAt,hash:await P.hash(release)})));
+ const history={schema:'megulit.torch-history-export',version:1,key:bad.key,releases,winner:releases[1].hash,revoked:[]};
+ const target=await compatibleTarget(history,context,'replace',f.keys);assert.equal(target.targetHash,releases[0].hash);
+ assert.equal(await compatibleTarget(history,{...context,stream:'f'.repeat(64)},'replace',f.keys),null);
+ assert.equal(await compatibleTarget({...history,revoked:[first.review.candidateHash]},context,'replace',f.keys),null);
+ const rollback=f.publisher.sign({...first,revision:3,previous:history.winner,action:'rollback',reason:'reader-regression',targetHash:target.targetHash});
+ const backed=await install(rollback);assert.equal(backed.receipt.capabilityStatus.replace,'passed');assert.deepEqual(fs.readFileSync(prefs),before);
+});
