@@ -69,18 +69,59 @@ test('bundled Seed, first public contribution and isolated submission are distin
  }
 });
 
-test('detail card shows the applied revision and surviving local settings without an installed receipt',async t=>{
+test('Chinese summary has a label for every profile domain and every string enum value',async()=>{
+ const {DOMAINS}=require('../core/profiles/domains.cjs');
+ const summary=fs.readFileSync(path.join(root,'web/profile-summary.js'),'utf8');
+ const {chineseProfileSetting:format}=await import('data:text/javascript;base64,'+Buffer.from(summary).toString('base64'));
+ for(const [key,domain] of Object.entries(DOMAINS)){
+  assert.match(format(key),/\p{Script=Han}/u,key);
+  for(const value of domain.enum||[]){
+   if(typeof value==='string')assert.match(format(key,value).split('：').at(-1),/\p{Script=Han}/u,key+' = '+value);
+  }
+ }
+ assert.equal(format('lang.zh-Hans.pairing','patch'),'简体中文译文配对方式：补丁文本配对');
+ assert.equal(format('lang.ja.dictionary','jmdict'),'日语词典：jmdict');
+ assert.equal(format('lang.ja.fontFallback',['Noto Sans JP']),'日语备用字体：1 项（「Noto Sans JP」）');
+ assert.equal(format('calibrate.textBox.client',[800,600]),'游戏窗口客户区尺寸（像素）：800 × 600');
+ assert.equal(format('draw.engineTable.stride',0),'引擎绘制参数（stride）：0');
+ assert.equal(format('library.partLabels..','序章'),'游戏根目录分部名称：序章');
+});
+
+test('detail card localizes both Chinese settings lists while preserving English and Japanese output',async t=>{
  let chromium;try{({chromium}=require(process.env.MEGULIT_PLAYWRIGHT||'H:/MeguLit-Work/pw/node_modules/playwright-core'));}catch{return t.skip('no playwright-core');}
  const browser=await chromium.launch({channel:'msedge',headless:true});t.after(()=>browser.close());
  const page=await browser.newPage();
  await page.route('http://megulit.test/**',route=>{
   const name=new URL(route.request().url()).pathname.slice(1);
-  return name==='first-player.js'||name==='seed-receipt.js'?route.fulfill({contentType:'text/javascript',body:fs.readFileSync(path.join(root,'web',name),'utf8')}):route.fulfill({contentType:'text/html',body:'<main><div id="host"></div></main>'});
+  return ['first-player.js','seed-receipt.js','profile-summary.js'].includes(name)?route.fulfill({contentType:'text/javascript',body:fs.readFileSync(path.join(root,'web',name),'utf8')}):route.fulfill({contentType:'text/html',body:'<main class="main"><div class="detail-tabs"></div><div class="detail-main"><div id="host"></div></div></main>'});
  });
- await page.goto('http://megulit.test/');
- await page.evaluate(async()=>{const {mountFirstPlayer}=await import('/first-player.js');
-  mountFirstPlayer({host:document.querySelector('#host'),id:'7',locale:'zh',esc:String,api:async()=>({state:'applied',application:{layers:[{layer:'seed',revision:4,keys:['draw.embed']}],personal:['page.presentation'],values:{'draw.embed':true,'page.presentation':'adv'}}})});
- });
- const card=page.locator('.first-player');await card.waitFor({state:'visible'});const text=await card.innerText();
- assert.match(text,/rev 4.*draw.embed = true/);assert.match(text,/保留的本机设置.*page.presentation = adv/);
+ const applied={'draw.embed':true,'draw.embedTranslation':false,'placement.lineOffsetY':0,'lang.ja.annotation':'ruby','choice.filters':['^<br>$','^0$'],'choice.pageFrames':[]};
+ const retained={'page.presentation':'adv','calibrate.hideMethod':'read','page.flowPage':null};
+ const payload={state:'applied',application:{layers:[{layer:'seed-skeleton',revision:4,keys:Object.keys(applied)}],personal:Object.keys(retained),values:{...applied,...retained}}};
+ for(const locale of ['zh','en','ja']){
+  await page.goto('http://megulit.test/');
+  await page.evaluate(async({locale,payload,escSource})=>{const {mountFirstPlayer}=await import('/first-player.js');
+   const escapeHTML=new Function('return '+escSource)();
+   mountFirstPlayer({host:document.querySelector('#host'),id:'7',locale,esc:escapeHTML,api:async action=>{
+    if(action!=='first_player')throw Error('Unexpected settings write');
+    return payload;
+   }});
+  },{locale,payload,escSource:esc.toString()});
+  const card=page.locator('.detail-main .first-player');await card.waitFor({state:'visible'});
+  const rows=await card.locator('p').allInnerTexts();
+  if(locale==='zh'){
+   assert.deepEqual(rows,[
+    '本次应用 · 内置 Seed 基础适配 · 修订版 4 · 游戏内嵌原文与注音：开启；游戏内嵌译文：关闭；原文行垂直偏移（像素）：0；日语注音方式：假名注音；选项过滤规则：2 项（「^<br>$」、「^0$」）；选项页面边框图匹配规则：0 项',
+    '保留的本机设置 · 正文排版：对话框式（ADV）；校准隐藏方式：保留原文的阅读模式；流式页面排版：默认',
+   ]);
+   assert.equal(await card.locator('br').count(),0);
+   if(process.env.MEGULIT_PROFILE_SUMMARY_SCREENSHOT)await card.screenshot({path:process.env.MEGULIT_PROFILE_SUMMARY_SCREENSHOT});
+  }else{
+   const [current,local]=locale==='en'?['Applied this session','Retained local settings']:['今回適用','保持したローカル設定'];
+   assert.deepEqual(rows,[
+    current+' · seed-skeleton rev 4 · draw.embed = true, draw.embedTranslation = false, placement.lineOffsetY = 0, lang.ja.annotation = ruby, choice.filters, choice.pageFrames',
+    local+' · page.presentation = adv, calibrate.hideMethod = read, page.flowPage',
+   ]);
+  }
+ }
 });

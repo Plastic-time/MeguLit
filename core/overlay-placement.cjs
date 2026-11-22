@@ -146,7 +146,7 @@ class OverlayPlacement {
       if (P.length && top >= bottom - 2) this.why('rows:' + l.id, 'page: ' + l.id + ' goes on the page under ' + P[P.length - 1].id + ' (no clear since, starts below its rows)');
       else { if (P.length) this.why('rows:' + l.id, 'page: ' + l.id + ' starts a new page (' + (top < bottom - 2 ? 'not below the page' : 'cleared') + ')'); P.length = 0; }
       P.push({ id: l.id, text: l.text, rects: l.rects }); if (P.length > 12) P.shift(); }
-    if (mode === true || P.length >= 2) { this.rowsPaged = true; this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: P.map(x => ({ id: x.id, text: x.text, rects: x.rects })) }); }
+    if (mode === true || P.length >= 2) { this.rowsPaged = true; this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: P.map(x => ({ id: x.id, text: x.text, rects: x.rects })) }, { engineRows: mode === true }); }
     else this.rowsUnpage();
   }
   /* auto (null): back to the line model once the page holds one line again */
@@ -155,7 +155,7 @@ class OverlayPlacement {
     return this.rowsPaged === true && require('./profiles/index.cjs').get(this.profile, 'page.engineRows', false) === true;
   }
   rowsCleared(id) { if (!this.rowPage || !this.rowPage.length) return; this.why('rowsgone:' + id, 'page: cleared by the game with ' + id + ', its ' + this.rowPage.length + ' row(s) go'); this.rowPage = [];
-    if (require('./profiles/index.cjs').get(this.profile, 'page.engineRows', null) === true) this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: [] }); else this.rowsUnpage(); }
+    if (require('./profiles/index.cjs').get(this.profile, 'page.engineRows', null) === true) this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: [] }, { engineRows: true }); else this.rowsUnpage(); }
   /* ① MeguLitFont blank mode (record spec 3): the current line's table (hook-native state.hookGlyphDots) with a cell
      origin per character. Spaces: c = client px, m<W>x<H> / t<W>x<H> = a surface of that size (scaled to the client),
      g / - = no device position (not placeable). A character the engine drew from its glyph cache has no record: it sits
@@ -360,7 +360,7 @@ class OverlayPlacement {
     const elsewhere = !m.armed && !!m.awake && o.replaced === true;
     const lines = m.awake && m.armed ? m.lines.map(l => ({ id: l.id, text: l.text, rects: l.rects.slice(0, [...l.text].length).map(r => [Math.round(r[0] * kx), Math.round(r[1] * ky), Math.round(r[2] * kx), Math.round(r[3] * ky)]) })) : [];
     const out = elsewhere ? { type: 'textPlacePage', awake: true, armed: false, elsewhere: true, lines: [], client: this.client.slice() }
-      : { type: 'textPlacePage', awake: m.awake, armed: m.armed, own: m.own, ownRects: m.ownRects, lines, client: this.client.slice() };
+      : { type: 'textPlacePage', awake: m.awake, armed: m.armed, ...(o.engineRows ? { engineRows: true } : {}), own: m.own, ownRects: m.ownRects, lines, client: this.client.slice() };
     const key = JSON.stringify(out);
     if (key === this.pageKey) return; this.pageKey = key; this.paged = true;
     for (const l of lines) this.learn(l.rects);
