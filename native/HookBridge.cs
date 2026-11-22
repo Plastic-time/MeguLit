@@ -626,7 +626,7 @@ static bool GdiProbeable(Candidate c){return c!=null&&!c.embed&&!ConversionHook(
   var S=new ThreadParam{processId=Pid,addr=0x1000,ctx=1};var T=new ThreadParam{processId=Pid,addr=0x1000,ctx=2};var W=new ThreadParam{processId=Pid,addr=0x1000,ctx=3};var R=new ThreadParam{processId=Pid,addr=0x1000,ctx=4};var Q=new ThreadParam{processId=Pid,addr=0x1000,ctx=5};
   var answers=new Dictionary<string,string>();var ttls=new Dictionary<string,uint>();uint lastTtl=0;var off=new List<string>();var calls=new List<string>();DLuna_EmbedCallback cb=_Luna_EmbedCallback;DLuna_UseEmbed ue=_Luna_UseEmbed;Action<uint> prevTtl=OnEmbedAnswerTtl;
   string was;Dictionary<string,Candidate> cands;HashSet<string> twins;Dictionary<string,int> hits;lock(Gate){was=Selected;cands=new Dictionary<string,Candidate>(Candidates);twins=new HashSet<string>(JaTwins);hits=new Dictionary<string,int>(JaTwinHits);}
-  bool conn=Connected,hidden=EngineDialogHidden,en=Enabled,rep=ReplacementEnabled,tr=TranslateMode,skip=SkipHeld,memory=MemorySaved,chinese=HookTarget.ChineseText,callback=ReplacementCallback,received=ReceivedText;
+  bool conn=Connected,hidden=EngineDialogHidden,en=Enabled,rep=ReplacementEnabled,tr=TranslateMode,skip=SkipHeld,memory=MemorySaved,chinese=HookTarget.ChineseText,callback=ReplacementCallback,received=ReceivedText;DateTime replaceAt=LastReplaceAt;
   Func<string,ThreadParam,string> ask=(text,tp)=>{OnEmbedAnswer(text,tp);lock(answers){string a;return answers.TryGetValue(tp.Key(),out a)?a:null;}};
   Func<ThreadParam,uint> ttl=tp=>{lock(answers){uint v;return ttls.TryGetValue(tp.Key(),out v)?v:uint.MaxValue;}};
   Func<bool> cover=()=>{Thread.Sleep(300);lock(Gate){return !Candidates[S.Key()].embed;}};
@@ -694,8 +694,21 @@ static bool GdiProbeable(Candidate c){return c!=null&&!c.embed&&!ConversionHook(
      bool sOff=false;for(int i=0;i<20&&!sOff;i++){lock(off)sOff=off.Contains(S.Key());if(!sOff)Thread.Sleep(25);}
      lock(Gate){if(Candidates[S.Key()].embed||!sOff)return false;}}
     finally{QueueUnsafeWork=prevQueue;}}
+   /* #696 review: FinishEmbed bound to trigger selection and generation: A->B->A while waiting does not attribute status/memory to the newer selection; unchanged selection still records */
+   reset();TranslateMode=true;lock(Gate){Candidates[S.Key()].code=game;}OnEmbedAnswer(line,S);
+   {long pid1=EmbedSerial;Select(Q.Key());Select(S.Key());
+    lock(Gate){LastReplaceAt=DateTime.MinValue;ReplacementCallback=false;ReceivedText=false;MemorySaved=false;}
+    FinishEmbed(pid1,"测试译文");
+    lock(answers){if(!answers.ContainsKey(S.Key())||answers[S.Key()]!="测试译文")return false;}
+    lock(Gate){if(LastReplaceAt!=DateTime.MinValue||ReplacementCallback||ReceivedText||MemorySaved)return false;}}
+   reset();TranslateMode=true;lock(Gate){Candidates[S.Key()].code=game;}OnEmbedAnswer(line,S);
+   {long pid2=EmbedSerial;
+    lock(Gate){LastReplaceAt=DateTime.MinValue;ReplacementCallback=false;ReceivedText=false;MemorySaved=false;}
+    FinishEmbed(pid2,"测试译文");
+    lock(answers){if(!answers.ContainsKey(S.Key())||answers[S.Key()]!="测试译文")return false;}
+    lock(Gate){if(LastReplaceAt==DateTime.MinValue||!ReplacementCallback||!ReceivedText||!MemorySaved)return false;}}
    return true;}
-  finally{Thread.Sleep(200);OnEmbedAnswerTtl=prevTtl;_Luna_EmbedCallback=cb;_Luna_UseEmbed=ue;UnsafeFileFor=null;SessionFileFor=null;MemorySaved=memory;Connected=conn;EngineDialogHidden=hidden;Enabled=en;ReplacementEnabled=rep;TranslateMode=tr;SkipHeld=skip;HookTarget.ChineseText=chinese;ReplacementCallback=callback;ReceivedText=received;
+  finally{Thread.Sleep(200);OnEmbedAnswerTtl=prevTtl;_Luna_EmbedCallback=cb;_Luna_UseEmbed=ue;UnsafeFileFor=null;SessionFileFor=null;MemorySaved=memory;Connected=conn;EngineDialogHidden=hidden;Enabled=en;ReplacementEnabled=rep;TranslateMode=tr;SkipHeld=skip;HookTarget.ChineseText=chinese;ReplacementCallback=callback;ReceivedText=received;LastReplaceAt=replaceAt;
    lock(Gate){Selected=was;Candidates.Clear();foreach(var kv in cands)Candidates[kv.Key]=kv.Value;JaTwins.Clear();foreach(var k in twins)JaTwins.Add(k);JaTwinHits.Clear();foreach(var kv in hits)JaTwinHits[kv.Key]=kv.Value;TwinCrowdSeen.Clear();UnitySiblings.Clear();LastEmbedAt=DateTime.MinValue;LastEmbedText="";LastEmbedCovered=false;BurstRun=0;foreach(var p in PendingEmbeds.Values)if(p.timer!=null)p.timer.Dispose();PendingEmbeds.Clear();}
    lock(UnsafeMemoGate)UnsafeMemo=null;try{File.Delete(file);}catch{}try{File.Delete(session);}catch{}}}
  public static bool LabelEmbedSelfTest(){return !LabelStopsEmbed(new Candidate{embed=true})&&LabelStopsEmbed(new Candidate{embed=true,gdiProbe=true})&&LabelStopsEmbed(new Candidate{embed=true,hideOnly=true})&&LabelStopsEmbed(new Candidate{embed=false})&&LabelStopsEmbed(null)&&EmbedTextPolicy.HideSpoken("たばこと")=="　　　　"&&EmbedTextPolicy.HideSpoken("屋上と")=="　　　"&&QuoteState("「やっぱり……いい女には、",false)&&QuoteState("屋上と",true)&&!QuoteState("ヒラヒラ服だわね……」",true)&&!QuoteState("　地の文。",false)&&EmbedTextPolicy.QuotedPiece("屋上と")&&!EmbedTextPolicy.QuotedPiece("■自動車（車内")&&!EmbedTextPolicy.QuotedPiece("bgm01")&&EmbedTextPolicy.Hide("たばこと")==""&&EmbedTextPolicy.Hide("ロード")=="";}
