@@ -112,6 +112,19 @@ test('intake maps all four failure steps to pending admin evidence and retries a
  }
 });
 
+test('direct upload without a probe identity durably exposes sanitized backlog Markdown',async()=>{
+ const bundle=bundleOf([{step:'timeout',detail:'private detail',title:'private name'}]);
+ const upload=randomUUID();
+ assert.equal((await uploadBundle(bundle,upload)).status,201);
+ const item=await ENV.DB.prepare("SELECT id,body FROM seed_admin_items WHERE kind='probe-backlog' AND json_extract(body,'$.step')='timeout'").first();
+ const response=await admin('/api/seed-admin/probe-backlog?item='+item.id,null,'GET');
+ assert.equal(response.status,200);
+ assert.equal(await response.text(),JSON.parse(item.body).markdown);
+ assert.match(JSON.parse(item.body).markdown,/timeout[\s\S]*probe-identity/);
+ assert.doesNotMatch(item.body,/private detail|private name/);
+ assert.equal((await (await uploadBundle(bundle,upload)).json()).duplicate,true);
+});
+
 test('signed GitHub events persist a skeleton or one Markdown record before closing and retry failed closure',async t=>{
  const originalFetch=ENV.fetch;
  t.after(()=>{ENV.fetch=originalFetch;delete ENV.ADAPTER_PROBE_WEBHOOK_SECRET;delete ENV.ADAPTER_PROBE_ISSUE_AUTHOR;});

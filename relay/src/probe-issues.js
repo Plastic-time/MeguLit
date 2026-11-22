@@ -149,10 +149,18 @@ export async function probeIssueWebhook(request, env, now, {json, fail}) {
 export async function probeIssueMarkdown(request, env, url, {fail}) {
   if (!seedAdminAuthorized(request, env)) return fail('UNAUTHORIZED', 401);
   if (request.method !== 'GET') return fail('METHOD_NOT_ALLOWED', 405);
+  const headers = {'content-type':'text/markdown; charset=utf-8','cache-control':'no-store'};
+  if (url.searchParams.has('item')) {
+    const id = url.searchParams.get('item');
+    if (!/^[a-f0-9]{64}$/.test(id)) return fail('INVALID_ITEM',400);
+    const draft = await env.DB.prepare(`SELECT json_extract(body,'$.markdown') AS markdown
+      FROM seed_admin_items WHERE id=? AND kind='probe-backlog' AND state<>'deleted'`).bind(id).first();
+    return draft?.markdown ? new Response(draft.markdown,{headers}) : fail('NOT_FOUND',404);
+  }
   const number = Number(url.searchParams.get('issue'));
   if (!Number.isSafeInteger(number) || number < 1) return fail('INVALID_ISSUE', 400);
   const row = await env.DB.prepare('SELECT markdown FROM probe_issue_disposition WHERE repo=? AND issue=?')
     .bind(repoOf(env), number).first();
   if (!row?.markdown) return fail('NOT_FOUND', 404);
-  return new Response(row.markdown, {headers: {'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-store'}});
+  return new Response(row.markdown, {headers});
 }

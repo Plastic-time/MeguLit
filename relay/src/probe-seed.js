@@ -55,6 +55,11 @@ export async function probeDraft(game, app, digest, index) {
   const kind = identity ? 'probe-skeleton' : 'probe-backlog';
   // The namespace is separate from the game/EXE keys used for Cardinal and publication.
   const key = await itemId({kind, layer: 'game', key: identity || digest + ':' + index});
+  if (!identity) {
+    body.markdown = ['# Adapter probe awaiting evidence','',
+      '- Review item: ' + key, '- Probe stage: ' + step, '- Missing: ' + missing.join(', '),
+      '- Retry: submit a new desensitized probe from the same build with its probe identity',''].join('\n');
+  }
   return {id: key, kind, engine: engine || '', body: JSON.stringify(body)};
 }
 

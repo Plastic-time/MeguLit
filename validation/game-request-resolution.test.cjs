@@ -56,6 +56,10 @@ test('website and desktop game requests close only against four durable exact ev
  assert.equal((await (await trigger(active)).json()).gameRequest,'open');
  await register(generating.toUpperCase(),'generating',randomUUID());
  assert.equal(active.state,'closed','durable generation registration wakes prior matching request');
+ const query='/api/seed-admin/game-request-evidence?selector='+encodeURIComponent(generating);
+ const liveEvidence=await (await request(query,undefined,{authorization:'Bearer test-admin'})).json();
+ assert.equal(liveEvidence.kind,'generating');
+ assert.equal((await request(query)).status,401);
 
  const profile=f.profile(),review=await f.review(profile);
  const proposed=await torch.propose(db,{profile,review},env,now);
