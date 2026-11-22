@@ -158,7 +158,7 @@ function libraryAlias(root){
   return names.length?names[crypto.randomInt(names.length)]:null;
  }catch{return null;}finally{db?.close();}
 }
-function cleanCredit(c){if(!c||typeof c!=='object')return null;const no=c.torchNo;if(typeof no!=='number'&&(typeof no!=='string'||!/^\d+$/.test(no)))return null;const n=Number(no);if(!Number.isSafeInteger(n)||n<0)return null;const at=typeof c.at==='string'||Number.isFinite(c.at)?c.at:'',name=cleanName(c.name);return {torchNo:n,name,at,...(!name?{alias:displayAlias(cleanName(c.alias),n)}:{})};}
+function cleanCredit(c){if(!c||typeof c!=='object')return null;const no=c.torchNo;if(typeof no!=='number'&&(typeof no!=='string'||!/^\d+$/.test(no)))return null;const n=Number(no);if(!Number.isSafeInteger(n)||n<0)return null;const at=typeof c.at==='string'||Number.isFinite(c.at)?c.at:'',name=cleanName(c.name);return {torchNo:n,name,at,...(typeof c.engraved==='boolean'?{engraved:c.engraved}:{}),...(!name?{alias:displayAlias(cleanName(c.alias),n)}:{})};}
 /* this PC's credit of the diff it sent: the relay's last answer, or the local one still waiting for the relay */
 function creditOf(root,key){const m=readSent(root,key);if(!m)return null;const c=cleanCredit(m.credit)||cleanCredit(m);
  if(m.localName!==undefined){const local=c?cleanCredit({...c,name:m.localName}):{torchNo:0,name:cleanName(m.localName),at:m.at||''};return {...local,synced:false};}return c?{...c,synced:true}:{torchNo:0,name:null,at:m.at||'',synced:true};}
@@ -166,7 +166,7 @@ function creditOf(root,key){const m=readSent(root,key);if(!m)return null;const c
    An old relay (no such route: 404 / 405) or no network keeps the name here (state 'local') and tries again at the next ask. */
 async function setCredit(root,key,name,{fetcher=globalThis.fetch}={}){if(!gameDiff.KEY.test(String(key||''))||!sent(root,key))return {state:'failed',credit:null};const want=cleanName(name);
  if(!fetcher)return keepLocal(root,key,want);let refused=false;
- for(const url of endpoints(root,'/api/game-profile/credit')){try{const r=await fetcher(url,{method:'PUT',headers:{'content-type':'application/json','user-agent':'MeguLit'},body:JSON.stringify({key,name:want}),signal:AbortSignal.timeout(TIMEOUT)});
+ for(const url of endpoints(root,'/api/game-profile/credit')){try{const r=await require('./account.cjs').torchRequest(root,url,{method:'PUT',headers:{'content-type':'application/json','user-agent':'MeguLit'},body:JSON.stringify({key,name:want}),signal:AbortSignal.timeout(TIMEOUT)},fetcher);
    if(r.ok){let j=null;try{j=await r.json();}catch{}const c=cleanCredit(j&&(j.credit||j))||cleanCredit({...(readSent(root,key)?.credit||{}),name:want});
     const old=readSent(root,key)||{};delete old.localName;writeSent(root,key,{...old,key,credit:c||{...(old.credit||{}),name:want}});return {state:'saved',credit:creditOf(root,key)};}
    if(r.status>=400&&r.status<500&&r.status!==404&&r.status!==405&&r.status!==429)refused=true;}catch{}}
@@ -185,7 +185,7 @@ async function report(root,record,{fetcher=globalThis.fetch,prints=null,credit:c
  const sharedPrints=isolated?(pr?.script?{script:pr.script}:null):pr;
  const alias=!isolated&&!credit&&!sent(root,block.key)?libraryAlias(root):null;
  const body=JSON.stringify({version:1,profile,...(candidate?{ordinary:candidate}:{}),...(!isolated&&credit?{credit:{name:credit}}:{}),...(alias?{libraryAlias:alias}:{}),...(sharedPrints&&Object.keys(sharedPrints).length?{prints:sharedPrints}:{})});
- for(const url of reportEndpoints(root,'/api/game-profile/report')){try{const r=await fetcher(url,{method:'POST',redirect:'error',credentials:'omit',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok){let j=null;try{j=await r.clone().json();}catch{}const c=cleanCredit(j&&(j.credit||j));markSent(root,block.key,c);if(gameDiff.KEY.test(j?.ordinary?.id||''))writeSent(root,block.key,{...readSent(root,block.key),ordinary:{id:j.ordinary.id,state:j.ordinary.state}});return {state:'sent',...(c?{credit:c}:{})};}if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
+ for(const url of reportEndpoints(root,'/api/game-profile/report')){try{const r=await require('./account.cjs').torchRequest(root,url,{method:'POST',redirect:'error',credentials:'omit',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)},fetcher);if(r.ok){let j=null;try{j=await r.clone().json();}catch{}const c=cleanCredit(j&&(j.credit||j));markSent(root,block.key,c);if(gameDiff.KEY.test(j?.ordinary?.id||''))writeSent(root,block.key,{...readSent(root,block.key),ordinary:{id:j.ordinary.id,state:j.ordinary.state}});return {state:'sent',...(c?{credit:c}:{})};}if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
  return {state:'failed'};}
 /* 2026-11-21 Cardinal (services/cardinal.cjs): POST /api/cardinal/score, the body is the record as core/cardinal/score.cjs record made it
    (schema megulit.cardinal-score, relay/src/cardinal.js checks every field): the exe hash, the seed revision, the app version and

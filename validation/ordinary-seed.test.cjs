@@ -40,7 +40,6 @@ async function setup(t,{live=false}={}) {
   const gateway='http://127.0.0.1:'+await listener(t,server(config))+'/scan';
   const f=fixture(),env={...f.env,ORDINARY_SCAN_URL:gateway,ORDINARY_PUBLIC_KEYS:JSON.stringify([publicKey]),ORDINARY_SCAN_TOKEN:config.ORDINARY_SCAN_TOKEN};
   const db=database();
-  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0026_torch_scale.sql'),'utf8'));
   db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0031_torch_changes.sql'),'utf8'));
   db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0033_ordinary_seeds.sql'),'utf8'));
   db.raw.exec('CREATE TABLE rate_limits(bucket TEXT PRIMARY KEY,count INTEGER,reset_at INTEGER)');
@@ -112,7 +111,7 @@ test('player upload, scanner retry, quarantine, signature, offline install and s
     assert.doesNotMatch(init.body,/private library title|v7771|v19073|"v4"/);
     return fetcher(url,init);
   }});
-  assert.equal(posted.state,'sent');assert.equal(posted.credit.alias,'岡崎朋也');
+  assert.equal(posted.state,'sent');assert.equal(posted.credit.engraved,false);assert.equal(posted.credit.alias,null);
   const [{id}]=(await store.prepare('SELECT id FROM ordinary_seed_jobs').all()).results;
   await find(id,'pending');assert.equal((await request('/api/game-profile?exe='+key)).status,404);
   config.CLAMD_PORT=realPort;

@@ -583,7 +583,7 @@ async function dispatch(request,runtime=null) {
       /* E377 opt-in leaderboard (services/leaderboard.cjs) */
       case 'profile_chip':return require('./leaderboard.cjs').chip(root);
       /* 2026-11-21 传火碑 (services/torch-monument.cjs, web/torch-monument.js) */
-      case 'torch_page':return await require('./torch-monument.cjs').page(root,{month:String(request.month||''),cursor:String(request.cursor||''),limit:Number(request.limit)||300});
+      case 'torch_page':return await require('./torch-monument.cjs').page(root,{month:String(request.month||''),cursor:String(request.cursor??''),before:String(request.before??''),limit:Number(request.limit)||300});
       case 'torch_months':return await require('./torch-monument.cjs').months(root);
       case 'torch_find':return await require('./torch-monument.cjs').find(root,String(request.name||''));
       case 'torch_me':return await require('./torch-monument.cjs').me(root);

@@ -30,16 +30,16 @@ import {createTorchWalk,keepTorchCameraAboveFloor} from './torch-controls.js';
 /* Legacy number queries still jump to the original internal ID. */
 const cnParse=q=>{const D="零壹贰叁肆伍陆柒捌玖",U={"拾":10,"佰":100,"仟":1000},B={"万":1e4,"亿":1e8};if(!/^[零壹贰叁肆伍陆柒捌玖拾佰仟万亿]+$/.test(q))return null;let total=0,sec=0,d=0;for(const c of q){const v=D.indexOf(c);if(v>=0){d=v;continue;}if(U[c]){sec+=(d||1)*U[c];d=0;continue;}if(B[c]){total=(total+sec+d)*B[c];sec=0;d=0;}}return total+sec+d;};
 const COPY={
- zh:{title:'传火碑',sub:'分享过校准结果的玩家，名字都刻在这里',count:n=>'已刻 '+n+' 人',monthCount:(m,n)=>m+' · '+n+' 人',range:(a,b)=>'第 '+a+'–'+b+' 位',all:'全部',
-  anon:'匿名',empty:'还没有人刻下名字',find:'找名字',findGo:'查找',me:'我的名字',meNone:'这台电脑还没有传过火',quality:{high:'画质 标准',low:'画质 省电'},
+ zh:{title:'传火碑',sub:'这里记录玩家为各部作品分享的校准',count:n=>'已刻名 '+n+' 处',monthCount:(m,n)=>m+' · '+n+' 处',range:(a,b)=>'第 '+a+'–'+b+' 位',all:'全部',
+  anon:'匿名',empty:'还没有人刻下名字',find:'找名字',findGo:'查找',me:'我的名字',meNone:'还没有查到这个账号的刻名',quality:{high:'画质 标准',low:'画质 省电'},
   prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',notDeployed:'服务器尚未开放这个名单功能',loading:'正在读取…',preparing:'正在准备殿堂…',more:'只显示前 50 个',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')},
- en:{title:'Monument',sub:'Everyone who shared a calibration is carved here',count:n=>n+' names',monthCount:(m,n)=>m+' · '+n,range:(a,b)=>'#'+a+'–'+b,all:'All',
-  anon:'Anonymous',empty:'No names carved yet',find:'Find a name',findGo:'Find',me:'My name',meNone:'This PC has not shared yet',quality:{high:'Quality: full',low:'Quality: light'},
+ en:{title:'Monument',sub:'Calibrations shared by contributors for each game',count:n=>n+' names',monthCount:(m,n)=>m+' · '+n,range:(a,b)=>'#'+a+'–'+b,all:'All',
+  anon:'Anonymous',empty:'No names carved yet',find:'Find a name',findGo:'Find',me:'My name',meNone:'No inscriptions found for this account',quality:{high:'Quality: full',low:'Quality: light'},
   prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',notDeployed:'This list feature is not available on the server yet.',loading:'Loading…',preparing:'Preparing the hall…',more:'First 50 only',
   ym:m=>m},
- ja:{title:'継火の碑',sub:'キャリブレーションを共有した人の名前が刻まれています',count:n=>n+' 名',monthCount:(m,n)=>m+' · '+n+' 名',range:(a,b)=>a+'–'+b+' 番目',all:'すべて',
-  anon:'匿名',empty:'まだ誰の名前も刻まれていません',find:'名前を探す',findGo:'探す',me:'自分の名前',meNone:'この PC からはまだ共有していません',quality:{high:'画質 標準',low:'画質 軽量'},
+ ja:{title:'継火の碑',sub:'作品ごとにキャリブレーションを共有した記録です',count:n=>n+' 件',monthCount:(m,n)=>m+' · '+n+' 件',range:(a,b)=>a+'–'+b+' 番目',all:'すべて',
+  anon:'匿名',empty:'まだ誰の名前も刻まれていません',find:'名前を探す',findGo:'探す',me:'自分の名前',meNone:'このアカウントの刻名は見つかりませんでした',quality:{high:'画質 標準',low:'画質 軽量'},
   prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',notDeployed:'名簿機能はサーバーでまだ公開されていません',loading:'読み込み中…',preparing:'聖堂を準備しています…',more:'最初の 50 件のみ',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')}};
 const QUALITY_KEY='megulit-torch-quality';
@@ -103,7 +103,7 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
   state.loading=false;
   if(!r||!r.ok){state.pageError=r?.error==='NOT_DEPLOYED'?t.notDeployed:t.offline;state.items=[];state.next=null;state.total=0;updateStatus();redraw();return false;}
   state.pageError='';updateStatus();state.month=r.month||month||'';state.items=r.items||[];state.next=r.next;state.total=r.total|0;state.off=0;
-  state.atStart=!cursor||cursor==='0'||!state.items.length;return true;}
+  state.atStart=!cursor||!state.items.length;return true;}
  async function ahead(valid){if(!valid()||state.loading||!state.next||state.off+state.fit+60<state.items.length)return;
   const request=++pageRequest;state.loading=true;
   const r=await call('torch_page',{month:state.month,cursor:state.next,limit:PAGE});if(!valid()||request!==pageRequest)return;
@@ -112,11 +112,11 @@ function createMonument({api,locale,esc=s=>String(s??''),toast=()=>{}}){
   if(state.items.length>KEEP&&state.off>PAGE){state.items.splice(0,PAGE);state.off-=PAGE;state.atStart=false;}}
  async function behind(valid){if(state.loading||state.atStart||!state.items.length)return 0;const first=state.items[0].torchNo;if(first<=0){state.atStart=true;return 0;}
   const request=++pageRequest;state.loading=true;
-  const r=await call('torch_page',{month:state.month,cursor:first-1-PAGE>0?String(first-1-PAGE):'',limit:PAGE});
+  const r=await call('torch_page',{month:state.month,before:String(first),limit:PAGE});
   if(!valid()||request!==pageRequest)return 0;
   state.loading=false;if(!r?.ok)return 0;
   const add=(r.items||[]).filter(i=>i.torchNo<first);if(!add.length){state.atStart=true;return 0;}state.items.unshift(...add);state.off+=add.length;
-  if(first-1-PAGE<=0)state.atStart=true;
+  if(r.hasPrevious===false)state.atStart=true;
   if(state.items.length>KEEP){const cut=state.items.length-KEEP;state.items.splice(KEEP,cut);state.next=String(state.items[state.items.length-1].torchNo);}
   return add.length;}
  async function jumpTo(item){if(!item||!mounted||state.loading)return;

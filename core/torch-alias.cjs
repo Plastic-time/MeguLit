@@ -12,9 +12,9 @@ const OLD_POOL=Object.freeze([
 
 const POOL=Object.freeze(['桐ヶ谷和人', 'ダクネス', 'Asuna', 'バニル', '結城明日奈', 'クレア', 'Kirito', 'ゆんゆん', '朝田詩乃', '御剣響夜', 'Sinon', 'アクア', '桐ヶ谷直葉', 'ルナ', '綾野珪子', 'レイン', 'Leafa', 'アイリス', '篠崎里香', 'ウィズ', 'Silica', 'クリス', 'Lisbeth', '佐藤和真']);
 
-function displayAlias(value, number){
+function displayAlias(value){
  const slot=OLD_POOL.indexOf(value);
- return slot>=0?POOL[slot]:value||fallbackAlias(number);
+ return slot>=0?POOL[slot]:value||null;
 }
 
 // The numbered receipts from older relays use the same assignment as the backfill.

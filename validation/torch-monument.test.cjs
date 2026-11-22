@@ -17,10 +17,10 @@ test('a route the relay does not have yet answers available:false',async()=>{con
 test('the find probe: 400 INVALID_NAME means the route exists',async()=>{const fetch=async()=>res(400,{ok:false,error:'INVALID_NAME'});
  assert.deepEqual(await tm.find(root(),'',{fetch}),{ok:true,available:true,items:[]});});
 test('names are cut to 30 characters',()=>{assert.equal([...tm.cleanItem({torchNo:3,name:'あ'.repeat(40),at:1}).name].length,30);});
-test('me merges the credits this PC keeps with what the relay knows',async()=>{const r0=root(),dir=path.join(r0,'data','The Seed');fs.mkdirSync(dir,{recursive:true});
- fs.writeFileSync(path.join(dir,'0123456789abcdef.sent.json'),JSON.stringify({credit:{torchNo:7,name:'本机',at:1763700000}}));
- const fetch=async()=>res(200,{ok:true,items:[{torchNo:9,name:null,at:1763800000,game:'X'}]});
- const r=await tm.me(r0,{fetch});assert.deepEqual(r.items.map(i=>i.torchNo),[7,9]);assert.equal(r.items[0].name,'本机');});
+test('me displays only confirmed inscriptions for the active session',async()=>{const r0=root(),dir=path.join(r0,'data','The Seed');fs.mkdirSync(dir,{recursive:true});
+ fs.writeFileSync(path.join(dir,'0123456789abcdef.sent.json'),JSON.stringify({credit:{torchNo:7,name:'本机',at:1763700000,engraved:true}}));
+ const fetch=async()=>res(200,{ok:true,rosterVersion:2,items:[{torchNo:9,name:null,at:1763800000,game:'X'}]});
+ const r=await tm.me(r0,{fetch});assert.deepEqual(r.items.map(i=>i.torchNo),[9]);assert.deepEqual((await tm.me(r0,{fetch:async()=>res(200,{ok:true,items:[{torchNo:1}]})})).items,[]);});
 
 test('owner launcher can only read the fixed public routes and keeps /me local',async()=>{
  const install=path.resolve('isolated-monument-fixture');
@@ -61,5 +61,24 @@ test('explicit offline and replay perform no public reads',async()=>{
   assert.equal((await tm.find(install,'',opts)).error,'OFFLINE');
   await tm.me(install,opts);
   assert.equal(calls,0);
+ }
+});
+
+test('authenticated desktop reports bind the session only to official Seed endpoints and accept token rotation',async t=>{
+ const {Account,torchRequest}=require('../services/account.cjs'),relay=require('../services/relay-config.cjs'),install=root();
+ const first='mgl_'+'a'.repeat(43),next='mgl_'+'b'.repeat(43);
+ let active=first;
+ t.mock.method(Account.prototype,'base',()=>relay.DEFAULT_RELAY_BASE);
+ t.mock.method(Account.prototype,'token',()=>active);
+ t.mock.method(Account.prototype,'setToken',v=>{active=v;});
+ for(const base of [relay.DEFAULT_RELAY_BASE,relay.CN_RELAY_BASE]){
+  await torchRequest(install,base+'/api/game-profile/report',{method:'POST'},async(url,init)=>{
+   assert.equal(init.headers.authorization,'Bearer '+active);assert.equal(init.redirect,'error');assert.equal(init.credentials,'omit');
+   return new Response('{}',{headers:{'x-megulit-token':next}});
+  });
+  assert.equal(active,next);
+ }
+ for(const url of ['https://third.invalid/api/torch/me',relay.DEFAULT_RELAY_BASE+'/dashboard']){
+  await torchRequest(install,url,{method:'GET'},async(_,init)=>{assert.equal(init.headers?.authorization,undefined);return new Response('{}');});
  }
 });

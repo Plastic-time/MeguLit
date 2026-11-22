@@ -34,6 +34,7 @@ import {torchReleaseRoute} from './torch-release.js';
 import {seedMalwareRoute} from './seed-malware.js';
 import {seedAdminRoute,seedUsageRoute} from './seed-admin.js';
 import {retryJobs} from './ordinary-seed.js';
+import {rosterOwner} from './torch-roster.js';
 import {monumentGet,monthsGet,findGet,meGet} from './torch-credit.js';
 
 /* requests per window; key prefix → [limit, seconds] */
@@ -319,7 +320,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
   else if(path==='/api/probe/stats'&&request.method==='GET')response=await probeStats(env,now,{json,fail},ctx);
   else if(path==='/api/torch/months')response=request.method==='GET'?await monthsGet(env,url,{json,fail},ctx):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/torch/find')response=request.method==='GET'?await findGet(env,url,{json,fail},ctx):fail('METHOD_NOT_ALLOWED',405);
-  else if(path==='/api/torch/me')response=request.method==='GET'?await meGet(env,url,ip,{json,fail},/^[0-9a-f]{64}$/):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/torch/me')response=request.method==='GET'?await meGet(env,url,await rosterOwner(request,env,now),{json,fail},/^[0-9a-f]{64}$/):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/torch/monument')response=request.method==='GET'?await monumentGet(env,url,{json,fail},ctx):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/torch-release/events'&&request.method==='GET')return notifier(env).fetch(request);
   else if(path==='/api/torch-release'||path.startsWith('/api/torch-release/'))response=await torchReleaseRoute(request,env,now,url,path,{json,fail})||fail('NOT_FOUND',404);

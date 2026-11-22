@@ -44,8 +44,9 @@ import {boundedJSON, enqueue, processJob, status as ordinaryStatus} from './ordi
 import protocol from '../../core/torch-release.cjs';
 import domains from '../../core/profiles/domains.cjs';
 import gamePrint from '../../core/game-print-schema.cjs';
-import {parseCredit,noteUpload,creditOfDiff,creditPut} from './torch-credit.js';
+import {parseCredit,noteUpload,creditOfDiff,creditPut,creditOut} from './torch-credit.js';
 import torchAliases from '../../core/torch-alias.cjs';
+import {carvingFor,engrave,rosterOwner} from './torch-roster.js';
 import {cleanForProfile} from './seed-malware.js';
 import {reportAllowed,noteSeedUpload,blockedProfile,profileBlock,retestOrder} from './seed-admin.js';
 const {canonical,validate,build,unsigned,KEY}=gameDiff;
@@ -144,14 +145,17 @@ async function report(request,env,ip,now,{json,fail,ctx}){
  if(candidate&&variant)candidate={...candidate,prints:{script:variant}};
  const hash=(await sha256(r.mode+'|'+canonical(r.settings)+(variant?'|'+variant:''))).slice(0,32);
  if(!await reportAllowed(env.DB,r.key,hash))return fail('SEED_DELETED',410);
+ const owner=await rosterOwner(request,env,now);
+ if(request.headers.has('authorization')&&!owner)return fail('UNAUTHORIZED',401);
  const gid=variant?await sha256('game|script:'+variant):await gidFor(env,r.prints);
  await env.DB.prepare('INSERT INTO auto_profile_reports(game_key,reporter,gid,prints,settings_hash,settings,mode,source,cost,metrics,engine,exe,app,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(game_key,reporter) DO UPDATE SET gid=excluded.gid,prints=excluded.prints,settings_hash=excluded.settings_hash,settings=excluded.settings,mode=excluded.mode,source=excluded.source,cost=excluded.cost,metrics=excluded.metrics,engine=excluded.engine,exe=excluded.exe,app=excluded.app,updated_at=excluded.updated_at')
   .bind(r.key,variant?await sha256(ip+'|'+variant):ip,gid,JSON.stringify(r.prints),hash,canonical(r.settings),r.mode,r.source,r.cost,JSON.stringify(r.metrics),r.engine,r.exe,r.app,t).run();
  await env.DB.prepare('DELETE FROM auto_profile_reports WHERE game_key=? AND reporter NOT IN (SELECT reporter FROM auto_profile_reports WHERE game_key=? ORDER BY updated_at DESC LIMIT ?)').bind(r.key,r.key,PROFILE_LIMITS.reportsPerKey).run();
  await register(env,'version',r.key,r.prints,['head','pe'],t);if(gid)await register(env,'game',gid,r.prints,['exe',...GAME_KINDS],t);
- const credit=await noteUpload(env,r.key,ip,cr,now,alias);
- const uploadId=candidate?await protocol.hash({ordinary:candidate,reporter:ip}):undefined;
- await noteSeedUpload(env.DB,r,hash,ip,credit.torchNo,now,uploadId);
+ const reporter=owner||ip;
+ const raw=await noteUpload(env,r.key,reporter,cr,now);
+ const uploadId=candidate?await protocol.hash({ordinary:candidate,reporter}):undefined;
+ await noteSeedUpload(env.DB,r,hash,reporter,raw.torchNo,now,uploadId);
  /* 2026-11-21 kind: 'newVersion' = a shared diff found by head / pe / the game (not this exe) failed its first window here (the
     client's reason starts 「同游戏新版本」): this build needs its own version layer; 'broken' = the self-check stepped it down */
  if(r.source==='gate'){const kind=r.reason.startsWith('同游戏新版本')?'newVersion':'broken';await env.DB.prepare("INSERT INTO auto_profile_queue(game_key,gid,prints,exe,engine,reasons,note,kind,reporters,app,first_at,last_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?) ON CONFLICT(game_key) DO UPDATE SET gid=excluded.gid,prints=excluded.prints,exe=excluded.exe,engine=excluded.engine,reasons=excluded.reasons,note=excluded.note,kind=excluded.kind,reporters=auto_profile_queue.reporters+1,app=excluded.app,last_at=excluded.last_at,closed_at=NULL")
@@ -159,6 +163,11 @@ async function report(request,env,ip,now,{json,fail,ctx}){
  await settle(env,'version',r.key,now);if(gid)await settle(env,'game',gid,now);
  let job=null;
  if(candidate){job=await enqueue(env.DB,candidate,now);if(job.state==='pending'&&env.ORDINARY_SCAN_URL&&ctx?.waitUntil)ctx.waitUntil(processJob(env,job.id,now));}
+ if(owner&&r.source!=='gate'&&(candidate||Object.keys(body.value.profile.settings||{}).length&&ordinary.normalize({key:r.key,mode:r.mode,settings:body.value.profile.settings}))){
+  await engrave(env.DB,{owner,key:r.key,no:raw.torchNo,time:t,credit:cr,preferred:alias,declaredWork:r.prints.vndb});
+ }
+ const shown=owner&&creditOut(await carvingFor(env.DB,raw.torchNo));
+ const credit=shown?{...shown,engraved:true}:{torchNo:raw.torchNo,name:cr.name??null,at:raw.at,engraved:false};
  return json({ok:true,...(job?{ordinary:job}:{}),queued:r.source==='gate',game:gid||null,torchNo:credit.torchNo,name:credit.name,at:credit.at,credit},201);}
 async function lookup(env,url,exeFromPath,{json,fail}){const q=Object.fromEntries(['exe','head','pe','pack','script','steam','vndb','title'].map(k=>[k,url.searchParams.get(k)||'']));if(exeFromPath)q.exe=exeFromPath;
  const prints=gamePrint.check(q);if(!Object.keys(prints).length)return fail('NO_PRINTS',400);

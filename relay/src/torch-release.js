@@ -54,7 +54,7 @@ export async function publish(db,release,env,now=new Date()){
 export async function lookup(db,key,env){if(!gameDiff.KEY.test(key||''))return null;const r=await row(db,key);if(!r)return null;const release=await checkedRow(r,env);const withdrawal=await db.prepare('SELECT body FROM torch_release_revocations WHERE profile_hash=?').bind(release.review.candidateHash).first();
  if(withdrawal)throw Object.assign(new Error('TORCH_REVOKED'),{code:'TORCH_REVOKED',withdrawal:{release,revocation:JSON.parse(withdrawal.body)}});
  if(await blockedProfile(db,release.profile))reject('TORCH_REVOKED');
- const n=release.review.torchNo,c=await db.prepare('SELECT name,alias FROM torch_credits WHERE torch_no=? AND game_key=?').bind(n,key).first(),cleaned=c?cleanName(c.name,env):null;
+ const n=release.review.torchNo,c=await db.prepare('SELECT c.name,c.alias FROM torch_credits r JOIN torch_roster_links l ON l.torch_no=r.torch_no JOIN torch_carvings c ON c.torch_no=l.carving_no WHERE r.torch_no=? AND r.game_key=? AND c.name_key IS NOT NULL').bind(n,key).first(),cleaned=c?cleanName(c.name,env):null;
  const name=cleaned?.ok?cleaned.name:null;
  return {release,publication:{hash:r.hash,at:r.published_at},credit:{torchNo:n,name,...(!name&&c?.alias?{alias:c.alias}:{})}};
 }
