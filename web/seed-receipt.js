@@ -28,6 +28,11 @@ const LOOKUP_COPY={
  ja:{missing:'このバージョンで受け取れる公開済みの適応はありません',unavailable:'伝火サービスに問い合わせできませんでした。後でもう一度確認します'},
  en:{missing:'No published adaptation is available for this version',unavailable:'The relay could not be reached. It will be checked again later'}
 };
+const SECURITY_COPY={
+ zh:{TORCH_SIGNATURE:'公开适配的签名验证失败',TORCH_REVOKED:'此版本的公开适配已撤销',TORCH_RELEASE_CONFLICT:'传火服务返回了冲突的发布记录'},
+ ja:{TORCH_SIGNATURE:'公開適応の署名を検証できませんでした',TORCH_REVOKED:'このバージョンの公開適応は取り消されました',TORCH_RELEASE_CONFLICT:'伝火サービスから矛盾する公開記録が返されました'},
+ en:{TORCH_SIGNATURE:'The public adaptation failed signature verification',TORCH_REVOKED:'The public adaptation for this version was revoked',TORCH_RELEASE_CONFLICT:'The relay returned conflicting publication records'}
+};
 const ORIGIN_COPY={
  zh:{seed:'此版本已有内置 The Seed 适配',public:'已验证的公开传火发布',legacy:'已验证的旧版共享适配',eligible:'此版本可作为首个公开传火贡献，发布需经审核',isolated:'隔离测试模式已禁用提交',bundled:'内置适配已提供设置，普通游玩不会触发首次自动校准',unknown:'公开传火状态尚未确认'},
  ja:{seed:'このバージョンには組み込みの The Seed 適応があります',public:'検証済みの公開リリース',legacy:'検証済みの旧形式の共有適応',eligible:'このバージョンで最初の公開貢献の候補になれます。公開には審査が必要です',isolated:'分離テストモードでは送信できません',bundled:'組み込みの適応があるため、通常のプレイでは初回の自動調整は行われません',unknown:'公開状況はまだ確認できていません'},
@@ -36,7 +41,9 @@ const ORIGIN_COPY={
 export function receiptView(dto,{locale='zh',esc,torch=n=>'#'+n}={}){const w=COPY[locale]||COPY.zh,r=installedReceipt(dto),state=dto?.state;
  const lookup=LOOKUP_COPY[locale]||LOOKUP_COPY.zh,origin=ORIGIN_COPY[locale]||ORIGIN_COPY.zh;
  const seed=Number.isSafeInteger(dto?.bundled?.revision)&&dto.bundled.revision>0?`${origin.seed} · rev ${dto.bundled.revision}`:'';
- const text=state==='bundled'?origin.unknown:state==='not-published'?lookup.missing:state==='installing'?w.installing:state==='install-failed'?(dto.code==='TORCH_RELAY_UNAVAILABLE'?lookup.unavailable:w.failed):r?w.installed:w.unconfirmed;
+ const security=SECURITY_COPY[locale]||SECURITY_COPY.zh;
+ const failure=dto?.code==='TORCH_RELAY_UNAVAILABLE'?lookup.unavailable:Object.hasOwn(security,dto?.code)?security[dto.code]:w.failed;
+ const text=state==='bundled'?origin.unknown:state==='not-published'?lookup.missing:state==='installing'?w.installing:state==='install-failed'?failure:r?w.installed:w.unconfirmed;
  const note=[seed,state==='not-published'&&dto.eligible===true&&origin.eligible,state==='not-published'&&dto.submission==='isolated'&&origin.isolated,state==='not-published'&&dto.submission==='bundled'&&origin.bundled].filter(Boolean);
  const notes=note.map(line=>`<p class="first-player-receipt-source">${esc(line)}</p>`).join('');
  if(state!=='received'||!r)return {signature:JSON.stringify([state,text,note]),html:`<p class="first-player-from" role="status">${esc(text)}</p>${notes}`};

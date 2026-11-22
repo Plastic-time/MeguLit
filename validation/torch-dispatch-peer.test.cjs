@@ -44,9 +44,11 @@ test('actual first_player DB-open failure cannot queue; state-read error occurs 
  let h=bridge({fail:'open'});await assert.rejects(h.dispatch({action:'first_player',id:'g1'}),/DB_OPEN_FAILED/);assert.equal(h.queued.length,0);
  h=bridge({fail:'state'});await assert.rejects(h.dispatch({action:'first_player',id:'g1',poll:true}),/DB_READ_FAILED/);assert.equal(h.queued.length,1);assert.equal(h.queued[0][2].priority,'user');assert.deepEqual(h.events,['enqueue','state','close']);
 });
-test('actual originalExecutable mutation failure cannot queue; success uses force/user',async()=>{
- let h=bridge({fail:'mutation'});await assert.rejects(h.dispatch({action:'game_original_executable',id:'g1'}),/DB_MUTATION_FAILED/);assert.equal(h.queued.length,0);
- h=bridge();await h.dispatch({action:'game_original_executable',id:'g1'});assert.equal(h.queued.length,1);assert(h.events.indexOf('mutation')<h.events.indexOf('enqueue'));assert.equal(h.queued[0][2].force,true);assert.equal(h.queued[0][2].priority,'user');
+test('actual originalExecutable read stays local; successful selection queues force/user after mutation',async()=>{
+ const select={action:'game_original_executable',id:'g1',mode:'select',executable};
+ let h=bridge({fail:'mutation'});await assert.rejects(h.dispatch(select),/DB_MUTATION_FAILED/);assert.equal(h.queued.length,0);
+ h=bridge();await h.dispatch({action:'game_original_executable',id:'g1'});assert.equal(h.queued.length,0);
+ await h.dispatch(select);assert.equal(h.queued.length,1);assert(h.events.lastIndexOf('mutation')<h.events.indexOf('enqueue'));assert.equal(h.queued[0][2].force,true);assert.equal(h.queued[0][2].priority,'user');
 });
 function runtime(fail=''){
  const events=[],queued=[];let release,releaseStory;

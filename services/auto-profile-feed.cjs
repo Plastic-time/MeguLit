@@ -64,17 +64,17 @@ function reject(root,key,l,why=''){if(!l||l.exact)return;try{fs.mkdirSync(dir(ro
 function query(key,prints,old,{exe}={}){const p={...require('../core/game-print.cjs').check(prints||{}),exe:key};const q=new URLSearchParams();for(const k of ['exe','head','pe','pack','script','steam','vndb','title','engine'])if(p[k])q.set(k,p[k]);
  const l=old&&!old.none?layer(old,key,{exe}):null;if(l?.version)q.set('have',String(l.version.rev));if(l?.game)q.set('haveGame',String(l.game.rev));return '?'+q.toString();}
 function cached(root,key){if(!gameDiff.KEY.test(String(key||'')))return null;try{const v=JSON.parse(fs.readFileSync(path.join(dir(root),key+'.json'),'utf8'));if(!v||typeof v!=='object')return null;cachedRoots.set(v,path.resolve(root));return v;}catch{return null;}}
-function keep(root,key,v){const old=cached(root,key),protectedRelease=old?.torchRelease||old?.torchQuarantined?.release;if(protectedRelease&&docOk(protectedRelease.profile)&&verify(protectedRelease,keys())&&!v.torchRelease)return old;
+function keep(root,key,v){const old=cached(root,key),protectedRelease=old?.torchRelease;if(old?.torchQuarantined||protectedRelease&&docOk(protectedRelease.profile)&&verify(protectedRelease,keys()))return old;
  const exact=a=>a?.version===2&&a.versionLayer?.match==='exe'&&a.versionLayer.diff?.key===key?a.versionLayer.diff:a?.diff?.key===key?a.diff:null,prev=exact(old),next=exact(v);
  if(prev&&next&&docOk(prev)&&docOk(next)&&(next.rev<prev.rev||next.rev===prev.rev&&gameDiff.canonical(next)!==gameDiff.canonical(prev)))return old;
  fs.mkdirSync(dir(root),{recursive:true});const f=path.join(dir(root),key+'.json'),tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(v));fs.renameSync(tmp,f);return v;}
 async function refresh(root,key,{fetcher=globalThis.fetch,now=Date.now(),force=false,prints=null,exe}={}){if(!gameDiff.KEY.test(String(key||''))||!fetcher)return null;
  const old=cached(root,key);if(!force&&old&&now-(old.fetchedAt||0)<(old.none?NONE_MS:FRESH_MS))return old;
  for(const url of endpoints(root,'/api/game-profile'+query(key,prints,old,{exe}))){try{const r=await fetcher(url,{headers:{'user-agent':'MeguLit',accept:'application/json'},signal:AbortSignal.timeout(TIMEOUT)});
-   if(r.status===304&&old&&!old.none){const v={...old,fetchedAt:now};return keep(root,key,v);}
+   if(r.status===304&&old&&!old.none){if(old.torchRelease)return cached(root,key);const v={...old,fetchedAt:now};return keep(root,key,v);}
    if(r.status===404){const v={none:true,key,fetchedAt:now};return keep(root,key,v);}
    if(!r.ok)continue;const text=await r.text();if(text.length>64*1024)continue;const v=JSON.parse(text);if(Object.keys(v).some(k=>k.startsWith('torch'))||!layer(v,key))continue;v.fetchedAt=now;return keep(root,key,v);}catch{}}
- return old;}
+ return cached(root,key);}
 /* 2026-11-21 this PC's calibration of the exe reached the relay: data/The Seed/<key>.sent.json (the game page's first-player card turns into its thank-you) */
 const sentFile=(root,key)=>path.join(dir(root),key+'.sent.json');
 /* the marker keeps this PC's credit for the diff: {torchNo, name|null, at} as the relay answered, plus localName/synced when a name could not reach the

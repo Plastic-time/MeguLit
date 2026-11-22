@@ -7,7 +7,7 @@ const sha=b=>crypto.createHash('sha256').update(b).digest('hex'),reply=v=>new Re
 async function setup(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'mgl-torch-')),exe=path.join(root,'game.exe'),script=path.join(root,'data.xp3');fs.writeFileSync(exe,'MZ neutral inert fixture');fs.writeFileSync(script,'neutral script container');const f=fixture();f.identity.exe=sha(fs.readFileSync(exe));f.identity.script=sha(fs.readFileSync(script));feed._trust(f.keys.profileKeys);let row={id:'7',title:'Neutral fixture',executable:exe,engine:'KiriKiri'};const getGame=()=>row,db={prepare:()=>({get:getGame})};t.after(()=>{feed._trust(null);fs.rmSync(root,{recursive:true,force:true});});const release=await f.release(),publication={hash:await P.hash(release),at:'2026-11-21T02:00:00.000Z'},options={getGame,resources:()=>true,keys:f.keys,urls:['https://relay.test/api/torch-release'],fetcher:async()=>reply({release,publication,credit:{torchNo:0,name:'Public name'}})};return {...f,root,exe,script,release,publication,options,db,setRow:v=>{row=v;},cache:()=>path.join(feed.dir(root),f.identity.exe+'.json')};}
 test('import installs only profile data atomically, binds all signatures and actual exe+whole script hash, shows current before old thanks',async t=>{const f=await setup(t),exe=fs.readFileSync(f.exe),script=fs.readFileSync(f.script);feed.markSent(f.root,f.identity.exe,{torchNo:6,name:'Old self',at:'old'});const got=await R.receive(f.root,'7',f.options);assert.equal(got.state,'received');assert.equal(got.receipt.serverTime,f.publication.at);assert.equal(got.receipt.hash,await P.hash(f.release));assert.equal(got.receipt.credit.torchNo,0);assert.equal(got.receipt.credit.name,'Public name');assert.deepEqual(fs.readFileSync(f.exe),exe);assert.deepEqual(fs.readFileSync(f.script),script);assert.equal(fs.existsSync(path.join(f.root,'data','config','library.json')),false);const card=await first.state(f.db,f.root,'7',{wait:0,hash:async()=>f.identity.exe,torchKeys:f.keys});assert.equal(card.state,'received');assert.equal(card.receipt.hash,got.receipt.hash);assert.equal(feed.layer(feed.cached(f.root,f.identity.exe),f.identity.exe,{torchTrust:f.keys,exe:f.exe}).exact,true);});
 test('wrong exe/script/signature/key set cannot install and old cache is unchanged',async t=>{const f=await setup(t);await R.receive(f.root,'7',f.options);const before=fs.readFileSync(f.cache());for(const change of ['script','signature','reviewKey']){const options={...f.options};if(change==='script')fs.writeFileSync(f.script,'different bytes');if(change==='signature'){const release=structuredClone(f.release);release.signature.value='A'.repeat(86)+'==';options.fetcher=async()=>reply({release});}if(change==='reviewKey')options.keys={...f.keys,reviewKeys:[]};assert.equal((await R.receive(f.root,'7',options)).state,'install-failed');assert.deepEqual(fs.readFileSync(f.cache()),before);if(change==='script')fs.writeFileSync(f.script,'neutral script container');}});
-test('duplicate imports share one in-flight fetch; late answer after removal/change cannot commit',async t=>{const f=await setup(t);let unblock,calls=0;const gate=new Promise(r=>{unblock=r;}),options={...f.options,fetcher:async()=>{calls++;await gate;return reply({release:f.release});}};const a=R.receive(f.root,'7',options),b=R.receive(f.root,'7',options);await new Promise(r=>setTimeout(r,30));assert.equal(calls,1);f.setRow(null);unblock();const both=await Promise.all([a,b]);assert.ok(both.every(v=>v.state==='install-failed'&&v.code==='TORCH_GAME_CHANGED'));assert.equal(fs.existsSync(f.cache()),false);});
+test('duplicate imports share one in-flight fetch; late answer after removal/change cannot commit',async t=>{const f=await setup(t);let unblock,calls=0;const gate=new Promise(r=>{unblock=r;}),options={...f.options,fetcher:async()=>{calls++;await gate;return reply({release:f.release,publication:f.publication});}};const a=R.receive(f.root,'7',options),b=R.receive(f.root,'7',options);await new Promise(r=>setTimeout(r,30));assert.equal(calls,1);f.setRow(null);unblock();const both=await Promise.all([a,b]);assert.ok(both.every(v=>v.state==='install-failed'&&v.code==='TORCH_GAME_CHANGED'));assert.equal(fs.existsSync(f.cache()),false);});
 test('write failure and cancelled job preserve previous installation, with no false success',async t=>{const f=await setup(t);await R.receive(f.root,'7',f.options);const before=fs.readFileSync(f.cache());const failOptions={...f.options,atomicWrite:()=>{throw Error('simulated disk failure');}};assert.equal((await R.receive(f.root,'7',failOptions)).state,'install-failed');assert.deepEqual(fs.readFileSync(f.cache()),before);const ac=new AbortController();ac.abort();assert.equal((await R.receive(f.root,'7',{...f.options,signal:ac.signal})).state,'install-failed');assert.deepEqual(fs.readFileSync(f.cache()),before);assert.ok(await R.installed(f.root,f.identity.exe,{keys:f.keys,exe:f.exe}));});
 test('local container changes invalidate reader layer; stale release cannot roll a newer install back',async t=>{const f=await setup(t);await R.receive(f.root,'7',f.options);const p=f.profile(2),r=f.publisher.sign({...f.release,revision:2,previous:await P.hash(f.release),profile:p,review:await f.review(p,f.release,{mean:.96})});await R.receive(f.root,'7',{...f.options,fetcher:async()=>reply({release:r,publication:{hash:await P.hash(r),at:'2026-11-21T02:00:00.000Z'}})});const before=fs.readFileSync(f.cache());assert.equal((await R.receive(f.root,'7',f.options)).code,'TORCH_ROLLBACK');assert.deepEqual(fs.readFileSync(f.cache()),before);fs.writeFileSync(f.script,'modified');assert.equal(feed.layer(feed.cached(f.root,f.identity.exe),f.identity.exe,{torchTrust:f.keys,exe:f.exe}),null);assert.equal(await R.installed(f.root,f.identity.exe,{keys:f.keys,exe:f.exe}),null);});
 test('revocation quarantines active profile and retains antirollback floor; old feed cannot override it',async t=>{const f=await setup(t);await R.receive(f.root,'7',f.options);const no=await R.receive(f.root,'7',{...f.options,fetcher:async()=>new Response('',{status:410})});assert.equal(no.code,'TORCH_REVOKED');assert.equal(feed.layer(feed.cached(f.root,f.identity.exe),f.identity.exe),null);assert.equal((await R.receive(f.root,'7',f.options)).code,'TORCH_ROLLBACK');const old=fs.readFileSync(f.cache());await feed.refresh(f.root,f.identity.exe,{force:true,fetcher:async()=>new Response('',{status:404})});assert.deepEqual(fs.readFileSync(f.cache()),old);});
@@ -38,7 +38,10 @@ test('owner launcher can receive an exact signed fire without opening the genera
   urls.push(url);
   assert.equal(request.method,'GET');
   assert.equal(request.redirect,'error');
+  assert.equal(request.credentials,'omit');
+  assert.equal(request.cache,'no-store');
   assert.equal(request.body,undefined);
+  if(url.startsWith(relay.CN_RELAY_BASE))return Response.json({ok:false,error:'NOT_FOUND'},{status:404});
   return reply({release:f.release,publication:f.publication});
  }};
  const relay=require('../services/relay-config.cjs');
@@ -50,8 +53,74 @@ test('owner launcher can receive an exact signed fire without opening the genera
  delete process.env.MEGULIT_OFFLINE;
  const result=await R.receive(f.root,'7',options);
  assert.equal(result.state,'received');
- assert.deepEqual(urls,[relay.CN_RELAY_BASE+'/api/torch-release?exe='+f.identity.exe]);
+ assert.deepEqual(urls,[relay.CN_RELAY_BASE,relay.DEFAULT_RELAY_BASE].map(base=>base+'/api/torch-release?exe='+f.identity.exe));
  assert.ok(fs.existsSync(f.cache()));
+});
+
+test('dual mirrors prefer the newest verified publication and refuse mixed hard failures',async t=>{
+ const f=await setup(t),urls=['https://one.test/release','https://two.test/release'];
+ const profile=f.profile(2),review=await f.review(profile,f.release,{mean:.96});
+ const newer=f.publisher.sign({...f.release,revision:2,previous:f.publication.hash,profile,review});
+ const newestPublication={hash:await P.hash(newer),at:f.publication.at};
+ const old=()=>reply({release:f.release,publication:f.publication});
+ const latest=()=>reply({release:newer,publication:newestPublication});
+ const failed=(code,status)=>()=>Response.json({ok:false,error:code},{status});
+ const receive=(first,second)=>R.receive(f.root,'7',{
+  ...f.options,urls,refresh:async()=>assert.fail('legacy fallback must not run'),
+  fetcher:url=>(url===urls[0]?first:second)()
+ });
+ assert.equal((await receive(failed('NOT_FOUND',404),()=>new Response(null,{status:503}))).code,'TORCH_RELAY_UNAVAILABLE');
+ assert.equal((await receive(old,latest)).receipt?.hash,newestPublication.hash);
+ const before=fs.readFileSync(f.cache());
+ const bad=()=>reply({release:{...newer,signature:{...newer.signature,value:'A'.repeat(86)+'=='}},publication:newestPublication});
+ assert.equal((await receive(bad,latest)).code,'TORCH_SIGNATURE');
+ assert.equal((await receive(latest,failed('TORCH_SIGNATURE',422))).code,'TORCH_SIGNATURE');
+ const alternate=f.publisher.sign({...newer,preparedAt:'2026-11-21T01:01:00.000Z'});
+ const alternatePublication={...newestPublication,hash:await P.hash(alternate)};
+ assert.equal((await receive(latest,()=>reply({release:alternate,publication:alternatePublication}))).code,'TORCH_RELEASE_CONFLICT');
+ assert.deepEqual(fs.readFileSync(f.cache()),before);
+});
+
+test('revocation beats a signed mirror and persists through missing relays and legacy refresh',async t=>{
+ const f=await setup(t),urls=['https://one.test/release','https://two.test/release'];
+ const stale=()=>reply({release:f.release,publication:f.publication});
+ const revoked=()=>Response.json({ok:false,error:'TORCH_REVOKED'},{status:410});
+ const missing=()=>Response.json({ok:false,error:'NOT_FOUND'},{status:404});
+ const receive=(first,second)=>R.receive(f.root,'7',{
+  ...f.options,urls,refresh:async()=>assert.fail('legacy fallback must not run'),
+  fetcher:url=>(url===urls[0]?first:second)()
+ });
+ assert.equal((await receive(stale,revoked)).code,'TORCH_REVOKED');
+ assert.equal(feed.cached(f.root,f.identity.exe).torchQuarantined.release,null);
+ const before=fs.readFileSync(f.cache());
+ assert.equal((await receive(missing,stale)).code,'TORCH_REVOKED');
+ assert.equal((await receive(missing,missing)).code,'TORCH_REVOKED');
+ await feed.refresh(f.root,f.identity.exe,{force:true,fetcher:async()=>reply({
+  schema:'megulit.game-diff-feed',version:1,key:f.identity.exe,diff:f.profile()
+ })});
+ assert.deepEqual(fs.readFileSync(f.cache()),before);
+ assert.equal(await R.installed(f.root,f.identity.exe,{keys:f.keys,exe:f.exe}),null);
+ const profile=f.profile(2),review=await f.review(profile,f.release,{mean:.96});
+ const replacement=f.publisher.sign({...f.release,revision:2,previous:f.publication.hash,profile,review});
+ const publication={hash:await P.hash(replacement),at:f.publication.at};
+ const latest=()=>reply({release:replacement,publication});
+ assert.equal((await receive(stale,latest)).code,'TORCH_REVOKED');
+ assert.equal((await receive(latest,latest)).receipt?.hash,publication.hash);
+});
+
+test('ordinary legacy refresh cannot revive a release revoked while its request was pending',async t=>{
+ const f=await setup(t);
+ await R.receive(f.root,'7',f.options);
+ const started=Promise.withResolvers(),response=Promise.withResolvers();
+ const refresh=feed.refresh(f.root,f.identity.exe,{force:true,fetcher:async()=>{
+  started.resolve();return response.promise;
+ }});
+ await started.promise;
+ const revoked=await R.receive(f.root,'7',{...f.options,fetcher:async()=>new Response(null,{status:410})});
+ assert.equal(revoked.code,'TORCH_REVOKED');
+ response.resolve(new Response(null,{status:304}));
+ assert.equal((await refresh).torchQuarantined.release.revision,1);
+ assert.equal(await R.installed(f.root,f.identity.exe,{keys:f.keys,exe:f.exe}),null);
 });
 
 test('owner launcher to ordinary import, receipt and reader profile with the local database',async t=>{
@@ -96,24 +165,35 @@ test('owner launcher to ordinary import, receipt and reader profile with the loc
  const signed=f.publisher.sign({...f.release,profile,review:await f.review(profile)});
  const publication={hash:await P.hash(signed),at:f.publication.at};
  let phase='offline';
+ const originalExe=path.join(root,'original.exe');
+ fs.writeFileSync(originalExe,'MZ alternate neutral fixture');
+ const originalKey=sha(fs.readFileSync(originalExe));
+ const pending=Promise.withResolvers(),closingFetch=Promise.withResolvers(),aborted=[];
  const notFound=()=>Response.json({ok:false,error:'NOT_FOUND'},{status:404});
  t.mock.method(globalThis,'fetch',async(url,request)=>{
   const target=new URL(url);
   const release=target.pathname==='/api/torch-release';
   assert.ok(release||target.pathname==='/api/game-profile');
   assert.ok([relay.CN_RELAY_BASE,relay.DEFAULT_RELAY_BASE].includes(target.origin));
-  assert.deepEqual([...target.searchParams],[['exe',f.identity.exe]]);
+  const key=target.searchParams.get('exe');
+  assert.deepEqual([...target.searchParams],[['exe',key]]);
+  assert.ok([f.identity.exe,originalKey].includes(key));
   assert.equal(request.method,'GET');
   assert.equal(request.redirect,'error');
   assert.equal(request.body,undefined);
   assert.equal(request.headers.authorization,undefined);
   calls.push([target.origin,target.pathname]);
+  if((phase==='change'&&key===f.identity.exe)||phase==='close')return new Promise((_,reject)=>{
+   request.signal.addEventListener('abort',()=>{aborted.push(key);reject(request.signal.reason);},{once:true});
+   (phase==='close'?closingFetch:pending).resolve();
+  });
+  if(phase==='change')return notFound();
   if(phase==='offline'){
    if(target.origin===relay.CN_RELAY_BASE)throw new TypeError('fixture connection refused');
    return new Response('edge error page',{status:404});
   }
   if(phase==='missing')return notFound();
-  if(phase==='legacy')return release?notFound():reply({
+  if(phase==='legacy')return release||target.origin===relay.CN_RELAY_BASE?notFound():reply({
    schema:'megulit.game-diff-feed',version:2,key:f.identity.exe,
    versionLayer:{match:'exe',key:f.identity.exe,diff:f.profile()},
    gameLayer:{match:'title',key:'unrelated'},credit:{torchNo:999}
@@ -175,4 +255,27 @@ test('owner launcher to ordinary import, receipt and reader profile with the loc
  assert.equal(fs.readFileSync(libraryFile,'utf8'),library);
  assert.equal(fs.readFileSync(onlineFile,'utf8'),online);
  assert.equal(path.dirname(feed.dir(root)),dbFile);
+
+ phase='change';
+ await dispatch({action:'save_game',id,title:'Neutral import fixture',executable:f.exe});
+ await pending.promise;
+ const selected=await dispatch({action:'game_original_executable',id,mode:'select',executable:originalExe});
+ assert.equal(selected.executable,originalExe);
+ assert.equal(selected.changed,true);
+ const deadline=Date.now()+3000;
+ while(R.status(root,id)?.code!=='TORCH_NOT_PUBLISHED'&&Date.now()<deadline)await new Promise(r=>setTimeout(r,10));
+ const original=await dispatch({action:'first_player',id,poll:true});
+ assert.equal(original.key,originalKey);
+ assert.equal(original.state,'not-published');
+ assert.deepEqual(aborted,[f.identity.exe,f.identity.exe]);
+ assert.equal(fs.existsSync(path.join(feed.dir(root),originalKey+'.json')),false);
+
+ phase='close';
+ const {Runtime}=require('../services/runtime.cjs');
+ const runtime=new Runtime(root);
+ await dispatch({action:'save_game',id,title:'Neutral import fixture',executable:originalExe});
+ await closingFetch.promise;
+ await runtime.stop();
+ assert.deepEqual(aborted,[f.identity.exe,f.identity.exe,originalKey,originalKey]);
+ assert.equal(fs.existsSync(path.join(feed.dir(root),originalKey+'.json')),false);
 });

@@ -22,14 +22,15 @@ async function state(db,root,id,{wait=2500,fetcher=globalThis.fetch,hash,torchKe
  if(pending?.key===key&&['installing','install-failed'].includes(pending.state))return {...local,...pending};
  const isolated=require('../core/owner-tests.cjs').privateMode(root);
  const answer=feed.cached(root,key),layer=feed.layer(answer,key,{exe:row.executable});
+ if(answer?.torchQuarantined)return {...local,state:'install-failed',code:'TORCH_REVOKED'};
  if(!isolated){
   const credit=layer&&feed.cleanCredit(answer.credit);
   if(credit)return {...local,state:'received',credit,receipt:null};
   if(feed.sent(root,key)){if(wait>0)await timeout(feed.syncCredit(root,key,{fetcher}),wait);return {...local,state:'thanks',credit:feed.creditOf(root,key)};}
  }
  const age=Date.now()-pending?.checkedAt;
- // A legacy cache miss can outlive a release and can also represent quarantine.
- const missing=pending?.key===key&&pending.code==='TORCH_NOT_PUBLISHED'&&age>=0&&age<MISSING_TTL&&!layer&&!answer?.torchQuarantined;
+ // A confirmed miss can outlive a subsequent publication.
+ const missing=pending?.key===key&&pending.code==='TORCH_NOT_PUBLISHED'&&age>=0&&age<MISSING_TTL&&!layer;
  if(!missing)return seed?{...local,state:'bundled'}:HIDDEN;
  let storedEngine=row.engine||'';try{storedEngine=JSON.parse(row.original||'{}').library?.engine||storedEngine;}catch{}
  const engine=engineKnown(seed?.engine||storedEngine);

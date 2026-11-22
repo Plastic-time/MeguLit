@@ -31,38 +31,61 @@ function receiveEndpoints(root,key,legacy=false,env=process.env){
  if(env.MEGULIT_OWNER_TORCH_RECEIVE!=='1'||env.MEGULIT_OFFLINE==='1'||env.MEGULIT_CARDINAL_REPLAY==='1')return [];
  return [relay.CN_RELAY_BASE+route,relay.DEFAULT_RELAY_BASE+route];
 }
-async function lookup(urls,fetcher,signal,{release=false,ownerTest=false}={}){
- if(!fetcher||!urls.length)return {state:'disabled'};
- for(const url of urls){
-  let response;
-  try{response=await fetcher(url,{method:'GET',redirect:'error',headers:{accept:'application/json','user-agent':'MeguLit'},signal:AbortSignal.any([signal,AbortSignal.timeout(15000)])});}
-  catch{signal.throwIfAborted();continue;}
-  if(response.status===404||release&&response.status===410){
-   const missing=response.status===404;
-   let confirmed=false;
-   if(missing||ownerTest){
-    let answer;
-    try{answer=await body(response);}catch{signal.throwIfAborted();}
-    confirmed=answer?.ok===false&&answer.error===(missing?'NOT_FOUND':'TORCH_REVOKED');
-    if(ownerTest&&!confirmed)continue;
-   }else await response.body?.cancel().catch(()=>{});
-   return {state:missing?'missing':'revoked',confirmed};
-  }
-  if(!response.ok){await response.body?.cancel().catch(()=>{});continue;}
+async function queryRelay(url,fetcher,signal,{release,strict}){
+ let response;
+ try{response=await fetcher(url,{method:'GET',redirect:'error',credentials:'omit',cache:'no-store',headers:{accept:'application/json','user-agent':'MeguLit'},signal:AbortSignal.any([signal,AbortSignal.timeout(15000)])});}
+ catch{signal.throwIfAborted();return {state:'unavailable'};}
+ const status=response.status;
+ if(response.ok){
   try{return {state:'found',answer:await body(response)};}
-  catch(e){signal.throwIfAborted();if(/^TORCH_[A-Z_]+$/.test(e.code||''))throw e;}
+  catch(e){signal.throwIfAborted();return e.code?{state:'rejected',code:e.code}:{state:'unavailable'};}
  }
+ if(status===404||release&&[409,410,422].includes(status)){
+  let answer;
+  try{answer=await body(response);}catch{signal.throwIfAborted();}
+  const code=answer?.ok===false?answer.error:null;
+  if(status===404&&(code==='NOT_FOUND'||!strict))return {state:'missing',confirmed:code==='NOT_FOUND'};
+  if(status===410&&(code==='TORCH_REVOKED'||!strict))return {state:'revoked'};
+  if([409,422].includes(status)&&/^TORCH_[A-Z_]+$/.test(code||''))return {state:'rejected',code};
+ }else await response.body?.cancel().catch(()=>{});
+ return {state:'unavailable'};
+}
+async function lookup(urls,fetcher,signal,{release=false,ownerTest=false,accept}){
+ if(!fetcher||!urls.length)return {state:'disabled'};
+ const results=await Promise.all(urls.map(url=>queryRelay(url,fetcher,signal,{release,strict:ownerTest||urls.length>1})));
+ signal.throwIfAborted();
+ // A mirror can still serve a signed release after the other mirror has seen its revocation.
+ if(results.some(r=>r.state==='revoked'))return {state:'revoked'};
+ const rejected=results.find(r=>r.state==='rejected');
+ if(rejected)fail(rejected.code);
+ const found=results.filter(r=>r.state==='found');
+ if(found.length){
+  const verified=await Promise.all(found.map(r=>accept(r.answer)));
+  verified.sort((a,b)=>b.revision-a.revision);
+  const winner=verified[0];
+  const agrees=verified.filter(v=>v.revision===winner.revision);
+  if(agrees.some(v=>!protocol.same(v.document,winner.document)))fail('TORCH_RELEASE_CONFLICT');
+  return {state:'found',...winner,consensus:agrees.length===urls.length};
+ }
+ if(results.every(r=>r.state==='missing'))return {state:'missing',confirmed:results.every(r=>r.confirmed)};
  fail('TORCH_RELAY_UNAVAILABLE');
 }
-async function legacy(root,key,fetcher,signal,ownerTest){
- const result=await lookup(receiveEndpoints(root,key,true),fetcher,signal,{ownerTest});
- if(result.state!=='found')return result;
- const answer=result.answer;
- if(!answer||Object.keys(answer).some(k=>k.startsWith('torch'))||!feed.layer(answer,key))fail('TORCH_RESPONSE');
+async function checkedRelease(answer,key,keys){
+ const release=answer?.release,proof=await protocol.checked(release,keys);
+ if(release.key!==key)fail('TORCH_IDENTITY');
+ const p=answer.publication;
+ if(p?.hash!==proof.hash||!protocol.iso(p.at)||Date.parse(p.at)<Date.parse(release.preparedAt)||Date.parse(p.at)>Date.now()+300000)fail('TORCH_PUBLICATION');
+ return {answer,proof,revision:release.revision,document:release};
+}
+function checkedLegacy(answer,key,ownerTest){
+ if(!answer||Object.keys(answer).some(k=>k.startsWith('torch')))fail('TORCH_RESPONSE');
+ const layer=feed.layer(answer,key);
+ if(!layer)fail('TORCH_RESPONSE');
  const exact=ownerTest?{schema:answer.schema,version:1,key,diff:answer.version===2
   ? (answer.versionLayer?.match==='exe'&&answer.versionLayer.key===key?answer.versionLayer.diff:null)
   : answer.diff}:answer;
- return {state:'found',answer:{...exact,fetchedAt:Date.now()}};
+ const document=(ownerTest?feed.layer(exact,key):layer)?.exact?exactProfile(exact,key):null;
+ return {answer:{...exact,fetchedAt:Date.now()},document,revision:document?.rev||0};
 }
 function status(root,id){return states.get(idKey(root,id))||null;}
 async function serial(key,fn){const old=locks.get(key)||Promise.resolve(),next=old.catch(()=>{}).then(fn);locks.set(key,next);try{return await next;}finally{if(locks.get(key)===next)locks.delete(key);}}
@@ -75,24 +98,25 @@ async function receive(root,id,options={}){const jobKey=idKey(root,id);if(jobs.h
    const still=()=>{check();const now=read(root,id);if(!now||now.executable!==exe||stamp(exe)!==exeStamp)fail('TORCH_GAME_CHANGED');};still();
    const fetcher=options.fetcher===undefined?globalThis.fetch:options.fetcher,keys=options.keys||trust(),urls=options.urls||receiveEndpoints(root,key);
    const ownerTest=require('../core/owner-tests.cjs').privateMode(root);
-   const result=await lookup(urls,fetcher,signal,{release:true,ownerTest});
+   const result=await lookup(urls,fetcher,signal,{release:true,ownerTest,accept:answer=>checkedRelease(answer,key,keys)});
    let missing=false;
    if(result.state==='revoked'){
     const old=feed.cached(root,key);
-    if(old?.torchRelease){still();(options.atomicWrite||atomic)(path.join(feed.dir(root),key+'.json'),{none:true,key,torchQuarantined:{release:old.torchRelease},fetchedAt:Date.now()});}
+    if(!old?.torchQuarantined){still();(options.atomicWrite||atomic)(path.join(feed.dir(root),key+'.json'),{none:true,key,torchQuarantined:{release:old?.torchRelease||null},fetchedAt:Date.now()});}
     fail('TORCH_REVOKED');
    }
-   if(result.state==='found'){const remote=result.answer,release=remote?.release,p=await protocol.checked(release,keys);if(release.key!==key)fail('TORCH_IDENTITY');if(!builtinCompatible(release))fail('TORCH_BUILTIN_NEWER');check();const script=scriptPath(exe,p.identity.scriptFile);resourcePaths.push(script);const scriptStamp=stamp(script);if(await fileHash(script,{signal,check})!==p.identity.script)fail('TORCH_SCRIPT_IDENTITY');const old=feed.cached(root,key);
+   if(result.state==='found'){const remote=result.answer,release=remote.release,p=result.proof;if(!builtinCompatible(release))fail('TORCH_BUILTIN_NEWER');check();const script=scriptPath(exe,p.identity.scriptFile);resourcePaths.push(script);const scriptStamp=stamp(script);if(await fileHash(script,{signal,check})!==p.identity.script)fail('TORCH_SCRIPT_IDENTITY');const old=feed.cached(root,key);
     const previous=old?.torchRelease||old?.torchQuarantined?.release;if(previous){await protocol.checked(previous,keys);if(release.revision<previous.revision||release.revision===previous.revision&&(!protocol.same(release,previous)||old.torchQuarantined))fail('TORCH_ROLLBACK');}
+    if(old?.torchQuarantined&&(!result.consensus||release.review.candidateHash===previous?.review.candidateHash))fail('TORCH_REVOKED');
     still();if(stamp(script)!==scriptStamp)fail('TORCH_LOCAL_CHANGED');
-    const publication=remote.publication?.hash===p.hash&&protocol.iso(remote.publication.at)&&Date.parse(remote.publication.at)>=Date.parse(release.preparedAt)&&Date.parse(remote.publication.at)<=Date.now()+300000?{hash:p.hash,at:remote.publication.at}:null;
-    if(!publication)fail('TORCH_PUBLICATION');
+    const publication={hash:p.hash,at:remote.publication.at};
     (options.atomicWrite||atomic)(path.join(feed.dir(root),key+'.json'),{schema:'megulit.game-diff-feed',version:1,key,diff:release.profile,torchRelease:release,torchPublication:publication,torchCredit:credit(remote.credit,release.review.torchNo),torchLocal:{key,exe,exeStamp,script,scriptStamp},fetchedAt:Date.now()});
    }else if(result.state==='missing'){
     /* Legacy exact signed profiles remain usable with unknown provenance. */
     const old=feed.cached(root,key);
-    if(!old?.torchRelease&&!old?.torchQuarantined){
-     const fallback=options.refresh?{answer:await options.refresh(root,key,{fetcher,signal})}:await legacy(root,key,fetcher,signal,ownerTest);
+    if(old?.torchQuarantined)fail('TORCH_REVOKED');
+    if(!old?.torchRelease){
+     const fallback=options.refresh?{answer:await options.refresh(root,key,{fetcher,signal})}:await lookup(receiveEndpoints(root,key,true),fetcher,signal,{ownerTest,accept:answer=>checkedLegacy(answer,key,ownerTest)});
      missing=result.confirmed&&fallback.state==='missing'&&fallback.confirmed;
      const answer=fallback.answer,p=exactProfile(answer,key),latest=feed.cached(root,key),prior=exactProfile(latest,key);
      if(!latest?.torchRelease&&!latest?.torchQuarantined&&answer&&!answer.none&&feed.layer(answer,key)?.exact&&p&&Number.isSafeInteger(p.rev)&&p.rev>0){
@@ -108,10 +132,12 @@ function enqueue(root,ids,options={}){
  if(!Array.isArray(ids)||ids.length>5000)fail('TORCH_QUEUE_LIMIT');const qKey=path.resolve(root);if(controllers.get(qKey)?.signal.aborted)return false;
  let q=queues.get(qKey);if(!q){q={items:new Map(),running:false,current:null};queues.set(qKey,q);}
  for(const id of new Set(ids.map(String))){const key=idKey(root,id),user=options.priority==='user';
-  if(q.current?.id===id&&q.current.stage==='running'){if(user){q.current.entry.options.priority='user';if(options.active)q.current.entry.options.active=options.active;}continue;}
-  if(jobs.has(key))continue;if(!options.force&&(!user||options.cooldown)&&Date.now()-(last.get(key)||0)<60000)continue;
+  const current=q.current?.id===id&&q.current.stage==='running'?q.current:null;
+  if(current&&!options.force){if(user){current.entry.options.priority='user';if(options.active)current.entry.options.active=options.active;}continue;}
+  if(!current&&jobs.has(key))continue;if(!options.force&&(!user||options.cooldown)&&Date.now()-(last.get(key)||0)<60000)continue;
   const prior=q.items.get(id);if(!prior&&q.items.size>=5000){const victim=user?[...q.items].reverse().find(([,e])=>e.options.priority!=='user'):null;if(victim)q.items.delete(victim[0]);else fail('TORCH_QUEUE_LIMIT');}const entry={options:{...options,priority:user?'user':prior?.options.priority||'bulk'},deadline:Date.now()+(user?120000:30*60000),deferrals:prior?.deferrals||0};
   if(user){q.items.delete(id);q.items=new Map([[id,entry],...q.items]);if(q.current?.entry.options.priority!=='user')q.current?.controller.abort(deferred());}else if(!prior)q.items.set(id,entry);
+  if(current)current.controller.abort(deferred());
  }
  if(!q.running){q.running=true;q.closed=new Promise(resolve=>setImmediate(async()=>{try{while(q.items.size){const [id,entry]=q.items.entries().next().value;q.items.delete(id);if(Date.now()>entry.deadline)continue;const controller=new AbortController();q.current={id,entry,controller,stage:'budget'};let timer=null,poll=null;
    try{if(entry.options.priority!=='user'){
