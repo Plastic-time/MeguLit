@@ -44,9 +44,9 @@ impl Broker {
   *slot=Some(Process{child,input,stopping});Ok(())
  }
  fn request(&self,request:Value)->Reply{
-  if CLOSING.load(Ordering::SeqCst)||RESTARTING.load(Ordering::SeqCst){return Err("SERVICE_CLOSING".into());}
+  if CLOSING.load(Ordering::SeqCst){return Err("SERVICE_CLOSING".into());}
   let id=self.serial.fetch_add(1,Ordering::Relaxed);let(tx,rx)=mpsc::channel();
-  {let mut process=self.process.lock().map_err(|_|"SERVICE_LOCK_FAILED")?;if CLOSING.load(Ordering::SeqCst)||RESTARTING.load(Ordering::SeqCst){return Err("SERVICE_CLOSING".into());}self.start(&mut process)?;
+  {let mut process=self.process.lock().map_err(|_|"SERVICE_LOCK_FAILED")?;if CLOSING.load(Ordering::SeqCst){return Err("SERVICE_CLOSING".into());}self.start(&mut process)?;
    self.pending.lock().unwrap_or_else(|e|e.into_inner()).insert(id,tx);let encoded=json!({"id":id,"request":request}).to_string()+"\n";
    if process.as_mut().unwrap().input.write_all(encoded.as_bytes()).is_err(){self.pending.lock().unwrap_or_else(|e|e.into_inner()).remove(&id);crate::yui::mark("service-disconnected");return Err("SERVICE_DISCONNECTED".into());}
   }
@@ -68,7 +68,9 @@ pub fn shutdown(){CLOSING.store(true,Ordering::SeqCst);let _=stop_process();}
 fn stop_process()->Result<(),String>{if let Some(broker)=BROKER.get(){
  let deadline=Instant::now()+Duration::from_secs(2);
  let mut slot=loop{match broker.process.try_lock(){Ok(g)=>break g,Err(std::sync::TryLockError::Poisoned(e))=>break e.into_inner(),Err(std::sync::TryLockError::WouldBlock)=>{if Instant::now()>=deadline{return Err("SERVICE_BUSY".into());}std::thread::sleep(Duration::from_millis(20));}}};
- let Some(Process{mut child,mut input,stopping})=slot.take() else{return Ok(())};stopping.store(true,Ordering::SeqCst);drop(slot);
+ // Hold the slot until the old child exits. Requests arriving during a reload then
+ // use the new service without replaying an action or racing two service processes.
+ let Some(Process{mut child,mut input,stopping})=slot.take() else{return Ok(())};stopping.store(true,Ordering::SeqCst);
  std::thread::spawn(move||{let _=input.write_all(b"{\"id\":0,\"request\":{\"action\":\"__shutdown\"}}\n");});
  let deadline=Instant::now()+Duration::from_secs(8);loop{if child.try_wait().map(|s|s.is_some()).unwrap_or(true){break;}if Instant::now()>=deadline{let _=child.kill();let _=child.wait();break;}std::thread::sleep(Duration::from_millis(50));}
 }Ok(())}

@@ -11,6 +11,20 @@ pub fn ready(root:&Path)->bool{
  ["runtime/node.exe","runtime/python/python.exe","runtime/python/Lib/zipfile/__init__.py","runtime/python/Lib/encodings/__init__.py"].iter().all(|p|root.join(p).is_file())
 }
 
+#[cfg(windows)]
+pub fn check_webview(root: &Path, interactive: bool) -> bool {
+ if let Err(error) = tauri::webview_version() {
+  let _ = std::fs::create_dir_all(root.join("logs"));
+  let _ = std::fs::write(root.join("logs/native-startup-stage.log"), format!("WebView2 Runtime unavailable: {error}"));
+  crate::yui::mark("webview-failed");
+  if interactive {
+   splash::error("无法启动 Microsoft Edge WebView2 Runtime。请安装或修复 Evergreen Runtime，然后重新打开 MeguLit。\n\nInstall or repair Microsoft Edge WebView2 Evergreen Runtime, then reopen MeguLit.\nhttps://developer.microsoft.com/microsoft-edge/webview2/");
+  }
+  return false;
+ }
+ true
+}
+
 // PowerShell 5.1 needs 1.3-3.7 s (measured 2026-11-20) before the setup script can show anything, more on a busy machine.
 // So the exe shows the installer's first picture itself (the opening clip's frame 0, same size and place as the setup
 // window) before it starts PowerShell, and closes it when a window of the setup process is visible (it shows the same

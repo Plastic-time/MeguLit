@@ -49,6 +49,7 @@ html:not(#u):not(#v) body dialog.game-dialog[open]{inset:var(--titlebar-height,5
 html:not(#u):not(#v) body dialog.game-dialog.dev-notice[open]{height:min(940px,calc(100vh - var(--titlebar-height,56px) - 40px))!important}
 html:not(#u):not(#v) body dialog.game-dialog.dev-notice[open]:not(:has(.dev-notice-updates:not([hidden]))):not(:has(.dev-notice-page:not([hidden])>.dev-notice-scroll)){height:auto!important}
 html:not(#u):not(#v) body :is(dialog.game-dialog,dialog.profile-panel)::backdrop{background:rgba(6,5,7,.62)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+html:not(#u):not(#v) body dialog.startup-notice::backdrop{-webkit-backdrop-filter:none;backdrop-filter:none}
 html:not(#u):not(#v) body .lv-backdrop{padding-top:calc(var(--titlebar-height,56px) + 16px)!important;background:rgba(6,5,7,.62)!important;backdrop-filter:blur(6px)!important}
 /* kickers in every dialog: gold mono, readable */
 html:not(#u):not(#v) body :is(.dev-notice-top,dialog.feedback-dialog .game-dialog-kicker,.lv-kicker){font-family:var(--u-mono)!important;font-size:11px!important;letter-spacing:.28em!important;color:var(--g-gold)!important}

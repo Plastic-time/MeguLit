@@ -24,7 +24,7 @@ use tauri_plugin_dialog::DialogExt;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
-struct DesktopState { root: PathBuf, exiting: AtomicBool, headless: bool, splash: Option<PathBuf>, window_memory:window_memory::WindowMemory,reader_background:AtomicBool,home_transition:home_transition::HomeTransition }
+struct DesktopState { root: PathBuf, exiting: AtomicBool, headless: bool, main_ready: AtomicBool, splash: Option<PathBuf>, window_memory:window_memory::WindowMemory,reader_background:AtomicBool,home_transition:home_transition::HomeTransition }
 struct TrayItems { language:std::sync::Mutex<String> }
 
 // Open the provider's own dialog, including its verification and QR flow.
@@ -357,7 +357,14 @@ async fn window_action(action: String, window: tauri::WebviewWindow, state: Stat
     if (action=="enter_overlay"||window.label()=="reader"&&action=="ready")&&reader_library_only(window.app_handle()).await?{if window.label()=="reader"{window.close().map_err(|e|e.to_string())?;}return Ok(());}
     match action.as_str() {
         "ready" => {
-            if window.label()=="main"{yui::mark("first-window-ready");}
+            if window.label()=="main"{
+                if state.main_ready.swap(true,Ordering::SeqCst) && !state.headless {
+                    // The same window survived a page reload. The startup island has already left.
+                    window.emit("home-revealed","reloaded").map_err(|e|e.to_string())?;
+                    return Ok(());
+                }
+                yui::mark("first-window-ready");
+            }
             if window.label()=="main"&&!state.headless{state.window_memory.enable();}
             if state.headless {
                 let status=json!({"host":"app.megulit","frontend":true,"visible":false});
@@ -496,6 +503,8 @@ fn main() {
     let _instance_lease=if isolated{None}else{match single_instance::acquire(&root,control){Ok(single_instance::Acquisition::Owner(lease))=>{if control.is_none()&&std::env::var("MEGULIT_SIDE_BY_SIDE").map(|v|v!="1").unwrap_or(true){single_instance::retire_other_installations(&root);}Some(lease)},Ok(_)=>{yui::mark("closed");return},Err(error)=>{yui::mark("instance-failed");let _=std::fs::create_dir_all(root.join("logs"));let _=std::fs::write(root.join("logs/instance-error.log"),error);return;}}};
     startup_mark(&root,"process-start");
     if !isolated&&!runtime_setup::ensure(&root){yui::mark("runtime-unavailable");return;}
+    #[cfg(windows)]
+    if !runtime_setup::check_webview(&root, !isolated){std::process::exit(1);}
     startup_mark(&root,"runtime-ready");
     let diagnostic_root=root.clone();
     std::panic::set_hook(Box::new(move |info| {
@@ -525,7 +534,7 @@ fn main() {
         startup_mark(&root,"splash-start");if command.spawn().is_ok() {let _=std::fs::write(format!("{}.pid",flag.display()),std::process::id().to_string());let _=std::fs::write(format!("{}.progress",flag.display()),"20");Some(flag)}else{None}
     }else{None};
     let window_memory=window_memory::WindowMemory::new(&root);
-    let state = DesktopState { root, exiting: AtomicBool::new(false), headless, splash,window_memory,reader_background:AtomicBool::new(true),home_transition:home_transition::HomeTransition::default() };
+    let state = DesktopState { root, exiting: AtomicBool::new(false), headless, main_ready: AtomicBool::new(false), splash,window_memory,reader_background:AtomicBool::new(true),home_transition:home_transition::HomeTransition::default() };
     tauri::Builder::default().manage(state).plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![yui::yui_stage, service, tray_menu::tray_menu_action, window_action, pick_executable, pick_patch_file, pick_image, pick_directories, pick_backup, set_tray_language, reader_open, reader_connect, reader_restart, read_clipboard, moji_login, kanji_go_open, kanji_go_embed, kanji_go_hide, app_exit_for_update, hot_reload])
         .setup(move |app| {
