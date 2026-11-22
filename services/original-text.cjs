@@ -410,15 +410,22 @@ const PATCH_VERSION=5;
 function patchCurrent(state){
  const patch=state?.patch;
  if(!patch||patch.runtimeSha&&patch.runtimeSha!==state.runtime?.sha256)return false;
+ if(state.patchStatus==='ready'&&patch.coverage&&!(patch.coverage.script?.paired>0))return false;
  return patch.version===PATCH_VERSION||[3,4].includes(patch.version)&&state.runtime?.engine!=='siglus'&&state.patchAlignment?.pairing?.paired>0;
 }
 function refreshCachedPatchReport(root,id,state){
- if(!patchCurrent(state)||state.patch.version===PATCH_VERSION)return state;
+ const patch=state?.patch,rt=state?.runtime;
+ if(!patch?.index||!rt?.index||!rt.engine||rt.engine==='siglus'||patch.version===PATCH_VERSION)return state;
+ if(patch.version!=null&&![3,4].includes(patch.version))return state;
+ if(patch.runtimeSha&&patch.runtimeSha!==rt.sha256)return state;
+ if(patch.coverage&&!(patch.coverage.script?.paired>0))return state;
+ if(!patchCurrent(state)&&(state.patchStatus!=='ready'||!state.patchAlignment?.reliable))return state;
  const source=readIndex(state.patch.index),runtime=readIndex(state.runtime.index);
- if(source.lines.length!==runtime.lines.length)return state;
- const reliable=state.patchStatus==='ready'&&state.patchAlignment?.reliable===true;
+ if(source.lines.length!==runtime.lines.length||runtime.roles?.includes('i'))return state;
+ const check=pairCheck(source.lines,runtime.lines,{into:'ja',zhSizes:source.sizes,jaSizes:runtime.sizes,structureOk:state.patchAlignment?.sameStructure===true});
+ const reliable=state.patchStatus==='ready'&&state.patchAlignment?.reliable===true&&check.verdict.ok&&!check.verdict.lines;
  const coverage=patchCoverage(runtime.lines,source.lines,null,reliable);
- return writeState(root,id,{patch:{...state.patch,coverage,version:PATCH_VERSION},
+ return writeState(root,id,{patchAlignment:{...state.patchAlignment,reliable,pairing:check.report},patch:{...patch,coverage,runtimeSha:rt.sha256,version:PATCH_VERSION},
   patchStatus:reliable&&coverage.script.paired?'ready':'unreliable'});
 }
 /* 2026-11-13 (ファタモルガーナの館: a good Chinese patch fell back to 提前机翻): the running script's index was kept while the game
