@@ -46,6 +46,14 @@ test('Lumina dynamic loader and modified startup files stay closed despite a rea
  const token=await O.resolve(f.root,{exe:f.exe,engine:'rgss'});f.setToken(token);assert.ok(token);assert.throws(()=>D.plan(f.exe,{ownerTestGrant:token}),/PRIVATE_EXE_NOT_VERIFIED/);assert.equal(await L.prepare({root:f.root,exe:f.exe,profile:{engine:'rgss'},enabled:false,ownerTestGrant:token}),null);
 });
 
+test('a freshly approved opaque grant cannot authorize changed INI, DLL, scripts or ambiguous archive layout',{skip:!receipts&&'MEGULIT_RGSS_PRIVATE_RECEIPTS not set; complete source unavailable'},async t=>{
+ const f=fixture(t,'rgss-ace-soprano'),copy=path.join(f.root,'changed-source');fs.mkdirSync(copy);const names=['Game.exe',...f.entry.files.map(x=>x.path)];for(const name of names){fs.mkdirSync(path.dirname(path.join(copy,name)),{recursive:true});fs.copyFileSync(path.join(f.dir,name),path.join(copy,name));}
+ const exe=path.join(copy,'Game.exe');
+ async function rejected(file,expected){const bytes=fs.readFileSync(path.join(copy,file)),changed=Buffer.from(bytes);changed[changed.length-1]^=1;fs.writeFileSync(path.join(copy,file),changed);const entry={...f.entry,exe,files:f.entry.files.map(x=>({...x,sha256:hash(fs.readFileSync(path.join(copy,x.path)))}))};fs.writeFileSync(path.join(f.root,'data/config/owner-tests.json'),JSON.stringify({schema:'megulit.owner-tests',version:1,root:f.root,entries:[entry]}));const token=await O.resolve(f.root,{exe,engine:'rgss'});assert.ok(token,'even an authentic newly approved grant must still satisfy the product pin');try{assert.throws(()=>D.plan(exe,{ownerTestGrant:token}),expected);}finally{O.revoke(token);fs.writeFileSync(path.join(copy,file),bytes);}}
+ await rejected('Game.ini',/INI_CHANGED/);await rejected('System/RGSS301.dll',/DLL_CHANGED/);await rejected('Data/Scripts.rvdata2',/DATA_CHANGED/);
+ const entry={...f.entry,exe};fs.writeFileSync(path.join(f.root,'data/config/owner-tests.json'),JSON.stringify({schema:'megulit.owner-tests',version:1,root:f.root,entries:[entry]}));const token=await O.resolve(f.root,{exe,engine:'rgss'});assert.ok(token);try{fs.writeFileSync(path.join(copy,'Game.rgss3a'),'foreign archive');assert.throws(()=>D.plan(exe,{ownerTestGrant:token}),/AMBIGUOUS_DATA/);}finally{O.revoke(token);}
+});
+
 test('Egomaniacs message-state API replay excludes ruby, waits for text_end and retires history',{skip:!process.env.MEGULIT_RUBY&&'MEGULIT_RUBY not set; no modern Ruby API replay'},()=>{
  const stand=fs.readFileSync(path.join(__dirname,'helpers/rgss-standin.rb'),'utf8'),boot=require('../core/rgss-page.cjs').candidatePageScript({generation:1,messageMode:'egomaniacs',port:1234,token:'a'.repeat(32)}),setup=String.raw`
 class Window_Message
