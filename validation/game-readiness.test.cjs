@@ -16,7 +16,8 @@ test('a clean exit without a replacement still fails promptly, and crashes still
  t.mock.timers.enable({apis:['Date']});
  let waits=0;
  const sleep=async ms=>{waits++;t.mock.timers.tick(ms);};
- await assert.rejects(waitForVisibleGame(async()=>[],{exit:()=>({code:0,signal:null}),sleep}),/GAME_PROCESS_EXITED/);
+ const exitedAt=Date.now();
+ await assert.rejects(waitForVisibleGame(async()=>[],{exit:()=>({code:0,signal:null}),sleep}),{message:'GAME_PROCESS_EXITED',exitedAt});
  assert.equal(waits,4);
  for(const exit of [()=>({code:1,signal:null}),()=>({code:0,signal:'SIGTERM'}),()=>({code:null,signal:null})]){
   await assert.rejects(waitForVisibleGame(async()=>[],{exit,sleep}),/GAME_PROCESS_EXITED/);

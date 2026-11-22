@@ -34,7 +34,7 @@ async function startProcess(file,args,cwd,errorCode,spawnProcess=spawn,env=null)
  child.unref();return state;
 }
 async function waitForVisibleGame(query,{attempts=60,interval=250,stableSamples=4,timeout=15000,exit,helper=false,helperError='LE_HELPER_FAILED',indirect=false,trace=()=>{},sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
- let pid=null,stable=0,seenProcess=false,exitLogged=false,answered=false,lastError=null,handoffUntil=0;
+ let pid=null,stable=0,seenProcess=false,exitLogged=false,answered=false,lastError=null,cleanExitAt=null;
  const deadline=Date.now()+timeout;
  for(let i=0;i<attempts&&Date.now()<deadline;i++){
   /* A process query can fail on some PCs (security software holding the helper, first-run scan past the timeout).
@@ -50,10 +50,12 @@ async function waitForVisibleGame(query,{attempts=60,interval=250,stableSamples=
   if(ended&&!exitLogged){
    trace(helper?'launch-helper-exited':'game-process-exited',ended);exitLogged=true;
    /* A successful direct launcher can exit before the game appears in the process list. */
-   if(!helper&&!indirect&&ended.code===0&&!ended.signal)handoffUntil=Date.now()+1000;
+   if(!helper&&!indirect&&ended.code===0&&!ended.signal)cleanExitAt=Date.now();
   }
   if(!processes.length&&((ended&&!helper)||seenProcess&&!indirect)){
-   if(Date.now()>=handoffUntil||i+1===attempts||Date.now()+interval>=deadline)throw Error('GAME_PROCESS_EXITED');
+   if(cleanExitAt===null||Date.now()-cleanExitAt>=1000||i+1===attempts||Date.now()+interval>=deadline){
+    const error=Error('GAME_PROCESS_EXITED');if(cleanExitAt!==null)error.exitedAt=cleanExitAt;throw error;
+   }
   }
   if(!processes.length&&helper&&!indirect&&ended&&(ended.code!==0||ended.signal))throw Error(helperError);
   if(i+1<attempts)await sleep(interval);
