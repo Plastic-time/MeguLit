@@ -74,7 +74,7 @@ test("Ren'Py: tl/<language> old/new pairs, the Chinese folder is picked",async()
 
 // Real data when this machine has it: Summer Pockets (Steam) restored to Japanese, Chinese column kept in the backup.
 const sp=path.join('E:/','Steam','steamapps','common','Summer Pockets');
-test('Siglus (Summer Pockets): Japanese column lines up with the Chinese column of the same table',{skip:!fs.existsSync(path.join(sp,'.megulit-japanese','dat'))&&'no local copy'},async()=>{
+test('Siglus (Summer Pockets): Japanese column lines up with the Chinese column of the same table',{skip:!(fs.existsSync(path.join(sp,'.megulit-japanese','dat'))&&fs.existsSync(path.join(sp,'SiglusEngine_Steam.exe')))&&'no local copy'},async()=>{
  const {DatabaseSync}=require('node:sqlite'),db=new DatabaseSync(':memory:');db.exec('CREATE TABLE games(id TEXT,executable TEXT,removed_at TEXT)');
  const exe=path.join(sp,'SiglusEngine_Steam.exe');db.prepare('INSERT INTO games VALUES(?,?,NULL)').run('1',exe);
  const data=fs.mkdtempSync(path.join(os.tmpdir(),'sp-'));

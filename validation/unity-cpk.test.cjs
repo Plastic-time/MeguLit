@@ -53,7 +53,7 @@ test('Unity messages keep unmarked narration after a message and pauses in the C
  const english=['#MesSta()', 'Good morning.','#MesEnd()','#MesSta()','「……」','#MesEnd()'].join('\n');
  assert.deepEqual(ua.parse(Buffer.from(english)).lines,[]);
 });
-test('Danganronpa V3 (Steam): CPK → SPC → STX text',{skip:!fs.existsSync(dr)&&'no local copy'},()=>{
+test('Danganronpa V3 (Steam): CPK → SPC → STX text',{skip:!fs.existsSync(dr+'/Dangan3Win.exe')&&'no local copy'},()=>{
  assert.equal(scenes.detect(dr),'drv3');const l=scenes.read('drv3',dr);assert.ok(l.length>5000);assert.ok(l.some(s=>s.lines.some(x=>/\w{4,}/.test(x))));});
 const hs='e:/steam/steamapps/common/海沙风云';
 test('海沙风云 (Unity + Fungus JSON in TextAssets)',{skip:!fs.existsSync(hs)&&'no local copy'},()=>{
