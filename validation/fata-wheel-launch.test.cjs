@@ -19,10 +19,17 @@ test('the Fata wheel launch can retain a verified wrapper language and resolve t
  const row={id:'fata',executable:launcher};
  const db={prepare:()=>({all:()=>[row]})};
  assert.equal(activeGameForProgram(db,executable),row);
+ fs.writeFileSync(launcher,Buffer.from('MZfata.exe\0-LANGUAGE=JP\0','latin1'));
+ assert.deepEqual(launchPlan(launcher),{executable,args:['-language=jp','-wheel=message']});
  fs.writeFileSync(launcher,wrapper('fata.exe\0'));
  assert.equal(launchPlan(launcher),null);
+ assert.equal(activeGameForProgram(db,executable),row);
  fs.writeFileSync(launcher,wrapper('fata.exe\0-language=jp\0-language=ru\0'));
+ assert.equal(launchPlan(launcher),null);
+ assert.equal(activeGameForProgram(db,executable),row);
+ fs.writeFileSync(launcher,Buffer.concat([Buffer.from('MZfata.exe\0\0','latin1'),Buffer.from('-language=jp\0','utf16le')]));
  assert.equal(launchPlan(launcher),null);
  fs.writeFileSync(launcher,wrapper('another.exe\0-language=jp\0'));
  assert.equal(launchPlan(launcher),null);
+ assert.equal(activeGameForProgram(db,executable),null);
 });

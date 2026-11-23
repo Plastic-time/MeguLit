@@ -32,3 +32,11 @@ test('a launcher that started no game still falls back to LEProc with the origin
  assert.deepEqual(started,['MeguLitLaunch32.exe','LEProc.exe']);assert.equal(r.gamePid,7);
  assert.deepEqual(commands,[[exe,...args],['-runas','ja',exe,...args]]);
 });
+
+test('a slow game started by a short-lived language launcher also prevents a second start',async t=>{
+ const {le,exe,started}=setup(t,{gameRunning:false});
+ const game=path.join(path.dirname(exe),'engine.exe');
+ le.processes=async file=>file===game?[{pid:7,visible:false}]:[];
+ await assert.rejects(le.launch(exe,{alsoExe:game}),/GAME_WINDOW_NOT_READY/);
+ assert.deepEqual(started,['MeguLitLaunch32.exe']);
+});

@@ -46,8 +46,8 @@ function activeGameForProgram(db,exe){
  if(exact.length)return exact.length===1?exact[0]:null;
  const variants=rows.filter(row=>knownPrograms(row,JSON.parse(row.original||'{}').library||{}).some(file=>canonical(file)===target));
  if(variants.length||path.basename(target)!=='fata.exe')return variants.length===1?variants[0]:null;
- const {launchPlan}=require('./fata-wheel.cjs');
- const launchers=rows.filter(row=>canonical(launchPlan(row.executable)?.executable)===target);
+ const {launchTarget}=require('./original-engines/krkr-lang.cjs');
+ const launchers=rows.filter(row=>canonical(launchTarget(row.executable)?.executable)===target);
  return launchers.length===1?launchers[0]:null;
 }
 function reconcile(root,items,{restoreRemoved=false,confirmedFolderMatches}={}){const db=openStore(root);let added=0,updated=0,committed=false;db.exec('BEGIN IMMEDIATE');try{
