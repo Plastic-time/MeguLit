@@ -60,6 +60,17 @@ test('Ikura GDL: SM2MPX10 and DRS archives, ISF version transforms, PM 0xFF text
  const locked=tmp(t);F.writeTree(locked,{SCR:F.mpx({'s001.isf':isfOf(F.sjis,IJA,{secret:true})}),'game.exe':'MZ'});
  assert.equal(scenes.detect(locked),null);assert.equal(scenes.unsupportedReason(locked)?.code,'IKURA_SECRET');
 });
+test('the Ikura probe reports a missing script key and keeps the scene sample',t=>{
+ const dir=tmp(t),executable=path.join(dir,'game.exe');
+ F.writeTree(dir,{SCR:F.mpx({'s001.isf':isfOf(F.sjis,IJA,{secret:true})}),'game.exe':'MZ'});
+ const result=require('../services/adapter-probe-core.cjs').probeGame({dir,executable,title:'Fixture'});
+ assert.equal(result.step,'decrypt-failed');
+ assert.equal(result.detail,'ikura:IKURA_SECRET');
+ assert.equal(result.detected,null);
+ assert.equal(result.lines,0);
+ const {samples}=require('../services/adapter-sample.cjs').sampleGame({dir,executable,result});
+ assert.ok(samples.some(s=>s.name==='s001.isf'&&s.role==='script:ikura'));
+});
 
 /* ---- ExHIBIT -------------------------------------------------------------------------------------------------- */
 const rldOf=(enc,L,o)=>F.rld([F.rldSay('記述',L[0],enc),F.rldSay('ひなた',L[1],enc),{op:0x0c,ints:[],strs:[enc('1 第一章')]},F.rldChoice([L[2],L[3]],enc),F.rldSay('*',L[4],enc)],{...o,enc});
