@@ -35,8 +35,8 @@ test('home settings: a global size is saved as hand-set, and a work\'s size as w
 test('the running reader is rebuilt from the global preset, and global sizes reach the running work',()=>{
  const src=read('services/runtime.cjs');
  assert.match(src,/SIZE_KEYS=\['japaneseSize','translationSize','englishSize'\]/);
- assert.match(src,/settings\.save\(\{scope:'text',profile:active/);
- assert.match(src,/const global=settings\.read\('text'\)/);
+ assert.match(src,/settings\.releaseSizes\(active,sizes\)/,'issue 800: the running work follows Settings instead of keeping a copy');
+ assert.match(src,/settings\.read\('text',active\)/);
  assert.doesNotMatch(src,/clean\(readJSON\(path\.join\(this\.folder,'gal-preferences\.json'\)\)\)/);
 });
 
