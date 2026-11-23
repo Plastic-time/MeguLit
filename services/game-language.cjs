@@ -122,7 +122,8 @@ function originalExecutable(db,id,root,mode,executable){
   const updaterStem=versionedUpdaterStem(row.executable);
   if(updaterStem!==null){const target=key(path.join(path.dirname(row.executable),updaterStem+'.exe'));
    const canResolve=updaterStem&&!localTranslated&&!['zh','en'].includes(lib.contentLanguage);
-   const matches=canResolve?candidates.filter(f=>key(f)===target&&!require('../core/library.cjs').isTranslated(path.basename(f))):[];
+   const matches=canResolve?candidates.filter(f=>key(f)===target
+    &&!require('../core/library.cjs').isTranslated(f)&&!require('../core/translated-launcher.cjs').inspect(f).translated):[];
    selected=matches.length===1?matches[0]:'';}
  }else if(mode!=='select')throw Error('INVALID_EXECUTABLE');
  if(!valid(selected)||legacyBlocked&&key(selected)===key(row.executable))throw Error('JAPANESE_EXECUTABLE_REQUIRED');

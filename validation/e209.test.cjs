@@ -205,3 +205,35 @@ test('automatic original selection repairs a saved versioned updater using its e
  insert.run('patch','Fixture',updater,'manual',data);
  assert.throws(()=>originalExecutable(db,'patch',root,'find'),/JAPANESE_EXECUTABLE_REQUIRED/);
 });
+test('automatic updater recovery preserves an old entry in a translated folder with no language setting',t=>{
+ const {root,write}=fixture(t),db=openStore(root);t.closeBeforeCleanup(()=>db.close());
+ const {originalExecutable}=require('../services/game-language.cjs');
+ const insert=db.prepare('INSERT INTO games(id,title,executable,source,original) VALUES(?,?,?,?,?)');
+ const record=db.prepare('SELECT executable,original FROM games WHERE id=?');
+ for(const folder of ['Novel-en','Novel-汉化']){
+  const exe=write(folder+'/NovelUpdata1.01.exe','updater');
+  write(folder+'/Novel.exe','translated game');
+  const original=JSON.stringify({library:{dir:path.dirname(exe)}});
+  insert.run(folder,'Fixture',exe,'manual',original);
+  assert.throws(()=>originalExecutable(db,folder,root,'find'),/JAPANESE_EXECUTABLE_REQUIRED/);
+  assert.deepEqual({...record.get(folder)},{executable:exe,original});
+ }
+});
+test('automatic updater recovery follows the existing translation-launcher check',t=>{
+ const {root,write}=fixture(t),db=openStore(root);t.closeBeforeCleanup(()=>db.close());
+ const {originalExecutable}=require('../services/game-language.cjs');
+ const insert=db.prepare('INSERT INTO games(id,title,executable,source,original) VALUES(?,?,?,?,?)');
+ const record=db.prepare('SELECT executable,original FROM games WHERE id=?');
+ const exe=write('marked/白昼恋歌Updata1.01.exe','updater');
+ write('marked/白昼恋歌.exe','translated game');
+ write('marked/title_cn.dll','translation marker');
+ const original=JSON.stringify({library:{dir:path.dirname(exe)}});
+ insert.run('marked','Fixture',exe,'manual',original);
+ assert.throws(()=>originalExecutable(db,'marked',root,'find'),/JAPANESE_EXECUTABLE_REQUIRED/);
+ assert.deepEqual({...record.get('marked')},{executable:exe,original});
+
+ const cleanUpdater=write('clear/白昼恋歌Updata1.01.exe','updater');
+ const cleanGame=write('clear/白昼恋歌.exe','original game');
+ insert.run('clear','Fixture',cleanUpdater,'manual',JSON.stringify({library:{dir:path.dirname(cleanUpdater)}}));
+ assert.equal(originalExecutable(db,'clear',root,'find').executable,cleanGame);
+});

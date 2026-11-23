@@ -57,6 +57,17 @@ test('versioned updaters beside a game are excluded from scanning and launch pla
  assert.equal(plan.launchVia,'');
  assert.deepEqual(plan.alternatives,[]);
 });
+test('an emulator target cannot select a versioned updater during scanning',t=>{
+ const dir=folder('Novel',{'Novel.exe':pe(1400000),'NovelUpdata1.01.exe':pe(8000000),
+  'launcher.ini':'Target=NovelUpdata1.01.exe\r\n','script.npa':'NPA'});
+ t.after(()=>fs.rmSync(path.dirname(dir),{recursive:true,force:true}));
+ assert.equal(library.findGame(dir).exe,path.join(dir,'Novel.exe'));
+
+ const game=folder('Novel',{'Novel.exe':pe(1400000),'NovelAlternate.exe':pe(400000),
+  'launcher.ini':'Target=NovelAlternate.exe\r\n','script.npa':'NPA'});
+ t.after(()=>fs.rmSync(path.dirname(game),{recursive:true,force:true}));
+ assert.equal(library.findGame(game).exe,path.join(game,'NovelAlternate.exe'));
+});
 test('a protected versioned updater cannot be the engine for a smaller clean game',t=>{
  const dir=folder('Novel',{'Novel.exe':pe(1400000),
   'NovelUpdata1.01.exe':pe(8000000),'NovelUpdata1.01.exe.emb':SIG,
