@@ -82,7 +82,7 @@ test('while the game runs, only a changed global size takes over that game\'s ow
  assert.equal(stored().prefs.japaneseSize,28.5,'a colour change keeps the game\'s size');assert.equal(shown.at(-1),28.5);
  save({...settings.get().values.text,japaneseSize:22});
  assert.equal('japaneseSize' in stored().prefs,false);assert.equal(shown.at(-1),22,'the running game shows the new size at once');
- assert.match(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),/sizesBefore=request\.scope==='text'&&!request\.profile\?settings\.read\('text'\):undefined;.*runtime\?\.settingsSaved\(\{\.\.\.request,sizesBefore\}\)/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),/sizesBefore=request\.scope==='text'&&!request\.profile\?settings\.read\('text'\):undefined;.*runtime\?\.settingsSaved\(\{\.\.\.request,sizesBefore(?:,\s*\w+)*\}\)/);
 });
 
 test('a running game with an old copied default size shows the Settings size',t=>{
