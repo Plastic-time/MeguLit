@@ -138,11 +138,11 @@ const rpaRead=(file,e)=>{const raw=Buffer.concat([e.prefix,kit.readAt(file,e.off
 
 /* ---- rpyc ------------------------------------------------------------------------------------------------------ */
 const isRpyc=buf=>buf.length>10&&(buf.toString('latin1',0,10)==='RENPY RPC2'||buf[0]===0x78);
-/* the pickled bytes of a .rpyc: slot 1 (or, with all, every slot joined: the font scan reads them all) */
-function data(buf,{all=false}={}){
- if(buf.toString('latin1',0,10)!=='RENPY RPC2')return zlib.inflateSync(buf);
+/* The pickled bytes of a .rpyc: slot 1 by default, or all slots joined for the font scan. */
+function data(buf,{all=false,slot:target=1}={}){
+ if(buf.toString('latin1',0,10)!=='RENPY RPC2')return all||target===1?zlib.inflateSync(buf):null;
  const parts=[];let p=10;while(p+12<=buf.length){const slot=buf.readUInt32LE(p),start=buf.readUInt32LE(p+4),len=buf.readUInt32LE(p+8);p+=12;if(!slot)break;
-  if(all){try{parts.push(zlib.inflateSync(buf.subarray(start,start+len)));}catch{}}else if(slot===1)return zlib.inflateSync(buf.subarray(start,start+len));}
+  if(all){try{parts.push(zlib.inflateSync(buf.subarray(start,start+len)));}catch{}}else if(slot===target)return zlib.inflateSync(buf.subarray(start,start+len));}
  return parts.length?Buffer.concat(parts):null;}
 function statements(buf){return statementsOf(data(buf));}
 function statementsOf(data){
@@ -166,7 +166,7 @@ function walk(stmts,visit){const seen=new Set();
   for(const k of Object.keys(v))if(k!=='__class'&&k!=='__args')go(v[k],id,lang);};
  go(stmts,null,null);}
 /* the running script: lines (Say text and menu choices), their translate ids, the speaker variable as an anchor */
-function parse(buf){const lines=[],ids=[],anchors=[],roles=[];let stmts;try{stmts=statements(buf);}catch{return {lines,anchors};}
+function parse(buf,{slot=1}={}){const lines=[],ids=[],anchors=[],roles=[];let stmts;try{stmts=statementsOf(data(buf,{slot}));}catch{return {lines,anchors};}
  walk(stmts,x=>{if(x.lang)return;if(x.kind==='say'&&x.text){lines.push(x.text);roles.push('b');ids.push(x.id||null);if(x.who)anchors.push(x.who);}else if(x.kind==='choice'){lines.push(x.text);roles.push('c');ids.push(null);}});
  return {lines,anchors,roles:roles.join(''),...(ids.some(Boolean)?{ids}:{})};}
 /* a compiled tl/<language> file: identifier -> translated Say text, old -> new strings */
