@@ -11,11 +11,21 @@ const pGlobal=(mod,name)=>Buffer.from('c'+mod+'\n'+name+'\n','latin1');
 const pDict=entries=>Buffer.concat([Buffer.from([0x28]),...entries.flatMap(([k,v])=>[pStr(k),v]),Buffer.from([0x64])]);
 const pList=items=>Buffer.concat([Buffer.from([0x28]),...items,Buffer.from([0x6c])]);
 const pObj=(mod,name,state)=>Buffer.concat([pGlobal(mod,name),Buffer.from([0x29,0x81]),pDict(state),Buffer.from([0x62])]);
-function makeRpyc(stmts){
- const pickle=Buffer.concat([Buffer.from([0x80,0x02,0x28,0x7d]),pList(stmts),Buffer.from([0x74,0x2e])]);
- const payload=zlib.deflateSync(pickle),header=Buffer.alloc(10+24);
- header.write('RENPY RPC2',0,'latin1');header.writeUInt32LE(1,10);header.writeUInt32LE(header.length,14);header.writeUInt32LE(payload.length,18);
- return Buffer.concat([header,payload]);
+function makeRpyc(stmts,restructured){
+ const payloads=(restructured?[stmts,restructured]:[stmts]).map(nodes=>zlib.deflateSync(Buffer.concat([
+  Buffer.from([0x80,0x02,0x28,0x7d]),pList(nodes),Buffer.from([0x74,0x2e]),
+ ])));
+ const header=Buffer.alloc(10+12*(payloads.length+1));
+ header.write('RENPY RPC2',0,'latin1');
+ let offset=header.length;
+ for(let i=0;i<payloads.length;i++){
+  const entry=10+12*i;
+  header.writeUInt32LE(i+1,entry);
+  header.writeUInt32LE(offset,entry+4);
+  header.writeUInt32LE(payloads[i].length,entry+8);
+  offset+=payloads[i].length;
+ }
+ return Buffer.concat([header,...payloads]);
 }
 function makeRpa(entries){
  const key=0x42424242,hdr=Buffer.from(`RPA-3.0 0000000000000000 ${key.toString(16).padStart(8,'0')}\n`,'latin1');
@@ -98,6 +108,30 @@ test("Ren'Py: compiled RPA base script reads Japanese tl/*.rpyc inside RPA and p
  assert.ok(r.found,JSON.stringify(r));
  assert.equal(ot.provider(data,exe).resolve('今すぐお店に行くよ。').translation,'我现在就去商店。');
 });
+
+for(const sameOrder of [true,false]){
+ test(`Ren'Py: restructured RPA dialogue IDs ${sameOrder?'recover compiled Japanese lines':'require matching source lines'}`,t=>{
+  const game=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-renpy-rpyc-slots-'));
+  t.after(()=>fs.rmSync(game,{recursive:true,force:true}));
+  const g=path.join(game,'game');
+  fs.mkdirSync(g);
+  const exe=path.join(game,'game.exe');
+  fs.writeFileSync(exe,'MZ');
+  const source=['Сейчас начинается новый урок.','Пожалуйста, откройте свою книгу.'];
+  const japanese=['授業が始まります。','本を開いてください。'];
+  const blocks=source.map((text,i)=>translateNode(`lesson_${i}`,null,[sayNode(text)]));
+  fs.writeFileSync(path.join(g,'archive.rpa'),makeRpa([
+   ['script.rpyc',makeRpyc(source.map(text=>sayNode(text)),sameOrder?blocks:blocks.reverse())],
+   ['tl/japanese/script.rpyc',makeRpyc(japanese.map((text,i)=>translateNode(`lesson_${i}`,'japanese',[sayNode(text)])))],
+  ]));
+  const probe=probeGame({dir:game,executable:exe,title:'Compiled lesson'});
+  assert.equal(probe.japaneseLines,sameOrder?2:0);
+  if(sameOrder)assert.equal(probe.step,'ok');
+  const [scene]=scenes.read('renpy',game);
+  assert.deepEqual(scene.lines,sameOrder?japanese:source);
+  if(sameOrder)assert.deepEqual(scene.ids,['lesson_0','lesson_1']);
+ });
+}
 
 test("Ren'Py: overlay replacement still parses the overlay buffer instead of s.parse()",t=>{
  const top=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-renpy-tl-overlay-'));

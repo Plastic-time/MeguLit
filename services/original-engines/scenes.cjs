@@ -283,9 +283,18 @@ function renpyJapaneseTl(g,base,{deadline=Infinity}={}){
  return best&&bestScore>baseJp*2?{...best,score:bestScore}:null;}
 function renpyScenes(dir,{deadline=Infinity}={}){const g=gameDir(dir),base=renpyBaseScenes(g),jp=renpyJapaneseTl(g,base,{deadline});
  if(!jp)return base;
- return base.map(s=>({name:s.name,read:s.read,parse(){const parsed=parseRenpyRaw(s.read()),src=parsed.lines;let hit=false;
-  const lines=src.map((t,k)=>{const id=parsed.ids?.[k],v=(id&&jp.ids.get(id))||jp.pairs.get(t)||jp.strings.get(t)||'';if(!v)return t;hit=true;return v;});
-  return hit?{...parsed,lines,sourceLines:src}:parsed;}}));}
+ return base.map(s=>({name:s.name,read:s.read,parse(){
+  const raw=s.read(),parsed=parseRenpyRaw(raw),src=parsed.lines;
+  let ids=parsed.ids;
+  // Older Ren'Py puts generated dialogue IDs in the restructured slot. Keep slot 1's line order and roles.
+  if(jp.ids.size&&rpyc.isRpyc(raw)&&src.some((_,i)=>parsed.roles?.[i]==='b'&&!ids?.[i])){
+   const restructured=rpyc.parse(raw,{slot:2});
+   if(restructured.ids&&restructured.roles===parsed.roles&&src.every((text,i)=>text===restructured.lines[i]))
+    ids=src.map((_,i)=>ids?.[i]||restructured.ids[i]);
+  }
+  let hit=false;
+  const lines=src.map((t,k)=>{const id=ids?.[k],v=(id&&jp.ids.get(id))||jp.pairs.get(t)||jp.strings.get(t)||'';if(!v)return t;hit=true;return v;});
+  return hit?{...parsed,...(ids?{ids}:{}),lines,sourceLines:src}:parsed;}}));}
 /* compiled tl files of a patch (or of the game's own tl folders): per language, id -> text and old -> new */
 function rpycTl(dirs){const langs=new Map(),add=buf=>{const t=rpyc.translations(buf);if(!t.lang||/^none$/i.test(t.lang))return;const l=langs.get(t.lang)||{ids:new Map(),strings:new Map()};langs.set(t.lang,l);for(const [k,v] of t.ids)if(!l.ids.has(k))l.ids.set(k,v);for(const [k,v] of t.strings)if(!l.strings.has(k))l.strings.set(k,v);};
  const seen=new Set();for(const d of dirs){let names;try{names=fs.readdirSync(d);}catch{continue;}
