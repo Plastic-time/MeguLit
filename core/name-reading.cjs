@@ -4,6 +4,7 @@
    character with the name as written (高嶺 昂晴) and in romaji (Takamine Kousei), so the reading comes from there. */
 const fs=require('node:fs'),path=require('node:path');
 const {kana}=require('./furigana.js');
+const {COUNTERS}=require('./counter-reading.cjs');
 const hasKanji=s=>/[\p{Script=Han}々]/u.test(s||'');
 
 const SYLLABLES={a:'あ',i:'い',u:'う',e:'え',o:'お',
@@ -90,6 +91,8 @@ function nameTokens(tokens,names){
    // in 新スキル (篝シナリオ is still Kagari's). A title, 家 or 本人 after it is still the name (希本人, 希先輩, 鳳家).
    // Otherwise the game's own cast is trusted: Cafe Stella writes 希に and 希な 133 times, all for Nozomi (希に起こされ, 希なら).
    const next=tokens[j+1],touching=next&&(!Number.isInteger(next.start)||next.start===part.at(-1).end),word=next?.surface||'';
+   // A name written in numerals before a counter is the count: 九十九 (Tsukumo) in 九十九回目 is きゅうじゅうきゅう.
+   if(/^[〇一二三四五六七八九十百千万]+$/u.test(surface)&&touching&&Object.hasOwn(COUNTERS,word))continue;
    if([...surface].length===1&&touching&&!TITLES.has(word)&&(/^\p{Script=Han}/u.test(word)||/^\p{Script=Katakana}/u.test(word)&&['接頭辞','接尾辞'].includes((part[0].grammar||[])[0])))continue;
    hit={part,surface,reading,stop:j};
    // VNDB romaji often drops long vowels (戸崎 瑛三 Tosaki Eizo, as the official site's thumb_eizo.jpg): when the tokenizer
@@ -131,7 +134,8 @@ async function vnForTitles(titles,{folder,find,now}){
  const search=find||vndbTitle;let found='',changed=false;
  for(const title of [...new Set((titles||[]).map(t=>String(t||'').trim()).filter(Boolean))]){
   const seen=known[title];if(fresh(seen,now,seen?.id?WEEK:DAY)){if(seen.id){found=seen.id;break;}continue;}
-  const vn=await search(title);if(vn===undefined)continue;
+  // VNDB unreachable: an id found before still names the game, so its cached characters are used.
+  const vn=await search(title);if(vn===undefined){if(seen?.id){found=seen.id;break;}continue;}
   known[title]={id:vn?.id||null,at:now};changed=true;if(vn?.id){found=vn.id;break;}
  }
  if(file&&changed){fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(known));fs.renameSync(file+'.tmp',file);}
@@ -153,7 +157,7 @@ async function gameNames(vndbId,{folder,fetcher=fetch,lookup,now=Date.now(),titl
   }
   if(file){fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify({at:now,vndbId:'v'+id,characters}));fs.renameSync(file+'.tmp',file);}
   return new Map(characterNames(characters,lookup));
- }catch{return new Map(characterNames(Array.isArray(cached?.characters)?cached.characters:[],lookup));}
+ }catch{return new Map(characterNames(cached?.characters||[],lookup));}
 }
 
 module.exports={romajiKana,characterNames,nameTokens,gameNames,vndbTitle};

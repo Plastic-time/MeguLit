@@ -88,7 +88,16 @@ test('the reader’s furigana, lookup and speech button read the bound game’s 
  assert.equal(reader.match(/this\.gameId=null;this\.runtime\.localLearning\?\.useNames\(null\);/g)?.length,2,'game change and game exit');
  assert.match(reader,/readings\.resolve\(this\.runtime\.learning\(\)\.withNames\(r\.result\)\)/,'the UniDic engine path too');
  assert.match(reader,/learning\(\)\.request\(r\.command,r\.args,r\.language\|\|this\.prefs\(\)\.learnerLanguage\|\|'zh',\{names:true\}\)/,'the reader page furigana');
- assert.match(reader,/learning\(\)\.word\(args,args\.entryId,\{names:true\}\)/,'the reader card and speech button');
+ assert.match(reader,/learning\(\)\.request\(command,args,this\.prefs\(\)\.learnerLanguage\|\|'zh',\{names:true\}\)/,'the reader page invoke path');
+});
+
+test('the reader card reads game names, the dictionary page’s Anki button does not',async()=>{
+ const {Reader}=require('../services/reader.cjs');const asked=[];
+ const model={word:async(args,id,options)=>{asked.push(options);return {surface:'希',reading:options?.names?'のぞみ':'まれ',pitch:[],ambiguous:false};}};
+ const reader=Object.assign(Object.create(Reader.prototype),{active:()=>true,runtime:{config:()=>({}),learning:()=>model}});
+ await reader.message({type:'v4',action:'word',args:{text:'希',start:0,end:1},id:1});
+ await reader.message({type:'v4',action:'word',args:{text:'希',start:0,end:1,dictionary:true},id:2});
+ assert.deepEqual(asked,[{names:true},{names:false}]);
 });
 
 test('the speech button says a full name as its family and given name',async()=>{
@@ -152,4 +161,14 @@ test('a damaged or future-dated name cache is replaced, not trusted',async()=>{
  let asked=0;const fetcher=async(...a)=>{asked++;return characters(...a);};
  assert.equal((await gameNames('v19216',{folder,fetcher,now:2000})).get('鹿南'),'かな','a cache written in the future (a clock set back) is fetched again');
  assert.equal(asked,1);
+ // Offline weeks later: the title's old id still finds the cached characters.
+ const offline=async()=>{throw Error('offline');};
+ assert.equal((await gameNames('',{titles:['去人たち'],folder,find:async()=>undefined,fetcher:offline,now:2000+30*86400e3})).get('鹿南'),'かな');
+ fs.writeFileSync(path.join(folder,'v19216.json'),JSON.stringify({at:1,characters:'x'}));
+ assert.equal((await gameNames('v19216',{folder,fetcher:offline,now:3000})).size,0,'a damaged cache and no VNDB give no names, not an error');
+});
+
+test('the reader page’s copy of the 私 reading drops the わたくし accent like the core one',()=>{
+ for(const file of ['core/furigana.js','web/reader/modules/furigana.js'])
+  assert.match(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),/reading: 'わたし' \+ reading\.slice\(4\), pitch: \[\], lexeme: null/,file);
 });

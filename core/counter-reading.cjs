@@ -90,13 +90,16 @@ const COUNTERS = {
   '頭': { base: 'とう', gem: [ST, 'とう'] },
   '通': { base: 'つう', gem: [ST, 'つう'] },
   '秒': { base: 'びょう' }, '枚': { base: 'まい' }, '台': { base: 'だい' }, '度': { base: 'ど' }, '番': { base: 'ばん' },
-  '倍': { base: 'ばい' }, '名': { base: 'めい' }, '割': { base: 'わり' }, '話': { base: 'わ' }, '週間': { base: 'しゅうかん' },
+  '倍': { base: 'ばい' }, '名': { base: 'めい' }, '割': { base: 'わり' }, '話': { base: 'わ' },
+  '週間': { base: 'しゅうかん', gem: [ST, 'しゅうかん'] },
   '円': { base: 'えん', numbers: { 4: 'よ' } },
   '年': { base: 'ねん', numbers: { 4: 'よ' } },
   '人': { base: 'にん', numbers: { 4: 'よ' }, exact: { 1: 'ひとり', 2: 'ふたり' } },
   '時': { base: 'じ', numbers: { 4: 'よ', 7: 'しち', 9: 'く' } },
   '時間': { base: 'じかん', numbers: { 4: 'よ', 7: 'しち', 9: 'く' } },
   '月': { base: 'がつ', numbers: { 4: 'し', 7: 'しち', 9: 'く' }, only: n => n >= 1 && n <= 12 },
+  // The native count: SudachiDict reads 六つ むいつ.
+  'つ': { base: 'つ', only: n => n >= 1 && n <= 9, exact: { 1: 'ひとつ', 2: 'ふたつ', 3: 'みっつ', 4: 'よっつ', 5: 'いつつ', 6: 'むっつ', 7: 'ななつ', 8: 'やっつ', 9: 'ここのつ' } },
   // 一日 is いちにち or ついたち by meaning: the plain reading stays.
   '日': { base: 'にち', numbers: { 7: 'しち', 9: 'く' }, lastFour: 'よっか', exact: { 2: 'ふつか', 3: 'みっか', 4: 'よっか', 5: 'いつか', 6: 'むいか', 7: 'なのか', 8: 'ようか', 9: 'ここのか', 10: 'とおか', 20: 'はつか' } },
 };
@@ -111,6 +114,8 @@ function geminated(tail, kind) {
    it is usually じゅうぶん (enough), not ten minutes. */
 function counterReading(numberText, counter) {
   const rule = COUNTERS[counter], n = parseNumber(numberText);
+  // 日間 is the day count and かん: 三日間 みっかかん, 十日間 とおかかん.
+  if (counter === '日間') { const days = counterReading(numberText, '日'); return days && days + 'かん'; }
   if (!rule || n === null || (numberText === '十' && counter === '分') || (rule.only && !rule.only(n))) return '';
   if (rule.exact?.[n]) return rule.exact[n];
   const { head, tail, kind } = numberParts(n);
@@ -128,22 +133,24 @@ function counterReading(numberText, counter) {
 /* Tokens with numbers read by value and a number + counter joined into one word (readingSource 'number'), so furigana,
    the speech button and cards share one reading. The pieces stay as subtokens for dictionary lookup; the UniDic accent of
    the pieces does not fit the word, so speech estimates it. A numeral is a 数詞 token, or plain digits without part of
-   speech. Tokens already read here pass through unchanged. */
+   speech. Tokens already read here pass through unchanged. A kanji numeral without a counter keeps the tokenizer's
+   reading, which knows the native counts (六つ むっつ, 三日月 みかづき). */
 const isNumeral = t => typeof t?.surface === 'string' && t.readingSource !== 'name' && (Array.isArray(t.grammar) ? t.grammar[1] === '数詞' : /^[0-9０-９,，]+$/.test(t.surface)) && parseNumber(t.surface) !== null;
 function numberTokens(tokens) {
   if (!Array.isArray(tokens)) return tokens;
   const out = [];
+  const zero = t => /^[〇零]$/.test(t?.surface || '') && t?.grammar?.[1] === '数詞';
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i], next = tokens[i + 1];
     // A score or a match-up: SudachiDict reads ０対２ and 5対5 with 対 as the pair counter ツイ (一対の).
-    if (token?.surface === '対' && isNumeral(tokens[i - 1]) && isNumeral(next)) { out.push({ ...token, reading: 'たい', pitch: [], lexeme: null, readingSource: 'number' }); continue; }
-    const plain = isNumeral(token), value = plain ? parseNumber(token.surface) : token?.grammar?.[1] === '数詞' && token.readingSource !== 'name' ? placed(token.surface) : null;
+    if (token?.surface === '対' && (isNumeral(tokens[i - 1]) || zero(tokens[i - 1])) && (isNumeral(next) || zero(next))) { out.push({ ...token, reading: 'たい', pitch: [], lexeme: null, readingSource: 'number' }); continue; }
+    const plain = isNumeral(token), value = plain ? parseNumber(token.surface) : token?.grammar?.[1] === '数詞' ? placed(token.surface) : null;
     if (value === null || token.readingSource === 'number') { out.push(token); continue; }
     const touching = typeof next?.surface === 'string' && (!Number.isInteger(token.end) || token.end === next.start);
     /* 分 of a fraction or a tenth is ぶ: 3分の1 さんぶんのいち, 八分咲き はちぶざき. */
     const after = tokens[i + 2], tenth = touching && next.surface === '分' && (after?.surface === 'の' && isNumeral(tokens[i + 3]) ? 'ぶん' : /^咲/.test(after?.surface || '') ? 'ぶ' : '');
     const joined = tenth ? readNumber(value) + tenth : touching ? counterReading(plain ? token.surface : String(value), next.surface) : '';
-    if (!joined && !plain) { out.push(token); continue; }
+    if (!joined && !(plain && /[0-9０-９〇零]/.test(token.surface))) { out.push(token); continue; }
     if (joined) {
       const word = token.surface + next.surface;
       out.push({ ...token, surface: word, reading: joined, base_form: word, normalized: word, end: Number.isInteger(next.end) ? next.end : token.end,

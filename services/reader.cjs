@@ -662,7 +662,8 @@ class Reader{
    const captured=action==='anki'&&typeof args.screenshotId==='string'&&this.cardScreenshots?.get(args.screenshotId);
    const screenshot=captured&&captured.expires>Date.now()?captured.image:'';
    if(captured)this.cardScreenshots.delete(args.screenshotId);
-   const word=await this.runtime.learning().word(args,args.entryId,{names:true}),reading=this.gal?.gameRuby?.dict(this.gal?.styleSync?.profileKey)?.[word.surface];if(reading){word.reading=reading;word.ambiguous=false;word.pitch=[];}
+   // The dictionary page's Anki button comes here too (args.dictionary): it is no game text, so no game names.
+   const word=await this.runtime.learning().word(args,args.entryId,{names:!args.dictionary}),reading=this.gal?.gameRuby?.dict(this.gal?.styleSync?.profileKey)?.[word.surface];if(reading){word.reading=reading;word.ambiguous=false;word.pitch=[];}
    if(args.pitchChoice!==undefined){if(!word.pitch.includes(args.pitchChoice))throw Error('INVALID_PITCH');word.pitch=[args.pitchChoice];}
    /* 2026-11-15 学习 › 词典 「加入 Anki」 (args.dictionary): the same card, made from a dictionary entry outside the game. The card's
       sentence is the example the page passes (a MOJi example, or none), never the word itself; no game picture or game voice is taken,

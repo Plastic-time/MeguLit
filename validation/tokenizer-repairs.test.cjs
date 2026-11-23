@@ -25,6 +25,16 @@ const SUDACHI={
  '〇〇さん':[['〇〇','レイキゴウ','名詞,数詞,*,*,*,*'],['さん','サン','接尾辞,名詞的,一般,*,*,*']],
  '一五歳':[['一五','イチゴ','名詞,数詞,*,*,*,*'],['歳','サイ','接尾辞,名詞的,助数詞,*,*,*']],
  '二八':[['二八','ニハチ','名詞,数詞,*,*,*,*']],
+ '十日間':[['十','トウ','名詞,数詞,*,*,*,*'],['日間','カカン','名詞,普通名詞,助数詞可能,*,*,*']],
+ '一週間後':[['一','イチ','名詞,数詞,*,*,*,*'],['週間','シュウカン','名詞,普通名詞,助数詞可能,*,*,*'],['後','ゴ','接尾辞,名詞的,副詞可能,*,*,*']],
+ '1週間':[['1','イチ','名詞,数詞,*,*,*,*'],['週間','シュウカン','名詞,普通名詞,助数詞可能,*,*,*']],
+ 'おでかけ中です':[['おでかけ','オデカケ','名詞,普通名詞,サ変可能,*,*,*'],['中','チュウ','接尾辞,名詞的,副詞可能,*,*,*'],['です','デス','助動詞,*,*,*,助動詞-デス,終止形-一般']],
+ '十対零':[['十','ジュウ','名詞,数詞,*,*,*,*'],['対','ツイ','名詞,普通名詞,助数詞可能,*,*,*'],['零','レイ','名詞,数詞,*,*,*,*']],
+ '九十九回目':[['九十九','キュウジュウキュウ','名詞,数詞,*,*,*,*'],['回','カイ','名詞,普通名詞,助数詞可能,*,*,*'],['目','メ','接尾辞,名詞的,一般,*,*,*']],
+ '九十九は':[['九十九','ツクモ','名詞,普通名詞,一般,*,*,*'],['は','ハ','助詞,係助詞,*,*,*,*']],
+ '二〇二六':[['二〇二六','ニレイニロク','名詞,数詞,*,*,*,*']],
+ '中':[['中','ナカ','名詞,普通名詞,副詞可能,*,*,*']],
+ '六つの':[['六','ムイ','名詞,数詞,*,*,*,*'],['つ','ツ','接尾辞,名詞的,助数詞,*,*,*'],['の','ノ','助詞,格助詞,*,*,*,*']],
  '〇月':[['〇','レイ','名詞,数詞,*,*,*,*'],['月','ガツ','名詞,普通名詞,助数詞可能,*,*,*']],
  '三分咲き':[['三','サン','名詞,数詞,*,*,*,*'],['分','フン','名詞,普通名詞,助数詞可能,*,*,*'],['咲き','サキ','名詞,普通名詞,一般,*,*,*']],
  '二三日':[['二三','ニサン','名詞,数詞,*,*,*,*'],['日','ニチ','名詞,普通名詞,助数詞可能,*,*,*']],
@@ -41,7 +51,7 @@ const SUDACHI={
  '達':[['達','トオル','名詞,固有名詞,人名,名,*,*']],
 };
 function tokens(text){let at=0;return (SUDACHI[text]||[]).map(([surface,reading,pos,base=surface])=>{const grammar=pos.split(','),t={surface,reading,grammar,pos:grammar[0],base_form:base,normalized:base,start:at,end:at+surface.length,pitch:[]};at=t.end;return t;});}
-const ENTRIES=[{id:1,spellings:['性に合う'],readings:['しょうにあう']},{id:2,spellings:['見に来る'],readings:['みにくる']},{id:3,spellings:['気もない'],readings:['けもない']}];
+const ENTRIES=[{id:1,spellings:['性に合う'],readings:['しょうにあう']},{id:2,spellings:['見に来る'],readings:['みにくる']},{id:3,spellings:['気もない'],readings:['けもない']},{id:4,spellings:['一週間'],readings:['いっしゅうかん']}];
 function stubbed(){
  const L=new LocalLearning(path.join(os.tmpdir(),'megulit-tokenizer-repairs'));L.ready=async()=>{};L.asked=[];
  L.worker={stdin:{write(line){const {id,text}=JSON.parse(line);L.asked.push(text);const p=L.pending.get(id);clearTimeout(p.timer);L.pending.delete(id);p.resolve(tokens(text));}}};
@@ -67,7 +77,8 @@ test('suffixes that attach to kana words keep their reading',async()=>{
  assert.equal(await read(L,'ちゃん的には','的'),'テキ');  // 形状詞的: ちゃん的には, ありす風
  assert.equal(await read(L,'さわり方を','方'),'カタ');    // after a 連用形 it is the way of doing
  assert.equal(await read(L,'さん達の','達'),'タチ');      // alone 達 is the given name トオル
- assert.equal(await read(L,'あんた方','方'),'カタ');      // after a pronoun: honorific (がた), not ほう
+ assert.equal(await read(L,'あんた方','方'),'カタ');      // after a pronoun: not ほう
+ assert.equal(await read(L,'おでかけ中です','中'),'チュウ'); // after an activity: during
  assert.equal(await read(L,'小さき','小'),'サ');          // a prefix before more kana is a split word
 });
 
@@ -75,6 +86,7 @@ test('対 between two numbers is a score or a match-up',async()=>{
  const L=stubbed();
  assert.equal(await read(L,'０対２','対'),'たい');
  assert.equal(await read(L,'対２','対'),'ツイ');
+ assert.equal(await read(L,'十対零','対'),'たい');                      // a lone 零 is a score too
  assert.equal(await read(L,'二対の','対'),'タイ');   // a pair counter (につい) is not a score; left as SudachiDict reads it
 });
 
@@ -87,6 +99,11 @@ test('numbers that are not a plain count stay as SudachiDict and the dictionary 
  assert.equal(await read(L,'二〇二六年','二〇二六年'),'にせんにじゅうろくねん'); // written with a zero, it is positional
  assert.equal(await read(L,'一五歳','一五歳'),'じゅうごさい');        // in place before a counter
  assert.equal(await read(L,'二八','二八'),'ニハチ');                  // without one it may be 2 and 8
+ assert.equal(await read(L,'十日間','十日間'),'とおかかん');
+ assert.equal(await read(L,'六つの','六つ'),'むっつ');                   // SudachiDict: むいつ
+ assert.equal(await read(L,'1週間','1週間'),'いっしゅうかん');
+ assert.equal(await read(L,'一週間後','一週間'),'いっしゅうかん');      // a dictionary word that starts with the number
+ assert.equal(await read(L,'二〇二六','二〇二六'),'にせんにじゅうろく');  // positional, without a counter too
  assert.equal(await read(L,'数万人','万'),'マン');                  // several ten thousands, not いちまん
  assert.equal(await read(L,'3分の1','3分'),'さんぶん');              // a fraction
  assert.equal(await read(L,'3分の休憩','3分'),'さんぷん');            // three minutes
@@ -96,7 +113,10 @@ test('a VNDB name written with a numeral keeps the name reading',async()=>{
  const L=stubbed();L.useNames(new Map([['一','はじめ']]));
  const [name]=await L.tokenize('一は来た',{names:true});
  assert.deepEqual([name.surface,name.reading,name.readingSource],['一','はじめ','name']);
- assert.equal((await L.tokenize('一は来た'))[0].reading,'いち','pages other than the reader read the numeral');
+ assert.equal((await L.tokenize('一は来た'))[0].reading,'イチ','pages other than the reader read the numeral');
+ L.useNames(new Map([['九十九','つくも']]));
+ assert.equal((await L.tokenize('九十九は',{names:true}))[0].reading,'つくも');
+ assert.equal((await L.tokenize('九十九回目',{names:true}))[0].reading,'きゅうじゅうきゅうかい','before a counter it is the count');
 });
 
 test('furigana still being made when the game changes uses the new game’s names',async()=>{
@@ -104,8 +124,8 @@ test('furigana still being made when the game changes uses the new game’s name
  L.worker={stdin:{write(line){const {id,text}=JSON.parse(line);answer=()=>{const p=L.pending.get(id);clearTimeout(p.timer);L.pending.delete(id);p.resolve(tokens(text));};}}};
  L.useNames(new Map([['一','はじめ']]));
  const late=L.tokenize('一は来た',{names:true});await new Promise(r=>setImmediate(r));
- L.useNames(null);answer();assert.equal((await late)[0].reading,'いち');
- L.worker=sync;assert.equal((await L.tokenize('一は来た',{names:true}))[0].reading,'いち','and that is what is cached');
+ L.useNames(null);answer();assert.equal((await late)[0].reading,'イチ');
+ L.worker=sync;assert.equal((await L.tokenize('一は来た',{names:true}))[0].reading,'イチ','and that is what is cached');
 });
 
 test('an idiom ending in an inflected verb is found under its dictionary form',async()=>{

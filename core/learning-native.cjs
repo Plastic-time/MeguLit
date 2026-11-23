@@ -144,15 +144,15 @@ class LocalLearning{
     SudachiDict read そのうち上の二人 with 上 as the suffix ジョウ (理論上), いとしき人 with 人 as ニン (三人) and ばか者 with 者
     as シャ. A kana word, a mark or the line edge is no word to attach to, so the kanji takes the reading SudachiDict gives
     it on its own (上 ウエ, 人 ヒト, 者 モノ) when that is a common noun or an adjective. Productive suffixes stay: 的 and 風
-    are 形状詞的 (ちゃん的には), a suffix after a 連用形 is the way of doing (さわり方 かた, 絡まれ方), one after a pronoun is honorific
-    or plural (あんた方 がた), a prefix
+    are 形状詞的 (ちゃん的には), a suffix after a 連用形 is the way of doing (さわり方 かた, 絡まれ方), one after a pronoun or an activity
+    keeps its reading (あんた方, おでかけ中 ちゅう, しごと上 じょう), a prefix
     before more kana is a split word (小さき, 小じゃれた), and a lone reading that is a name or a particle
     (好 ヨシミ, 達 トオル, 宛 ズツ) is no word either. Judged on 44k real game lines. */
  async strayAffixes(tokens){
   if(!Array.isArray(tokens))return tokens;const out=[];this.alone??=new Map();
   const loose=t=>!t||/^[\p{Script=Hiragana}ー]+$/u.test(t.surface||'')||t.pos==='補助記号'||!String(t.surface||'').trim();
   const g=t=>Array.isArray(t?.grammar)?t.grammar:[];
-  const stray=(t,before,after)=>g(t)[0]==='接尾辞'?g(t)[1]==='名詞的'&&loose(before)&&g(before)[0]!=='代名詞'&&!String(g(before)[5]).startsWith('連用形')&&!/^[\p{Script=Han}々]/u.test(after?.surface||''):
+  const stray=(t,before,after)=>g(t)[0]==='接尾辞'?g(t)[1]==='名詞的'&&loose(before)&&g(before)[0]!=='代名詞'&&g(before)[2]!=='サ変可能'&&!String(g(before)[5]).startsWith('連用形')&&!/^[\p{Script=Han}々]/u.test(after?.surface||''):
    g(t)[0]==='接頭辞'&&(!after||!after.surface.trim()||['補助記号','記号','助詞'].includes(g(after)[0]));
   for(let i=0;i<tokens.length;i++){
    const t=tokens[i];
