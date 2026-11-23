@@ -294,7 +294,8 @@ function renpyScenes(dir,{deadline=Infinity}={}){const g=gameDir(dir),base=renpy
   }
   let hit=false;
   const lines=src.map((t,k)=>{const id=ids?.[k],v=(id&&jp.ids.get(id))||jp.pairs.get(t)||jp.strings.get(t)||'';if(!v)return t;hit=true;return v;});
-  return hit?{...parsed,...(ids?{ids}:{}),lines,sourceLines:src}:parsed;}}));}
+  const withIds=ids===parsed.ids?parsed:{...parsed,ids};
+  return hit?{...withIds,lines,sourceLines:src}:withIds;}}));}
 /* compiled tl files of a patch (or of the game's own tl folders): per language, id -> text and old -> new */
 function rpycTl(dirs){const langs=new Map(),add=buf=>{const t=rpyc.translations(buf);if(!t.lang||/^none$/i.test(t.lang))return;const l=langs.get(t.lang)||{ids:new Map(),strings:new Map()};langs.set(t.lang,l);for(const [k,v] of t.ids)if(!l.ids.has(k))l.ids.set(k,v);for(const [k,v] of t.strings)if(!l.strings.has(k))l.strings.set(k,v);};
  const seen=new Set();for(const d of dirs){let names;try{names=fs.readdirSync(d);}catch{continue;}

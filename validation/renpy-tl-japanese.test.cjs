@@ -42,6 +42,16 @@ function makeRpa(entries){
 }
 const sayNode=(what,who=null)=>pObj('renpy.ast','Say',[['what',pStr(what)],...(who?[['who',pStr(who)]]:[])]);
 const translateNode=(id,lang,block)=>pObj('renpy.ast','Translate',[['identifier',pStr(id)],['language',lang===null?Buffer.from([0x4e]):pStr(lang)],['block',pList(block)]]);
+const menuChoice=text=>pObj('renpy.ast','Menu',[['items',pList([pList([pStr(text)])])]]);
+
+function archivedScripts(t,entries){
+ const game=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-renpy-rpyc-slots-'));
+ t.after(()=>fs.rmSync(game,{recursive:true,force:true}));
+ const g=path.join(game,'game');
+ fs.mkdirSync(g);
+ fs.writeFileSync(path.join(g,'archive.rpa'),makeRpa(entries));
+ return {game,g};
+}
 
 test("Ren'Py: non-Japanese base script reads Japanese tl/*.rpy and pairs Chinese tl/*.rpy",async t=>{
  const top=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-renpy-tl-rpy-'));
@@ -132,6 +142,70 @@ for(const sameOrder of [true,false]){
   if(sameOrder)assert.deepEqual(scene.ids,['lesson_0','lesson_1']);
  });
 }
+
+test('Ren\'Py: recovered IDs pair the compiled Chinese patch even without a Japanese match for that scene',t=>{
+ const raw='Are you coming with me?';
+ const {game,g}=archivedScripts(t,[
+  ['check.rpyc',makeRpyc([sayNode(raw)],[translateNode('check',null,[sayNode(raw)])])],
+  ['start.rpyc',makeRpyc([translateNode('start',null,[sayNode('The lesson is starting.')])])],
+  ['tl/japanese/start.rpyc',makeRpyc([translateNode('start','japanese',[sayNode('授業が始まります。')])])],
+  ['tl/schinese/check.rpyc',makeRpyc([translateNode('check','schinese',[sayNode('你要跟我一起去吗？')])])],
+ ]);
+ const base=scenes.read('renpy',game);
+ assert.deepEqual(base[0].lines,[raw]);
+ assert.deepEqual(base[0].ids,['check']);
+ const [paired]=scenes.ENGINES.renpy.patchLines(base,{dirs:[g]});
+ assert.equal(paired.patched,true);
+ assert.deepEqual(paired.lines,['你要跟我一起去吗？']);
+});
+
+test('Ren\'Py: matching line text with different dialogue and choice roles cannot supply IDs',t=>{
+ const first='The lesson is starting.',second='Go to class.';
+ const {game}=archivedScripts(t,[
+  ['script.rpyc',makeRpyc([sayNode(first),menuChoice(second)],[menuChoice(first),translateNode('choice',null,[sayNode(second)])])],
+  ['tl/japanese/script.rpyc',makeRpyc([translateNode('choice','japanese',[sayNode('授業に行きます。')])])],
+ ]);
+ const [scene]=scenes.read('renpy',game);
+ assert.deepEqual(scene.lines,[first,second]);
+ assert.equal(scene.roles,'bc');
+ assert.equal(scene.ids,undefined);
+});
+
+test('Ren\'Py: restructured IDs only fill missing entries in the first slot',t=>{
+ const first=sayNode('The lesson is starting.'),second=sayNode('Please open your book.');
+ const {game}=archivedScripts(t,[
+  ['script.rpyc',makeRpyc([translateNode('existing',null,[first]),second],
+    [translateNode('other',null,[first]),translateNode('recovered',null,[second])])],
+  ['tl/japanese/script.rpyc',makeRpyc([
+   translateNode('existing','japanese',[sayNode('授業が始まります。')]),
+   translateNode('other','japanese',[sayNode('別の授業です。')]),
+   translateNode('recovered','japanese',[sayNode('本を開いてください。')]),
+  ])],
+ ]);
+ const [scene]=scenes.read('renpy',game);
+ assert.deepEqual(scene.ids,['existing','recovered']);
+ assert.deepEqual(scene.lines,['授業が始まります。','本を開いてください。']);
+});
+
+test('Ren\'Py: a matching second slot without translated dialogue IDs preserves the scene',t=>{
+ const text='The lesson is starting.',raw=[sayNode(text)];
+ const {game}=archivedScripts(t,[
+  ['script.rpyc',makeRpyc(raw,raw)],
+  ['tl/japanese/script.rpyc',makeRpyc([translateNode('start','japanese',[sayNode('授業が始まります。')])])],
+ ]);
+ const [scene]=scenes.read('renpy',game);
+ assert.deepEqual(scene.lines,[text]);
+ assert.equal(scene.ids,undefined);
+});
+
+test('Ren\'Py: legacy compiled scripts expose only the unframed first slot',()=>{
+ const rpyc=require('../services/original-engines/renpy-rpyc.cjs');
+ const framed=makeRpyc([sayNode('古い形式でも読めます。')]);
+ const legacy=framed.subarray(framed.readUInt32LE(14));
+ assert.deepEqual(rpyc.parse(legacy).lines,['古い形式でも読めます。']);
+ assert.equal(rpyc.data(legacy,{slot:2}),null);
+ assert.deepEqual(rpyc.data(legacy,{all:true}),zlib.inflateSync(legacy));
+});
 
 test("Ren'Py: overlay replacement still parses the overlay buffer instead of s.parse()",t=>{
  const top=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-renpy-tl-overlay-'));
