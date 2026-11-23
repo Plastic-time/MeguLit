@@ -292,14 +292,17 @@ test('a legacy override without a save timestamp is not removed based on the pre
  assert.equal(stored().prefs.japaneseSize,34);
 });
 
-test('synced legacy sizes follow the incoming save time regardless of the receiving work',t=>{
+test('legacy cloud overrides with unknown provenance do not depend on either receiver preset',t=>{
  const at=Date.now()-60000,{kinds}=require('../services/account.cjs');
- for(const entry of [undefined,{savedAt:at-1000,textSavedAt:at-1000,prefs:{japaneseSize:24,sizeSource:'user'}}]){
+ for(const presetAt of [at-1000,at+1000])for(const entry of [undefined,{savedAt:at-2000,textSavedAt:at-2000,prefs:{japaneseSize:24,sizeSource:'user'}}]){
   const {settings,launch,stored}=fixture(t,entry),preset=path.join(settings.folder,'text-defaults.json');
   fs.writeFileSync(preset,JSON.stringify({japaneseSize:22,sizeSource:'user'}));
-  fs.utimesSync(preset,new Date(at),new Date(at));
-  kinds.settings.apply(null,key,{data:{name:'SomeGame',prefs:{japaneseSize:34,sizeSource:'user'}},updated_at:at+1000},settings.root);
+  fs.utimesSync(preset,new Date(presetAt),new Date(presetAt));
+  kinds.settings.apply(null,key,{data:{name:'SomeGame',prefs:{japaneseSize:34,sizeSource:'user'}},updated_at:at},settings.root);
   assert.equal(launch().japaneseSize,34);
-  assert.equal(stored().savedAt,at+1000);
+  assert.equal(stored().savedAt,at);
+  settings.save({scope:'text',values:{japaneseSize:20}});
+  assert.equal(launch().japaneseSize,34);
+  assert.equal(stored().sizes,1);
  }
 });

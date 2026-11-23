@@ -216,9 +216,14 @@ const kinds={
    if(!/^[a-f0-9]{64}$/.test(key))return;const file=path.join(root,'data','config','game-style-profiles.json'),doc=readJSON(file);doc.entries=doc.entries&&typeof doc.entries==='object'?doc.entries:{};
    if(record.deleted){if(!doc.entries[key])return;delete doc.entries[key];}
    else{const old=doc.entries[key]||{},kept=Object.fromEntries(Object.entries(old.prefs||{}).filter(([k])=>PATH_KEY.test(k)||k==='gameProcess'||k==='bindEnabled'));
-    const prefs={...kept,...cleanSettings(record.data.prefs||{})};
-    const textSavedAt=require('../core/game-profile.js').textKeys.some(k=>Object.hasOwn(prefs,k))?record.updated_at:0;
-    doc.entries[key]={...old,name:cleanTitle(record.data.name)||old.name||key.slice(0,12),prefs,savedAt:record.updated_at,textSavedAt};if(record.data.sizes===1)doc.entries[key].sizes=1;else delete doc.entries[key].sizes;}
+    const prefs={...kept,...cleanSettings(record.data.prefs||{})},profileTools=require('../core/game-profile.js');
+    if(record.data.sizes!==1){
+     /* A legacy cloud record has no source preset. Only discard the known unmarked built-in copy; keep ambiguous sizes. */
+     const normalized=profileTools.normalize({prefs}).prefs;
+     for(const k of [...profileTools.sizeKeys,'sizeSource'])if(!Object.hasOwn(normalized,k))delete prefs[k];
+    }
+    const textSavedAt=profileTools.textKeys.some(k=>Object.hasOwn(prefs,k))?record.updated_at:0;
+    doc.entries[key]={...old,name:cleanTitle(record.data.name)||old.name||key.slice(0,12),prefs,savedAt:record.updated_at,textSavedAt,sizes:1};}
    doc.version=doc.version||3;atomic(file,doc);
   }
  }
