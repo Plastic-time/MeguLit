@@ -15,13 +15,25 @@ if (root && /^(?:[a-f0-9]{32}|[a-f0-9]{64})$/.test(challenge) &&
   delete process.env.NODE_OPTIONS;
   delete process.env.MEGULIT_COLLECTOR_SESSION;
   const socket = net.createConnection('\\\\.\\pipe\\megulit-cardinal-' + challenge);
-  socket.on('error', () => socket.destroy());
+  function closeTap(reason){
+    if(!socket.destroyed)writeDiagnostic(reason);
+    socket.destroy();
+  }
+  function writeDiagnostic(reason){
+    try{require('node:fs').appendFileSync(path.join(root,'logs','cardinal-tap-stop.log'),reason+'\n');}catch{}
+  }
+  socket.on('error',error=>closeTap('pipe '+error.code));
+  process.once('uncaughtExceptionMonitor',error=>writeDiagnostic('service exception '+String(error.message).slice(0,200)));
+  process.once('exit',code=>writeDiagnostic('exit '+code));
   const live=challenge.length===64;
   function write(frame) {
     if(socket.destroyed)return;
-    if(socket.writableLength>262144){socket.destroy();return;}
+    if(socket.writableLength>262144){closeTap('delivery backlog');return;}
     socket.write(JSON.stringify({challenge,servicePid:process.pid,...frame})+'\n');
   }
+  // GalWindowBridge also emits screenshots/OCR payloads which are not Reader
+  // observations. Bound the raw native stream separately from evidence IPC.
+  const maxNativeRecord=8*1024*1024;
   const spawn = cp.spawn;
   cp.spawn = function (file, args, options) {
     const child = spawn.apply(this, arguments);
@@ -38,7 +50,7 @@ if (root && /^(?:[a-f0-9]{32}|[a-f0-9]{64})$/.test(challenge) &&
         if (end < 0) break;
         const line = pending.slice(0, end);
         pending = pending.slice(end + 1);
-        if (line.length > 65536) { socket.destroy(); return; }
+        if (line.length > maxNativeRecord) { closeTap(name+' raw record '+line.length); return; }
         let m;
         try { m = JSON.parse(line); } catch { continue; }
         if (enumerateWindows && (name !== 'GalWindowBridge.exe' || m.type !== 'windows')) continue;
@@ -47,10 +59,11 @@ if (root && /^(?:[a-f0-9]{32}|[a-f0-9]{64})$/.test(challenge) &&
           if(name==='HookBridge.exe' && !['hookSource','hookChars','hookChoices','hookProcess','hookError','hookStatus','hookHeartbeat'].includes(m.type))continue;
         }
         if (!live && !enumerateWindows && !(name === 'GalWindowBridge.exe' ? ['ready','bound'].includes(m.type) : m.type === 'hookSource')) continue;
-        if (socket.writableLength > 262144) { socket.destroy(); return; }
+        if (Buffer.byteLength(line)>64000) { closeTap(name+' evidence '+m.type+' '+line.length); return; }
+        if (socket.writableLength > 262144) { closeTap('native delivery backlog'); return; }
         write({kind:'native',wireNs:process.hrtime.bigint().toString(),bridgePid:child.pid,name,args,m});
       }
-      if (pending.length > 65536) socket.destroy();
+      if (pending.length > maxNativeRecord) closeTap(name+' partial record '+pending.length);
     });
     return child;
   };

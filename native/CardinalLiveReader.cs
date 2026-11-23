@@ -47,14 +47,14 @@ internal static partial class CardinalCollector {
         return ch<0 && buffer.Length==0 ? null : buffer.ToString();
     }
 
-    static async Task ReadFrames(PipeStream pipe,BlockingCollection<string> frames){
+    static async Task ReadFrames(PipeStream pipe,BlockingCollection<string> frames,string ended){
         var server=pipe as NamedPipeServerStream;
         if(server!=null)await Task.Factory.FromAsync(server.BeginWaitForConnection,server.EndWaitForConnection,null);
         var bytes=new byte[8192];
         using(var record=new MemoryStream()){
             for(;;){
                 int n=await pipe.ReadAsync(bytes,0,bytes.Length);
-                if(n==0)throw new EndOfStreamException("NATIVE_STREAM_ENDED");
+                if(n==0)throw new EndOfStreamException(ended);
                 int from=0;
                 for(int i=0;i<n;i++){
                     if(bytes[i]!=10)continue;
@@ -125,8 +125,8 @@ internal static partial class CardinalCollector {
 
             };
             verifyGame();
-            var pending=ReadFrames(pipe,frames);
-            var dialoguePending=plugin?ReadFrames(dialogue,sources):null;
+            var pending=ReadFrames(pipe,frames,"LIVE_SERVICE_PIPE_ENDED");
+            var dialoguePending=plugin?ReadFrames(dialogue,sources,"LIVE_GAME_PIPE_ENDED"):null;
             int sequence=0;
             bool serviceVerified=false;
             if(plugin)Environment.SetEnvironmentVariable("MEGULIT_DIALOGUE_TARGET",pid+"|"+birth);
