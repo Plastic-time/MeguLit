@@ -175,8 +175,9 @@ function probeInScope({dir,executable,title},{budgetMs=60000,progress=null}={}){
  try{const scenes=require('./original-engines/scenes.cjs');unsupported=scenes.unsupportedReason(dir);preparing=scenes.preparing(dir)?.kind||null;}catch{}
  report({stage:'native'});
  const native=nativeEngines(dir,executable),engines=[...native,...runEngines(dir,{deadline,routed:route.readers,progress:p=>report({...p,engines:[...native,...p.engines]})})];
+ if(!unsupported&&engines.some(e=>e.id==='kogado'&&!e.lines&&e.error==='HYPACK_COCOTTE'))unsupported={engine:'kogado',code:'HYPACK_COCOTTE'};
  /* the engine that named the unsupported code is a reader that tried: list it (issue showed 'engines tried: -' next to cmvs:CMVS_CPZ7) */
- /* S5 GARbro route: nothing read and archives the GARbro pack would open (HyPack Cocotte, formats MeguLit has no reader for):
+ /* S5 GARbro fallback: no native reader found lines, and the GARbro pack supports the archives.
     unpack them now when the pack is installed (a probe never downloads it), else say the pack is what is missing */
  let garbroNeed=0;
  if(!engines.some(e=>e.lines>0))try{const g=require('./original-engines/garbro.cjs'),scenes=require('./original-engines/scenes.cjs');

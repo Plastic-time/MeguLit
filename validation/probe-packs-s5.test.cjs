@@ -10,15 +10,79 @@ function hypack(entries){/* v3: data from 0x10, index after it, 48-byte entries 
  let data=Buffer.alloc(0);const idx=[];for(const e of entries){const off=data.length;data=Buffer.concat([data,e.stored]);const r=Buffer.alloc(48);r.write(e.name,0,'latin1');r.write(e.ext,0x15,'latin1');r.writeUInt32LE(off,0x18);r.writeUInt32LE(e.unpacked,0x1c);r.writeUInt32LE(e.stored.length,0x20);r[0x24]=e.type;idx.push(r);}
  const h=Buffer.alloc(16);h.write('HyPack');h.writeUInt16LE(0x300,6);h.writeUInt32LE(data.length,8);h.writeInt32LE(entries.length,12);return Buffer.concat([h,data,...idx]);}
 test('Mariel LZ: literals and a back reference',()=>{assert.strictEqual(kogado.mariel(Buffer.concat([u32(0x08000000),Buffer.from('ABCD'),Buffer.from([0x33])]),8).toString(),'ABCDABCD');});
-test('HyPack Script.pak: SR01 string tables read, Cocotte entries left to GARbro',()=>{
+test('HyPack Script.pak: plain and XOR SR01 string tables read',()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hyp-'));const sc=sr01(['「おはよう、トルタ」','雨が降っている。','Func_a01']);
  const plain=Buffer.from(sc);
- fs.writeFileSync(path.join(dir,'Script.pak'),hypack([{name:'scr0001',ext:'kgo',type:0,unpacked:plain.length,stored:plain},{name:'scr0002',ext:'kgo',type:3,unpacked:plain.length,stored:Buffer.from(plain.map(x=>x^0xff))},{name:'scr0003',ext:'kgo',type:2,unpacked:10,stored:Buffer.alloc(10)}]));
+ fs.writeFileSync(path.join(dir,'Script.pak'),hypack([{name:'scr0001',ext:'kgo',type:0,unpacked:plain.length,stored:plain},{name:'scr0002',ext:'kgo',type:3,unpacked:plain.length,stored:Buffer.from(plain.map(x=>x^0xff))}]));
  const list=kogado.engine.scenes(dir);assert.deepStrictEqual(list.map(s=>s.name),['scr0001.kgo','scr0002.kgo']);
  for(const s of list)assert.deepStrictEqual(kogado.engine.parse(s.read()).lines,['「おはよう、トルタ」','雨が降っている。']);
- assert.strictEqual(kogado.engine.unsupported(dir),'');
  const fp=require('../services/engine-fingerprint.cjs');assert.strictEqual(fp.archiveInfo('Script.pak',Buffer.from('HyPack\0\x03').toString('hex')).engine,'kogado');
  fs.rmSync(dir,{recursive:true,force:true});});
+test('HyPack Cocotte reads consecutive range blocks, resets the model after a stored block, and reads the SKTR table',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hyp-cocotte-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ // Synthetic four-block script, decoded independently with GARbro (two range blocks, stored, range).
+ const packed=Buffer.from('IABAAADgF3rIuAAAAAAAEr161VUe8nZQaR6vhuoAABwoADAAAONj0ptOpVBE/obk1k/mY/s4pG3ErI90z3Z6Gn9crWSqAAAkMgAsABcOETQzBQQTlgugmr+owmUXFxevwfqWc28Zt9DyyBcAFRgAAAAAFgEAAAAAAKgtACkAAONssCfjkhzRzkMeYv8aOsmsSNmzxuTWjeZEXOnuEJzShmR76CsAACk=','base64');
+ fs.writeFileSync(path.join(dir,'Script.pak'),hypack([
+  {name:'lesson',ext:'kgo',type:2,unpacked:197,stored:packed},
+  {name:'truncated',ext:'kgo',type:2,unpacked:197,stored:packed.subarray(0,-1)},
+  {name:'wrongSize',ext:'kgo',type:2,unpacked:198,stored:packed},
+ ]));
+ const [scene,truncated,wrongSize]=kogado.engine.scenes(dir);
+ const decoded=scene.read();
+ assert.strictEqual(require('node:crypto').createHash('sha256').update(decoded).digest('hex'),
+  '78120d7b5bf1a73679814c32a2a9c09d4a9aabd65d855fb423726d6a37543279');
+ assert.deepStrictEqual(kogado.engine.parse(decoded).lines,['明日は雨が降りそうです。','忘れずに傘を持ってきてね。','駅まで一緒に歩きましょう。']);
+ assert.throws(()=>truncated.read(),{code:'HYPACK_COCOTTE'});
+ assert.throws(()=>wrongSize.read(),{code:'HYPACK_COCOTTE'});
+ const probe=core.probeGame({dir,executable:'',title:'Compiled lesson'});
+ assert.strictEqual(probe.step,'ok');
+ assert.strictEqual(probe.detected,'kogado');
+ assert.strictEqual(probe.japaneseLines,3);
+});
+test('HyPack remaster reads SK20 entries as UTF-8 even when a neighboring entry is malformed',()=>{
+ const lines=['雨下得越来越大了。','我们先去车站避雨吧。'];
+ const raw=sr01([...lines,'bad glyph']);
+ raw.write('SK20');
+ raw.copy(raw,0x34,0x28,0x34);
+ raw.fill(0,0x28,0x34);
+ raw[raw.indexOf('bad glyph')]=0xff;
+ assert.deepStrictEqual(kogado.parse(raw).lines,[...lines,'�ad glyph']);
+});
+test('HyPack Cocotte rejects malformed blocks and oversized entries before reading them',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hyp-cocotte-invalid-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const block=bytes=>Buffer.concat([u16(bytes.length+4),u16(1),Buffer.from(bytes)]);
+ const valid=block([0,0,0]);
+ const entries=[
+  {name:'badRow',unpacked:1,stored:block([1,1,0])},
+  {name:'shortHeader',unpacked:1,stored:Buffer.concat([valid,Buffer.from([0])])},
+  {name:'shortRange',unpacked:1,stored:block([0])},
+  {name:'tooLarge',unpacked:64*1024*1024+1,stored:valid},
+ ];
+ fs.writeFileSync(path.join(dir,'Script.pak'),hypack(entries.map(e=>({...e,ext:'kgo',type:2}))));
+ const alloc=Buffer.alloc;
+ t.mock.method(Buffer,'alloc',(size,...args)=>{
+  assert.ok(size<=64*1024*1024,'Refuse the entry before allocating its output');
+  return alloc(size,...args);
+ });
+ const list=kogado.engine.scenes(dir);
+ assert.strictEqual(list.length,entries.length);
+ for(const s of list)assert.throws(()=>s.read(),{code:'HYPACK_COCOTTE'},s.name);
+});
+test('HyPack with no readable Cocotte scripts retains the probe error and Kogado identity',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hyp-cocotte-failed-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ fs.writeFileSync(path.join(dir,'Script.pak'),hypack([
+  {name:'bad',ext:'kgo',type:2,unpacked:1,stored:Buffer.from([0])},
+  {name:'resource',ext:'bin',type:0,unpacked:4096,stored:Buffer.alloc(4096)},
+ ]));
+ const result=core.probeGame({dir,executable:'',title:'Fixture'});
+ assert.strictEqual(result.step,'parse-failed');
+ assert.strictEqual(result.detail,'kogado:HYPACK_COCOTTE');
+ assert.deepStrictEqual(result.unsupported,{engine:'kogado',code:'HYPACK_COCOTTE'});
+ assert.strictEqual(require('../services/probe-identity.cjs').engineOf(result),'kogado');
+});
 test('AdvHD v2 ARC (UTF-16 names): Rio.arc .ws2 messages and names',()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ws2-'));const rot=b=>Buffer.from(b.map(x=>((x<<2)|(x>>>6))&255));
  const sjEnc=t=>Buffer.from(require('../services/original-engines/kit.cjs').encodeSjis(t));

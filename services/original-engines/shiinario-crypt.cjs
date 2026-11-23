@@ -241,10 +241,10 @@ function decoder(warcVersion,scheme){
 
 /* ---- the 1.2–1.6 index: Kogado's range coder, quasistatic model of 257 symbols (256 = end), totals of 2^12 ----- */
 const RC_SYMBOLS=257,RC_BITS=12,RC_TOTAL=1<<RC_BITS,RC_RESCALE=2000,RC_END=256;
-function rangeModel(){
+function rangeModel(initial){
  const cf=new Uint32Array(RC_SYMBOLS+1),newf=new Uint32Array(RC_SYMBOLS);cf[RC_SYMBOLS]=RC_TOTAL;
  const m={cf,newf,rescale:RC_SYMBOLS>>4|2,nextleft:0,left:0,incr:0};
- const each=Math.floor(RC_TOTAL/RC_SYMBOLS),end=RC_TOTAL%RC_SYMBOLS;for(let i=0;i<RC_SYMBOLS;i++)newf[i]=each+(i<end?1:0);
+ const each=Math.floor(RC_TOTAL/RC_SYMBOLS),end=RC_TOTAL%RC_SYMBOLS;for(let i=0;i<RC_SYMBOLS;i++)newf[i]=initial?.[i]??each+(i<end?1:0);
  m.dorescale=()=>{if(m.nextleft){m.incr++;m.left=m.nextleft;m.nextleft=0;return;}
   if(m.rescale<RC_RESCALE){m.rescale<<=1;if(m.rescale>RC_RESCALE)m.rescale=RC_RESCALE;}
   let c=cf[RC_SYMBOLS],missing=c;for(let i=RC_SYMBOLS-1;i;i--){const t=newf[i];c-=t;cf[i]=c;const h=t>>1|1;missing-=h;newf[i]=h;}
@@ -253,8 +253,8 @@ function rangeModel(){
  m.update=sym=>{if(m.left<=0)m.dorescale();m.left--;newf[sym]+=m.incr;};
  m.dorescale();return m;}
 /* the decoded bytes (at most max), or null where GARbro's UnpackRNG gives 0 */
-function rangeDecode(input,length=input.length,max=1<<24){
- length=Math.min(length,input.length);const m=rangeModel(),out=[];let pos=0,low=0,range=0,help=0,buffer=0;
+function rangeDecode(input,length=input.length,max=1<<24,m=rangeModel()){
+ length=Math.min(length,input.length);const out=[];let pos=0,low=0,range=0,help=0,buffer=0;
  const take=()=>{if(pos>=length){buffer=0;return false;}buffer=input[pos++];return true;};
  const normalize=()=>{while(range<=0x800000){low=((low<<8)|((buffer<<7)&0xff))>>>0;if(!take())return;low=(low|(buffer>>>1))>>>0;range=(range<<8)>>>0;}};
  take();take();low=buffer>>>1;range=1<<7;
@@ -277,4 +277,4 @@ function rangeEncode(data){
  out.push(t&255,(bytecount>>>16)&255,(bytecount>>>8)&255,bytecount&255);
  return Buffer.from(out);}
 
-module.exports={loadSchemes,extraCrypt,decoder,rangeDecode,rangeEncode,helper1,helper3,token,regionCrc32,crc16,crc32Normal,adler32,systemTime,Fault};
+module.exports={loadSchemes,extraCrypt,decoder,rangeModel,rangeDecode,rangeEncode,helper1,helper3,token,regionCrc32,crc16,crc32Normal,adler32,systemTime,Fault};
