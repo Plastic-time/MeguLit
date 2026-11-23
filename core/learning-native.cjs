@@ -127,32 +127,70 @@ class LocalLearning{
  }
  async tokenize(text){
   if(this.cache.has(text))return this.cache.get(text);await this.ready();const version=this.namesVersion;
-  const tokens=await new Promise((resolve,reject)=>{const id=++this.serial,timer=setTimeout(()=>{this.pending.delete(id);reject(Error('本地分词等待超时，请检查 Full 组件状态'));},45000);this.pending.set(id,{resolve,reject,timer});this.worker.stdin.write(JSON.stringify({id,text})+'\n');});
+  const tokens=await this.raw(text);
   /* 2026-11-23 (user: the speech button said わたくし and ぶん where furigana showed わたし and ふん): furigana, the speech
      button, lookup and cards all read these tokens, so the contextual readings (私 わたし, 10分 じゅっぷん) are settled here
      once instead of in the reader page only. Numbers first: JMdict would otherwise join the counter with what follows
      (10分だけ as 10 + 分だけ ぶんだけ, 3本の as 3 + 本の ほんの). */
-  const corrected=contextual(text,this.readings.settle(this.dictionaryWords(numberTokens(this.withNames(tokens)))));if(version===this.namesVersion)this.cache.set(text,corrected);if(this.cache.size>200)this.cache.delete(this.cache.keys().next().value);return corrected;
+  const corrected=contextual(text,this.readings.settle(this.dictionaryWords(numberTokens(this.withNames(await this.strayAffixes(tokens))))));if(version===this.namesVersion)this.cache.set(text,corrected);if(this.cache.size>200)this.cache.delete(this.cache.keys().next().value);return corrected;
  }
- // Whole adjacent tokens that together spell one JMdict word with a single reading are that word: Sudachi split
- // 後一歩 into 後一 (ゴイチ) + 歩 (アユミ, a given name), so furigana and speech said ごいちあゆみ while the dictionary card
- // knew あといっぽ (user, 2026-11-03). Only when the joined guess differs from the dictionary reading; up to 4 tokens,
- // longest first, never across punctuation or a gap.
+ /* SudachiDict tokens for a text as the worker gives them. */
+ raw(text){return new Promise((resolve,reject)=>{const id=++this.serial,timer=setTimeout(()=>{this.pending.delete(id);reject(Error('本地分词等待超时，请检查 Full 组件状态'));},45000);this.pending.set(id,{resolve,reject,timer});this.worker.stdin.write(JSON.stringify({id,text})+'\n');});}
+ /* A noun-like suffix with no word before it, or a prefix with none after it, is the word itself (user, 2026-11-23):
+    SudachiDict read そのうち上の二人 with 上 as the suffix ジョウ (理論上), いとしき人 with 人 as ニン (三人) and ばか者 with 者
+    as シャ. A kana word, a mark or the line edge is no word to attach to, so the kanji takes the reading SudachiDict gives
+    it on its own (上 ウエ, 人 ヒト, 者 モノ) when that is a common noun or an adjective. Productive suffixes stay: 的 and 風
+    are 形状詞的 (ちゃん的には), a suffix after a 連用形 is the way of doing (さわり方 かた, 絡まれ方), a prefix
+    before more kana is a split word (小さき, 小じゃれた), and a lone reading that is a name or a particle
+    (好 ヨシミ, 達 トオル, 宛 ズツ) is no word either. Judged on 44k real game lines. */
+ async strayAffixes(tokens){
+  if(!Array.isArray(tokens))return tokens;const out=[];this.alone??=new Map();
+  const loose=t=>!t||/^[\p{Script=Hiragana}ー]+$/u.test(t.surface||'')||t.pos==='補助記号'||!String(t.surface||'').trim();
+  const g=t=>Array.isArray(t?.grammar)?t.grammar:[];
+  const stray=(t,before,after)=>g(t)[0]==='接尾辞'?g(t)[1]==='名詞的'&&loose(before)&&!String(g(before)[5]).startsWith('連用形')&&!/^[\p{Script=Han}々]/u.test(after?.surface||''):
+   g(t)[0]==='接頭辞'&&(!after||!after.surface.trim()||['補助記号','記号','助詞'].includes(g(after)[0]));
+  for(let i=0;i<tokens.length;i++){
+   const t=tokens[i];
+   if(!t||!/[\p{Script=Han}々]/u.test(t.surface||'')||!stray(t,tokens[i-1],tokens[i+1])){out.push(t);continue;}
+   if(!this.alone.has(t.surface)){const own=await this.raw(t.surface),o=own[0],k=g(o);this.alone.set(t.surface,own.length===1&&o.surface===t.surface&&o.reading&&(k[0]==='名詞'&&k[1]==='普通名詞'||k[0]==='形容詞')?o:null);if(this.alone.size>500)this.alone.delete(this.alone.keys().next().value);}
+   const own=this.alone.get(t.surface);
+   out.push(own&&own.reading!==t.reading?{...t,reading:own.reading,grammar:own.grammar,pos:own.pos,base_form:own.base_form,normalized:own.normalized,pitch:own.pitch||[],lexeme:own.lexeme||null}:t);
+  }
+  return out;
+ }
  /* The running game's character names from VNDB (name-reading.cjs); null when no game is bound. Furigana made with the
     previous game's names is dropped. */
  useNames(names){this.names=names instanceof Map?names:new Map();this.namesVersion++;this.cache.clear();}
  withNames(tokens){return nameTokens(tokens,this.names);}
+ // Whole adjacent tokens that together spell one JMdict word with a single reading are that word: Sudachi split
+ // 後一歩 into 後一 (ゴイチ) + 歩 (アユミ, a given name), so furigana and speech said ごいちあゆみ while the dictionary card
+ // knew あといっぽ (user, 2026-11-03). Only when the joined guess differs from the dictionary reading; up to 4 tokens,
+ // longest first, never across punctuation or a gap.
  dictionaryWords(tokens){
   if(!Array.isArray(tokens)||tokens.length<2)return tokens;this.load();const out=[];
   for(let i=0;i<tokens.length;i++){let best=null,stop=i;
    for(let j=Math.min(tokens.length,i+4)-1;j>i&&!best;j--){const part=tokens.slice(i,j+1);
     if(part.some((t,k)=>!t.surface?.trim()||t.pos==='補助記号'||(k&&part[k-1].end!==t.start)))continue;
     const surface=part.map(t=>t.surface).join('');if(!/[\p{Script=Han}々]/u.test(surface))continue;
-    const readings=this.compoundReadings(surface);
-    if(readings.length!==1||kana(part.map(t=>t.reading||'').join(''))===readings[0])continue;
-    best={...tokens[i],surface,base_form:surface,normalized:surface,end:tokens[j].end,reading:readings[0],reading_source:'JMdict 词语读音',subtokens:part};stop=j;}
+    const [reading,base]=this.idiomReading(part,surface);
+    if(!reading||kana(part.map(t=>t.reading||'').join(''))===reading)continue;
+    best={...tokens[i],surface,base_form:base,normalized:base,end:tokens[j].end,reading,reading_source:'JMdict 词语读音',subtokens:part};stop=j;}
    out.push(best||tokens[i]);i=stop;}
   return out;
+ }
+ /* The one JMdict reading of joined tokens, and the dictionary form it was found under. An idiom ending in a verb or an
+    adjective is listed in its dictionary form: 性に合わない is 性に合う しょうにあう, which SudachiDict read せいにあわ
+    (user, 2026-11-23). The inflected tail replaces the dictionary-form tail (あう → あわ) under a kanji stem that keeps its
+    reading; 来る does not (来た き, 来ない こ), and a kana-only tail like なかっ has no stem to keep (気もない けもない). */
+ idiomReading(part,surface){
+  const exact=this.compoundReadings(surface);if(exact.length===1)return [exact[0],surface];if(exact.length||part.length<2)return [];
+  const last=part.at(-1),g=last.grammar?.[0];if(g!=='動詞'&&g!=='形容詞'||last.grammar?.[4]==='カ行変格'||!last.base_form||last.base_form===last.surface)return [];
+  let cut=0;while(cut<last.surface.length&&last.surface[cut]===last.base_form[cut])cut++;
+  const from=last.base_form.slice(cut),to=last.surface.slice(cut);
+  if(!/[\p{Script=Han}々]/u.test(last.surface.slice(0,cut))||!/^[\p{Script=Hiragana}]+$/u.test(from)||!/^[\p{Script=Hiragana}]*$/u.test(to))return [];
+  const base=part.slice(0,-1).map(t=>t.surface).join('')+last.base_form,found=this.compoundReadings(base);
+  if(found.length!==1||!found[0].endsWith(from))return [];
+  return [found[0].slice(0,found[0].length-from.length)+to,base];
  }
  compounds(tokens){
   this.load();const output=[];

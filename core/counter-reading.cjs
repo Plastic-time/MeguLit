@@ -126,6 +126,8 @@ function numberTokens(tokens) {
   const out = [];
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i], next = tokens[i + 1];
+    // A score or a match-up: SudachiDict reads ０対２ and 5対5 with 対 as the pair counter ツイ (一対の).
+    if (token?.surface === '対' && isNumeral(tokens[i - 1]) && isNumeral(next)) { out.push({ ...token, reading: 'たい', pitch: [], lexeme: null, readingSource: 'number' }); continue; }
     if (!isNumeral(token) || token.readingSource === 'number') { out.push(token); continue; }
     const joined = typeof next?.surface === 'string' && (!Number.isInteger(token.end) || token.end === next.start) ? counterReading(token.surface, next.surface) : '';
     if (joined) {
