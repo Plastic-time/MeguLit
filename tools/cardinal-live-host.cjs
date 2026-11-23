@@ -125,7 +125,7 @@ async function main(req,cfg,port,cancel){
    if(hash.digest('hex')!==script.sha256)fail('LIVE_GAME_COPY_SCRIPT');
   }
   const store=require(path.join(lib,'services/store.cjs')).openStore(readerRoot);
-  try{store.prepare('INSERT INTO games(id,title,executable) VALUES(?,?,?)').run('cardinal-'+crypto.randomUUID(),path.basename(source,'.exe'),game.exe);}finally{store.close();}
+  try{store.prepare('INSERT INTO games(id,title,executable) VALUES(?,?,?)').run('cardinal-'+crypto.randomUUID(),ctx?.proof.context.title||path.basename(source,path.extname(source)),game.exe);}finally{store.close();}
   measurement=new LiveMeasurement(game,profile);
   const journal=fs.openSync(path.join(eventsDir,'events.jsonl'),'wx');
   let used=0;
