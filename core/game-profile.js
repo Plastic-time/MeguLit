@@ -28,9 +28,14 @@
  const legacySizes={japaneseSize:34,translationSize:30,englishSize:34};
  function map(value){if(value===null)return null;if(!value||typeof value!=='object'||![value.s,value.bx,value.by,value.dx,value.dy,value.cw,value.ch].every(Number.isFinite)||value.s<=.1||value.s>=10||value.cw<=0||value.ch<=0||['bx','by','dx','dy'].some(k=>Math.abs(value[k])>20000))return undefined;const out={};for(const key of ['engine','s','bx','by','dx','dy','cw','ch'])if(key==='engine'?typeof value[key]==='string'&&value[key].length<40:Number.isFinite(value[key]))out[key]=value[key];return out;}
  function version(value){if(!value||!Number.isFinite(value.savedAt)||value.savedAt<=0)return null;const m=map(value.positionMap);return {id:String(value.id||value.savedAt).slice(0,80),savedAt:value.savedAt,prefs:pick(value.prefs),positionMap:m===undefined?null:m};}
- function normalize(entry,base){if(!entry||!entry.prefs)return null;const prefs=pick(entry.prefs);if('lineHeight' in prefs&&prefs.lineHeightMode!=='offset'){prefs.lineHeight=Number(prefs.lineHeight)-(Number(prefs.lineHeight)>=0?1.95:0);prefs.lineHeightMode='offset';}const textSavedAt=entry.textSavedAt??(textKeys.some(k=>k in prefs)?entry.savedAt:0),positionSavedAt=entry.positionSavedAt??(positionKeys.some(k=>k in prefs)?entry.savedAt:0);const history=Array.isArray(entry.history)?entry.history.map(version).filter(Boolean).sort((a,b)=>b.savedAt-a.savedAt).slice(0,7):[];
+ function normalize(entry,base,presetModifiedAt=0){if(!entry||!entry.prefs)return null;const prefs=pick(entry.prefs);if('lineHeight' in prefs&&prefs.lineHeightMode!=='offset'){prefs.lineHeight=Number(prefs.lineHeight)-(Number(prefs.lineHeight)>=0?1.95:0);prefs.lineHeightMode='offset';}const textSavedAt=entry.textSavedAt??(textKeys.some(k=>k in prefs)?entry.savedAt:0),positionSavedAt=entry.positionSavedAt??(positionKeys.some(k=>k in prefs)?entry.savedAt:0);const history=Array.isArray(entry.history)?entry.history.map(version).filter(Boolean).sort((a,b)=>b.savedAt-a.savedAt).slice(0,7):[];
   if(entry.sizes!==1){const held=sizeKeys.filter(k=>k in prefs);
-   if(prefs.sizeSource!=='user'&&held.every(k=>Number(prefs[k])===legacySizes[k]))for(const k of held)delete prefs[k];
+   // Old Alt+T saves copied the global 'user' mark too. If the preset is newer, the old global sizes cannot be recovered.
+   if(held.length&&prefs.sizeSource==='user'&&presetModifiedAt>(Number(textSavedAt)||0)){
+    const previous=version({...entry,savedAt:Number(entry.savedAt)||Number(textSavedAt)||0,prefs});
+    if(previous&&!history.some(item=>item.savedAt===previous.savedAt)){history.unshift(previous);if(history.length>7)history.pop();}
+    for(const k of held)delete prefs[k];
+   }else if(prefs.sizeSource!=='user'&&held.every(k=>Number(prefs[k])===legacySizes[k]))for(const k of held)delete prefs[k];
    else if(base)for(const k of held)if(Number(prefs[k])===Number(base[k]))delete prefs[k];
    if(!sizeKeys.some(k=>k in prefs))delete prefs.sizeSource;}
   return {...entry,prefs,textSavedAt,positionSavedAt,history,sizes:1};}

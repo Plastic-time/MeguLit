@@ -15,13 +15,14 @@ const FILE='text-defaults.json';
 function read(folder){let saved={};const file=path.join(folder,FILE);try{saved=JSON.parse(fs.readFileSync(file,'utf8'))||{};}catch{}
  if(saved&&typeof saved==='object'&&saved.spacingDefaults!==1&&('gap' in saved||'rubyOffsetY' in saved)){const n=v=>Number.isFinite(Number(v))&&v!==''&&v!==null?Number(v):null;
   if('gap' in saved)saved.gap=Math.max(-28,Math.min(40,(n(saved.gap)??6)-8));if('rubyOffsetY' in saved)saved.rubyOffsetY=Math.max(-100,Math.min(100,Math.round(((n(saved.rubyOffsetY)??0)+3)*10)/10));saved.spacingDefaults=1;
-  try{const tmp=file+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(saved,null,2));fs.renameSync(tmp,file);}catch{}}
+  try{const tmp=file+'.'+process.pid+'.tmp',stat=fs.statSync(file);fs.writeFileSync(tmp,JSON.stringify(saved,null,2));fs.utimesSync(tmp,stat.atime,stat.mtime);fs.renameSync(tmp,file);}catch{}}
  return {...BUILTIN,...profileTools.pick(saved,'text')};}
 /* What a work without saved settings starts from (core/game-style-sync.cjs base()), and what a work's own size is told apart from
    (issue 800). The session file is not part of it. */
 function workBase(folder){return {...profileTools.pick(require('./game-style.js').defaults,'base'),...read(folder)};}
+function workSnapshot(folder){let modifiedAt=0;try{modifiedAt=Math.trunc(fs.statSync(path.join(folder,FILE)).mtimeMs);}catch{}return {prefs:workBase(folder),modifiedAt};}
 function write(folder,values){const next={...read(folder),...profileTools.pick(values,'text'),spacingDefaults:1},file=path.join(folder,FILE),tmp=file+'.'+process.pid+'.tmp';
  fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(tmp,JSON.stringify(next,null,2));fs.renameSync(tmp,file);return next;}
 // Text keys of a value object (the rest of the text settings group stays with the session preferences).
 function isTextKey(key){return profileTools.textKeys.includes(key);}
-module.exports={BUILTIN,FILE,read,workBase,write,isTextKey};
+module.exports={BUILTIN,FILE,read,workBase,workSnapshot,write,isTextKey};
