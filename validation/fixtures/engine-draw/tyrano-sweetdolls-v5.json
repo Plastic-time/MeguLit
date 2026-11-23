@@ -1,0 +1,183 @@
+{
+  "schema": 1,
+  "engine": "tyrano",
+  "title": "スイートドールズルーム",
+  "engineVersion": 500,
+  "exeSha256": "387ece151f2357cdac80063f29a6dd9a3f64ed633b30bfa021d941075c7659d2",
+  "producerCommit": "4d97b64ec77d11bf214dfcdd617cee6e74f61823",
+  "producerSha256": "3d9f502989946838503235c917a51920e167c1bfa08e7eab7e7d26272f701cf0",
+  "captureKind": "real-game-hidden-desktop",
+  "recordCount": 194,
+  "roles": [
+    "line",
+    "name"
+  ],
+  "sourceUnchanged": true,
+  "sourceFiles": 420,
+  "physicalReaderAccepted": false,
+  "choiceSample": false,
+  "knownNegative": "Menu open retained old body under 4d97; separate menu owner regression/fix required",
+  "artifacts": {
+    "records.json": "25e04d303aa50a0332339603d759595ca132c40350cfe55b388296f1c70160d1",
+    "placements.json": "d6e243755bc7f60a23c582340ff7482de54ce7c52106f8e22feb156bbdeb8f97",
+    "logs/advance.jsonl": "a896fef2068f679f515173de376940496d9f0cb42dba5310232341b13b3e34a7",
+    "menu-before-fix.json": "a318693d694686f6604205c01f404c860632e3c90fcbeacd4602e7b3546b259b",
+    "source-after.json": "e13309ee8bbdf502c531834a6f457ccf8b8ed98c300fe73528780f3e521f74d3"
+  },
+  "completeLines": [
+    {
+      "n": 1,
+      "scenario": "scene1.ks",
+      "index": 27,
+      "codePoints": 11,
+      "textSha256": "e78b2681b4b83b6a26e6b95146301222ccc9a03da3d32f5d420f7c0c075958a6",
+      "shotSha256": "9937cb3e3b50f4f36430d43cc5183229bc791f5d5879be9156b01e4725a356e4",
+      "hidden": true,
+      "viewport": [
+        960,
+        640,
+        1
+      ]
+    },
+    {
+      "n": 2,
+      "scenario": "scene1.ks",
+      "index": 29,
+      "codePoints": 35,
+      "textSha256": "fe65b7fed96eb1cc153ea86e21e1050d801d1fb5d247f905f4aeadf1890bf6ad",
+      "shotSha256": "bd4d557c28f09ec88ab0a26ac43c2edd1170d0a2efeb80bca9f5060f8da85bae",
+      "hidden": true,
+      "viewport": [
+        960,
+        640,
+        1
+      ]
+    },
+    {
+      "n": 3,
+      "scenario": "scene1.ks",
+      "index": 35,
+      "codePoints": 29,
+      "textSha256": "d9fdd1fbc93da51c85266bbb081019463b9a6ac3e2776b90a9f45b941c012c7c",
+      "shotSha256": "d625e8ade6dd1093092b18d73be96d182f8f3fdd0b49cc4c1759240db0fec583",
+      "hidden": true,
+      "viewport": [
+        960,
+        640,
+        1
+      ]
+    },
+    {
+      "n": 4,
+      "scenario": "scene1.ks",
+      "index": 37,
+      "codePoints": 17,
+      "textSha256": "d2e3ec6f31e284a48f2e7e18254de6a67958a0b55c3dfc6ca5df8a7973207aa3",
+      "shotSha256": "8854c9e24c61b1bdb95feb24a764c4002ba157bdc9e7a27235740a6a6330505f",
+      "hidden": true,
+      "viewport": [
+        960,
+        640,
+        1
+      ]
+    },
+    {
+      "n": 5,
+      "scenario": "scene1.ks",
+      "index": 41,
+      "codePoints": 32,
+      "textSha256": "549cee0106b8613ce1b5fb2993351421250910e8b802b02b69e35a41aa8295bf",
+      "shotSha256": "3b2ee9c74c3b415730a6b728de8e22f367eb151525386804407c6c7c06730ca1",
+      "hidden": true,
+      "viewport": [
+        960,
+        640,
+        1
+      ]
+    },
+    {
+      "n": 6,
+      "scenario": "scene1.ks",
+      "index": 48,
+      "codePoints": 37,
+      "textSha256": "30fa879062e4ef2a5af9877f31477931b451e0d2b8d60d67cd8d3f2f71edaaf5",
+      "shotSha256": "02d99dfab4b32a907a1ade88d4310961b640beab631c46899b99d805af4ffef4",
+      "hidden": true,
+      "viewport": [
+        960,
+        640,
+        1
+      ]
+    },
+    {
+      "n": 7,
+      "scenario": "scene1.ks",
+      "index": 55,
+      "codePoints": 42,
+      "textSha256": "88f1e7e8b7312425452560eef0e2567b60aae9f559b601a3a238f183fc16ab88",
+      "shotSha256": "b12e7e0397432684959ca51096d9c56a41786a51de7677bf632b5f40e5e490c9",
+      "hidden": true,
+      "viewport": [
+        960,
+        640,
+        1
+      ]
+    },
+    {
+      "n": 8,
+      "scenario": "scene1.ks",
+      "index": 62,
+      "codePoints": 17,
+      "textSha256": "92b9c242103656ea6cc5a0c9c069fcc429e28ccc55ff142e53ec7098d617a08d",
+      "shotSha256": "7d85758358dd8e206c0ea9dac555a0739fde2f2553d2d4e86df1d27160f176ae",
+      "hidden": true,
+      "viewport": [
+        960,
+        640,
+        1
+      ]
+    },
+    {
+      "n": 9,
+      "scenario": "scene1.ks",
+      "index": 68,
+      "codePoints": 34,
+      "textSha256": "8259bd89a3cd403ca375a6be55e47b5aeda1c02ae06169d47b2e7ac36edff842",
+      "shotSha256": "03ebbcc1e844d34e9c2eed6160418b90b2add9906affdb43c2429ec31e988e96",
+      "hidden": true,
+      "viewport": [
+        960,
+        640,
+        1
+      ]
+    },
+    {
+      "n": 10,
+      "scenario": "scene1.ks",
+      "index": 71,
+      "codePoints": 33,
+      "textSha256": "b3a8d58350e2f93697992ac371110c45b6b41b5c125b0f7f84bedeec917ea1cc",
+      "shotSha256": "44fa7012a0955063d92498b417f426476cad8f580560e93826bd7f0d1fe96def",
+      "hidden": true,
+      "viewport": [
+        960,
+        640,
+        1
+      ]
+    }
+  ],
+  "menuFix": {
+    "producerSha256": "bbfb9687563dda50e8d175221ff548628f19f613fa3b743fbc3fbbe23f81dbe1",
+    "artifacts": {
+      "records.json": "b3c096fca80b34b2a08505342f7a8febf15ce67413d371f2f4e572a9f1c924f1",
+      "placements.json": "8570f8beeff2a4bcda8a6570d21357912b6e39ca1ad9f8e183cc976dab19a100",
+      "menu-after-fix.json": "63b9dc12f7f52cfe91ff06145428fd6d5a9fa1401e33f5b1b2bfa80d165cb907",
+      "menu-closed-fixed.json": "286ed2a57957aebb55bed1b85ec05f6f06457024426b539e30c6bbf51101f86e",
+      "source-after.json": "03569eaa29062488f1de42e539a3109ec52ea824b36856b0ce7479fab5de1d63",
+      "logs/chars.jsonl": "caf364fa960f021eb6a1d68f57ed7c585eba80126ff9e2a9a1e65b498f1e2e32"
+    },
+    "sourceUnchanged": true,
+    "sourceFiles": 420,
+    "fullReaderLaunched": false
+  }
+}

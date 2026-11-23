@@ -166,9 +166,9 @@ function walk(stmts,visit){const seen=new Set();
   for(const k of Object.keys(v))if(k!=='__class'&&k!=='__args')go(v[k],id,lang);};
  go(stmts,null,null);}
 /* the running script: lines (Say text and menu choices), their translate ids, the speaker variable as an anchor */
-function parse(buf){const lines=[],ids=[],anchors=[];let stmts;try{stmts=statements(buf);}catch{return {lines,anchors};}
- walk(stmts,x=>{if(x.lang)return;if(x.kind==='say'&&x.text){lines.push(x.text);ids.push(x.id||null);if(x.who)anchors.push(x.who);}else if(x.kind==='choice'){lines.push(x.text);ids.push(null);}});
- return ids.some(Boolean)?{lines,anchors,ids}:{lines,anchors};}
+function parse(buf){const lines=[],ids=[],anchors=[],roles=[];let stmts;try{stmts=statements(buf);}catch{return {lines,anchors};}
+ walk(stmts,x=>{if(x.lang)return;if(x.kind==='say'&&x.text){lines.push(x.text);roles.push('b');ids.push(x.id||null);if(x.who)anchors.push(x.who);}else if(x.kind==='choice'){lines.push(x.text);roles.push('c');ids.push(null);}});
+ return {lines,anchors,roles:roles.join(''),...(ids.some(Boolean)?{ids}:{})};}
 /* a compiled tl/<language> file: identifier -> translated Say text, old -> new strings */
 function translations(buf){const out={ids:new Map(),strings:new Map(),lang:null};let stmts;try{stmts=statements(buf);}catch{return out;}
  walk(stmts,x=>{if(!x.lang)return;out.lang=out.lang||x.lang;if(x.kind==='say'&&x.id&&x.text!=null&&!out.ids.has(x.id))out.ids.set(x.id,x.text);else if(x.kind==='string'&&x.old!=null&&x.text)out.strings.set(x.old,x.text);});

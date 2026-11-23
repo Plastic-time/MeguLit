@@ -23,24 +23,29 @@ for(const corrected of [false,true])test('two detail languages keep the right wo
  t.after(()=>meta.stop());
  let started,release;
  const fetching=new Promise(resolve=>{started=resolve;}),gate=new Promise(resolve=>{release=resolve;});
- const calls=[];meta.synopses.get=async({lang,vndbId})=>{
-  calls.push(lang);if(lang==='en'){started();await gate;}
-  return {source:'VNDB',text:vndbId+'-'+lang};
+ const calls=[];
+ meta.synopses.lookup=async vndbId=>{
+  calls.push(vndbId);if(calls.length===1){started();await gate;}
+  return {text:vndbId+'-en'};
  };
+ meta.synopses.moegirl=async()=>null;
+ meta.synopses.translate=async(text,lang)=>text.replace('-en','-'+lang);
  const english=meta.ensure('g','en');await fetching;
  if(corrected){
   const write=store.openStore(work);
   try{write.prepare("UPDATE games SET original=json_set(original,'$.vndbManual','v2') WHERE id='g'").run();}finally{write.close();}
  }
- const japanese=meta.ensure('g','ja');release();await Promise.all([english,japanese]);
- const {synopses:saved,reviews}=store.readJSON(meta.file).g;
- assert.equal(saved.en?.text,corrected?undefined:'v1-en');
- assert.equal(saved.ja?.text,corrected?'v2-ja':'v1-ja');
+ const japanese=meta.ensure('g','ja');release();
+ const [en,ja]=await Promise.all([english,japanese]);
+ const {reviews,synopses}=store.readJSON(meta.file).g;
+ assert.equal(synopses,undefined);
+ assert.equal(en.synopsis.text,corrected?'':'v1-en');
+ assert.equal(ja.synopsis.text,corrected?'v2-ja':'v1-ja');
  assert.equal(reviews.en?.[0]?.text,corrected?undefined:'review-english');
  assert.equal(reviews.ja?.[0]?.text,'review-japanese');
  if(!corrected)await meta.ensure('g','en');
  await meta.ensure('g','ja');
- assert.equal(calls.length,2);
+ assert.deepEqual(calls,corrected?['v1','v2']:['v1']);
 });
 
 test('a forced refresh asked during a run is not lost',async()=>{
@@ -65,4 +70,24 @@ test('a forced refresh asked during a run is not lost',async()=>{
  }finally{globalThis.fetch=realFetch;}
  assert.deepEqual([...new Set(asked)],['v1','v2']);/* the old run, then one for the corrected entry */
  assert.equal(original().library.vndbId,'v2');
+});
+
+test('ordinary import asks for layout once alongside VN metadata and rechecks a different executable',async t=>{
+ const work=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-vn-layout-'));
+ t.after(()=>fs.rmSync(work,{recursive:true,force:true}));
+ const db=store.openStore(work),exe=path.join(work,'unknown.exe'),fields=[];
+ fs.writeFileSync(exe,'version one');
+ db.prepare("INSERT INTO games(id,title,executable,source,original) VALUES('g','Game',?,'folder',?)")
+  .run(exe,JSON.stringify({vndbManual:'v123'}));db.close();
+ const meta=new GameEnrichment(work,()=>{},async(url,req)=>{
+  if(url.endsWith('/kana/vn')){
+   const query=JSON.parse(req.body);fields.push(query.fields);
+   return Response.json({results:[{id:'v123',title:'Game',...(query.fields.includes('tags.id')?{tags:[{id:'g355',rating:3}]}:{})}]});
+  }
+  return new Response('',{status:404});
+ });
+ meta.synopses.get=async()=>null;t.after(()=>meta.stop());
+ await meta.ensure('g','en',true);await meta.ensure('g','en',true);
+ fs.writeFileSync(exe,'different build');await meta.ensure('g','en',true);
+ assert.deepEqual(fields.map(x=>x.includes('tags.id')),[true,false,true]);
 });

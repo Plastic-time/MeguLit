@@ -106,7 +106,7 @@ function originalTextState(root,id){
 }
 /* 2026-11-21 the game diff calibrated on this PC and the self-check windows of the running game (docs/auto-profile.md): the
    upload format the server aggregates; no paths, the program name only */
-function autoProfile(root,executable,engine){try{const ap=require('../core/auto-profile.cjs');const key=executable?ap.exeKeySync(root,executable):'';if(!key)return null;let windows=[];try{const cur=require('./self-check-live.cjs').current();if(cur&&cur.key===key)windows=cur.check.windows;}catch{}return ap.diagnostic(ap.load(root,key),windows);}catch{return null;}}
+function autoProfile(root,executable,engine){try{const ap=require('../core/auto-profile.cjs');const key=executable?ap.exeKeySync(root,executable):'';if(!key)return null;const cur=require('./self-check-live.cjs').current();const session=cur?.reader.root===root&&cur.key===key&&cur.exe===executable?cur:null;const check=session?.check;return ap.diagnostic(session?.stored||ap.load(root,key,require('./original-text.cjs').contributionScript(root,executable)),check?.windows,check?.w.lines??null);}catch{return null;}}
 function osInfo(){let version='';try{version=os.version();}catch{}return {platform:process.platform,release:os.release(),version,arch:process.arch,node:process.version,locale:Intl.DateTimeFormat().resolvedOptions().locale};}
 function findScreenshot(root,executable,maxAgeMs=6*3600*1000){
  const dirs=[path.join(root,'data','screenshots'),path.join(root,'logs','screenshots'),path.join(root,'logs')];const base=executable?path.basename(executable,path.extname(executable)).toLowerCase():'';let best=null;
@@ -121,12 +121,14 @@ function collect(root,db,id,{version='',now=new Date(),who=identity(),screenshot
  const files=[],logInfo={};
  for(const name of LOGS){const all=readLog(root,name);const kept=name==='game-launch.log'?all.filter(l=>l.includes(`"gameId":"${id}"`)).slice(-MAX_LINES):filterLines(all,windows,exe?[exe]:[]);logInfo[name]={linesInLog:all.length,linesKept:kept.length};if(kept.length)files.push({name:'logs/'+name,data:scrub(kept.join('\n')+'\n',who),kind:'log'});}
  let overviewRow=null;try{overviewRow=require('./adaptation-overview.cjs').overview(db,root,{entries}).games.find(g=>g.id===String(id))||null;}catch{}
- const info={schema:1,createdAt:now.toISOString(),megulit:{version:String(version||'')},os:osInfo(),
+ const info={schema:1,yui:require('./yui.cjs').sessions(root).filter(s=>s.session===process.env.MEGULIT_YUI_SESSION),createdAt:now.toISOString(),megulit:{version:String(version||'')},os:osInfo(),
   game:{id:String(row.id),title:row.title,engine:String(library.engine||''),executable:row.executable||'',executableName:exe,available:!!row.executable&&fs.existsSync(row.executable),localeMode:library.localeMode||(library.localeJapanese===true?'japanese':'auto'),source:row.source,lastLaunchedAt:ms(row.last_launched_at)?new Date(ms(row.last_launched_at)).toISOString():null,removed:row.removed_at!=null},
   embed:{hookSupport:String(library.hook||'unknown'),hookVerifiedAt:ms(library.hookVerifiedAt)?new Date(ms(library.hookVerifiedAt)).toISOString():null,hookVerifiedStream:library.hookVerifiedStream||null,hookReadonlyAt:ms(library.hookReadonlyAt)?new Date(ms(library.hookReadonlyAt)).toISOString():null,hookReadonlyBuild:library.hookReadonlyBuild||null,hookVerdictStale:require('./hook-verdict.cjs').stale(library,require('./hook-verdict.cjs').appVersion(root)),hookStreams:hookStreams(root,row.executable)},
   originalText:originalTextState(root,id),autoProfile:autoProfile(root,row.executable,library.engine),adaptation:overviewRow?{reading:overviewRow.reading,zeroLatency:overviewRow.zeroLatency,evidence:overviewRow.evidence}:null,
   runs:windows.slice(-20).map(w=>({from:new Date(w.from).toISOString(),to:new Date(w.to).toISOString()})),logs:logInfo};
  files.unshift({name:'info.json',data:scrub(JSON.stringify(info,null,2),who),kind:'info'});
+ const marks=require('./sentence-marks.cjs').read(root,id);
+ if(marks.length)files.push({name:'sentence-marks.json',kind:'info',data:JSON.stringify({schema:1,marks},null,2)});
  const shot=screenshot?findScreenshot(root,row.executable):null;if(shot){try{files.push({name:'screenshot'+(shot.ext==='.png'?'.png':'.jpg'),data:fs.readFileSync(shot.file),kind:'screenshot'});}catch{}}
  const readme=['MeguLit diagnostic package','','Game: '+row.title,'Created: '+now.toISOString(),'',...files.map(f=>`${f.name}  ${f.kind==='log'?'log lines from this game\'s runs':f.kind==='info'?'game, engine, version, OS, original-text and embed evidence':'screenshot already on disk'}`),'','Privacy: the Windows user name and profile paths are replaced with <user> / %USERPROFILE%, e-mail addresses with <email>.'].join('\r\n');
  files.push({name:'README.txt',data:scrub(readme,who),kind:'readme'});
@@ -148,7 +150,9 @@ function collectAll(root,db,{version='',now=new Date(),who=identity()}={}){
  const files=[],logInfo={};
  for(const name of names){const all=readLog(root,name),kept=all.slice(-MAX_LINES);logInfo[name]={linesInLog:all.length,linesKept:kept.length};if(kept.length)files.push({name:'logs/'+name,data:scrub(kept.join('\n')+'\n',who),kind:'log'});}
  let games=[];try{games=db.prepare('SELECT id,title,library FROM games ORDER BY last_launched_at DESC LIMIT 60').all().map(r=>{let lib={};try{lib=JSON.parse(r.library||'{}');}catch{}return {id:String(r.id),title:r.title,engine:String(lib.engine||''),hook:String(lib.hook||'')};});}catch{}
- const info={schema:1,kind:'all',createdAt:now.toISOString(),megulit:{version:String(version||'')},os:osInfo(),games,logs:logInfo};
+ const marked=require('./sentence-marks.cjs').all(root);
+ if(marked.length)files.push({name:'sentence-marks.json',kind:'info',data:JSON.stringify({schema:1,games:marked},null,2)});
+ const info={schema:1,yui:require('./yui.cjs').sessions(root),kind:'all',createdAt:now.toISOString(),megulit:{version:String(version||'')},os:osInfo(),games,logs:logInfo};
  files.unshift({name:'info.json',data:scrub(JSON.stringify(info,null,2),who),kind:'info'});
  const readme=['MeguLit diagnostic package (whole app)','','Created: '+now.toISOString(),'',...files.map(f=>`${f.name}  ${f.kind==='log'?'last lines of this log':'MeguLit version, OS and the library'}`),'','Privacy: the Windows user name and profile paths are replaced by placeholders and e-mail addresses are removed.'].join('\n');
  files.push({name:'README.txt',data:scrub(readme,who),kind:'readme'});

@@ -52,20 +52,23 @@ test('R18 filter: memory CGs (never rated) are left out',()=>{
  assert.deepEqual(wall.unlocked(db,root,'g1').map(x=>x.id),[]);});
 
 // End to end with the native self-test output, when run.ps1 has run on this machine with the Cg case (it leaves cg.log).
-const selfWork=path.join(process.env.MEGULIT_WORK||'H:\MeguLit-Work','runtime-dump-selftest'),selfOut=path.join(selfWork,'out64');
-/* the native self-test leaves its output once; settling it moves the waiting TLG on, so a check run here works on a copy
-   (it used to settle the shared folder itself: every run after the first failed) and waits for output that still has one */
-const hasCgRun=()=>{try{return fs.readdirSync(selfOut).some(k=>fs.existsSync(path.join(selfOut,k,'cg.log'))&&fs.existsSync(path.join(selfOut,k,'cg-wait'))&&fs.readdirSync(path.join(selfOut,k,'cg-wait')).some(n=>n.endsWith('.tlg')));}catch{return false;}};
-test('native self-test output: shown CGs readable, the preloaded one absent',{skip:!hasCgRun()&&'environment: no unsettled native CG self-test output on this PC (run the runtime-cg self-test again)'},t=>{
+const selfWork=path.join(process.env.MEGULIT_WORK||'H:/MeguLit-Work','runtime-dump-selftest'),selfOut=path.join(selfWork,'out64');
+test('native self-test output: shown CGs readable, the preloaded one absent',{skip:!fs.existsSync(selfOut)&&'environment: no native self-test output'},t=>{
  const work=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-rtcg-self-'));t.after(()=>fs.rmSync(work,{recursive:true,force:true}));
  fs.cpSync(selfOut,path.join(work,'out64'),{recursive:true});/* the dump folder is keyed by the game's path: the game stays where it is, only what settling changes is copied */
  process.env.MEGULIT_RUNTIME_DUMP=path.join(work,'out64');delete require.cache[require.resolve('../services/runtime-dump.cjs')];delete require.cache[require.resolve('../services/runtime-cg.cjs')];
- const cg=require('../services/runtime-cg.cjs');cg.settle(require('../services/runtime-dump.cjs').dirFor(path.join(selfWork,'game64')));
+ const dir=require('../services/runtime-dump.cjs').dirFor(path.join(selfWork,'game64'));
+ // Replay the capture at its last screen sample, before the unmatched preload expires.
+ const screens=fs.readFileSync(path.join(dir,'cg-screens.bin'));
+ const recordSize=8+32*18;
+ assert.ok(screens.length>=recordSize);
+ assert.equal(screens.length%recordSize,0);
+ const captureTime=screens.readUInt32LE(screens.length-recordSize)*1000;
+ const cg=require('../services/runtime-cg.cjs');cg.settle(dir,captureTime);
  const l=cg.list(path.join(selfWork,'game64','host.exe'),{settle:false});
  /* A (png) and C (jpg) confirmed by the DLL, F (TLG, shown) confirmed here and stored as png; G (TLG, preloaded) waits */
  assert.deepEqual(l.map(x=>x.fmt).sort(),['jpg','png','png']);for(const x of l){assert.equal(x.w,800);assert.equal(x.h,600);}
  assert.equal(l.filter(x=>x.how==='tlg').length,1);
- const dir=require('../services/runtime-dump.cjs').dirFor(path.join(selfWork,'game64'));
  assert.equal(fs.readdirSync(path.join(dir,'cg-wait')).filter(n=>n.endsWith('.tlg')).length,1);});
 const tlgs=dir=>fs.readdirSync(path.join(dir,'cg-wait')).filter(n=>n.endsWith('.tlg'));
 

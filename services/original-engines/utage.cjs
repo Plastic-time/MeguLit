@@ -13,6 +13,7 @@ const RUBY=/<ruby=([^>]*)>([\s\S]*?)<\/ruby>/gi;
 const TAG=/<\/?[a-zA-Z][^>\n]{0,64}>/g;
 const MAX_ASSET=512*1024*1024,MAX_NODE=96*1024*1024;
 const SKIP_COL=new Set(['','command','waittype','pagectrl','voice','windowtype']);
+const SCENARIO_PATCH=/[\\/]StreamingAssets[\\/].*[\\/][^\\/]+-patch[\\/][^\\/]+\.scenarios\.asset$/i;
 
 function clean(s){
  const pairs=[];
@@ -152,7 +153,7 @@ function pickColumns(rows){
  return {hi,cCmd,cArg1,srcCol,zhCol,otherCols};
 }
 
-function collectObjects(buf,books,chapters){
+function collectObjects(buf,books,chapters,source){
  const r=ser.parse(buf);if(!r)return;
  for(const o of r.objects){
   if(o.type!==114||o.size<64)continue;
@@ -160,12 +161,49 @@ function collectObjects(buf,books,chapters){
   if(!h)continue;
   if(/\.book$/i.test(h.name)){
    const sheets=o.tree?gridsFromTree(ser.readValue(buf,o)):parseBook(buf.subarray(o.offset,o.offset+o.size),r.version);
-   if(sheets?.length)books.push(sheets);
+   if(sheets?.length)books.push({name:h.name,sheets,source});
   }else if(/\.chapter$/i.test(h.name)){
    const grids=o.tree?gridsFromTree(ser.readValue(buf,o)):parseChapter(buf.subarray(o.offset,o.offset+o.size),r.version);
    if(grids?.length)chapters.push(grids);
   }
  }
+}
+
+/* A compiled patch replaces a book only when every source row still has the same identity.
+   Matching a basename or a line count alone can pair a different route or translation column. */
+const sheetIdentity=sheet=>String(sheet.name||'').split(':').pop();
+function sameSourceRows(base,patch){
+ if(base.sheets.length!==patch.sheets.length)return false;
+ return base.sheets.every((sheet,i)=>{
+  const other=patch.sheets[i],cols=pickColumns(sheet.rows),next=pickColumns(other.rows);
+  if(sheetIdentity(sheet)!==sheetIdentity(other)||sheet.rows.length!==other.rows.length||!cols||!next)return false;
+  if(cols.srcCol!==next.srcCol||cols.hi!==next.hi||JSON.stringify(sheet.rows[cols.hi])!==JSON.stringify(other.rows[next.hi]))return false;
+  const voiceCol=sheet.rows[cols.hi].findIndex(cell=>String(cell).trim().toLowerCase()==='voice');
+  return sheet.rows.slice(cols.hi+1).every((row,j)=>{
+   const incoming=other.rows[next.hi+1+j];
+   return row[cols.srcCol]===incoming[next.srcCol]&&
+    (cols.cCmd<0||row[cols.cCmd]===incoming[next.cCmd])&&
+    (cols.cArg1<0||row[cols.cArg1]===incoming[next.cArg1])&&
+    (voiceCol<0||row[voiceCol]===incoming[voiceCol]);
+  });
+ });
+}
+
+function selectBooks(books){
+ const base=books.filter(book=>!SCENARIO_PATCH.test(book.source)),patches=new Map();
+ const identity=book=>JSON.stringify(book.sheets.map(sheetIdentity));
+ for(const book of books.filter(book=>SCENARIO_PATCH.test(book.source))){
+  const key=identity(book);
+  if(!patches.has(key))patches.set(key,[]);
+  patches.get(key).push(book);
+ }
+ for(const [key,candidates] of patches){
+  if(candidates.length!==1)continue;
+  const patch=candidates[0],matches=base.filter(book=>identity(book)===key);
+  if(!matches.length){base.push(patch);continue;}
+  if(matches.length===1&&sameSourceRows(matches[0],patch))base[base.indexOf(matches[0])]=patch;
+ }
+ return base;
 }
 
 function speakerResolver(chapters){
@@ -194,7 +232,11 @@ function speakerResolver(chapters){
 const memo=new Map();
 function loadDir(dir){
  const src=ua._internal.sources(dir);
- const files=[...src.players,...src.bundles];
+ const patches=src.loose.filter(file=>{
+  const size=Number(stat(file).split('|')[0]);
+  return SCENARIO_PATCH.test(file)&&size>=64&&size<=MAX_NODE;
+ });
+ const bundles=[...src.bundles,...patches],files=[...src.players,...bundles];
  const sig=files.map(f=>f+'|'+stat(f)).join('\n');
  const hit=memo.get(dir);
  if(hit&&hit.sig===sig)return hit.data;
@@ -205,10 +247,10 @@ function loadDir(dir){
   if(!sz||sz>MAX_ASSET)continue;
   let buf;try{buf=fs.readFileSync(f);}catch{continue;}
   const before=books.length+chapters.length;
-  try{collectObjects(buf,books,chapters);}catch{}
+  try{collectObjects(buf,books,chapters,f);}catch{}
   if(books.length+chapters.length>before)usedSources.push(f);
  }
- for(const f of src.bundles){
+ for(const f of bundles){
   let nodes;try{nodes=ufs.list(f);}catch{nodes=null;}
   if(!nodes)continue;
   const before=books.length+chapters.length;
@@ -216,14 +258,14 @@ function loadDir(dir){
    if(/\.(resS|resource|ress)$/i.test(n.name)||n.size>MAX_NODE||n.size<64)continue;
    let node;try{node=ufs.readNode(f,n.index,MAX_NODE);}catch{continue;}
    if(!node)continue;
-   try{collectObjects(node.data,books,chapters);}catch{}
+   try{collectObjects(node.data,books,chapters,f);}catch{}
   }
   if(books.length+chapters.length>before)usedSources.push(f);
  }
 
  const resolveSpeaker=speakerResolver(chapters);
  const sceneMap=new Map(),foreignRows=[];
- for(const sheets of books){
+ for(const {sheets} of selectBooks(books)){
   for(const s of sheets){
    const cols=pickColumns(s.rows);if(!cols)continue;
    const lines=[],zh=[],ruby=[],speakers=[];
@@ -231,7 +273,7 @@ function loadDir(dir){
     const cmd=cols.cCmd>=0?String(r[cols.cCmd]||'').trim():'';
     if(cmd.startsWith('//'))continue;
     const src=clean(r[cols.srcCol]);
-    if(!src.text)continue;
+    if(!src.text||(cmd&&src.text.startsWith('//')))continue;
     const z=cols.zhCol>=0?clean(r[cols.zhCol]).text:'';
     const sp=!cmd&&cols.cArg1>=0?resolveSpeaker(r[cols.cArg1]):'';
     lines.push(src.text);zh.push(z);ruby.push(src.ruby);speakers.push(sp);
@@ -285,5 +327,5 @@ module.exports={
  test:()=>false,
  patchLines:require('./fill.cjs').patchLines,
  foreign,
- _internal:{parseBook,parseChapter,clean,pickColumns,speakerResolver},
+ _internal:{parseBook,parseChapter,clean,pickColumns,speakerResolver,sameSourceRows,selectBooks},
 };

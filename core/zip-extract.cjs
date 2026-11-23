@@ -10,7 +10,7 @@ function decodeName(buf,flag){if(flag&0x800)return buf.toString('utf8');try{retu
 
 async function readAt(fd,pos,len){const b=Buffer.alloc(len);const {bytesRead}=await fd.read(b,0,len,pos);return b.subarray(0,bytesRead);}
 
-async function entries(file){
+async function entries(file,{maxIndex=Infinity,maxEntries=Infinity}={}){
  const fd=await fsp.open(file,'r');
  try{const size=(await fd.stat()).size,tailLen=Math.min(size,65557),tail=await readAt(fd,size-tailLen,tailLen);
   let eocd=-1;for(let i=tail.length-22;i>=0;i--)if(tail.readUInt32LE(i)===0x06054b50){eocd=i;break;}
@@ -18,6 +18,9 @@ async function entries(file){
   let count=tail.readUInt16LE(eocd+10),cdSize=tail.readUInt32LE(eocd+12),cdOff=tail.readUInt32LE(eocd+16);
   if(cdOff===0xFFFFFFFF||count===0xFFFF){const loc=eocd-20;if(loc>=0&&tail.readUInt32LE(loc)===0x07064b50){const z=await readAt(fd,Number(tail.readBigUInt64LE(loc+8)),56);
    if(z.readUInt32LE(0)===0x06064b50){count=Number(z.readBigUInt64LE(32));cdSize=Number(z.readBigUInt64LE(40));cdOff=Number(z.readBigUInt64LE(48));}}}
+  const bounded=Number.isFinite(maxIndex);
+  if(cdSize>maxIndex||count>maxEntries)throw Error('IMPORT_NPA_LIMIT');
+  if(bounded&&(!Number.isSafeInteger(cdOff)||!Number.isSafeInteger(cdSize)||!Number.isSafeInteger(count)||cdOff<0||cdOff+cdSize>size-tailLen+eocd))throw Error('IMPORT_EXTRACT_FAILED');
   const cd=await readAt(fd,cdOff,cdSize),list=[];let p=0;
   for(let n=0;n<count&&p+46<=cd.length;n++){if(cd.readUInt32LE(p)!==0x02014b50)break;
    const flag=cd.readUInt16LE(p+8),method=cd.readUInt16LE(p+10),nameLen=cd.readUInt16LE(p+28),extraLen=cd.readUInt16LE(p+30),commentLen=cd.readUInt16LE(p+32);
@@ -25,8 +28,32 @@ async function entries(file){
    const name=decodeName(cd.subarray(p+46,p+46+nameLen),flag),extra=cd.subarray(p+46+nameLen,p+46+nameLen+extraLen);
    for(let e=0;e+4<=extra.length;){const id=extra.readUInt16LE(e),len=extra.readUInt16LE(e+2);if(id===1){let q=e+4;
      if(usize===0xFFFFFFFF){usize=Number(extra.readBigUInt64LE(q));q+=8;}if(csize===0xFFFFFFFF){csize=Number(extra.readBigUInt64LE(q));q+=8;}if(local===0xFFFFFFFF){local=Number(extra.readBigUInt64LE(q));}}e+=4+len;}
-   list.push({name,flag,method,csize,usize,local});p+=46+nameLen+extraLen+commentLen;}
+   const crc=cd.readUInt32LE(p+16);list.push({name,flag,method,csize,usize,local,crc,boundary:cdOff});p+=46+nameLen+extraLen+commentLen;}
+  if(bounded&&(list.length!==count||p!==cdSize))throw Error('IMPORT_EXTRACT_FAILED');
   return list;}finally{await fd.close();}
+}
+
+async function readMember(file,e,max){
+ if(e.flag&0x41)throw Error('IMPORT_NPA_ENCRYPTED');
+ if(![0,8].includes(e.method))throw Error('IMPORT_NPA_ZIP');
+ if(!Number.isSafeInteger(e.csize)||!Number.isSafeInteger(e.usize)||e.csize>max||e.usize>max)throw Error('IMPORT_NPA_LIMIT');
+ const fd=await fsp.open(file,'r');
+ try{
+  if(!Number.isSafeInteger(e.local)||e.local<0||e.local+30>e.boundary)throw Error('IMPORT_NPA_ZIP');
+  const head=await readAt(fd,e.local,30);
+  if(head.length!==30||head.readUInt32LE(0)!==0x04034b50||head.readUInt16LE(6)!==e.flag||head.readUInt16LE(8)!==e.method)throw Error('IMPORT_NPA_ZIP');
+  const nameLength=head.readUInt16LE(26),start=e.local+30+nameLength+head.readUInt16LE(28);
+  if(start+e.csize>e.boundary)throw Error('IMPORT_NPA_ZIP');
+  const name=await readAt(fd,e.local+30,nameLength);
+  if(decodeName(name,e.flag)!==e.name)throw Error('IMPORT_NPA_ZIP');
+  const compressed=await readAt(fd,start,e.csize);
+  if(compressed.length!==e.csize)throw Error('IMPORT_NPA_ZIP');
+  let data;
+  try{data=e.method===8?zlib.inflateRawSync(compressed,{maxOutputLength:Math.max(1,e.usize)}):compressed;}
+  catch{throw Error('IMPORT_NPA_ZIP');}
+  if(data.length!==e.usize||zlib.crc32(data)!==e.crc)throw Error('IMPORT_NPA_ZIP');
+  return data;
+ }finally{await fd.close();}
 }
 
 // Names are checked so an entry can never write outside the target folder.
@@ -47,4 +74,4 @@ async function extract(file,dest){
  return list.length;
 }
 
-module.exports={entries,extract,decodeName};
+module.exports={entries,extract,decodeName,readMember};

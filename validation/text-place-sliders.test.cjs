@@ -50,7 +50,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
   assert.deepStrictEqual(gp.pick({ x: 1, anchorDX: 3, anchorDY: -1 }, 'position'), { x: 1, anchorDX: 3, anchorDY: -1 });
   const gal = fs.readFileSync(path.join(__dirname, '..', 'web', 'reader', 'modules', 'gal.js'), 'utf8');
   assert.match(gal, /fieldsAreOffset \? \{ x: preferences\.x, y: preferences\.y, anchorDX: Number\(f\('galX'\)\.value\) \|\| 0, anchorDY: Number\(f\('galY'\)\.value\) \|\| 0 \}/, 'anchored: the fields write the offset, x/y stay');
-  assert.match(gal, /fieldsAreOffset = anchoredNow\(\); if \(fieldsAreOffset\) \{ f\('galX'\)\.value = Number\(preferences\.anchorDX\) \|\| 0;/, 'anchored: the fields show the offset'); }
+  assert.match(gal, /key = fieldsAreOffset \? 'anchorD'\+axis : axis\.toLowerCase\(\)[\s\S]*?field\.value = Number\(preferences\[key\]\)/, 'anchored: the fields show the offset'); }
 
 /* the fields' meaning is fixed when they are filled and refilled when the mode changes while the menu is open; nothing is read
    in the other meaning (user: 校准后拖换行宽度，再也恢复不了正确位置) */

@@ -5,10 +5,14 @@
 const fs=require('node:fs');
 
 function lz4(src,size){const out=Buffer.alloc(size);let s=0,d=0;
- while(s<src.length){const token=src[s++];let lit=token>>4;if(lit===15){let b;do{b=src[s++];lit+=b;}while(b===255);}
+ const length=n=>{if(n!==15)return n;let b;do{if(s>=src.length)throw Error('LZ4_TRUNCATED');b=src[s++];n+=b;}while(b===255);return n;};
+ while(s<src.length){const token=src[s++],lit=length(token>>4);
+  if(s+lit>src.length||d+lit>size)throw Error('LZ4_LITERAL_SIZE');
   src.copy(out,d,s,s+lit);s+=lit;d+=lit;if(s>=src.length)break;
-  const off=src[s]|src[s+1]<<8;s+=2;let len=token&15;if(len===15){let b;do{b=src[s++];len+=b;}while(b===255);}len+=4;
-  let from=d-off;if(from<0)throw Error('LZ4_BAD_OFFSET');for(let k=0;k<len;k++)out[d++]=out[from++];}
+  if(s+2>src.length)throw Error('LZ4_TRUNCATED');
+  const off=src[s]|src[s+1]<<8;s+=2;const len=length(token&15)+4;
+  let from=d-off;if(!off||from<0)throw Error('LZ4_BAD_OFFSET');if(d+len>size)throw Error('LZ4_MATCH_SIZE');
+  for(let k=0;k<len;k++)out[d++]=out[from++];}
  return d===size?out:out.subarray(0,d);}
 /* E700 type 1 = LZMA (lzma.cjs): Unity's default for BuildAssetBundle without ChunkBasedCompression */
 function inflate(buf,size,type){if(type===0)return buf;if(type===2||type===3)return lz4(buf,size);if(type===1)return require('./lzma.cjs').decode(buf,size);throw Error('UNITYFS_COMPRESSION_'+type);}
@@ -60,18 +64,51 @@ function serializedHeaderEnd(head,sz){
  return dataOffset>0&&dataOffset<=sz?dataOffset:0;
 }
 
-function read(file){
+function read(file,{maxUnpacked,check=()=>{},consume=()=>{}}={}){
+ const bounded=maxUnpacked!==undefined;
  let b=Buffer.isBuffer(file)?file:fs.readFileSync(file);const at=start(b.subarray(0,65536));if(at<0)throw Error('NOT_UNITYFS');if(at)b=b.subarray(at);
- let p=8;const version=b.readUInt32BE(p);p+=4;let s;[s,p]=cstr(b,p);[s,p]=cstr(b,p);
+ let p=8;const version=b.readUInt32BE(p);p+=4;
+ for(let i=0;i<2;i++){
+  const end=b.indexOf(0,p);
+  if(bounded&&(end<0||end-p>128))throw Error('UNITYFS_HEADER');
+  p=end+1;
+ }
+ if(bounded&&(version<6||version>8||b.readBigUInt64BE(p)!==BigInt(b.length)))throw Error('UNITYFS_HEADER');
  p+=8;/* total size */const cInfo=b.readUInt32BE(p),uInfo=b.readUInt32BE(p+4),flags=b.readUInt32BE(p+8);p+=12;
  if(version>=7)p=(p+15)&~15;
- let infoAt=flags&0x80?b.length-cInfo:p;const info=inflate(b.subarray(infoAt,infoAt+cInfo),uInfo,flags&0x3f);
+ const infoAt=flags&0x80?b.length-cInfo:p;
+ if(bounded&&(cInfo>1<<20||uInfo>1<<20))throw Error('EMBEDDED_BUNDLE_BUDGET');
+ if(bounded&&(infoAt<p||infoAt+cInfo>b.length||uInfo<24))throw Error('UNITYFS_HEADER');
+ const info=inflate(b.subarray(infoAt,infoAt+cInfo),uInfo,flags&0x3f);
  let data=flags&0x80?p:p+cInfo;if(flags&0x200)data=(data+15)&~15;
- let q=16;const blocks=[],n=info.readInt32BE(q);q+=4;for(let i=0;i<n;i++){blocks.push({u:info.readUInt32BE(q),c:info.readUInt32BE(q+4),f:info.readUInt16BE(q+8)});q+=10;}
- const parts=[];for(const k of blocks){parts.push(inflate(b.subarray(data,data+k.c),k.u,k.f&0x3f));data+=k.c;}
- const all=Buffer.concat(parts),nodes=[],m=info.readInt32BE(q);q+=4;
- for(let i=0;i<m;i++){const off=Number(info.readBigInt64BE(q)),size=Number(info.readBigInt64BE(q+8));q+=20;let name;[name,q]=cstr(info,q);nodes.push({name,data:all.subarray(off,off+size)});}
- return nodes;}
+ let q=16;const blocks=[],n=info.readInt32BE(q);q+=4;
+ if(bounded&&(n<1||n>1024||n*10+q+4>info.length||info.length!==uInfo))throw Error('UNITYFS_BLOCK_TABLE');
+ let unpacked=0,packed=0;
+ for(let i=0;i<n;i++){
+  const u=info.readUInt32BE(q),c=info.readUInt32BE(q+4),f=info.readUInt16BE(q+8);q+=10;
+  blocks.push({u,c,f});unpacked+=u;packed+=c;
+ }
+ if(bounded&&unpacked>maxUnpacked)throw Error('EMBEDDED_BUNDLE_BUDGET');
+ if(bounded&&data+packed>(flags&0x80?infoAt:b.length))throw Error('UNITYFS_BLOCK_TABLE');
+ const nodes=[],m=info.readInt32BE(q);q+=4;
+ if(bounded&&(m<1||m>256||m*21+q>info.length))throw Error('UNITYFS_NODE_TABLE');
+ for(let i=0;i<m;i++){
+  const off=Number(info.readBigInt64BE(q)),size=Number(info.readBigInt64BE(q+8));q+=20;
+  const end=info.indexOf(0,q);
+  if(bounded&&(end<0||off<0||size<0||off+size>unpacked))throw Error('UNITYFS_NODE_TABLE');
+  nodes.push({name:info.toString('utf8',q,end),off,size});q=end+1;
+ }
+ consume(unpacked);
+ const parts=[];
+ for(const k of blocks){
+  check();
+  const part=inflate(b.subarray(data,data+k.c),k.u,k.f&0x3f);data+=k.c;
+  if(bounded&&part.length!==k.u)throw Error('UNITYFS_BLOCK_SIZE');
+  parts.push(part);
+ }
+ const all=Buffer.concat(parts);
+ return nodes.map(({name,off,size})=>({name,data:all.subarray(off,off+size)}));
+}
 /* E450 One node of a bundle read from the file block by block, for bundles too large to load (夏色四叶草 keeps its
    source scripts in a 3 GB bundle whose serialized file is 333 MB, beside gigabytes of .resS). index: the node to read
    (default the first, the serialized assets); null when the bundle is not UnityFS or the node is over max bytes. */

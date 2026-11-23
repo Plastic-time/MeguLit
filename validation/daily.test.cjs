@@ -307,7 +307,7 @@ test('Microsoft hint: the reader learns which engine answered (also from cache);
  assert.match(view,/当前为微软机器翻译，效果一般。想要更好的译文，可以在设置 › 翻译里接入自己的 AI API/);assert.match(view,/openSettings\?\.\('translation'\)/);assert.match(view,/data-rd-mt-x/);
  assert.match(require('./flat-source.cjs')(path.join(__dirname,'..','web','app.js')),/route==='daily'\)await mountDaily\(main,.*?openSettings:section=>\{settingsSection=section/);
  const inject=fs.readFileSync(path.join(__dirname,'..','web','reader','modules','inject.js'),'utf8');assert.match(inject,/bridge\.mtNotice = \(\) => \{\s*if \(bridge\.mtNoticed\) return;/);
- assert.match(fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8'),/r\.source==='mt'&&!chain\.isMt\(options\.provider\)&&!this\.mtNoticed\)\{this\.mtNoticed=true;this\.runtime\.emit\('reader-event',\{type:'call',method:'mtNotice'/,'said once when machine translation stood in for the chosen engine (services/translation-chain.cjs)');
+ assert.match(fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8'),/r\.source==='mt'&&!chain\.isMt\(options\.provider\)&&!this\.mtNoticed\)\{this\.mtNoticed=true;this\.emit\('reader-event',\{type:'call',method:'mtNotice'/,'said once when machine translation stood in for the chosen engine (services/translation-chain.cjs)');
  const page=await import(pathToFileURL(path.join(__dirname,'..','web','daily-view.js')).href);
  const esc=s=>String(s);const html=page.pageHTML({state:'ok',news:{items:[{title:'G',link:'https://a/1',source:'A',cat:'gal'},{title:'C',link:'https://a/2',source:'B',cat:'acg'}]},words:{words:[]}},{locale:'zh',esc,cat:'acg'});
  assert.match(html,/data-dl-cat="acg" aria-selected="true"/);assert.match(html,/<h2>C<\/h2>/);assert.doesNotMatch(html,/<h2>G<\/h2>/);

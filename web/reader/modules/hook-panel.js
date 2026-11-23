@@ -53,6 +53,14 @@
  .tome-hooks h4{margin:0 0 4px;font-size:15px}.tome-hooks p{margin:7px 0;font-size:12px;line-height:1.6}.tome-hook-engines{display:grid;gap:7px;margin:12px 0}.tome-hook-engines button{margin:0!important;padding:10px!important;text-align:left;border-radius:9px!important;width:100%}.tome-hook-engines button span{display:block;font-size:11px;opacity:.75;margin-top:3px}.tome-hook-engines button[aria-pressed=true]{border-color:var(--theme-primary,#82b6ff)!important;background:color-mix(in srgb,var(--theme-primary,#82b6ff) 15%,transparent)!important}.tome-hooks button:disabled{opacity:.45;cursor:not-allowed}.tome-hook-proof{padding:10px;border-radius:8px;background:#7891ad16}.tome-hook-proof[data-state=verified]{background:#3bbb771b;border:1px solid #59bd8a}.tome-hook-proof[data-state=visible],.tome-hook-proof[data-state=unsupported]{background:#e18b5b18;border:1px solid #d99b6b}.tome-hook-chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px}.tome-hook-chips span{font-size:10px;padding:2px 5px;border-radius:4px;background:#88a8ce1c}.tome-hook-proof strong{font-size:12px;font-weight:500}.tome-hook-time{display:block;font-size:10px;opacity:.65;margin-top:5px}.tome-hook-row{padding:10px 0;border-bottom:1px solid var(--theme-border,#45607e)}.tome-hook-row>strong{font-size:12px;overflow-wrap:anywhere}.tome-hook-row>small{display:block;max-height:35px;overflow:hidden}.tome-hook-actions{display:flex;flex-wrap:wrap;gap:5px}.tome-hook-actions button{margin:6px 0 0!important;font-size:11px!important}
  `;document.head.append(style);
  function text(node,value){if(node.textContent!==value)node.textContent=value;}
+ const streamProbeMessages={
+  waiting:['正在探测正文文本流，请在游戏里推进一句','Probing dialogue streams. Advance one line in the game.','本文のテキストストリームを探索中です。ゲームを一文進めてください'],
+  recovered:['文本流已恢复，已收到本局新对白','Text stream recovered. New dialogue received.','テキストストリームが復旧し、今回のプレイの新しい台詞を受信しました'],
+  timedOut:['还没有收到新对白，请继续推进或再次重选','No new dialogue yet. Advance again or retry.','新しい台詞をまだ受信していません。ゲームを進めるか、再試行してください'],
+  unbound:['请先绑定当前游戏窗口','Bind the current game window first.','現在のゲームウィンドウを先に紐付けてください'],
+  disabled:['Hook 已停止，请先开启读取','Text capture is stopped. Start it first.','テキスト取得が停止しています。先に開始してください'],
+ };
+ b.hookReselectText=()=>streamProbeMessages[state.hookReselectState]?.[({en:1,ja:2})[document.documentElement.lang?.slice(0,2)]||0]||'';
  function paint(p){
 {const fx=p.querySelector('[data-hook-fx]');if(fx){fx.hidden=!(state.readModeHint===true&&state.hookHide===true);/* 2026-11-21 (owner) read mode is only ever switched by the user: a self-check or text-effects verdict shows this hint and a button, nothing switches by itself */const why=typeof state.readReason==='string'?state.readReason:'',t=fx.querySelector('[data-hook-fx-why]'),bt=fx.querySelector('[data-hook-fx-back]');if(t)t.textContent='这部游戏可能有显示问题，可以手动切读模式'+(why?'（'+why+'）':'');if(bt)bt.textContent='切读模式';}}for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookPref==='hookHide'?state.hookHide===true:state[cb.dataset.hookPref]!==false;if(cb.checked!==v&&document.activeElement!==cb)cb.checked=v;
  }
@@ -67,11 +75,11 @@
     // Chosen automatically: embed when the game's stream can be embedded, otherwise read + OCR cover.
     text(p.querySelector('[data-hook-mode]'),state.hookProfile==='off'?'Hook 已停止':state.hookProfile==='euphoria474'?'自动：YU-RIS 0.474 绘制隐藏原文':state.hookProfile==='embed'?'自动：LunaHook 内嵌，在引擎内隐藏原文':state.hookAutoOcr?'自动：只读取台词 + OCR 遮盖原文（当前已发现的文本流没有提供内嵌）':state.hookHide?'自动：只读取台词，等待可内嵌的文本流':'自动：只读取台词（未开启隐藏原文）');
   const proof=p.querySelector('[data-hook-proof]');proof.dataset.state=state.hookCheckState||'waiting';
-  text(p.querySelector('[data-hook-message]'),state.hookEmbedUnsupported?feedbackCopy()[0]:state.hookCheckMessage||'在游戏里点一下推进一句，MeguLit 就会开始读');
+  text(p.querySelector('[data-hook-message]'),b.hookReselectText()||(state.hookEmbedUnsupported?feedbackCopy()[0]:state.hookCheckMessage||'在游戏里点一下推进一句，MeguLit 就会开始读'));
   {const row=p.querySelector('[data-hook-feedback-row]'),show=state.hookEmbedUnsupported===true&&state.hookProfile!=='off';if(row.hidden===show)row.hidden=!show;
    text(row.querySelector('button'),feedbackCopy()[1]);}
   text(p.querySelector('[data-hook-connection]'),state.hookProfile==='off'?'已停止':state.processAttached?'游戏已连接':'等待游戏连接');
-  text(p.querySelector('[data-hook-capture]'),state.receivedText&&state.hookCaptureCharacters?'已捕捉 '+state.hookCaptureCharacters+' 字':'等待新台词');
+  text(p.querySelector('[data-hook-capture]'),!['waiting','timedOut'].includes(state.hookReselectState)&&state.receivedText&&state.hookCaptureCharacters?'已捕捉 '+state.hookCaptureCharacters+' 字':'等待新台词');
   text(p.querySelector('[data-hook-hide]'),state.hookVisualVerified?'隐藏检查通过':state.hookCheckState==='visible'?'原文仍可见':state.hookProfile==='read'?'仅读取':'画面待确认');
   text(p.querySelector('[data-hook-time]'),state.hookCheckedAt?'上次通过 '+new Date(state.hookCheckedAt).toLocaleTimeString()+' · 扫描区内未识别到日文':'只检查游戏自己的画面，MeguLit 的译文不算在内');
   p.querySelector('[data-hook-force]').hidden=!(state.hookCheckState==='unverified'&&!state.hookBaselineVerified&&['euphoria474','embed'].includes(state.hookProfile));

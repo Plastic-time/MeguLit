@@ -146,3 +146,21 @@ test('same text shown again as a new sequence rejects the previous sequence late
  f.draw(1,'#ffff00','end','krkr',A);assert.equal(f.color(),undefined,'late end of the retired draw cannot repaint');
  f.draw(2,'#ffffff');f.draw(2,'#ffffff','end','krkr',A);assert.equal(f.color(),'#ffffff','the new draw still paints its own colour');
 });
+
+test('TextRender fallback samples stay with the recorded draw across repeated or similar dialogue',t=>{
+ const f=fixture(t),text='『お客さん』';
+ f.status({hookSource:text,hookSequence:1});
+ f.b.lineReadDrawn(text,true,'krkr:100001');f.b.lineColorDrawn(text,'#eedefe','krkr:100001');
+ assert.equal(f.color(),'#eedefe');
+ // The next draw can precede its source, including when the characters are identical.
+ f.b.lineReadDrawn(text,false,'krkr:100002');f.b.lineColorDrawn(text,'#ffffff','krkr:100002');
+ assert.equal(f.color(),'#eedefe');
+ f.status({hookSourceRead:false,hookSourceReadOrigin:'tome-history'});
+ assert.equal(f.classes.has('tome-line-read'),true,'current native read flag survives a history update while the next draw waits');
+ f.status({hookSource:text,hookSequence:2,hookSourceRead:true,hookSourceReadOrigin:'tome-history'});assert.equal(f.color(),'#ffffff');
+ assert.equal(f.classes.has('tome-line-read'),false);
+ f.b.lineReadDrawn(text,true,'krkr:100001');
+ f.b.lineColorDrawn(text,'#eedefe','krkr:100001');assert.equal(f.color(),'#ffffff');
+ assert.equal(f.classes.has('tome-line-read'),false);
+ f.status({hookSource:'『お客さんってば』',hookSequence:3});assert.equal(f.color(),undefined);
+});

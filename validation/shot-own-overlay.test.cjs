@@ -41,7 +41,7 @@ test('stand-in game with an overlay on top: the picture holds the game only, a b
  execFileSync(csc,['/nologo','/target:winexe','/platform:x64','/reference:System.Drawing.dll','/reference:System.Windows.Forms.dll','/out:'+exe,
   path.join(root,'native/GameCapture.cs'),path.join(__dirname,'shot-overlay-harness.cs')],{windowsHide:true});
  try{fs.rmSync(out,{force:true});}catch{}
- execFileSync(exe,[out],{windowsHide:true,timeout:30000});
+ execFileSync(process.execPath,[path.join(root,'tools/run-isolated.cjs'),exe,out],{windowsHide:true,timeout:30000});
  const r=JSON.parse(fs.readFileSync(out,'utf8'));
  assert.ok(!r.error,r.error);
  assert.equal(r.overlaps,true,'the overlay popup covers part of the game');

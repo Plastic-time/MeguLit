@@ -10,11 +10,11 @@ test('a restore that changed files marks the program on record Japanese; its und
  assert.equal(changedFiles({added:0,exe:'',imported:1,removed:1,replaced:0}),true);
  assert.equal(changedFiles({added:0,removed:0,replaced:0,imported:0}),false);assert.equal(changedFiles(null),false);
  // overlay patch turned off: the same program becomes the verified Japanese original
- assert.match(src,/jio\.apply\(dir,dir,row\.executable\)\.then\(r=>\{if\(changedFiles\(r\)\)importedExecutable\(db,id,r\.exe\|\|row\.executable,'ja'\);return withPatch\(r\);\}\)/);
+ assert.match(src,/jio\.apply\(dir,dir,row\.executable\)\.then\(r=>\{if\(changedFiles\(r\)\)importedExecutable\(db,id,r\.exe\|\|row\.executable,'ja'\);return withPatch\(\{\.\.\.r,applied:r\.imported,cells:0\}\);\}\)/);
  // import from a Japanese original that keeps the program name
  assert.match(src,/else if\(changedFiles\(r\)\)importedExecutable\(db,id,row\.executable,'ja'\);return withPatch\(r\);/);
  // undo of the generic import / overlay removal: back to the translated program, also when the name is the same
- assert.match(src,/const r=jio\.restore\(dir\);if\(!r\.skipped\.length\)importedExecutable\(db,id,r\.exe&&r\.exe\.toLowerCase\(\)!==row\.executable\.toLowerCase\(\)\?r\.exe:row\.executable,'zh'\);return r;/);
+ assert.match(src,/const r=jio\.restore\(dir\);if\(!r\.archive&&!r\.skipped\.length\)importedExecutable\(db,id,r\.exe&&r\.exe\.toLowerCase\(\)!==row\.executable\.toLowerCase\(\)\?r\.exe:row\.executable,'zh'\);return r;/);
 });
 test('the launch preflight lets a verified Japanese program through and stops a translated one',()=>{
  const gl=fs.readFileSync(path.join(__dirname,'..','services','game-language.cjs'),'utf8');

@@ -14,6 +14,9 @@ for %%F in (MeguLitGdiHide.h MeguLitMarks.h MeguLitEmbedWait.h texthook.cc hijac
 for %%F in (DrawSites.h DrawSitesSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
 for %%F in (MajiroDraw.h MajiroDrawSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
 for %%F in (AdvhdDraw.h AdvhdDrawSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
+for %%F in (CmvsDraw.h CmvsDrawSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
+for %%F in (FvpDraw.h FvpDrawSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
+for %%F in (MinoriInput.h MinoriInputSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
 rem the shared safe unhook flow (native\shared\MeguLitSafeUnhook.h); main.cc and veh_hook.cpp carry its detach and breakpoint parts
 copy /y "%~dp0..\shared\MeguLitSafeUnhook.h" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\MeguLitSafeUnhook.h" >nul || exit /b 1
 rem the crash witness (native\shared\MeguLitCrashWitness.h), armed by main.cc
@@ -24,6 +27,9 @@ copy /y "%~dp0PalTextBounds.h" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\
 rem one hook runtime (2026-11-19): the exact-program adapters (ISLAND, STEINS;GATE) are engines our enginecollection32.cpp lists first, euphoria HD sits in Yuris.cpp;
 rem the STEINS;GATE adapter is compiled from native\mages under its own namespaces (MeguLitSg.cpp), upstream engines\mages untouched
 for %%F in (enginecollection32.cpp MeguLitEngines.h MeguLitMatch.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
+for %%F in (MusicaBasic.h MusicaBasicSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
+for %%F in (IgaText.h IgaTextPin.h IgaTextSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
+for %%F in (DanganronpaPc.h DanganronpaPcSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
 rem engine-draw MAGES (MagesDraw.h, MagesDrawSig.h) next to MeguLitEngines.h, whose STEINS;GATE adapter arms it
 for %%F in (MagesDraw.h MagesDrawSig.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
 copy /y "%~dp0..\mages\readString.cpp" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engine32\MeguLitSg_readString.inc" >nul || exit /b 1
@@ -41,4 +47,5 @@ copy /y "%~dp0UnityEngine.cpp" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\
 for %%F in (Il2cppDraw.h Il2cppDrawRoles.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\unity\%%F" >nul || exit /b 1
 for %%F in (hde32.h pstdint.h) do copy /y "%~dp0..\shared\minhook\src\hde\%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\mages\%%F" >nul || exit /b 1
 cmake -S "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook" -B "%MEGULIT_HOOK_TREE%\build-x86-vs" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_HOST=OFF -DBUILD_HOOK=ON -DWIN10ABOVE=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DFETCHCONTENT_SOURCE_DIR_MINHOOK="%~dp0..\shared\minhook" -DFETCHCONTENT_FULLY_DISCONNECTED=ON || exit /b 1
-cmake --build "%MEGULIT_HOOK_TREE%\build-x86-vs" --target LunaHook --parallel 8
+if not defined CMAKE_BUILD_PARALLEL_LEVEL set "CMAKE_BUILD_PARALLEL_LEVEL=8"
+cmake --build "%MEGULIT_HOOK_TREE%\build-x86-vs" --target LunaHook

@@ -9,13 +9,13 @@ const flowExe=name=>require('./hook-native.cjs').FLOW_PAGE_EXES.test(String(name
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 const num=(v,d)=>Number.isFinite(Number(v))?Number(v):d;
 
-function area(p={},flow=flowExe(p.gameProcess)){
+function area(p={},flow=flowExe(p.gameProcess),processName=p.gameProcess){
  if(p.scanAuto===false)return {scanX:num(p.scanX,2),scanY:num(p.scanY,60),scanWidth:num(p.scanWidth,96),scanHeight:num(p.scanHeight,38)};
- if(flow)return {scanX:0,scanY:0,scanWidth:100,scanHeight:100};
+ if(flow||/^saya(?:\.exe)?$/i.test(processName))return {scanX:0,scanY:0,scanWidth:100,scanHeight:100};
  // The text box with a margin: a little to each side, more above (name plates sit over the box), down to the bottom.
  const x=num(p.x,4),y=num(p.y,70),w=num(p.width,92),h=num(p.height,27);
  const scanX=clamp(Math.round(x-2),0,95),scanY=clamp(Math.round(y-10),0,95);
  return {scanX,scanY,scanWidth:clamp(Math.round(x+w+2)-scanX,5,100-scanX),scanHeight:clamp(Math.min(100,Math.round(y+h+2))-scanY,5,100-scanY)};
 }
-const apply=(p,flow)=>({...p,...area(p,flow)});
+const apply=(p,flow,processName)=>({...p,...area(p,flow,processName)});
 module.exports={area,apply};

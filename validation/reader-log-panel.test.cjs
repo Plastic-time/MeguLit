@@ -19,13 +19,38 @@ const STUB=`<script>window.__seedState=${JSON.stringify(seed)};window.__TAURI_IN
  if(cmd==='service'){if(r.action==='home')return {preferences:{language:'zh',themeMode:'dark'},games:[]};if(r.action==='ui_state')return window.__seedState;
   if(r.action==='reader_bootstrap')return {engines:[],native:{}};if(r.action==='reader_message')return {replies:[]};return {};}return null;}};</script>`;
 const TYPES={'.js':'text/javascript','.css':'text/css','.html':'text/html; charset=utf-8','.svg':'image/svg+xml','.woff2':'font/woff2','.json':'application/json'};
-function serve(){const server=http.createServer((req,res)=>{const rel=decodeURIComponent(new URL(req.url,'http://x').pathname),file=path.join(WEB,rel);
+function serve({missing,requests=[]}={}){const server=http.createServer((req,res)=>{const rel=decodeURIComponent(new URL(req.url,'http://x').pathname),file=path.join(WEB,rel);
+ if(rel.startsWith('/reader/modules/'))requests.push(rel);
+ if(rel===missing){res.writeHead(200,{'content-type':'text/javascript'});return res.end(fs.readFileSync(path.join(WEB,'index.html')));}
  if(!file.startsWith(WEB)||!fs.existsSync(file)||!fs.statSync(file).isFile()){
-  /* a module the build adds (local-font) is not in the repo: an empty script keeps the module chain going */
-  if(/^\/reader\/modules\/[a-z0-9-]+\.js$/.test(rel)){res.writeHead(200,{'content-type':'text/javascript'});return res.end('');}res.writeHead(404);return res.end();}
+  res.writeHead(404);return res.end();}
  let data=fs.readFileSync(file);if(rel==='/reader/index.html')data=Buffer.from(String(data).replace('<head>','<head>'+STUB));
  res.writeHead(200,{'content-type':TYPES[path.extname(file)]||'application/octet-stream'});res.end(data);});
  return new Promise(r=>server.listen(0,'127.0.0.1',()=>r(server)));}
+
+test('Reader reaches ready after the optional font fallback but stops for a required script fallback',{skip:!hasEdge&&'Edge not installed',timeout:60000},async()=>{
+ const {modules}=await import('../web/reader/module-list.js');
+ const urls=modules.map(name=>'/reader/modules/'+name+'.js');
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-reader-bootstrap-'));
+ const cdp=await startEdge(temp);
+ try{
+  for(const name of ['local-font','save-sentence']){
+   const missing='/reader/modules/'+name+'.js',requests=[],server=await serve({missing,requests});
+   try{
+    await cdp.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/reader/index.html`});
+    let state;
+    for(let attempt=0;attempt<100;attempt++){
+     state=await cdp.evaluate('({ready:!!window.__TOME_READER_READY__,error:document.querySelector("#reader-status")?.textContent})').catch(()=>null);
+     if(state?.ready||state?.error?.startsWith('Error:'))break;
+     await sleep(100);
+    }
+    assert.equal(state?.ready,name==='local-font',state?.error);
+    if(name!=='local-font')assert.match(state.error,/save-sentence.*Unexpected token '<'/);
+    assert.deepEqual([...new Set(requests)],name==='local-font'?urls:urls.slice(0,urls.indexOf(missing)+1));
+   }finally{server.close();}
+  }
+ }finally{await cdp.stop();}
+});
 
 const TRANSLATION=`(async()=>{window.__tomoyoMode.set('translation');document.body.classList.add('tomoyo-gal-bound');
  /* wait for GSAP (loaded on idle by reader-panels.js): the bug needs it */

@@ -16,6 +16,7 @@ const ENGINE_DIR=path.join(__dirname,'engines'),GAME_DIR=path.join(__dirname,'ga
 const KEY=/^[a-z0-9][a-z0-9-]{1,62}$/;
 /* names the engine detectors use (services/original-engines/registry.cjs names, hook page engines, probe ids) -> engine file id */
 const ALIASES={'bgi':'bgi','ethornell':'bgi','bgi/ethornell':'bgi','yuris':'yuris','yu-ris':'yuris','kirikiri':'kirikiri','kirikiriz':'kirikiri','krkr':'kirikiri','krkrz':'kirikiri','krkr2':'kirikiri','tvpx':'kirikiri','siglus':'siglus','siglusengine':'siglus','reallive':'reallive','catsystem2':'catsystem2','cs2':'catsystem2','artemis':'artemis','malie':'malie','advhd':'advhd','willplus':'advhd','kogado':'kogado','majiro':'majiro','qlie':'qlie','softpal':'softpal','nexas':'nexas','system3x':'system3','system3':'system3','system4':'system4','shiinario':'shiinario','entis':'entis','cotopha':'entis','nscripter':'nscripter','livemaker':'livemaker','stuffscript':'stuffscript','unity':'unity','renpy':'renpy','tyrano':'tyrano','rpgmaker':'rpgmaker','rpgmakermvmz':'rpgmaker','rpgmakermv':'rpgmaker','rpgmakermz':'rpgmaker','rpgmv':'rpgmaker','rpgmz':'rpgmaker','mages':'mages','wolf':'wolf','avg32':'avg32','unknown':'','rpgm':'rpgmaker','rmmv':'rpgmaker','rmmz':'rpgmaker'};
+Object.assign(ALIASES,{rgss:'rgss',rgss1:'rgss',rgss2:'rgss',rgss3:'rgss',rgss13:'rgss',rpgmakerxp:'rgss',rpgmakervx:'rgss',rpgmakervxace:'rgss',rpgmakervxxp:'rgss'});
 /* program names many unrelated games share: they count as a weak sign only */
 const GENERIC_EXE=new Set(['game.exe','bgi.exe','siglusengine.exe','advhd.exe','malie.exe','cs2.exe','start.exe','launcher.exe','system.exe','reallive.exe','krkr.exe','krkrz.exe','tvpwin32.exe','nscripter.exe','nscr.exe','gamepro.exe','main.exe','play.exe','run.exe','setup.exe','config.exe','avg32.exe','sys4.exe','system4.exe','livemaker.exe','windows.exe','nw.exe','ruby.exe','soft.exe','pal.exe','renpy.exe','python.exe']);
 
@@ -71,7 +72,7 @@ const clone=v=>JSON.parse(JSON.stringify(v));
 /* only the kernel keys of a layer (an auto layer read from disk may carry stale or unknown keys: they are dropped, not errors) */
 function known(settings,base=DEFAULTS,at=''){const out={};if(!plain(settings))return out;for(const [k,v] of Object.entries(settings)){if(!(k in base))continue;if(plain(base[k])){if(plain(v))out[k]=OPEN.has(at+k)?{...v}:known(v,base[k],at+k+'.');}else out[k]=v;}return out;}
 /* one more layer over a profile (same rule as profileFor): a new frozen profile, layers +name */
-function apply(profile,layer,name){const meta={gameKey:profile.gameKey,engine:profile.engine,exeSha256:profile.exeSha256||'',match:profile.match||'none',layers:profile.layers,matched:profile.matched,rejected:profile.rejected||''};const base={};for(const k of Object.keys(DEFAULTS))base[k]=clone(profile[k]);
+function apply(profile,layer,name){const meta={application:profile.application,vndbLayout:profile.vndbLayout,gameKey:profile.gameKey,engine:profile.engine,exeSha256:profile.exeSha256||'',match:profile.match||'none',layers:profile.layers,matched:profile.matched,rejected:profile.rejected||''};const base={};for(const k of Object.keys(DEFAULTS))base[k]=clone(profile[k]);
  const s=merge(base,clone(known(layer)));return freeze({...meta,layers:name?meta.layers+'+'+name:meta.layers,...s});}
 
 /* layers, each over the one before (docs/diff-layers.md):
@@ -84,7 +85,7 @@ function apply(profile,layer,name){const meta={gameKey:profile.gameKey,engine:pr
    (services/self-check-live.cjs inputOf picks them; the signed documents are checked by services/auto-profile-feed.cjs).
    Each is checked again against core/profiles/domains.cjs here; one key or value outside its domain leaves that layer out
    whole (profile.rejected names it). input.exeSha256: the program's SHA-256, shown in the trace. */
-const OUTSIDE=[['sharedGame','shared-game'],['shared','shared'],['auto','auto'],['officialGame','official-game'],['official','official'],['stepDown','stepdown']];
+const OUTSIDE=[['sharedGame','shared-game'],['shared','shared'],['auto','auto'],['officialGame','official-game'],['official','official'],['verifiedLocal','verified-local'],['stepDown','stepdown']];
 function profileFor(input={}){input=input||{};const hit=findGame(input);const game=hit?.game||null;const {clean}=require('./domains.cjs');
  const engine=engineId(input.engine)||engineId(game?.engine)||'';const eng=loadEngine(engine);
   let s=clone(DEFAULTS);const layers=['core'],rejected=[];if(eng){s=merge(s,clone(eng.settings||{}));layers.push('engine');}
@@ -95,13 +96,26 @@ function profileFor(input={}){input=input||{};const hit=findGame(input);const ga
  const seedVersion=/^[0-9a-f]{64}$/.test(String(input.exeSha256||''))?require('./seed.cjs').versionOf(input.exeSha256):null;
  const take=(seedDoc,field,rev)=>seedDoc&&(!plain(input[field])||!(Number(input[rev])>Number(seedDoc.rev||0)));
  const seedGame=game?.seed&&game.status!=='skeleton'?game:null;
- const slots={officialGame:take(seedGame,'officialGame','officialGameRev')?['seed-game',game.settings]:null,official:take(seedVersion,'official','officialRev')?['seed',seedVersion.settings]:null};
- for(const [field,name0] of OUTSIDE){let v=input[field],name=name0;if(slots[field]){[name,v]=slots[field];}if(!plain(v))continue;const c=clean(v);if(c.rejected.length){rejected.push(name+': '+c.rejected.slice(0,3).join(','));continue;}s=merge(s,c.value);layers.push(name);}
+ // A bundled revision has no checked runtime/script binding at this stage.
+ const evidence=require('../seed-evidence.cjs');
+ const scoped=seedVersion?.evidence?.trials;
+ const bundled=scoped ? evidence.applyStatus(seedVersion,evidence.status(seedVersion,null)) : seedVersion;
+ const useBundled=take(seedVersion,'official','officialRev') &&
+  !(scoped && input.verifiedTrialRevision===seedVersion.rev && input.officialRev===seedVersion.rev);
+ const slots={officialGame:take(seedGame,'officialGame','officialGameRev')?['seed-game',game.settings]:null,official:useBundled?['seed',bundled.settings]:null};
+ const owners=new Map(),revisions=new Map();
+ function remember(settings,name,prefix=''){for(const [k,v] of Object.entries(settings)){const key=prefix+k;if(plain(v))remember(v,name,key+'.');else owners.set(key,name);}}
+ if(game?.seed&&game.status==='skeleton'){remember(game.settings,'seed-skeleton');revisions.set('seed-skeleton',game.seedRev);}
+ for(const [field,name0] of OUTSIDE){let v=input[field],name=name0;if(slots[field]){[name,v]=slots[field];}if(!plain(v))continue;const c=clean(v);if(c.rejected.length){rejected.push(name+': '+c.rejected.slice(0,3).join(','));continue;}s=merge(s,c.value);layers.push(name);remember(c.value,name);
+ if(name==='seed'||name==='seed-game'||name.startsWith('official'))revisions.set(name,name==='seed'?seedVersion.rev:name==='seed-game'?game.seedRev:input[field+'Rev']);}
+ if(['adv','nvl','mixed'].includes(input.confirmedPresentation)){s.page.presentation=input.confirmedPresentation;owners.set('page.presentation','personal');}
+ const keysFor=layer=>[...owners].filter(([,owner])=>owner===layer).map(([key])=>key);
+ const application={values:Object.fromEntries([...owners.keys()].map(key=>[key,get(s,key,null)])),layers:[...revisions].map(([layer,revision])=>({layer,revision:revision||null,keys:keysFor(layer)})),personal:[...keysFor('personal'),...keysFor('auto'),...keysFor('verified-local'),...keysFor('stepdown')]};
  const exe=/^[0-9a-f]{64}$/.test(String(input.exeSha256||''))?String(input.exeSha256):'';
  /* how the game was recognised, most exact first (docs/diff-layers.md): input.match is the relay's ('exe' | 'bin' | 'game:<basis>');
     else the repo game file's ('exe' when it lists this exe hash, game:<why> otherwise); else 'engine' or 'none' */
  const match=/^(exe|head|pe|game:[a-z~(),]{2,40})$/.test(String(input.match||''))?String(input.match):hit?(hit.why.includes('sha256')?'exe':'game:'+hit.why.filter(w=>w!=='sha256').map(w=>/^exe/.test(w)?'name':w.replace('~','')).join(',')):eng?'engine':'none';
- return freeze({gameKey:game?game.key:autoKey(input),seedStatus:game?.seed?game.status:'',sourceLangs:game?.sourceLangs||['ja'],engine:engine||'unknown',exeSha256:exe,match,layers:layers.join('+'),matched:hit?hit.why.join(','):'',rejected:rejected.join('; '),...s});}
+ return freeze({application,vndbLayout:exe&&input.vndbLayoutKey===exe&&['adv','nvl','mixed'].includes(input.vndbLayout)?input.vndbLayout:null,gameKey:game?game.key:autoKey(input),seedStatus:game?.seed?game.status:'',sourceLangs:game?.sourceLangs||['ja'],engine:engine||'unknown',exeSha256:exe,match,layers:layers.join('+'),matched:hit?hit.why.join(','):'',rejected:rejected.join('; '),...s});}
 /* the trace line every run writes once (hook-events.log), so the owner's log tells which layers this game ran with */
 const traceLine=p=>'profile '+p.gameKey+' match='+(p.match||'none')+' exe='+(p.exeSha256?p.exeSha256.slice(0,8):'-')+' layers='+p.layers+' engine='+p.engine+(p.rejected?' rejected='+p.rejected:'');
 /* a dotted key of a profile, with the fallback when the profile or the key is missing */

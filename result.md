@@ -1,4 +1,4 @@
-# KAG and RenPy integration
+# Engine integration reports
 
 Original reports are preserved without replacing each other
 
@@ -10,3 +10,16 @@ The integration checkpoint and its consumer regression are recorded in docs/kag-
 - [TextRender lifetime and role report](side-session-notes/TextRender-roles-result-ec6a304b.md)
 
 - [RPG Maker CDP and page-state report](side-session-notes/RPGMaker-cdp-result-ff1063a0.md)
+
+- [RGSS fixed VX observation and user checklist](side-session-notes/RGSS-vx-result.md)
+- [Artemis source audit and bounded Lua session](side-session-notes/Artemis-result.md)
+- [Artemis production input-session contract and pending owner checklist](docs/artemis-lua-input.md)
+- [Artemis shared owner-test and teardown integration](side-session-notes/Artemis-owner-integration.md)
+- [Unity IL2CPP private source contract and pending owner checks](docs/engine-unity-il2cpp-play.md)
+
+Artemis remains default off and requires an isolated, exact-build local owner-test grant
+Its optional source transport does not implement glyph coordinates, hiding or new translation drawing
+No live pass or engine-complete result is claimed
+- [RGSS opaque grant and actual-path Reader integration](side-session-notes/RGSS-vx-grant-result.md)
+- [XP/Ace body candidates and explicit runtime/sample gaps](side-session-notes/RGSS-xp-ace-candidate-result.md)
+- [Exact XP/Ace private sample loading and the hidden-run blocker](side-session-notes/RGSS-xp-ace-runtime-result.md)

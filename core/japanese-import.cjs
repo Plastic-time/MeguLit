@@ -67,6 +67,12 @@ function plan(dir,exe,source){
  return {dir,adapter,files,exeName,exeTarget,exeData,addExe:!isFile(exeTarget)};
 }
 
+function preview(dir,exe,source){
+ const p=plan(dir,exe,source),replace=p.files.filter(file=>file.current).map(file=>({file:file.name,size:file.data.length}));
+ const add=p.files.filter(file=>!file.current).map(file=>({file:file.name,size:file.data.length}));
+ if(p.addExe)add.push({file:p.exeName,size:p.exeData.length});
+ return {state:'preview',replace,add,remove:[],exe:p.exeName,changes:replace.length+add.length};
+}
 function apply(dir,exe,source){
  const p=plan(dir,exe,source),backup=path.join(p.dir,BACKUP_DIR);
  fs.mkdirSync(backup,{recursive:true});
@@ -106,4 +112,4 @@ function restore(dir){
  return {restored,skipped,exe:path.join(dir,manifest.previousExe||'')};
 }
 
-module.exports={detect,apply,restore,translatedOnly,BACKUP_DIR};
+module.exports={detect,preview,apply,restore,translatedOnly,BACKUP_DIR};

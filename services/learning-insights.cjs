@@ -18,7 +18,7 @@ const usable=text=>typeof text==='string'&&!!text.trim()&&!JAPANESE_KANA.test(te
    line is the official Chinese. */
 function humanFromResolve(kind,r){
   if(!r||(r.status!=='exact'&&r.status!=='high'))return null;
-  if(kind==='patch'){if(r.machine===true||!usable(r.translation))return null;return {text:r.translation.trim(),source:'group'};}
+  if(kind==='patch'){if(r.machine||r.filled||['machine','filled'].includes(r.source)||!usable(r.translation))return null;return {text:r.translation.trim(),source:'group'};}
   if(kind==='original'){if(!usable(r.captured))return null;return {text:r.captured.trim(),source:'official'};}
   return null;
 }

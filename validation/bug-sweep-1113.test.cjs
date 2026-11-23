@@ -16,9 +16,9 @@ test('Anki HUD drops its document listeners as soon as its page is gone',()=>{
  assert.match(s,/stopMessages=stop;/);
 });
 
-test('pending lookup tolerates a re-rendered page; Japanese import errors fall back to English',()=>{
+test('pending lookup tolerates a re-rendered page; import errors use the selected language with English fallback',()=>{
  assert.match(read('web/app.js'),/if\(form\?\.isConnected\)/);
- assert.match(read('web/game-language.js'),/locale==='ja'\?sourceWords\.en:sourceWords\.zh/);
+ assert.match(read('web/game-language.js'),/catch\(error\)\{const w=sourceWords\[locale\]\|\|sourceWords\.en;toast\(w\.errors\[errorCode\(error\)\]\|\|w\.failed\)/);
 });
 
 test('broker shutdown waits for the lock with a deadline and refuses new requests while closing',()=>{

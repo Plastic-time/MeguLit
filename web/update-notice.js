@@ -1,22 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import {hasUnsavedSettings} from './settings-autosave.js';
-/* Update notice (v1.1.0). On start MeguLit asks GitHub for the latest release; a newer one is downloaded right away
-   with a real progress bar, and the card shows the version, what changed and how the package size moves. Restart now
-   or later: a verified package waits in cache/update and is reused at the next start. */
+/* Startup updates precede onboarding in a centered dialog; manual checks keep the corner card. A required update
+   waits for one click, then downloads the latest full package and restarts through the existing installer */
 const M={
- zh:{title:v=>`MeguLit v${v} 来了`,current:v=>`当前 v${v}`,size:mb=>`安装包 ${mb}`,bigger:'比当前版本大',smaller:'比当前版本小',same:'和当前版本差不多大',notes:'更新内容',downloading:'正在下载',verifying:'正在校验…',ready:'下载完成，已校验',restart:'重启并更新',later:'稍后',retry:'重试',failed:'下载失败',keep:'只替换程序文件，游戏库、学习记录和设置都会保留',closing:'MeguLit 即将关闭，更新完会自动重新打开',latest:'已经是最新版',checking:'正在检查…',page:'在 GitHub 查看',hotSize:mb=>`更新包 ${mb}，只含改动的文件`,hotGo:'立即更新',hotKeep:'不用重启：替换改动的文件，界面会刷新一下',hotApplying:'正在更新…',hotReader:'游戏正在运行，先退出游戏再更新',hotLater:'文件已更新，下次打开 MeguLit 时生效',hotDone:v=>`已更新到 v${v}`,hotDoneMore:'点开看更新内容',hotDoneClose:'关闭',hotDoneNone:'这次没有写更新说明',
-  cTitle:'帮 MeguLit 改进适配（可选）',cBody:'同意后，MeguLit 会在后台上传你游戏库里读不好的游戏的剧本和启动程序（exe 的代码部分），只用来给这些游戏写适配、改进翻译对照。只取游戏文件夹里的剧本和程序代码，不碰图片、语音、视频、存档和你的其它文件，路径和用户名会先打码。适配做好后服务器上的包就删掉，最长也只保留 30 天。随时可以在 设置 → 游戏库 里关掉。',
-  cBeta:'封测版默认开启：MeguLit 会在后台上传你游戏库里读不好的游戏的剧本和启动程序（exe 的代码部分），只用来给这些游戏写适配。不碰图片、语音、视频、存档和你的其它文件，路径和用户名会先打码；适配做好后就删，最长保留 30 天。不想参与可以点「不参与」，或在 设置 → 游戏库 里关掉。',
-  cAgree:'同意并下一步',cDecline:'不参与',cOn:'已开启，谢谢！随时可以在 设置 → 游戏库 里关掉',cOff:'不参与，什么都不会上传。以后想帮忙可以在 设置 → 游戏库 里打开',cNext:'下一步'},
- ja:{title:v=>`MeguLit v${v} が出ました`,current:v=>`現在 v${v}`,size:mb=>`パッケージ ${mb}`,bigger:'今より大きい',smaller:'今より小さい',same:'今とほぼ同じサイズ',notes:'更新内容',downloading:'ダウンロード中',verifying:'検証中…',ready:'ダウンロード完了・検証済み',restart:'再起動して更新',later:'あとで',retry:'再試行',failed:'ダウンロードに失敗しました',keep:'プログラムだけを置き換えます。ライブラリ・学習記録・設定はそのままです',closing:'MeguLit を閉じて更新し、自動で開き直します',latest:'最新版です',checking:'確認中…',page:'GitHub で見る',hotSize:mb=>`更新パッケージ ${mb}（変更分のみ）`,hotGo:'今すぐ更新',hotKeep:'再起動は不要です。変更されたファイルだけを置き換え、画面が一度読み込み直されます',hotApplying:'更新中…',hotReader:'ゲームの実行中です。ゲームを終了してから更新してください',hotLater:'ファイルは更新済みです。次回の起動から反映されます',hotDone:v=>`v${v} に更新しました`,hotDoneMore:'クリックで更新内容を表示',hotDoneClose:'閉じる',hotDoneNone:'今回の更新内容の説明はありません',
-  cTitle:'MeguLit の適応改善に協力する（任意）',cBody:'同意すると、ライブラリでうまく読めないゲームのスクリプトと起動プログラム（exe のコード部分）をバックグラウンドで送信し、そのゲームの適応と翻訳の対応づけの改善だけに使います。ゲームフォルダのスクリプトとプログラムコードのみで、画像・音声・動画・セーブデータやほかのファイルには触れません。パスとユーザー名は伏せてから送ります。適応が終わればサーバーから削除し、長くても 30 日で消えます。設定 → ライブラリ でいつでもオフにできます。',
-  cBeta:'クローズドベータでは最初からオンです：うまく読めないゲームのスクリプトと起動プログラム（exe のコード部分）を適応の改善のためだけに送信します。画像・音声・動画・セーブデータやほかのファイルには触れず、パスとユーザー名は伏せます。適応が終われば削除し、最長 30 日で消えます。参加しない場合は「参加しない」か 設定 → ライブラリ でオフにしてください。',
-  cAgree:'同意して次へ',cDecline:'参加しない',cOn:'オンにしました。ありがとうございます。設定 → ライブラリ でいつでもオフにできます',cOff:'参加しません。何も送信されません。設定 → ライブラリ でいつでもオンにできます',cNext:'次へ'},
- en:{title:v=>`MeguLit v${v} is here`,current:v=>`Current v${v}`,size:mb=>`Package ${mb}`,bigger:'Larger than now',smaller:'Smaller than now',same:'About the same size as now',notes:'What’s new',downloading:'Downloading',verifying:'Verifying…',ready:'Downloaded and verified',restart:'Restart and update',later:'Later',retry:'Retry',failed:'Download failed',keep:'Only program files are replaced. Your library, study records and settings stay',closing:'MeguLit will close, update and reopen',latest:'You are up to date',checking:'Checking…',page:'View on GitHub',hotSize:mb=>`Update ${mb}, changed files only`,hotGo:'Update now',hotKeep:'No restart: only the changed files are replaced and the window reloads once',hotApplying:'Updating…',hotReader:'A game is running. Close it first, then update',hotLater:'Files updated. The new version starts next time you open MeguLit',hotDone:v=>`Updated to v${v}`,hotDoneMore:'Click to see what’s new',hotDoneClose:'Close',hotDoneNone:'No notes for this update',
-  cTitle:'Help improve MeguLit adaptations (optional)',cBody:'If you agree, MeguLit uploads in the background the scripts and the program (the code part of the exe) of library games it cannot read well, used only to write adaptations and improve translation pairing for those games. Only scripts and program code from the game folder: never images, voice, video, saves or any other file of yours, and paths and your user name are masked first. The package is deleted from the server once the game is adapted, after 30 days at the latest. Turn it off any time in Settings → Library.',
-  cBeta:'On by default in the closed beta: MeguLit uploads the scripts and the program (the code part of the exe) of library games it cannot read well, used only to adapt them. Never images, voice, video, saves or other files; paths and your user name are masked. Deleted once adapted, after 30 days at the latest. To opt out, press “Not now” or turn it off in Settings → Library.',
-  cAgree:'Agree and continue',cDecline:'Not now',cOn:'On, thank you! Turn it off any time in Settings → Library',cOff:'Not taking part; nothing is uploaded. You can turn it on later in Settings → Library',cNext:'Continue'}};
+ zh:{title:v=>`MeguLit v${v} 来了`,current:v=>`当前 v${v}`,size:mb=>`安装包 ${mb}`,bigger:'比当前版本大',smaller:'比当前版本小',same:'和当前版本差不多大',notes:'更新内容',downloading:'正在下载',verifying:'正在校验…',ready:'下载完成，已校验',restart:'重启并更新',later:'稍后',retry:'重试',failed:'下载失败',keep:'只替换程序文件，游戏库、学习记录和设置都会保留',closing:'MeguLit 即将关闭，更新完会自动重新打开',latest:'已经是最新版',checking:'正在检查…',page:'在 GitHub 查看',hotSize:mb=>`更新包 ${mb}，只含改动的文件`,hotGo:'立即更新',hotKeep:'不用重启：替换改动的文件，界面会刷新一下',hotApplying:'正在更新…',hotReader:'游戏正在运行，先退出游戏再更新',hotLater:'文件已更新，下次打开 MeguLit 时生效',hotDone:v=>`已更新到 v${v}`,hotDoneMore:'点开看更新内容',hotDoneClose:'关闭',hotDoneNone:'这次没有写更新说明'},
+ ja:{title:v=>`MeguLit v${v} が出ました`,current:v=>`現在 v${v}`,size:mb=>`パッケージ ${mb}`,bigger:'今より大きい',smaller:'今より小さい',same:'今とほぼ同じサイズ',notes:'更新内容',downloading:'ダウンロード中',verifying:'検証中…',ready:'ダウンロード完了・検証済み',restart:'再起動して更新',later:'あとで',retry:'再試行',failed:'ダウンロードに失敗しました',keep:'プログラムだけを置き換えます。ライブラリ・学習記録・設定はそのままです',closing:'MeguLit を閉じて更新し、自動で開き直します',latest:'最新版です',checking:'確認中…',page:'GitHub で見る',hotSize:mb=>`更新パッケージ ${mb}（変更分のみ）`,hotGo:'今すぐ更新',hotKeep:'再起動は不要です。変更されたファイルだけを置き換え、画面が一度読み込み直されます',hotApplying:'更新中…',hotReader:'ゲームの実行中です。ゲームを終了してから更新してください',hotLater:'ファイルは更新済みです。次回の起動から反映されます',hotDone:v=>`v${v} に更新しました`,hotDoneMore:'クリックで更新内容を表示',hotDoneClose:'閉じる',hotDoneNone:'今回の更新内容の説明はありません'},
+ en:{title:v=>`MeguLit v${v} is here`,current:v=>`Current v${v}`,size:mb=>`Package ${mb}`,bigger:'Larger than now',smaller:'Smaller than now',same:'About the same size as now',notes:'What’s new',downloading:'Downloading',verifying:'Verifying…',ready:'Downloaded and verified',restart:'Restart and update',later:'Later',retry:'Retry',failed:'Download failed',keep:'Only program files are replaced. Your library, study records and settings stay',closing:'MeguLit will close, update and reopen',latest:'You are up to date',checking:'Checking…',page:'View on GitHub',hotSize:mb=>`Update ${mb}, changed files only`,hotGo:'Update now',hotKeep:'No restart: only the changed files are replaced and the window reloads once',hotApplying:'Updating…',hotReader:'A game is running. Close it first, then update',hotLater:'Files updated. The new version starts next time you open MeguLit',hotDone:v=>`Updated to v${v}`,hotDoneMore:'Click to see what’s new',hotDoneClose:'Close',hotDoneNone:'No notes for this update'}};
 const mb=n=>(n/1048576).toFixed(n>=10485760?1:2)+' MB';
+const U={
+ zh:{title:'让惠惠帮你更新一下吧',required:'这本魔导书需要更新啦～此版本已不再接收反馈和适配探针，请更新后再继续',quick:'稍等一下，更新通常很快就好～下载完成后会自动安装、重启 MeguLit，再回来陪你',go:'立即更新',manual:'手动下载',available:'新版魔导书准备好啦～更新后，惠惠会继续陪你读下去',failed:'更新暂时没成功，别着急～点「重试」，或手动下载最新版'},
+ ja:{title:'めぐみんに更新を任せてね',required:'この魔導書は更新が必要です。このバージョンからのフィードバック・適応プローブは受け付けていません。更新してから続けてね',quick:'少しだけ待ってね。通常はすぐに終わります。ダウンロード後、自動でインストールして MeguLit を再起動します',go:'今すぐ更新',manual:'手動ダウンロード',available:'新しい魔導書ができました。更新したら、また一緒に読もうね',failed:'更新がうまくいきませんでした。「再試行」か手動ダウンロードで、もう一度試してね'},
+ en:{title:'Let Megumin help you update',required:'This grimoire needs an update. This version no longer accepts feedback or adaptation probes. Please update to continue',quick:'Just a little moment—updates usually finish quickly. After downloading, MeguLit will install the update and restart automatically',go:'Update now',manual:'Manual download',available:'Your new grimoire is ready. Update and we can keep reading together',failed:'The update didn’t finish this time. Try again, or download the latest version manually'}
+};
 /* Signed size change in MB, precise enough that a few KB does not read as 0.00 */
 const deltaMb=n=>{const v=n/1048576,a=Math.abs(v);return (v>=0?'+':'−')+(a<0.01?a.toFixed(3):a.toFixed(2))+' MB';};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
@@ -43,7 +38,16 @@ function notesFor(body,locale){
   .map(l=>({head:/^#{1,6}\s/.test(l),text:l.replace(/^#{1,6}\s*|^[-*]\s+/g,'').replace(/\*\*(.*?)\*\*/g,'$1').replace(/`([^`]*)`/g,'$1').replace(/\[([^\]]+)\]\([^)]*\)/g,'$1')})).slice(0,80);
 }
 
-let card=null,poll=0;
+let card=null,poll=0,disposeCard=null,activeClosed=Promise.resolve();
+export const updateIsBlocking=()=>!!card?.matches?.('dialog[open]');
+export const updateIsRequired=()=>!!card?.classList.contains('upd-required');
+export async function afterStartupUpdate(check,{notice,ready}){
+ await check;
+ while(updateIsBlocking())await activeClosed;
+ const dialog=notice();
+ if(dialog?.open)await new Promise(resolve=>dialog.addEventListener('close',resolve,{once:true}));
+ ready();
+}
 export function updateLocale(){const l=typeof document!=='undefined'?document.documentElement?.lang||'':'';return l.startsWith('ja')?'ja':l.startsWith('en')?'en':'zh';}
 
 /* 2026-11-15 adaptation contribution consent (services/adapter-contrib.cjs, rule 1): the text sits at the very end of the
@@ -52,21 +56,29 @@ export function updateLocale(){const l=typeof document!=='undefined'?document.do
    to turn it off; showing it is what lets the beta default start. Settings → 游戏库 holds the switch either way. */
 function consentHTML(consent,t){if(!consent||!(consent.ask||consent.notice))return '';
  return `<section class="upd-consent" data-upd-consent><h4>${esc(t.cTitle)}</h4><p>${esc(consent.ask?t.cBody:t.cBeta)}</p><button type="button" class="upd-consent-no" data-upd-decline>${esc(t.cDecline)}</button></section>`;}
-function render(info,{api,invoke,locale,consent=null}){
- const t=M[locale]||M.zh;card?.remove();clearInterval(poll);
- card=document.createElement('aside');card.className='upd-card';card.setAttribute('role','dialog');card.setAttribute('aria-label',t.title(info.latest));
+export function render(info,{api,invoke,locale,consent=null,center=false}){
+ const t=M[locale]||M.zh,u=U[locale]||U.zh,required=!!info.required;center=center||required;
+ const message=info.policy?.message,explanation=required?(typeof message==='string'&&locale==='zh'?message:message?.[locale])||u.required:u.available;
+ disposeCard?.();card?.remove();clearInterval(poll);
+ if(required)consent=null;
+ card=document.createElement(center?'dialog':'aside');const own=card;
+ card.className='upd-card'+(center?' upd-center':'')+(required?' upd-required':'');card.setAttribute('role','dialog');card.setAttribute('aria-label',required?u.title:t.title(info.latest));
+ let finished;const closed=new Promise(resolve=>{finished=resolve;});
+ activeClosed=closed;
  const delta=info.delta==null?'':(Math.abs(info.delta)<51200?t.same:info.delta>0?t.bigger:t.smaller)+(locale==='en'?' (':'（')+deltaMb(info.delta)+(locale==='en'?')':'）');
  const notes=notesFor(info.notes,locale);
  const same=info.hotfix?({zh:'（热修复）',ja:'（修正版）',en:' (hotfix)'})[locale]||'':'';
- card.innerHTML=`<button type="button" class="upd-x" data-upd-close aria-label="${esc(t.later)}">×</button>
-  <div class="upd-eyebrow">${esc(t.current(info.current))} → v${esc(info.latest)}</div>
-  <h3>${esc(t.title(info.latest))}${esc(same)}</h3>
+ card.innerHTML=`${required?'':`<button type="button" class="upd-x" data-upd-close aria-label="${esc(t.later)}">×</button>`}
+  <h3>${esc(required?u.title:t.title(info.latest))}${esc(same)}</h3>
+  <p class="upd-version">${esc(t.current(info.current))} → v${esc(info.latest)}</p>
+  ${center?`<p class="upd-message">${esc(explanation)}</p>`:''}
   <p class="upd-size">${info.hot?esc(t.hotSize(mb(info.hotSize||0))):`${esc(t.size(mb(info.size||0)))}${delta?` · <b class="${info.delta>0?'up':'down'}">${esc(delta)}</b>`:''}`}</p>
-  ${notes.length||consentHTML(consent,t)?`<div class="upd-notes" tabindex="0">${notes.length?`<span>${esc(t.notes)}</span>`:''}${notes.map(n=>n.head?`<h4>${esc(n.text)}</h4>`:`<p>${esc(n.text)}</p>`).join('')}${consentHTML(consent,t)}</div>`:''}
+  ${notes.length?`<div class="upd-notes" tabindex="0"><span>${esc(t.notes)}</span>${notes.map(n=>n.head?`<h4>${esc(n.text)}</h4>`:`<p>${esc(n.text)}</p>`).join('')}</div>`:''}
   <div class="upd-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
-  <div class="upd-state" data-upd-state>${esc(t.downloading)}</div>
+  <div class="upd-state" data-upd-state role="status" aria-live="polite">${esc(required?u.quick:t.downloading)}</div>
+  ${required?`<p class="upd-reassure">${esc(u.quick)}</p>`:''}
   <p class="upd-keep" data-upd-keep>${esc(info.hot?t.hotKeep:t.keep)}</p>
-  <div class="upd-acts"><button type="button" class="upd-go" data-upd-go disabled>${esc(info.hot?t.hotGo:t.restart)}</button><button type="button" class="upd-later" data-upd-close>${esc(t.later)}</button></div>`;
+  <div class="upd-acts"><button type="button" class="upd-go" data-upd-go ${required?'':'disabled'}>${esc(required?u.go:info.hot?t.hotGo:t.restart)}</button>${required?'':`<button type="button" class="upd-later" data-upd-close>${esc(t.later)}</button>`}<button type="button" class="upd-later" data-upd-manual hidden>${esc(u.manual)}</button></div>`;
  document.body.append(card);requestAnimationFrame(()=>card?.classList.add('in'));
  const bar=card.querySelector('.upd-bar'),fill=bar.querySelector('i'),state=card.querySelector('[data-upd-state]'),go=card.querySelector('[data-upd-go]');
  /* while the consent question is open the main button is 同意并下一步; the download's own button state waits in want */
@@ -77,21 +89,33 @@ function render(info,{api,invoke,locale,consent=null}){
  const decided=on=>{asking=false;go.classList.remove('upd-agree');if(block)block.innerHTML=`<p class="upd-consent-done">${esc(on?t.cOn:t.cOff)}</p>`;go.disabled=want.disabled;go.textContent=want.text;go.dataset.mode=want.mode;};
  if(asking){go.disabled=false;go.textContent=t.cAgree;go.classList.add('upd-agree');}
  block?.querySelector('[data-upd-decline]')?.addEventListener('click',async()=>{try{await api('contrib_consent_set',{on:false,source:consent?.ask?'card':'beta-card'});}catch{}decided(false);});
- const close=()=>{clearInterval(poll);const c=card;card=null;c?.classList.remove('in');setTimeout(()=>c?.remove(),260);};
+ const dispose=()=>{clearInterval(poll);if(own.open)own.close();own.remove();if(card===own)card=null;finished();};
+ disposeCard=dispose;
+ const close=()=>{if(required)return;dispose();};
+ own.addEventListener('cancel',e=>{e.preventDefault();close();});
+ if(center){own.setAttribute('aria-modal','true');own.showModal();}
  card.querySelectorAll('[data-upd-close]').forEach(b=>b.addEventListener('click',close));
+ const manual=card.querySelector('[data-upd-manual]');manual.addEventListener('click',()=>invoke('open_url',{url:/^https:\/\/github\.com\/ilynthn\/MeguLit\/releases(?:\/|$)/.test(info.page||'')?info.page:'https://github.com/ilynthn/MeguLit/releases/latest'}).catch(()=>{}));
+ let installing=false;
+ const installNow=async()=>{if(installing)return;installing=true;setGo(true,t.restart,'install');state.textContent=t.closing;
+  try{await api('update_install');await invoke('app_exit_for_update');}catch(e){installing=false;show({phase:'error',error:String(e?.message||e)});}};
  const show=s=>{
+  if(card!==own)return;
   const total=s.total||(info.hot?info.hotSize:info.size)||0,got=Math.min(s.received||0,total||Infinity),pct=total?Math.floor(got/total*100):0;
   fill.style.width=pct+'%';bar.setAttribute('aria-valuenow',String(pct));
   if(s.phase==='downloading'){state.textContent=total&&got>=total?t.verifying:`${t.downloading} ${mb(got)} / ${mb(total)} · ${pct}%`;}
-  else if(s.phase==='ready'){clearInterval(poll);fill.style.width='100%';bar.classList.add('done');state.textContent=t.ready;setGo(false,s.hot?t.hotGo:t.restart,s.hot?'hot':'install');}
-  else if(s.phase==='error'){if(info.hot&&!s.hot){/* the hot package failed: the retry fetches the full one */info.hot=false;const keep=card?.querySelector('[data-upd-keep]');if(keep)keep.textContent=t.keep;}clearInterval(poll);bar.classList.add('fail');state.textContent=t.failed+(s.error?' · '+s.error:'');setGo(false,t.retry,'retry');}
+  else if(s.phase==='ready'){clearInterval(poll);fill.style.width='100%';bar.classList.add('done');state.textContent=t.ready;setGo(false,s.hot?t.hotGo:t.restart,s.hot?'hot':'install');if(required)void installNow();}
+  else if(s.phase==='error'){if(info.hot&&!s.hot){/* the hot package failed: the retry fetches the full one */info.hot=false;const keep=card?.querySelector('[data-upd-keep]');if(keep)keep.textContent=t.keep;}clearInterval(poll);bar.classList.add('fail');state.textContent=u.failed+(s.error?' · '+s.error:'');manual.hidden=false;setGo(false,t.retry,'retry');}
  };
- const begin=async()=>{bar.classList.remove('fail','done');setGo(true,want.text,want.mode);try{show(await api('update_start',{current:info.current}));}catch(e){show({phase:'error',error:String(e?.message||e)});return;}
-  clearInterval(poll);let inflight=false;poll=setInterval(async()=>{if(!card){clearInterval(poll);return;}if(inflight)return;inflight=true;try{show(await api('update_status'));}catch{}finally{inflight=false;}},250);};
+ const begin=async()=>{bar.classList.remove('fail','done');manual.hidden=true;setGo(true,t.downloading,want.mode);try{show(await api('update_start',{current:info.current,forceLatest:required}));}catch(e){show({phase:'error',error:String(e?.message||e)});return;}
+  if(card!==own||bar.classList.contains('done')||bar.classList.contains('fail'))return;
+  clearInterval(poll);let inflight=false;poll=setInterval(async()=>{if(card!==own)return;if(inflight)return;inflight=true;let timer;
+   try{show(await Promise.race([api('update_status'),new Promise((resolve,reject)=>{timer=setTimeout(()=>reject(Error('UPDATE_STATUS_TIMEOUT')),15000);})]));}
+   catch(e){show({phase:'error',error:String(e?.message||e)});}finally{clearTimeout(timer);inflight=false;}},250);};
  go.addEventListener('click',async()=>{
   if(asking){go.disabled=true;try{await api('contrib_consent_set',{on:true,source:'card'});}catch{go.disabled=false;return;}decided(true);return;}
   if(go.dataset.mode==='close'){close();return;}
-  if(go.dataset.mode==='retry'){begin();return;}
+  if(go.dataset.mode==='retry'||go.dataset.mode==='start'){begin();return;}
   if(go.dataset.mode==='hot'){
    /* no restart (services/hot-update.cjs): files first, then the service restarts and the pages reload */
    go.disabled=true;state.textContent=t.hotApplying;
@@ -102,8 +126,9 @@ function render(info,{api,invoke,locale,consent=null}){
   go.disabled=true;state.textContent=t.closing;
   try{await api('update_install');setTimeout(()=>invoke('app_exit_for_update').catch(()=>{}),1200);}catch(e){state.textContent=t.failed+' · '+String(e?.message||e);go.disabled=false;}
  });
- if(info.consentOnly){bar.hidden=true;state.hidden=true;card.querySelector('[data-upd-keep]').hidden=true;card.querySelector('.upd-size').hidden=true;card.querySelector('.upd-eyebrow').hidden=true;card.querySelector('h3').textContent=t.cTitle;card.querySelector('.upd-notes h4')?.remove();setGo(false,t.cNext,'close');return;}
- begin();
+ if(info.consentOnly){bar.hidden=true;state.hidden=true;card.querySelector('[data-upd-keep]').hidden=true;card.querySelector('.upd-size').hidden=true;card.querySelector('.upd-version').hidden=true;card.querySelector('h3').textContent=t.cTitle;card.querySelector('.upd-notes h4')?.remove();setGo(false,t.cNext,'close');return closed;}
+ if(required){setGo(false,u.go,'start');state.textContent='';}else begin();
+ go.focus();return closed;
 }
 
 /* Silent hot update (user 2026-11-15: 自动静默，要用户点的只包含热更新无法的内容). A release that fits as a small
@@ -171,17 +196,14 @@ export function showHotDone({locale=updateLocale(),keep=store,doc=typeof documen
 }
 
 /* Called once at start (silent unless there is something new) and by About → Check for updates (reports either way).
-   A small package that fits is applied silently; only an update that needs the full package shows the card. */
-export async function checkForUpdates({api,invoke,version,toast,manual=false,show=render,silent=silentHotUpdate}){
+   Startup offers every update in the center before onboarding; manual checks retain the corner card. */
+export async function checkForUpdates({api,invoke,version,toast,manual=false,show=render,requiredPolicy=null}){
  const locale=updateLocale(),t=M[locale]||M.zh;
- /* rule 1 (adapter-contrib.cjs): an open consent question or an unseen beta note always gets the card, also when the
-    update itself is silent or there is none */
- let consent=null;try{consent=await api('contrib_consent');}catch{}
- const asking=!!(consent&&(consent.ask||consent.notice));
- try{const info=await api('update_check',{current:version});
-  if(!info.newer){if(manual)toast?.(t.latest);if(asking&&!manual)show({current:version,latest:version,consentOnly:true,notes:''},{api,invoke,locale,consent});return info;}
-  if(info.silent&&!asking){silent(info,{api,invoke});return info;}
-  show(info,{api,invoke,locale,consent});return info;
- }catch(error){if(manual)toast?.(t.failed+' · '+String(error?.message||error));else if(asking)show({current:version,latest:version,consentOnly:true,notes:''},{api,invoke,locale,consent});return null;}
+ const checking=api('update_check',{current:version});
+ try{let info;try{info=await checking;}catch(error){if(!requiredPolicy)throw error;info={current:version,latest:requiredPolicy.latest,newer:true,required:true,policy:requiredPolicy};}
+  if(requiredPolicy)info={...info,required:true,silent:false,hot:false};
+  if(!info.newer&&!info.required){if(manual)toast?.(t.latest);return info;}
+  const closed=show(info,{api,invoke,locale,center:!manual||info.required});if(!manual)await closed;return info;
+ }catch(error){if(manual)toast?.(t.failed+' · '+String(error?.message||error));return null;}
 }
 export {notesFor};

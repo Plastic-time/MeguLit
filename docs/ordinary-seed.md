@@ -1,0 +1,67 @@
+# Automatic sharing of Seed calibrations
+
+The desktop's existing sharing switch sends one optional `ordinary` candidate alongside its calibration report. The private launcher separately permits ordinary calibration submissions and signed reception on the two built-in relay hosts. Private reports include only the restricted calibration and optional script fingerprint. Each eligible submission enters a durable D1 job before acknowledgement. Older report formats continue to work. The signed feed still uses `megulit.game-diff` and the existing exact-version receiver and disk cache
+
+The candidate contains only the full executable SHA-256, optional 64-hex script fingerprint, read/hide mode and settings emitted by ordinary calibration. The schema in `core/ordinary-seed.cjs` bounds groups, keys, enums, numeric rectangles and the two-element client size. Choice filters may only be cleared. The Worker checks the candidate against the actual calibration. The report body is limited to 16 KiB while streaming. Candidate defaults, revisions, timestamps and material for signing are constructed on the server. Raw diagnostics, runtime archives, paths, regex sources, engine tables and draw grants cannot enter the signer
+
+The scan service accepts at most 4 KiB of canonical JSON on authenticated POST `/scan`. It revalidates the same restricted schema, checks clamd's loaded database version and age, streams the unsigned bytes with INSTREAM, then signs only a clean result. It scans the complete signed artifact before returning a clean receipt. The Worker verifies the unsigned and signed SHA-256 digests and checks the signature against its separately pinned ordinary publisher key. These keys have a reserved `ordinary-` ID and a separate client trust file. Reviewed releases, rollback and revocation keep their existing keys and protocols
+
+D1 deduplicates normalized content and assigns each candidate a revision per executable. A timed lease and a transaction fence publication against concurrent retries, newer versions, existing signed winners, deleted inputs, infection records and revocations. A detection quarantines the job. Missing configuration, stale definitions, network failures, unknown replies or key mismatch leave the job pending. Submission triggers an immediate attempt when the scanner is configured. The existing half-hour cron retries two due jobs per run. Capacity planning should include this recovery rate as well as the two concurrent scans accepted by each gateway
+
+The upload response includes `ordinary: {id,state,revision}`. The game card reads `GET /api/game-profile/ordinary-status?id=<id>`. A published job records successful publication at that revision. Subsequent feed updates can provide a newer revision. The ordinary receiver requires an exact executable hash and verifies its signature again when reading the cache. The scanner signs the uploader’s script fingerprint when available. The relay and desktop match that fingerprint to the receiver’s local script, including the absence of a fingerprint. This binding carries no game acceptance score or permission to execute code. A signed profile-hash revocation from the existing release authority, or an authenticated withdrawal of the active ordinary profile, suppresses delivery. The next online check of an installed ordinary profile records a revision floor on disk. Ordinary publication and withdrawal append to the 0031 change log in their D1 transaction. After commit the Worker wakes connected subscribers. Reconnecting clients replay the log and check the current signed feed
+
+## Deployment
+
+1. Deploy a maintained ClamAV daemon and enable freshclam on a scan host. Bind clamd to loopback or a private network accessible only to the gateway. Configure both processes for the same timezone. The gateway requires current definitions loaded by clamd, and refuses clean publication if their age exceeds seven days
+2. Provision a dedicated Ed25519 PEM outside the repository, readable only by the scan-service account. Give it a unique `ordinary-` key ID. Put the corresponding base64 DER SPKI public key in `services/ordinary-seed-keys.json` under `keys` as `{"id":"ordinary-…","alg":"ed25519","publicKey":"…"}`. Ship the receiver and public key before enabling the publisher. Leave maintainer DPAPI keys and the review trust lists in their existing locations
+3. Install Node 22+, the repository's `core/` and `relay/scan-service/` under `/opt/megulit`. The supplied systemd unit expects a `megulit-seed` account and a protected `/etc/megulit/ordinary-seed.env` with `ORDINARY_PRIVATE_KEY_FILE`, `ORDINARY_KEY_ID`, and a high-entropy `ORDINARY_SCAN_TOKEN` of at least 32 characters. Optional values are `CLAMD_HOST`, `CLAMD_PORT` and `PORT`. By default Node listens on loopback port 8093 and contacts clamd at 127.0.0.1:3310. Terminate HTTPS at an authenticated gateway or reverse proxy in front of the loopback listener. Forward the bearer header to the service and exclude it from logs
+4. Apply the relay D1 migrations in order, including `0031_torch_changes.sql`, `0032_yui.sql` and `0033_ordinary_seeds.sql`. Configure `ORDINARY_SCAN_URL` with the gateway's HTTPS `/scan` URL, `ORDINARY_PUBLIC_KEYS` with the same ordinary public-key array, and `ORDINARY_SCAN_TOKEN` using Wrangler secret provisioning. Deploy the Worker with the existing cron trigger. Both desktop relay hosts reach the same Worker and database. Keep the token and private key out of client builds and source control
+5. Check a harmless calibration on the deployed path, its receipt, exact-version offline reuse and a signed revocation on a test version. An account's deployed quotas, scan-host uptime and trust rotation remain operational responsibilities. To pause new signing, stop the scan service. Pending jobs remain available for retry
+
+### Windows production host
+
+The Windows host runs three automatic services. `freshclam` updates the definitions, `clamd` listens on loopback port 3310, and `MeguLitOrdinaryScan` runs the loopback signer on port 8093. Each runs as its own Windows virtual service account. The signer depends on clamd and TCP/IP. The Service Control Manager restarts failed services
+
+The installation lives in `C:\ProgramData\MeguLitSeedScan`. The service executable launches the protected Node runtime and `app\relay\scan-service\windows-host.cjs` with no desktop window. The service identity can read its own configuration and ordinary signing key in `private`. Administrators and SYSTEM manage the directory. ClamAV writes its logs in `log`. Keep the private directory on the scan host
+
+The separate `megulit-ordinary-scan` Worker routes authenticated `POST /scan` requests to the Windows connector over its outbound WSS connection. It uses one SQLite-backed Durable Object on the Workers Free plan. The publisher and connector use distinct credentials. Each message carries one bounded calibration document, and the local service validates and scans it before signing. No inbound Windows firewall rule or public clamd listener is required. The queue and its retry schedule belong to the main relay
+
+Service operations in an elevated PowerShell:
+
+```powershell
+Get-Service clamd,freshclam,MeguLitOrdinaryScan
+Stop-Service MeguLitOrdinaryScan
+Start-Service MeguLitOrdinaryScan
+```
+
+While the signer is stopped, authenticated scans return 503. Check the same job on either relay host using `/api/game-profile/ordinary-status?id=<job-id>`. A failed scan sets a five-minute backoff. The half-hour cron takes up to two eligible jobs per run. Its successful result should have one revision, one signed exact-version profile and one change event for a new fixture. A retried upload of the same normalized settings should return the same job ID and revision
+
+Deploy the gateway separately with `relay/scan-service/gateway/wrangler.toml`. On the main relay, changes limited to gateway credentials can use `wrangler versions secret bulk` on the current production version. Compare the staged script ETag, runtime and unrelated bindings with the live version before promotion. The desktop verification key and the public Worker pin must match. A rollback to the previous Worker version leaves the D1 queue intact
+
+### Dashboard control
+
+Open `/dashboard#seed-admin` on either relay and connect with the administrator credential. **自动处理 Seed** controls automatic processing on both domains, including scanning and game review. New installations default to enabled with migration `0038_ordinary_publish_policy.sql`. A clean, verified eligible upload publishes automatically. An infected candidate is quarantined. Temporary scan failures stay pending for retry
+
+Pausing invalidates active publication leases while preserving queued uploads and published versions. Resuming starts processing again. The scanner indicator independently probes the authenticated gateway, Windows service and ClamAV definitions. An offline scanner leaves uploads queued. **高级管理 → 历史审核目录** contains the separate catalog of repository snapshots, reports, candidates and signed records
+
+### Scan host archive and release check
+
+From a clean release checkout, build the portable scanner archive with the following command. The destination needs Node 22 or later and a running clamd with maintained definitions. The archive contains the server, its JavaScript dependencies, license and systemd unit. It can be extracted into `/opt/megulit` without npm or a repository checkout. The service account reads its own key and environment file under `/etc/megulit`
+
+```sh
+git -c core.autocrlf=false -c core.eol=lf archive -o ordinary-scan-host.tar.gz HEAD LICENSE docs/ordinary-seed.md core/ordinary-seed.cjs core/game-diff.cjs core/game-print-schema.cjs core/seed-evidence.cjs core/profiles/domains.cjs relay/scan-service
+```
+
+Apply all relay migrations through `0035_torch_alias_search.sql` for the roster. Migration 0034 updates the fallback aliases separately from explicit signatures. A normal client's first anonymous upload may nominate one catalogued protagonist from its visible local library. The catalog matches exact VNDB IDs, with the manual mapping taking precedence. Only the selected original name goes on the wire. An existing number keeps its assigned alias. The isolated test launcher omits this field
+
+On the release workstation, set the gateway bearer in the process environment and install the locked relay dependencies. Run the check below with the intended Wrangler configuration and the trust file from the distributed receiver. It posts one synthetic calibration directly to the gateway and verifies its scan receipt and Ed25519 signature against the Worker and receiver pins. It prints the key ID and hashes without writing to the roster or publishing a Seed. A deployment must also verify an ordinary upload and a separate receiving client through each actual relay hostname
+
+```sh
+node relay/check-ordinary.mjs relay/wrangler.toml /path/to/installed/services/ordinary-seed-keys.json
+```
+
+## Local integration
+
+Run `node --test validation/ordinary-seed.test.cjs` for the normal protocol suite. Its default clamd peer is a test fixture. For the real-engine variant use an isolated clamd with fresh official definitions and add a local NDB signature with name `Seed.Test.Marker`, target `0`, offset `*`, and the hex encoding of 64 ASCII lowercase b characters. Set `MEGULIT_TEST_CLAMD_PORT` to that daemon's loopback port. Use a separate database directory for this test signature
+
+To exercise the deployable Worker in workerd, install the locked packages with `npm ci` in `relay/`, run `wrangler deploy --dry-run --outdir <temporary-directory>` there, and set `MEGULIT_TEST_WORKER_BUNDLE` to the resulting absolute `worker.js` path before running the test. The suite uses temporary keys and D1 storage. Its outbound adapter only forwards requests to its own scan gateway. Tests cover unavailable AV, scheduled retry, duplicate delivery, actual gateway signing, benign signature detection, feed receive, fresh-process offline verification, tampering, version mismatch and revocation

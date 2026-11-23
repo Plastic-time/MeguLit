@@ -4,6 +4,7 @@
 // original, overlay lines were placed twice (the reader's flow page and the OCR page locator), the title-screen help
 // was read as dialogue, and one line came in twice. Synthetic events and source checks; the C# rules run in
 // HookBridge --self-test (Build-HookBridge.ps1).
+const hookBridgeChild=require('./helpers/hook-bridge-child.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {HookNative}=require('../core/hook-native.cjs');
 const root=path.join(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'utf8');
@@ -81,7 +82,7 @@ test("E323 wiring: per-sentence indent, marker on the current line, box probes o
 });
 
 test('E349: the TYPE-MOON hint stream (same hook code as the story) is never the WoH source; the story stream is selected',t=>{
- const f=fixture(t);const sent=[];f.hook.process={stdin:{write(){},end(){}},kill(){},removeAllListeners(){}};f.hook.send=m=>sent.push(m);
+ const f=fixture(t);const sent=[];f.hook.process=hookBridgeChild();f.hook.send=m=>sent.push(m);
  f.hook.originalText={kind:'patch',resolve:text=>text.includes('ボイス')||text.includes('早送り')?{status:'none',method:'no-cover'}:{status:'exact'}};
  assert.equal(f.hook.flowStory('ボイスを再生します'),false);assert.equal(f.hook.flowStory('　彼女がはじめて命に<rふ>触</r>れた。'),true);
  f.hook.state.hookThreads=[{id:'hint',name:'typemoon',selected:true,embeddable:true,sample:'押している間、早送りします'},{id:'story',name:'typemoon',selected:false,embeddable:true,sample:'　数分後。'}];
@@ -101,7 +102,7 @@ test('E349: 重新选取文本流 on WoH skips hint streams; earlier lines fade 
 });
 
 test('E350: hovering the control bar (tooltips run together) never reaches the page, never wins a stream pick, and the story stream wins back',t=>{
- const f=fixture(t);const sent=[];f.hook.process={stdin:{write(){},end(){}},kill(){},removeAllListeners(){}};f.hook.send=m=>sent.push(m);
+ const f=fixture(t);const sent=[];f.hook.process=hookBridgeChild();f.hook.send=m=>sent.push(m);
  const joined='前のシーン、選択肢までジャンプします押している間、早戻ししますオートモードのＯＮ、ＯＦＦを切り替えますクイックセーブを行いますボイスを再生します';
  assert.equal(HookNative.uiHelp(joined),true);assert.equal(HookNative.uiHelp('ボイスを再生します'),true);
  for(const story of ['　もっとも、それは夏だけの話。','「わかりました」','そっちこそ、一度した約束は絶対守','鳶丸は開けっぱなしの扉を閉め、鍵をかけて'])assert.equal(HookNative.uiHelp(story),false,story);
@@ -122,7 +123,7 @@ test('E350: hovering the control bar (tooltips run together) never reaches the p
 });
 
 test('E352: a full-screen page with the game\'s own translation table is written back by the game (translate embed); others keep their setting',t=>{
- const f=fixture(t);const sent=[];f.hook.process={stdin:{write(){},end(){}},kill(){},removeAllListeners(){}};f.hook.send=m=>sent.push(m);f.hook.enabled=true;f.hook.preferences={embedTranslation:false};
+ const f=fixture(t);const sent=[];f.hook.process=hookBridgeChild();f.hook.send=m=>sent.push(m);f.hook.enabled=true;f.hook.preferences={embedTranslation:false};
  f.hook.syncEmbedMode();assert.deepEqual(sent.filter(m=>m.type==='embedMode').map(m=>m.mode),['hide'],'no script table yet: hide as set');
  f.hook.originalText={kind:'patch',resolve:()=>({status:'exact'}),tableDrawable:()=>true};f.hook.scriptAllowed=()=>true;
  f.line('　もっとも、それは夏だけの話。');f.tick(100);
@@ -144,7 +145,7 @@ test('E352 wiring: writeback keeps indent and engine codes; embed lookups drop r
 // E358 (user report on 1.2.8, WoH prologue: the Chinese the game drew had a blank for every third character). The game
 // draws from its own bitmap font, which in Japanese holds only the characters of the Japanese script.
 test('E358: a translation the game font cannot draw is hidden in the game and drawn by MeguLit; WoH is not switched to translate mode',t=>{
- const f=fixture(t);const sent=[];f.hook.process={stdin:{write(){},end(){}},kill(){},removeAllListeners(){}};f.hook.send=m=>sent.push(m);f.hook.enabled=true;f.hook.preferences={embedTranslation:false};f.hook.scriptAllowed=()=>true;
+ const f=fixture(t);const sent=[];f.hook.process=hookBridgeChild();f.hook.send=m=>sent.push(m);f.hook.enabled=true;f.hook.preferences={embedTranslation:false};f.hook.scriptAllowed=()=>true;
  f.hook.originalText={kind:'patch',resolve:()=>({status:'exact'}),tableDrawable:()=>false,drawable:()=>false};
  f.hook.syncEmbedMode();assert.equal(sent.filter(m=>m.type==='embedMode').at(-1).mode,'hide','the game font cannot draw the official table: hide + overlay');
  f.hook.originalText.tableDrawable=()=>true;f.hook.syncEmbedMode();assert.equal(sent.filter(m=>m.type==='embedMode').at(-1).mode,'translate','a font that has the glyphs: the game draws');
@@ -162,7 +163,7 @@ test('E358 wiring: the reader checks the game glyphs before writing back; the br
  assert.match(bridge,/string reply=hide\?\(p\.hidden\?\?""\):EmbedTextPolicy\.Writeback\(p\.text,trans\);/);
  assert.match(bridge,/new PendingEmbed\{tp=tp,text=text,hidden=replacement,code=candidate\.code,selected=Selected,leaveGen=LeaveGen,askedState=askedState\}/,'a pending line remembers the selection it was asked for (#696: an answer after a stream switch is dropped, a reselection of the same stream keeps it) and the state it was asked under (its answer is remembered only if nothing changed)');
  assert.match(bridge,/d\.TryGetValue\("hide",out hv\)&&Convert\.ToBoolean\(hv\)/);
- assert.match(text,/const api=\{kind:'patch',patch:!!patched,fill,drawable,tableDrawable,/);
+ assert.match(text,/const api=\{kind:'patch',patch:!!patched,[^;]*?\bfill,drawable,tableDrawable,/);
 });
 
 test('E358 real data: WoH\'s Japanese font cannot draw the reported line; every line it can draw has all its glyphs',t=>{
@@ -269,7 +270,7 @@ test('E422: lines a page shows together are hidden; only a held skip key or a ru
 });
 
 test('E422: the skip key reaches the bridge once per change',t=>{
- const f=fixture(t);const sent=[];f.hook.process={stdin:{write(){},end(){}},kill(){},removeAllListeners(){}};f.hook.send=m=>sent.push(m);
+ const f=fixture(t);const sent=[];f.hook.process=hookBridgeChild();f.hook.send=m=>sent.push(m);
  f.hook.skipHeld(true);f.hook.skipHeld(true);f.hook.skipHeld(false);
  assert.deepEqual(sent.filter(m=>m.type==='skipHeld'),[{type:'skipHeld',held:true},{type:'skipHeld',held:false}]);
 });

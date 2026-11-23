@@ -4,7 +4,9 @@
    restore resources, online), the sites file the user writes, and the card's wording. Never touches real games. */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {DatabaseSync}=require('node:sqlite'),cg=require('../services/cn-version-guide.cjs');
-const tmp=name=>fs.mkdtempSync(path.join(os.tmpdir(),'megulit-cng-'+name+'-'));
+const suiteRoot=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-cng-suite-'));
+test.after(()=>fs.rmSync(suiteRoot,{recursive:true,force:true}));
+const tmp=name=>fs.mkdtempSync(path.join(suiteRoot,name+'-'));
 function put(root,files){for(const [f,t] of Object.entries(files)){const file=path.join(root,f);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,t);}}
 const kinds=list=>list.map(x=>x.kind);
 

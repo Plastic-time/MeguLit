@@ -10,7 +10,7 @@
    relay runtime bundle ({schema:'megulit.runtime-bundle',files:[{name,data base64}]}, gzip or not) passed as runtime=. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),zlib=require('node:zlib');
 const Profiles=require('../../core/profiles/index.cjs'),GamePrint=require('../../core/game-print.cjs');
-const ENGINE_OF_RECORD={krkr:'kirikiri',rpgm:'rpgmaker',renpy:'renpy',unity:'unity',web:'web'};
+const ENGINE_OF_RECORD={krkr:'kirikiri',rpgm:'rpgmaker',rgss:'rgss',renpy:'renpy',unity:'unity',web:'web'};
 const readJson=f=>{try{return JSON.parse(fs.readFileSync(f,'utf8').replace(/^\uFEFF/,''));}catch{return null;}};
 const readText=f=>{try{return fs.readFileSync(f,'utf8');}catch{return '';}};
 const HEX64=/^[0-9a-f]{64}$/;
@@ -25,6 +25,7 @@ function detectEngine(manifest,runtime,files){const why=[];
  if(/\bkrkr page\b|choice aux (?:KiriKiri|TextRender|Krkr2wcs|tTVPNativeBaseBitmap)/.test(runtime.hookEvents)){why.push('runtime hooks are KiriKiri hooks');return {engine:'kirikiri',why};}
  const names=files.map(f=>String(f.path||f).toLowerCase().replace(/\\/g,'/'));
  if(names.some(n=>/(^|\/)(js\/rmmz_core\.js|www\/js\/rpg_core\.js|js\/rpg_core\.js)$/.test(n))){why.push('rpg_core.js / rmmz_core.js');return {engine:'rpgmaker',why};}
+ if(names.some(n=>/\.rgss(?:ad|2a|3a)$/.test(n))){why.push('RGSSAD archive');return {engine:'rgss',why};}
  if(names.some(n=>/\.xp3$/.test(n))){why.push('.xp3 archives');return {engine:'kirikiri',why};}
  return {engine:'',why:['no engine sign']};}
 

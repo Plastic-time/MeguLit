@@ -65,7 +65,7 @@ test('Unity: JSON settings, PlayerPrefs strings and BinaryFormatter preference d
  assert.equal(fs.readFileSync(path.join(low,'Saves','Settings.json'),'utf8'),json);assert.ok(fs.readFileSync(path.join(low,'save_preferences.sav')).equals(sav));
  assert.equal(Buffer.from(reg['HKCU\\Software\\Maker\\Game'][0].data,'hex').toString(),'en\0');
  /* no Japanese resources → never switched */
- fs.rmSync(path.join(data,'StreamingAssets','langja.cy'));assert.notEqual(LS.detect(g,env).state,'restorable');
+ fs.rmSync(path.join(data,'StreamingAssets','langja.cy'));assert.equal(LS.detect(g,env).state,'language-unverified');
  fs.rmSync(root,{recursive:true,force:true});fs.rmSync(home,{recursive:true,force:true});
 });
 
@@ -80,6 +80,8 @@ test('Steam language: guide while Steam runs, local appmanifest write when it is
  running=false;d=LS.detect(g,env);assert.equal(d.state,'restorable');assert.equal(d.mode,'steam');
  assert.equal(LS.apply(g,env).mode,'steam');const now=fs.readFileSync(acf,'utf8');
  assert.match(now,/"UserConfig"\s*\{\s*"language"\s+"japanese"/);assert.match(now,/"MountedConfig"\s*\{\s*"language"\s+"english"/,'only the user choice changes; Steam does the rest');
+ assert.equal(LS.detect(g,env).state,'applied');
+ fs.writeFileSync(acf,setAcfLanguage(now,'english'));assert.equal(LS.detect(g,env).state,'applied-unverified');
  /* Steam rewrote the manifest meanwhile */
  fs.writeFileSync(acf,now.replace('"Mano"','"Mano"\n\t"LastPlayed"\t\t"1"'));LS.restore(g,env);assert.match(fs.readFileSync(acf,'utf8'),/"UserConfig"\s*\{\s*"language"\s+"english"/);
  assert.match(setAcfLanguage('"AppState"\n{\n\t"appid"\t\t"1"\n}\n','japanese'),/"UserConfig"\n\t\{\n\t\t"language"\t\t"japanese"/);

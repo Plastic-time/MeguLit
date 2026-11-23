@@ -49,6 +49,7 @@ html:not(#u):not(#v) body dialog.game-dialog[open]{inset:var(--titlebar-height,5
 html:not(#u):not(#v) body dialog.game-dialog.dev-notice[open]{height:min(940px,calc(100vh - var(--titlebar-height,56px) - 40px))!important}
 html:not(#u):not(#v) body dialog.game-dialog.dev-notice[open]:not(:has(.dev-notice-updates:not([hidden]))):not(:has(.dev-notice-page:not([hidden])>.dev-notice-scroll)){height:auto!important}
 html:not(#u):not(#v) body :is(dialog.game-dialog,dialog.profile-panel)::backdrop{background:rgba(6,5,7,.62)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+html:not(#u):not(#v) body dialog.startup-notice::backdrop{-webkit-backdrop-filter:none;backdrop-filter:none}
 html:not(#u):not(#v) body .lv-backdrop{padding-top:calc(var(--titlebar-height,56px) + 16px)!important;background:rgba(6,5,7,.62)!important;backdrop-filter:blur(6px)!important}
 /* kickers in every dialog: gold mono, readable */
 html:not(#u):not(#v) body :is(.dev-notice-top,dialog.feedback-dialog .game-dialog-kicker,.lv-kicker){font-family:var(--u-mono)!important;font-size:11px!important;letter-spacing:.28em!important;color:var(--g-gold)!important}
@@ -1822,6 +1823,11 @@ html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-n
 @media (max-width:900px){html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]:not([hidden]){grid-template-rows:none}html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-notice-updates:not([hidden]){height:auto!important;min-height:0!important;max-height:min(240px,26vh)!important}}
 /* (user 2026-11-12: "别让框被选中") a dialog takes focus when it opens; its own frame never shows a focus ring */
 html:not(#u):not(#v):not(#w):not(#x) body :is(dialog,.lv-dialog):is(:focus,:focus-visible){outline:none!important}
+dialog.startup-notice>.startup-notice-close{align-self:flex-end;flex:none;margin:-10px 0 8px;padding:5px 9px;border:1px solid var(--u-line-2);border-radius:4px;color:var(--g-t1)}
+dialog.startup-notice>.startup-notice-close:hover{border-color:var(--g-gold);color:var(--g-gold)}
+html:not(#u):not(#v) body dialog.startup-notice :is(.startup-notice-close,.dev-notice-updates):focus-visible{outline:2px solid var(--g-gold);outline-offset:-2px!important}
+html:not(#u):not(#v):not(#w) body dialog.startup-notice .dev-notice-page[data-page="1"]>.dev-notice-updates{mask:none;-webkit-mask:none}
+dialog.startup-notice .startup-updates-empty{grid-area:upd}
 /* 2026-11-12 (user) the plan for the chosen level: in the guide and right after picking a level */
 html:not(#u):not(#v):not(#w):not(#x) body .guide-level-note{margin:8px 0 0;font-size:12.5px;color:var(--g-t3,#a08a80)}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lv-tips{width:min(560px,94vw)!important}
@@ -1887,3 +1893,8 @@ html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.guide
  html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.guide-success{margin-top:18px!important}
  html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-notice-updates{max-height:200px!important}
 }
+
+.profile-identity-form{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px}
+.profile-identity-form label,.profile-identity-form [role=status]{flex-basis:100%}
+.profile-identity-form img{border-radius:50%}
+.profile-identity-form [role=status]:empty{display:none}

@@ -49,6 +49,24 @@
   minute:'2-digit',second:'2-digit',hour12:false}).format(at):'';
  const clamp=(v,a,z)=>Math.max(a,Math.min(z,v));
  let gameIdentity='',last={gameStyleState:'waiting'},message='',saving=null,saveSerial=0,aligning=false,correctionTimer=0,measurementSerial=0,repainting=false;
+ let itemUndo=null;
+ function storedUndo(key,at){
+  try{const record=JSON.parse(localStorage.getItem('megulit-calibration-undo:'+key));
+   if(at&&record?.at===at&&['translation','text','position'].includes(record.item?.part))return record.item;
+  }catch{}return null;
+ }
+ function storeUndo(key,at){
+  try{const name='megulit-calibration-undo:'+key;if(itemUndo)localStorage.setItem(name,JSON.stringify({at,item:itemUndo}));
+   else localStorage.removeItem(name);}catch{}
+ }
+ function finishItem(){
+  if(!itemUndo)return;
+  const now=b.galPreferences();
+  for(const key of Object.keys(itemUndo.prefs))if(now[key]===itemUndo.prefs[key])delete itemUndo.prefs[key];
+ }
+ function rememberItem(part){
+  itemUndo={part,prefs:pick(b.galPreferences(),part),map:part==='position'?getMap():undefined};
+ }
  const getMap=()=>window.__tomeTextPosition?.getMap?.()||null;
  function values(){const p=pick(b.galPreferences());const tp=window.__tomeTextPosition;if(tp?.state?.().following){p.x=session.base.prefs.x;p.y=session.base.prefs.y;/* a width the follow fitted to the window is not a setting either */const fw=tp.followState?.().setWidth;if(fw!=null&&p.width===fw&&Number.isFinite(Number(session.base.prefs.width)))p.width=session.base.prefs.width;}return p;
   }
@@ -132,10 +150,10 @@
   const close=()=>{box.remove();window.__tomoyoHitRegionsRefresh?.(true);};ok.onclick=close;setTimeout(close,30000);document.body.append(box);window.__tomoyoHitRegionsRefresh?.(true);
    }
  const firstRunPage=Date.now().toString(36);
- b.cancelGameSettings=()=>{if(saving)return false;stopMeasurement();importing=null;for(const select of document.querySelectorAll('[data-import-select]')){if(select.value){
+ b.cancelGameSettings=()=>{if(saving)return false;itemUndo=storedUndo(session.key,session.savedAt);stopMeasurement();importing=null;for(const select of document.querySelectorAll('[data-import-select]')){if(select.value){
   select.value='';select.dispatchEvent(new Event('change',{bubbles:true}));}}for(const button of document.querySelectorAll('[data-import-save]'))button.disabled=true;
   const before=session.cancel();apply(before.prefs,before.map);/* the colour painted on the current sentence from a sample taken during the discarded calibration goes with it */b.lineColorReset?.();message=t('cancelled');last={...last,gameStyleState:'cancelled'};paint();return true;};
- function restore(id){if(saving)return;const version=session.select(id);if(!version)return;stopMeasurement();apply(version.prefs,version.map);message=t('historyPreview');
+ function restore(id){if(saving)return;const version=session.select(id);if(!version)return;itemUndo=null;stopMeasurement();apply(version.prefs,version.map);message=t('historyPreview');
   last={...last,gameStyleState:'measured'};paint();}
  function resync(part='all'){
   if(!session.key){message=t('unbound');paint();return;}
@@ -154,13 +172,13 @@
   const complete=()=>{if(generation!==measurementSerial||key!==session.key)return;aligning=false;
    if(part!=='text'){const target={...r,textWidth:Number(r.style?.width)*r.width/100,samples:r.positionSamples};const map=window.__tomeTextPosition?.finishCalibration?.(target,
     b.galPreferences(),{persist:false});message=t('positionReady');}
-   if(m.gameStyleAutomatic===true)save();paint();};
+   if(m.gameStyleAutomatic===true)save();else if(itemUndo?.part===part)finishItem();paint();};
   if(part!=='text'&&Number.isFinite(r.inkLeft)&&Number.isFinite(r.inkTop)&&!b.pageTranslationActive?.())runCorrection({inkLeft:r.inkLeft,inkTop:r.inkTop,width:r.width,
    height:r.height},complete);else complete();
  }
  function receiveImport(m){if(m.gameStyleState==='importList'){importList=Array.isArray(m.gameStyleImportList)?m.gameStyleImportList:[];paint();return true;}
   if(m.gameStyleState!=='importPreview')return false;if(!importing||importing.source!==m.gameStyleImportSource||importing.part!==m.gameStyleImportPart)return true;
-  if(!m.gameStyleImportPrefs){message=t('importMissing');paint();return true;}stopMeasurement();
+  itemUndo=null;if(!m.gameStyleImportPrefs){message=t('importMissing');paint();return true;}stopMeasurement();
   apply(m.gameStyleImportPrefs,m.gameStyleImportPart==='position'?m.gameStyleImportMap||null:undefined);const source=importList.find(w=>w.key===importing.source)?.name||'';
    message=t('importPreview',{source,part:t(importing.part==='text'?'partText':'partPosition')});last={...last,gameStyleState:'measured'};paint();return true;}
  b.gameStyleStatus=m=>{if(receiveImport(m))return;
@@ -173,21 +191,31 @@
   if(m.gameStyleState==='profile')setTimeout(()=>firstRunTip(m),0);
   if(m.gameStyleState==='profile'){
    const changed=(m.gameStyleKey||'')!==session.key||!!m.gameStyleIdentity&&m.gameStyleIdentity!==gameIdentity;
-   if(changed||!dirty()&&!saving){if(changed){measurementSerial++;clearInterval(correctionTimer);saving=null;aligning=false;gameIdentity=m.gameStyleIdentity||'';
+   if(changed||!dirty()&&!saving){if(changed){itemUndo=storedUndo(m.gameStyleKey,m.gameStyleSavedAt);measurementSerial++;clearInterval(correctionTimer);saving=null;aligning=false;gameIdentity=m.gameStyleIdentity||'';
     window.__tomeTextPosition?.resetSession?.(gameIdentity);}
     const p={...pick(b.galPreferences()),...(tools.followFont?tools.followFont(m.gameStyleEffectivePrefs):m.gameStyleEffectivePrefs)};session.load(m.gameStyleKey,m.gameStyleGameName,p,m.gameStylePositionMap,m.gameStyleSavedAt||Math.max(m.gameStyleTextSavedAt||0,
      m.gameStylePositionSavedAt||0),m.gameStyleHistory||[]);apply(p,m.gameStylePositionMap||null,false);message='';}
   }else if(m.gameStyleState==='saved'){
    if(saving&&m.gameStyleSaveId&&m.gameStyleSaveId!==saving.id)return;
    const prefs={...pick(b.galPreferences()),...tools.followFont(m.gameStyleEffectivePrefs||m.gameStyleProfile||saving?.prefs||values())},map=m.gameStylePositionMap===undefined?saving?.map||getMap():m.gameStylePositionMap;
+   if(saving)storeUndo(session.key,m.gameStyleSavedAt);
    session.saved(m.gameStyleKey||session.key,prefs,map,m.gameStyleSavedAt,m.gameStyleHistory||[]);saving=null;apply(prefs,map,false);message='';
   }else if(m.gameStyleState==='saveFailed'){if(saving&&m.gameStyleSaveId&&m.gameStyleSaveId!==saving.id)return;saving=null;message=t('failed');}
   else if(m.gameStyleState==='measured'&&m.gameStyle)receivedMeasurement(m);
+  else if(['following','timeout','unmatched','unavailable','cancelled','autoGaveUp'].includes(m.gameStyleState))window.__tomeTextPosition?.cancelCalibration?.();
   else if(m.gameStyleState==='positionMap'&&!dirty())window.__tomeTextPosition?.setMap?.(m.gameStylePositionMap);
   last={...last,...m};paint();
  };
  const oldStatus=b.galStatus;b.galStatus=m=>{oldStatus?.(m);if(typeof m.gameStylePreview==='boolean')document.body.classList.toggle('tome-style-probing',m.gameStylePreview);if(typeof m.gameStyleReveal==='boolean')document.body.classList.toggle('megulit-original-shown',m.gameStyleReveal);
+  if('hookReselectState' in m)paintStreamProbe();
   if(m.type==='gameClosed'){measurementSerial++;clearInterval(correctionTimer);aligning=false;document.body.classList.remove('tome-style-probing');}};
+ function paintStreamProbe(){
+  const value=b.hookReselectText?.()||'';
+  for(const state of document.querySelectorAll('[data-calibrate-stream-status]')){
+   if(state.textContent!==value)state.textContent=value;
+   state.hidden=!value;
+  }
+ }
  b.calibrationMenuOpened=dialog=>{if(!session.key)session.load('',session.name,values(),getMap(),0,[]);wire(dialog);buildImports(dialog);send({type:'gameStyleImportList'});
   paint();};
  // Two import groups (user, 2026-11-02): text appearance, and position/wrapping with its coordinate map. Each previews a
@@ -233,14 +261,26 @@
    const box=dialog.querySelector('.tome-game-style-sync');if(box){
     const sync=box.querySelector('[data-game-style-sync]');if(sync){sync.dataset.noI18n='';sync.textContent=t('sync');sync.disabled=!!saving||aligning;sync.onclick=()=>{
      /* 2026-11-21 (owner: after 文本框上边距 moved the text, 校准当前句 did not bring it back): calibrating puts the line back on the game's own place (offset 0) */
-     window.__tomoyoChinese?.galAnchorOffsetReset?.();send({type:'hookReselect',onlyIfBad:true});resync('all');};}
+     itemUndo=null;window.__tomoyoChinese?.galAnchorOffsetReset?.();send({type:'hookReselect',onlyIfBad:true});resync('all');};}
     let textButton=box.querySelector('[data-calibrate-text]');if(!textButton){textButton=document.createElement('button');textButton.type='button';textButton.dataset.calibrateText='';
-     textButton.dataset.noI18n='';textButton.onclick=()=>resync('text');box.append(textButton);}textButton.textContent=t('textSync');textButton.disabled=!!saving||aligning;
+     textButton.dataset.noI18n='';textButton.onclick=()=>{rememberItem('text');resync('text');};box.append(textButton);}textButton.textContent=t('textSync');textButton.disabled=!!saving||aligning;
     const positionButton=dialog.querySelector('[data-gal-position-sync]');if(positionButton){positionButton.dataset.noI18n='';positionButton.textContent=t('positionSync');
-     positionButton.disabled=!!saving||aligning;positionButton.onclick=()=>{window.__tomoyoChinese?.galAnchorOffsetReset?.();resync('position');};if(positionButton.parentElement!==box)box.append(positionButton);}
+     positionButton.disabled=!!saving||aligning;positionButton.onclick=()=>{rememberItem('position');window.__tomoyoChinese?.galAnchorOffsetReset?.();resync('position');};if(positionButton.parentElement!==box)box.append(positionButton);}
+    let translation=box.querySelector('[data-calibrate-translation]');
+    if(!translation){translation=document.createElement('button');translation.type='button';translation.dataset.calibrateTranslation='';
+     translation.onclick=()=>{const gap=b.calibratedTranslationGap?.();if(!Number.isFinite(gap)){message=t('waitingSource');paint();return;}
+      itemUndo={part:'translation',prefs:{gap:b.galPreferences().gap}};apply({gap});message=t('measured');paint();};box.append(translation);}
+    translation.textContent=({en:'Translation position only',ja:'訳文の位置のみ'})[lang()]||'仅校准译文位置';
+    translation.disabled=!!saving||aligning||isBusy()||!session.key;
+    let undo=box.querySelector('[data-calibration-undo]');
+    if(!undo){undo=document.createElement('button');undo.type='button';undo.dataset.calibrationUndo='';
+     undo.onclick=()=>{if(!itemUndo)return;stopMeasurement();apply(itemUndo.prefs,itemUndo.map);itemUndo=null;message=t('cancelled');paint();};box.append(undo);}
+    undo.textContent=({en:'Undo last calibration',ja:'直前の個別校正を戻す'})[lang()]||'撤销上次单项校准';
+    undo.disabled=!itemUndo||!!saving;
     let streamButton=box.querySelector('[data-calibrate-stream]');if(!streamButton){streamButton=document.createElement('button');streamButton.type='button';streamButton.dataset.calibrateStream='';
-     streamButton.dataset.noI18n='';streamButton.onclick=()=>send({type:'hookReselect'});box.append(streamButton);}streamButton.textContent=({en:'Re-pick text stream',
+     streamButton.dataset.noI18n='';streamButton.onclick=()=>send({type:'hookReselect'});const state=document.createElement('small');state.dataset.calibrateStreamStatus='';state.dataset.noI18n='';state.setAttribute('role','status');box.append(streamButton,state);}streamButton.textContent=({en:'Re-pick text stream',
      ja:'テキストストリームを選び直す'})[document.documentElement.lang?.slice(0,2)]||'重新选取文本流';
+    paintStreamProbe();
     const label=box.querySelector('.tome-auto-style-switch');if(label){label.dataset.noI18n='';const n=[...label.childNodes].find(n=>n.nodeType===3);if(n&&n.textContent!==t('automatic'))n.textContent=t('automatic');
      }
     /* E349: on a full-screen page the box position is the page's FIRST line; calibrating on a later line moved the whole page. */let flowHint=box.querySelector('[data-flow-hint]');

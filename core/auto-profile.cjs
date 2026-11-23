@@ -21,7 +21,7 @@
    The stored file (data/config/auto-profiles/<key>.json, schema in docs/auto-profile.md) is newest-wins: a new calibration or a
    gate trip replaces it; 重新校准 deletes it. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const {SelfCheck,DEFAULTS,reasonText,effectFrame}=require('./self-check.cjs');
+const {SelfCheck,DEFAULTS,reasonText,effectFrame,windowEvidence}=require('./self-check.cjs');
 const SCHEMA=1;
 /* only keys and values core/profiles/domains.cjs allows: a stored or uploaded diff is data the kernel already understands */
 const cleanSettings=s=>require('./profiles/domains.cjs').clean(s).value;
@@ -41,9 +41,10 @@ async function exeKey(root,executable){const known=exeKeySync(root,executable);i
  const hash=await new Promise((resolve)=>{const h=crypto.createHash('sha256');fs.createReadStream(executable).on('data',d=>h.update(d)).on('error',()=>resolve('')).on('end',()=>resolve(h.digest('hex')));});if(!hash)return '';
  try{const all=readHashes(root);all[k]=hash;const keys=Object.keys(all);for(const old of keys.slice(0,Math.max(0,keys.length-500)))delete all[old];fs.mkdirSync(path.dirname(hashFile(root)),{recursive:true});const tmp=hashFile(root)+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(all));fs.renameSync(tmp,hashFile(root));}catch{}
  return keyFor({hash});}
-function load(root,key){if(!key)return null;try{const v=JSON.parse(fs.readFileSync(path.join(dir(root),key+'.json'),'utf8').replace(/^﻿/,''));return v&&v.schema===SCHEMA?v:null;}catch{return null;}}
-function store(root,key,value){if(!key)return;const d=dir(root);fs.mkdirSync(d,{recursive:true});const f=path.join(d,key+'.json');fs.writeFileSync(f+'.tmp',JSON.stringify(value,null,2));fs.renameSync(f+'.tmp',f);}
-function clear(root,key){if(!key)return false;try{fs.unlinkSync(path.join(dir(root),key+'.json'));return true;}catch{return false;}}
+function recordName(key,script){return key+(/^[a-f0-9]{64}$/.test(script)?'.'+script:'')+'.json';}
+function load(root,key,script){if(!key)return null;try{const v=JSON.parse(fs.readFileSync(path.join(dir(root),recordName(key,script)),'utf8').replace(/^﻿/,''));return v&&v.schema===SCHEMA?v:null;}catch{return null;}}
+function store(root,key,value,script){if(!key)return;const d=dir(root);fs.mkdirSync(d,{recursive:true});const f=path.join(d,recordName(key,script));fs.writeFileSync(f+'.tmp',JSON.stringify(value,null,2));fs.renameSync(f+'.tmp',f);}
+function clear(root,key,script){if(!key)return false;try{fs.unlinkSync(path.join(dir(root),recordName(key,script)));return true;}catch{return false;}}
 
 /* candidates: every combination of the enumerated keys */
 function candidates(measuredSources){const out=[];const sources=measuredSources.length?measuredSources:[null];
@@ -68,18 +69,39 @@ function cost(r,t){const m=r.metrics;let c=0;
  c+=m.choiceMismatch/Math.max(1,t.choiceMismatch);if(m.positionPx!=null)c+=m.positionPx/(r.positionLimit||t.positionPx);if(m.pairRate!=null)c+=(1-m.pairRate)/(1-t.pairRate);return Math.round(c*1000)/1000;}
 function textBox(recording){const b=recording.filter(e=>e.kind==='box');if(b.length<3)return null;const x=Math.min(...b.map(e=>e.x)),y=Math.min(...b.map(e=>e.y)),r=Math.max(...b.map(e=>e.x+e.w)),bt=Math.max(...b.map(e=>e.y+e.h));return {x,y,w:r-x,h:bt-y,client:[b[0].cw,b[0].ch]};}
 
+/* A non-failing window is not proof that hiding worked: absent sensors stay null. Choice coverage is only
+   required when choices exist; the ordinary choice mismatch threshold still applies to those events. */
+function missingHideObservations(r,t){const missing=[];
+ if(r.lines<t.minLines)missing.push('lines');if(!r.drawn)missing.push('drawn');
+ for(const k of ['hideVisible','positionPx','pairRate'])if(r.metrics[k]==null)missing.push(k);
+ return missing;}
+const OBSERVATIONS={lines:'正文行数',drawn:'阅读层绘制',hideVisible:'隐藏检测',positionPx:'位置测量',pairRate:'配对测量'};
+/* Old records did not store sensor counts. A finite metric records that its original sample minimum was met;
+   repeatRate was only produced after reader drawing. Do not demand new fields from a measured old record. */
+function calibrationAdmission(rec,{thresholds={}}={}){
+ if(!rec||rec.source!=='calibration'||rec.mode!=='hide')return {eligible:true,missing:[]};
+ const m=rec.score?.metrics||{},min=Number.isFinite(+thresholds.minLines)?+thresholds.minLines:DEFAULTS.minLines,missing=[];
+ if(!Number.isInteger(rec.score?.lines)||rec.score.lines<min)missing.push('lines');
+ const ratio=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1;
+ if(!ratio(m.repeatRate))missing.push('drawn');
+ if(!ratio(m.hideVisible))missing.push('hideVisible');
+ if(typeof m.positionPx!=='number'||!Number.isFinite(m.positionPx)||m.positionPx<0)missing.push('positionPx');
+ if(!ratio(m.pairRate))missing.push('pairRate');
+ return {eligible:missing.length===0,missing};}
+
 /* the calibration: returns {mode,settings,score,candidates,reason} */
 function calibrate(recording,{thresholds={}}={}){const t={...DEFAULTS};for(const [k,v] of Object.entries(thresholds||{}))if(k in DEFAULTS&&Number.isFinite(+v))t[k]=+v;
  const sources=recording.some(e=>e.kind==='box')?['engine']:[];
- const all=candidates(sources).map(c=>{const r=predict(recording,c,t);return {params:c,metrics:r.metrics,over:r.over,pass:r.pass,lines:r.lines,cost:cost(r,t)};});
+ const all=candidates(sources).map(c=>{const r=predict(recording,c,t),missing=c.hideMethod==='hide'?missingHideObservations(r,t):[];return {params:c,metrics:r.metrics,over:r.over,missing,pass:r.pass&&missing.length===0,lines:r.lines,cost:cost(r,t)};});
  const hide=all.filter(c=>c.params.hideMethod==='hide'),passing=hide.filter(c=>c.pass).sort((a,b)=>a.cost-b.cost||changes(a.params)-changes(b.params));
  const best=passing[0]||null,read=all.find(c=>c.params.hideMethod==='read');
  const pick=best||read;const p=pick.params;
  const settings={calibrate:{positionSource:p.positionSource,textBox:textBox(recording),hideMethod:p.hideMethod},page:{effectFrames:p.effectFrames},hide:{textEffectsRead:p.hideMethod==='read'}};
  if(p.filters==='none')settings.choice={filters:[]};/* the kernel reads the anchor from placement.firstLineAnchor; 'engine' is the kernel's own first choice (krkr-state 2026-11-21) */if(p.positionSource==='glyph')settings.placement={firstLineAnchor:'glyph'};else if(p.positionSource==='ocr')settings.placement={firstLineAnchor:'box'};
  const worst=hide.slice().sort((a,b)=>a.cost-b.cost)[0];
- return {mode:p.hideMethod,settings,score:{metrics:pick.metrics,cost:pick.cost,lines:pick.lines},reason:best?'':reasonText(worst?.over||[]),
-  candidates:all.sort((a,b)=>a.cost-b.cost).slice(0,8).map(c=>({params:c.params,pass:c.pass,cost:c.cost,over:c.over,metrics:c.metrics}))};}
+ const reason=best?'':[reasonText(worst?.over||[]),worst?.missing.length?'观测不足：'+worst.missing.map(k=>OBSERVATIONS[k]).join('、'):''].filter(Boolean).join('；');
+ return {mode:p.hideMethod,settings,score:{metrics:pick.metrics,cost:pick.cost,lines:pick.lines},reason,
+  candidates:all.sort((a,b)=>a.cost-b.cost).slice(0,8).map(c=>({params:c.params,pass:c.pass,cost:c.cost,over:c.over,missing:c.missing,metrics:c.metrics}))};}
 const changes=p=>(p.effectFrames!==null)+(p.filters!=='kernel');
 
 /* the stored record (also the upload payload, see docs/auto-profile.md) */
@@ -90,7 +112,7 @@ function stepDown(prev,{key,engine,exe,version,trip,window}){const base=prev||{s
  at:new Date().toISOString(),source:'gate',mode:'read',reason:trip.reason,settings:cleanSettings({...base.settings,calibrate:{...(base.settings?.calibrate||{}),hideMethod:'read'},hide:{...(base.settings?.hide||{}),textEffectsRead:true}}),
  score:{metrics:window?.metrics||trip.metrics,over:trip.over,lines:window?.lines||0},candidates:base.candidates||[],gate:{window:trip.window,over:trip.over,metrics:trip.metrics},previous:prev?{mode:prev.mode,source:prev.source,at:prev.at}:null};}
 /* the block the one-click diagnostic adds (info.json autoProfile): only what the server aggregates, no paths */
-function diagnostic(rec,windows=[]){if(!rec&&!windows.length)return null;return {schema:SCHEMA,profile:rec?{key:rec.key,engine:rec.engine,exe:rec.exe,version:rec.version,at:rec.at,source:rec.source,mode:rec.mode,reason:rec.reason,settings:rec.settings,score:rec.score,gate:rec.gate||null,candidates:(rec.candidates||[]).slice(0,4),...(rec.cold?{cold:rec.cold}:{})}:null,
- windows:windows.slice(-10).map(w=>({window:w.window,lines:w.lines,metrics:w.metrics,over:w.over,pass:w.pass}))};}
+function diagnostic(rec,windows=[],pendingLines=null){if(!rec&&!windows.length&&pendingLines===null)return null;return {schema:SCHEMA,windowState:windows.length?'scored':pendingLines===null?'noWindowEvidence':'noClosedWindow',pendingLines,gameplayAcceptance:'unverified',profile:rec?{key:rec.key,engine:rec.engine,exe:rec.exe,version:rec.version,at:rec.at,source:rec.source,mode:rec.mode,reason:rec.reason,settings:rec.settings,score:rec.score,gate:rec.gate||null,candidates:(rec.candidates||[]).slice(0,4),...(rec.cold?{cold:rec.cold}:{})}:null,
+ windows:windows.slice(-10).map(w=>({window:w.window,lines:w.lines,metrics:w.metrics,over:w.over,pass:w.pass,evidence:windowEvidence(w)}))};}
 function list(root){try{return fs.readdirSync(dir(root)).filter(f=>f.endsWith('.json')).map(f=>load(root,f.slice(0,-5))).filter(Boolean);}catch{return [];}}
-module.exports={SCHEMA,KEY,dir,keyFor,exeKey,exeKeySync,load,store,clear,list,candidates,predict,calibrate,record,stepDown,diagnostic};
+module.exports={SCHEMA,KEY,dir,keyFor,exeKey,exeKeySync,load,store,clear,list,candidates,predict,calibrate,calibrationAdmission,record,stepDown,diagnostic};

@@ -14,7 +14,7 @@ const CGISH=/(?:^|[\\/_])(?:ev|cg|event|evcg|ecg)[\w-]*|^e\d/i;
 function ksdText(buf){
  if(!buf||buf.length<4)return '';
  if(buf[0]===0xfe&&buf[1]===0xfe){const mode=buf[2];
-  if(mode===2){const at=buf.indexOf(Buffer.from([0x78]),5);for(let i=at;i>=0&&i<Math.min(buf.length,64);i=buf.indexOf(Buffer.from([0x78]),i+1)){try{return zlib.inflateSync(buf.subarray(i)).toString('utf16le');}catch{}}return '';}
+  if(mode===2){const at=buf.indexOf(Buffer.from([0x78]),5);for(let i=at;i>=0&&i<Math.min(buf.length,64);i=buf.indexOf(Buffer.from([0x78]),i+1)){try{return zlib.inflateSync(buf.subarray(i),{maxOutputLength:8*1024*1024}).toString('utf16le');}catch{}}return '';}
   if(mode===1){const body=buf.subarray(5),out=Buffer.alloc(body.length&~1);for(let i=0;i+1<body.length;i+=2){const c=body.readUInt16LE(i);out.writeUInt16LE(((c&0xaaaa)>>1)|((c&0x5555)<<1),i);}return out.toString('utf16le');}
   return '';}
  if(buf[0]===0xff&&buf[1]===0xfe)return buf.subarray(2).toString('utf16le');
@@ -22,11 +22,49 @@ function ksdText(buf){
 }
 const base=name=>path.basename(String(name).replace(/\\/g,'/')).replace(/\.[^.]+$/,'').toLowerCase();
 
-function kirikiriSaves(dir){
- const out=[];let list=[];try{list=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
- for(const e of list)if(e.isDirectory()&&/^save/i.test(e.name)){const f=path.join(dir,e.name,'datasu.ksd');if(fs.existsSync(f))out.push(f);}
+const saveLocations=new Map();
+function kirikiriSaveDirs(dir){
+ let dirs=[];try{dirs=require('../core/game-language-switch.cjs').krkrSaveDirs(dir);}catch{}
+ const home=require('node:os').homedir(),bases=[dir,process.env.APPDATA||path.join(home,'AppData','Roaming'),process.env.LOCALAPPDATA||path.join(home,'AppData','Local'),path.join(home,'Documents'),path.join(home,'Saved Games')];
+ const inside=(base,target)=>{const r=path.relative(path.resolve(base),path.resolve(target));return r===''||!r.startsWith('..'+path.sep)&&r!=='..'&&!path.isAbsolute(r);};
+ dirs=dirs.filter(d=>bases.some(b=>inside(b,d))||/[\\/]userdata[\\/]\d+[\\/]\d+[\\/]remote$/i.test(d));
+ /* Config.tjs also supplies a literal save location in older KAG releases. Read it through the existing XP3 reader;
+    never execute TJS or search unrelated user folders. Cache only the location, keyed by the archives' identities. */
+ const archives=xp3Archives(dir),signature=archives.map(f=>{try{const s=fs.statSync(f);return f+'|'+s.size+'|'+s.mtimeMs;}catch{return f;}}).join(';');
+ const hit=saveLocations.get(dir);if(hit?.signature===signature)return [...new Set([...dirs,...hit.dirs])];
+ const found=[],xp3=require('./original-engines/xp3.cjs');
+ for(const file of archives){let entries;try{entries=xp3.list(file)?.files||[];}catch{continue;}
+  const e=entries.find(e=>/(?:^|[\\/])Config\.tjs$/i.test(e.name)&&(e.size||0)<256*1024);if(!e)continue;
+  try{const cx=e.encrypted?require('./original-engines/cx-filter.cjs').forArchive(file):null,t=require('./original-engines/scenes.cjs').decode(xp3.read(file,e,cx));
+   const line=t.split(/\r?\n/).map(l=>l.replace(/\/\/.*$/,'')).find(l=>/^\s*;?\s*saveDataLocation\s*=/.test(l));
+   const m=line&&/^\s*;?\s*saveDataLocation\s*=\s*System\.(appDataPath|personalPath)\s*\+\s*"([^"\r\n]+)"\s*;?\s*$/.exec(line);
+   if(m&&!m[2].split(/[\\/]/).includes('..')&&!/[:\x00]/.test(m[2])){const baseDir=m[1]==='appDataPath'?(process.env.APPDATA||path.join(home,'AppData','Roaming')):path.join(home,'Documents'),target=path.join(baseDir,m[2]);if(inside(baseDir,target))found.push(target);}
+  }catch{}}
+ saveLocations.set(dir,{signature,dirs:found});if(saveLocations.size>16)saveLocations.delete(saveLocations.keys().next().value);
+ return [...new Set([...dirs,...found])];
+}
+function kirikiriSaves(dir){const out=[];
+ for(const d of kirikiriSaveDirs(dir)){let list=[];try{list=fs.readdirSync(d);}catch{continue;}for(const n of list)if(/^[^\\/]*datasu\.ksd$/i.test(n)){const f=path.join(d,n);try{if(fs.statSync(f).size<=8*1024*1024)out.push(f);}catch{}}}
  return out;
 }
+/* Primitive top-level system variables only. Nested bookmark values cannot masquerade as global flags. */
+function systemVariables(buf){
+ const binary=kbadValue(buf);if(binary&&typeof binary==='object'&&!Array.isArray(binary))return new Map(Object.entries(binary).filter(([,v])=>typeof v==='number'||typeof v==='boolean'||typeof v==='string'));
+ const text=ksdText(buf).replace(/\(int\)\s*/g,'');if(!/^\s*(?:\(const\)\s*)?%\[/.test(text)||!text.trimEnd().endsWith(']'))return null;
+ const out=new Map(),rx=/"((?:\\.|[^"\\])*)"|\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|=>|\[|\]|\(|\)|\btrue\b|\bfalse\b|\bvoid\b|-?\d+(?:\.\d+)?|[^\s]/g;let depth=0,key=null,expect=false;
+ for(const m of text.matchAll(rx)){const t=m[0];if(t.startsWith('/*')||t.startsWith('//'))continue;if(t==='['){depth++;key=null;expect=false;continue;}if(t===']'){depth--;key=null;expect=false;continue;}
+  if(depth!==1)continue;
+  if(t==='=>'){expect=key!==null;continue;}
+  if(expect){if(t==='('){key=null;expect=false;continue;}let v;if(t==='true'||t==='false')v=t==='true';else if(/^-?\d+(?:\.\d+)?$/.test(t))v=Number(t);else if(m[1]!==undefined)v=m[1].replace(/\\(["\\])/g,'$1');if(v!==undefined&&key!==null)out.set(key,v);key=null;expect=false;continue;}
+  if(m[1]!==undefined)key=m[1].replace(/\\(["\\])/g,'$1');else if(t===',')key=null;
+ }
+ return depth===0?out:null;
+}
+function progress(executable){const files=kirikiriSaves(path.dirname(String(executable||''))),flags=new Map();let valid=0;
+ for(const f of files){try{const v=systemVariables(fs.readFileSync(f));if(!v)continue;valid++;for(const [k,value] of v)if(!flags.has(k)||value===true||typeof value==='number'&&value>0)flags.set(k,value);}catch{}}
+ return {state:valid?'valid':files.length?'unknown':'unsupported',flags};
+}
+function galleryCsv(text){const scenes=[];for(const row of text.split(/\r?\n/)){const cols=row.split(',').map(s=>s.trim());if(!/^thum_/i.test(cols[0]))continue;const names=[...new Set(cols.slice(2).filter(s=>/^[\w-]+$/.test(s)).map(base))];if(names.length)scenes.push({id:cols[0],names});}return scenes;}
 function tokens(text){const set=new Set();
  for(const m of text.matchAll(/"cg_([^"]+?)"\s*=>/g))set.add(base(m[1]));
  for(const m of text.matchAll(/"([A-Za-z0-9_\-]{3,64})(?:\.(?:png|jpe?g|tlg|bmp|webp))?"/gi))set.add(m[1].toLowerCase());
@@ -82,7 +120,9 @@ function kirikiri(dir){
  for(const file of xp3Archives(dir)){let list;try{list=xp3.list(file)?.files||[];}catch{continue;}const a=path.basename(file);
   let cx=null;if(list.some(e=>e.encrypted)){try{cx=require('./original-engines/cx-filter.cjs').forArchive(file);}catch{}if(!cx&&!plainDespiteFlag(xp3,file,list)){closed=true;continue;}}
   for(const e of list){
-   if(/cg/i.test(e.name)&&/\.(?:tjs|csv)$/i.test(e.name)&&(e.size||0)<1<<20){try{const v=kbadValue(xp3.read(file,e,cx));if(Array.isArray(v))for(const x of v){const scene='g'+(sceneOf.size+1)+':'+e.name;for(const ev of (x&&Array.isArray(x.events)?x.events:[]))if(typeof ev==='string'){gallery.add(base(ev));if(!sceneOf.has(base(ev)))sceneOf.set(base(ev),scene);}}}catch{}}
+   if(/cg/i.test(e.name)&&/\.(?:tjs|csv)$/i.test(e.name)&&(e.size||0)<1<<20){try{const raw=xp3.read(file,e,cx),v=kbadValue(raw);if(Array.isArray(v)){for(const x of v){const scene='g'+(sceneOf.size+1)+':'+e.name;for(const ev of (x&&Array.isArray(x.events)?x.events:[]))if(typeof ev==='string'){gallery.add(base(ev));if(!sceneOf.has(base(ev)))sceneOf.set(base(ev),scene);}}}
+    else if(/cglist\.csv$/i.test(e.name))for(const scene of galleryCsv(require('./original-engines/scenes.cjs').decode(raw)))for(const n of scene.names){gallery.add(n);sceneOf.set(n,scene.id);}
+   }catch{}}
    if(!IMG.test(e.name))continue;const b=base(e.name);if(!seen.has(b)||items.has(b))continue;if(!CGISH.test(a+'/'+e.name))continue;add(b,{name:b,archive:file,entry:e,cx});}}
  if(gallery.size)for(const k of [...items.keys()])if(!gallery.has(k))items.delete(k);
  for(const [k,it] of items)if(sceneOf.has(k))it.group=sceneOf.get(k);
@@ -190,34 +230,46 @@ function yurisSaves(dir){const out=[];let l=[];try{l=fs.readdirSync(dir,{withFil
  for(const e of l)if(e.isDirectory()&&/^save/i.test(e.name)){const f=path.join(dir,e.name,'gsd.sd');if(fs.existsSync(f))out.push(f);}return out;}
 function yuris(dir){
  const saves=yurisSaves(dir);if(!saves.length)return null;const archives=yurisArchives(dir);if(!archives.length)return null;
- const g=yurisGallery(dir,archives);if(!g||!g.slots.size)return null;const on=new Set();
+ const g=yurisGallery(dir,archives);if(!g||!g.slots.size)return null;const on=new Set();let valid=false;
  for(const f of saves){let arrays;try{arrays=yssdArrays(fs.readFileSync(f));}catch{continue;}
-  const fit=arrays.filter(a=>a.count>=g.size&&a.set.every(i=>g.slots.has(i))).sort((a,b)=>b.set.length-a.set.length)[0];if(fit)for(const i of fit.set)on.add(base(g.slots.get(i)));}
+  const fit=arrays.filter(a=>a.count>=g.size&&a.set.every(i=>g.slots.has(i))).sort((a,b)=>b.set.length-a.set.length)[0];if(fit){valid=true;for(const i of fit.set)on.add(base(g.slots.get(i)));}}
  /* 2026-11-15 the scene (gallery entry) each picture belongs to: variants of one scene are grouped on the card page */
  const sceneOf=new Map();for(const [slot,n] of g.slots){const b=base(n);if(!sceneOf.has(b)&&g.entry?.has(slot))sceneOf.set(b,'e'+g.entry.get(slot));}
  const names=new Set([...g.slots.values()].map(base)),items=new Map(),{ypfList}=require('./original-engines/yuris.cjs')._internal;
  for(const a of archives){let l;try{l=ypfList(a)||[];}catch{continue;}
-  for(const e of l){if(!/\.(?:png|bmp|jpe?g)$/i.test(e.name))continue;const b=base(e.name);if(!on.has(b)||items.has(b))continue;items.set(b,{name:b,archive:a,entry:e,group:sceneOf.get(b)});}}
- return {engine:'YU-RIS',supported:true,items,total:names.size};
+  for(const e of l){if(!/\.(?:png|bmp|jpe?g)$/i.test(e.name)||/(?:^|[\\/])(?:thumb[^\\/]*|thum[^\\/]*)[\\/]/i.test(e.name))continue;const b=base(e.name);if(!on.has(b)||items.has(b))continue;items.set(b,{name:b,archive:a,entry:e,group:sceneOf.get(b)});}}
+ return {engine:'YU-RIS',supported:true,items,total:names.size,progressState:valid?'valid':'unknown',unlocked:on,gallery:g};
 }
 
 const READERS=[{read:kirikiri,saves:dir=>[...kirikiriSaves(dir),...kirikiriCapture(dir)]},{read:hunex,saves:hunexSaves},{read:siglus,saves:siglusSaves},{read:yuris,saves:yurisSaves}];
+const recipesByExe=new Map();
+const recipeKey=exe=>path.resolve(exe).toLowerCase();
+function setRecipes(exe,rows=[]){if(!require('./story-pimg-recipes.cjs').validate(rows))throw Error('CG_RECIPE_SCHEMA');const k=recipeKey(exe),old=recipesByExe.get(k);if(JSON.stringify(old||[])!==JSON.stringify(rows))cache.delete(path.dirname(String(exe)).toLowerCase());recipesByExe.set(k,JSON.parse(JSON.stringify(rows)));if(recipesByExe.size>8)recipesByExe.delete(recipesByExe.keys().next().value);}
+function recipesFor(exe){return recipesByExe.get(recipeKey(exe))||[];}
+function fileStamp(file){try{const actual=fs.realpathSync(file),st=fs.statSync(actual);return actual+'|'+st.dev+'|'+st.ino+'|'+st.size+'|'+st.mtimeMs+'|'+st.ctimeMs;}catch{return null;}}
+function sourceStamp(result){return [...new Set([...(result?.items?.values()||[])].flatMap(v=>[v.file||v.archive,v.mappingFile]).filter(Boolean))].map(fileStamp).join(';');}
 const cache=new Map();
-function stamp(dir){let s='';for(const r of READERS)for(const f of r.saves(dir)){try{s+=f+fs.statSync(f).mtimeMs;}catch{}}return s;}
+function stamp(dir){let s='';for(const r of READERS)for(const f of r.saves(dir)){try{const st=fs.statSync(f);s+=f+'|'+st.dev+'|'+st.ino+'|'+st.size+'|'+st.mtimeMs+'|'+st.ctimeMs;}catch{}}return s;}
 function scan(executable){
  const dir=path.dirname(String(executable||''));if(!dir||!fs.existsSync(dir))return {supported:false,items:new Map()};
- const key=dir.toLowerCase(),st=stamp(dir),hit=cache.get(key);if(hit&&hit.stamp===st)return hit.result;
+ const key=dir.toLowerCase(),st=stamp(dir),hit=cache.get(key);const currentSources=hit?sourceStamp(hit.result):null;if(hit&&hit.stamp===st&&hit.sources===currentSources)return hit.result;
+ if(hit?.primed&&hit.sources!==currentSources){try{require('./story-analysis.cjs').refreshCg(String(executable),st+'|'+currentSources);}catch{}return {supported:false,items:new Map(),progressState:'unknown'};}
+ if(hit?.primed){try{require('./story-analysis.cjs').refreshCg(String(executable),st);}catch{}
+  const r=hit.result;if(r.engine==='KiriKiri'){const on=kirikiriMarked(executable)||new Set();return {...r,items:new Map([...r.items].filter(([n])=>on.has(n))),wanted:(r.wanted||[]).filter(n=>on.has(n))};}
+  if(r.engine==='YU-RIS'){const unlocked=new Set();let valid=false;for(const f of yurisSaves(dir))try{const g=r.gallery,fit=yssdArrays(fs.readFileSync(f)).filter(a=>a.count>=g.size&&a.set.every(i=>g.slots.has(i))).sort((a,b)=>b.set.length-a.set.length)[0];if(fit){valid=true;for(const slot of fit.set)unlocked.add(base(g.slots.get(slot)));}}catch{}return {...r,items:new Map([...r.items].filter(([n])=>unlocked.has(n))),unlocked,progressState:valid?'valid':'unknown'};}
+ }
  let result={supported:false,items:new Map()};for(const r of READERS){try{const got=r.read(dir,String(executable));if(got){result=got;break;}}catch{}}
- cache.delete(key);cache.set(key,{stamp:st,result});if(cache.size>8)cache.delete(cache.keys().next().value);return result;
+ if(result.engine==='KiriKiri'&&(!require('node:worker_threads').isMainThread||process.argv.includes('--warm'))){const marked=kirikiriMarked(executable)||new Set();for(const recipe of recipesFor(executable)){if(!marked.has(recipe.variant.toLowerCase()))continue;try{const prepared=require('./story-pimg-recipes.cjs').resolve(executable,recipe);result.items.set(prepared.item.name,prepared.item);}catch{}}}
+ cache.delete(key);cache.set(key,{stamp:st,result,sources:sourceStamp(result)});if(cache.size>8)cache.delete(cache.keys().next().value);return result;
 }
 const cacheDirOf=(root,executable)=>path.join(root,'data','cg-cache',crypto.createHash('sha1').update(path.dirname(String(executable)).toLowerCase()).digest('hex').slice(0,16));
 /* opts: root; cold (the cold-run setting: the game may be started in the background to read CGs only it can open);
    safe (the R18 filter: only CGs the local rating model called safe, the rest rated in the background, cg-rating.cjs) */
 function list(executable,opts={}){
- const r=scan(executable),{root}=opts;let items=[...r.items.keys()],pending=0;
+ const r=scan(executable),{root}=opts;let items=[...r.items.keys()].filter(n=>!Array.isArray(opts.names)||opts.names.includes(n)),pending=0;
  if(root&&opts.cold&&r.wanted?.length){try{const dir=path.dirname(String(executable));require('./voice-cold.cjs').consider(root,{executable:String(executable),dir,engine:'kirikiri-cg'},r.wanted,{enabled:true});}catch{}}
- if(root&&opts.safe&&items.length){const rating=require('./cg-rating.cjs'),cacheDir=cacheDirOf(root,executable),known=rating.ratings(cacheDir),todo=items.filter(n=>!known[n]);
-  pending=todo.length;if(todo.length)rating.rateLater(root,cacheDir,todo,name=>pictureFile(root,executable,name));items=items.filter(n=>rating.isSafe(known[n]));}
+ if(root&&opts.safe&&items.length){const rating=require('./cg-rating.cjs'),cacheDir=cacheDirOf(root,executable),known=rating.ratings(cacheDir),todo=items.filter(n=>!known[n]||opts.freshRating&&!ratingCurrent(root,executable,n)).slice(0,opts.ratingLimit||items.length);
+  pending=todo.length;if(todo.length)rating.rateLater(root,cacheDir,todo,name=>pictureFile(root,executable,name));items=items.filter(n=>rating.isSafe(known[n])&&(!opts.freshRating||ratingCurrent(root,executable,n)));}
  return {supported:!!r.supported,engine:r.engine||'',total:r.total||0,items,pending,safe:!!opts.safe};}
 function mimeOf(b){if(b.length<12)return null;if(b[0]===0x89&&b.toString('latin1',1,4)==='PNG')return 'image/png';if(b[0]===0xff&&b[1]===0xd8)return 'image/jpeg';
  if(b.toString('latin1',0,4)==='RIFF'&&b.toString('latin1',8,12)==='WEBP')return 'image/webp';if(b[0]===0x42&&b[1]===0x4d)return 'image/bmp';return null;}
@@ -227,27 +279,42 @@ function bytesOf(it){
  let buf;if(it.file)buf=fs.readFileSync(it.file);
  else if(/\.hfa$/i.test(it.archive))buf=require('./original-engines/hunex.cjs').hfaRead(it.archive,it.entry);
  else if(/\.ypf$/i.test(it.archive)){const y=require('./original-engines/yuris.cjs')._internal;buf=y.ypfRead?y.ypfRead(it.archive,it.entry):null;}
- else buf=require('./original-engines/xp3.cjs').read(it.archive,it.entry,it.cx||null);
- if(it.decode&&dec[it.decode])return dec.png(dec.fit(dec[it.decode](buf)));
+ else{let cx=it.cx;if(cx===undefined&&it.entry?.encrypted)try{cx=require('./original-engines/cx-filter.cjs').forArchive(it.archive);}catch{}buf=require('./original-engines/xp3.cjs').read(it.archive,it.entry,cx||null);}
+ if(it.decode&&dec[it.decode])return dec.png(dec.fit(dec[it.decode](buf,it.variant)));
  return buf;}
 const EXT={'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp','image/bmp':'.bmp'};
 /* the CG as a browser picture in the card back's cache (read and decoded once) */
 function pictureFile(root,executable,name){
  const r=scan(executable),it=r.items.get(String(name||'').toLowerCase());if(!it)throw Error('CG_NOT_FOUND');
  const dir=cacheDirOf(root,executable);
- for(const ext of Object.values(EXT)){const f=path.join(dir,it.name+ext);if(fs.existsSync(f))return f;}
+ const cached=cachedPicture(root,executable,name);if(cached)return cached;
  const buf=bytesOf(it),mime=mimeOf(buf);if(!mime||buf.length>24<<20)throw Error('CG_UNREADABLE');
- const f=path.join(dir,it.name+EXT[mime]);fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(f,buf);return f;}
+ const ext=EXT[mime],f=path.join(dir,it.name+ext);fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(f,buf);fs.writeFileSync(path.join(dir,it.name+'.source.json'),JSON.stringify({key:pictureIdentity(it),ext}));return f;}
+async function pictureFileAsync(root,executable,name){
+ const item=scan(executable).items.get(String(name||'').toLowerCase());if(item?.decode!=='pimg')return pictureFile(root,executable,name);
+ if(require('node:worker_threads').isMainThread&&!process.argv.includes('--warm'))throw Error('CG_BACKGROUND_REQUIRED');
+ const cached=cachedPicture(root,executable,name);if(cached)return cached;if(require('node:os').freemem()<1024*1024*1024)throw Error('CG_RESOURCE_LIMIT');const before=pictureIdentity(item),prepared=require('./story-pimg-recipes.cjs').resolve(executable,item.composition);
+ const image=await require('./story-pimg.cjs').render(prepared.bytes,{layerIds:prepared.layerIds,limits:{inputBytes:32*1024*1024,pixels:4*1024*1024,decodedPixels:16*1024*1024}}),buf=require('./cg-decoders.cjs').png(image);
+ if(buf.length>24*1024*1024||before!==pictureIdentity(item)||!kirikiriMarked(executable)?.has(item.name))throw Error('CG_SOURCE_CHANGED');
+ const dir=cacheDirOf(root,executable),file=path.join(dir,item.name+'.png');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(file,buf);fs.writeFileSync(path.join(dir,item.name+'.source.json'),JSON.stringify({key:before,ext:'.png'}));return file;
+}
 function image(root,executable,name,opts={}){
  if(opts.safe&&!require('./cg-rating.cjs').isSafe(require('./cg-rating.cjs').ratings(cacheDirOf(root,executable))[String(name||'').toLowerCase()]))throw Error('CG_HIDDEN');
  const b=fs.readFileSync(pictureFile(root,executable,name));return {mime:mimeOf(b),data:b.toString('base64')};
 }
 /* 2026-11-13 card wall (no spoilers): only explicit unlock marks of the KiriKiri system saves ("cg_<FILE>" set to a
    true value), never bare names that merely appear in the save; null when there is no KiriKiri save */
-function kirikiriMarked(executable){const dir=path.dirname(String(executable||''));const saves=kirikiriSaves(dir);if(!saves.length)return null;const out=new Set();
- for(const f of saves){try{const buf=fs.readFileSync(f),v=kbadValue(buf);
-  if(v&&typeof v==='object'){for(const k of Object.keys(v)){const m=/^cg_(.+)$/i.exec(k);if(m&&v[k])out.add(base(m[1]));}}
-  else for(const m of ksdText(buf).matchAll(/"cg_([^"]+?)"\s*=>\s*(?:\(int\)\s*)?(?:[1-9]\d*|true)/gi))out.add(base(m[1]));}catch{}}
- return out;}
-const cachedPicture=(root,executable,name)=>{const d=cacheDirOf(root,executable);for(const ext of Object.values(EXT)){const f=path.join(d,String(name).toLowerCase()+ext);if(fs.existsSync(f))return f;}return null;};
-module.exports={list,image,scan,pictureFile,kirikiriMarked,cachedPicture,ksdText,tokens,kbad,esSlots,sdcUnpack,mzpNameSets,yssdArrays,siglusTable,siglusGlobalTables,SIGLUS_KEY};
+function kirikiriMarked(executable){const p=progress(executable);if(p.state!=='valid')return null;const out=new Set();for(const [k,v] of p.flags){const m=/^cg_(.+)$/i.exec(k);if(m&&(v===true||typeof v==='number'&&v>0))out.add(base(m[1]));}return out;}
+function pictureIdentity(item){let source=item.file||item.archive,stamp='';try{source=fs.realpathSync(source);const st=fs.statSync(source);stamp=st.dev+'|'+st.ino+'|'+st.size+'|'+st.mtimeMs+'|'+st.ctimeMs;}catch{}return crypto.createHash('sha256').update(String(source)+'|'+stamp+'|'+String(item.entry?.name||'')+'|'+String(item.entry?.size||item.entry?.unpacked||'')+'|'+JSON.stringify(item.composition||null)+'|'+(item.mappingFile?fileStamp(item.mappingFile):'')+'|cg-v4').digest('hex');}
+function sourceKey(exe,name){try{const item=scan(exe).items.get(String(name||'').toLowerCase());if(!item||!fs.statSync(fs.realpathSync(item.file||item.archive)).isFile())return null;return pictureIdentity(item);}catch{return null;}}
+const cachedPicture=(root,executable,name)=>{const d=cacheDirOf(root,executable),n=String(name).toLowerCase(),item=scan(executable).items.get(n);if(!item)return null;try{const meta=JSON.parse(fs.readFileSync(path.join(d,n+'.source.json'),'utf8'));if(meta.key!==pictureIdentity(item)||!Object.values(EXT).includes(meta.ext))return null;const f=path.join(d,n+meta.ext);return fs.existsSync(f)?f:null;}catch{return null;}};
+function storyProgress(executable){const dir=path.dirname(String(executable||'')),r=scan(executable);if(r.engine!=='YU-RIS')return progress(executable);const flags=new Map(),galleryUnlocked=new Set();let valid=false,galleryValid=false;
+ for(const file of yurisSaves(dir)){try{const arrays=yssdArrays(fs.readFileSync(file));if(arrays.length)valid=true;for(const a of arrays){flags.set('yuris:'+a.id+':count',a.count);for(const n of a.set)flags.set('yuris:'+a.id+':'+n,1);}
+  const g=r.gallery,fit=g&&arrays.filter(a=>a.count>=g.size&&a.set.every(i=>g.slots.has(i))).sort((a,b)=>b.set.length-a.set.length)[0];if(fit){galleryValid=true;for(const i of fit.set)galleryUnlocked.add(base(g.slots.get(i)));}
+ }catch{}}
+ return {state:valid?'valid':'unknown',flags,galleryUnlocked,galleryState:galleryValid?'valid':'unknown'};}
+function ratingCurrent(root,exe,name){if(!cachedPicture(root,exe,name))return false;try{const dir=cacheDirOf(root,exe),n=String(name).toLowerCase(),meta=JSON.parse(fs.readFileSync(path.join(dir,n+'.source.json'),'utf8')),rating=JSON.parse(fs.readFileSync(path.join(dir,'ratings.json'),'utf8'))[n];return !!meta.key&&rating?.sourceKey===meta.key;}catch{return false;}}
+/* Private worker handoff: no image bytes or current values leave the process. Never a shared rules artifact. */
+function exportScan(exe,recipes){if(recipes!==undefined)setRecipes(exe,recipes);const dir=path.dirname(String(exe)),before=stamp(dir),r=scan(exe);if(before!==stamp(dir))return null;return {stamp:before,sources:sourceStamp(r),recipes:recipesFor(exe),locations:saveLocations.get(dir),result:{...r,items:new Map([...r.items].map(([n,item])=>{const {cx,...plain}=item;return [n,plain];}))}};}
+function primeScan(exe,snapshot){if(!snapshot?.result||!(snapshot.result.items instanceof Map)||typeof snapshot.stamp!=='string')return false;const dir=path.dirname(String(exe));if(snapshot.locations)saveLocations.set(dir,snapshot.locations);if(snapshot.stamp!==stamp(dir)||snapshot.sources!==sourceStamp(snapshot.result)||!require('./story-pimg-recipes.cjs').validate(snapshot.recipes||[]))return false;setRecipes(exe,snapshot.recipes||[]);cache.set(dir.toLowerCase(),{stamp:snapshot.stamp,result:snapshot.result,sources:snapshot.sources,primed:true});if(cache.size>8)cache.delete(cache.keys().next().value);return true;}
+module.exports={list,image,scan,progress,storyProgress,systemVariables,galleryCsv,kirikiriSaveDirs,pictureFile,pictureFileAsync,setRecipes,_recipes:recipesFor,kirikiriMarked,cachedPicture,sourceKey,ratingCurrent,_exportScan:exportScan,_primeScan:primeScan,ksdText,tokens,kbad,esSlots,sdcUnpack,mzpNameSets,yssdArrays,siglusTable,siglusGlobalTables,SIGLUS_KEY};

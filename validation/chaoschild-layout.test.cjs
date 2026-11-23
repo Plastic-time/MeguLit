@@ -1,13 +1,13 @@
 /* CHAOS;CHILD acceptance (2026-11-20): two-row box lines stay above the game's button strip; a centred line re-measures its middle while typing; a cleared page hides the placed line */
 const test = require('node:test'), assert = require('node:assert'), fs = require('fs'), path = require('path');
 const src = fs.readFileSync(path.join(__dirname, '../web/reader/modules/text-place.js'), 'utf8');
-test('box line: Japanese rows close up, translation <=15% smaller, then the block moves up, under client bottom minus two glyph rows', () => {
+test('box line: Japanese-only fitting is separate from translation overflow, with an 85% translation floor', () => {
   assert.match(src, /uiLimit = cy0 \+ chc - glyph \* 2/);
   assert.match(src, /set\(sentence, 'line-height', closeRows\(sentence\)\)/); /* rows close up, never under 1.45 and never so far the furigana sits on the row above */
   assert.match(src, /Math\.max\(1\.45, Math\.round\(\(1 \+ rs \+ \.12\)/);
   assert.match(src, /\.megulit-anchor-window\.megulit-game-rows \.sentence-text\{white-space:nowrap!important\}/, 'a line on the game rows breaks only where the game did');
-  /* 85 % of the current size: only 千恋＊万花's translationGrowsDown takes 85 % of the user's size (649b93ef) */
-  assert.match(src, /Math\.ceil\(\(grows\(\) \? cnBase : fsx\) \* \.85\)/); assert.match(src, /rx\.bottom > uiLimit && !grows\(\)\) \{ const up/);
+  assert.match(src, /Math\.ceil\(cnBase \* \.85\)/);
+  assert.match(src, /available >= oneLine/);
   assert.match(src, /!anchor\.center && tr && tr\.height/);
 });
 test('centred line keeps only its top while typing', () => { assert.match(src, /anchor\.center && Number\.isFinite\(center\) && anchorLine === lineKey[^\n]*a = \[center, anchor\[1\]\]/); });

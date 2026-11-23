@@ -27,7 +27,7 @@ test('a reader that never started names quarantined native files',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-rt-'));
  try{
   fs.mkdirSync(path.join(root,'native'));fs.writeFileSync(path.join(root,'native','GalWindowBridge.exe'),'');
-  const status=Runtime.prototype.readerStatus.call({root,reader:null,readerReady:false,readerError:'',readerPhase:'',readerMissing:Runtime.prototype.readerMissing,readerStatusRaw:Runtime.prototype.readerStatusRaw});
+  const status=new Runtime(root).readerStatus();
   assert.equal(status.ready,false);
   assert.match(status.error,/^READER_NATIVE_MISSING: HookBridge\.exe, HookInjector32\.exe, HookInjector64\.exe$/);
  }finally{fs.rmSync(root,{recursive:true,force:true});}

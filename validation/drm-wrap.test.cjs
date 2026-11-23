@@ -87,6 +87,67 @@ test('nothing to switch to: no change, and the hint asks for the runtime or anot
  const p=drm.plan(path.join(dir,'game.exe'));assert.equal(p.changed,false);assert.equal(p.launchVia,'');
  assert.match(drm.hint(p,'zh'),/game\.exe 需要软电池（SoftDenchi）正版验证.*没找到破解或汉化启动器/);
 });
+function totono(folderName='TOTONO'){
+ return folder(folderName,{
+  'totono.exe':pe(98304,{ascii:['SdWrap','sdrt5030.exe']}),
+  'sdrt5030.exe':pe(5*1024*1024,{ascii:['SoftDenchi']}),
+  'totonoUpdata1.01.exe':pe(3*1024*1024),
+ });
+}
+test('#776: TOTONO keeps its original starter when the only clean candidate is the updater',()=>{
+ const dir=totono(),starter=path.join(dir,'totono.exe');
+ const plan=drm.plan(starter);
+ assert.equal(base(plan.wrapped),'sdrt5030.exe');
+ assert.equal(base(plan.executable),'totono.exe');
+ assert.equal(plan.changed,false);
+ assert.equal(plan.launchVia,'');
+ assert.deepEqual(plan.ignoredUpdaters,['totonoUpdata1.01.exe']);
+});
+test('#776: the saved updater can revert to the starter recorded by DRM correction',()=>{
+ const dir=totono(),updater=path.join(dir,'totonoUpdata1.01.exe');
+ const savedDrm={kind:'softdenchi',wrapped:path.join(dir,'sdrt5030.exe'),from:path.join(dir,'totono.exe')};
+ const plan=drm.plan(updater,{savedDrm});
+ assert.equal(base(plan.executable),'totono.exe');
+ assert.equal(plan.changed,true);
+ assert.equal(plan.restoredFromUpdater,true);
+ assert.equal(plan.launchVia,'');
+
+ assert.equal(drm.plan(updater),null);
+ assert.equal(drm.plan(updater,{savedDrm:{...savedDrm,from:path.join(totono('Other'),'totono.exe')}}),null);
+ assert.equal(drm.plan(updater,{savedDrm:{...savedDrm,wrapped:path.join(dir,'another.exe')}}),null);
+});
+test('#776: bridge saves the recovered starter before preparing the game process',async t=>{
+ const dir=totono(),starter=path.join(dir,'totono.exe'),updater=path.join(dir,'totonoUpdata1.01.exe');
+ const savedDrm={kind:'softdenchi',wrapped:path.join(dir,'sdrt5030.exe'),from:starter};
+ const row={executable:updater,original:JSON.stringify({library:{exe:updater,source:'manual',drm:savedDrm}})};
+ const writes=[];
+ const db={prepare(sql){
+  if(sql.startsWith('SELECT * FROM games'))return {get:()=>({...row})};
+  if(sql.startsWith('UPDATE games SET executable'))return {run:(...values)=>writes.push(values)};
+  throw Error('Unexpected SQL: '+sql);
+ }};
+ const previousRoot=process.env.MEGULIT_ROOT;
+ process.env.MEGULIT_ROOT=dir;
+ let launch;
+ try{({launch}=require('../services/bridge.cjs'));}
+ finally{
+  if(previousRoot===undefined)delete process.env.MEGULIT_ROOT;
+  else process.env.MEGULIT_ROOT=previousRoot;
+ }
+ t.mock.method(require('../services/background-games.cjs'),'foreground',async()=>{});
+ t.mock.method(require('../services/game-language.cjs'),'originalExecutable',()=>({blocked:false}));
+ const reachedPrepare=Error('Fixture ends before starting a process');
+ let prepared;
+ await assert.rejects(launch(db,'totono',{prepareGame(exe){prepared=exe;throw reachedPrepare;}}),e=>e===reachedPrepare);
+ assert.equal(prepared,starter);
+ assert.equal(writes.length,1);
+ assert.equal(writes[0][0],starter);
+ assert.equal(JSON.parse(writes[0][1]).library.exe,starter);
+ const entries=fs.readFileSync(path.join(dir,'logs','game-launch.log'),'utf8').trim().split('\n').map(JSON.parse);
+ const ignored=entries.find(entry=>entry.stage==='drm-updaters-ignored');
+ assert.deepEqual(ignored.files,['totonoUpdata1.01.exe']);
+ assert.equal(ignored.restoredPreviousLauncher,true);
+});
 test('a plain KiriKiri Z release with .sig files everywhere is not DRM',()=>{
  const dir=folder('krkrz',{'game.exe':pe(4000000),'game.sig':SIG,'data.xp3':'XP3','data.xp3.sig':SIG,'config.exe':pe(300000)});
  assert.equal(drm.plan(path.join(dir,'game.exe')),null);

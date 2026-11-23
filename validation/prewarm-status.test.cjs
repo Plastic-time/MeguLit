@@ -8,7 +8,7 @@ test('embed tag shows a run that could only read',async()=>{
 });
 test('zero-latency brief comes from the saved state only',()=>{
  const ot=require('../services/original-text.cjs'),root=fs.mkdtempSync(path.join(os.tmpdir(),'brief-'));fs.mkdirSync(path.join(root,'data/config'),{recursive:true});
- fs.writeFileSync(path.join(root,'data/config/original-text.json'),JSON.stringify({a:{status:'native-japanese',patchStatus:'ready'},b:{status:'native-japanese'},c:{status:'awaiting-original'},d:{status:'unsupported'}}));
- assert.deepEqual(['a','b','c','d','e'].map(id=>ot.brief(root,id)),['patch','machine','needs-japanese','none','unknown']);
+ fs.writeFileSync(path.join(root,'data/config/original-text.json'),JSON.stringify({a:{status:'native-japanese',patchStatus:'ready',patch:{version:5,coverage:{script:{paired:60}}}},stale:{status:'native-japanese',patchStatus:'ready'},ui:{status:'native-japanese',patchStatus:'interface-only',patch:{version:5}},b:{status:'native-japanese'},c:{status:'awaiting-original'},d:{status:'unsupported'}}));
+ assert.deepEqual(['a','b','c','d','e','stale','ui'].map(id=>ot.brief(root,id)),['patch','machine','needs-japanese','none','unknown','machine','machine']);
  fs.rmSync(root,{recursive:true,force:true});
 });

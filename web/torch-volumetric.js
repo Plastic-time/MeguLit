@@ -26,16 +26,23 @@ void main(){float d=texture2D(tDepth,vUv).x;vec4 v=projInv*vec4(vUv*2.-1.,d*2.-1
  float c=dot(rd,lightDir),g=.6,hg=(1.-g*g)/(12.566*pow(1.+g*g-2.*g*c,1.5)),phase=mix(.0796,hg,.75);
  float acc=0.;vec3 glow=vec3(0.);
  for(int i=0;i<STEPS;i++){vec3 p=ro+rd*t;vec4 sc=shadowMatrix*vec4(p,1.);
+  vec3 edge=min(p-boxMin,boxMax-p);
+  float envelope=smoothstep(0.,3.5,min(edge.y,min(edge.x,edge.z)));
   if(hasSun>.5&&sc.x>0.&&sc.x<1.&&sc.y>0.&&sc.y<1.&&sc.z<1.){float sd=unpackRGBAToDepth(texture2D(tShadow,sc.xy));
-   if(hasSun>.5&&sc.z-.0012<sd){float dens=.45+.9*n3(p*.32+vec3(time*.05,time*.02,-time*.03));acc+=dens*stepL;}}
+   if(hasSun>.5&&sc.z-.0012<sd){float dens=.45+.9*n3(p*.32+vec3(time*.05,time*.02,-time*.03));acc+=dens*stepL*envelope;}}
   if(hasVol>.5){vec3 q=clamp((p-volMin)/volSize,0.,1.);float tq=texture(tTorch,q).r;vec4 sv=texture(tStele,q);float dn=.5+.8*n3(p*.45+vec3(-time*.04,time*.05,time*.02));
-   glow+=(torchCol*tq*tq*.5+steleCol*dot(sv*sv*2.,steleLv))*dn*stepL;}
+   glow+=(torchCol*tq*tq*.5+steleCol*dot(sv*sv*2.,steleLv))*dn*stepL*envelope;}
   t+=stepL;}
  gl_FragColor=vec4(color*acc*phase*density+glow*volDensity*.0796,1.);}`;
 const BLUR=`uniform sampler2D tInput;uniform vec2 dir;varying vec2 vUv;
 void main(){vec3 s=texture2D(tInput,vUv).rgb*.2270;s+=(texture2D(tInput,vUv+dir*1.3846).rgb+texture2D(tInput,vUv-dir*1.3846).rgb)*.3162;
  s+=(texture2D(tInput,vUv+dir*3.2308).rgb+texture2D(tInput,vUv-dir*3.2308).rgb)*.0703;gl_FragColor=vec4(s,1.);}`;
-const COMP=`uniform sampler2D tInput;varying vec2 vUv;void main(){gl_FragColor=vec4(texture2D(tInput,vUv).rgb,1.);}`;
+const COMP=`uniform sampler2D tInput;uniform sampler2D tDepth;varying vec2 vUv;
+ void main(){
+  float depth=texture2D(tDepth,vUv).r;
+  float surface=1.-smoothstep(.9975,.99999,depth);
+  gl_FragColor=vec4(texture2D(tInput,vUv).rgb*surface,1.);
+ }`;
 
 export class VolumetricPass extends Pass{
  constructor({camera,light,box,scale=.5,steps=48}){super();this.needsSwap=false;this.camera=camera;this.light=light;this.scale=scale;this.strength=1;
@@ -44,7 +51,7 @@ export class VolumetricPass extends Pass{
    tDepth:{value:null},tShadow:{value:null},shadowMatrix:{value:new THREE.Matrix4()},projInv:{value:new THREE.Matrix4()},camWorld:{value:new THREE.Matrix4()},camPos:{value:new THREE.Vector3()},
    lightDir:{value:new THREE.Vector3()},color:{value:new THREE.Color()},density:{value:.05},hasSun:{value:0},hasVol:{value:0},tTorch:{value:null},tStele:{value:null},volMin:{value:new THREE.Vector3()},volSize:{value:new THREE.Vector3(1,1,1)},torchCol:{value:new THREE.Color()},steleCol:{value:new THREE.Color()},steleLv:{value:new THREE.Vector4()},volDensity:{value:.03},time:{value:0},boxMin:{value:new THREE.Vector3(...box.min)},boxMax:{value:new THREE.Vector3(...box.max)},maxDist:{value:70}}});
   this.blurMat=new THREE.ShaderMaterial({vertexShader:VS,fragmentShader:BLUR,depthTest:false,depthWrite:false,uniforms:{tInput:{value:null},dir:{value:new THREE.Vector2()}}});
-  this.compMat=new THREE.ShaderMaterial({vertexShader:VS,fragmentShader:COMP,depthTest:false,depthWrite:false,transparent:true,blending:THREE.AdditiveBlending,uniforms:{tInput:{value:null}}});
+  this.compMat=new THREE.ShaderMaterial({vertexShader:VS,fragmentShader:COMP,depthTest:false,depthWrite:false,transparent:true,blending:THREE.AdditiveBlending,uniforms:{tInput:{value:null},tDepth:{value:null}}});
   this.march=new FullScreenQuad(this.marchMat);this.blur=new FullScreenQuad(this.blurMat);this.comp=new FullScreenQuad(this.compMat);}
  setSize(w,h){const W=Math.max(1,Math.round(w*this.scale)),H=Math.max(1,Math.round(h*this.scale));this.rtA.setSize(W,H);this.rtB.setSize(W,H);this.px=[1/W,1/H];}
  /* baked light volumes (torch-bake.js): the air near the torches and the stele scatters their light too */
@@ -61,6 +68,6 @@ export class VolumetricPass extends Pass{
   renderer.setRenderTarget(this.rtA);renderer.clear();this.march.render(renderer);
   this.blurMat.uniforms.tInput.value=this.rtA.texture;this.blurMat.uniforms.dir.value.set(this.px[0],0);renderer.setRenderTarget(this.rtB);this.blur.render(renderer);
   this.blurMat.uniforms.tInput.value=this.rtB.texture;this.blurMat.uniforms.dir.value.set(0,this.px[1]);renderer.setRenderTarget(this.rtA);this.blur.render(renderer);
-  this.compMat.uniforms.tInput.value=this.rtA.texture;renderer.setRenderTarget(readBuffer);this.comp.render(renderer);
+  this.compMat.uniforms.tInput.value=this.rtA.texture;this.compMat.uniforms.tDepth.value=readBuffer.depthTexture;renderer.setRenderTarget(readBuffer);this.comp.render(renderer);
   renderer.autoClear=auto;}
  dispose(){this.rtA.dispose();this.rtB.dispose();this.marchMat.dispose();this.blurMat.dispose();this.compMat.dispose();this.march.dispose();this.blur.dispose();this.comp.dispose();}}

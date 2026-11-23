@@ -129,7 +129,7 @@ function readFailed(root,exe){try{const v=JSON.parse(fs.readFileSync(failedFile(
 function noteGame(root,pid){try{if(pid)atomicWrite(playingFile(root),JSON.stringify({pid:Number(pid)}));else fs.rmSync(playingFile(root),{force:true});}catch{}}
 function playingPid(root){try{const p=Number(JSON.parse(fs.readFileSync(playingFile(root),'utf8')).pid);return p&&alive(p)?p:0;}catch{return 0;}}
 let spawnWarm=function(root,exe,items){
- if(warmBusy(root,exe))return;const job=path.join(dirOf(root),'warm-'+exeKey(exe)+'-job.json');atomicWrite(job,JSON.stringify({root,exe,items}));
+ if(warmBusy(root,exe))return;const job=path.join(dirOf(root),'warm-'+exeKey(exe)+'-job.json');atomicWrite(job,JSON.stringify({root,exe,items,recipes:require('./game-cg.cjs')._recipes(exe)}));
  const child=require('node:child_process').spawn(process.execPath,[__filename,'--warm',job],{detached:true,stdio:'ignore',windowsHide:true});
  atomicWrite(warmFile(root,exe),JSON.stringify({pid:child.pid,at:Date.now(),done:0,total:items.length}));child.unref();};
 const itemKey=it=>typeof it==='string'?'save:'+it:'file:'+it.file;
@@ -139,6 +139,7 @@ function noteFailed(root,exe,keys){if(!keys.length)return;try{const s=readFailed
 function warm(root,exe,items){const failed=[];
  for(let i=0;i<items.length;i+=24){const files=[];for(const it of items.slice(i,i+24)){try{const f=itemFile(root,exe,it);if(f)files.push(f);else failed.push(itemKey(it));}catch{failed.push(itemKey(it));}}if(files.length)scaled(root,files,THUMB);}
  noteFailed(root,exe,failed);}
+async function warmAsync(root,exe,items){const failed=[];for(const item of items){try{const file=typeof item==='string'?await require('./game-cg.cjs').pictureFileAsync(root,exe,item):item.file;if(file)scaled(root,[file],THUMB);else failed.push(itemKey(item));}catch{failed.push(itemKey(item));}}noteFailed(root,exe,failed);}
 /* the pooled worker: Node decodes, card-image.ps1 -Serve processes shrink */
 function thumbPool(size,parentPid,cacheDir){
  const {spawn}=require('node:child_process'),workers=[];let seq=0,closed=false;
@@ -166,7 +167,7 @@ async function warmRun(root,exe,items){
  const beat=()=>{try{atomicWrite(warmFile(root,exe),JSON.stringify({pid:process.pid,at:Date.now(),done,total:items.length,paused}));}catch{}};
  /* the heartbeat runs on a timer from the start: a slow start on a busy PC must not look dead and get a second worker */
  beat();const heart=setInterval(beat,10000);heart.unref();
- const pool=thumbPool(size,process.pid,path.join(dirOf(root),'bin'));if(!await pool.open()){clearInterval(heart);return warm(root,exe,items);}
+ const pool=thumbPool(size,process.pid,path.join(dirOf(root),'bin'));if(!await pool.open()){clearInterval(heart);return warmAsync(root,exe,items);}
  const tick=ms=>new Promise(r=>setTimeout(r,ms));
  async function refresh(){if(Date.now()-lastState<1500)return;lastState=Date.now();const game=playingPid(root);let fg=0,quns=5;
   const w=pool.idle(size);if(w){const r=await pool.state(w);if(r&&r[0]==='S'){quns=Number(r[1])||5;fg=Number(r[2])||0;}}
@@ -177,7 +178,7 @@ async function warmRun(root,exe,items){
   for(;;){await refresh();if(gate.pause){if(!paused){paused=true;beat();}await tick(2000);lastState=0;continue;}if(paused){paused=false;beat();}
    if(pool.idle(gate.limit)||!pool.live())break;await Promise.race([...inflight,tick(500)]);}
   if(!pool.live())break;
-  let f=null;try{f=itemFile(root,exe,it);}catch{}
+  let f=null;try{f=typeof it==='string'?await require('./game-cg.cjs').pictureFileAsync(root,exe,it):it.file;}catch{}
   const t=f&&thumbOf(root,f,THUMB);if(!t){failed.push(itemKey(it));done++;continue;}
   if(readMeta(root)[t.k]&&fs.existsSync(t.out)){done++;continue;}
   fs.mkdirSync(thumbsDir(root),{recursive:true});const w=pool.idle(gate.limit);
@@ -211,7 +212,30 @@ function pending(db,root,gameId){const g=gameRow(db,gameId),{list,later,need}=sp
 function image(db,root,gameId,srcId){
  const g=gameRow(db,gameId),s=sources(root,g).find(x=>x.id===String(srcId||''));if(!s)throw Error('CARD_SOURCE_LOCKED');
  const f=fileOf(root,g,s),t=f&&scaled(root,[f],VIEW).get(f);if(!t)throw Error('CARD_SOURCE_UNREADABLE');return {id:s.id,src:dataUrl(t.out),w:t.w,h:t.h};}
+/* Story CGs use current save permission and a source identity; static NSFW labels are handled by the shared veil. */
+function memoriesImage(db,root,gameId,name,{sourceKey}={}){
+ const cg=require('./game-cg.cjs'),g=gameRow(db,gameId),key=String(name||'').toLowerCase();
+ const source=()=>sources(root,g,{safe:false,settle:false}).find(s=>s.source==='save'&&s.kind==='cg'&&String(s.name).toLowerCase()===key);
+ const allowed=()=>/^[a-f0-9]{64}$/.test(String(sourceKey||''))&&cg.sourceKey(g.executable,key)===sourceKey&&source();
+ const current=allowed();if(!current)throw Error('CARD_SOURCE_LOCKED');const file=cg.cachedPicture(root,g.executable,current.name);if(!file)throw Error('CARD_SOURCE_UNREADABLE');
+ const picture=require('./story-image.cjs').read(file);if(!allowed())throw Error('CARD_SOURCE_CHANGED');return {id:current.id,...picture};
+}
 
+/* A bounded save-only view of the existing warmer. No image is decoded on a list request. */
+function memoriesThumb(root,exe,name){
+ const f=require('./game-cg.cjs').cachedPicture(root,exe,name);if(!f)return null;
+ const t=cachedThumbs(root,[f],THUMB).get(f);if(!t)return null;
+ const size=fs.statSync(t.out).size;if(size>512*1024)throw Error('MEMORIES_IMAGE_TOO_LARGE');
+ return {src:dataUrl(t.out),w:t.w,h:t.h};
+}
+function memoriesQueue(root,exe,names,{cacheOnly=false}={}){
+ if(cacheOnly)return {status:'resource-limited',cacheOnly:true,pending:0,blocked:Math.min(24,new Set(names).size),paused:true};
+ const list=[...new Set(names)].slice(0,24),failed=readFailed(root,exe),need=[];
+ for(const n of list)if(!failed.has(itemKey(n))&&!memoriesThumb(root,exe,n))need.push(n);
+ // A busy worker owns its current batch. Later page requests retry after it exits.
+ if(need.length&&!warmBusy(root,exe))spawnWarm(root,exe,need);
+ return {pending:need.length,failed:list.filter(n=>failed.has(itemKey(n))).length,paused:!!readWarm(root,exe)?.paused};
+}
 function games(db,root){
  const store=require('./store.cjs'),out=[];
  for(const g of store.games(db,root)){if(g.hidden)continue;const row=db.prepare('SELECT id,title,executable,cover FROM games WHERE id=?').get(g.id);let n=0;try{n=sources(root,row,{settle:false}).length;}catch{}
@@ -275,5 +299,5 @@ function handle(db,root,r){
   case 'cards_set_mode':return setMode(root,r.mode);
  }
  throw Error('UNKNOWN_ACTION');}
-module.exports={handle,state,games,unlocked,image,create,sources,noteSeen,readState,_setRunner:f=>{runner=f;},_setSpawnWarm:f=>{spawnWarm=f;},warm,warmRun,noteGame,DEFAULT_TOPLOADERS};
-if(require.main===module&&process.argv[2]==='--warm'){setTimeout(()=>process.exit(0),30*60000).unref();try{const j=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));warmRun(j.root,j.exe,j.items||j.names||[]).catch(()=>{}).finally(()=>{try{fs.rmSync(warmFile(j.root,j.exe),{force:true});fs.rmSync(process.argv[3],{force:true});}catch{}process.exit(0);});}catch{}}
+module.exports={memoriesThumb,memoriesQueue,memoriesImage,handle,state,games,unlocked,image,create,sources,noteSeen,readState,_setRunner:f=>{runner=f;},_setSpawnWarm:f=>{spawnWarm=f;},warm,warmRun,noteGame,DEFAULT_TOPLOADERS};
+if(require.main===module&&process.argv[2]==='--warm'){setTimeout(()=>process.exit(0),30*60000).unref();try{const j=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));require('./game-cg.cjs').setRecipes(j.exe,j.recipes||[]);warmRun(j.root,j.exe,j.items||j.names||[]).catch(()=>{}).finally(()=>{try{fs.rmSync(warmFile(j.root,j.exe),{force:true});fs.rmSync(process.argv[3],{force:true});}catch{}process.exit(0);});}catch{}}

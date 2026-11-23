@@ -62,12 +62,12 @@ test('the same sentence refits on a resized or moved client without carrying ove
  let layout={clientX:0,clientY:120,clientWidth:600,clientHeight:300},anchor=300,frame;
  const scale=()=>Number(props['--megulit-fit']??1);
  const rect=(start,height)=>{const top=anchor+start+(parseFloat(props['--megulit-fit-shift'])||0);return {top,bottom:top+height,height};};
- const jp={getBoundingClientRect:()=>rect(0,100)};
+ // This legacy surface has no separately anchored Japanese node. Its whole block can shift.
  const cn={getBoundingClientRect:()=>rect(100,120*scale())};
  const win={getBoundingClientRect:()=>rect(0,100+120*scale()),classList:{contains:()=>false},
-  querySelectorAll:selector=>selector==='.sentence-text'?[jp]:[jp,cn],querySelector:()=>cn};
+  querySelectorAll:selector=>selector==='.sentence-text'?[]:[cn],querySelector:()=>cn};
  const bridge={galLayoutInfo:()=>layout,galLayout:next=>{layout=next;}};
- const window={__tomoyoChinese:bridge,devicePixelRatio:1,addEventListener(){},requestAnimationFrame(cb){frame=cb;return 1;},
+ const window={__tomoyoChinese:bridge,devicePixelRatio:1,getComputedStyle:()=>({lineHeight:'24px',fontSize:'18px'}),addEventListener(){},requestAnimationFrame(cb){frame=cb;return 1;},
   document:{head:{append(){}},createElement:()=>({}),querySelectorAll:()=>[win],
    body:{classList:{contains:key=>classes.has(key),toggle:(key,on)=>on?classes.add(key):classes.delete(key)}},
    documentElement:{style:{setProperty:(name,value)=>{props[name]=value;}}}}};

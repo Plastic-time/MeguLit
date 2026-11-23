@@ -73,7 +73,7 @@ function verifyFiles(gameDir){
  if(m.adapter==='artemis-pfs')return require('./artemis-language.cjs').verify(gameDir);
  if(m.adapter!=='siglus-dbs')return {ok:true};
  const dat=path.join(gameDir,'dat');
- for(const e of m.files){const f=path.join(dat,e.file);let buf;try{buf=fs.readFileSync(f);}catch{return {ok:false,reason:'FILE_MISSING',file:e.file};}
+ for(const e of m.files){if(e.kind==='chinese-source')continue;const f=path.join(dat,e.file);let buf;try{buf=fs.readFileSync(f);}catch{return {ok:false,reason:'FILE_MISSING',file:e.file};}
   if(sha(buf)!==e.patchedSha256)continue; /* changed by an update or another tool: not ours to judge */
   try{const {marker,raw}=J._internal.decrypt(buf),t=J._internal.parse(raw,marker);if(!t.rows||!t.cols)return {ok:false,reason:'TABLE_EMPTY',file:e.file};}catch{return {ok:false,reason:'TABLE_UNREADABLE',file:e.file};}
   try{if(J._internal.sharedPool(f))return {ok:false,reason:'SHARED_STRINGS',file:e.file};}catch{return {ok:false,reason:'TABLE_UNREADABLE',file:e.file};}}

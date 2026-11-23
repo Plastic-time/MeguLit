@@ -168,6 +168,16 @@ test('raising the cap never admits a truncated migrated sentence under the origi
  const text='読'.repeat(3001);
  A.run(db=>db.prepare("INSERT INTO saved_sentences(text,created_at,original) VALUES(?,1,'{}')").run(text));
  await signIn(A,r);clock.now+=61000;await signIn(B,r);
+ // Older clients clipped the payload after deriving the key from the complete text.
+ const transport=A.a.fetcher;
+ A.a.fetcher=(url,init)=>{
+  if(init.method==='PUT'&&url.endsWith('/sync/sentences')){
+   const payload=JSON.parse(init.body);
+   for(const record of payload.records)record.data.text=record.data.text.slice(0,3000);
+   init={...init,body:JSON.stringify(payload)};
+  }
+  return transport(url,init);
+ };
  await assert.rejects(A.a.sync(),{code:'RECORD_TOO_LARGE'});
  assert.equal(A.a.status().pending.sentences,1);
  assert.equal(A.run(db=>db.prepare('SELECT text FROM saved_sentences').get().text),text);
@@ -285,4 +295,40 @@ test('UI and wiring: settings page, bridge hook, ACCOUNTS.md router note',()=>{
  assert.match(read('services/bridge.cjs'),/startsWith\('account_'\)/);
  assert.match(read('relay/ACCOUNTS.md'),/isAccountsPath\(path\)/);
  for(const f of ['services/account.cjs','web/account-ui.js'])assert.doesNotMatch(read(f).split('\n').slice(1).join('\n'),/(^|[;{}])\s*\/\/(?!\/)/m,f+' has no inline // comments');
+});
+test('account page sync preserves oversized sentences, other records and retry state',async t=>{
+ const r=relay(),clock={now:T0.getTime()},dev=device(t,r,clock);
+ await signIn(dev,r);
+ const large='海'.repeat(14000);
+ dev.run(db=>{
+  const insert=db.prepare("INSERT INTO saved_sentences(text,created_at,original) VALUES(?,1,'{}')");
+  insert.run(large);insert.run('small');
+ });
+ const online=dev.a.fetcher,options={env:dev.a.env,vault:dev.a.vault,now:dev.a.now,fetch:online};
+ const sync=()=>account.handle(dev.root,{action:'account_sync'},options);
+ await assert.rejects(sync,/RECORD_TOO_LARGE/);
+ const {renderAccount}=await import('../web/account-ui.js');
+ const button={},control={querySelector:()=>control,querySelectorAll:()=>[]};
+ const target={querySelector:selector=>selector==='[data-sync]'?button:control,querySelectorAll:()=>[]};
+ const messages=[];
+ await renderAccount({target,locale:'en',esc:String,toast:message=>messages.push(message),
+  api:(action,args)=>account.handle(dev.root,{action,...args,autoSync:false},options)});
+ await button.onclick();
+ assert.match(messages.at(-1),/size limit/);
+ const count=()=>r.env.DB.raw.prepare("SELECT COUNT(*) n FROM sync_records WHERE kind='sentences'").get().n;
+ assert.equal(count(),1);
+ assert.equal(dev.a.status().pending.sentences,1);
+ assert.equal(dev.run(db=>db.prepare('SELECT length(text) n FROM saved_sentences ORDER BY n DESC').get().n),large.length);
+ dev.run(db=>db.prepare("UPDATE saved_sentences SET translation='changed' WHERE text='small'").run());
+ let intercept='GET';
+ options.fetch=async(url,init)=>url.includes('/sync/sentences')&&init.method===intercept?new Response('<html/>'):online(url,init);
+ await assert.rejects(sync,/SYNC_RESPONSE_INVALID/);
+ intercept='PUT';
+ await assert.rejects(sync,/SYNC_RESPONSE_INVALID/);
+ assert.equal(dev.a.status().pending.sentences,2);
+ options.fetch=online;
+ await assert.rejects(sync,/RECORD_TOO_LARGE/);
+ assert.equal(dev.a.status().pending.sentences,1);
+ assert.equal(count(),1);
+ assert.match(r.env.DB.raw.prepare("SELECT data FROM sync_records WHERE kind='sentences'").get().data,/changed/);
 });

@@ -9,6 +9,7 @@
     "migrate": "wrangler d1 migrations apply megulit-relay --remote"
   },
   "devDependencies": {
-    "wrangler": "^4"
+    "wrangler": "^4",
+    "ws": "^8.23.0"
   }
 }

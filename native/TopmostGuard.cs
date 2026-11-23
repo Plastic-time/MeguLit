@@ -22,6 +22,13 @@ internal static class TopmostGuard {
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern IntPtr CreateWindowEx(uint ex,string cls,string title,uint style,int x,int y,int w,int h,IntPtr owner,IntPtr menu,IntPtr instance,IntPtr param);
     [DllImport("user32.dll")] static extern bool DestroyWindow(IntPtr h);
+    [DllImport("user32.dll")] static extern IntPtr GetActiveWindow();
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern IntPtr SetActiveWindow(IntPtr h);
+    [DllImport("user32.dll")] static extern IntPtr GetThreadDesktop(uint thread);
+    [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll",CharSet=CharSet.Unicode)]
+    static extern bool GetUserObjectInformation(IntPtr obj,int index,System.Text.StringBuilder info,int bytes,out int needed);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h,System.Text.StringBuilder s,int n);
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h,int cmd);
     [DllImport("user32.dll")] static extern bool ShowWindowAsync(IntPtr h,int cmd);
@@ -53,6 +60,11 @@ internal static class TopmostGuard {
     }
 
     public static bool IsTopmost(IntPtr h){return h!=IntPtr.Zero&&(GetWindowLong(h,-20)&0x8)!=0;}
+
+    public static bool ShowAtBottom(IntPtr window){
+        // Show and place in the same call. SW_SHOWNOACTIVATE can still show above the current app.
+        return SetWindowPos(window,new IntPtr(1),0,0,0,0,NoSizeMoveActivate|0x0040);
+    }
 
     /// <summary>Where a layer goes when it may not float: directly above the game, i.e. after the nearest normal
     /// (non-topmost) window above it; HWND_TOP of the normal band when only topmost windows lie above the game (it is then
@@ -99,7 +111,11 @@ internal static class TopmostGuard {
        "layer". Checks the z-order after the guard, that a second pass changes nothing, that the hook delivers a
        minimise of the game and the layer is down within 100 ms, and that a closed game sends the layer to the bottom.
        Returns "" when everything holds, else what failed. */
-    static IntPtr Stand(string name){var h=CreateWindowEx(0x80|0x08000000,"STATIC","MeguLit topmost guard test "+name,0x80000000,-32000,-32000,64,64,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);/* shown already at the bottom of the z-order, off screen, never activated: it cannot cover anything of the user */if(h!=IntPtr.Zero)SetWindowPos(h,new IntPtr(1),0,0,0,0,NoSizeMoveActivate|0x0040);return h;}
+    static IntPtr Stand(string name,uint style=0x80|0x08000000,bool show=true){
+        var h=CreateWindowEx(style,"STATIC","MeguLit topmost guard test "+name,0x80000000,-32000,-32000,64,64,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);
+        if(show&&h!=IntPtr.Zero)ShowAtBottom(h);
+        return h;
+    }
     /* nothing the user could see lies below: only hidden / minimised windows and the desktop shell (Progman, WorkerW) */
     static bool AtBottom(IntPtr h){var c=new System.Text.StringBuilder(64);int steps=0;
         for(IntPtr n=GetWindow(h,2);n!=IntPtr.Zero&&steps<4000;n=GetWindow(n,2),steps++){
@@ -111,6 +127,25 @@ internal static class TopmostGuard {
     static bool Within(Func<bool> ok,int ms=2000){var c=System.Diagnostics.Stopwatch.StartNew();for(;;){Pump();if(ok())return true;if(c.ElapsedMilliseconds>=ms)return false;System.Threading.Thread.Sleep(50);}}
     /// <summary>Last self-test: milliseconds from the game's minimise to the layer being down (informational).</summary>
     public static long LastMinimiseMs=-1;
+    public static string BackgroundShowSelfTest(){
+        var desktop=new System.Text.StringBuilder(128);int needed;
+        if(!GetUserObjectInformation(GetThreadDesktop(GetCurrentThreadId()),2,desktop,desktop.Capacity*2,out needed)||
+            !desktop.ToString().StartsWith("MeguLitTest-",StringComparison.Ordinal))return "requires tools/run-isolated.cjs";
+        IntPtr active=Stand("active",0x80), background=Stand("background",0x80|0x8,false);
+        try{
+            if(active==IntPtr.Zero||background==IntPtr.Zero)return "stand-in windows";
+            SetActiveWindow(active);
+            if(GetActiveWindow()!=active)return "fixture could not activate its reference window";
+            IntPtr foreground=GetForegroundWindow();
+            if(IsWindowVisible(background)||!IsTopmost(background))return "fixture is not hidden and topmost";
+            if(!ShowAtBottom(background)||!IsWindowVisible(background)||IsTopmost(background)||!AtBottom(background))
+                return "first show did not place the background window at the bottom";
+            if(GetActiveWindow()!=active||GetForegroundWindow()!=foreground)return "background show changed focus";
+            Console.WriteLine("desktop={0}, foreground before/after={1}, active={2}, background={3}",desktop,foreground,active,background);
+            return "";
+        }finally{if(background!=IntPtr.Zero)DestroyWindow(background);if(active!=IntPtr.Zero)DestroyWindow(active);}
+    }
+
     public static string WindowSelfTest(){
         if(!PolicySelfTest())return "policy";
         /* the "game" lives on its own thread with its own message loop, like a game in its own process */

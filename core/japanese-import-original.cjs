@@ -10,6 +10,7 @@ const fs=require('node:fs'),fsp=require('node:fs/promises'),path=require('node:p
 const {languageHint,isLauncher}=require('./launcher-language.cjs');
 
 const BACKUP_DIR='.megulit-japanese-import',STAGING_DIR='.megulit-japanese-staging',ADAPTER='original-files';
+const npa=()=>require('./japanese-import-npa.cjs');
 const ARCHIVE=/\.(zip|7z|rar)$/i;
 const SKIP_DIR=/^(save|savedata|saves|userdata|\.megulit.*)$/i;
 const SKIP_FILE=/\.(sav|ini|cfg|log|txt|url|lnk|md|html?|pdf)$/i;
@@ -106,14 +107,19 @@ function separatePlan(gameDir,source,info){
   if(launcher){const name=path.basename(source).replace(/\.(zip|7z|rar|iso|cue|bin|img)$/i,'').replace(/\s*\((?:bin|iso|img)[^)]*\)\s*$/i,'').replace(/[<>:"|?*]/g,'').trim()||'Japanese';
    return {root:path.dirname(hdr),cab:hdr,exe:path.join(launcher.dir.replace(/^[\\/]+/,''),launcher.name),target:freeFolder(path.join(path.dirname(path.resolve(source)),name)),move:true};}}}
  if(!exe&&info.image){const installer=fs.readdirSync(info.base).some(n=>/^(setup|install|autorun)\.(exe|inf)$/i.test(n))||walk(info.base,5000).some(r=>/\.(cab|msi)$/i.test(r));
-  if(installer)return {installer:true,image:info.image,iso:/\.iso$/i.test(info.image)?info.image:path.join(path.dirname(path.resolve(source)),path.basename(info.image).replace(/\.(cue|bin|img)$/i,'')+'.iso'),from:require('./disc-image.cjs').imageOf(info.image)};}
+  if(installer)return {installer:true,image:info.image};}
  if(!exe){const disc=(()=>{const stack=[[info.base,2]];while(stack.length){const [d,depth]=stack.pop();let list;try{list=fs.readdirSync(d,{withFileTypes:true});}catch{continue;}for(const e of list){if(e.isFile()&&/\.(bin|cue|iso|mdf|mds|ccd|img|nrg)$/i.test(e.name)&&(e.name.match(/\.(cue|iso|mds|ccd|nrg)$/i)||(stat(path.join(d,e.name))?.size||0)>50e6))return true;if(e.isDirectory()&&depth>0)stack.push([path.join(d,e.name),depth-1]);}}return false;})();throw Error(disc?'IMPORT_DISC_IMAGE':'IMPORT_SOURCE_NO_MATCH');}
  const root=path.dirname(exe);
  const target=info.staged?freeFolder(path.join(path.dirname(path.resolve(source)),path.basename(source).replace(/\.(zip|7z|rar)$/i,'').replace(/[<>:"|?*]/g,'').trim()||'Japanese')):root;
  return {root,exe:path.relative(root,exe),target,move:info.staged};}
 
-async function plan(gameDir,source){
+async function plan(gameDir,source,executable,{archiveOnly=false}={}){
  gameDir=path.resolve(String(gameDir||''));if(readManifest(gameDir))throw Error('ALREADY_IMPORTED');
+ if(/\.(?:npa|zip)$/i.test(String(source||''))){
+  const archive=await npa().plan(fs.realpathSync(gameDir),path.resolve(source),executable);
+  if(archive)return {gameDir,archive};
+ }
+ if(archiveOnly)throw Error('IMPORT_NPA_CONFIRM');
  const info=await sourceRoot(gameDir,source),{root,staged}=info;
  if(info.overlay){
   return {gameDir,root:gameDir,staged:false,replace:[],add:[],remove:info.overlay.overlays.map(o=>({file:o.file,size:o.size})),exe:'',overlay:true};}
@@ -132,17 +138,28 @@ async function plan(gameDir,source){
  const launchers=theirs.filter(r=>!r.includes(path.sep)&&isLauncher(r)&&languageHint(r)!=='zh').sort((a,b)=>(stat(path.join(root,b))?.size||0)-(stat(path.join(root,a))?.size||0));
  return {gameDir,root,staged,replace,add,remove,exe:launchers[0]||''};}
 
-async function preview(gameDir,source){
- const p=await plan(gameDir,source),list=a=>a.map(({file,size})=>({file,size}));
- if(p.separate?.installer){const s=p.separate;if(!fs.existsSync(s.iso))await require('./disc-image.cjs').toIso(s.from,s.iso);return {state:'installer',iso:s.iso};}
+async function preview(gameDir,source,executable){
+ const p=await plan(gameDir,source,executable),list=a=>a.map(({file,size})=>({file,size}));
+ if(p.archive)return archivePreview({...p.archive,size:p.archive.bytes.length});
+ if(p.separate?.installer)return {state:'installer',image:p.separate.image};
  if(p.port){const r=require('./saya-script-port.cjs').build(fs.readFileSync(p.port.steam),fs.readFileSync(p.port.pak)).report;return {state:'port',textLines:r.textLines,matched:r.matched,rate:r.rate,joined:r.joined,cut:r.originalUnused.length,unmatched:r.unmatched.slice(0,50)};}
  if(p.separate)return {state:'separate',exe:p.separate.exe,target:p.separate.target,copy:p.separate.move};
  return {state:'preview',root:p.root,replace:list(p.replace),add:list(p.add),remove:list(p.remove),exe:p.exe,changes:p.replace.length+p.add.length+p.remove.length};}
+function archivePreview(a){
+ return {state:'preview',archive:true,archiveToken:a.token,coverage:a.coverage,replace:[{file:a.file,size:a.size}],add:[],remove:[],exe:'',changes:1};
+}
+async function discoverArchive(gameDir,executable){
+ const dir=fs.realpathSync(gameDir);
+ if(fs.existsSync(path.join(dir,BACKUP_DIR)))throw Error('ALREADY_IMPORTED');
+ const {source,archive}=await npa().discover(dir,executable);
+ return {...archivePreview(archive),source};
+}
 
 async function place(from,to,staged){await fsp.mkdir(path.dirname(to),{recursive:true});if(staged){try{await fsp.rename(from,to);return;}catch{}}await fsp.copyFile(from,to);}
 
-async function apply(gameDir,source,previousExe=''){
- const p=await plan(gameDir,source);
+async function apply(gameDir,source,previousExe='',{archiveToken,beforeWrite}={}){
+ const p=await plan(gameDir,source,previousExe,{archiveOnly:archiveToken!==undefined});
+ if(p.archive)return npa().apply(p.archive,path.join(p.archive.gameDir,BACKUP_DIR),ADAPTER,archiveToken,beforeWrite);
  if(p.separate?.installer)throw Error('IMPORT_DISC_INSTALLER');
  if(p.port)return applyPort(p.gameDir,p.port,previousExe);
  if(p.separate){const s=p.separate;
@@ -184,6 +201,7 @@ async function applyPort(gameDir,port,previousExe){
 // Files changed after the import (a game update, another tool) are left alone and reported.
 function restore(gameDir){
  gameDir=path.resolve(String(gameDir||''));const m=readManifest(gameDir);if(!m||m.adapter!==ADAPTER)throw Error('NOT_APPLIED');
+ if(m.kind==='single-npa'){const resolved=fs.realpathSync(gameDir);return {...npa().restore(resolved,path.join(resolved,BACKUP_DIR),m),archive:true};}
  const backup=path.join(gameDir,BACKUP_DIR,'files'),skipped=[];let restored=0;
  for(const e of [...m.files].reverse()){const target=path.join(gameDir,e.file),keep=path.join(backup,e.file),s=stat(target);
   const ours=e.kind==='remove'?!s:s&&s.size===e.size&&Math.abs(s.mtimeMs-e.mtime)<2;
@@ -198,4 +216,18 @@ function restore(gameDir){
 
 function cleanup(gameDir){fs.rmSync(path.join(path.resolve(String(gameDir||'')),STAGING_DIR),{recursive:true,force:true});}
 
-module.exports={separateLauncher,preview,apply,restore,cleanup,readManifest,ADAPTER,_internal:{matchRoot,walk,OVERRIDE}};
+function archiveManifest(dir){const m=readManifest(dir);return m?.adapter===ADAPTER&&m.kind==='single-npa'?m:null;}
+function localArchive(executable,manifest=archiveManifest(path.dirname(executable))){
+ if(!manifest)return null;
+ try{const dir=fs.realpathSync(path.dirname(executable));return npa().local(path.join(dir,path.basename(executable)),path.join(dir,BACKUP_DIR),manifest);}
+ catch{return null;}
+}
+function archiveStamp(executable,manifest){
+ try{
+  const dir=path.dirname(executable),file=manifest.files[0]?.file;
+  if(!file||path.basename(file)!==file)return 'stale';
+  const stamp=npa().snapshot;
+  return JSON.stringify([manifest.indexSha256,stamp(executable),stamp(path.join(dir,file)),stamp(path.join(dir,BACKUP_DIR,'pairs.json'))]);
+ }catch{return 'stale';}
+}
+module.exports={separateLauncher,preview,discoverArchive,apply,restore,cleanup,readManifest,archiveManifest,localArchive,archiveStamp,ADAPTER,_internal:{matchRoot,walk,OVERRIDE}};

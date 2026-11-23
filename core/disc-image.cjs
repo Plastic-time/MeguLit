@@ -16,7 +16,7 @@ function geometry(fd,size){
 function reader(file){
  const fd=fs.openSync(file,'r'),size=fs.fstatSync(fd).size,g=geometry(fd,size);
  const read=(lba,count=1)=>{const out=Buffer.alloc(count*2048);for(let i=0;i<count;i++)fs.readSync(fd,out,i*2048,2048,(lba+i)*g.sector+g.offset);return out;};
- return {fd,read,g,close:()=>fs.closeSync(fd)};
+ return {fd,read,g,sectors:Math.floor(size/g.sector),close:()=>fs.closeSync(fd)};
 }
 function descriptors(r){
  let pvd=null,joliet=null;
@@ -26,20 +26,31 @@ function descriptors(r){
  return {root:(joliet||pvd).subarray(156,190),joliet:!!joliet};
 }
 function entries(r,record,joliet){
- const lba=record.readUInt32LE(2),len=record.readUInt32LE(10),data=r.read(lba,Math.ceil(len/2048)),out=[];let p=0;
+ const lba=record.readUInt32LE(2),len=record.readUInt32LE(10),sectors=Math.ceil(len/2048);
+ if(len>16*1024*1024||lba+sectors>r.sectors)throw Error('IMPORT_DISC_UNREADABLE');
+ const data=r.read(lba,sectors),out=[];let p=0;
  while(p<len){const n=data[p];if(!n){p=(Math.floor(p/2048)+1)*2048;continue;}
+  if(n<34||p+n>len||p%2048+n>2048)throw Error('IMPORT_DISC_UNREADABLE');
   const rec=data.subarray(p,p+n),nameLen=rec[32],raw=rec.subarray(33,33+nameLen),flags=rec[25];p+=n;
   if(nameLen===1&&(raw[0]===0||raw[0]===1))continue;
   let name=joliet?utf16be.decode(raw):sjis.decode(raw);name=name.replace(/;\d+$/,'').replace(/\.$/,'');
   out.push({name,dir:!!(flags&2),lba:rec.readUInt32LE(2),size:rec.readUInt32LE(10),record:rec});}
  return out;
 }
-async function extract(file,dest){
- const r=reader(file),root=path.resolve(dest);let count=0;
+async function extract(file,dest,{bounded=false}={}){
+ const r=reader(file),root=path.resolve(dest);let count=0,written=0;
+ const directories=new Set();
  try{const {root:rootRecord,joliet}=descriptors(r);
-  const walk=async(record,rel,depth)=>{if(depth>12)return;for(const e of entries(r,record,joliet)){
+  const walk=async(record,rel,depth)=>{if(depth>12)return;
+   const lba=record.readUInt32LE(2);
+   if(bounded&&(directories.has(lba)||directories.size>=10000))throw Error('IMPORT_DISC_UNREADABLE');
+   directories.add(lba);
+   for(const e of entries(r,record,joliet)){
    const safe=e.name.replace(/[<>:"|?*\x00-\x1f]/g,'_');if(!safe||safe==='.'||safe==='..')continue;const target=path.resolve(root,rel,safe);if(!target.startsWith(root+path.sep))continue;
    if(e.dir){await fsp.mkdir(target,{recursive:true});await walk(e.record,path.join(rel,safe),depth+1);continue;}
+   if(e.lba+Math.ceil(e.size/2048)>r.sectors)throw Error('IMPORT_DISC_UNREADABLE');
+   written+=e.size;
+   if(bounded&&(written>r.sectors*2048||count>=100000))throw Error('IMPORT_DISC_UNREADABLE');
    await fsp.mkdir(path.dirname(target),{recursive:true});const fd=fs.openSync(target,'w');
    try{for(let done=0;done<e.size;){const chunk=Math.min(e.size-done,2048*256),sectors=Math.ceil(chunk/2048),buf=r.read(e.lba+done/2048,sectors);fs.writeSync(fd,buf,0,chunk);done+=chunk;}}finally{fs.closeSync(fd);}count++;}};
   await walk(rootRecord,'',0);}

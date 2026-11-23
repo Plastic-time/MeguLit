@@ -162,7 +162,7 @@ class CompositorHost {
     else if (e.e === 'ready') { this.setDrawing(true); this.onEvent({ type: 'compositorState', state: 'running' }); }
   }
   setDrawing(v) { if (v === this.drawing) return; this.drawing = v; this.onEvent({ compositorDrawing: v }); }
-  stop() { const cc = this.cc; this.cc = null; this.lines.clear(); this.setDrawing(false); cc?.stop(); }
+  stop() { const cc = this.cc; this.cc = null; this.lines.clear(); this.setDrawing(false);const stops=this.stops??=new Set(),next=cc?.stop();if(next){stops.add(next);next.then(()=>stops.delete(next),()=>{});}const result=Promise.all([...stops]);result.catch(()=>{});return result; }
 }
 
 module.exports = { CompositorHost, rectsToClient };

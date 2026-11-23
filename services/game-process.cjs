@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-const fs=require('node:fs'),path=require('node:path'),{execFile}=require('node:child_process');
+const fs=require('node:fs'),path=require('node:path'),{execFile,execFileSync}=require('node:child_process');
 /* E382 GameProcess.exe can fail once when the PC is busy (seen while building); one retry before PROCESS_QUERY_FAILED */
 async function gameProcess(root,executable,options={}){try{return await gameProcessOnce(root,executable,options);}catch(error){if(error.message!=='PROCESS_QUERY_FAILED')throw error;return gameProcessOnce(root,executable,options);}}
 function gameProcessOnce(root,executable,{focus=false,execute=execFile}={}){
@@ -24,8 +24,11 @@ async function gameProcesses(root,exe){
  if(result.type!=='gameProcesses'||!Array.isArray(result.processes))throw Error('PROCESS_QUERY_FAILED');
  return result.processes;
 }
-/* Whether a program with this file name is running. tasklist prints in the console code page (GBK on Chinese Windows), so
-   looking for a Chinese or Japanese exe name in its output never matched and a running game counted as closed. The
-   IMAGENAME filter already did the matching: any CSV row means a match, whatever the encoding. */
-function imageRunning(exe){try{const out=require('node:child_process').execFileSync('tasklist',['/FI','IMAGENAME eq '+path.basename(exe),'/FO','CSV','/NH'],{windowsHide:true,encoding:'utf8',timeout:8000});return /^"/m.test(out);}catch{return false;}}
+/* Cold runs check the image name even when the executable path differs. */
+function imageRunning(exe){
+ const helper=path.join(__dirname,'..','native','GameProcess.exe');
+ try{
+  return execFileSync(helper,['--image-running',path.basename(exe)],{windowsHide:true,encoding:'utf8',timeout:8000}).trim()==='running';
+ }catch{return false;}
+}
 module.exports={gameProcess,gameProcesses,shellOpen,imageRunning};

@@ -11,7 +11,7 @@
 import * as THREE from './vendor/three/three.module.min.js';
 
 const BASE=new URL('./assets/torch/',import.meta.url);
-export const BAKE_SOURCES=['torch-hall.js','torch-textures.js','torch-bake.js'];
+export const BAKE_SOURCES=['torch-hall.js','torch-ground.js','torch-textures.js','torch-bake.js'];
 /* the volume covers the whole church (x ±14.7, floor to vault crown, apse to the west wall) */
 export const AO_BOX={min:[-14.7,-.3,-18.3],max:[14.7,40.2,41.4],res:.3};
 export const TORCH_RES=.6;
@@ -21,21 +21,40 @@ const hex=buf=>[...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).j
 /* same as tools/torch-bake.cjs and the test: sha-256 over the sources with \r\n folded, first 24 hex digits */
 export async function sourceHash(){const parts=await Promise.all(BAKE_SOURCES.map(f=>fetch(new URL('./'+f,import.meta.url),{cache:'no-store'}).then(r=>r.text())));
  return hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(parts.map(t=>t.replace(/\r\n/g,'\n')).join('\n--\n')))).slice(0,24);}
-const shrink=img=>{const c=document.createElement('canvas');c.width=Math.max(1,img.width>>1);c.height=Math.max(1,img.height>>1);c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c;};
+const bakedCanvases=new WeakSet();
+export const isBakedTorchCanvas=canvas=>bakedCanvases.has(canvas);
+const shrink=img=>{const c=document.createElement('canvas');c.width=Math.max(1,img.width>>1);c.height=Math.max(1,img.height>>1);c.getContext('2d').drawImage(img,0,0,c.width,c.height);bakedCanvases.add(c);return c;};
 async function inflate(buf){return new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());}
 
-/* load the bake if it matches this build; `low` halves the big textures (less GPU memory on the light tier) */
-export async function loadBaked(low){baked=null;record=window.__TORCH_BAKE?new Map():null;if(record)return {ok:false,reason:'baking'};
- try{const man=await (await fetch(new URL('manifest.json',BASE),{cache:'no-store'})).json(),hash=await sourceHash();if(!man||man.hash!==hash)return {ok:false,reason:'stale'};
+/* Keep one tier's CPU assets across route visits. GPU textures are owned by the scene. */
+let cached=null;
+export function loadBaked(low){
+ if(window.__TORCH_BAKE)return Promise.resolve({ok:false,reason:'baking'});
+ if(cached?.low===low)return cached.promise;
+ const entry={low,promise:readBaked(low).then(result=>{if(!result.ok&&cached===entry)cached=null;return result;})};
+ cached=entry;
+ return entry.promise;
+}
+async function readBaked(low){
+ try{const [man,hash]=await Promise.all([fetch(new URL('manifest.json',BASE),{cache:'no-store'}).then(r=>r.json()),sourceHash()]);
+  if(!man||man.hash!==hash)return {ok:false,reason:'stale'};
   const tex={};
-  await Promise.all(Object.entries(man.textures).map(async([key,fields])=>{tex[key]={};await Promise.all(Object.entries(fields).map(async([f,file])=>{
+  const textures=Promise.all(Object.entries(man.textures).map(async([key,fields])=>{tex[key]={};await Promise.all(Object.entries(fields).map(async([f,file])=>{
    const img=new Image();img.decoding='async';img.src=new URL(file,BASE).href;await img.decode();tex[key][f]=low&&img.width>=512?shrink(img):img;}));}));
-  const ao=await inflate(await (await fetch(new URL(man.ao.file,BASE))).arrayBuffer());
-  if(ao.length!==man.ao.dims[0]*man.ao.dims[1]*man.ao.dims[2])return {ok:false,reason:'ao-size'};
-  const tl=await inflate(await (await fetch(new URL(man.torch.file,BASE))).arrayBuffer());if(tl.length!==man.torch.dims[0]*man.torch.dims[1]*man.torch.dims[2])return {ok:false,reason:'torch-size'};
-  const st=await inflate(await (await fetch(new URL(man.stele.file,BASE))).arrayBuffer());if(st.length!==man.stele.dims[0]*man.stele.dims[1]*man.stele.dims[2]*4)return {ok:false,reason:'stele-size'};
-  baked={tex,ao:{data:ao,dims:man.ao.dims,box:man.ao.box},torch:{data:tl,dims:man.torch.dims,box:man.torch.box},stele:{data:st,dims:man.stele.dims,box:man.stele.box}};return {ok:true};}
+  const volume=async(key,channels=1)=>{const {file,dims,box}=man[key];
+   const data=await inflate(await (await fetch(new URL(file,BASE))).arrayBuffer());
+   if(data.length!==dims[0]*dims[1]*dims[2]*channels)throw Error(key+'-size');
+   return {data,dims,box};};
+  const [ao,torch,stele]=await Promise.all([volume('ao'),volume('torch'),volume('stele',4),textures]);
+  return {ok:true,assets:{tex,ao,torch,stele}};}
  catch(e){return {ok:false,reason:String(e&&e.message||e)};}}
+
+/* Hall builders read these assets synchronously. A cancelled visit can never install them. */
+export function withBaked(result,build){
+ baked=result.assets||null;
+ record=window.__TORCH_BAKE?new Map():null;
+ try{return build();}finally{baked=null;}
+}
 /* a set of maps by name: the baked images when there are some, else drawn now (and noted when baking) */
 export function maps(key,make){if(baked&&baked.tex[key])return baked.tex[key];const t0=performance.now();const o=make();if(record){record.set(key,o);console.log('BAKESTEP texture',key,Math.round(performance.now()-t0),'ms');}return o;}
 export function bakedAO(){return baked?{ao:baked.ao,torch:baked.torch,stele:baked.stele}:null;}
@@ -117,8 +136,10 @@ const b64=u8=>{let bin='';for(let i=0;i<u8.length;i+=8192)bin+=String.fromCharCo
 export async function exportBake(scene,torches,stele){const out={files:{},textures:{}};
  /* encode every canvas at once (the browser encodes off the main thread, in parallel) */
  const jobs=[];for(const [key,o] of record||[]){out.textures[key]={};for(const [f,c] of Object.entries(o)){if(!c||!c.toBlob)continue;
-  const name=key+'.'+f+'.webp',q=f==='normal'?.96:.9;out.textures[key][f]=name;
-  jobs.push(new Promise(r=>c.toBlob(r,'image/webp',q)).then(async blob=>{out.files[name]=b64(new Uint8Array(await blob.arrayBuffer()));}));}}
+  const lossless=f==='normal'&&(key==='plinthRelief'||key==='steleMarble');
+  const format=lossless?'png':'webp',name=key+'.'+f+'.'+format,q=f==='normal'||key==='plinthRelief'?.96:.9;
+  out.textures[key][f]=name;
+  jobs.push(new Promise(r=>c.toBlob(r,'image/'+format,q)).then(async blob=>{out.files[name]=b64(new Uint8Array(await blob.arrayBuffer()));}));}}
  const te=performance.now();await Promise.all(jobs);console.log('BAKESTEP encoded',jobs.length,'images',Math.round(performance.now()-te),'ms');
  const tv=performance.now();const vols=computeVolumes(scene,torches,stele);console.log('BAKESTEP volumes',Math.round(performance.now()-tv),'ms');const zip=async u8=>new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
  out.files['ao.bin']=b64(await zip(vols.ao.data));out.files['torch.bin']=b64(await zip(vols.torch.data));out.files['stele.bin']=b64(await zip(vols.stele.data));

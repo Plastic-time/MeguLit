@@ -124,21 +124,24 @@ for(const [name,pid,started,sameProcess] of [
  ['a different PID',102,'1234567890123',false],
  ['the same PID with a new start time',101,'1234567890124',false],
  ['a reconnect to the same process',101,'1234567890123',true],
-])test(`NVL evidence stays with its process: ${name}`,t=>{
+])test(`NVL evidence stays with its process: ${name}`,async t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-page-'));
  for(const file of ['HookBridge.exe','LunaHost64.dll','LunaHook32.dll','LunaHook64.dll'])fs.writeFileSync(path.join(dir,file),'');
  let now=1000,child,spawns=0;
  const out=[];
  const spawn=()=>{
   const bridge=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stdin:new PassThrough()});
-  bridge.stdin.on('finish',()=>bridge.stdout.end());
+  bridge.stdin.on('finish',()=>{
+   bridge.stdout.end();
+   if(bridge.exitCode==null){bridge.exitCode=0;bridge.emit('exit',0,null);}
+  });
   child=bridge;
   spawns++;
   return bridge;
  };
  const h=new HookNative({native:dir,hook:dir,logs:dir},m=>out.push(m),spawn,()=>now);
  h.trace=()=>{};
- t.after(()=>{h.stop();fs.rmSync(dir,{recursive:true,force:true});});
+ t.after(async()=>{await h.stop();fs.rmSync(dir,{recursive:true,force:true});});
  const bind=(pid,started)=>h.configure({hookAutoStart:true,bindEnabled:true,hookProfile:'read'},
   {gameProcessId:pid,gameStarted:started,gameHwnd:'123',processName:'Game',bound:true});
  const feed=text=>{now+=1500;h.emitSource(text,'live');};
@@ -153,10 +156,15 @@ for(const [name,pid,started,sameProcess] of [
 
  if(sameProcess){
   child.stdin.end();
-  child.emit('exit',1);
+  child.exitCode=1;child.emit('exit',1,null);
   now+=1000;
   h.tick();
- }else bind(pid,started);
+ }else{
+  bind(pid,started);
+  assert.equal(spawns,1);
+  await h.stopPending;
+  h.tick();
+ }
  assert.equal(spawns,2);
  out.length=0;
  const lines=[E,'近所を散歩してくる。','夕方までには帰ろう。'];

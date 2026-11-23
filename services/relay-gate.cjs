@@ -20,6 +20,8 @@ const TTL=[
 ];
 const ttlFor=pathname=>{for(const[re,s]of TTL)if(re.test(pathname))return s;return 0;};
 const MAX_ENTRIES=300;
+let required=null;
+const requiredStatus=()=>required?{...required}:null;
 function headerOf(init,name){const h=init?.headers;if(!h)return '';if(typeof h.get==='function')return h.get(name)||'';const k=Object.keys(h).find(k=>k.toLowerCase()===name);return k?String(h[k]):'';}
 function retryAfterSeconds(response){
  const raw=String(response?.headers?.get?.('retry-after')||'').trim();if(!raw)return 60;
@@ -38,18 +40,23 @@ function createGate(fetcher,options={}){
  async function gated(input,init={}){
   const url=typeof input==='string'?input:input?.url||String(input);
   if(!isRelay(url))return fetcher(input,init);
+  const headers=new Headers(init.headers||(typeof input==='object'?input.headers:undefined));
+  const version=options.version?.();if(version)headers.set('x-megulit-version',version);
+  init={...init,headers};
+  if(required&&/^(POST|PUT|PATCH)$/.test(init.method||input?.method||'GET')&&/^\/api\/(feedback|diagnostics|probe|adapters|contrib|cardinal|game-profile|torch)(\/|$)/.test(new URL(url).pathname))return new Response(JSON.stringify({ok:false,error:'UPDATE_REQUIRED',...required}),{status:426,headers:{'content-type':'application/json','retry-after':'86400'}});
   /* 2026-11-15 (v1.4.10 user could not send logs) a one-click report (一键上传问题反馈: logs + reason) always goes out:
      a 429 or backoff from the background adaptation-contribution chunks used to make it fail at once with a local
      RATE_LIMITED; the relay still rate-limits it itself */
   const method0=String(init.method||'GET').toUpperCase(),userSend=method0==='POST'&&/^\/api\/(diagnostics|feedback)$/.test(new URL(url).pathname);
   const t=now();if(!userSend&&t<blockedUntil)return limited(Math.ceil((blockedUntil-t)/1000));
   if(!userSend&&t<failUntil)throw Object.assign(new TypeError('fetch failed'),{cause:{code:'MEGULIT_BACKOFF'}});
-  const method=String(init.method||'GET').toUpperCase(),path=new URL(url).pathname,ttl=method==='GET'?ttlFor(path):0;
+  const method=String(init.method||'GET').toUpperCase(),path=new URL(url).pathname,ttl=method==='GET'&&init.cache!=='no-store'?ttlFor(path):0;
   const key=ttl?url+'\n'+headerOf(init,'authorization'):'';
   if(key){const hit=cache.get(key);if(hit&&hit.until>t)return replay(hit);if(inflight.has(key))return replay(await inflight.get(key));}
   const run=(async()=>{
    count();let r;
    try{r=await fetcher(input,init);}catch(error){if(error?.name!=='TimeoutError'&&error?.name!=='AbortError'){failures++;failUntil=now()+Math.min(120,2**failures)*1000;}throw error;}
+   if(r.status===426){try{const body=await r.clone().json();if(body.error==='UPDATE_REQUIRED')required={latest:body.latest||'',minVersion:body.minVersion||'',message:body.message||''};}catch{}}
    if(r.status===429){const s=retryAfterSeconds(r);blockedUntil=Math.max(blockedUntil,now()+s*1000);}
    if(r.status>=500){failures++;failUntil=now()+Math.min(120,2**failures)*1000;}else failures=0;
    if(method!=='GET'&&r.ok)cache.clear();
@@ -70,7 +77,7 @@ function currentHosts(){const out=[...DEFAULT_HOSTS];try{const base=require('./r
 let installed=null;
 function install(){
  if(installed)return installed;if(process.env.NODE_TEST_CONTEXT||typeof globalThis.fetch!=='function')return null;
- const inner=globalThis.fetch.bind(globalThis);installed=createGate(inner,{hosts:currentHosts});globalThis.fetch=installed;return installed;
+ const inner=globalThis.fetch.bind(globalThis);installed=createGate(inner,{hosts:currentHosts,version:()=>{try{return require('./shared-adaptation.cjs').appVersion(process.env.MEGULIT_ROOT||process.env.TOME_FINAL_ROOT||require('node:path').resolve(__dirname,'..'));}catch{return '';}}});globalThis.fetch=installed;return installed;
 }
 function stats(){return installed?installed.stats():{perMinute:0,blockedFor:0,cached:0};}
-module.exports={createGate,install,stats,ttlFor,retryAfterSeconds,DEFAULT_HOSTS};
+module.exports={createGate,install,stats,ttlFor,retryAfterSeconds,DEFAULT_HOSTS,requiredStatus};

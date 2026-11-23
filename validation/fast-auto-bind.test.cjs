@@ -7,7 +7,7 @@ test('a launch asks the bridge to enter the game from the start and cancels on f
  const src=read('services/bridge.cjs');
  assert.match(src,/runtime\?\.prepareGame\(game\.executable,\{enter:true\}\);/);
  assert.doesNotMatch(src,/prepareGame\(game\.executable,\{enter:false\}\)/);
- assert.match(src,/\}catch\(error\)\{if\(launcherRun\)[\s\S]{0,300}send\(\{type:'enterGame',cancel:true\}\)/);
+ assert.match(src,/\}catch\(error\)\{[^\n]*?if\(launcherRun\)[\s\S]{0,300}send\(\{type:'enterGame',cancel:true\}\)/);
  assert.match(src,/lib\.locale\.launch\(launchVia,\{trace,alsoExe:game\.executable\}\)/);
 });
 test('the bridge binds on EVENT_OBJECT_SHOW and compares programs by file identity',()=>{

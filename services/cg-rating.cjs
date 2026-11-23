@@ -55,7 +55,7 @@ function ask(root,file){return new Promise(resolve=>{if(!worker)worker=startWork
 /* ---- ratings per game ---- */
 const ratingsFile=cacheDir=>path.join(cacheDir,'ratings.json');
 function ratings(cacheDir){try{return JSON.parse(fs.readFileSync(ratingsFile(cacheDir),'utf8'))||{};}catch{return {};}}
-function remember(cacheDir,name,value){const all=ratings(cacheDir);all[name]=value;try{fs.mkdirSync(cacheDir,{recursive:true});fs.writeFileSync(ratingsFile(cacheDir)+'.tmp',JSON.stringify(all));fs.renameSync(ratingsFile(cacheDir)+'.tmp',ratingsFile(cacheDir));}catch{}}
+function remember(cacheDir,name,value,sourceKey=''){const all=ratings(cacheDir);all[name]={...value,...(sourceKey?{sourceKey}:{})};try{fs.mkdirSync(cacheDir,{recursive:true});fs.writeFileSync(ratingsFile(cacheDir)+'.tmp',JSON.stringify(all));fs.renameSync(ratingsFile(cacheDir)+'.tmp',ratingsFile(cacheDir));}catch{}}
 /* a picture is shown only when the model's answer is safe */
 const isSafe=v=>!!v&&v.label==='safe';
 const queue=[],queued=new Set();let busy=false;
@@ -68,7 +68,7 @@ async function pump(){
  if(busy||!queue.length)return;busy=true;
  try{const root=queue[0].root;if(!ready(root)&&!(await prepare(root))){for(const j of queue.splice(0))queued.delete(j.cacheDir+'|'+j.name);return;}
   while(queue.length){const job=queue.shift();let file='';try{file=job.picture(job.name);}catch(e){log(job.root,'picture failed '+job.name+' '+e.message);}
-   if(file){const r=await ask(job.root,file);if(r&&!r.error)remember(job.cacheDir,job.name,{label:r.label,safe:r.safe,r15:r.r15,r18:r.r18,model:r.model});else log(job.root,'rate failed '+job.name+' '+(r&&r.error));}
+   if(file){let sourceKey='';try{sourceKey=JSON.parse(fs.readFileSync(path.join(job.cacheDir,job.name+'.source.json'),'utf8')).key||'';}catch{}const r=await ask(job.root,file);if(r&&!r.error)remember(job.cacheDir,job.name,{label:r.label,safe:r.safe,r15:r.r15,r18:r.r18,model:r.model},sourceKey);else log(job.root,'rate failed '+job.name+' '+(r&&r.error));}
    queued.delete(job.cacheDir+'|'+job.name);}
  }finally{busy=false;}}
 const status=root=>({ready:ready(root),preparing:!!preparing,error:lastError,queued:queue.length});

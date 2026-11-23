@@ -1,0 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),{yurisSources}=require('../services/story-discovery.cjs');
+function fixture(tail){const head=Buffer.alloc(12);head.write('YSTL');head.writeUInt32LE(450,4);head.writeUInt32LE(2,8);return Buffer.concat([head,...['source/route-one.yst','source/route-two.yst'].map((s,i)=>{const name=Buffer.from(s),h=Buffer.alloc(8);h.writeUInt32LE(i);h.writeUInt32LE(name.length,4);return Buffer.concat([h,name,Buffer.alloc(tail)]);})]);}
+test('both observed complete YSTL record layouts retain their script IDs and only basename metadata',()=>{for(const tail of [16,20])assert.deepEqual(yurisSources(fixture(tail)),[{id:0,name:'route-one.yst'},{id:1,name:'route-two.yst'}]);});
+test('truncated, trailing, duplicate-ID, oversized and unknown-tail source tables stay unknown',()=>{const good=fixture(16);for(const b of [good.subarray(0,-1),Buffer.concat([good,Buffer.from([0])]),fixture(18),Buffer.alloc(2*1024*1024+1)])assert.deepEqual(yurisSources(b),[]);const duplicate=Buffer.from(good),next=12+8+Buffer.byteLength('source/route-one.yst')+16;duplicate.writeUInt32LE(0,next);assert.deepEqual(yurisSources(duplicate),[]);});

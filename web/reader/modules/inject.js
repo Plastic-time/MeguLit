@@ -6,7 +6,7 @@
   }
   if (window.__tomoyoChinese) return;
   const bridge = window.__tomoyoChinese = { current: '', serial: 0, timer: null };
-  bridge.refresh = () => { if(bridge.refreshPageTranslations?.())return;bridge.current = ''; bridge.serial++; clearTimeout(bridge.timer); schedule(); };
+  bridge.refresh = () => { bridge.cardinalPair?.refresh();bridge.choiceOverlay?.refresh();if(bridge.refreshPageTranslations?.())return;bridge.current = ''; bridge.serial++; clearTimeout(bridge.timer); schedule(); };
   bridge.sourceText = '';
   let row, output, parent;
   let translationVisible = true;
@@ -14,6 +14,7 @@
   bridge.setTranslationVisible = value => {
     if (translationVisible === !!value) return;
     translationVisible = !!value;
+    bridge.cardinalPair?.refresh();
     bridge.refresh();
     if (output) output.hidden = !enabled || !translationVisible;
     try { window.__tomoyoTranslateRequest(JSON.stringify({ id: bridge.serial, disabled: !translationVisible })); } catch {}
@@ -24,6 +25,8 @@
     const next = !!value;
     if (next === enabled) return;
     enabled = next;
+    bridge.choiceOverlay?.refresh();
+    bridge.cardinalPair?.refresh();
     localStorage.setItem('tomoyo-chinese-enabled', String(enabled));
     bridge.current = '';
     bridge.serial++;
@@ -69,10 +72,16 @@
   }
   function settled() { if (!output || output.dataset.state !== 'ready' || !output.textContent.trim() || output.textContent === '翻译中…') return; const prev = output.style.minHeight; output.style.minHeight = ''; const h = output.getBoundingClientRect().height; output.style.minHeight = prev;
     if (h > 0) { recentHeights.push(h); if (recentHeights.length > 3) recentHeights.shift(); if (h > (parseFloat(prev) || 0)) output.style.minHeight = Math.ceil(h) + 'px'; } }
-  function setText(text, error = false, animate = false) {
+  bridge.markTranslationSource=(node,context)=>{if(!node)return;
+    const source=['script','patch','official','machine','local','api','mt','filled'].includes(context?.source)?context.source:'unknown';
+    Object.assign(node.dataset,{translationSource:context?.cached?'cache':source,translationOrigin:source,translationProvider:context?.provider||''});
+  };
+  function setText(text, error = false, animate = false, context=null) {
     if (!output) return;
+    bridge.markTranslationSource(output,context);
     const was = output.dataset.state === 'ready' ? [...output.textContent] : [];
     output.dataset.state = error ? 'error' : 'ready';
+    bridge.cardinalPair?.notify();
     if (output.textContent === text) return;
     if (animate && window.TomeTypewriter) { const now = [...text]; let from = 0; while (from < was.length && from < now.length && was[from] === now[from]) from++; window.TomeTypewriter.text(output, text, { from }); }
     else {
@@ -130,6 +139,7 @@
     if (!ensureRow(sentence)) { skip('no sentence window'); return; }
     const chars = sentence.querySelectorAll('.char-token');
     const text = (chars.length ? Array.from(chars, c => c.textContent).join('') : sentence.textContent).trim();
+    bridge.cardinalPair?.bind(null, sentence, output);
     if (text !== bridge.sourceText) { bridge.sourceText = text; bridge.onSourceText?.(text); }
     if (!enabled || !translationVisible || !text || text === bridge.current) { skip(!enabled ? 'translation off' : !translationVisible ? 'translation hidden' : !text ? 'empty line' : 'already asked', text); return; }
     const growing = grown(bridge.current, text) && output.dataset.state === 'ready' && !!output.textContent;
@@ -158,7 +168,7 @@
     if(sentence&&text&&enabled&&translationVisible&&!output?.isConnected&&ensureRow(sentence))reserve(text);
     /* 2026-11-13 (STEINS;GATE: each new line showed the previous line's translation for ~250 ms): the translation is
        requested after a 220 ms debounce, so the old one goes the moment the source line changes */
-    if(output&&text&&text!==bridge.current&&enabled&&translationVisible&&output.dataset.state!=='pending'&&!(output.dataset.state==='ready'&&grown(bridge.current,text))){reserve(text);window.TomeTypewriter?.stop(output);output.replaceChildren();output.dataset.state='pending';}
+    if(output&&text&&text!==bridge.current&&enabled&&translationVisible&&output.dataset.state!=='pending'&&!(output.dataset.state==='ready'&&grown(bridge.current,text))){reserve(text);window.TomeTypewriter?.stop(output);output.replaceChildren();bridge.markTranslationSource(output,null);output.dataset.state='pending';}
     clearTimeout(bridge.timer);
     bridge.timer = setTimeout(read, 220);
   }
@@ -225,11 +235,12 @@
     if (mine && output.dataset.state === 'ready' && output.textContent.trim() && !bridge.lastTranslationError && kind !== 'better') return;
     if (!mine) { bridge.current = shown; bridge.serial++; }
     output.dataset.state = 'ready';
-    bridge.lastTranslationError = ''; setText(text, false, true); bridge.alignText?.();
+    bridge.returnedTranslation={line:shown,id:bridge.serial,target:bridge.translationTarget(),...context,source:context?.source||(['better','late','guard'].includes(kind)?'':kind)};bridge.refreshTranslationOrigin?.();
+    bridge.lastTranslationError = ''; setText(text, false, true,bridge.returnedTranslation); bridge.alignText?.();
   };
   bridge.deliver = (id, text, error, message = '', context = null) => {
     if (!bridge.acceptTranslationTarget(context)) return;
-    if(bridge.deliverPageTranslation?.(id,text,error,message))return;
+    if(bridge.deliverPageTranslation?.(id,text,error,message,context))return;
     if (id !== bridge.serial || !enabled || !translationVisible || !output?.isConnected) return;
     if ((error || !String(text || '').trim()) && bridge.growingId === id && output.textContent) {
       const source = bridge.current;
@@ -240,6 +251,7 @@
       }, 1500);
       return;
     }
+    bridge.returnedTranslation={line:bridge.current,id,target:bridge.translationTarget(),...context,source:error?'':context?.source};bridge.refreshTranslationOrigin?.();
     bridge.lastTranslationError = error ? message || '暂时无法翻译，请检查网络' : '';
     const local = /^LOCAL_RUNTIME_DOWNLOADING:?(\d*)/.exec(message||'') ? (Number(/:(\d+)/.exec(message)?.[1])>0 ? `正在下载本地翻译服务程序 ${/:(\d+)/.exec(message)[1]}%，下载完自动开始翻译` : '正在下载本地翻译服务程序，下载完自动开始翻译')
       : message === 'LOCAL_STARTING' ? '服务程序已就绪，正在启动本地模型…'
@@ -247,7 +259,7 @@
       : message === 'LOCAL_SERVER_FAILED' ? '本地模型没能启动（可能是显存不够）· 可以换小一点的模型或改用在线翻译'
       : message === 'LOCAL_RUNTIME_MISSING' ? '缺少本地翻译服务程序 · Alt+T 打开设置安装' : '';
     if (error && local) bridge.lastTranslationError = local;
-    setText(error ? local || (bridge.quietTranslation ? '翻译暂不可用 · Alt+T' : message || '暂时无法翻译，请检查网络，按 Alt+T 打开设置重试') : text, !!error, !error);
+    setText(error ? local || (bridge.quietTranslation ? '翻译暂不可用 · Alt+T' : message || '暂时无法翻译，请检查网络，按 Alt+T 打开设置重试') : text, !!error, !error,error?null:context);
     bridge.alignText?.();
   };
   const observer = new MutationObserver(records => {

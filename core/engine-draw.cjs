@@ -16,7 +16,7 @@ const MAX=64;
 /* draw.viaRoles entries the engine DLL understands: "<hex rva>[,<hex rva>...]=<role>" (BGI, native/megulithook/BgiDraw.h) */
 const VIA_ROLE=/^[0-9a-f]{1,8}(?:,[0-9a-f]{1,8}){0,5}=(?:line|name|choice|button|menu|system)$/;
 function viaRoles(v){const r=Array.isArray(v)?v.filter(s=>typeof s==='string'&&VIA_ROLE.test(s)).slice(0,16):[];return r.length?{viaRoles:r}:{};}/* none = the settings as before */
-function settings(profile){const frames=Profiles.get(profile,'choice.pageFrames',[]);return {clear:Profiles.get(profile,'page.reportClear',false)===true,choiceFrames:Array.isArray(frames)?frames.filter(f=>typeof f==='string'&&f&&!/[\r\n]/.test(f)).slice(0,20):[],roles:Profiles.get(profile,'draw.roles',false)===true,...(Profiles.get(profile,'draw.advhdInput',false)===true?{advhdInput:true}:{}),...viaRoles(Profiles.get(profile,'draw.viaRoles',[])),embed:Profiles.get(profile,'draw.embed',false)===true,zh:Profiles.get(profile,'draw.embedTranslation',true)!==false,...withTable(tableLine(Profiles.get(profile,'draw.engineTable',null)))};}
+function settings(profile){const frames=Profiles.get(profile,'choice.pageFrames',[]);return {clear:Profiles.get(profile,'page.reportClear',false)===true,choiceFrames:Array.isArray(frames)?frames.filter(f=>typeof f==='string'&&f&&!/[\r\n]/.test(f)).slice(0,20):[],roles:Profiles.get(profile,'draw.roles',false)===true,...(Profiles.get(profile,'draw.advhdInput',false)===true?{advhdInput:true}:{}),...(Profiles.get(profile,'draw.cmvsInput',false)===true?{cmvsInput:true}:{}),...(Profiles.get(profile,'draw.fvpInput',false)===true?{fvpInput:true}:{}),...(Profiles.get(profile,'draw.minoriInput',false)===true?{minoriInput:true}:{}),...(Profiles.get(profile,'draw.spikechunsoftInput',false)===true?{spikechunsoftInput:true}:{}),...viaRoles(Profiles.get(profile,'draw.viaRoles',[])),embed:Profiles.get(profile,'draw.embed',false)===true,zh:Profiles.get(profile,'draw.embedTranslation',true)!==false,...withTable(tableLine(Profiles.get(profile,'draw.engineTable',null)))};}
 const withTable=t=>t?{table:t}:{};
 /* draw.engineTable (the version layer: this exe's addresses for an engine DLL that finds its functions by signature and
    checks them against the table, e.g. MAGES) -> one control-file line "#table <engine> key=value ..."; '' = none */
@@ -36,7 +36,7 @@ const clean=t=>String(t||'').replace(/\t/g,' ').replace(/\r?\n/g,'\u001f');
 /* ---- KiriKiri transport: %TEMP%\MeguLit\draw\<pid>.txt, UTF-16LE with BOM (both KiriKiri 2 and Z read it) ---- */
 function krkrControlPath(pid,tmp=os.tmpdir()){return path.join(tmp,'MeguLit','draw',(Number(pid)|0)+'.txt');}
 function krkrControlText(cfg,entries){
- const lines=['#cfg roles='+(cfg.roles?1:0)+' embed='+(cfg.embed?1:0)+' zh='+(cfg.zh?1:0)+(cfg.advhdInput===true?' advhdInput=1':'')];
+ const lines=['#cfg roles='+(cfg.roles?1:0)+' embed='+(cfg.embed?1:0)+' zh='+(cfg.zh?1:0)+(cfg.advhdInput===true?' advhdInput=1':'')+(cfg.cmvsInput===true?' cmvsInput=1':'')+(cfg.fvpInput===true?' fvpInput=1':'')+(cfg.minoriInput===true?' minoriInput=1':'')+(cfg.spikechunsoftInput===true?' spikechunsoftInput=1':'')];
  if(cfg.table)lines.push(cfg.table);
  if(cfg.clear)lines.push('#clearline');
  for(const f of cfg.choiceFrames||[])lines.push('#choiceframe '+f);
@@ -46,24 +46,31 @@ function krkrControlText(cfg,entries){
 }
 class KrkrTransport{
  constructor(pid,{tmp=os.tmpdir(),delay=40}={}){this.file=krkrControlPath(pid,tmp);this.delay=delay;this.timer=null;this.last='';}
- write(cfg,entries){clearTimeout(this.timer);this.timer=setTimeout(()=>this.flush(cfg,entries),this.delay);this.timer.unref?.();}
- flush(cfg,entries){clearTimeout(this.timer);this.timer=null;const text=krkrControlText(cfg,entries);if(text===this.last)return;this.last=text;
+ write(cfg,entries){if(this.closed)return;clearTimeout(this.timer);this.timer=setTimeout(()=>this.flush(cfg,entries),this.delay);this.timer.unref?.();}
+ flush(cfg,entries){if(this.closed)return;clearTimeout(this.timer);this.timer=null;const text=krkrControlText(cfg,entries);if(text===this.last)return;this.last=text;
   try{fs.mkdirSync(path.dirname(this.file),{recursive:true});const t=this.file+'.'+process.pid+'.tmp';fs.writeFileSync(t,Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from(text,'utf16le')]));fs.renameSync(t,this.file);}catch{}}
- stop(){clearTimeout(this.timer);this.timer=null;try{fs.unlinkSync(this.file);}catch{}}
+ stop({terminal=false}={}){if(terminal)this.closed=true;clearTimeout(this.timer);this.timer=null;
+  try{fs.unlinkSync(this.file);}catch(error){if(error.code!=='ENOENT'){
+   // A locked file may still allow writing. This confirms the control bytes, not a native drain ACK.
+   const text='#cfg roles=0 embed=0 zh=0 advhdInput=0 cmvsInput=0 fvpInput=0 minoriInput=0\r\n',off=Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from(text,'utf16le')]);
+   try{fs.writeFileSync(this.file,off);if(!fs.readFileSync(this.file).equals(off))throw Error('CONTROL_READBACK_MISMATCH');}
+   catch(cause){const failed=Error('READER_STOP_INCOMPLETE',{cause});failed.code='READER_STOP_INCOMPLETE';failed.controlFile=this.file;failed.unlinkError=error;throw failed;}
+  }}this.last='';
+ }
 }
 
 /* One game process. `transport` = {write(cfg, entries), stop()} */
 class EngineDraw{
  constructor({profile,transport,onAsk=()=>{}}){this.cfg=settings(profile);this.transport=transport;this.onAsk=onAsk;this.entries=new Map();this.asked=new Set();this.sync();}
- setProfile(profile){const c=settings(profile);if(JSON.stringify(c)===JSON.stringify(this.cfg))return;this.cfg=c;this.sync();}
- get active(){return this.cfg.roles||this.cfg.embed||this.cfg.clear||this.cfg.advhdInput===true||(this.cfg.choiceFrames||[]).length>0;}
- sync(){if(this.active)this.transport.write(this.cfg,this.entries);else this.transport.stop();}
+ setProfile(profile){if(this.closed)return;const c=settings(profile);if(JSON.stringify(c)===JSON.stringify(this.cfg))return;this.cfg=c;this.sync();}
+ get active(){return !this.closed&&(this.cfg.roles||this.cfg.embed||this.cfg.clear||this.cfg.advhdInput===true||this.cfg.spikechunsoftInput===true||this.cfg.cmvsInput===true||this.cfg.fvpInput===true||this.cfg.minoriInput===true||(this.cfg.choiceFrames||[]).length>0);}
+ sync(){if(this.closed)return;if(this.active)this.transport.write(this.cfg,this.entries);else this.transport.stop();}
  /* a dialogue record (role=line) without emb: ask the reader for its replacement once */
- line(rec){if(!this.cfg.embed||!rec||rec.emb)return false;const k=keyOf(rec.text);if(!k||this.entries.has(k)||this.asked.has(k))return false;
+ line(rec){if(this.closed||!this.cfg.embed||!rec||rec.emb)return false;const k=keyOf(rec.text);if(!k||this.entries.has(k)||this.asked.has(k))return false;
   this.asked.add(k);if(this.asked.size>4*MAX)this.asked.delete(this.asked.values().next().value);this.onAsk({key:k,text:k,engine:rec.engine});return true;}
- put(key,{ruby=[],zh=''}={}){const k=keyOf(key);if(!k)return;this.entries.delete(k);this.entries.set(k,{ruby,zh:String(zh||'')});
+ put(key,{ruby=[],zh=''}={}){if(this.closed)return;const k=keyOf(key);if(!k)return;this.entries.delete(k);this.entries.set(k,{ruby,zh:String(zh||'')});
   while(this.entries.size>MAX)this.entries.delete(this.entries.keys().next().value);if(this.cfg.embed)this.transport.write(this.cfg,this.entries);}
- stop(){this.transport.stop();this.entries.clear();this.asked.clear();}
+ stop(){this.closed=true;try{return this.transport.stop({terminal:true});}finally{this.entries.clear();this.asked.clear();}}
 }
 
 /* ---- UI items -> the reader's art-text items (web/reader/modules/art-text.js: an invisible, look-up-able copy of each row

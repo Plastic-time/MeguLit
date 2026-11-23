@@ -137,7 +137,7 @@ test('draft: findings → a valid pack (index source, Blowfish key, scripts only
 
 /* ---- the loop: store → bundle → relay → pack → feed → rebuild → verdict -------------------------------------------- */
 const relayDir=path.join(__dirname,'..','relay'),MIGRATION=fs.readdirSync(path.join(relayDir,'migrations')).filter(f=>f.endsWith('.sql')).sort().map(f=>fs.readFileSync(path.join(relayDir,'migrations',f),'utf8')).join('');
-function d1(){const db=new DatabaseSync(':memory:');db.exec(MIGRATION);const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>{db.prepare(sql).run(...args);return {success:true};}});return {prepare:sql=>stmt(sql),raw:db};}
+function d1(){const db=new DatabaseSync(':memory:');db.exec(MIGRATION);const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>({success:true,meta:{changes:Number(db.prepare(sql).run(...args).changes)}}),_run:()=>({meta:{changes:Number(db.prepare(sql).run(...args).changes)}})});return {prepare:sql=>stmt(sql),raw:db,batch:async statements=>{db.exec('BEGIN IMMEDIATE');try{const results=statements.map(s=>s._run());db.exec('COMMIT');return results;}catch(e){db.exec('ROLLBACK');throw e;}}};}
 function r2(){const store=new Map();return {store,put:async(k,b)=>{store.set(k,new Uint8Array(b));},get:async k=>store.has(k)?{body:store.get(k)}:null,delete:async k=>{store.delete(k);}};}
 const issues=[];const ENV={DB:d1(),BUCKET:r2(),LINK_SECRET:'link',HASH_SALT:'salt',ADAPTER_ADMIN_TOKEN:'admin-token',GITHUB_TOKEN:'gh',GITHUB_REPO:'o/r',fetch:async(url,init)=>{issues.push(JSON.parse(init.body));return new Response(JSON.stringify({html_url:'https://github.com/o/r/issues/7'}),{status:201});}};
 let handle;const relay=async()=>handle??=(await import(pathToFileURL(path.join(relayDir,'src','worker.js')).href)).handle;
@@ -158,7 +158,7 @@ test('default on (2026-11-14): on with no stored value, the Settings switch and 
  for(const loc of ['zh','en']){const t=rh.explain(loc);assert.ok(t.reads.length&&t.uploads.length&&t.never.length&&t.consent);}
  assert.match(rh.explain('zh').reads[0],/只读/);
 });
-test('loop: findings join the probe bundle, every item listed, relay accepts it, issue shows a runtime line',async()=>{
+test('loop: findings join the probe bundle, every item listed, relay queues the review and stores the runtime evidence',async()=>{
  const probe=require('../services/adapter-probe.cjs'),sample=require('../services/adapter-sample.cjs');
  probe.start(R,DB,{reason:'test',perGameMs:60000});for(let i=0;i<400&&probe.status(R).state==='running';i++)await new Promise(r=>setTimeout(r,100));
  assert.equal(probe.results(R)['g-rhpk'].step,'unknown-pack','the offline probe cannot open it');
@@ -170,8 +170,14 @@ test('loop: findings join the probe bundle, every item listed, relay accepts it,
  const kinds=prep.manifest[0].items.map(i=>i.kind);for(const k of ['runtime-key','runtime-index','runtime-dispatch','runtime-script','runtime-constants'])assert.ok(kinds.includes(k),k);
  assert.ok(prep.manifest[0].items.filter(i=>i.kind.startsWith('runtime')).every(i=>i.name&&i.bytes>0),'each runtime item has a name and a size the dialog shows');
  const u=await sample.upload(R,{hash:prep.hash,fetcher});assert.equal(u.state,'uploaded',JSON.stringify(u));
- assert.match(issues.at(-1).body,/runtime \(v1\): keys blowfish/);assert.deepEqual(leaks({b:issues.at(-1).body.replace(/^### .*$/gm,'')}),[],'only the title the user chose to share');
- test.bundle=bundle;
+ const receipt=ENV.DB.raw.prepare('SELECT object_key FROM probe_bundles').get();
+ const stored=JSON.parse(new TextDecoder().decode((await ENV.BUCKET.get(receipt.object_key)).body));
+ assert.deepEqual(stored,bundle);
+ assert.ok(stored.games[0].runtime.keys.some(key=>key.algo==='blowfish'));
+ const review=ENV.DB.raw.prepare('SELECT body FROM seed_admin_items').get();
+ assert.equal(JSON.parse(review.body).step,bundle.games[0].step);
+ assert.deepEqual(leaks(review),[]);
+ test.bundle=stored;
 });
 test('loop: the pack built from those findings comes back, the game is read offline, the verdict is reported',async()=>{
  const feed=require('../services/adapter-feed.cjs'),g=test.bundle.games[0];

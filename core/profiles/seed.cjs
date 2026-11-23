@@ -21,7 +21,7 @@ const SEED_FIELDS=['status','slug','builds','match','sourceLangs','seedFormat','
    ext: an extension area ({<name>: anything}) a client that does not know <name> ignores. Unknown top-level fields and unknown
    settings keys are ignored too (an older client reading a newer seed); known fields and keys are checked strictly. */
 const SEED_FORMAT=1;
-const GAME_DIFF_FIELDS=new Set(['schema','version','key','layer','prints','rev','source','mode','settings','exe','engine','app','issuedAt','agree','reporters','cost','signature']);
+const GAME_DIFF_FIELDS=new Set(['evidence','schema','version','key','layer','prints','rev','source','mode','settings','exe','engine','app','issuedAt','agree','reporters','cost','signature']);
 const {clean,DOMAINS}=require('./domains.cjs');
 /* the document as this client understands it: known fields only, settings without unknown keys; ignored = what was left out */
 function known(d){const ignored=[],doc={};for(const [k,v] of Object.entries(d)){if(GAME_DIFF_FIELDS.has(k)||SEED_FIELDS.includes(k))doc[k]=v;else ignored.push(k);}
@@ -57,7 +57,7 @@ function check(d0,{engine,slug,file}={}){const e=[];const bad=m=>e.push(m);
   if(d.layer!=='version')bad('layer');
   for(const k of SEED_FIELDS)if(k in d)bad(k+' belongs to game.json');
   if(!HEX.test(String(d.key||'')))bad('key');else if(file&&file!==d.key+'.json')bad('file name is not <key>.json');
-  if(d.prints&&(d.prints.exe!==undefined&&d.prints.exe!==d.key||['pack','script','steam','vndb','title'].some(k=>k in d.prints)))bad('a version seed has its own exe prints only');
+  if(d.prints&&(d.prints.exe!==undefined&&d.prints.exe!==d.key||['pack','steam','vndb','title'].some(k=>k in d.prints)||d.prints.script&&!d.evidence))bad('a version seed has its own exe prints only');
   if(d.exe&&/[\\/]/.test(d.exe))bad('exe is a file name');}
  if(d.prints!==undefined){const p=gamePrint.check(d.prints);if(Object.keys(p).length!==Object.keys(d.prints).length)bad('prints');}
  if(PRIVATE.test(JSON.stringify(d)))bad('a path, user folder or address');
@@ -70,7 +70,8 @@ function check(d0,{engine,slug,file}={}){const e=[];const bad=m=>e.push(m);
 let cache=null;
 function load(dir=SEED_DIR){const games=[],versions=new Map(),errors=[];
  const read=f=>{try{return JSON.parse(fs.readFileSync(f,'utf8').replace(/^﻿/,''));}catch(x){errors.push(path.relative(dir,f)+': '+x.message);return null;}};
- let engines=[];try{engines=fs.readdirSync(dir,{withFileTypes:true}).filter(d=>d.isDirectory()).map(d=>d.name);}catch{return {games,versions,errors,dir};}
+ // Publication history has its own signed-chain validator and never supplies profile settings.
+ let engines=[];try{engines=fs.readdirSync(dir,{withFileTypes:true}).filter(d=>d.isDirectory()&&d.name!=='history').map(d=>d.name);}catch{return {games,versions,errors,dir};}
  for(const engine of engines){let slugs=[];try{slugs=fs.readdirSync(path.join(dir,engine),{withFileTypes:true}).filter(d=>d.isDirectory()).map(d=>d.name);}catch{}
   for(const slug of slugs){const base=path.join(dir,engine,slug);
    let files=[];try{files=fs.readdirSync(path.join(base,'versions')).filter(f=>f.endsWith('.json'));}catch{}
@@ -78,7 +79,7 @@ function load(dir=SEED_DIR){const games=[],versions=new Map(),errors=[];
    const g0=read(path.join(base,'game.json'));if(!g0)continue;const r=check(g0,{engine,slug});if(!r.ok){errors.push(engine+'/'+slug+'/game.json: '+r.errors.join('; '));continue;}const g=r.doc;
    /* builds: its own version files and the shared ones it lists; their exe names also name the game (a generic name only weakly) */
    const builds=[...new Set([...(g.builds||[]),...files.map(f=>f.slice(0,-5))])];
-   games.push({key:slug,engine:g.engine,seed:true,status:g.status,sourceLangs:g.sourceLangs||['ja'],mode:g.mode,gameId:g.key,prints:g.prints||{},settings:g.settings||{},
+   games.push({key:slug,engine:g.engine,seed:true,status:g.status,seedRev:Number.isInteger(g.rev)?g.rev:null,sourceLangs:g.sourceLangs||['ja'],mode:g.mode,gameId:g.key,prints:g.prints||{},settings:g.settings||{},
     match:{exeSha256:builds,exe:[...new Set([...builds.map(b=>versions.get(b)?.exe).filter(Boolean),...(g.match?.exe||[])])],titles:g.match?.titles||[],notTitles:g.match?.notTitles||[],steamAppId:g.prints?.steam||undefined,prints:g.prints||{}}});}}
  /* a version file filed under one game may serve others (builds): its game is the one that lists it */
  for(const g of games)for(const b of g.match.exeSha256){const v=versions.get(b);if(v&&!v.game)v.game=g.key;}

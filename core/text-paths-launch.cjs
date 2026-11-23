@@ -15,35 +15,108 @@ const W=require('./text-paths-web.cjs'),U=require('./text-paths-unity.cjs');
 
 function unityPack(root){const dir=path.join(root,'runtime','unity-text');try{return require('node:fs').existsSync(path.join(dir,'MeguLitUnityText.dll'))?dir:null;}catch{return null;}}
 
-async function prepare({root,exe,profile={},enabled=false,shadowRoot=null,trace=()=>{}}){
- if(!enabled||!exe)return null;
+async function prepare({root,exe,profile={},title='',enabled=false,ownerTestGrant=null,shadowRoot=null,trace=()=>{}}){
+ if(!exe||require('./library-mode.cjs').libraryOnly(root))return null;
+ /* An opaque, locally validated test grant is independent of compositor/roles. The session rechecks both the
+    authority and the exact executable/effective Lua members before creating any private launch files. */
+ if(ownerTestGrant){const canary=new Canary(root,exe);canary.settle();if(canary.allowed('artemis')){
+  const a=await require('./artemis-session.cjs').prepare({root,exe,ownerTestGrant,shadowRoot,steamAppId:require('./steam-owned.cjs').launchAppid(exe,profile)||null,canary,trace});if(a)return a;
+ }}
+ const O=require('./owner-tests.cjs'),privateSource=U.unityGame(exe)==='il2cpp'&&O.allowed(ownerTestGrant,{exe,engine:'unity',capability:'diagnostic-input'}),privateRgss=require('./profiles/index.cjs').engineId(profile.engine)==='rgss'&&O.allowed(ownerTestGrant,{exe,engine:'rgss',capability:'roles'});
+ if(!enabled&&!privateSource&&!privateRgss)return null;
  const canary=new Canary(root,exe);const off=canary.settle();if(Object.keys(off||{}).length)trace('text-paths-canary',{off:Object.keys(off)});
  const steam=require('./steam-owned.cjs').launchAppid(exe,profile)||null; /* E-SteamOwned */
  const steamEnv=steam?{SteamAppId:steam,SteamGameId:steam,SteamOverlayGameId:steam}:{};
+ if(require('./profiles/index.cjs').engineId(profile.engine)==='rgss'&&canary.allowed('rgss')){
+  const R=require('./text-paths-rgss.cjs');let session;
+  try{const resolved=require('./owner-tests.cjs').apply(R.launchProfile({root,exe,profile,title}),ownerTestGrant,{exe,engine:'rgss',prepared:true});if(resolved.draw?.roles!==true)return null;
+   const source=R.plan(exe,{ownerTestGrant});session=new R.RgssTextPath();session.drawConfig(resolved.draw);const port=await session.listen(),sh=R.makeShadow({source,shadowRoot:shadowRoot||path.join(root,'data','rgss-shadow'),port,token:session.token});
+   if(ownerTestGrant&&!await require('./owner-tests.cjs').registerLaunch(ownerTestGrant,{exe:sh.exe,engine:'rgss',artifact:sh})){session.stop();trace('text-paths-rgss-skipped',{error:'RGSS_OWNER_ALIAS_REJECTED'});return null;}
+   const privateGrant=source.generation?ownerTestGrant:null;
+   if(privateGrant){const stop=session.stop.bind(session),unsub=O.onRevoke(privateGrant,()=>session.stop());session.stop=()=>{if(session.stopped)return;stop();unsub();O.revoke(privateGrant);};}
+   trace('text-paths-rgss',{shadow:sh.shadow,reused:sh.reused,files:sh.files,bytes:sh.bytes,generation:source.generation||2});return {path:'rgss',exe:sh.exe,args:[],env:steamEnv,cwd:sh.shadow,session,ownerTestGrant:privateGrant,observeProcess:privateGrant?p=>O.allowed(privateGrant,{exe:sh.exe,engine:'rgss',capability:'roles'})&&O.bind(privateGrant,{pid:p.pid,birth:p.started}):null,connect:async()=>true};
+  }catch(error){session?.stop();trace('text-paths-rgss-skipped',{error:error.message});return null;}
+ }
  if(W.chromiumShell(exe)&&canary.allowed('web')){
-  const port=await W.freePort();const session=new W.WebTextPath({port,canary});
-  return {path:'web',exe,args:W.launchArgs(port),env:steamEnv,cwd:path.dirname(exe),session,
-   connect:()=>session.attach().then(ok=>{trace('text-paths-web',{attached:ok,port});return ok;})};
+  const port=await W.freePort();if(require('./library-mode.cjs').libraryOnly(root))return null;const session=new W.WebTextPath({port,canary});
+  const args=W.launchArgs(port);trace('text-paths-web-prepared',{exe:path.basename(exe),args});
+  return {path:'web',exe,args,env:steamEnv,cwd:path.dirname(exe),session,
+   connect:()=>session.attach().then(ok=>{trace('text-paths-web',{attached:ok,port,...session.discovery});return ok;})};
  }
  const pack=unityPack(root);
  const kind=pack&&U.unityGame(exe),il2cppReady=kind==='il2cpp'&&require('node:fs').existsSync(path.join(pack,'MeguLitUnityText.IL2CPP.dll'));
+ if(kind==='il2cpp'&&!privateSource){trace('text-paths-unity-skipped',{error:'UNITY_IL2CPP_PRIVATE_GRANT_REQUIRED'});return null;}
  if(pack&&(kind==='mono'||il2cppReady)&&!U.modded(exe)&&canary.allowed('unity')){
-  const session=new U.UnityTextPath({canary});const port=await session.listen();
-  let sh;try{sh=U.makeShadow({exe,shadowRoot:shadowRoot||path.join(root,'data','unity-shadow'),pack,port,steamAppId:steam});}catch(e){session.stop();trace('text-paths-unity-skipped',{error:e.message});return null;}
+  const session=new U.UnityTextPath({canary,sourceOnly:kind==='il2cpp'});const port=await session.listen();
+  if(require('./library-mode.cjs').libraryOnly(root)){await session.stop();return null;}
+  let sh;try{sh=U.makeShadow({exe,shadowRoot:shadowRoot||path.join(root,'data','unity-shadow'),pack,port,sourceScope:session.il2cpp?.scope,steamAppId:steam});}catch(e){session.stop();trace('text-paths-unity-skipped',{error:e.message});return null;}
+  if(ownerTestGrant&&!await require('./owner-tests.cjs').registerLaunch(ownerTestGrant,{exe:sh.exe,engine:'unity'})){await session.stop();trace('owner-test-shadow-refused');return null;}
   trace('text-paths-unity',{shadow:sh.shadow,links:sh.links,copies:sh.copies,junctions:sh.junctions});
-  return {path:'unity',exe:sh.exe,args:[],env:steamEnv,cwd:sh.shadow,session,connect:async()=>true};
+  if(session.il2cpp){const unsub=O.onRevoke(ownerTestGrant,()=>{session.stop().catch(()=>{});});session.sourceCleanup=()=>{unsub();O.revoke(ownerTestGrant);};}
+  return {path:'unity',kind,ownerTestGrant,exe:sh.exe,args:[],env:steamEnv,cwd:sh.shadow,session,
+   observeProcess:kind==='il2cpp'?p=>{const bound=O.bind(ownerTestGrant,{pid:p.pid,birth:p.started});if(bound&&!session.armed){canary.arm('unity');session.armed=true;}return bound;}:null,connect:async()=>true};
  }
  return null;
 }
 
 /* Connect a prepared session to the hook reader (core/hook-native.cjs): records in, replacement switch and lines out. */
 function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepared.session;
- s.onSource=m=>{const {sameOwner}=require('./unity-kemco-source.cjs');
+ let rgssShown=null;
+ if(prepared.path==='rgss'&&prepared.ownerTestGrant)s.onClear=m=>{if(!rgssShown||hook.textPath!==s||hook.state?.hookSourceOrigin!=='rgss'||hook.state.hookSequence!==rgssShown.sequence||m.line!==rgssShown.line||m.text!==rgssShown.text||m.pid!==rgssShown.pid||m.birth!==rgssShown.birth)return;rgssShown=null;hook.lastSource='';hook.lastSourceAt=0;hook.pageReset?.();hook.pageText?.reset?.();hook.notify?.({hookSource:'',hookSpeaker:'',hookSourceRuby:[],hookSourceOrigin:'leave',hookSequence:(hook.state.hookSequence||0)+1,receivedText:false,hookMessage:'RGSS 原文已清空'});};
+ if(prepared.path==='rgss'){s.owner=()=>hook.wanted===false||hook.disposed||hook.stopPending||hook.stopError||prepared.ownerTestGrant&&(hook.wanted!==true||hook.ownerTestGrant!==prepared.ownerTestGrant||!require('./owner-tests.cjs').allowed(prepared.ownerTestGrant,{exe:prepared.exe,engine:'rgss',capability:'roles'}))?0:hook.gamePid?.()||hook.target?.pid||0;s.ownerBirth=()=>String(hook.target?.started||hook.windowState?.gameStarted||'');}
+ if(prepared.path==='artemis'){
+  const current=m=>hook.textPath===s&&hook.wanted!==false&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&s.permission()&&s.owner&&m?.artemisOwner&&hook.target?.pid===s.owner.pid&&hook.target?.started===s.owner.started&&m.artemisOwner.pid===s.owner.pid&&m.artemisOwner.started===s.owner.started;
+  let rubyOwner=null,speakerOwner=null,sourceOwner=null,pendingOwner=null;
+  const clearRuby=()=>{if(rubyOwner)for(const key of rubyOwner.keys)if(hook.sourceRuby?.get(key)===rubyOwner.pairs)hook.sourceRuby.delete(key);rubyOwner=null;};
+  s.onStop=()=>{clearRuby();if(hook.speaker===speakerOwner)hook.speaker=null;speakerOwner=null;
+   // A revoked input session must withdraw its current Reader row, including synchronous revocation during notify.
+   const owns=o=>o&&hook.state?.hookSourceOrigin==='artemis-lua-input'&&hook.state.hookSequence===o.sequence&&(o.text===undefined||hook.state.hookSource===o.text);
+   const shown=owns(sourceOwner)||owns(pendingOwner);sourceOwner=null;if(!shown)return;
+   hook.lastSource='';hook.lastSourceAt=0;hook.pageReset?.();hook.pageText?.reset?.();
+   hook.notify?.({hookSource:null,hookSpeaker:'',hookSourceRuby:[],hookSourceOrigin:'leave',hookSequence:hook.state.hookSequence+1,receivedText:false});
+  };
+  s.onSource=m=>{if(!current(m))return false;const previous=rubyOwner;clearRuby();const before=hook.state?.hookSequence||0,chars=[...m.text];
+   const pairs=m.artemisRuby.map(([at,n,reading])=>[chars.slice(at,at+n).join(''),reading,chars.slice(0,at).filter(c=>!/\s/u.test(c)).length]);
+   if(pairs.length){const keys=[...new Set([m.text,m.text.replace(/\s+/g,'')])],map=hook.sourceRuby||(hook.sourceRuby=new Map());for(const key of keys)map.set(key,pairs);while(map.size>64)map.delete(map.keys().next().value);rubyOwner={keys,pairs};}
+   const previousPending=pendingOwner,pending={sequence:before+1};pendingOwner=pending;
+   try{hook.source(m,'Artemis Lua input');}finally{
+    if(hook.state?.hookSequence===pending.sequence&&hook.state.hookSourceOrigin==='artemis-lua-input'&&typeof hook.state.hookSource==='string')sourceOwner={sequence:pending.sequence,text:hook.state.hookSource};
+    pendingOwner=previousPending;
+   }
+   const accepted=current(m)&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='artemis-lua-input'&&hook.state.hookSource===m.text;
+   if(!accepted){clearRuby();if(previous&&current(m)){const map=hook.sourceRuby;for(const key of previous.keys)if(!map.has(key))map.set(key,previous.pairs);rubyOwner=previous;}}return accepted;};
+  /* Semantic input metadata is deliberately not CHARS/UI rectangles or a current-pixel visibility acknowledgement. */
+  s.onSemantic=m=>{if(!current({artemisOwner:m.owner}))return;
+   if(m.role==='name'){const name=require('./hook-native.cjs').speakerName(m.text);speakerOwner=name?{text:name,at:hook.now()}:null;hook.speaker=speakerOwner;if(name)hook.noteSpeaker?.(name);return;}
+   hook.trace?.('artemis input role='+m.role+' variant='+(m.variant||'-')+' chars='+[...m.text].length);};
+  s.onStatus=st=>hook.trace?.('text path artemis: '+st);hook.attachTextPath?.(s);return;
+ }
+ if(s.il2cpp){
+  const O=require('./owner-tests.cjs'),{sameOwner}=require('./unity-kemco-source.cjs');
+  s.canSource=owner=>prepared.path==='unity'&&hook.textPath===s&&hook.wanted===true&&hook.ownerTestGrant===prepared.ownerTestGrant&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&sameOwner(hook.target,owner)&&O.allowed(prepared.ownerTestGrant,{exe:prepared.exe,engine:'unity',capability:'diagnostic-input'})&&O.matches(prepared.ownerTestGrant,{pid:owner.pid,birth:owner.started});
+  s.onSource=m=>{if(!s.canSource(m.unityOwner))return false;hook.source(m,m.sourceName);return true;};
+  s.onClear=m=>{
+   const shown=hook.il2cppShown;if(hook.textPath!==s||!shown||!sameOwner(shown.authority.unityOwner,m.unityOwner)||hook.state?.hookSourceOrigin!=='unity-il2cpp'||hook.state.hookSequence!==shown.sequence||!m.all&&shown.authority.il2cppStream!==m.il2cppStream)return;
+   hook.il2cppShown=null;hook.lastSource='';hook.lastSourceAt=0;hook.pageReset?.();hook.pageText?.reset?.();hook.clearChoices?.('unity source cleared');
+   hook.notify?.({hookSource:'',hookSpeaker:'',hookSourceRuby:[],hookSourceOrigin:'leave',hookSequence:(hook.state.hookSequence||0)+1,receivedText:false,hookMessage:'Unity 原文已清空'});
+  };
+ }else{
+ s.onSource=m=>{if(prepared.path==='web'&&m?.engine==='rpgm')return require('./rpgm-source.cjs').deliver(hook,s,m);const {sameOwner}=require('./unity-kemco-source.cjs');
+  if(prepared.path==='rgss'){
+   const grantCurrent=()=>!prepared.ownerTestGrant||hook.wanted===true&&hook.ownerTestGrant===prepared.ownerTestGrant&&require('./owner-tests.cjs').allowed(prepared.ownerTestGrant,{exe:prepared.exe,engine:'rgss',capability:'roles'})&&require('./owner-tests.cjs').matches(prepared.ownerTestGrant,{pid:m.pid,birth:s.birth});
+   const current=()=>grantCurrent()&&hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&hook.wanted!==false&&!s.stopped&&s.roles&&s.generation===m.generation&&hook.gamePid?.()===m.pid&&s.body.get(m.line)?.text===m.text;
+   if(!current()||typeof hook.emitSource!=='function')return false;
+   if(hook.state?.hookSourceOrigin!=='rgss'&&hook.sameAsLast?.(m.text))return true;
+   const before=hook.state?.hookSequence||0;hook.emitSource(m.text,'rgss','rgss',m.line);
+   const accepted=current()&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='rgss'&&hook.state.hookSourceLine===m.line;
+   if(accepted&&prepared.ownerTestGrant)rgssShown={line:m.line,text:m.text,pid:m.pid,birth:s.birth,sequence:hook.state.hookSequence};return accepted;
+  }
   const current=()=>prepared.path==='unity'&&hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&sameOwner(hook.target,m?.unityOwner);
   if(!current())return false;const before=hook.state?.hookSequence||0;hook.source(m,'KEMCO Message');
   return current()&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='unity-kemco'&&hook.state.hookSource===m.text;
  };
- s.onChars=line=>hook.charRects(line);s.onStatus=st=>hook.trace?.('text path '+prepared.path+': '+st);/* engine-draw: a sentence the engine wants to draw itself asks the reader for its ruby and translation */s.onAsk=a=>{try{hook.emit?.({type:'hookDrawEmbed',...a});}catch{}};hook.attachTextPath?.(s);}
+ }
+ s.onChars=line=>{if(prepared.path!=='rgss'||hook.textPath===s)hook.charRects(line);};s.onStatus=st=>hook.trace?.('text path '+prepared.path+': '+st);/* engine-draw: a sentence the engine wants to draw itself asks the reader for its ruby and translation */s.onAsk=a=>{try{hook.emit?.({type:'hookDrawEmbed',...a});}catch{}};hook.attachTextPath?.(s);}
 
 /* ③ dot font at the source (native/fontdot, docs/text-architecture.md): when ① starts the game through MeguLitLaunch
    (compositor mode), MeguLitFontDot<bit>.dll rides along in MEGULIT_LAUNCH_EXTRA and is loaded while the game is still
@@ -52,6 +125,7 @@ function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepa
 function fontDot(root,exe,early,trace=()=>{}){
  /* 2026-11-21 (owner: 打点可以不要了，精度差、容易漏点) the dot font is retired: never loaded into a game. Kept as code only so an
     old install's canary record still reads; MEGULIT_FONTDOT_FORCE=1 (tests, research) is the one way in */
+ if(require('./library-mode.cjs').libraryOnly(root))return null;
  if(process.env.MEGULIT_FONTDOT_FORCE!=='1')return null;
  if(!early||process.env.MEGULIT_FONTDOT_OFF==='1')return null;/* dot font = marks: only with the capture compositor (off by default since 2026-11-14) */if(process.env.MEGULIT_CAPTURE_COMPOSITOR!=='1')return null;
  const bit=/MeguLitLaunch32\.exe$/i.test(early.file)?'32':'64',dll=path.join(root,'native','MeguLitFontDot'+bit+'.dll');

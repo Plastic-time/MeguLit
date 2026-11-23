@@ -3,7 +3,7 @@
 /* 2026-11-21 (owner: 游戏差分全自动生成) replay of the owner's incr9 run (E:\MeguLit-Test-1421\logs, trimmed to the lines the gate reads):
    - ファタモルガーナの館 (22:51:03-22:53:42Z): lines drawn nowhere and dropped, choices filtered to nothing -> the gate steps it down,
      and the first-play calibration finds no hide combination that passes -> read mode.
-   - 千恋＊万花 (22:53:42Z on): no window over a threshold, calibration keeps hide + redraw.
+   - 千恋＊万花 (22:53:42Z on): no measured failure, but missing position observations cannot validate hide calibration.
    Then the live service on a fake reader: calibration stored, read mode with the reason, 重新校准 records again. */
 process.env.MEGULIT_RELAY_BASE='off';/* no relay: the shared result and the report stay local */
 const assert=require('node:assert'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
@@ -12,6 +12,26 @@ const ap=require('../core/auto-profile.cjs');
 const dir=path.join(__dirname,'helpers','selfcheck-replay');
 const he=fs.readFileSync(path.join(dir,'incr9-hook-events.log'),'utf8'),rh=fs.readFileSync(path.join(dir,'incr9-reader-host.log'),'utf8');
 const FATA=['2026-11-20T22:51:03','2026-11-20T22:53:42'],SENREN=['2026-11-20T22:53:42',''];
+
+/* Twenty sources can satisfy the gate even if the Reader never records a displayed pair. */
+{
+ const sc=new SelfCheck(),receipt={type:'layoutDiagnostic',kind:'cardinalPair',episode:'fixture:1',scope:'fixture:0',accepted:true,observed:true,paired:true};
+ sc.reader({...receipt,accepted:false});
+ sc.reader({...receipt,observed:false});
+ const complete=()=>{for(let seq=1;seq<=20;seq++)sc.trace('source chars=12 sequence='+seq);return ap.diagnostic(null,sc.windows).windows.at(-1);};
+ const empty=complete();
+ assert.strictEqual(empty.pass,true);
+ assert.deepStrictEqual(empty.evidence.unmeasured,['hideVisible','repeatRate','choiceMismatch','positionPx','pairRate']);
+ assert.strictEqual(empty.evidence.thresholdResult,'withinLimits');
+ assert.strictEqual(empty.evidence.bodyDOM,'unobserved');
+ assert.strictEqual(empty.evidence.translationDOM,'unobserved');
+ sc.reader({...receipt,paired:false});
+ const bodyOnly=complete();
+ assert.strictEqual(bodyOnly.evidence.bodyDOM,'observed');
+ assert.strictEqual(bodyOnly.evidence.translationDOM,'unobserved');
+ assert.strictEqual(complete().evidence.bodyDOM,'unobserved');
+ assert.ok(sc.recording.every(e=>e.kind==='line'));
+}
 
 /* parser */
 assert.deepStrictEqual(parseTrace('2026-11-20T22:51:56.031Z choice options filtered 3 -> 0'),{kind:'choice',at:Date.parse('2026-11-20T22:51:56.031Z'),raw:3,shown:0});
@@ -33,7 +53,9 @@ const cf=ap.calibrate(fata.recording),cs=ap.calibrate(senren.recording);
 assert.strictEqual(cf.mode,'read','no hide combination fixes Fata: '+JSON.stringify(cf.candidates.map(c=>[c.params,c.over])));
 assert.ok(cf.reason.length>0);assert.strictEqual(cf.settings.hide.textEffectsRead,true);
 assert.ok(cf.candidates.some(c=>c.params.effectFrames===true&&c.over.includes('hideVisible')),'effect frames as one line still leave the game painting its original');
-assert.strictEqual(cs.mode,'hide');assert.strictEqual(cs.settings.calibrate.hideMethod,'hide');assert.strictEqual(cs.settings.calibrate.positionSource,'engine');
+assert.strictEqual(cs.mode,'read');assert.strictEqual(cs.settings.calibrate.hideMethod,'read');assert.strictEqual(cs.settings.calibrate.positionSource,null);
+assert.match(cs.reason,/观测不足：位置测量/);assert.strictEqual(senren.windows[0].metrics.positionPx,null);
+assert.ok(cs.candidates.filter(c=>c.params.hideMethod==='hide').every(c=>!c.pass&&c.missing.includes('positionPx')));
 assert.strictEqual(cs.settings.page.effectFrames,null,'the least change wins among passing ones');assert.ok(!cs.settings.choice,'kernel choice filters kept');
 
 /* thresholds come from the profile layers */
@@ -61,21 +83,63 @@ try{
  const profiles=[];const gal={setGameProfile(p){profiles.push(p);},textEffectsHold:null,textEffects(on,why){calls.push([on,why]);this.textEffectsHold=on?{why}:null;},hooks:{pageMode:{engine:'krkr'},trace:l=>traced.push(l)}};
  const reader={root,gal,gameExe:exe,logVisibility:e=>logged.push(e)};
  live.start(reader,reader.gameExe);assert.strictEqual(live.current().key,key);
+ assert.strictEqual(live.diagnostic().windowState,'noClosedWindow');
+ assert.strictEqual(live.diagnostic().pendingLines,0);
+ live.feedReader({type:'layoutDiagnostic',kind:'cardinalPair',accepted:true,observed:true,paired:true,episode:'fixture:1',scope:'fixture:0'});
  for(const l of he.split('\n'))if(l>=FATA[0]&&l<FATA[1])live.feedTrace(l);
  const stored=ap.load(root,key);
+ const firstWindow=logged.find(e=>e.what==='window');
+ assert.strictEqual(firstWindow.thresholdResult,'exceeded');
+ assert.strictEqual(firstWindow.translationDOM,'observed');
+ assert.strictEqual(firstWindow.gameplayAcceptance,'unverified');
+ assert.strictEqual(live.diagnostic().windows[0].evidence.translationDOM,'observed');
  assert.ok(stored,'calibration stored');assert.strictEqual(stored.mode,'read');assert.strictEqual(calls.length,1);assert.strictEqual(calls[0][0],true);assert.ok(calls[0][1].length>0,'Alt+T shows why');
  assert.ok(traced.some(l=>l.startsWith('selfCheck window=1')),'window traced');const top=profiles[profiles.length-1];assert.ok(/\+auto(\+seed-game)?$/.test(top.layers),'the calibration is the top layer under a built-in seed: '+top.layers);assert.strictEqual(top.hide.textEffectsRead,true);assert.strictEqual(top.calibrate.hideMethod,'read');assert.ok(logged.some(e=>e.kind==='selfCheck'&&e.what==='calibrated'));
  /* the runtime sample of the first window */
  const sample=JSON.parse(fs.readFileSync(path.join(root,'data','runtime-samples',key,'sample.json'),'utf8'));assert.strictEqual(sample.schema,'megulit.runtime-sample');assert.ok(sample.lines.length>=20);assert.ok(sample.boxes.length>0);assert.ok(sample.drops.length>0);assert.strictEqual(sample.exe,'game_x.exe');
  live.stop();gal.textEffectsHold=null;calls.length=0;
+ assert.ok(logged.some(e=>e.what==='sessionEnd'&&e.closedWindows>0));
+ /* An independent reviewer receives only the claimed calibration. It must
+    recreate exactly the runner's version layer and still see live changes. */
+ const P=require('../core/profiles/index.cjs'),I=require('../services/cardinal/identity.cjs');
+ const {LiveMeasurement}=require('../services/cardinal-live-measurement.cjs');
+ const reviewRoot=path.join(root,'reviewer');fs.mkdirSync(reviewRoot);
+ const input={exe,title:path.basename(exe,path.extname(exe)),engine:'krkr'};
+ const candidate={key,mode:stored.mode,settings:stored.settings,rev:7,prints:{exe:key,script:'a'.repeat(64)}};
+ const expected=P.profileFor({...input,exeSha256:key,official:candidate.settings,officialRev:7,match:'exe',prints:candidate.prints});
+ const proc={exe,pid:11,birth:'123',hwnd:'22'};
+ const observed=new LiveMeasurement(proc,expected,I.hashObject(expected));
+ const observe=p=>observed.frame({kind:'profile',exe,profile:p});
+ const report=m=>observed.frame({kind:'native',wireNs:process.hrtime.bigint().toString(),m});
+ const {GalNative}=require('../core/gal-native.cjs');
+ const reviewGal={hooks:{},notify(){},hookPrefs(){return {};},textEffects:GalNative.prototype.textEffects,setGameProfile:GalNative.prototype.setGameProfile};
+ const reviewReader={...reader,root:reviewRoot,gamePid:proc.pid,gameBirth:proc.birth,gal:reviewGal};
+ const options={key,skipFeed:true,reviewCandidate:candidate};
+ assert.throws(()=>live.start(reviewReader,exe,P.profileFor(input),input,{...options,key:'f'.repeat(64)}),/LIVE_REVIEW_EXE/);
+ const session=live.start(reviewReader,exe,P.profileFor(input),input,options);
+ assert.equal(session.calibrated,true);assert.equal(session.check.recording,null);
+ observed.frame({kind:'page',pageId:'unit-page'});
+ report({type:'bound',bound:true,gameProcessId:11,gameStarted:'123',gameHwnd:'22'});
+ const source={type:'hookSource',origin:'live',text:'unit'};
+ assert.throws(()=>report(source),/LIVE_EFFECTIVE_PROFILE/);
+ assert.throws(()=>observe(P.profileFor(input)),/LIVE_EFFECTIVE_PROFILE/);
+ reviewGal.setGameProfile(P.profileFor(live.inputOf(session)),input);
+ observe(reviewGal.profile);report(source);
+ for(const l of he.split('\n'))if(l>=FATA[0]&&l<FATA[1])live.feedTrace(l);
+ assert.strictEqual(I.hashObject(P.profileFor(live.inputOf(session))),I.hashObject(expected));
+ live.setPresentation(reviewRoot,key,'nvl');
+ assert.throws(()=>observe(reviewReader.gal.profile),/LIVE_PROFILE_CHANGED/);
+ live.stop();
  live.start(reader,reader.gameExe);assert.strictEqual(calls.length,1,'stored read mode applies at the next start');
  gal.textEffectsHold=null;live.recalibrate(reader);assert.strictEqual(ap.load(root,key),null,'重新校准 forgets the stored diff');assert.ok(live.current().check.recording,'and records again');
  live.stop();
  /* a stored hide diff that fails later steps down */
- ap.store(root,key,ap.record({key,engine:'krkr',exe:reader.gameExe,version:'x',result:cs}));calls.length=0;live.start(reader,reader.gameExe);assert.strictEqual(calls.length,0);
+ /* Explicit historic stored-hide fixture: the unmeasured Senren recording above no longer creates one. */
+ const historicHide={mode:'hide',settings:{calibrate:{hideMethod:'hide'},hide:{textEffectsRead:false}},score:{cost:0,lines:20,metrics:{hideVisible:0,positionPx:0,pairRate:1,repeatRate:0}},reason:''};
+ ap.store(root,key,ap.record({key,engine:'krkr',exe:reader.gameExe,version:'x',result:historicHide}));calls.length=0;live.start(reader,reader.gameExe);assert.strictEqual(calls.length,0);
  for(const l of he.split('\n'))if(l>=FATA[0]&&l<FATA[1])live.feedTrace(l);
  const down=ap.load(root,key);assert.strictEqual(down.mode,'read');assert.strictEqual(down.source,'gate');assert.ok(down.gate.over.includes('dropRate'));assert.strictEqual(down.previous.mode,'hide');assert.strictEqual(calls.length,1);
  live.stop();
 }finally{fs.rmSync(root,{recursive:true,force:true});}
-console.log('self-check gate: Fata steps down (window 1: '+fata.tripped.over.join(',')+'), calibration -> read; Senren '+senren.windows.length+' window(s) pass, calibration -> hide');
+console.log('self-check gate: Fata steps down (window 1: '+fata.tripped.over.join(',')+'), calibration -> read; Senren '+senren.windows.length+' window(s) have no measured failure, hide calibration unverified (missing position)');
 })().catch(e=>{console.error(e);process.exit(1);});

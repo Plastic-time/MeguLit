@@ -88,5 +88,5 @@
   }
   if(old)item.classList.add('is-shown');layer.append(item);items.set(m.id,item);if(!old)requestAnimationFrame(()=>item.classList.add('is-shown'));
  }
- b.artText=m=>{try{if(!m||m.id==null)return;if(m.visible===true)show(m);else remove(m.id);}catch{}};
+ b.artText=m=>{try{if(m?.clear===true){items.clear();layer.replaceChildren();return;}if(!m||m.id==null)return;if(m.visible===true)show(m);else remove(m.id);}catch{}};
 })();

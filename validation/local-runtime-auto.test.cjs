@@ -20,9 +20,9 @@ test('the overlay gets live download progress, then the model start, then the tr
  const {Reader}=require('../services/reader.cjs');const events=[];let calls=0;
  const job={state:'downloading',received:0,total:100};
  const llm={job,ensure:async()=>{calls++;if(calls===1)throw Error('LOCAL_RUNTIME_DOWNLOADING:0');}};
- const fake={runtime:{local:()=>llm,emit:(t,m)=>events.push(m.args[3])}};
+ const reader=Object.assign(Object.create(Reader.prototype),{runtime:{local:()=>llm,emit:(t,m)=>events.push(m.args[3])}});
  const tick=setInterval(()=>{job.received=Math.min(100,job.received+40);if(job.received>=100)job.state='done';},300);
- await Reader.prototype.localReady.call(fake,{},7,()=>true);clearInterval(tick);
+ try{await reader.localReady({},7,()=>true);}finally{clearInterval(tick);}
  assert.equal(events[0],'LOCAL_RUNTIME_DOWNLOADING:0');assert.ok(events.some(e=>/:(40|80)$/.test(e)));
  assert.deepEqual(events.slice(-2),['LOCAL_RUNTIME_DOWNLOADING:100','LOCAL_STARTING']);assert.equal(calls,2);
 });

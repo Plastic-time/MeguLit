@@ -14,9 +14,15 @@ Gate 保存 flags、全部 GPR 和 FXSAVE 状态，再读取入口 EAX 与原始
 
 `draw.advhdInput` 是版本层布尔键，默认 false，写入控制文件为 `advhdInput=1`。它独立于 `roles`；设置此键只建立诊断控制通道，不开启旧角色记录、隐藏、嵌入、自动路由或 reader 正文源。正式允许某部游戏开启仍要先加入 opt-in 允许名单并按游戏顺序实测，本次没有添加允许名单或 seed
 
-`ToMe_ADVHD_INPUT begin` 带调用者 RVA、EAX 高度和 11 个原始栈参数，`data` 按 offset 分块记录原始 hex，`end` 标记完整字节数。只接受可读且不超过 32768 字节的完整 NUL 串，超过上限直接拒绝，不能将残段当完整输入。未证明文本编码，诊断不会猜解码
+控制文件只接受完整首行 `#cfg ... advhdInput=1`，UTF-16LE 可带 BOM 或沿用无 BOM 格式。只允许 ASCII 首行、唯一精确授权键及完整 LF/CRLF；正文中的 cfg、重复键、非零高字节、窄字节和未完成首行都不能授权
 
-记录沿现有 HookBridge info 诊断通道进入 `hook-diagnostics.log`，该日志有 1 MiB 上限。回放必须按 run/offset/字节数核对 begin 与 end，日志容量或传输造成的缺块不能当成完整输入证据
+`ToMe_ADVHD_INPUT begin` 带调用者 RVA、EAX 高度和 11 个原始栈参数，`data` 按 offset 分块记录原始 hex，`end` 标记完整字节数；三类记录同时携带权限 epoch。只接受可读且不超过 32768 字节的完整 NUL 串，超过上限直接拒绝，不能将残段当完整输入。未证明文本编码，诊断不会猜解码
+
+记录沿现有 HookBridge info 诊断通道进入 `hook-diagnostics.log`，该日志有 1 MiB 上限。回放必须按 run/epoch/offset/字节数核对 begin 与 end，日志容量或传输造成的缺块不能当成完整输入证据
+
+安装后的 watcher 仍每 2 秒检查授权；关闭后保留原 trampoline 并透传。每次开关递增权限代次，采集前后、每个 data 和 end 前都检查同一代次，因此 logger 中关闭再开启也不会恢复旧 snapshot。已经越过最终检查进入 logger 的调用仍可完成，这不是撤权排空 ACK，也不能召回已写日志
+
+采集和 logger 的 C++/SEH 异常被隔离，TLS guard 用 finally 释放；控制刷新异常会关闭观察。CreateHook 失败锁定后续尝试，EnableHook 失败关闭观察并保留可能正在被原调用引用的 trampoline，禁止立即 RemoveHook 后盲目重试。沿用 DLL 驻留生命周期，未新增随意卸载能力
 
 arg3/arg4 在本机例程内参与画布位置计算，但尚未建立屏幕变换。原始参数不是已验收屏幕坐标，23 个调用者也没有被硬编码成正文、名字或选项
 
@@ -40,3 +46,7 @@ AdvHD 原生脚本已接到 `megulithook/selftest/run.cmd`，但该部件在 `na
 若设置 `MEGULIT_ADVHD_SAMPLE` 为实际 utmoon.exe 路径，原生 gate 会额外只读核验完整 SHA，并生成一个同大小错 SHA 的小测试文件作为负例。该测试不运行样本，输出只在 TEMP 的 `megulit-advhd` 及当前测试 PID 的诊断控制文件；不替换 DLL 或正式安装目录
 
 后续实机检查应从全新隐藏桌面进程记录重复字句，重组 begin/data/end 确认字符串完整，再与游戏截图和原文配对。屏幕坐标、角色和渲染效果都尚未经过这一步
+
+权限回归使用同一实际 MinHook fixture：旧 `51171e55` 为 50 项中 12 项失败，修后 50/50；包含错误控制文件、begin/首个 data 中撤权再开启、真实持续 watcher、独占控制文件不可读、logger 破坏浮点状态后的 SEH 和后续恢复。双架构签名各 77 项、x64 no-op 均通过；不把控制台假引擎当作真实游戏
+
+安装日志可能重入控制刷新；本引擎用递归控制锁串行化读取/安装，每个刷新请求都有独立序号，包括 off→off。外层旧请求不得覆盖日志中较新的关闭请求；该控制锁不被观察器或原函数获取。独立的 C++/SEH 边界与 finally 保证刷新故障后释放锁。该反例在首轮修复上 51 项中 1 项失败，补充后同一真实 MinHook 门 51/51，通过的旧 50 项记录保留，不替代这一追加验证

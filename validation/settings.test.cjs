@@ -17,6 +17,27 @@ test('per-game styles and extracted game fonts survive saves without changing gl
  const {settings,put,read}=fixture(t),key='a'.repeat(64);put('gal-preferences.json',{japaneseSize:34});put('game-style-profiles.json',{version:3,entries:{[key]:{name:'Test work',prefs:{japaneseSize:42,japaneseFont:'game:0123456789'},positionMap:{anchor:7},customFlag:true,history:[]}}});
  const before=settings.get(key);assert.equal(before.values.text.japaneseSize,42);settings.save({scope:'text',profile:key,values:{japaneseSize:45,japaneseFont:'game:0123456789'}});assert.equal(settings.get().values.text.japaneseSize,34);assert.equal(settings.get(key).values.text.japaneseSize,45);assert.equal(read('game-style-profiles.json').entries[key].customFlag,true);assert.equal(read('game-style-profiles.json').entries[key].positionMap.anchor,7);assert.equal(read('game-style-profiles.json').entries[key].history.length,1);
 });
+test('text renderer follows the global setting even when an active profile contains an old renderer value',async t=>{
+ const {root,settings,put,read}=fixture(t),key='a'.repeat(64);
+ put('gal-preferences.json',{textRenderer:'compositor'});
+ put('game-style-profiles.json',{version:3,entries:{[key]:{name:'Test work',prefs:{textRenderer:'compositor',hookHide:false}}}});
+ assert.ok(settings.get().fields.some(field=>field.key==='textRenderer'));
+ assert.ok(!settings.get(key).fields.some(field=>field.key==='textRenderer'));
+ assert.throws(()=>settings.save({scope:'embedding',profile:key,values:{hookHide:true,textRenderer:'overlay'}}),/SETTINGS_FIELD_INVALID/);
+ const saved=settings.save({scope:'embedding',values:{textRenderer:'overlay'}});
+ assert.equal(saved.values.embedding.textRenderer,'overlay');
+ assert.equal(settings.read('embedding',key).textRenderer,'overlay');
+ assert.deepEqual(read('game-style-profiles.json').entries[key].prefs,{textRenderer:'compositor',hookHide:false});
+
+ const {Runtime}=require('../services/runtime.cjs');
+ let preview;
+ const gal={preferences:{gameProcess:'Game',gameExecutable:'Game.exe',bindEnabled:true},styleSync:{profileKey:key},preview:p=>{preview=p;},setGameAudio(){}};
+ const runtime=Object.assign(Object.create(Runtime.prototype),{root,folder:path.dirname(settings.file('gal-preferences.json')),reader:{gal,prefs:()=>({})},emit(){}});
+ await runtime.settingsSaved({scope:'embedding',values:{textRenderer:'overlay'}});
+ assert.equal(preview.textRenderer,'overlay');
+ assert.equal(preview.hookHide,false);
+ assert.equal(preview.gameExecutable,'Game.exe');
+});
 test('three panel settings remain independent and preserve existing positions and crops',t=>{
  const {settings,root}=fixture(t);fs.writeFileSync(path.join(root,'data','ui-state.json'),JSON.stringify({'tome-log-position':'{"x":20}','tome-menu-background':JSON.stringify({alpha:62,panels:{menu:{alpha:40},log:{alpha:70},card:{alpha:90}},custom:true,crop:{x:22,y:44,zoom:2}})}));
  settings.save({scope:'panels',values:{'panels.menu.alpha':35,'panels.log.glassBlur':9}});const panels=settings.read('panels');assert.equal(panels.panels.menu.alpha,35);assert.equal(panels.panels.log.alpha,70);assert.equal(panels.panels.card.alpha,90);assert.equal(panels.custom,true);assert.equal(panels.crop.x,22);assert.equal(settings.ui()['tome-log-position'],'{"x":20}');

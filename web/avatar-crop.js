@@ -30,14 +30,14 @@ export function cropFromFrame(width,height,zoom,left,top){
 }
 let active=null;
 /* Opens the crop window; resolves to {sx,sy,side} or null when cancelled. */
-export function openAvatarCrop({src,width,height,locale='zh'}){
+export function openAvatarCrop({src,width,height,locale='zh',confirmLabel}){
  active?.();
  const w=avatarCropWords(locale);
  return new Promise(resolve=>{
-  const box=document.createElement('dialog');box.className='tome-crop avatar-crop';box.dataset.noI18n='';box.setAttribute('aria-label',w.title);
+  const box=document.createElement('dialog');box.style.margin='0';box.className='tome-crop avatar-crop';box.dataset.noI18n='';box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.setAttribute('aria-label',w.title);
   box.innerHTML='<header><span></span><button type="button" data-x>×</button></header><div class="avatar-crop-body"><div class="tome-crop-stage"><img alt=""><i></i></div><figure class="avatar-crop-preview"><span><img alt=""></span><figcaption></figcaption></figure></div><label class="tome-crop-zoom"><span></span><input type="range" min="0" max="100" step="any"><output></output></label><small></small><footer><button type="button" data-cancel></button><button type="button" data-ok></button></footer>';
   const $=q=>box.querySelector(q),stage=$('.tome-crop-stage'),img=$('.tome-crop-stage img'),frame=$('.tome-crop-stage i'),zoom=$('input'),out=$('output'),ring=$('.avatar-crop-preview span'),thumb=$('.avatar-crop-preview img');
-  $('header span').textContent=w.title;$('.tome-crop-zoom span').textContent=w.zoom;$('small').textContent=w.hint;$('figcaption').textContent=w.preview;$('[data-cancel]').textContent=w.cancel;$('[data-ok]').textContent=w.ok;$('[data-x]').setAttribute('aria-label',w.cancel);
+  $('header span').textContent=w.title;$('.tome-crop-zoom span').textContent=w.zoom;$('small').textContent=w.hint;$('figcaption').textContent=w.preview;$('[data-cancel]').textContent=w.cancel;$('[data-ok]').textContent=confirmLabel||w.ok;$('[data-x]').setAttribute('aria-label',w.cancel);
   const top=maxAvatarZoom(width,height),toProgress=z=>zoomProgress(1+(z-1)*4/Math.max(1e-9,top-1||1)),fromProgress=p=>top<=1?1:1+(zoomFromProgress(p)-1)*(top-1)/4;
   let c={x:50,y:50,zoom:1};
   const draw=()=>{const r=cropRect(width,height,c),p=toProgress(c.zoom);
@@ -78,12 +78,12 @@ export function encodeAvatar(image,{sx,sy,side}){
  return 'TOO_BIG';
 }
 /* File → crop window → encode. Resolves to a data URL, '' (cancelled) or throws Error(unreadable|tooSmall|tooBig). */
-export async function cropAvatarFile(file,locale){
+export async function cropAvatarFile(file,locale,confirmLabel){
  const url=URL.createObjectURL(file);
  try{
   let image;try{image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=url;});}catch{throw new Error('unreadable');}
   if(Math.min(image.naturalWidth,image.naturalHeight)<32)throw new Error('tooSmall');
-  const rect=await openAvatarCrop({src:url,width:image.naturalWidth,height:image.naturalHeight,locale});if(!rect)return '';
+  const rect=await openAvatarCrop({src:url,width:image.naturalWidth,height:image.naturalHeight,locale,confirmLabel});if(!rect)return '';
   const data=encodeAvatar(image,rect);if(!data)throw new Error('unreadable');if(data==='TOO_BIG')throw new Error('tooBig');return data;
  }finally{URL.revokeObjectURL(url);}
 }

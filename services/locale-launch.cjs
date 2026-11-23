@@ -1,6 +1,11 @@
 'use strict';
 const fs=require('node:fs');
+const path=require('node:path');
 const {x86}=require('../core/locale-emulator.cjs');
+// The original Josou Sanmyaku build can exit before the first process sample on a non-Japanese system.
+function josouOriginal(exe){
+ return path.basename(exe).toLowerCase()==='女装山脈.exe'&&fs.existsSync(path.join(path.dirname(exe),'pac','jyosou.ico'));
+}
 function useJapanese(profile,library,exe){
  if(profile.localeMode==='off')return false;
  if(profile.localeMode==='japanese'||profile.localeJapanese===true)return true;
@@ -18,4 +23,4 @@ function requiresAdministrator(exe){
  }catch{}
  return false;
 }
-module.exports={useJapanese,requiresAdministrator};
+module.exports={useJapanese,requiresAdministrator,josouOriginal};

@@ -56,6 +56,24 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>.sentence-
     await page.evaluate(() => window.__tomoyoChinese.textPlace({ text: '紙から', rects: [[200, 600, 30, 30], [230, 600, 30, 30], [260, 600, 30, 30]], client: [1280, 720] })); await frame();
     assert.strictEqual(await page.evaluate(() => document.body.classList.contains('megulit-placed')), true, 'line placed on its boxes');
     assert.strictEqual(await jp(), 'visible');
+    for (const clear of ['empty', 'elsewhere', 'off']) {
+      await page.evaluate(() => {
+        const bridge = window.__tomoyoChinese;
+        bridge.textPlaceAnchor(true);
+        bridge.textPlaceMode({ on: true });
+        bridge.textPlacePage({ awake: true, armed: false, lines: [], client: [1280, 720] });
+      });
+      await frame();
+      assert.strictEqual(await jp(), 'hidden', clear + ': original is already drawn by the game');
+      assert.strictEqual(await cn(), 'visible');
+      await page.evaluate(action => {
+        const bridge = window.__tomoyoChinese;
+        if (action === 'off') bridge.textPlaceMode({ on: false });
+        else bridge.textPlacePage(action === 'empty' ? null : { elsewhere: true });
+      }, clear);
+      await frame();
+      assert.strictEqual(await jp(), 'visible', clear + ': original returns when the page gives up ownership');
+    }
     console.log('PASS page elsewhere (node + DOM)');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

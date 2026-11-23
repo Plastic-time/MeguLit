@@ -3,6 +3,7 @@
 // "this stream draws twice" evidence and 「そこには普段と変わらない日常の姿があった。」 was shown and translated twice; the side stream's
 // doubled frame reached the art path before the dialogue line; tTVPNativeBaseBitmap::DrawText's typewriter dump
 // (「公公園公園で公園での…」) became a choice.
+const hookBridgeChild=require('./helpers/hook-bridge-child.cjs');
 const test=require('node:test'),assert=require('node:assert');
 const {HookNative}=require('../core/hook-native.cjs');
 const {DoubleLine}=require('../core/double-line.cjs');
@@ -13,7 +14,7 @@ const twice=s=>s+'　'+s+'　';
 function fixture(t){
  let now=1e6;const art=[];
  const hook=new HookNative({native:__dirname,hook:__dirname,logs:'Z:/no-fixture-log'},()=>{},()=>{},()=>now);hook.trace=()=>{};t.after(()=>hook.stop());
- hook.artLocate=text=>art.push(text);hook.process={stdin:{write(){},end(){}},kill(){}};
+ hook.artLocate=text=>art.push(text);hook.process=hookBridgeChild();
  const line=text=>{hook.source({text,sourceName:'Krkr2wcs',sourceCode:'EXHQXN8@17527C:bug02_yakata.exe',origin:'live'},'');now+=1500;return String(hook.lastSource||'').trim();};
  return {hook,art,line,tick:ms=>{now+=ms;}};
 }

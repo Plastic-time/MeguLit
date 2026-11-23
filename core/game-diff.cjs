@@ -14,7 +14,7 @@
    the app trusts the public keys of services/profile-keys.json.
    A document whose settings needed any cleaning is refused whole: a signer never signs anything the kernel does not know. */
 const {clean,split}=require('./profiles/domains.cjs');
-const gamePrint=require('./game-print.cjs');
+const gamePrint=require('./game-print-schema.cjs');
 const KEY=/^[0-9a-f]{64}$/;
 function canonical(v){if(Array.isArray(v))return '['+v.map(canonical).join(',')+']';if(v&&typeof v==='object')return '{'+Object.keys(v).filter(k=>v[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+canonical(v[k])).join(',')+'}';return JSON.stringify(v);}
 const unsigned=d=>{const {signature,...rest}=d||{};return rest;};
@@ -37,7 +37,8 @@ function validate(d){if(!d||typeof d!=='object'||Array.isArray(d))return {ok:fal
  if(d.layer==='game'&&Object.keys(split(d.settings).version).length)return {ok:false,error:'LAYER_KEYS'};
  if(d.prints!==undefined){const c=gamePrint.check(d.prints);if(!d.prints||typeof d.prints!=='object'||Object.keys(d.prints).length!==Object.keys(c).length||Object.entries(c).some(([k,v])=>d.prints[k]!==v))return {ok:false,error:'FIELD_prints'};}
  if(d.cost!==undefined&&!(typeof d.cost==='number'&&Number.isFinite(d.cost)&&d.cost>=0&&d.cost<=1e6))return {ok:false,error:'FIELD_cost'};
- const allowed=new Set(['schema','version','key','layer','prints','rev','source','mode','settings','exe','engine','app','issuedAt','agree','reporters','cost','signature']);
+ if(d.evidence!==undefined&&(d.layer!=='version'||!require('./seed-evidence.cjs').valid(d.evidence)||d.evidence.originalExe!==d.key||d.evidence.script!==d.prints?.script))return {ok:false,error:'FIELD_evidence'};
+ const allowed=new Set(['evidence','schema','version','key','layer','prints','rev','source','mode','settings','exe','engine','app','issuedAt','agree','reporters','cost','signature']);
  for(const k of Object.keys(d))if(!allowed.has(k))return {ok:false,error:'FIELD_'+k.slice(0,20)};
  return {ok:true};}
 /* a document built from parts (relay / tool): unknown settings dropped first, so it always validates */

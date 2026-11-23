@@ -20,6 +20,11 @@ class LocalLearning{
  python(){const own=require('./layout.cjs').python;return fs.existsSync(own)?own:'python.exe';}
  runtimeFolder(){return require('./layout.cjs').reading;}
  installed(){return fs.existsSync(path.join(this.runtimeFolder(),'sudachidict_full/resources/system.dic'));}
+ status(){
+  const installed=this.installed();
+  const progress=installed?{stage:'ready',percent:100}:{stage:'idle',percent:null};
+  return {learningInstalled:installed,learningProgress:this.installing||this.progress.stage==='error'?this.progress:progress};
+ }
  async install(retry=false,force=false,only=null){
   if(this.closed)throw Error('本地辞书已关闭');
   const SPECS={sudachi:['sudachidict_full==20261015'],unidic:['unidic-lite==1.0.8']},ALL=['sudachipy==0.7.0','sudachidict_full==20261015','fugashi==1.5.2','unidic-lite==1.0.8'];
@@ -164,10 +169,12 @@ class LocalLearning{
   return [...new Set(matches.flatMap(e=>e.readings).map(kana))];
  }
  load(){
-  if(this.index)return;this.index=new Map();this.byId=new Map();this.english=new Map();const root=require('./paths.cjs').resources;
-  for(const entry of JSON.parse(fs.readFileSync(path.join(root,'jmdict.json'),'utf8'))){this.byId.set(entry.id,entry);for(const key of [...entry.spellings,...entry.readings]){const ids=this.index.get(key)||[];ids.push(entry.id);this.index.set(key,ids);}}
+  if(this.index)return;
+  const root=require('./paths.cjs').resources,index=new Map(),byId=new Map(),english=new Map();
+  for(const entry of JSON.parse(fs.readFileSync(path.join(root,'jmdict.json'),'utf8'))){byId.set(entry.id,entry);for(const key of [...entry.spellings,...entry.readings]){const ids=index.get(key)||[];ids.push(entry.id);index.set(key,ids);}}
   const backup=path.join(root,'jmdict.english.json'); // English senses for the English learner mode
-  if(fs.existsSync(backup))for(const entry of JSON.parse(fs.readFileSync(backup,'utf8')))this.english.set(entry.id,entry);
+  if(fs.existsSync(backup))for(const entry of JSON.parse(fs.readFileSync(backup,'utf8')))english.set(entry.id,entry);
+  Object.assign(this,{index,byId,english});
  }
  adapt(entry,language){
   this.load();const selected=language==='en'?(this.english.get(entry.id)||entry):(this.byId.get(entry.id)||entry);
@@ -214,6 +221,18 @@ class LocalLearning{
   const selected=[...args.text].slice(args.start,args.end).join(''),fixed=!chosen?selectedReading(selected,entry):null;if(fixed){reading=fixed.reading;surface=selected;pronunciationForm=fixed.form;}
   // A selection spanning several tokens (e.g. 木曜日の空) reads as the sentence-context readings joined in order.
   let phrase=false;if(!chosen&&!fixed){const inside=tokens.filter(t=>t.start>=args.start&&t.end<=args.end).sort((a,b)=>a.start-b.start);if(inside.length>1&&inside[0].start===args.start&&inside.at(-1).end===args.end&&inside.every((t,i)=>i===0||inside[i-1].end===t.start)&&inside.every(t=>t.reading||!/[一-龯々]/.test(t.surface))){reading=inside.map(t=>t.reading||t.surface).join('');surface=[...args.text].slice(args.start,args.end).join('');phrase=true;pronunciationForm='phrase';}}
+  // Separate digit tokens lose the counter pronunciation in a multi-digit minute count.
+  const minute = /^([1-9][0-9]?)分$/u.exec(selected.normalize('NFKC'));
+  if (minute) {
+    const n = Number(minute[1]), tens = Math.floor(n / 10), ones = n % 10;
+    const digits = ['', 'イチ', 'ニ', 'サン', 'ヨン', 'ゴ', 'ロク', 'ナナ', 'ハチ', 'キュウ'];
+    const minutes = ['ジュップン','イップン','ニフン','サンプン','ヨンプン','ゴフン','ロップン','ナナフン','ハップン','キュウフン'];
+    const fraction = [...args.text][args.end] === 'の' && tokens.some(t=>t.start===args.end+1 && t.grammar?.[1]==='数詞');
+    const prefix = tens > 1 ? digits[tens] : '';
+    reading = fraction ? prefix + (tens ? 'ジュウ' : '') + digits[ones] + 'ブン'
+                       : prefix + (tens && ones ? 'ジュウ' : '') + minutes[ones];
+    surface = selected; chosen = null; phrase = true; pronunciationForm = 'phrase';
+  }
   const ambiguous=!reading||!!chosen?.reading_ambiguous||!phrase&&!fixed&&!!entry&&!entry.readings?.some(r=>kana(r)===kana(reading));
   return {surface,clickedSurface:result.surface,base:m.base||result.surface,reading,pitch:chosen?.pitch||[],pitchSource:chosen?.pitch_source||(phrase?'词组 · 音调由语音引擎估计':'UniDic 未匹配 · 音调由语音引擎估计'),pronunciationForm,ambiguous,pos:m.wordClass||entry?.pos?.join('、')||'',meaning:entry?.definition_groups?.map(g=>g.text).join('\n')||entry?.definitions?.join('\n')||'',sentence:args.text};
  }

@@ -6,6 +6,7 @@
  "source": "official",
  "settings": {
   "draw": {
+   "roles": true,
    "embed": false,
    "embedTranslation": true
   }
@@ -19,5 +20,5 @@
   "head": "99c2df61dddf09ac0ce868681c075705e7b5f789e9a3fc92e5736b234a7ba58d",
   "pe": "2.31.2013.411@516666b8"
  },
- "rev": 1
+ "rev": 2
 }

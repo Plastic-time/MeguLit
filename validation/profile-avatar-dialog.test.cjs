@@ -26,14 +26,14 @@ test('the profile avatar crop accepts clicks above the profile and displays the 
     this.files=files.files;this.dispatchEvent(new Event('change'));
    };
    const profile=await import('/profile-panel.js');
-   const name='Reader';
+   let name='Reader';
    const api=async(action,args)=>{
     if(action==='account_status')return {configured:true,loggedIn:true};
     if(action==='leaderboard_profile')return {configured:true,joined:true,name};
     if(action==='leaderboard_profile_get')return {state:'ok',joined:true,favorites:[]};
     if(action==='leaderboard_avatar_status')return {state:'ok',status:'none'};
     if(action==='leaderboard_avatar_set'){window.upload=args.data;window.uploads=(window.uploads||0)+1;return {state:'ok',status:window.uploadStatus||'approved'};}
-    if(action==='leaderboard_join'){window.savedName=args.name;return {state:'ok'};}
+    if(action==='profile_name_save'){if(window.rejectRename)throw Error('LEADERBOARD_BAD_NAME');window.savedName=name=args.name;return {name};}
     return [];
    };
    window.profileToasts=[];
@@ -89,5 +89,24 @@ test('the profile avatar crop accepts clicks above the profile and displays the 
     pictured:!!document.querySelector('[data-hero-avatar] img')};
   })()`);
   assert.deepEqual(rejection,{status:'rejected',noteVisible:true,message:'Picture not approved',pictured:false});
+  const unified=await browser.evaluate(`(async()=>{
+   document.querySelector('[data-edit-profile]').click();
+   const form=document.querySelector('.profile-identity-form');
+   form.elements.nickname.value='Third name';
+   form.querySelector('[data-picture]').click();
+   const wait=async predicate=>{for(let i=0;i<100&&!predicate();i++)await new Promise(r=>setTimeout(r,20));};
+   await wait(()=>document.querySelector('.avatar-crop [data-ok]'));
+   document.querySelector('.avatar-crop [data-ok]').click();
+   await wait(()=>!form.querySelector('img').hidden);
+   const before=window.uploads;
+   window.rejectRename=true;form.requestSubmit();
+   await wait(()=>!form.inert);
+   const retained=form.isConnected&&!form.querySelector('img').hidden&&form.elements.nickname.value==='Third name';
+   const previous=document.querySelector('[data-hero-name-text]').textContent;
+   window.rejectRename=false;window.uploadStatus='approved';form.requestSubmit();
+   await wait(()=>window.uploads===before+1&&!form.isConnected);
+   return {previous,retained,uploadsBeforeSubmit:before,uploadsAfterRetry:window.uploads,savedName:window.savedName};
+  })()`);
+  assert.deepEqual(unified,{previous:'New reader',retained:true,uploadsBeforeSubmit:2,uploadsAfterRetry:3,savedName:'Third name'});
  }finally{await browser?.stop();server?.close();fs.rmSync(temp,{recursive:true,force:true});}
 });

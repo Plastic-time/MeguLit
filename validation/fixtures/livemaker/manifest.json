@@ -1,0 +1,32 @@
+{
+  "repository": "https://github.com/pmrowla/pylivemaker",
+  "commit": "ceeb12911c571fe6da77107bb0eaf7eb29594612",
+  "license": "GPL-3.0-or-later",
+  "origin": "official upstream test fixtures, not user game or saves; tiny test.exe is only MZ+archive, never executed",
+  "files": [
+    {
+      "name": "test.dat",
+      "bytes": 68,
+      "sha256": "d284fb1ce496aaeffb7e80864ca024c41c746da63cf8a40b14c4042e0a23f3d9",
+      "upstreamPath": "tests/data/test.dat"
+    },
+    {
+      "name": "test.exe",
+      "bytes": 70,
+      "sha256": "88f5071845b2e648ae15a312c6e390fac5a7f256d3e11d8f3abf09f8f4a590c0",
+      "upstreamPath": "tests/data/test.exe"
+    },
+    {
+      "name": "00000001.lsb",
+      "bytes": 4138,
+      "sha256": "907a9459a896b6800521233f8b87c4dac950e66c28cf93e66355b945f0912dec",
+      "upstreamPath": "tests/data/00000001.lsb"
+    },
+    {
+      "name": "gamemain.lsb",
+      "bytes": 3071,
+      "sha256": "9aee78b0e033a9e7b9c6aa3d686e6ba8afecc1761a15681b3b948cf1df9a5179",
+      "upstreamPath": "tests/data/gamemain.lsb"
+    }
+  ]
+}

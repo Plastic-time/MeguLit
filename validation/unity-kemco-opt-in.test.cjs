@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const domains=require('../core/profiles/domains.cjs');
 const test=require('node:test'),assert=require('node:assert/strict');
 const Profiles=require('../core/profiles/index.cjs'),{HookNative}=require('../core/hook-native.cjs'),{UnityTextPath}=require('../core/text-paths-unity.cjs');
+test('Kemco observer has a strict per-version boolean domain',()=>{
+ assert.equal(domains.layerOf('draw.kemcoSprites'),'version');
+ assert.deepEqual(domains.clean({draw:{kemcoSprites:false}}).value,{draw:{kemcoSprites:false}});
+ assert.deepEqual(domains.clean({draw:{kemcoSprites:'true'}}).rejected,['draw.kemcoSprites']);
+ assert.deepEqual(domains.split({draw:{kemcoSprites:true}}),{game:{},version:{draw:{kemcoSprites:true}}});
+});
 test('Kemco observer defaults off and the existing Unity control bytes stay unchanged',()=>{
  const profile=Profiles.profileFor({});assert.equal(Profiles.get(profile,'draw.kemcoSprites'),false);
  const writes=[],transport={sock:{write:v=>writes.push(v)},drawLine:UnityTextPath.prototype.drawLine};

@@ -1,6 +1,44 @@
 # 传火碑（三维）——怎么做的、用什么做的、以后怎么改
 
-顶栏「传火碑」按钮打开一个全屏 3D 页面：一座带穹顶的石砌教堂，碑立在中央，所有传过火的玩家的名字竖排刻在碑面上。场景随电脑本地时间变化：白天日光从窗户照进来，黄昏点起火把，夜里有月光。
+顶栏「传火碑」按钮打开一个全屏 3D 页面：一座带穹顶的石砌教堂，碑立在中央，入选名册的署名竖排刻在碑面上。场景随电脑本地时间变化：白天日光从窗户照进来，黄昏点起火把，夜里有月光。
+
+## 名册迁移与验收（0036）
+
+原始贡献编号记录上传。碑面按已验证的账号和作品刻名，同一账号再次上传同一作品的另一版 EXE、补丁或修订，沿用该作品的刻名。作品映射取自随仓库发行的 Seed 清单，可用 `node tools/gen-torch-works.cjs` 重建。仅在实际收到并存储有效校准后刻名。未登录、作品未知或声明与清单冲突时，上传仍有收据。签名、扫描和撤销沿用各自的验证流程。
+
+同一账号首次占用的自动署名可用于其实际上传的另一部作品。先选客户端从库内官方主角名对照表给出的未占用候选，再选未占用的池名。池满时保留收据和作品归属，用户可以提交一个未占用的手动署名。只读名册、搜索和每月计数使用相同的可见刻名集合。公开响应包含展示署名，账号邮箱、账号标识和网络标识仅在服务端处理。
+
+0036 保留原始贡献、上传事件和手动署名，停用循环分配触发器。历史同显示名优先展示手动署名，再按最早编号选择代表。其余旧收据仍可审计；旧 IP 散列无法证明玩家归属。旧客户端仍能上传并使用原有分页格式。已安装旧版的本地收据可能继续按编号生成别名，其「我的名字」和跨稀疏编号向前翻页的显示修正在新版桌面生效。旧客户端的未认证改名请求返回 401。新版「我的名字」只读取当前会话已证实的刻名。
+
+上线前用 Wrangler D1 的 `execute megulit-relay --remote --config relay/wrangler.toml --command "<SQL>"` 运行以下只读查询并保存结果。记下最高编号，供上线后比较同一批历史数据
+
+```sql
+WITH labels AS (
+  SELECT c.torch_no, c.name,
+         coalesce(n.name_key, lower(replace(coalesce(c.name,c.alias),' ',''))) AS k
+  FROM torch_credits c LEFT JOIN torch_names n
+    ON n.torch_no=c.torch_no AND c.name IS NOT NULL
+)
+SELECT max(torch_no) AS highwater, count(*) AS receipts, count(name) AS manual,
+       count(DISTINCT nullif(k,'')) AS expected,
+       (SELECT count(*) FROM seed_admin_uploads) AS upload_events FROM labels;
+```
+
+先应用 0036，再部署同版本 Worker。将下例的 92 替换为刚记录的最高编号。前三列应与上线前的 receipts、manual、expected 相等。visible 与 by_month 应相等，shared_between_owners 应为零。线上继续接收上传，upload_events 可增长
+
+```sql
+WITH historical AS (SELECT * FROM torch_credits WHERE torch_no<=92)
+SELECT (SELECT count(*) FROM historical) AS receipts,
+       (SELECT count(name) FROM historical) AS manual,
+       (SELECT count(*) FROM torch_carvings WHERE owner LIKE 'legacy:%' AND torch_no<=92) AS historical_visible,
+       (SELECT count(*) FROM torch_carvings WHERE name_key IS NOT NULL) AS visible,
+       (SELECT coalesce(sum(n),0) FROM torch_roster_months) AS by_month,
+       (SELECT count(*) FROM (SELECT name_key FROM torch_carvings WHERE name_key IS NOT NULL
+                              GROUP BY name_key HAVING count(DISTINCT owner)>1)) AS shared_between_owners,
+       (SELECT count(*) FROM seed_admin_uploads) AS upload_events;
+```
+
+两域分别遍历 `/api/torch/monument?limit=500` 及其 next 游标，将条数和 `/api/torch/months` 合计比较。用实际页上的姓名访问 `/api/torch/find?name=…`，按编号核对命中。公众页缓存 60 秒。若需回退 Worker，应保留新增表及原账，旧 Worker 会恢复读取原始编号；回退窗口产生的新收据需要在重新启用名册前单独核对
 
 ## 用了什么
 

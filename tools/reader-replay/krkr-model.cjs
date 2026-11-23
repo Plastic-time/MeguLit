@@ -22,15 +22,16 @@ function toJs(t){
 function ctlPathFor(pid,tmp){
  const src=cpp();if(!/swprintf\(tail, 64, L"MeguLit\\\\draw\\\\%lu\.txt", GetCurrentProcessId\(\)\)/.test(src))throw Error('KrkrText.cpp MakeCtlPath changed: update krkr-model.cjs');
  const win=path.join(tmp,'MeguLit','draw',String(pid>>>0)+'.txt');
- return {win,url:'file://./'+win[0].toLowerCase()+win.slice(2).replace(/\\/g,'/')};
+ return {win,url:process.platform==='win32'?'file://./'+win[0].toLowerCase()+win.slice(2).replace(/\\/g,'/'):require('node:url').pathToFileURL(win).href};
 }
-const loadUrl=url=>{const m=/^file:\/\/\.\/([a-z])(\/.*)$/.exec(url);if(!m)throw Error('not a krkr storage path');const buf=fs.readFileSync(m[1].toUpperCase()+':'+m[2]);
+const loadUrl=url=>{const m=/^file:\/\/\.\/([a-z])(\/.*)$/.exec(url);
+ const buf=fs.readFileSync(m?m[1].toUpperCase()+':'+m[2]:require('node:url').fileURLToPath(url));
  const text=buf[0]===0xff&&buf[1]===0xfe?buf.slice(2).toString('utf16le'):buf.toString('utf8');const lines=text.split(/\r?\n/);if(lines.length&&lines.at(-1)==='')lines.pop();return lines;};
 class KrkrModel{
  constructor({pid,tmp=require('node:os').tmpdir(),report=()=>{}}){
   const src=script(),ctl=ctlPathFor(pid,tmp);this.ctl=ctl;this.reports=[];
   const st=this.st={cfg:{roles:0,embed:0,zh:1},embMap:{},ctlRaw:'',clears:0,report:s=>{this.reports.push(s);report(s);},screen:()=>[800,600]};
-  const global=this.global={__megulitKrkrCtlPath:ctl.url};
+  const global=this.global={__megulitKrkrCtlPath:ctl.url,RegExp};
   for(const head of ['st.ctl=function(){','st.clearSent=function(rec)','st.choicePage=function(P)','st.uiDraw=function(ll)'])
    {let js;try{js=tjsFunction(src,head);}catch{continue;}/* a build without that function (an older script.inc) */new Function('st','global','__load',toJs(js)+';')(st,global,loadUrl);}
  }

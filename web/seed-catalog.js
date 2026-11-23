@@ -77,11 +77,22 @@ export function catalogHTML(games,locale,mode,esc,query=''){
    next request, so leaving NSFW mode stops the downloads of covers normal mode does not show. */
 const covers=new Map();
 const isCover=u=>typeof u==='string'&&u.startsWith('data:image/');
+export function resolveSeedCover(api,vid,mode='safe',cache=covers){
+ const key=vid+'|'+mode;
+ let pending=cache.get(key);
+ if(!pending){
+  pending=Promise.resolve().then(()=>api('seed_cover',{vndb:vid,nsfw:mode==='nsfw'})).catch(()=>null).then(url=>{
+   if(!isCover(url))cache.delete(key);
+   return isCover(url)?url:null;
+  });
+  cache.set(key,pending);
+ }
+ return pending;
+}
 export function loadCovers(root,api,mode,live=()=>root.isConnected,{cache=covers,show=showCover}={}){
  const todo=[...root.querySelectorAll('.sc-cover[data-state="load"][data-vndb]')];let at=0;
- const next=async()=>{while(at<todo.length&&live()){const el=todo[at++],vid=el.dataset.vndb,key=vid+'|'+mode;if(!el.isConnected)continue;
-  let p=cache.get(key);if(!p){p=Promise.resolve().then(()=>api('seed_cover',{vndb:vid,nsfw:mode==='nsfw'})).catch(()=>null).then(u=>{if(!isCover(u))cache.delete(key);return u;});cache.set(key,p);}
-  const url=await p;if(isCover(url)&&live()&&el.isConnected)show(el,url);}};
+ const next=async()=>{while(at<todo.length&&live()){const el=todo[at++];if(!el.isConnected)continue;
+  const url=await resolveSeedCover(api,el.dataset.vndb,mode,cache);if(isCover(url)&&live()&&el.isConnected)show(el,url);}};
  return Promise.all([next(),next(),next(),next()]);
 }
 function showCover(el,url){const img=new Image();img.alt='';img.decoding='async';img.onload=()=>img.classList.add('is-in');img.src=url;el.prepend(img);el.dataset.loaded='1';}

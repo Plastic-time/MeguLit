@@ -77,12 +77,18 @@ bool safeattach(ENGINE *m, const char *enginename)
 }
 #include "DrawSites.h" /* engine-draw 2026-11-21: GDI draw sites of the native engines (opt-in, docs/engine-draw-native.md) */
 #include "MajiroDraw.h" /* complete-string path: observe only after draw.roles opt-in */
+#include "MinoriInput.h"
 #include "AdvhdDraw.h" /* version-pinned diagnostic only, independent advhdInput opt-in */
+#include "CmvsDraw.h" /* both pinned full-input draw entries, diagnostics only */
+#include "FvpDraw.h" /* pinned raw append input, diagnostics only */
 bool checkengine()
 {
     DrawSites::Arm();
     MajiroDraw::Arm();
     AdvhdDraw::Arm();
+    CmvsDraw::Arm();
+    FvpDraw::Arm();
+    MinoriInput::Arm();
 
     auto engines = check_engines();
     std::vector<const char *> infomations = {

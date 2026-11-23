@@ -101,6 +101,7 @@ const KIND_CODES={opaque:'o',text:'t',data:'d',png:'p',ogg:'g',riff:'w',jpeg:'j'
 /* local findings (runtime-harvest-scan finish()) → the uploadable form + what was dropped */
 function publicize(local,{dumps=[]}={}){
  const dropped={language:0,verify:0};const used=new Set(),mod=i=>{if(i>=0)used.add(i);return i;};
+ const sampleFor=bytes=>{const result=d.sampleResult(bytes,{max:bytes.length,compress:true});if(!result.sample){const reason=result.reason==='VERIFY'?'verify':result.reason;dropped[reason]=(dropped[reason]||0)+1;}return result.sample;};
  const where=w=>w?(w.heap?{heap:true}:{module:mod(w.module),rva:w.rva}):null;
  const loc=l=>l?{module:mod(l.module),rva:l.rva,deref:l.deref,add:l.add||0}:null;
  const sig=list=>(list||[]).filter(s=>/^[0-9a-f?]{8,64}$/.test(s.pattern)).map(s=>({module:mod(s.module),rva:s.rva,kind:s.kind,pattern:s.pattern}));
@@ -116,14 +117,14 @@ function publicize(local,{dumps=[]}={}){
   const ext={};for(const n of names||[]){const m=/\.([A-Za-z0-9]{1,8})$/.exec(n);const k=m?m[1].toLowerCase():'(none)';ext[k]=(ext[k]||0)+1;}
   const kinds=ix.kinds?ix.kinds.map(([k])=>KIND_CODES[k]||'o').join(''):null;const via=ix.kinds?[...new Set(ix.kinds.map(([,v])=>v).filter(Boolean))]:[];
   /* the table region itself, desensitized like a file sample (record layout, name fields as placeholders) */
-  const region=ix.region?d.sample(ix.region.bytes,{max:ix.region.bytes.length,compress:true}):null;if(ix.region&&!region)dropped.verify++;
+  const region=ix.region?sampleFor(ix.region.bytes):null;
   const item={...(region?{region:{at:ix.region.at,sample:region}}:{}),archive:{name:d.maskString(ix.archive.name).slice(0,120),size:ix.archive.size,magic:ix.archive.file?magicHex(readHead(ix.archive.file,8)):''},where:where(ix.where),locator:loc(ix.locator),slotSig:sig(ix.slotSig),stride:ix.stride,fields:ix.fields,countAt:ix.countAt,count:ix.count,coverage:ix.coverage,
    entries:b64u32(entries),entryWords:3,...(names?{names:{at:ix.names.at,form:ix.names.form,list:names},ext}:{}),...(kinds?{kinds,via}:{})};
   if(names&&names.some(n=>naturalLanguage(Buffer.from(n,'utf8'))||naturalLanguage(Buffer.from(n,'utf16le')))){dropped.language++;delete item.names;}
   indexes.push(item);}
  const dispatch=(local.dispatch||[]).map(t=>({where:where(t.where),count:t.count,ptr:t.ptr,targets:b64u32(t.targets),sig:sig(t.sig)}));
- const scripts=[];for(const s of local.scripts||[]){const sm=d.sample(s.window,{max:s.window.length,compress:true});if(!sm){dropped.verify++;continue;}scripts.push({where:where(s.where),locator:loc(s.locator),encoding:s.encoding,runs:s.runs,textShare:s.textShare,before:s.before,opcodes:s.opcodes,lengthPrefix:s.lengthPrefix,terminator:s.terminator,sample:sm});}
- for(const x of dumps.slice(0,4)){const whole=x.bytes.subarray(0,8<<20),sm=d.sample(whole,{max:whole.length,compress:true});if(!sm){dropped.verify++;continue;}const shape=require('./runtime-harvest-scan.cjs').bytecodeShape(x.bytes.subarray(0,65536));
+ const scripts=[];for(const s of local.scripts||[]){const sm=sampleFor(s.window);if(!sm)continue;scripts.push({where:where(s.where),locator:loc(s.locator),encoding:s.encoding,runs:s.runs,textShare:s.textShare,before:s.before,opcodes:s.opcodes,lengthPrefix:s.lengthPrefix,terminator:s.terminator,sample:sm});}
+ for(const x of dumps.slice(0,4)){const whole=x.bytes.subarray(0,8<<20),sm=sampleFor(whole);if(!sm)continue;const shape=require('./runtime-harvest-scan.cjs').bytecodeShape(x.bytes.subarray(0,65536));
   scripts.push({where:{dump:true},source:d.maskString(path.basename(String(x.source||'memory').replace(/\\/g,'/'))).slice(0,80),how:x.how,size:x.bytes.length,...(shape||{}),sample:sm});}
  const modules=(local.modules||[]).map((m,i)=>used.has(i)||m.main?{id:i,name:d.maskString(m.name).slice(0,80),size:m.size,main:!!m.main}:null).filter(Boolean);
  return {schema:SCHEMA,version:VERSION,collector:{scan:scanStamp(),native:'RuntimeHarvest',bits:local.bits||0},stats:local.stats||{},modules,constants,keys,indexes,dispatch,scripts,dropped};}

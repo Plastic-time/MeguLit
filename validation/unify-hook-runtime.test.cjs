@@ -9,7 +9,7 @@ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 test('the adapters are engines of MeguLitHook32, listed first, each for its exact program only',()=>{
  const c=read('native/megulithook/enginecollection32.cpp');
  assert.match(c,/#include "MeguLitEngines\.h"/);
- assert.match(c,/return \{\r?\n\s*new ToMeIsland,\r?\n\s*new ToMeSteinsGate,\r?\n\s*new LovaGame,/,'first, then upstream as it was');
+ assert.match(c,/return \{\r?\n\s*new ToMeIsland,\r?\n\s*new ToMeSteinsGate,\r?\n\s*new ToMeDanganronpaPc,\r?\n\s*new LovaGame,/,'first, then upstream as it was');
  const e=read('native/megulithook/MeguLitEngines.h');
  assert.match(e,/MeguLitMatch::Island\(processName, !_wcsicmp\(processName, L"ISLAND\.exe"\) && ToMeIslandDraw::ExactFile\(\)\)/,'ISLAND: name first, then the whole file hash');
  assert.match(e,/MeguLitMatch::SteinsGate\(processName, pe->FileHeader\.TimeDateStamp\)/,'STEINS;GATE: name and PE time stamp');

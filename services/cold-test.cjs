@@ -164,8 +164,9 @@ async function reportResult(root,{game,key,scored,verdict,profile},{fetcher}={})
   score:{metrics:scored.best.metrics,cost:scored.best.cost,lines:scored.lines},candidates:scored.candidates.slice(0,4)}});
  rec.cold={verdict:verdict.verdict,near:scored.near,measured:scored.measured,seed:scored.seed?{status:profile?.seedStatus||'',pass:scored.seed.pass,over:scored.seed.over}:null};
  /* this PC's own calibration, when it has none yet: the live gate still checks every window of the real play */
- try{if(!auto.load(root,key))auto.store(root,key,rec);}catch{}
- let prints=null;try{prints=require('../core/game-print.cjs').prints(game.exe,{exe:key,title:game.title,steamAppId:game.steamAppId,vndb:game.vndb,engine:profile?.engine||''});}catch{prints={exe:key};}
+ const script=require('./original-text.cjs').contributionScript(root,game.exe,game.id);
+ try{if(!auto.load(root,key,script))auto.store(root,key,rec,script);}catch{}
+ let prints=null;try{prints=require('../core/game-print.cjs').prints(game.exe,{exe:key,script,title:game.title,steamAppId:game.steamAppId,vndb:game.vndb,engine:profile?.engine||''});}catch{prints={exe:key};}
  return feed.report(root,rec,{prints,...(fetcher?{fetcher}:{})});}
 
 /* fail / edge: 2-3 small client-area pictures (coldTestShots) and the run's logs (runtimeSampleShare) */

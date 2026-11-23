@@ -813,5 +813,5 @@ public sealed class PageLocator : IDisposable {
   return "0";
  }
 
- public void Dispose() { Disposed = true; Wake.Set(); }
+ public void Dispose() { Disposed = true; ScanOn = false; Wake.Set(); }
 }

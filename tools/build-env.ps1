@@ -70,5 +70,5 @@ $taskNode = Resolve-First @((Join-Path $taskRoot 'runtime\node.exe'), (Get-Comma
 if (-not $taskNode) { $taskProblems.Add('Node.js 20+ not found (put node.exe on PATH)') }
 elseif ([int](((& $taskNode --version) -replace '^v','') -split '\.')[0] -lt 20) { $taskProblems.Add("Node.js 20+ required: $taskNode") }
 
-$env:Path = (@($taskRustBin, $(if ($taskNode) { Split-Path -Parent $taskNode }), (Join-Path $env:WINDIR 'System32'), $env:WINDIR, (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0')) | Where-Object { $_ }) -join ';'
+$env:Path = (@($taskRustBin, $(if ($taskNode) { Split-Path -Parent $taskNode }), (Join-Path $env:WINDIR 'System32'), $env:WINDIR, (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0'), $env:Path) | Where-Object { $_ }) -join ';'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'; $env:VSCMD_SKIP_SENDTELEMETRY = '1'; $env:POWERSHELL_TELEMETRY_OPTOUT = '1'

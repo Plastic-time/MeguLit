@@ -62,5 +62,25 @@
  "sourceLangs": [
   "ja"
  ],
- "rev": 1
+ "rev": 2,
+ "ext": {
+  "translationQuality": {
+   "116a1b6ab5902bb6dc49e25086b1ef6f07d941dbb090b497fb7a158e997dea2d": {
+    "script": "459edbf644eda6cf38ccdd4db65883449d0a16772694cba82a6b33725f3bb63e",
+    "basis": "identified-script-slots",
+    "body": {
+     "extracted": 101489,
+     "localPaired": 0,
+     "workTotal": null
+    },
+    "choice": {
+     "extracted": 654,
+     "localPaired": 0,
+     "workTotal": null
+    },
+    "indexHash": "67226a54fd2fdc7ff92b8bc6f01f403d4186e4ab5d20fbfe61fd1dc7a8183014",
+    "patchIndexHash": "d869e05884b4db46cb60a4980df4614667beb9cfddfb29301daa0ec7b7f400ac"
+   }
+  }
+ }
 }

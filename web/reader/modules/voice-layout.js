@@ -32,7 +32,12 @@
   const speaker=voice.querySelector('.tome-speaker-select');
   // First synthesis of a voice/style is computed locally and slow: say so under the voice picker (user, 2026-11-02).
   const firstTry=localized(node('small','tome-voice-first'),'firstTry');(voice.querySelector('.tome-speaker-pick')||speaker?.closest('label'))?.after(firstTry);
-  if(speaker)new MutationObserver(()=>{const caption=speaker.closest('label').querySelector('.tome-voice-caption');caption.dataset.voiceCopy=speaker.hidden?'id':'speaker';render(voice);}).observe(speaker,{attributes:true,attributeFilter:['hidden']});
+  const speakerId=voice.querySelector('input[data-v4-key="aivisSpeaker"]');
+  const speakerCaption=speakerId?.closest('label')?.querySelector('.tome-voice-caption');
+  if(speakerCaption)new MutationObserver(()=>{
+   speakerCaption.dataset.voiceCopy=speakerId.hidden?'speaker':'id';
+   render(voice);
+  }).observe(speakerId,{attributes:true,attributeFilter:['hidden']});
   for(const button of [...voice.children].filter(n=>n.tagName==='BUTTON'))actions.append(button);
   actions.firstElementChild?.classList.add('tome-voice-save');
   const status=[...voice.children].find(n=>n.tagName==='SMALL'&&n!==hint);if(status){status.classList.add('tome-voice-status');status.setAttribute('role','status');}

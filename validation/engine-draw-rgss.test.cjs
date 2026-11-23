@@ -1,0 +1,229 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),net=require('node:net'),{spawnSync}=require('node:child_process');
+const C=require('../core/rgss-scripts.cjs'),F=require('./helpers/engine-fixtures-rgss.cjs'),R=require('../services/original-engines/rgss.cjs'),P=require('../core/profiles/index.cjs'),TP=require('../core/text-paths.cjs'),D=require('../core/text-paths-rgss.cjs'),{pageScript}=require('../core/rgss-page.cjs'),z=require('node:zlib');
+const tmp=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-rgss-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));return dir;};
+const digest=b=>crypto.createHash('sha256').update(b).digest('hex');
+function scriptsFixture(rows){
+ const encode=v=>{
+  if(Array.isArray(v))return Buffer.concat([Buffer.from('['),C.marshalInteger(v.length),...v.map(encode)]);
+  if(typeof v==='number')return Buffer.concat([Buffer.from('i'),C.marshalInteger(v)]);
+  const b=Buffer.isBuffer(v)?v:Buffer.from(v);return Buffer.concat([Buffer.from('"'),C.marshalInteger(b.length),b]);
+ };
+ return Buffer.concat([Buffer.from([4,8]),encode(rows)]);
+}
+const table=()=>scriptsFixture([[1,'Window_Message',z.deflateSync(Buffer.from('class Window_Message; end'))],[2,'Main',z.deflateSync(Buffer.from('original_main'))]]);
+
+test('script codec keeps binary strings and patches only Main, retaining every other source and trailing Marshal metadata',()=>{
+ const before=table(),original=C.scriptTable(before);assert.equal(original.rows.length,2);assert.equal(original.rows[1].source.toString(),'original_main');
+ const patched=C.patchMain(before,'# MEGULIT_RGSS_BOOTSTRAP\nmodule Observer;end'),after=C.scriptTable(patched);
+ assert.deepEqual(after.rows[0].packed.value,original.rows[0].packed.value);assert.equal(after.rows[1].source.toString(),'# MEGULIT_RGSS_BOOTSTRAP\nmodule Observer;end\noriginal_main');
+ assert.throws(()=>C.patchMain(patched,'again'),/ALREADY_PATCHED/);
+ const bad=scriptsFixture([[1,'Main',z.deflateSync(Buffer.from('main'))],[2,'After Main',z.deflateSync(Buffer.from('side_effect'))]]);assert.throws(()=>C.patchMain(bad,'observer'),/MAIN_NOT_FINAL/);
+ const tail=scriptsFixture([[1,'Main',z.deflateSync(Buffer.from('main'))],[2,'End',z.deflateSync(Buffer.from('exit'))]]);assert.equal(C.scriptTable(C.patchMain(tail,'observer')).rows[1].source.toString(),'exit');
+ for(const b of [before.subarray(0,before.length-1),Buffer.from([4,8,111]),Buffer.from([4,8,91,127]),Buffer.concat([before,Buffer.from([0])])])assert.throws(()=>C.scriptTable(b));
+});
+
+test('RGSSAD v1 script replacement preserves later payload keys, names and all non-script bytes after reindexing',t=>{
+ const dir=tmp(t),file=path.join(dir,'Game.rgss2a'),data=table();fs.writeFileSync(file,F.rgssadV1({'Data\\Before.rvdata':Buffer.from('before'),'Data\\Scripts.rvdata':data,'Data\\After.rvdata':Buffer.from('after payload')}));
+ const list=R.list(file),entry=list[1],patched=C.patchArchiveV1(fs.readFileSync(file),entry,C.patchMain(data,'observer'));const copy=path.join(dir,'copy.rgss2a');fs.writeFileSync(copy,patched);
+ const next=R.list(copy);assert.deepEqual(next.map(e=>e.name),list.map(e=>e.name));assert.deepEqual(R.read(copy,next[0]),R.read(file,list[0]));assert.deepEqual(R.read(copy,next[2]),R.read(file,list[2]));
+ assert.equal(C.scriptTable(R.read(copy,next[1])).rows[1].source.toString(),'observer\noriginal_main');assert.throws(()=>C.patchArchiveV1(Buffer.from('not archive'),entry,data),/PATCH_SCOPE/);
+});
+
+test('RGSS aliases and archive fingerprints stay separate from MV/MZ and consume the complete default-off contract',()=>{
+ for(const name of ['RGSS','RGSS1','RGSS2','RGSS3','RGSS1-3','RPG Maker XP','RPG Maker VX','RPG Maker VX/XP','RPG Maker VX Ace / VX / XP']){
+  const p=P.profileFor({engine:name});assert.equal(p.engine,'rgss',name);assert.equal(p.layers,'core+engine');assert.deepEqual(p.draw,P.profileFor({}).draw,name);}
+ for(const name of ['RPG Maker MV/MZ','RPG Maker MV','RPG Maker MZ','rpgm'])assert.equal(P.engineId(name),'rpgmaker');
+ const fp=require('../services/engine-fingerprint.cjs'),probe=require('../tools/diff-maker/probe.cjs');
+ for(const name of ['Game.rgssad','Game.rgss2a','Game.rgss3a']){assert.equal(fp.archiveInfo(name,'5247535341440001').engine,'rgss');assert.equal(probe.detectEngine({}, {hookEvents:'',extra:''},[name]).engine,'rgss');}
+});
+
+test('launch path stays inert without explicit roles, rejects unverified DLLs, and guards traversal paths',async t=>{
+ const dir=tmp(t),exe=path.join(dir,'Game.exe');fs.writeFileSync(exe,'MZ');fs.writeFileSync(path.join(dir,'Game.ini'),'[Game]\nLibrary=RGSS202J.dll\nScripts=Data\\Scripts.rvdata\n');fs.writeFileSync(path.join(dir,'RGSS202J.dll'),'unverified');
+ const L=require('../core/text-paths-launch.cjs');for(const cfg of [{}, {roles:'true'}, {roles:false,embed:true}])assert.equal(await L.prepare({root:dir,exe,enabled:true,profile:P.profileFor({engine:'rgss',official:{draw:cfg}})}),null);
+ assert.equal(fs.existsSync(path.join(dir,'data','rgss-shadow')),false);assert.throws(()=>D.plan(exe),/DLL_NOT_VERIFIED/);
+ fs.writeFileSync(path.join(dir,'Game.ini'),'Library=../RGSS202J.dll\nScripts=Data\\Scripts.rvdata');assert.throws(()=>D.plan(exe),/UNSAFE_INI_PATH/);
+});
+
+test('live transport validates token, PID, generation and protocol; revocation clears the exact dialogue and UI groups',async t=>{
+ let birth='first-birth';const out=[],session=new D.RgssTextPath({owner:()=>42,ownerBirth:()=>birth,onChars:x=>out.push(TP.parseChars(x))});t.after(()=>session.stop());session.drawConfig({roles:true});await session.listen();
+ const client=net.connect(session.port,'127.0.0.1');t.after(()=>client.destroy());let pending='';const cfg=new Promise(resolve=>client.on('data',b=>{pending+=b.toString();if(pending.includes('\n'))resolve(pending);}));
+ await new Promise(resolve=>client.once('connect',resolve));client.write('HELLO '+session.token+' 42\n');assert.match(await cfg,/^CFG 1 1/);
+ const body=TP.formatChars({engine:'rgss',line:1,hidden:false,sw:544,sh:416,rects:[[16,20,24,24]],text:'字'}),ui=TP.formatChars({engine:'rgss',line:2,hidden:false,sw:544,sh:416,rects:[],text:'はい',role:'choice',id:'W7:0',box:[20,30,100,28],sel:true});
+ client.write('G 99 '+body+'\nG 1 '+body+'\nG 1 '+ui+'\n');await new Promise(resolve=>setTimeout(resolve,30));assert.equal(out.length,2);
+ session.drawConfig({roles:false});assert.equal(out.length,4);assert.deepEqual(out.slice(2).map(x=>[x.line,x.text,x.id]),[[1,'',undefined],[2,'','W7:']]);
+ client.write('G 1 '+body+'\n');await new Promise(resolve=>setTimeout(resolve,20));assert.equal(out.length,4);
+ session.drawConfig({roles:true});client.write('G 1 '+body+'\nG '+session.generation+' '+body.replace('hidden=0','hidden=1')+'\n');await new Promise(resolve=>setTimeout(resolve,20));assert.equal(out.length,4);
+ session.owner=()=>43;client.write('G '+session.generation+' '+body+'\n');await new Promise(resolve=>setTimeout(resolve,20));assert.equal(out.length,4);
+ session.owner=()=>42;birth='second-birth';session.report('G '+session.generation+' '+body,42);assert.equal(out.length,4,'same PID from another birth cannot submit');session.sync();assert.equal(session.socket.destroyed,true);
+});
+
+const ruby=process.env.MEGULIT_RUBY;
+test('launch grant loads the same per-exe local layer as the reader and does not leak to another exe',t=>{
+ const root=tmp(t),exe=path.join(root,'Game.exe'),other=path.join(root,'Other.exe');fs.writeFileSync(exe,'one game');fs.writeFileSync(other,'another game');
+ const auto=require('../core/auto-profile.cjs'),input={root,exe,profile:{engine:'RPG Maker VX/XP'},title:'Synthetic VX'};
+ assert.equal(D.launchProfile(input).draw.roles,false);auto.store(root,digest(fs.readFileSync(exe)),{schema:1,source:'calibration',settings:{draw:{roles:true}}});
+ assert.equal(D.launchProfile(input).draw.roles,true);assert.equal(D.launchProfile({...input,exe:other}).draw.roles,false);
+ auto.store(root,digest(fs.readFileSync(exe)),{schema:1,source:'gate',settings:{draw:{roles:false}}});assert.equal(D.launchProfile(input).draw.roles,false);
+});
+
+test('watching the actual game PID closes the listener when it exits, including locale retry ownership',async t=>{
+ const s=new D.RgssTextPath();t.after(()=>s.stop());await s.listen();let live=true;s.watch(45,{alive:pid=>{assert.equal(pid,45);return live;},every:5});live=false;
+ await new Promise(resolve=>setTimeout(resolve,30));assert.equal(s.stopped,true);assert.equal(s.server.listening,false);
+});
+
+test('paused message sources require a current body, bound owner and generation, and reach only the attached reader',async t=>{
+ const s=new D.RgssTextPath(),calls=[],hook={state:{},gamePid:()=>42,charRects:()=>{},emitSource(...a){calls.push(a);this.state={hookSequence:(this.state.hookSequence||0)+1,hookSourceOrigin:'rgss',hookSourceLine:a[3]};},attachTextPath(p){this.textPath=p;p.drawConfig({roles:true});}};t.after(()=>s.stop());
+ require('../core/text-paths-launch.cjs').attach({path:'rgss',session:s},hook);await s.listen();const client=net.connect(s.port,'127.0.0.1');t.after(()=>client.destroy());
+ await new Promise(resolve=>client.once('connect',resolve));client.write('HELLO '+s.token+' 42\n');await new Promise(resolve=>setTimeout(resolve,20));
+ const body=TP.formatChars({engine:'rgss',line:11,hidden:false,sw:544,sh:416,rects:[[16,20,24,24],[40,20,24,24]],text:'本文'}),send=line=>s.report(line,42);
+ const paused=()=> 'S '+s.generation+' 11 '+Buffer.from('本文').toString('base64');send(paused());assert.equal(calls.length,0,'no source without rendered body');send('G '+s.generation+' '+body);send('S '+s.generation+' 11 '+Buffer.from('別文').toString('base64'));assert.equal(calls.length,0,'a rejected or replaced body cannot promote stale text');send(paused());send(paused());assert.deepEqual(calls,[['本文','rgss','rgss',11]]);
+ s.drawConfig({roles:false});send(paused());assert.equal(calls.length,1);s.drawConfig({roles:true});send('G '+s.generation+' '+body);hook.textPath=null;send(paused());assert.equal(calls.length,1,'replaced reader refuses stale callback');
+});
+
+test('Ruby pauses publish one source signal per visible message and never for selectable UI',{skip:!ruby&&'MEGULIT_RUBY not set; no Ruby replay'},()=>{
+ const stand=fs.readFileSync(path.join(__dirname,'helpers','rgss-standin.rb'),'utf8'),script=pageScript({port:1234,token:'a'.repeat(32)}),checks=String.raw`
+$control << "CFG 1 1\n";m=Window_Message.new(0,0,300,100);m.contents.draw_text(0,0,48,32,'本文');frames(4)
+raise 'unpaused source' if $wire.join.include?("\nS ")
+m.pause=true;menu=Window_Command.new(['菜单']);menu.pause=true;frames(6)
+raise 'paused source missing or duplicate' unless $wire.join.scan(/^S /).size==1
+m.contents.clear;m.contents.draw_text(0,0,48,32,'次頁');frames(4)
+raise 'next page missing' unless $wire.join.scan(/^S /).size==2
+puts JSON.generate({:wire=>$wire.join})
+`;
+ const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000,windowsHide:true});assert.equal(r.status,0,r.stderr);const lines=JSON.parse(r.stdout).wire.split('\n'),body=new Map(),sources=[];
+ for(const line of lines){if(/^G /.test(line)){const rec=TP.parseChars(line.replace(/^G \d+ /,''));if(rec&&!rec.role)body.set(rec.line,rec.text);}else if(/^S /.test(line))sources.push(body.get(Number(line.split(' ')[2])));}
+ assert.deepEqual(sources,['本文','次頁']);
+});
+
+test('production HookNative receives the paused RGSS source and its following page without starting a native helper',t=>{
+ const dir=tmp(t),events=[],{HookNative}=require('../core/hook-native.cjs'),h=new HookNative({native:dir,hook:dir,logs:dir},m=>events.push(m),()=>{throw Error('native spawn forbidden in replay');}),s=new D.RgssTextPath();h.trace=()=>{};t.after(()=>{s.stop();h.stop();});
+ h.profile=P.profileFor({engine:'rgss',official:{draw:{roles:true}}});require('../core/text-paths-launch.cjs').attach({path:'rgss',session:s},h);h.target={pid:42,started:'1234567890123'};s.pid=42;s.birth='1234567890123';s.generation=1;
+ for(const [line,text] of [[1,'本文です'],[2,'次の文章です']]){const body=TP.formatChars({engine:'rgss',line,hidden:false,sw:544,sh:416,rects:[...text].map((_,i)=>[16+i*24,280,24,24]),text});s.report('G 1 '+body,42);s.report('S 1 '+line+' '+Buffer.from(text).toString('base64'),42);assert.equal(h.state.hookSource,text);assert.equal(h.state.hookSourceEngine,'rgss');assert.equal(h.state.hookSourceLine,line);}
+ const count=h.state.hookSequence;h.wanted=false;s.report('S 1 2 '+Buffer.from('次の文章です').toString('base64'),42);assert.equal(h.state.hookSequence,count);assert.ok(events.some(e=>e.type==='hookCharRects'&&e.engine==='rgss'));
+});
+
+test('production launch focuses a running owned shadow before any observer preparation or game start',async t=>{
+ const dir=tmp(t),exe=path.join(dir,'Game.exe'),shadow=path.join(dir,'shadow','Game.exe'),game={id:'one',title:'VX',executable:exe,original:JSON.stringify({library:{engine:'RPG Maker VX/XP'}})},queried=[],bound=[];fs.writeFileSync(exe,'fixture');
+ const modules={
+  './store.cjs':{},'./relay-gate.cjs':{install(){}},'./import-source.cjs':{backfill(){},targetOf:()=>''},'./background-games.cjs':{foreground:async()=>{},unmute:async()=>{}},'../core/steam-owned.cjs':{launchAppid:()=>null},'./game-language.cjs':{originalExecutable:()=>({blocked:false})},'../core/drm-wrap.cjs':{plan:()=>null},'../core/library.cjs':{isTranslated:()=>false},'./locale-launch.cjs':{requiresAdministrator:()=>false},'./shared-adaptation.cjs':{importFor(){}},'./japanese-restore-options.cjs':{forExecutable:()=>({})},'../core/japanese-restore.cjs':{repairNameColumns:()=>({}),repairShared:()=>({}),_internal:{yurisPlan:()=>null}},'./japanese-auto-run.cjs':{beforeLaunch(){}},'../core/directplay.cjs':{prepare:()=>({copied:[],declined:[],missing:[]})},'../core/windows-features.cjs':{prepareDotnet:()=>[]},'../core/profiles/index.cjs':P,'../core/text-paths-rgss.cjs':{existingShadow:()=>shadow},'../core/japanese-auto.cjs':{launchResult(){}},
+  './game-process.cjs':{gameProcess:async(root,file)=>{queried.push(file);return file===shadow?'focused':'absent';},gameProcesses:async(root,file)=>{assert.equal(file,shadow);return [{pid:42,visible:true}];}},
+  './game-readiness.cjs':{waitForVisibleGame:async query=>{const rows=await query();assert.equal(rows[0].pid,42);return {pid:42};}},
+  '../core/text-paths-launch.cjs':{prepare(){throw Error('must not re-patch a running game');}}
+ };
+ modules['../core/library-mode.cjs']={libraryOnly:()=>false};
+ modules['./embedded-japanese-jobs.cjs']=require('../services/embedded-japanese-jobs.cjs');
+ const sandbox={module:{exports:{}},__dirname:path.join(__dirname,'..','services'),process:{env:{MEGULIT_ROOT:dir}},Buffer,require:name=>{if(name in modules)return modules[name];if(['node:fs','node:path','node:crypto','node:child_process'].includes(name))return require(name);throw Error('unexpected launch dependency '+name);}};
+ require('node:vm').runInNewContext(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),sandbox);
+ const db={prepare:()=>({get:()=>game,run(){}})},runtime={prepareGame(){},bindLaunched:pid=>bound.push(pid)};const result=await sandbox.module.exports.launch(db,'one',runtime);
+ assert.equal(result.action,'focused');assert.deepEqual(queried,[exe,shadow]);assert.deepEqual(bound,[42]);
+});
+
+test('Ruby geometry replay keeps whitespace, prefix-based squeezing, viewport scroll, partial clears and new contents isolated',{skip:!ruby&&'MEGULIT_RUBY not set; no Ruby replay'},()=>{
+ const stand=fs.readFileSync(path.join(__dirname,'helpers','rgss-standin.rb'),'utf8'),script=pageScript({port:1234,token:'a'.repeat(32)});
+ const checks=String.raw`
+$control << "CFG 1 1\n";m=Window_Message.new(10,20,300,160);m.ox=4;m.oy=8
+v=Object.new;def v.rect;Rect.new(20,30,544,416);end;def v.ox;2;end;def v.oy;3;end;def v.visible;true;end;def v.disposed?;false;end;m.viewport=v
+m.contents.draw_text(0,0,60,32,'AB CD');frames(3)
+m.contents.clear_rect(Rect.new(36,0,12,32));frames(3)
+m.contents=Bitmap.new(268,128);m.contents.draw_text(0,0,24,32,'新');frames(3)
+$control << "CFG 2 0\n";frames(3);during=Window_Message.new(0,0,200,80);during.contents.draw_text(0,0,24,32,'禁')
+$control << "CFG 3 1\n";frames(3);during.contents.clear;during.contents.draw_text(0,0,24,32,'復');frames(3)
+12.times{|i|m.contents.clear;m.contents.draw_text(0,0,48,32,'頁'+i.to_s);frames(3)}
+puts JSON.generate({:wire=>$wire.join})
+`;
+ const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000,windowsHide:true});assert.equal(r.status,0,r.stderr);
+ const rows=JSON.parse(r.stdout).wire.split('\n').filter(x=>/^G /.test(x)).map(x=>TP.parseChars(x.replace(/^G \d+ /,'')));assert.ok(rows.every(Boolean));
+ const first=rows.find(x=>x.text==='AB CD');assert.ok(first);assert.deepEqual(first.rects[0],[40,59,12,24]);assert.equal(first.rects.length,5);assert.ok(rows.some(x=>x.text==='AB D'));assert.ok(rows.some(x=>x.text==='新'));assert.ok(rows.some(x=>x.text==='復'));assert.ok(!rows.some(x=>/禁|新.*AB|復.*禁/.test(x.text)));
+ for(let i=0;i<12;i++)assert.ok(rows.some(x=>x.text==='頁'+i),'complete page '+i);
+});
+
+test('Ruby nonblocking transport reassembles partial sends and checks completion without waiting in Graphics.update',{skip:!ruby&&'MEGULIT_RUBY not set; no Ruby replay'},()=>{
+ const stand=fs.readFileSync(path.join(__dirname,'helpers','rgss-standin.rb'),'utf8'),script=pageScript({port:1234,token:'a'.repeat(32)}),checks=String.raw`
+$connecting=true;$send_limit=37;$control << "CFG 1 1\n";m=Window_Message.new(0,0,300,100);m.contents.draw_text(0,0,48,32,'通信');frames(120)
+raise 'select not used' unless $api_calls.any?{|c|c[0]=='select'}
+raise 'signed FIONBIO lost' unless $api_calls.any?{|c|c[0]=='ioctlsocket' && c[1][1]==-2147195266}
+puts JSON.generate({:wire=>$wire.join})
+`;
+ const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000,windowsHide:true});assert.equal(r.status,0,r.stderr);const wire=JSON.parse(r.stdout).wire;
+ assert.match(wire,/^HELLO a{32} 42\n/);assert.ok(wire.split('\n').some(x=>x.startsWith('G ')&&TP.parseChars(x.replace(/^G \d+ /,''))?.text==='通信'));
+});
+
+test('Ruby capture budget refuses an oversized page without publishing a truncated source and recovers after clear',{skip:!ruby&&'MEGULIT_RUBY not set; no Ruby replay'},()=>{
+ const stand=fs.readFileSync(path.join(__dirname,'helpers','rgss-standin.rb'),'utf8'),script=pageScript({port:1234,token:'a'.repeat(32)}),checks=String.raw`
+$control << "CFG 1 1\n";m=Window_Message.new(0,0,300,100);m.pause=true
+raise 'host return changed' unless m.contents.draw_text(0,0,200,32,'A'*1001)==:draw_return
+frames(5);raise 'oversized source leaked' if $wire.join.scan(/^S /).size>0
+m.contents.clear;m.contents.draw_text(0,0,48,32,'回復');frames(5)
+raise 'recovery missing' unless $wire.join.scan(/^S /).size==1
+puts JSON.generate({:wire=>$wire.join})
+`;
+ const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000,windowsHide:true});assert.equal(r.status,0,r.stderr);const records=JSON.parse(r.stdout).wire.split('\n').filter(x=>x.startsWith('G ')).map(x=>TP.parseChars(x.replace(/^G \d+ /,'')));
+ assert.ok(records.some(x=>x?.text==='回復'));assert.ok(!records.some(x=>x?.text?.includes('A')));
+});
+
+const sample=process.env.MEGULIT_RGSS_SAMPLE;
+test('opaque VX launch grant maps the actual Reader shadow path back to the catalog without changing PID or birth',{skip:!sample&&'MEGULIT_RGSS_SAMPLE not set; full private corpus unavailable'},async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-rgss-reader-')),root=path.join(dir,'isolated'),exe=path.join(sample,'Game.exe'),O=require('../core/owner-tests.cjs'),L=require('../core/text-paths-launch.cjs'),LP=require('../services/launch-path.cjs'),saved={};let prepared,hook,token;
+ for(const name of ['data/config','cache','logs'])fs.mkdirSync(path.join(root,name),{recursive:true});
+ for(const [k,v] of Object.entries({MEGULIT_ROOT:root,MEGULIT_SIDE_BY_SIDE:'1',MEGULIT_OWNER_TESTS:'1',MEGULIT_RELAY_BASE:'off'})){saved[k]=process.env[k];process.env[k]=v;}
+ t.after(()=>{prepared?.session.stop();hook?.stop();if(token)O.revoke(token);for(const [k,v]of Object.entries(saved)){if(v===undefined)delete process.env[k];else process.env[k]=v;}assert.ok(path.resolve(dir).startsWith(path.resolve(os.tmpdir())+path.sep));fs.rmSync(dir,{recursive:true,force:true});});
+ fs.writeFileSync(path.join(root,'data/config/library.json'),JSON.stringify({runtimeSampleShare:false,autoProfileShare:false,sharedAdaptation:false}));fs.writeFileSync(path.join(root,'data/config/online.json'),'{"relayUrl":""}');
+ const entry={id:'fixed-vx',engine:'rgss',exe:fs.realpathSync(exe),sha256:digest(fs.readFileSync(exe)),files:[{path:'Game.rgss2a',bytes:fs.statSync(path.join(sample,'Game.rgss2a')).size,sha256:digest(fs.readFileSync(path.join(sample,'Game.rgss2a')))}],draw:{roles:true,embed:false},capabilities:['roles']};
+ fs.writeFileSync(path.join(root,'data/config/owner-tests.json'),JSON.stringify({schema:'megulit.owner-tests',version:1,root,entries:[entry]}));token=await O.resolve(root,{exe,engine:'rgss'});assert.ok(token);assert.equal(P.profileFor({engine:'rgss'}).draw.roles,false);
+ fs.writeFileSync(path.join(root,'data/preferences.json'),JSON.stringify({ownTextOutput:true}));
+ prepared=await require('./helpers/rgss-launch-replay.cjs').launchReplay({root,exe,L});assert.equal(prepared?.path,'rgss');assert.equal(O.identity(token,prepared.exe),fs.realpathSync(exe));assert.equal(O.describe(token).phase,'prepared');
+ const forged=path.join(root,'data/rgss-shadow/forged/Game.exe');fs.mkdirSync(path.dirname(forged));fs.copyFileSync(exe,forged);assert.equal(await O.registerLaunch(token,{exe:forged,engine:'rgss',artifact:{...prepared}}),false);assert.equal(LP.canonical(forged,{root,pid:process.pid,birth:'1234567890123'}),fs.realpathSync(forged));
+ const events=[],birth='1234567890123',pid=process.pid,{HookNative}=require('../core/hook-native.cjs');hook=new HookNative({native:root,hook:root,logs:path.join(root,'logs')},m=>events.push(m),()=>{throw Error('native helper forbidden in replay');});hook.trace=()=>{};hook.target={pid,started:birth};hook.wanted=true;hook.profile=P.profileFor({engine:'rgss'});hook.ensureEngineDraw=()=>({setProfile(){},stop(){}});L.attach(prepared,hook);
+ const game={id:'original-catalog-row',title:'VX',original:JSON.stringify({library:{engine:'RPG Maker VX/XP'}})},catalog=[],adopted=[],file=path.join(__dirname,'..','services','reader.cjs'),req=require('node:module').createRequire(file),sandbox={module:{exports:{}},__dirname:path.dirname(file),process,Buffer,setTimeout,clearTimeout,setInterval,clearInterval};
+ const mods={'./store.cjs':{readJSON:()=>({}),openStore:()=>({close(){}})},'../core/game-fonts.cjs':{exePath:async id=>{assert.equal(id,pid);return prepared.exe;}},'./background-games.cjs':{foreground:async()=>{},unmute:async()=>{}},'./card-wall.cjs':{noteGame(){}},'./text-effects.cjs':{has:()=>false},'./library.cjs':{activeGameForProgram:(db,path)=>{catalog.push(path);assert.equal(path,fs.realpathSync(exe));return game;}},'./self-check-live.cjs':{start:()=>null,current:()=>null},'./runtime-harvest.cjs':{onGameBound(){}}};sandbox.require=name=>name in mods?mods[name]:req(name);new Function('require','module','exports','__dirname','__filename',fs.readFileSync(file,'utf8'))(sandbox.require,sandbox.module,sandbox.module.exports,path.dirname(file),file);const {Reader}=sandbox.module.exports;
+ const r=Object.assign(Object.create(Reader.prototype),{root,runtime:{config:()=>({}),services:()=>({gameEvent:async()=>{}}),emit(){}},gal:{state:{gameStarted:birth},hooks:hook,setGameProfile:(p,input)=>hook.setProfile(p,input)},stats:{reset(){},line(){}},immersion:{bind(){}},setWorkPrompt(){},confirmGameFont:async()=>{},adoptTextSource:(path,id)=>adopted.push([path,id]),findTextSource(){},sharedImport(){}});
+ r.event({type:'bound',gameProcessId:pid,gameStarted:birth,gameHwnd:'10'});for(let i=0;i<100&&!hook.ownerTestGrant;i++)await new Promise(resolve=>setTimeout(resolve,5));
+ assert.equal(r.gameExe,fs.realpathSync(exe));assert.equal(r.gameId,game.id);assert.deepEqual(catalog,[fs.realpathSync(exe)]);assert.deepEqual(adopted,[[fs.realpathSync(exe),pid]]);assert.equal(hook.profile.draw.roles,true);assert.match(hook.profile.layers,/owner-test/);assert.equal(events.filter(e=>e.gameProfile).at(-1).gameProfile.draw.roles,true);assert.deepEqual(hook.target,{pid,started:birth});assert.equal(O.matches(token,{pid,birth}),true);assert.equal(prepared.session.roles,true);
+ prepared.session.pid=pid;prepared.session.birth=birth;prepared.session.generation=9;const text='実際の本文です',body=TP.formatChars({engine:'rgss',line:17,hidden:false,sw:544,sh:416,rects:[...text].map((_,i)=>[16+24*i,280,24,24]),text});prepared.session.report('G 9 '+body,pid);prepared.session.report('S 9 17 '+Buffer.from(text).toString('base64'),pid);assert.equal(hook.state.hookSource,text);assert.equal(hook.state.hookSourceOrigin,'rgss');
+ assert.equal(LP.canonical(prepared.exe,{root,pid,birth:'other-birth'}),fs.realpathSync(prepared.exe));assert.equal(O.identity(token,prepared.exe),null);assert.equal(hook.profile.draw.roles,false);assert.equal(prepared.session.roles,false);
+ const waiting=[],was=catalog.length;mods['../core/game-fonts.cjs'].exePath=()=>new Promise(resolve=>waiting.push(resolve));for(const next of ['next-birth','latest-birth']){r.gal.state.gameStarted=next;hook.target.started=next;r.event({type:'bound',gameProcessId:pid,gameStarted:next,gameHwnd:'10'});}assert.equal(waiting.length,2,'birth changes are processed even when PID is reused');waiting[0](prepared.exe);await new Promise(resolve=>setTimeout(resolve,10));assert.equal(catalog.length,was,'stale exePath response cannot replace current catalog');r.gamePid=null;waiting[1](prepared.exe);await new Promise(resolve=>setTimeout(resolve,10));assert.equal(catalog.length,was);
+});
+
+test('full VX corpus: every archive member and all non-Main scripts survive the actual shadow path, source files remain identical',{skip:!sample&&'MEGULIT_RGSS_SAMPLE not set; full private corpus unavailable'},t=>{
+ const dir=tmp(t),source=D.plan(path.join(sample,'Game.exe')),entries=R.list(source.archive),scripts=C.scriptTable(source.original);
+ assert.equal(digest(fs.readFileSync(source.exe)),'771017ca0f9d18978a906d00cd4236c8e9f974f3c7388173492ed8f92901a7e8');assert.equal(digest(fs.readFileSync(source.archive)),'a316e9007e736ca8b1380c868248bbd6c83ea0c70c80a79a52d8e7ea4ac3c4aa');assert.equal(entries.length,446);assert.equal(scripts.rows.length,129);assert.equal(scripts.bytes,862327);
+ const before=new Map();function inventory(base,rel=''){for(const e of fs.readdirSync(path.join(base,rel),{withFileTypes:true})){const p=path.join(rel,e.name);if(e.isDirectory())inventory(base,p);else before.set(p,digest(fs.readFileSync(path.join(base,p))));}}inventory(sample);
+ const sh=D.makeShadow({source,shadowRoot:dir,port:1234,token:'a'.repeat(32)}),archive=path.join(sh.shadow,'Game.rgss2a'),after=R.list(archive);assert.equal(sh.files,441);assert.equal(after.length,entries.length);
+ for(let i=0;i<entries.length;i++){assert.equal(after[i].name,entries[i].name);if(entries[i].name.toLowerCase()!=='data/scripts.rvdata')assert.deepEqual(R.read(archive,after[i]),R.read(source.archive,entries[i]),entries[i].name);}
+ const patched=C.scriptTable(R.read(archive,after.find(x=>x.name.toLowerCase()==='data/scripts.rvdata')));for(let i=0;i<scripts.rows.length;i++){assert.equal(patched.rows[i].name,scripts.rows[i].name);if(scripts.rows[i].name==='Main')assert.ok(patched.rows[i].source.subarray(-scripts.rows[i].source.length).equals(scripts.rows[i].source));else assert.deepEqual(patched.rows[i].source,scripts.rows[i].source);}
+ const scenes=R.engine.scenes(sample).map(s=>R.engine.parse(s.read()));assert.equal(scenes.length,118);assert.equal(scenes.reduce((n,s)=>n+s.lines.length,0),1324);
+ for(const [f,h] of before)assert.equal(digest(fs.readFileSync(path.join(sample,f))),h,'source '+f);
+ const save=path.join(sh.shadow,'Save01.rvdata'),settings=path.join(sh.shadow,'preferences.dat');fs.writeFileSync(save,'new user progress');fs.writeFileSync(settings,'new user settings');
+ const reused=D.makeShadow({source,shadowRoot:dir,port:4321,token:'b'.repeat(32)});assert.equal(reused.shadow,sh.shadow);assert.equal(reused.reused,true);assert.equal(fs.readFileSync(save,'utf8'),'new user progress');assert.equal(fs.readFileSync(settings,'utf8'),'new user settings');assert.equal(D.existingShadow({exe:source.exe,shadowRoot:dir}),sh.exe);
+ const replacement=R.read(archive,R.list(archive).find(x=>x.name.toLowerCase()==='data/scripts.rvdata')),main=C.scriptTable(replacement).rows.find(x=>x.name==='Main').source.toString();assert.ok(main.includes('HELLO '+ 'b'.repeat(32)));assert.ok(!main.includes('HELLO '+ 'a'.repeat(32)));
+ const marker=path.join(sh.shadow,'megulit-rgss-shadow.json'),owned=fs.readFileSync(marker),foreign=JSON.parse(owned);foreign.sourceExe='other';fs.writeFileSync(marker,JSON.stringify(foreign));assert.throws(()=>D.makeShadow({source,shadowRoot:dir,port:4321,token:'b'.repeat(32)}),/SHADOW_SOURCE_CHANGED/);fs.writeFileSync(marker,owned);assert.equal(fs.readFileSync(save,'utf8'),'new user progress');
+ for(const [f,h] of before)assert.equal(digest(fs.readFileSync(path.join(sample,f))),h,'source after reuse '+f);
+ // The real sample is read-only above; loose-script refusal is exercised on its disposable shadow
+ fs.mkdirSync(path.join(sh.shadow,'Data'),{recursive:true});fs.writeFileSync(path.join(sh.shadow,'Data','Scripts.rvdata'),'override');assert.throws(()=>D.plan(sh.exe),/LOOSE_SCRIPTS_OVERRIDE/);
+});
+
+test('Ruby producer replay: rectangles, roles, page clear, shrinking UI, off/on and original returns/exceptions',{skip:!ruby&&'MEGULIT_RUBY not set; Ruby replay is unavailable, not a game pass'},()=>{
+ const stand=fs.readFileSync(path.join(__dirname,'helpers','rgss-standin.rb'),'utf8'),script=pageScript({port:1234,token:'a'.repeat(32)});
+ const checks=String.raw`
+$control << "CFG 1 1\n"
+m=Window_Message.new(0,260,544,156)
+raise 'return lost' unless m.contents.draw_text(0,0,48,32,'本文')==:draw_return
+menu=Window_Command.new(['ニューゲーム','終了']);choice=Window_Choice.new(['はい','いいえ']);choice.index=1
+frames(4)
+m.contents.clear;m.contents.draw_text(0,0,24,32,'次');frames(3)
+choice.commands=['はい'];choice.refresh;frames(3)
+menu.visible=false;frames(3)
+$control << "CFG 2 0\n";frames(3);before=$wire.join
+m.contents.draw_text(0,0,24,32,'無');frames(3);raise 'off emitted body' unless $wire.join==before
+$control << "CFG 3 1\n";frames(3);m.contents.clear;m.contents.draw_text(0,0,24,32,'再');frames(3)
+raised=false;begin;m.contents.draw_text(0,0,24,32,'RAISE');rescue StandardError=>e;raised=e.message=='host draw failure';end
+raise 'host exception swallowed' unless raised
+raise 'update return lost' unless Graphics.update==:update_return
+puts JSON.generate({:wire=>$wire.join,:draws=>$draws.size})
+`;
+ const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000,windowsHide:true});assert.equal(r.status,0,r.stderr||r.stdout);
+ const result=JSON.parse(r.stdout),records=result.wire.split('\n').filter(x=>x.startsWith('G ')).map(x=>({generation:Number(x.split(' ')[1]),rec:TP.parseChars(x.replace(/^G \d+ /,''))}));assert.ok(records.every(x=>x.rec),'every producer record parses');
+ const rows=records.map(x=>x.rec);assert.ok(rows.some(x=>x.text==='本文'&&x.rects[0][0]===16&&x.rects[0][1]===280));assert.ok(rows.some(x=>x.role==='choice'&&x.text==='いいえ'&&x.sel));assert.ok(rows.some(x=>x.role==='menu'&&x.text==='ニューゲーム'));assert.ok(rows.some(x=>x.text===''&&!x.role));assert.ok(rows.some(x=>x.role==='menu'&&x.text===''));assert.ok(rows.some(x=>x.text==='再'));assert.ok(!rows.some(x=>x.text.includes('無')));assert.ok(!records.some(x=>x.generation===2));
+});

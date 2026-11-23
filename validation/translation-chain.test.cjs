@@ -37,6 +37,18 @@ test('the background retry fills a line in once a source answers, then forgets i
  const q2=[],R2=new chain.Retries(async()=>null,()=>assert.fail('never'),{delays:[1,1],timers:{set:f=>{q2.push(f);},clear(){}}});R2.add('x');await q2.shift()();await q2.shift()();assert.equal(R2.size,0,'gives up after its last try');
 });
 
+test('reader returns the answering provider on both immediate and cached requests',async()=>{
+ const r=Object.create(require('../services/reader.cjs').Reader.prototype);
+ r.runtime={};
+ r.requestOptions=()=>({provider:'google'});r.targetLanguage=()=>'zh';
+ r.chainTranslate=async()=>({text:'translated',source:'mt',provider:'bing'});
+ const first={},second={};
+ assert.equal(await r.translate({id:1,text:'original sentence'},first),'translated');
+ r.chainTranslate=()=>assert.fail('cache should satisfy the second request');
+ assert.equal(await r.translate({id:2,text:'original sentence'},second),'translated');
+ assert.deepEqual(first,{source:'mt',provider:'bing'});
+ assert.deepEqual(second,{source:'mt',provider:'bing',cached:true});
+});
 test('reader.translate: script translation first, else the chain; a total failure is retried and filled in on screen and in the log',async()=>{
  const {Reader}=require('../services/reader.cjs');const r=Object.create(Reader.prototype),events=[],stats=[];
  const cache=new Map();r.embedCached=(t,v)=>{if(v===undefined)return cache.get(t);cache.set(t,v);return v;};r.displayLanguage=()=>'zh';r.prefs=()=>({provider:'deepseek',model:'deepseek-flash'});r.workPrompt='';r.langOptions=o=>o;r.loadKeys=()=>{};r.latest=0;r.pageScope='';r.gameId='game-1';

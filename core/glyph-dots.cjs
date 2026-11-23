@@ -14,6 +14,7 @@ const fs = require('node:fs'), path = require('node:path');
 
 /* 'place', 'dot' or '' (off). */
 function mode(root) {
+  if(require('./library-mode.cjs').libraryOnly(root))return '';
   const env = process.env.MEGULIT_GLYPH_MODE;
   /* 2026-11-21 (owner: 打点可以不要了，精度差、容易漏点) dot glyphs are retired: every request for them is the blank mode */
   if (env === 'dot' || env === 'blank' || env === 'place') return 'blank';

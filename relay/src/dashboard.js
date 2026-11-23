@@ -2,6 +2,7 @@
 /* 2026-11-16 beta live-usage dashboard served by the relay (GET /dashboard). Polls /api/probe/stats on both relay nodes
    (CORS open) every 15 s, shows the first answer and each node's latency. Phone: https://cn-api.megulit.com/dashboard.
    Operator console (btop/htop/tmux idiom), black + red, LED dot-matrix live counter, full-width 12-column grid. */
+import {SEED_ADMIN_HTML,SEED_ADMIN_SCRIPT} from './dashboard-seed-admin.js';
 export const DASHBOARD_HTML=String.raw`<!doctype html>
 <html lang="zh">
 <head>
@@ -141,6 +142,8 @@ tbody tr:hover td{background:#121212}
 #boot .ok{color:var(--ok)}#boot.off{display:none}
 @media(max-width:520px){.tmux .win:not(.on),.tmux .host,.vim #ep{display:none}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important}}
+.ops-group{margin:0 0 26px;scroll-margin-top:12px}.ops-group>h2{margin:2px 0 14px;font:600 14px/1.5 "Microsoft YaHei UI",sans-serif;color:var(--hi);letter-spacing:.05em}.tmux a{text-decoration:none}.admin-link{color:var(--gold);padding:0 10px;border-left:1px solid var(--line);white-space:nowrap}.ops-admin{margin:24px 0 16px}#seed-admin{scroll-margin-top:12px}.grid>.pane{min-width:0}.ops-group table{max-width:100%}
+@media(max-width:600px){.ops-group{margin-bottom:20px}.ops-group>h2{margin-bottom:10px}.tmux .admin-link{margin-left:auto}.ops-group .grid{row-gap:16px}}
 </style>
 </head>
 <body>
@@ -150,13 +153,13 @@ tbody tr:hover td{background:#121212}
 <div class="wrap">
   <div class="tmux">
     <span class="sess gl" id="name" data-t="MEGULIT">MEGULIT</span>
-    <span class="win on">0:live*</span><span class="win">1:dumps</span><span class="win">2:log</span>
+    <a class="win on" href="#live">live</a><a class="win" href="#operations">运行记录</a><a class="admin-link" href="#seed-admin">Seed 管理</a>
     <span class="sp"></span>
     <span class="host" id="host">relay ─</span>
     <span class="clk" id="clock">--:--:--</span>
   </div>
 
-  <div class="grid">
+<section class="ops-group" id="live"><h2>服务概况</h2><div class="grid">
     <section class="pane c3">
       <span class="ti">┤ <b>online</b> ├</span><span class="tr">last 10 min</span>
       <div class="on-row">
@@ -172,7 +175,6 @@ tbody tr:hover td{background:#121212}
       <div class="kv" style="margin-top:6px"><span class="k">now / 1h</span><span id="oNow">--</span><span class="k">6h avg</span><span id="o6">--</span></div>
       <div class="spark" id="spark" hidden></div><span id="ax0" hidden></span>
     </section>
-
     <section class="pane c3">
       <span class="ti">┤ <b>stats</b> ├</span><span class="tr">/api/probe/stats</span>
       <div class="m"><span class="k">active 1h</span><span class="bar" id="b1"></span><span class="v" id="v1">--</span></div>
@@ -186,70 +188,61 @@ tbody tr:hover td{background:#121212}
       <div class="m"><span class="k">reporters</span><span class="bar"></span><span class="v" id="v4">--</span></div>
       <div class="m"><span class="k">per game</span><span class="bar"></span><span class="v" id="v5">--</span></div>
     </section>
-
     <section class="pane c3">
       <span class="ti">┤ <b>activity</b> ├</span><span class="tr">online per hour · 24h</span>
       <div class="hist" id="hist"></div>
       <div class="axis"><span>-24h</span><span>-12h</span><span>now</span></div>
       <div class="kv" style="margin-top:8px"><span class="k">peak hour</span><span id="hPeak">--</span><span class="k">avg / hour</span><span id="hAvg">--</span><span class="k">quiet hours</span><span id="hZero">--</span><span class="k">this hour</span><span id="hNow">--</span><span class="k">busiest 3h</span><span id="h3">--</span></div>
     </section>
-
     <section class="pane c3">
       <span class="ti">┤ <b>quota</b> ├</span><span class="tr">usage / limit</span>
       <div id="quota"><div class="empty">-- loading</div></div>
     </section>
-
+</div></section>
+<section class="ops-group" id="sharing"><h2>校准与社区</h2><div class="grid">
     <section class="pane c3 gold">
       <span class="ti">┤ <b>the seed</b> ├</span><span class="tr">The Seed/ · game diffs</span>
       <div id="seed"><div class="empty">-- loading</div></div>
     </section>
-
     <section class="pane c3 gold">
       <span class="ti">┤ <b>cardinal</b> ├</span><span class="tr">replay scores · today</span>
       <div id="cardinal"><div class="empty">-- loading</div></div>
     </section>
-
     <section class="pane c3">
       <span class="ti">┤ <b>why</b> ├</span><span class="tr">by step</span>
       <div id="steps"><div class="empty">-- no data</div></div>
     </section>
-
-    <section class="pane c3">
-      <span class="ti">┤ <b>accounts</b> ├</span><span class="tr">login · sync</span>
-      <div id="acc"><div class="empty">-- loading</div></div>
-    </section>
-
-    <section class="pane c3">
-      <span class="ti">┤ <b>community</b> ├</span><span class="tr">board · forum · social</span>
-      <div id="com"><div class="empty">-- loading</div></div>
-    </section>
-
-    <section class="pane c8">
-      <span class="ti">┤ <b>targets</b> ├</span><span class="tr">by reporters</span>
-      <div id="top"><div class="empty">-- no rows</div></div>
-    </section>
-
-    <section class="pane c4">
-      <span class="ti">┤ <b>most read</b> ├</span><span class="tr">by characters</span>
-      <div id="most"><div class="empty">-- loading</div></div>
-    </section>
-
     <section class="pane c3">
       <span class="ti">┤ <b>adapters</b> ├</span><span class="tr">packs · reports · uploads</span>
       <div id="adp"><div class="empty">-- loading</div></div>
     </section>
-
+    <section class="pane c3">
+      <span class="ti">┤ <b>accounts</b> ├</span><span class="tr">login · sync</span>
+      <div id="acc"><div class="empty">-- loading</div></div>
+    </section>
+    <section class="pane c3">
+      <span class="ti">┤ <b>community</b> ├</span><span class="tr">board · forum · social</span>
+      <div id="com"><div class="empty">-- loading</div></div>
+    </section>
     <section class="pane c3">
       <span class="ti">┤ <b>now playing</b> ├</span><span class="tr">board · last 7d</span>
       <div id="playing"><div class="empty">-- loading</div></div>
     </section>
-
     <section class="pane c3">
       <span class="ti">┤ <b>storage</b> ├</span><span class="tr">r2 · uploads in flight</span>
       <div id="stor"><div class="empty">-- loading</div></div>
     </section>
-
-    <section class="pane c3">
+</div></section>
+<section class="ops-group" id="operations"><h2>作品与运行记录</h2><div class="grid">
+    <section class="pane c8">
+      <span class="ti">┤ <b>targets</b> ├</span><span class="tr">by reporters</span>
+      <div id="top"><div class="empty">-- no rows</div></div>
+    </section>
+    <section class="pane c4">
+      <span class="ti">┤ <b>most read</b> ├</span><span class="tr">by characters</span>
+      <div id="most"><div class="empty">-- loading</div></div>
+    </section>
+    <section class="pane c6">
       <span class="ti">┤ <b>full dumps</b> ├</span><span class="tr">r2://probe-full</span>
       <div class="cnt">
         <div><div class="v r" id="fReady">--</div><div class="k">ready</div></div>
@@ -263,14 +256,15 @@ tbody tr:hover td{background:#121212}
         <span class="k">last upload</span><span id="fLast">--</span>
       </div>
     </section>
-
-    <section class="pane c3">
+    <section class="pane c6">
       <span class="ti">┤ <b>relay.log</b> ├</span><span class="tr" id="latT">latency</span>
       <div class="lat" id="lat"></div>
       <div class="log" id="log"></div>
     </section>
-  </div>
-
+</div></section>
+<div class="grid ops-admin">
+    ${SEED_ADMIN_HTML}
+</div>
   <div class="vim"><span class="md" id="mode">LINK</span><span id="ep">GET /api/probe/stats</span><span class="d" id="code">--</span><span class="sp"></span><span class="d" id="extAt">ext --</span><span class="d" id="node">--</span><span>poll <span id="count">15</span>s<span class="cur"></span></span></div>
 </div>
 
@@ -521,5 +515,6 @@ function start(){var left=PERIOD;
 boot();
 </script>
 
+<script>${SEED_ADMIN_SCRIPT}</script>
 </body>
 </html>`;

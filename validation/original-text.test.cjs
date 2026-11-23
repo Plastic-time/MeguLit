@@ -172,3 +172,18 @@ test('a few kana lines in a big translated script (translator notes) do not deci
  for(let i=1000;i<1100;i++)zh[i]='原文：「キタキツネ」（北极狐）';
  assert.equal(ot.align({lines:zh,structure:s},{lines:ja,structure:s}).reliable,false);
 });
+
+test('loose RenPy entry script supplies its on-disk hash before indexing',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'renpy-variant-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(root,'game'));
+ const script=path.join(root,'game','script.rpyc'),exe=path.join(root,'game.exe');
+ const bytes=Buffer.from('RENPY RPC2compiled entry');
+ fs.writeFileSync(script,bytes);
+ assert.equal(ot.contributionScript(root,exe),'');
+ fs.mkdirSync(path.join(root,'renpy'));
+ fs.writeFileSync(path.join(root,'renpy','__init__.py'),'');
+ assert.equal(ot.contributionScript(root,exe),require('node:crypto').createHash('sha256').update(bytes).digest('hex'));
+ fs.writeFileSync(script,'invalid header');
+ assert.equal(ot.contributionScript(root,exe),'');
+});

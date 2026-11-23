@@ -50,6 +50,24 @@
     const dpr = Math.max(.5, Number(window.devicePixelRatio) || 1);
     if (layoutInfo) for (const [name,key] of Object.entries({x:'readerX',y:'readerY',width:'readerWidth'})) document.documentElement.style.setProperty('--tomoyo-reader-'+name,
      (layoutInfo[key]/dpr)+'px');
+    if (layoutInfo) {
+      const root = document.documentElement.style;
+      const game = bridge.gameArea();
+      if (game) bridge.textPlaceClientArea?.(game);
+      if (game && document.body.classList.contains('megulit-saya-page')) {
+        root.setProperty('--saya-page-left', (game.left + game.width * .05) + 'px');
+        root.setProperty('--saya-page-bottom', (game.top + game.height * .98) + 'px');
+        root.setProperty('--saya-page-width', (game.width * .9) + 'px');
+        root.setProperty('--saya-page-height', (game.height * .34) + 'px');
+      }
+      for (const [axis, dimension, offset] of [['X','Width','anchorDX'], ['Y','Height','anchorDY']]) {
+        const length = layoutInfo['client' + dimension], origin = layoutInfo['client' + axis], reader = layoutInfo['reader' + axis];
+        if (![length, origin, reader].every(Number.isFinite) || length <= 0) continue;
+        const delta = length * (Number(preferences[offset]) || 0) / 100;
+        const position = delta ? Math.max(origin, Math.min(origin + Math.max(0, length - 40*dpr), reader + delta)) : reader;
+        root.setProperty('--megulit-fallback-' + axis.toLowerCase(), position / dpr + 'px');
+      }
+    }
     if (maskImage && maskGeometry) {
       maskImage.style.left = (maskGeometry.x/dpr)+'px'; maskImage.style.top = (maskGeometry.y/dpr)+'px';
       maskImage.style.width = (maskGeometry.width/dpr)+'px'; maskImage.style.height = (maskGeometry.height/dpr)+'px';
@@ -131,6 +149,8 @@
     @media (prefers-reduced-motion:reduce) { .sentence-text .megulit-ruby-base::before { transition:none; } }
     body.tome-line-read .sentence-window:not(.tome-island-page) { --tomoyo-gal-color:var(--tomoyo-gal-read-color); --tomoyo-gal-gradient:var(--tomoyo-gal-read-gradient); --tomoyo-gal-fill:var(--tomoyo-gal-read-fill); --tomoyo-gal-jp-stroke:var(--tomoyo-gal-read-jp-stroke); --tomoyo-gal-cn-stroke:var(--tomoyo-gal-read-cn-stroke); --tomoyo-gal-jp-filter:var(--tomoyo-gal-read-jp-filter); --tomoyo-gal-cn-filter:var(--tomoyo-gal-read-cn-filter); }
     body.tome-line-color .sentence-window:not(.tome-island-page) { --tomoyo-gal-color:var(--tomoyo-gal-line-color); --tomoyo-gal-gradient:none; --tomoyo-gal-fill:currentColor; } /* E550 per-line colour (text-position.js paintLine) */
+    /* A bound normal-mode reader also fills solid glyphs with currentColor. Use the same line colour as its ruby. */
+    body.tomoyo-gal-bound:is(.tome-line-read,.tome-line-color) .sentence-window:not(.tome-island-page) :is(.sentence-text .char-token,.tomoyo-cn-output) { color:var(--tomoyo-gal-color)!important; }
     body.tome-line-edge .sentence-window:not(.tome-island-page) { --tomoyo-jp-stroke-color:var(--tomoyo-gal-line-edge); --tomoyo-ruby-stroke-color:var(--tomoyo-gal-line-edge); --tomoyo-cn-stroke-color:var(--tomoyo-gal-line-edge); } /* the outline the game drew this sentence with; furigana and the translation under it follow the line (they take its colour too) */
     body.tome-surface-pending .sentence-window, body.tome-surface-pending .tomoyo-native-mask, body.tome-surface-pending .tome-inline-wait { visibility:hidden!important; }
     body.tome-box-dragging .sentence-window { outline:2px dashed var(--theme-primary,#e0495a)!important; outline-offset:2px; cursor:move!important; }
@@ -142,7 +162,17 @@
     .tomoyo-native-mask { position:fixed!important; z-index:10!important; pointer-events:none!important; user-select:none!important; max-width:none!important; margin:0!important; padding:0!important; border:0!important; opacity:1!important; filter:none!important; }
     body:not(.tomoyo-gal-bound) .tomoyo-native-mask { display:none!important; }
     body.tomoyo-gal-bound .sentence-window { position:fixed!important; z-index:20!important; inset:auto!important; left:var(--tomoyo-reader-x,0px)!important; top:var(--tomoyo-reader-y,0px)!important; margin:var(--tomoyo-gal-out-y,0px) var(--tomoyo-gal-out-x,0px)!important; width:calc(var(--tomoyo-reader-width,100vw) - var(--tomoyo-gal-out-x,0px) * 2)!important; height:auto!important; max-height:none!important; flex-direction:column!important; justify-content:flex-start!important; max-width:none!important; min-height:0!important; padding:var(--tomoyo-gal-pad-y,10px) var(--tomoyo-gal-pad-x,20px)!important; box-sizing:border-box!important; border:0!important; border-radius:0!important; align-items:stretch!important; overflow:visible!important; scrollbar-width:none; -webkit-app-region:no-drag; }
+    body.tomoyo-gal-bound.megulit-anchor-mode:not(.megulit-placed):not(.megulit-anchored) .sentence-window { left:var(--megulit-fallback-x,var(--tomoyo-reader-x,0px))!important; top:var(--megulit-fallback-y,var(--tomoyo-reader-y,0px))!important; }
     body.tomoyo-gal-bound .sentence-window::-webkit-scrollbar { display:none; }
+    /* The original page is visible during OCR. Its translation fits the game client
+       even when the reader surface covers the whole desktop. */
+    body.tomoyo-gal-bound.megulit-saya-page .sentence-window.tomoyo-hook-reader[data-hook-reader] {
+      left:var(--saya-page-left)!important; top:auto!important; bottom:calc(100% - var(--saya-page-bottom))!important;
+      width:var(--saya-page-width)!important; max-height:var(--saya-page-height)!important;
+      overflow:auto!important; margin:0!important; padding:0!important;
+    }
+    body.tomoyo-gal-bound.megulit-saya-page .tomoyo-hook-reader .sentence-text { display:none!important; }
+    body.tomoyo-gal-bound.megulit-saya-page .tomoyo-hook-reader .tomoyo-cn-output { white-space:pre-wrap!important; overflow-wrap:anywhere; }
     html:has(body.tomoyo-gal-bound), body.tomoyo-gal-bound, body.tomoyo-gal-bound [data-gal-reader-container], body.tomoyo-gal-bound .sentence-window { background-color:transparent!important; background-image:none!important; box-shadow:none!important; backdrop-filter:none!important; -webkit-backdrop-filter:none!important; }
     body.tomoyo-gal-bound .lookup-limit-badge { display:none!important; }
     body.tomoyo-ui-translation.tomoyo-cover-hidden .sentence-window, body.tomoyo-ui-translation.tomoyo-cover-hidden .tomoyo-native-mask { visibility:hidden!important; pointer-events:none!important; }
@@ -228,6 +258,11 @@
         first.before(base);base.append(...nodes);
       }
     }
+    measureRuby(sentence, chars, bases());
+  }
+  bridge.measurePlacedRuby = sentence => measureRuby(sentence, [...sentence.querySelectorAll('.char-token')], sentence.querySelectorAll('.megulit-ruby-base'));
+  function measureRuby(sentence, chars, bases) {
+    const placed = sentence.closest('.megulit-place-window') && document.body.classList.contains('megulit-placed');
     const canvas=document.createElement('canvas').getContext('2d');
     const root=getComputedStyle(document.documentElement),family=root.getPropertyValue('--tomoyo-ruby-font').trim()||'Meiryo';
     const offset=parseFloat(root.getPropertyValue('--tomoyo-ruby-offset-x'))||0,items=[];
@@ -261,11 +296,12 @@
     rows.sort((a,b)=>a.center-b.center);
     const rowOf=g=>{const c=(g.top+g.bottom)/2;let best=0;for(let i=1;i<rows.length;i++)if(Math.abs(rows[i].center-c)<Math.abs(rows[best].center-c))best=i;return best;
      };
-    for(const node of bases()){
+    for(const node of bases){
       const first=node.firstElementChild,style=getComputedStyle(first),rect=node.getBoundingClientRect(),glyph=first.getBoundingClientRect();
       const baseFont=parseFloat(style.fontSize)||16;
       const trailing=parseFloat(style.letterSpacing)||0,scale=rect.width/(node.offsetWidth||1)||1;
-      const spacing=Math.max(-.08,trailing/baseFont),reading=node.__megulitReading;
+      const spacing=Math.max(-.08,trailing/baseFont),reading=node.__megulitReading || node.dataset.tomoyoReading;
+      if (!reading) continue;
       node.style.setProperty('--megulit-ruby-trailing-space',trailing+'px');
       node.style.setProperty('--megulit-ruby-letter-spacing',spacing+'em');
       const scaleY=rect.height/(node.offsetHeight||1)||1,boxTop=(glyph.top+glyph.bottom)/2-baseFont*scaleY*.58;
@@ -292,6 +328,35 @@
     // One reading size for the whole sentence (user: 一样大最好): the smallest that fits any of its rows.
     const common=Math.min(...items.map(i=>i.font));for(const i of items){i.width*=common/i.font;i.font=common;}
     {const n=Math.min(16,rows.length);if(n&&n!==window.__megulitRubyRows){window.__megulitRubyRows=n;dispatchEvent(new Event('megulit-ruby-rows'));}} /* E270: the rows of the current sentence, not the most ever seen */
+    if (placed) {
+      // The game fixes every word's centre. Keep the requested height and fit only readings that
+      // meet on that row, horizontally, without displacing the clickable Japanese underneath.
+      const nativeRows = [];
+      for (const i of items) {
+        i.center = (i.left + i.right) / 2;
+        i.fit = 1;
+        if (i.right <= i.left || !i.node.offsetHeight) continue;
+        i.fit = Math.min(1, 2 * Math.max(0, Math.min(i.center, innerWidth - i.center)) / (i.width || 1));
+        const y = i.node.offsetTop + i.node.offsetHeight / 2;
+        let row = nativeRows.find(r => Math.abs(r.y - y) < i.node.offsetHeight / 2);
+        if (!row) { row = { y, labels: [] }; nativeRows.push(row); }
+        row.labels.push(i);
+      }
+      for (const { labels } of nativeRows) {
+        labels.sort((a, b) => a.center - b.center);
+        for (let j = 1; j < labels.length; j++) {
+          const a = labels[j - 1], b = labels[j];
+          const fit = Math.max(0, 2 * (b.center - a.center - 1) / (a.width + b.width || 1));
+          a.fit = Math.min(a.fit, fit); b.fit = Math.min(b.fit, fit);
+        }
+      }
+      for (const i of items) {
+        i.node.dataset.tomoyoReading = i.reading;
+        i.node.style.setProperty('--megulit-cell-ruby-scale', String(i.fit));
+        i.node.style.setProperty('--tomoyo-ruby-actual-size', i.font + 'px');
+      }
+      return;
+    }
     for(const item of window.TomoyoRubyLayout.layout(items,{minFont:1e9})){
       if(!item.visible){item.node.removeAttribute('data-tomoyo-reading');continue;}
       item.node.setAttribute('data-tomoyo-reading',item.reading);
@@ -301,6 +366,11 @@
   // Preserve the authored rows even when their rendered extent crosses the game client.
   function preserveNativeBreaks(sentence,text){
     sentence.toggleAttribute('data-megulit-native-breaks',text.includes('\n'));
+  }
+  function reportRubyFailure(error){
+    const message=error.message||'当前行注音暂不可用';
+    bridge.learningStatus?.({learningRubyError:message});
+    if(dialogFields&&dialogFields.state.textContent!==message)dialogFields.state.textContent=message;
   }
   async function updateRuby() {
     const targets = rubyTargets(), page = !!targets[0]?.closest('.tome-island-page');
@@ -314,10 +384,11 @@
        continue; }
       try {
         const tokens = await rubyTokens(text);
-        if (id !== renderSerial) return;
+        if (id !== renderSerial || !preferences.furigana) return;
         if (!sentence.isConnected || sourceText(sentence) !== text) continue;
         sentence.__tomeRubyText = text; sentence.__tomeRubyKey = cacheKey; paint(tokens, sentence, false);
-      } catch(error) { clearRuby(sentence); bridge.learningStatus?.({learningMessage:error.message||'Full 注音尚未就绪'}); if (dialogFields) dialogFields.state.textContent = error.message||'本地注音暂未就绪';
+      } catch(error) { if (id !== renderSerial || !preferences.furigana || !sentence.isConnected || sourceText(sentence) !== text) return;
+       clearRuby(sentence); reportRubyFailure(error);
        return; }
     }
     bridge.islandPage?.refresh?.(); // furigana changes each pair's height and reserved band
@@ -336,7 +407,7 @@
   bridge.prepareRuby = async sentence => {
     const text = sourceText(sentence);if (!preferences.furigana || !text) return false;
     const key = rubyKey(text), tokens = await rubyTokens(text);
-    if (!sentence.isConnected || sourceText(sentence) !== text) return false;
+    if (!preferences.furigana || !sentence.isConnected || sourceText(sentence) !== text) return false;
     sentence.__tomeRubyText = text; sentence.__tomeRubyKey = key; paint(tokens, sentence, false); bridge.islandPage?.refresh?.(); return true;
   };
   // The backlog annotates past lines with the same readings as the current one: the game's own ruby first, then the
@@ -349,7 +420,10 @@
   async function tokenize(text, cacheKey) {
     const full=(bridge.options?.().readingEngine||'sudachi')==='sudachi';
     const raw = full?await bridge.localTokenize(text):await window.__TAURI_INTERNALS__.invoke('tokenize_text', { text });
-    if(full&&(!Array.isArray(raw)||raw.some(t=>t.source!=='SudachiDict Full')))throw Error('注音未取得 Full 原生分词结果');
+    // tokenizeWhole restores authored line breaks as blank tokens after Sudachi runs.
+    const layoutBreak=t=>t.source===undefined&&t.pos==='空白'&&t.reading===''&&typeof t.surface==='string'&&/^[\r\n]+$/u.test(t.surface);
+    if(full&&(!Array.isArray(raw)||raw.some(t=>!t||(t.source!=='SudachiDict Full'&&!layoutBreak(t)))))
+      throw Error('当前行注音未取得 Full 原生分词结果');
     const tokens = window.TomoyoFurigana.contextual(text, full?raw:await spellingReadings(Array.isArray(raw)?raw:[]));
     const result = Array.isArray(tokens) ? tokens : [];
     tokenCache.set(cacheKey, result);
@@ -367,8 +441,7 @@
       if(current()){lastText=text;paint(tokens,sentence);}
     } catch(error) {
       if(!current())return;
-      clearRuby(sentence);bridge.learningStatus?.({learningMessage:error.message||'Furigana unavailable'});
-      if(dialogFields)dialogFields.state.textContent=error.message||'Furigana unavailable';
+      clearRuby(sentence);reportRubyFailure(error);
     }
   }
   function markReader() {
@@ -526,6 +599,7 @@
     document.body.classList.toggle('tomoyo-gal-none', preferences.interfaceMode==='translation' && preferences.display === 'none');
     bridge.quietTranslation = preferences.style !== 'custom';
     bridge.setTranslationVisible(preferences.display !== 'japanese' && preferences.display !== 'none');
+    bridge.cardinalPair?.refresh();
     document.body.classList.toggle('tomoyo-gal-bound', bound);
     document.body.classList.toggle('tomoyo-gal-mask', bound && preferences.maskMode === 'full');bridge.islandPage?.refresh();
     markReader();
@@ -562,8 +636,12 @@
   // back to black as soon as the outline was touched) and Cancel would undo the sync.
   let syncingForm=false;
   const syncOpenForm = values => { const dialog = document.querySelector('.tomoyo-cn-dialog[open]'); if (!dialog) return;
-    syncingForm=true;try{for (const [key, value] of Object.entries(values)) { const name = key === 'translationSize' ? 'ChineseSize' : key[0].toUpperCase()+key.slice(1),
-     field = dialog.querySelector('[name="gal'+name+'"]'); if (!field) continue; if (field.type === 'checkbox') field.checked = !!value; else field.value = key==='readTextColor'&&!value?preferences.textColor:key==='japaneseFont'&&preferences.japaneseFontSource!=='user'&&field.querySelector?.('option[value="@game"]')?'@game':value;
+    syncingForm=true;try{for (const [key, value] of Object.entries(values)) {
+     // The same two controls edit either the box position or the offset from the game glyph.
+     // A calibration can update both pairs while the menu is open. Only display the pair the form will read.
+     const name = key === 'translationSize' ? 'ChineseSize' : key[0].toUpperCase()+key.slice(1);
+     const field = ['x','y','anchorDX','anchorDY'].includes(key) ? dialog.querySelector('[data-position-pref="'+key+'"]') : dialog.querySelector('[name="gal'+name+'"]');
+     if (!field) continue; if (field.type === 'checkbox') field.checked = !!value; else field.value = key==='readTextColor'&&!value?preferences.textColor:key==='japaneseFont'&&preferences.japaneseFontSource!=='user'&&field.querySelector?.('option[value="@game"]')?'@game':value;
      field.dispatchEvent(new Event('input', { bubbles:true })); }}finally{syncingForm=false;} };
   // Interface mode and window binding are runtime state owned by the launcher: a saved profile, import or form snapshot
   // carrying stale values (interfaceMode normal, bindEnabled false) dropped game style, so colours and embedding stopped.
@@ -573,6 +651,19 @@
    syncOpenForm(applied); if(!options.preview)localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...preferences,translationPrompt:undefined,anchorDX:undefined,anchorDY:undefined})); if(options.preview)send({
    type:'galPreview',settings:preferences});else if(options.persist!==false)send({ type:'galConfigure', settings:preferences }); apply(); return { ...preferences };
    };
+  // Measure the current pair in CSS pixels, then convert the correction to the game's gap units.
+  bridge.calibratedTranslationGap = () => {
+    if(document.body.classList.contains('megulit-original-shown')||document.body.classList.contains('tome-style-probing'))return null;
+    const source=[...document.querySelectorAll('.sentence-text')].reverse().find(n=>n.getBoundingClientRect().height>0);
+    const pair=source?.closest('.tome-island-pair,.sentence-window');
+    const translation=pair?.querySelector('.tomoyo-cn-output');
+    if(!source?.textContent.trim()||!translation?.textContent.trim()||!translation.getBoundingClientRect().height||!(gameScale>0))return null;
+    const range=document.createRange();range.selectNodeContents(translation);
+    const translated=range.getBoundingClientRect();
+    range.selectNodeContents(source);const original=range.getBoundingClientRect();
+    if(!translated.height||!original.height)return null;
+    return Math.max(-28,Math.min(40,Math.round(preferences.gap+(original.bottom+2-translated.top)/gameScale)));
+  };
   bridge.galPreferences = () => ({ ...preferences });
   /* 2026-11-12 values the engine told us (its own font): applied and kept like a choice in the menu */
   bridge.enginePreferences=m=>{try{if(m&&m.values&&typeof m.values==='object')bridge.applyGalPreferences(m.values,{persist:true});}catch{}};
@@ -591,6 +682,12 @@
    tip.style.cssText='position:fixed;left:50%;top:9%;transform:translateX(-50%);z-index:2147483000;max-width:min(560px,86vw);padding:10px 18px;border-radius:12px;background:rgba(18,12,14,.92);color:#f3e6da;font:500 14px/1.6 "Microsoft YaHei",sans-serif;box-shadow:0 12px 32px rgba(0,0,0,.45);pointer-events:none;transition:opacity .3s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
    document.body.append(tip); setTimeout(()=>{tip.style.opacity='0';setTimeout(()=>tip.remove(),350);},message.ok===true?2600:4500); };
   bridge.galStatus = message => {
+    if ('hookSource' in message || message.type==='gameClosed') {
+      const page=!!message.hookSource && ['saya-page-ocr','saya-script-read'].includes(message.hookSourceEngine);
+      document.body.classList.toggle('megulit-saya-page',page);
+      if(page)placeLayers();
+    }
+    bridge.cardinalPair?.source(message);
     if(message?.type==='modeRequest'){if(window.__tomoyoMode?.requestToggle)window.__tomoyoMode.requestToggle();else send({type:'galToggleMode'});return;}
     if(message?.type==='regionApplied'){window.dispatchEvent(new CustomEvent('tome-region-applied',{detail:message}));return;}
     if(typeof message.hookActive==='boolean'){bridge.hookActive=message.hookActive;if(!message.hookActive)bridge.hookSourceText='';}
@@ -859,7 +956,16 @@
      anchorResetWords = {zh:['回到游戏原字位置','本作品尚无引擎坐标'],en:['Back to the game text position','No engine positions for this game yet'],ja:['ゲームの文字位置に戻す','この作品はまだエンジン座標がありません']};
     const paintAnchorReset = () => { const w = anchorResetWords[(window.__tomeI18n?.get?.()||'zh').slice(0,2)] || anchorResetWords.zh, on = document.body.classList.contains('megulit-anchored'); /* the button: this line sits on the game's places now (the fields use the stable mode, anchoredNow) */ anchorReset.dataset.noI18n = '';
      anchorReset.textContent = w[0]; anchorReset.disabled = !on; anchorReset.title = on ? '' : w[1]; anchorReset.setAttribute('aria-disabled', String(!on)); };
-    const fillPosition = () => { fieldsAreOffset = anchoredNow(); if (fieldsAreOffset) { f('galX').value = Number(preferences.anchorDX) || 0; f('galY').value = Number(preferences.anchorDY) || 0; f('galX').min = f('galY').min = '-95'; } else { f('galX').value = preferences.x; f('galY').value = preferences.y; f('galX').min = f('galY').min = '0'; } };
+    const fillPosition = () => {
+      fieldsAreOffset = anchoredNow();
+      for (const axis of ['X','Y']) {
+        const field = f('gal'+axis), key = fieldsAreOffset ? 'anchorD'+axis : axis.toLowerCase();
+        field.dataset.positionPref = key;
+        field.min = fieldsAreOffset ? '-95' : '0';
+        field.value = Number(preferences[key]) || 0;
+        field.dispatchEvent(new Event('input')); // refresh its output label without previewing the form
+      }
+    };
     fillPosition();
     const modeWatch = new MutationObserver(() => { if (anchoredNow() !== fieldsAreOffset && document.body.contains(dialog)) { const was = syncingForm; syncingForm = true; try { fillPosition(); } finally { syncingForm = was; } } paintAnchorReset(); });
     paintAnchorReset();
@@ -949,7 +1055,7 @@
      };
     dragButton.onclick = () => { const on = !document.body.classList.contains('tome-box-dragging'); dragMode(on); if (!on) save(); };
     dragLabel(false); dialog.addEventListener('close', () => dragMode(false), { once:true });
-    bridge.galAnchorOffsetReset = () => anchorReset.onclick?.(); /* 校准当前句 / 仅校准位置 put the line back on the game's own place */
+    bridge.galAnchorOffsetReset = () => { if (anchoredNow()) bridge.applyGalPreferences({ anchorDX: 0, anchorDY: 0 }, { preview: true }); }; /* 校准当前句 / 仅校准位置 put the line back on the game's own place */
     anchorReset.onclick = () => { if (!anchoredNow()) return; if (bridge.gameStyleCommitReady?.() === false) return; preferences = { ...current(), anchorDX: 0, anchorDY: 0 };
      if (fieldsAreOffset) { const was = syncingForm; syncingForm = true; try { f('galX').value = 0; f('galY').value = 0; for (const update of sliderOutputs) update(); } finally { syncingForm = was; } }
      committed = { ...preferences }; send({ type: 'galConfigure', settings: preferences }); bridge.saveGameProfileFromMenu?.(preferences); apply(); };

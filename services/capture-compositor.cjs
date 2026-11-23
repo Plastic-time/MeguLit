@@ -92,7 +92,7 @@ class CaptureCompositor {
   clear() { this.send({ t: 'clear' }); }
   undot(id) { this.send({ t: 'undot', id }); }
   shot(file) { this.send({ t: 'shot', path: file }); }
-  stop() { if (!this.proc) return; this.send({ t: 'quit' }); const p = this.proc; setTimeout(() => { try { if (p.exitCode === null) p.kill(); } catch {} }, 1500).unref?.(); this.proc = null; }
+  stop() {const p=this.proc;const result=require('../core/owned-exit.cjs').trackStop(this,p,()=>{this.send({t:'quit'});p.stdin?.end();});this.proc=null;return result;}
 }
 
 module.exports = { CaptureCompositor, strip, rubyToStripped };

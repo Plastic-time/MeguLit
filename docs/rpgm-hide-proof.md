@@ -1,0 +1,13 @@
+# RPG Maker glyph hide and restore
+
+The 2026-11-22 Creatures MV capture already contains a successful CDP install, eight completed body pages and the corresponding Reader source events. Every body record has `hidden=0`; Reader correctly rejects placement over visible native text. The old RPGM observer always called the original draw and always reported `hidden:false`. Its canvas was unaffected by the DOM text-path hide control.
+
+The engine script now accepts the existing text-path hide request separately from roles/embed permission. Only a fresh message page with roles permission, hide requested and embed disabled can withhold glyphs. During the original `Window_Message.contents` Bitmap draw, its context's `fillText` and `strokeText` calls are withheld; the original draw still performs layout, dirty notifications and returns its original value. Other bitmaps, face/icon blits, backgrounds, name and menu windows are untouched. No embed permission is granted.
+
+Each withheld draw retains its bounded arguments, Bitmap paint settings and context alpha. Off, permission revocation, embed mode and stop replay the original draw on the same contents, preserving the current page without clearing unrelated pixels. Partial clears restore before the game's own clear. New pages discard old ink. A visible retained page cannot be retroactively hidden; enabling waits for the next fresh page. Records are bounded to 4,000 draw calls, 16,000 code units and the existing 4,000-character observed page limit. Unsupported drawing, a late page redraw or missing glyph interception restores the original and reports a fixed diagnostic rather than claiming hidden success.
+
+`hidden=true` requires withheld glyph calls. Transport/restore exceptions now reach the host's status and rejection path; stop cannot return successful restoration after a page exception. Defaults remain off. The tests execute the production page script and web control/stop methods in a neutral MV/MZ model with real draw operation counters; they are not browser pixel or in-game acceptance.
+
+Remaining verification: exact Creatures and Luise live pages, off/on at typewriter/pause, face/icon/plugin combinations, transformed/clipped custom Bitmap plugins, and shutdown. The restoration contract is the stock MV/MZ Bitmap draw path, not arbitrary plugin renderers that cache native canvas methods or change an unobservable context transform/clip. Such plugin compatibility is unverified. An already-injected older `window.__megulitRpgm` must be replaced by a fresh game document; replacing host files alone does not hot-patch that object.
+
+MZ's missing launch trace and VX/RGSS are separate investigations; this fix does not claim either launch gate or RGSS has passed.

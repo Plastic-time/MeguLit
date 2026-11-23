@@ -127,7 +127,7 @@ test('nickname rules match the relay; fetch output is sanitized',async t=>{
 
 test('top tab 排行榜 sits between 学习 and 工具 and the page renders the not-ready state',async()=>{
  const app=fs.readFileSync(path.join(__dirname,'..','web','app.js'),'utf8');
- assert.ok(app.includes("['home','library','history','learning'].map(tabButton)"));assert.ok(app.includes("['leaderboard','daily'].map(tabButton)"));assert.ok(app.includes("['tools','settings','about'].map("));assert.ok(app.includes('data-top-me'));
+ assert.ok(app.includes("['home','library','history','learning'].map(tabButton)"));assert.ok(app.includes("['leaderboard','daily','torch'].map(tabButton)"));assert.ok(app.includes("['tools','settings','about'].map("));assert.ok(app.includes('data-top-me'));
  const view=await import(pathToFileURL(path.join(__dirname,'..','web','leaderboard-view.js')).href);
  assert.deepEqual(view.leaderboardLabel,{zh:'排行榜',ja:'ランキング',en:'Leaderboard'});
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
@@ -192,6 +192,29 @@ test('avatars: only small WebP goes up; pictures come back as cached data URLs; 
  assert.deepEqual(await lb.report(root,id,{env:BASE_ENV,account:null,fetch}),{state:'ok',hidden:true});
  await assert.rejects(lb.report(root,'../x',{env:BASE_ENV}),/LEADERBOARD_INVALID_QUERY/);
  assert.deepEqual(await lb.avatarStatus(fixture(t).root,{env:NO_ENV}),{state:'not-configured',status:'none'});
+});
+
+test('profile editor publishes the nickname before updating the navigation chip and caches only approved pictures',async t=>{
+ const {root,db}=fixture(t),id='a'.repeat(32);
+ const options={env:BASE_ENV,account:{accountId:'test',token:()=>''},fetch:async()=>Response.json({error:'NAME_TAKEN'},{status:409})};
+ await lb.saveProfileName(root,db,{name:'Local'},options);
+ await assert.rejects(lb.saveProfileName(root,db,{name:'Taken',joinBoard:true},options),/NAME_TAKEN/);
+ assert.equal(lb.config(root,BASE_ENV,options).joined,false);
+ assert.equal(lb.chip(root).name,'Local');
+ options.fetch=async(url,init)=>{assert.equal(JSON.parse(init.body).name,'Joined');return Response.json({ok:true});};
+ await lb.saveProfileName(root,db,{name:'Joined',joinBoard:true},options);
+ assert.equal(lb.chip(root).name,'Joined');
+ const bytes=Buffer.alloc(40);bytes.write('RIFF');bytes.write('WEBP',8);
+ const data='data:image/webp;base64,'+bytes.toString('base64');
+ options.fetch=async()=>Response.json({status:'approved',avatar:id});
+ await lb.setAvatar(root,data,options);
+ assert.equal(lb.chip(root).avatars[id],data);
+ options.fetch=async()=>Response.json({error:'RATE_LIMITED'},{status:429});
+ assert.equal((await lb.setAvatar(root,data,options)).state,'error');
+ assert.equal(lb.chip(root).avatars[id],data);
+ options.fetch=async()=>Response.json({status:'rejected'});
+ await lb.setAvatar(root,data,options);
+ assert.equal(lb.chip(root).self.avatar,null);
 });
 
 test('name filter also blocks R18 and abuse words on both sides',async()=>{

@@ -33,7 +33,8 @@ struct Live { uintptr_t at, base; int sig; Api api; bool on; };
 static const int MaxSites = 16;
 static Live Sites[MaxSites]; static int NSites = 0;
 extern "C" void *DrawSitesOriginal[MaxSites] = {};
-static volatile LONG Armed = 0, Installed = 0;
+static volatile LONG Armed = 0, Installed = 0, Observing = 0;
+static const DWORD ObserverMxcsr = 0x1f80;
 static bool Looked[64]; // a signature whose module was there and was scanned (found or not)
 static CRITICAL_SECTION Lock;
 // the current run
@@ -41,6 +42,12 @@ static int RunSite = -1; static DWORD RunVia1 = 0, RunVia2 = 0, RunTick = 0; sta
 static int RunChars = 0; static unsigned Run = 0; static std::string RunText;
 // the enclosing function's first four arguments at the latest call, and at the run's first character (the pen is often one of them)
 static DWORD FArgs[4], RunArgs[4];
+static void SetObserving(bool enabled) {
+  EnterCriticalSection(&Lock);
+  InterlockedExchange(&Observing, enabled ? 1 : 0);
+  if (!enabled) { RunChars = 0; RunText.clear(); RunSite = -1; }
+  LeaveCriticalSection(&Lock);
+}
 
 static std::string Utf8W(const wchar_t *w, int n) {
   if (n <= 0) return std::string();
@@ -53,6 +60,7 @@ static std::string Utf8A(const char *s, int n) {
   std::wstring w(k, L'\0'); MultiByteToWideChar(932, 0, s, n, &w[0], k); return Utf8W(w.data(), k);
 }
 static void FlushLocked() {
+  if (!InterlockedCompareExchange(&Observing, 0, 0)) { RunChars = 0; RunText.clear(); return; }
   if (!RunChars) return;
   std::string t = RunText;
   if (t.size() > 120) { size_t cut = 120; while (cut > 0 && ((unsigned char)t[cut] & 0xc0) == 0x80) cut--; t.resize(cut); }
@@ -63,9 +71,9 @@ static void FlushLocked() {
            (unsigned long)RunArgs[0], (unsigned long)RunArgs[1], (unsigned long)RunArgs[2], (unsigned long)RunArgs[3], t.c_str());
   RunChars = 0; RunText.clear();
 }
-static void Add(int k, DWORD via1, DWORD via2, long x, long y, long size, const std::string &text, int chars) {
+static void AddLocked(int k, DWORD via1, DWORD via2, long x, long y, long size, const std::string &text, int chars) {
   if (text.empty()) return;
-  EnterCriticalSection(&Lock);
+  if (!InterlockedCompareExchange(&Observing, 0, 0)) return;
   DWORD now = GetTickCount();
   bool same = RunChars && k == RunSite && via1 == RunVia1 && now - RunTick < 1000 &&
               (x < 0 ? LastX < 0 : (y == LastY && x >= LastX && x - LastX <= (Size > 0 ? Size : 32) * 4));
@@ -73,7 +81,6 @@ static void Add(int k, DWORD via1, DWORD via2, long x, long y, long size, const 
   if (x < X0) X0 = x; if (y < Y0) Y0 = y; if (x > X1) X1 = x; if (y > Y1) Y1 = y; if (size > Size) Size = size;
   RunText += text; RunChars += chars; LastX = x; LastY = y; RunTick = now;
   if (RunText.size() > 2000) FlushLocked();
-  LeaveCriticalSection(&Lock);
 }
 // a stack word, 0 when it cannot be read (a caller without a frame pointer leaves anything in EBP)
 static DWORD Peek(DWORD p) { __try { return p ? *(const DWORD *)p : 0; } __except (EXCEPTION_EXECUTE_HANDLER) { return 0; } }
@@ -82,6 +89,7 @@ static int CountChars(const std::string &u) { int n = 0; for (unsigned char c : 
 // the detour body: k = site, a = the API's arguments on the game's stack, ebp = the game's EBP at the call
 static void OnCall(int k, const DWORD *a, DWORD ebp) {
   {
+    if (!InterlockedCompareExchange(&Observing, 0, 0)) return;
     if (k < 0 || k >= NSites) return;
     const Live &s = Sites[k]; DWORD via1 = 0, via2 = 0;
     int fr = DrawSitesSig::Sigs[s.sig].frame; DWORD ret = 0;
@@ -100,24 +108,37 @@ static void OnCall(int k, const DWORD *a, DWORD ebp) {
     case A_GGOW: { wchar_t w = (wchar_t)a[1]; t = Utf8W(&w, 1); break; }
     default: return;
     }
-    Add(k, via1, via2, x, y, FontHeight(dc), t, CountChars(t));
+    AddLocked(k, via1, via2, x, y, FontHeight(dc), t, CountChars(t));
   }
 }
-// a bad pointer from the game (or a run this cannot read) never reaches the game: the call goes on as if nothing happened
-extern "C" void __cdecl DrawSitesOnCall(int k, const DWORD *a, DWORD ebp) { __try { OnCall(k, a, ebp); } __except (EXCEPTION_EXECUTE_HANDLER) {} }
+// Observer faults are swallowed; the original call still receives the game's untouched arguments.
+extern "C" void __cdecl DrawSitesOnCall(int k, const DWORD *a, DWORD ebp) {
+  // Revocation waits for an in-flight read; SEH must also release the lock on a bad game pointer.
+  EnterCriticalSection(&Lock);
+  __try { __try { OnCall(k, a, ebp); } __except (EXCEPTION_EXECUTE_HANDLER) {} }
+  __finally { LeaveCriticalSection(&Lock); }
+}
 // common gate, reached from a per-site stub `push k; jmp Gate` placed by MinHook on the call instruction: the API's
 // arguments are on the stack, nothing of the call has run yet
 static __declspec(naked) void Gate() {
   __asm {
     pushfd
     pushad
-    mov eax, esp
-    push dword ptr [eax + 8]     // EBP saved by pushad
-    lea ecx, [eax + 40]          // the API's arguments (past the 32 bytes of pushad, flags, k)
+    mov ebx, esp
+    sub esp, 527
+    and esp, 0xfffffff0
+    fxsave [esp]
+    fninit
+    ldmxcsr ObserverMxcsr
+    cld
+    push dword ptr [ebx + 8]     // EBP saved by pushad
+    lea ecx, [ebx + 40]          // the API's arguments (past the 32 bytes of pushad, flags, k)
     push ecx
-    push dword ptr [eax + 36]    // k
+    push dword ptr [ebx + 36]    // k
     call DrawSitesOnCall
     add esp, 12
+    fxrstor [esp]
+    mov esp, ebx
     popad
     popfd
     xchg eax, [esp]              // eax = k, the slot keeps the game's eax
@@ -202,26 +223,63 @@ static void Install() {
 }
 static bool Pending() { for (int i = 0; i < DrawSitesSig::SigCount && i < 64; i++) if (!Looked[i]) return true; return false; }
 static void LookAll() { __try { for (int i = 0; i < DrawSitesSig::SigCount; i++) Look(i); } __except (EXCEPTION_EXECUTE_HANDLER) {} }
+static bool RolesFromControl(const unsigned char *bytes, size_t length) {
+  char line[256]; size_t used = 0, pos = 0; bool wide = false, complete = false;
+  if (length >= 2 && bytes[0] == 0xff && bytes[1] == 0xfe) { wide = true; pos = 2; }
+  else if (length >= 2 && bytes[0] == '#' && !bytes[1]) wide = true;
+  else if (length >= 3 && bytes[0] == 0xef && bytes[1] == 0xbb && bytes[2] == 0xbf) pos = 3;
+  while (pos < length && used < sizeof(line) - 1) {
+    if (wide && (pos + 1 >= length || bytes[pos + 1])) return false;
+    unsigned char c = bytes[pos]; pos += wide ? 2 : 1;
+    if (c == '\r' || c == '\n') { complete = true; break; }
+    if (c != '\t' && (c < 32 || c > 126)) return false;
+    line[used++] = (char)c;
+  }
+  if (!complete || used < 5 || memcmp(line, "#cfg", 4) || (line[4] != ' ' && line[4] != '\t')) return false;
+  line[used] = 0; bool found = false, enabled = false;
+  for (size_t i = 4; i < used;) {
+    while (i < used && (line[i] == ' ' || line[i] == '\t')) i++;
+    size_t start = i; while (i < used && line[i] != ' ' && line[i] != '\t') i++;
+    if (i - start >= 6 && !memcmp(line + start, "roles=", 6)) {
+      if (found) return false;
+      found = true; enabled = i - start == 7 && line[start + 6] == '1';
+    }
+  }
+  return found && enabled;
+}
 static bool RolesAsked() {
   wchar_t tmp[MAX_PATH]; DWORD n = GetTempPathW(MAX_PATH, tmp); if (!n || n >= MAX_PATH) return false;
   wchar_t path[MAX_PATH + 64]; swprintf_s(path, L"%sMeguLit\\draw\\%lu.txt", tmp, GetCurrentProcessId());
   HANDLE h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
   if (h == INVALID_HANDLE_VALUE) return false;
-  char buf[256] = {}; DWORD got = 0; ReadFile(h, buf, sizeof(buf) - 2, &got, nullptr); CloseHandle(h);
-  static const char want[] = "roles=1"; size_t k = 0; // UTF-16LE: every other byte 0
-  for (DWORD i = 0; i < got; i++) { if (!buf[i]) continue; k = buf[i] == want[k] ? k + 1 : (buf[i] == want[0] ? 1 : 0); if (!want[k]) return true; }
-  return false;
+  unsigned char buf[512]; DWORD got = 0; BOOL ok = ReadFile(h, buf, sizeof(buf), &got, nullptr); CloseHandle(h);
+  return ok && RolesFromControl(buf, got);
+}
+static void RefreshControl() {
+  const bool roles = RolesAsked();
+  if (NSites && roles) Install();
+  SetObserving(roles && InterlockedCompareExchange(&Installed, 0, 0));
+}
+static void FlushIdle() {
+  EnterCriticalSection(&Lock);
+  __try {
+    __try { if (RunChars && GetTickCount() - RunTick > 250) FlushLocked(); }
+    __except (EXCEPTION_EXECUTE_HANDLER) { RunChars = 0; RunText.clear(); }
+  } __finally { LeaveCriticalSection(&Lock); }
 }
 static DWORD WINAPI Watch(void *) {
-  // for an hour: the control file decides, and a signature whose DLL is not loaded yet is looked for again
-  for (int i = 0; i < 1800; i++) {
-    if (Pending()) LookAll();
-    if (NSites && RolesAsked()) Install();
-    if (Installed && !Pending()) break;
-    Sleep(2000);
+  DWORD checked = 0; unsigned scans = 0;
+  for (;;) {
+    DWORD now = GetTickCount();
+    if (!scans || now - checked >= 2000) {
+      // DLL discovery expires after an hour; permission checks continue for the process lifetime.
+      if (scans < 1800 && Pending()) LookAll();
+      if (scans < 1800) scans++;
+      RefreshControl(); checked = now;
+    }
+    FlushIdle();
+    Sleep(300);
   }
-  // the last run of a line is written when nothing more comes for a while
-  for (;;) { Sleep(300); EnterCriticalSection(&Lock); if (RunChars && GetTickCount() - RunTick > 250) FlushLocked(); LeaveCriticalSection(&Lock); }
 }
 // called once from checkengine (enginecontrol.cpp) whatever engine matched; never fails the engine
 static void Arm() {

@@ -193,8 +193,8 @@ test('an empty line of origin leave is an inference for the arbiter; a real empt
 test('leaving hides the layer in place instead of sinking it; only a layer that stays visible leaves the topmost band',()=>{
  const s=fs.readFileSync(path.join(__dirname,'..','native','GalWindowBridge.cs'),'utf8'),p=fs.readFileSync(path.join(__dirname,'..','native','ReaderLayerPolicy.cs'),'utf8');
  assert.match(s,/if\(!ReaderLayerPolicy\.SinkOnLeave\(staysVisible\)\)\{\s*bool hid=IsShown\|\|IsWindowVisible\(Overlay\);if\(hid\)\{ShowWindow\(Overlay,0\);IsShown=false;\}/);
- assert.equal((s.match(/TopmostGuard\.Sink\(Overlay,/g)||[]).length,3);
- assert.equal((s.match(/ReaderLayerPolicy\.SinkOnLeave\(/g)||[]).length,3,'every sink of the layer asks the rule first');
+ assert.equal((s.match(/TopmostGuard\.Sink\(Overlay,/g)||[]).length,4);
+ assert.equal((s.match(/ReaderLayerPolicy\.SinkOnLeave\(/g)||[]).length,4,'every sink of the layer asks the rule first');
  assert.match(p,/public static bool SinkOnLeave\(bool layerStaysVisible\)\{return layerStaysVisible;\}/);
  assert.match(p,/return after sinking: the old way does not fail with every request refused/);
 });

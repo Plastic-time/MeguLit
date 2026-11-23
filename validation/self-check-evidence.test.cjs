@@ -1,0 +1,31 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
+const {Reader}=require('../services/reader.cjs');
+const {SelfCheck,replay,windowEvidence}=require('../core/self-check.cjs');
+
+test('a patch receipt reaches both the live gate and the saved Reader log exactly once',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'reader-patch-evidence-'));
+ t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ await fs.mkdir(path.join(root,'logs'));
+ const live=new SelfCheck();
+ t.mock.method(require('../services/self-check-live.cjs'),'feedReader',msg=>live.reader(msg));
+ const reader=Object.assign(Object.create(Reader.prototype),{root,active:()=>true,embedCached(){},humanLine(){},emit(){}});
+ const message={type:'hookPatchTranslation',japanese:'こんにちは',chinese:'你好'};
+ reader.event({...message,machine:true});
+ reader.event({...message,chinese:' '});
+ reader.event(message);
+ const file=path.join(root,'logs','reader-host.log');
+ const sink=require('../core/log-sink.cjs');
+ for(let i=0;i<100&&sink.pending(file)?.busy;i++)await new Promise(r=>setTimeout(r,10));
+ const host=await fs.readFile(file,'utf8'),receipt=JSON.parse(host);
+ assert.deepEqual(Object.keys(receipt).sort(),['at','type']);
+ assert.equal(receipt.type,'patchLine');
+ const hook=Array.from({length:20},(_,i)=>new Date(Date.parse(receipt.at)+i+1).toISOString()+' source chars=5 sequence='+(i+1));
+ hook.forEach(line=>live.trace(line));
+ const offline=replay(hook.join('\n'),host).windows[0];
+ assert.deepEqual(offline.metrics,live.windows[0].metrics);
+ assert.equal(offline.metrics.pairRate,.05);
+ assert.deepEqual(offline.over,['pairRate']);
+ assert.equal(windowEvidence(offline).translationDOM,'unobserved');
+});

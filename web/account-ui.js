@@ -62,6 +62,9 @@ const P={
    NO_CODE:'Send a code first; if the email never arrives, send a new one'}}
 };
 for(const k of Object.keys(T)){const {err,...rest}=P[k];Object.assign(T[k],rest);Object.assign(T[k].err,err);}
+Object.assign(T.zh.err,{RECORD_TOO_LARGE:'有记录超过云端大小限制，已保留在本机待同步',SYNC_RESPONSE_INVALID:'同步服务返回了无效响应，请重试'});
+Object.assign(T.ja.err,{RECORD_TOO_LARGE:'容量制限を超えた記録は、この端末に未送信のまま保存されています',SYNC_RESPONSE_INVALID:'同期サービスの応答が無効です。もう一度お試しください'});
+Object.assign(T.en.err,{RECORD_TOO_LARGE:'Some records exceed the cloud size limit and remain queued on this device',SYNC_RESPONSE_INVALID:'The sync service returned an invalid response. Try again'});
 const store={get:k=>{try{return localStorage.getItem(k)||'';}catch{return '';}},set:(k,v)=>{try{localStorage.setItem(k,v);}catch{}}};
 const KINDS=['words','sentences','reading','settings'];
 export const accountLabel={zh:T.zh.title,ja:T.ja.title,en:T.en.title};

@@ -29,6 +29,10 @@ function sources(rel,china=inChina()){const direct=[rel.url];if(!rel.digest)retu
  /* mainland China: the China entry (cn-dl) first, Cloudflare's dl second */
  const dl=ASSET.test(String(rel.name||''))&&/^[a-f0-9]{64}$/.test(String(rel.digest))?(china?[...DL_MIRRORS].reverse():DL_MIRRORS).map(m=>m+'files/'+rel.digest+'/'+rel.name):[];
  return china?[...dl,...relayed,...direct]:[...direct,...dl,...relayed];}
+function downloadGroups(rel,china=inChina(),required=false){
+ const urls=sources(rel,china);if(!china||!required)return [urls];
+ return [urls.filter(url=>DL_MIRRORS.some(base=>url.startsWith(base))),urls.filter(url=>!DL_MIRRORS.some(base=>url.startsWith(base))&&url!==rel.url),[rel.url]].filter(group=>group.length);
+}
 const updateLog=(root,line)=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','update.log'),new Date().toISOString()+' '+line+'\n');}catch{}};
 const HEADERS={'User-Agent':'MeguLit-Updater','Accept':'application/vnd.github+json'};
 /* E461 (user: players in mainland China, update_check "fetch failed"): api.github.com is often unreachable there, so the
@@ -38,31 +42,39 @@ const RELAY_RELEASE='https://api.megulit.com/api/release/';
 const CN_RELAY_RELEASE='https://cn-api.megulit.com/api/release/';
 /* the relay host that answered fastest (api.megulit.com or its EdgeOne copy cn-api.megulit.com, see relay-config.cjs) */
 function relayReleaseBase(){try{const base=require('./relay-config.cjs').relayBase(null);return base?base+'/api/release/':RELAY_RELEASE;}catch{return RELAY_RELEASE;}}
-async function releaseFetch(fetcher,which,timeout,china=inChina()){
+async function releaseFetch(fetcher,which,timeout,china=inChina(),fresh=false){
  /* 2026-11-13 fake-mainland test: with api.megulit.com (Cloudflare) unreachable the check failed, because the race for
     the fastest relay had not finished and only api.megulit.com was asked. The China entry cn-api is always on the list. */
  const relayed=[...new Set(china?[CN_RELAY_RELEASE,relayReleaseBase(),RELAY_RELEASE]:[relayReleaseBase(),RELAY_RELEASE,CN_RELAY_RELEASE])].map(u=>u+which);const urls=china?[...relayed,REPO+'/'+which]:[REPO+'/'+which,...relayed];let last;
- for(const url of urls){try{const r=await fetcher(url,{headers:HEADERS,signal:AbortSignal.timeout(timeout)});if(r.ok||r.status===404)return r;last=r;}catch(e){last=e;}}
+ for(const url of urls){try{const r=await fetcher(url,{headers:fresh?{...HEADERS,'cache-control':'no-cache'}:HEADERS,cache:fresh?'no-store':'default',signal:AbortSignal.timeout(timeout)});if(r.ok||r.status===404)return r;last=r;}catch(e){last=e;}}
  if(last instanceof Error)throw last;return last;}
 /* Hotfix letters (user 2026-11-10: 1.2.8a, 1.2.8b ...) are a display label only: the GitHub tag and the package name stay
    numeric (v1.2.8, MeguLit-v1.2.8-win-x64.zip) so every installed updater keeps working; a lettered hotfix is found by the
    package digest like any hotfix. The letter is dropped before comparing. */
-const base=v=>String(v||'').trim().replace(/^v/,'').replace(/[a-z]+$/i,'');
+const {base,newer,valid}=require('../core/app-version.cjs');
 /* E350 (user 2026-11-10: "修改以后的自动更新识别规则"): versions compare as major.minor.patch plus the hotfix letter
    (1.2.8 < 1.2.8a < 1.2.8b < 1.2.9), and a package named MeguLit-v1.2.8b-win-x64.zip is accepted, so later releases
    may carry the letter in the tag itself. */
 /* Beta builds (user 2026-11-13: 1.4.9-beta.1 on branch beta, GitHub prereleases) sort below their stable release and
    above the one before it, so the stable 1.4.9 replaces a beta and 1.4.8 never pulls a beta user back. */
-const parse=v=>{const s=String(v||'').trim().replace(/^v/,''),b=/^(\d+)\.(\d+)\.(\d+)-beta\.(\d+)$/i.exec(s);if(b)return [+b[1],+b[2],+b[3],-1000+ +b[4]];const m=/^(\d+)\.(\d+)\.(\d+)([a-z]?)$/i.exec(s);if(!m)return base(v).split('.').map(n=>Number(n)||0).concat(0);return [+m[1],+m[2],+m[3],m[4]?m[4].toLowerCase().charCodeAt(0)-96:0];};
-const newer=(a,b)=>{const x=parse(a),y=parse(b);for(let i=0;i<4;i++){if((x[i]||0)!==(y[i]||0))return (x[i]||0)>(y[i]||0);}return false;};
+/* Version ordering lives in core/app-version.cjs and is also used by the relay */
+
+async function policy(fetcher=fetch,root=''){
+ for(const url of require('./relay-config.cjs').endpoints(root,'/api/update/policy')){
+  try{const r=await fetcher(url,{signal:AbortSignal.timeout(5000)});if(!r.ok)continue;const p=await r.json();
+   if(p&&(!p.minVersion||valid(p.minVersion))&&valid(p.latest))return {latest:p.latest,minVersion:p.minVersion||null,message:p.message||''};
+  }catch{}
+ }
+ return null;
+}
 
 function asset(rel){
  const a=(rel.assets||[]).find(a=>ASSET.test(a.name));if(!a)throw Error('UPDATE_ASSET_MISSING');
  const url=new URL(a.browser_download_url);if(url.protocol!=='https:'||!HOSTS.has(url.hostname))throw Error('UPDATE_URL_REJECTED');
  return a;
 }
-async function latest(fetcher=fetch){
- const r=await releaseFetch(fetcher,'latest',15000);
+async function latest(fetcher=fetch,fresh=false){
+ const r=await releaseFetch(fetcher,'latest',15000,inChina(),fresh);
  if(!r.ok)throw Error('UPDATE_CHECK_FAILED');
  const rel=await r.json(),a=asset(rel);
  return {version:String(rel.tag_name||'').replace(/^v/,''),name:a.name,size:a.size,url:a.browser_download_url,digest:/^sha256:[a-f0-9]{64}$/i.test(a.digest||'')?a.digest.slice(7).toLowerCase():'',hot:require('./hot-update.cjs').asset(rel),notes:String(rel.body||'').replace(/^> \*\*\[⬇[^\n]*\n*/m,'').slice(0,60000),page:rel.html_url,published:rel.published_at||''};
@@ -72,8 +84,8 @@ async function installedSize(current,fetcher=fetch){
  try{let r=await releaseFetch(fetcher,'tags/v'+String(current).replace(/^v/,''),10000);if(!r.ok&&base(current)!==String(current).replace(/^v/,''))r=await releaseFetch(fetcher,'tags/v'+base(current),10000);if(!r.ok)return 0;return asset(await r.json()).size||0;}catch{return 0;}
 }
 
-let state={phase:'idle'},job=null,found=null;
-const status=()=>({...state});
+let state={phase:'idle'},job=null,found=null,pendingForced=null;
+const status=()=>pendingForced?{phase:'downloading',received:0,total:0,hot:false}:{...state};
 
 /* v1.1.8 hotfixes: a release can be replaced in place under the same version. The package this install came from is
    remembered by GitHub's digest; the same version with a different digest online is offered as an update. A manual
@@ -103,14 +115,17 @@ function refreshIcons(root,current,run=(file,args)=>{const c=require('node:child
  if(seen===String(current))return false;try{run(path.join(process.env.SystemRoot||'C:\\Windows','System32','ie4uinit.exe'),['-show']);fs.mkdirSync(path.dirname(mark),{recursive:true});fs.writeFileSync(mark,JSON.stringify({version:String(current)}));return true;}catch{return false;}
 }
 async function check(current,fetcher=fetch,root=''){current=String(current||'').trim().replace(/^v/,'');tidyRollback(root);refreshIcons(root,current);try{require('./uninstall.cjs').registerSoon(root,current);}catch{}
- const rel=await latest(fetcher),hotfix=isHotfix(root,rel,current),isNewer=newer(rel.version,current)||hotfix;
+ const [releaseResult,p]=await Promise.all([latest(fetcher).then(value=>({value}),error=>({error})),policy(fetcher,root)]);
+ const required=!!(p?.minVersion&&newer(p.minVersion,current));
+ if(releaseResult.error){if(required)return {current,latest:p.latest,newer:true,required:true,policy:p,hot:false,silent:false,notes:'',page:'https://github.com/ilynthn/MeguLit/releases/latest'};throw releaseResult.error;}
+ const rel=releaseResult.value,hotfix=isHotfix(root,rel,current),isNewer=newer(rel.version,current)||hotfix;
  /* a small package of only the changed files, when this install is exactly the one it was made from (hot-update.cjs) */
  const failed=isNewer?hotFailed(root,rel.version):'';
- const hot=isNewer&&root&&!failed&&require('./hot-update.cjs').fits(rel.hot,current,readInstalled(root))?rel.hot:null;
+ const hot=isNewer&&!required&&root&&!failed&&require('./hot-update.cjs').fits(rel.hot,current,readInstalled(root))?rel.hot:null;
  found=isNewer?{...rel,hotfix,useHot:!!hot}:null;
  const previous=isNewer&&!hot?await installedSize(current,fetcher):0;
  if(isNewer&&!['downloading','ready'].includes(state.phase))state={phase:'available',version:rel.version,total:hot?hot.size:rel.size,received:0,hot:!!hot};
- return {current,latest:rel.version,newer:isNewer,hotfix,hot:!!hot,silent:!!hot,hotFailed:failed,hotSize:hot?hot.size:0,size:rel.size,previousSize:previous,delta:previous?rel.size-previous:null,notes:rel.notes,page:rel.page,published:rel.published,phase:state.phase};
+ return {current,latest:rel.version,newer:isNewer,required,policy:p,hotfix,hot:!!hot,silent:!!hot,hotFailed:failed,hotSize:hot?hot.size:0,size:rel.size,previousSize:previous,delta:previous?rel.size-previous:null,notes:rel.notes,page:rel.page,published:rel.published,phase:state.phase};
 }
 
 /* Fetches one package through core/fast-download.cjs and returns its bytes.
@@ -134,11 +149,19 @@ async function download(urls,rel,fetcher,zip,root){
  if(data.subarray(0,2).toString('latin1')!=='PK'){fs.rmSync(zip,{force:true});throw Error('UPDATE_NOT_ZIP');}
  return data;
 }
-function start(root,current,fetcher=fetch){current=String(current||'').trim().replace(/^v/,'');
+function start(root,current,fetcher=fetch,{forceLatest=false}={}){current=String(current||'').trim().replace(/^v/,'');
+ if(forceLatest&&pendingForced)return pendingForced;
+ /* A manual/silent download already in flight must finish before the forced full-package job starts. Never
+    expose that earlier package as ready to the forced dialog, and never write two downloads to the same cache */
+ if(forceLatest&&job&&!['ready','error','installed','applied'].includes(state.phase)){
+  pendingForced=job.catch(()=>{}).then(()=>{pendingForced=null;job=null;return start(root,current,fetcher,{forceLatest:true});});return pendingForced;
+ }
+ if(forceLatest){job=null;found=null;state={phase:'downloading',received:0,total:0,hot:false};}
  if(job)return job;
  job=(async()=>{
   try{
-   let rel=found&&(newer(found.version,current)||found.hotfix)?found:await latest(fetcher);if(!newer(rel.version,current)&&!rel.hotfix)throw Error('ALREADY_LATEST');
+   let rel=!forceLatest&&found&&(newer(found.version,current)||found.hotfix)?found:await latest(fetcher,forceLatest);if(!newer(rel.version,current)&&!rel.hotfix)throw Error('ALREADY_LATEST');
+   if(forceLatest){const p=await policy(fetcher,root);if(p?.latest&&newer(p.latest,rel.version))throw Error('UPDATE_CHECK_FAILED');}
    const dir=path.join(root,'cache','update');fs.mkdirSync(dir,{recursive:true});
    const full=rel.digest;if(rel.useHot&&rel.hot)rel={...rel.hot,version:rel.version,isHot:true};
    const zip=path.join(dir,rel.name),ps1=path.join(dir,'apply-update.ps1');
@@ -152,7 +175,7 @@ function start(root,current,fetcher=fetch){current=String(current||'').trim().re
    for(let round=0;!data&&round<2;round++){
     if(round&&pick.isHot)break;
     if(round){try{const fresh=await latest(fetcher);if(fresh.digest===pick.digest&&fresh.size===pick.size)break;pick=fresh;state.total=fresh.size||0;}catch{break;}}
-    try{data=await download(sources(pick),pick,fetcher,zip,root);}
+    try{let last;for(const urls of downloadGroups(pick,inChina(),forceLatest)){try{data=await download(urls,pick,fetcher,zip,root);break;}catch(error){last=error;updateLog(root,'source group failed '+error.message);}}if(!data)throw last||Error('UPDATE_DOWNLOAD_FAILED');}
     catch(error){updateLog(root,'download failed '+error.message+' ('+(pick.size||0)+' bytes)');if(!/^UPDATE_(HASH|SIZE)_MISMATCH$|^UPDATE_NOT_ZIP$/.test(error.message))break;}
    }
    if(!data)throw Error('UPDATE_DOWNLOAD_FAILED');
@@ -257,5 +280,5 @@ try{
  }
 }catch{ Log ('rollback check failed: '+$_) }
 `;}
-function reset(){state={phase:'idle'};job=null;found=null;}
-module.exports={hotFail,hotFailed,refreshIcons,tidyRollback,sources,check,start,status,install,apply,newer,latest,installedSize,reset,launchScript};
+function reset(){state={phase:'idle'};job=null;found=null;pendingForced=null;}
+module.exports={hotFail,hotFailed,refreshIcons,tidyRollback,sources,check,start,status,install,apply,newer,latest,installedSize,reset,launchScript,policy,downloadGroups};
