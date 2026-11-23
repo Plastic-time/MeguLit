@@ -107,10 +107,10 @@ test('a size set to the old built-in value for one game is kept, in the game and
  assert.equal(other.launch().japaneseSize,34);assert.equal(other.stored().sizes,1);
 });
 
-test('an old entry keeps its sizes when one of them was changed by hand',t=>{
+test('an old entry keeps the size changed by hand; the one equal to the global size of its time follows Settings',t=>{
  const {settings,launch}=fixture(t,{prefs:{japaneseSize:34,translationSize:26,sizeSource:'user'}});
  settings.save({scope:'text',values:{japaneseSize:24,translationSize:20}});
- assert.deepEqual([launch().japaneseSize,launch().translationSize],[34,26]);
+ assert.deepEqual([launch().japaneseSize,launch().translationSize],[24,26]);
  const english=fixture(t,{prefs:{japaneseSize:34,translationSize:30,englishSize:34}});
  english.settings.save({scope:'text',values:{japaneseSize:24,translationSize:20,englishSize:22}});
  assert.deepEqual([english.launch().japaneseSize,english.launch().translationSize,english.launch().englishSize],[24,20,22]);
@@ -181,20 +181,42 @@ test('a work saved under the rule keeps a size equal to the old built-in one',()
  assert.equal(fs.readFileSync(path.join(__dirname,'..','core','game-profile.js'),'utf8'),fs.readFileSync(path.join(__dirname,'..','web','reader','modules','game-profile.js'),'utf8'));
 });
 
-// Shapes the previous release wrote for a size picked by hand while Settings said 24: Alt+T saved the whole text set and
-// marked a size changed in the menu sizeSource 'user'; the work's page in Settings saved only the fields it changed, with the
-// same mark. Neither is a copied default, so the upgrade, the next save from either place and a restart keep 34.
-test('a size an old release saved by hand stays through the upgrade, the next save and a restart',t=>{
- for(const prefs of [{japaneseSize:34,translationSize:30,englishSize:34,sizeSource:'user',x:10},{japaneseSize:34,sizeSource:'user',x:10}]){
-  const {settings,launch,stored}=fixture(t,{prefs});
+// The previous release's Alt+T save (GameStyleSync.saveProfile before sizes:1, given the reader's settings): the whole text set of
+// the moment, built-in sizes under the global preset under the menu's changes, a size changed in the menu marked sizeSource 'user'
+// and otherwise the preset's mark, which a size typed in Settings set to 'user' as well.
+function oldAltT(settings,changes){
+ const preset=JSON.parse(fs.readFileSync(path.join(settings.folder,'text-defaults.json'),'utf8')),shown={...profile.pick(require('../core/game-style.js').defaults,'base'),...preset};
+ const sized=profile.sizeKeys.some(k=>k in changes&&Number(changes[k])!==Number(shown[k]));
+ const prefs=profile.pick({...shown,...changes,sizeSource:sized?'user':shown.sizeSource},'text');
+ fs.writeFileSync(path.join(settings.folder,'game-style-profiles.json'),JSON.stringify({version:3,entries:{[key]:{name:'SomeGame',savedAt:1,textSavedAt:1,positionSavedAt:0,prefs,history:[]}}}));
+ return prefs;
+}
+
+test('sizes an old release saved with Alt+T: the inherited global size follows Settings, a size picked by hand stays',t=>{
+ const cases=[
+  ['colour only, the global 24 copied with its mark',{textColor:'#ffeeaa'},22],
+  ['34 picked in the menu',{japaneseSize:34},34],
+  // the menu left at the global 24 saves the same record as the colour change: it cannot be told apart and follows Settings
+  ['24 left as the global one',{japaneseSize:24,textColor:'#ffeeaa'},22]];
+ for(const [name,changes,expected] of cases)for(const resave of ['','Alt+T','page']){
+  const {settings,launch,stored}=fixture(t);
   settings.save({scope:'text',values:{japaneseSize:24}});
-  assert.equal(launch().japaneseSize,34,'after the upgrade');
-  const sync=new GameStyleSync({config:settings.folder},()=>{});sync.profileKey=key;
-  assert.equal(sync.saveProfile({...sync.effective(sync.profile),textColor:'#ffeeaa'},'text'),true);
-  assert.equal(stored().prefs.japaneseSize,34,'Alt+T save');
-  settings.save({scope:'text',profile:key,values:{textColor:'#eeeeee'}});
-  assert.equal(stored().prefs.japaneseSize,34,"the work's page");assert.equal(stored().sizes,1);
+  const old=oldAltT(settings,changes);assert.equal(old.sizeSource,'user',name);assert.equal(old.japaneseSize,changes.japaneseSize??24);
+  assert.equal(launch().japaneseSize,changes.japaneseSize??24,name+': after the upgrade');
+  if(resave==='Alt+T'){const sync=new GameStyleSync({config:settings.folder},()=>{});sync.profileKey=key;
+   assert.equal(sync.saveProfile({...sync.effective(sync.profiles[key]),textColor:'#ffeeab'},'text'),true);}
+  if(resave==='page')settings.save({scope:'text',profile:key,values:{...settings.get(key).values.text,textColor:'#eeeeee'}});
+  if(resave)assert.equal(stored().sizes,1);
   settings.save({scope:'text',values:{japaneseSize:22}});
-  assert.equal(launch().japaneseSize,34,'restart');
+  assert.equal(launch().japaneseSize,expected,name+(resave?', saved again from '+resave:'')+': restart after Settings changed with the game closed');
+  assert.equal(settings.get(key).values.text.japaneseSize,expected,name+': the work\'s page');
+  settings.save({scope:'text',values:{translationSize:20}});
+  assert.equal(launch().translationSize,20,name+': the copied 30 follows Settings too');
  }
+});
+
+test('a size saved under the rule stays when Settings moves to it and on',t=>{
+ const {settings,launch}=fixture(t,{prefs:{japaneseSize:24,sizeSource:'user'},sizes:1});
+ settings.save({scope:'text',values:{japaneseSize:24}});settings.save({scope:'text',values:{japaneseSize:22}});
+ assert.equal(launch().japaneseSize,24);
 });

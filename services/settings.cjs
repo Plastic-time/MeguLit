@@ -65,6 +65,12 @@ class Settings{
  }
  /* Issues 119 / 800: a text size changed in Settings reaches the running work too; it stops holding sizes of its own and follows
     Settings from now on (copying the sizes in kept them frozen in that work after the next change). */
+ /* Global sizes changed: entries saved before sizes:1 hold copies of the sizes they were saved under, so those equal to the global sizes
+    just replaced are inherited; they now follow Settings (core/game-profile.js normalize). Entries saved under the rule are left alone. */
+ inheritSizes(before){const after=require('../core/text-defaults.cjs').workBase(this.folder);if(!profileTools.sizeKeys.some(k=>Number(before[k])!==Number(after[k])))return false;
+  const file=this.file('game-style-profiles.json'),document=readJSON(file);let hit=false;
+  for(const [key,entry] of Object.entries(document.entries||{})){if(entry?.sizes===1||!entry?.prefs||!profileTools.sizeKeys.some(k=>k in entry.prefs))continue;document.entries[key]={...entry,prefs:profileTools.normalize(entry,before).prefs,sizes:1};hit=true;}
+  if(hit)atomic(file,document);return hit;}
  releaseSizes(profile,keys=profileTools.sizeKeys){const file=this.file('game-style-profiles.json'),document=readJSON(file),entry=document.entries?.[profile];if(!entry?.prefs)return false;
   /* an old entry is read as one first: its copied 34 / 30 go together, the size not changed here is not left behind as the work's own */
   const prefs={...profileTools.normalize(entry).prefs};let hit=false;for(const key of keys)if(key in prefs){delete prefs[key];hit=true;}
@@ -94,11 +100,11 @@ class Settings{
     if(profile){
       if(!/^[a-f0-9]{64}$/.test(profile))throw Error('SETTINGS_PROFILE_INVALID');
       const document=readJSON(this.file('game-style-profiles.json'));const entry=document.entries?.[profile];if(!entry)throw Error('SETTINGS_PROFILE_INVALID');
-      const own=profileTools.normalize(entry)?.prefs||{},saved=profileTools.ownSizes({...own,...Object.fromEntries(written.map(key=>[key,cleaned[key]]))},require('../core/text-defaults.cjs').workBase(this.folder),own);const now=Date.now();
+      const work=require('../core/text-defaults.cjs').workBase(this.folder),own=profileTools.normalize(entry,work)?.prefs||{},saved=profileTools.ownSizes({...own,...Object.fromEntries(written.map(key=>[key,cleaned[key]]))},work,own);const now=Date.now();
       document.entries[profile]={...entry,prefs:saved,sizes:1,savedAt:now,textSavedAt:scope==='position'?entry.textSavedAt:now,positionSavedAt:scope==='position'?now:entry.positionSavedAt,history:[{id:String(now),savedAt:now,prefs:saved,positionMap:entry.positionMap||null},...(entry.history||[])].slice(0,7)};document.version=3;atomic(this.file('game-style-profiles.json'),document);
     }else if(scope==='text'){
       const presets=require('../core/text-defaults.cjs'),keys=written,style=Object.fromEntries(keys.filter(presets.isTextKey).map(k=>[k,cleaned[k]])),rest=Object.fromEntries(keys.filter(k=>!presets.isTextKey(k)).map(k=>[k,cleaned[k]]));
-      if(Object.keys(style).length)presets.write(this.folder,style);if(Object.keys(rest).length)atomic(this.file('gal-preferences.json'),{...readJSON(this.file('gal-preferences.json')),...rest});
+      const before=presets.workBase(this.folder);if(Object.keys(style).length)presets.write(this.folder,style);this.inheritSizes(before);if(Object.keys(rest).length)atomic(this.file('gal-preferences.json'),{...readJSON(this.file('gal-preferences.json')),...rest});
     }else atomic(this.file('gal-preferences.json'),{...readJSON(this.file('gal-preferences.json')),...cleaned});
   }else if(nativeScopes.has(scope))atomic(this.file('native-preferences.json'),{...readJSON(this.file('native-preferences.json')),...next});
   else if(v4Scopes.has(scope))atomic(this.file('v4-preferences.json'),{...readJSON(this.file('v4-preferences.json')),...cleanV4(next)});
