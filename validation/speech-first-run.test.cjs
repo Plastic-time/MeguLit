@@ -24,7 +24,7 @@ function rig(t,answer=()=>{},ready=false){
    calls.push(id);
    return answer({id,download,opts})??(download?model():meta());
   },
-  spawn:()=>{starts.push(fs.readdirSync(dir).sort());return new EventEmitter();},
+  spawn:()=>{starts.push(fs.readdirSync(dir).filter(name=>/\.aivmx$/i.test(name)).sort());return new EventEmitter();},
  });
  t.after(async()=>{
   await services.stop();
@@ -60,6 +60,15 @@ test('an installed user model skips preparation',async t=>{
  assert.deepEqual(starts,[['user.AIVMX']]);
  assert.deepEqual(calls,[]);
  assert.equal(fs.readFileSync(path.join(dir,'user.AIVMX'),'utf8'),'my voice');
+});
+
+test('a manually chosen default does not trigger installation of the other voice',async t=>{
+ const {dir,calls,starts,services}=rig(t),file=ids[0]+'.aivmx';
+ fs.writeFileSync(path.join(dir,file),'manual model');
+ await services.ensureSpeech(undefined,false);
+ assert.deepEqual(starts,[[file]]);
+ assert.deepEqual(calls,[]);
+ assert.equal(fs.readFileSync(path.join(dir,file),'utf8'),'manual model');
 });
 
 test('an already running remote engine leaves the local models alone',async t=>{
@@ -131,6 +140,32 @@ test('a model installed at publication keeps its original bytes',async t=>{
  assert.deepEqual(starts,[files]);
  assert.equal(fs.readFileSync(path.join(dir,files[0]),'utf8'),'concurrent install');
  assert.deepEqual(fs.readFileSync(path.join(dir,files[1])),data);
+});
+
+test('failed publication retries only the missing default and preserves the installed model',async t=>{
+ const {dir,calls,starts,services,log}=rig(t),link=fs.linkSync;
+ let fail=true;
+ const installed=ids[0]+'.aivmx';
+ t.mock.method(fs,'linkSync',(source,target)=>{
+  if(fail&&target===path.join(dir,ids[1]+'.aivmx'))throw Object.assign(Error('could not publish defaults'),{code:'EACCES'});
+  return link(source,target);
+ });
+ await services.ensureSpeech(undefined,false);
+ assert.deepEqual(starts,[[installed]]);
+ assert.deepEqual(fs.readdirSync(dir).sort(),['.megulit-default-voices-pending',installed]);
+ assert.match(log(),/could not publish defaults/);
+ const manual=path.join(dir,'manual.tmp');
+ fs.writeFileSync(manual,'manually replaced default');
+ fs.renameSync(manual,path.join(dir,installed));
+ await services.stopSpeech();
+ starts.length=0;
+ calls.length=0;
+ fail=false;
+ await services.ensureSpeech(undefined,false);
+ assert.deepEqual(starts,[files]);
+ assert.deepEqual([...new Set(calls)],[ids[1]]);
+ assert.deepEqual(fs.readdirSync(dir),files);
+ assert.equal(fs.readFileSync(path.join(dir,installed),'utf8'),'manually replaced default');
 });
 
 test('closing during a download waits for staging cleanup and never spawns the engine',async t=>{

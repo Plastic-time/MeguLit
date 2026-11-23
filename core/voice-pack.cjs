@@ -70,24 +70,32 @@ class VoicePack{
   catch(e){for(const f of [tmp,tmp+'.part',tmp+'.part.json'])try{fs.unlinkSync(f);}catch{}if(/^(HASH|SIZE)_MISMATCH$/.test(e.code||''))throw Error(voice.name+' 校验失败');if(e.code==='DOWNLOAD_FAILED')throw Error(voice.name+' 下载失败 '+String((e.last&&e.last.message)||''));throw e;}}
 }
 
-// Use the bundled engine's own first-run defaults when its model folder is empty.
+// Use the bundled defaults for an empty folder or a first-run publication we previously started.
 async function prepareDefaultVoices({fetch,signal,dir=modelsDir()}){
  signal.throwIfAborted();
  fs.mkdirSync(dir,{recursive:true});
- const hasModels=()=>fs.readdirSync(dir,{withFileTypes:true}).some(entry=>/\.aivmx$/i.test(entry.name)&&!entry.isDirectory());
- if(hasModels())return;
+ const marker=path.join(dir,'.megulit-default-voices-pending'),voices=VOICES.filter(voice=>voice.bundledDefault);
+ const remaining=()=>{
+  const installed=new Set(fs.readdirSync(dir,{withFileTypes:true}).filter(entry=>/\.aivmx$/i.test(entry.name)&&!entry.isDirectory()).map(entry=>entry.name.toLowerCase()));
+  if(installed.size&&(!fs.existsSync(marker)||[...installed].some(file=>!voices.some(voice=>file===voice.uuid+'.aivmx'))))return [];
+  return voices.filter(voice=>!installed.has(voice.uuid+'.aivmx'));
+ };
+ const missing=remaining();
+ if(!missing.length){fs.rmSync(marker,{force:true});return;}
  const stage=fs.mkdtempSync(path.join(dir,'.megulit-first-voices-'));
  try{
   const pack=new VoicePack({dir:stage,fetch});
-  const voices=VOICES.filter(voice=>voice.bundledDefault);
-  for(const voice of voices){signal.throwIfAborted();await pack.download(voice,null,signal);}
+  for(const voice of missing){signal.throwIfAborted();await pack.download(voice,null,signal);}
   signal.throwIfAborted();
-  if(hasModels())return;
-  for(const voice of voices){
+  if(!remaining().length){fs.rmSync(marker,{force:true});return;}
+  // Keep enough state to resume an incomplete publish without unlinking a possibly replaced model.
+  try{fs.writeFileSync(marker,'',{flag:'wx'});}catch(e){if(e.code!=='EEXIST')throw e;}
+  for(const voice of missing){
    const file=voice.uuid+'.aivmx';
    // Publish a complete model without replacing a file installed by another downloader.
    try{fs.linkSync(path.join(stage,file),path.join(dir,file));}catch(e){if(e.code!=='EEXIST')throw e;}
   }
+  if(!remaining().length)fs.rmSync(marker,{force:true});
  }finally{fs.rmSync(stage,{recursive:true,force:true});}
 }
 module.exports={VoicePack,VOICES,prepareDefaultVoices};
