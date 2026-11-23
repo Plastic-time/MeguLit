@@ -234,6 +234,32 @@ test('E414: multilingual KiriKiri blocks pair by label, [l] continues the row, [
  assert.deepEqual(p.starts,[0,1,3,5]);assert.deepEqual(p.cont,[2],'only the sentence after [l] on the same physical line continues the row');
 });
 
+test('multilingual KiriKiri pairs literal caption commands with their Chinese text',()=>{
+ const {pair}=require('../services/original-engines/krkr-lang.cjs');
+ const ja=[
+  '[show text="演出[l][cm]"]',
+  `[c text="丘の上[l][cm]"][l][C text = '夜が来る。'][p]`,
+  '*first_AAA|',
+  '[cm]',
+  '[c text=&caption]',
+  'いつもの台詞。[p]',
+  '*scenario_BBB|',
+ ].join('\n');
+ const zh=[
+  '[show text="演出[l][cm]"]',
+  '[c text="山丘上[l][cm]"][l][c text="夜幕降临。"][p]',
+  '*first_AAA|',
+  '[cm]',
+  '平时的对白。[p]',
+  '*scenario_BBB|',
+ ].join('\n');
+ const p=pair(ja,zh);
+ assert.deepEqual(p.lines,['丘の上[l][cm]','夜が来る。','いつもの台詞。']);
+ assert.deepEqual(p.zh,['山丘上[l][cm]','夜幕降临。','平时的对白。']);
+ assert.deepEqual(p.starts,[0,2]);
+ assert.deepEqual(p.cont,[1]);
+});
+
 test('E414: a page game by its own script turns on every page rule; a game whose pages hold one line does not',t=>{
  const f=fixture(t);f.hook.flowPage=false;
  const page=(starts,known)=>({kind:'patch',resolve:()=>({status:'exact',indices:[0]}),flowGame:()=>{let multi=0;for(const i of starts)if(known.includes(i+1)&&!starts.includes(i+1))multi++;return multi/starts.length>=.15;},flowLayout:()=>null});

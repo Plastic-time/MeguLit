@@ -23,6 +23,21 @@ function entryText(file,entry){try{const t=xp3.decodeText(xp3.read(file,entry));
 function scripts(file){const t=list(file);if(!t)return [];return t.files.filter(e=>KS(e.name)&&e.size>0).map(e=>({name:e.name.replace(/\\/g,'/'),entry:e})).sort((a,b)=>a.name.localeCompare(b.name));}
 const INLINE_IF=/\[if exp="[^"]*"\]([^\[]*)\[endif\](?:\[if exp="[^"]*"\][^\[]*\[endif\])+/gi;
 const ascii=t=>/^[\x20-\x7e]*$/.test(t);
+// The multilingual prologue also draws captions from literal [c text="…"] commands.
+const INLINE_TAG=/\[c\s+text\s*=\s*(?:"([^"]*)"|'([^']*)')\s*\]|\[(?:[^\]"']|"[^"]*"|'[^']*')*\]/gi;
+function parseRow(line){
+ const parts=[];let text='',at=0,clear=false;
+ for(const match of line.matchAll(INLINE_TAG)){
+  const [tag,doubleQuoted,singleQuoted]=match;
+  text+=line.slice(at,match.index);
+  at=match.index+tag.length;
+  if(/^\[l\]$/i.test(tag)){parts.push(text);text='';}
+  else if(/^\[(?:cm|er|ct)\]$/i.test(tag))clear=true;
+  else text+=doubleQuoted??singleQuoted??'';
+ }
+ parts.push(text+line.slice(at));
+ return {parts:parts.map(t=>t.trim()).filter(Boolean),clear};
+}
 // Blocks of one script: {key, rows:[[sentence,…],…]}; anchors: ASCII command/label lines.
 function blocks(text){const out=[],anchors=[];let rows=[],code=false;const close=key=>{if(rows.length)out.push({key,rows});rows=[];};
  for(const raw of String(text||'').split(/\r?\n/)){const t=raw.trim();
@@ -31,9 +46,9 @@ function blocks(text){const out=[],anchors=[];let rows=[],code=false;const close
   if(!t||t[0]===';')continue;
   if(t[0]==='*'){if(ascii(t))anchors.push(t);close(t.includes('|')?t:null);continue;}
   if(t[0]==='@'){if(ascii(t))anchors.push(t);continue;}
-  const line=t.replace(INLINE_IF,'$1'),parts=line.split(/\[l\]/i).map(s=>s.replace(/\[[^\]]*\]/g,'').trim()).filter(Boolean);
+  const {parts,clear}=parseRow(t.replace(INLINE_IF,'$1'));
   if(parts.length)rows.push(parts);else if(ascii(t))anchors.push(t);
-  if(/\[(?:cm|er|ct)\]/i.test(t))close(null);}
+  if(clear)close(null);}
  close(null);return {blocks:out,anchors};}
 // One scenario: Japanese lines with the Chinese of the same label, page starts and row continuations (local indices).
 /* Blocks without a label both languages share (unlabelled blocks: choices, whole scenes such as badend4.ks; labels

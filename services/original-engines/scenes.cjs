@@ -778,7 +778,12 @@ function read(id,dir,overlay){const engine=ENGINES[id];
  // E449 a release's Chinese column gets the filled translations of the lines it leaves empty (fill.cjs).
  const list=engine.scenes(dir).map(s=>{const replaced=overlay?.get(s.name.toLowerCase());let parsed={lines:[],anchors:[]};try{parsed=engine.parse(replaced||s.read());}catch{}return fill.scene({name:s.name,...parsed,patched:!!replaced});});
  return engine.annotate?engine.annotate(dir,list):list;}
-function fingerprint(id,dir){return crypto.createHash('sha256').update(id+'\n'+ENGINES[id].sources(dir).sort().map(f=>path.basename(f)+'|'+stat(f)).join('\n')).digest('hex');}
+function fingerprint(id,dir){
+ // Rebuild multilingual KiriKiri indexes that omitted captions in tag arguments.
+ const format=id==='kirikiri-lang'?'caption-text-v1\n':'';
+ const sources=ENGINES[id].sources(dir).sort().map(f=>path.basename(f)+'|'+stat(f)).join('\n');
+ return crypto.createHash('sha256').update(id+'\n'+format+sources).digest('hex');
+}
 /* E294 (user: say that the first use needs 30-90 s of unpacking instead of "not supported"): what a game that cannot
    be read yet is waiting for. 'unpack': its cx archives are being decrypted in the background (started: when);
    'capture': strongly encrypted KiriKiri archives, read while the game runs (kirikiri-dump), nothing saved yet. */
