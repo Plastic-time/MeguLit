@@ -82,3 +82,20 @@ test('received: a relay diff with a credit shows who passed it on; no credit, no
  assert.equal((await fp.state(db,root,'7',{wait:0})).state,'hidden');
  feed.layer=()=>({source:'agreed'});try{const r=await fp.state(db,root,'7',{wait:0});assert.equal(r.state,'received');assert.deepEqual(r.credit,{torchNo:5,name:'A',at:'2026-11-20T10:00:00Z'});
   write({});assert.equal((await fp.state(db,root,'7',{wait:0})).state,'hidden');write({credit:{torchNo:9,name:null,at:'t'}});assert.equal((await fp.state(db,root,'7',{wait:0})).credit.name,null);}finally{feed.layer=orig;}});
+
+test('one Seed keeps its upload identity through review and offline status reads',async()=>{
+ const {root}=setup(),key='a'.repeat(64),id='b'.repeat(64);
+ const progress={id,state:'pending',steps:{scan:'pending',review:'pending'},notificationKey:id};
+ const sent=await feed.report(root,{key,engine:'renpy',source:'calibration',mode:'read',settings:{}},{
+  fetcher:async()=>Response.json({seed:progress},{status:201})
+ });
+ assert.deepEqual(sent.seed,progress);
+ const published={...progress,state:'published',steps:{scan:'published',review:'pending'}};
+ const fresh=await feed.sharedState(root,key,async url=>{
+  assert.equal(new URL(url).searchParams.get('id'),id);
+  assert.equal(new URL(url).pathname,'/api/game-profile/seed-status');
+  return Response.json(published);
+ });
+ assert.deepEqual(fresh.seed,published);
+ assert.deepEqual((await feed.sharedState(root,key,null)).seed,published);
+});

@@ -30,11 +30,11 @@ async function state(db,root,id,{wait=2500,fetcher=globalThis.fetch,hash,torchKe
  if(!isolated){
   const credit=layer&&feed.cleanCredit(answer.credit);
   if(credit)return {...local,state:'received',credit,receipt:null};
-  if(feed.sent(root,key)){if(wait>0)await timeout(feed.syncCredit(root,key,{fetcher}),wait);const ordinary=await feed.ordinaryState(root,key,fetcher);return {...local,state:'thanks',credit:feed.creditOf(root,key),...(ordinary?{ordinary}:{})};}
+  if(feed.sent(root,key)){if(wait>0)await timeout(feed.syncCredit(root,key,{fetcher}),wait);const progress=await feed.sharedState(root,key,fetcher);return {...local,state:'thanks',credit:feed.creditOf(root,key),...progress};}
  }
  if(isolated&&feed.calibrationSharing(root)&&feed.sent(root,key)){
-  const ordinary=await feed.ordinaryState(root,key,fetcher);
-  return {...local,state:'thanks',isolated:true,...(ordinary?{ordinary}:{})};
+  const progress=await feed.sharedState(root,key,fetcher);
+  return {...local,state:'thanks',isolated:true,...progress};
  }
  const age=Date.now()-pending?.checkedAt;
  // A confirmed miss can outlive a subsequent publication.

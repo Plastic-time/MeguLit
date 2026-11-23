@@ -185,7 +185,11 @@ async function report(root,record,{fetcher=globalThis.fetch,prints=null,credit:c
  const sharedPrints=isolated?(pr?.script?{script:pr.script}:null):pr;
  const alias=!isolated&&!credit&&!sent(root,block.key)?libraryAlias(root):null;
  const body=JSON.stringify({version:1,profile,...(candidate?{ordinary:candidate}:{}),...(!isolated&&credit?{credit:{name:credit}}:{}),...(alias?{libraryAlias:alias}:{}),...(sharedPrints&&Object.keys(sharedPrints).length?{prints:sharedPrints}:{})});
- for(const url of reportEndpoints(root,'/api/game-profile/report')){try{const r=await require('./account.cjs').torchRequest(root,url,{method:'POST',redirect:'error',credentials:'omit',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)},fetcher);if(r.ok){let j=null;try{j=await r.clone().json();}catch{}const c=cleanCredit(j&&(j.credit||j));markSent(root,block.key,c);if(gameDiff.KEY.test(j?.ordinary?.id||''))writeSent(root,block.key,{...readSent(root,block.key),ordinary:{id:j.ordinary.id,state:j.ordinary.state}});return {state:'sent',...(c?{credit:c}:{})};}if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
+ for(const url of reportEndpoints(root,'/api/game-profile/report')){try{const r=await require('./account.cjs').torchRequest(root,url,{method:'POST',redirect:'error',credentials:'omit',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)},fetcher);if(r.ok){let j=null;try{j=await r.clone().json();}catch{}const c=cleanCredit(j&&(j.credit||j));markSent(root,block.key,c);
+ const seed=seedStatus(j?.seed);
+ const ordinary=gameDiff.KEY.test(j?.ordinary?.id||'')?{id:j.ordinary.id,state:j.ordinary.state}:null;
+ if(seed||ordinary)writeSent(root,block.key,{...readSent(root,block.key),seed,ordinary});
+ return {state:'sent',...(seed?{seed}:{}),...(c?{credit:c}:{})};}if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
  return {state:'failed'};}
 /* 2026-11-21 Cardinal (services/cardinal.cjs): POST /api/cardinal/score, the body is the record as core/cardinal/score.cjs record made it
    (schema megulit.cardinal-score, relay/src/cardinal.js checks every field): the exe hash, the seed revision, the app version and
@@ -197,6 +201,29 @@ async function reportScore(root,record,{fetcher=globalThis.fetch}={}){if(!record
  return {state:'failed'};}
 function pendingScore(root,key,fetcher){let doc=null;try{doc=require('./cardinal.cjs').load(root,key);}catch{}if(doc?.sent||!require('../core/cardinal/upload.cjs').eligible(doc))return;
  reportScore(root,doc.record,{fetcher}).then(r=>{if(r.state!=='sent')return;try{const cur=require('./cardinal.cjs').load(root,key);if(cur?.record?.at===doc.record.at){const f=require('./cardinal.cjs').fileOf(root,key);fs.writeFileSync(f,JSON.stringify({...cur,sent:true,upload:{state:'sent'}},null,1));}}catch{}}).catch(()=>{});}
+function seedStatus(seed){
+ if(!gameDiff.KEY.test(seed?.id||'')||typeof seed.state!=='string'||seed.state.length>64)return null;
+ return {id:seed.id,state:seed.state,steps:{scan:seed.steps?.scan,review:seed.steps?.review},notificationKey:seed.id};
+}
+async function sharedState(root,key,fetcher){
+ const saved=readSent(root,key), seed=seedStatus(saved?.seed);
+ if(!seed)return {ordinary:await ordinaryState(root,key,fetcher)};
+ if(fetcher&&calibrationSharing(root)){
+  for(const url of reportEndpoints(root,'/api/game-profile/seed-status?id='+seed.id)){
+   try{
+    const response=await fetcher(url,{redirect:'error',signal:AbortSignal.timeout(2000)});
+    if(!response.ok)continue;
+    const next=seedStatus(await response.json());
+    if(next?.id!==seed.id)continue;
+    const latest=readSent(root,key);
+    if(latest?.seed?.id!==seed.id)return {seed:latest?.seed||null};
+    if(JSON.stringify(next)!==JSON.stringify(seed))writeSent(root,key,{...latest,seed:next});
+    return {seed:next};
+   }catch{}
+  }
+ }
+ return {seed};
+}
 async function ordinaryState(root,key,fetcher){
  const record=readSent(root,key)?.ordinary;
  if(!record||!gameDiff.KEY.test(record.id)||!calibrationSharing(root))return null;
@@ -210,4 +237,4 @@ async function ordinaryState(root,key,fetcher){
  }
  return record.state;
 }
-module.exports={calibrationSharing,_trustOrdinary,ordinaryState,revokeOrdinary,ordinaryAllowed,documentsFor,reportScore,sent,markSent,creditOf,setCredit,syncCredit,cleanName,cleanCredit,CREDIT_MAX,cached,refresh,report,layer,forExe,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};
+module.exports={sharedState,calibrationSharing,_trustOrdinary,ordinaryState,revokeOrdinary,ordinaryAllowed,documentsFor,reportScore,sent,markSent,creditOf,setCredit,syncCredit,cleanName,cleanCredit,CREDIT_MAX,cached,refresh,report,layer,forExe,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};
