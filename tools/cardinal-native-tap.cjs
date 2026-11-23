@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 // Loaded only in the collector-owned service. Observe the same native stdout as
 // the normal reader without changing how it binds, translates, or renders.
@@ -57,9 +57,35 @@ if (root && /^(?:[a-f0-9]{32}|[a-f0-9]{64})$/.test(challenge) &&
   if(live){
     const {GalNative}=require(path.join(root,'core','gal-native.cjs'));
     const {DisplayPairs}=require(path.join(root,'core','cardinal','display-pairs.cjs'));
+    const target=process.env.MEGULIT_DIALOGUE_TARGET;
+    delete process.env.MEGULIT_DIALOGUE_TARGET;
+    let boundGal;
+    if(target){
+      const {HookNative}=require(path.join(root,'core','hook-native.cjs'));
+      // This run uses the engine callback as its sole source.
+      HookNative.prototype.start=function(){};
+      const decoder=new StringDecoder('utf8');
+      let buffer='',sequence=0;
+      socket.on('data',chunk=>{
+        buffer+=decoder.write(chunk);
+        let end;
+        while((end=buffer.indexOf('\n'))>=0){
+          if(end>65536)throw Error('LIVE_DIALOGUE_LIMIT');
+          const frame=JSON.parse(buffer.slice(0,end));buffer=buffer.slice(end+1);
+          const state=boundGal?.state;
+          if(frame.challenge!==challenge || frame.sequence!==++sequence || !state?.bound ||
+              String(state.gameProcessId)+'|'+state.gameStarted!==target)throw Error('LIVE_DIALOGUE_BINDING');
+          const m={type:'hookSource',origin:'live',text:frame.text,sourceName:'RenPyCharacterCallback'};
+          write({kind:'gameDialogue',wireNs:process.hrtime.bigint().toString(),m,sequence});
+          boundGal.hooks.source(m,m.sourceName);
+        }
+        if(buffer.length>65536)throw Error('LIVE_DIALOGUE_LIMIT');
+      });
+    }
     const apply=GalNative.prototype.setGameProfile;
     GalNative.prototype.setGameProfile=function(profile,input){
       const result=apply.apply(this,arguments);
+      if(target)boundGal=this;
       if(this.profile===profile && input?.exe)write({kind:'profile',exe:input.exe,profile:this.profile});
       return result;
     };
@@ -81,6 +107,12 @@ if (root && /^(?:[a-f0-9]{32}|[a-f0-9]{64})$/.test(challenge) &&
       const descriptor=source.apply(this,arguments);
       if(descriptor)write({kind:'episode',descriptor,sequence:this.current.sequence});
       return descriptor;
+    };
+    const setPolicy=DisplayPairs.prototype.setPolicy;
+    DisplayPairs.prototype.setPolicy=function(message,target){
+      const result=setPolicy.apply(this,arguments);
+      if(result?.descriptor)write({kind:'pairPolicy',descriptor:result.descriptor,sequence:this.current.sequence});
+      return result;
     };
     const observe=DisplayPairs.prototype.observe;
     DisplayPairs.prototype.observe=function(message,target){

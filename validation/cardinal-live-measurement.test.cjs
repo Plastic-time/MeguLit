@@ -39,3 +39,33 @@ test('rejects history, changed target and a new source before the prior occurren
  native({type:'hookSource',text:'unit',origin:'live'});
  assert.throws(()=>native({type:'hookSource',text:'next',origin:'live'}),/LIVE_SOURCE_WITHOUT_DOM_ACK/);
 });
+
+test('game callbacks require the selected exporter and contiguous sequence, and cannot mix with hook output',()=>{
+ const {m,native}=session();
+ const frame={kind:'gameDialogue',sequence:1,wireNs:process.hrtime.bigint().toString(),
+  m:{type:'hookSource',origin:'live',text:'callback'}};
+ assert.throws(()=>m.frame(frame),/LIVE_DIALOGUE_SESSION/);
+ m.game={...m.game,pluginHash:'a'.repeat(64)};
+ assert.throws(()=>m.frame({...frame,sequence:2}),/LIVE_DIALOGUE_SESSION/);
+ assert.throws(()=>native(frame.m),/LIVE_DIALOGUE_MIXED_SOURCE/);
+ m.frame(frame);
+ assert.equal(m.counts.sources,1);
+ assert.equal(m.counts.pairs,0);
+ assert.throws(()=>m.frame(frame),/LIVE_DIALOGUE_SESSION/);
+});
+
+test('a Reader policy update binds its new scope only to the active source occurrence',()=>{
+ const {m,native}=session();
+ const text='policy source',sourceKey=key(text);
+ native({type:'hookSource',text,origin:'live'});
+ const descriptor={episode:'unit:1',scope:'scope:0',sourceKey};
+ m.frame({kind:'episode',sequence:7,descriptor});
+ const changed={...descriptor,scope:'scope:1'};
+ m.frame({kind:'pairPolicy',sequence:6,descriptor:changed});
+ assert.equal(m.current.scope,descriptor.scope);
+ m.frame({kind:'pairPolicy',sequence:7,descriptor:changed});
+ m.frame({kind:'ack',sequence:7,message:{...changed,observed:true,paired:true,enabled:true,visible:true,translation:'shown'}});
+ assert.equal(m.current.accepted.scope,changed.scope);
+ m.frame({kind:'pairPolicy',sequence:7,descriptor:{...changed,scope:'scope:2'}});
+ assert.equal(m.current.accepted,undefined);
+});

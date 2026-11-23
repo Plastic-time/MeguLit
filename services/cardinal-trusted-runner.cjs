@@ -93,6 +93,12 @@ function evaluateEvidence(report,context,reporter,challenge){
  const run=report.run;if(!run||!Array.isArray(run.steps)||run.steps.length>10000||!run.o||run.o.models!==false||!Array.isArray(run.o.samples)||run.o.samples.length>12000||!Array.isArray(run.o.sourceEpisodes)||run.o.sourceEpisodes.length>400||(run.o.errors||[]).length)fail('TRUSTED_CAPTURE_OBSERVATIONS');
  const bound=run.steps.filter(x=>x.gwb?.type==='bound');if(bound.length!==1||bound[0].gwb.gameProcessId!==p.pid||String(bound[0].gwb.gameStarted)!==p.birth)fail('TRUSTED_PROCESS_BINDING');
  const sources=run.steps.filter(x=>x.hb?.type==='hookSource');if(sources.length<30||sources.some(x=>['history','ocr','replay','fixture'].includes(x.hb.origin)||x.hb.recovering||x.hb.hookRecovering)||run.o.sourceEpisodes.some(x=>x.pid!==p.pid||x.birth!==p.birth))fail('TRUSTED_SOURCE_BINDING');
+ if(report.gameDialogue || sources.some(s=>s.hb.sourceName==='RenPyCharacterCallback')){
+  const d=report.gameDialogue, id=context.request.identity;
+  if(!d || d.engine!=='renpy8' || id.engine!=='renpy' || !/^[a-f0-9]{64}$/.test(d.payloadHash) ||
+     !/^[a-f0-9]{64}$/.test(d.pluginHash) || d.scriptHashes?.[id.scriptFile]!==id.script ||
+     sources.some(s=>s.hb.sourceName!=='RenPyCharacterCallback'||s.hb.origin!=='live'))fail('TRUSTED_GAME_DIALOGUE_BINDING');
+ }
  const acks=report.domAcks;if(!Array.isArray(acks)||acks.length!==sources.length)fail('TRUSTED_DOM_ACK');const episodes=new Set();
  for(let i=0;i<sources.length;i++){const st=sources[i],e=run.o.sourceEpisodes[i],a=acks[i];if(!e||!a||a.line!==st.line||typeof a.episode!=='string'||!a.episode||episodes.has(a.episode)||a.sourceKey!==Pairs.key(st.hb.text)||a.observed!==true||a.paired!==true||a.enabled!==true||a.visible!==true||!Number.isFinite(a.at)||a.at<e.at||a.at>=(run.o.sourceEpisodes[i+1]?.at??Infinity)||a.at>run.o.timing?.durationMs||!run.o.timing?.wallChecks?.some(c=>Math.abs(c.at-a.at)<.01)||typeof a.translation!=='string'||!Pairs.normalize(a.translation))fail('TRUSTED_DOM_ACK');episodes.add(a.episode);
   const nextAt=run.o.sourceEpisodes[i+1]?.at??Infinity;

@@ -94,6 +94,12 @@ async function main(req,cfg,port,cancel){
  }
  const source=diagnostic?cfg.sample:ctx.exe,app=diagnostic?cfg.app:ctx.policy.appRoot;
  if(path.resolve(req.exe).toLowerCase()!==path.resolve(source).toLowerCase() || digest(source)!==req.identity.exe)fail('LIVE_SAMPLE_PIN');
+ const dialogue=cfg.dialoguePlugin;
+ if(dialogue!=null && dialogue!=='renpy8')fail('LIVE_PLUGIN_UNKNOWN');
+ if(dialogue && !diagnostic){
+  if(ctx.request.identity.engine!=='renpy')fail('LIVE_PLUGIN_ENGINE');
+  if(!/^[a-f0-9]{64}$/.test(cfg.dialogueTreeSha256))fail('LIVE_GAME_PAYLOAD_PIN');
+ }
  const budget=diagnostic?cfg.budgetMs:ctx.policy.budgetMs;
  if(!Number.isInteger(budget)||budget<1000||budget>360000)fail('LIVE_BUDGET');
  const profile=ctx?.profile||Profiles.profileFor({exe:source,engine:cfg.engine});
@@ -111,7 +117,7 @@ async function main(req,cfg,port,cancel){
   const args=['--game-worker','--isolated-game',source,req.identity.exe,cfg.controlIPv4];
   if(cfg.saveDir)args.push('--save-dir',cfg.saveDir);
   if(cfg.saveTemplate)args.push('--save-template',cfg.saveTemplate.name,cfg.saveTemplate.sha256);
-  gameWorker=worker(args,{...req,budgetMs:budget,readerRoot},path.join(eventsDir,'game.log'),f=>{
+  gameWorker=worker(args,{...req,budgetMs:budget,readerRoot,dialoguePlugin:dialogue??null,dialogueTreeSha256:cfg.dialogueTreeSha256??null},path.join(eventsDir,'game.log'),f=>{
    if(f.type==='game'&&!game)game=f;
    else if(f.type==='cleanup'&&!cleanup)cleanup=f;
    else fail('LIVE_GAME_FRAME');
@@ -119,6 +125,25 @@ async function main(req,cfg,port,cancel){
   await wait(()=>game);
   summary.game={pid:game.pid,birth:game.birth,hwnd:game.hwnd,exe:game.exe};
   if(digest(game.exe)!==req.identity.exe)fail('LIVE_GAME_COPY_IDENTITY');
+  if(cfg.dialoguePlugin==='renpy8'){
+   const plugin=path.join(path.dirname(game.exe),'game','CardinalDialogue.rpy');
+   plain(plugin);
+   if(game.pluginHash!==digest(plugin)||game.pluginHash!==digest(path.join(__dirname,'CardinalDialogue.rpy')))fail('LIVE_PLUGIN_PIN');
+   summary.pluginHash=game.pluginHash;
+   summary.payloadHash=game.payloadHash;
+   const scriptFile=req.identity.scriptFile;
+   if(typeof scriptFile!=='string' || !/^game\/(?:[\w.-]+\/)*[\w.-]+\.rpyc$/.test(scriptFile) ||
+      scriptFile.split('/').some(part=>part==='.'||part==='..'))fail('LIVE_PLUGIN_SCRIPT_PATH');
+   for(const relative of [scriptFile,scriptFile.slice(0,-1)]){
+    const original=path.join(path.dirname(source),relative);
+    const copy=path.join(path.dirname(game.exe),relative);
+    if(relative!==scriptFile && !fs.existsSync(original) && !fs.existsSync(copy))continue;
+    plain(original);plain(copy);
+    const hash=digest(copy);
+    if(hash!==digest(original)||(relative===scriptFile && hash!==req.identity.script))fail('LIVE_PLUGIN_SCRIPT_PIN');
+    (summary.scriptHashes??={})[relative]=hash;
+   }
+  }
   if(ctx)for(const script of ctx.proof.scripts){
    const f=path.join(path.dirname(game.exe),script.path);plain(f);
    const hash=crypto.createHash('sha256');for await(const b of fs.createReadStream(f))hash.update(b);
@@ -153,6 +178,7 @@ async function main(req,cfg,port,cancel){
    runId:crypto.randomUUID(),identity:ctx.request.identity,candidateHash:ctx.candidateHash,configHash:ctx.proof.config.digest,
    identityDigest:ctx.proof.digest,process:{pid,birth,owned,jobAssigned,hiddenDesktop,privateCopy,savesIsolated,networkBlocked,parentWatchdog},
    cleanup:{treeExited:cleanup.treeExited,audioRestored:cleanup.audioRestored,ownershipReleased:cleanup.ownershipReleased},...evidence};
+  if(dialogue)body.gameDialogue={engine:'renpy8',payloadHash:summary.payloadHash,pluginHash:summary.pluginHash,scriptHashes:summary.scriptHashes};
   if(cancel.aborted)fail('LIVE_CANCELLED');
   const stored=await Runner.storeMeasuredCapture(body,ctx,reporter,req.challenge,eventsDir,()=> {
    const file=path.join(__dirname,'reporter-keys',reporter.id+'.pem');plain(file);
@@ -163,6 +189,17 @@ async function main(req,cfg,port,cancel){
  }catch(e){stop(e);throw e;}
  finally{
   ended=true;timers.forEach(clearTimeout);
+  if(diagnostic && game?.pluginHash){
+   try{
+    const file=path.join(path.dirname(game.exe),cfg.saveDir||'savedata','cardinal-dialogue-stages.log');
+    plain(file);
+    if(fs.statSync(file).isFile() && fs.statSync(file).size<=128){
+     const stages=fs.readFileSync(file,'ascii').trim().split(/\r?\n/);
+     if(stages.every((stage,i)=>stage===['registered','show_done','text_ready','sent'][i]))
+      fs.writeFileSync(path.join(eventsDir,'cardinal-dialogue-stages.log'),stages.join('\n')+'\n',{flag:'wx'});
+    }
+   }catch(e){summary.stageLogError=e.code||'LIVE_STAGE_LOG';}
+  }
   const cleanupErrors=[];
   for(const w of [readerWorker,gameWorker])if(w)try{await w.stop();}catch(e){cleanupErrors.push(e.message);}
   Object.assign(summary,{counts:measurement?.counts||{},nativeCounts:measurement?.nativeCounts||{},firstFailure:err?.message==='LIVE_BUDGET'?firstMissing(game,measurement):err?.message||null,bridgeDiagnostic:measurement?.bridgeDiagnostic||null,appliedProfileHash:measurement?.appliedHash||null,expectedProfileHash:req.appliedProfileHash||null,stopReason:err?.message||null,cleanup:cleanup||null,cleanupErrors});

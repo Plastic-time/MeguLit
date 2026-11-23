@@ -13,6 +13,7 @@ foreach($name in 'Microsoft.Web.WebView2.WinForms.dll','Microsoft.Web.WebView2.C
 Copy-Item -LiteralPath (Join-Path $wv 'x64/WebView2Loader.dll') -Destination $out
 & $csc /nologo /optimize+ /platform:x64 ("/out:"+ (Join-Path $out 'ColdCapture64.exe')) (Join-Path $root 'native/ColdCapture.cs')
 if($LASTEXITCODE){throw 'Audio guard build failed'}
+Copy-Item -LiteralPath (Join-Path $root 'native/CardinalDialogue.rpy') -Destination $out
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'cardinal-native-tap.cjs') -Destination $out
 & $csc /nologo /optimize+ /platform:x64 ("/out:"+ (Join-Path $out 'CardinalIsolationProbe.exe')) (Join-Path $root 'native/CardinalIsolationProbe.cs')
 if($LASTEXITCODE){throw 'Isolation probe build failed'}
@@ -25,7 +26,7 @@ foreach($entry in (& git -C $root ls-files -- core services)){
     [void][IO.Directory]::CreateDirectory((Split-Path $dest))
     Copy-Item -LiteralPath (Join-Path $root $entry) -Destination $dest
 }
-$assets=@('node.exe','ColdCapture64.exe','CardinalIsolationProbe.exe','cardinal-live-host.cjs','cardinal-native-tap.cjs','cardinal-dom-probe.js','WebView2Loader.dll','Microsoft.Web.WebView2.Core.dll','Microsoft.Web.WebView2.WinForms.dll')
+$assets=@('CardinalDialogue.rpy','node.exe','ColdCapture64.exe','CardinalIsolationProbe.exe','cardinal-live-host.cjs','cardinal-native-tap.cjs','cardinal-dom-probe.js','WebView2Loader.dll','Microsoft.Web.WebView2.Core.dll','Microsoft.Web.WebView2.WinForms.dll')
 $assets+=Get-ChildItem -LiteralPath (Join-Path $out 'lib') -Recurse -File | ForEach-Object {$_.FullName.Substring($out.TrimEnd('\').Length+1)}
 $manifest=[IO.Path]::GetTempFileName()
 try {

@@ -44,7 +44,7 @@ internal static class CardinalIsolationProbe {
     [DllImport("kernel32")] static extern bool TerminateProcess(IntPtr handle,int code);
 
     static void Check(bool ok) { if(!ok) throw new Win32Exception(); }
-    internal static Child Launch(string exe,string args,IntPtr sid,string desktop,bool suspended) {
+    internal static Child Launch(string exe,string args,IntPtr sid,string desktop,bool suspended,string dialogueSession=null,string saveRoot=null) {
         IntPtr size=IntPtr.Zero;
         InitializeProcThreadAttributeList(IntPtr.Zero,1,0,ref size);
         IntPtr list=Marshal.AllocHGlobal(size);
@@ -53,6 +53,12 @@ internal static class CardinalIsolationProbe {
         values["LOCALAPPDATA"]=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         values["USERPROFILE"]=Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         values["SystemDrive"]=Path.GetPathRoot(Environment.SystemDirectory).TrimEnd(Path.DirectorySeparatorChar);
+        if(dialogueSession!=null){
+            values["MEGULIT_GAME_SESSION"]=dialogueSession;
+            values["RENPY_PATH_TO_SAVES"]=saveRoot;
+            values["RENPY_LOG_BASE"]=saveRoot;
+            values["PYTHONDONTWRITEBYTECODE"]="1";
+        }
         var block=new StringBuilder();
         foreach(string key in new[]{"SystemRoot","TEMP","TMP","WINDIR"})
             values[key]=Environment.GetEnvironmentVariable(key);
@@ -96,7 +102,8 @@ internal static class CardinalIsolationProbe {
 
     static int Measure(string root,string address) {
         Guid run;
-        const string prefix=@"F:\MeguLit.Probe.";
+        string prefix=root.StartsWith(@"D:\MeguLit-Work\",StringComparison.OrdinalIgnoreCase)
+            ? @"D:\MeguLit-Work\MeguLit.Probe." : @"F:\MeguLit.Probe.";
         if(!root.StartsWith(prefix,StringComparison.Ordinal) || !Guid.TryParseExact(root.Substring(prefix.Length),"N",out run))return 17;
         using(var current=WindowsIdentity.GetCurrent()) {
             int restricted,length;
@@ -124,10 +131,11 @@ internal static class CardinalIsolationProbe {
             PropagationFlags.None,AccessControlType.Allow));
         info.SetAccessControl(acl);
     }
-    internal static void WithIsolation(string address,string probeFile,Action<string,IntPtr> run) {
+    internal static void WithIsolation(string address,string probeFile,Action<string,IntPtr> run,string scratchDrive=@"F:\") {
         Connect(address);
         string name="MeguLit.Probe."+Guid.NewGuid().ToString("N");
-        string root=Path.Combine(@"F:\",name);
+        if(scratchDrive!=@"F:\" && scratchDrive!=@"D:\MeguLit-Work")throw new IOException("PROBE_ROOT");
+        string root=Path.Combine(scratchDrive,name);
         IntPtr sid;
         Marshal.ThrowExceptionForHR(CreateAppContainerProfile(name,name,name,IntPtr.Zero,0,out sid));
         try {
@@ -151,12 +159,12 @@ internal static class CardinalIsolationProbe {
         } finally {
             FreeSid(sid);
             Marshal.ThrowExceptionForHR(DeleteAppContainerProfile(name));
-            if(Directory.Exists(root) && Path.GetDirectoryName(Path.GetFullPath(root))==@"F:\" && Path.GetFileName(root)==name)
+            if(Directory.Exists(root) && Path.GetDirectoryName(Path.GetFullPath(root))==scratchDrive && Path.GetFileName(root)==name)
                 Directory.Delete(root,true);
         }
     }
     internal static void AuditRuntimeReads(string probeRoot,string readerRoot,IntPtr sid) {
-        if(!Path.IsPathRooted(readerRoot) || !readerRoot.StartsWith(@"F:\",StringComparison.OrdinalIgnoreCase))
+        if(!Path.IsPathRooted(readerRoot) || (!readerRoot.StartsWith(@"F:\",StringComparison.OrdinalIgnoreCase) && !readerRoot.StartsWith(@"D:\MeguLit-Work\",StringComparison.OrdinalIgnoreCase)))
             throw new IOException("LIVE_READER_ROOT");
         foreach(string group in new[]{"hook","megulithook"}){
             string folder=Path.Combine(readerRoot,"runtime",group);

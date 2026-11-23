@@ -27,7 +27,10 @@ class LiveMeasurement {
    return;
   }
   if(f.kind==='regions'){if(!Array.isArray(f.regions))throw Error('LIVE_REGION_SHAPE');this.regions=f.regions;return;}
-  if(f.kind==='native'){
+  if(f.kind==='gameDialogue' && (!this.game.pluginHash || f.sequence!==c.sources+1 || f.m?.type!=='hookSource'))
+   throw Error('LIVE_DIALOGUE_SESSION');
+  if(this.game.pluginHash && f.kind==='native' && f.m?.type==='hookSource')throw Error('LIVE_DIALOGUE_MIXED_SOURCE');
+  if(f.kind==='native'||f.kind==='gameDialogue'){
    c.native++;
    const m=f.m;
    this.nativeCounts[m.type]=(this.nativeCounts[m.type]||0)+1;
@@ -74,6 +77,14 @@ class LiveMeasurement {
     if(this.current.id && this.current.id!==f.descriptor.episode)throw Error('LIVE_EPISODE_CHANGED');
     Object.assign(this.current,{id:f.descriptor.episode,scope:f.descriptor.scope,sequence:f.sequence});
    }
+  }
+  if(f.kind==='pairPolicy'){
+   const x=this.current,d=f.descriptor;
+   if(x?.id && d?.episode===x.id && d.sourceKey===x.key && f.sequence===x.sequence && d.scope!==x.scope){
+    x.scope=d.scope;
+    delete x.accepted;
+   }
+   return;
   }
   if(f.kind==='ack'){
    c.acceptedAcks++;

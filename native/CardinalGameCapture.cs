@@ -51,15 +51,32 @@ internal static class CardinalGameCapture {
         using(var input=File.OpenRead(file))
         using(var sha=SHA256.Create())return BitConverter.ToString(sha.ComputeHash(input)).Replace("-","").ToLowerInvariant();
     }
+    // Canonical manifest: slash-relative path, NUL, lowercase file hash, LF.
+    // Hash the staged payload before installing the separately pinned exporter.
+    static string PayloadHash(string directory) {
+        var files=Directory.GetFiles(directory,"*",SearchOption.AllDirectories);
+        Array.Sort(files,StringComparer.Ordinal);
+        using(var sha=SHA256.Create()){
+            foreach(string file in files){
+                string relative=file.Substring(directory.Length+1).Replace(Path.DirectorySeparatorChar,'/');
+                var bytes=System.Text.Encoding.UTF8.GetBytes(relative+"\0"+Digest(file)+"\n");
+                sha.TransformBlock(bytes,0,bytes.Length,bytes,0);
+            }
+            sha.TransformFinalBlock(new byte[0],0,0);
+            return BitConverter.ToString(sha.Hash).Replace("-","").ToLowerInvariant();
+        }
+    }
+
     internal static string Run(Dictionary<string,object> req,string hostExe,string hostHash,string address,string saveDir,string template,string templateHash,bool worker=false) {
         var source=Path.GetFullPath(hostExe);
-        if(!source.StartsWith(@"F:\",StringComparison.OrdinalIgnoreCase) ||
+        if((!source.StartsWith(@"F:\",StringComparison.OrdinalIgnoreCase) && !source.StartsWith(@"D:\MeguLit-Work\",StringComparison.OrdinalIgnoreCase)) ||
             !String.Equals(source,Path.GetFullPath((string)req["exe"]),StringComparison.OrdinalIgnoreCase))
             throw new IOException("GAME_ALLOWLIST_PATH");
         var identity=(Dictionary<string,object>)req["identity"];
         PlainPath(source);
         var baseDir=Path.GetDirectoryName(source);
         if(baseDir.Length<=3 || !Equals(identity["exe"],hostHash) || Digest(source)!=hostHash)throw new IOException("GAME_ALLOWLIST_IDENTITY");
+        bool dialogue=worker && req.ContainsKey("dialoguePlugin") && Equals(req["dialoguePlugin"],"renpy8");
         var output=Console.Out;
         string why="GAME_OBSERVATION_INCOMPLETE";
         string challenge=(string)req["challenge"];
@@ -75,6 +92,16 @@ internal static class CardinalGameCapture {
                 CopyAssets(baseDir,game,saveDir);
                 string exe=Path.Combine(game,Path.GetFileName(source));
                 if(Digest(exe)!=hostHash)throw new IOException("GAME_COPY_CHANGED");
+                string pluginHash=null,payloadHash=null;
+                if(dialogue){
+                    payloadHash=PayloadHash(game);
+                    if(req.ContainsKey("dialogueTreeSha256") && req["dialogueTreeSha256"]!=null &&
+                       !Equals(req["dialogueTreeSha256"],payloadHash))throw new IOException("LIVE_GAME_PAYLOAD_PIN");
+                    string plugin=Path.Combine(game,"game","CardinalDialogue.rpy");
+                    if(File.Exists(Path.ChangeExtension(plugin,".rpyc")))throw new IOException("LIVE_PLUGIN_COLLISION");
+                    File.Copy(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"CardinalDialogue.rpy"),plugin);
+                    pluginHash=Digest(plugin);
+                }
                 var package=new SecurityIdentifier(sid);
                 CardinalIsolationProbe.Grant(game,package,FileSystemRights.ReadAndExecute);
                 var save=Directory.CreateDirectory(Path.Combine(game,saveDir));
@@ -101,7 +128,7 @@ internal static class CardinalGameCapture {
                                     CardinalCollector.VerifyImage(job,gameProcess,exe);
                                     observedWindow=true;
                                     send(new {type="game",pid,birth=gameProcess.StartTime.ToUniversalTime().Ticks.ToString(),
-                                        hwnd=hwnd.ToInt64().ToString(),desktop,exe,jobAssigned=true,hiddenDesktop=true,
+                                        packageSid=package.Value,pluginHash,payloadHash,hwnd=hwnd.ToInt64().ToString(),desktop,exe,jobAssigned=true,hiddenDesktop=true,
                                         savesIsolated=true,networkBlocked=true,privateCopy=true,owned=true,parentWatchdog=true});
                                 }
                             }
@@ -110,7 +137,7 @@ internal static class CardinalGameCapture {
                     },
                     delegate(string image,string desk,out IntPtr process,out IntPtr thread,out int pid) {
                         CardinalIsolationProbe.Child child;
-                        try { child=CardinalIsolationProbe.Launch(image,"",sid,desk,true); }
+                        try { child=CardinalIsolationProbe.Launch(image,"",sid,desk,true,dialogue?challenge:null,save.FullName); }
                         catch(Win32Exception error) {
                             Console.Error.WriteLine("GAME_CREATEPROCESS_WIN32_"+error.NativeErrorCode+": "+error.Message);
                             throw;
@@ -120,7 +147,7 @@ internal static class CardinalGameCapture {
                 if(code!=0)why="GAME_JOB_FAILED";
                 else if(!ColdDesk.AudioReadback)why="GAME_AUDIO_READBACK_MISSING";
                 else if(observedWindow && worker)why=null;
-            });
+            },source.StartsWith(@"D:\MeguLit-Work\",StringComparison.OrdinalIgnoreCase)?@"D:\MeguLit-Work":@"F:\");
         } catch(Win32Exception error) { why="ISOLATED_WIN32_"+error.NativeErrorCode; }
         finally {Console.SetOut(output);}
         if(why==null)send(new {type="cleanup",treeExited=true,audioRestored=true,ownershipReleased=true});

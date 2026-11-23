@@ -47,8 +47,9 @@ internal static partial class CardinalCollector {
         return ch<0 && buffer.Length==0 ? null : buffer.ToString();
     }
 
-    static async Task ReadFrames(NamedPipeServerStream pipe,BlockingCollection<string> frames){
-        await Task.Factory.FromAsync(pipe.BeginWaitForConnection,pipe.EndWaitForConnection,null);
+    static async Task ReadFrames(PipeStream pipe,BlockingCollection<string> frames){
+        var server=pipe as NamedPipeServerStream;
+        if(server!=null)await Task.Factory.FromAsync(server.BeginWaitForConnection,server.EndWaitForConnection,null);
         var bytes=new byte[8192];
         using(var record=new MemoryStream()){
             for(;;){
@@ -68,6 +69,35 @@ internal static partial class CardinalCollector {
         }
     }
 
+    [System.Runtime.InteropServices.DllImport("kernel32.dll",SetLastError=true)]
+    static extern bool GetNamedPipeServerProcessId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe,out uint pid);
+
+    [System.Runtime.InteropServices.DllImport("kernelbase.dll",CharSet=System.Runtime.InteropServices.CharSet.Unicode,SetLastError=true)]
+    static extern bool GetAppContainerNamedObjectPath(IntPtr token,byte[] sid,uint length,StringBuilder path,out uint required);
+
+    static NamedPipeClientStream GameDialoguePipe(string challenge,string sid,int pid){
+        var package=new System.Security.Principal.SecurityIdentifier(sid);
+        var sidBytes=new byte[package.BinaryLength];
+        package.GetBinaryForm(sidBytes,0);
+        var scope=new StringBuilder(1024);uint required;
+        if(!GetAppContainerNamedObjectPath(IntPtr.Zero,sidBytes,(uint)scope.Capacity,scope,out required))
+            throw new System.ComponentModel.Win32Exception();
+        string localScope=scope.ToString().Trim('\\');
+        using(var current=Process.GetCurrentProcess()){
+            if(localScope.StartsWith(@"AppContainerNamedObjects\",StringComparison.OrdinalIgnoreCase))
+                localScope=@"Sessions\"+current.SessionId+@"\"+localScope;
+        }
+        var client=new NamedPipeClientStream(".",localScope+@"\megulit-dialogue-"+challenge,
+            PipeDirection.In,PipeOptions.Asynchronous,System.Security.Principal.TokenImpersonationLevel.Anonymous);
+        try{
+            client.Connect(5000);
+            uint sender;
+            if(!GetNamedPipeServerProcessId(client.SafePipeHandle,out sender)||sender!=pid)
+                throw new IOException("LIVE_DIALOGUE_OWNER");
+            return client;
+        }catch{client.Dispose();throw;}
+    }
+
     static int LiveReader(string root,int port) {
         root=Path.GetFullPath(root);
         var ctx=Json.Deserialize<Dictionary<string,object>>(ReadBoundedLine());
@@ -76,10 +106,13 @@ internal static partial class CardinalCollector {
         int pid=(int)ctx["pid"];
         if(port<1 || !Regex.IsMatch(challenge,@"\A[a-f0-9]{64}\z") ||
             !Regex.IsMatch(desktop,@"\ACardinal[a-f0-9]{32}\z") ||
-            !Regex.IsMatch(exe,@"\AF:\\MeguLit\.Probe\.[a-f0-9]{32}\\game\\[^\\]+\.exe\z",RegexOptions.IgnoreCase) ||
-            !root.StartsWith(@"F:\",StringComparison.OrdinalIgnoreCase) ||
+            !Regex.IsMatch(exe,@"\A(?:F:|D:\\MeguLit-Work)\\MeguLit\.Probe\.[a-f0-9]{32}\\game\\[^\\]+\.exe\z",RegexOptions.IgnoreCase) ||
+            (!root.StartsWith(@"F:\",StringComparison.OrdinalIgnoreCase) && !root.StartsWith(@"D:\MeguLit-Work\",StringComparison.OrdinalIgnoreCase)) ||
             !File.Exists(Path.Combine(root,"services","server.cjs")))throw new IOException("LIVE_TARGET");
         if(!Regex.IsMatch(hwnd,@"\A[1-9][0-9]{0,18}\z"))throw new IOException("LIVE_HWND");
+        bool plugin=ctx.ContainsKey("pluginHash") && ctx["pluginHash"]!=null;
+        using(var dialogue=plugin?GameDialoguePipe(challenge,(string)ctx["packageSid"],pid):null)
+        using(var sources=new BlockingCollection<string>(16))
         using(var game=Process.GetProcessById(pid))
         using(var pipe=new NamedPipeServerStream("megulit-cardinal-"+challenge,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous))
         using(var frames=new BlockingCollection<string>(512)){
@@ -93,6 +126,10 @@ internal static partial class CardinalCollector {
             };
             verifyGame();
             var pending=ReadFrames(pipe,frames);
+            var dialoguePending=plugin?ReadFrames(dialogue,sources):null;
+            int sequence=0;
+            bool serviceVerified=false;
+            if(plugin)Environment.SetEnvironmentVariable("MEGULIT_DIALOGUE_TARGET",pid+"|"+birth);
             string tools=AppDomain.CurrentDomain.BaseDirectory;
             Environment.SetEnvironmentVariable("MEGULIT_ROOT",root);
             Environment.SetEnvironmentVariable("MEGULIT_RELAY_BASE","off");
@@ -121,6 +158,7 @@ internal static partial class CardinalCollector {
                             if(!Equals(f["challenge"],challenge)||!GetNamedPipeClientProcessId(pipe.SafePipeHandle,out client) ||
                                 !Equals(f["servicePid"],(int)client))throw new IOException("LIVE_PIPE_OWNER");
                             using(var svc=Process.GetProcessById((int)client))VerifyImage(job,svc,Path.Combine(root,"runtime","node.exe"));
+                            serviceVerified=true;
                             if(Equals(f["kind"],"native")){
                                 string name=(string)f["name"];
                                 if(name!="HookBridge.exe" && name!="GalWindowBridge.exe")throw new IOException("LIVE_BRIDGE_NAME");
@@ -147,6 +185,22 @@ internal static partial class CardinalCollector {
                                 }
                             }
                             emit(f);
+                        }
+                        if(plugin && serviceVerified){
+                            if(dialoguePending.IsCompleted)dialoguePending.GetAwaiter().GetResult();
+                            while(sources.TryTake(out line)){
+                                uint sender;
+                                if(!GetNamedPipeServerProcessId(dialogue.SafePipeHandle,out sender)||sender!=pid)
+                                    throw new IOException("LIVE_DIALOGUE_OWNER");
+                                verifyGame();
+                                var record=Json.Deserialize<Dictionary<string,object>>(line);
+                                if(!Equals(record["challenge"],challenge)||!Equals(record["sequence"],++sequence)
+                                    || !(record["text"] is string) || String.IsNullOrWhiteSpace((string)record["text"]))
+                                    throw new IOException("LIVE_DIALOGUE_FRAME");
+                                if(pageId==null || !bindRequested)throw new IOException("LIVE_DIALOGUE_BEFORE_READER");
+                                byte[] data=Encoding.UTF8.GetBytes(Json.Serialize(new {challenge,sequence,text=record["text"]})+"\n");
+                                pipe.Write(data,0,data.Length);
+                            }
                         }
                         int browserPid=Listener(port);if(browserPid==0)return false;
                         using(var browser=Process.GetProcessById(browserPid)){
