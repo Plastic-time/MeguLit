@@ -17,7 +17,8 @@ const D3_ROUTE=[0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,1,1,1,0,0,1,1,1,0,0,1,1,
 const BACKUP_DIR='.megulit-japanese',KANA=/[぀-ヿ]/,HAN_ONLY_CN=/[一-鿿]/;
 
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
-function xorKey(buf,offset){const out=Buffer.alloc(buf.length-offset);for(let i=0;i<out.length;i++)out[i]=buf[i+offset]^DBS_KEY[i%4];return out;}
+/* the engine XORs whole dwords only; a 1-3 byte tail stays plain (SiglusSceneScriptUtility dbs.py _xor32_inplace) */
+function xorKey(buf,offset){const out=Buffer.from(buf.subarray(offset)),n=out.length&~3;for(let i=0;i<n;i++)out[i]^=DBS_KEY[i%4];return out;}
 function route(data){const out=Buffer.alloc(data.length);for(let i=0;i<data.length;i++)out[i]=data[i]^D3_KEYS[D3_ROUTE[(i>>2)%D3_ROUTE.length]][i%4];return out;}
 /* E580 the distance-back LZ shared with Siglus scenes and Interheart (kit.lzDistance) */
 function lzss(src){
@@ -27,7 +28,7 @@ function literal(data){ // stored as literal runs; the engine reads it with the 
  const flagBytes=Math.ceil(data.length/8),out=Buffer.alloc(8+data.length+flagBytes);out.writeUInt32LE(out.length,0);out.writeUInt32LE(data.length,4);
  let s=0,d=8;while(s<data.length){const n=Math.min(8,data.length-s);out[d++]=(1<<n)-1;data.copy(out,d,s,s+n);s+=n;d+=n;}return out;}
 function decrypt(file){if(file.length<12)throw Error('DBS_SHORT');return {marker:file.readUInt32LE(0),raw:route(lzss(xorKey(file,4)))};}
-function encrypt(marker,raw){const packed=literal(route(raw)),out=Buffer.alloc(packed.length+4);out.writeUInt32LE(marker,0);for(let i=0;i<packed.length;i++)out[i+4]=packed[i]^DBS_KEY[i%4];return out;}
+function encrypt(marker,raw){const packed=literal(route(raw)),out=Buffer.alloc(packed.length+4);out.writeUInt32LE(marker,0);packed.copy(out,4);for(let i=0,n=packed.length&~3;i<n;i++)out[i+4]^=DBS_KEY[i%4];return out;}
 
 function parse(raw,marker){
  const u=o=>raw.readUInt32LE(o),[size,rows,cols,,fmt,data,text]=[0,4,8,12,16,20,24].map(u);
@@ -55,9 +56,15 @@ function languageColumns(table){ // per string column: share of non-empty cells 
 // not an identifier; only a token with a digit or a path/key character (BGM01, bg_01.png, a:b) counts as one.
 const IDENT=/^[A-Za-z0-9_.\\/:#@-]*$/,IDENT_MARK=/[0-9_.\\/:#@]/;
 const isIdent=v=>IDENT.test(v)&&IDENT_MARK.test(v);
-function translationColumns(table,langs,jp){
+function nameColumn(options){
+ const id=options?.siglusDbsNameColumn;
+ if(id===undefined||id===null)return null;
+ if(!Number.isSafeInteger(id)||id<0||id>0x7fffffff)throw Error('SIGLUS_DBS_COLUMN_INVALID');
+ return id;
+}
+function translationColumns(table,langs,jp,nameId=null){
  const rowsJp=table.cells.filter(r=>r[jp]);if(!rowsJp.length)return [];
- return langs.filter(c=>{if(c.index===jp||!c.filled||c.kana>.1)return false;
+ return langs.filter(c=>{if(c.index===jp||!c.filled||c.kana>.1||table.columns[c.index].id===nameId)return false;
   let paired=0,ident=0,distinct=new Set();for(const r of rowsJp){const v=r[c.index];if(!v)continue;paired++;distinct.add(v);if(isIdent(v))ident++;}
   return paired/rowsJp.length>=.6&&ident/Math.max(1,paired)<.3&&distinct.size>=Math.min(5,rowsJp.length*.5);});
 }
@@ -66,7 +73,8 @@ function translationColumns(table,langs,jp){
 function shownJapanese(jp,old){const i=jp.indexOf('／');return i>0&&!/[\/／]/.test(String(old||''))?jp.slice(0,i):jp;}
 function datDir(gameDir){const d=path.join(gameDir,'dat');return fs.existsSync(d)&&fs.readdirSync(d).some(f=>/\.dbs$/i.test(f))?d:'';}
 
-function siglusPlan(gameDir){
+function siglusPlan(gameDir,options={}){
+ const nameId=nameColumn(options);
  const dir=datDir(gameDir);if(!dir)return null;
  const files=fs.readdirSync(dir).filter(f=>/\.dbs$/i.test(f)),changes=[];let japanese=null,targets=new Set(),cells=0,japaneseTables=0;
  for(const name of files){
@@ -83,7 +91,7 @@ function siglusPlan(gameDir){
   if(jp&&jp.kana>=.3)japaneseTables++;
   if(!jp||jp.kana<.3||langs.filter(c=>c.filled).length<2)continue;
   if(japanese==null)japanese=jp.index;
-  const tgt=translationColumns(table,langs,jp.index);tgt.forEach(c=>targets.add(c.index));
+  const tgt=translationColumns(table,langs,jp.index,nameId);tgt.forEach(c=>targets.add(c.index));
   const next=table.cells.map(row=>row.map((v,c)=>tgt.some(t=>t.index===c)&&row[jp.index]?shownJapanese(row[jp.index],v):v));
   let n=0;next.forEach((row,r)=>row.forEach((v,c)=>{if(v!==table.cells[r][c])n++;}));
   if(n)changes.push({name,file,decoded,table,next,changed:n,kind:'column',from:jp.index,to:tgt.map(t=>t.index)});cells+=n;
@@ -127,7 +135,7 @@ function detect(gameDir,options={}){
  if(manifest?.adapter==='artemis-pfs')return artemis().detect(gameDir);
  if(manifest?.adapter==='yuris-update')return {state:'applied',adapter:'yuris-update',files:manifest.files.length,cells:0,pending:0,manifest:{at:manifest.at,files:manifest.files.length}};
  const yuris=yurisPlan(gameDir);if(yuris&&yuris.updates.length)return {state:'restorable',adapter:'yuris-update',files:yuris.updates.length,cells:0,pending:yuris.updates.length,manifest:null};
- const siglus=siglusPlan(gameDir);
+ const siglus=siglusPlan(gameDir,options);
  /* E373: a third-party Japanese patch (a JapanesePatch folder with its own backups) may already have rewritten some
     tables; MeguLit then backs up those patched files, so undo returns to that patch, not to the Steam original. */
  const externalPatch=['JapanesePatch'].find(n=>fs.existsSync(path.join(gameDir,n,'backup')))||'';
@@ -148,7 +156,20 @@ function detect(gameDir,options={}){
  return {state:'none'};
 }
 
+/* Native first (the same GameProcess.exe launch and patch-swap use): a cold PowerShell start under build or render load
+   ran past 40 s twice and the check gave up with PROCESS_QUERY_FAILED. Each .exe in the folder (and one level down) is
+   asked by name and full path; any answer other than running/absent falls back to the PowerShell scan below. */
+function nativeRunning(gameDir){
+ const tool=path.join(__dirname,'..','native','GameProcess.exe');if(!fs.existsSync(tool))return null;
+ const exes=[];const add=d=>{let names=[];try{names=fs.readdirSync(d,{withFileTypes:true});}catch{return [];}for(const e of names)if(e.isFile()&&/\.exe$/i.test(e.name))exes.push(path.join(d,e.name));return names;};
+ for(const e of add(gameDir))if(e.isDirectory())add(path.join(gameDir,e.name));
+ if(!exes.length||exes.length>40)return null;
+ for(const exe of exes){let out;try{out=require('node:child_process').execFileSync(tool,['--patch-check',exe],{encoding:'utf8',windowsHide:true,timeout:15000}).trim();}catch{return null;}
+  if(out==='running')return true;if(out!=='absent')return null;}
+ return false;
+}
 function gameRunning(gameDir){
+ {const quick=nativeRunning(gameDir);if(quick!==null)return quick;}
  // PowerShell prints in the console code page unless told otherwise; Japanese and Chinese paths must come back as UTF-8.
  // A cold PowerShell start can take well over 15 s on a busy machine; a timeout used to read as "not running",
  // so the check now waits longer and asks a second time before giving up.
@@ -167,8 +188,9 @@ function writeAtomic(file,data){const tmp=file+'.megulit-tmp';fs.writeFileSync(t
 
 function apply(gameDir,options={}){
  gameDir=path.resolve(String(gameDir||''));if(gameRunning(gameDir))throw Error('GAME_RUNNING');
+ const repaired=repairNameColumns(gameDir,options);if(repaired.repaired)return {applied:repaired.applied,cells:repaired.cells||0,repaired:true};
  {const y=readManifest(gameDir)?null:yurisPlan(gameDir);if(y&&y.updates.length)return yurisApply(gameDir,y);}
- const plan=siglusPlan(gameDir);if(!plan||!plan.changes.length){if(!readManifest(gameDir)&&langSwitch().detect(gameDir,options).state==='restorable')return langSwitch().apply(gameDir,options);if(!readManifest(gameDir)&&artemis().detect(gameDir).state==='restorable')return artemis().apply(gameDir);throw Error('NOTHING_TO_RESTORE');}
+ const plan=siglusPlan(gameDir,options);if(!plan||!plan.changes.length){if(!readManifest(gameDir)&&langSwitch().detect(gameDir,options).state==='restorable')return langSwitch().apply(gameDir,options);if(!readManifest(gameDir)&&artemis().detect(gameDir).state==='restorable')return artemis().apply(gameDir,{bilingual:options.bilingual});throw Error('NOTHING_TO_RESTORE');}
  const backup=path.join(gameDir,BACKUP_DIR,'dat');fs.mkdirSync(backup,{recursive:true});
  const prior=readManifest(gameDir),entries=prior?prior.files:[],built=[];
  for(const c of plan.changes){ // build and verify every file before any write
@@ -191,6 +213,7 @@ function apply(gameDir,options={}){
 
 function restore(gameDir,options={}){
  gameDir=path.resolve(String(gameDir||''));if(gameRunning(gameDir))throw Error('GAME_RUNNING');
+ repairNameColumns(gameDir,options);
  const manifest=readManifest(gameDir);if(!manifest)throw Error('NOT_APPLIED');if(manifest.adapter==='yuris-update')return yurisRestore(gameDir,manifest);if(manifest.adapter==='language-switch')return langSwitch().restore(gameDir,options);if(manifest.adapter==='artemis-pfs')return artemis().restore(gameDir);
  const dat=path.join(gameDir,'dat'),backup=path.join(gameDir,BACKUP_DIR,'dat'),skipped=[];let restored=0;
  for(const e of manifest.files){const target=path.join(dat,e.file),keep=path.join(backup,e.file);
@@ -207,11 +230,17 @@ function restore(gameDir,options={}){
 // Summer Pockets crashed on start (0xC0000005, user 2026-11-09). Before a launch, a table MeguLit itself wrote that
 // still has shared strings is rewritten: restore the kept original, then apply again with the current writer.
 function sharedPool(file){const {marker,raw}=decrypt(fs.readFileSync(file)),t=parse(raw,marker),offs=[];for(let r=0;r<t.rows;r++)for(let c=0;c<t.cols;c++)if(t.columns[c].type===0x53)offs.push(raw.readUInt32LE(t.data+(r*t.cols+c)*4));return new Set(offs).size<offs.length;}
-function repairShared(gameDir){
+function repairNameColumns(gameDir,options={}){
+ gameDir=path.resolve(String(gameDir||''));const column=nameColumn(options);
+ if(column===null&&!fs.existsSync(path.join(gameDir,BACKUP_DIR,'name-column-transaction.json')))return {repaired:false};
+ return require('./siglus-dbs-name-repair.cjs').repair(gameDir,column,{decrypt,encrypt,parse,rebuild,shownJapanese,languageColumns,gameRunning,writeAtomic});
+}
+function repairShared(gameDir,options={}){
+ const repaired=repairNameColumns(gameDir,options);if(repaired.repaired)return repaired;
  gameDir=path.resolve(String(gameDir||''));const manifest=readManifest(gameDir);if(!manifest||manifest.adapter!=='siglus-dbs')return {repaired:false};
  const dat=path.join(gameDir,'dat'),ours=manifest.files.find(e=>{try{return sha(fs.readFileSync(path.join(dat,e.file)))===e.patchedSha256;}catch{return false;}});
  if(!ours||!sharedPool(path.join(dat,ours.file)))return {repaired:false};
- const undone=restore(gameDir);if(undone.skipped.length)return {repaired:false,skipped:undone.skipped};
- const done=apply(gameDir);return {repaired:true,applied:done.applied};
+ const undone=restore(gameDir,options);if(undone.skipped.length)return {repaired:false,skipped:undone.skipped};
+ const done=apply(gameDir,options);return {repaired:true,applied:done.applied};
 }
-module.exports={repairShared,detect,apply,restore,_internal:{sharedPool,readManifest,siglusPlan,shownJapanese,isIdent,yurisPlan,gameRunning,decrypt,encrypt,parse,rebuild,lzss,literal,languageColumns}};
+module.exports={repairShared,repairNameColumns,detect,apply,restore,_internal:{sharedPool,readManifest,siglusPlan,shownJapanese,isIdent,nameColumn,yurisPlan,gameRunning,nativeRunning,decrypt,encrypt,parse,rebuild,lzss,literal,languageColumns}};

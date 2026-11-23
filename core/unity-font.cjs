@@ -15,15 +15,12 @@ class UnityFont{
  download(){
   if(['downloading','extracting'].includes(this.state.state))return this.status();
   this.state={state:'downloading',received:0,total:0,error:''};
-  (async()=>{const archive=path.join(path.dirname(this.dir),'unity-font.zip.part');
+  (async()=>{const archive=path.join(path.dirname(this.dir),'unity-font.zip');
    try{
-    /* a stalled connection used to keep the state at downloading forever, so no retry was possible: 30 s with no data aborts */
-    const idle=new AbortController();let timer=setTimeout(()=>idle.abort(),30000);const poke=()=>{clearTimeout(timer);timer=setTimeout(()=>idle.abort(),30000);};
-    try{const res=await fetch(URL,{redirect:'follow',signal:idle.signal});poke();if(!res.ok||!res.body)throw Error('下载失败 HTTP '+res.status);
-    this.state.total=Number(res.headers.get('content-length'))||0;fs.mkdirSync(path.dirname(archive),{recursive:true});
-    const out=fs.createWriteStream(archive);let failed=null;out.on('error',e=>{failed=e;out.emit('drain');});
-    try{for await(const chunk of res.body){poke();if(failed)throw failed;this.state.received+=chunk.length;if(!out.write(chunk))await new Promise(r=>out.once('drain',r));}if(failed)throw failed;}catch(e){out.destroy();throw e;}
-    await new Promise((resolve,reject)=>out.end(e=>e?reject(e):resolve()));if(failed)throw failed;}finally{clearTimeout(timer);}
+    /* a stalled connection used to keep the state at downloading forever: core/fast-download.cjs drops a connection that
+       sends nothing for 15 s, pulls Range pieces in parallel when the server allows it and keeps finished pieces for a retry */
+    fs.mkdirSync(path.dirname(archive),{recursive:true});
+    await require('./fast-download.cjs').download({urls:[URL],dest:archive,onProgress:p=>{this.state.received=p.received;this.state.total=p.total||0;}}).catch(e=>{throw Error('下载失败 '+String((e.last&&e.last.message)||e.message||e));});
     this.state.state='extracting';fs.rmSync(this.dir,{recursive:true,force:true});fs.mkdirSync(this.dir,{recursive:true});
     // Windows 10+ ships bsdtar, which reads zip archives.
     await new Promise((resolve,reject)=>execFile(path.join(process.env.SystemRoot||'C:\\Windows','System32','tar.exe'),['-xf',archive,'-C',this.dir],{windowsHide:true,timeout:300000},e=>e?reject(Error('解压失败：'+e.message)):resolve()));

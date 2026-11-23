@@ -36,15 +36,16 @@ function parse(db){
 function fromFiles(root,env){
   const list=profiles(env),errors=[];if(!list.length)return {available:false,points:[],profiles:[],errors:['没有找到 Anki 的用户文件夹（%APPDATA%\\Anki2）']};
   const stamp=list.map(p=>{let m=0;for(const x of [p.file,p.file+'-wal'])try{m=Math.max(m,fs.statSync(x).mtimeMs);}catch{}return p.name+':'+m;}).join('|');
-  const cache=path.join(root,'data','grammar-anki-cache.json');try{const c=JSON.parse(fs.readFileSync(cache,'utf8'));if(c.stamp===stamp&&c.result?.available)return c.result;}catch{}
-  let DatabaseSync;try{({DatabaseSync}=require('node:sqlite'));}catch(e){return {available:false,points:[],profiles:list.map(p=>p.name),errors:['本机的读取组件不支持 SQLite：'+e.message]};}
+  const cache=path.join(root,'data','grammar-anki-cache.json');try{const c=JSON.parse(fs.readFileSync(cache,'utf8'));if(c.stamp===stamp&&c.result?.available&&!c.result.errors?.length)return c.result;}catch{}
+  let DatabaseSync;try{({DatabaseSync}=require('node:sqlite'));}catch(e){return {available:false,incomplete:true,points:[],profiles:list.map(p=>p.name),errors:['本机的读取组件不支持 SQLite：'+e.message]};}
   const points=[],seen=new Set();
   for(const p of list){let dir='';
     try{dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-anki-'));const copy=path.join(dir,'c.anki2');fs.copyFileSync(p.file,copy);if(fs.existsSync(p.file+'-wal'))fs.copyFileSync(p.file+'-wal',copy+'-wal');
       const db=new DatabaseSync(copy,{readOnly:false});try{for(const x of parse(db))if(!seen.has(x.word+x.level)){seen.add(x.word+x.level);points.push({...x,profile:p.name});}}finally{db.close();}}
     catch(e){errors.push(`${p.name}：${e.code||''} ${e.message}`.trim());}finally{if(dir)try{fs.rmSync(dir,{recursive:true,force:true});}catch{}}}
   const result={available:points.length>0,points,profiles:list.map(p=>p.name),errors};
-  if(result.available)try{fs.mkdirSync(path.dirname(cache),{recursive:true});fs.writeFileSync(cache,JSON.stringify({stamp,result}));}catch{}
+  if(errors.length)result.incomplete=true;
+  else if(result.available)try{fs.mkdirSync(path.dirname(cache),{recursive:true});fs.writeFileSync(cache,JSON.stringify({stamp,result}));}catch{}
   return result;
 }
 /* Through AnkiConnect when Anki is open: the decks whose name mentions 蓝宝书, their notes as cards. */
@@ -59,19 +60,21 @@ async function fromAnkiConnect(anki,config){
 /* Files first; AnkiConnect when the files give nothing; every reason kept so the page can say what went wrong. */
 async function readAll(root,{env=process.env,anki=null,config=null}={}){
   const a=fromFiles(root,env);if(a.available)return a;
-  if(anki&&config){try{const b=await fromAnkiConnect(anki,config);if(b.available)return {...b,profiles:a.profiles};if(b.decks?.length)a.errors.push('AnkiConnect 找到了牌组 '+b.decks.join('、')+'，但卡片字段不是蓝宝书格式');a.decks=b.decks;}catch(e){a.errors.push('AnkiConnect：'+(e.message||e));}}
+  if(anki&&config){try{const b=await fromAnkiConnect(anki,config);if(b.available)return {...b,profiles:a.profiles};if(b.decks?.length)a.errors.push('AnkiConnect 找到了牌组 '+b.decks.join('、')+'，但卡片字段不是蓝宝书格式');a.decks=b.decks;}catch(e){if(!a.profiles.length)a.incomplete=true;a.errors.push('AnkiConnect：'+(e.message||e));}}
   return a;
 }
 function read(root,opts){return fromFiles(root,opts?.env);}
 /* The lines you read that contain each card's forms (at most 4 per card, recorded lines and human translations first). */
 /* E459: the page's version lets other requests run between cards (763 cards × 20 000 lines held the service for seconds)
    and is cached until the cards or the lines change */
-const exampleCache={key:null,value:null};
-async function examplesForAsync(points,list,opts={}){
-  const key=points.length+':'+(points[0]?.id||'')+':'+(points.at(-1)?.id||'')+'|'+list.length+':'+(list[0]?.text||'');if(exampleCache.key===key)return exampleCache.value;
+let exampleCache;
+async function examplesForAsync(points,list,{max=4}={}){
+  /* candidatesCached reuses the list until the recorded lines or the imported scripts change. */
+  const key=JSON.stringify(points.map(p=>[p.id,p.hits]));
+  if(exampleCache?.list===list&&exampleCache.key===key&&exampleCache.max===max)return exampleCache.value;
   const breathe=require('./cooperative.cjs').breather(),out={};
-  for(let i=0;i<points.length;i+=25){Object.assign(out,examplesFor(points.slice(i,i+25),list,opts));await breathe();}
-  exampleCache.key=key;exampleCache.value=out;return out;
+  for(let i=0;i<points.length;i+=25){Object.assign(out,examplesFor(points.slice(i,i+25),list,{max}));await breathe();}
+  exampleCache={list,key,max,value:out};return out;
 }
 function examplesFor(points,list,{max=4}={}){
   const score=e=>(e.translationSource==='group'||e.translationSource==='official'?4:e.translation?1:0)+(e.origin==='history'?2:0);

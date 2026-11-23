@@ -28,15 +28,21 @@
 namespace {
 typedef BOOL(WINAPI *ReadFileFn)(HANDLE, LPVOID, DWORD, LPDWORD, LPOVERLAPPED);
 ReadFileFn ORead;
+// Locks. None is ever held across file or pipe I/O, and the game's ReadFile path never waits for the memory scan:
+//   Gate      - the background scan and switch (Originals, MemFonts, Pending); background threads only.
+//   ReadLock  - Ranges and Checked, the game's read path (shared for lookups, exclusive for a short append).
+//   OrigGate  - fonts found by file reads for the scan (NewOriginals, KnownSigs); taken for a push or a swap.
+//   OutLock   - the report queue; a push or a swap. The Writer thread does the pipe I/O.
 std::mutex Gate;
+SRWLOCK ReadLock = SRWLOCK_INIT; volatile LONG RangeCount;
 struct Range { DWORD vol; ULONGLONG id; ULONGLONG at; std::vector<uint8_t> data; };
 std::vector<Range> Ranges;
 std::vector<std::pair<ULONGLONG, ULONGLONG>> Checked;  // (file key hash, offset) already looked at
 std::vector<uintptr_t> MemDone;
 volatile LONG Live = 1; // the compositor heartbeat gate (below): dots only while it is open
 thread_local bool Inside;
-HANDLE Pipe = INVALID_HANDLE_VALUE;
-DWORD PipeTried;
+HANDLE Pipe = INVALID_HANDLE_VALUE; // Writer thread only
+SRWLOCK OutLock = SRWLOCK_INIT; HANDLE OutWake;
 
 std::vector<std::string> Pending; // reports made while Gate is held, sent after
 std::vector<std::string> Backlog; // reports wait here until the listener is up (fonts load before anyone listens)
@@ -48,24 +54,32 @@ struct Sig { uint32_t size; uint64_t hash; bool operator==(const Sig &o) const {
 struct FontOriginal { Sig sig; std::vector<uint8_t> bytes; bool reported; };
 struct MemFont { uint8_t *at; Sig sig; std::vector<uint8_t> dir; bool dotted; };
 std::vector<FontOriginal> Originals; std::vector<MemFont> MemFonts;
+std::mutex OrigGate; std::vector<FontOriginal> NewOriginals; std::vector<Sig> KnownSigs; // see the lock note above
 Sig SigOf(const uint8_t *p, uint32_t ext) {
  size_t d = 12 + 16 * (size_t)FontDot::U16(p + 4); if (FontDot::U32(p) == FontDot::TAG_TTCF) d = 12 + 4 * (size_t)FontDot::U32(p + 8);
  uint64_t h = 1469598103934665603ull; for (size_t i = d; i < d + 256 && i < ext; i++) { h ^= p[i]; h *= 1099511628211ull; }
  Sig s; s.size = ext; s.hash = h; return s;
 }
+// Queues a report line (any thread, never blocks on the pipe); "" only wakes the Writer. Lines wait in Backlog until the
+// listener is up (fonts load before anyone listens); at most 4000, the oldest dropped first.
 void Report(const std::string &line) {
- std::lock_guard<std::mutex> g(Gate);
- if (!line.empty()) { if (Backlog.size() > 4000) Backlog.erase(Backlog.begin()); Backlog.push_back(line); }
- if (Pipe == INVALID_HANDLE_VALUE) {
-  DWORD now = GetTickCount(); if (now - PipeTried < 2000) return; PipeTried = now;
-  char name[64]; sprintf_s(name, "\\\\.\\pipe\\MeguLitFontDot-%lu", GetCurrentProcessId());
-  Pipe = CreateFileA(name, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
-  if (Pipe == INVALID_HANDLE_VALUE) return;
- }
- while (!Backlog.empty()) {
-  std::string s = Backlog.front() + "\n"; DWORD w;
-  if (!WriteFile(Pipe, s.data(), (DWORD)s.size(), &w, NULL)) { CloseHandle(Pipe); Pipe = INVALID_HANDLE_VALUE; return; }
-  Backlog.erase(Backlog.begin());
+ if (!line.empty()) { AcquireSRWLockExclusive(&OutLock); if (Backlog.size() > 4000) Backlog.erase(Backlog.begin()); Backlog.push_back(line); ReleaseSRWLockExclusive(&OutLock); }
+ if (OutWake) SetEvent(OutWake);
+}
+// The pipe: connects at most every 2 s, writes the queued lines in order; a line that could not be written stays queued.
+DWORD WINAPI Writer(void *) {
+ char name[64]; sprintf_s(name, "\\\\.\\pipe\\MeguLitFontDot-%lu", GetCurrentProcessId()); DWORD tried = 0; bool first = true;
+ for (;;) {
+  WaitForSingleObject(OutWake, 2000);
+  if (Pipe == INVALID_HANDLE_VALUE) {
+   DWORD now = GetTickCount(); if (!first && now - tried < 2000) continue; first = false; tried = now;
+   Pipe = CreateFileA(name, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+   if (Pipe == INVALID_HANDLE_VALUE) continue;
+  }
+  std::vector<std::string> batch; AcquireSRWLockExclusive(&OutLock); batch.swap(Backlog); ReleaseSRWLockExclusive(&OutLock);
+  size_t i = 0;
+  for (; i < batch.size(); i++) { std::string l = batch[i] + "\n"; DWORD w; if (!WriteFile(Pipe, l.data(), (DWORD)l.size(), &w, NULL)) { CloseHandle(Pipe); Pipe = INVALID_HANDLE_VALUE; break; } }
+  if (i < batch.size()) { AcquireSRWLockExclusive(&OutLock); Backlog.insert(Backlog.begin(), batch.begin() + i, batch.end()); while (Backlog.size() > 4001) Backlog.erase(Backlog.begin()); ReleaseSRWLockExclusive(&OutLock); }
  }
 }
 std::string Stat(const char *src, const FontDot::Result &r) {
@@ -99,10 +113,11 @@ void Register(HANDLE h, DWORD vol, ULONGLONG id, ULONGLONG at) {
    std::vector<uint8_t> data(ext);
    if (ReadAt(own, at, data.data(), ext)) {
     // the original, so a copy the engine keeps in memory (already dotted by this read) can be switched back later
-    { std::lock_guard<std::mutex> g(Gate); Sig sg = SigOf(data.data(), ext); bool have = false; for (auto &x : Originals) if (x.sig == sg) have = true;
-      if (!have && Originals.size() < 32) { FontOriginal n; n.sig = sg; n.reported = true; if (ext <= (64u << 20)) n.bytes = data; Originals.push_back(std::move(n)); } }
+    // (handed to the scan through NewOriginals: this read never waits for a scan in progress)
+    { Sig sg = SigOf(data.data(), ext); bool add = false; { std::lock_guard<std::mutex> g(OrigGate); bool have = false; for (auto &x : KnownSigs) if (x == sg) have = true; if (!have && KnownSigs.size() < 32) { KnownSigs.push_back(sg); add = true; } }
+      if (add) { FontOriginal n; n.sig = sg; n.reported = true; if (ext <= (64u << 20)) n.bytes = data; std::lock_guard<std::mutex> g(OrigGate); NewOriginals.push_back(std::move(n)); } }
     FontDot::Result r = FontDot::Patch(data.data(), data.size());
-    if (r.ok) { { std::lock_guard<std::mutex> g(Gate); Ranges.push_back(Range{vol, id, at, std::move(data)}); } registered = true; Report(Stat("file", r)); }
+    if (r.ok) { AcquireSRWLockExclusive(&ReadLock); Ranges.push_back(Range{vol, id, at, std::move(data)}); ReleaseSRWLockExclusive(&ReadLock); InterlockedIncrement(&RangeCount); registered = true; Report(Stat("file", r)); }
    }
   }
  }
@@ -115,23 +130,24 @@ void After(HANDLE h, LPVOID buf, DWORD len, LARGE_INTEGER pos) {
   if (Trace && Traced < 3000) { wchar_t pth[400]; char u[600] = "?"; if (GetFinalPathNameByHandleW(h, pth, 400, 0)) WideCharToMultiByte(CP_UTF8, 0, pth, -1, u, sizeof u, NULL, NULL);
    const uint8_t *q = (const uint8_t *)buf; char m[800]; sprintf_s(m, "ToMe_FONTDOT trace off=%lld len=%lu head=%02x%02x%02x%02x %s", pos.QuadPart, len, q[0], len > 1 ? q[1] : 0, len > 2 ? q[2] : 0, len > 3 ? q[3] : 0, u); if (strstr(u, ".rpa") || strstr(u, ".ttf") || strstr(u, ".otf") || strstr(u, ".pfs")) { Traced++; Report(m); } }
   DWORD vol = 0; ULONGLONG id = 0; bool keyed = false;
-  bool any; { std::lock_guard<std::mutex> g(Gate); any = !Ranges.empty(); }
+  bool any = InterlockedCompareExchange(&RangeCount, 0, 0) != 0;
   if (Magic((const uint8_t *)buf, len)) {
    keyed = Key(h, &vol, &id);
    if (keyed) {
     ULONGLONG k = id ^ ((ULONGLONG)vol << 40); bool seen = false;
-    { std::lock_guard<std::mutex> g(Gate); for (auto &c : Checked) if (c.first == k && c.second == (ULONGLONG)pos.QuadPart) { seen = true; break; } if (!seen) Checked.push_back({k, (ULONGLONG)pos.QuadPart}); }
+    { AcquireSRWLockExclusive(&ReadLock); for (auto &c : Checked) if (c.first == k && c.second == (ULONGLONG)pos.QuadPart) { seen = true; break; } if (!seen) Checked.push_back({k, (ULONGLONG)pos.QuadPart}); ReleaseSRWLockExclusive(&ReadLock); }
     if (!seen) { Register(h, vol, id, (ULONGLONG)pos.QuadPart); any = true; }
    }
   }
   if (any && Live && (keyed || Key(h, &vol, &id))) {
-   std::lock_guard<std::mutex> g(Gate);
+   AcquireSRWLockShared(&ReadLock);
    ULONGLONG a = (ULONGLONG)pos.QuadPart, b = a + len;
    for (auto &r : Ranges) {
     if (r.vol != vol || r.id != id) continue;
     ULONGLONG ra = r.at, rb = r.at + r.data.size(); ULONGLONG s = max(a, ra), e = min(b, rb);
     if (s < e) memcpy((uint8_t *)buf + (s - a), r.data.data() + (s - ra), (size_t)(e - s));
    }
+   ReleaseSRWLockShared(&ReadLock);
   }
 }
 // no C++ objects here, so a fault in the game's buffer or our code never escapes into the game's read
@@ -169,8 +185,10 @@ bool DotsLive() {
 
 // ---- fonts already in memory ----------------------------------------------------------------------------------------
 int ScanRegion(uint8_t *base, size_t size);
+void MergeOriginalsLocked();
 int ScanRegionGuarded(uint8_t *base, size_t size) { __try { return ScanRegion(base, size); } __except (EXCEPTION_EXECUTE_HANDLER) { return 0; } }
 int ScanOnce() {
+ { std::lock_guard<std::mutex> g(Gate); MergeOriginalsLocked(); }
  int found = 0; SYSTEM_INFO si; GetSystemInfo(&si);
  uint8_t *p = (uint8_t *)si.lpMinimumApplicationAddress, *end = (uint8_t *)si.lpMaximumApplicationAddress;
  HMODULE self = NULL; GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)&ScanOnce, &self);
@@ -193,7 +211,7 @@ int ScanRegion(uint8_t *base, size_t size) {
      MemFont *known = NULL; for (auto &m : MemFonts) if (m.at == at && m.sig == sig) { known = &m; break; }
      if (known && known->dotted == live) { i += ext & ~15u; continue; }    // already as it should be
      FontOriginal *o = NULL; for (auto &x : Originals) if (x.sig == sig) { o = &x; break; }
-     if (!o && Originals.size() < 32) { FontOriginal n; n.sig = sig; n.reported = false; if (ext <= (64u << 20)) n.bytes.assign(at, at + ext); Originals.push_back(std::move(n)); o = &Originals.back(); }
+     if (!o && Originals.size() < 32) { { std::lock_guard<std::mutex> g(OrigGate); bool k = false; for (auto &x : KnownSigs) if (x == sig) k = true; if (!k) KnownSigs.push_back(sig); } FontOriginal n; n.sig = sig; n.reported = false; if (ext <= (64u << 20)) n.bytes.assign(at, at + ext); Originals.push_back(std::move(n)); o = &Originals.back(); }
      if (live) {
       FontDot::Result r = FontDot::Patch(at, size - i);
       if (r.ok && o && !o->reported) { o->reported = true; found++; Pending.push_back(Stat("mem", r)); }
@@ -213,6 +231,11 @@ void TraceMapped() {
    if (GetMappedFileNameW(GetCurrentProcess(), m.BaseAddress, n, 400)) { WideCharToMultiByte(CP_UTF8, 0, n, -1, u, sizeof u, NULL, NULL);
     if (strstr(u, ".rpa") || strstr(u, ".ttf") || strstr(u, ".otf") || strstr(u, ".pfs")) { char r[800]; sprintf_s(r, "ToMe_FONTDOT mapped %p size=%zu protect=%lx %s", m.BaseAddress, m.RegionSize, m.Protect, u); Report(r); } } }
   p = (uint8_t *)m.BaseAddress + m.RegionSize; }
+}
+// Fonts registered by file reads join Originals here (scan and switch threads, under Gate) before they are needed.
+void MergeOriginalsLocked() {
+ std::vector<FontOriginal> fresh; { std::lock_guard<std::mutex> g(OrigGate); fresh.swap(NewOriginals); }
+ for (auto &n : fresh) { bool have = false; for (auto &x : Originals) if (x.sig == n.sig) have = true; if (!have && Originals.size() < 32) Originals.push_back(std::move(n)); }
 }
 void FlushPending() { std::vector<std::string> p; { std::lock_guard<std::mutex> g(Gate); p.swap(Pending); } for (auto &l : p) Report(l); }
 const FontOriginal *OriginalOf(const MemFont &f) { for (auto &x : Originals) if (x.sig == f.sig && !x.bytes.empty()) return &x; return NULL; }
@@ -238,10 +261,10 @@ DWORD WINAPI BeatWatch(void *) {
   Sleep(250); bool live = DotsLive();
   if (live == (Live != 0)) continue;
   InterlockedExchange(&Live, live ? 1 : 0);
-  int n; { std::lock_guard<std::mutex> g(Gate); n = SwitchGuarded(live); }
+  int n; { std::lock_guard<std::mutex> g(Gate); MergeOriginalsLocked(); n = SwitchGuarded(live); }
   if (live) Report("ToMe_FONTDOT status live fonts=" + std::to_string(n));
   else { Report(std::string("ToMe_FONTDOT status ") + (served || n > 0 ? "needs-relaunch" : "paused") + " fonts=" + std::to_string(n)); }
-  served = served || n > 0 || !Originals.empty();
+  { std::lock_guard<std::mutex> g(Gate); served = served || n > 0 || !Originals.empty(); }
  }
 }
 DWORD WINAPI Scanner(void *) {
@@ -251,6 +274,7 @@ DWORD WINAPI Scanner(void *) {
 
 DWORD WINAPI Start(void *) {
  LoadedAt = GetTickCount64();
+ OutWake = CreateEventW(NULL, FALSE, FALSE, NULL); CreateThread(NULL, 0, Writer, NULL, 0, NULL);
  MH_Initialize();
  HMODULE kb = GetModuleHandleW(L"kernelbase.dll"); if (!kb) kb = GetModuleHandleW(L"kernel32.dll");
  void *target = kb ? (void *)GetProcAddress(kb, "ReadFile") : NULL;

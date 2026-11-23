@@ -33,10 +33,16 @@ function parse(buf){
  const v=require('./voice-ref.cjs').keep(voices);
  return v?{lines,anchors,ruby,voices:v}:{lines,anchors,ruby};}
 
+function unsupported(dir){const f=scriptFile(dir);if(!f)return '';
+ try{const h=Buffer.alloc(0x20),fd=fs.openSync(f,'r');try{fs.readSync(fd,h,0,0x20,0);}finally{fs.closeSync(fd);}if(!npk.isNpk2(h))return '';}catch{return '';}
+ return archive(f)?'':'NPK_KEY';}
+const REASONS={NPK_KEY:'这个 Nitro+ NPK2 游戏的 script.npk 使用了未知密钥加密，暂时读不了'};
+
 module.exports={
  id:'nitroplus-n4',hint:'script.npk',
  scenes(dir){const f=scriptFile(dir);return f?scenesOf(f):[];},
  archives(dir){const f=scriptFile(dir);return f?scenesOf(f):[];},
  sources(dir){const f=scriptFile(dir);return f?[f]:[];},
+ unsupported,REASONS,
  parse,test:()=>false,
 };

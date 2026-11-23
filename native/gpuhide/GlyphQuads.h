@@ -24,7 +24,7 @@
 #include <cmath>
 #include <stdio.h>
 
-struct Quad { float x0, y0, x1, y1, u0, v0, u1, v1; unsigned first; };
+struct Quad { float x0, y0, x1, y1, u0, v0, u1, v1; unsigned first; unsigned col = 0xffffffffu; bool hasCol = false; }; // col: vertex colour 0xAARRGGBB of the quad's first vertex
 
 static inline bool GlyphLike(const Quad &q, unsigned tw, unsigned th) {
  if (tw < 32 || th < 32) return false;
@@ -45,7 +45,11 @@ struct GlyphLearner {
  bool readOnly = false;
  // line
  std::vector<bool> blankAt; unsigned nb = 0; // the line with its interior blanks (engines that draw a blank glyph for a space)
- std::wstring text; unsigned n = 0, seq = 0, lineAt = 0, prevLineAt = 0, armedUntil = 0; bool reported = false, hitSent = false, hiddenSent = false; unsigned hiddenQuads = 0;
+ /* 2026-11-20 (CHAOS;CHILD: a page keeps its earlier lines while the next one types out): the places the earlier lines of the page
+    were matched on, and when; their glyphs are never the new line's (they made a typed-out line look complete, and the line was
+    hidden and placed on the earlier line's glyphs: its own last row stayed visible) */
+ std::vector<Rect> lastRects, earlierRects; std::set<std::pair<long long, long long>> lastKeys, earlierKeys; unsigned frameNow = 0;
+ unsigned nameN = 0; std::wstring text; unsigned n = 0, seq = 0, lineAt = 0, prevLineAt = 0, armedUntil = 0; bool reported = false, hitSent = false, hiddenSent = false; unsigned hiddenQuads = 0;
  // learned
  bool learned = false; void *areaRt = nullptr; unsigned areaW = 0, areaH = 0; Rect area{}; std::set<long long> atlases; unsigned learnedSeq = 0; float glyphH = 0;
  std::map<void *, unsigned> texFirst; // texture -> first time a glyph quad used it
@@ -58,6 +62,24 @@ struct GlyphLearner {
  // a glyph sheet made for one line is sized to that line (e.g. 76 x 88), unlike UI / font atlases (powers of two)
  static bool LineSized(unsigned w, unsigned h) { auto p2 = [](unsigned v) { return v && !(v & (v - 1)); }; return !(p2(w) && p2(h)) && w * h <= 1024u * 256u; }
  bool Armed(unsigned now) const { return n > 0 && (int)(armedUntil - now) > 0; }
+ /* 2026-11-21 (owner, CHAOS;CHILD centred narration: near the end of a page the previous line showed again under MeguLit's):
+    the game draws the whole page once more (earlier lines + the current one) from a texture the learner has not seen, so
+    neither the learned atlas nor the fresh-sheet rule hid it. A line that is the page so far (it ends with the line before
+    and is longer) is a redraw: for RedrawMs glyph-height quads in the learned area of a target of the learned size are
+    hidden whatever their texture. */
+ static const unsigned RedrawMs = 3000; unsigned redrawUntil = 0;
+ /* 2026-11-21 (owner, STEINS;GATE r25: the game's own furigana 「な」「き」 showed over MeguLit's text): a ruby glyph is about half
+    the body height, so the glyph-height rule (+-20 %) never hid it. A quad 0.35-0.65 of the learned height whose box overlaps a
+    body glyph of the current or an earlier line horizontally and sits right on top of it (bottom within 0.15..0.7 body heights
+    above the body's top edge, or overlapping it a little) is that glyph's ruby. */
+ bool RubySized(float h) const { return glyphH > 0 && h >= glyphH * 0.35f && h <= glyphH * 0.65f; }
+ bool RubyOver(const Rect &q) const {
+  for (const std::vector<Rect> *v : { &lastRects, &earlierRects }) for (auto &b : *v) {
+   float bh = b.y1 - b.y0; if (bh <= 0) continue;
+   bool across = q.x1 > b.x0 - bh * 0.25f && q.x0 < b.x1 + bh * 0.25f; float gap = b.y0 - q.y1;
+   if (across && gap >= -bh * 0.15f && gap <= bh * 0.7f) return true; }
+  return false; }
+ static bool PageRedraw(const std::wstring &now, const std::wstring &before) { return before.size() >= 2 && now.size() > before.size() && now.compare(now.size() - before.size(), before.size(), before) == 0; }
 
  /* Some hooks hand a sentence over twice in one go (the engine lays it out for the page and again for its log): "X    X".
     The line is X: counted twice, a line had room for twice its characters and took the next sentences' places, so the
@@ -70,12 +92,19 @@ struct GlyphLearner {
   return t.substr(0, at[h - 1] + 1);
  }
  void Line(const std::wstring &raw, unsigned now) {
-  const std::wstring t = Undouble(raw);
+  /* 2026-11-20 (CHAOS;CHILD: every voiced line stayed unplaced): a speaker tag the hook puts before the line (【大谷】, LunaHook's
+     MAGES reader and others) is not drawn in the text box (the name has its own plate): the line is the text after it. A game
+     that does draw it inline still matches (Match: the tag's glyphs first, then the line). */
+  std::wstring body = raw; nameN = 0;
+  { size_t a = 0; while (a < body.size() && Blank(body[a])) a++; if (a < body.size() && body[a] == L'\u3010') { size_t c = body.find(L'\u3011', a); if (c != std::wstring::npos && c - a >= 2 && c - a <= 17 && c + 1 < body.size()) { for (size_t k = a; k <= c; k++) if (!Blank(body[k])) nameN++; body = body.substr(c + 1); } } }
+  const std::wstring t = Undouble(body);
   std::wstring s; for (wchar_t c : t) if (!Blank(c)) s += c; if (s.empty()) return;
   if (s == text && Armed(now)) { armedUntil = now + 60000; return; } // the same line again (re-read): keep its state
+  redrawUntil = learned && PageRedraw(s, text) ? now + RedrawMs : 0;
   { size_t a = 0, b = t.size(); while (a < b && Blank(t[a])) a++; while (b > a && Blank(t[b - 1])) b--; blankAt.clear(); nb = 0;
     for (size_t i = a; i < b; i++) { if (t[i] == L'\n' || t[i] == L'\r' || t[i] == 0x1F) continue; bool bl = Blank(t[i]); blankAt.push_back(bl); if (bl) nb++; } }
   prevLineAt = lineAt; text = s; n = (unsigned)s.size(); seq++; lineAt = now; armedUntil = now + 60000; reported = hitSent = hiddenSent = false; hiddenQuads = 0;
+  if (!lastKeys.empty()) { earlierRects.insert(earlierRects.end(), lastRects.begin(), lastRects.end()); earlierKeys.insert(lastKeys.begin(), lastKeys.end()); if (earlierRects.size() > 512 || earlierKeys.size() > 1024) { earlierRects.clear(); earlierKeys.clear(); } lastRects.clear(); lastKeys.clear(); }
   PageLineAdd(t, n, now);
   if (log) log("LINE seq=%u n=%u", seq, n);
  }
@@ -100,8 +129,8 @@ struct GlyphLearner {
     (LineSized textures): the text stays the game's own layout, so every character keeps its real place, width and row.
     Every glyph place of the page is tracked; a LINE claims the places that appear for it (the hook delivers the text a
     moment after the game started typing: places up to 3 s older are its own, at most n). Claimed places are left out
-    of every draw while armed, new places are left out at once (a typing sentence whose LINE is on its way) and are given
-    back to the game when no LINE takes them within 2.5 s (a menu, a backlog, a page shown by loading a save). The page is
+    of every draw while armed. New places keep their pixels until a LINE claims them, so a font-height match alone
+    cannot hide a menu, backlog or page shown by loading a save. The page is
     reported whole (ToMe_PAGE: every line's text and its places in reading order) whenever it changes; places that stop
     being drawn while others stay are a page turn (lines forgotten), all places gone is "asleep" (text window hidden, a
     title screen): the same places drawn again wake the page with its lines. */
@@ -131,7 +160,7 @@ struct GlyphLearner {
   if (ppos.size() >= 4096) { ppos.clear(); pkey.clear(); for (auto &l : plines) l.claimed = 0; }
   ppos.push_back(PPos{ r, now, frameNo, frameNo, -1, true }); pkey[k] = (int)ppos.size() - 1; return (int)ppos.size() - 1;
  }
- bool PageHidden(const PPos &p) const { if (!pageArmed || readOnly) return false; if (p.line == -2) return false; if (p.line == -1) return p.opt; return true; }
+ bool PageHidden(const PPos &p) const { if (!pageArmed || readOnly) return false; return p.line >= 0; }
  bool PageAnyClaim() const { if (!pageArmed || readOnly) return false; for (auto &l : plines) if (l.claimed) return true; return false; }
  // a page quad: handled here (true) with *leave = leave it out
  bool PageQuad(const Quad &x, void *tex, unsigned tw, unsigned th, void *rt, unsigned rtW, unsigned rtH, unsigned now, bool *leave) {
@@ -141,8 +170,8 @@ struct GlyphLearner {
   if (std::fabs(h - pageH) <= 1.5f) {
    if (!pageRtW) { pageRt = rt; pageRtW = rtW; pageRtH = rtH; }
    sheetNow.insert(tex);
-   // the page drawn again into a buffer of another size (effects): follows the page as a whole
-   if (rtW != pageRtW || rtH != pageRtH) { *leave = PageAnyClaim(); return true; }
+   // Another target has no confirmed character correspondence yet.
+   if (rtW != pageRtW || rtH != pageRtH) return false;
    int i = PageFind(Rect{ x.x0, x.y0, x.x1, x.y1 }, now); PPos &p = ppos[i];
    p.lastFrame = frameNo; if (p.r.x1 - p.r.x0 < x.x1 - x.x0 - 0.5f && std::fabs(p.r.x0 - x.x0) < 1.5f) p.r = Rect{ x.x0, x.y0, x.x1, x.y1 };
    *leave = PageHidden(p); return true;
@@ -152,7 +181,7 @@ struct GlyphLearner {
   if (!pageArmed || readOnly) return true;
   float cx = (x.x0 + x.x1) / 2; const PPos *best = nullptr; float bd = 1e30f;
   for (auto &p : ppos) { if (p.lastFrame + 2 < frameNo) continue; if (cx < p.r.x0 - pageH || cx > p.r.x1 + pageH) continue; float d = std::fabs((p.r.y0 + p.r.y1) / 2 - (x.y0 + x.y1) / 2) + std::fabs((p.r.x0 + p.r.x1) / 2 - cx) * 0.25f; if (d < bd) { bd = d; best = &p; } }
-  *leave = best && bd < pageH * 1.6f ? PageHidden(*best) : PageAnyClaim();
+  *leave = best && bd < pageH * 1.6f && PageHidden(*best);
   return true;
  }
  /* The line's places in reading order: rows top to bottom (a place within half a height of the row's first place), left
@@ -271,9 +300,11 @@ struct GlyphLearner {
    bool sameAtlas = rtW == areaW && rtH == areaH && atlases.count(AtlasKey(NULL, tex)), sheet = freshTex && LineSized(tw, th) && rtW == areaW && rtH == areaH && std::fabs((x.y1 - x.y0) - glyphH) <= glyphH * 0.25f;
    // glyph height only: a wait cursor or icon drawn from the same sheet inside the area stays
    bool glyphSize = std::fabs((x.y1 - x.y0) - glyphH) <= glyphH * 0.2f;
-   if (learned && armed && !readOnly && glyphSize && (sameAtlas || sheet)) {
+   if (!glyphSize && RubySized(x.y1 - x.y0) && RubyOver(Rect{ x.x0, x.y0, x.x1, x.y1 })) glyphSize = true; /* the line's ruby goes with it */
+   bool redraw = (int)(redrawUntil - now) > 0 && rtW == areaW && rtH == areaH;
+   if (learned && armed && !readOnly && glyphSize && (sameAtlas || sheet || redraw)) {
     float cx = (x.x0 + x.x1) / 2, cy = (x.y0 + x.y1) / 2;
-    if (cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1) { drop.push_back((int)i); hiddenQuads++; if (log && hiddenQuads < 60) log("drop %s tex=%p %ux%u [%.0f,%.0f %.0fx%.0f uv %.3f,%.3f %.3fx%.3f]", sameAtlas ? "atlas" : "sheet", tex, tw, th, x.x0, x.y0, x.x1 - x.x0, x.y1 - x.y0, x.u0, x.v0, x.u1 - x.u0, x.v1 - x.v0); }
+    if (cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1) { drop.push_back((int)i); hiddenQuads++; if (log && hiddenQuads < 60) log("drop %s tex=%p %ux%u [%.0f,%.0f %.0fx%.0f uv %.3f,%.3f %.3fx%.3f]", sameAtlas ? "atlas" : sheet ? "sheet" : "redraw", tex, tw, th, x.x0, x.y0, x.x1 - x.x0, x.y1 - x.y0, x.u0, x.v0, x.u1 - x.u0, x.v1 - x.v0); }
    }
   }
   if (!drop.empty() && !hitSent) { hitSent = true; char b[128]; snprintf(b, sizeof b, "ToMe_GPUHIDE hit seq=%u quads=%u chars=%u", seq, (unsigned)drop.size(), n); if (emit) emit(b); }
@@ -305,6 +336,7 @@ struct GlyphLearner {
  // glyphs (reading order; the blank positions are dropped from the result).
  const std::vector<Rect> *Match(const std::vector<Rect> &a, const std::vector<Rect> &b, std::vector<Rect> &keep) const {
   if (a.size() == n) return &a; if (b.size() == n) return &b;
+  if (nameN) for (const std::vector<Rect> *src : { &a, &b }) if (src->size() == n + nameN) { keep.assign(src->begin() + nameN, src->end()); return &keep; }
   if (!nb) return nullptr;
   for (const std::vector<Rect> *src : { &a, &b }) if (src->size() > n && src->size() <= n + nb && Blanks(*src, keep)) return &keep;
   return nullptr;
@@ -320,14 +352,21 @@ struct GlyphLearner {
    if (k >= r.size()) return false; keep.push_back(r[k++]); }
   return k == r.size() && keep.size() == n;
  }
+ /* the same place as an earlier glyph, offset copies (shadow, outline) included: the tolerance Chars() merges them with */
+ bool Earlier(const Rect &r) const { for (auto &e : earlierRects) { float w = (std::min)(e.x1 - e.x0, r.x1 - r.x0), h = e.y1 - e.y0; if (std::fabs(e.x0 - r.x0) < 0.4f * w && std::fabs(e.y0 - r.y0) < 0.4f * h) return true; } return false; }
+ /* a glyph of an earlier line of the page (the same glyph on the same place) is never the new line's */
+ bool EarlierGlyph(long long gk, long long k) const { return earlierKeys.count({ gk, k }) > 0; }
  void Frame(unsigned now, unsigned backW, unsigned backH) {
-  bbW = backW; bbH = backH; PageFrame(now); frameNo++; if (pageOn) return; if (!Armed(now)) return;
+  bbW = backW; bbH = backH; frameNow = now; PageFrame(now); frameNo++; if (pageOn) return; if (!Armed(now)) return;
+  /* the earlier lines are on screen while most of their glyphs are still drawn: a text box that replaces its line (most ADV
+     games) drops them at once, and its new glyphs on the old places are the new line's again */
+  if (!earlierKeys.empty()) { size_t on = 0; for (auto &e : earlierKeys) { auto g = groups.find(e.first); if (g == groups.end()) continue; auto it = g->second.keys.find(e.second); if (it != g->second.keys.end() && frameNo - it->second.lastFrame <= 2) on++; } if (on * 2 < earlierKeys.size()) { earlierKeys.clear(); earlierRects.clear(); } }
   if (reported && hiddenSent == (hitSent && !readOnly)) return;
   unsigned since = prevLineAt && now - prevLineAt < 120000 ? (std::max)(prevLineAt + 200, lineAt - 3000) : lineAt - 3000;
   for (auto &kv : groups) {
    Group &g = kv.second; std::vector<Rect> fresh, live;
-   for (auto &s : g.keys) if ((int)(s.second.firstAt - since) >= 0) fresh.push_back(s.second.r);
-   const std::vector<Rect> &last = g.prevFrame == frameNo - 1 ? g.frame : g.prev; live = last;
+   for (auto &s : g.keys) if ((int)(s.second.firstAt - since) >= 0 && !EarlierGlyph(kv.first, s.first)) fresh.push_back(s.second.r);
+   const std::vector<Rect> &last = g.prevFrame == frameNo - 1 ? g.frame : g.prev; for (auto &r : last) if (earlierRects.empty() || !Earlier(r)) live.push_back(r);
    std::vector<Rect> a = Chars(Cluster(Chars(live))), b = Chars(Cluster(Chars(fresh)));
    if (log && (now / 500) != ((now - 17) / 500)) log("frame %u group rt=%p %ux%u live=%u fresh=%u n=%u", frameNo, g.rt, g.tw, g.th, (unsigned)a.size(), (unsigned)b.size(), n);
    std::vector<Rect> keep; const std::vector<Rect> *hit = Match(a, b, keep); if (!hit) continue;
@@ -340,8 +379,8 @@ struct GlyphLearner {
   for (auto &kv : byRt) {
    if (kv.second.size() < 2 || (learned && (kv.second[0]->rtW != areaW || kv.second[0]->rtH != areaH))) continue;
    std::vector<Rect> fresh, live; Group *big = kv.second[0]; size_t most = 0;
-   for (Group *g : kv.second) { const std::vector<Rect> &last = g->prevFrame == frameNo - 1 ? g->frame : g->prev; live.insert(live.end(), last.begin(), last.end()); if (last.size() > most) { most = last.size(); big = g; }
-    for (auto &s : g->keys) if ((int)(s.second.firstAt - since) >= 0) fresh.push_back(s.second.r); }
+   for (Group *g : kv.second) { const std::vector<Rect> &last = g->prevFrame == frameNo - 1 ? g->frame : g->prev; for (auto &r : last) if (earlierRects.empty() || !Earlier(r)) live.push_back(r); if (last.size() > most) { most = last.size(); big = g; }
+    for (auto &s : g->keys) if ((int)(s.second.firstAt - since) >= 0 && !EarlierGlyph(GroupKey(g->rt, g->tex), s.first)) fresh.push_back(s.second.r); }
    std::vector<Rect> a = Chars(Cluster(Chars(live))), b = Chars(Cluster(Chars(fresh)));
    if (log && (now / 500) != ((now - 17) / 500)) log("frame %u target rt=%p pages=%u live=%u fresh=%u n=%u", frameNo, kv.first, (unsigned)kv.second.size(), (unsigned)a.size(), (unsigned)b.size(), n);
    std::vector<Rect> keep; const std::vector<Rect> *hit = Match(a, b, keep); if (!hit) continue;
@@ -353,7 +392,7 @@ struct GlyphLearner {
   float h = 0; Rect box{ 1e30f, 1e30f, -1e30f, -1e30f }; for (auto &r : cs) { h += r.y1 - r.y0; box.x0 = (std::min)(box.x0, r.x0); box.y0 = (std::min)(box.y0, r.y0); box.x1 = (std::max)(box.x1, r.x1); box.y1 = (std::max)(box.y1, r.y1); } h /= cs.size();
   char b[256];
   if (!learned) {
-   learned = true; areaRt = g.rt; areaW = g.rtW; areaH = g.rtH; glyphH = h; learnedSeq = seq; area = Rect{ box.x0 - h, box.y0 - h, box.x1 + h * 8, box.y1 + h * 2 };
+   learned = true; areaRt = g.rt; areaW = g.rtW; areaH = g.rtH; glyphH = h; learnedSeq = seq; area = Rect{ 0, box.y0 - h, (std::max)(box.x1 + h * 8, (float)g.rtW), box.y1 + h * 2 };
    // atlases whose quads line up with the matched glyphs (other pages, outline / shadow sheets: top-left within 3 px of a
    // glyph for at least 60 % of their quads in the area); a UI sheet drawing the box frame or body under the text is not
    auto aligned = [&](const Rect &r) { for (auto &c : cs) if (std::fabs(r.x0 - c.x0) <= 3 && std::fabs(r.y0 - c.y0) <= 3) return true; return false; };
@@ -364,12 +403,13 @@ struct GlyphLearner {
    snprintf(b, sizeof b, "ToMe_GPUHIDE learn seq=%u area=%.0f,%.0f,%.0f,%.0f atlas=%ux%u glyphs=%u chars=%u atlases=%u", seq, area.x0, area.y0, area.x1 - area.x0, area.y1 - area.y0, g.tw, g.th, (unsigned)cs.size(), n, (unsigned)atlases.size()); if (emit) emit(b);
   } else {
    // grow the area when a longer line spills over it
-   area.x0 = (std::min)(area.x0, box.x0 - h * 0.5f); area.y0 = (std::min)(area.y0, box.y0 - h * 0.5f); area.x1 = (std::max)(area.x1, box.x1 + h * 0.5f); area.y1 = (std::max)(area.y1, box.y1 + h * 0.5f);
+   area.x0 = 0; /* centred rows (CHAOS;CHILD) start further left than the learned line: the band spans the whole target so a new row's first glyphs never leak */ area.x1 = (std::max)(area.x1, (float)g.rtW); area.y0 = (std::min)(area.y0, box.y0 - h * 0.5f); area.x1 = (std::max)(area.x1, box.x1 + h * 0.5f); area.y1 = (std::max)(area.y1, box.y1 + h * 0.5f);
   }
   bool hidden = hitSent && !readOnly; std::string rects; bool mapped = true;
   for (auto r : cs) { if (!ToScreen(g.rt, g.rtW, g.rtH, r)) { mapped = false; break; } char x[64]; snprintf(x, sizeof x, "%s%.0f,%.0f,%.0f,%.0f", rects.empty() ? "" : ";", r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0); rects += x; }
   if (!mapped) { if (log && frameNo % 60 == 0) log("rects not mapped yet: render target %p not composited", g.rt); return; } // try again next frame
-  reported = true; hiddenSent = hidden;
+  reported = true; hiddenSent = hidden; lastRects = cs; lastKeys.clear();
+  { long long gk = GroupKey(g.rt, g.tex); for (auto &kv : groups) { if (kv.second.rt != g.rt) continue; for (auto &s : kv.second.keys) { if (frameNo - s.second.lastFrame > 2) continue; for (auto &c : cs) { float w = (std::min)(c.x1 - c.x0, s.second.r.x1 - s.second.r.x0), h = c.y1 - c.y0; if (std::fabs(c.x0 - s.second.r.x0) < 0.4f * w && std::fabs(c.y0 - s.second.r.y0) < 0.4f * h) { lastKeys.insert({ kv.first, s.first }); break; } } } } (void)gk; }
   std::string t;
   { std::string u; for (size_t i = 0; i < text.size(); i++) { unsigned c = text[i]; if (c >= 0xD800 && c < 0xDC00 && i + 1 < text.size()) { c = 0x10000 + ((c - 0xD800) << 10) + (text[++i] - 0xDC00); u += (char)(0xF0 | (c >> 18)); u += (char)(0x80 | ((c >> 12) & 63)); u += (char)(0x80 | ((c >> 6) & 63)); u += (char)(0x80 | (c & 63)); } else if (c < 0x80) u += (char)c; else if (c < 0x800) { u += (char)(0xC0 | (c >> 6)); u += (char)(0x80 | (c & 63)); } else { u += (char)(0xE0 | (c >> 12)); u += (char)(0x80 | ((c >> 6) & 63)); u += (char)(0x80 | (c & 63)); } } t = u; }
   std::string line = "ToMe_CHARS engine=gpu line=" + std::to_string(seq) + " hidden=" + (hidden ? "1" : "0") + " sw=" + std::to_string(bbW) + " sh=" + std::to_string(bbH) + " vx=0 vy=0 vw=" + std::to_string(bbW) + " vh=" + std::to_string(bbH) + " n=" + std::to_string(cs.size()) + " rects=" + rects + " text=" + t;

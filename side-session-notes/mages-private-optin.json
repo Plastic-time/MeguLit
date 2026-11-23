@@ -1,0 +1,11 @@
+{
+  "scope": "MAGES private live diagnostics only",
+  "sourceExeSha256": "51aeae59786ed60a519411e035b324bbc10f1bd49490a607fab69a3741133bd4",
+  "privateExeSha256": "91eb389202999f3365ba715778d9fd7b908baf2a543b6fa461d953c8e17e1f72",
+  "privateExe": "H:/MeguLit-Work/night-1423/mages-live/game-rdata/Game.exe",
+  "defaultRoles": false,
+  "explicitOptInAllowed": true,
+  "sourceBuildAcceptance": false,
+  "userSeedWrites": false,
+  "reason": "Private data-only save namespace, original text and relocations unchanged; default off, root slot3; no source-build acceptance"
+}

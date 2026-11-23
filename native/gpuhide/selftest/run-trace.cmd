@@ -11,7 +11,7 @@ set "OUT=%TEMP%\megulit-gputrace-selftest"
 if not exist "%OUT%\32" mkdir "%OUT%\32"
 if not exist "%OUT%\64" mkdir "%OUT%\64"
 set FLAGS=/nologo /O2 /MT /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE
-set M=..\..\scncapture\minhook\src
+set M=..\..\shared\minhook\src
 set MH=%M%\hook.c %M%\buffer.c %M%\trampoline.c %M%\hde\hde32.c %M%\hde\hde64.c
 setlocal
 call "%~dp0..\..\vsx86.cmd" >nul || exit /b 1

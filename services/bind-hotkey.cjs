@@ -47,7 +47,7 @@ function request(reader,m,emit,lang){
 function follow(reader,m,emit,lang){
  const pending=reader.hotkeyBind;if(!pending)return;
  if(Date.now()-pending.at>8000){reader.hotkeyBind=null;return;}
- if(m.type==='bound'&&String(m.gameHwnd||'')===pending.hwnd){reader.hotkeyBind=null;const title=String(m.gameTitle||pending.title||'');const g=reader.gal;if(g&&pending.processName&&g.preferences?.gameProcess!==pending.processName)try{g.save({...g.preferences,gameProcess:pending.processName,bindEnabled:true},false);}catch{}
+ if(m.type==='bound'&&String(m.gameHwnd||'')===pending.hwnd){reader.hotkeyBind=null;const title=String(m.gameTitle||pending.title||'');const g=reader.gal;if(g&&pending.processName&&g.preferences?.gameProcess!==pending.processName)try{g.save({...g.preferences,gameProcess:pending.processName,gameExecutable:'',bindEnabled:true},false);}catch{}
   emit({type:'bindHotkeyResult',ok:true,kind:'bound',title,message:message('bound',lang,title)});}
  else if(m.type==='error'){reader.hotkeyBind=null;emit({type:'bindHotkeyResult',ok:false,kind:'failed',title:pending.title,message:message('failed',lang,m.message)});}
 }

@@ -182,6 +182,6 @@ export async function checkForUpdates({api,invoke,version,toast,manual=false,sho
   if(!info.newer){if(manual)toast?.(t.latest);if(asking&&!manual)show({current:version,latest:version,consentOnly:true,notes:''},{api,invoke,locale,consent});return info;}
   if(info.silent&&!asking){silent(info,{api,invoke});return info;}
   show(info,{api,invoke,locale,consent});return info;
- }catch(error){if(manual)toast?.(t.failed+' · '+String(error?.message||error));return null;}
+ }catch(error){if(manual)toast?.(t.failed+' · '+String(error?.message||error));else if(asking)show({current:version,latest:version,consentOnly:true,notes:''},{api,invoke,locale,consent});return null;}
 }
 export {notesFor};

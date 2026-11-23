@@ -58,14 +58,29 @@ test('a readable Japanese stream keeps its noise lines (the game\'s script text)
   assert.equal(ev[back].hookSource.trim(), READABLE[1].trim(), 'the reader comes back with the readable line itself');
 });
 
-test('a noise line never goes to the art path (no translation drawn over the game\'s own line)', t => {
+test('a noise line never goes to the art path (no translation drawn over the game\'s own line)', async t => {
   const hook = new HookNative({ native: __dirname, hook: __dirname, logs: 'Z:/no-fixture-log' }, () => {}, () => {}, () => 1000);
   const located = [], traces = []; hook.trace = m => traces.push(m); hook.artLocate = x => located.push(x); t.after(() => hook.stop());
   for (const n of NOISE) hook.artCandidate(n);
   assert.deepEqual(located, []);
   hook.artCandidate('館がある'); assert.deepEqual(located, ['館がある'], 'a readable card still goes');
   assert.ok(traces.some(m => /^art text unreadable/.test(m)));
-  assert.match(read('services/reader.cjs'), /async artText\(message\)\{\/\* 2026-11-15 unreadable art text[^]*?garbledSource\(String\(message\.text\|\|''\),\{controls:false\}\)\)\{[^}]*translation:'',visible:false\}\);return;\}/);
+  const { Reader } = require('../services/reader.cjs'), reader = Object.create(Reader.prototype);
+  const events = [], translated = [];
+  Object.assign(reader, {
+    gal: { hooks: { trace() {} } }, prefs: () => ({ provider: 'google', learnerLanguage: 'zh' }),
+    runtime: { emit: (event, message) => events.push({ event, message }) },
+    embedCached: (text, value) => value,
+    chainTranslate: async text => { translated.push(text); return { text: '这里有一座馆' }; }
+  });
+  for (const [id, text] of NOISE.entries()) await reader.artText({ id, text, visible: true });
+  assert.deepEqual(translated, [], 'the actual reader never asks a translator for noise');
+  assert.equal(reader.artTurns, undefined, 'noise does not enter the art render lifecycle');
+  assert.deepEqual(events.map(e => [e.event, e.message.translation, e.message.visible]), NOISE.map(() => ['reader-event', '', false]));
+  await reader.artText({ id: 'readable', text: '館がある', visible: true });
+  assert.deepEqual(translated, ['館がある'], 'a readable card still translates through the actual reader');
+  assert.equal(events.at(-1).message.translation, '这里有一座馆');
+  assert.equal(events.at(-1).message.visible, true);
 });
 
 test('a line the game still draws itself: the placement host says so, a placed line clears it', () => {
@@ -80,7 +95,7 @@ test('a line the game still draws itself: the placement host says so, a placed l
 
 test('HookBridge: nothing unreadable is hidden, every write goes through the code-page guard', () => {
   const b = read('native/HookBridge.cs'), p = read('native/EmbedTextPolicy.cs');
-  assert.match(b, /static void GlyphLine\(string text\)\{FlushFit\(\);if\(SkipHeld\)\{GlyphOff\(\);return;\}\/\*[^*]*\*\/[^\n]*?if\(EmbedTextPolicy\.Unreadable\(text\)&&SelectedReadableRun<2&&!EmbedTextPolicy\.EngineText\(selCode\)\)\{[^}]*GlyphOff\(\);return;\}GpuLine\(text\);/);
+  assert.match(b, /static void GlyphLine\(string text\)\{FlushFit\(\);[^\n]*?if\(SkipHeld\)\{GlyphOff\(\);return;\}\/\*[^*]*\*\/[^\n]*?if\(EmbedTextPolicy\.Unreadable\(text\)&&SelectedReadableRun<2&&!EmbedTextPolicy\.EngineText\(selCode\)\)\{[^}]*GlyphOff\(\);return;\}GpuLine\(text\);/);
   assert.match(b, /string reply=hide\?\(p\.hidden\?\?""\):EmbedTextPolicy\.Writeback\(p\.text,trans\);reply=SafeReply\(p\.code,p\.text,reply,"embed-translate"\);/);
   assert.match(b, /replacement=SafeReply\(candidate\.code,text,replacement,candidate\.name\);\r?\n   Luna_EmbedCallback\(tp,text,replacement==text\?"":replacement\);/);
   assert.match(b, /if\(replacement\.Length>0&&EmbedTextPolicy\.Unreadable\(text\)&&SelectedReadableRun<2\)\{replacement="";/);
@@ -121,7 +136,7 @@ test('reader DOM: a game-drawn line goes back to the reader window, bilingual, w
     const frame = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     const vis = () => page.evaluate(() => ['.char-token', '.megulit-ruby-base', '.tomoyo-cn-row'].map(s => getComputedStyle(document.querySelector(s)).visibility));
     const b = 'window.__tomoyoChinese';
-    await page.evaluate(`${b}.textPlaceMode({ on: true })`); await frame();
+    await page.evaluate(`${b}.textPlaceAnchor?.(false); ${b}.textPlaceMode({ on: true })`); await frame();
     assert.deepEqual(await vis(), ['visible', 'visible', 'visible'], 'nothing known yet: unchanged');
     await page.evaluate(`${b}.textPlace({ visible: true, text: '肉塊が、暗く' })`); await frame();
     /* 2026-11-15 (1.4.10 user group: 「只有翻译了，要替换的原文没了」) the Japanese is never dropped: not placed over the

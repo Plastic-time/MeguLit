@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using BepInEx;
@@ -37,6 +38,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
   int port;
   string file = Path.Combine(dir, "MeguLitUnityText.port");
   if (!File.Exists(file) || !int.TryParse(File.ReadAllText(file).Trim(), out port)) { Logger.LogInfo("no MeguLit control port: idle"); enabled = false; return; }
+  KemcoOwner();
   net = new Thread(() => Net(port)) { IsBackground = true, Name = "MeguLitUnityText" };
   net.Start();
   StartCoroutine(EndOfFrame());
@@ -73,7 +75,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
      }
     }
    } catch (Exception) {
-    connected = false; hideAsked = false;
+    connected = false; hideAsked = false; KemcoControl(false);
     Thread.Sleep(1000);
    }
   }
@@ -82,7 +84,136 @@ public class MeguLitUnityText : BaseUnityPlugin {
  void Command(string line) {
   if (line.StartsWith("HIDE ")) hideAsked = line.EndsWith("1");
   else if (line.StartsWith("WANT ")) wanted = line.Substring(5).Replace("\u001f", "\n");
+  else if (line.StartsWith("KEMCO ")) KemcoScope(line.Substring(6));
+  else if (line.StartsWith("DRAW ") || line.StartsWith("EMB ")) DrawCommand(line);
  }
+
+ // ---- engine-draw (docs/engine-draw-protocol.md): roles and the in-game replacement ------------------------------------
+ // DRAW roles=0|1 embed=0|1 zh=0|1 and EMB <sentence> TAB <start:len:reading|...> TAB <Chinese> come over the control socket.
+ // roles: other visible texts are reported as UI items with their screen boxes: a name plate (Utage's message window
+ // nameText field, Naninovel's author name, or an object named name / speaker / author), a choice (Utage AdvUguiSelection,
+ // Naninovel ChoiceHandlerButton, any *Choice* / *Selection* component above it), a button (UnityEngine.UI.Button / Toggle
+ // or any *Button component above it). Never changed, never hidden: the game keeps drawing them and taking their clicks.
+ // embed: the dialogue component gets the replacement as its own text: TextMeshPro draws the ruby (<voffset><size=50%>
+ // over its base, centred with <space>) and the Chinese as a smaller second paragraph; uGUI Text only the Chinese (no
+ // ruby in its rich text). The game's own tags and line breaks stay. The record then holds the Japanese only, emb=1|2.
+ volatile bool drawRoles, drawEmbed, drawZh = true;
+ readonly Dictionary<string, string[]> embeds = new Dictionary<string, string[]>();
+ readonly List<string> embedOrder = new List<string>();
+ readonly HashSet<string> asked = new HashSet<string>();
+ Component embComp; string embSet = "", lastRaw = ""; int embJp, embLevel, ui; float lastRawAt;
+ readonly Dictionary<string, string> roleSig = new Dictionary<string, string>();
+ PropertyInfo tmpMaxVisible, tmpOverflow; MethodInfo tmpForce; PropertyInfo uFontSize;
+
+ void DrawCommand(string line) {
+  if (line.StartsWith("DRAW ")) { drawRoles = line.Contains("roles=1"); drawEmbed = line.Contains("embed=1"); drawZh = !line.Contains("zh=0"); KemcoControl(KemcoFlag(line),KemcoFlag(line,"roles")); return; }
+  var p = line.Substring(4).Split('\t'); if (p.Length < 2 || p[0].Length == 0) return;
+  lock (embeds) {
+   if (!embeds.ContainsKey(p[0])) embedOrder.Add(p[0]);
+   embeds[p[0]] = new[] { p[1], p.Length > 2 ? p[2].Replace('\u001f', '\n') : "" };
+   while (embedOrder.Count > 64) { embeds.Remove(embedOrder[0]); embedOrder.RemoveAt(0); }
+  }
+ }
+
+ static float[] ScreenBox(Component c) {
+  var rt = c.transform as RectTransform; if (rt == null) return null;
+  var corners = new Vector3[4]; rt.GetWorldCorners(corners); var cam = CameraOf(c);
+  Vector2 a = Screen2(cam, corners[0]), b = Screen2(cam, corners[2]);
+  float x = Math.Min(a.x, b.x), w = Math.Abs(b.x - a.x), h = Math.Abs(b.y - a.y), top = Screen.height - Math.Max(a.y, b.y);
+  return w > 0 && h > 0 ? new[] { x, top, w, h } : null;
+ }
+ static string RoleOf(Component c, string t) {
+  bool button = false, name = false; Transform tr = c.transform;
+  for (int d = 0; tr != null && d < 6; d++, tr = tr.parent) {
+   foreach (var comp in tr.GetComponents<Component>()) {
+    if (comp == null) continue; string n = comp.GetType().Name;
+    if (n == "AdvUguiSelection" || n == "ChoiceHandlerButton" || n.IndexOf("Choice", StringComparison.Ordinal) >= 0 || n.IndexOf("Selection", StringComparison.Ordinal) >= 0) return "choice";
+    if (n == "AuthorNamePanel" || n == "AuthorNameText") return "name";
+    if (n.IndexOf("MessageWindow", StringComparison.Ordinal) >= 0) {
+     foreach (var f in comp.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)) {
+      if (f.Name.IndexOf("name", StringComparison.OrdinalIgnoreCase) < 0) continue;
+      object v = null; try { v = f.GetValue(comp); } catch { }
+      var vc = v as Component; if (vc != null && vc.gameObject == c.gameObject) return "name";
+     }
+    }
+    if (n == "Button" || n == "Toggle" || n.EndsWith("Button", StringComparison.Ordinal)) button = true;
+   }
+   string go = tr.gameObject.name.ToLowerInvariant();
+   if (d <= 2 && t.Length <= 16 && (go.Contains("name") || go.Contains("speaker") || go.Contains("author"))) name = true;
+  }
+  return name ? "name" : button ? "button" : null;
+ }
+ void RoleScan(List<Component> list) {
+  var groups = new Dictionary<string, List<KeyValuePair<string, float[]>>> { { "name", new List<KeyValuePair<string, float[]>>() }, { "choice", new List<KeyValuePair<string, float[]>>() }, { "button", new List<KeyValuePair<string, float[]>>() } };
+  foreach (var c in list) {
+   if (c == current) continue; string t = Norm(TextOf(c)); if (t.Length == 0 || t.Length > 40) continue;
+   string role = RoleOf(c, t); if (role == null) continue; var box = ScreenBox(c); if (box == null) continue;
+   groups[role].Add(new KeyValuePair<string, float[]>(t, box));
+  }
+  foreach (var g in groups) {
+   var sig = new StringBuilder(); foreach (var it in g.Value) sig.Append(it.Key).Append('|').Append(F(it.Value[0])).Append(',').Append(F(it.Value[1])).Append(';');
+   string old; roleSig.TryGetValue(g.Key, out old); string now = sig.ToString();
+   if (old == now || old == null && now.Length == 0) continue; roleSig[g.Key] = now; ui++;
+   string head = "ToMe_CHARS engine=unity line=" + ui + " hidden=0 sw=" + Screen.width + " sh=" + Screen.height + " vx=0 vy=0 vw=" + Screen.width + " vh=" + Screen.height + " n=0 rects= role=" + g.Key;
+   if (g.Value.Count == 0) { Send(head + " id=U" + g.Key + ": box=0,0,0,0 text="); continue; }
+   for (int i = 0; i < g.Value.Count; i++) { var b = g.Value[i].Value; Send(head + " id=U" + g.Key + ":" + i + " box=" + F(b[0]) + "," + F(b[1]) + "," + F(b[2]) + "," + F(b[3]) + " text=" + g.Value[i].Key); }
+  }
+ }
+
+ void SetText(Component c, string s) { try { var p = tmpType != null && tmpType.IsInstanceOfType(c) ? tmpText : uText; p.SetValue(c, s, null); } catch { } }
+ bool Overflowing(Component c) {
+  try {
+   if (tmpForce == null) tmpForce = tmpType.GetMethod("ForceMeshUpdate", Type.EmptyTypes);
+   if (tmpOverflow == null) tmpOverflow = tmpType.GetProperty("isTextOverflowing");
+   if (tmpForce != null) tmpForce.Invoke(c, null);
+   return tmpOverflow != null && (bool)tmpOverflow.GetValue(c, null);
+  } catch { return false; }
+ }
+ // the game's text with the ruby after each base and the Chinese appended; the game's tags and breaks are copied as they are
+ static string Build(string raw, string ruby, string zh, bool tmp, float zhScale, int uguiSize) {
+  var spans = new Dictionary<int, KeyValuePair<int, string>>();
+  foreach (var one in (ruby ?? "").Split('|')) { var q = one.Split(new[] { ':' }, 3); int s, n; if (q.Length == 3 && q[2].Length > 0 && int.TryParse(q[0], out s) && int.TryParse(q[1], out n) && n > 0) spans[s] = new KeyValuePair<int, string>(n, q[2]); }
+  var sb = new StringBuilder(); bool tag = false; int k = 0, closeAt = -1; string reading = null; int baseLen = 0;
+  foreach (char ch in raw) {
+   if (ch == '<') tag = true;
+   if (tag || char.IsWhiteSpace(ch) || ch == '　') { sb.Append(ch); if (ch == '>') tag = false; continue; }
+   KeyValuePair<int, string> sp;
+   if (tmp && closeAt < 0 && spans.TryGetValue(k, out sp)) { closeAt = k + sp.Key - 1; reading = sp.Value; baseLen = sp.Key; }
+   sb.Append(ch);
+   if (k == closeAt) {
+    float n = baseLen, m = reading.Length * 0.5f;
+    sb.Append("<space=-").Append(F((n + m) / 2)).Append("em><voffset=1em><size=50%>").Append(reading).Append("</size></voffset><space=").Append(F((n - m) / 2)).Append("em>");
+    closeAt = -1;
+   }
+   k++;
+  }
+  if (!string.IsNullOrEmpty(zh)) sb.Append('\n').Append(tmp ? "<size=" + Math.Round(zhScale * 100) + "%><noparse>" + zh + "</noparse></size>" : (uguiSize > 0 ? "<size=" + uguiSize + ">" + zh + "</size>" : zh));
+  return sb.ToString();
+ }
+ void EmbedTick() {
+  if (!drawEmbed || current == null) return;
+  string raw = TextOf(current) ?? "";
+  if (embComp == current && raw == embSet) { RevealAll(); return; }
+  if (raw != lastRaw) { lastRaw = raw; lastRawAt = Time.unscaledTime; return; }
+  if (Time.unscaledTime - lastRawAt < 0.3f) return; // the game is still writing the line
+  string key = Norm(raw); if (key.Length < 2) return;
+  string[] e; lock (embeds) embeds.TryGetValue(key, out e);
+  if (e == null) { if (asked.Add(key)) Send("ToMe_UNITY ask " + key); return; }
+  bool tmp = tmpType != null && tmpType.IsInstanceOfType(current);
+  string zh = drawZh ? e[1] : "";
+  int size = 0; if (!tmp) { try { if (uFontSize == null) uFontSize = uguiText.GetProperty("fontSize"); size = (int)Math.Round((int)uFontSize.GetValue(current, null) * 0.8); } catch { } }
+  if (!tmp && zh.Length == 0) return; // uGUI cannot show ruby: nothing to draw
+  string text = Build(raw, e[0], zh, tmp, 0.8f, size); int level = zh.Length > 0 ? 2 : 1;
+  SetText(current, text);
+  if (tmp && level == 2 && Overflowing(current)) { text = Build(raw, e[0], zh, tmp, 0.7f, size); SetText(current, text); if (Overflowing(current)) { text = Build(raw, e[0], "", tmp, 0.8f, size); SetText(current, text); level = 1; } }
+  embComp = current; embSet = text; embJp = key.Length; embLevel = level; lastKey = "";
+ }
+ // a typewriter that counts the game's own characters stops before the added ones: once it reached the game's length, all are shown
+ void RevealAll() {
+  if (tmpType == null || !tmpType.IsInstanceOfType(current)) return;
+  try { if (tmpMaxVisible == null) tmpMaxVisible = tmpType.GetProperty("maxVisibleCharacters"); int v = (int)tmpMaxVisible.GetValue(current, null); if (v >= embJp && v < 99999) tmpMaxVisible.SetValue(current, 99999, null); } catch { }
+ }
+
 
  // ---- components by type name ----------------------------------------------------------------------------------
  Type tmpType, uguiText, graphic;
@@ -110,7 +241,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
  }
 
  // ---- the dialogue component ------------------------------------------------------------------------------------
- Component current; bool hidingCurrent; float nextScan; string lastKey = ""; int line; string lastText = "";
+ Component current; bool hidingCurrent, published; float nextScan; string lastKey = ""; int line; string lastText = "";
  readonly Dictionary<int, string> seen = new Dictionary<int, string>();
  readonly Dictionary<int, float> changedAt = new Dictionary<int, float>();
 
@@ -143,7 +274,8 @@ public class MeguLitUnityText : BaseUnityPlugin {
    int k = Cjk(t); float at; changedAt.TryGetValue(id, out at);
    if (k >= 2 && (at > bestAt || at == bestAt && k > bestLen)) { best = c; bestAt = at; bestLen = k; }
   }
-  if (best != current) { Restore(); current = best; }
+  if (best != current) { ClearPublished(); Restore(); current = best; embComp = null; }
+  if (drawRoles) try { RoleScan(list); } catch (Exception e) { Logger.LogWarning("roles " + e.Message); }
  }
 
  // ---- hide / restore --------------------------------------------------------------------------------------------
@@ -176,10 +308,18 @@ public class MeguLitUnityText : BaseUnityPlugin {
  }
  void Restore() { if (hidingCurrent && current != null) HideSet(current, false); hidingCurrent = false; saved.Clear(); }
 
+ // An empty record retires the exact published line; clearing local state alone leaves its reader overlay on screen
+ void ClearPublished() {
+  if (!published) return;
+  published = false; lastKey = ""; lastText = "";
+  Send("ToMe_CHARS engine=unity line=" + line + " hidden=0 sw=" + Screen.width + " sh=" + Screen.height + " vx=0 vy=0 vw=" + Screen.width + " vh=" + Screen.height + " n=0 rects= text=");
+ }
+
  void LateUpdate() {
   if (Time.unscaledTime >= nextScan) { nextScan = Time.unscaledTime + 0.5f; try { Scan(); } catch (Exception e) { Logger.LogWarning("scan " + e.Message); } }
-  if (current == null || !Shown(current)) { Restore(); current = null; return; }
-  bool want = hideAsked && connected;
+  if (current == null || !Shown(current)) { ClearPublished(); Restore(); current = null; return; }
+  try { EmbedTick(); } catch (Exception e) { Logger.LogWarning("embed " + e.Message); }
+  bool want = hideAsked && connected && !drawEmbed; /* the game draws the replacement: never hidden */
   if (want && !hidingCurrent) hidingCurrent = true;
   if (!want) Restore();
   if (hidingCurrent) HideSet(current, true);
@@ -189,6 +329,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
   var wait = new WaitForEndOfFrame();
   while (true) {
    yield return wait;
+   try { KemcoTick(); } catch (Exception) { kemcoPages.Reset(Screen.width,Screen.height,Send); KemcoSendSource("gone",0,""); }
    try { if (current != null && connected) Report(); } catch (Exception e) { Logger.LogWarning("report " + e.Message); }
   }
  }
@@ -237,7 +378,10 @@ public class MeguLitUnityText : BaseUnityPlugin {
     add(s[ci], new Vector3(Math.Min(p0.x, p2.x), Math.Min(p0.y, p2.y), 0), new Vector3(Math.Max(p0.x, p2.x), Math.Max(p0.y, p2.y), 0));
    }
   }
-  if (all.Count == 0) return;
+  if (all.Count == 0) { ClearPublished(); return; }
+  /* engine-draw: the component carries the replacement: the record keeps the Japanese (the first characters, ruby left out above) */
+  bool embedded = embComp == current && (TextOf(current) ?? "") == embSet;
+  if (embedded && all.Count > embJp) all.RemoveRange(embJp, all.Count - embJp);
   // Quads far smaller than the line's glyphs in both directions are not readable characters (markup some games leave as near-empty
   // glyphs, underline / cursor quads): left out, so the record holds what a reader sees.
   var hs = new List<float>(); foreach (var e in all) hs.Add(e.Value[3]); hs.Sort(); float median = hs[hs.Count / 2];
@@ -248,19 +392,170 @@ public class MeguLitUnityText : BaseUnityPlugin {
    if (!float.IsNaN(prevTop) && Math.Abs(mid - prevTop) > median * 0.9f) text.Append('\n');
    prevTop = mid; text.Append(e.Key); rects.Add(r);
   }
-  if (rects.Count == 0) return;
+  if (rects.Count == 0) { ClearPublished(); return; }
   string flat = text.ToString().Replace("\n", "");
   if (!(lastText.Length > 0 && (flat.StartsWith(lastText) || lastText.StartsWith(flat)))) line++;
   bool hidden = hidingCurrent && AllHidden(current);
   var sb = new StringBuilder();
   foreach (var r in rects) { if (sb.Length > 0) sb.Append(';'); sb.Append(F(r[0])).Append(',').Append(F(r[1])).Append(',').Append(F(r[2])).Append(',').Append(F(r[3])); }
-  string key = line + "|" + hidden + "|" + sb;
+  string key = line + "|" + hidden + "|" + (embedded ? embLevel : 0) + "|" + sb;
   if (key == lastKey) return;
-  lastKey = key; lastText = flat;
-  Send("ToMe_CHARS engine=unity line=" + line + " hidden=" + (hidden ? 1 : 0) + " sw=" + Screen.width + " sh=" + Screen.height + " vx=0 vy=0 vw=" + Screen.width + " vh=" + Screen.height + " n=" + rects.Count + " rects=" + sb + " text=" + text);
+  lastKey = key; lastText = flat; published = true;
+  Send("ToMe_CHARS engine=unity line=" + line + " hidden=" + (hidden ? 1 : 0) + " sw=" + Screen.width + " sh=" + Screen.height + " vx=0 vy=0 vw=" + Screen.width + " vh=" + Screen.height + " n=" + rects.Count + " rects=" + sb + (embedded ? " emb=" + embLevel : "") + " text=" + text);
  }
  static string Keep(string s, bool blanks) { var b = new StringBuilder(); foreach (char c in s) if (c != (char)10 && c != (char)13 && (blanks || !char.IsWhiteSpace(c))) b.Append(c); return b.ToString(); }
  static string F(float v) { return Math.Round(v, 1).ToString(System.Globalization.CultureInfo.InvariantCulture); }
 
- void OnDestroy() { Restore(); }
+ void OnDestroy() { kemcoPages.Reset(Screen.width,Screen.height,Send); ClearPublished(); Restore(); }
+
+ // Exact original Raging Loop assembly only; this observer never writes renderers, text, roles or input
+ volatile bool kemcoAsked, kemcoRoles;
+ int kemcoEpoch, kemcoObservedEpoch=-1;
+ string kemcoScope=""; long kemcoSequence;
+ int kemcoPid; long kemcoStarted;
+ void KemcoOwner() { try { using(var self=System.Diagnostics.Process.GetCurrentProcess()) { kemcoPid=self.Id; kemcoStarted=self.StartTime.ToUniversalTime().Ticks; } } catch { kemcoPid=0; kemcoStarted=0; } }
+ bool kemcoTried, kemcoReady; float kemcoNext;
+ Type kemcoMain, kemcoMessage, kemcoButton;
+ FieldInfo kemcoBody, kemcoName, kemcoDialogs, kemcoRows, kemcoParent, kemcoLastMes, kemcoButtonText, kemcoButtonEnabled;
+ readonly KemcoSpriteSnapshot kemcoPages = new KemcoSpriteSnapshot();
+ void KemcoControl(bool on,bool roles=false) { lock(gate) { kemcoAsked=on; kemcoRoles=roles; kemcoScope=""; kemcoEpoch++; } }
+ void KemcoSend(string wire) { lock(gate) { if (connected && kemcoAsked && kemcoObservedEpoch==kemcoEpoch) Send(wire); } }
+ void KemcoScope(string scope) {
+  bool valid=scope.Length==32;
+  if(valid) foreach(char c in scope) if (!(c>='a'&&c<='f'||c>='0'&&c<='9')) valid=false;
+  lock(gate) { string next=kemcoAsked&&valid?scope:""; if(next==kemcoScope)return; kemcoScope=next; kemcoEpoch++; }
+ }
+ void KemcoSendSource(string kind,int page,string text) {
+  lock(gate) {
+   if(!connected || !kemcoAsked || kemcoScope.Length!=32 || kemcoObservedEpoch!=kemcoEpoch || kemcoPid<=0 || kemcoStarted<=0) return;
+   if(text.Length>4127 || Encoding.UTF8.GetByteCount(text)>8223) { kind="pending"; text=""; }
+   if(kemcoSequence>=9007199254740991L) return;
+   string encoded=Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
+   Send("ToMe_UNITY kemco2 "+kemcoScope+"\t"+(++kemcoSequence).ToString(System.Globalization.CultureInfo.InvariantCulture)+"\t"+page.ToString(System.Globalization.CultureInfo.InvariantCulture)+"\t"+kind+"\tc4d74235dc06d19630d8b826e49bd3d047c09bc03e8d8badeb0d60dd71dd7314\t"+kemcoPid.ToString(System.Globalization.CultureInfo.InvariantCulture)+"\t"+kemcoStarted.ToString(System.Globalization.CultureInfo.InvariantCulture)+"\t"+encoded);
+  }
+ }
+ void KemcoSource(Component message,int page,KemcoSpriteSnapshot.Page p) {
+  if(message==null || page==0) { KemcoSendSource("gone",0,""); return; }
+  string expected=kemcoLastMes.GetValue(message) as string;
+  if(p==null || !p.complete || expected==null || expected.TrimEnd('\n')!=p.text) { KemcoSendSource("pending",page,""); return; }
+  KemcoSendSource("full",page,p.text);
+ }
+ internal static bool KemcoFlag(string command,string name="kemcoSprites") {
+  int count=0; bool on=false;
+  foreach (string token in command.Split(' ')) if (token.StartsWith(name+"=",StringComparison.Ordinal)) { count++; on=token==name+"=1"; }
+  return count==1 && on;
+ }
+ static FieldInfo KemcoField(Type t,string name,Type value) {
+  if (t==null) return null;
+  var f=t.GetField(name,BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance);
+  return f!=null && f.FieldType==value ? f : null;
+ }
+ internal static bool KemcoMethod(Type type) {
+  if (type==null) return false;
+  var mes=type.GetMethod("Mes",BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance,null,new[]{typeof(string),typeof(bool)},null);
+  return mes!=null && mes.ReturnType==typeof(string);
+ }
+ bool KemcoSchema() {
+  if (kemcoTried) return kemcoReady; kemcoTried=true;
+  foreach (var a in AppDomain.CurrentDomain.GetAssemblies()) {
+   if (a.GetName().Name!="Assembly-CSharp") continue;
+   var file=new FileInfo(a.Location); if (!file.Exists || file.Length!=361472) return false;
+   string hash; var bytes=new byte[361472]; using (var s=File.OpenRead(a.Location)) {
+    int at=0; while(at<bytes.Length) { int n=s.Read(bytes,at,bytes.Length-at); if(n<=0) return false; at+=n; }
+    if(s.ReadByte()!=-1) return false;
+   }
+   using (var sha=SHA256.Create()) hash=BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-","").ToLowerInvariant();
+   if (hash!="c4d74235dc06d19630d8b826e49bd3d047c09bc03e8d8badeb0d60dd71dd7314") return false;
+   kemcoMain=a.GetType("MainScene",false); kemcoMessage=a.GetType("Message",false); kemcoButton=a.GetType("Button",false);
+   if (kemcoMain==null || kemcoMessage==null || kemcoButton==null || !typeof(MonoBehaviour).IsAssignableFrom(kemcoMain) || !typeof(MonoBehaviour).IsAssignableFrom(kemcoMessage) || !typeof(Component).IsAssignableFrom(kemcoButton)) return false;
+   kemcoBody=KemcoField(kemcoMain,"message",kemcoMessage); kemcoName=KemcoField(kemcoMain,"nameMessage",kemcoMessage);
+   kemcoDialogs=KemcoField(kemcoMain,"dialogList",typeof(List<GameObject>));
+   kemcoRows=KemcoField(kemcoMessage,"messageSprite",typeof(List<List<GameObject>>)); kemcoParent=KemcoField(kemcoMessage,"parentObject",typeof(GameObject));
+   kemcoLastMes=KemcoField(kemcoMessage,"LastMes",typeof(string));
+   kemcoButtonText=KemcoField(kemcoButton,"Text",typeof(GameObject)); kemcoButtonEnabled=KemcoField(kemcoButton,"Enabled",typeof(bool));
+   kemcoReady=kemcoBody!=null && kemcoName!=null && kemcoDialogs!=null && kemcoRows!=null && kemcoParent!=null && kemcoLastMes!=null && kemcoButtonText!=null && kemcoButtonEnabled!=null && KemcoMethod(kemcoMessage);
+   Send("ToMe_UNITY status kemco-sprites schema="+(kemcoReady?"original-readonly":"unsupported")); return kemcoReady;
+  }
+  return false;
+ }
+ static float[] KemcoBox(GameObject root,out bool shown) {
+  shown=false; if (root==null || !root.activeInHierarchy) return null;
+  var mesh=root.GetComponent<TextMesh>(); var renderer=root.GetComponent<Renderer>();
+  if (mesh==null || renderer==null || !renderer.enabled) return null;
+  float alpha=mesh.color.a; if (float.IsNaN(alpha) || float.IsInfinity(alpha)) { shown=true; return null; } if (alpha<=0) return null;
+  // Reading sharedMaterial avoids the instantiating material getter and preserves the game's ownership
+  var material=renderer.sharedMaterial;
+  if (material==null || !material.HasProperty("_Color")) { shown=true; return null; }
+  alpha=material.color.a; if (float.IsNaN(alpha) || float.IsInfinity(alpha)) { shown=true; return null; } if (alpha<=0) return null;
+  var cameras=Camera.allCameras; if (cameras.Length>8) { shown=true; return null; }
+  Camera camera=null;
+  foreach (var c in cameras) if (c!=null && c.enabled && c.gameObject.activeInHierarchy && c.targetTexture==null && (c.cullingMask & (1<<root.layer))!=0) { if (camera!=null) { shown=true; return null; } camera=c; }
+  if (camera==null) return null;
+  shown=true; var bounds=renderer.bounds; var lo=bounds.min; var hi=bounds.max;
+  float x=float.PositiveInfinity,y=x,r=float.NegativeInfinity,b=r;
+  for (int i=0;i<8;i++) {
+   var p=camera.WorldToScreenPoint(new Vector3((i&1)==0?lo.x:hi.x,(i&2)==0?lo.y:hi.y,(i&4)==0?lo.z:hi.z));
+   if (p.z<=0 || float.IsNaN(p.z) || float.IsInfinity(p.z) || float.IsNaN(p.x) || float.IsNaN(p.y) || float.IsInfinity(p.x) || float.IsInfinity(p.y)) return null;
+   x=Math.Min(x,p.x); r=Math.Max(r,p.x); y=Math.Min(y,Screen.height-p.y); b=Math.Max(b,Screen.height-p.y);
+  }
+  // Completely parked glyphs are a typewriter suffix; a partially clipped glyph is unsupported
+  if (r<=0 || b<=0 || x>=Screen.width || y>=Screen.height) { shown=false; return null; }
+  var box=new[]{x,y,r-x,b-y}; var viewport=camera.pixelRect;
+  if (x<viewport.xMin || r>viewport.xMax || Screen.height-b<viewport.yMin || Screen.height-y>viewport.yMax) return null;
+  return box;
+ }
+ KemcoSpriteSnapshot.Page KemcoRead(Component message,out int generation) {
+  generation=0; if (message==null || !Shown(message)) return null;
+  var parent=kemcoParent.GetValue(message) as GameObject; if (parent==null || !parent.activeInHierarchy) return null;
+  generation=parent.GetInstanceID(); var source=kemcoRows.GetValue(message) as List<List<GameObject>>;
+  if (source==null || source.Count>32) return null;
+  var rows=new List<IList<KemcoSpriteSnapshot.Glyph>>(); int count=0;
+  foreach (var row in source) {
+   if (row==null || row.Count>256 || (count+=row.Count)>2048) return null;
+   var glyphs=new List<KemcoSpriteSnapshot.Glyph>(); rows.Add(glyphs);
+   foreach (var root in row) {
+    if (root==null || root.transform.parent!=parent.transform) return null;
+    var mesh=root.GetComponent<TextMesh>(); if (mesh==null) return null;
+    bool shown; var box=KemcoBox(root,out shown);
+    glyphs.Add(new KemcoSpriteSnapshot.Glyph { id=root.GetInstanceID(),text=mesh.text,shown=shown,box=box });
+   }
+  }
+  return KemcoSpriteSnapshot.Read(rows,Screen.width,Screen.height);
+ }
+ static float[] KemcoUnion(KemcoSpriteSnapshot.Page p) {
+  if (p==null || p.text.IndexOf('\n')>=0) return null;
+  float x=float.PositiveInfinity,y=x,r=0,b=0;
+  foreach(var q in p.rects) { x=Math.Min(x,q[0]); y=Math.Min(y,q[1]); r=Math.Max(r,q[0]+q[2]); b=Math.Max(b,q[1]+q[3]); }
+  return new[]{x,y,r-x,b-y};
+ }
+ sealed class KemcoChoice { internal int generation; internal string text; internal float[] box; }
+ void KemcoTick() {
+  int epoch; lock(gate) epoch=kemcoEpoch;
+  if (epoch!=kemcoObservedEpoch) { kemcoPages.Reset(Screen.width,Screen.height,Send); kemcoObservedEpoch=epoch; }
+  if (!connected || !kemcoAsked) { kemcoPages.Reset(Screen.width,Screen.height,Send); return; }
+  if (Time.unscaledTime<kemcoNext) return; kemcoNext=Time.unscaledTime+0.1f;
+  if (!KemcoSchema()) { kemcoPages.Reset(Screen.width,Screen.height,Send); return; }
+  var all=UnityEngine.Object.FindObjectsOfType(kemcoMain); Component main=null; int active=0;
+  foreach (var obj in all) { var c=obj as Component; if (Shown(c)) { main=c; active++; } }
+  if (active!=1) { kemcoPages.Reset(Screen.width,Screen.height,Send); KemcoSendSource("gone",0,""); return; }
+  int generation; var bodyMessage=kemcoBody.GetValue(main) as Component; var body=KemcoRead(bodyMessage,out generation);
+  kemcoPages.Publish("body",generation,body,null,null,Screen.width,Screen.height,KemcoSend);
+  KemcoSource(bodyMessage,generation,body);
+  var name=kemcoRoles?KemcoRead(kemcoName.GetValue(main) as Component,out generation):null;
+  kemcoPages.Publish("name",generation,null,name==null?null:name.text,KemcoUnion(name),Screen.width,Screen.height,KemcoSend);
+  var dialogs=kemcoDialogs.GetValue(main) as List<GameObject>;
+  if (dialogs==null || dialogs.Count>32) { for (int i=0;i<16;i++) kemcoPages.Drop("choice"+i,Screen.width,Screen.height,Send); return; }
+  var seenChoices=new HashSet<int>(); var choices=new List<KemcoChoice>();
+  foreach (var go in dialogs) {
+   if (!kemcoRoles || go==null || !go.activeInHierarchy) continue;
+   var button=go.GetComponent(kemcoButton); if (button==null || !(bool)kemcoButtonEnabled.GetValue(button)) continue;
+   if (!seenChoices.Add(go.GetInstanceID()) || choices.Count>=16) { for (int i=0;i<16;i++) kemcoPages.Drop("choice"+i,Screen.width,Screen.height,Send); return; }
+   var text=kemcoButtonText.GetValue(button) as GameObject; var mesh=text==null?null:text.GetComponent<TextMesh>(); bool shown;
+   var box=KemcoBox(text,out shown); if (!shown) box=null;
+   choices.Add(new KemcoChoice { generation=go.GetInstanceID(),text=mesh==null?null:mesh.text,box=box });
+  }
+  int index=0;
+  foreach(var choice in choices) kemcoPages.Publish("choice"+index++,choice.generation,null,choice.text,choice.box,Screen.width,Screen.height,KemcoSend);
+  for (;index<16;index++) kemcoPages.Drop("choice"+index,Screen.width,Screen.height,Send);
+ }
 }

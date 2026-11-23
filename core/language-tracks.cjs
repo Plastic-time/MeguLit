@@ -72,7 +72,17 @@ function foreignRows(text){const rows=String(text).split(/\r?\n/);if(rows.length
 /* E296 (user, 2026-11-10, ライムライト・レモネードジャム: "%n;あの瞬間の…ない。あの瞬間の…ない。V" on screen): KiriKiri inline commands
    (%n; %p; %f0; …, colour #rrggbb; / #;) leak as text, and the engine hands a line over twice. Commands go; a line that is
    then two equal halves (a stray end marker letter allowed) keeps one. %l groups are left to inlineAlternatives. */
-function inlineCommands(text){return text.replace(/%(?!l)[a-z][a-z0-9]*;/gi,'').replace(/#(?:[0-9a-f]{6,8})?;/gi,'');}
+function inlineCommands(text){return text.replace(/%(?!l)[a-z][^;%\r\n]{0,40};/gi,'').replace(/#(?:[0-9a-f]{6,8})?;/gi,'');}
+/* 2026-11-16 (死に逝く君、館に芽吹く憎悪: 「然后%p-1;%fMS 哥特;——%p;%fuser;杀人」 reached the reader, MS ゴシック translated as 哥特):
+   engine markup any script, patch or stream may carry, stripped before text is shown or translated: KiriKiri %x…; with arguments
+   (%p-1; %fMS ゴシック; %fuser;) and #rrggbb; / #;, RPG Maker / Wolf escapes (\C[2] \V[1] \n \.), Unity / TMP rich tags
+   (<color=#f00> </b> <size=30>), KAG inline tags ([r] [l] [p] [font size=30]). %l groups are left to inlineAlternatives. */
+const MARKUP_TAG=/^(?:r|l|p|er|cm|ct|wait|font|resetfont|style|resetstyle|nowait|endnowait|locate|indent|endindent|delay|w|wc)$/i;
+function engineMarkup(text){if(typeof text!=='string'||!text)return text;let out=inlineCommands(text);
+ out=out.replace(/\\[A-Za-z]{1,3}(?:\[[^\]\r\n]{0,20}\])?|\\[.|!><^{}]/g,'');
+ out=out.replace(/<\/?(?:color|b|i|u|s|size|font|material|quad|sprite|link|mark|sup|sub|voffset|cspace|mspace|line-height|alpha|nobr|noparse|indent|align|style)(?:=[^>\r\n]{0,40})?>/gi,'');
+ out=out.replace(/\[([a-z]+)(?:\s[^\[\]\r\n]{0,60})?\]/gi,(m,tag)=>MARKUP_TAG.test(tag)?'':m);
+ return out;}
 function halveLoose(s){const once=halve(s);if(once!==s)return once;const m=/^([\s\S]*?)[A-Za-z]{1,2}\s*$/.exec(s);if(m&&KANA.test(m[1])){const body=m[1].trimEnd(),h=halve(body);if(h!==body)return h;}return s;}
 /* 2026-11-13 (live ATRI: 「…足になります！成为你的右腿！成為你的右腿！」): a multi-language stream glues the Simplified and Traditional
    lines onto the Japanese one in a single row. After the last kana's sentence end, a kana-free tail that reads as Chinese goes. */
@@ -80,7 +90,7 @@ function foreignTail(row){const s=String(row);let last=-1;for(let i=s.length-1;i
 function japaneseTrack(text){
  if(typeof text!=='string'||!text)return text;
  let out=inlineAlternatives(text);
- if(/%(?!l)[a-z][a-z0-9]*;|#(?:[0-9a-f]{6,8})?;/i.test(out)){out=inlineCommands(out);out=halveLoose(out);}
+ {const cleaned=engineMarkup(out);if(cleaned!==out)out=halveLoose(cleaned);}
  out=tracks(out)??out;
  out=semicolonTracks(out)??out;
  out=foreignRows(out);
@@ -122,4 +132,4 @@ function typedOut(text){let s=[...String(text||'').replace(/\s+/g,'')];if(s.leng
    if(!ok||lens.length<3)continue;const d=[...new Set(lens)].sort((a,b)=>a-b);if(d.length>=3&&d.every((v,i)=>!i||v-d[i-1]===1))return true;}return false;};
  return steps(s)||!!halved&&steps(halved);}
 function soundCaption(text){const t=String(text||'').trim();return /^[■□◆◇▼▽★☆※◎●○]/u.test(t)&&[...t].length<=30&&!/[、。「」『』！？!?\r\n]/u.test(t);}
-module.exports={chineseTrack,stuttered,typedOut,soundCaption,scriptIdentifier,inlineCommands,halveLoose,borrowedCode,foreignLine,foreignRows,japaneseTrack,inlineAlternatives,tracks,semicolonTracks};
+module.exports={engineMarkup,chineseTrack,stuttered,typedOut,soundCaption,scriptIdentifier,inlineCommands,halveLoose,borrowedCode,foreignLine,foreignRows,japaneseTrack,inlineAlternatives,tracks,semicolonTracks};

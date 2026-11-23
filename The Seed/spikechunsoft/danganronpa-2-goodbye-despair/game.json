@@ -1,0 +1,67 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "54926cbe3c26b06b4a00e5d7af574a006225904b055bdbaf4331706cbe247519",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "spikechunsoft",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "6aa6b30a9a15290a0bc7bcc6a3e2ba0c15c915b91dc2c16853ed28d7de8c1e84",
+  "title": "4ffea8dc54079fcc59d8fb52aa37b79f30c2fb4bd98aefa0319e705fdde7ae79",
+  "steam": "413420",
+  "vndb": "v7679"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "danganronpa-2-goodbye-despair",
+ "builds": [
+  "8840bd4fd7aa2aaccb376f141e8ea12fce265107c2d94b87d243f77356893c4b"
+ ],
+ "match": {
+  "exe": [
+   "DR2_us.exe"
+  ],
+  "titles": [
+   "Danganronpa 2: Goodbye Despair",
+   "スーパーダンガンロンパ2 さよなら絶望学園"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

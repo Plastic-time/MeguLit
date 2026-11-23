@@ -1,0 +1,67 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "b332f31bae6c2268d81639a1396aeea9e779b5a651265da86f152945cef1bd4a",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "softpal",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "fb8ae5522da5b893138bc9bd58845cffba13b22a71a688be65f47415a6a30d91",
+  "script": "27956d4ab0cafd751f4d896eedeee6998a22c71f90ce4974947a39ac03102fb1",
+  "title": "5104697d08918fb528731df862b262727b77c7ed637f59bcda466ec8d8a33073",
+  "vndb": "v10016"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "tokei-jikake-no-leyline-1",
+ "builds": [
+  "9a502090106c713c6a7ee1b9ca2cfb57eb3c6ef375c9d2006ae89dbe356ffb77"
+ ],
+ "match": {
+  "exe": [
+   "LeyLine.exe"
+  ],
+  "titles": [
+   "時計仕掛けのレイライン －黄昏時の境界線－",
+   "[120727][ユニゾンシフト：ブロッサム] 時計仕掛けのレイライン -黄昏時の境界線-"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

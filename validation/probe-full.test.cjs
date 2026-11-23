@@ -48,7 +48,8 @@ test('collect: scripts and code only, never images / voices / movies; exe slim w
  const c=pf.collect({dir:g.dir,executable:g.exe,result:g.result,out,identity:'a'.repeat(64),title:'テスト'});
  assert.ok(c.file&&fs.existsSync(c.file));assert.equal(path.basename(c.file),c.sha256+'.mlfp');assert.equal(sha(fs.readFileSync(c.file)),c.sha256);
  const {manifest:m,data}=pf.open(fs.readFileSync(c.file));const paths=m.items.map(i=>i.path);
- for(const want of ['data.xp3/scenario/first.ks','data.xp3/scenario/enc.ks','data.xp3/system/Config.tjs','patch.xp3/scenario/first.ks','startup.ks','Game.exe','chs.exe','plugin/krglhwebp.dll','data/scene.pak#head','data/scene.pak#tail'])assert.ok(paths.includes(want),want);
+ for(const want of ['data.xp3/scenario/first.ks','data.xp3/scenario/enc.ks','data.xp3/system/Config.tjs','patch.xp3/scenario/first.ks','startup.ks','Game.exe','chs.exe','plugin/krglhwebp.dll','data/scene.pak#head'])assert.ok(paths.includes(want),want);
+ {const whole=m.items.find(i=>i.path==='data/scene.pak#head');assert.ok(whole.whole&&whole.size===(3<<20)+11,'a script-named archive under ENTRY_MAX goes whole');}
  for(const p of paths)assert.doesNotMatch(p,/\.(png|ogg|mp4)$|bgm\.pak|voice\//i,'no media: '+p);
  assert.ok(m.dropped.some(d=>d.entry==='system/sound.dat'&&d.reason==='media'),'a script-named entry holding Ogg is dropped by magic');
  assert.equal(m.items.find(i=>i.path==='data.xp3/scenario/enc.ks').encrypted,true,'encrypted entries go as stored');

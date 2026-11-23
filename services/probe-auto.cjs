@@ -35,6 +35,8 @@ const runtimeAt=(root,id)=>{try{return require('./runtime-harvest.cjs').load(roo
 function logEntry(s,entry){s.log=[{at:Date.now(),...entry},...s.log.filter(x=>!(x.gameId===entry.gameId&&x.identity===entry.identity))].slice(0,LOG_MAX);}
 
 /* one game: → 'known' | 'sent' | 'duplicate' | 'nothing' | 'failed' | 'offline' | 'skipped' */
+/* transport-level failures worth one try on the other built-in relay */
+const RELAY_RETRY=/^(NETWORK|TIMEOUT|HTTP_5\d\d|HTTP_4(?:03|08|13|29)|RATE_LIMITED)$/;
 async function one(root,db,game,result,s,{fetcher,endpoint,hasEndpoint,sampler,now=Date.now()}){
  const sample=require('./adapter-sample.cjs'),pi=require('./probe-identity.cjs');
  const rec=s.games[game.id]||{};if(rec.nextAt&&rec.nextAt>now)return 'skipped';
@@ -47,10 +49,12 @@ async function one(root,db,game,result,s,{fetcher,endpoint,hasEndpoint,sampler,n
  const seen={seen:true};
  if(remote.state==='complete'){s.games[game.id]={identity:ident.id,state:'known',items:remote.items,at:now,runtimeAt:rtAt,...seen};return 'known';}
  const prep=await sample.prepare(root,db,{ids:[game.id],sampler});
- if(!prep?.hash){s.games[game.id]={identity:ident.id,state:prep?.empty?'nothing':'failed',at:now,runtimeAt:rtAt,...seen,...(prep?.empty?{}:{attempts:(rec.attempts|0)+1,nextAt:now+RETRY_MAX})};return prep?.empty?'nothing':'failed';}
+ if(!prep?.hash){s.games[game.id]={identity:ident.id,state:prep?.empty?'nothing':'failed',at:now,runtimeAt:rtAt,...seen,...(prep?.empty?{}:{error:String(prep?.error||'PREPARE').slice(0,40),attempts:(rec.attempts|0)+1,nextAt:now+RETRY_MAX})};return prep?.empty?'nothing':'failed';}
  const g=prep.manifest[0]||{},items=g.probeItems|0,state=g.probeState||'partial';
  if(covered(remote,items)){s.games[game.id]={identity:ident.id,state:'known',items,at:now,runtimeAt:rtAt,...seen};return 'known';}
- const u=await sample.upload(root,{hash:prep.hash,fetcher,endpoint,identity:{id:ident.id,items,state,vndb:ident.vndb}});
+ /* 2026-11-16 (QQ group, Fate/stay night REMASTERED: 上传失败 again and again, the relay never saw a part): a transport failure on one built-in relay (cn-api through EdgeOne, or api.megulit.com) is tried once on the other; an address from Settings stays the only one */
+ const urls=endpoint?[endpoint]:(()=>{try{return require('./relay-config.cjs').endpoints(root,'/api/probe');}catch{return [];}})();
+ let u={state:'not-configured'};for(const url of urls.length?urls:[undefined]){u=await sample.upload(root,{hash:prep.hash,fetcher,endpoint:url,identity:{id:ident.id,items,state,vndb:ident.vndb}});if(!RELAY_RETRY.test(String(u.error||'')))break;}
  if(u.state==='uploaded'||u.state==='duplicate'){s.games[game.id]={identity:ident.id,state:u.state==='uploaded'?'sent':'duplicate',items,hash:prep.hash,at:now,runtimeAt:rtAt,...seen};
   logEntry(s,{gameId:game.id,title:game.title,identity:ident.id,hash:prep.hash,bytes:prep.bytes,state:u.state==='uploaded'?'sent':'duplicate'});return u.state==='uploaded'?'sent':'duplicate';}
  if(u.state==='not-configured')return 'offline';
@@ -60,48 +64,60 @@ async function one(root,db,game,result,s,{fetcher,endpoint,hasEndpoint,sampler,n
    to code, versions), once per identity, after the desensitized one. Kept under games[id].full {identity,state,hash,
    bytes,at,attempts,nextAt}; the collected file stays in data/adapter-probe/full only until the relay has it. */
 const appVersion=root=>{try{return require('./shared-adaptation.cjs').appVersion(root);}catch{return '';}};
+/* the runtime sample of an exe (services/runtime-sample.cjs), only with its consent switch */
+const runtimeStamp=(root,exe)=>{try{const rs=require('./runtime-sample.cjs');return rs.enabled(root)?rs.stamp(rs.dirFor(root,exe)):'';}catch{return '';}};
+async function runtimeOnly(root,game,ident,f,{fetcher=globalThis.fetch}={}){const rs=require('./runtime-sample.cjs');if(!rs.enabled(root))return {state:'off'};
+ const key=require('../core/auto-profile.cjs').exeKeySync(root,game.executable),dir=key?rs.keyDir(root,key):'',stamp=dir?rs.stamp(dir):'';if(!stamp||stamp===f.runtime)return {state:'nothing'};
+ const b=rs.bundle(dir,key);if(!b)return {state:'nothing'};let prints;try{prints=JSON.parse(fs.readFileSync(path.join(dir,'sample.json'),'utf8')).prints;}catch{}
+ const body=JSON.stringify({version:1,key,identity:ident.id,...(prints?{prints}:{}),sha256:b.sha256,data:b.data.toString('base64')});
+ let urls=[];try{urls=require('./relay-config.cjs').endpoints(root,'/api/game-profile/runtime');}catch{}
+ for(const url of urls){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(60000)});if(r.ok)return {state:'sent',stamp};if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused'};}catch{}}
+ return {state:'failed'};}
 async function fullOne(root,db,game,result,s,{fetcher,fullBase,fuller,now=Date.now()}){
  const pf=require('./probe-full.cjs'),pi=require('./probe-identity.cjs');
  const ident=pi.identity({executable:game.executable,result,vndb:pi.vndbOf(db,game.id)});if(!ident.id)return 'skipped';
  const rec=s.games[game.id]||(s.games[game.id]={}),f=rec.full&&rec.full.identity===ident.id?rec.full:{};
+ /* 2026-11-21 the relay has this game's scripts and exe: a runtime sample made since goes on its own (scripts and exe not again) */
+ if(['sent','duplicate'].includes(f.state)&&!(f.nextAt&&f.nextAt>now)){const r=await runtimeOnly(root,game,ident,f,{fetcher});if(r.state==='sent'){rec.full={...f,runtime:r.stamp,at:now};return 'runtime';}return 'skipped';}
  if(['sent','duplicate','nothing'].includes(f.state)||f.nextAt&&f.nextAt>now)return 'skipped';
  const retry=(state,extra={})=>{const attempts=(f.attempts|0)+1;rec.full={...f,identity:ident.id,state,at:now,attempts,nextAt:now+Math.min(RETRY_MAX,RETRY_MIN*2**Math.min(6,attempts-1)),...extra};return state;};
  let file=pf.pending(root,f.hash),bytes=f.bytes|0,hash=f.hash||'';
- if(!file){const c=await fuller(game,result,{out:pf.fullDir(root),identity:ident.id,title:String(game.title||''),vndb:ident.vndb||'',app:appVersion(root)});
+ if(!file){const c=await fuller(game,result,{out:pf.fullDir(root),runtime:(()=>{try{const rs=require('./runtime-sample.cjs');return rs.enabled(root)?rs.dirFor(root,game.executable):'';}catch{return '';}})(),identity:ident.id,title:String(game.title||''),vndb:ident.vndb||'',app:appVersion(root)});
   if(c?.empty){rec.full={identity:ident.id,state:'nothing',at:now};return 'nothing';}
   if(!c?.file)return retry('failed',{error:String(c?.error||'COLLECT').slice(0,40)});
   file=c.file;bytes=c.bytes;hash=c.sha256;}
  const u=await pf.upload(root,{file,identity:ident.id,title:String(game.title||''),vndb:ident.vndb||'',step:result.step||'',app:appVersion(root),fetcher,base:fullBase});
- if(u.state==='uploaded'||u.state==='duplicate'){const state=u.state==='uploaded'?'sent':'duplicate';rec.full={identity:ident.id,state,hash,bytes,at:now};
+ if(u.state==='uploaded'||u.state==='duplicate'){const state=u.state==='uploaded'?'sent':'duplicate';rec.full={identity:ident.id,state,hash,bytes,at:now,...(u.state==='uploaded'?{runtime:runtimeStamp(root,game.executable)}:{})};
   logEntry(s,{gameId:game.id,title:game.title,identity:ident.id,hash,bytes,state,kind:'full'});return state;}
  if(u.state==='not-configured')return 'offline';
  return retry('failed',{hash,bytes,error:String(u.error||'').slice(0,40)});}
 
 /* run(root,db,opts) → {state, results:{gameId:outcome}}: the library probe when due, then every problem game in turn */
 let busy=null;
-async function run(root,db,{ids=null,fetcher=globalThis.fetch,endpoint,hasEndpoint,fullBase,sampler,fuller,probeFirst=true,wait=ms=>new Promise(r=>setTimeout(r,ms))}={}){
+async function run(root,db,{ids=null,fetcher=globalThis.fetch,endpoint,hasEndpoint,fullBase,sampler,fuller,probeFirst=true,automatic=false,checkpoint=automatic?()=>require('./background-budget.cjs').wait(root):async()=>{},wait=ms=>new Promise(r=>setTimeout(r,ms))}={}){
  if(!enabled(root))return {state:'off',results:{}};
  if(busy)return {state:'busy',results:{}};
  busy=(async()=>{const probe=require('./adapter-probe.cjs');sampler=sampler||probe.sampleInWorker;fuller=fuller||probe.fullInWorker;try{require('./probe-full.cjs').sweep(root);}catch{}
-  const s=load(root);
+  const s=load(root);await checkpoint();
   if(probeFirst&&!ids&&Date.now()-s.probedAt>PROBE_EVERY&&probe.status(root).state!=='running'){
-   s.probedAt=Date.now();save(root,s);probe.start(root,db,{reason:'auto'});
+   s.probedAt=Date.now();save(root,s);probe.start(root,db,{reason:'auto',automatic});
    for(let i=0;i<2400&&probe.status(root).state==='running';i++)await wait(1000);}
-  const results=probe.results(root),games=probe.libraryGames(db),want=ids?new Set(ids.map(String)):null,out={},full={},contrib=require('./adapter-contrib.cjs'),contribOut={};
+  const results=probe.results(root),games=probe.libraryGames(db),want=ids?new Set(ids.map(String)):null,out={},errors={},full={},contrib=require('./adapter-contrib.cjs'),contribOut={};
   /* rule 3 (adapter-contrib.cjs): local packages never stay longer than KEEP_DAYS, nor at all once the switch is off */
   contrib.purgeOutbox(root,contrib.enabled(root)?{olderThan:contrib.KEEP_DAYS*86400000}:{});
   for(const p of probe.problems(root)){if(want&&!want.has(p.id))continue;const g=games.find(x=>x.id===p.id);if(!g||!results[p.id])continue;
-   const keep=s.games[p.id]?.full;let o;try{o=await one(root,db,g,results[p.id],s,{fetcher,endpoint,hasEndpoint,sampler});}catch{o='failed';}
+   await checkpoint();const keep=s.games[p.id]?.full;let o;try{o=await one(root,db,g,results[p.id],s,{fetcher,endpoint,hasEndpoint,sampler});}catch(e){o='failed';/* an exception used to leave no record (no error code, no backoff): the dialog said 上传失败 with nothing to go on */const rec=s.games[p.id]||{},attempts=(rec.attempts|0)+1;s.games[p.id]={...rec,state:'failed',error:('EXC '+String(e?.message||e)).replace(/[^ -~]/g,'?').slice(0,40),at:Date.now(),attempts,nextAt:Date.now()+Math.min(RETRY_MAX,RETRY_MIN*2**Math.min(6,attempts-1))};}
+   if(o==='failed')errors[p.id]=String(s.games[p.id]?.error||'');
    if(keep&&s.games[p.id]&&!s.games[p.id].full)s.games[p.id].full=keep;
    out[p.id]=o;save(root,s);if(o==='offline')break;
    /* 2026-11-16 informed consent (adapter-contrib.cjs consentState): the contribution and the full script + exe upload
       run only after the player agreed (update card 同意并下一步 or the Settings switch); without it nothing of the game is sent */
    if(contrib.enabled(root)){
-    try{contribOut[p.id]=await contrib.forGame(root,db,g,results[p.id],{fetcher});}catch{contribOut[p.id]='failed';}
-    let fo;try{fo=await fullOne(root,db,g,results[p.id],s,{fetcher,fullBase,fuller});}catch{fo='failed';}
+    await checkpoint();try{contribOut[p.id]=await contrib.forGame(root,db,g,results[p.id],{fetcher});}catch{contribOut[p.id]='failed';}
+    await checkpoint();let fo;try{fo=await fullOne(root,db,g,results[p.id],s,{fetcher,fullBase,fuller});}catch{fo='failed';}
     full[p.id]=fo;save(root,s);if(fo==='offline')break;if(fo!=='skipped')await wait(1500);}
    await wait(o==='skipped'?0:1500);}
-  save(root,s);return {state:'done',results:out,contrib:contribOut,full};})();
+  save(root,s);return {state:'done',results:out,errors,contrib:contribOut,full};})();
  try{return await busy;}finally{busy=null;}}
 
 /* status(root) → {enabled, busy, games, log} (the probe dialog shows log + each bundle's manifest as the record) */
@@ -109,8 +125,8 @@ function status(root){const s=load(root);return {enabled:enabled(root),busy:!!bu
 
 /* background schedule: FIRST_DELAY after start, then every EVERY; kick() after a runtime harvest or a finished probe */
 let timer=null,opener=null,started=null;
-function schedule(root,delay){if(!opener)return;clearTimeout(timer);timer=setTimeout(async()=>{timer=null;let db;try{db=opener();await run(root,db);}catch{}finally{try{db?.close?.();}catch{}}schedule(root,EVERY);},delay);timer.unref?.();}
+function schedule(root,delay){if(!opener)return;timer?.stop?.();timer=require('./background-budget.cjs').schedule(root,async()=>{timer=null;let db;try{db=opener();await run(root,db,{automatic:true});}catch{}finally{try{db?.close?.();}catch{}}schedule(root,EVERY);},{delay});timer.unref?.();}
 function start(root,openDb,{delay=FIRST_DELAY}={}){if(process.env.NODE_TEST_CONTEXT||started===root)return null;started=root;opener=openDb;schedule(root,delay);return true;}
 function kick(root,{delay=KICK_DELAY}={}){if(!opener||started!==root||!enabled(root))return false;schedule(root,delay);return true;}
 
-module.exports={enabled,setEnabled,has,covered,run,fullOne,status,start,kick,load,fileOf,RETRY_MIN,RETRY_MAX};
+module.exports={enabled,setEnabled,has,covered,run,fullOne,runtimeOnly,status,start,kick,load,fileOf,RETRY_MIN,RETRY_MAX};

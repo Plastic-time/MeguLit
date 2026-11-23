@@ -43,12 +43,19 @@ function textsOf(doc){
  }
  return scenes;
 }
+const NON_SCN=/\.(?:png|jpe?g|bmp|gif|webp|tlg\d?|psd|pimg|mstand|stage|ogg|wav|mp3|opus|flac|wma|sli|wmv|mp4|avi|mpe?g|mkv|amv|ttf|otf|ttc|tft|fon|ks|tjs|txt|csv|tsv|ini|xml|json|cfg|dll|exe|zip|7z|rar)$/i;
 function build(file){
  const list=xp3.list(file),docs=[];if(!list)return {docs,files:0};let tried=0;
+ const hasScn=list.files.some(e=>/\.scn$/i.test(e.name));
+ let cx=null;if(list.files.some(e=>e.encrypted))try{cx=require('./cx-filter.cjs').forArchive(file);}catch{}
  for(const entry of list.files){
-  let raw;try{raw=xp3.read(file,entry);}catch{continue;}
-  if(raw.length<0x40||(raw[1]^raw[3])!==0x53||(raw[2]^raw[3])!==0x42)continue;tried++;
-  const doc=psb.openCx(raw);if(!doc)continue;const scenes=textsOf(doc);
+  if(hasScn?!/\.scn$/i.test(entry.name):NON_SCN.test(entry.name))continue;
+  let raw;try{raw=xp3.read(file,entry,cx);}catch{continue;}
+  if(raw.length<0x40)continue;
+  const h=raw.toString('latin1',0,4),plain=h==='PSB\0'||h==='mdf\0';
+  if(!plain&&!((raw[1]^raw[3])===0x53&&(raw[2]^raw[3])===0x42||(raw[1]^raw[2])===0x11&&(raw[0]^raw[1])===0x03))continue;tried++;
+  let doc=null;if(plain)try{const d=psb.parse(raw,{tolerant:true});if(d?.root&&typeof d.root==='object')doc=d;}catch{}if(!doc)doc=psb.openCx(raw);if(!doc)continue;
+  const scenes=textsOf(doc);
   if(scenes.length)docs.push({entry:entry.name,name:typeof doc.root.name==='string'?doc.root.name:'',scenes});
  }
  return {docs,files:tried};

@@ -17,9 +17,10 @@ function serve(){const server=http.createServer((req,res)=>{const rel=decodeURIC
  return new Promise(r=>server.listen(0,'127.0.0.1',()=>r(server)));}
 const PROBE=`(async()=>{const w=ms=>new Promise(r=>setTimeout(r,ms));const d=document.querySelector('.tomoyo-cn-dialog[open]');d.querySelector('[data-menu-key=calibrate]').click();await w(300);
  const p=d.querySelector('[data-menu-category=calibrate]'),all=[...p.querySelectorAll('*')],at=n=>all.indexOf(n),q=s=>p.querySelector(s);
- const block=q('[data-calibration-window-bind]'),pick=q('[data-gal-pick]'),bound=q('[data-gal-bound-window]');
+ const block=q('[data-calibration-window-bind]'),pick=q('[data-gal-pick]'),bound=q('[data-gal-bound-window]'),bar=q('.tome-ac-bindbar'),tabs=q('.mg-subtabs');
  const out={summaries:[...p.querySelectorAll('summary')].map(s=>s.textContent.trim()),drag:at(q('[data-gal-drag]')),sync:at(q('.tome-position-sync')),block:at(block),imports:at(q('.tome-calibration-imports')),
-  inBlock:['[data-gal-pick]','[data-gal-bind-hint]','[data-gal-bound-window]','select[name=galGame]','[data-gal-refresh]','[data-gal-bind]','[data-gal-unbind]','.tomoyo-gal-state'].map(s=>!!block?.querySelector(s)),
+  barOk:!!bar&&bar.contains(bound)&&at(bar)<at(block)&&at(block)<at(tabs)&&at(tabs)<at(q('[data-gal-drag]'))&&at(q('[data-gal-drag]'))<at(q('.tome-calibration-imports')),manualOpen:!block.classList.contains('tome-ac-off')&&!!block.getClientRects().length,tabLabels:[...p.querySelectorAll('.mg-subtabs>button')].map(b=>b.textContent),impInTab:!!q('.tome-calibration-imports')&&!q('.tome-calibration-imports').classList.contains('tome-ac-off')?'visible':'hidden',
+  inBlock:['[data-gal-pick]','[data-gal-bind-hint]','select[name=galGame]','[data-gal-refresh]','[data-gal-bind]','[data-gal-unbind]','.tomoyo-gal-state'].map(s=>!!block?.querySelector(s)),
   presetVisible:!!q('[name=galPreset]')?.getClientRects().length&&!q('[name=galPreset]').closest('details'),gridVisible:!!q('[name=galX]')?.getClientRects().length&&!q('[name=galX]').closest('details'),
   hint:q('[data-gal-bind-hint]')?.textContent.trim(),bound:bound?.textContent,pick:pick?.textContent,pickBox:(()=>{const s=getComputedStyle(pick),o=getComputedStyle(q('[data-gal-drag]'));return [s.borderRadius===o.borderRadius,s.fontSize===o.fontSize,s.height===o.height];})(),
   blockBg:getComputedStyle(block).backgroundColor+'|'+getComputedStyle(block).backgroundImage,footer:d.querySelector('.tomoyo-menu-header small')?.textContent||''};
@@ -38,12 +39,15 @@ test('校准: 绑定游戏窗口 sits after 拖动文本框 and its hint, before
   await sleep(1500);const s=await cdp.evaluate(PROBE);
   if(process.env.MEGULIT_SHOT){const r=await cdp.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.MEGULIT_SHOT,Buffer.from(r.data,'base64'));}
   assert.ok(!s.summaries.some(t=>/窗口绑定/.test(t)),'old fold gone: '+s.summaries);
-  assert.ok(s.drag>=0&&s.sync>s.drag&&s.block>s.sync&&s.imports>s.block,'order 拖动文本框 → hint → 绑定游戏窗口 → imports: '+JSON.stringify(s));
-  assert.deepEqual(s.inBlock,[true,true,true,true,true,true,true,true],'everything for binding in the block');
+  assert.ok(s.barOk,'binding status bar sits above the sub-tabs; manual block between bar and tabs; 拖动文本框 and imports below the tabs: '+JSON.stringify(s));
+  assert.ok(s.drag>=0&&s.sync>s.drag&&s.imports>s.sync,'order 拖动文本框 → hint → imports: '+JSON.stringify(s));
+  assert.ok(!s.manualOpen,'manual bind controls start collapsed, bound or not');
+  assert.deepEqual(s.tabLabels,['校准','沿用设置'],'calibration sub-tabs (short names, full name in the tooltip)');
+  assert.deepEqual(s.inBlock,[true,true,true,true,true,true,true],'manual binding controls (pick, hint, list, refresh, bind, unbind, state) live in the block');
   assert.ok(s.presetVisible&&s.gridVisible,'preset and margins stay on the page, not folded');
   assert.equal(s.hint,'先开游戏后开 MeguLit，或 MeguLit 重开后，用这里或 Alt+M 重新连接');assert.equal(s.bound,'未绑定');assert.equal(s.pick,'绑定游戏窗口');
   assert.deepEqual(s.pickBox,[true,true,true],'the pick button looks like 拖动文本框');assert.match(s.blockBg,/rgba\(0, 0, 0, 0\)\|none/,'no glass box');
   assert.match(s.footer,/Alt\+M ?绑定窗口/);
   assert.equal(s.boundAfter,'当前：さくらの詩');assert.deepEqual(s.picking,['请点一下游戏窗口…（再点这里取消）',true]);assert.equal(s.pickAfter,false);assert.equal(s.tip,'已绑定：さくらの詩');assert.equal(s.unbound,'未绑定');
- }finally{cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });

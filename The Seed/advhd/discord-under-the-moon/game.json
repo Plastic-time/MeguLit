@@ -1,0 +1,69 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "6cb32b6b39a1a07469879dd601586a33a399d74febcf0091cfebeab4a86bcb11",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "advhd",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "b30abb325532d2c6ca5d492f07c12269a83e32edf5dd5aecf7a82af4319b1480",
+  "script": "8596fb3787c3d1a811d1faa9f8a4771273bd0110d351c4854982baacd472e62f",
+  "title": "952caa1ad5651bc6616e4dd9e6c484529eecc2f7e2802fb63d9b0b595815b6bc",
+  "vndb": "v19434"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "discord-under-the-moon",
+ "builds": [
+  "cf7b3a19ef818d67682192dabb29528129c90c4ff7d861d89074c309cc2e3282"
+ ],
+ "match": {
+  "exe": [
+   "utmoon.exe"
+  ],
+  "titles": [
+   "ディスコード！",
+   "disc",
+   "[061215][シュガービーンズ] Under The Moon～ (iso)",
+   "Discord!"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

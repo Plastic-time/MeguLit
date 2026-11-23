@@ -21,21 +21,22 @@
 #include <deque>
 #include <memory>
 #include "dump_api.h"
-#include "../minhook/include/MinHook.h" // MH_Initialize only; hooks go through DumpHook
+#include "../threadflag.h"
+#include "../../shared/minhook/include/MinHook.h" // MH_Initialize only; hooks go through DumpHook
 
 namespace voicefile {
 wchar_t Dir[1024], OutDir[1024];
 CRITICAL_SECTION Gate;
-DWORD Tls = TLS_OUT_OF_INDEXES;
+ThreadFlags HookBusy; // never allocates; TlsSetValue could re-enter the heap hook (threadflag.h)
 volatile LONG On, Seq, Faults;
 volatile LONGLONG Spent, Budget = 1536ll << 20;
 const DWORD MinFile = 2048, MaxFile = 8u << 20, InPlaceMs = 500;
 const size_t PendingCap = 32u << 20;
 
 struct Lock { Lock() { EnterCriticalSection(&Gate); } ~Lock() { LeaveCriticalSection(&Gate); } };
-ULONGLONG Enter() { DWORD e = GetLastError(); bool was = TlsGetValue(Tls) != NULL; TlsSetValue(Tls, (void *)1); SetLastError(e); return ((ULONGLONG)was << 32) | e; }
-void Leave(ULONGLONG w) { if (!(w >> 32)) TlsSetValue(Tls, NULL); SetLastError((DWORD)w); }
-bool Busy() { DWORD e = GetLastError(); bool r = Tls == TLS_OUT_OF_INDEXES || TlsGetValue(Tls) != NULL; SetLastError(e); return r; }
+ULONGLONG Enter() { DWORD e = GetLastError(); bool was = HookBusy.Raise(); SetLastError(e); return ((ULONGLONG)was << 32) | e; }
+void Leave(ULONGLONG w) { HookBusy.Lower((w >> 32) != 0); SetLastError((DWORD)w); }
+bool Busy() { return HookBusy.On(); }
 bool Live() { return On && !Busy(); }
 ULONGLONG NowMs() { FILETIME f; GetSystemTimeAsFileTime(&f); ULARGE_INTEGER u; u.LowPart = f.dwLowDateTime; u.HighPart = f.dwHighDateTime; return u.QuadPart / 10000 - 11644473600000ULL; }
 std::string Utf8(const wchar_t *s) {
@@ -316,7 +317,6 @@ bool StartUp(const wchar_t *out) {
   if (fh != INVALID_HANDLE_VALUE) { do { Spent += fd.nFileSizeLow; LONG k = _wtoi(fd.cFileName + 1); if (k > top) top = k; } while (FindNextFileW(fh, &fd)); FindClose(fh); }
   Seq = top;
   InitializeCriticalSection(&Gate);
-  Tls = TlsAlloc();
   Crc32 = (Crc32Fn)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlComputeCrc32");
   MH_STATUS s = MH_Initialize();
   return s == MH_OK || s == MH_ERROR_ALREADY_INITIALIZED;
@@ -334,12 +334,12 @@ void VoiceFileStart(const wchar_t *out) {
  using namespace voicefile;
  if (!StartUp(out)) return;
  On = 1;
- TlsSetValue(Tls, (void *)1);
+ HookBusy.Raise();
  SafeStep();
 }
 void VoiceFileTick() {
  using namespace voicefile;
  if (!On) return;
- TlsSetValue(Tls, (void *)1);
+ HookBusy.Raise();
  SafeStep();
 }

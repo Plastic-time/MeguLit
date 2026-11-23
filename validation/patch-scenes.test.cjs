@@ -118,6 +118,33 @@ test('gaps are filled ahead of the reading position: next line ready before it i
  assert.strictEqual(again.resolve('そうだね、散歩に行こうか。').translation,'译：そうだね、散歩に行こうか。','kept for the next session');
 });
 
+/* A capture can cover two script lines (the game shows them in one box). The lines ahead are filled one by one, so the
+   capture takes each line's own translation, and a line the patch translates keeps the patch's wording. */
+const ks3='*start\r\n[name text="ハル"]\r\nおはよう、今日はいい天気だね。[p]\r\nそうだね、散歩に行こうか。[p]\r\n公園まで歩いていこう。[p]\r\n@s\r\n';
+const fakeReader=(provider,data)=>{const calls=[],service={translate:async(t)=>{calls.push(t);return '译：'+t;},clearContext(){},observeSource(){},setKey(){}};
+ return {calls,reader:{gal:{hooks:{originalText:provider}},prefs:()=>({}),displayLanguage:()=>'',localReady:async()=>{},embedCached:()=>{},folder:data,root:data,scriptPrefetch:{service,keysAt:Date.now(),running:false}}};};
+test('a capture of two filled lines takes each line\'s filled translation',async()=>{
+ const {data,exe}=setup(game=>{fs.writeFileSync(path.join(game,'first.ks'),ks3);});
+ assert.strictEqual(ot.scanRunning(data,'1',exe).status,'native-japanese');
+ const provider=ot.provider(data,exe),{calls,reader}=fakeReader(provider,data);
+ provider.resolve('おはよう、今日はいい天気だね。');
+ assert.strictEqual(await require('../services/script-prefetch.cjs').ahead(reader),2);assert.deepStrictEqual(calls,['そうだね、散歩に行こうか。','公園まで歩いていこう。']);
+ const r=provider.resolve('そうだね、散歩に行こうか。\n公園まで歩いていこう。');
+ assert.deepStrictEqual(r.indices,[2,3].map(i=>i-1));assert.strictEqual(r.translation,'译：そうだね、散歩に行こうか。译：公園まで歩いていこう。');assert.strictEqual(r.machine,true);
+});
+test('a capture of a patch line and a filled line keeps the patch translation',async()=>{
+ const zh=ks3.replace('おはよう、今日はいい天気だね。','早上好，今天天气真好。').replace('そうだね、散歩に行こうか。','是啊，去散步吧。');
+ const u16=t=>Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from(t,'utf16le')]);
+ const {db,data,exe}=setup((game,patch)=>{fs.mkdirSync(path.join(game,'scenario'));fs.writeFileSync(path.join(game,'scenario','first.ks'),u16(ks3));writeXp3(path.join(patch,'patch.xp3'),[['scenario/first.ks',u16(zh)]]);});
+ assert.strictEqual(ot.scanRunning(data,'1',exe).status,'native-japanese');
+ const found=await ot.autoPatch(data,db,'1',{drives:false,force:true});assert.ok(found.found,JSON.stringify(found));
+ const provider=ot.provider(data,exe),{calls,reader}=fakeReader(provider,data);
+ assert.strictEqual(provider.resolve('おはよう、今日はいい天気だね。').translation,'早上好，今天天气真好。');
+ assert.strictEqual(await require('../services/script-prefetch.cjs').ahead(reader),1);assert.deepStrictEqual(calls,['公園まで歩いていこう。']);
+ const r=provider.resolve('そうだね、散歩に行こうか。公園まで歩いていこう。');
+ assert.strictEqual(r.translation,'是啊，去散步吧。译：公園まで歩いていこう。');assert.strictEqual(r.machine,true);
+});
+
 // E294: an encrypted KiriKiri game that cannot be read yet says it is being prepared, not that it is unsupported.
 test('encrypted KiriKiri archives report preparing (unpack, then capture), not unsupported',async()=>{
  const {data,exe}=setup(game=>{writeXp3(path.join(game,'scn.xp3'),[['0123456789abcdef0123456789abcdef',Buffer.from('random bytes that are no PSB')]],0x80000000);});

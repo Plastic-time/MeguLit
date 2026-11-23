@@ -11,7 +11,9 @@ const work=fs.existsSync('H:/')?'H:/MeguLit-Work/shot-own-overlay-test':path.joi
 
 test('saved pictures go through GameCapture.Picture, which never reads the screen',()=>{
  const cap=read('native/GameCapture.cs'),audio=read('native/GameAudio.cs'),bridge=read('native/GalWindowBridge.cs');
- assert.match(cap,/public static bool Picture\(IntPtr hwnd,Bitmap image\)\{if\(!Into\(hwnd,image,2,false\)\)return false;if\(FromScreen\)\{FromScreen=false;return false;\}return true;\}/);
+ assert.match(cap,/public static bool Picture\(IntPtr hwnd,Bitmap image\)\{\s+if\(Into\(hwnd,image,2,false\)\)\{if\(FromScreen\)\{FromScreen=false;return false;\}return true;\}/);
+ /* a frozen window's fallback is its own last PrintWindow print (Kept), never the screen */
+ assert.match(cap,/if\(Busy\(hwnd\)\|\|!Kept\(c,image,DateTime\.UtcNow\)\)return false;/);
  assert.match(cap,/FromScreen=true;return ScreenInto\(hwnd,image\);/,'a screen copy inside Into is marked so Picture drops it');
  for(const name of ['Screenshot','SceneShot','SceneFrame','SceneProbe']){
   const body=audio.slice(audio.indexOf('public static string '+name+'('));assert.match(body.slice(0,700),/GameCapture\.Picture\(target,image\)/,name);

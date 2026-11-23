@@ -38,7 +38,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>.sentence-
     const jp = () => page.evaluate(() => getComputedStyle(document.querySelector('.sentence-text')).visibility);
     const cn = () => page.evaluate(() => getComputedStyle(document.querySelector('.tomoyo-cn-row')).visibility);
     const bg = () => page.evaluate(() => getComputedStyle(document.querySelector('.sentence-window')).backgroundColor);
-    await page.evaluate(() => window.__tomoyoChinese.textPlaceMode({ on: true })); await frame();
+    await page.evaluate(() => (window.__tomoyoChinese.textPlaceAnchor?.(false), window.__tomoyoChinese.textPlaceMode({ on: true }))); await frame();
     /* unarmed page, nothing else hides the line = the game draws it: the reader is not placed over it, it goes back to its
        own window bilingual (Japanese on top, clickable), never on a plate */
     await page.evaluate(() => window.__tomoyoChinese.textPlacePage({ type: 'textPlacePage', awake: true, armed: false, lines: [], client: [1280, 720] })); await frame();

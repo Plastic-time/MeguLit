@@ -1,0 +1,549 @@
+2026-11-21T03:31:30.002Z render mode switched in place read -> custom
+2026-11-21T03:31:30.367Z render mode switched in place custom -> embed
+2026-11-21T03:31:32.342Z ocr page art scan on
+2026-11-21T03:31:35.416Z ocr page art scan 3/0 当作品には流血・暴力や精神的不安を煽る表現が含まれておりますまた、差別的な用語を使用している箇所もございますが全
+2026-11-21T03:31:36.152Z ocr page art scan 2/0 当作品のプレイには、ヘッドホンやイヤホン等のご利用を心からお勧めさせていただきます
+2026-11-21T03:31:36.581Z ocr page art scan 0/0
+2026-11-21T03:31:37.111Z ocr lines skipped: 5 text groups at once (menu or settings page)
+2026-11-21T03:31:38.310Z ocr page art scan 2/0 当作品のプレイには、ヘッドホンやイヤホン等のご利用を心からお勧めさせていただきます
+2026-11-21T03:31:39.393Z ocr page art scan 0/0
+2026-11-21T03:31:39.615Z ocr line "当作品のプレイには、ヘッドホンやイヤホン等のご利用を心からお勧めさせていただきま"
+2026-11-21T03:31:39.640Z source chars=83 sequence=1
+2026-11-21T03:31:42.094Z ocr page art scan 8/0 Dロ.ロ
+2026-11-21T03:31:43.653Z ocr lines skipped: 8 text groups at once (menu or settings page)
+2026-11-21T03:31:43.841Z ocr page art scan 2/0 Dロ.ロ
+2026-11-21T03:31:44.562Z ocr page art scan 1/0 ロロ
+2026-11-21T03:31:45.067Z ocr line refused (OCR noise) "ロロ"
+2026-11-21T03:31:45.067Z ocr line refused (a title or menu screen) "ロロ"
+2026-11-21T03:31:45.076Z ocr page art scan 0/0
+2026-11-21T03:31:48.953Z ocr page art scan 1/0 館がある
+2026-11-21T03:31:51.117Z ocr line "館がある"
+2026-11-21T03:31:51.118Z source chars=4 sequence=2
+2026-11-21T03:31:52.823Z ocr page art scan 1/0 鬱蒼と茂る闇の森をかき分けると
+2026-11-21T03:31:53.949Z ocr line snapped to the script "鬱蒼と茂る闇の森を掻き分けると――"
+2026-11-21T03:31:53.950Z ocr line "鬱蒼と茂る闇の森を掻き分けると――"
+2026-11-21T03:31:53.958Z source chars=17 sequence=3
+2026-11-21T03:31:53.991Z ocr page art scan 2/0 寝起きざまのように
+2026-11-21T03:31:54.576Z ocr page art scan 0/0
+2026-11-21T03:31:55.095Z ocr line "寝起きざまのように\n忽然と現れる館"
+2026-11-21T03:31:55.139Z source chars=17 sequence=4
+2026-11-21T03:31:59.254Z ocr page art scan 1/0 誰が初めに言ったのだろう
+2026-11-21T03:31:59.813Z ocr page art scan 1/0 隹が初めに言ったのだろう
+2026-11-21T03:32:00.320Z ocr line "隹が初めに言ったのだろう"
+2026-11-21T03:32:00.321Z source chars=12 sequence=5
+2026-11-21T03:32:02.014Z ocr page art scan 0/0
+2026-11-21T03:32:05.744Z ocr page art scan 1/0 その館が、呪われていると
+2026-11-21T03:32:06.816Z ocr line "その館が、呪われていると"
+2026-11-21T03:32:06.818Z source chars=12 sequence=6
+2026-11-21T03:32:09.323Z ocr page art scan 0/0
+2026-11-21T03:32:17.757Z ocr page art scan 1/0 聖なるかな聖なるかな聖なるかな
+2026-11-21T03:32:18.801Z ocr line voted "聖なるかな聖なるかな聖なるかな" -> "聖なるかな"
+2026-11-21T03:32:18.801Z ocr line "聖なるかな"
+2026-11-21T03:32:18.802Z source chars=5 sequence=7
+2026-11-21T03:32:21.436Z ocr page art scan 0/0
+2026-11-21T03:32:22.009Z ocr page art scan 1/0 父よ仏を情れみたまえ
+2026-11-21T03:32:22.537Z ocr page art scan 1/0 父よ私を憐れみたまえ
+2026-11-21T03:32:23.040Z ocr line "父よ私を憐れみたまえ"
+2026-11-21T03:32:23.041Z source chars=10 sequence=8
+2026-11-21T03:32:25.121Z ocr page art scan 0/0
+2026-11-21T03:32:25.658Z ocr page art scan 1/0 彼らの魂に永劫の苦しみがあらんことを
+2026-11-21T03:32:26.704Z ocr line "彼らの魂に永劫の苦しみがあらんことを"
+2026-11-21T03:32:26.704Z source chars=18 sequence=9
+2026-11-21T03:32:30.547Z ocr page art scan 0/0
+2026-11-21T03:32:32.861Z krkr page mode on
+2026-11-21T03:32:33.265Z source chars=18 sequence=10
+2026-11-21T03:32:33.290Z placement placed: line 1, 18 characters, first box 220,488,20,22 in client 804x604
+2026-11-21T03:32:33.445Z choice aux KiriKiri2 role=0 added=[] text="その瞬間、私は死体を見下ろしていた。"
+2026-11-21T03:32:33.512Z ocr page art scan off
+2026-11-21T03:32:33.740Z source chars=9 sequence=11
+2026-11-21T03:32:33.756Z placement placed: line 2, 9 characters, first box 307,488,22,22 in client 804x604
+2026-11-21T03:32:33.952Z choice aux KiriKiri2 role=0 added=[] text="……自分の死体だ。"
+2026-11-21T03:32:34.105Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="そのそ瞬のそ間の瞬、そ私の瞬間はそ、死の私瞬間体瞬は、を間死私見、体はを下私死ろは体見をし死下て体見ろをいをし下た見てろ。下いしてろたいし。てろたしい。てたい。"
+2026-11-21T03:32:35.685Z source chars=17 sequence=12
+2026-11-21T03:32:35.699Z placement placed: line 3, 17 characters, first box 226,488,22,22 in client 804x604
+2026-11-21T03:32:35.888Z choice aux KiriKiri2 role=0 added=[] text="磔の場へと引きずられるその姿に……"
+2026-11-21T03:32:36.018Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="磔の場へと引きずられるその姿に……"
+2026-11-21T03:32:37.483Z source chars=9 sequence=13
+2026-11-21T03:32:37.499Z placement placed: line 4, 9 characters, first box 307,488,22,22 in client 804x604
+2026-11-21T03:32:37.686Z choice aux KiriKiri2 role=0 added=[] text="深い絶望を抱き……"
+2026-11-21T03:32:37.832Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="深い深絶望い深を絶抱望い深き深を絶…い抱望…絶をき抱望…を…き抱望…を…き抱……き……"
+2026-11-21T03:32:40.406Z source chars=9 sequence=14
+2026-11-21T03:32:40.425Z placement placed: line 5, 9 characters, first box 309,488,20,22 in client 804x604
+2026-11-21T03:32:40.613Z choice aux KiriKiri2 role=0 added=[] text="そして魂は砕け……"
+2026-11-21T03:32:40.761Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="そしそて魂しそはて砕魂しそけそては…し魂砕…てけは魂…砕…はけ魂…砕…はけ…砕…け……"
+2026-11-21T03:32:41.211Z source chars=12 sequence=15
+2026-11-21T03:32:41.231Z placement placed: line 6, 12 characters, first box 281,488,22,22 in client 804x604
+2026-11-21T03:32:41.417Z choice aux KiriKiri2 role=0 added=[] text="私のすべては、消滅した。"
+2026-11-21T03:32:41.555Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="私のすべては、消滅した。"
+2026-11-21T03:32:42.504Z source chars=14 sequence=16
+2026-11-21T03:32:42.520Z placement placed: line 7, 14 characters, first box 265,488,20,22 in client 804x604
+2026-11-21T03:32:42.711Z choice aux KiriKiri2 role=0 added=[] text="そう、一度はすべてを失った。"
+2026-11-21T03:32:42.875Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="そう、一度はすべてを失った。"
+2026-11-21T03:32:47.891Z ocr page art scan on
+2026-11-21T03:32:47.997Z render mode switched in place embed -> read
+2026-11-21T03:32:48.900Z source chars=7 sequence=17
+2026-11-21T03:32:48.921Z placement not placed: line 8 is drawn by the game itself (hidden=0)
+2026-11-21T03:32:48.991Z choice aux KiriKiri2 role=0 added=[] text="……けれど……"
+2026-11-21T03:32:49.174Z choice aux KiriKiri1 role=0 added=["………けれ……どけ……れ………けど……れけ…ど……れけ…ど…れ…ど……"] text="………けれ……どけ……れ………けど……れけ…ど……れけ…ど…れ…ど……"
+2026-11-21T03:32:49.175Z choice aux KiriKiri1 role=0 added=[] text="………けれ……どけ……れ………けど……れけ…ど……れけ…ど…れ…ど……"
+2026-11-21T03:32:49.176Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="………けれ……どけ……れ………けど……れけ…ど……れけ…ど…れ…ど……"
+2026-11-21T03:32:49.226Z ocr page art scan 0/0
+2026-11-21T03:32:49.610Z ocr page art scan off
+2026-11-21T03:32:50.290Z source chars=16 sequence=18
+2026-11-21T03:32:50.305Z placement not placed: line 9 is drawn by the game itself (hidden=0)
+2026-11-21T03:32:50.480Z render mode switched in place read -> embed
+2026-11-21T03:32:50.482Z render mode switched in place embed -> custom
+2026-11-21T03:32:50.498Z placement skipped: glyph line 1 (the engine path places the lines of this game)
+2026-11-21T03:32:50.509Z choice aux KiriKiri1 role=0 added=[] text="……とこしえの闇に溶けゆく中……"
+2026-11-21T03:32:50.510Z choice aux KiriKiri1 role=0 added=[] text="……とこしえの闇に溶けゆく中……"
+2026-11-21T03:32:50.511Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="……とこしえの闇に溶けゆく中……"
+2026-11-21T03:32:51.543Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="私"
+2026-11-21T03:32:51.665Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["を私呼ぶを私声が呼ぶを"] text="を私呼ぶを私声が呼ぶを"
+2026-11-21T03:32:51.811Z krkr page line 10 drew another text than the hook line; the drawn text is the line
+2026-11-21T03:32:51.812Z source chars=14 sequence=19
+2026-11-21T03:32:51.829Z placement placed: line 10, 14 characters, first box 255,488,22,22 in client 804x604
+2026-11-21T03:32:51.840Z placement skipped: glyph line 2 (the engine path places the lines of this game)
+2026-11-21T03:32:51.884Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["私…私呼…をぶ声が届呼いぶ声がた声のがだ…。…い届たのだ。いたの届"] text="私…私呼…をぶ声が届呼いぶ声がた声のがだ…。…い届たのだ。いたの届"
+2026-11-21T03:32:51.989Z krkr page: hook line already read, skipped chars=7
+2026-11-21T03:32:51.990Z krkr page: hook line already read, skipped chars=16
+2026-11-21T03:32:52.005Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["だ。いたの届だ。い届たのだ。"] text="だ。いたの届だ。い届たのだ。"
+2026-11-21T03:32:53.343Z krkr page: hook line already read, skipped chars=8
+2026-11-21T03:32:53.615Z render mode switched in place custom -> embed
+2026-11-21T03:32:53.639Z render mode switched in place embed -> read
+2026-11-21T03:32:57.540Z ocr page art scan on
+2026-11-21T03:32:58.356Z ocr page art scan 0/0
+2026-11-21T03:33:32.237Z source chars=7 sequence=20
+2026-11-21T03:33:32.274Z placement not placed: line 11 is drawn by the game itself (hidden=0)
+2026-11-21T03:33:32.287Z source chars=9 sequence=21
+2026-11-21T03:33:32.301Z placement not placed: line 12 is drawn by the game itself (hidden=0)
+2026-11-21T03:33:32.302Z source chars=10 sequence=22
+2026-11-21T03:33:32.312Z placement not placed: line 13 is drawn by the game itself (hidden=0)
+2026-11-21T03:33:32.347Z placement skipped: glyph line 3 (the engine path places the lines of this game)
+2026-11-21T03:33:32.348Z choice aux KiriKiri1 role=0 added=["……だから……もう一度、誓った。どれほど時を重ねても"] text="……だから……もう一度、誓った。どれほど時を重ねても"
+2026-11-21T03:33:32.350Z choice aux KiriKiri1 role=0 added=[] text="……だから……もう一度、誓った。どれほど時を重ねても"
+2026-11-21T03:33:32.351Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="……だから……もう一度、誓った。どれほど時を重ねても"
+2026-11-21T03:33:32.361Z ocr page art scan off
+2026-11-21T03:33:33.859Z krkr page: hook line already read, skipped chars=26
+2026-11-21T03:33:35.176Z render mode switched in place read -> embed
+2026-11-21T03:33:37.348Z ocr page art scan on
+2026-11-21T03:33:38.109Z ocr page art scan 0/0
+2026-11-21T03:35:37.415Z source chars=11 sequence=23
+2026-11-21T03:35:37.435Z placement placed: line 14, 11 characters, first box 298,488,22,22 in client 804x604
+2026-11-21T03:35:37.786Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="多くの障害があろうとも"
+2026-11-21T03:35:37.787Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["ろうあともろうもとも"] text="ろうあともろうもとも"
+2026-11-21T03:35:38.476Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["君が"] text="君が"
+2026-11-21T03:35:38.797Z ocr page art scan off
+2026-11-21T03:35:38.861Z source chars=15 sequence=24
+2026-11-21T03:35:38.872Z placement placed: line 15, 15 characters, first box 257,488,22,22 in client 804x604
+2026-11-21T03:35:39.173Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="君どんが君な姿が君に君ながっどてんいな姿になっよ姿てうにいなっとなてよもっいうてとよいもうてとよいもう"
+2026-11-21T03:35:39.174Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["とよもうとも"] text="とよもうとも"
+2026-11-21T03:35:39.749Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="迎"
+2026-11-21T03:35:39.890Z krkr page line 16 drew another text than the hook line; the drawn text is the line
+2026-11-21T03:35:39.891Z source chars=9 sequence=25
+2026-11-21T03:35:39.904Z placement placed: line 16, 9 characters, first box 315,488,22,22 in client 804x604
+2026-11-21T03:35:39.923Z placement skipped: glyph line 4 (the engine path places the lines of this game)
+2026-11-21T03:35:40.124Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["え迎に行迎えくにと行迎え…迎くに…えと行。にく…と"] text="え迎に行迎えくにと行迎え…迎くに…えと行。にく…と"
+2026-11-21T03:35:40.126Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["行…く。…と行…く。…と…。…"] text="行…く。…と行…く。…と…。…"
+2026-11-21T03:35:40.383Z krkr page: hook line already read, skipped chars=4
+2026-11-21T03:35:41.424Z krkr page: hook line already read, skipped chars=8
+2026-11-21T03:35:43.282Z placement skipped: glyph line 5 (the engine path places the lines of this game)
+2026-11-21T03:35:43.310Z placement skipped: glyph line 6 (the engine path places the lines of this game)
+2026-11-21T03:35:43.310Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……そ"] text="……そ"
+2026-11-21T03:35:43.368Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["の……館そに"] text="の……館そに"
+2026-11-21T03:35:43.512Z krkr page line 17 drew another text than the hook line; the drawn text is the line
+2026-11-21T03:35:43.512Z source chars=8 sequence=26
+2026-11-21T03:35:43.524Z placement placed: line 17, 8 characters, first box 316,488,22,22 in client 804x604
+2026-11-21T03:35:43.903Z placement skipped: glyph line 7 (the engine path places the lines of this game)
+2026-11-21T03:35:43.903Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["…………その館……にその館にその館にの館に"] text="…………その館……にその館にその館にの館に"
+2026-11-21T03:35:43.949Z placement skipped: glyph line 8 (the engine path places the lines of this game)
+2026-11-21T03:35:43.950Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……戻らねばならない"] text="……戻らねばならない"
+2026-11-21T03:35:43.966Z source chars=12 sequence=27
+2026-11-21T03:35:43.979Z placement placed: line 18, 12 characters, first box 283,488,22,22 in client 804x604
+2026-11-21T03:35:43.993Z placement skipped: glyph line 9 (the engine path places the lines of this game)
+2026-11-21T03:35:44.464Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["とねらなな。ばいらなないと。らなないと。らないと。と。"] text="とねらなな。ばいらなないと。らなないと。らないと。と。"
+2026-11-21T03:35:44.592Z placement skipped: glyph line 10 (the engine path places the lines of this game)
+2026-11-21T03:35:44.697Z placement skipped: glyph line 11 (the engine path places the lines of this game)
+2026-11-21T03:35:44.698Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["…だか……らど……う…だからか…"] text="…だか……らど……う…だからか…"
+2026-11-21T03:35:44.714Z source chars=10 sequence=28
+2026-11-21T03:35:44.729Z placement placed: line 19, 10 characters, first box 300,488,22,22 in client 804x604
+2026-11-21T03:35:44.745Z placement skipped: glyph line 12 (the engine path places the lines of this game)
+2026-11-21T03:35:45.075Z krkr page: hook line already read, skipped chars=2
+2026-11-21T03:35:45.076Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["ど…だうから…かかどう…ら…かどう…ら…かどう……か"] text="ど…だうから…かかどう…ら…かどう…ら…かどう……か"
+2026-11-21T03:35:45.419Z krkr page: hook line already read, skipped chars=2
+2026-11-21T03:35:45.513Z krkr page: hook line already read, skipped chars=2
+2026-11-21T03:35:46.094Z krkr page: hook line already read, skipped chars=2
+2026-11-21T03:35:46.249Z krkr page: hook line already read, skipped chars=2
+2026-11-21T03:35:48.881Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["………待"] text="………待"
+2026-11-21T03:35:48.881Z placement skipped: glyph line 13 (the engine path places the lines of this game)
+2026-11-21T03:35:49.165Z krkr page line 20 drew another text than the hook line; the drawn text is the line
+2026-11-21T03:35:49.166Z source chars=12 sequence=29
+2026-11-21T03:35:49.180Z placement placed: line 20, 12 characters, first box 276,488,22,22 in client 804x604
+2026-11-21T03:35:49.188Z placement skipped: glyph line 14 (the engine path places the lines of this game)
+2026-11-21T03:35:49.496Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="っ……て待い……て…待欲…し待いっ…てしいて欲…いいし…て欲…いし…て欲…い…て欲し…い……"
+2026-11-21T03:35:49.549Z render mode switched in place embed -> custom
+2026-11-21T03:35:49.634Z render mode switched in place custom -> read
+2026-11-21T03:35:51.738Z krkr page: hook line already read, skipped chars=3
+2026-11-21T03:35:51.738Z krkr page: hook line already read, skipped chars=9
+2026-11-21T03:35:51.792Z placement skipped: glyph line 15 (the engine path places the lines of this game)
+2026-11-21T03:35:51.793Z source chars=14 sequence=30
+2026-11-21T03:35:51.814Z placement not placed: line 21 is drawn by the game itself (hidden=0)
+2026-11-21T03:35:51.817Z placement skipped: glyph line 16 (the engine path places the lines of this game)
+2026-11-21T03:35:51.817Z choice aux KiriKiri1 role=0 added=[] text="このばらばらの肉体が……"
+2026-11-21T03:35:51.819Z choice aux KiriKiri1 role=0 added=[] text="このばらばらの肉体が……"
+2026-11-21T03:35:51.820Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="このばらばらの肉体が……"
+2026-11-21T03:35:53.106Z placement skipped: glyph line 17 (the engine path places the lines of this game)
+2026-11-21T03:35:53.229Z placement skipped: glyph line 18 (the engine path places the lines of this game)
+2026-11-21T03:35:53.243Z choice aux KiriKiri1 role=0 added=["……そこ……にそ向……こか…にそ"] text="……そこ……にそ向……こか…にそ"
+2026-11-21T03:35:53.244Z choice aux KiriKiri1 role=0 added=[] text="……そこ……にそ向……こか…にそ"
+2026-11-21T03:35:53.245Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="……そこ……にそ向……こか…にそ"
+2026-11-21T03:35:53.341Z krkr page line 22 drew another text than the hook line; the drawn text is the line
+2026-11-21T03:35:53.342Z source chars=13 sequence=31
+2026-11-21T03:35:53.353Z placement not placed: line 22 is drawn by the game itself (hidden=0)
+2026-11-21T03:35:53.354Z krkr page: hook line already read, skipped chars=12
+2026-11-21T03:35:53.359Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["う…まそ向こかにでこ向…にかうま…向で。か"] text="う…まそ向こかにでこ向…にかうま…向で。か"
+2026-11-21T03:35:53.361Z placement skipped: glyph line 19 (the engine path places the lines of this game)
+2026-11-21T03:35:53.362Z choice aux KiriKiri1 role=0 added=[] text="う…まそ向こかにでこ向…にかうま…向で。か"
+2026-11-21T03:35:53.363Z choice aux KiriKiri1 role=0 added=[] text="う…まそ向こかにでこ向…にかうま…向で。か"
+2026-11-21T03:35:53.415Z choice aux KiriKiri1 role=0 added=["うま……でう。ま…"] text="うま……でう。ま…"
+2026-11-21T03:35:53.417Z choice aux KiriKiri1 role=0 added=[] text="うま……でう。ま…"
+2026-11-21T03:35:53.418Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="うま……でう。ま…"
+2026-11-21T03:35:53.508Z choice aux KiriKiri1 role=0 added=["で…う。ま…で…。……"] text="で…う。ま…で…。……"
+2026-11-21T03:35:53.509Z choice aux KiriKiri1 role=0 added=[] text="で…う。ま…で…。……"
+2026-11-21T03:35:53.510Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="で…う。ま…で…。……"
+2026-11-21T03:35:53.711Z krkr page: hook line already read, skipped chars=2
+2026-11-21T03:35:53.712Z choice aux Krkr2wcs role=0 added=["暖炉"] text="暖炉"
+2026-11-21T03:35:54.165Z choice locate round=0 options=["……そこ……にそ向……こか…にそ","うま……でう。ま…","で…う。ま…で…。……","暖炉"]
+2026-11-21T03:35:54.631Z choice aux KiriKiri4 role=0 added=["波間をたゆたう意識が、ぎい、ぎいと引き戻されていく。"] text="波間をたゆたう意識が、ぎい、ぎいと引き戻されていく。"
+2026-11-21T03:35:54.632Z choice aux KiriKiri1 role=0 added=[] text="波"
+2026-11-21T03:35:54.634Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="波"
+2026-11-21T03:35:54.635Z choice aux KiriKiri1 role=0 added=[] text="波"
+2026-11-21T03:35:54.692Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["間波をた"] text="間波をた"
+2026-11-21T03:35:54.693Z choice aux KiriKiri1 role=0 added=[] text="間波をた"
+2026-11-21T03:35:54.694Z choice aux KiriKiri1 role=0 added=[] text="間波をた"
+2026-11-21T03:35:54.738Z krkr page: hook line already read, skipped chars=6
+2026-11-21T03:35:54.739Z choice aux KiriKiri1 role=0 added=["間波ゆ"] text="間波ゆ"
+2026-11-21T03:35:54.741Z choice aux KiriKiri1 role=0 added=[] text="間波ゆ"
+2026-11-21T03:35:54.743Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="間波ゆ"
+2026-11-21T03:35:54.801Z choice aux KiriKiri1 role=0 added=["をたた間波をゆう波意間た"] text="をたた間波をゆう波意間た"
+2026-11-21T03:35:54.803Z choice aux KiriKiri1 role=0 added=[] text="をたた間波をゆう波意間た"
+2026-11-21T03:35:54.815Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="をたた間波をゆう波意間た"
+2026-11-21T03:35:54.863Z krkr page: hook line already read, skipped chars=6
+2026-11-21T03:35:54.864Z placement skipped: glyph line 20 (the engine path places the lines of this game)
+2026-11-21T03:35:54.999Z choice aux KiriKiri1 role=0 added=["識をゆたがたう意、ゆたう意識が、たう意識が、たう意識が、"] text="識をゆたがたう意、ゆたう意識が、たう意識が、たう意識が、"
+2026-11-21T03:35:55.007Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="識をゆたがたう意、ゆたう意識が、たう意識が、たう意識が、"
+2026-11-21T03:35:55.009Z choice aux KiriKiri1 role=0 added=[] text="識をゆたがたう意、ゆたう意識が、たう意識が、たう意識が、"
+2026-11-21T03:35:55.085Z placement skipped: glyph line 21 (the engine path places the lines of this game)
+2026-11-21T03:35:55.085Z choice aux KiriKiri1 role=0 added=["識が、ぎ"] text="識が、ぎ"
+2026-11-21T03:35:55.087Z choice aux KiriKiri1 role=0 added=[] text="識が、ぎ"
+2026-11-21T03:35:55.088Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="識が、ぎ"
+2026-11-21T03:35:55.140Z placement skipped: glyph line 22 (the engine path places the lines of this game)
+2026-11-21T03:35:55.141Z choice aux KiriKiri1 role=0 added=["いぎ、"] text="いぎ、"
+2026-11-21T03:35:55.142Z choice aux KiriKiri1 role=0 added=[] text="いぎ、"
+2026-11-21T03:35:55.143Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="いぎ、"
+2026-11-21T03:35:55.293Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["ぎい、ぎい、ぎい、い、"] text="ぎい、ぎい、ぎい、い、"
+2026-11-21T03:35:55.295Z choice aux KiriKiri1 role=0 added=[] text="ぎい、ぎい、ぎい、い、"
+2026-11-21T03:35:55.296Z choice aux KiriKiri1 role=0 added=[] text="ぎい、ぎい、ぎい、い、"
+2026-11-21T03:35:55.512Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="ぎ"
+2026-11-21T03:35:55.515Z placement skipped: glyph line 23 (the engine path places the lines of this game)
+2026-11-21T03:35:55.516Z choice aux KiriKiri1 role=0 added=[] text="ぎ"
+2026-11-21T03:35:55.517Z choice aux KiriKiri1 role=0 added=[] text="ぎ"
+2026-11-21T03:35:55.719Z krkr page line 23 drew another text than the hook line; the drawn text is the line
+2026-11-21T03:35:55.725Z source chars=26 sequence=32
+2026-11-21T03:35:55.737Z placement not placed: line 23 is drawn by the game itself (hidden=0)
+2026-11-21T03:35:55.738Z krkr page: hook line already read, skipped chars=1
+2026-11-21T03:35:55.764Z placement skipped: glyph line 24 (the engine path places the lines of this game)
+2026-11-21T03:35:55.791Z choice aux KiriKiri1 role=0 added=[] text="いぎと引ぎきい戻とぎさぎ引いきれいと戻てと引きさい引れ戻くきてさ。戻いれてくさい。れ"
+2026-11-21T03:35:55.793Z choice aux KiriKiri1 role=0 added=[] text="いぎと引ぎきい戻とぎさぎ引いきれいと戻てと引きさい引れ戻くきてさ。戻いれてくさい。れ"
+2026-11-21T03:35:55.794Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="いぎと引ぎきい戻とぎさぎ引いきれいと戻てと引きさい引れ戻くきてさ。戻いれてくさい。れ"
+2026-11-21T03:35:55.928Z choice aux KiriKiri1 role=0 added=["てくさいれ。てくい。く。"] text="てくさいれ。てくい。く。"
+2026-11-21T03:35:55.951Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="てくさいれ。てくい。く。"
+2026-11-21T03:35:55.953Z choice aux KiriKiri1 role=0 added=[] text="てくさいれ。てくい。く。"
+2026-11-21T03:35:56.596Z krkr page: hook line already read, skipped chars=1
+2026-11-21T03:35:56.612Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……さ"] text="……さ"
+2026-11-21T03:35:56.615Z placement skipped: glyph line 25 (the engine path places the lines of this game)
+2026-11-21T03:35:56.615Z choice aux KiriKiri1 role=0 added=[] text="……さ"
+2026-11-21T03:35:56.616Z choice aux KiriKiri1 role=0 added=[] text="……さ"
+2026-11-21T03:35:56.621Z krkr page line 24 drew another text than the hook line; the drawn text is the line
+2026-11-21T03:35:56.623Z source chars=6 sequence=33
+2026-11-21T03:35:56.635Z placement not placed: line 24 is drawn by the game itself (hidden=0)
+2026-11-21T03:35:56.635Z krkr page: hook line already read, skipped chars=3
+2026-11-21T03:35:56.643Z krkr page: hook line already read, skipped chars=2
+2026-11-21T03:35:56.646Z placement skipped: glyph line 26 (the engine path places the lines of this game)
+2026-11-21T03:35:56.691Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["ま……さ…ま…"] text="ま……さ…ま…"
+2026-11-21T03:35:56.692Z choice aux KiriKiri1 role=0 added=[] text="ま……さ…ま…"
+2026-11-21T03:35:56.694Z choice aux KiriKiri1 role=0 added=[] text="ま……さ…ま…"
+2026-11-21T03:35:56.799Z choice aux KiriKiri1 role=0 added=["さ…ま…さ…まさ"] text="さ…ま…さ…まさ"
+2026-11-21T03:35:56.800Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="さ…ま…さ…まさ"
+2026-11-21T03:35:56.801Z choice aux KiriKiri1 role=0 added=[] text="さ…ま…さ…まさ"
+2026-11-21T03:35:56.892Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="ま"
+2026-11-21T03:35:56.893Z choice aux KiriKiri1 role=0 added=[] text="ま"
+2026-11-21T03:35:56.895Z choice aux KiriKiri1 role=0 added=[] text="ま"
+2026-11-21T03:35:56.935Z render mode switched in place read -> custom
+2026-11-21T03:35:57.015Z krkr page: hook line already read, skipped chars=1
+2026-11-21T03:35:57.250Z choice locate round=0 options=["ま……さ…ま…","さ…ま…さ…まさ"]
+2026-11-21T03:35:57.269Z choice aux KiriKiri4 role=0 added=["呼吸をひとつする度に、指先に感覚が宿る。"] text="呼吸をひとつする度に、指先に感覚が宿る。"
+2026-11-21T03:35:57.406Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["呼吸呼をひ吸呼と"] text="呼吸呼をひ吸呼と"
+2026-11-21T03:35:57.599Z placement skipped: glyph line 27 (the engine path places the lines of this game)
+2026-11-21T03:35:57.603Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["をつ吸ひ呼す呼とる吸をひ度をとにひ、と"] text="をつ吸ひ呼す呼とる吸をひ度をとにひ、と"
+2026-11-21T03:35:57.720Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["つする度、につする、度につする、度に"] text="つする度、につする、度につする、度に"
+2026-11-21T03:35:58.142Z krkr page: hook line already read, skipped chars=3
+2026-11-21T03:35:58.143Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["つする、度に指先"] text="つする、度に指先"
+2026-11-21T03:35:58.145Z krkr page line 25 drew another text than the hook line; the drawn text is the line
+2026-11-21T03:35:58.151Z source chars=20 sequence=34
+2026-11-21T03:35:58.166Z placement placed: line 25, 20 characters, first box 70,488,22,22 in client 804x604
+2026-11-21T03:35:58.168Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["指に感先指覚にが感先指宿指覚る先に感が。に覚"] text="指に感先指覚にが感先指宿指覚る先に感が。に覚"
+2026-11-21T03:35:58.169Z placement skipped: glyph line 28 (the engine path places the lines of this game)
+2026-11-21T03:35:58.169Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["宿感がる"] text="宿感がる"
+2026-11-21T03:35:58.170Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["覚宿。感がる宿。覚がる宿。る"] text="覚宿。感がる宿。覚がる宿。る"
+2026-11-21T03:35:58.172Z krkr page: hook line already read, skipped chars=2
+2026-11-21T03:35:58.172Z krkr page: hook line already read, skipped chars=1
+2026-11-21T03:35:58.756Z choice locate round=0 options=["つする、度に指先","宿感がる"]
+2026-11-21T03:35:59.115Z krkr page: hook line already read, skipped chars=6
+2026-11-21T03:35:59.679Z krkr page: hook line already read, skipped chars=7
+2026-11-21T03:36:01.280Z source chars=7 sequence=35
+2026-11-21T03:36:01.290Z placement placed: line 26, 5 characters, first box 354,488,21,22 in client 804x604
+2026-11-21T03:36:01.312Z placement skipped: glyph line 29 (the engine path places the lines of this game)
+2026-11-21T03:36:01.654Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["だんだなさんだまなさんだなまさんだなまさんなまさま"] text="だんだなさんだまなさんだなまさんだなまさんなまさま"
+2026-11-21T03:36:02.178Z placement skipped: glyph line 30 (the engine path places the lines of this game)
+2026-11-21T03:36:02.184Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="ど"
+2026-11-21T03:36:02.185Z choice aux KiriKiri2 role=0 added=[] text="ど"
+2026-11-21T03:36:02.257Z choice aux KiriKiri2 role=0 added=["こかで"] text="こかで"
+2026-11-21T03:36:02.350Z choice aux KiriKiri2 role=0 added=["雨の音を聞"] text="雨の音を聞"
+2026-11-21T03:36:02.381Z choice aux KiriKiri2 role=0 added=["いた"] text="いた"
+2026-11-21T03:36:02.396Z krkr page line 27 paired by its drawn text
+2026-11-21T03:36:02.397Z source chars=12 sequence=36
+2026-11-21T03:36:02.408Z placement placed: line 27, 12 characters, first box 70,488,19,22 in client 804x604
+2026-11-21T03:36:02.472Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="どこかで雨の音を聞いた。"
+2026-11-21T03:36:02.554Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["を。いた聞。いた"] text="を。いた聞。いた"
+2026-11-21T03:36:03.680Z krkr page: hook line already read, skipped chars=20
+2026-11-21T03:36:03.791Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="ね"
+2026-11-21T03:36:03.792Z choice aux KiriKiri2 role=0 added=[] text="ね"
+2026-11-21T03:36:03.818Z krkr page line 28 drew another text than the hook line; the drawn text is the line
+2026-11-21T03:36:03.819Z source chars=5 sequence=37
+2026-11-21T03:36:03.829Z placement placed: line 28, 3 characters, first box 370,488,22,22 in client 804x604
+2026-11-21T03:36:03.830Z krkr page: hook line already read, skipped chars=5
+2026-11-21T03:36:03.851Z choice aux KiriKiri2 role=0 added=["え？"] text="え？"
+2026-11-21T03:36:04.052Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["えね？"] text="えね？"
+2026-11-21T03:36:04.081Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["えね？え？"] text="えね？え？"
+2026-11-21T03:36:04.516Z placement skipped: glyph line 31 (the engine path places the lines of this game)
+2026-11-21T03:36:04.634Z choice aux KiriKiri2 role=0 added=["そして火の爆"] text="そして火の爆"
+2026-11-21T03:36:04.698Z source chars=10 sequence=38
+2026-11-21T03:36:04.708Z placement placed: line 29, 10 characters, first box 70,488,20,22 in client 804x604
+2026-11-21T03:36:04.728Z choice aux KiriKiri2 role=0 added=["ぜる音。"] text="ぜる音。"
+2026-11-21T03:36:04.805Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="そして火の爆ぜる音。"
+2026-11-21T03:36:04.896Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["音ぜ。る音。"] text="音ぜ。る音。"
+2026-11-21T03:36:06.250Z render mode switched in place custom -> read
+2026-11-21T03:36:07.045Z choice aux KiriKiri2 role=0 added=[] text="起"
+2026-11-21T03:36:07.046Z choice aux KiriKiri1 role=0 added=[] text="起"
+2026-11-21T03:36:07.047Z choice aux KiriKiri1 role=0 added=[] text="起"
+2026-11-21T03:36:07.047Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="起"
+2026-11-21T03:36:07.049Z source chars=10 sequence=39
+2026-11-21T03:36:07.059Z placement not placed: line 30 is drawn by the game itself (hidden=0)
+2026-11-21T03:36:07.060Z choice aux KiriKiri2 role=0 added=[] text="きてくださいな"
+2026-11-21T03:36:07.061Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["き起てく起ださ起い起なきさてくだいなさいてくだな"] text="き起てく起ださ起い起なきさてくだいなさいてくだな"
+2026-11-21T03:36:07.061Z choice aux KiriKiri1 role=0 added=[] text="き起てく起ださ起い起なきさてくだいなさいてくだな"
+2026-11-21T03:36:07.062Z choice aux KiriKiri1 role=0 added=[] text="き起てく起ださ起い起なきさてくだいなさいてくだな"
+2026-11-21T03:36:07.063Z choice aux KiriKiri1 role=0 added=["さいてくだ"] text="さいてくだ"
+2026-11-21T03:36:07.064Z choice aux KiriKiri1 role=0 added=[] text="さいてくだ"
+2026-11-21T03:36:07.064Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="さいてくだ"
+2026-11-21T03:36:07.070Z placement skipped: glyph line 32 (the engine path places the lines of this game)
+2026-11-21T03:36:07.070Z choice aux KiriKiri2 role=0 added=[] text="き"
+2026-11-21T03:36:07.071Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="き"
+2026-11-21T03:36:07.072Z choice aux KiriKiri1 role=0 added=[] text="き"
+2026-11-21T03:36:07.073Z choice aux KiriKiri1 role=0 added=[] text="き"
+2026-11-21T03:36:07.080Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["いき、"] text="いき、"
+2026-11-21T03:36:07.081Z choice aux KiriKiri2 role=0 added=["い、"] text="い、"
+2026-11-21T03:36:07.082Z choice aux KiriKiri1 role=0 added=[] text="いき、"
+2026-11-21T03:36:07.083Z choice aux KiriKiri1 role=0 added=[] text="いき、"
+2026-11-21T03:36:07.133Z choice aux KiriKiri1 role=0 added=["いき、いき"] text="いき、いき"
+2026-11-21T03:36:07.134Z choice aux KiriKiri1 role=0 added=[] text="いき、いき"
+2026-11-21T03:36:07.135Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="いき、いき"
+2026-11-21T03:36:07.322Z choice aux KiriKiri2 role=0 added=["きい、"] text="きい、"
+2026-11-21T03:36:07.323Z choice aux KiriKiri1 role=0 added=["、いき、い、きいき、"] text="、いき、い、きいき、"
+2026-11-21T03:36:07.325Z choice aux KiriKiri1 role=0 added=["、いき、い、きいき、"] text="、いき、い、きいき、"
+2026-11-21T03:36:07.326Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["、いき、い、きいき、"] text="、いき、い、きいき、"
+2026-11-21T03:36:07.394Z choice aux KiriKiri1 role=0 added=[] text="いき、いき、"
+2026-11-21T03:36:07.395Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="いき、いき、"
+2026-11-21T03:36:07.396Z choice aux KiriKiri1 role=0 added=[] text="いき、いき、"
+2026-11-21T03:36:07.441Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="いき、"
+2026-11-21T03:36:07.442Z choice aux KiriKiri1 role=0 added=[] text="いき、"
+2026-11-21T03:36:07.444Z choice aux KiriKiri1 role=0 added=[] text="いき、"
+2026-11-21T03:36:07.502Z choice aux KiriKiri2 role=0 added=[] text="き"
+2026-11-21T03:36:07.504Z choice aux KiriKiri1 role=0 added=["い、き"] text="い、き"
+2026-11-21T03:36:07.504Z choice aux KiriKiri1 role=0 added=[] text="い、き"
+2026-11-21T03:36:07.505Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="い、き"
+2026-11-21T03:36:07.543Z source chars=9 sequence=40
+2026-11-21T03:36:07.553Z placement not placed: line 31 is drawn by the game itself (hidden=0)
+2026-11-21T03:36:07.554Z choice aux KiriKiri1 role=0 added=["いき。"] text="いき。"
+2026-11-21T03:36:07.556Z choice aux KiriKiri1 role=0 added=[] text="いき。"
+2026-11-21T03:36:07.556Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="いき。"
+2026-11-21T03:36:07.557Z choice aux KiriKiri2 role=0 added=["い。"] text="い。"
+2026-11-21T03:36:07.641Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="いき。いき。"
+2026-11-21T03:36:07.643Z choice aux KiriKiri1 role=0 added=[] text="いき。いき。"
+2026-11-21T03:36:07.643Z choice aux KiriKiri1 role=0 added=[] text="いき。いき。"
+2026-11-21T03:36:07.760Z choice aux KiriKiri1 role=0 added=["いき。い。"] text="いき。い。"
+2026-11-21T03:36:07.761Z choice aux KiriKiri1 role=0 added=[] text="いき。い。"
+2026-11-21T03:36:07.762Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="いき。い。"
+2026-11-21T03:36:08.218Z choice locate round=0 options=["いき、い、きいき、","いき。い。"]
+2026-11-21T03:36:09.514Z source chars=7 sequence=41
+2026-11-21T03:36:09.526Z placement not placed: line 32 is drawn by the game itself (hidden=0)
+2026-11-21T03:36:09.527Z choice aux KiriKiri1 role=0 added=[] text="起"
+2026-11-21T03:36:09.528Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="起"
+2026-11-21T03:36:09.528Z choice aux KiriKiri2 role=0 added=[] text="起"
+2026-11-21T03:36:09.529Z choice aux KiriKiri1 role=0 added=[] text="起"
+2026-11-21T03:36:09.550Z choice aux KiriKiri2 role=0 added=["きて……"] text="きて……"
+2026-11-21T03:36:09.566Z choice aux KiriKiri1 role=0 added=["きて……起"] text="きて……起"
+2026-11-21T03:36:09.567Z choice aux KiriKiri1 role=0 added=["きて……起"] text="きて……起"
+2026-11-21T03:36:09.568Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["きて……起"] text="きて……起"
+2026-11-21T03:36:09.598Z choice aux KiriKiri1 role=0 added=[] text="起"
+2026-11-21T03:36:09.599Z choice aux KiriKiri1 role=0 added=[] text="起"
+2026-11-21T03:36:09.600Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="起"
+2026-11-21T03:36:09.660Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="起"
+2026-11-21T03:36:09.660Z choice aux KiriKiri1 role=0 added=[] text="起"
+2026-11-21T03:36:09.661Z choice aux KiriKiri1 role=0 added=[] text="起"
+2026-11-21T03:36:09.690Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="起"
+2026-11-21T03:36:09.690Z choice aux KiriKiri1 role=0 added=[] text="起"
+2026-11-21T03:36:09.692Z choice aux KiriKiri1 role=0 added=[] text="起"
+2026-11-21T03:36:10.110Z choice aux Krkr2wcs role=0 added=["暖炉のぱちぱち"] text="暖炉のぱちぱち"
+2026-11-21T03:36:10.134Z placement skipped: glyph line 33 (the engine path places the lines of this game)
+2026-11-21T03:36:10.626Z krkr page line 33 drew another text than the hook line; the drawn text is the line
+2026-11-21T03:36:10.631Z source chars=27 sequence=42
+2026-11-21T03:36:10.641Z placement not placed: line 33 is drawn by the game itself (hidden=0)
+2026-11-21T03:36:10.671Z choice aux KiriKiri2 role=0 added=[] text="は気付くとロッキングチェアーに揺られていた。"
+2026-11-21T03:36:10.779Z choice aux KiriKiri1 role=0 added=[] text="「あ「なたあ「」なは気付くとロッキングチェアーに揺られていた。たあ「」なあた「」なあた」なた」"
+2026-11-21T03:36:10.781Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="「あ「なたあ「」なは気付くとロッキングチェアーに揺られていた。たあ「」なあた「」なあた」なた」"
+2026-11-21T03:36:10.782Z choice aux KiriKiri1 role=0 added=[] text="「あ「なたあ「」なは気付くとロッキングチェアーに揺られていた。たあ「」なあた「」なあた」なた」"
+2026-11-21T03:36:11.371Z render mode switched in place read -> custom
+2026-11-21T03:36:11.578Z placement skipped: glyph line 34 (the engine path places the lines of this game)
+2026-11-21T03:36:11.585Z choice aux KiriKiri2 role=0 added=[] text="室"
+2026-11-21T03:36:11.587Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="室"
+2026-11-21T03:36:11.726Z choice aux KiriKiri2 role=0 added=["内は薄暗く、"] text="内は薄暗く、"
+2026-11-21T03:36:11.963Z choice aux KiriKiri2 role=0 added=[] text="暖"
+2026-11-21T03:36:11.964Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["内室は薄内室暗はく薄内室、室は暗薄内くは、暗薄内くは、暗薄く、暗く、暖"] text="内室は薄内室暗はく薄内室、室は暗薄内くは、暗薄内くは、暗薄く、暗く、暖"
+2026-11-21T03:36:11.965Z choice aux KiriKiri2 role=0 added=["炉の"] text="炉の"
+2026-11-21T03:36:11.966Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["炉暖の"] text="炉暖の"
+2026-11-21T03:36:12.002Z krkr page line 34 paired by its drawn text
+2026-11-21T03:36:12.003Z source chars=32 sequence=43
+2026-11-21T03:36:12.015Z placement placed: line 34, 32 characters, first box 70,488,22,22 in client 804x604
+2026-11-21T03:36:12.016Z krkr page: hook line drawn off the page layer, delivered from the hook text chars=23
+2026-11-21T03:36:12.016Z source chars=23 sequence=44
+2026-11-21T03:36:12.036Z choice aux KiriKiri2 role=0 added=[] text="中で火花を散らす灯り以外、頼れるものはない。"
+2026-11-21T03:36:12.051Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["中炉暖で火花を散らす灯り以外、頼れるものはない。の炉暖中の"] text="中炉暖で火花を散らす灯り以外、頼れるものはない。の炉暖中の"
+2026-11-21T03:36:12.129Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["炉暖中の炉中の"] text="炉暖中の炉中の"
+2026-11-21T03:36:12.580Z choice locate round=0 options=["炉暖の","中炉暖で火花を散らす灯り以外、頼れるものはない。の炉暖中の","炉暖中の炉中の"]
+2026-11-21T03:36:13.222Z placement skipped: glyph line 35 (the engine path places the lines of this game)
+2026-11-21T03:36:13.602Z choice aux KiriKiri2 role=0 added=["閉じられた窓からは何の明かりも見えず、"] text="閉じられた窓からは何の明かりも見えず、"
+2026-11-21T03:36:13.785Z choice aux KiriKiri2 role=0 added=[] text="ひ"
+2026-11-21T03:36:13.786Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="閉じ閉られじ閉たら窓じれ閉か閉たららじ窓れはらたか何れ窓らのたはか明窓何らかかはのりら何明もはのか見何り明えのもかず明見り、かえも見りずえも、見りずえも、見ずえ"
+2026-11-21T03:36:13.801Z krkr page line 35 drew another text than the hook line; the drawn text is the line
+2026-11-21T03:36:13.806Z source chars=33 sequence=45
+2026-11-21T03:36:13.821Z placement placed: line 35, 33 characters, first box 70,488,22,22 in client 804x604
+2026-11-21T03:36:13.847Z choice aux KiriKiri2 role=0 added=[] text="たひたと滴がガラスを打つ。"
+2026-11-21T03:36:13.863Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["たひたと滴がガラスを打つ。ひひ"] text="たひたと滴がガラスを打つ。ひひ"
+2026-11-21T03:36:13.910Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="ひ"
+2026-11-21T03:36:13.957Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="ひ"
+2026-11-21T03:36:14.654Z choice aux KiriKiri2 role=0 added=[] text="ま"
+2026-11-21T03:36:14.856Z choice aux KiriKiri2 role=0 added=["るで屋敷全体を暗闇が"] text="るで屋敷全体を暗闇が"
+2026-11-21T03:36:14.937Z choice aux KiriKiri2 role=0 added=["包み込"] text="包み込"
+2026-11-21T03:36:14.938Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="まるまで屋るま敷で全屋るま体ま敷でをる屋全暗で敷体闇屋を全が敷暗体包全闇をみ体が暗込を闇"
+2026-11-21T03:36:15.093Z krkr page line 36 drew another text than the hook line; the drawn text is the line
+2026-11-21T03:36:15.097Z source chars=22 sequence=46
+2026-11-21T03:36:15.111Z placement placed: line 36, 22 characters, first box 70,517,17,22 in client 804x604
+2026-11-21T03:36:15.126Z choice aux KiriKiri2 role=0 added=[] text="んでいるようだ。"
+2026-11-21T03:36:15.213Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["包ん暗がみで闇込包いがみる包込よみう込だん。でいるようだい。るようだい。るよう"] text="包ん暗がみで闇込包いがみる包込よみう込だん。でいるようだい。るようだい。るよう"
+2026-11-21T03:36:15.260Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["だい。るよう"] text="だい。るよう"
+2026-11-21T03:36:15.308Z choice aux Krkr2wcs role=0 added=["女中のテーマピアノソロ"] text="女中のテーマピアノソロ"
+2026-11-21T03:36:15.400Z choice aux KiriKiri2 role=0 added=[] text="ま"
+2026-11-21T03:36:15.401Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="ま"
+2026-11-21T03:36:15.407Z placement skipped: glyph line 36 (the engine path places the lines of this game)
+2026-11-21T03:36:15.473Z choice aux KiriKiri2 role=0 added=["あ……、"] text="あ……、"
+2026-11-21T03:36:15.568Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["あま……あま、……あま、……あま、…"] text="あま……あま、……あま、……あま、…"
+2026-11-21T03:36:15.646Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["…あ、……、"] text="…あ、……、"
+2026-11-21T03:36:15.676Z choice aux KiriKiri2 role=0 added=[] text="や"
+2026-11-21T03:36:15.677Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="や"
+2026-11-21T03:36:15.723Z choice aux KiriKiri2 role=0 added=["っと"] text="っと"
+2026-11-21T03:36:15.724Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["っやと"] text="っやと"
+2026-11-21T03:36:15.784Z choice aux KiriKiri2 role=0 added=["、お目"] text="、お目"
+2026-11-21T03:36:15.846Z choice aux KiriKiri2 role=0 added=["覚めに"] text="覚めに"
+2026-11-21T03:36:15.848Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["、やおっと目、や覚やっとおめっ目、にと"] text="、やおっと目、や覚やっとおめっ目、にと"
+2026-11-21T03:36:15.878Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["お覚な、目めらお"] text="お覚な、目めらお"
+2026-11-21T03:36:15.924Z choice aux KiriKiri2 role=0 added=["なられま"] text="なられま"
+2026-11-21T03:36:16.017Z choice aux KiriKiri2 role=0 added=["したのね"] text="したのね"
+2026-11-21T03:36:16.019Z krkr page line 37 paired by its drawn text
+2026-11-21T03:36:16.020Z source chars=29 sequence=47
+2026-11-21T03:36:16.033Z placement placed: line 37, 23 characters, first box 70,491,17,22 in client 804x604
+2026-11-21T03:36:16.034Z krkr page: hook line already read, skipped chars=55
+2026-11-21T03:36:16.143Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="に覚目れ目なめま覚らにしめれなたにらまのなれしねらまた。れしのねまたしの。ねまたしのね。た"
+2026-11-21T03:36:16.190Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["のね。"] text="のね。"
+2026-11-21T03:36:17.555Z placement skipped: glyph line 37 (the engine path places the lines of this game)
+2026-11-21T03:36:17.788Z choice aux KiriKiri2 role=0 added=["に声をかける人"] text="に声をかける人"
+2026-11-21T03:36:17.871Z source chars=19 sequence=48
+2026-11-21T03:36:17.886Z placement placed: line 38, 17 characters, first box 70,488,12,22 in client 804x604
+2026-11-21T03:36:18.083Z choice aux KiriKiri2 role=0 added=["物がいる。"] text="物がいる。"
+2026-11-21T03:36:18.084Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="「あなた死者」に声をかける人物がいる。"
+2026-11-21T03:36:18.086Z placement skipped: glyph line 38 (the engine path places the lines of this game)
+2026-11-21T03:36:18.101Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="る。物がい「あな「たあ」「な"
+2026-11-21T03:36:18.127Z choice aux KiriKiri2 role=0 added=["は周"] text="は周"
+2026-11-21T03:36:18.159Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["はあた周「な」囲あ"] text="はあた周「な」囲あ"
+2026-11-21T03:36:18.161Z choice aux KiriKiri2 role=0 added=[] text="囲"
+2026-11-21T03:36:18.205Z choice aux KiriKiri2 role=0 added=["を見渡"] text="を見渡"
+2026-11-21T03:36:18.253Z choice aux KiriKiri2 role=0 added=["そう"] text="そう"
+2026-11-21T03:36:18.254Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="たをなは周」見た囲渡」は周そは囲う周渡を見"
+2026-11-21T03:36:18.347Z choice aux KiriKiri2 role=0 added=["とするが、"] text="とするが、"
+2026-11-21T03:36:18.362Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["と囲そすを見渡うる見そとが渡うす、そると"] text="と囲そすを見渡うる見そとが渡うす、そると"
+2026-11-21T03:36:18.393Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["がうす、る"] text="がうす、る"
+2026-11-21T03:36:18.548Z placement line without a source line, delivered from the placement chars=17
+2026-11-21T03:36:18.553Z source chars=17 sequence=49
+2026-11-21T03:36:18.581Z source chars=30 sequence=50
+2026-11-21T03:36:18.599Z placement placed: line 39, 28 characters, first box 70,517,12,22 in client 804x604
+2026-11-21T03:36:18.821Z choice aux KiriKiri2 role=0 added=[] text="その必要はなかった。"
+2026-11-21T03:36:18.822Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["とがうす、るとがす、るが、そのそ必要はなかった。のそ必のそ必のそ必の必"] text="とがうす、るとがす、るが、そのそ必要はなかった。のそ必のそ必のそ必の必"
+2026-11-21T03:36:19.257Z placement line without a source line, delivered from the placement chars=28
+2026-11-21T03:36:19.262Z source chars=28 sequence=51
+2026-11-21T03:36:23.574Z placement skipped: glyph line 39 (the engine path places the lines of this game)
+2026-11-21T03:36:23.585Z choice aux KiriKiri2 role=0 added=[] text="声"
+2026-11-21T03:36:23.587Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="声"
+2026-11-21T03:36:23.786Z choice aux KiriKiri2 role=0 added=["の主は「あなた」の傍"] text="の主は「あなた」の傍"
+2026-11-21T03:36:23.879Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="の声主はの声「主あはの声な声「主たのあは」主「なのはあた傍「」ならあのたにな傍」そたのらっ」傍にとの"
+2026-11-21T03:36:23.925Z choice aux KiriKiri2 role=0 added=["らにそっとしゃ"] text="らにそっとしゃ"
+2026-11-21T03:36:23.988Z choice aux KiriKiri2 role=0 added=["がみ、"] text="がみ、"
+2026-11-21T03:36:24.034Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["そらし傍っにゃらとそがにしっみそとゃ、っしがとゃみし、が"] text="そらし傍っにゃらとそがにしっみそとゃ、っしがとゃみし、が"
+2026-11-21T03:36:24.143Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["とゃみし、がゃみ、がみ、"] text="とゃみし、がゃみ、がみ、"
+2026-11-21T03:36:24.203Z choice aux KiriKiri2 role=0 added=[] text="翠"
+2026-11-21T03:36:24.205Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="翠"
+2026-11-21T03:36:24.484Z choice aux KiriKiri2 role=0 added=["色の瞳で見上げていたのだから"] text="色の瞳で見上げていたのだから"
+2026-11-21T03:36:24.487Z source chars=39 sequence=52
+2026-11-21T03:36:24.504Z placement placed: line 40, 37 characters, first box 70,488,22,22 in client 804x604
+2026-11-21T03:36:24.780Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="色翠の瞳翠で見翠上翠げ色てのい瞳で見上たでげてた見上げていのだかのらだ。かのらだのか。らだかの。らだか。ら。"
+2026-11-21T03:36:25.230Z placement line without a source line, delivered from the placement chars=37
+2026-11-21T03:36:25.234Z source chars=37 sequence=53
+2026-11-21T03:36:26.511Z placement skipped: glyph line 40 (the engine path places the lines of this game)
+2026-11-21T03:36:26.584Z krkr page line 41 had no readable text
+2026-11-21T03:36:26.585Z source chars=5 sequence=54
+2026-11-21T03:36:26.587Z placement placed: line 42, 5 characters, first box 70,491,22,22 in client 804x604
+2026-11-21T03:36:27.580Z placement skipped: glyph line 41 (the engine path places the lines of this game)
+2026-11-21T03:36:27.653Z choice aux KiriKiri2 role=0 added=["おはようご"] text="おはようご"
+2026-11-21T03:36:27.760Z choice aux KiriKiri2 role=0 added=["ざいます、"] text="ざいます、"
+2026-11-21T03:36:27.948Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="おはおようはおごよざうはおいおごよまはうざすよごい、うまざごすい、まざごすい、まざすい、ます、旦"
+2026-11-21T03:36:27.950Z choice aux KiriKiri2 role=0 added=[] text="旦"
+2026-11-21T03:36:28.042Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["那旦さま那旦…"] text="那旦さま那旦…"
+2026-11-21T03:36:28.043Z choice aux KiriKiri2 role=0 added=["那さま…"] text="那さま…"
+2026-11-21T03:36:28.057Z source chars=17 sequence=55
+2026-11-21T03:36:28.070Z placement placed: line 44, 17 characters, first box 70,491,22,22 in client 804x604
+2026-11-21T03:36:28.070Z krkr page line 43 had no readable text
+2026-11-21T03:36:28.120Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["さ…那ま旦。旦…さま那…さ"] text="さ…那ま旦。旦…さま那…さ"
+2026-11-21T03:36:28.228Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["…ま。那…さ…ま。……。"] text="…ま。那…さ…ま。……。"
+2026-11-21T03:36:28.693Z choice locate round=0 options=["那旦さま那旦…","…ま。那…さ…ま。……。"]
+2026-11-21T03:36:29.279Z choice aux Krkr2wcs role=0 added=["選択肢"] text="選択肢"
+2026-11-21T03:36:29.744Z choice locate round=0 options=["那旦さま那旦…","…ま。那…さ…ま。……。"]
+2026-11-21T03:36:30.397Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……おはよう…………はよう……お…………"] text="……おはよう…………はよう……お…………"
+2026-11-21T03:36:30.405Z choice aux Krkr2wcs role=0 added=["選択肢選択肢……おはよう………………"] text="選択肢選択肢……おはよう………………"
+2026-11-21T03:36:30.405Z placement skipped: glyph line 42 (the engine path places the lines of this game)
+2026-11-21T03:36:32.118Z krkr page: hook line is the choice screen (1 candidate(s)), left to the choice layer chars=18
+2026-11-21T03:36:32.118Z krkr page: hook line drawn off the page layer, delivered from the hook text chars=10
+2026-11-21T03:36:32.119Z source chars=10 sequence=56
+2026-11-21T03:36:37.674Z ocr page art scan on
+2026-11-21T03:36:38.884Z ocr page art scan 1/0 ノ気ゞ亠。
+2026-11-21T03:36:40.089Z ocr line "ノ気ゞ亠。"
+2026-11-21T03:36:41.601Z krkr page: hook line drawn off the page layer, delivered from the hook text chars=5
+2026-11-21T03:36:41.602Z source chars=5 sequence=57

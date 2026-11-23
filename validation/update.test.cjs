@@ -30,7 +30,8 @@ test('update: background download reports real progress, verifies and reuses the
  const info=await u.check('1.1.0',fetcher);assert.equal(info.newer,true);assert.equal(info.delta,1000);
  const done=await u.start(root,'1.1.0',fetcher);assert.equal(done.phase,'ready');assert.equal(done.received,zip.length);
  assert.ok(seen.some(n=>n>0&&n<zip.length),'progress moves during the download');
- u.reset();const again=await u.start(root,'1.1.0',fetcher);assert.equal(again.phase,'ready');assert.equal(downloads,1,'a verified package is reused');
+ /* every source is measured at once (core/fast-download.cjs), so the first run asks each once */const first=downloads;assert.ok(first>=1);
+ u.reset();const again=await u.start(root,'1.1.0',fetcher);assert.equal(again.phase,'ready');assert.equal(downloads,first,'a verified package is reused');
  u.reset();fs.rmSync(root,{recursive:true,force:true});
 });
 test('v1.1.2: the update script is started by Windows (WMI), and a failed launch keeps MeguLit open',async()=>{
@@ -57,8 +58,11 @@ test('v1.1.8: the same version with a different package online is a hotfix',asyn
 test('update: relays are tried when GitHub fails, and only with a digest',()=>{
  const rel={url:'https://github.com/ilynthn/MeguLit/releases/download/v9.9.9/a.zip',digest:'a'.repeat(64)};
  const fresh=rel.url+'?v='+'a'.repeat(12);
- assert.deepEqual(u.sources(rel,false),[rel.url,'https://gh-proxy.com/'+fresh,'https://ghproxy.net/'+fresh,'https://ghfast.top/'+fresh],'relays get the digest so a cached old package is not served');
- assert.equal(u.sources(rel,true)[3],rel.url,'China tries relays first');
+ /* 2026-11-20: the relays are the ones in setup/runtime.json (core/download-sources.cjs) */
+ const relays=require('../core/download-sources.cjs').relays().map(m=>m.url.replace('{url}',fresh));
+ assert.ok(relays.length>=3&&relays.some(r=>r.startsWith('https://gh-proxy.com/')),'relays listed');
+ assert.deepEqual(u.sources(rel,false),[rel.url,...relays],'relays get the digest so a cached old package is not served');
+ assert.equal(u.sources(rel,true).at(-1),rel.url,'China tries relays first');
  assert.deepEqual(u.sources({...rel,digest:''},true),[rel.url],'no digest, no relay');
 });
 /* User report (2026-11-13: "更新显示下载失败"): the site's own R2 mirror is one of the sources, first in
@@ -107,11 +111,42 @@ test('update: a download cut off near the end resumes with a range request',asyn
  const rel={tag_name:'v9.9.9',assets:[{name:'MeguLit-v9.9.9-win-x64.zip',size:zip.length,digest:'sha256:'+digest,browser_download_url:'https://github.com/ilynthn/MeguLit/releases/download/v9.9.9/MeguLit-v9.9.9-win-x64.zip'}]};
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'upd-'));u.reset();const ranges=[];
  const stream=(data,fail)=>{let sent=false;return {getReader:()=>({read:async()=>{if(!sent){sent=true;return {done:false,value:data};}if(fail)throw Error('ECONNRESET');return {done:true};}})};};
- const r=await u.start(root,'1.0.0',async(url,opts)=>{if(url.endsWith('/latest'))return {ok:true,json:async()=>rel};const range=opts?.headers?.Range;ranges.push(range||'');
-  if(!range)return {ok:true,status:200,url,body:stream(zip.subarray(0,8000),true)};
-  const from=Number(/bytes=(\d+)-/.exec(range)[1]);return {ok:true,status:206,url,body:stream(zip.subarray(from),false)};});
- assert.equal(r.phase,'ready');assert.equal(r.sha256,digest);assert.deepEqual(ranges,['','bytes=8000-']);
+ /* 2026-11-19 core/fast-download.cjs asks every source at once in Range pieces. The connection drops at 8000 bytes on every
+    source (a line that breaks near the end, not one bad mirror), so what arrived is kept and only the rest is asked for. */
+ const cutHosts=new Set();
+ const serve=(url,opts,cut)=>{const range=opts?.headers?.Range;ranges.push(range||'');
+  const m=/bytes=(\d+)-(\d*)/.exec(range||''),from=m?Number(m[1]):0,to=m&&m[2]?Number(m[2])+1:zip.length,host=new URL(url).hostname;
+  if(cut(host,from,to)){cutHosts.add(host);return {ok:true,status:206,url,headers:{'content-range':'bytes '+from+'-'+(to-1)+'/'+zip.length},body:stream(zip.subarray(from,8000),true)};}
+  return {ok:true,status:206,url,headers:{'content-range':'bytes '+from+'-'+(to-1)+'/'+zip.length},body:stream(zip.subarray(from,to),false)};};
+ const r=await u.start(root,'1.0.0',async(url,opts)=>url.endsWith('/latest')?{ok:true,json:async()=>rel}:serve(url,opts,(host,from,to)=>!cutHosts.has(host)&&from<8000&&to>8000));
+ assert.equal(r.phase,'ready');assert.equal(r.sha256,digest);assert.ok(ranges.some(x=>/^bytes=8000-/.test(x)),'the rest is asked from 8000: '+ranges.join(' '));
+ assert.ok(ranges.filter(x=>!/^bytes=0-$/.test(x)).every(x=>/^bytes=8000-/.test(x)),'nothing before 8000 is asked again: '+ranges.join(' '));
  u.reset();fs.rmSync(root,{recursive:true,force:true});
+});
+
+/* 2026-11-19: the .part a failed update left behind (cache/update/<name>.part + .part.json) is used by the next start, which
+   asks only for the rest, also from the measuring requests */
+test('update: the next start continues the .part a failed download left behind',async()=>{
+ const fs=require('fs'),os=require('os'),path=require('path'),crypto=require('crypto');
+ const zip=Buffer.concat([Buffer.from('PK'),crypto.randomBytes(9000)]),digest=crypto.createHash('sha256').update(zip).digest('hex');
+ const rel={tag_name:'v9.9.9',assets:[{name:'MeguLit-v9.9.9-win-x64.zip',size:zip.length,digest:'sha256:'+digest,browser_download_url:'https://github.com/ilynthn/MeguLit/releases/download/v9.9.9/MeguLit-v9.9.9-win-x64.zip'}]};
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'upd-'));u.reset();
+ const stream=(data,fail)=>{let sent=false;return {getReader:()=>({read:async()=>{if(!sent){sent=true;return {done:false,value:data};}if(fail)throw Error('ECONNRESET');return {done:true};}})};};
+ const answer=(url,opts,broken)=>{const m=/bytes=(\d+)-(\d*)/.exec(opts?.headers?.Range||''),from=m?Number(m[1]):0,to=m&&m[2]?Number(m[2])+1:zip.length;
+  if(broken&&from>=8000)throw Error('ECONNRESET');
+  return {ok:true,status:206,url,headers:{'content-range':'bytes '+from+'-'+(to-1)+'/'+zip.length},body:stream(zip.subarray(from,broken?Math.min(to,8000):to),broken&&to>8000)};};
+ try{
+  /* first start: every source breaks at 8000 and nothing after it answers */
+  await assert.rejects(u.start(root,'1.0.0',async(url,opts)=>url.endsWith('/latest')?{ok:true,json:async()=>rel}:answer(url,opts,true)));
+  const part=path.join(root,'cache','update','MeguLit-v9.9.9-win-x64.zip.part');
+  assert.ok(fs.existsSync(part)&&fs.existsSync(part+'.json'),'the .part and its state are kept');
+  /* next start: the line works again */
+  u.reset();const asked=[];
+  const r=await u.start(root,'1.0.0',async(url,opts)=>{if(url.endsWith('/latest'))return {ok:true,json:async()=>rel};asked.push(opts?.headers?.Range||'');return answer(url,opts,false);});
+  assert.equal(r.phase,'ready');assert.equal(r.sha256,digest);
+  assert.ok(asked.length&&asked.every(x=>/^bytes=8000-/.test(x)),'only the rest is asked: '+asked.join(' '));
+  assert.equal(fs.existsSync(part),false);
+ }finally{u.reset();fs.rmSync(root,{recursive:true,force:true});}
 });
 
 // E350: hotfix letters order after the base version, and lettered packages are accepted.

@@ -27,7 +27,9 @@ function makeZip(dir,files,manifest){
  for(const [p,body] of Object.entries(files)){const to=path.join(src,...p.split('/'));fs.mkdirSync(path.dirname(to),{recursive:true});fs.writeFileSync(to,body);}
  fs.writeFileSync(path.join(src,'hot.json'),JSON.stringify(manifest));
  const zip=path.join(dir,'hot-src.zip');
- const r=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command','Compress-Archive -Path $env:S -DestinationPath $env:Z -Force'],{windowsHide:true,env:{...process.env,S:src,Z:zip}});
+ /* 2026-11-19 (Signed build of v1.4.17 on the runner: HOT_MANIFEST_MISSING) .NET ZipFile with the MeguLit folder as base, not the Compress-Archive cmdlet, whose module comes from whatever PSModulePath the parent shell left */
+ const env={...process.env,S:src,Z:zip};delete env.PSModulePath;
+ const r=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command','Add-Type -AssemblyName System.IO.Compression.FileSystem; if(Test-Path -LiteralPath $env:Z){Remove-Item -LiteralPath $env:Z -Force}; [IO.Compression.ZipFile]::CreateFromDirectory($env:S,$env:Z,[IO.Compression.CompressionLevel]::Optimal,$true)'],{windowsHide:true,env});
  assert.equal(r.status,0,String(r.stderr));return zip;
 }
 /* a fake service: the bridge actions the page calls, with the update phases it goes through */
@@ -155,4 +157,27 @@ test('silent: a successful hot apply clears an older failure record',{skip:proce
 test('silent: hot-done note strings exist in zh, ja and en',()=>{
  const s=fs.readFileSync(path.join(__dirname,'..','web','update-notice.js'),'utf8');
  for(const key of ['hotDone:','hotDoneMore:','hotDoneClose:','hotDoneNone:'])assert.equal(s.split(key).length-1,3,key);
+});
+
+test('consent: undecided → card at every start (no update, offline too); agreed or declined → no card',async()=>{
+ const {checkForUpdates}=await notice();
+ const run=async(consent,check)=>{let shown=0;await checkForUpdates({api:async a=>a==='contrib_consent'?consent:check(),invoke:async()=>{},version:'1.5.1',show:()=>{shown++;},silent:()=>{}});return shown;};
+ const none=()=>({newer:false}),off=()=>{throw new Error('offline');};
+ for(let i=0;i<3;i++)assert.equal(await run({ask:true,decided:false},none),1,'undecided: every start shows the card');
+ assert.equal(await run({ask:true,decided:false},off),1,'undecided: shown offline too');
+ assert.equal(await run({ask:false,decided:true,enabled:true},none),0,'agreed: no card');
+ assert.equal(await run({ask:false,decided:true,enabled:false},none),0,'declined: no card');
+});
+
+test('a hot package the page refused is not handed out again: the next start downloads the full package',async t=>{
+ const root=installRoot();t.after(()=>{u.reset();fs.rmSync(root,{recursive:true,force:true});});
+ const hotBytes=Buffer.from('PK small package'),fullBytes=Buffer.from('PK full package'),hotName='MeguLit-v1.5.2-hot-from-v1.5.1-ab12cd34ef56.zip';
+ const rel={tag_name:'v1.5.2',body:'- 修复A\n---\n- Fixed A',assets:[{name:'MeguLit-v1.5.2-win-x64.zip',size:fullBytes.length,digest:'sha256:'+sha(fullBytes),browser_download_url:url('MeguLit-v1.5.2-win-x64.zip')},{name:hotName,size:hotBytes.length,digest:'sha256:'+sha(hotBytes),browser_download_url:url(hotName)}]};
+ const fetcher=async x=>x.endsWith('/latest')?{ok:true,json:async()=>rel}:x.includes('-hot-from-')?{ok:true,status:200,url:x,arrayBuffer:async()=>hotBytes}:x.endsWith('-win-x64.zip')?{ok:true,status:200,url:x,arrayBuffer:async()=>fullBytes}:{ok:false,status:404};
+ u.reset();assert.equal((await u.check('1.5.1',fetcher,root)).silent,true);
+ await u.start(root,'1.5.1',fetcher);assert.equal(u.status().hot,true);
+ u.hotFail(root,'hot_reload refused: READER_BUSY');/* silentHotUpdate after a refused dry run */
+ const info=await u.check('1.5.1',fetcher,root);assert.equal(info.hot,false);/* the manual check in the same session */
+ await u.start(root,'1.5.1',fetcher);
+ assert.equal(u.status().phase,'ready');assert.equal(u.status().hot,undefined);assert.match(u.status().zip,/-win-x64\.zip$/);
 });

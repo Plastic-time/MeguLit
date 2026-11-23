@@ -21,7 +21,8 @@
 #include <map>
 #include <deque>
 #include <algorithm>
-#include "minhook/include/MinHook.h"
+#include "../shared/minhook/include/MinHook.h"
+#include "../shared/MeguLitSafeRead.h"
 
 namespace {
 // TJS string (tTJSVariantString): a ttstr is one pointer to this.
@@ -162,7 +163,8 @@ bool QueryGuarded(void *exporter, const char *name, void **fn) {
   return ((QueryNarrowFn)vt[1])(exporter, names, fn, 1) && *fn;
  } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-bool ReadPtr(const void *at, uintptr_t *v) { __try { *v = *(const uintptr_t *)at; return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
+/* P0 2026-11-20: never __try-read a guessed pointer blind (stack guard pages), see ../shared/MeguLitSafeRead.h */
+bool ReadPtr(const void *at, uintptr_t *v) { return MeguLitSafe::ReadPtr(at, v); }
 
 // ---- the hook ---------------------------------------------------------------------------------------------------
 bool IsScene(const wchar_t *name) { size_t n = wcslen(name); return n > 4 && !_wcsicmp(name + n - 4, L".scn"); }
@@ -410,22 +412,30 @@ void AskAudio(const std::wstring &name) {
  free(data);
  ReleaseGuarded(s);
 }
-LRESULT CALLBACK OnMessage(int code, WPARAM wp, LPARAM lp) {
- if (code >= 0 && wp == PM_REMOVE && GetTickCount() - LastAsk >= 120) {
+void AskStep() {
+ {
 #if defined(_M_IX86)
-  if (InterlockedExchange(&HxWanted, 0)) { LastAsk = GetTickCount(); DumpHx(); if (!AudioAsked) Report("done"); return CallNextHookEx(NULL, code, wp, lp); }
+  if (InterlockedExchange(&HxWanted, 0)) { LastAsk = GetTickCount(); DumpHx(); if (!AudioAsked) Report("done"); return; }
 #endif
   std::vector<std::wstring> voices;
   EnterCriticalSection(&Gate);
   while (!Wanted.empty() && voices.size() < 48 && IsAudio(Wanted.front().c_str())) { voices.push_back(Wanted.front()); Wanted.pop_front(); }
   LeaveCriticalSection(&Gate);
-  if (!voices.empty()) { for (auto &v : voices) AskAudio(v); LastAsk = GetTickCount(); return CallNextHookEx(NULL, code, wp, lp); }
+  if (!voices.empty()) { for (auto &v : voices) AskAudio(v); LastAsk = GetTickCount(); return; }
   std::wstring next;
   EnterCriticalSection(&Gate);
   while (!Wanted.empty() && next.empty()) { next = Wanted.front(); Wanted.pop_front(); if (IsAudio(next.c_str())) { Wanted.push_front(next); next.clear(); break; } if (IsScene(next.c_str()) ? Done.count(Lower(BaseOf(next.c_str()))) > 0 : HaveText(next)) next.clear(); }
   LeaveCriticalSection(&Gate);
   if (!next.empty()) { LastAsk = GetTickCount(); if (IsScene(next.c_str())) AskOne(next); else AskText(next); }
  }
+}
+// 2026-11-19 (千恋＊万花 ended with 0xC000041D): the kernel calls this hook procedure on the game's own thread, so an
+// exception that leaves it is not seen by the engine's handlers and ends the game. Every step runs guarded; after a
+// failure the game thread is not asked again.
+volatile LONG AskBroken;
+bool AskStepGuarded() { __try { AskStep(); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
+LRESULT CALLBACK OnMessage(int code, WPARAM wp, LPARAM lp) {
+ if (code >= 0 && wp == PM_REMOVE && !AskBroken && GetTickCount() - LastAsk >= 120 && !AskStepGuarded()) InterlockedExchange(&AskBroken, 1);
  return CallNextHookEx(NULL, code, wp, lp);
 }
 FILETIME WantSeen;
@@ -595,8 +605,10 @@ DWORD WINAPI Run(void *) {
   if (!MainThread) continue;
   ReadWants();
   EnterCriticalSection(&Gate); bool more = !Wanted.empty(); LeaveCriticalSection(&Gate);
+  if (AskBroken == 1) { InterlockedExchange(&AskBroken, 2); Log("asking stopped: a step failed on the game thread"); }
+  if (AskBroken) more = false;
 #if defined(_M_IX86)
-  if (HxWanted) more = true;
+  if (HxWanted && !AskBroken) more = true;
 #endif
   if (more && !MessageHook) { MessageHook = SetWindowsHookExW(WH_GETMESSAGE, OnMessage, NULL, (DWORD)MainThread); if (MessageHook) Log("asking on the game thread"); }
   if (more && MessageHook) PostThreadMessageW((DWORD)MainThread, WM_NULL, 0, 0);

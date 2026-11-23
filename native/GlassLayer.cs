@@ -119,8 +119,10 @@ public sealed class GlassLayer:IDisposable{
   // The cadence counts from the previous request, not from the end of its processing (that halved the rate: 16/s).
   double since=Ms(now-ReqAt);if(HasFrame&&since<Gap()&&Covers(l,t,r,b))return Gap()-since;
   Request(l,t,r,b,moving);return 14;}
- // A picture that stopped changing (a still scene) is checked about 10 times a second instead of 30.
- double Gap(){return Math.Max(Unchanged>15?100:ReadMs,Cost/BusyShare);}int Unchanged;
+ // A picture that stopped changing (a still scene) is checked about 10 times a second instead of 30, and about 5 times
+ // once it has been still for 3 s (2026-11-19 perf: each read waits for a DWM composition, which the game shares; a still
+ // picture behind a panel shows the same either way, and the first change is picked up within 0.2 s).
+ double Gap(){return Math.Max(Unchanged>45?200:Unchanged>15?100:ReadMs,Cost/BusyShare);}int Unchanged;
 
  bool Covers(int l,int t,int r,int b){return SrcW>0&&l>=SrcX&&t>=SrcY&&r<=SrcX+SrcW&&b<=SrcY+SrcH;}
  void Request(int l,int t,int r,int b,bool moving){

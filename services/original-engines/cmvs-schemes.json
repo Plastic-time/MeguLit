@@ -1,5 +1,5 @@
 {
-  "_comment": "E592 CMVS (Purple Software) CPZ5/CPZ6 schemes, from GARbro ArcFormats/Cmvs (morkt, MIT): ArcCPZ.cs CreateCpz5Scheme / DefaultCpz5Secret and CmvsMD5.cs. Numbers are hex strings. The reader tries every md5 variant in this order and keeps the first that gives a sane directory. A new title's variant or secret can be added here or sent as an adapter pack's params (same shape). out: [state index, op (^ + -), constant] per result word.",
+  "_comment": "E592 CMVS (Purple Software) CPZ5/CPZ6/CPZ7 schemes; cpz5 from GARbro ArcFormats/Cmvs (morkt, MIT): ArcCPZ.cs CreateCpz5Scheme / DefaultCpz5Secret and CmvsMD5.cs. Numbers are hex strings. The reader tries every md5 variant in this order and keeps the first that gives a sane directory. A new title's variant or secret can be added here or sent as an adapter pack's params (same shape). out: [state index, op (^ + -), constant] per result word.",
   "md5": {
     "Mirai":   {"init": ["67452301", "EFCDAB89", "98BADCFE", "10325476"], "out": [[0, "^", "0"], [1, "^", "0"], [2, "^", "0"], [3, "^", "0"]]},
     "A":       {"init": ["C74A2B01", "E7C8AB8F", "D8BEDC4E", "7302A4C5"], "out": [[3, "^", "0"], [1, "^", "0"], [2, "^", "0"], [0, "^", "0"]]},
@@ -22,6 +22,31 @@
     "indexAddend": "784C5962",
     "indexSubtrahend": "79",
     "dirKeyAddend": ["0", "00112233", "0", "34258765"]
+  },
+  "cpz5Late": {
+    "_comment": "CPZ5 packing modes 8 and 9 share a different 96-byte table. Mode 8 retains the old cipher constants with a new digest. Mode 9 uses digest B and changes four constants.",
+    "secret": ["CD90F089", "E982B782", "A282AB88", "CD82718E", "52838A83", "A882AA82", "7592648E", "B582AB82",
+               "E182BF82", "DC82A282", "4281B782", "62838183", "A9824981", "A282ED82", "C682A282", "BE8CA982",
+               "C482C182", "968BE082", "C482B582", "B082A082", "A282C882", "BE82F182", "E782A982", "49819F82"],
+    "mode8Digest": {"init": ["64FE9A8C","C2F93EA8","EF81BA5D","92C8A72F"], "out": [[1,"^","49876325"],[2,"+","54F46D7C"],[3,"^","AC7958B7"],[0,"+","1C0638BD"]]},
+    "mode9": {"decoderFactor":"1A740235","indexSubtrahend":"73","entryInitKey":"2547B39E","entryTailKey":"CB"}
+  },
+  "order": ["cpz5", "cpz6"],
+  "cpz6": {
+    "_comment": "CMVS 3.x CPZ6 (アマツツミ cmvs32 3.26): the CPZ6/7 index and entry constants with the CPZ5 entry seed subtrahend; read from the game's cmvs32.exe, matches Shizuku-in/cmvs-rs crates/cmvs-core/src/cpz/cpz6.rs (Apache-2.0, seed + 0xA3D61785).",
+    "secret": ["CD90F089", "E982B782", "A282AB88", "CD82718E", "52838A83", "A882AA82", "7592648E", "B582AB82",
+               "E182BF82", "DC82A282", "4281B782", "ED82F48E", "BF82EA82", "A282E182", "B782DC82", "6081E682",
+               "C6824181", "A482A282", "E082A982", "F48EA482", "BF82C182", "A282E182", "B582DC82", "F481BD82"],
+    "decoderFactor": "1A74F195",
+    "entryInitKey": "2748C39E",
+    "entrySubKey": "5C29E87B",
+    "entryTailKey": "AE",
+    "entryKeyPos": "A",
+    "indexSeed": "2A65CB4F",
+    "indexAddend": "784C5062",
+    "indexSubtrahend": "7D",
+    "dirKeyAddend": ["0", "11003322", "0", "34216785"],
+    "entryIndexTail": "3"
   },
   "cpz7": {
     "_comment": "CPZ7 constants (same secret as cpz5), from Shizuku-in/cmvs-rs crates/cmvs-core/src/cpz/crypto.rs (Apache-2.0). entryIndexTail: added to each tail byte of a file index.",

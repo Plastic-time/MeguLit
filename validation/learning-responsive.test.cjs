@@ -12,8 +12,10 @@ test.after(()=>{try{fs.rmSync(root,{recursive:true,force:true});}catch{}});
 function seed(n){const db=openStore(root);try{db.prepare("INSERT OR IGNORE INTO games(id,title) VALUES('g1','テスト')").run();const add=db.prepare('INSERT INTO reading_events(session_id,game_id,text,read_at,original) VALUES(1,?,?,?,?)');
  const words=['雨が降っている','先輩を待っていた','学校へ行きたい','静かな部屋でした','誰も来ないけれど','一緒に帰りましょう','窓を開けてください'];
  db.exec('BEGIN');for(let i=0;i<n;i++)add.run('g1',`${words[i%words.length]}、その${i}番目の夜だった。`,1794300000+i,'{"translation":""}');db.exec('COMMIT');}finally{db.close();}}
-/* the longest time the thread was held while `run` was going on */
-async function longestBlock(run){let last=Date.now(),worst=0;const iv=setInterval(()=>{const n=Date.now();worst=Math.max(worst,n-last);last=n;},5);try{await run();await new Promise(r=>setTimeout(r,15));}finally{clearInterval(iv);}return worst;}
+/* the longest time the thread was held while `run` was going on. A gap counts only as far as this process used the CPU
+   in it: under a parallel test run the OS takes the core away for a while, which is not the service holding it
+   (E987: 605 ms at concurrency 8, 1xx ms alone); a real block (the old 8 s scan) is CPU time and still counts whole */
+async function longestBlock(run){let last=Date.now(),cpu=process.cpuUsage(),worst=0;const iv=setInterval(()=>{const n=Date.now(),c=process.cpuUsage(cpu);worst=Math.max(worst,Math.min(n-last,(c.user+c.system)/1000));last=n;cpu=process.cpuUsage();},5);try{await run();await new Promise(r=>setTimeout(r,15));}finally{clearInterval(iv);}return worst;}
 
 test('breather gives way after the slice and not before',async()=>{
  const b=breather(10);let turns=0;const t=Date.now();while(Date.now()-t<60){await b();turns++;}assert.ok(turns>1000,'cheap when not due');

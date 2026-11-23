@@ -6,6 +6,8 @@
    exactly the term (never a tokenizer guess). No relay / no data → {state:'not-configured'|'error'|'empty'}. */
 const fs=require('node:fs'),path=require('node:path');
 const relay=require('./relay-config.cjs');
+const {MAX_PARAS,MAX_CHARS}=require('./news-article.cjs');
+const TRANSLATION_CHARS=2000;
 const TIMEOUT=8000,GLOSS_BUDGET=4000;
 const str=(v,n)=>typeof v==='string'?v.slice(0,n):'';
 /* (user 2026-11-12: a Game*Spark article would not open) a source may still give http:// links: they are upgraded to
@@ -59,15 +61,27 @@ async function translateList(root,runtime,list,goal,options={}){
  const cachedEngines=new Set(list.map(t=>val(cache.get(key(t))).e).filter(Boolean));
  const todo=list.map((t,i)=>i).filter(i=>list[i].trim()&&!out[i]);if(!todo.length)return {texts:out,engine:[...cachedEngines].join('+')||'cache'};
  let engine='',reason='';
- if(runtime?.reviews)try{const got=await runtime.reviews().translate(todo.map(i=>list[i]),goal,'ja');if(Array.isArray(got)&&got.some(Boolean)){todo.forEach((i,n)=>{out[i]=String(got[n]||'');});engine='app';}else reason='ENGINE_EMPTY';}catch(e){reason=String(e?.message||e);}
+ let reviews;try{reviews=runtime?.reviews?.({daily:true});}catch(e){reason=String(e?.message||e);}
+ if(reviews)for(let start=0;start<todo.length;start+=60){
+  const batch=todo.slice(start,start+60);
+  try{
+   const result=await reviews.translate(batch.map(i=>list[i]),goal,'ja');
+   const texts=Array.isArray(result)?result:result?.texts;
+   if(Array.isArray(texts)&&texts.some(Boolean)){
+    batch.forEach((i,n)=>{out[i]=String(texts[n]||'');});
+    if(result.error)reason=result.error;
+    engine='app';
+   }else reason=result?.error||'ENGINE_EMPTY';
+  }catch(e){reason=String(e?.message||e);}
+ }
  const left=todo.filter(i=>!out[i]);
  if(left.length){const free=options.translateFree||require('../core/translate.cjs').translateFree;let failed='';
   for(const i of left){try{out[i]=String(await free(list[i],{source:'ja',target:goal,preferred:'microsoft',fetcher:options.fetch||fetch})||'');}catch(e){failed=String(e?.message||e);}}
-  if(left.some(i=>out[i]))engine=engine?engine+'+microsoft':'microsoft';else if(failed)reason=failed;}
+  if(left.some(i=>out[i]))engine=engine?engine+'+microsoft':'microsoft';if(failed)reason=failed;}
  const by=new Set(left.filter(i=>out[i]));for(const i of todo)if(out[i])cache.set(key(list[i]),{t:out[i],e:by.has(i)?'microsoft':'app'});trSave(root);
  if(cachedEngines.has('microsoft')&&!engine.includes('microsoft'))engine=engine?engine+'+microsoft':'microsoft';
  if(!out.some(Boolean)&&list.some(t=>t.trim())){const e=Error('TRANSLATION_FAILED:'+(reason||'UNKNOWN'));throw e;}
- return {texts:out,engine};
+ return {texts:out,engine,...(reason&&list.some((t,i)=>t.trim()&&!out[i])?{error:reason}:{})};
 }
 async function view(root,db,options={}){
  const base=relay.relayBase(root,options.env||process.env);if(!base)return {state:'not-configured',news:null,words:null};
@@ -117,12 +131,26 @@ const artDir=root=>root?path.join(root,'data','cache','daily-article'):'';
 const hash=v=>crypto.createHash('sha256').update(String(v)).digest('hex').slice(0,32);
 /* sources the relay may cache in full (wrangler.toml NEWS_FULLTEXT_SOURCES); the relay marks those items fulltext:true */
 const fulltext=new Set();
-async function fromRelay(base,link,fetcher){const r=await get(base+'/api/news/article?link='+encodeURIComponent(link),fetcher);return r.state==='ok'&&Array.isArray(r.data?.paragraphs)?{title:str(r.data.title,200),paragraphs:r.data.paragraphs.slice(0,120).map(p=>str(p,2000)).filter(Boolean),via:'relay'}:null;}
+/* Keep the previous total request budget while allowing one long paragraph from the extractor. */
+function articleTexts(values,toText){
+ let remaining=MAX_PARAS*TRANSLATION_CHARS;
+ return values.slice(0,MAX_PARAS).map(value=>{
+  const original=toText(value),limit=Math.min(MAX_CHARS,remaining);
+  let text=original.slice(0,limit);
+  if(text.length<original.length&&/[\uD800-\uDBFF]$/.test(text))text=text.slice(0,-1);
+  remaining-=text.length;return text;
+ });
+}
+async function fromRelay(base,link,fetcher){const r=await get(base+'/api/news/article?link='+encodeURIComponent(link),fetcher);return r.state==='ok'&&Array.isArray(r.data?.paragraphs)?{title:str(r.data.title,200),paragraphs:articleTexts(r.data.paragraphs,p=>typeof p==='string'?p:'').filter(Boolean),via:'relay'}:null;}
 async function fromSite(link,options){const page=await require('./fast-fetch.cjs').getText(link,{fetch:options.fetch,doh:options.doh});if(!page.ok)return null;const x=require('./news-article.cjs').extract(page.text,page.url||link);return x.paragraphs.length?{...x,via:page.via}:null;}
 /* readings only when the dictionary settled them (readingSource 'dictionary'), never the tokenizer's guess */
 async function tokens(text,learning){
  if(!learning)return null;
- try{const list=learning.readings.resolve(await learning.tokenize(text));return list.map(t=>({s:String(t.surface||''),b:String(t.base_form&&t.base_form!=='*'?t.base_form:t.surface||''),r:t.readingSource==='dictionary'?String(t.reading||''):''})).filter(t=>t.s);}catch{return null;}
+ try{
+  const list=[];
+  for(const part of splitParagraph(text,4000))list.push(...learning.readings.resolve(await learning.tokenize(part)));
+  return list.map(t=>({s:String(t.surface||''),b:String(t.base_form&&t.base_form!=='*'?t.base_form:t.surface||''),r:t.readingSource==='dictionary'?String(t.reading||''):''})).filter(t=>t.s);
+ }catch{return null;}
 }
 async function article(root,link,options={}){
  if(!canOpen(link))throw Error('URL_NOT_ALLOWED');
@@ -139,12 +167,29 @@ async function article(root,link,options={}){
  const paragraphs=[];for(const text of body.paragraphs)paragraphs.push({text,tokens:await tokens(text,learning)});
  return {state:'ok',link,title:body.title,via:body.via,paragraphs};
 }
+function splitParagraph(text,limit){
+ const parts=[];
+ while(text.length>limit){
+  const head=text.slice(0,limit);
+  const sentenceEnd=Math.max(...['。','！','？','!','?','\n'].map(c=>head.lastIndexOf(c)))+1;
+  const cut=sentenceEnd||head.length-(/[\uD800-\uDBFF]$/.test(head)?1:0);
+  parts.push(text.slice(0,cut));text=text.slice(cut);
+ }
+ parts.push(text);return parts;
+}
 async function translate(root,runtime,texts,target,options={}){
  const goal={zh:'zh-CN',en:'en','zh-CN':'zh-CN'}[String(target)]||'zh-CN';
- const list=(Array.isArray(texts)?texts:[]).slice(0,60).map(t=>String(t||'').slice(0,2000));
- const r=await translateList(root,runtime,list,goal,options);
+ const paragraphs=articleTexts(Array.isArray(texts)?texts:[],t=>String(t||'')).map(t=>splitParagraph(t,TRANSLATION_CHARS).filter(part=>part.trim()));
+ const r=await translateList(root,runtime,paragraphs.flat(),goal,options);
+ let at=0;
+ const translated=paragraphs.map(parts=>{
+  const pieces=r.texts.slice(at,at+parts.length);at+=parts.length;
+  return pieces.every(Boolean)?pieces.join(goal==='en'?' ':''):'';
+ });
  /* withEngine (the reader): also say which engine answered, so the page can point out the Microsoft fallback */
- return options.withEngine?{texts:r.texts,engine:r.engine}:r.texts;
+ const incomplete=translated.some((t,i)=>!t&&paragraphs[i].length),error=r.error||'ENGINE_EMPTY';
+ if(incomplete&&!translated.some(Boolean))throw Error('TRANSLATION_FAILED:'+error);
+ return options.withEngine?{texts:translated,engine:r.engine,...(incomplete?{error}:{})}:translated;
 }
 /* one card per word per article, in the megulit_news deck (created on first use) */
 const NEWS_DECK='megulit_news';

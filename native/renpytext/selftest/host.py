@@ -27,6 +27,7 @@ def install_fakes():
         sys.modules[name] = m
         return m
     renpy = mod('renpy')
+    renpy.version_tuple = (8, 4, 0, 25071206)
     for n in ('display', 'text'):
         setattr(renpy, n, mod('renpy.' + n))
     render, textmod, extras = mod('renpy.display.render'), mod('renpy.text.text'), mod('renpy.text.extras')
@@ -92,6 +93,7 @@ def install_fakes():
 
         def __init__(self, lines):
             self.lines = lines
+            self.paragraph_glyphs = [list(line.glyphs) for line in lines]
 
         def unscale_pair(self, x, y):
             return x / self.oversample, y / self.oversample
@@ -101,22 +103,35 @@ def install_fakes():
             self.size = size
 
     class Text(object):
-        def __init__(self, what, size, rows, ruby=None):
+        def __init__(self, what, size, rows, ruby=None, ruby_count=None):
             self.text_parameter, self.text, self.style = what, [what], Style(size)
+            self.start, self.end = 0, len(what)
             lines = []
             for r, row in enumerate(rows):
                 glyphs = []
+                base_count = ruby_count if ruby_count is not None else len(row)
                 for i, ch in enumerate(row):
-                    glyphs.append(Glyph(ch, i * size * 2, size * 2, 1 if ruby else 0))
-                if ruby and r == 0:
-                    for i, ch in enumerate(ruby):
-                        glyphs.append(Glyph(ch, i * size, size // 2, 2))
+                    glyphs.append(Glyph(ch, i * size * 2, size * 2, 1 if ruby and r == 0 and i < base_count else 0))
+                    if ruby and r == 0 and i == base_count - 1:
+                        for j, reading in enumerate(ruby):
+                            glyphs.append(Glyph(reading, j * size, size // 2, 2))
                 glyphs.append(Glyph('\ufffc', len(row) * size * 2, size * 2))  # the click-to-continue mark
                 lines.append(Line(r * (size + 10) * 2, (size + 10) * 2, glyphs))
             self._layout = Layout(lines)
 
         def get_layout(self):
             return self._layout
+
+        def set_text(self, text):
+            # engine-draw: Ren'Py lays the new text out again; here a row per paragraph, ruby readings and tags left out
+            self.text_parameter, self.text = text, [text]
+            visible = text if self.start is None else text[self.start:self.end]
+            plain = re.sub(r'\{rt\}.*?\{/rt\}', '', visible)
+            plain = re.sub(r'\{[^{}]*\}', '', plain.replace('{{', '\x00').replace('[[', '[')).replace('\x00', '{')
+            size = self.style.size
+            self._layout = Layout([Line(r * (size + 10) * 2, (size + 10) * 2, [Glyph(ch, i * size * 2, size * 2) for i, ch in enumerate(row)])
+                                   for r, row in enumerate(plain.split('\n'))])
+            self.set_calls = getattr(self, 'set_calls', []) + [text]
 
         def render(self, width, height, st, at):
             rv = Render()
@@ -139,6 +154,18 @@ def install_fakes():
     def say_show(who, what):
         return None
     state = {'tree': None}
+    screenmod = mod('renpy.display.screen')
+    screenmod.get_widget = lambda screen, ident: state.get('who') if (screen, ident) == ('say', 'who') else None
+    screenmod.get_screen = lambda screen: state.get('choice_screen') if screen == 'choice' else None
+    behaviormod = mod('renpy.display.behavior')
+    class Button(object):
+        def __init__(self, action):
+            self.action = action
+        def render(self, *args):
+            result = Render()
+            result.alpha = 1.0
+            return result
+    behaviormod.Button = Button
 
     def display_say(who, what, show_function, interact=True, *rest, **kw):
         show_function(who, what)
@@ -147,6 +174,25 @@ def install_fakes():
             renpy.display.render.render_screen(state['tree'], 1280, 720)
     character.display_say = display_say
     exports.display_say = display_say
+    state['restarts'] = 0
+
+    def restart_interaction():
+        state['restarts'] += 1
+    exports.restart_interaction = restart_interaction
+
+    def display_menu(items, interact=True):
+        entries = [types.SimpleNamespace(caption=caption, action=object()) for caption, value in items if caption and value is not None]
+        state['choice_screen'] = types.SimpleNamespace(scope={'items': entries})
+        leaves = state['tree'].children[0][0].children
+        for entry, leaf in zip(entries, leaves):
+            leaf[0].render_of.insert(0, Button(entry.action))
+        for _ in range(2):
+            renpy.display.render.render_screen(state['tree'], 1280, 720)
+        state['choice_screen'] = None
+        return items[0][1]
+    exports.display_menu = display_menu
+    renpy.display_menu = display_menu
+    store.menu = display_menu
     renpy.display_say = display_say
     return renpy, store, Render, Text, Matrix, nvl_show_core, say_show, state
 
@@ -170,7 +216,7 @@ def scenario(fakes):
     state['tree'] = screen((t1, (20, 30), None))
     renpy.character.display_say(None, '\u6625\u306e\u98a8\u304c\u5439\u3044\u305f\u3002{w}\u4e8c\u884c\u76ee\u3067\u3059\u3002', nvl_show_core)
     what2 = '{rb}\u6f22\u5b57{/rb}{rt}\u304b\u3093\u3058{/rt}\u3092\u8aad\u3080\u3002'
-    t2 = Text('rebuilt by the screen', 28, ['\u6f22\u5b57\u3092\u8aad\u3080\u3002'], ruby='\u304b\u3093\u3058')
+    t2 = Text('rebuilt by the screen', 28, ['\u6f22\u5b57\u3092\u8aad\u3080\u3002'], ruby='\u304b\u3093\u3058', ruby_count=2)
     store.nvl_list.append(('b', 'y', {}))
     state['tree'] = screen((t1, (20, 30), None), (t2, (40, 0), 0.5))
     renpy.exports.display_say(None, what2, nvl_show_core)
@@ -191,6 +237,44 @@ def scenario(fakes):
     store.nvl_list = [('c', 'z', {})]
     state['tree'] = screen((t4, (20, 30), None))
     renpy.display_say(None, '\u65b0\u3057\u3044\u9801\u3002', nvl_show_core)
+
+
+def scenario_draw(fakes, ctl):
+    renpy, store, Render, Text, Matrix, nvl_show_core, say_show, state = fakes
+    with open(ctl, 'wb') as f:
+        f.write(u'#cfg roles=1 embed=1 zh=1\r\n\u4eca\u65e5\u306f\u6674\u308c\t0:2:\u304d\u3087\u3046\t\u4eca\u5929\u6674\u6717\r\n'.encode('utf-16'))
+    sys._megulit_renpy_ctl = ctl
+
+    def screen(*texts):
+        root = Render()
+        window = root.blit(Render(), (100, 50))
+        for t, pos in texts:
+            window.blit(Render(t), pos)
+        return root
+    name = Text('Eileen', 20, ['Eileen'])
+    state['who'] = name
+    what = Text('\u4eca\u65e5\u306f\u6674\u308c', 24, ['\u4eca\u65e5\u306f\u6674\u308c'])
+    state['tree'] = screen((name, (60, 440)), (what, (60, 500)))
+    sys._megulit_renpy_hide = lambda: True
+    renpy.character.display_say('Eileen', '\u4eca\u65e5\u306f\u6674\u308c', say_show)
+    for _ in range(3):
+        renpy.display.render.render_screen(state['tree'], 1280, 720)
+    state['set_calls'] = getattr(what, 'set_calls', [])
+    a, b = Text('\u306f\u3044', 24, ['\u306f\u3044']), Text('\u3044\u3044\u3048', 24, ['\u3044\u3044\u3048'])
+    state['tree'] = screen((a, (400, 200)), (b, (400, 280)))
+    renpy.exports.display_menu([('\u306f\u3044', 1), ('\u3044\u3044\u3048', 2), ('\u898b\u51fa\u3057', None)])
+
+
+def run_sink_draw(script, ctl):
+    fakes = install_fakes()
+    out = []
+    sys._megulit_renpy_sink = out.append
+    src = open(script, 'rb').read().decode('utf-8')
+    exec(compile(src, script, 'exec'), {'__name__': '__main__'})
+    scenario_draw(fakes, ctl)
+    out.append('HOST set_calls=%s restarts=%d' % (json.dumps(fakes[7].get('set_calls')), fakes[7].get('restarts')))
+    sys.stdout.buffer.write(json.dumps(out).encode('utf-8'))
+    return 0
 
 
 def run_sink(script):
@@ -262,6 +346,8 @@ def run_dll(dll):
 if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == '--sink':
         sys.exit(run_sink(sys.argv[2]))
+    if len(sys.argv) == 4 and sys.argv[1] == '--sink-draw':
+        sys.exit(run_sink_draw(sys.argv[2], sys.argv[3]))
     if len(sys.argv) == 3 and sys.argv[1] == '--dll':
         sys.exit(run_dll(sys.argv[2]))
     print('usage: host.py --sink MeguLitRenpy.py | --dll MeguLitRenpy64.dll')

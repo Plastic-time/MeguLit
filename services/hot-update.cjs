@@ -12,7 +12,8 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto'),{spawnSync}
 const NAME=/^MeguLit-v([0-9A-Za-z.-]+?)-hot-from-v([0-9A-Za-z.-]+?)-([a-f0-9]{12})\.zip$/i;
 const HOSTS=new Set(['github.com','objects.githubusercontent.com','release-assets.githubusercontent.com']);
 /* Only these folders may change in a hot update; native helpers, the runtime and user data never do. */
-const ALLOWED=/^(web|services|core|setup)\//;
+/* 2026-11-21 The Seed/: the built-in game diffs (docs/diff-layers.md) come with hot updates too */
+const ALLOWED=/^(web|services|core|setup|The Seed)\//;
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 
 function asset(rel){
@@ -29,7 +30,10 @@ function safe(rel){return typeof rel==='string'&&ALLOWED.test(rel)&&!/\.html?$/i
 
 function extract(zip,dest,run=spawnSync){
  fs.rmSync(dest,{recursive:true,force:true});fs.mkdirSync(dest,{recursive:true});
- const r=run('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-Command','Expand-Archive -LiteralPath $env:MEGULIT_HOT_ZIP -DestinationPath $env:MEGULIT_HOT_DEST -Force'],{windowsHide:true,env:{...process.env,MEGULIT_HOT_ZIP:zip,MEGULIT_HOT_DEST:dest}});
+ /* 2026-11-19: .NET ZipFile instead of the Expand-Archive cmdlet, and no inherited PSModulePath (a PowerShell 7 parent hands Windows
+    PowerShell its own module path, and the Archive cmdlets then depend on which module version loads) */
+ const env={...process.env,MEGULIT_HOT_ZIP:zip,MEGULIT_HOT_DEST:dest};delete env.PSModulePath;
+ const r=run('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-Command','Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::ExtractToDirectory($env:MEGULIT_HOT_ZIP,$env:MEGULIT_HOT_DEST)'],{windowsHide:true,env});
  if(!r||r.status!==0)throw Error('HOT_EXTRACT_FAILED');
 }
 /* Writes the files of a verified hot package; returns its manifest. Nothing is written unless every file checks out. */

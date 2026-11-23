@@ -72,7 +72,7 @@ test('a game started before MeguLit: one bind for Alt+M, 点选 and the list; th
  lib.bindWindow(reader,{hwnd:'77',title:'さくら',processName:'sakura.exe'},{fontSize:28},e=>out.push(e));
  assert.deepEqual(binds,[{h:'77',s:{fontSize:28,bindEnabled:true}}],'the page settings of the list bind go with it');
  lib.follow(reader,{type:'bound',bound:true,gameHwnd:'77',gameTitle:'さくら'},e=>out.push(e),'zh');
- assert.equal(out[0].message,'已绑定：さくら');assert.deepEqual(saved,[{v:{fontSize:30,gameProcess:'sakura',bindEnabled:true},c:false}],'gameProcess kept: a MeguLit restart binds this game again by itself');
+ assert.equal(out[0].message,'已绑定：さくら');assert.deepEqual(saved,[{v:{fontSize:30,gameProcess:'sakura',gameExecutable:'',bindEnabled:true},c:false}],'gameProcess kept: a MeguLit restart binds this game again by itself (its full path is written by the bound event, validation/autobind-path.test.cjs)');
  const pick=[];lib.request({gal:reader.gal},{hwnd:'9',className:'Progman',processName:'explorer',pick:true},e=>pick.push(e),'zh');assert.equal(pick[0].pick,true);assert.match(pick[0].message,/桌面/);
  const reader2=read('services/reader.cjs');
  assert.match(reader2,/case 'galBind':[^\n]*require\('\.\/bind-hotkey\.cjs'\)\.bindWindow\(this,\{hwnd:r\.hwnd,title:r\.title,processName:r\.processName\},r\.settings/,'the list bind goes the same way');
@@ -83,13 +83,17 @@ test('a game started before MeguLit: one bind for Alt+M, 点选 and the list; th
 
 test('reconnecting to a game an earlier MeguLit injected: HookBridge connects first and injects only when needed, our DLLs redial their pipes',()=>{
  const hb=read('native/HookBridge.cs');
- const start=hb.indexOf('Luna_Start(connected'),connect=hb.indexOf('Luna_ConnectProcess(Pid)',start),check=hb.indexOf('if(Luna_CheckIfNeedInject(Pid))',start);
+ const start=hb.indexOf('Luna_Start(connected'),connect=hb.indexOf('Luna_ConnectProcess(Pid)',start),check=hb.indexOf('Reattach=!Luna_CheckIfNeedInject(Pid)',start);
  assert.ok(start>0&&connect>start&&check>connect,'ConnectProcess, then inject only if Luna_CheckIfNeedInject');
+ /* #468 an already injected process gets the hooks it had again; 490a7b5b the DLL may connect before Reattach is set (CHAOS;CHILD rig: OnConnect ran first, nothing reinserted), so it runs once more when already connected, and only once */
+ assert.ok(hb.includes('Connected=true;ReattachHooks();'));
+ assert.ok(hb.includes('Reattach=!Luna_CheckIfNeedInject(Pid);if(Reattach){')&&hb.includes('if(Connected)ReattachHooks();}'),'run once more when the DLL connected first');
+ assert.ok(hb.includes('static void ReattachHooks(){if(!Reattach||ReattachDone'),'runs once');
  assert.match(hb,/Luna_DetachProcess\(Pid\)/,'a clean exit detaches, so the next start injects a fresh hook');
  const font=read('native/fontprobe/FontProbe.cpp');assert.match(font,/if \(pipe == INVALID_HANDLE_VALUE\) \{ pipe = CreateFileW\(name[^\n]*continue; fresh = true; \}/,'FontProbe redials and replays to a new HookBridge');
  assert.match(font,/CloseHandle\(p\); InterlockedExchange\(&CtlConnected, 0\); Command\("OFF"\)/,'with HookBridge gone nothing stays hidden');
  assert.match(read('native/gpuhide/GpuHide.cpp'),/if \(pipe == INVALID_HANDLE_VALUE\) \{ pipe = CreateFileW\(name/);
- assert.match(read('native/fontdot/FontDot.cpp'),/if \(Pipe == INVALID_HANDLE_VALUE\) \{\s*DWORD now = GetTickCount\(\); if \(now - PipeTried < 2000\) return;/);
+ /* perf/inject-hotpath: the pipe is dialled by the background Writer (never on the game thread), at most every 2 s */assert.match(read('native/fontdot/FontDot.cpp'),/if \(Pipe == INVALID_HANDLE_VALUE\) \{\s*DWORD now = GetTickCount\(\); if \(!first && now - tried < 2000\) continue;[^\n]*\n\s*Pipe = CreateFileA\(name/);
 });
 
 test('MeguLit started while a library game runs: the home window says 「检测到…正在运行…Alt+M」 once, not for the game it rebinds itself',async t=>{

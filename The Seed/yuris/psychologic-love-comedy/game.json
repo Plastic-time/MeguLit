@@ -1,0 +1,68 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "22fec3d1cb2104269f0f7ad7e25037c58d2fe9f31d1ef0d078f5b4fee701354d",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "yuris",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "60a886916d5f2c5bb3d94c9c89a661514762dbfd6202ac5ee0a800cae975082b",
+  "script": "9cd3849f86eeee730a71751613048eaed6f47d03ab6b9e73ceeeec9de431a455",
+  "title": "6ce4689035af8172a1f0bf2b9cecc6163c03e5d1f294cfb8d90b2dcfbb00c1b9",
+  "vndb": "v16584"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "psychologic-love-comedy",
+ "builds": [
+  "90d4614fa0c2f23ed263fe79ca6e03394e9c25c092ac4187bb3ed9e63d292d8c"
+ ],
+ "match": {
+  "exe": [
+   "saikoro.exe"
+  ],
+  "titles": [
+   "サイコロジック・ラブコメディ",
+   "サイコロジック ラブコメディ",
+   "[150828][initial] サイコロジック・ラブコメディ"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

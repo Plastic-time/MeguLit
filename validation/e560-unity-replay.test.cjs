@@ -44,7 +44,7 @@ test('HookBridge Unity embed safety (source)',()=>{
  assert.match(b,/MarkUnsafe\("unity-readback"\)/,'veil read back -> cover mode');
  assert.match(b,/MarkUnsafe\("unity-colour-reveal"\)/);
  assert.match(b,/MarkUnsafe\("unity-many-contexts"\)/);
- assert.match(b,/finally\{foreach\(var a in later\)a\(\);\}/,'UseEmbed outside Gate in Select');
+ assert.match(b,/finally\{FlushEmbedSync\(\);\}/,'UseEmbed reconciler runs outside Gate in Select');
  assert.match(p,/Resource\.IsMatch\(visible\)/,'rich-text </size> is not a path');
  assert.match(p,/UnityVeilOpen = "<color=#01010100>"/);
 });

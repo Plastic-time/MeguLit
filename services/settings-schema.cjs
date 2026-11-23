@@ -111,6 +111,8 @@ for(const[panel,names]of Object.entries(panelNames)){
 }
 field('library','steamPath','Steam 安装目录','Steam folder','Steam フォルダ');field('library','folders','其他游戏目录（一行一个）','Other game folders (one per line)','ほかのゲームフォルダ（1行に1つ）',
  'multiline');
+bool('library','nsfw','显示成人向封面（NSFW，默认关）','Show adult covers (NSFW, off by default)','成人向けの表紙を表示（NSFW・既定はオフ）');
+choice('library','infoSource','作品和游戏社介绍的来源','Source of work and developer introductions','作品・ブランド紹介の取得元',[option('auto','自动（中文界面用萌娘百科，没有再用 VNDB；其他语言用 VNDB）','Automatic (Moegirlpedia in the Chinese UI, then VNDB; VNDB in other languages)','自動（中国語 UI は萌娘百科→VNDB、他の言語は VNDB）'),option('moegirl','萌娘百科优先（任何界面语言），没有再用 VNDB','Moegirlpedia first (any UI language), then VNDB','萌娘百科を優先（どの言語でも）、なければ VNDB'),option('vndb','只用 VNDB','VNDB only','VNDB のみ')]);
 bool('library','autoSeries','自动识别游戏系列','Automatically recognize game series','ゲームシリーズを自動認識');
 /* E370: anonymous adaptation records (hook stream, embed result, calibration) shared between users; off stops both directions */
 /* 2026-11-12 the game's good-looking scenes, captured quietly for the detail card's back (scene-shots.cjs) */
@@ -125,6 +127,10 @@ bool('library','probeUpload','自动上传读不出的游戏的脱敏结构（�
 /* 2026-11-15 adaptation contribution (services/adapter-contrib.cjs): scripts and program code of library games that do not read
    well, for the maintainer's adapter packs. Public: off until the player agrees; closed beta: on after the in-app note. */
 bool('library','adapterContrib','后台上传读不好的游戏的剧本和启动程序（只用于改进适配，用完即删，可随时关）','Upload scripts and program code of games that do not read well (for adaptation only, deleted after use)','うまく読めないゲームのスクリプトと実行ファイルを送信（適応の改善のみ・使用後に削除）');
+/* 2026-11-21 (owner: 闲时冷测试，默认开) the idle-time cold test for The Seed (services/cold-test.cjs, docs/cold-test.md): on unless the
+   user turned it off; pictures only for a failed or borderline game, and never with coldTestShots off */
+bool('library','coldTest','闲时帮 The Seed 测游戏（后台隐藏桌面，可关）','Test games for The Seed while the PC is idle (hidden desktop)','PC が空いているときに The Seed のためにゲームをテスト（非表示デスクトップ）');
+bool('library','coldTestShots','冷测试没过线时附带游戏画面（2 到 3 张，只截游戏窗口）','Send game pictures when a cold test fails (2-3, game window only)','コールドテスト不合格時にゲーム画面を添える（2〜3 枚、ゲームウィンドウのみ）');
 for(const engine of ['ollama','lmstudio'])fields.find(f=>f.scope==='translation'&&f.key==='provider').options.push(engine==='ollama'?option(engine,'Ollama（本地模型）',
  'Ollama','Ollama'):option(engine,'LM Studio（本地模型）','LM Studio','LM Studio'));
 choice('lookup','lookup_mode','查词触发方式','Lookup gesture','辞書を開く操作',[option('click','单击','Click','クリック'),option('hover','悬停','Hover','ホバー')]);

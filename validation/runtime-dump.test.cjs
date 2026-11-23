@@ -46,7 +46,7 @@ test('the game folder is also found through game.txt when the key differs',()=>{
  fs.writeFileSync(path.join(other,'game.txt'),game.toUpperCase());assert.equal(rd.dirFor(game),other);});
 
 // When the native self-test has run on this machine, its real output must read back too.
-test('native self-test output (if present) reads back as Japanese and Chinese',{skip:!fs.existsSync('H:\\MeguLit-Work\\runtime-dump-selftest\\out64')},()=>{
+test('native self-test output (if present) reads back as Japanese and Chinese',{skip:!fs.existsSync('H:\\MeguLit-Work\\runtime-dump-selftest\\out64')&&'environment: no native runtime-dump self-test output on this PC'},()=>{
  process.env.MEGULIT_RUNTIME_DUMP='H:\\MeguLit-Work\\runtime-dump-selftest\\out64';delete require.cache[require.resolve('../services/runtime-dump.cjs')];
  const rd=require('../services/runtime-dump.cjs'),c=rd.corpus('H:\\MeguLit-Work\\runtime-dump-selftest\\game64');
  assert.ok(c.ja.some(l=>l.includes('めぐみん')),'Japanese line');assert.ok(c.zh.some(l=>l.includes('惠惠')),'Chinese line');});

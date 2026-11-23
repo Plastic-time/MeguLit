@@ -13,3 +13,13 @@ test('E408: hook-native wires the collapse and the cross-stream window',()=>{
  assert.match(s,/new DoubleLine\(/);assert.match(s,/source doubled collapsed/);
  assert.match(s,/this\.sourceStream!==this\.lastSourceStream&&age<2500/);assert.match(s,/age<650/);
 });
+test('2026-11-16: the first doubled line of a run (no evidence yet) is collapsed when a whole sentence repeats',()=>{
+ const d=new DoubleLine(()=>0),line='　特に何かの説明があったわけでもなく、それは起こった。　特に何かの説明があったわけでもなく、それは起こった。　';
+ const r=d.fix('krkr',line,'');assert.ok(r.collapsed);assert.strictEqual(r.text.trim(),'特に何かの説明があったわけでもなく、それは起こった。');
+ assert.strictEqual(new DoubleLine(()=>0).fix('x','はい。はい。','').collapsed,false,'short repeats stay');
+ assert.strictEqual(new DoubleLine(()=>0).fix('x','ドキドキドキドキ','').collapsed,false,'no closing punctuation stays');
+});
+test('2026-11-16: a new game process forgets the LOG detector seen lines (first line after a restart is not a replay)',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'../core/hook-native.cjs'),'utf8');
+ assert.match(s,/if\(identity!==this\.identity\)\{[^]*?this\.nativeLog=null;/);
+});

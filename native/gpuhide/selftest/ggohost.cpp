@@ -21,7 +21,7 @@
 #include <thread>
 #include <atomic>
 #include <cmath>
-#include "../../scncapture/minhook/include/MinHook.h"
+#include "../../shared/minhook/include/MinHook.h"
 
 static std::mutex Mu; static std::vector<std::string> Reports; static HANDLE Ctl = INVALID_HANDLE_VALUE; static int Fails;
 static void Check(bool ok, const char *what) { printf("%s %s\n", ok ? "PASS" : "FAIL", what); if (!ok) Fails++; }

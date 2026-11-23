@@ -1,0 +1,67 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "8e95430323383c108389dfd1bdc52aca76e96e28bc516013deb1f9f9e0f059a5",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "fvp",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "cb890380c6f44794368ff163c5872f07db1bdcd64e5a224ca9ea6a0d7a92c823",
+  "script": "55f86b3dcfb1cfe62ed685e0d46e23168628dbebdece5f52c53e489fa204f5f1",
+  "title": "ea6d9d756909167ece140bf9497fa9b8943eecca1a6165b93656c664db911f03",
+  "vndb": "v10028"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "irotoridori-no-hikari-hd",
+ "builds": [
+  "adb556478ad608a3a0321f7d3b6e7e3c8394c648ca4758fea80e2ac0c683a492"
+ ],
+ "match": {
+  "exe": [
+   "irohika_HD.exe"
+  ],
+  "titles": [
+   "いろとりどりのヒカリ",
+   "[220930][FAVORITE] いろとりどりのヒカリ"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

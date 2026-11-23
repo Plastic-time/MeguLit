@@ -50,10 +50,13 @@ function header(d){if(d.length<0x1d0||d.readInt32LE(0)!==0x1d0)return null;const
  return {version:v,xor2:v!==10002,at:d.readInt32LE(0x20),dlen:d.readInt32LE(0x24),clen:d.readInt32LE(0x28)};}
 // Text runs: double-byte Shift-JIS (or GBK) characters, with ASCII spaces and digits inside a run.
 const lead=c=>(c>=0x81&&c<=0x9f)||(c>=0xe0&&c<=0xfc);
+/* Quoted pieces ("…""【""名前""】""「…」") are one text token (rlvm: the quotes are not printed). A Chinese patch writes
+   every line that way, so 【 and 】 alone were dropped and the name became a line of its own. */
 function runs(code){const out=[];let i=0;
- while(i<code.length){if(!lead(code[i])&&!(code[i]>=0xa1&&code[i]<=0xfe)){i++;continue;}const st=i;let dbl=0;
-  while(i+1<code.length&&(lead(code[i])||(code[i]>=0xa1&&code[i]<=0xfe))&&code[i+1]>=0x40&&code[i+1]!==0x7f){i+=2;dbl++;}
-  if(dbl>=2)out.push(code.subarray(st,i));if(i===st)i++;}
+ const ch=j=>j+1<code.length&&(lead(code[j])||(code[j]>=0xa1&&code[j]<=0xfe))&&code[j+1]>=0x40&&code[j+1]!==0x7f;
+ while(i<code.length){if(!lead(code[i])&&!(code[i]>=0xa1&&code[i]<=0xfe)){i++;continue;}const st=i;let dbl=0,quoted=false;
+  for(;;){if(ch(i)){i+=2;dbl++;continue;}if(code[i]===0x22){let j=i;while(code[j]===0x22)j++;if(ch(j)){i=j;quoted=true;continue;}}break;}
+  if(dbl>=2)out.push(quoted?Buffer.from(code.subarray(st,i).filter(b=>b!==0x22)):code.subarray(st,i));if(i===st)i++;}
  return out;}
 const KANA=/[ぁ-ゖァ-ヺ]/,HAN=/[一-鿿]/;
 // Japanese if Shift-JIS reads it with kana; else GBK when that is clean Chinese (a patched Seen.txt).
@@ -64,12 +67,18 @@ const score=code=>{let n=0;for(const r of runs(code)){const t=text(r);if(t&&KANA
 // One scenario's bytecode: the second key named by the archive (REGNAME), else the one that gives the most Japanese.
 function bytecode(raw,keyName){const h=header(raw);if(!h||h.at<=0||h.at+h.clen>raw.length||h.dlen<=0||h.dlen>64<<20)return null;const src=raw.subarray(h.at,h.at+h.clen);
  if(!h.xor2)return decompress(src,h.dlen,null);
- const names=keyName&&KEYS[keyName]?[keyName]:Object.keys(KEYS);let best=null,top=-1;
- for(const n of names){let d;try{d=decompress(src,h.dlen,KEYS[n]);}catch{continue;}const s=score(d);if(s>top){top=s;best=d;}}
+ /* The key REGNAME names is used as is: a Chinese patch's GBK text has no kana, so scoring it threw every scenario away */
+ if(keyName&&KEYS[keyName]){try{return decompress(src,h.dlen,KEYS[keyName]);}catch{return null;}}
+ let best=null,top=-1;
+ for(const n of Object.keys(KEYS)){let d;try{d=decompress(src,h.dlen,KEYS[n]);}catch{continue;}const s=score(d);if(s>top){top=s;best=d;}}
  return best;}
 const tidy=t=>t.replace(/^[\s　]+|[\s　]+$/g,'');
-function parse(buf){const lines=[];const code=Buffer.isBuffer(buf)?buf:Buffer.from(buf);
- for(const r of runs(code)){const t=tidy(text(r));if(t&&(KANA.test(t)||HAN.test(t)))lines.push(t);}
+/* The language is decided per scenario: in a Japanese one a line without kana (「４月１５日（火）」, 「声…」) is still
+   Shift-JIS, not GBK (it came out as 「係寧侾俆擔」) */
+function parse(buf){const lines=[];const code=Buffer.isBuffer(buf)?buf:Buffer.from(buf),list=runs(code);
+ let ja=0,zh=0;for(const r of list){const t=text(r);if(!t)continue;if(KANA.test(t))ja++;else zh++;}
+ const sjis=r=>{const a=sj.decode(r);return JUNK.test(a)?'':a;};
+ for(const r of list){const t=tidy(ja>zh?sjis(r):text(r));if(t&&(KANA.test(t)||HAN.test(t)))lines.push(t);}
  return {lines,anchors:[]};}
 // REGNAME in Gameexe.ini picks the second key (rlvm archive.cc), when the folder has one.
 function keyFor(dir){let ini;for(const n of ['Gameexe.ini','GAMEEXE.INI','gameexe.ini']){try{ini=fs.readFileSync(path.join(dir,n));break;}catch{}}if(!ini)return null;

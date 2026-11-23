@@ -12,7 +12,12 @@
  const css=String.raw`
 ${R} body{
  & .tomoyo-cn-dialog,& .tomoyo-selection-card,& .tome-backlog{
-  & :is(button,summary,input,select,textarea,[role=tab]):focus-visible{outline:var(--mgc-focus)!important;outline-offset:2px!important;box-shadow:var(--mgc-focus-halo)!important}
+  /* 2026-11-19 (user: alt+t 菜单选中的高亮做和谐点, 太割裂): keyboard focus is a soft warm-gold hairline with a faint glow, not a bright orange box; the shape follows the element; a mouse click shows nothing (:focus-visible only) */
+  & :is(button,summary,input,select,textarea,[role=tab]):focus-visible{outline:1px solid color-mix(in srgb,var(--mgc-gold) 40%,transparent)!important;outline-offset:1px!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--mgc-gold) 12%,transparent),0 0 14px color-mix(in srgb,var(--mgc-gold) 16%,transparent)!important}
+  & summary:focus-visible{outline:none!important;border-radius:10px;background-color:color-mix(in srgb,var(--mgc-gold) 5%,transparent)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--mgc-gold) 26%,transparent),0 0 14px color-mix(in srgb,var(--mgc-gold) 10%,transparent)!important}
+  & [role=tab]:focus-visible{border-radius:8px;background-color:color-mix(in srgb,var(--mgc-gold) 7%,transparent)!important}
+  & input[type=range]:focus-visible{outline:none!important;box-shadow:none!important}
+  & input[type=range]:focus-visible{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--mgc-gold) 70%,transparent)) drop-shadow(0 0 8px color-mix(in srgb,var(--mgc-gold) 30%,transparent))}
  }
 
  /* ---------- Alt+T rail: a hairline spine, the current page gets the red rule and the diamond ---------- */
@@ -26,12 +31,13 @@ ${R} body{
  & .tomoyo-menu-tabs button[aria-selected=true]::after{content:""!important;position:absolute!important;left:-4.5px!important;top:50%!important;width:7px!important;height:7px!important;margin-top:-3.5px!important;transform:rotate(45deg)!important;background:var(--mgc-red)!important;border:1px solid color-mix(in srgb,var(--mgc-red) 60%,#fff)!important;border-radius:0!important;display:block!important;opacity:1!important}
 
  /* ---------- buttons in the menu ---------- */
- & .tomoyo-cn-dialog button:not(.tomoyo-menu-tabs button):not(.tome-color-swatch):not(.tome-menu-close):not(.megulit-ruby-row-chip):not([type=submit]):not(.tome-reset-row>button){
+ & .tomoyo-cn-dialog button:not(.tomoyo-menu-tabs button):not(.tome-color-swatch):not(.tome-menu-close):not(.megulit-ruby-row-chip):not([type=submit]):not(.tome-reset-row>button):not(.mg-subtabs>button):not([data-game-style-sync]):not(.tome-ac-bind-cta){
   min-height:32px;padding:0 14px!important;border:1px solid var(--mgc-line)!important;border-radius:var(--mgc-r)!important;background:transparent!important;color:var(--mgc-ink)!important;
   font:500 13px/1 var(--mgc-ui)!important;letter-spacing:.03em!important;box-shadow:none!important;transform:none!important;transition:background-color var(--mgc-t),border-color var(--mgc-t)!important}
- & .tomoyo-cn-dialog button:not(.tomoyo-menu-tabs button):not(.tome-color-swatch):not(.tome-menu-close):not(.megulit-ruby-row-chip):not([type=submit]):not(.tome-reset-row>button):hover:not(:disabled){background:var(--mgc-tint)!important;border-color:color-mix(in srgb,var(--mgc-ink) 55%,transparent)!important}
- & .tomoyo-cn-dialog button:not(.tomoyo-menu-tabs button):not(.tome-color-swatch):not(.tome-menu-close):not(.megulit-ruby-row-chip):not([type=submit]):not(.tome-reset-row>button):active:not(:disabled){background:var(--mgc-tint-2)!important;border-color:var(--mgc-ink)!important}
- & .tomoyo-cn-dialog button:disabled{border-style:dashed!important;color:var(--mgc-ink-3)!important;background:transparent!important;opacity:1!important}
+ & .tomoyo-cn-dialog button:not(.tomoyo-menu-tabs button):not(.tome-color-swatch):not(.tome-menu-close):not(.megulit-ruby-row-chip):not([type=submit]):not(.tome-reset-row>button):not(.mg-subtabs>button):not([data-game-style-sync]):not(.tome-ac-bind-cta):hover:not(:disabled){background:var(--mgc-tint)!important;border-color:color-mix(in srgb,var(--mgc-ink) 55%,transparent)!important}
+ & .tomoyo-cn-dialog button:not(.tomoyo-menu-tabs button):not(.tome-color-swatch):not(.tome-menu-close):not(.megulit-ruby-row-chip):not([type=submit]):not(.tome-reset-row>button):not(.mg-subtabs>button):not([data-game-style-sync]):not(.tome-ac-bind-cta):active:not(:disabled){background:var(--mgc-tint-2)!important;border-color:var(--mgc-ink)!important}
+ /* 2026-11-19: same :not chain as the base rule, otherwise the base rule (more specific) wins and a disabled button looks enabled */
+ & .tomoyo-cn-dialog button:not(.tomoyo-menu-tabs button):not(.tome-color-swatch):not(.tome-menu-close):not(.megulit-ruby-row-chip):not([type=submit]):not(.tome-reset-row>button):not(.mg-subtabs>button):not([data-game-style-sync]):not(.tome-ac-bind-cta):disabled,& .tomoyo-cn-dialog button:disabled{border-style:dashed!important;border-color:color-mix(in srgb,var(--mgc-ink) 22%,transparent)!important;color:var(--mgc-ink-3)!important;background:transparent!important;opacity:.55!important;cursor:not-allowed!important}
  /* the menu's save button is the crimson plate */
  & .tomoyo-cn-dialog footer button[type=submit],& .tomoyo-cn-dialog button[type=submit]{min-height:36px;padding:0 18px!important;border:1px solid var(--mgc-red)!important;border-radius:var(--mgc-r)!important;background:var(--mgc-red)!important;color:#fff!important;
   font:600 14px/1 var(--mgc-ui)!important;letter-spacing:.04em!important;box-shadow:none!important;transform:none!important;transition:background-color var(--mgc-t)!important}

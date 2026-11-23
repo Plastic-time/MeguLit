@@ -1,0 +1,68 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "09c99e7e4eef17584598d32918a63dac2379a0c7a9fb6a77152bb474d3b41ba9",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "artemis",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "2fd3544ae0ad3a3ae518676cefaf3d23b9bb37c034822a64741b77cfebf48ad7",
+  "script": "fd89f1599025bdcf5329f8342d05a6da8b5adb2f34feada9651c02b4cdcc96bf",
+  "title": "936ced6030841b2d11ae4ad7ff8ad85c49aa0d17cb5281e37a4b9f565ca70f50",
+  "steam": "2712550",
+  "vndb": "v5922"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "the-shell-part-ii-purgatorio",
+ "builds": [
+  "2141fbb5f5fdc10ee9b6bc6fba5dd571b6b64343da71255e456f09082c2f60e0"
+ ],
+ "match": {
+  "exe": [
+   "TheShell2.exe"
+  ],
+  "titles": [
+   "The Shell Part II: Purgatorio",
+   "虚ノ少女"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

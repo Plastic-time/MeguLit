@@ -27,11 +27,12 @@ function encStage1(d,key,sc){const sk=sc.secret.map(s=>(s-key)>>>0),shift=(((key
  for(let q=n*4,k=d.length&3;k>0;k--,q++){d[q]=(((d[q]+sc.indexSub)&255)^(sk[j]>>>(k*4)))&255;j=(j+1)%24;}}
 function encDir(d,len,key4){let seed=0x76548AEF,i=0;for(;i<len>>>2;i++){d.writeUInt32LE(((rotr((d.readUInt32LE(i*4)+seed)>>>0,3)+0x4A91C262)>>>0^key4[i&3])>>>0,i*4);seed=(seed+0x10FB562A)>>>0;}
  for(let q=i*4;q<len;q++,i++)d[q]=(((d[q]-0x37)&255)^(key4[i&3]>>>6))&255;}
-function encEntries(d,at,len,key4,seed){let i=0;for(;i<len>>>2;i++){const o=at+i*4;d.writeUInt32LE(((rotr((d.readUInt32LE(o)-0x37A19E8B)>>>0,2)+seed)>>>0^key4[i&3])>>>0,o);seed=(seed-0x139FA9B)>>>0;}
- for(let q=at+i*4;q<at+len;q++,i++)d[q]=(((d[q]-5)&255)^(key4[i&3]>>>4))&255;}
-/* files: {'dir/name.ps3': Buffer} ("root" for files without a folder) -> CPZ5/CPZ6, encrypted with the given md5 variant */
-function cpz(files,{version=6,variant='Mirai',encrypted=true,master=0x1234ABCD,raw=[0x11111111,0x22222222,0x33333333,0x44444444],entryRaw=0x5555AAAA}={}){
- const sc=cmvs.DEFAULT,v=sc.md5.find(x=>x.name===variant),md5=cmvs.md5Words(raw,v),dirs=new Map();
+function encEntries(d,at,len,key4,seed,tail=5){let i=0;for(;i<len>>>2;i++){const o=at+i*4;d.writeUInt32LE(((rotr((d.readUInt32LE(o)-0x37A19E8B)>>>0,2)+seed)>>>0^key4[i&3])>>>0,o);seed=(seed-0x139FA9B)>>>0;}
+ for(let q=at+i*4;q<at+len;q++,i++)d[q]=(((d[q]-tail)&255)^(key4[i&3]>>>4))&255;}
+/* files: {'dir/name.ps3': Buffer} ("root" for files without a folder) -> CPZ5/CPZ6, encrypted with the given md5 variant and
+   constant set (cmvs-schemes.json 'cpz5', or 'cpz6' for a CMVS 3.x CPZ6 such as アマツツミ) */
+function cpz(files,{version=6,variant='Mirai',set='cpz5',encrypted=true,master=0x1234ABCD,raw=[0x11111111,0x22222222,0x33333333,0x44444444],entryRaw=0x5555AAAA}={}){
+ const sc=cmvs.scheme(null,set),v=sc.md5.find(x=>x.name===variant),md5=cmvs.md5Words(raw,v),dirs=new Map();
  for(const [n,b] of Object.entries(files)){const at=n.lastIndexOf('/'),d=at<0?'root':n.slice(0,at);if(!dirs.has(d))dirs.set(d,[]);dirs.get(d).push({name:n.slice(at+1),data:b});}
  const dirKeys=[...dirs.keys()].map((_,i)=>(0x01020304*(i+1))>>>0);let dataAt=0;const dirBufs=[],entBufs=[],datas=[];let entOff=0;
  [...dirs.entries()].forEach(([dn,list],di)=>{const ents=list.map((f,i)=>{const nb=pad4(z(f.name,s=>Buffer.from(s,'latin1'))),e=Buffer.alloc(0x18);e.writeInt32LE(0x18+nb.length,0);e.writeBigInt64LE(BigInt(dataAt),4);e.writeUInt32LE(f.data.length,12);e.writeUInt32LE(0,16);e.writeUInt32LE((0x100+i)>>>0,20);
@@ -40,7 +41,7 @@ function cpz(files,{version=6,variant='Mirai',encrypted=true,master=0x1234ABCD,r
   dirBufs.push(Buffer.concat([dh,nb]));entBufs.push({eb,dirKey:dirKeys[di],at:entOff});entOff+=eb.length;});
  const dirArea=Buffer.concat(dirBufs),entArea=Buffer.concat(entBufs.map(x=>x.eb)),idx=Buffer.concat([dirArea,entArea]),mk=master>>>0;
  const t1=inverse(cmvs.table(mk,md5[1],sc.factor)),t2=inverse(cmvs.table(mk,md5[2],sc.factor));
- for(const x of entBufs){const at=dirArea.length+x.at;encEntries(idx,at,x.eb.length,md5.map((m,j)=>(m^((x.dirKey+sc.dirAddend[j])>>>0))>>>0),sc.indexSeed);for(let i=at;i<at+x.eb.length;i++)idx[i]=t2[idx[i]]^0x7E;}
+ for(const x of entBufs){const at=dirArea.length+x.at;encEntries(idx,at,x.eb.length,md5.map((m,j)=>(m^((x.dirKey+sc.dirAddend[j])>>>0))>>>0),sc.indexSeed,sc.entryIndexTail);for(let i=at;i<at+x.eb.length;i++)idx[i]=t2[idx[i]]^0x7E;}
  encDir(idx,dirArea.length,[(md5[0]^((mk+0x76A3BF29)>>>0))>>>0,(md5[1]^mk)>>>0,(md5[2]^((mk+0x10000000)>>>0))>>>0,(md5[3]^mk)>>>0]);for(let i=0;i<dirArea.length;i++)idx[i]=t1[idx[i]]^0x3A;
  encStage1(idx,(mk^0x3795B39A)>>>0,sc);
  const k=version===5?[-0x1C5AC27,0x37F298E7,0x7A6F3A2C,0xAE7D39BF,0xFB73A955,0x43DE7C19,0xCC65F415,0xD016A93C,0x97A3BA9A]:[-0x1C5AC26,0x37F298E8,0x7A6F3A2D,0xAE7D39B7,0xFB73A956,0x43DE7C1A,0xCC65F416,0xD016A93D,0x97A3BA9B];

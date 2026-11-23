@@ -109,8 +109,10 @@ if($DryRun -or $Prepare){}
 elseif(Done 'sync'){Skip 'sync'}
 else{
  $dirty=git status --porcelain --untracked-files=no
- # an earlier run of this release already bumped the version files: that is our own change, not someone else's
- if($Resuming){$bumpFiles='web/about.js','desktop/Cargo.toml','desktop/tauri.conf.json','desktop/Cargo.lock','README.md';$dirty=@($dirty|Where-Object{$l=$_;-not ($bumpFiles|Where-Object{$l -like "* $_"})})}
+ # an earlier run of this release already bumped the version files: that is our own change, not someone else's.
+ # 2026-11-19 (1.4.17): -Prepare leaves exactly that bump uncommitted, and the documented next step is -SkipBuild; it was
+ # refused as a dirty tree and had to be run with -IncludeWorkingChanges. -SkipBuild accepts the bump files like a resume.
+ if($Resuming -or $SkipBuild){$bumpFiles='web/about.js','desktop/Cargo.toml','desktop/tauri.conf.json','desktop/Cargo.lock','README.md';$dirty=@($dirty|Where-Object{$l=$_;-not ($bumpFiles|Where-Object{$l -like "* $_"})})}
  if($dirty -and -not $IncludeWorkingChanges){throw "Working tree has uncommitted changes (add -IncludeWorkingChanges to ship them):`n$dirty"}
  G fetch -q origin
  if($Beta){
@@ -156,7 +158,7 @@ Step 'build and test'
 # writes files whose content changes, and cargo's own rewrite of Cargo.lock happens before the exe is produced.
 $stampFile=Join-Path $env:TEMP 'megulit-release-stamp.json';$exePath=Join-Path $Root 'MeguLit.exe'
 function NewestSource{
- $files=git ls-files --cached --others --exclude-standard web services core setup desktop/src desktop/Cargo.toml desktop/tauri.conf.json native
+ $files=git ls-files --cached --others --exclude-standard web services core setup 'The Seed' desktop/src desktop/Cargo.toml desktop/tauri.conf.json native
  $newest=$null;foreach($f in $files){if($f -match '\.(exe|dll|lib|obj|png|jpg|webp|ico)$'){continue};$p=Join-Path $Root $f;if(-not (Test-Path -LiteralPath $p)){continue};$t=(Get-Item -LiteralPath $p).LastWriteTimeUtc;if(-not $newest -or $t -gt $newest.Time){$newest=@{Time=$t;File=$f}}}
  $newest
 }
@@ -172,7 +174,10 @@ else{
  # stderr from the child (vswhere...) is not a failure; only its exit code is. One automatic retry: the timing-sensitive
  # self-tests (D2D and friends) flake now and then, and a second run is cheap (cargo is incremental).
  $ea=$ErrorActionPreference;$ErrorActionPreference='Continue'
- try{for($try=1;$try -le 2;$try++){& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'Build.ps1') -Check;if($LASTEXITCODE -eq 0){break};if($try -eq 1){Write-Host '  build/tests failed; retrying once (unstable self-test?)' -ForegroundColor Yellow}}}finally{$ErrorActionPreference=$ea}
+ # Test resume (user 2026-11-21): one state file per tag. Build.ps1 exits 3 when the build was good and only tests failed;
+ # the retry then reruns just the failed test files (-TestsOnly), never the build. Any other failure retries the whole build.
+ $env:MEGULIT_TEST_STATE=Join-Path $env:TEMP "megulit-release-tests-$Tag.json"
+ try{$args1=@('-Check');for($try=1;$try -le 2;$try++){& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'Build.ps1') @args1;if($LASTEXITCODE -eq 0){break};if($try -eq 1){if($LASTEXITCODE -eq 3){$args1=@('-TestsOnly');Write-Host '  tests failed; rerunning only the failed test files (no rebuild)' -ForegroundColor Yellow}else{Write-Host '  build failed; retrying once (unstable self-test?)' -ForegroundColor Yellow}}}}finally{$ErrorActionPreference=$ea}
  if($LASTEXITCODE -ne 0){throw 'Build or tests failed (twice)'}
  @{version=$Version;exe=(Get-FileHash $exePath -Algorithm SHA256).Hash} | ConvertTo-Json | Set-Content $stampFile
 }
@@ -195,16 +200,17 @@ if(-not $got){Invoke-WebRequest -Uri $prevAsset.browser_download_url -OutFile $p
 $old=[IO.Compression.ZipFile]::OpenRead($prevZip)
 $names=New-Object 'System.Collections.Generic.SortedSet[string]' ([StringComparer]::Ordinal)
 # E-pkg: carry over only files the repository never tracked (prebuilt native helpers, fonts); a file git deleted stays deleted.
-function Get-DroppedPaths([string[]]$Paths){$gone=@{};foreach($f in (git log --diff-filter=D --name-only --format= -- core services web setup native)){if($f){$gone[$f]=1}};$live=@{};foreach($f in (git ls-files)){$live[$f]=1};@($Paths | Where-Object {$gone.ContainsKey($_) -and -not $live.ContainsKey($_) -and -not (Test-Path -LiteralPath (Join-Path $Root ($_ -replace '/','\')))})}
+function Get-DroppedPaths([string[]]$Paths){$gone=@{};foreach($f in (git log --diff-filter=D --name-only --format= -- core services web setup native 'The Seed')){if($f){$gone[$f]=1}};$live=@{};foreach($f in (git ls-files)){$live[$f]=1};@($Paths | Where-Object {$gone.ContainsKey($_) -and -not $live.ContainsKey($_) -and -not (Test-Path -LiteralPath (Join-Path $Root ($_ -replace '/','\')))})}
 $prevNames=@(foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and $e.FullName -ne 'MeguLit/build-shell.txt' -and -not $e.FullName.EndsWith('/') -and $e.FullName -notmatch '\.(lib|obj|pdb|exp|ilk|iobj|ipdb)$' -and $e.FullName -notmatch '/build/'){$e.FullName.Substring(8)}})
 $dropped=Get-DroppedPaths $prevNames
 foreach($n in $prevNames){if($dropped -contains $n){Write-Host "  dropped deleted $n"}else{[void]$names.Add($n)}}
 # --others: files added in this release are not tracked yet when the list is built (-IncludeWorkingChanges)
-foreach($f in (git ls-files --cached --others --exclude-standard core services web setup)){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
+<# 2026-11-21 The Seed/ (owner): the built-in game diffs ship with the code, one folder in MeguLit/ #>
+foreach($f in (git ls-files --cached --others --exclude-standard core services web setup 'The Seed')){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
 # Prebuilt native helpers added after the previous package (not tracked: *.dll is ignored); E293 scene capture.
 # E301 Ren'Py positions: the DLLs run native/MeguLitRenpy.py, which must ship next to them.
 # E297 cold run helpers (built by Build.ps1, *.exe is not tracked).
-foreach($f in 'native/MeguLitFontDot32.dll','native/MeguLitFontDot64.dll','native/ColdCapture32.exe','native/ColdCapture64.exe','native/MeguLitLaunch32.exe','native/MeguLitLaunch64.exe','native/RuntimeHarvest.exe','native/MeguLitScn32.dll','native/MeguLitScn64.dll','native/MeguLitDpDecline32.dll','native/MeguLitDpDecline64.dll','native/MeguLitKrkr32.dll','native/MeguLitKrkr64.dll','native/MeguLitRenpy32.dll','native/MeguLitRenpy64.dll','native/MeguLitRenpy.py','native/MeguLitFont32.dll','native/MeguLitFont64.dll','native/MeguLitGpu32.dll','native/MeguLitGpu64.dll','native/MeguLitBorderless32.dll','native/MeguLitBorderless64.dll','native/MeguLitBorderlessLaunch32.exe','native/MeguLitBorderlessLaunch64.exe','native/MeguLitCompositor.exe','native/megulithook/MeguLitHook32.dll','native/megulithook/MeguLitHook64.dll'){if(Test-Path -LiteralPath (Join-Path $Root $f)){[void]$names.Add($f)}}
+foreach($f in 'native/MeguLitFontDot32.dll','native/MeguLitFontDot64.dll','native/ColdCapture32.exe','native/ColdCapture64.exe','native/ColdDesk.exe','native/MeguLitLaunch32.exe','native/MeguLitLaunch64.exe','native/RuntimeHarvest.exe','native/MeguLitScn32.dll','native/MeguLitScn64.dll','native/MeguLitDpDecline32.dll','native/MeguLitDpDecline64.dll','native/MeguLitKrkr32.dll','native/MeguLitKrkr64.dll','native/MeguLitRenpy32.dll','native/MeguLitRenpy64.dll','native/MeguLitRenpy.py','native/MeguLitFont32.dll','native/MeguLitFont64.dll','native/MeguLitGpu32.dll','native/MeguLitGpu64.dll','native/MeguLitBorderless32.dll','native/MeguLitBorderless64.dll','native/MeguLitBorderlessLaunch32.exe','native/MeguLitBorderlessLaunch64.exe','native/MeguLitCompositor.exe','native/megulithook/MeguLitHook32.dll','native/megulithook/MeguLitHook64.dll'){if(Test-Path -LiteralPath (Join-Path $Root $f)){[void]$names.Add($f)}}
 # E578 (live beta38: the GDI hide and the glyph hide were merged but the shipped MeguLitHook32.dll / MeguLitFont32.dll were the old builds,
 # so neither ran): a native DLL whose committed sources add a marker string must carry that marker, or the release stops.
 foreach($m in @(@('native/megulithook/MeguLitGdiHide.h','native/megulithook/MeguLitHook32.dll','MeguLit_GDIHIDE'),@('native/megulithook/MeguLitGdiHide.h','native/megulithook/MeguLitHook64.dll','MeguLit_GDIHIDE armed version=2'),@('native/megulithook/MeguLitGdiHide.h','native/megulithook/MeguLitHook32.dll','MeguLit_GDIHIDE armed version=2'),@('native/fontprobe/GlyphMatch.h','native/MeguLitFont32.dll','ToMe_GLYPHHIDE'),@('native/fontprobe/GlyphMatch.h','native/MeguLitFont64.dll','ToMe_GLYPHHIDE'),@('native/fontprobe/FontProbe.cpp','native/MeguLitFont32.dll','ToMe_GLYPHDOT'),@('native/fontprobe/FontProbe.cpp','native/MeguLitFont64.dll','ToMe_GLYPHDOT'),@('native/gpuhide/GpuHide.cpp','native/MeguLitGpu32.dll','MeguLitGpu version=1'),@('native/gpuhide/GpuHide.cpp','native/MeguLitGpu64.dll','MeguLitGpu version=1'))){$src=Join-Path $Root $m[0];$dll=Join-Path $Root $m[1];if((Test-Path -LiteralPath $src)-and(Test-Path -LiteralPath $dll)){$bytes=[IO.File]::ReadAllBytes($dll);if([Text.Encoding]::ASCII.GetString($bytes).IndexOf($m[2],[StringComparison]::Ordinal)-lt 0){throw ($m[1]+' is an old build: it lacks '+$m[2]+' from '+$m[0]+'; rebuild it before releasing')}}}
@@ -248,7 +254,7 @@ Write-Host "$Asset  $count files  $size bytes  sha256 $hash"
 # ---------- hot package ----------
 # Only the changed files, for installs running exactly the previous package (name carries its version and digest).
 # Offered when MeguLit.exe's own code is unchanged (build-shell.txt) and every changed file is under web/, services/,
-# core/ or setup/ and is not HTML. Betas are prereleases the updater never reads, so they get none.
+# core/, setup/ or The Seed/ and is not HTML. Betas are prereleases the updater never reads, so they get none.
 $HotPath=$null;$HotAsset=$null
 if(-not $Beta){
  $prevDigestHot=(Get-FileHash $prevZip -Algorithm SHA256).Hash.ToLower()
@@ -258,9 +264,11 @@ if(-not $Beta){
   $oldShell=$za.GetEntry('MeguLit/build-shell.txt')
   if(-not $oldShell){$why='previous package has no build-shell.txt'}
   else{$rd=New-Object IO.StreamReader($oldShell.Open());$prevShell=$rd.ReadToEnd().Trim();$rd.Dispose();if($prevShell -ne $Shell){$why='MeguLit.exe code, HTML or fonts changed'}}
-  if(-not $why){foreach($e in $zb.Entries){$n=$e.FullName;if($n.EndsWith('/') -or $n -eq 'MeguLit/MeguLit.exe' -or $n -eq 'MeguLit/build-shell.txt'){continue}
+  <# 2026-11-19: the top-level documents (README.md carries the new download name every release) are not program files;
+     counting them meant no release ever got a small package. A hot install simply keeps the previous copies. #>
+  if(-not $why){foreach($e in $zb.Entries){$n=$e.FullName;if($n.EndsWith('/') -or $n -eq 'MeguLit/MeguLit.exe' -or $n -eq 'MeguLit/build-shell.txt' -or $n -match '^MeguLit/[^/]+\.md$'){continue}
    $h=EntryHash $e;$o=$za.GetEntry($n);if($o -and $o.Length -eq $e.Length -and (EntryHash $o) -eq $h){continue}
-   $rel=$n.Substring(8);if($rel -notmatch '^(web|services|core|setup)/' -or $rel -match '\.html?$'){$why="$rel changed";break}
+   $rel=$n.Substring(8);if($rel -notmatch '^(web|services|core|setup|The Seed)/' -or $rel -match '\.html?$'){$why="$rel changed";break}
    $changed+=[pscustomobject]@{path=$rel;sha256=$h;entry=$e}}}
   if(-not $why -and -not $changed.Count){$why='no file changed'}
   if(-not $why){

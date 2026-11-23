@@ -67,7 +67,7 @@ test('hook text: HuneX <r reading>base</r> ruby becomes the game reading and lea
  assert.deepStrictEqual(r.ruby,[['触','ふ'],['厳','しず']]);
 });
 
-test('local WITCH ON THE HOLY NIGHT tables, when installed',{skip:!fs.existsSync('E:/Steam/steamapps/common/WITCH ON THE HOLY NIGHT/data00200.hfa')},()=>{
+test('local WITCH ON THE HOLY NIGHT tables, when installed',{skip:!fs.existsSync('E:/Steam/steamapps/common/WITCH ON THE HOLY NIGHT/data00200.hfa')&&'environment: WITCH ON THE HOLY NIGHT not installed'},()=>{
  const [scene]=scenes.read('hunex','E:/Steam/steamapps/common/WITCH ON THE HOLY NIGHT');
  assert.ok(scene.lines.length>20000);assert.strictEqual(scene.lines.length,scene.zh.length);
  assert.ok(scene.lines.includes('　彼女の家は山の中腹にあった。'));assert.strictEqual(scene.zh[scene.lines.indexOf('　彼女の家は山の中腹にあった。')],'　她的家在山腰上。');

@@ -11,8 +11,8 @@ test('closest: best family above the threshold wins, otherwise no face',()=>{
  assert.equal(mf.closest([{family:'X',style:'Regular',score:0.7}]).face,'');assert.equal(mf.closest([]).face,'');});
 test('font-match.ps1 draws paths without fallback and takes the sheet em size',()=>{const s=fs.readFileSync(path.join(repo,'services','font-match.ps1'),'utf8');
  assert.match(s,/GraphicsPath/);assert.match(s,/InstalledFontCollection/);assert.match(s,/\$job\.em/);assert.doesNotMatch(s,/FontStyle\.Bold\}/);});
-test('engine-font-scan MAGES branch uses the matcher and cache version 2',()=>{const s=fs.readFileSync(path.join(repo,'core','engine-font-scan.cjs'),'utf8');
- assert.match(s,/mages-font\.cjs/);assert.match(s,/version===2/);});
+test('engine-font-scan MAGES branch uses the matcher and cache version 2 or later',()=>{const s=fs.readFileSync(path.join(repo,'core','engine-font-scan.cjs'),'utf8');
+ assert.match(s,/mages-font\.cjs/);/* bumped again when a result changes (3: KiriKiri archive fonts, 2026-11-19) */assert.ok(Number((/hit\.version===(\d+)/.exec(s)||[])[1])>=2);});
 const SG='E:/steam/steamapps/common/STEINS;GATE';
 test('live: STEINS;GATE FONT.PNG matches a gothic face',{skip:!fs.existsSync(SG)&&'STEINS;GATE not installed',timeout:300000},()=>{
  const job=mf.sample(SG);assert.ok(job&&job.cell===48&&job.chars.length>=60);const r=mf.closest(mf.matchSync(job,fs.mkdtempSync(path.join(os.tmpdir(),'mfm-'))));

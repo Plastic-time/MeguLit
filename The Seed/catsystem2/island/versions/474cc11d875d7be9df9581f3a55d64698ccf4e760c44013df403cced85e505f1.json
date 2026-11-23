@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "474cc11d875d7be9df9581f3a55d64698ccf4e760c44013df403cced85e505f1",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "ISLAND.exe",
+ "engine": "catsystem2",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "474cc11d875d7be9df9581f3a55d64698ccf4e760c44013df403cced85e505f1",
+  "head": "d8c08b69e630adf45b81c1b513a08b8398fb8a3f6751155a8a1d9b05433d5f6d",
+  "pe": "2.6.1.68@55387938"
+ },
+ "rev": 1
+}

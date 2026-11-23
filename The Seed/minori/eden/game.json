@@ -1,0 +1,66 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "c9b1d1df7e5b285a5bd0403a98fbf6c87d89f289be81d62622fc7d03d67cbe97",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "minori",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "title": "e24ef8f938288781086e27a9433a4d0472a1dbaac31cfe54be2c3525fa30cb2e",
+  "steam": "315810",
+  "vndb": "v1286"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "eden",
+ "builds": [
+  "7b0f4be87c1296e62b7425d2ee3470e337e51921c4e28adba67d4a3cfed50fc3"
+ ],
+ "match": {
+  "exe": [
+   "eden_en.exe"
+  ],
+  "titles": [
+   "eden*",
+   "eden* They were only two, on the planet."
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

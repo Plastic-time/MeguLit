@@ -12,7 +12,8 @@ const m = sent.shift();
 assert.strictEqual(m.type, 'textPlace'); assert.strictEqual(m.text, 'あいう'); assert.deepStrictEqual(m.rects[2], [10, 60, 30, 40]);
 p.hook(rec); assert.strictEqual(sent.length, 0, 'same line twice is sent once');
 p.hook({ ...rec, rects: rec.rects.slice(0, 2) }); assert.strictEqual(sent.length, 0, 'rect count mismatch is not placeable');
-p.hook({ ...rec, hidden: false }); assert.deepStrictEqual(sent.shift(), { type: 'textPlace', clear: true });
+p.hook({ ...rec, hidden: false }); assert.strictEqual(sent.length, 0, '2026-11-16: a repaint of the placed line (focus change) keeps it placed');
+p.hook({ ...rec, line: 4, hidden: false, text: 'かき' , rects: rec.rects.slice(0, 2) }); assert.deepStrictEqual(sent.shift(), { type: 'textPlace', visible: true, text: 'かき' }, 'a new line the game draws itself');
 p.configure({}, { bound: false }); assert.deepStrictEqual(sent.pop(), { type: 'textPlaceMode', on: false });
 /* glyph records (spec 3): client space, memory surface scaled to the client, cache gap filled, g / - not placeable */
 p.configure({}, { bound: true, layout: { clientWidth: 1280, clientHeight: 720 } }); sent.length = 0;

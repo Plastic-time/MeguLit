@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "c4d35f7a1925d661676708693464ca366d861d8a4166bbe4a820863db96b1c65",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "海沙风云.exe",
+ "engine": "unity",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "c4d35f7a1925d661676708693464ca366d861d8a4166bbe4a820863db96b1c65",
+  "head": "8a78efbceabf14d95cfae226745a4b17eaa40bc2e3593721d25d06f40242b45c",
+  "pe": "2019.4.29.60130@6102c4e1"
+ },
+ "rev": 1
+}

@@ -19,7 +19,7 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 
 const KINDS=['words','sentences','reading','settings'];
 const DEFAULT_KINDS={words:true,sentences:true,reading:true,settings:true};
-const RECORD_CAP={words:32<<10,sentences:8<<10,reading:1<<10,settings:32<<10};
+const RECORD_CAP={words:32<<10,sentences:40<<10,reading:1<<10,settings:32<<10};
 const USERNAME=/^[A-Za-z][A-Za-z0-9_]{2,19}$/;
 const PUSH_RECORDS=200,PUSH_BYTES=1500<<10,TIMEOUT=20000;
 
@@ -125,7 +125,8 @@ function relinkGames(db){
 const parse=text=>{try{const v=JSON.parse(text||'{}');return v&&typeof v==='object'?v:{};}catch{return {};}};
 const wordKey=(spelling,reading)=>String(spelling)+'\t'+String(reading);
 function fitExamples(data,cap){while(data.examples.length&&bytes(data)>cap)data.examples.pop();if(bytes(data)>cap)delete data.entry;return data;}
-function unionExamples(a=[],b=[]){const seen=new Map();for(const e of [...a,...b])if(e&&typeof e.text==='string'&&!seen.has(e.text))seen.set(e.text,e);return [...seen.values()].sort((x,y)=>(y.created_at||0)-(x.created_at||0)).slice(0,20);}
+const exampleKey=(text,game)=>JSON.stringify([text,cleanTitle(game).toLowerCase()]);
+function unionExamples(a=[],b=[]){const seen=new Map();for(const e of [...a,...b])if(e&&typeof e.text==='string'){const key=exampleKey(e.text,e.game);if(!seen.has(key))seen.set(key,e);}return [...seen.values()].sort((x,y)=>(y.created_at||0)-(x.created_at||0)).slice(0,20);}
 
 const kinds={
  words:{
@@ -161,8 +162,8 @@ const kinds={
     const original=JSON.stringify({sync:true,...(d.entry&&typeof d.entry==='object'?{entry:d.entry}:{})});
     id=Number(db.prepare('INSERT INTO vocabulary(id,spelling,reading,definitions,status,created_at,original) VALUES(?,?,?,?,?,?,?)').run(free?d.entryId:null,String(d.spelling??spelling),String(d.reading??reading),definitions,status,Number(d.created_at)||Math.floor(ctx.now()/1000),original).lastInsertRowid);
    }else db.prepare('UPDATE vocabulary SET definitions=?,status=? WHERE id=?').run(definitions,status,id);
-   const games=gameByTitle(db),have=new Set(db.prepare('SELECT text FROM examples WHERE word_id IN ('+[id,...rows.slice(1).map(r=>r.id)].join(',')+')').all().map(r=>r.text));
-   for(const e of Array.isArray(d.examples)?d.examples:[]){if(typeof e?.text!=='string'||have.has(e.text))continue;have.add(e.text);
+    const games=gameByTitle(db),have=new Set(db.prepare('SELECT e.text,e.original,g.title FROM examples e LEFT JOIN games g ON g.id=e.game_id WHERE e.word_id IN ('+[id,...rows.slice(1).map(r=>r.id)].join(',')+')').all().map(e=>exampleKey(e.text,e.title||syncedTitle(e.original))));
+    for(const e of Array.isArray(d.examples)?d.examples:[]){if(typeof e?.text!=='string')continue;const key=exampleKey(e.text,e.game);if(have.has(key))continue;have.add(key);
     db.prepare('INSERT INTO examples(word_id,game_id,text,translation,highlight_start,highlight_end,created_at,original) VALUES(?,?,?,?,?,?,?,?)').run(id,games.get(String(e.game||'').toLowerCase())||null,e.text.slice(0,4000),String(e.translation||''),Number(e.start)||0,Number(e.end)||0,Number(e.created_at)||Math.floor(ctx.now()/1000),syncOriginal(e.game));}
   }
  },
@@ -173,11 +174,13 @@ const kinds={
    return out;
   },
   apply(db,key,record){
-   const rows=db.prepare('SELECT id,text FROM saved_sentences').all().filter(r=>'s:'+sha(r.text,32)===key),source=record.data?.source==='auto'?'auto':'manual';
-   if(record.deleted){for(const r of rows)db.prepare('DELETE FROM saved_sentences WHERE id=?').run(r.id);return;}
-   const d=record.data;
-   if(rows.length)db.prepare('UPDATE saved_sentences SET translation=?,source=? WHERE id=?').run(String(d.translation||''),source,rows[0].id);
-   else db.prepare('INSERT INTO saved_sentences(game_id,text,translation,created_at,original,source) VALUES(?,?,?,?,?,?)').run(gameByTitle(db).get(String(d.game||'').toLowerCase())||null,String(d.text),String(d.translation||''),Number(d.created_at)||0,syncOriginal(d.game),source);
+   const matches=db.prepare('SELECT id,text,game_id,original FROM saved_sentences ORDER BY id').all().filter(r=>'s:'+sha(r.text,32)===key);
+   if(record.deleted){for(const r of matches)db.prepare('DELETE FROM saved_sentences WHERE id=?').run(r.id);return;}
+   const d=record.data,source=d.source==='auto'?'auto':'manual',title=cleanTitle(d.game).toLowerCase();
+   const gameId=gameByTitle(db).get(title)||null;
+   const match=(gameId&&matches.find(row=>row.game_id===gameId))||matches.find(row=>row.game_id===null&&syncedTitle(row.original).toLowerCase()===title);
+   if(match)db.prepare('UPDATE saved_sentences SET game_id=?,translation=?,source=? WHERE id=?').run(gameId,String(d.translation||''),source,match.id);
+   else db.prepare('INSERT INTO saved_sentences(game_id,text,translation,created_at,original,source) VALUES(?,?,?,?,?,?)').run(gameId,String(d.text),String(d.translation||''),Number(d.created_at)||0,syncOriginal(d.game),source);
   }
  },
  reading:{

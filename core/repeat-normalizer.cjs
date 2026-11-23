@@ -51,7 +51,10 @@ class RepeatNormalizer{
    /* 2026-11-15 (死に逝く君、館に芽吹く憎悪: 「そして――殺人――――。」 came out as 「そして――殺人――。」 on a stream that draws lines twice):
       only whole copies are undone. A run inside a line of a symbol-only unit (――, ……, ！！) or of a unit under 3 characters
       (ドキドキ) is the line's own text, kept as written. */
-   const lineLike=list.length===1||LETTER.test(r.raw)&&norm(r.raw).replace(/\s+/g,'').length>=3;
+   /* 2026-11-16 (1.4.16 live, same game: 「今日も明日も明後日も」 shown as 「今日も明後日も」): a repeated stretch inside a sentence
+      (日も明|日も明) is the sentence's own text too. A copy is a run that makes up a large part of the block. */
+   const total=norm(text).replace(/\s+/g,'').length,cover=norm(r.raw).replace(/\s+/g,'').length*r.count;
+   const lineLike=list.length===1||LETTER.test(r.raw)&&norm(r.raw).replace(/\s+/g,'').length>=3&&cover>=total*.4;
    const copies=lineLike?Math.max(1,Math.round(r.count/f)):r.count;for(let k=0;k<copies;k++)parts.push(r.raw);}
   return parts.join('');
  }

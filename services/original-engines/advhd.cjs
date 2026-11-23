@@ -36,16 +36,35 @@ function parse(buf){const d=Buffer.isBuffer(buf)?buf:Buffer.from(buf),lines=[],a
 function archives(dir){let names;try{names=fs.readdirSync(dir);}catch{return [];}
  return names.filter(f=>/\.arc$/i.test(f)).map(f=>path.join(dir,f)).filter(f=>{try{const fd=fs.openSync(f,'r');try{const h=Buffer.alloc(4+16*12);fs.readSync(fd,h,0,h.length,0);const n=h.readInt32LE(0);
  /* E654 Willadv (Will's engine before AdvHD) keeps scripts beside images in one ARC, so WSC need not be the first extension */
- if(!(n>0&&n<16))return false;for(let i=0;i<n;i++)if(/^(WSC|SCR)\0?$/i.test(h.toString('latin1',4+i*12,8+i*12).replace(/\0+$/,'')))return true;return false;}finally{fs.closeSync(fd);}}catch{return false;}});}
-function scenesIn(file){let b;try{b=fs.readFileSync(file);}catch{return [];}const es=list(b);if(!es)return [];
+ if(n>0&&n<16)for(let i=0;i<n;i++)if(/^(WSC|SCR)\0?$/i.test(h.toString('latin1',4+i*12,8+i*12).replace(/\0+$/,'')))return true;return !!v2Index(f)?.some(e=>WS2.test(e.name));}finally{fs.closeSync(fd);}}catch{return false;}});}
+/* S5 AdvHD's later ARC (リビドー・アバンちゅ～る Rio.arc / Chip*.arc; GARbro ArcPulltop.cs "ARC/WillV2", MIT): u32 count, u32 index size,
+   then per file u32 size, u32 offset (from the end of the index), UTF-16LE name + NUL; the index ends exactly at its size.
+   .ws2 entries are rotated like .wsc. Read from the head only (Chip6.arc is 1 GB). → [{name,size,offset}] | null */
+const WS2=/\.ws2$/i,V2_NAME=/^[\x20-\x7e　-鿿＀-￯]{1,120}$/;
+function listV2(head,fileSize){if(head.length<8)return null;const n=head.readInt32LE(0),isz=head.readUInt32LE(4),base=8+isz;if(n<=0||n>100000||isz<10*n||base>fileSize||base>head.length)return null;
+ const out=[];let p=8;for(let i=0;i<n;i++){if(p+10>base)return null;const size=head.readUInt32LE(p),off=base+head.readUInt32LE(p+4);p+=8;let e=p;while(e+1<base&&(head[e]|head[e+1]))e+=2;if(e+1>=base||e===p)return null;
+  const name=head.toString('utf16le',p,e);p=e+2;if(!V2_NAME.test(name)||off+size>fileSize)return null;out.push({name,size,offset:off});}
+ return p===base?out:null;}
+function v2Index(file){try{const h=kit.readAt(file,0,8);if(h.length<8)return null;const isz=h.readUInt32LE(4);if(isz>64<<20)return null;return listV2(kit.readAt(file,0,8+isz),kit.size(file));}catch{return null;}}
+/* the text of a decoded .ws2: 0x14 message (u32 id, voice string, text) and 0x15 speaker name, layout as in VNTranslationTools
+   AdvHdDisassemblerV2 (MIT, arcusmaximus). Strings are Shift-JIS; %LC / %LF / %LR in front of a name are dropped. */
+function parseWs2(d){const lines=[],anchors=[];
+ for(let i=0;i<d.length-6;i++){
+  if(d[i]===0x15){const t=cstr(d,i+1);if(!t||t.s.length<2)continue;const s=text(t.s).replace(/^%L[CFR]/,'');if(s&&s.length<=24&&PROSE.test(s)&&!s.includes('�')){lines.push(s);i=t.next-1;}continue;}
+  if(d[i]!==0x14)continue;const v=cstr(d,i+5);if(!v||v.s.length>64||v.s.some(b=>b>=0x80))continue;const t=cstr(d,v.next);if(!t||t.s.length<2||t.s[0]<0x80&&t.s[0]!==0x25)continue;
+  const s=text(t.s);if(!s||!PROSE.test(s)||s.includes('�'))continue;lines.push(s);i=t.next-1;}
+ return {lines,anchors};}
+function scenesIn(file){const v2=v2Index(file);if(v2)return v2.filter(e=>WS2.test(e.name)).map(e=>({name:e.name,read:()=>decode(kit.readAt(file,e.offset,e.size))}));
+ let b;try{b=fs.readFileSync(file);}catch{return [];}const es=list(b);if(!es)return [];
  return es.filter(e=>/\.(wsc|scr)$/i.test(e.name)).map(e=>({name:e.name,read:()=>decode(b.subarray(e.offset,e.offset+e.size))}));}
 const engine={
  id:'advhd',hint:'Rio.arc（.wsc）',
  scenes:dir=>archives(dir).flatMap(scenesIn).sort((a,b)=>a.name.localeCompare(b.name)),
  archives:dir=>archives(dir).flatMap(scenesIn),
  sources:archives,
- parse,test:n=>/\.wsc$/i.test(n),
- _internal:{list,decode},
+ /* the .wsc grammar first, the .ws2 one when it finds nothing */
+ parse:buf=>{const r=parse(buf);if(r.lines.length)return r;return parseWs2(Buffer.isBuffer(buf)?buf:Buffer.from(buf));},test:n=>/\.ws[c2]$/i.test(n),
+ _internal:{list,decode,listV2,parseWs2},
 };
 /* E580 an archive's index without reading the whole file (the voice catalogue: voice archives are large) */
 const listFile=file=>{return list(kit.head(file,8<<20),kit.size(file));};

@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "17a4dc70dcc6dfa2b11c8cb48a5f846aac3c7e58cced04e8a1303115a4343add",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "BGI.exe",
+ "engine": "bgi",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "17a4dc70dcc6dfa2b11c8cb48a5f846aac3c7e58cced04e8a1303115a4343add",
+  "head": "59ef7984d9f66885be9780d6c30f9db9697db13ca4e3531dc5717675e675489e",
+  "pe": "1.520.6.0@4d7495bd"
+ },
+ "rev": 1
+}

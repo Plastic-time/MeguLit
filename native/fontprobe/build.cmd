@@ -7,7 +7,7 @@ cd /d "%~dp0"
 if "%MEGULIT_FONT_OUT%"=="" set "MEGULIT_FONT_OUT=%~dp0.."
 if "%MEGULIT_VS%"=="" set "MEGULIT_VS=E:\Apps\build-tools\vs2022\Common7\Tools\VsDevCmd.bat"
 if "%MEGULIT_VS_X86%"=="" set "MEGULIT_VS_X86=E:\Apps\work\euphoria-test-build\toolchain\msvc\setup_x86.bat"
-set SRC=FontProbe.cpp ..\scncapture\minhook\src\hook.c ..\scncapture\minhook\src\buffer.c ..\scncapture\minhook\src\trampoline.c ..\scncapture\minhook\src\hde\hde32.c ..\scncapture\minhook\src\hde\hde64.c
+set SRC=FontProbe.cpp ..\shared\minhook\src\hook.c ..\shared\minhook\src\buffer.c ..\shared\minhook\src\trampoline.c ..\shared\minhook\src\hde\hde32.c ..\shared\minhook\src\hde\hde64.c
 set FLAGS=/nologo /O2 /MT /EHsc /LD /W3 /utf-8 /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN
 if not exist "%MEGULIT_FONT_OUT%\obj32" mkdir "%MEGULIT_FONT_OUT%\obj32"
 if not exist "%MEGULIT_FONT_OUT%\obj64" mkdir "%MEGULIT_FONT_OUT%\obj64"
@@ -18,7 +18,7 @@ endlocal & set "MEGULIT_FONT_OUT=%MEGULIT_FONT_OUT%"
 setlocal
 cd /d "%~dp0"
 if "%MEGULIT_VS%"=="" set "MEGULIT_VS=E:\Apps\build-tools\vs2022\Common7\Tools\VsDevCmd.bat"
-set SRC=FontProbe.cpp ..\scncapture\minhook\src\hook.c ..\scncapture\minhook\src\buffer.c ..\scncapture\minhook\src\trampoline.c ..\scncapture\minhook\src\hde\hde32.c ..\scncapture\minhook\src\hde\hde64.c
+set SRC=FontProbe.cpp ..\shared\minhook\src\hook.c ..\shared\minhook\src\buffer.c ..\shared\minhook\src\trampoline.c ..\shared\minhook\src\hde\hde32.c ..\shared\minhook\src\hde\hde64.c
 set FLAGS=/nologo /O2 /MT /EHsc /LD /W3 /utf-8 /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN
 call "%MEGULIT_VS%" -arch=x64 -host_arch=x64 -no_logo || exit /b 1
 cl %FLAGS% /Fo"%MEGULIT_FONT_OUT%\obj64\\" %SRC% /Fe:"%MEGULIT_FONT_OUT%\MeguLitFont64.dll" /link user32.lib gdi32.lib || exit /b 1

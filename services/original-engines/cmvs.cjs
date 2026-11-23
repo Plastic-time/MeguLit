@@ -10,6 +10,9 @@
              (stage 1 with the CPZ5 secret, a byte substitution table, the directory cipher, the per-directory entry
              cipher), keyed by a modified MD5 of four header words (the variant differs per title). Entries are
              decrypted with the same secret and table.
+             CMVS 3.x CPZ6 (アマツツミ, クロノクロック …) runs the same passes with the CPZ6/7 constants and the
+             CPZ5 entry seed subtrahend (cmvs-schemes.json "cpz6"; seen in cmvs32 3.26: seed − 0x5C29E87B, decoder factor
+             0x1A74F195); the index decides which set fits, the md5 variant is "Chrono" there.
              CPZ7 (青い鳥 …): a 0x48-byte header; after the index comes a key block {MD5 of the rest, unpacked
              length, 4 XOR bytes, a Huffman tree and stream} whose ≥ 1023 bytes are XORed over the index first. The passes
              then run with the CPZ6/7 constants (cmvs-schemes.json "cpz7") and four per-archive values that start.ps3
@@ -28,12 +31,17 @@ const kit=require('./kit.cjs'),fs=require('node:fs'),path=require('node:path');
 const SCHEMES=require('./cmvs-schemes.json');
 const hex=s=>parseInt(s,16)>>>0;
 /* set 'cpz5' (CPZ5/CPZ6) or 'cpz7'; an adapter pack's params may bring its own md5 variants and either set */
-function scheme(params,set='cpz5'){const s=params||SCHEMES,c=set==='cpz7'?{...SCHEMES.cpz7,...s.cpz7}:s.cpz5;
+function scheme(params,set='cpz5'){const s=params||SCHEMES,c={...SCHEMES[set],...(s[set]||{})};
  return {md5:Object.entries(s.md5||SCHEMES.md5).map(([name,v])=>({name,init:v.init.map(hex),out:v.out.map(([i,op,k])=>[i,op,hex(k)])})),
   secret:c.secret.map(hex),factor:hex(c.decoderFactor),entryInit:hex(c.entryInitKey),entrySub:hex(c.entrySubKey),entryTail:hex(c.entryTailKey),entryPos:hex(c.entryKeyPos),
   indexSeed:hex(c.indexSeed),indexAddend:hex(c.indexAddend),indexSub:hex(c.indexSubtrahend),dirAddend:c.dirKeyAddend.map(hex),
   entryIndexTail:hex(c.entryIndexTail||'5')};}
 const DEFAULT=scheme(),DEFAULT7=scheme(null,'cpz7');
+/* CPZ5/CPZ6 archives try each constant set in cmvs-schemes.json "order": the GARbro CPZ5 set, then the CMVS 3.x CPZ6 set */
+const ORDER=(SCHEMES.order||['cpz5']).filter(n=>SCHEMES[n]),DEFAULTS=ORDER.map(n=>scheme(null,n));
+const late5=SCHEMES.cpz5Late,CPZ5_SETS=[...DEFAULTS,
+ scheme({cpz5:{secret:late5.secret},md5:{Mode8:late5.mode8Digest}}),
+ scheme({cpz5:{secret:late5.secret,...late5.mode9},md5:{B:SCHEMES.md5.B}})];
 const rotl=(v,n)=>{n&=31;return n?((v<<n)|(v>>>(32-n)))>>>0:v>>>0;},rotr=(v,n)=>{n&=31;return n?((v>>>n)|(v<<(32-n)))>>>0:v>>>0;};
 
 /* ---- modified MD5: one compression of {w0..w3, 0x80, 0 …, 0x80 (bit length), 0} from the variant's state ---------- */
@@ -130,9 +138,9 @@ const memo=new Map();
 /* {version, entries, md5, h, sc[, values]} for a CPZ5/CPZ6/CPZ7 archive; null for anything else */
 function open(file,params){const fsz=kit.size(file),stamp=file+'|'+fsz+'|'+(kit.isFile(file)?fs.statSync(file).mtimeMs:0);if(memo.has(stamp))return memo.get(stamp);
  let r=null;try{const h=header(kit.head(file,0x48));if(h&&h.version===7)r=open7(file,h,fsz,params);
-  else if(h){const sc=params?scheme(params):DEFAULT,raw=kit.readAt(file,h.indexAt,h.dirSize+h.fileSize);
+  else if(h){const sets=params?ORDER.map(n=>scheme(params,n)):h.version===5?CPZ5_SETS:DEFAULTS,raw=kit.readAt(file,h.indexAt,h.dirSize+h.fileSize);
   if(raw.length===h.dirSize+h.fileSize&&md5sum(raw).equals(h.indexMd5))
-   for(const v of sc.md5){const x=readIndex(raw,h,v,sc,fsz);if(x&&x.entries.length){r={...x,h,sc};break;}}}}catch{r=null;}
+   find:for(const sc of sets)for(const v of sc.md5){const x=readIndex(raw,h,v,sc,fsz);if(x&&x.entries.length){r={...x,h,sc};break find;}}}}catch{r=null;}
  if(memo.size>64)memo.clear();memo.set(stamp,r);return r;}
 const list=file=>open(file)?.entries||null;
 function read(file,e){const a=open(file),data=kit.readAt(file,e.offset,e.size);if(!a||!a.h.encrypted)return data;
@@ -154,10 +162,13 @@ function unpackPs2(buf){if(buf.length<0x30||buf.toString('latin1',0,4)!=='PS2A')
 const PUSH=Buffer.from([1,2,0x20,1]),PUSH_END=Buffer.from([0x0f,2,0x30,4]);
 const RESOURCE=/\.(ogg|wav|mv2|pb3|pb2|ps3|ps2|cur|cmv|mgv|png|bmp)\b/i;
 /* the pushed strings in code order; an empty one stays as an empty buffer, so the n-th push of two builds of one script
-   is the same line */
+   is the same line. A push with no NUL within MAX_PUSH bytes is a damaged text section (a wrong key, a cut file) and
+   counts as empty: read to the section end, every push of such a script was the whole rest of it (300 MB for one scene) */
+const MAX_PUSH=0x2000;
 function pushed(d){const count=d.readUInt32LE(0x10),code=0x30,codeLen=d.readUInt32LE(0x14)+4*count+d.readUInt32LE(0x18),text=code+codeLen,textLen=d.readUInt32LE(0x1C),out=[];
- if(text+textLen>d.length||codeLen<0)return out;
- for(let p=code;p+12<=text;p++){if(d[p]!==1||!d.subarray(p,p+4).equals(PUSH)||!d.subarray(p+8,p+12).equals(PUSH_END))continue;out.push(kit.cstr(d,text+d.readUInt32LE(p+4),text+textLen)||Buffer.alloc(0));p+=11;}
+ if(text+textLen>d.length||codeLen<0)return out;const tend=text+textLen;
+ for(let p=code;p+12<=text;p++){if(d[p]!==1||!d.subarray(p,p+4).equals(PUSH)||!d.subarray(p+8,p+12).equals(PUSH_END))continue;
+  const at=text+d.readUInt32LE(p+4),end=Math.min(tend,at+MAX_PUSH),s=kit.cstr(d.subarray(0,end),at,end);out.push(s&&!(end<tend&&s.length===end-at)?s:Buffer.alloc(0));p+=11;}
  return out;}
 const clean=t=>kit.trimBoth(t.replace(/\\n/g,'\n'));
 /* an English (or other Latin-script) release keeps its dialogue as plain ASCII pushes: a string with letters and a space, sentence punctuation or a
@@ -194,4 +205,4 @@ function originalLines(dir){const arch=new Map();
  for(const f of kit.files(dir,{name:/\.cpz$/i,magic:'CPZ',subs:SUBS}))for(const e of engine.archiveEntries(f)||[])arch.set(e.name.toLowerCase(),e);
  return engine.scenes(dir).flatMap(s=>{let own=[];try{own=texts(s.read());}catch{}const a=arch.get(s.name.toLowerCase());let ja=null;try{ja=a&&texts(a.read());}catch{}
   return own.flatMap((x,i)=>x.kind!=='line'?[]:[ja&&ja.length===own.length&&ja[i].kind==='line'?ja[i].t:'']);});}
-module.exports={engine,packed,parse,texts,originalLines,header,open,list,read,unpackPs2,pushed,md5Words,table,stage1,dirCipher,entryCipher,scheme,DEFAULT,DEFAULT7,indexKey,startValues,rotl,rotr};
+module.exports={engine,packed,parse,texts,originalLines,header,open,list,read,unpackPs2,pushed,md5Words,table,stage1,dirCipher,entryCipher,scheme,DEFAULT,DEFAULT7,DEFAULTS,indexKey,startValues,rotl,rotr};

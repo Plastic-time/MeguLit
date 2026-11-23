@@ -43,11 +43,7 @@ function decodePNG(buf){let p=8,w=0,h=0,type=0;const idat=[];
  return {w,h,px};}
 
 /* ---------- services on a temp root ---------- */
-function startService(root){const child=spawn(process.execPath,[path.join(ROOT,'services','server.cjs')],{env:{...process.env,MEGULIT_ROOT:root},stdio:['pipe','pipe','ignore']});
- let next=1,buf='';const waits=new Map();
- child.stdout.on('data',d=>{buf+=d;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+1);let m;try{m=JSON.parse(line);}catch{continue;}const w=waits.get(m.id);if(w){waits.delete(m.id);m.ok?w[0](m.data):w[1](Error(m.error));}}});
- const call=(request,ms=20000)=>new Promise((res,rej)=>{const id=next++;waits.set(id,[res,rej]);child.stdin.write(JSON.stringify({id,request})+'\n');setTimeout(()=>{if(waits.delete(id))rej(Error('SERVICE_TIMEOUT'));},ms);});
- return {call,stop:async()=>{await call({action:'__shutdown'},5000).catch(()=>{});child.kill();}};}
+const {startService}=require('./library-views-perf.cjs');
 
 /* ---------- static server + test transport ---------- */
 const TRANSPORT=`<script>(()=>{const S=JSON.parse(decodeURIComponent((location.hash.slice(1))||'%7B%7D'));const svg=c=>'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080"><rect width="100%" height="100%" fill="'+c+'"/></svg>');
@@ -68,7 +64,8 @@ function startWeb(service){const server=http.createServer(async(req,res)=>{try{
 
 /* ---------- headless Edge over CDP ---------- */
 function edgePath(){for(const p of [process.env.MEGULIT_EDGE,'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe','C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'])if(p&&fs.existsSync(p))return p;throw Error('EDGE_NOT_FOUND');}
-async function startEdge(profile){const child=spawn(edgePath(),['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--window-size='+String(arg('size','1920x1080')).replace('x',','),'--hide-scrollbars','--force-device-scale-factor=1',
+const {stopLayoutBrowser,checkLayoutProfile}=require('./helpers/stop-layout-browser.cjs');
+async function startEdge(profile){checkLayoutProfile(profile);const child=spawn(edgePath(),['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--window-size='+String(arg('size','1920x1080')).replace('x',','),'--hide-scrollbars','--force-device-scale-factor=1',
   '--no-first-run','--no-default-browser-check','--disable-extensions','--mute-audio','about:blank'],{stdio:'ignore'});
  const portFile=path.join(profile,'DevToolsActivePort');for(let i=0;i<100&&!fs.existsSync(portFile);i++)await sleep(100);const port=fs.readFileSync(portFile,'utf8').split(/\r?\n/)[0];
  let target;for(let i=0;i<50&&!target;i++){target=(await fetch(`http://127.0.0.1:${port}/json/list`).then(r=>r.json()).catch(()=>[])).find(t=>t.type==='page');if(!target)await sleep(100);}
@@ -76,9 +73,10 @@ async function startEdge(profile){const child=spawn(edgePath(),['--headless=new'
  ws.onmessage=e=>{const m=JSON.parse(e.data);const w=m.id&&waits.get(m.id);if(w){waits.delete(m.id);m.error?w[1](Error(m.error.message)):w[0](m.result);}};
  const send=(method,params={})=>new Promise((res,rej)=>{const id=next++;waits.set(id,[res,rej]);ws.send(JSON.stringify({id,method,params}));});
  const evaluate=async(expression)=>{const r=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error('EVAL: '+(r.exceptionDetails.exception?.description||r.exceptionDetails.text));return r.result.value;};
- await send('Page.enable');await send('Runtime.enable');await send('Emulation.setDeviceMetricsOverride',{width:Number(String(arg('size','1920x1080')).split('x')[0]),height:Number(String(arg('size','1920x1080')).split('x')[1]),deviceScaleFactor:1,mobile:false});
- await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
- return {send,evaluate,stop:()=>{try{ws.close();}catch{}child.kill();}};}
+ const stop=stopLayoutBrowser(ws,child);
+ try{await send('Page.enable');await send('Runtime.enable');await send('Emulation.setDeviceMetricsOverride',{width:Number(String(arg('size','1920x1080')).split('x')[0]),height:Number(String(arg('size','1920x1080')).split('x')[1]),deviceScaleFactor:1,mobile:false});
+ await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});}catch(error){await stop();throw error;}
+ return {send,evaluate,stop};}
 
 /* ---------- in-page: list the visible text ---------- */
 const COLLECT=`(()=>{const out=[],dlg=[...document.querySelectorAll('dialog[open]')].pop(),W=innerWidth,H=innerHeight;
@@ -137,7 +135,7 @@ async function main(){fs.mkdirSync(OUT,{recursive:true});const temp=fs.mkdtempSy
      console.log(`${scene.padEnd(6)} ${page.padEnd(20)} ${String(res.length).padStart(4)} texts  min ${Number.isFinite(min)?min.toFixed(2):'-'}  fail ${bad.length}`);
      for(const b of bad.slice(0,arg('verbose')?999:12))console.log(`   ${b.ratio.toFixed(2)}<${b.need} ${b.path} "${b.text}" fg ${b.fg} bg ${b.bg}`);}
     catch(e){console.log(`${scene} ${page} ERROR ${e.message}`);report[scene][page]={error:e.message};failures++;}}}
- }finally{fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify(report,null,1));cdp.stop();web.close();await service.stop();await sleep(500);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify(report,null,1));await cdp.stop();web.close();await service.stop();await sleep(500);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
  console.log(`\n${failures} text(s) below the WCAG threshold. Screenshots and report.json in ${OUT}`);
  if(process.argv.includes('--strict')&&failures)process.exitCode=1;}
 if(require.main===module)main().catch(e=>{console.error(e);process.exitCode=2;});

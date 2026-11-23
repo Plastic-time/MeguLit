@@ -1,0 +1,66 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "44234bc345aeed01920a7c43dfb464644f21dc2efb6557a0551fca619043bd32",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "renpy",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "title": "fd56c754b5a77f8c4420ae2c2084425585ac24f449f052b434b0c00da85d9a80",
+  "steam": "1173010",
+  "vndb": "v30340"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "flowers-blooming-at-the-end-of-summer",
+ "builds": [
+  "05e00238e7373555a928fe4bb3f44f7a88a6669192fb3774e04f495551b2494f"
+ ],
+ "match": {
+  "exe": [
+   "flowersblooming.exe"
+  ],
+  "titles": [
+   "Flowers Blooming at the End of Summer",
+   "여름의 끝에 피는 꽃"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

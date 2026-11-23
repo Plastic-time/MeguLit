@@ -31,7 +31,7 @@ test('closing the menu ends the preview: saved preferences apply again',()=>{
 });
 
 test('reader host routes galPreviewEnd to the bridge host',()=>{
- assert.match(read('services/reader.cjs'),/case 'galPreviewEnd':g\?\.endPreview\?\.\(\);break;/);
+ assert.match(read('services/reader.cjs'),/case 'galPreviewEnd':g\?\.endPreview\?\.\(\);/);
 });
 
 test('menu close sends galPreviewEnd, not the snapshot as a preview',()=>{
@@ -84,4 +84,12 @@ test('why the layer was hidden reaches reader-host.log once per change',()=>{
  call({type:'coverDebug',text:'阅读层隐藏 (translation, target=True) menu=False/False cover=True dialog=True iconic=False fg=other'});
  call({type:'coverDebug',text:'阅读层隐藏 (translation, target=True) menu=False/False cover=True dialog=True iconic=False fg=other'});
  assert.equal(logs.length,1);assert.match(logs[0].text,/fg=other/);
+});
+test('2026-11-16: closing the Alt+T menu hands the page the host state, never the stale menu snapshot',()=>{
+ const s=require('fs').readFileSync(require('path').join(__dirname,'../services/reader.cjs'),'utf8');
+ assert.match(s,/case 'galPreviewEnd':g\?\.endPreview\?\.\(\);[^\n]*reply\('restoreGalSettings',\{\.\.\.g\.preferences/);
+});
+test('2026-11-16 #299: an open Alt+T menu keeps the reading layer up before its hit region is ready',()=>{
+ const s=require('fs').readFileSync(require('path').join(__dirname,'../native/GalWindowBridge.cs'),'utf8');
+ assert.match(s,/ReadingVisible\(Layer\.Context,IsIconic\(Target\),IsIconic\(Overlay\),CoverEnabled,DialogVisible,MenuOpen\)/);
 });

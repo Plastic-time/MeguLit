@@ -10,16 +10,35 @@
    XOR the first 8 bytes with a key from the hash.
    The parameters of every title GARbro knows are in cx-schemes.json (taken from GARbro's Formats.dat); a game folder
    is matched to a scheme by trying them on one entry and keeping the one whose output is a known file header. */
-const fs=require('node:fs'),path=require('node:path');
+const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
 const OP={NOP:0,RETN:1,MOV_EDI_ARG:2,PUSH_EBX:3,POP_EBX:4,PUSH_ECX:5,POP_ECX:6,MOV_EAX_EBX:7,MOV_EBX_EAX:8,MOV_ECX_EBX:9,MOV_EAX_EDI:11,MOV_EAX_INDIRECT:12,ADD_EAX_EBX:13,SUB_EAX_EBX:14,IMUL_EAX_EBX:15,AND_ECX_0F:16,SHR_EBX_1:17,SHL_EAX_1:18,SHR_EAX_CL:19,SHL_EAX_CL:20,OR_EAX_EBX:21,NOT_EAX:22,NEG_EAX:23,DEC_EAX:24,INC_EAX:25,IMMED:0x100,MOV_EAX_IMMED:0x101,AND_EBX_IMMED:0x102,AND_EAX_IMMED:0x103,XOR_EAX_IMMED:0x104,ADD_EAX_IMMED:0x105,SUB_EAX_IMMED:0x106};
-const LIMIT=0x80;
+const LIMIT=0x80,M64=0xffffffffffffffffn,M32=0xffffffffn;
 function lcg(seed){let s=seed>>>0;return ()=>{const old=s;s=(Math.imul(1103515245,old)+12345)>>>0;return (s^(old<<16)^(old>>>16))>>>0;};}
 function nana(seed,random){let s=seed>>>0,r=random>>>0;return ()=>{let x=(s^(s<<17))>>>0;x=(x^((x<<18)|(x>>>15)))>>>0;s=(~x)>>>0;let y=(r^(r<<13))>>>0;y=(y^(y>>>17))>>>0;r=(y^(y<<5))>>>0;return (s^r)>>>0;};}
+/* HxCrypt (GARbro HxCrypt.cs, MIT): 64-bit SplitMix64 seeding + 128-bit old/new PRNG for HxProgram. */
+function hxRandom(seed,type){
+ const s=BigInt(seed>>>0);let st=(s|((~s&M32)<<32n))&M64;
+ const next64=()=>{st=(st+0x9e3779b97f4a7c15n)&M64;let z=st;z=(z^(z>>30n))&M64;z=(z*0xbf58476d1ce4e5b9n)&M64;z=(z^(z>>27n))&M64;z=(z*0x94d049bb133111ebn)&M64;return (z^(z>>31n))&M64;};
+ let m0=next64(),m1=next64();
+ return ()=>{
+  const a=m0,b=m1,aLo=a&M32,aHi=a>>32n,bLo=b&M32,bHi=b>>32n;
+  if(!type){
+   const cLo=aHi^bHi,cHi=aLo^bLo,c=cLo|(cHi<<32n),e=cHi|(cLo<<32n);
+   m0=((((cHi<<21n)^(a>>15n))^cHi)&M32)|(((((aHi>>15n)|(aLo<<17n))^(e>>11n))^cLo)&M32)<<32n;
+   m1=((c>>4n)&M32)|(((e>>4n)&M32)<<32n);
+   const d=(a+b)&M64;return Number(((((d<<17n)&M64)|(d>>47n))+a)&M32);
+  }
+  const cLo=aLo^bLo,cHi=aHi^bHi,c=cLo|(cHi<<32n);
+  m0=(((((aLo<<24n)|(aHi>>8n))^(cLo<<16n))^cLo)&M32)|((((c>>16n)^(a>>8n))^cHi)&M32)<<32n;
+  m1=((c>>27n)&M32)|((((cHi>>27n)|(cLo<<5n))&M32)<<32n);
+  const d=(5n*a)&M64;return Number(((((d<<7n)&M64)|(d>>57n))*9n)&M32);
+ };
+}
 function generate(scheme,seed){
  /* the generator keeps its state across stages, as GARbro's CxProgram.Clear() keeps m_seed: a seed whose stage-5
     program is too long goes on with the numbers after it (restarting it decoded about half of the entries wrong:
     9-nine- Episode 4 / ATRI voices) */
- const random=scheme.random==null?lcg(seed):nana(seed,scheme.random);
+ const random=scheme.type==='HxCrypt'?hxRandom(seed,scheme.randomType||0):scheme.random==null?lcg(seed):nana(seed,scheme.random);
  for(let stage=5;stage>0;stage--){
   const code=[];let len=0;
   const nop=n=>{if(len+n>LIMIT)return false;len+=n;return true;};
@@ -94,18 +113,148 @@ function controlBlockIn(file){let b;try{b=fs.readFileSync(file);}catch{return nu
  while(at>=0){if(at%4===0&&at+0x1000<=b.length){const cb=new Uint32Array(0x400);for(let i=0;i<0x400;i++)cb[i]=(~b.readUInt32LE(at+i*4))>>>0;return cb;}at=b.indexOf(SIG,at+1);}return null;}
 // Does a decrypted head look like a file KiriKiri keeps (script text with BOM, TJS2 bytecode, PSB, image, sound,
 // movie)? Only multi-byte magics: a one-byte guess (* ; @) matches random bytes of a wrong scheme.
-const HEAD=/^(?:\xff\xfe|\xef\xbb\xbf|TJS2|PSB\x00|mdf\x00|TLG[05]|\x89PNG|OggS|RIFF|AMV\d)/;
+// 2026-11-19 (千恋＊万花 data.xp3: its first encrypted entries are KiriKiri simple-crypt scripts \xfe\xfe<mode>\xff,
+// pre-rendered fonts "TVP pre-rendered font" and OpenType / TrueType fonts; none matched, so the archive got no filter
+// and its fonts could not be read): those heads count too.
+const HEAD=/^(?:\xff\xfe|\xef\xbb\xbf|TJS2|PSB\x00|mdf\x00|TLG[05]|\x89PNG|OggS|RIFF|AMV\d|\xfe\xfe[\x00-\x02]\xff|TVP |OTTO|\x00\x01\x00\x00|ttcf)/;
 const looks=b=>HEAD.test(b.toString('latin1',0,4))||(b.length>=4&&(b[1]^b[3])===0x53&&(b[2]^b[3])===0x42);
+const rotl32=(x,n)=>((x<<n)|(x>>>(32-n)))>>>0;
+function hxChacha(key1Hex,key2Hex,data){
+ const key=Buffer.from(key1Hex,'hex'),nonce=Buffer.from(key2Hex,'hex'),st=Buffer.alloc(64);
+ Buffer.from('expand 32-byte k','ascii').copy(st,0);key.copy(st,16,0,16);key.copy(st,32,16,32);
+ st.writeUInt32LE(1,48);st.writeUInt32LE(0,52);nonce.copy(st,56,0,8);
+ const out=Buffer.allocUnsafe(data.length),s=new Uint32Array(16),z=new Uint32Array(16);
+ for(let off=0;off<data.length;off+=64){
+  for(let i=0;i<16;i++)s[i]=st.readUInt32LE(i*4);z.set(s);
+  for(let i=0;i<10;i++){
+   const q=(a,b,c,d)=>{z[a]=(z[a]+z[b])>>>0;z[d]=rotl32(z[d]^z[a],16);z[c]=(z[c]+z[d])>>>0;z[b]=rotl32(z[b]^z[c],12);z[a]=(z[a]+z[b])>>>0;z[d]=rotl32(z[d]^z[a],8);z[c]=(z[c]+z[d])>>>0;z[b]=rotl32(z[b]^z[c],7);};
+   q(0,4,8,12);q(1,5,9,13);q(2,6,10,14);q(3,7,11,15);q(0,5,10,15);q(1,6,11,12);q(2,7,8,13);q(3,4,9,14);
+  }
+  const blk=Buffer.allocUnsafe(64);for(let i=0;i<16;i++)blk.writeUInt32LE((s[i]+z[i])>>>0,i*4);
+  const n=Math.min(64,data.length-off);for(let i=0;i<n;i++)out[off+i]=data[off+i]^blk[i];
+  for(let k=0;k<8;k++){st[48+k]=(st[48+k]+1)&0xff;if(st[48+k]!==0)break;}
+ }
+ return out;
+}
+function hxIndexEntries(buf){
+ let p=0;
+ const read=()=>{const t=buf[p++];if(t===0||t===1)return null;
+  if(t===2){const n=buf.readInt32BE(p);p+=4;const s=buf.toString('utf16le',p,p+n*2);p+=n*2;return s;}
+  if(t===3){const n=buf.readInt32BE(p);p+=4;const a=buf.subarray(p,p+n);p+=n;return a;}
+  if(t===4||t===5){const v=buf.readBigInt64BE(p);p+=8;return v;}
+  if(t===0x81){const n=buf.readInt32BE(p);p+=4;const a=[];for(let i=0;i<n;i++)a.push(read());return a;}
+  if(t===0xc1){const n=buf.readInt32BE(p);p+=4;const d={};for(let i=0;i<n;i++){const k=read();d[k]=read();}return d;}
+  throw new Error('HX_INDEX_TYPE_'+t);};
+ const root=read(),map=new Map();if(!Array.isArray(root))return map;
+ for(let i=0;i<root.length;i+=2){const dir=root[i+1];if(!Array.isArray(dir))continue;
+  for(let j=0;j<dir.length;j+=2){const info=dir[j+1];if(!Array.isArray(info)||info.length<2)continue;
+   const id=info[0],key=info[1];if(typeof id!=='bigint'||typeof key!=='bigint'||id<0n)continue;
+   let h=Number(id&M32)>>>0,uname='';for(;;){uname+=String.fromCharCode((h&0x3fff)+0x5000);h>>>=14;if(!h)break;}
+   map.set(uname,{id,key});}}
+ return map;
+}
+function hxEntryDecryptor(scheme,id,key,programs=new Array(0x80)){
+ const exec=h32=>{const seed=h32&0x7f,code=programs[seed]||(programs[seed]=generate(scheme,seed)),h=h32>>>7;return [run(code,scheme.cb,h),run(code,scheme.cb,(~h)>>>0)];};
+ const fk=BigInt('0x'+(scheme.filterKey||'0'));let ek=BigInt(key)&M64;if((BigInt(id)&0x100000000n)===0n)ek^=fk;
+ const hkSeed=(~ek)&M64,r0=exec(Number(ek&M32)),r1=exec(Number((ek>>32n)&M32));
+ const k0=BigInt(r0[0])|(BigInt(r0[1])<<32n),k1=BigInt(r1[0])|(BigInt(r1[1])<<32n);
+ const split=Number((BigInt(scheme.offset)+((ek>>16n)&BigInt(scheme.mask)))&M32);
+ const hk=Buffer.alloc(16);let r3=exec(Number(hkSeed&M32)),v5=(~(BigInt(r3[0])|(BigInt(r3[1])<<32n)))&M64;
+ for(let i=0,j=56;i<8;i++,j-=8)hk[i]=Number((v5>>BigInt(j))&0xffn);
+ r3=exec(Number(v5&M32));v5=(~(BigInt(r3[0])|(BigInt(r3[1])<<32n)))&M64;
+ for(let i=0,j=56;i<8;i++,j-=8)hk[i+8]=Number((v5>>BigInt(j))&0xffn);
+ const span=(k64,off,buf,pos,cnt)=>{if(cnt<=0)return;
+  const fk0=Number(k64&0xffn)||0xa5,d1=Number((k64>>8n)&0xffn),d2=Number((k64>>16n)&0xffn);
+  const s0=Number((k64>>48n)&0xffffn);let s1=Number((k64>>32n)&0xffffn);if(s0===s1)s1+=1;
+  for(let i=0;i<cnt;i++)buf[pos+i]^=fk0;
+  if(d1&&s0>=off&&s0<off+cnt)buf[pos+s0-off]^=d1;
+  if(d2&&s1>=off&&s1<off+cnt)buf[pos+s1-off]^=d2;};
+ return (offset,buf,pos=0,count=buf.length-pos)=>{
+  if(offset<16&&count>0){const n=Math.min(count,16-offset);for(let i=0;i<n;i++)buf[pos+i]^=hk[offset+i];}
+  if(offset<split){const n=Math.min(split-offset,count);span(k0,offset,buf,pos,n);offset+=n;pos+=n;count-=n;}
+  if(count>0)span(k1,offset,buf,pos,count);
+  return buf;};
+}
+function hxFilter(scheme,hxMap){
+ const programs=new Array(0x80);
+ return function decrypt(hash,offset,buf,pos=0,count=buf.length-pos,entry=null){
+  const info=entry&&hxMap.get(entry.name);if(!info)return buf;
+  const dec=info.dec||(info.dec=hxEntryDecryptor(scheme,info.id,info.key,programs));
+  return dec(offset,buf,pos,count);};
+}
+const zlibHead=b=>b.length>=2&&(b[0]&0x0f)===8&&(b[0]>>4)<=7&&(((b[0]<<8)|b[1])%31)===0;
+function decodeHxMap(hxRaw,k1,k2){
+ if(hxRaw.length<=20)return null;
+ const head=hxChacha(k1,k2,hxRaw.subarray(16,Math.min(hxRaw.length,80)));
+ if(head.length<6||!zlibHead(head.subarray(4)))return null;
+ try{return hxIndexEntries(zlib.inflateSync(hxChacha(k1,k2,hxRaw.subarray(16)).subarray(4)));}catch{return null;}
+}
+const TEXT_NAME=/\.(ks|tjs|txt|asd|csv|ini)$/i;
+const isJpg=b=>b.length>=10&&b[0]===0xff&&b[1]===0xd8&&b[2]===0xff&&(b[3]===0xe0&&b.toString('latin1',6,10)==='JFIF'||b[3]===0xe1&&b.toString('latin1',6,10)==='Exif');
+const looksHashXor=b=>HEAD.test(b.toString('latin1',0,4))||isJpg(b);
+const sjisDec=new TextDecoder('shift_jis'),gbkDec=new TextDecoder('gbk'),utf8Dec=new TextDecoder('utf-8',{fatal:true});
+function scoreScript(b){
+ if(b.length<16)return 0;
+ let lf=0,crlf=0,lfcr=0;
+ for(let i=0;i<b.length;i++){const c=b[i];if(c<9||(c>13&&c<32&&c!==27))return 0;if(c===10){lf++;if(i>0&&b[i-1]===13)crlf++;if(i+1<b.length&&b[i+1]===13)lfcr++;}}
+ if(!lf||lfcr>crlf)return 0;
+ const cut=b.lastIndexOf(10),view=cut>16&&b.length===512?b.subarray(0,cut+1):b;
+ if(!/(?:^|\n)\s*(?:\[[A-Za-z_][\w\s=."']*\]|@[A-Za-z_]|;|\/\/|\*[A-Za-z0-9_]+|\b(?:var|function|class|if|return)\b)/m.test(view.toString('latin1')))return 0;
+ try{utf8Dec.decode(view);return 8;}catch{}
+ for(const dec of [sjisDec,gbkDec]){const t=dec.decode(view);if(!/\ufffd/.test(t)&&(t.match(/[｡-ﾟ]/g)||[]).length<=t.length*.05)return crlf>=lf*.5?8:6;}
+ return 0;
+}
+/* KiriKiri keyless hash filters: the whole key comes from the entry's adlr hash, so they are found by trying them on
+   sample entries and keeping the one whose output reads as a known file head or a script, never by title.
+   hash^k: KiriKiri 2 simple xp3dec.tpm, each byte XOR (adlr_hash ^ k) & 0xff, k one of 256.
+   rot31: 2026-11-20 (#472 #417 #415 #404 #411: kinglove/hutamata/koirowa/koikari.tpm, one 45 KiB plug-in): h = hash &
+   0x7fffffff seen as a 31-bit ring, key[i] = low byte of h rotated right by 8*i bits, byte at file offset o XOR key[o % 31]. */
+function rot31Key(hash){let h=(hash&0x7fffffff)>>>0;h=(h|(h<<31))>>>0;const k=Buffer.alloc(31);for(let i=0;i<31;i++){k[i]=h&0xff;h=((h>>>8)|(((h&0xfffffffe)<<23)>>>0))>>>0;}return k;}
+function rot31(hash,offset,buf,pos=0,count=buf.length-pos){const k=rot31Key(hash>>>0);let o=offset%31;for(let i=0;i<count;i++){buf[pos+i]^=k[o];if(++o===31)o=0;}return buf;}
+const hashXor=k=>function decrypt(hash,offset,buf,pos=0,count=buf.length-pos){const x=((hash>>>0)^k)&0xff;for(let i=0;i<count;i++)buf[pos+i]^=x;return buf;};
+function keylessCandidates(){const out=[{name:'rot31',dec:rot31}];for(let k=0;k<256;k++)out.push({name:'hash^'+k,dec:hashXor(k)});return out;}
+function hashXorFilter(file,xp3,list,plainHits){
+ const enc=(list?list.files:[]).filter(e=>e.encrypted&&e.size>=16&&e.size<=(4<<20));
+ if(!enc.length)return null;
+ const picked=enc.length>24?Array.from({length:24},(_,i)=>enc[Math.floor(i*enc.length/24)]):enc;
+ const sample=picked.map(e=>{try{return {e,r:xp3.read(file,e).subarray(0,512)};}catch{return null;}}).filter(Boolean);
+ if(!sample.length||plainHits>=Math.max(2,Math.ceil(sample.length/2)))return null;
+ const minHits=Math.min(2,sample.length);
+ let best=null,bestScore=0;
+ for(const c of keylessCandidates()){
+  let hits=0,score=0;
+  for(const {e,r} of sample){
+   const b=c.dec(e.hash>>>0,0,Buffer.from(r));
+   if(looksHashXor(b)){hits++;score+=10;}
+   else if(TEXT_NAME.test(e.name)){const sc=scoreScript(b);if(sc>0){hits++;score+=sc;}}
+  }
+  if(hits>=minHits&&hits>plainHits&&score>bestScore){bestScore=score;best=c;}
+ }
+ if(!best)return null;
+ const dec=best.dec;const fn=(hash,offset,buf,pos=0,count=buf.length-pos)=>dec(hash,offset,buf,pos,count);fn.titles=[best.name];return fn;
+}
 const memo=new Map();
 // The filter of one archive: the known scheme that turns most of its encrypted entries into known heads (at least
 // two and more than reading them as they are), or null.
 function forArchive(file){let key;try{const st=fs.statSync(file);key=path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+'|'+schemes().length;}catch{return null;}
  if(memo.has(key))return memo.get(key);let best=null;
- try{const xp3=require('./xp3.cjs'),list=xp3.list(file);const sample=(list?list.files:[]).filter(e=>e.encrypted&&e.size>=16).slice(0,16).map(e=>{try{return {e,r:xp3.read(file,e).subarray(0,32)};}catch{return null;}}).filter(Boolean);
-  const plainHits=sample.filter(s=>looks(s.r)).length;let top=Math.max(1,plainHits);const dir=path.dirname(file);
-  for(const s of schemes()){let cb=s.cb;if(!cb&&s.tpm)cb=controlBlockIn(path.join(dir,s.tpm))||controlBlockIn(path.join(dir,'plugin',s.tpm));if(!cb)continue;
-   let dec;try{dec=filter({...s,cb});}catch{continue;}let hits=0;
-   for(const {e,r} of sample){const b=Buffer.from(r);try{dec(e.hash,0,b);}catch{continue;}if(looks(b))hits++;}
-   if(hits>top){top=hits;best=dec;best.titles=s.titles;}}}catch{best=null;}
+ try{const xp3=require('./xp3.cjs'),list=xp3.list(file),hxRaw=xp3.hxChunk(file),dir=path.dirname(file);
+  const enc=(list?list.files:[]).filter(e=>e.encrypted&&e.size>=16);
+  const picked=hxRaw&&enc.length>32?Array.from({length:32},(_,i)=>enc[Math.floor(i*enc.length/32)]):enc.slice(0,hxRaw?32:16);
+  const sample=picked.map(e=>{try{return {e,r:xp3.read(file,e).subarray(0,32)};}catch{return null;}}).filter(Boolean);
+  const plainHits=sample.filter(s=>looks(s.r)).length;let top=Math.max(1,plainHits);
+  const tryScheme=(make,titles)=>{let dec;try{dec=make();}catch{return;}let hits=0;
+   for(const {e,r} of sample){const b=Buffer.from(r);try{dec(e.hash,0,b,0,b.length,e);}catch{continue;}if(looks(b))hits++;}
+   if(hits>top){top=hits;best=dec;best.titles=titles;}};
+  if(hxRaw){
+   const idxCache=new Map();
+   for(const s of schemes()){if(s.type!=='HxCrypt'||!s.cb||!s.filterKey||!Array.isArray(s.indexKeys))continue;
+    let hxMap=null;
+    for(const [k1,k2] of s.indexKeys){const ck=k1+':'+k2;if(!idxCache.has(ck))idxCache.set(ck,decodeHxMap(hxRaw,k1,k2));hxMap=idxCache.get(ck);if(hxMap)break;}
+    if(hxMap?.size)tryScheme(()=>hxFilter(s,hxMap),s.titles);}
+  }else{
+   for(const s of schemes()){if(s.type==='HxCrypt')continue;let cb=s.cb;if(!cb&&s.tpm)cb=controlBlockIn(path.join(dir,s.tpm))||controlBlockIn(path.join(dir,'plugin',s.tpm));
+    if(cb)tryScheme(()=>filter({...s,cb}),s.titles);}
+    if(!best)best=hashXorFilter(file,xp3,list,plainHits);}}catch{best=null;}
  memo.set(key,best);return best;}
-module.exports={filter,generate,run,schemes,controlBlockIn,forArchive,looks};
+module.exports={rot31,rot31Key,filter,generate,run,schemes,controlBlockIn,forArchive,looks,hxChacha,hxEntryDecryptor};

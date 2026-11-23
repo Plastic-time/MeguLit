@@ -1,0 +1,68 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "cb03fddce8d1422943f779401eb8afbd922a8fe6e4c51324d2c7c454f8422c6f",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "fvp",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "22ead6840906c97c392ee831c9710a0855498f26e2388e31f937eb2b7f791b15",
+  "script": "d3eeff567e52b934ea7e22626f093a609cbd90c974ee1d00933570ff1a77021c",
+  "title": "ea6d9d756909167ece140bf9497fa9b8943eecca1a6165b93656c664db911f03",
+  "vndb": "v10028"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "irotoridori-no-hikari-chs",
+ "builds": [
+  "ea2cb0cd2d01808cf80ec68da2713a96e6aa91c425c2b16e4e6667b226cb47f3"
+ ],
+ "match": {
+  "exe": [
+   "五彩斑斓的曙光.exe"
+  ],
+  "titles": [
+   "いろとりどりのヒカリ",
+   "五彩斑斓的曙光",
+   "[120831][FAVORITE] いろとりどりのヒカリ"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

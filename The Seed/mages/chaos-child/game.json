@@ -1,0 +1,67 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "e46f4a528506e0480120b7ab1bf4fb403c29e6db2ac1c72832e4461e6f455767",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "mages",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "295e0cc7f9d5b7104d23c441979b46471feb23faaf3dc36e6c56cae4a632ecd6",
+  "script": "34c37b8cdc3935421f66ddcf57d0a50e703b5fc02151bac92965359721bc9065",
+  "title": "eb27e063deb523f71bec72aad2254030216e3ab574e74db1eac968c18969a613",
+  "steam": "970570",
+  "vndb": "v14018"
+ },
+ "seedFormat": 1,
+ "status": "verified",
+ "slug": "chaos-child",
+ "builds": [
+  "51aeae59786ed60a519411e035b324bbc10f1bd49490a607fab69a3741133bd4"
+ ],
+ "match": {
+  "exe": [
+   "Game.exe"
+  ],
+  "titles": [
+   "CHAOS;CHILD"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

@@ -1,0 +1,119 @@
+{"at": "2026-11-19T05:54:08.295Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T05:54:22.271Z", "type": "dialogScene", "visible": false, "reason": "text window hidden: box 50%, picture 0%"}
+{"at": "2026-11-19T05:54:22.272Z", "type": "dialogVisibility", "visible": false, "reason": "window text window hidden: box 50%, picture 0%"}
+{"at": "2026-11-19T05:54:22.607Z", "type": "coverDebug", "text": "阅读层隐藏 (translation, target=True) menu=False/False cover=True dialog=False iconic=False fg=game"}
+{"at": "2026-11-19T05:54:26.739Z", "type": "line", "chars": 6, "sequence": 1}
+{"at": "2026-11-19T05:54:26.904Z", "type": "dialogVisibility", "visible": true}
+{"at": "2026-11-19T05:54:27.217Z", "type": "line", "chars": 6, "sequence": 2}
+{"at": "2026-11-19T05:54:33.227Z", "type": "coverDebug", "text": "前台换成了别的程序/游戏最小化：阅读层退出置顶，放在游戏正上方、其他程序下面 (event 3)"}
+{"at": "2026-11-19T05:54:33.395Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T05:54:41.136Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T05:54:42.091Z", "type": "coverDebug", "text": "阅读层已移到前台游戏上方"}
+{"at": "2026-11-19T05:54:43.729Z", "type": "dialogScene", "visible": false, "reason": "text window hidden: box 57%, picture 7%"}
+{"at": "2026-11-19T05:54:43.730Z", "type": "dialogVisibility", "visible": false, "reason": "window text window hidden: box 57%, picture 7%"}
+{"at": "2026-11-19T05:54:44.003Z", "type": "coverDebug", "text": "阅读层隐藏 (translation, target=True) menu=False/False cover=True dialog=False iconic=False fg=game"}
+{"at": "2026-11-19T05:54:49.306Z", "type": "line", "chars": 6, "sequence": 3}
+{"at": "2026-11-19T05:54:50.086Z", "type": "dialogVisibility", "visible": true}
+{"at": "2026-11-19T05:54:53.673Z", "type": "coverDebug", "text": "前台换成了别的程序/游戏最小化：阅读层退出置顶，放在游戏正上方、其他程序下面 (event 3)"}
+{"at": "2026-11-19T05:54:53.692Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T05:54:54.528Z", "type": "coverDebug", "text": "阅读层已移到前台游戏上方"}
+{"at": "2026-11-19T05:54:54.600Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T05:54:54.715Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T05:54:55.953Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T05:54:58.344Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T05:54:59.392Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T05:55:00.566Z", "type": "line", "chars": 6, "sequence": 4}
+{"at": "2026-11-19T05:55:02.655Z", "type": "coverDebug", "text": "前台换成了别的程序/游戏最小化：阅读层退出置顶，放在游戏正上方、其他程序下面 (event 3)"}
+{"at": "2026-11-19T05:55:02.664Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T05:55:03.629Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T05:55:04.822Z", "type": "dialogScene", "visible": false, "reason": "text window hidden: box 53%, picture 8%"}
+{"at": "2026-11-19T05:55:04.823Z", "type": "dialogVisibility", "visible": false, "reason": "window text window hidden: box 53%, picture 8%"}
+{"at": "2026-11-19T05:55:05.056Z", "type": "coverDebug", "text": "阅读层隐藏 (translation, target=True) menu=False/False cover=True dialog=False iconic=False fg=game"}
+{"at": "2026-11-19T05:55:06.341Z", "type": "line", "chars": 9, "sequence": 5}
+{"at": "2026-11-19T05:55:06.591Z", "type": "dialogVisibility", "visible": true}
+{"at": "2026-11-19T05:55:08.773Z", "type": "coverDebug", "text": "前台换成了别的程序/游戏最小化：阅读层退出置顶，放在游戏正上方、其他程序下面 (event 3)"}
+{"at": "2026-11-19T05:55:08.773Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T05:55:11.126Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T05:55:12.055Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T05:55:14.341Z", "type": "line", "chars": 14, "sequence": 6}
+{"at": "2026-11-19T05:55:19.729Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T05:55:19.757Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T05:55:19.789Z", "type": "coverDebug", "text": "阅读层已移到前台游戏上方"}
+{"at": "2026-11-19T05:55:20.098Z", "type": "line", "chars": 22, "sequence": 7}
+{"at": "2026-11-19T05:55:22.189Z", "type": "line", "chars": 13, "sequence": 8}
+{"at": "2026-11-19T05:55:22.719Z", "type": "line", "chars": 41, "sequence": 9}
+{"at": "2026-11-19T05:55:23.675Z", "type": "line", "chars": 27, "sequence": 10}
+{"at": "2026-11-19T05:55:24.837Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T05:55:24.911Z", "type": "coverDebug", "text": "Alt+T 菜单打开：阅读层固定到游戏上方"}
+{"at": "2026-11-19T05:55:26.473Z", "type": "line", "chars": 19, "sequence": 11}
+{"at": "2026-11-19T05:55:29.330Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T05:55:30.031Z", "type": "line", "chars": 30, "sequence": 12}
+{"at": "2026-11-19T05:55:30.702Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T05:55:32.445Z", "type": "line", "chars": 28, "sequence": 13}
+{"at": "2026-11-19T05:55:35.379Z", "type": "line", "chars": 17, "sequence": 14}
+{"at": "2026-11-19T05:55:36.911Z", "type": "line", "chars": 34, "sequence": 15}
+{"at": "2026-11-19T05:55:40.225Z", "type": "line", "chars": 11, "sequence": 16}
+{"at": "2026-11-19T05:55:46.479Z", "type": "line", "chars": 22, "sequence": 17}
+{"at": "2026-11-19T05:55:48.303Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T05:55:48.948Z", "type": "line", "chars": 12, "sequence": 18}
+{"at": "2026-11-19T05:55:49.987Z", "type": "line", "chars": 28, "sequence": 19}
+{"at": "2026-11-19T05:55:51.570Z", "type": "line", "chars": 44, "sequence": 20}
+{"at": "2026-11-19T05:55:56.010Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T05:56:00.236Z", "type": "line", "chars": 15, "sequence": 21}
+{"at": "2026-11-19T05:56:03.337Z", "type": "line", "chars": 14, "sequence": 22}
+{"at": "2026-11-19T05:56:07.893Z", "type": "line", "chars": 28, "sequence": 23}
+{"at": "2026-11-19T05:56:11.752Z", "type": "line", "chars": 26, "sequence": 24}
+{"at": "2026-11-19T05:56:15.047Z", "type": "line", "chars": 28, "sequence": 25}
+{"at": "2026-11-19T05:56:16.931Z", "type": "line", "chars": 21, "sequence": 26}
+{"at": "2026-11-19T05:56:22.948Z", "type": "line", "chars": 17, "sequence": 27}
+{"at": "2026-11-19T05:56:27.423Z", "type": "line", "chars": 16, "sequence": 28}
+{"at": "2026-11-19T05:56:29.132Z", "type": "line", "chars": 40, "sequence": 29}
+{"at": "2026-11-19T05:56:31.234Z", "type": "line", "chars": 15, "sequence": 30}
+{"at": "2026-11-19T05:56:32.462Z", "type": "line", "chars": 30, "sequence": 31}
+{"at": "2026-11-19T05:56:33.663Z", "type": "line", "chars": 38, "sequence": 32}
+{"at": "2026-11-19T05:56:46.268Z", "type": "line", "chars": 32, "sequence": 33}
+{"at": "2026-11-19T05:56:52.024Z", "type": "line", "chars": 29, "sequence": 34}
+{"at": "2026-11-19T05:56:53.409Z", "type": "line", "chars": 29, "sequence": 35}
+{"at": "2026-11-19T05:56:55.434Z", "type": "line", "chars": 13, "sequence": 36}
+{"at": "2026-11-19T05:56:56.673Z", "type": "line", "chars": 42, "sequence": 37}
+{"at": "2026-11-19T05:57:02.778Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T05:57:02.831Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T05:57:02.873Z", "type": "coverDebug", "text": "阅读层已移到前台游戏上方"}
+{"at": "2026-11-19T05:57:03.087Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T06:00:26.206Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T06:00:26.499Z", "type": "line", "chars": 35, "sequence": 38}
+{"at": "2026-11-19T06:00:28.437Z", "type": "line", "chars": 34, "sequence": 39}
+{"at": "2026-11-19T06:00:30.042Z", "type": "line", "chars": 56, "sequence": 40}
+{"at": "2026-11-19T06:00:32.055Z", "type": "line", "chars": 25, "sequence": 41}
+{"at": "2026-11-19T06:00:32.379Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T06:00:32.444Z", "type": "coverDebug", "text": "Alt+T 菜单打开：阅读层固定到游戏上方"}
+{"at": "2026-11-19T06:00:34.075Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T06:00:34.090Z", "type": "coverDebug", "text": "阅读层已移到前台游戏上方"}
+{"at": "2026-11-19T06:00:34.129Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T06:00:34.466Z", "type": "line", "chars": 52, "sequence": 42}
+{"at": "2026-11-19T06:00:36.802Z", "type": "dialogVisibility", "visible": false, "reason": "marker"}
+{"at": "2026-11-19T06:00:36.997Z", "type": "coverDebug", "text": "阅读层隐藏 (translation, target=True) menu=False/False cover=True dialog=False iconic=False fg=game"}
+{"at": "2026-11-19T06:00:37.745Z", "type": "line", "chars": 7, "sequence": 43}
+{"at": "2026-11-19T06:00:38.385Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T06:00:38.464Z", "type": "coverDebug", "text": "Alt+T 菜单打开：阅读层固定到游戏上方"}
+{"at": "2026-11-19T06:00:38.544Z", "type": "dialogVisibility", "visible": true}
+{"at": "2026-11-19T06:00:39.802Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T06:00:39.856Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T06:00:39.869Z", "type": "coverDebug", "text": "阅读层已移到前台游戏上方"}
+{"at": "2026-11-19T06:00:40.285Z", "type": "line", "chars": 29, "sequence": 44}
+{"at": "2026-11-19T06:00:40.816Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T06:00:40.888Z", "type": "coverDebug", "text": "Alt+T 菜单打开：阅读层固定到游戏上方"}
+{"at": "2026-11-19T06:00:42.658Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T06:00:44.575Z", "type": "line", "chars": 10, "sequence": 45}
+{"at": "2026-11-19T06:00:45.317Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T06:00:46.222Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T06:00:46.284Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T06:00:46.292Z", "type": "coverDebug", "text": "阅读层已移到前台游戏上方"}
+{"at": "2026-11-19T06:00:47.477Z", "type": "line", "chars": 7, "sequence": 46}
+{"at": "2026-11-19T06:00:47.943Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T06:00:48.018Z", "type": "coverDebug", "text": "Alt+T 菜单打开：阅读层固定到游戏上方"}
+{"at": "2026-11-19T06:00:49.144Z", "type": "readerContext", "active": false}
+{"at": "2026-11-19T06:00:49.199Z", "type": "readerContext", "active": true}
+{"at": "2026-11-19T06:00:49.211Z", "type": "coverDebug", "text": "阅读层已移到前台游戏上方"}
+{"at": "2026-11-19T06:00:51.533Z", "type": "coverDebug", "text": "前台换成了别的程序/游戏最小化：阅读层退出置顶，放在游戏正上方、其他程序下面 (event 3)"}
+{"at": "2026-11-19T06:00:51.533Z", "type": "readerContext", "active": false}

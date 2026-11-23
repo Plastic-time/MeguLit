@@ -29,7 +29,7 @@ export default {
       const obj = await env.BUCKET.get(path.slice(1));
       if (!obj) return json({ error: 'not synced yet' }, 0, 503);
       return new Response(request.method === 'HEAD' ? null : obj.body, {
-        headers: { ...cors(), 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=60', etag: obj.httpEtag },
+        headers: { ...cors(), 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store, max-age=0', etag: obj.httpEtag },
       });
     }
 
@@ -38,7 +38,7 @@ export default {
       if (!latest?.key) return Response.redirect(`https://github.com/${REPO}/releases/latest`, 302);
       return new Response(null, {
         status: 302,
-        headers: { location: `${url.origin}/${latest.key}`, 'cache-control': 'public, max-age=60', ...cors() },
+        headers: { location: `${url.origin}/${latest.key}`, 'cache-control': 'no-store, max-age=0', ...cors() },
       });
     }
 
@@ -60,7 +60,7 @@ export default {
 // Content-addressed files never change, so they cache forever at the edge. Range requests resume broken downloads.
 // E383 runtime packs and the llama.cpp build are mirrored by hand (Release / docs); prune never touches them.
 const INSTALLER = /^files\/[0-9a-f]{64}\/MeguLit-v[\d.]+-win-x64\.zip$/;
-const RUNTIME_FILE = /^files\/(runtime-v[\d.]+\/MeguLit-runtime-(base|reading|voice)-v[\d.]+\.zip|b\d+\/llama-b\d+-bin-win-vulkan-x64\.zip|anki\/anki-[\d.]+-win-x64\.msi)$/; // anki: the official installer (ankitects/anki, GitHub release digest checked), for one-click install
+const RUNTIME_FILE = /^files\/(runtime-v[\d.]+\/MeguLit-runtime-(base|reading|voice)-v[\d.]+\.zip|runtime-dump-v[\d.]+\/MeguLit-runtime-dump-v[\d.]+\.zip|b\d+\/llama-b\d+-bin-win-vulkan-x64\.zip|anki\/anki-[\d.]+-win-x64\.msi)$/; // anki: the official installer (ankitects/anki, GitHub release digest checked), for one-click install
 async function serveFile(request, env, ctx, key) {
   if (!INSTALLER.test(key) && !RUNTIME_FILE.test(key)) return new Response('not found', { status: 404 });
   const cache = caches.default;

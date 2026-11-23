@@ -18,16 +18,41 @@ test('a stream with three paced dialogue lines takes over a selected stream that
 test('a second writable stream that repeats the selected line is hidden with it',()=>{
  assert.match(s,/japanese twin embedding on/);
  assert.match(s,/japanese twin hidden/);
- assert.match(s,/\(sel\.code\?\?""\)!=\(c\.code\?\?""\)&&JaTwins\.Add\(key\)/,'contexts of the same setter stay with ManyUnityContexts');
- assert.match(s,/if\(id!=Selected\)\{DialogueRivals\.Clear\(\);JaTwins\.Clear\(\);/);
+ assert.match(s,/bool own=code==\(sel\.code\?\?""\);if\(own&&!\(UnitySetter\(code\)&&c\.name==sel\.name\)\)return;if\(n>=\(own\?1:2\)&&JaTwins\.Add\(key\)\)/,'another hook after two repeats, or a context of the selected Unity setter itself after one (Aokana sets each line twice through TMP_Text.set_text)');
+ assert.match(s,/foreach\(var kv in OtherLines\)if\(Math\.Abs\(\(now-kv\.Value\.Value\)\.TotalMilliseconds\)<1500&&SameLine\(kv\.Value\.Key,text\)\)JaTwinHit\(kv\.Key,twinOn\);/,'a twin seen before the selected line counts');
+ assert.match(s,/if\(Math\.Abs\(\(now-LastSelectedLineAt\)\.TotalMilliseconds\)<1500&&SameLine\(text,LastSelectedLine\)\)JaTwinHit\(tp\.Key\(\),twinOn\);\}/);
+ assert.match(s,/rv\.embed&&rv\.role!=2&&rv\.role!=3&&!DialogueLike\(text\)&&DialogueLike\(LastSelectedLine\)&&Math\.Abs\(\(now-LastSelectedLineAt\)\.TotalMilliseconds\)<1500&&SameLine\(text,LastSelectedLine\)\)JaTwinHit/,'typewriter frames buffered past 600 characters still count');
+ assert.match(s,/if\(last==0\|\|Bare\(rows\[last\]\)!=b\)return false;for\(int i=0;i<last;i\+\+\)\{string r=Bare\(rows\[i\]\);if\(r\.Length>0&&!b\.StartsWith\(r,StringComparison\.Ordinal\)\)return false;\}return true;/,'a typewriter buffer: every row a start of the line, the last the line; a backlog page is no twin');
+ assert.match(s,/if\(!TwinSelfTest\(\)\)\{Console\.Error\.WriteLine\("FAIL japanese twins/,'HookBridge --self-test runs the twin rules (built by Build-HookBridge.ps1)');
+ assert.match(s,/if\(id!=Selected\)LeaveSelected\(\);/,'Select leaves the old line state behind (#696 review)');
+ assert.match(s,/static void LeaveSelected\(\)\{LeaveGen\+\+;foreach\(var k in JaTwins\)MarkEmbedDirty\(k\);foreach\(var k in TwinEmbed\)MarkEmbedDirty\(k\);JaTwins\.Clear\(\);[^\n]*LastEmbedText="";LastEmbedCovered=false;\}/,'the twins of the stream left are forgotten and marked dirty for the embed reconciler, and its line forgotten (#696 review)');
 });
 
 test('E610 the twin is hidden only after the selected stream wrote the same line back; the remembered stream comes back on its first line',()=>{
- assert.match(s,/DialogueLike\(text\)&&text==LastEmbedText&&\(DateTime\.UtcNow-LastEmbedAt\)\.TotalMilliseconds<1500/);
+ assert.match(s,/out sel\)&&!sel\.hideOnly&&\(\(DateTime\.UtcNow-LastEmbedAt\)\.TotalMilliseconds<1500\|\|\(DateTime\.UtcNow-JaTwinHiddenAt\)\.TotalMilliseconds<1500\)&&Bare\(text\)==Bare\(LastEmbedText\)/,'one frame is the whole line');
  assert.match(s,/RememberedCode!=""&&rv\.code==RememberedCode\?1:/);
  assert.match(s,/Emit\(new\{type="hookStreamLeft",id=was,code=wasCode,to=tp\.Key\(\)\}\)/);
+ assert.match(s,/Select\(tp\.Key\(\)\);\/\*[^*]*\*\/lock\(Gate\)\{if\(DialogueLike\(text\)\)\{LastSelectedLine=text;LastSelectedLineAt=DateTime\.UtcNow;\}\}/,'the line that won the switch counts for its twins');
  const n=fs.readFileSync(path.join(__dirname,'..','core','hook-native.cjs'),'utf8');
  assert.match(n,/gdilessSelected\(sel\)\{[^\n]*return \/:JIT:UNITY\$\|IL2CPP\/i\.test/);assert.match(n,/this\.ownTextFn\?\.\(\)===true&&!this\.gdilessSelected\(\)/,'calibration can pause a Unity stream under placement');assert.match(n,/own&&!this\.textPathActive&&!gdiless/);
  assert.match(n,/if\(m\.type==='hookStreamLeft'\)/);
  assert.match(fs.readFileSync(path.join(__dirname,'..','core','hook-control.cjs'),'utf8'),/x\.embeddable&&!left\.has\(x\.code\)/);
+});
+
+test('E560 still holds for twins: three writing the shown line go to cover mode for this run, not remembered, and four are remembered (#696 review)',()=>{
+ assert.match(s,/\{int crowd=TwinCrowd\(tp\.Key\(\),DateTime\.UtcNow\);if\(crowd>2\)\{Luna_EmbedCallback\(tp,text,""\);[^\n]*?if\(crowd==3\)\{Diagnostic\("[^"]*"\);QueueMarkUnsafe\("japanese-twin-crowd",false\);\}else if\(crowd==4\)\{Diagnostic\("[^"]*"\);RememberUnsafe\(sel,"japanese-twin-crowd"\);\}return;\}if\(!sel\.embed\)\{Luna_EmbedCallback\(tp,text,""\);return;\}string twinHidden=/,'three twins: cover mode for this run; four: remembered');
+ assert.match(s,/static void MarkUnsafe\(string reason,bool remember=true,string expectedSelected=null,long expectedGen=0\)\{[^\n]*expectedSelected!=null&&\(Selected!=expectedSelected\|\|SelectGen!=expectedGen\)[^\n]*MarkEmbedDirty\(Selected\);foreach\(var k in JaTwins\)MarkEmbedDirty\(k\);[^\n]*if\(remember\)RememberUnsafe\(c,reason\);[^\n]*\r?\n\s*ScheduleEmbedSync\(\);/,'cover mode binds queued work to the selected stream and selection generation, reconciles selected and twin embed switches, and only remembers when requested');
+ assert.match(s,/static bool WantEmbed\(string key,out ThreadParam tp\)/,'single owner computes desired native embed state');
+ assert.match(s,/static void RunEmbedSync\(\)/,'ordered serial reconciler applies native UseEmbed outside Gate');
+ for(const reason of ['japanese-twin-crowd','unity-many-contexts','unity-readback','unity-colour-reveal'])assert.ok(s.includes('QueueMarkUnsafe("'+reason+'"'),reason+' queues MarkUnsafe bound to trigger selection');
+ assert.doesNotMatch(s,/ThreadPool\.QueueUserWorkItem\(_=>MarkUnsafe\(/,'no unbound queued MarkUnsafe remains');
+ assert.match(s,/if\(tp\.Key\(\)!=Selected&&JaTwins\.Contains\(tp\.Key\(\)\)\)\{Candidate sel;if\(ReplacementEnabled&&Enabled&&Connected&&LastEmbedCovered&&!SkipHeld&&!EngineDialogHidden&&/,'a twin is hidden only after the selected stream wrote its own line back');
+ assert.match(s,/\*\/Luna_EmbedCallback\(tp,text,""\);return;\}if\(ReplacementEnabled&&Enabled&&Connected&&tp\.Key\(\)!=Selected&&ManyUnityContexts\(/,'a twin the gate does not let through is left alone and never reaches ManyUnityContexts');
+ assert.match(s,/if\(!TwinAnswerSelfTest\(\)\)\{Console\.Error\.WriteLine\("FAIL japanese twin answers/,'HookBridge --self-test answers Aokana\'s twins: skip held, the text window hidden, embedded translation, 1.6 s late, a skip burst, a backlog row, a fourth twin, another stream selected by hand');
+ assert.match(s,/static int TwinCrowd\(string key,DateTime now\)\{[^\n]*return TwinCrowdSeen\.Count;\}/,'Aokana has two: the second setter and the typewriter');
+});
+
+test('Aokana: a typewriter frame that colours each character itself is blanked with its tags and alphas kept',()=>{
+ assert.match(s,/if\(twinHidden\.Length==0&&UnitySetter\(candidate\.code\)&&EmbedTextPolicy\.HasInnerColor\(text\)\)twinHidden=EmbedTextPolicy\.Hide\(text\);/);
+ assert.match(s,/if\(line!=JaTwinHiddenLine\)\{JaTwinHiddenLine=line;Diagnostic\("japanese twin hidden "/,'logged once per line, not per frame');
 });

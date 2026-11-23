@@ -9,3 +9,47 @@ test('real review shows the answer before sending a rating and deduplicates a re
 test('a stale card cannot be shown or graded after Anki advances elsewhere',async t=>{const {reviewer,state,calls}=fixture(t);await reviewer.start('Real deck');await reviewer.showAnswer(101);state.card=202;await assert.rejects(reviewer.grade({cardId:101,ease:3,operationId:'stale-101'}),/ANKI_CARD_CHANGED/);await assert.rejects(reviewer.showAnswer(101),/ANKI_CARD_CHANGED/);assert.equal(calls.filter(c=>c.action==='guiAnswerCard').length,0);});
 test('a lost rating response cannot trigger an automatic retry, even with a new operation ID',async t=>{const {reviewer,state,calls}=fixture(t);await reviewer.start('Real deck');await reviewer.showAnswer(101);state.fail=true;await assert.rejects(reviewer.grade({cardId:101,ease:3,operationId:'uncertain-101'}),/ANKI_RATING_UNCERTAIN/);await assert.rejects(reviewer.grade({cardId:101,ease:3,operationId:'uncertain-101'}),/ANKI_ACTION_PENDING/);await assert.rejects(reviewer.grade({cardId:101,ease:3,operationId:'uncertain-102'}),/ANKI_ACTION_PENDING/);assert.equal(calls.filter(c=>c.action==='guiAnswerCard').length,1);});
 test('media is retrieved through AnkiConnect without navigating its Qt window',async t=>{const {reviewer,calls}=fixture(t);const html=await reviewer.withMedia('<img src="picture.png">[sound:voice.mp3]');assert.match(html,/data:image\/png;base64,/);assert.match(html,/audio controls/);assert.deepEqual(calls.map(c=>c.action),['retrieveMediaFile','retrieveMediaFile']);});
+
+
+test('explicit reload recovers a failed rating while the old operation stays blocked',async t=>{
+ const {reviewer,state,calls}=fixture(t);
+ await reviewer.start('Real deck');await reviewer.showAnswer(101);state.fail=true;
+ await assert.rejects(reviewer.grade({cardId:101,ease:3,operationId:'failed-101'}),/ANKI_RATING_UNCERTAIN/);
+ state.fail=false;
+ await reviewer.snapshot(null,{recover:true});
+ await assert.rejects(reviewer.grade({cardId:101,ease:3,operationId:'failed-101'}),/ANKI_ACTION_PENDING/);
+ await assert.rejects(reviewer.grade({cardId:101,ease:3,operationId:'recovered-101'}),/ANKI_ANSWER_REQUIRED/);
+ await reviewer.showAnswer(101);
+ assert.equal((await reviewer.grade({cardId:101,ease:3,operationId:'recovered-101'})).cardId,102);
+ assert.equal(calls.filter(c=>c.action==='guiAnswerCard').length,2);
+});
+
+test('a successful answer followed by a lost snapshot can be reviewed when scheduled again',async t=>{
+ const {reviewer,state,db}=fixture(t),call=reviewer.call.bind(reviewer);
+ let fail=false;
+ reviewer.call=async(action,params)=>{
+  if(action==='guiCurrentCard'&&fail){fail=false;throw Error('ANKI_UNAVAILABLE');}
+  const result=await call(action,params);if(action==='guiAnswerCard')fail=true;return result;
+ };
+ await reviewer.start('Real deck');await reviewer.showAnswer(101);
+ await assert.rejects(reviewer.grade({cardId:101,ease:1,operationId:'answered-101'}),/ANKI_RATING_UNCERTAIN/);
+ state.card=101;reviewer.call=call;
+ const restarted=new AnkiReviewer({db});restarted.call=call;
+ await restarted.snapshot(null,{recover:true});await restarted.showAnswer(101);
+ assert.equal((await restarted.grade({cardId:101,ease:3,operationId:'scheduled-101'})).cardId,102);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM anki_review_events').get().n,2);
+});
+
+test('reload does not release a rating still waiting for Anki',async t=>{
+ const {reviewer,db}=fixture(t),call=reviewer.call.bind(reviewer);
+ let entered,release;const started=new Promise(r=>entered=r),gate=new Promise(r=>release=r);
+ reviewer.call=async(action,params)=>{if(action==='guiAnswerCard'){entered();await gate;}return call(action,params);};
+ await reviewer.start('Real deck');await reviewer.showAnswer(101);
+ const pending=reviewer.grade({cardId:101,ease:3,operationId:'inflight-101'});
+ await started;
+ try{
+  const other=new AnkiReviewer({db});other.call=call;
+  await other.snapshot(null,{recover:true});
+  await assert.rejects(other.grade({cardId:101,ease:3,operationId:'second-101'}),/ANKI_ACTION_PENDING/);
+ }finally{release();await pending;}
+});

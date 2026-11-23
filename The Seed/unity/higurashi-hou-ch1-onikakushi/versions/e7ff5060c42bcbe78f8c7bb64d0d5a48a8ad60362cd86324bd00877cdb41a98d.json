@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "e7ff5060c42bcbe78f8c7bb64d0d5a48a8ad60362cd86324bd00877cdb41a98d",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "HigurashiEp01.exe",
+ "engine": "unity",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "e7ff5060c42bcbe78f8c7bb64d0d5a48a8ad60362cd86324bd00877cdb41a98d",
+  "head": "1d7e8e58aff34291786085fcb31ccdaf209dbf749a1d98940998b40914a039f7",
+  "pe": "5.2.2.22320@56261962"
+ },
+ "rev": 1
+}

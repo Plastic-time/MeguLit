@@ -46,7 +46,9 @@ function consider(root,game,missing,{enabled=true,force=false}={}){
  const bit=bitness(game.executable),helper=path.join(nativeDir(),hook.helper+bit+'.exe'),dll=path.join(nativeDir(),hook.dll+bit+'.dll');
  if(!bit||(!consider.anyPlatform&&(!fs.existsSync(helper)||!fs.existsSync(dll))))return false;
  queue.push({root,key,game,hook,helper,dll,missing:[...missing]});next();return true;}
+let checking=false,retry=null;
 function next(){
+ if(!next.allowed){if(checking)return;checking=true;const job=queue[0];if(!job){checking=false;return;}require('./background-games.cjs').idle(job.root).then(ok=>{checking=false;if(ok){next.allowed=true;next();next.allowed=false;}else{clearTimeout(retry);retry=setTimeout(next,30000);retry.unref?.();}});return;}
  if(busy||!queue.length)return;const job=queue.shift();busy=true;
  const finish=result=>{let saved=0;try{saved=fs.readdirSync(job.hook.outDir(job.game.dir)).length;}catch{}writeState(job.root,job.key,{result,missing:job.missing.length,saved});busy=false;for(const f of listeners)try{f(job,result);}catch{}next();};
  try{const file=job.hook.wantFile(job.game.dir);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,job.missing.flatMap(job.hook.want).join('\n')+'\n');}catch{return finish('failed');}
@@ -54,6 +56,6 @@ function next(){
  if(isRunning(job.game.executable))return finish('running');
  runner(job,secondsFor(job.missing.length),word=>finish(word||'failed'));}
 let isRunning=exe=>require('./game-process.cjs').imageRunning(exe);
-let runner=(job,seconds,done)=>execFile(job.helper,[job.game.executable,job.dll,job.hook.report(job.game.dir),String(seconds)],{windowsHide:true,timeout:(seconds+30)*1000},(error,stdout)=>done(String(stdout||'').trim().split(/\s+/).pop()||(error?'failed':'')));
+let runner=(job,seconds,done)=>require('./background-games.cjs').capture(job,[job.game.executable,job.dll,job.hook.report(job.game.dir),String(seconds)],done);
 function onDone(f){listeners.add(f);return ()=>listeners.delete(f);}
-module.exports={HOOKS,hookFor,outDirs,consider,onDone,secondsFor,_setRunner:(f,r)=>{runner=f;if(r)isRunning=r;},_queue:queue,_state:readState};
+module.exports={HOOKS,hookFor,outDirs,consider,onDone,secondsFor,_setRunner:(f,r)=>{runner=f;next.allowed=true;if(r)isRunning=r;},_queue:queue,_state:readState};

@@ -29,17 +29,21 @@
 #include <cmath>
 #include <stdint.h>
 #include <stdio.h>
+#include <chrono>
 
 struct GtGlyph { unsigned ord, at; uint32_t u; int bw, bh, cell, ink; std::vector<uint8_t> cov; };
-struct GtCell { int x, y, w, h; uint32_t u; unsigned ord; };
+// tint: 0x01RRGGBB when the texels the glyph was written to carry a colour (the engine tints on the CPU), 0 = unknown / grey-only format
+struct GtCell { int x, y, w, h; uint32_t u; unsigned ord; uint32_t tint = 0; };
 
 struct GlyphTrace {
- struct Q { float x0, y0, x1, y1, u0, v0, u1, v1; };
- struct Pos { uint32_t u; float x, y, w, h; unsigned order; };
+ // col: the quad's vertex colour 0xAARRGGBB when the draw has one (hasCol)
+ struct Q { float x0, y0, x1, y1, u0, v0, u1, v1; uint32_t col = 0xffffffffu; bool hasCol = false; };
+ struct Pos { uint32_t u; float x, y, w, h; unsigned order; uint32_t col = 0; bool hasCol = false; };
  std::function<void(const std::string &)> emit; void (*log)(const char *, ...) = nullptr;
  std::deque<GtGlyph> pending; unsigned ord = 0, traced = 0;
  std::map<void *, std::vector<GtCell>> cells;
  unsigned seq = 0, lineAt = 0, order = 0, lastEmit = 0; bool dirty = false; std::vector<Pos> drawn;
+ uint32_t sentCol = 0; bool sentAny = false, colDirty = false;
 
  static int Pad(int h) { return (std::max)(8, h / 2); }
  void Expire(unsigned now) { while (!pending.empty() && (int)(now - pending.front().at) > 1500) pending.pop_front(); while (pending.size() > 256) pending.pop_front(); }
@@ -60,41 +64,54 @@ struct GlyphTrace {
   if (v.size() >= 8192) v.erase(v.begin()); v.push_back(c); traced++; if (cells.size() > 256) { auto keep = cells[tex]; cells.clear(); cells[tex] = keep; }
  }
  // Best place of glyph g inside the region (rx,ry,rw,rh) of read(x,y) (-1 = unreadable): returns false when not found.
- template <class R> static bool Find(const GtGlyph &g, const R &read, int rx, int ry, int rw, int rh, int &fx, int &fy, const std::vector<GtCell> *taken = nullptr) {
+ /* 2026-11-19 (1.4.17 live, 千恋＊万花: 35 s "not responding" on the title): a search runs on the game thread, so it stops at the
+    deadline of the write that asked for it */
+ typedef std::chrono::steady_clock::time_point Deadline;
+ static bool Late(const Deadline *d) { return d && std::chrono::steady_clock::now() > *d; }
+ template <class R> static bool Find(const GtGlyph &g, const R &read, int rx, int ry, int rw, int rh, int &fx, int &fy, const std::vector<GtCell> *taken = nullptr, const Deadline *deadline = nullptr) {
   auto used = [&](int x, int y) { if (taken) for (const GtCell &c : *taken) if (x < c.x + c.w && c.x < x + g.bw && y < c.y + c.h && c.y < y + g.bh) return true; return false; };
   if (g.bw > rw || g.bh > rh) return false;
   if (g.ink >= 3) {
    int ax = 0, ay = 0, av = -1; for (int y = 0; y < g.bh; y++) for (int x = 0; x < g.bw; x++) if (g.cov[(size_t)y * g.bw + x] > av) { av = g.cov[(size_t)y * g.bw + x]; ax = x; ay = y; }
-   for (int y = ry + ay; y <= ry + rh - g.bh + ay; y++) for (int x = rx + ax; x <= rx + rw - g.bw + ax; x++) {
+   for (int y = ry + ay; y <= ry + rh - g.bh + ay; y++) { if (Late(deadline)) return false; for (int x = rx + ax; x <= rx + rw - g.bw + ax; x++) {
     int t = read(x, y); if (t < 0) return false; if (std::abs(t - av) > 40) continue;
     int ox = x - ax, oy = y - ay; if (used(ox, oy)) continue; long diff = 0; int missing = 0;
     for (int yy = 0; yy < g.bh; yy++) for (int xx = 0; xx < g.bw; xx++) { int a = g.cov[(size_t)yy * g.bw + xx], b = read(ox + xx, oy + yy); if (b < 0) return false; diff += std::abs(a - b); if (a > 96 && b < 32) missing++; }
     if (diff <= 20L * g.bw * g.bh && missing * 10 <= g.ink) { fx = ox; fy = oy; return true; }
-   }
+   } }
    // not there with its ink: the engine may have received the blank of MeguLitFont (whose hook ran after ours)
   }
   // blank glyph with a mark pixel at its top-left (coverage 1..48), nothing else inside its box
   else if (g.cov[0] == 0) return false;
-  for (int y = ry; y <= ry + rh - g.bh; y++) for (int x = rx; x <= rx + rw - g.bw; x++) {
+  for (int y = ry; y <= ry + rh - g.bh; y++) { if (Late(deadline)) return false; for (int x = rx; x <= rx + rw - g.bw; x++) {
    int t = read(x, y); if (t < 0) return false; if (t < 1 || t > 48 || used(x, y)) continue; bool empty = true;
    for (int yy = 0; yy < g.bh && empty; yy++) for (int xx = 0; xx < g.bw; xx++) { if (!xx && !yy) continue; int b = read(x + xx, y + yy); if (b < 0 || b > 2) { empty = false; break; } }
    if (empty) { fx = x; fy = y; return true; }
-  }
+  } }
   return false;
  }
  // 2. Texels (x, y, w, h) of texture tex were written; read(x, y) gives the written coverage (0..255) or -1.
- template <class R> void Write(void *tex, int x, int y, int w, int h, bool whole, const R &read, unsigned now) {
+ // The colour of a glyph where it was written (read / unread tint done on the CPU): the mean of up to 8 texels under the glyph's
+ // strongest coverage, looked up from the glyph's own small bitmap. No search of the written image, a few texel reads per glyph.
+ template <class C> static uint32_t Tint(const GtGlyph &g, const C &rgb, int fx, int fy) {
+  long r = 0, gg = 0, b = 0; int n = 0; size_t total = g.cov.size(), step = total > 4096 ? total / 4096 : 1;
+  for (size_t i = 0; i < total && n < 8; i += step) if (g.cov[i] >= 200) { int c = rgb(fx + (int)(i % g.bw), fy + (int)(i / g.bw)); if (c < 0) return 0; r += (c >> 16) & 255; gg += (c >> 8) & 255; b += c & 255; n++; i += total / 9; }
+  if (n < 2) return 0; return 0x01000000u | ((uint32_t)(r / n) << 16) | ((uint32_t)(gg / n) << 8) | (uint32_t)(b / n);
+ }
+ template <class R> void Write(void *tex, int x, int y, int w, int h, bool whole, const R &read, unsigned now) { Write(tex, x, y, w, h, whole, read, [](int, int) { return -1; }, now); }
+ template <class R, class C> void Write(void *tex, int x, int y, int w, int h, bool whole, const R &read, const C &rgb, unsigned now) {
   Expire(now); if (pending.empty() || w <= 0 || h <= 0) return;
   if (!whole) for (size_t i = 0; i < pending.size(); i++) { const GtGlyph &g = pending[i];
    // one glyph's upload: as big as the glyph's box at least, at most its cell plus a margin
    if (w + 1 < g.bw || h + 1 < g.bh || w > g.cell + Pad(g.cell) || h > g.cell + Pad(g.cell)) continue;
-   GtCell c{ x, y, w, h, g.u, g.ord }; int fx, fy; if (g.ink >= 3 && Find(g, read, x, y, w, h, fx, fy)) c = GtCell{ fx, fy, g.bw, g.bh, g.u, g.ord };
+   GtCell c{ x, y, w, h, g.u, g.ord }; int fx, fy; if (g.ink >= 3 && Find(g, read, x, y, w, h, fx, fy)) { c = GtCell{ fx, fy, g.bw, g.bh, g.u, g.ord }; c.tint = Tint(g, rgb, fx, fy); }
    Keep(tex, c); if (log) log("glyph trace: U+%04X ord=%u -> tex %p texels %d,%d %dx%d (upload)", g.u, g.ord, tex, c.x, c.y, c.w, c.h);
    pending.erase(pending.begin(), pending.begin() + i + 1); return; }
   if ((long long)w * h > 4LL * 1024 * 1024) return;
-  std::vector<GtCell> taken;
-  for (size_t i = 0; i < pending.size();) { const GtGlyph &g = pending[i]; int fx, fy;
-   if (Find(g, read, x, y, w, h, fx, fy, &taken)) { taken.push_back(GtCell{ fx, fy, g.bw, g.bh, g.u, g.ord }); Keep(tex, taken.back()); if (log) log("glyph trace: U+%04X ord=%u -> tex %p texels %d,%d %dx%d (content)", g.u, g.ord, tex, fx, fy, g.bw, g.bh); pending.erase(pending.begin() + i); }
+  /* at most 4 ms of the game thread per write; the glyphs not looked for yet stay pending for the next writes */
+  std::vector<GtCell> taken; const Deadline deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(4);
+  for (size_t i = 0; i < pending.size();) { if (Late(&deadline)) break; const GtGlyph &g = pending[i]; int fx, fy;
+   if (Find(g, read, x, y, w, h, fx, fy, &taken, &deadline)) { taken.push_back(GtCell{ fx, fy, g.bw, g.bh, g.u, g.ord }); if (g.ink >= 3) taken.back().tint = Tint(g, rgb, fx, fy); Keep(tex, taken.back()); if (log) log("glyph trace: U+%04X ord=%u -> tex %p texels %d,%d %dx%d (content)", g.u, g.ord, tex, fx, fy, g.bw, g.bh); pending.erase(pending.begin() + i); }
    else i++; }
  }
  // A copy of texels (sx, sy, w, h) of src to (dx, dy) of dst (UpdateSurface / UpdateTexture / CopySubresourceRegion).
@@ -104,7 +121,7 @@ struct GlyphTrace {
   for (auto &c : add) Keep(dst, c);
  }
  void Line(unsigned s, unsigned now) {
-  seq = s; lineAt = now; drawn.clear(); order = 0; dirty = false;
+  seq = s; lineAt = now; drawn.clear(); order = 0; dirty = false; sentAny = false; colDirty = false;
  }
  void Off() { seq = 0; drawn.clear(); }
  // 3. One draw of quads from texture tex (tw x th); toBack maps a render-target rect to back-buffer pixels (false = not yet).
@@ -116,12 +133,29 @@ struct GlyphTrace {
    if (!hit) continue;
    float r[4] = { (std::min)(d.x0, d.x1), (std::min)(d.y0, d.y1), (std::max)(d.x0, d.x1), (std::max)(d.y0, d.y1) }; if (!toBack(r)) continue;
    float w = r[2] - r[0], h = r[3] - r[1]; if (w < 1 || h < 1) continue;
-   bool dup = false; for (const Pos &p : drawn) if (p.u == hit->u && std::fabs(p.x - r[0]) < h * 0.4f && std::fabs(p.y - r[1]) < h * 0.4f) { dup = true; break; }
+   // what this pass paints the character with: the written tint times the vertex colour (either may be missing). A character is
+   // drawn in several passes (shadow, outline, then the text on top): the last pass is its colour.
+   bool has = hit->tint != 0 || d.hasCol; uint32_t col = 0;
+   if (has) { uint32_t t = hit->tint ? hit->tint & 0xffffff : 0xffffff, v = d.hasCol ? d.col : 0xffffffffu;
+    col = (v & 0xff000000u) | ((((t >> 16) & 255) * ((v >> 16) & 255) / 255) << 16) | ((((t >> 8) & 255) * ((v >> 8) & 255) / 255) << 8) | ((t & 255) * (v & 255) / 255); }
+   bool dup = false; for (Pos &p : drawn) if (p.u == hit->u && std::fabs(p.x - r[0]) < h * 0.4f && std::fabs(p.y - r[1]) < h * 0.4f) { dup = true; if (has && (!p.hasCol || p.col != col)) { p.col = col; p.hasCol = true; colDirty = true; } break; }
    if (dup || drawn.size() >= 400) continue;
-   drawn.push_back(Pos{ hit->u, r[0], r[1], w, h, ++order }); dirty = true;
+   Pos np{ hit->u, r[0], r[1], w, h, ++order }; np.col = col; np.hasCol = has; drawn.push_back(np); dirty = true; if (has) colDirty = true;
   }
  }
+ // The line's colour: the most common one among its characters (4 bits a channel), as the mean of that group.
+ //   ToMe_GLYPHCOL line=<seq> rgb=<rrggbb> a=<aa> n=<characters with that colour> of=<characters with a colour>
+ static uint32_t ColKey(uint32_t c) { return ((c >> 28) & 15) << 12 | ((c >> 20) & 15) << 8 | ((c >> 12) & 15) << 4 | ((c >> 4) & 15); }
+ bool LineColor(uint32_t &out, int &n, int &of) const {
+  std::map<uint32_t, int> count; of = 0; for (const Pos &p : drawn) if (p.hasCol) { of++; count[ColKey(p.col)]++; }
+  if (of < 2) return false; uint32_t key = 0; n = 0; for (auto &c : count) if (c.second > n) { n = c.second; key = c.first; }
+  long a = 0, r = 0, g = 0, b = 0; for (const Pos &p : drawn) if (p.hasCol && ColKey(p.col) == key) { a += p.col >> 24; r += (p.col >> 16) & 255; g += (p.col >> 8) & 255; b += p.col & 255; }
+  out = ((uint32_t)(a / n) << 24) | ((uint32_t)(r / n) << 16) | ((uint32_t)(g / n) << 8) | (uint32_t)(b / n); return n * 2 >= of;
+ }
+ unsigned lastCol = 0;
  void Frame(unsigned now, unsigned bbW, unsigned bbH) {
+  if (colDirty && emit && seq && (int)(now - lastCol) >= 120) { colDirty = false; lastCol = now; uint32_t c; int n, of;
+   if (LineColor(c, n, of) && (!sentAny || c != sentCol)) { sentAny = true; sentCol = c; char b[120]; snprintf(b, sizeof b, "ToMe_GLYPHCOL line=%u rgb=%06x a=%02x n=%d of=%d", seq, c & 0xffffff, c >> 24, n, of); emit(b); } }
   if (!dirty || !emit || (int)(now - lastEmit) < 120) return; dirty = false; lastEmit = now;
   std::string l = "ToMe_GLYPHPOS line=" + std::to_string(seq) + " sw=" + std::to_string(bbW) + " sh=" + std::to_string(bbH) + " n=" + std::to_string(drawn.size()) + " list=";
   for (size_t i = 0; i < drawn.size(); i++) { char b[80]; snprintf(b, sizeof b, "%s%X,%.0f,%.0f,%.0f,%.0f", i ? ";" : "", drawn[i].u, drawn[i].x, drawn[i].y, drawn[i].w, drawn[i].h); l += b; }
@@ -137,6 +171,15 @@ static inline int GtTexel(const unsigned char *row, int x, int fmt) {
   case 28: case 50: return row[x];                                                                  // A8, L8
   case 51: return row[x * 2 + 1];                                                                   // A8L8: alpha
   case 26: return (row[x * 2 + 1] >> 4) * 17;                                                       // A4R4G4B4: alpha
+  default: return -1;
+ }
+}
+// Colour 0xRRGGBB of one texel in the formats that carry one (-1: alpha / luminance only, or another format).
+static inline int GtTexelRgb(const unsigned char *row, int x, int fmt) {
+ switch (fmt) {
+  case 21: case 22: { const unsigned char *p = row + x * 4; return (p[2] << 16) | (p[1] << 8) | p[0]; }  // A8R8G8B8, X8R8G8B8 (memory B G R A)
+  case 32: case 33: { const unsigned char *p = row + x * 4; return (p[0] << 16) | (p[1] << 8) | p[2]; }  // A8B8G8R8, X8B8G8R8
+  case 26: { unsigned v = row[x * 2] | (row[x * 2 + 1] << 8); return (((v >> 8) & 15) * 17 << 16) | (((v >> 4) & 15) * 17 << 8) | ((v & 15) * 17); } // A4R4G4B4
   default: return -1;
  }
 }

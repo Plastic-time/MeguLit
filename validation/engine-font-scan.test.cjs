@@ -58,6 +58,6 @@ test('Ren\'Py: gui.text_font in a loose gui.rpy and in an .rpa archive picks the
 
 test('reader wiring: scan after the folder font scan, scanned hookFont carries family to pick',()=>{
  const src=fs.readFileSync(path.join(root,'services','reader.cjs'),'utf8');
- assert.match(src,/fonts\.detect\(pid\)\.then\(\(\)=>this\.engineFontScan\(pid\)\)/);assert.match(src,/scanned:true/);assert.match(src,/family:message\.family/);
+ /* 2026-11-19: one pass (confirmGameFont) runs the folder scan first, then the engine scan */const pass=src.slice(src.indexOf('async confirmGameFont('),src.indexOf(' probeFonts(){'));assert.ok(pass.indexOf('this.fonts.detect(pid,force)')>=0&&pass.indexOf('this.fonts.detect(pid,force)')<pass.indexOf('this.engineFontScan(pid,{force})'));assert.match(src,/scanned:true/);assert.match(src,/family:message\.family/);
  assert.match(fs.readFileSync(path.join(root,'core','engine-font-scan.cjs'),'utf8'),/new Worker\(__filename/);
 });

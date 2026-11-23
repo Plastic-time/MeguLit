@@ -52,7 +52,7 @@ app calls from Node with no Origin, so no CORS change is needed.
 | GET | `/api/sync/:kind` | `?since=<seq>&limit=` | `{records:[{key,updated_at,deleted,data}],cursor,more}` |
 | PUT | `/api/sync/:kind` | `{records:[{key,updated_at,deleted?,data?}]}` | `{accepted,newer:[server records that won],cursor}` |
 
-Kinds and caps (per account): `words` 8 MB / 32 KB per record, `sentences` 4 MB / 8 KB, `reading` 1 MB / 1 KB,
+Kinds and caps (per account): `words` 8 MB / 32 KB per record, `sentences` 4 MB / 40 KB, `reading` 1 MB / 1 KB,
 `settings` 512 KB / 32 KB. At most 500 records and 2 MB per PUT. Over the cap → `413 SYNC_QUOTA_EXCEEDED`.
 
 Tokens: `mgl_` + 32 random bytes (base64url), stored as sha256. Sliding 180-day expiry. Rotated on use at most once a

@@ -102,3 +102,62 @@ test('different works, Japanese-import sources, hidden cards and rows without id
  assert.equal(active(db).length,6);
  assert.equal(db.prepare('SELECT COUNT(*) n FROM series').get().n,0);
 });
+
+
+test('rescanning a merged installation updates its survivor without new rows or backups', t => {
+ const {root,write,open}=fixture(t),exe=write('Same/Game.exe');
+ let db=open();
+ insert(db,'keep','Same',exe,{key:'same',vndbId:'v9'});
+ insert(db,'duplicate','Same',exe,{key:'same',vndbId:'v9'});
+ db.prepare("INSERT INTO reading_sessions(game_id,started_at,active_seconds) VALUES('keep',1,100)").run();
+ dedupe.dedupe(db,root);
+ const before=fs.readdirSync(path.join(root,'data/backups')).sort();
+ db.close();
+ for(let i=0;i<3;i++)assert.deepEqual(reconcile(root,[{key:'same',dir:path.dirname(exe),exe,title:'Same',source:'folder',vndbId:'v9'}]),{added:0,updated:1});
+ db=open();
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM games').get().n,2);
+ assert.equal(active(db)[0].id,'keep');
+ assert.deepEqual(fs.readdirSync(path.join(root,'data/backups')).sort(),before);
+});
+
+test('merging saved scenes preserves shared files, colliding names, and rollback source bytes', t => {
+ const {root,write,open}=fixture(t),exe=write('Same/Game.exe');
+ const scenes=require('../services/sentence-scenes.cjs');
+ const db=open();
+ insert(db,'keep','Same',exe,{key:'same',vndbId:'v9'});
+ insert(db,'duplicate','Same',exe,{key:'same',vndbId:'v9'});
+ db.prepare("INSERT INTO reading_sessions(game_id,started_at,active_seconds) VALUES('keep',1,100)").run();
+ const scene={file:'a5a5a5a5a5a5a5a5-1700000000000.jpg',hash:'a5a5a5a5a5a5a5a5',at:1700000000000};
+ for(const [id,bytes] of [['keep','keep-picture'],['duplicate','duplicate-picture']]){
+  fs.mkdirSync(scenes.dirOf(root,id),{recursive:true});
+  fs.writeFileSync(path.join(scenes.dirOf(root,id),scene.file),bytes);
+ }
+ const add=(id,text)=>Number(db.prepare('INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES(?,?,1,?)').run(id,text,JSON.stringify({scene,note:'preserved'})).lastInsertRowid);
+ const own=add('keep','own'),a=add('duplicate','first'),b=add('duplicate','second');
+ const unique={...scene,file:scene.hash+'-1700000000001.jpg',at:1700000000001};
+ fs.writeFileSync(path.join(scenes.dirOf(root,'duplicate'),unique.file),'unique-picture');
+ const c=Number(db.prepare("INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES('duplicate','unique',1,?)").run(JSON.stringify({scene:unique})).lastInsertRowid);
+ dedupe.dedupe(db,root);
+ const row=id=>db.prepare('SELECT game_id,original FROM saved_sentences WHERE id=?').get(id);
+ const picture=id=>{const r=row(id);return Buffer.from(scenes.read(root,r.game_id,JSON.parse(r.original).scene.file).data,'base64').toString();};
+ assert.equal(picture(c),'unique-picture');
+ assert.equal(picture(a),'duplicate-picture');assert.equal(picture(b),'duplicate-picture');assert.equal(picture(own),'keep-picture');
+ assert.equal(JSON.parse(row(a).original).scene.file,JSON.parse(row(b).original).scene.file);
+ assert.equal(JSON.parse(row(a).original).note,'preserved');
+ assert.equal(Buffer.from(scenes.read(root,'duplicate',scene.file).data,'base64').toString(),'duplicate-picture');
+ assert.equal(dedupe.dedupe(db,root).merged.length,0);
+});
+
+test('a scene copy failure leaves game and sentence identities unchanged', t => {
+ const {root,write,open}=fixture(t),exe=write('Same/Game.exe'),db=open();
+ const scenes=require('../services/sentence-scenes.cjs');
+ insert(db,'keep','Same',exe,{key:'same',vndbId:'v9'});insert(db,'duplicate','Same',exe,{key:'same',vndbId:'v9'});
+ db.prepare("INSERT INTO reading_sessions(game_id,started_at,active_seconds) VALUES('keep',1,100)").run();
+ const scene={file:'a5a5a5a5a5a5a5a5-1700000000000.jpg',hash:'a5a5a5a5a5a5a5a5',at:1700000000000};
+ fs.mkdirSync(scenes.dirOf(root,'duplicate'),{recursive:true});fs.writeFileSync(path.join(scenes.dirOf(root,'duplicate'),scene.file),'picture');
+ fs.writeFileSync(scenes.dirOf(root,'keep'),'blocks-directory');
+ db.prepare("INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES('duplicate','line',1,?)").run(JSON.stringify({scene}));
+ assert.throws(()=>dedupe.dedupe(db,root));
+ assert.equal(active(db).length,2);
+ assert.equal(db.prepare('SELECT game_id FROM saved_sentences').get().game_id,'duplicate');
+});

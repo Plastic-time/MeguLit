@@ -136,7 +136,7 @@
    const mask=names.some(x=>/^gal(Mask|Scan|Blur|Fast|Hook|HideWait|RelocateWait|WaitCover)/.test(x))||n.hasAttribute('data-gal-hook-options')||n.classList.contains('tomoyo-mask-state')||(n.tagName==='SMALL'&&/遮罩|局部模糊|扫描/.test(n.textContent));
    if(mask){panels.mask.append(n);continue;}
    if(n.classList.contains('tome-game-style-sync')){calibration.prepend(n);continue;}
-   const pos=names.some(x=>/^gal(X|Y|Width|Height|Preset|Game|LivePosition)$/.test(x))||['bind','unbind','refresh','drag'].some(k=>n.hasAttribute('data-gal-'+k))||n.classList.contains('tome-position-sync')||n.classList.contains('tomoyo-gal-state');
+   const pos=names.some(x=>/^gal(X|Y|Width|Height|Preset|Game|LivePosition)$/.test(x))||['bind','unbind','refresh','drag'].some(k=>n.hasAttribute('data-gal-'+k))||!!n.querySelector('[data-gal-drag]')||n.classList.contains('tome-position-sync')||n.classList.contains('tomoyo-gal-state');
    if(n.hasAttribute('data-gal-window-bind')||n.classList.contains('tomoyo-gal-state')||n.hasAttribute('data-gal-bind-hint')){windowBind.append(n);continue;}
    if(pos){if(names.includes('galPreset'))position.prepend(n);else position.append(n);continue;}
    if(n.classList.contains('tomoyo-gal-spacing')){unwrap(n,spacing);continue;}
@@ -153,6 +153,68 @@
   }
   const uiLang=document.documentElement.lang.slice(0,2),colourTitles={en:['Read / unread','Selected / unselected'],ja:['既読・未読','選択済み・未選択']}[uiLang];
   if(colourTitles)for(const [i,section] of [colours,choiceColours].entries()){const summary=section.querySelector('summary');summary.dataset.noI18n='';summary.textContent=colourTitles[i];}
+  /* 颜色 page (user 2026-11-21: 「重灾区」): no folds; two flat sections, each one compact matrix. Columns are the two states,
+     rows are 文字颜色 / 渐变 / 上色 / 下色 / 起点 %. The same inputs (same names, same handlers) are moved into the cells; a colour
+     cell is a small swatch whose value is its tooltip; rows of a column whose gradient is off are dimmed. */
+  {const copy={zh:{dlg:'台词（已读 / 未读）',chc:'选项（已选 / 未选）',unread:'未读',read:'已读',unsel:'未选',sel:'已选',colour:'文字颜色',grad:'渐变',top:'上色',bottom:'下色',start:'起点 %'},
+    en:{dlg:'Lines (read / unread)',chc:'Choices (selected / unselected)',unread:'Unread',read:'Read',unsel:'Unselected',sel:'Selected',colour:'Text colour',grad:'Gradient',top:'Top',bottom:'Bottom',start:'Start %'},
+    ja:{dlg:'台詞（既読・未読）',chc:'選択肢（選択済み・未選択）',unread:'未読',read:'既読',unsel:'未選択',sel:'選択済み',colour:'文字色',grad:'グラデーション',top:'上の色',bottom:'下の色',start:'開始 %'}};
+   const C=copy[uiLang]||copy.zh;
+   const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null){e.textContent=text;e.dataset.noI18n='';}return e;};
+   /* the text panel is not inside the form yet when this runs: look the inputs up in the sections themselves */
+   const field=name=>palette.querySelector('[name='+name+']')||colours.querySelector('[name='+name+']');
+   /* the whole original label goes into the cell (its colour field, toggle look and handlers come along); only its caption text is hidden */
+   const cellOf=input=>{if(!input)return null;const l=input.closest('label');if(!l)return input;for(const n of [...l.childNodes])if(n.nodeType===3&&n.textContent.trim()){const cap=el('span','tome-cm-cap');cap.textContent=n.textContent;n.replaceWith(cap);}l.classList.add('tome-cm-control');return l;};
+   const swatch=cellOf;
+   const block=(title,cols)=>{const box=el('div','tome-cm');const head=el('div','tome-cm-head');head.append(el('h4','tome-cm-title',title));box.append(head);
+    const grid=el('div','tome-cm-grid');grid.append(el('span','tome-cm-corner'));for(const c of cols)grid.append(el('span','tome-cm-col',c));box.append(grid);return {box,head,grid};};
+   const row=(grid,label,inputs,key)=>{const l=el('span','tome-cm-label',label);l.dataset.cmRow=key;grid.append(l);inputs.forEach((input,i)=>{const cell=el('span','tome-cm-cell');cell.dataset.cmRow=key;cell.dataset.cmCol=String(i);if(input)cell.append(input);grid.append(cell);});};
+   /* 台词 */
+   const d=block(C.dlg,[C.unread,C.read]);
+   row(d.grid,C.colour,[swatch(field('galTextColor')),swatch(field('galReadTextColor'))],'colour');
+   row(d.grid,C.grad,[field('galTextGradient'),field('galReadTextGradient')],'grad');
+   row(d.grid,C.top,[swatch(field('galTextGradientTop')),swatch(field('galReadTextGradientTop'))],'g');
+   row(d.grid,C.bottom,[swatch(field('galTextGradientBottom')),swatch(field('galReadTextGradientBottom'))],'g');
+   /* 起点 %: another module turns the number into a slider with its own number box; it is kept short */
+   const startCell=name=>cellOf(field(name));
+   row(d.grid,C.start,[startCell('galTextGradientStart'),startCell('galReadTextGradientStart')],'g');
+   const undo=d.grid.querySelector('[data-gal-color-undo]')||colours.querySelector('[data-gal-color-undo]');if(undo){undo.classList.add('tome-cm-link');d.head.append(undo);}
+   /* what is left of the old fold (the hidden 文字阴影 select and the emptied labels) stays in the form, out of sight */
+   const rest=el('div','tome-cm-rest');for(const n of [...colours.children])if(n.tagName!=='SUMMARY')rest.append(n);rest.hidden=true;
+   /* 选项 */
+   const choiceBox=choiceColours.querySelector('[data-megulit-choice-fields]');const c=block(C.chc,[C.unsel,C.sel]);
+   if(choiceBox){const font=choiceBox.querySelector('[name=galChoiceFont]')?.closest('label');
+    const pick=state=>cellOf(choiceBox.querySelector('[name=galChoice'+state+'Color]'));
+    row(c.grid,C.colour,[pick('Unselected'),pick('Selected')],'colour');
+    const reset=[...choiceBox.querySelectorAll(':scope>button')].pop();if(reset){reset.classList.add('tome-cm-link');c.head.append(reset);}
+    if(font){font.classList.add('tome-cm-font');c.box.insertBefore(font,c.grid);}choiceBox.append(c.box);}
+   /* flat: the two old folds go, their contents sit straight in the colour page */
+   palette.append(d.box,rest);palette.append(choiceBox||c.box);colours.remove();choiceColours.remove();palette.dataset.colourMatrix='';
+   const dim=()=>{for(const [i,name] of ['galTextGradient','galReadTextGradient'].entries()){const on=!!field(name)?.checked;for(const cell of d.grid.querySelectorAll('.tome-cm-cell[data-cm-row=g][data-cm-col="'+i+'"]'))cell.classList.toggle('tome-cm-off',!on);}
+    for(const cell of palette.querySelectorAll('.tome-cm-cell')){const v=cell.querySelector('input[type=color]');if(v)cell.title=v.value;}};
+   form.addEventListener('input',dim);form.addEventListener('change',dim);dim();const tick=setInterval(()=>{if(!document.contains(palette)){clearInterval(tick);return;}dim();},500);
+   const css=document.createElement('style');css.textContent=`
+ .tome-cm{margin:4px 0 14px}
+ .tome-cm-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 6px}
+ .tome-cm-title{margin:0;font-size:13px;font-weight:700;white-space:nowrap}
+ .tome-cm-link:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){background:none!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;min-height:0!important;height:auto!important;width:auto!important;font-size:12px!important;color:var(--menu-accent,#e0495a)!important;cursor:pointer;white-space:nowrap}
+ .tome-cm-link:disabled{opacity:.45;cursor:default}
+ .tome-cm-grid{display:grid;grid-template-columns:max-content repeat(2,minmax(56px,1fr));align-items:center;gap:6px 14px}
+ .tome-cm-col{font-size:12px;opacity:.7;white-space:nowrap;text-align:center}
+ .tome-cm-label{font-size:13px;white-space:nowrap}
+ .tome-cm-cell{display:flex;justify-content:center;align-items:center;min-height:28px;transition:opacity .15s}
+ .tome-cm-cell.tome-cm-off{opacity:.35}
+ .tome-cm-cell input[type=number]:not(#q1):not(#q2):not(#q3){width:64px!important;min-width:0!important;text-align:center}
+ .tome-cm-cap{display:none!important}
+ .tome-cm-cell input[type=range]:not(#q1):not(#q2):not(#q3):not(#q4){width:72px!important;min-width:0!important;flex:0 0 72px!important}
+ label.tome-cm-control:has(input[type=range]){gap:6px!important}
+ label.tome-cm-control:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:flex!important;justify-content:center;align-items:center;gap:0!important;margin:0!important;padding:0!important;min-height:0!important;width:auto!important;border:0!important;background:none!important}
+ .tome-cm-cell .tome-color-text,.tome-cm-cell .tome-color-copy{display:none!important}
+ .tome-cm-cell .tome-color-field{display:inline-flex!important;width:auto!important;min-width:0!important;padding:0!important;border:0!important;background:none!important}
+ .tome-cm-cell .tome-color-swatch:not(#q1):not(#q2):not(#q3):not(#q4){width:40px!important;height:24px!important;min-width:0!important;border-radius:6px!important}
+ .tome-cm-font{display:flex;align-items:center;gap:10px;white-space:nowrap;margin:0 0 8px}
+`;(document.head||document.documentElement).append(css);}
+
   // Each size goes into its own language group, right under that language's font.
   const placeSize=(name,host,font)=>{for(const n of sizes){const field=n.querySelector('[name='+name+']');if(!field)continue;const label=field.closest('label');const anchor=host.querySelector('[name='+font+']')?.closest('label');if(anchor)anchor.after(label);else host.prepend(label);}};
   placeSize('galJapaneseSize',jp,'galJapaneseFont');placeSize('galChineseSize',cn,'galChineseFont');for(const n of sizes)if(!n.querySelector('[name]'))n.remove();
@@ -236,7 +298,7 @@
   const scan=[...panel.querySelectorAll(':scope>details')].find(d=>d!==diag);
   // Immersion mode sits in the embed tab right below the click-wait icon card (user, 2026-11-03), as a card of its own.
   const imm=q(':scope>.tomoyo-v4-immersion');if(imm&&!imm.classList.contains('tome-mask-card'))imm.classList.add('tome-mask-card');
-  const order=[hide,wait,imm,scan,diag].filter(Boolean),kids=[...panel.children].filter(n=>order.includes(n));
+  /* owner 2026-11-20: the hiding card sits low, just above the picture-recognition (scan) group */const order=[hide,wait,imm,scan,diag].filter(Boolean),kids=[...panel.children].filter(n=>order.includes(n));
   if(kids.length!==order.length||kids.some((n,i)=>n!==order[i]))for(const n of order)panel.append(n);
  }
  // Opening animation, and a short fold-away for closing (settings.js hands the closed dialog to menuLeave).

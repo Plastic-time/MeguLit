@@ -66,7 +66,8 @@ test('rule 1: public build is off until agreed, beta only after the note, settin
  let c=contrib.consentState(u.root,{version:'1.4.9'});assert.deepEqual([c.enabled,c.ask,c.notice],[false,true,false],'public: off and the card asks');
  c=contrib.consentState(u.root,{version:'1.4.9-beta.44'});assert.deepEqual([c.enabled,c.ask,c.notice],[false,false,true],'beta: off until the note was shown');
  contrib.noticeSeen(u.root);c=contrib.consentState(u.root,{version:'1.4.9-beta.44'});assert.equal(c.enabled,true,'beta: on after the note');
- assert.equal(contrib.consentState(u.root,{version:'1.4.9'}).enabled,false,'the beta note never counts for a public build');
+ c=contrib.consentState(u.root,{version:'1.4.9'});assert.deepEqual([c.enabled,c.decided,c.ask],[true,true,false],'beta noticed → public build never asks again');
+ assert.equal(JSON.parse(fs.readFileSync(path.join(u.root,'data','config','library.json'),'utf8')).adapterContrib,true,'migration written to library.json');
  contrib.setConsent(u.root,true,{source:'card'});c=contrib.consentState(u.root,{version:'1.4.9'});assert.deepEqual([c.enabled,c.decided,c.ask],[true,true,false]);
  contrib.setConsent(u.root,false);assert.equal(contrib.consentState(u.root,{version:'1.4.9-beta.1'}).enabled,false,'an explicit no holds in beta too');
  /* Settings: an untouched switch never decides; a change does */
@@ -193,4 +194,13 @@ test('probe-auto: with consent the problem game is contributed once; switch off 
  const o=await auto.run(v.root,v.db,{wait:async()=>{},probeFirst:false,fetcher:g,endpoint:'https://relay.test/api/probe',hasEndpoint:'https://relay.test/api/probe/has',sampler:async()=>({samples:[],keys:[]})});
  assert.deepEqual(o.contrib||{},{});assert.equal(seen.filter(u=>u.includes('/api/contrib/')).length,0,'off: no contribution request');
  assert.equal(await contrib.forGame(v.root,v.db,v.game,v.result,{fetcher:g}),'off');
+});
+
+test('rule 1: agreeing on a public build survives upgrades; an explicit no is never asked again',()=>{
+ const a=setup('megulit-ct-upg-',{consent:null});contrib.setConsent(a.root,true,{source:'card'});
+ for(const v of ['1.4.15','1.4.16-beta.1','1.4.16','1.5.0'])assert.equal(contrib.consentState(a.root,{version:v}).ask,false,'agreed: '+v);
+ const b=setup('megulit-ct-no-',{consent:null});contrib.setConsent(b.root,false,{source:'card'});
+ for(const v of ['1.4.15','1.4.16'])assert.deepEqual([contrib.consentState(b.root,{version:v}).ask,contrib.consentState(b.root,{version:v}).enabled],[false,false],'declined: '+v);
+ const c=setup('megulit-ct-later-',{consent:null});
+ for(let i=0;i<3;i++)assert.equal(contrib.consentState(c.root,{version:'1.4.15'}).ask,true,'稍后 / undecided: asked each start');
 });

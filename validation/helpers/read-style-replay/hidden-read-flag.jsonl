@@ -1,0 +1,90 @@
+{"t":"meta","engine":"krkr-textrender","kind":"synthetic","about":"hidden dialogue follows the game's read flag with the colours sampled while the game still drew"}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（1）"}
+{"t":"drawn","text":"静かな朝の光が部屋に差し込んでいた。（1）","color":"#eedefe"}
+{"t":"expect","color":"#eedefe","edge":null,"line":1}
+{"t":"status","hookSourceRead":true,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":2,"note":"flag after the colour: same paint, now remembered under its state"}
+{"t":"status","text":"「おはよう、今日は早いんだね」（2）"}
+{"t":"drawn","text":"「おはよう、今日は早いんだね」（2）","color":"#eedefe"}
+{"t":"expect","color":"#eedefe","edge":null,"line":3}
+{"t":"status","hookSourceRead":true,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":4,"note":"flag after the colour: same paint, now remembered under its state"}
+{"t":"status","text":"彼女は窓の外を見つめたまま答えない。（3）"}
+{"t":"drawn","text":"彼女は窓の外を見つめたまま答えない。（3）","color":"#eedefe"}
+{"t":"expect","color":"#eedefe","edge":null,"line":5}
+{"t":"status","hookSourceRead":true,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":6,"note":"flag after the colour: same paint, now remembered under its state"}
+{"t":"status","text":"「……昨日のこと、覚えてる？」（4）"}
+{"t":"drawn","text":"「……昨日のこと、覚えてる？」（4）","color":"#eedefe"}
+{"t":"expect","color":"#eedefe","edge":null,"line":7}
+{"t":"status","hookSourceRead":true,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":8,"note":"flag after the colour: same paint, now remembered under its state"}
+{"t":"status","text":"俺は言葉に詰まって視線を落とした。（5）"}
+{"t":"drawn","text":"俺は言葉に詰まって視線を落とした。（5）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":9}
+{"t":"status","hookSourceRead":false,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":10,"note":"flag after the colour: same paint, now remembered under its state"}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（6）"}
+{"t":"drawn","text":"静かな朝の光が部屋に差し込んでいた。（6）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":11}
+{"t":"status","hookSourceRead":false,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":12,"note":"flag after the colour: same paint, now remembered under its state"}
+{"t":"status","text":"「おはよう、今日は早いんだね」（7）"}
+{"t":"drawn","text":"「おはよう、今日は早いんだね」（7）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":13}
+{"t":"status","hookSourceRead":false,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":14,"note":"flag after the colour: same paint, now remembered under its state"}
+{"t":"status","text":"彼女は窓の外を見つめたまま答えない。（8）"}
+{"t":"drawn","text":"彼女は窓の外を見つめたまま答えない。（8）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":15}
+{"t":"status","hookSourceRead":false,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":16,"note":"flag after the colour: same paint, now remembered under its state"}
+{"t":"note","text":"hide mode from here: lines are written back hidden, the text renderer draws nothing"}
+{"t":"status","text":"「……昨日のこと、覚えてる？」（9）"}
+{"t":"expect","color":null,"edge":null,"line":17,"note":"state not known yet: nothing carried over from the previous sentence"}
+{"t":"status","hookSourceRead":true,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":18}
+{"t":"status","text":"俺は言葉に詰まって視線を落とした。（10）"}
+{"t":"expect","color":null,"edge":null,"line":19,"note":"state not known yet: nothing carried over from the previous sentence"}
+{"t":"status","hookSourceRead":true,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":20}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（11）"}
+{"t":"expect","color":null,"edge":null,"line":21,"note":"state not known yet: nothing carried over from the previous sentence"}
+{"t":"status","hookSourceRead":true,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":22}
+{"t":"status","text":"「おはよう、今日は早いんだね」（12）"}
+{"t":"expect","color":null,"edge":null,"line":23,"note":"state not known yet: nothing carried over from the previous sentence"}
+{"t":"status","hookSourceRead":true,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":24}
+{"t":"status","text":"彼女は窓の外を見つめたまま答えない。（13）"}
+{"t":"expect","color":null,"edge":null,"line":25,"note":"state not known yet: nothing carried over from the previous sentence"}
+{"t":"status","hookSourceRead":true,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":26}
+{"t":"status","text":"「……昨日のこと、覚えてる？」（14）"}
+{"t":"expect","color":null,"edge":null,"line":27,"note":"state not known yet: nothing carried over from the previous sentence"}
+{"t":"status","hookSourceRead":false,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":28}
+{"t":"status","text":"俺は言葉に詰まって視線を落とした。（15）"}
+{"t":"expect","color":null,"edge":null,"line":29,"note":"state not known yet: nothing carried over from the previous sentence"}
+{"t":"status","hookSourceRead":false,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":30}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（16）"}
+{"t":"expect","color":null,"edge":null,"line":31,"note":"state not known yet: nothing carried over from the previous sentence"}
+{"t":"status","hookSourceRead":false,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":32}
+{"t":"status","text":"「おはよう、今日は早いんだね」（17）"}
+{"t":"expect","color":null,"edge":null,"line":33,"note":"state not known yet: nothing carried over from the previous sentence"}
+{"t":"status","hookSourceRead":true,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":34}
+{"t":"status","text":"彼女は窓の外を見つめたまま答えない。（18）"}
+{"t":"expect","color":null,"edge":null,"line":35,"note":"state not known yet: nothing carried over from the previous sentence"}
+{"t":"status","hookSourceRead":true,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":36}
+{"t":"status","text":"「……昨日のこと、覚えてる？」（19）"}
+{"t":"expect","color":null,"edge":null,"line":37,"note":"state not known yet: nothing carried over from the previous sentence"}
+{"t":"status","hookSourceRead":false,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":38}
+{"t":"status","text":"俺は言葉に詰まって視線を落とした。（20）"}
+{"t":"expect","color":null,"edge":null,"line":39,"note":"state not known yet: nothing carried over from the previous sentence"}
+{"t":"status","hookSourceRead":false,"hookSourceReadOrigin":"engine"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":40}

@@ -19,5 +19,5 @@ test('runtime mirror template: dl.megulit.com gets tag and file, GitHub proxies 
  assert.equal(mirrorUrl('https://dl.megulit.com/files/{tag}/{file}',u),'https://dl.megulit.com/files/runtime-v1.0.0/MeguLit-runtime-voice-v1.0.0.zip');
  assert.equal(mirrorUrl('https://gh-proxy.com/{url}',u),'https://gh-proxy.com/'+u);
  const manifest=JSON.parse(fs.readFileSync(path.join(__dirname,'..','setup','runtime.json'),'utf8').replace(/^﻿/,''));
- assert.equal(manifest.mirrors[0],'https://dl.megulit.com/files/{tag}/{file}');
+ assert.ok(manifest.mirrors.some(m=>(m.url||m)==='https://dl.megulit.com/files/{tag}/{file}'),'R2 mirror listed');
 });

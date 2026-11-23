@@ -26,12 +26,21 @@
                                          ]
                             },
                   "archives":  {"size":  9767775, "unpacked":  33133381, "sha256":  "C0E64B881F967E0A1473127B1D181C0808068A47E99D8B5F1FBE2D99A6B2ED53", "onDemand":  true, "dest":  "runtime/garbro", "license":  "GARbro 1.5.44 (morkt, MIT)", "urls":  ["https://github.com/morkt/GARbro/releases/download/v1.5.44/GARbro-v1.5.44.2904.rar"]},
-                  "runtime-dump":  {"size":224916,"unpacked":448585,"sha256":"B732652EEC2018D8D2504643ED65B78880F7B8B2231548F1474135D49612343F","onDemand":true,"hidden":true,"dest":"runtime/runtime-dump","files":["MeguLitDump32.dll","MeguLitDump64.dll","pack.json"],"license":"MeguLit (GPL-3.0-or-later), MinHook (BSD-2-Clause)","urls":["https://github.com/ilynthn/MeguLit/releases/download/runtime-dump-v1.0.0/MeguLit-runtime-dump-v1.0.0.zip"]}
+                  "runtime-dump":  {"size":408067,"contract":3,"unpacked":833098,"sha256":"4FE09696313DD6481FB5601AAB4A6E5DE9C530D8F1006D0956DFF14F4BB93F7B","onDemand":true,"hidden":true,"dest":"runtime/runtime-dump","files":["MeguLitDump32.dll","MeguLitDump64.dll","pack.json"],"license":"MeguLit (GPL-3.0-or-later), MinHook (BSD-2-Clause)","urls":["https://github.com/ilynthn/MeguLit/releases/download/runtime-dump-v1.0.1/MeguLit-runtime-dump-v1.0.1.zip"]}
               },
     "mirrors":  [
-                    "https://dl.megulit.com/files/{tag}/{file}",
-                    "https://cn-dl.megulit.com/files/{tag}/{file}",
-                    "https://gh-proxy.com/{url}",
-                    "https://ghproxy.net/{url}"
+                    {"url": "https://cn-dl.megulit.com/files/{tag}/{file}", "own": true, "cn": 0, "world": 2, "trust": true},
+                    {"url": "https://dl.megulit.com/files/{tag}/{file}", "own": true, "cn": 1, "world": 1, "trust": true},
+                    {"url": "https://modelscope.cn/models/<ns>/MeguLit-runtime/resolve/master/{tag}/{file}", "own": true, "cn": 0, "world": 4, "trust": true, "off": true},
+                    {"url": "https://hf-mirror.com/<ns>/MeguLit-runtime/resolve/main/{tag}/{file}", "own": true, "cn": 2, "world": 9, "max": 4, "off": true},
+                    {"url": "https://huggingface.co/<ns>/MeguLit-runtime/resolve/main/{tag}/{file}", "own": true, "cn": 8, "world": 1, "trust": true, "off": true},
+                    {"url": "https://gh.monlor.com/{url}", "cn": 3, "world": 6, "max": 4},
+                    {"url": "https://gh-proxy.com/{url}", "cn": 3, "world": 6, "max": 4},
+                    {"url": "https://edgeone.gh-proxy.com/{url}", "cn": 3, "world": 6, "max": 4},
+                    {"url": "https://fastgit.cc/{url}", "cn": 3, "world": 6, "max": 4},
+                    {"url": "https://cdn.gh-proxy.com/{url}", "cn": 4, "world": 7, "max": 4},
+                    {"url": "https://gh.idayer.com/{url}", "cn": 4, "world": 7, "max": 4},
+                    {"url": "https://ghfast.top/{url}", "cn": 5, "world": 8, "max": 2},
+                    {"url": "{url}", "cn": 9, "world": 0, "trust": true}
                 ]
 }

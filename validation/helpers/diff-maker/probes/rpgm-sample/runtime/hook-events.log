@@ -1,0 +1,46 @@
+2026-11-21T10:00:00.500Z ToMe_CHARS engine=rpgm line=1 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=6 rects=300,383,26,30;326,383,26,30;352,383,26,30;378,383,26,30;404,383,26,30;430,383,26,30 role=menu id=title:0 box=288,380,240,36 sel=1 text=ニューゲーム
+2026-11-21T10:00:00.500Z ToMe_CHARS engine=rpgm line=2 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=7 rects=300,419,26,30;326,419,26,30;352,419,26,30;378,419,26,30;404,419,26,30;430,419,26,30;456,419,26,30 role=menu id=title:1 box=288,416,240,36 sel=0 text=コンティニュー
+2026-11-21T10:00:00.500Z ToMe_CHARS engine=rpgm line=3 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=5 rects=300,455,26,30;326,455,26,30;352,455,26,30;378,455,26,30;404,455,26,30 role=menu id=title:2 box=288,452,240,36 sel=0 text=オプション
+2026-11-21T10:00:01.400Z ToMe_CHARS engine=rpgm line=4 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=14 rects=20,470,26,30;46,470,26,30;72,470,26,30;98,470,26,30;124,470,26,30;150,470,26,30;176,470,26,30;202,470,26,30;228,470,26,30;254,470,26,30;280,470,26,30;306,470,26,30;332,470,26,30;358,470,26,30 emb=1 text=むかしむかし、ある小さな村に
+2026-11-21T10:00:01.400Z source chars=14 sequence=1
+2026-11-21T10:00:02.360Z ToMe_CHARS engine=rpgm line=5 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=13 rects=20,470,26,30;46,470,26,30;72,470,26,30;98,470,26,30;124,470,26,30;150,470,26,30;176,470,26,30;202,470,26,30;228,470,26,30;254,470,26,30;280,470,26,30;306,470,26,30;332,470,26,30 emb=1 text=ひとりの旅人がやってきた。
+2026-11-21T10:00:02.360Z source chars=13 sequence=2
+2026-11-21T10:00:02.720Z ToMe_CHARS engine=rpgm line=6 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=6 rects=12,3,26,30;38,3,26,30;64,3,26,30;90,3,26,30;116,3,26,30;142,3,26,30 role=system id=mapname box=0,0,360,36 text=はじまりの村
+2026-11-21T10:00:03.620Z ToMe_CHARS engine=rpgm line=7 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=2 rects=24,424,26,30;50,424,26,30 role=name id=namebox box=20,420,160,36 text=村長
+2026-11-21T10:00:03.620Z ToMe_CHARS engine=rpgm line=8 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=11 rects=20,470,26,30;46,470,26,30;72,470,26,30;98,470,26,30;124,470,26,30;150,470,26,30;176,470,26,30;202,470,26,30;228,470,26,30;254,470,26,30;280,470,26,30 emb=1 text=よく来たな、旅の者よ。
+2026-11-21T10:00:03.620Z source chars=11 sequence=3
+2026-11-21T10:00:04.580Z ToMe_CHARS engine=rpgm line=9 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=2 rects=24,424,26,30;50,424,26,30 role=name id=namebox box=20,420,160,36 text=村長
+2026-11-21T10:00:04.580Z ToMe_CHARS engine=rpgm line=10 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=16 rects=20,470,26,30;46,470,26,30;72,470,26,30;98,470,26,30;124,470,26,30;150,470,26,30;176,470,26,30;202,470,26,30;228,470,26,30;254,470,26,30;280,470,26,30;306,470,26,30;332,470,26,30;358,470,26,30;384,470,26,30;410,470,26,30 emb=1 text=この村は小さいが、良いところだ。
+2026-11-21T10:00:04.580Z source chars=16 sequence=4
+2026-11-21T10:00:05.540Z ToMe_CHARS engine=rpgm line=11 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=2 rects=24,424,26,30;50,424,26,30 role=name id=namebox box=20,420,160,36 text=村長
+2026-11-21T10:00:05.540Z ToMe_CHARS engine=rpgm line=12 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=14 rects=20,470,26,30;46,470,26,30;72,470,26,30;98,470,26,30;124,470,26,30;150,470,26,30;176,470,26,30;202,470,26,30;228,470,26,30;254,470,26,30;280,470,26,30;306,470,26,30;332,470,26,30;358,470,26,30 emb=1 text=ひとつ頼みを聞いてくれんか？
+2026-11-21T10:00:05.540Z source chars=14 sequence=5
+2026-11-21T10:00:06.100Z ToMe_CHARS engine=rpgm line=13 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=5 rects=532,303,26,30;558,303,26,30;584,303,26,30;610,303,26,30;636,303,26,30 role=choice id=choice:0 box=520,300,240,36 sel=1 text=引き受ける
+2026-11-21T10:00:06.100Z ToMe_CHARS engine=rpgm line=14 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=2 rects=532,339,26,30;558,339,26,30 role=choice id=choice:1 box=520,336,240,36 sel=0 text=断る
+2026-11-21T10:00:06.100Z choice options filtered 2 -> 2
+2026-11-21T10:00:07.000Z ToMe_CHARS engine=rpgm line=15 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=2 rects=24,424,26,30;50,424,26,30 role=name id=namebox box=20,420,160,36 text=村長
+2026-11-21T10:00:07.000Z ToMe_CHARS engine=rpgm line=16 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=18 rects=20,470,26,30;46,470,26,30;72,470,26,30;98,470,26,30;124,470,26,30;150,470,26,30;176,470,26,30;202,470,26,30;228,470,26,30;254,470,26,30;280,470,26,30;306,470,26,30;332,470,26,30;358,470,26,30;384,470,26,30;410,470,26,30;436,470,26,30;462,470,26,30 emb=1 text=ありがたい！　北の森へ向かってくれ。
+2026-11-21T10:00:07.000Z source chars=18 sequence=6
+2026-11-21T10:00:07.560Z ToMe_CHARS engine=rpgm line=17 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=4 rects=12,75,26,30;38,75,26,30;64,75,26,30;90,75,26,30 role=menu id=shopcmd:0 box=0,72,240,36 sel=1 text=購入する
+2026-11-21T10:00:07.560Z ToMe_CHARS engine=rpgm line=18 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=4 rects=12,111,26,30;38,111,26,30;64,111,26,30;90,111,26,30 role=menu id=shopcmd:1 box=0,108,240,36 sel=0 text=売却する
+2026-11-21T10:00:07.560Z ToMe_CHARS engine=rpgm line=19 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=3 rects=12,147,26,30;38,147,26,30;64,147,26,30 role=menu id=shopcmd:2 box=0,144,240,36 sel=0 text=やめる
+2026-11-21T10:00:07.560Z ToMe_CHARS engine=rpgm line=20 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=5 rects=640,75,26,30;666,75,26,30;692,75,26,30;718,75,26,30;744,75,26,30 role=system id=gold box=600,72,200,36 text=120 G
+2026-11-21T10:00:08.060Z ToMe_CHARS engine=rpgm line=21 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=0 rects= role=menu id=shopbuy:0 box=0,144,240,36 sel=0 text=ポーション
+2026-11-21T10:00:08.060Z ToMe_CHARS engine=rpgm line=22 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=0 rects= role=menu id=shopbuy:1 box=0,180,240,36 sel=1 text=薬草
+2026-11-21T10:00:08.060Z ToMe_CHARS engine=rpgm line=23 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=0 rects= role=menu id=shopbuy:2 box=0,216,240,36 sel=0 text=毒消し
+2026-11-21T10:00:08.060Z ToMe_CHARS engine=rpgm line=24 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=10 rects=12,20,26,30;38,20,26,30;64,20,26,30;90,20,26,30;116,20,26,30;142,20,26,30;168,20,26,30;194,20,26,30;220,20,26,30;246,20,26,30 role=system id=help box=0,0,816,72 text=HPを50回復する。
+2026-11-21T10:00:08.560Z ToMe_CHARS engine=rpgm line=25 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=0 rects= role=menu id=shopbuy:0 box=0,144,240,36 sel=0 text=ポーション
+2026-11-21T10:00:08.560Z ToMe_CHARS engine=rpgm line=26 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=0 rects= role=menu id=shopbuy:1 box=0,180,240,36 sel=0 text=薬草
+2026-11-21T10:00:08.560Z ToMe_CHARS engine=rpgm line=27 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=0 rects= role=menu id=shopbuy:2 box=0,216,240,36 sel=1 text=毒消し
+2026-11-21T10:00:09.460Z ToMe_CHARS engine=rpgm line=28 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=2 rects=24,424,26,30;50,424,26,30 role=name id=namebox box=20,420,160,36 text=ミナ
+2026-11-21T10:00:09.460Z ToMe_CHARS engine=rpgm line=29 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=13 rects=20,470,26,30;46,470,26,30;72,470,26,30;98,470,26,30;124,470,26,30;150,470,26,30;176,470,26,30;202,470,26,30;228,470,26,30;254,470,26,30;280,470,26,30;306,470,26,30;332,470,26,30 emb=1 text=お兄ちゃん、森は危ないよ。
+2026-11-21T10:00:09.460Z source chars=13 sequence=7
+2026-11-21T10:00:10.420Z ToMe_CHARS engine=rpgm line=30 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=2 rects=24,424,26,30;50,424,26,30 role=name id=namebox box=20,420,160,36 text=ミナ
+2026-11-21T10:00:10.420Z ToMe_CHARS engine=rpgm line=31 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=11 rects=20,470,26,30;46,470,26,30;72,470,26,30;98,470,26,30;124,470,26,30;150,470,26,30;176,470,26,30;202,470,26,30;228,470,26,30;254,470,26,30;280,470,26,30 emb=1 text=薬草を持っていってね。
+2026-11-21T10:00:10.420Z source chars=11 sequence=8
+2026-11-21T10:00:10.980Z ToMe_CHARS engine=rpgm line=32 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=4 rects=12,3,26,30;38,3,26,30;64,3,26,30;90,3,26,30 role=menu id=menu:0 box=0,0,240,36 sel=1 text=アイテム
+2026-11-21T10:00:10.980Z ToMe_CHARS engine=rpgm line=33 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=3 rects=12,39,26,30;38,39,26,30;64,39,26,30 role=menu id=menu:1 box=0,36,240,36 sel=0 text=スキル
+2026-11-21T10:00:10.980Z ToMe_CHARS engine=rpgm line=34 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=2 rects=12,75,26,30;38,75,26,30 role=menu id=menu:2 box=0,72,240,36 sel=0 text=装備
+2026-11-21T10:00:10.980Z ToMe_CHARS engine=rpgm line=35 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=3 rects=12,111,26,30;38,111,26,30;64,111,26,30 role=menu id=menu:3 box=0,108,240,36 sel=0 text=セーブ
+2026-11-21T10:00:10.980Z ToMe_CHARS engine=rpgm line=36 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=5 rects=12,147,26,30;38,147,26,30;64,147,26,30;90,147,26,30;116,147,26,30 role=menu id=menu:4 box=0,144,240,36 sel=0 text=ゲーム終了
+2026-11-21T10:00:11.180Z ToMe_CHARS engine=rpgm line=37 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=3 rects=744,11,26,30;770,11,26,30;796,11,26,30 role=button id=cancel box=740,8,68,36 text=閉じる

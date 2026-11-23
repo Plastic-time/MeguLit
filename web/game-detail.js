@@ -6,6 +6,8 @@ import {launchReason,launchShort,launchRestorable} from './launch-feedback.js';
 import {embedStatus} from './embed-status.js';
 import {gameLanguageLabel,openGameLanguage,originalExecutableError} from './game-language.js';
 import {mountCnGuide} from './cn-version-guide.js';
+import {mountFirstPlayer} from './first-player.js';
+import {mountDetailDeveloper} from './developer.js';
 import {synopsisHTML,bindSynopsis} from './synopsis-view.js';
 import {receptionHTML,receptionMessages,bindReception} from './game-reception.js';
 import {openDiagnostics,diagnosticsLabel} from './diagnostics-ui.js';
@@ -40,13 +42,15 @@ export async function renderGamePage({main,id,tab:startTab='',api,locale,text,es
   /* long titles shrink (down to a floor) until they fit the two-line title box; the box itself never changes size */
   {const h1=main.querySelector('.detail-title>h1'),host=main.querySelector('.detail-title');if(h1&&host){const fit=()=>{if(!h1.isConnected)return;h1.style.removeProperty('--dfit');const base=parseFloat(getComputedStyle(h1).fontSize);let size=base;while(h1.scrollHeight>h1.clientHeight+1&&size>26){size-=2;h1.style.setProperty('--dfit',size+'px');}};
    fit();document.fonts?.ready?.then(fit);if(window.ResizeObserver){let w=host.clientWidth;const ro=new ResizeObserver(()=>{if(!h1.isConnected){ro.disconnect();return;}if(Math.abs(host.clientWidth-w)>1){w=host.clientWidth;fit();}});ro.observe(host);}}}
+ /* 2026-11-21 首位玩家 card (first player of an exe the engine reads, nobody has calibrated); asks the service once, never blocks */const firstPlayer=mountFirstPlayer({host:main.querySelector('.game-detail-hero'),id,api,locale,esc,isCurrent});
+ /* 2026-11-21 the developer line under the title: logo, name, a small panel with VNDB's introduction and links */const devCard=mountDetailDeveloper({main,id,api,locale,esc,toast,isCurrent});
  /* 2026-11-12 Chinese build: the big guide card under the title, filled by its own checks */mountCnGuide({host:main.querySelector('.game-detail-hero'),id,api,locale,
   esc,toast,isCurrent,onChanged:onOriginalChanged,openLanguage:()=>main.querySelector('[data-language]')?.click()});
  main.querySelector('[data-language]').onclick=()=>openGameLanguage({id,api,invoke,locale,esc,toast,onChanged:onOriginalChanged}).catch(error=>toast(originalExecutableError(error,
   locale)));main.querySelector('[data-back]').onclick=onBack;main.querySelector('[data-edit]').onclick=()=>onEdit(id);{const jr=main.querySelector('[data-jp-restore]');if(jr)jr.onclick=()=>onJapaneseRestore?.({id,title:game.title});const wr=main.querySelector('[data-warn-restore]');if(wr)wr.onclick=e=>{e.preventDefault();onJapaneseRestore?.({id,title:game.title});};}main.querySelector('[data-play]').onclick=event=>onLaunch(id,
   event.currentTarget);
  const target=main.querySelector('.game-detail-content'),row=(title,value)=>`<div class="detail-info-row"><span>${title}</span><span>${esc(Array.isArray(value)?value.join(' / '):value||'—')}</span></div>`;
- function show(tab){const order=['overview','sessions','words','sentences'],dir=Math.sign(order.indexOf(tab)-order.indexOf(activeTab)),changed=tab!==activeTab;activeTab=tab;unmount();unmount=()=>{};
+ function show(tab){const order=['overview','sessions','words','sentences'],dir=Math.sign(order.indexOf(tab)-order.indexOf(activeTab)),changed=tab!==activeTab;activeTab=tab;unmount();unmount=()=>{};requestAnimationFrame(()=>{firstPlayer?.place(tab);devCard?.place(tab);});
   /* E266 sliding tab bar + directional content swap */requestAnimationFrame(()=>{const tabs=main.querySelector('.detail-tabs'),on=tabs?.querySelector('[aria-selected="true"]');
   if(!tabs||!on)return;let bar=tabs.querySelector('.detail-tab-bar');if(!bar){bar=document.createElement('span');bar.className='detail-tab-bar';bar.setAttribute('aria-hidden',
   'true');tabs.append(bar);bar.style.transition='none';}bar.style.width=on.offsetWidth+'px';bar.style.transform='translateX('+on.offsetLeft+'px)';if(bar.style.transition==='none')requestAnimationFrame(()=>{

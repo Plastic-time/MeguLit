@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "ea2cb0cd2d01808cf80ec68da2713a96e6aa91c425c2b16e4e6667b226cb47f3",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "五彩斑斓的曙光.exe",
+ "engine": "fvp",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "ea2cb0cd2d01808cf80ec68da2713a96e6aa91c425c2b16e4e6667b226cb47f3",
+  "head": "ac9c4c5bc4c833042eefc0150c57e0eb52dbfa4f1f2c3e26c581c891261a254c",
+  "pe": "0.0.0.0@531958b3"
+ },
+ "rev": 1
+}

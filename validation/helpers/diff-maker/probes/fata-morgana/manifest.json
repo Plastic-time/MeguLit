@@ -1,0 +1,67 @@
+{
+ "schema": 1,
+ "note": "simulated probe from the owner test build logs (incr9) + original-text index",
+ "title": "ファタモルガーナの館",
+ "identity": "f3a5ffde1fa90b2dfb02a5b97c55c9e0e2a18dc62e34e241c4215c0a948ecf8e",
+ "detected": "kirikiri",
+ "exe": {
+  "name": "fata_jp.exe",
+  "sha256": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42"
+ },
+ "runtime": {
+  "from": "2026-11-20T22:51:03",
+  "to": "2026-11-20T22:53:42"
+ },
+ "files": [
+  {
+   "path": "data.xp3",
+   "size": 394117996,
+   "sha256": "b7831b34a90402bff863605fc11a271dca1dcd49f6151931d805b7d3dd6ac541"
+  },
+  {
+   "path": "data_en.xp3",
+   "size": 49046881,
+   "sha256": "b6948f50afa351e2d48c721f234fafef021bfa0f5ea5ba670a8ebe4cb2639691"
+  },
+  {
+   "path": "data_jp.xp3",
+   "size": 33394089,
+   "sha256": "6d3148d82c6f5df45825a0fa3d4992effc27a63f2e4a0a0f1a4773a0b7b08a79"
+  },
+  {
+   "path": "data_zh.xp3",
+   "size": 49224944,
+   "sha256": "f733b338bf196d7f58d0d25633d0fc3b38675c519760869529742d9b552e9013"
+  },
+  {
+   "path": "dtcn.xp3",
+   "size": 4515,
+   "sha256": "07b522ae19ff3d5d9667edbba86df2e1330c12723fe639e8b4b75cb0e37dc08c"
+  },
+  {
+   "path": "dten.xp3",
+   "size": 4515,
+   "sha256": "57da4a90ed05562154190efcd294b425c1cb2d8c83f3c688042abab0559a4cf9"
+  },
+  {
+   "path": "dtjp.xp3",
+   "size": 4515,
+   "sha256": "1f6d4c4d6c4baf712e5bd8cadbf0cb89b1489e6f4e9a020ee1212eb88d1d5691"
+  },
+  {
+   "path": "fata_cn.exe",
+   "size": 3658478,
+   "sha256": "7a81b36a76aa4794ad02ae3bbc70d7e15e9fecb09be678f47e427c126d8e1de3"
+  },
+  {
+   "path": "fata_en.exe",
+   "size": 3658478,
+   "sha256": "5d3ad108df657f254806bae6d053522bbbcbdb29fba3fc50a496af9de9711a2a"
+  },
+  {
+   "path": "fata_jp.exe",
+   "size": 3658478,
+   "sha256": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42"
+  }
+ ]
+}

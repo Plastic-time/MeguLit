@@ -69,22 +69,31 @@ function makeShadow({exe,shadowRoot,pack,port,steamAppId=null}){
 }
 
 /* The plugin's control socket: MeguLit listens on loopback, the plugin connects (Unity's Mono has no reliable named
-   pipes on Windows). Lines in: ToMe_CHARS / ToMe_UNITY status. Lines out: HIDE 0|1, WANT <text>. */
+   pipes on Windows). Lines in: ToMe_CHARS / ToMe_UNITY status. Lines out: HIDE 0|1, WANT <text>,
+   and for engine-draw (docs/engine-draw-protocol.md): DRAW roles= embed= zh=, EMB <sentence> TAB <ruby> TAB <Chinese>; in: ToMe_UNITY ask <sentence>. */
 class UnityTextPath{
- constructor({onChars=()=>{},onStatus=()=>{},canary=null}={}){Object.assign(this,{onChars,onStatus,canary});this.sock=null;this.on=false;this.wanted='';this.armed=false;}
+ constructor({onChars=()=>{},onStatus=()=>{},onAsk=()=>{},onSource=()=>{},canary=null}={}){Object.assign(this,{onChars,onStatus,onAsk,onSource,canary});this.sock=null;this.on=false;this.wanted='';this.armed=false;this.drawCfg=null;this.embeds=new Map();this.kemco=new(require('./unity-kemco-source.cjs').UnityKemcoSource)({onSource:m=>this.onSource(m)});}
  listen(){return new Promise((resolve,reject)=>{this.server=net.createServer(s=>this.accept(s));this.server.on('error',reject);this.server.listen(0,'127.0.0.1',()=>resolve(this.server.address().port));});}
- accept(s){if(this.sock)this.sock.destroy();this.sock=s;s.setEncoding('utf8');s.setNoDelay(true);let buf='';
+ negotiateKemco(){try{this.kemco?.configure(!this.stopped&&this.drawCfg?.kemcoSprites===true,{force:true});}catch{try{this.onStatus('kemco source negotiation unavailable');}catch{}}}
+ accept(s){if(this.stopped){s.destroy();return;}if(this.sock)this.sock.destroy();this.sock=s;this.negotiateKemco();s.setEncoding('utf8');s.setNoDelay(true);let buf='';
   s.on('data',d=>{buf+=d;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).replace(/\r$/,'');buf=buf.slice(i+1);this.line(line);}if(buf.length>200000)buf='';});
-  s.on('close',()=>{if(this.sock===s)this.sock=null;});s.on('error',()=>{});this.push();}
- line(l){if(l.startsWith('ToMe_UNITY status ')){this.onStatus(l.slice(18));return;}
+  s.on('close',()=>{if(this.sock===s){this.sock=null;this.negotiateKemco();}});s.on('error',()=>{});this.push(true);}
+ line(l){if(this.stopped)return;if(this.kemco?.accept(l))return;if(l.startsWith('ToMe_UNITY status ')){this.onStatus(l.slice(18));return;}
+  if(l.startsWith('ToMe_UNITY ask ')){const k=l.slice(15).trim();if(k)this.onAsk({key:k,text:k,engine:'unity'});return;}
   const r=parseChars(l);if(!r||r.engine!=='unity')return;
   if(r.hidden&&this.canary){if(!this.armed){this.canary.arm('unity');this.armed=true;}else this.canary.alive('unity');}
   this.onChars(l);}
- push(){if(!this.sock)return;this.sock.write('WANT '+this.wanted.replace(/\r?\n/g,'\x1f')+'\nHIDE '+(this.on?1:0)+'\n');}
+ push(reset=false){if(this.stopped||!this.sock)return;const controls=this.drawCfg&&(!this.drawCfg.kemcoSprites||reset)?this.drawLine()+(this.kemco?.command()||''):'';this.sock.write('WANT '+this.wanted.replace(/\r?\n/g,'\x1f')+'\nHIDE '+(this.on?1:0)+'\n'+controls+[...this.embeds.values()].join(''));}
+ drawLine(){const c=this.drawCfg;return 'DRAW roles='+(c.roles?1:0)+' embed='+(c.embed?1:0)+' zh='+(c.zh?1:0)+(c.kemcoSprites?' kemcoSprites=1':'')+'\n';}
+ /* engine-draw: the switches, and one sentence's replacement (kept for a reconnect, newest 64) */
+ drawConfig(cfg){if(this.stopped)return;const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false,kemcoSprites:cfg?.kemcoSprites===true};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;if(this.kemco)UnityTextPath.prototype.negotiateKemco.call(this);if(this.sock){this.sock.write(this.drawLine());const command=this.kemco?.command();if(command)this.sock.write(command);}}
+ blockSource(message,owner){return this.kemco.block(message,owner);}
+ drawEmbed(key,o={}){if(this.stopped)return;const {krkrControlText}=require('./engine-draw.cjs');const body=krkrControlText({roles:false,embed:true,zh:true},new Map([[String(key||''),{ruby:o.ruby||[],zh:o.zh||''}]])).split('\r\n')[1]||'';if(!body)return;
+  const l='EMB '+body+'\n';this.embeds.delete(key);this.embeds.set(key,l);while(this.embeds.size>64)this.embeds.delete(this.embeds.keys().next().value);if(this.sock)this.sock.write(l);}
  hide(on){this.on=!!on;if(this.on&&this.canary&&!this.canary.allowed('unity')){this.on=false;this.onStatus('unity invisible drawing off for this game (crash canary)');}this.push();}
  want(text){this.wanted=String(text||'');this.push();}
  exited(code){if(this.canary&&this.armed)this.canary.exited('unity',code);}
- stop(){try{this.sock?.end('HIDE 0\n');}catch{}try{this.server?.close();}catch{}}
+ stop(){if(this.stopping)return this.stopping;this.stopped=true;this.kemco.configure(false);this.on=false;this.drawCfg={roles:false,embed:false,zh:false};this.embeds.clear();const s=this.sock,server=this.server;this.stopping=new Promise((resolve,reject)=>{let timer;const finish=error=>{clearTimeout(timer);if(error)reject(error);else resolve();};timer=setTimeout(()=>{s?.destroy();finish(Error('READER_STOP_INCOMPLETE'));},2000);const close=()=>{if(!server?.listening){finish();return;}server.close(error=>finish(error));};if(s&&!s.destroyed){s.once('close',close);s.end('HIDE 0\nDRAW roles=0 embed=0 zh=0\n');}else close();});this.stopping.catch(()=>{});return this.stopping;}
 }
 
 module.exports={unityGame,modded,bits,mirror,makeShadow,UnityTextPath,formatChars};

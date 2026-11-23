@@ -147,5 +147,5 @@ static int Install11(HMODULE d3d11) {
   Hook<412>(cv[12], HDrawIndexed11); Hook<413>(cv[13], HDraw11); Hook<414>(cv[14], HMap11); Hook<415>(cv[15], HUnmap11); Hook<448>(cv[48], HUpdateSub11); Hook<446>(cv[46], HCopyRegion11); Hook<511>(dv[11], HCreateInputLayout); Hook<608>(sv[8], HPresent11);
   ctx->Release(); dev->Release(); sc->Release();
  }
- DestroyWindow(w); UnregisterClassW(wc.lpszClassName, wc.hInstance); return made;
+ DestroyWindow(w); UnregisterClassW(wc.lpszClassName, wc.hInstance); return Apply() ? made : 0;
 }

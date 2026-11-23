@@ -1,0 +1,218 @@
+2026-11-21T02:14:27.260Z profile fata-morgana match=game:vndb,title,name,title,engine exe=- layers=core+engine+seed-game engine=kirikiri
+2026-11-21T02:14:27.267Z render mode switched in place embed -> custom
+2026-11-21T02:14:27.268Z check reading 读取已启动，推进一句后检查捕捉结果
+2026-11-21T02:14:27.322Z embed hook pending EXHWXN0@1E3389:fata_jp.exe
+2026-11-21T02:14:27.329Z glyph mode blank stream=575310:0:0 writable
+2026-11-21T02:14:27.355Z selfCheck key=17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42 layer=none calibrating (first 20 lines)
+2026-11-21T02:14:27.360Z profile fata-morgana match=exe exe=17b5941a layers=core+engine+seed-game+seed engine=kirikiri
+2026-11-21T02:14:27.532Z glyph hide ready
+2026-11-21T02:14:28.674Z ocr page art scan 3/0 当作品には流血・暴力や精神的不安を煽る表現が含まれておりますまた、差別的な用語を使用している箇所もございますが全
+2026-11-21T02:14:29.873Z ocr line "当作品には流血・暴力や精神的不安を煽る表現が含まれておりますまた、差別的な用語を"
+2026-11-21T02:14:29.879Z source chars=204 sequence=8
+2026-11-21T02:14:29.880Z text effects: line clean 0/1
+2026-11-21T02:14:29.894Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:14:29.911Z translation miss key=4c02c40c/202 no cached line equal to or around it (7 cached)
+2026-11-21T02:14:30.307Z flow page: not a story line, dropped (menu/help) "オープニング女中のテーマピアノソロオープニングタイトルメニュー右から掠れ選択ライ"
+2026-11-21T02:14:30.678Z ocr page art scan 0/0
+2026-11-21T02:14:30.769Z chain deepseek 649 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:14:30.841Z visual {"type":"hookVisual","sequence":1,"stage":"read","sample":1,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":194,"checkedAt":1795227270841,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-21T02:14:30.841Z check unverified 捕捉成功，画面未匹配到本句原文
+2026-11-21T02:14:31.244Z chain microsoft 475 ms ok
+2026-11-21T02:14:31.257Z translation store key=4c02c40c/202
+2026-11-21T02:14:31.424Z script noise line kept "一発雷オープニングタイトルメニュー左上か"
+2026-11-21T02:14:31.425Z flow page: not a story line, dropped (menu/help) "一発雷オープニングタイトルメニュー左上から右下へ"
+2026-11-21T02:14:31.539Z visual {"type":"hookVisual","sequence":1,"stage":"read","sample":2,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":194,"checkedAt":1795227271539,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-21T02:14:31.539Z check unverified 捕捉成功，画面未匹配到本句原文
+2026-11-21T02:14:48.621Z script noise line kept "ファタモルガーナの館歌入り"
+2026-11-21T02:14:48.621Z flow page: not a story line, dropped (menu/help) "ファタモルガーナの館歌入り"
+2026-11-21T02:15:01.751Z ocr page art scan 1/0 館がある
+2026-11-21T02:15:02.308Z ocr page art scan 1/0 鬱蒼と茂る闇の森をかき分けると
+2026-11-21T02:15:02.818Z ocr line "館がある"
+2026-11-21T02:15:02.819Z script noise line kept "館がある"
+2026-11-21T02:15:02.820Z source chars=4 sequence=9
+2026-11-21T02:15:02.820Z text effects: line clean 0/2
+2026-11-21T02:15:02.836Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:02.854Z translation miss key=465a4bad/4 no cached line equal to or around it (8 cached)
+2026-11-21T02:15:03.042Z ocr page art scan 0/0
+2026-11-21T02:15:03.049Z translation miss key=465a4bad/4 no cached line equal to or around it (8 cached)
+2026-11-21T02:15:03.551Z ocr line "鬱蒼と茂る闇の森をかき分けると"
+2026-11-21T02:15:03.551Z script noise line kept "鬱蒼と茂る闇の森をかき分けると"
+2026-11-21T02:15:03.551Z source chars=15 sequence=10
+2026-11-21T02:15:03.552Z text effects: line clean 0/3
+2026-11-21T02:15:03.567Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:03.581Z translation miss key=37b701fb/15 no cached line equal to or around it (8 cached)
+2026-11-21T02:15:03.760Z chain deepseek 720 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:03.760Z chain deepseek 522 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:03.767Z translation miss key=37b701fb/15 no cached line equal to or around it (8 cached)
+2026-11-21T02:15:03.964Z krkr page mode on
+2026-11-21T02:15:03.966Z source chars=18 sequence=11
+2026-11-21T02:15:03.966Z text effects: line clean 0/4
+2026-11-21T02:15:03.981Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:03.982Z placement placed: line 1, 18 characters, first box 220,488,20,22 in client 804x604
+2026-11-21T02:15:03.984Z source chars=9 sequence=12
+2026-11-21T02:15:03.984Z text effects: line clean 0/5
+2026-11-21T02:15:03.995Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:03.995Z placement placed: line 2, 9 characters, first box 307,488,22,22 in client 804x604
+2026-11-21T02:15:03.997Z source chars=17 sequence=13
+2026-11-21T02:15:03.997Z text effects: line clean 0/6
+2026-11-21T02:15:04.008Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:04.008Z placement placed: line 3, 17 characters, first box 226,488,22,22 in client 804x604
+2026-11-21T02:15:04.072Z source chars=9 sequence=14
+2026-11-21T02:15:04.072Z text effects: line clean 0/7
+2026-11-21T02:15:04.089Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:04.090Z placement placed: line 4, 9 characters, first box 307,488,22,22 in client 804x604
+2026-11-21T02:15:04.091Z source chars=9 sequence=15
+2026-11-21T02:15:04.091Z text effects: line clean 0/8
+2026-11-21T02:15:04.102Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:04.103Z placement placed: line 5, 9 characters, first box 309,488,20,22 in client 804x604
+2026-11-21T02:15:04.105Z source chars=12 sequence=16
+2026-11-21T02:15:04.105Z text effects: line clean 0/9
+2026-11-21T02:15:04.114Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:04.115Z placement placed: line 6, 12 characters, first box 281,488,22,22 in client 804x604
+2026-11-21T02:15:04.116Z source chars=14 sequence=17
+2026-11-21T02:15:04.116Z text effects: line clean 0/10
+2026-11-21T02:15:04.127Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:04.128Z placement placed: line 7, 14 characters, first box 265,488,20,22 in client 804x604
+2026-11-21T02:15:04.130Z source chars=7 sequence=18
+2026-11-21T02:15:04.130Z text effects: line clean 0/11
+2026-11-21T02:15:04.140Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:04.141Z placement placed: line 8, 7 characters, first box 327,488,22,22 in client 804x604
+2026-11-21T02:15:04.148Z translation miss key=5380c9ac/9 no cached line equal to or around it (8 cached)
+2026-11-21T02:15:04.369Z translation miss key=a01eb68d/17 no cached line equal to or around it (8 cached)
+2026-11-21T02:15:04.585Z translation miss key=203a47f6/9 no cached line equal to or around it (8 cached)
+2026-11-21T02:15:04.768Z translation miss key=48105695/9 no cached line equal to or around it (8 cached)
+2026-11-21T02:15:04.970Z translation miss key=17bfe332/12 no cached line equal to or around it (8 cached)
+2026-11-21T02:15:05.155Z translation miss key=dd40a572/14 no cached line equal to or around it (8 cached)
+2026-11-21T02:15:05.342Z source chars=16 sequence=19
+2026-11-21T02:15:05.342Z text effects: line clean 0/12
+2026-11-21T02:15:05.353Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:05.354Z placement placed: line 9, 16 characters, first box 240,488,22,22 in client 804x604
+2026-11-21T02:15:05.355Z source chars=14 sequence=20
+2026-11-21T02:15:05.355Z text effects: line clean 0/13
+2026-11-21T02:15:05.364Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:05.365Z placement placed: line 10, 14 characters, first box 255,488,22,22 in client 804x604
+2026-11-21T02:15:05.366Z patch-text high #20907
+2026-11-21T02:15:05.366Z translation store key=3de0127e/7
+2026-11-21T02:15:05.370Z source chars=7 sequence=21
+2026-11-21T02:15:05.370Z text effects: line clean 0/14
+2026-11-21T02:15:05.380Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:05.381Z placement placed: line 11, 7 characters, first box 328,488,22,22 in client 804x604
+2026-11-21T02:15:05.382Z choice aux KiriKiri2 role=0 added=[] text="その瞬間、私は死体を見下ろしていた。……自分の死体だ。磔の場へと引きずられるその姿に……深い絶望を抱き……そして魂は砕け……私のすべては、消滅した。そう、一度は"
+2026-11-21T02:15:05.383Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="その瞬間、私は死体を見下ろしていた。……自分の死体だ。磔の場へと引きずられるその姿に……深い絶望を抱き……そして魂は砕け……私のすべては、消滅した。そう、一度は"
+2026-11-21T02:15:05.384Z source chars=9 sequence=22
+2026-11-21T02:15:05.384Z text effects: line clean 0/15
+2026-11-21T02:15:05.394Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:05.394Z placement placed: line 12, 9 characters, first box 320,488,16,22 in client 804x604
+2026-11-21T02:15:05.395Z choice aux KiriKiri2 role=0 added=[] text="もう一度、誓った。"
+2026-11-21T02:15:05.396Z text effects: line effect 1/15
+2026-11-21T02:15:05.396Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="もうも一度うも、一誓度うもっも一、たう度誓。一っ、度た誓。っ、度た誓。っ、た誓。った。"
+2026-11-21T02:15:05.406Z translation miss key=3d29c5ee/7 no cached line equal to or around it (9 cached)
+2026-11-21T02:15:05.654Z translation miss key=9c0b2913/16 no cached line equal to or around it (9 cached)
+2026-11-21T02:15:05.841Z translation miss key=c62b3e92/14 no cached line equal to or around it (9 cached)
+2026-11-21T02:15:06.038Z translation hit key=3de0127e/7
+2026-11-21T02:15:06.054Z translation miss key=4c9949ca/9 no cached line equal to or around it (9 cached)
+2026-11-21T02:15:06.243Z art text located "もうも一度うも、一誓度うもっも一、たう度誓。一っ、度た誓。っ、度た誓。っ、た誓。"
+2026-11-21T02:15:06.243Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:06.245Z chain deepseek 2487 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:06.245Z chain microsoft 2485 ms failed Superseded sentence
+2026-11-21T02:15:06.245Z chain deepseek 2297 ms failed Superseded sentence
+2026-11-21T02:15:06.245Z chain deepseek 1895 ms failed Superseded sentence
+2026-11-21T02:15:06.245Z chain deepseek 1678 ms failed Superseded sentence
+2026-11-21T02:15:06.245Z chain deepseek 1492 ms failed Superseded sentence
+2026-11-21T02:15:06.246Z chain deepseek 1292 ms failed Superseded sentence
+2026-11-21T02:15:06.246Z chain deepseek 1105 ms failed Superseded sentence
+2026-11-21T02:15:06.246Z chain deepseek 915 ms failed Superseded sentence
+2026-11-21T02:15:06.246Z chain deepseek 669 ms failed Superseded sentence
+2026-11-21T02:15:06.247Z chain deepseek 424 ms failed Superseded sentence
+2026-11-21T02:15:06.247Z chain deepseek 225 ms failed Superseded sentence
+2026-11-21T02:15:06.250Z ocr page art scan off
+2026-11-21T02:15:06.296Z visual {"type":"hookVisual","valid":false,"sequence":15,"stage":"read","error":"The operation was canceled."}
+2026-11-21T02:15:06.296Z check unverified 画面未确认：The operation was canceled.
+2026-11-21T02:15:06.484Z source chars=10 sequence=23
+2026-11-21T02:15:06.485Z text effects: line clean 1/16
+2026-11-21T02:15:06.498Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:06.499Z placement placed: line 13, 10 characters, first box 300,488,19,22 in client 804x604
+2026-11-21T02:15:06.513Z translation miss key=4f1a96bd/10 no cached line equal to or around it (9 cached)
+2026-11-21T02:15:06.700Z choice aux KiriKiri2 role=0 added=[] text="どれほど時を重ねても"
+2026-11-21T02:15:06.833Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="どれほど時を重ねても"
+2026-11-21T02:15:06.842Z chain deepseek 607 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:07.314Z chain deepseek 619 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:07.446Z visual {"type":"hookVisual","valid":false,"sequence":16,"stage":"read","error":"The operation was canceled."}
+2026-11-21T02:15:07.446Z check unverified 画面未确认：The operation was canceled.
+2026-11-21T02:15:07.488Z chain microsoft 172 ms ok
+2026-11-21T02:15:07.502Z translation store key=4f1a96bd/10
+2026-11-21T02:15:08.361Z source chars=11 sequence=24
+2026-11-21T02:15:08.362Z text effects: line clean 1/17
+2026-11-21T02:15:08.376Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:08.376Z placement placed: line 14, 11 characters, first box 298,488,22,22 in client 804x604
+2026-11-21T02:15:08.389Z translation miss key=8e29f199/11 no cached line equal to or around it (10 cached)
+2026-11-21T02:15:08.566Z choice aux KiriKiri2 role=0 added=[] text="多くの障害があろうとも"
+2026-11-21T02:15:08.719Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="多くの障害があろうとも"
+2026-11-21T02:15:09.032Z chain deepseek 467 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:09.268Z visual {"type":"hookVisual","valid":false,"sequence":17,"stage":"read","error":"The operation was canceled."}
+2026-11-21T02:15:09.268Z check unverified 画面未确认：The operation was canceled.
+2026-11-21T02:15:09.515Z chain deepseek 661 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:09.675Z chain microsoft 642 ms ok
+2026-11-21T02:15:09.683Z translation store key=8e29f199/11
+2026-11-21T02:15:10.214Z chain microsoft 699 ms ok
+2026-11-21T02:15:10.214Z translation store key=465a4bad/4
+2026-11-21T02:15:10.508Z source chars=15 sequence=25
+2026-11-21T02:15:10.508Z text effects: line clean 1/18
+2026-11-21T02:15:10.523Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:10.523Z placement placed: line 15, 15 characters, first box 257,488,22,22 in client 804x604
+2026-11-21T02:15:10.537Z translation miss key=a026052a/15 no cached line equal to or around it (12 cached)
+2026-11-21T02:15:10.712Z choice aux KiriKiri2 role=0 added=[] text="君がどんな姿になっていようとも"
+2026-11-21T02:15:10.872Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="君がどんな姿になっていようとも"
+2026-11-21T02:15:11.195Z chain deepseek 484 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:11.422Z chain microsoft 227 ms ok
+2026-11-21T02:15:11.480Z translation store key=a026052a/15
+2026-11-21T02:15:11.481Z visual {"type":"hookVisual","valid":false,"sequence":18,"stage":"read","error":"The operation was canceled."}
+2026-11-21T02:15:11.481Z check unverified 画面未确认：The operation was canceled.
+2026-11-21T02:15:12.207Z chain deepseek 874 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:12.687Z chain deepseek 1266 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:12.779Z source chars=9 sequence=26
+2026-11-21T02:15:12.779Z text effects: line clean 1/19
+2026-11-21T02:15:12.794Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:12.795Z placement placed: line 16, 9 characters, first box 315,488,22,22 in client 804x604
+2026-11-21T02:15:12.809Z translation miss key=942c568e/9 no cached line equal to or around it (13 cached)
+2026-11-21T02:15:12.991Z choice aux KiriKiri2 role=0 added=[] text="迎えに行くと……。"
+2026-11-21T02:15:13.136Z text effects: line effect 2/19
+2026-11-21T02:15:13.136Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="迎え迎に行え迎くにと行え迎…迎にく…え行と。に…く行…と。…く行…と。…く…と。……。"
+2026-11-21T02:15:13.173Z chain deepseek 1602 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:13.261Z art text located "迎え迎に行え迎くにと行え迎…迎にく…え行と。に…く行…と。…く行…と。…く…と。"
+2026-11-21T02:15:13.663Z chain deepseek 2005 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:13.696Z visual {"type":"hookVisual","valid":false,"sequence":19,"stage":"read","error":"The operation was canceled."}
+2026-11-21T02:15:13.696Z check unverified 画面未确认：The operation was canceled.
+2026-11-21T02:15:13.837Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:13.931Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:14.071Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:14.152Z chain deepseek 2402 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:14.163Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:14.259Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:14.352Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:14.428Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:14.521Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:14.614Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:14.635Z chain deepseek 2798 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:14.694Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:14.804Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:15.108Z chain deepseek 3181 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:15.491Z chain budget 2500 ms spent: machine translation alongside
+2026-11-21T02:15:15.583Z chain deepseek 3571 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:16.059Z chain deepseek 3950 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:16.565Z chain deepseek 4377 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:16.831Z chain microsoft 4624 ms ok
+2026-11-21T02:15:16.831Z chain microsoft 2994 ms ok
+2026-11-21T02:15:16.831Z translation store key=37b701fb/15
+2026-11-21T02:15:17.327Z chain deepseek 5024 ms failed API 账户余额不足，请检查所选服务的账户余额
+2026-11-21T02:15:17.524Z chain microsoft 4837 ms ok
+2026-11-21T02:15:17.524Z chain microsoft 3593 ms ok
+2026-11-21T02:15:17.524Z translation store key=5380c9ac/9
+2026-11-21T02:15:17.760Z source chars=8 sequence=27
+2026-11-21T02:15:17.760Z selfCheck window=1 lines=20 hide=- drop=0 repeat=0 choice=0 pos=- pair=0.05 over=pairRate
+2026-11-21T02:15:17.783Z selfCheck calibrated key=17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42 mode=read settings={"calibrate":{"positionSource":null,"textBox":{"x":220,"y":488,"w":130,"h":22,"client":[804,604]},"hideMethod":"read"},"page":{"effectFrames":null},"hide":{"textEffectsRead":true}} reason=游戏原文和阅读层的句子对不上（配对率低）
+2026-11-21T02:15:17.784Z profile fata-morgana match=exe exe=17b5941a layers=core+engine+auto+seed-game+seed engine=kirikiri
+2026-11-21T02:15:17.786Z text effects: line clean 2/20
+2026-11-21T02:15:17.842Z check captured 台词捕捉成功，正在检查游戏画面
+2026-11-21T02:15:17.847Z placement placed: line 17, 8 characters, first box 316,488,22,22 in client 804x604
+2026-11-21T02:15:17.857Z translation miss key=aabcfc34/8 no cached line equal to or around it (15 cached)

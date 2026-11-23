@@ -107,6 +107,9 @@ static bool Transform(const std::vector<uint8_t> &file, std::vector<uint8_t> &ou
 #ifndef FONTDOTS_CORE_ONLY
 // ---- serving the copy through the game's own handle --------------------------------------------------------------------
 struct VFile { std::shared_ptr<std::vector<uint8_t>> data; uint64_t pos; };
+// VFiles, VCache and VNo have their own lock: the game's file reads (often an audio or loader thread) never wait for the
+// draw hooks, which hold Lock while they decode and decide a draw.
+static SRWLOCK VLock = SRWLOCK_INIT; struct VGuard { VGuard() { AcquireSRWLockExclusive(&VLock); } ~VGuard() { ReleaseSRWLockExclusive(&VLock); } };
 static std::map<HANDLE, VFile> VFiles; static std::map<std::wstring, std::shared_ptr<std::vector<uint8_t>>> VCache; static std::set<std::wstring> VNo;
 static bool FontDotsOn;
 typedef HANDLE(WINAPI *CreateFileWF)(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
@@ -121,17 +124,17 @@ static CreateFileWF OCreateFileW; static CreateFileAF OCreateFileA; static ReadF
 // Reads the file through our own handle (the trampoline, so no recursion), once per path.
 static std::shared_ptr<std::vector<uint8_t>> DottedCopy(const std::wstring &path) {
  std::wstring key = path; for (auto &c : key) c = towlower(c);
- { Guard g; auto it = VCache.find(key); if (it != VCache.end()) return it->second; if (VNo.count(key)) return nullptr; }
+ { VGuard g; auto it = VCache.find(key); if (it != VCache.end()) return it->second; if (VNo.count(key)) return nullptr; }
  std::shared_ptr<std::vector<uint8_t>> res;
  HANDLE h = OCreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
  if (h != INVALID_HANDLE_VALUE) { LARGE_INTEGER sz = {}; if (OGetFileSizeEx(h, &sz) && sz.QuadPart >= 16 && sz.QuadPart <= (48ll << 20)) { uint8_t head[4]; DWORD got = 0; if (OReadFile(h, head, 4, &got, NULL) && got == 4 && ((head[0] == 'B' && head[1] == 'M') || (head[0] == 'E' && head[1] == 'E' && head[2] == 'N'))) {
    std::vector<uint8_t> f((size_t)sz.QuadPart); memcpy(f.data(), head, 4); DWORD rest = 0; if (OReadFile(h, f.data() + 4, (DWORD)f.size() - 4, &rest, NULL) && rest == f.size() - 4) { auto out = std::make_shared<std::vector<uint8_t>>(); fd::Sheet s = {}; if (fd::Transform(f, *out, s)) { wchar_t idn[4] = {}; GetEnvironmentVariableW(L"MEGULIT_FONT_DOTS_PROBE", idn, 4); if (idn[0] == L'1') *out = f; else if (idn[0] == L'2') { std::vector<uint8_t> in2; int kd; uint32_t ky; if (fd::Unwrap(f, in2, kd, ky)) fd::Wrap(f, in2, kd, ky, *out); } /* diagnostics: serve the original bytes through the same path */ res = out; char b[600]; std::string p8 = Utf8(path); snprintf(b, sizeof b, "ToMe_FONTDOTS sheet cells=%dx%d grid=%dx%d glyphs=%d dot=%d path=%s", s.cw, s.ch, s.w / s.cw, s.h / s.ch, s.glyphs, s.dot, p8.c_str()); Send(b); } } } }
   OCloseHandle(h); }
- Guard g; if (res) VCache[key] = res; else { VNo.insert(key); if (VNo.size() > 20000) VNo.clear(); } return res;
+ VGuard g; if (res) VCache[key] = res; else { VNo.insert(key); if (VNo.size() > 20000) VNo.clear(); } return res;
 }
 static HANDLE Track(HANDLE h, const std::wstring &path, DWORD access, DWORD disp) {
  if (h == INVALID_HANDLE_VALUE || !FontDotsOn || (access & (GENERIC_WRITE | FILE_WRITE_DATA | FILE_APPEND_DATA)) || disp != OPEN_EXISTING) return h;
- auto d = DottedCopy(path); if (d) { Guard g; VFiles[h] = VFile{ d, 0 }; } if (Diag) Log("open %s %S", d ? "DOTS" : "file", path.c_str()); return h;
+ auto d = DottedCopy(path); if (d) { VGuard g; VFiles[h] = VFile{ d, 0 }; } if (Diag) Log("open %s %S", d ? "DOTS" : "file", path.c_str()); return h;
 }
 static HANDLE WINAPI HCreateFileW(LPCWSTR n, DWORD a, DWORD sh, LPSECURITY_ATTRIBUTES sa, DWORD disp, DWORD fl, HANDLE t) { HANDLE h = OCreateFileW(n, a, sh, sa, disp, fl, t); return n ? Track(h, n, a, disp) : h; }
 static HANDLE WINAPI HCreateFileA(LPCSTR n, DWORD a, DWORD sh, LPSECURITY_ATTRIBUTES sa, DWORD disp, DWORD fl, HANDLE t) {
@@ -139,29 +142,29 @@ static HANDLE WINAPI HCreateFileA(LPCSTR n, DWORD a, DWORD sh, LPSECURITY_ATTRIB
  int k = MultiByteToWideChar(CP_ACP, 0, n, -1, NULL, 0); std::wstring w(k > 0 ? k - 1 : 0, 0); if (k > 1) MultiByteToWideChar(CP_ACP, 0, n, -1, &w[0], k); return Track(h, w, a, disp);
 }
 static BOOL WINAPI HReadFile(HANDLE h, LPVOID buf, DWORD n, LPDWORD read, LPOVERLAPPED ov) {
- { Guard g; auto it = VFiles.find(h); if (it != VFiles.end() && !ov) { VFile &v = it->second; size_t sz = v.data->size(); DWORD k = v.pos >= sz ? 0 : (DWORD)(std::min)((uint64_t)n, sz - v.pos); if (k) memcpy(buf, v.data->data() + v.pos, k); v.pos += k; if (read) *read = k; return TRUE; } }
+ { VGuard g; auto it = VFiles.find(h); if (it != VFiles.end() && !ov) { VFile &v = it->second; size_t sz = v.data->size(); DWORD k = v.pos >= sz ? 0 : (DWORD)(std::min)((uint64_t)n, sz - v.pos); if (k) memcpy(buf, v.data->data() + v.pos, k); v.pos += k; if (read) *read = k; return TRUE; } }
  return OReadFile(h, buf, n, read, ov);
 }
 static DWORD WINAPI HSetFilePointer(HANDLE h, LONG lo, PLONG hi, DWORD how) {
- { Guard g; auto it = VFiles.find(h); if (it != VFiles.end()) { VFile &v = it->second; int64_t d = hi ? ((int64_t)*hi << 32) | (uint32_t)lo : lo; int64_t base = how == FILE_BEGIN ? 0 : how == FILE_CURRENT ? (int64_t)v.pos : (int64_t)v.data->size(); int64_t p = base + d; if (p < 0) { SetLastError(ERROR_NEGATIVE_SEEK); return INVALID_SET_FILE_POINTER; } v.pos = (uint64_t)p; if (hi) *hi = (LONG)(p >> 32); return (DWORD)p; } }
+ { VGuard g; auto it = VFiles.find(h); if (it != VFiles.end()) { VFile &v = it->second; int64_t d = hi ? ((int64_t)*hi << 32) | (uint32_t)lo : lo; int64_t base = how == FILE_BEGIN ? 0 : how == FILE_CURRENT ? (int64_t)v.pos : (int64_t)v.data->size(); int64_t p = base + d; if (p < 0) { SetLastError(ERROR_NEGATIVE_SEEK); return INVALID_SET_FILE_POINTER; } v.pos = (uint64_t)p; if (hi) *hi = (LONG)(p >> 32); return (DWORD)p; } }
  return OSetFilePointer(h, lo, hi, how);
 }
 static BOOL WINAPI HSetFilePointerEx(HANDLE h, LARGE_INTEGER d, PLARGE_INTEGER np, DWORD how) {
- { Guard g; auto it = VFiles.find(h); if (it != VFiles.end()) { VFile &v = it->second; int64_t base = how == FILE_BEGIN ? 0 : how == FILE_CURRENT ? (int64_t)v.pos : (int64_t)v.data->size(); int64_t p = base + d.QuadPart; if (p < 0) { SetLastError(ERROR_NEGATIVE_SEEK); return FALSE; } v.pos = (uint64_t)p; if (np) np->QuadPart = p; return TRUE; } }
+ { VGuard g; auto it = VFiles.find(h); if (it != VFiles.end()) { VFile &v = it->second; int64_t base = how == FILE_BEGIN ? 0 : how == FILE_CURRENT ? (int64_t)v.pos : (int64_t)v.data->size(); int64_t p = base + d.QuadPart; if (p < 0) { SetLastError(ERROR_NEGATIVE_SEEK); return FALSE; } v.pos = (uint64_t)p; if (np) np->QuadPart = p; return TRUE; } }
  return OSetFilePointerEx(h, d, np, how);
 }
-static DWORD WINAPI HGetFileSize(HANDLE h, LPDWORD hi) { { Guard g; auto it = VFiles.find(h); if (it != VFiles.end()) { uint64_t sz = it->second.data->size(); if (hi) *hi = (DWORD)(sz >> 32); return (DWORD)sz; } } return OGetFileSize(h, hi); }
-static BOOL WINAPI HGetFileSizeEx(HANDLE h, PLARGE_INTEGER s) { { Guard g; auto it = VFiles.find(h); if (it != VFiles.end()) { s->QuadPart = (LONGLONG)it->second.data->size(); return TRUE; } } return OGetFileSizeEx(h, s); }
-static BOOL WINAPI HCloseHandle(HANDLE h) { { Guard g; VFiles.erase(h); } return OCloseHandle(h); }
+static DWORD WINAPI HGetFileSize(HANDLE h, LPDWORD hi) { { VGuard g; auto it = VFiles.find(h); if (it != VFiles.end()) { uint64_t sz = it->second.data->size(); if (hi) *hi = (DWORD)(sz >> 32); return (DWORD)sz; } } return OGetFileSize(h, hi); }
+static BOOL WINAPI HGetFileSizeEx(HANDLE h, PLARGE_INTEGER s) { { VGuard g; auto it = VFiles.find(h); if (it != VFiles.end()) { s->QuadPart = (LONGLONG)it->second.data->size(); return TRUE; } } return OGetFileSizeEx(h, s); }
+static BOOL WINAPI HCloseHandle(HANDLE h) { { VGuard g; VFiles.erase(h); } return OCloseHandle(h); }
 // Diagnostics only: which strings the engine still sends through GDI (an engine may mix sheet fonts and system fonts).
 typedef BOOL(WINAPI *TextOutWF)(HDC, int, int, LPCWSTR, int); static TextOutWF OTextOutW; static volatile LONG TextOutCalls;
 static BOOL WINAPI HTextOutW(HDC dc, int x, int y, LPCWSTR s, int n) { LONG k = InterlockedIncrement(&TextOutCalls); if (Diag && k < 40 && s && n > 0) Log("TextOutW %d,%d %.*S", x, y, (std::min)(n, 40), s); return OTextOutW(dc, x, y, s, n); }
 static int InstallFontDots() {
- int n = 0; HMODULE k = GetModuleHandleW(L"kernel32.dll"); auto hk = [&](const char *name, void *hook, void **orig) { void *t = (void *)GetProcAddress(k, name); if (t && MH_CreateHook(t, hook, orig) == MH_OK && MH_EnableHook(t) == MH_OK) n++; };
+ int n = 0; HMODULE k = GetModuleHandleW(L"kernel32.dll"); auto hk = [&](const char *name, void *hook, void **orig) { void *t = (void *)GetProcAddress(k, name); if (t && MH_CreateHook(t, hook, orig) == MH_OK && MH_QueueEnableHook(t) == MH_OK) n++; };
  hk("CreateFileW", (void *)HCreateFileW, (void **)&OCreateFileW); hk("CreateFileA", (void *)HCreateFileA, (void **)&OCreateFileA); hk("ReadFile", (void *)HReadFile, (void **)&OReadFile);
  hk("SetFilePointer", (void *)HSetFilePointer, (void **)&OSetFilePointer); hk("SetFilePointerEx", (void *)HSetFilePointerEx, (void **)&OSetFilePointerEx); hk("GetFileSize", (void *)HGetFileSize, (void **)&OGetFileSize);
  hk("GetFileSizeEx", (void *)HGetFileSizeEx, (void **)&OGetFileSizeEx); hk("CloseHandle", (void *)HCloseHandle, (void **)&OCloseHandle);
- if (Diag) { void *t = (void *)GetProcAddress(GetModuleHandleW(L"gdi32.dll"), "TextOutW"); if (t && MH_CreateHook(t, (void *)HTextOutW, (void **)&OTextOutW) == MH_OK) MH_EnableHook(t); }
- return n;
+ if (Diag) { void *t = (void *)GetProcAddress(GetModuleHandleW(L"gdi32.dll"), "TextOutW"); if (t && MH_CreateHook(t, (void *)HTextOutW, (void **)&OTextOutW) == MH_OK) MH_QueueEnableHook(t); }
+ return Apply() ? n : 0;
 }
 #endif

@@ -1,0 +1,90 @@
+{"t":"meta","engine":"krkr","kind":"live","min":16,"game":"ファタモルガーナの館","about":"recorded 2026-11-19 off screen, new game, read-only profile; expectations are the colours measured on the game frame of each step"}
+{"t":"line","raw":"ToMe_KRKR begin line=27 same=0 nvl=1 x0=70 y0=485 x1=718 y1=485 size=22 sw=800 sh=600 n=0 color=9d9d9d paint=f:9d9d9d32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=27 same=0 nvl=1 x0=70 y0=485 x1=294 y1=485 size=22 sw=800 sh=600 n=12 color=9d9d9d paint=f:9d9d9dff,e:000000ff:1 text=どこかで雨の音を聞いた。"}
+{"t":"source","text":"ど"}
+{"t":"expectPos","pixel":"#9b9b9b","text":"どこかで雨の音を聞いた。","shot":"fataI-01","line":1}
+{"t":"line","raw":"ToMe_KRKR begin line=28 same=0 nvl=1 x0=70 y0=427 x1=718 y1=427 size=22 sw=800 sh=600 n=0 color=707070 paint=f:70707032,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=28 same=0 nvl=1 x0=70 y0=427 x1=410 y1=485 size=22 sw=800 sh=600 n=4 color=707070 paint=f:70707032,e:000000ff:1 text= \u001fねえ？"}
+{"t":"source","text":"ね"}
+{"t":"line","raw":"ToMe_KRKR begin line=29 same=0 nvl=1 x0=70 y0=485 x1=718 y1=485 size=22 sw=800 sh=600 n=0 color=9d9d9d paint=f:9d9d9d32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=29 same=0 nvl=1 x0=70 y0=485 x1=254 y1=485 size=22 sw=800 sh=600 n=10 color=9d9d9d paint=f:9d9d9dff,e:000000ff:1 text=そして火の爆ぜる音。"}
+{"t":"source","text":"そ"}
+{"t":"expectPos","pixel":"#9b9b9b","text":"そして火の爆ぜる音。","shot":"fataI-03","line":2}
+{"t":"line","raw":"ToMe_KRKR begin line=30 same=0 nvl=1 x0=70 y0=427 x1=718 y1=427 size=22 sw=800 sh=600 n=0 color=707070 paint=f:70707032,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=30 same=0 nvl=1 x0=70 y0=427 x1=456 y1=485 size=22 sw=800 sh=600 n=9 color=707070 paint=f:707070ff,e:000000ff:1 text= \u001f起きてくださいな"}
+{"t":"source","text":"き"}
+{"t":"expectPos","pixel":"#6d6d6d","text":" 起きてくださいな","shot":"fataI-04","line":3}
+{"t":"line","raw":"ToMe_KRKR begin line=31 same=0 nvl=1 x0=70 y0=485 x1=718 y1=485 size=22 sw=800 sh=600 n=0 color=9d9d9d paint=f:9d9d9d32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=31 same=0 nvl=1 x0=70 y0=485 x1=217 y1=485 size=22 sw=800 sh=600 n=9 color=9d9d9d paint=f:9d9d9d32,e:000000ff:1 text=きい、きい、きい。"}
+{"t":"source","text":"き"}
+{"t":"expectPos","pixel":"#9a9a9a","text":"きい、きい、きい。","shot":"fataI-05","line":4}
+{"t":"line","raw":"ToMe_KRKR begin line=32 same=0 nvl=1 x0=70 y0=427 x1=718 y1=427 size=22 sw=800 sh=600 n=0 color=707070 paint=f:70707032,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=32 same=0 nvl=1 x0=70 y0=427 x1=430 y1=485 size=22 sw=800 sh=600 n=6 color=707070 paint=f:70707032,e:000000ff:1 text= \u001f起きて……"}
+{"t":"source","text":" \n起きて……"}
+{"t":"line","raw":"ToMe_KRKR begin line=33 same=0 nvl=1 x0=70 y0=485 x1=718 y1=485 size=22 sw=800 sh=600 n=0 color=9d9d9d paint=f:9d9d9d32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=33 same=0 nvl=1 x0=70 y0=485 x1=563 y1=485 size=22 sw=800 sh=600 n=27 color=9d9d9d paint=f:9d9d9dff,e:000000ff:1 text=「あなた」は気付くとロッキングチェアーに揺られていた。"}
+{"t":"source","text":"「"}
+{"t":"expectPos","pixel":"#9b9b9b","text":"「あなた」は気付くとロッキングチェアーに揺られていた。","shot":"fataI-07","line":5}
+{"t":"line","raw":"ToMe_KRKR begin line=34 same=0 nvl=1 x0=70 y0=485 x1=718 y1=485 size=22 sw=800 sh=600 n=0 color=9d9d9d paint=f:9d9d9d32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=34 same=0 nvl=1 x0=70 y0=485 x1=695 y1=485 size=22 sw=800 sh=600 n=32 color=9d9d9d paint=f:9d9d9dff,e:000000ff:1 text=室内は薄暗く、暖炉の中で火花を散らす灯り以外、頼れるものはない。"}
+{"t":"source","text":"、"}
+{"t":"expectPos","pixel":"#9b9b9b","text":"室内は薄暗く、暖炉の中で火花を散らす灯り以外、頼れるものはない。","shot":"fataI-08","line":6}
+{"t":"line","raw":"ToMe_KRKR begin line=35 same=0 nvl=1 x0=70 y0=485 x1=718 y1=485 size=22 sw=800 sh=600 n=0 color=9d9d9d paint=f:9d9d9d32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=35 same=0 nvl=1 x0=70 y0=485 x1=704 y1=485 size=22 sw=800 sh=600 n=33 color=9d9d9d paint=f:9d9d9dff,e:000000ff:1 text=閉じられた窓からは何の明かりも見えず、ひたひたと滴がガラスを打つ。"}
+{"t":"source","text":"じられた"}
+{"t":"expectPos","pixel":"#9b9b9b","text":"閉じられた窓からは何の明かりも見えず、ひたひたと滴がガラスを打つ。","shot":"fataI-09","line":7}
+{"t":"line","raw":"ToMe_KRKR begin line=36 same=1 nvl=1 x0=70 y0=514 x1=718 y1=514 size=22 sw=800 sh=600 n=0 color=9d9d9d paint=f:9d9d9d32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=36 same=1 nvl=1 x0=70 y0=514 x1=496 y1=514 size=22 sw=800 sh=600 n=22 color=9d9d9d paint=f:9d9d9dff,e:000000ff:1 text=まるで屋敷全体を暗闇が包み込んでいるようだ。"}
+{"t":"source","text":"ま"}
+{"t":"expectPos","pixel":"#9b9b9b","text":"まるで屋敷全体を暗闇が包み込んでいるようだ。","shot":"fataI-10","line":8}
+{"t":"line","raw":"ToMe_KRKR begin line=37 same=0 nvl=1 x0=70 y0=427 x1=718 y1=427 size=22 sw=800 sh=600 n=0 color=ffffff paint=f:ffffff32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=37 same=0 nvl=1 x0=70 y0=427 x1=500 y1=488 size=22 sw=800 sh=600 n=27 color=ffffff paint=f:ffffffff,e:000000ff:1 text=　　　\u001f \u001fまあ……、やっと、お目覚めになられましたのね。"}
+{"t":"source","text":"　　　\n \nまあ……、やっと、お目覚めになられましたのね。"}
+{"t":"expectPos","pixel":"#fdfdfd","text":"　　　 まあ……、やっと、お目覚めになられましたのね。","shot":"fataI-11","line":9}
+{"t":"line","raw":"ToMe_KRKR begin line=38 same=0 nvl=1 x0=70 y0=485 x1=718 y1=485 size=22 sw=800 sh=600 n=0 color=9d9d9d paint=f:9d9d9d32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=38 same=0 nvl=1 x0=70 y0=485 x1=377 y1=485 size=22 sw=800 sh=600 n=17 color=9d9d9d paint=f:9d9d9dff,e:000000ff:1 text=「あなた」に声をかける人物がいる。"}
+{"t":"source","text":"「あなた」に声をかける人物がいる。"}
+{"t":"expectPos","pixel":"#9b9b9b","text":"「あなた」に声をかける人物がいる。","shot":"fataI-12","line":10}
+{"t":"line","raw":"ToMe_KRKR begin line=39 same=1 nvl=1 x0=70 y0=514 x1=718 y1=514 size=22 sw=800 sh=600 n=0 color=9d9d9d paint=f:9d9d9d32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=39 same=1 nvl=1 x0=70 y0=514 x1=591 y1=514 size=22 sw=800 sh=600 n=28 color=9d9d9d paint=f:9d9d9dff,e:000000ff:1 text=「あなた」は周囲を見渡そうとするが、その必要はなかった。"}
+{"t":"source","text":"あ「なたあ「」なに声「たあ」なをあたかなに」声けたをにる」声か人にけを物声るかがを人け物いかるるけ人が物。るい人るが物。い人るが物。いるが。いる。"}
+{"t":"expectPos","pixel":"#9b9b9b","text":"「あなた」は周囲を見渡そうとするが、その必要はなかった。","shot":"fataI-13","line":11}
+{"t":"line","raw":"ToMe_KRKR begin line=40 same=0 nvl=1 x0=70 y0=485 x1=718 y1=485 size=22 sw=800 sh=600 n=0 color=9d9d9d paint=f:9d9d9d32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=40 same=0 nvl=1 x0=70 y0=485 x1=682 y1=514 size=22 sw=800 sh=600 n=37 color=9d9d9d paint=f:9d9d9d32,e:000000ff:1 text=声の主は「あなた」の傍らにそっとしゃがみ、翠色の瞳で見上げていた\u001fのだから。"}
+{"t":"source","text":"の声主はの声「主あはの声な声「主たのあは」主「なのはあた傍「」ならあのたにな傍」そたらのっ」傍にとのらそし傍っに"}
+{"t":"expectPos","pixel":"#9b9b9b","text":"声の主は「あなた」の傍らにそっとしゃがみ、翠色の瞳で見上げていたのだから。","shot":"fataI-14","line":12}
+{"t":"line","raw":"ToMe_KRKR begin line=41 same=0 nvl=1 x0=70 y0=427 x1=718 y1=427 size=22 sw=800 sh=600 n=0 color=ffffff paint=f:ffffff32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR begin line=42 same=0 nvl=1 x0=70 y0=488 x1=718 y1=488 size=22 sw=800 sh=600 n=0 color=ffffff paint=f:ffffff32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=41 same=0 nvl=1 x0=70 y0=427 x1=465 y1=430 size=22 sw=800 sh=600 n=4 color=ffffff paint=f:ffffff32,e:000000ff:1 text=　　　\u001f "}
+{"t":"line","raw":"ToMe_KRKR end line=42 same=0 nvl=1 x0=70 y0=488 x1=158 y1=488 size=22 sw=800 sh=600 n=5 color=ffffff paint=f:ffffff32,e:000000ff:1 text=…………。"}
+{"t":"source","text":"…"}
+{"t":"line","raw":"ToMe_KRKR begin line=43 same=0 nvl=1 x0=70 y0=427 x1=718 y1=427 size=22 sw=800 sh=600 n=0 color=ffffff paint=f:ffffff32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR begin line=44 same=0 nvl=1 x0=70 y0=488 x1=718 y1=488 size=22 sw=800 sh=600 n=0 color=ffffff paint=f:ffffff32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=44 same=0 nvl=1 x0=70 y0=488 x1=378 y1=488 size=22 sw=800 sh=600 n=17 color=ffffff paint=f:ffffffff,e:000000ff:1 text=おはようございます、旦那さま……。"}
+{"t":"source","text":"お"}
+{"t":"line","raw":"ToMe_KRKR end line=43 same=0 nvl=1 x0=70 y0=427 x1=465 y1=430 size=22 sw=800 sh=600 n=4 color=ffffff paint=f:ffffff32,e:000000ff:1 text=　　　\u001f "}
+{"t":"source","text":"はおようはおごよざうはおいおごよざまはうすよごい、うざまごすいざ、まごすいざ、ますい、ます、旦"}
+{"t":"line","raw":"ToMe_KRKR begin line=45 same=0 nvl=1 x0=389 y0=252 x1=778 y1=252 size=22 sw=800 sh=600 n=0 color=ffffff paint=f:ffffff32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR begin line=46 same=0 nvl=1 x0=70 y0=488 x1=718 y1=488 size=22 sw=800 sh=600 n=0 color=ffffff paint=f:ffffff32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=45 same=0 nvl=1 x0=70 y0=252 x1=465 y1=430 size=22 sw=800 sh=600 n=16 color=ffffff paint=f:ffffff32,e:000000ff:1 text=……おはよう……\u001f…………\u001f　　　\u001f "}
+{"t":"source","text":"……おはよう…………"}
+{"t":"line","raw":"ToMe_KRKR end line=46 same=0 nvl=1 x0=70 y0=488 x1=362 y1=488 size=22 sw=800 sh=600 n=16 color=ffffff paint=f:ffffffff,e:000000ff:1 text=……あら、どうなされたんですか？"}
+{"t":"source","text":"………あら……、あら……、あら……、あら…、あら、ど"}
+{"t":"expectPos","pixel":"#fdfdfd","text":"……あら、どうなされたんですか？","shot":"fataI-18","line":13}
+{"t":"line","raw":"ToMe_KRKR begin line=47 same=1 nvl=1 x0=384 y0=488 x1=718 y1=488 size=22 sw=800 sh=600 n=0 color=ffffff paint=f:ffffff32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=47 same=1 nvl=1 x0=70 y0=488 x1=686 y1=517 size=22 sw=800 sh=600 n=36 color=ffffff paint=f:ffffffff,e:000000ff:1 text=　わたくしの顔をそんなにじろじろ見\u001fて……、何かついていましたでしょうか？"}
+{"t":"source","text":"うどなさうどれなたさうどんどれなでうたさすなれんかさたで？れすんたかで？すんたかで？すんかで？すか？"}
+{"t":"expectPos","pixel":"#fdfdfd","text":"　わたくしの顔をそんなにじろじろ見て……、何かついていましたでしょうか？","shot":"fataI-19","line":14}
+{"t":"line","raw":"ToMe_KRKR begin line=48 same=0 nvl=1 x0=70 y0=427 x1=718 y1=427 size=22 sw=800 sh=600 n=0 color=ffffff paint=f:ffffff32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR begin line=49 same=0 nvl=1 x0=70 y0=488 x1=718 y1=488 size=22 sw=800 sh=600 n=0 color=ffffff paint=f:ffffff32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=49 same=0 nvl=1 x0=70 y0=488 x1=482 y1=488 size=22 sw=800 sh=600 n=22 color=ffffff paint=f:ffffffff,e:000000ff:1 text=“寝起き様には衝撃的”……というものですか？"}
+{"t":"source","text":"“"}
+{"t":"line","raw":"ToMe_KRKR end line=48 same=0 nvl=1 x0=70 y0=427 x1=465 y1=430 size=22 sw=800 sh=600 n=4 color=ffffff paint=f:ffffff32,e:000000ff:1 text=　　　\u001f "}
+{"t":"line","raw":"ToMe_KRKR begin line=50 same=1 nvl=1 x0=70 y0=517 x1=718 y1=517 size=22 sw=800 sh=600 n=0 color=ffffff paint=f:ffffff32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=50 same=1 nvl=1 x0=70 y0=517 x1=503 y1=517 size=22 sw=800 sh=600 n=23 color=ffffff paint=f:ffffffff,e:000000ff:1 text=うふふ……、驚かせるつもりはなかったんですよ？"}
+{"t":"source","text":"うふふう…ふ…ふう、…ふ…ふう…"}
+{"t":"expectPos","pixel":"#fdfdfd","text":"うふふ……、驚かせるつもりはなかったんですよ？","shot":"fataI-21","line":15}
+{"t":"line","raw":"ToMe_KRKR begin line=51 same=0 nvl=1 x0=70 y0=427 x1=718 y1=427 size=22 sw=800 sh=600 n=0 color=ffffff paint=f:ffffff32,e:000000ff:1"}
+{"t":"line","raw":"ToMe_KRKR end line=51 same=0 nvl=1 x0=70 y0=427 x1=601 y1=488 size=22 sw=800 sh=600 n=32 color=ffffff paint=f:ffffffff,e:000000ff:1 text=　　　\u001f \u001fだって、わたくし、この時を待ちわびていたのですから……。"}
+{"t":"source","text":"っだて、っだて、っだて"}
+{"t":"expectPos","pixel":"#fdfdfd","text":"　　　 だって、わたくし、この時を待ちわびていたのですから……。","shot":"fataI-22","line":16}

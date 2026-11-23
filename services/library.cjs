@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {openStore}=require('./store.cjs');
 const normalize=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu,'');
-function signature(file,saved){try{const stat=fs.statSync(file);if(!stat.isFile())return null;if(saved?.size===stat.size&&saved?.mtime===stat.mtimeMs)return saved;const hash=crypto.createHash('sha256'),chunk=Buffer.alloc(1024*1024),fd=fs.openSync(file,'r');try{let length;while((length=fs.readSync(fd,chunk,0,chunk.length,null)))hash.update(chunk.subarray(0,length));}finally{fs.closeSync(fd);}return {size:stat.size,mtime:stat.mtimeMs,hash:hash.digest('hex')};}catch{return saved||null;}}
+function signature(file,saved){try{const stat=fs.statSync(file);if(!stat.isFile())return null;if(saved?.size===stat.size&&saved?.mtime===stat.mtimeMs&&saved.ctime===stat.ctimeMs)return saved;const hash=crypto.createHash('sha256'),chunk=Buffer.alloc(1024*1024),fd=fs.openSync(file,'r');try{let length;while((length=fs.readSync(fd,chunk,0,chunk.length,null)))hash.update(chunk.subarray(0,length));}finally{fs.closeSync(fd);}return {size:stat.size,mtime:stat.mtimeMs,ctime:stat.ctimeMs,hash:hash.digest('hex')};}catch{return saved||null;}}
 const canonical=file=>file?require('./launch-path.cjs').canonical(file).toLowerCase():'';
 function knownPrograms(row,lib){
  return [row.executable,lib.languageLaunch?.exe,...Object.values(lib.languageExecutables||{}),...(lib.variants||[]).map(v=>v.exe)].filter(file=>typeof file==='string'&&file);
@@ -11,14 +11,15 @@ function knownPrograms(row,lib){
 function matchGame(db,item,{manual=false}={}){
  if(item.mediaId!=null){const row=db.prepare('SELECT * FROM games WHERE legacy_id=?').get(item.mediaId);if(row)return row;}
  if(!item.exe)return null;
- const target=canonical(item.exe),exact=db.prepare("SELECT * FROM games WHERE lower(executable)=lower(?) AND executable!=''").all(item.exe);
+ const target=canonical(item.exe),exact=db.prepare("SELECT * FROM games WHERE lower(executable)=lower(?) AND executable!=''").all(item.exe).filter(row=>!JSON.parse(row.original||'{}').mergedInto);
  if(exact.length===1)return exact[0];
  if(exact.length>1)return null;
  const names=new Set([item.title,...item.names||[]].map(normalize).filter(Boolean));
  let sig;
  const matches=db.prepare('SELECT * FROM games').all().filter(row=>{
   if(item.mediaId!=null&&row.legacy_id!=null&&item.mediaId!==row.legacy_id)return false;
-  const lib=JSON.parse(row.original||'{}').library||{};
+  const original=JSON.parse(row.original||'{}');if(original.mergedInto)return false;
+  const lib=original.library||{};
   if(knownPrograms(row,lib).some(file=>canonical(file)===target))return true;
   if(!item.missing&&row.executable&&canonical(lib.dir)===canonical(item.dir)&&(item.variants||[]).some(variant=>canonical(variant.exe)===canonical(row.executable)))return true;
   // The scanner keys a work by its install folder; another program in that same folder (crack/original/launcher
@@ -46,7 +47,7 @@ function activeGameForProgram(db,exe){
  const variants=rows.filter(row=>knownPrograms(row,JSON.parse(row.original||'{}').library||{}).some(file=>canonical(file)===target));
  return variants.length===1?variants[0]:null;
 }
-function reconcile(root,items,{restoreRemoved=false}={}){const db=openStore(root);let added=0,updated=0,committed=false;db.exec('BEGIN IMMEDIATE');try{
+function reconcile(root,items,{restoreRemoved=false,confirmedFolderMatches}={}){const db=openStore(root);let added=0,updated=0,committed=false;db.exec('BEGIN IMMEDIATE');try{
  if(restoreRemoved){const revive=db.prepare('UPDATE games SET removed_at=NULL WHERE id=?');for(const row of db.prepare('SELECT id,executable,original FROM games WHERE removed_at IS NOT NULL').all())if(!JSON.parse(row.original||'{}').mergedInto&&row.executable&&fs.statSync(row.executable,{throwIfNoEntry:false})?.isFile())revive.run(row.id);}
  for(const item of items){
  const existing=matchGame(db,item);
@@ -64,7 +65,18 @@ function reconcile(root,items,{restoreRemoved=false}={}){const db=openStore(root
  // Passive scans leave a removed installation hidden until its executable changes.
  if(existing?.removed_at!=null){if(item.missing||!item.exe||String(existing.executable||'').toLowerCase()===String(item.exe).toLowerCase()||!fs.existsSync(item.exe))continue;db.prepare('UPDATE games SET removed_at=NULL WHERE id=?').run(existing.id);existing.removed_at=null;}
  if(item.missing&&existing?.executable&&existing.executable.toLowerCase()!==String(item.exe||'').toLowerCase()&&fs.existsSync(existing.executable))continue;
- const cover=path.win32.basename(item.cover||''),original=existing?JSON.parse(existing.original):{},saved=original.library||{};original.library=require('./library-dedupe.cjs').keepMergedEditions(saved,{...saved,...item,executableSignature:signature(item.exe,saved.executableSignature)});if(saved.localeMode)original.library.localeMode=saved.localeMode;
+ const cover=path.win32.basename(item.cover||''),original=existing?JSON.parse(existing.original):{},saved=original.library||{};
+ const sameProgram=!!item.exe&&canonical(saved.exe||existing?.executable)===canonical(item.exe);
+ original.library=require('./library-dedupe.cjs').keepMergedEditions(saved,{...saved,...item,executableSignature:signature(item.exe,sameProgram?saved.executableSignature:null)});if(saved.localeMode)original.library.localeMode=saved.localeMode;
+ // The folder scanner's cache predates metadata fetched from the details page.
+ // Keep that match for the same installation unless the scan identifies a different work.
+ const next=original.library;
+ if((item.source==='folder'||item.source==='manual')&&saved.source===item.source&&item.dir&&canonical(saved.dir)===canonical(item.dir)
+    &&sameProgram&&saved.vndbId&&!item.appid&&(!item.vndbId||item.vndbId===saved.vndbId||confirmedFolderMatches?.has(item.dir)===false)
+    &&(!saved.executableSignature||saved.executableSignature.hash===next.executableSignature?.hash)){
+  next.vndbId=saved.vndbId;
+  if(saved.appid&&(saved.vndbSteamAppid===saved.appid||original.vndbManual===saved.vndbId))next.appid=saved.appid;
+ }
  const selected=existing&&saved.contentLanguage&&saved.languageExecutables?.[saved.contentLanguage];
  const preserve=existing&&((saved.originalExecutableVerified&&fs.existsSync(existing.executable))||selected&&canonical(saved.dir)===canonical(item.dir));
  const executable=preserve?existing.executable:item.exe||existing?.executable||'';

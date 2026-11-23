@@ -58,6 +58,15 @@ test('frozen format-1 fixture reads its game: scenes → lines, names dropped, t
  const parsed=scenes.map(s=>packs.parse(p,s.read()));assert.equal(parsed.reduce((n,x)=>n+x.lines.length,0),g.lines);
  assert.ok(parsed[0].lines.every(l=>!/\[|【/.test(l)));assert.ok(parsed[0].anchors.some(a=>a.startsWith('@bg')));
 });
+/* the grammar a runtime draft guesses for UTF-16 bytecode with NUL-terminated strings: the terminator is 00 00 on a code
+   unit; a single 00 byte is half of '　' (U+3000), '一' (U+4E00) or any ASCII character */
+test('strings: utf-16le without a length prefix ends at an aligned 00 00, not at the first 00 byte',()=>{
+ const g=require('../services/runtime-pack-draft.cjs').grammarOf([{encoding:'utf16le',opcodes:[{byte:'10',share:.9}],terminator:'nul'}]);
+ assert.deepEqual(g,{mode:'strings',encoding:'utf-16le',opcode:'10',length:'zero'});
+ const LINES=['　一人で歩いていく。','「OKだよ、3時に駅で」','朝の光が差し込む。'];
+ const buf=Buffer.concat(LINES.flatMap(t=>[Buffer.from([0x10]),Buffer.from(t,'utf16le'),Buffer.from([0,0,5,0,0,0])]));
+ assert.deepEqual(packs.parse({grammar:g,pairing:{minChars:1}},buf).lines,LINES.map(t=>t.trim()));
+});
 test('install → the adapter-pack engine reads the game first; original-text rebuilds its index from it',()=>{
  const g=fx.game(R,'Engine Game');const r=packs.install(R,JSON.stringify(signed(fx.fixturePack())),{app:APP});assert.equal(r.ok,true,JSON.stringify(r));
  const scenes=require('../services/original-engines/scenes.cjs');assert.equal(scenes.detect(g.dir),'adapter-pack');

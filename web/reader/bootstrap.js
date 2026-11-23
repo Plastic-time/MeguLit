@@ -37,7 +37,7 @@ window.__tomoyoInvoke=invoke;window.__tomoyoNativeInvoke=invoke;installHostTrans
 // Legacy /media paths address this reader, never the independent homepage.
 window.__tomeOverlayRoute=path=>{const reader=path==='@reader'||/^\/media\/\d+\/?$/.test(path);native('window_action',{action:reader?'enter_overlay':'show_home'}).catch(()=>{});};
 function appearance(p){const light=p.themeMode==='light',values={'--theme-primary':p.accent||'#ad1539','--theme-background':light?'#f5f5f7':p.themeMode==='black'?'#08090c':'#14161b','--theme-surface':light?'#ffffff':'#24272e','--theme-border':light?'#d5d6de':'#393e49','--theme-text':light?'#252832':'#f3f3f5','--theme-textSecondary':light?'#626878':'#adb1bc'};for(const[key,value]of Object.entries(values))document.documentElement.style.setProperty(key,value);document.documentElement.style.colorScheme=light?'light':'dark';if(p.fontFamily)document.documentElement.style.fontFamily='"'+String(p.fontFamily).replace(/["\\;{}]/g,'')+'",sans-serif';}
-function event(message){if(!loaded){queued.push(message);return;}if(message.type==='activeGame'){localStorage.setItem('tomoyo-reader-path',message.legacyId==null?'':'/media/'+message.legacyId);return;}const b=window.__tomoyoChinese;if(!b)return;
+function event(message){if(!loaded){queued.push(message);return;}if(typeof message.bound==='boolean')window.__megulitReaderIntervals?.setBound(message.bound);if(message.type==='gameClosed')window.__megulitReaderIntervals?.setBound(false);if(message.type==='activeGame'){localStorage.setItem('tomoyo-reader-path',message.legacyId==null?'':'/media/'+message.legacyId);return;}const b=window.__tomoyoChinese;if(!b)return;
  if(message.type==='compositorLookup'){b.compositorLookup?.(message);return;} if(message.type==='word-status-changed'){dispatchEvent(new Event('tome-word-status-changed'));return;}if(message.type==='sentence-saved'){dispatchEvent(new Event('tome-sentences-changed'));return;}
  if(message.type==='appearance'){appearance(message.preferences);return;}
  if(message.type==='panelAppearance'){for(const[key,value]of Object.entries(message.values||{}))if(['tome-background','tome-menu-background'].includes(key))localStorage.setItem(key,value);b.hostRefreshAppearance?.().catch(error=>{status.textContent=String(error);});return;}
@@ -45,7 +45,7 @@ function event(message){if(!loaded){queued.push(message);return;}if(message.type
  if(message.type==='call'){deliver({replies:[message]});return;}
  /* Alt+M bound the window in front, or said why not (services/bind-hotkey.cjs) */
  if(message.type==='bindHotkeyResult'){b.bindHotkeyResult?.(message);return;}
- const method={glassFrame:'glassFrame',gameStyleStatus:'gameStyleStatus',hookTextPos:'textPosition',textPlace:'textPlace',textPlaceMode:'textPlaceMode',textPlaceExtra:'textPlaceExtra',textPlacePage:'textPlacePage',artText:'artText',enginePreferences:'enginePreferences',hookPage:'hookPage',waitMarkerFrame:'waitMarkerFrame',maskFrame:'galMaskFrame'}[message.type];
+ const method={glassFrame:'glassFrame',gameStyleStatus:'gameStyleStatus',hookTextPos:'textPosition',lineStyleSample:'lineStyleSample',textPlace:'textPlace',textPlaceMode:'textPlaceMode',textPlaceExtra:'textPlaceExtra',textPlacePage:'textPlacePage',artText:'artText',enginePreferences:'enginePreferences',hookPage:'hookPage',waitMarkerFrame:'waitMarkerFrame',maskFrame:'galMaskFrame'}[message.type];
  if(method){b[method]?.(message);return;}
  if(message.type==='workTranslationPrompt'){b.workTranslationPrompt?.(message.key,message.prompt);return;}
  if(typeof message.hookNativeLog==='boolean'){document.body.classList.toggle('megulit-native-log',message.hookNativeLog);window.__tomoyoHitRegionsRefresh?.(true);}
@@ -54,12 +54,17 @@ function event(message){if(!loaded){queued.push(message);return;}if(message.type
  if(message.type==='dialogVisibility'){document.body.classList.toggle('megulit-dialog-hidden',message.visible===false);/* 2026-11-13 choices on screen while the game hid its text box: the reader shows them, not the old line */document.body.classList.toggle('megulit-choice-only',message.choiceOnly===true);return;}
  if(message.type==='fonts'){b.gameFonts?.(message.fonts);return;}
  /* which hotkeys the bridge holds (ready / hotkeyState): those keys have their single path there (settings.js) */if(typeof message.hotkey==='boolean')b.nativeHotkeys={menu:message.hotkey,cover:message.coverHotkey===true};
+ /* 2026-11-21 layered game profile (core/profiles, hook state gameProfile): the running game's frozen kernel+engine+game settings.
+    Reader modules read window.MeguLitProfile.get('placement.firstLineAnchor',fallback), never the program name; 'megulit-profile' fires on change */
+ if(message.gameProfile&&typeof message.gameProfile==='object'){const freeze=v=>{if(v&&typeof v==='object'&&!Object.isFrozen(v)){Object.freeze(v);for(const x of Object.values(v))freeze(x);}return v;};const data=freeze(JSON.parse(JSON.stringify(message.gameProfile)));
+  window.MeguLitProfile=Object.freeze({data,get:(key,fallback)=>{let v=data;for(const k of String(key).split('.')){if(v==null||typeof v!=='object')return fallback;v=v[k];}return v===undefined||v===null?fallback:v;}});b.gameProfile=data;
+  document.body.dataset.gameProfile=String(data.gameKey||'');document.body.dataset.gameEngine=String(data.engine||'');dispatchEvent(new CustomEvent('megulit-profile',{detail:data}));}
  if(message.type==='hotkey')b.toggleGalMenu?.();else b.galStatus?.(message);
  b.learningStatus?.(message);b.hookReaderStatus?.();
  // interface-mode-host owns mode navigation, avoiding a duplicate home reveal/focus.
 }
 try{
- const home=await api('home'),saved=await api('ui_state'),bootstrap=await api('reader_bootstrap');uiState=saved;window.__tomoyoEngines=bootstrap.engines;window.__tomoyoNativePreferences=bootstrap.native;
+ const home=await api('home'),saved=await api('ui_state'),bootstrap=await api('reader_bootstrap');uiState=saved;window.__tomoyoEngines=bootstrap.engines;window.__tomoyoModelLists=bootstrap.models||{};window.__tomoyoNativePreferences=bootstrap.native;
  for(const[key,value]of Object.entries(saved))localStorage.setItem(key,value);
  for(const[key,value]of Object.entries(saved))if(key.startsWith('tome-')&&legacyKey(key.replace(/^tome-/,'tomoyo-')))localStorage.setItem(key.replace(/^tome-/,'tomoyo-'),value);
  window.__tomoyoUiState=snapshot();localStorage.setItem('tome-ui-language',home.preferences.language);localStorage.setItem('tomoyo-ui-language',home.preferences.language);appearance(home.preferences);

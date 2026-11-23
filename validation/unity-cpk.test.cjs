@@ -20,13 +20,47 @@ test('DRV3 SPC compression and STX tags',()=>{
  assert.deepEqual(drv3.parse(Buffer.concat([b,Buffer.from(s[0]+'\0','utf16le')])).lines,['やあ']);});
 test('CRI @UTF cipher round-trips',()=>{const t=Buffer.from('@UTF....');assert.equal(cpk.unmask(cpk.unmask(t)).toString(),t.toString());});
 const dr='e:/steam/steamapps/common/Danganronpa V3 Killing Harmony';
+
+test('Unity message blocks keep a screen of dialogue together with its speaker and ruby',()=>{
+ const script=[
+  '#L(準備)', 'これは制御用の文です。', '#MesName(%rbs旅{たび}%rbe@s人)',
+  '#MesSta(00001_01,1)', '「%co2明日%coeは', '#SoundEffect(bell)',
+  '%dot(%rbs晴(は)%rbeれ)だよ！」', '#MesEnd()', '#MesName()', '#MesSta()',
+  '%hosよかった%hoe。', '#MesEnd()', '#MesName(案内人)', '#MesSta()',
+  'English text only.', '#MesEnd()',
+ ].join('\r\n');
+ const result=ua.parse(Buffer.from('\uFEFF'+script));
+ assert.deepEqual(result.lines,['「明日は\n晴れだよ！」','よかった。']);
+ assert.deepEqual(result.speakers,['旅 人','']);
+ assert.deepEqual(result.ruby,[[['晴','は']],null]);
+});
+
+test('Unity message blocks flush at a new message and leave other Unity scripts alone',()=>{
+ const script='#MesSta()\n一つ目です。\n#MesName(葵)\n#MesSta()\n次です。\n#MesEnd()\n#MesSta()\n終わりです。';
+ const result=ua.parse(Buffer.from(script));
+ assert.deepEqual(result.lines,['一つ目です。','次です。','終わりです。']);
+ assert.deepEqual(result.speakers,['','葵','葵']);
+ assert.equal(result.ruby,undefined);
+ for(const marker of ['#MesSta()', '#MesEnd()', '#MesEnd()\n#MesSta()', '#MesSta()\n#MesEnd()', '#MesSta() is a comment\n#MesEnd()']){
+  assert.deepEqual(ua.parse(Buffer.from('普通の台詞です。\n'+marker)).lines,['普通の台詞です。']);
+ }
+});
+
+test('Unity messages keep unmarked narration after a message and pauses in the CJK script',()=>{
+ const script=['#MesSta()', '「%dot(長い','文章)」','#MesEnd()', '続きの台詞です。','//表示しない注釈',';この行も注釈',
+  '#MesEnd()','#MesSta()','「……」','#MesEnd()'].join('\n');
+ assert.deepEqual(ua.parse(Buffer.from(script)).lines,['「長い\n文章」','続きの台詞です。','「……」']);
+ const english=['#MesSta()', 'Good morning.','#MesEnd()','#MesSta()','「……」','#MesEnd()'].join('\n');
+ assert.deepEqual(ua.parse(Buffer.from(english)).lines,[]);
+});
 test('Danganronpa V3 (Steam): CPK → SPC → STX text',{skip:!fs.existsSync(dr)&&'no local copy'},()=>{
  assert.equal(scenes.detect(dr),'drv3');const l=scenes.read('drv3',dr);assert.ok(l.length>5000);assert.ok(l.some(s=>s.lines.some(x=>/\w{4,}/.test(x))));});
 const hs='e:/steam/steamapps/common/海沙风云';
 test('海沙风云 (Unity + Fungus JSON in TextAssets)',{skip:!fs.existsSync(hs)&&'no local copy'},()=>{
  assert.equal(scenes.detect(hs),'unity-assets');const l=scenes.read('unity-assets',hs);const big=l.find(s=>s.name==='脑死部分');assert.ok(big&&big.lines.length>1000);assert.equal(big.lines[0],'这里是贝让旧城区的港口。');});
 // ゆのはな: MAGES SC3 scripts in script.cpk (user contribution 36de7c9b, first 2 MB of the CPK only)
-const yuno=require('node:fs').readdirSync('h:/MeguLit-Work/contrib').find(n=>n.startsWith('36de7c9b'));
+/* the contribution folder is on the maintainer's machine only: elsewhere (CI) the test is skipped, not the whole file failed */
+let yuno=null;try{yuno=fs.readdirSync('h:/MeguLit-Work/contrib').find(n=>n.startsWith('36de7c9b'));}catch{}
 const yunoCpk=yuno&&'h:/MeguLit-Work/contrib/'+yuno+'/files/data/script.cpk.section.head';
 test('ゆのはな: SC3 scenes inside a CRI CPK read as Japanese',{skip:!(yunoCpk&&fs.existsSync(yunoCpk))&&'no contribution copy'},()=>{
  const tmp=fs.mkdtempSync(require('node:os').tmpdir()+'/yuno-');try{fs.mkdirSync(tmp+'/data');fs.copyFileSync(yunoCpk,tmp+'/data/script.cpk');

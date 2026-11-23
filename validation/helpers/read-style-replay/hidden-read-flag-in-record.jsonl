@@ -1,0 +1,71 @@
+{"t":"meta","engine":"krkr-textrender","kind":"synthetic","about":"read flag in the line record, before or after the sentence"}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（1）"}
+{"t":"dread","text":"静かな朝の光が部屋に差し込んでいた。（1）","read":true}
+{"t":"drawn","text":"静かな朝の光が部屋に差し込んでいた。（1）","color":"#eedefe"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":1}
+{"t":"status","text":"「おはよう、今日は早いんだね」（2）"}
+{"t":"dread","text":"「おはよう、今日は早いんだね」（2）","read":true}
+{"t":"drawn","text":"「おはよう、今日は早いんだね」（2）","color":"#eedefe"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":2}
+{"t":"status","text":"彼女は窓の外を見つめたまま答えない。（3）"}
+{"t":"dread","text":"彼女は窓の外を見つめたまま答えない。（3）","read":false}
+{"t":"drawn","text":"彼女は窓の外を見つめたまま答えない。（3）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":3}
+{"t":"status","text":"「……昨日のこと、覚えてる？」（4）"}
+{"t":"dread","text":"「……昨日のこと、覚えてる？」（4）","read":false}
+{"t":"drawn","text":"「……昨日のこと、覚えてる？」（4）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":4}
+{"t":"status","text":"俺は言葉に詰まって視線を落とした。（5）"}
+{"t":"dread","text":"俺は言葉に詰まって視線を落とした。（5）","read":true}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":5,"note":"no colour for this line: the last sample of the same state"}
+{"t":"dread","text":"静かな朝の光が部屋に差し込んでいた。（6）","read":true}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（6）"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":6,"note":"no colour for this line: the last sample of the same state"}
+{"t":"status","text":"「おはよう、今日は早いんだね」（7）"}
+{"t":"dread","text":"「おはよう、今日は早いんだね」（7）","read":false}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":7,"note":"no colour for this line: the last sample of the same state"}
+{"t":"dread","text":"彼女は窓の外を見つめたまま答えない。（8）","read":true}
+{"t":"status","text":"彼女は窓の外を見つめたまま答えない。（8）"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":8,"note":"no colour for this line: the last sample of the same state"}
+{"t":"status","text":"「……昨日のこと、覚えてる？」（9）"}
+{"t":"dread","text":"「……昨日のこと、覚えてる？」（9）","read":true}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":9,"note":"no colour for this line: the last sample of the same state"}
+{"t":"dread","text":"俺は言葉に詰まって視線を落とした。（10）","read":false}
+{"t":"status","text":"俺は言葉に詰まって視線を落とした。（10）"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":10,"note":"no colour for this line: the last sample of the same state"}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（11）"}
+{"t":"dread","text":"静かな朝の光が部屋に差し込んでいた。（11）","read":true}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":11,"note":"no colour for this line: the last sample of the same state"}
+{"t":"dread","text":"「おはよう、今日は早いんだね」（12）","read":true}
+{"t":"status","text":"「おはよう、今日は早いんだね」（12）"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":12,"note":"no colour for this line: the last sample of the same state"}
+{"t":"status","text":"彼女は窓の外を見つめたまま答えない。（13）"}
+{"t":"dread","text":"彼女は窓の外を見つめたまま答えない。（13）","read":false}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":13,"note":"no colour for this line: the last sample of the same state"}
+{"t":"dread","text":"「……昨日のこと、覚えてる？」（14）","read":true}
+{"t":"status","text":"「……昨日のこと、覚えてる？」（14）"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":14,"note":"no colour for this line: the last sample of the same state"}
+{"t":"status","text":"俺は言葉に詰まって視線を落とした。（15）"}
+{"t":"dread","text":"俺は言葉に詰まって視線を落とした。（15）","read":true}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":15,"note":"no colour for this line: the last sample of the same state"}
+{"t":"dread","text":"静かな朝の光が部屋に差し込んでいた。（16）","read":false}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（16）"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":16,"note":"no colour for this line: the last sample of the same state"}
+{"t":"status","text":"「おはよう、今日は早いんだね」（17）"}
+{"t":"dread","text":"「おはよう、今日は早いんだね」（17）","read":true}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":17,"note":"no colour for this line: the last sample of the same state"}
+{"t":"dread","text":"彼女は窓の外を見つめたまま答えない。（18）","read":true}
+{"t":"status","text":"彼女は窓の外を見つめたまま答えない。（18）"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":18,"note":"no colour for this line: the last sample of the same state"}
+{"t":"status","text":"「……昨日のこと、覚えてる？」（19）"}
+{"t":"dread","text":"「……昨日のこと、覚えてる？」（19）","read":false}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":19,"note":"no colour for this line: the last sample of the same state"}
+{"t":"dread","text":"俺は言葉に詰まって視線を落とした。（20）","read":true}
+{"t":"status","text":"俺は言葉に詰まって視線を落とした。（20）"}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":20,"note":"no colour for this line: the last sample of the same state"}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（21）"}
+{"t":"dread","text":"静かな朝の光が部屋に差し込んでいた。（21）","read":true}
+{"t":"expect","color":"#eedefe","edge":null,"readClass":true,"line":21,"note":"no colour for this line: the last sample of the same state"}
+{"t":"dread","text":"「おはよう、今日は早いんだね」（22）","read":false}
+{"t":"status","text":"「おはよう、今日は早いんだね」（22）"}
+{"t":"expect","color":"#fefefe","edge":null,"readClass":false,"line":22,"note":"no colour for this line: the last sample of the same state"}

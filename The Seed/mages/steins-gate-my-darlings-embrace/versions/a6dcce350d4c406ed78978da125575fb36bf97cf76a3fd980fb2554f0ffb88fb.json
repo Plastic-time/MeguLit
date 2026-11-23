@@ -1,0 +1,58 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "a6dcce350d4c406ed78978da125575fb36bf97cf76a3fd980fb2554f0ffb88fb",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true,
+   "engineTable": {
+    "engine": "mages",
+    "drawDialogue": [
+     "0x70480",
+     "0x708b0"
+    ],
+    "drawGlyph": "0x47000",
+    "commit": "0x6f960",
+    "clear": [
+     "0x6fc60",
+     "0x6ffd0"
+    ],
+    "pages": "0x1b4e960",
+    "stride": "0x3348c",
+    "chars": 7000,
+    "scale": "0x12d418",
+    "layoutCount": "0x1d50638",
+    "layoutCodes": "0x1d50640",
+    "layoutInfo": "0x1d5aa58",
+    "backbuffer": [
+     "0x31d6cd0",
+     "0x31d6cd4"
+    ],
+    "menuText": [
+     "0x699e0",
+     "0x6a190"
+    ],
+    "selPage": 7,
+    "sysSelPage": 5,
+    "charset": "sgmde",
+    "canvas": [
+     1920,
+     1080
+    ]
+   }
+  }
+ },
+ "exe": "Game.exe",
+ "engine": "mages",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "a6dcce350d4c406ed78978da125575fb36bf97cf76a3fd980fb2554f0ffb88fb",
+  "head": "e11932e7d65b28ce5132ba4110d9ce07dfdb95bb1986a71ee64fc5b12743cfa6",
+  "pe": "1.0.0.0@5f4f3c3f"
+ },
+ "rev": 1
+}

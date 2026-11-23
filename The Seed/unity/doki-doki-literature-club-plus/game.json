@@ -1,0 +1,67 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "19e3c0a2e7388ec29357238c6803d928507d38c4b613b70379dd6a9fc8efe05d",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "unity",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "199aed88c3c1bb41eb60f53a139a40e1b7253d618fc6431ffa8a5f64ca99b660",
+  "title": "2177b35ead8967322e67948bf5f1244911d8c3c080a342da62b08c42e616de42",
+  "steam": "1388880",
+  "vndb": "v21905"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "doki-doki-literature-club-plus",
+ "builds": [
+  "b17b6a1e21e7beae66b256da045c02a5bf624e0c3ed3d7590167ee4d2f3cb7c5"
+ ],
+ "match": {
+  "exe": [
+   "Doki Doki Literature Club Plus.exe"
+  ],
+  "titles": [
+   "Doki Doki Literature Club Plus!",
+   "Doki Doki Literature Club!"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

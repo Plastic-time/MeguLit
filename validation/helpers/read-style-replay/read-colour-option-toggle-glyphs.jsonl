@@ -1,0 +1,69 @@
+{"t":"meta","engine":"krkr-textrender","kind":"synthetic","about":"read colour option switched while playing, glyph colour path"}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（1）"}
+{"t":"drawn","text":"静かな朝の光が部屋に差し込んでいた。（1）","color":"#f7f77b"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":1}
+{"t":"status","text":"「おはよう、今日は早いんだね」（2）"}
+{"t":"drawn","text":"「おはよう、今日は早いんだね」（2）","color":"#f7f77b"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":2}
+{"t":"status","text":"彼女は窓の外を見つめたまま答えない。（3）"}
+{"t":"drawn","text":"彼女は窓の外を見つめたまま答えない。（3）","color":"#f7f77b"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":3}
+{"t":"status","text":"「……昨日のこと、覚えてる？」（4）"}
+{"t":"drawn","text":"「……昨日のこと、覚えてる？」（4）","color":"#f7f77b"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":4}
+{"t":"status","text":"俺は言葉に詰まって視線を落とした。（5）"}
+{"t":"drawn","text":"俺は言葉に詰まって視線を落とした。（5）","color":"#f7f77b"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":5}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（6）"}
+{"t":"drawn","text":"静かな朝の光が部屋に差し込んでいた。（6）","color":"#f7f77b"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":6}
+{"t":"status","text":"「おはよう、今日は早いんだね」（7）"}
+{"t":"drawn","text":"「おはよう、今日は早いんだね」（7）","color":"#f7f77b"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":7}
+{"t":"status","text":"彼女は窓の外を見つめたまま答えない。（8）"}
+{"t":"drawn","text":"彼女は窓の外を見つめたまま答えない。（8）","color":"#f7f77b"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":8}
+{"t":"drawn","text":"彼女は窓の外を見つめたまま答えない。（8）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":9,"note":"option off: the glyphs of the sentence on screen changed colour"}
+{"t":"status","text":"「……昨日のこと、覚えてる？」（9）"}
+{"t":"drawn","text":"「……昨日のこと、覚えてる？」（9）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":10}
+{"t":"status","text":"俺は言葉に詰まって視線を落とした。（10）"}
+{"t":"drawn","text":"俺は言葉に詰まって視線を落とした。（10）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":11}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（11）"}
+{"t":"drawn","text":"静かな朝の光が部屋に差し込んでいた。（11）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":12}
+{"t":"status","text":"「おはよう、今日は早いんだね」（12）"}
+{"t":"drawn","text":"「おはよう、今日は早いんだね」（12）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":13}
+{"t":"status","text":"彼女は窓の外を見つめたまま答えない。（13）"}
+{"t":"drawn","text":"彼女は窓の外を見つめたまま答えない。（13）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":14}
+{"t":"status","text":"「……昨日のこと、覚えてる？」（14）"}
+{"t":"drawn","text":"「……昨日のこと、覚えてる？」（14）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":15}
+{"t":"status","text":"俺は言葉に詰まって視線を落とした。（15）"}
+{"t":"drawn","text":"俺は言葉に詰まって視線を落とした。（15）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":16}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（16）"}
+{"t":"drawn","text":"静かな朝の光が部屋に差し込んでいた。（16）","color":"#fefefe"}
+{"t":"expect","color":"#fefefe","edge":null,"line":17}
+{"t":"drawn","text":"「おはよう、今日は早いんだね」（17）","color":"#f7f77b"}
+{"t":"status","text":"「おはよう、今日は早いんだね」（17）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":18,"note":"option on again; the colour arrives before the sentence"}
+{"t":"drawn","text":"彼女は窓の外を見つめたまま答えない。（18）","color":"#f7f77b"}
+{"t":"status","text":"彼女は窓の外を見つめたまま答えない。（18）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":19,"note":"option on again; the colour arrives before the sentence"}
+{"t":"drawn","text":"「……昨日のこと、覚えてる？」（19）","color":"#f7f77b"}
+{"t":"status","text":"「……昨日のこと、覚えてる？」（19）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":20,"note":"option on again; the colour arrives before the sentence"}
+{"t":"drawn","text":"俺は言葉に詰まって視線を落とした。（20）","color":"#f7f77b"}
+{"t":"status","text":"俺は言葉に詰まって視線を落とした。（20）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":21,"note":"option on again; the colour arrives before the sentence"}
+{"t":"drawn","text":"静かな朝の光が部屋に差し込んでいた。（21）","color":"#f7f77b"}
+{"t":"status","text":"静かな朝の光が部屋に差し込んでいた。（21）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":22,"note":"option on again; the colour arrives before the sentence"}
+{"t":"drawn","text":"「おはよう、今日は早いんだね」（22）","color":"#f7f77b"}
+{"t":"status","text":"「おはよう、今日は早いんだね」（22）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":23,"note":"option on again; the colour arrives before the sentence"}

@@ -21,6 +21,14 @@ AVATAR_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
 HOT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
 HOT_MIN_USERS = "3"
 REPORT_THRESHOLD = "3"
+# 2026-11-21 Cardinal (src/cardinal.js): an auto diff becomes verified with >= VERIFY_VOTERS different reporters, mean total >= VERIFY_MEAN and no vote
+# below VERIFY_FLOOR; mean < REPAIR_MEAN (with >= REPAIR_VOTERS reporters) sends it to the repair queue; votes under MIN_LINES lines do not count.
+CARDINAL_VERIFY_VOTERS = "3"
+CARDINAL_VERIFY_MEAN = "0.9"
+CARDINAL_VERIFY_FLOOR = "0.6"
+CARDINAL_REPAIR_MEAN = "0.6"
+CARDINAL_REPAIR_VOTERS = "3"
+CARDINAL_MIN_LINES = "30"
 # E415 日报 sources whose full article text the relay may cache (only with the site's permission), comma separated
 # source ids: moepedia, 4gamer, denfami. Empty = the app fetches articles on the user's PC.
 NEWS_FULLTEXT_SOURCES = ""

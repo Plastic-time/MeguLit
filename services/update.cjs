@@ -17,7 +17,8 @@ const HOSTS=new Set(['github.com','objects.githubusercontent.com','release-asset
 /* E??? (user report 2026-11-13: "更新显示下载失败"): the site's own R2 mirror (dl.megulit.com, what the
    download buttons on megulit.com use) is tried as well. It serves GitHub's own package by file name, supports Range
    requests and is reachable in mainland China when GitHub and the gh proxies are not; the sha256 digest still decides. */
-const MIRRORS=['https://gh-proxy.com/{url}','https://ghproxy.net/{url}','https://ghfast.top/{url}'];
+/* 2026-11-20: the GitHub relays come from setup/runtime.json (core/download-sources.cjs), the list setup uses too */
+const MIRRORS=(()=>{try{const r=require('../core/download-sources.cjs').relays().map(m=>m.url);if(r.length)return r;}catch{}return ['https://gh-proxy.com/{url}','https://ghproxy.net/{url}','https://ghfast.top/{url}'];})();
 const DL_MIRRORS=['https://dl.megulit.com/','https://cn-dl.megulit.com/'];
 const MIRROR_HOSTS=new Set([...MIRRORS.map(m=>new URL(m.replace('{url}','')).hostname),...DL_MIRRORS.map(u=>new URL(u).hostname)]);
 const inChina=()=>{try{const o=Intl.DateTimeFormat().resolvedOptions();return o.timeZone==='Asia/Shanghai'||o.timeZone==='Asia/Urumqi'||/^zh-CN/i.test(o.locale||'');}catch{return false;}};
@@ -112,29 +113,26 @@ async function check(current,fetcher=fetch,root=''){current=String(current||'').
  return {current,latest:rel.version,newer:isNewer,hotfix,hot:!!hot,silent:!!hot,hotFailed:failed,hotSize:hot?hot.size:0,size:rel.size,previousSize:previous,delta:previous?rel.size-previous:null,notes:rel.notes,page:rel.page,published:rel.published,phase:state.phase};
 }
 
-/* Writes zip + script; resolves when the package is verified and ready to install.
-   E289: a connection that drops near the end no longer throws the whole package away. What arrived is kept in `part`
-   and the next try (same source again, then the next one) asks only for the rest with an HTTP Range request; a source
-   that ignores the range sends the whole file and the kept part is replaced. The digest still checks the result. */
-async function download(url,rel,fetcher=fetch,part={chunks:[],length:0}){
- const control=new AbortController();let idle=setTimeout(()=>control.abort(),30000);const poke=()=>{clearTimeout(idle);idle=setTimeout(()=>control.abort(),30000);};
+/* Fetches one package through core/fast-download.cjs and returns its bytes.
+   E289 kept: a connection that drops keeps what arrived (cache/update/<name>.part + .part.json) and the next try asks only
+   for the missing ranges. 2026-11-19 (hundreds of mainland players, downloads crawled on dl.megulit.com): every source is
+   measured at once and the fast ones are pulled in parallel Range pieces; a slow or silent connection moves to another
+   source. Only GitHub and the known mirrors may answer (a redirect elsewhere is refused); size, zip header and the sha256
+   digest still decide. */
+async function download(urls,rel,fetcher,zip,root){
+ const accept=(r,url)=>{const final=new URL(r.url||url);if(final.protocol!=='https:'||!(HOSTS.has(final.hostname)||MIRROR_HOSTS.has(final.hostname)))throw Error('UPDATE_URL_REJECTED');};
  try{
-  const from=rel.size&&part.length>0&&part.length<rel.size?part.length:0;if(!from){part.chunks=[];part.length=0;}
-  const headers={'User-Agent':'MeguLit-Updater',...(from?{Range:'bytes='+from+'-'}:{})};
-  const r=await fetcher(url,{headers,redirect:'follow',signal:AbortSignal.any?AbortSignal.any([control.signal,AbortSignal.timeout(600000)]):control.signal});
-  if(!r.ok)throw Error('HTTP_'+r.status);
-  const final=new URL(r.url||url);if(final.protocol!=='https:'||!(HOSTS.has(final.hostname)||MIRROR_HOSTS.has(final.hostname)))throw Error('UPDATE_URL_REJECTED');
-  if(from&&r.status!==206){part.chunks=[];part.length=0;}
-  state.received=part.length;poke();
-  if(r.body&&r.body.getReader){const reader=r.body.getReader();for(;;){const {done,value}=await reader.read();if(done)break;poke();const b=Buffer.from(value);part.chunks.push(b);part.length+=b.length;state.received=part.length;}}
-  else{const b=Buffer.from(await r.arrayBuffer());part.chunks.push(b);part.length+=b.length;state.received=part.length;}
-  const data=Buffer.concat(part.chunks);
-  if(rel.size&&data.length<rel.size)throw Error('UPDATE_INCOMPLETE');
-  if(rel.size&&data.length!==rel.size){part.chunks=[];part.length=0;throw Error('UPDATE_SIZE_MISMATCH');}
-  if(data.subarray(0,2).toString('latin1')!=='PK'){part.chunks=[];part.length=0;throw Error('UPDATE_NOT_ZIP');}
-  if(rel.digest&&crypto.createHash('sha256').update(data).digest('hex')!==rel.digest){part.chunks=[];part.length=0;throw Error('UPDATE_HASH_MISMATCH');}
-  return data;
- }catch(error){throw Error(control.signal.aborted&&!/^UPDATE_/.test(error.message)?'STALLED':error.message);}finally{clearTimeout(idle);}
+  await require('../core/fast-download.cjs').download({urls,china:inChina(),dest:zip,size:rel.size||0,sha256:rel.digest||'',fetch:fetcher,accept,userAgent:'MeguLit-Updater',
+   onProgress:p=>{state.received=p.received;if(p.total)state.total=p.total;},log:line=>updateLog(root,'download '+line)});
+ }catch(error){
+  if(error.code==='HASH_MISMATCH')throw Error('UPDATE_HASH_MISMATCH');if(error.code==='SIZE_MISMATCH')throw Error('UPDATE_SIZE_MISMATCH');
+  if(/UPDATE_URL_REJECTED/.test(String(error.message)))throw Error('UPDATE_URL_REJECTED');
+  if(/STALLED/.test(String(error.last&&error.last.code)))throw Error('STALLED');
+  throw Error('UPDATE_DOWNLOAD_FAILED');
+ }
+ const data=fs.readFileSync(zip);
+ if(data.subarray(0,2).toString('latin1')!=='PK'){fs.rmSync(zip,{force:true});throw Error('UPDATE_NOT_ZIP');}
+ return data;
 }
 function start(root,current,fetcher=fetch){current=String(current||'').trim().replace(/^v/,'');
  if(job)return job;
@@ -148,27 +146,18 @@ function start(root,current,fetcher=fetch){current=String(current||'').trim().re
    let data=null;
    /* A package downloaded earlier (user chose "later") is reused when it still verifies. */
    if(fs.existsSync(zip)){const old=fs.readFileSync(zip);if((!rel.size||old.length===rel.size)&&(!rel.digest||crypto.createHash('sha256').update(old).digest('hex')===rel.digest))data=old;}
-   /* One source after another; a source that stalls for 30 s, fails or delivers a different file is skipped. A
-      size or digest mismatch on every source usually means the release was replaced meanwhile (hotfix), so the
-      release is read again once and the download repeated. */
+   /* All sources together (core/fast-download.cjs); a size or digest mismatch on every source usually means the release
+      was replaced meanwhile (hotfix), so the release is read again once and the download repeated. */
    let pick=rel;
    for(let round=0;!data&&round<2;round++){
     if(round&&pick.isHot)break;
     if(round){try{const fresh=await latest(fetcher);if(fresh.digest===pick.digest&&fresh.size===pick.size)break;pick=fresh;state.total=fresh.size||0;}catch{break;}}
-    const part={chunks:[],length:0};
-    for(const url of sources(pick)){
-     // A source that delivered part of the file gets two more tries to finish it before the next source continues.
-     for(let attempt=0;!data&&attempt<3;attempt++){
-      const before=part.length;
-      try{data=await download(url,pick,fetcher,part);}
-      catch(error){updateLog(root,'download failed '+new URL(url).hostname+' '+error.message+' at '+part.length+'/'+(pick.size||0));if(part.length<=before)break;}
-     }
-     if(data)break;
-    }
+    try{data=await download(sources(pick),pick,fetcher,zip,root);}
+    catch(error){updateLog(root,'download failed '+error.message+' ('+(pick.size||0)+' bytes)');if(!/^UPDATE_(HASH|SIZE)_MISMATCH$|^UPDATE_NOT_ZIP$/.test(error.message))break;}
    }
    if(!data)throw Error('UPDATE_DOWNLOAD_FAILED');
    rel=pick;const hash=crypto.createHash('sha256').update(data).digest('hex');
-   fs.writeFileSync(zip,data);
+   if(!fs.existsSync(zip))fs.writeFileSync(zip,data);
    if(rel.isHot){state={phase:'ready',version:rel.version,total:data.length,received:data.length,sha256:full,zip,hot:true};return status();}
    fs.writeFileSync(ps1,'﻿'+script(),'utf8');
    state={phase:'ready',version:rel.version,total:data.length,received:data.length,sha256:hash,zip,ps1};
@@ -197,7 +186,11 @@ function launchScript(root,{run=spawn}={}){
  });
 }
 /* the page could not finish a silent hot update (hot_reload refused or failed after the files were written) */
-function hotFail(root,reason){const version=state.version||found?.version||'';if(!version)return {recorded:false};markHotFailed(root,version,String(reason||'HOT_FAILED').slice(0,200));if(found)found.useHot=false;return {recorded:true,version};}
+function hotFail(root,reason){const version=state.version||found?.version||'';if(!version)return {recorded:false};markHotFailed(root,version,String(reason||'HOT_FAILED').slice(0,200));if(found)found.useHot=false;
+ /* a hot package downloaded but refused before it was applied (hot_reload dry run) is dropped with its finished job:
+    start() returned that job again and the card got the same small package instead of downloading the full one */
+ if(state.hot&&state.phase==='ready'){try{if(state.zip)fs.rmSync(state.zip,{force:true});}catch{}job=null;state={phase:'available',version,total:found?.size||0,received:0,hot:false};}
+ return {recorded:true,version};}
 async function install(root,options={}){
  if(state.phase!=='ready'||!state.zip||!fs.existsSync(state.zip))throw Error('UPDATE_NOT_READY');
  if(state.hot){

@@ -25,23 +25,18 @@ class ModelStore{
  download(id,source='hf'){
   const m=this.find(id),base=SOURCES[source]||SOURCES.hf;const old=this.jobs[id];if(old?.state==='downloading')return this.status();
   const controller=new AbortController(),job={state:'downloading',received:0,total:0,error:'',controller};this.jobs[id]=job;
-  const target=this.file(m),part=target+'.part';
+  const target=this.file(m);
   (async()=>{try{
     fs.mkdirSync(this.dir,{recursive:true});
-    const order=[base,...Object.values(SOURCES).filter(x=>x!==base)];let last=null,done=false;
-    for(const src of order){if(controller.signal.aborted)break;
-     const attempt=new AbortController(),stop=()=>attempt.abort();controller.signal.addEventListener('abort',stop,{once:true});let idle=setTimeout(stop,30000);
-     try{let have=0;try{have=fs.statSync(part).size;}catch{}
-      const res=await fetch(src+'/'+m.repo+'/resolve/main/'+encodeURIComponent(m.file)+(src.includes('dl.megulit.com')?'':'?download=true'),{redirect:'follow',signal:attempt.signal,headers:have?{Range:'bytes='+have+'-'}:{}});
-      if(res.status===416&&have>0){/* the .part already holds the whole file */done=true;break;}if(!res.ok||!res.body)throw Error('HTTP '+res.status);const resumed=have>0&&res.status===206;if(!resumed)have=0;
-      job.total=have+(Number(res.headers.get('content-length'))||0)||Math.round(m.size*1073741824);job.received=have;
-      const out=fs.createWriteStream(part,{flags:resumed?'a':'w'});
-      try{for await(const chunk of res.body){clearTimeout(idle);idle=setTimeout(stop,30000);job.received+=chunk.length;if(!out.write(chunk))await new Promise(r=>out.once('drain',r));}}finally{await new Promise(r=>out.end(r));}
-      if(job.total&&job.received<job.total)throw Error('incomplete');done=true;break;
-     }catch(e){last=e;}finally{clearTimeout(idle);controller.signal.removeEventListener('abort',stop);}
-    }
-    if(!done&&controller.signal.aborted)throw Error('cancelled');if(!done)throw Error('下载失败：HuggingFace、国内镜像和 MeguLit 中转都连不上（'+String(last?.message||last||'')+'），请检查网络后重试');
-    fs.renameSync(part,target);job.state='done';
+    /* 2026-11-19: core/fast-download.cjs measures every source at once (the chosen one first in the list) and pulls the
+       fast ones in parallel Range pieces; a slow or silent connection moves to another source and finished pieces survive
+       a cancel or a restart (<file>.part.json), so a 5 GB model never starts over. The size comes from the servers. */
+    const order=[base,...Object.values(SOURCES).filter(x=>x!==base),'https://cn-dl.megulit.com/hf'];
+    const urls=order.map(src=>src+'/'+m.repo+'/resolve/main/'+encodeURIComponent(m.file)+(src.includes('dl.megulit.com')?'':'?download=true'));
+    job.total=Math.round(m.size*1073741824);
+    try{await require('./fast-download.cjs').download({urls,dest:target,signal:controller.signal,onProgress:p=>{job.received=p.received;if(p.total)job.total=p.total;}});}
+    catch(e){if(controller.signal.aborted)throw Error('cancelled');throw Error('下载失败：HuggingFace、国内镜像和 MeguLit 中转都连不上（'+String((e.last&&e.last.message)||e.message||e)+'），请检查网络后重试');}
+    job.state='done';
    }catch(e){job.state=controller.signal.aborted?'cancelled':'error';job.error=controller.signal.aborted?'':String(e.message||e);}})();
   return this.status();
  }

@@ -8,6 +8,7 @@
    Any engine, any folder: evidence is read from the files only.
    Not evidence: KiriKiri Z's "-- SIGNATURE - SHA256/PSS/RSA --" .sig files (every file of a signed release has one). */
 const fs=require('node:fs'),path=require('node:path');
+const {isVersionedUpdater}=require('./launcher-language.cjs');
 
 const RULES=[
  {kind:'softdenchi',name:{zh:'软电池（SoftDenchi）正版验证',en:'SoftDenchi licence check',ja:'ソフト電池の認証'},needles:['soft-denchi','SoftDenchi','softdenchi','SdWrap']},
@@ -70,7 +71,9 @@ function replacementFor(list,target,allowTranslated){return list.filter(e=>usabl
    {kind, name:{zh,en,ja}, executable, launchVia, original, wrapped, changed, launcherNames, alternatives} */
 function plan(exe,{allowTranslated=true,source=''}={}){
  exe=String(exe||'');if(!/\.exe$/i.test(exe)||!stat(exe))return null;
- const dir=path.dirname(exe),list=classify(dir),self=list.find(e=>e.name.toLowerCase()===path.basename(exe).toLowerCase());if(!self)return null;
+ // An updater can have its own DRM, so exclude it before selecting either an engine or a launcher.
+ const list=classify(path.dirname(exe)).filter(e=>!isVersionedUpdater(e.name));
+ const self=list.find(e=>e.name.toLowerCase()===path.basename(exe).toLowerCase());if(!self)return null;
  const engines=list.filter(e=>e.role==='protected').sort((a,b)=>b.size-a.size);
  let target=null;
  if(self.role==='protected')target=self;
@@ -91,7 +94,10 @@ function plan(exe,{allowTranslated=true,source=''}={}){
 function roleOf(exe){const list=classify(path.dirname(exe));const e=list.find(x=>x.name.toLowerCase()===path.basename(exe).toLowerCase());return e?{role:e.role,kind:e.kind}:{role:'clean',kind:''};}
 /* Words for a launch that failed: why, and what to choose instead. */
 function hint(p,locale='zh'){
- if(!p)return '';const L=locale==='zh'?0:locale==='ja'?2:1,name=(p.name||RULE.softdenchi.name)[['zh','en','ja'][L]],wrapped=path.basename(p.wrapped||p.original||'');
+ if(!p)return '';const L=locale==='zh'?0:locale==='ja'?2:1;
+ /* E-SteamOwned: Steam's own wrapper (SteamStub) is no crack problem: the game needs Steam running and the account that owns it */
+ if(p.kind==='steam'){const w=path.basename(p.wrapped||p.original||'');return [`${w} 是 Steam 版，需要 Steam 在运行并登录购买它的账号才能启动（这是 Steam 自带的正版保护，不用找破解）。请先打开 Steam，确认在 Steam 库里能正常启动；也可以直接从 Steam 启动游戏，再在 MeguLit 按 Alt+M 绑定窗口`,`${w} is a Steam build: Steam must be running and signed in to the account that owns it (this is Steam's own licence check, no crack needed). Open Steam and check the game starts from the Steam library, or start it from Steam and press Alt+M in MeguLit to bind its window`,`${w} は Steam 版で、購入したアカウントで Steam を起動・ログインしている必要があります（Steam 標準の認証です）。Steam を開いてライブラリから起動できるか確認するか、Steam から起動して MeguLit で Alt+M を押してウィンドウを紐付けてください`][L];}
+ const name=(p.name||RULE.softdenchi.name)[['zh','en','ja'][L]],wrapped=path.basename(p.wrapped||p.original||'');
  const via=p.launchVia?path.basename(p.launchVia):'',alt=p.alternatives?.[0]||'';
  if(via)return [`${wrapped} 需要${name}，已改用同目录的 ${via} 启动。如果它也弹窗报错，请在「编辑作品」里换成其他能直接双击打开的程序`,`${wrapped} needs the ${name}, so MeguLit started it through ${via} in the same folder. If that also fails, choose another program that opens by double-click under Edit game`,`${wrapped} は${name}が必要なため、同じフォルダーの ${via} から起動しました。それも失敗する場合は「作品を編集」でダブルクリックで起動できる実行ファイルを選んでください`][L];
  if(alt)return [`${wrapped} 需要${name}，没装就会退出。请在「编辑作品」里换成 ${alt}`,`${wrapped} needs the ${name} and quits without it. Choose ${alt} under Edit game`,`${wrapped} は${name}が必要で、ないと終了します。「作品を編集」で ${alt} を選んでください`][L];

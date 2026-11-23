@@ -1,0 +1,66 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "12213c89e250454e5edb7bcf0bda3bab79dad20ef4c942d8b487b79c1fa428f3",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "spikechunsoft",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "title": "e50ea1da193539974908943ac1da8945593f8e3610265a946076fa23efc34d75",
+  "steam": "567640",
+  "vndb": "v18334"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "danganronpa-v3-killing-harmony",
+ "builds": [
+  "503073a67a2cc0056b7d11d400fb9736c65eec46ec6877478e6ff1ccb6526438"
+ ],
+ "match": {
+  "exe": [
+   "Dangan3Win.exe"
+  ],
+  "titles": [
+   "Danganronpa V3: Killing Harmony",
+   "ニューダンガンロンパV3 みんなのコロシアイ新学期"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

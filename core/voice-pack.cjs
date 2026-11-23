@@ -3,7 +3,7 @@
 // (free to use, no credit required). Downloaded only when the user asks (about 250 MB each), checked against the size
 // and SHA-256 that AivisHub publishes, then placed where AivisSpeech Engine loads models at start.
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node:crypto'),{Readable,Transform}=require('node:stream'),{pipeline}=require('node:stream/promises');
+const fs=require('node:fs'),path=require('node:path');
 const VOICES=[
  {uuid:'a59cb814-0083-4369-8542-f51a29e72af7',name:'まお',gender:'female',recommended:true},
  {uuid:'22e8ed77-94fe-4ef2-871f-a86f94e9a579',name:'コハク',gender:'female',recommended:true},
@@ -43,10 +43,31 @@ class VoicePack{
   const meta=await(await this.fetch(API+voice.uuid,{signal:job?AbortSignal.any([job.controller.signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)})).json();const file=(meta.model_files||[]).find(f=>f.model_type==='AIVMX');
   if(!file||!/^[a-f0-9]{64}$/i.test(String(file.checksum||''))||!(file.file_size>0))throw Error('AivisHub 没有 '+voice.name+' 的 AIVMX 文件信息');
   if(!['ACML 1.0','CC0'].includes(file.license_type))throw Error(voice.name+' 的许可已变为 '+file.license_type+'，已跳过');
-  const response=await this.fetch(API+voice.uuid+'/download?model_type=AIVMX',{signal});if(!response.ok||!response.body)throw Error(voice.name+' 下载失败 HTTP '+response.status);
-  const target=path.join(this.dir,voice.uuid+'.aivmx'),tmp=target+'.tome-download',hash=createHash('sha256');progress.bytes=0;progress.size=file.file_size;
-  const count=new Transform({transform:(chunk,encoding,done)=>{progress.bytes+=chunk.length;if(progress.bytes>file.file_size){done(Error(voice.name+' 大小超出预期'));return;}hash.update(chunk);done(null,chunk);}});
-  try{await pipeline(Readable.fromWeb(response.body),count,fs.createWriteStream(tmp),{signal});if(progress.bytes!==file.file_size||hash.digest('hex')!==String(file.checksum).toLowerCase())throw Error(voice.name+' 校验失败');fs.renameSync(tmp,target);this.log('[ToMe] voice installed: '+voice.name);}
-  catch(e){try{fs.unlinkSync(tmp);}catch{}throw e;}}
+  /* 2026-11-19: core/fast-download.cjs pulls the file in parallel Range pieces when AivisHub's answer allows it (one
+     connection otherwise); a silent connection is dropped after 15 s. Size and checksum still decide. */
+  const target=path.join(this.dir,voice.uuid+'.aivmx'),tmp=target+'.tome-download';progress.bytes=0;progress.size=file.file_size;
+  const endpoint=API+voice.uuid+'/download?model_type=AIVMX',downloader=require('./fast-download.cjs');
+  let source=endpoint,renewal,renewed=false;
+  const redirected=response=>response.ok&&response.redirected&&response.url.startsWith('https://')?response.url:'';
+  const renewSource=async options=>{
+   const response=await this.fetch(endpoint,{...options,headers:{...options.headers,Range:'bytes=0-0'},signal:AbortSignal.any([signal,AbortSignal.timeout(downloader.DEFAULTS.probeCapMs)])});
+   const next=redirected(response);
+   void response.body?.cancel().catch(()=>{});
+   if(!next)return false;
+   source=next;renewed=true;
+   return true;
+  };
+  // Reuse the HTTPS URL reached by the initial request so later ranges don't each request a new AivisHub link.
+  const fetchModel=async(_url,options)=>{
+   const url=source,usedRenewal=renewed,response=await this.fetch(url,options);
+   if(url===endpoint){source=redirected(response)||source;return response;}
+   if(response.status!==403||usedRenewal)return response;
+   void response.body?.cancel().catch(()=>{});
+   // Several ranges can receive the same refusal. Share one bounded request for a new link.
+   if(!await (renewal??=renewSource(options).catch(()=>false)))return response;
+   return this.fetch(source,options);
+  };
+  try{await downloader.download({urls:[endpoint],dest:tmp,size:file.file_size,sha256:String(file.checksum).toLowerCase(),fetch:fetchModel,signal,onProgress:p=>{progress.bytes=p.received;}});fs.renameSync(tmp,target);this.log('[ToMe] voice installed: '+voice.name);}
+  catch(e){for(const f of [tmp,tmp+'.part',tmp+'.part.json'])try{fs.unlinkSync(f);}catch{}if(/^(HASH|SIZE)_MISMATCH$/.test(e.code||''))throw Error(voice.name+' 校验失败');if(e.code==='DOWNLOAD_FAILED')throw Error(voice.name+' 下载失败 '+String((e.last&&e.last.message)||''));throw e;}}
 }
 module.exports={VoicePack,VOICES};

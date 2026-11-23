@@ -24,10 +24,10 @@ class DoubleLine{
   let unit='';if(p.length>=4&&p.length%2===0&&p.slice(0,p.length/2)===p.slice(p.length/2))unit=p.slice(0,p.length/2);
   s.frames.push(!!unit||doubled(plain(drawn)));if(s.frames.length>8)s.frames.shift();
   if(!unit){s.singles.push({key:p,at:now});if(s.singles.length>20)s.singles.shift();return {text,collapsed:false,reason:''};}
-  const reason=plain(previous)===unit?'redraw of previous line':s.singles.some(x=>x.key===unit)?'stream sent it alone just before':s.frames.slice(0,-1).some(Boolean)?'stream draws lines twice':'';
+  const reason=plain(previous)===unit?'redraw of previous line':s.singles.some(x=>x.key===unit)?'stream sent it alone just before':s.frames.slice(0,-1).some(Boolean)?'stream draws lines twice':/* 2026-11-16 (死に逝く君、館に芽吹く憎悪: the first line of a run, before any evidence, was drawn twice) a whole sentence of 8+ characters, closed by its punctuation, twice in one frame is a redraw: nobody writes that */unit.length>=8&&/[。！？!?」』）)…―～]$/.test(unit)?'whole sentence twice':'';
   if(!reason)return {text,collapsed:false,reason:''};
   /* keep the first copy as drawn (its own line breaks) */let cut=text.length;for(let i=1,seen='';i<=text.length;i++){seen=plain(text.slice(0,i));if(seen===unit){cut=i;break;}}
-  return {text:text.slice(0,cut).trim(),collapsed:true,reason};
+  return {text:reason==='whole sentence twice'?text.slice(0,cut).trimEnd():text.slice(0,cut).trim(),collapsed:true,reason};
  }
 }
 module.exports={DoubleLine};

@@ -58,7 +58,7 @@ test('provider answers captured lines at once and feeds them back as seeds; relo
 test('switched off: no seeds are written',()=>{const{game,rd,h}=setup();write(rd,game,[]);rd.disable(game);
  h.seed(game,'教室には僕たち二人しか残っていない。');assert.equal(fs.existsSync(path.join(rd.dirFor(game),'seeds.txt')),false);});
 
-test('real DLL output of the native self-test (seed blocks from a stand-in game) harvests the whole script',{skip:!seedRun()},()=>{
+test('real DLL output of the native self-test (seed blocks from a stand-in game) harvests the whole script',{skip:!seedRun()&&'environment: no native seed self-test output on this PC'},()=>{
  const out=path.resolve(SELF+'/out64');process.env.MEGULIT_RUNTIME_DUMP=out;
  for(const m of ['../services/runtime-dump.cjs','../services/script-harvest.cjs'])delete require.cache[require.resolve(m)];
  const h=require('../services/script-harvest.cjs'),game=path.resolve(SELF+'/game64');

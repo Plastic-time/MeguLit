@@ -26,15 +26,20 @@ public static class GameStyleProbe{
  // A flood keeps its seed colour, so anti-alias gradients cannot drift into the outline. Candidate area is
  // penalized by background contact; using only contact ratio mistakes enclosed background holes for a thin fill.
  sealed class Band{public Dictionary<int,int> Counts=new Dictionary<int,int>();public Dictionary<int,long[]> Sums=new Dictionary<int,long[]>();public Dictionary<int,int> Touches=new Dictionary<int,int>();}
+ // The outline the same glyphs were drawn with (the ring between the fill and the background), from the last Ink call; null when none.
+ [ThreadStatic]static string LastEdge;
+ // What the same glyphs stand on: the mean of the pixels around the words (the dialogue box, or the picture behind the text); null when unknown.
+ // The caller decides with it whether the measured fill can be the text at all (a fill that does not stand out from its background is not).
+ [ThreadStatic]static string LastBack;
  static string Ink(Bitmap image,List<Word> words){string top,bottom;return Ink(image,words,out top,out bottom);}
  static string Ink(Bitmap image,List<Word> words,out string gradientTop,out string gradientBottom){
-  gradientTop=gradientBottom=null;var bands=Enumerable.Range(0,8).Select(i=>new Band()).ToArray();
+  gradientTop=gradientBottom=null;LastEdge=null;LastBack=null;var bands=Enumerable.Range(0,8).Select(i=>new Band()).ToArray();
   int w=image.Width,h=image.Height;var px=new byte[w*h*4];var data=image.LockBits(new Rectangle(0,0,w,h),ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);
   try{for(int y=0;y<h;y++)Marshal.Copy(IntPtr.Add(data.Scan0,y*data.Stride),px,y*w*4,w*4);}finally{image.UnlockBits(data);}
-  var bins=new Dictionary<int,int>();var sums=new Dictionary<int,long[]>();var touches=new Dictionary<int,int>();
+  var bins=new Dictionary<int,int>();var sums=new Dictionary<int,long[]>();var touches=new Dictionary<int,int>();long[] back=new long[4];
   foreach(var word in words){var b=Rectangle.Intersect(new Rectangle(0,0,w,h),Rectangle.Inflate(word.Box,3,3));if(b.Width<5||b.Height<5)continue;
    int bw=b.Width,bh=b.Height;var bg=new bool[bw*bh];var seeds=new int[bw*bh];var q=new Queue<int>();
-   Action<int> seed=i=>{if(!bg[i]){bg[i]=true;seeds[i]=((b.Top+i/bw)*w+b.Left+i%bw)*4;q.Enqueue(i);}};
+   Action<int> seed=i=>{if(!bg[i]){bg[i]=true;seeds[i]=((b.Top+i/bw)*w+b.Left+i%bw)*4;q.Enqueue(i);back[0]+=px[seeds[i]+2];back[1]+=px[seeds[i]+1];back[2]+=px[seeds[i]];back[3]++;}};
    for(int x=0;x<bw;x++){seed(x);seed((bh-1)*bw+x);}for(int y=0;y<bh;y++){seed(y*bw);seed(y*bw+bw-1);}
    while(q.Count>0){int i=q.Dequeue(),x=i%bw,y=i/bw,o=seeds[i];foreach(int j in new[]{x>0?i-1:-1,x+1<bw?i+1:-1,y>0?i-bw:-1,y+1<bh?i+bw:-1}){if(j<0||bg[j])continue;int p=((b.Top+j/bw)*w+b.Left+j%bw)*4;if(Math.Abs(px[o]-px[p])+Math.Abs(px[o+1]-px[p+1])+Math.Abs(px[o+2]-px[p+2])<=42){bg[j]=true;seeds[j]=o;q.Enqueue(j);}}}
    for(int y=1;y<bh-1;y++)for(int x=1;x<bw-1;x++){int i=y*bw+x;if(bg[i])continue;int o=((b.Top+y)*w+b.Left+x)*4,R=px[o+2],G=px[o+1],B=px[o];
@@ -44,8 +49,17 @@ public static class GameStyleProbe{
     double t=((b.Top+y)-word.Box.Top)/(double)Math.Max(1,word.Box.Height-1);if(t>=0&&t<=1){var band=bands[Math.Min(7,(int)(t*8))];if(!band.Counts.ContainsKey(key)){band.Counts[key]=0;band.Sums[key]=new long[3];band.Touches[key]=0;}band.Counts[key]++;band.Sums[key][0]+=R;band.Sums[key][1]+=G;band.Sums[key][2]+=B;if(near)band.Touches[key]++;}
    }
   }
+  if(back[3]>0)LastBack=String.Format("#{0:x2}{1:x2}{2:x2}",back[0]/back[3],back[1]/back[3],back[2]/back[3]);
+  if(bins.Count==0)return null;
+  // Background seen through closed strokes (the counters of 口, 目) is not ink: on a black box with a black outline it outnumbered
+  // the thin grey fill and came out as the text colour (live ファタモルガーナの館 2026-11-19). Hollow text, a fill in the background
+  // colour inside an outline, keeps it: there the enclosed area is at least as large as the strokes around it.
+  if(back[3]>0){Func<int,bool> like=k=>{var e=sums[k];int c=bins[k];return Math.Abs(e[0]/c-back[0]/back[3])+Math.Abs(e[1]/c-back[1]/back[3])+Math.Abs(e[2]/c-back[2]/back[3])<60;};int other=bins.Where(p=>!like(p.Key)).Select(p=>p.Value).DefaultIfEmpty(0).Max();if(other>=12)foreach(int k in bins.Keys.Where(k=>like(k)&&bins[k]*10<other*6).ToList()){bins.Remove(k);}}
   if(bins.Count==0)return null;int top=bins.Values.Max();if(top<12)return null;
-  int best=bins.Where(p=>p.Value>=Math.Max(12,top/5)).OrderByDescending(p=>p.Value-2*touches[p.Key]).ThenByDescending(p=>p.Value).First().Key,count=bins[best];var s=sums[best];Gradient(bands,out gradientTop,out gradientBottom);return String.Format("#{0:x2}{1:x2}{2:x2}",s[0]/count,s[1]/count,s[2]/count);
+  int best=bins.Where(p=>p.Value>=Math.Max(12,top/5)).OrderByDescending(p=>p.Value-2*touches[p.Key]).ThenByDescending(p=>p.Value).First().Key,count=bins[best];var s=sums[best];Gradient(bands,out gradientTop,out gradientBottom);
+  {int edgeKey=-1,edgeCount=0;foreach(var p in bins){if(p.Key==best||p.Value<Math.Max(12,count/6))continue;var e=sums[p.Key];if(back[3]>0&&Math.Abs(e[0]/p.Value-back[0]/back[3])+Math.Abs(e[1]/p.Value-back[1]/back[3])+Math.Abs(e[2]/p.Value-back[2]/back[3])<90)continue; /* the background seen inside closed strokes */if(Math.Abs(e[0]/p.Value-s[0]/count)+Math.Abs(e[1]/p.Value-s[1]/count)+Math.Abs(e[2]/p.Value-s[2]/count)<120)continue;if(p.Value>edgeCount){edgeCount=p.Value;edgeKey=p.Key;}}
+   if(edgeKey>=0){var e=sums[edgeKey];LastEdge=String.Format("#{0:x2}{1:x2}{2:x2}",e[0]/edgeCount,e[1]/edgeCount,e[2]/edgeCount);}}
+  return String.Format("#{0:x2}{1:x2}{2:x2}",s[0]/count,s[1]/count,s[2]/count);
  }
  // Fit a vertical two-stop gradient to per-height fill candidates, after the same background flood as solid ink.
  // Reject uneven/unsupported band coverage and nonlinear fits rather than invent a gradient from a background.
@@ -80,10 +94,14 @@ public static class GameStyleProbe{
   using(var image=OpaqueBitmap(300,100))using(var g=Graphics.FromImage(image))using(var font=new Font("Meiryo",30)){g.Clear(Color.Black);g.DrawString("原文の検査",font,Brushes.White,10,10);string top,bottom;Ink(image,new List<Word>{new Word{Text="原文の検査",Box=new Rectangle(10,20,240,45)}},out top,out bottom);if(top!=null)throw new Exception("Solid text falsely identified as a gradient");}
  }
  static void InkSelfTest(){
-  var cases=new[]{new[]{Color.White,Color.White,Color.Black},new[]{Color.FromArgb(22,30,45),Color.White,Color.Black},new[]{Color.White,Color.Black,Color.White},new[]{Color.FromArgb(22,30,45),Color.FromArgb(187,238,255),Color.Black},new[]{Color.White,Color.FromArgb(200,20,30),Color.Transparent}};
+  var cases=new[]{new[]{Color.White,Color.White,Color.Black},new[]{Color.FromArgb(22,30,45),Color.White,Color.Black},new[]{Color.White,Color.Black,Color.White},new[]{Color.FromArgb(22,30,45),Color.FromArgb(187,238,255),Color.Black},new[]{Color.White,Color.FromArgb(200,20,30),Color.Transparent},/* 2026-11-19 素晴らしき日々: white text with a dark outline over a light blue sky */new[]{Color.FromArgb(120,170,230),Color.White,Color.FromArgb(16,16,24)},new[]{Color.FromArgb(190,215,240),Color.FromArgb(250,250,250),Color.Black},/* the same game's real text (frame of the user's recording): black with a white edge on #799ebe */new[]{Color.FromArgb(121,158,190),Color.Black,Color.White},/* dark text on a light text box, no outline */new[]{Color.FromArgb(240,236,225),Color.FromArgb(40,36,48),Color.Transparent}};
   foreach(var weight in new[]{FontStyle.Regular,FontStyle.Bold})foreach(var colors in cases)using(var image=OpaqueBitmap(420,100))using(var g=Graphics.FromImage(image))using(var path=new System.Drawing.Drawing2D.GraphicsPath())using(var font=new FontFamily("Meiryo")){
    g.Clear(colors[0]);g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;path.AddString("原文色の検査",font,(int)weight,38,new PointF(20,20),StringFormat.GenericDefault);if(colors[2].A>0)using(var pen=new Pen(colors[2],4)){pen.LineJoin=System.Drawing.Drawing2D.LineJoin.Round;g.DrawPath(pen,path);}using(var brush=new SolidBrush(colors[1]))g.FillPath(brush,path);
    string result=Ink(image,new List<Word>{new Word{Text="原文色の検査",Box=Rectangle.Ceiling(path.GetBounds())}});Color actual=result==null?Color.Transparent:ColorTranslator.FromHtml(result);if(result==null||Math.Abs(actual.R-colors[1].R)+Math.Abs(actual.G-colors[1].G)+Math.Abs(actual.B-colors[1].B)>60)throw new Exception("Text fill colour mismatch: expected "+ColorTranslator.ToHtml(colors[1])+", got "+result);
+   bool outlined=colors[2].A>0&&Math.Abs(colors[2].R-colors[0].R)+Math.Abs(colors[2].G-colors[0].G)+Math.Abs(colors[2].B-colors[0].B)>120&&Math.Abs(colors[2].R-colors[1].R)+Math.Abs(colors[2].G-colors[1].G)+Math.Abs(colors[2].B-colors[1].B)>120;
+   if(outlined){Color edge=LastEdge==null?Color.Transparent:ColorTranslator.FromHtml(LastEdge);if(LastEdge==null||Math.Abs(edge.R-colors[2].R)+Math.Abs(edge.G-colors[2].G)+Math.Abs(edge.B-colors[2].B)>110)throw new Exception("Text outline colour mismatch: expected "+ColorTranslator.ToHtml(colors[2])+", got "+LastEdge);}
+   else if(colors[2].A==0&&LastEdge!=null)throw new Exception("An outline was reported for plain text: "+LastEdge);
+   {Color bk=LastBack==null?Color.Transparent:ColorTranslator.FromHtml(LastBack);if(LastBack==null||Math.Abs(bk.R-colors[0].R)+Math.Abs(bk.G-colors[0].G)+Math.Abs(bk.B-colors[0].B)>60)throw new Exception("Text background colour mismatch: expected "+ColorTranslator.ToHtml(colors[0])+", got "+LastBack);}
   }
  }
  // GDI capture writes BGR pixels but may leave the reserved alpha byte at zero. Treat the
@@ -105,7 +123,10 @@ public static class GameStyleProbe{
  public static object Probe(Dictionary<string,object>d){
   long hwnd=(long)N(d,"hwnd",0),pid=(long)N(d,"pid",0);IntPtr target=new IntPtr(hwnd);uint actual;Rect client;
   if(!IsWindow(target)||GetWindowThreadProcessId(target,out actual)==0||actual!=pid||!GetClientRect(target,out client))throw new Exception("target changed");
-  uint foregroundPid;GetWindowThreadProcessId(GetForegroundWindow(),out foregroundPid);uint overlayPid=(uint)N(d,"overlayPid",0);if(IsIconic(target)||(GetAncestor(GetForegroundWindow(),2)!=GetAncestor(target,2)&&(overlayPid==0||foregroundPid!=overlayPid)))throw new Exception("game not foreground; measurement deferred");
+  uint foregroundPid;GetWindowThreadProcessId(GetForegroundWindow(),out foregroundPid);uint overlayPid=(uint)N(d,"overlayPid",0);
+  // Background test rigs (MEGULIT_NO_HOTKEYS=1: a second copy that never owns the foreground) measure a game kept behind other windows; the capture is the game window's own surface either way.
+  bool rig=Environment.GetEnvironmentVariable("MEGULIT_NO_HOTKEYS")=="1";
+  if(IsIconic(target)||(!rig&&GetAncestor(GetForegroundWindow(),2)!=GetAncestor(target,2)&&(overlayPid==0||foregroundPid!=overlayPid)))throw new Exception("game not foreground; measurement deferred");
   int width=client.R,height=client.B;if(width<100||height<100||width>16384||height>16384)throw new Exception("invalid client size");
   bool scanUi=d.ContainsKey("mode")&&Convert.ToString(d["mode"])=="screen-text";
   string source=scanUi?"":Convert.ToString(d["source"]);if(source.Length>4000)throw new Exception("source too long");
@@ -115,7 +136,7 @@ public static class GameStyleProbe{
   if((long)width*height>36000000)throw new Exception("capture budget exceeded");
   using(var full=OpaqueBitmap(width,height)){
    if(scanUi){if(!GameCapture.Into(target,full,3,false))throw new Exception("capture deferred");return Measure(full,region,"",width,height,false,true);}
-   if(!(Convert.ToString(d.ContainsKey("captureMode")?d["captureMode"]:null)=="visible-client"&&GameCapture.ScreenInto(target,full))&&!GameCapture.Into(target,full,3,true))throw new Exception("capture deferred");
+   /* 2026-11-19 captureMode "window": the game window alone, no screen fallback, so MeguLit hides nothing for it (calibration: the Alt+T menu and the subtitle blinked on every sample) */string captureMode=Convert.ToString(d.ContainsKey("captureMode")?d["captureMode"]:null);if(captureMode=="window"){if(!GameCapture.Into(target,full,3,false))throw new Exception("capture deferred");}else if(!(captureMode=="visible-client"&&GameCapture.ScreenInto(target,full))&&!GameCapture.Into(target,full,3,true))throw new Exception("capture deferred");
    return Measure(full,region,source,width,height,true);
   }
  }
@@ -153,7 +174,7 @@ public static class GameStyleProbe{
       var bounds=rows.Aggregate(Rectangle.Union);var ordered=rows.OrderBy(r=>r.Top).ToArray();var steps=new List<double>();for(int i=1;i<ordered.Length;i++){double step=(ordered[i].Top-ordered[i-1].Top)/scale;if(step>inkHeight*.7)steps.Add(step);}
       // OCR may use a downscaled image. Measure colour from the original pixels so
       // resampling cannot blend the fill with a dark outline or the dialogue box.
-      string gradientTop,gradientBottom;string color=Ink(full,SourcePixels(words,region,scale),out gradientTop,out gradientBottom);if(gradientTop!=null)color=gradientTop;double advance=Median(advances);double em=Math.Max(inkHeight,advance);var style=new Dictionary<string,object>();
+      string gradientTop,gradientBottom;string color=Ink(full,SourcePixels(words,region,scale),out gradientTop,out gradientBottom);string edgeColor=LastEdge,backColor=LastBack;if(gradientTop!=null)color=gradientTop;double advance=Median(advances);double em=Math.Max(inkHeight,advance);var style=new Dictionary<string,object>();
       style["x"]=(region.Left+bounds.Left/scale)*100/width;style["y"]=(region.Top+bounds.Top/scale)*100/height;// Width of the measured text itself (it used to run to the window edge, so MeguLit's box always reached the screen edge).
       style["width"]=Math.Min(100-styleNumber(style,"x"),bounds.Width/scale*100/width);
       // Rows before an explicit script break give no evidence of the game's automatic wrap width.
@@ -162,7 +183,7 @@ public static class GameStyleProbe{
       // Height of the measured lines only; MeguLit derives its display area from several lines (game-style-sync.cjs).
       style["height"]=bounds.Height/scale*100/height;
       style["japaneseSize"]=em*1280/width;style["paddingX"]=0;style["paddingY"]=0;style["autoScale"]=true;
-      if(color!=null){style["textColor"]=color;style["textGradient"]=gradientTop!=null;if(gradientTop!=null){style["textGradientTop"]=gradientTop;style["textGradientBottom"]=gradientBottom;}}if(advance>0)style["japaneseSpacingPx"]=(advance-em)*1280/width;if(steps.Count>0)style["lineHeight"]=Median(steps)/em;
+      if(color!=null){style["textColor"]=color;if(edgeColor!=null)style["textEdgeColor"]=edgeColor;if(backColor!=null)style["textBackColor"]=backColor;style["textGradient"]=gradientTop!=null;if(gradientTop!=null){style["textGradientTop"]=gradientTop;style["textGradientBottom"]=gradientBottom;}}if(advance>0)style["japaneseSpacingPx"]=(advance-em)*1280/width;if(steps.Count>0)style["lineHeight"]=Median(steps)/em;
       return new{valid=true,method="visual-measurement",estimated=true,confidence=confidence,width=width,height=height,rows=rows.Count,inkHeight=inkHeight,advance=advance,lineStep=steps.Count>0?Median(steps):0,wrapWidth=wrap,inkLeft=region.Left+bounds.Left/scale,inkTop=region.Top+bounds.Top/scale,inkBottom=region.Top+bounds.Bottom/scale,style=style,unsupported=new[]{"fontFamily","exactEmSize","nonVerticalOrMultiStopGradient","perCharacterColor","outline","weight"}};
      }
     }
@@ -174,5 +195,5 @@ public static class GameStyleProbe{
  }}
 
  static double styleNumber(Dictionary<string,object>d,string key){return Convert.ToDouble(d[key]);}
- public static int Main(string[] args){if(args.Length==2&&args[0]=="--ui-image"){Console.OutputEncoding=new UTF8Encoding(false);try{Console.WriteLine(Json.Serialize(MeasureFile(args[1],"",true)));return 0;}catch(Exception e){Console.WriteLine(Json.Serialize(new{valid=false,error=e.Message}));return 3;}}if(args.Length==3&&args[0]=="--image"){Console.OutputEncoding=new UTF8Encoding(false);try{Console.WriteLine(Json.Serialize(MeasureFile(args[1],args[2])));return 0;}catch(Exception e){Console.WriteLine(Json.Serialize(new{valid=false,error=e.Message}));return 3;}}if(args.Length==1&&args[0]=="--self-test"){try{if(Match("街の喧噪の中に立っている時とは打って変わって、ここはとても静かだ","ここはとても静かだ")<.78||Match("全く違う内容の文章です","魔女の裁判が始まる")>=.78)return 3;CaptureImageSelfTest();InkSelfTest();GradientSelfTest();Console.WriteLine("PASS style matching, opaque capture preparation and ten regular/bold fill/outline/background colour cases, two vertical gradients and solid rejection");return 0;}catch(Exception e){Console.Error.WriteLine(e.Message);return 3;}}Console.InputEncoding=new UTF8Encoding(false);Console.OutputEncoding=new UTF8Encoding(false);string line;while((line=Console.ReadLine())!=null){try{if(line.Length>20000)throw new Exception("request too large");var d=Json.Deserialize<Dictionary<string,object>>(line);var start=DateTime.UtcNow;Console.WriteLine(Json.Serialize(new{id=d["id"],result=Probe(d),elapsedMs=(DateTime.UtcNow-start).TotalMilliseconds}));}catch(Exception e){Console.WriteLine(Json.Serialize(new{error=e.Message}));}}return 0;}
+ public static int Main(string[] args){if(args.Length==2&&args[0]=="--ui-image"){Console.OutputEncoding=new UTF8Encoding(false);try{Console.WriteLine(Json.Serialize(MeasureFile(args[1],"",true)));return 0;}catch(Exception e){Console.WriteLine(Json.Serialize(new{valid=false,error=e.Message}));return 3;}}if(args.Length==3&&args[0]=="--image"){Console.OutputEncoding=new UTF8Encoding(false);try{Console.WriteLine(Json.Serialize(MeasureFile(args[1],args[2])));return 0;}catch(Exception e){Console.WriteLine(Json.Serialize(new{valid=false,error=e.Message}));return 3;}}if(args.Length==1&&args[0]=="--self-test"){try{if(Match("街の喧噪の中に立っている時とは打って変わって、ここはとても静かだ","ここはとても静かだ")<.78||Match("全く違う内容の文章です","魔女の裁判が始まる")>=.78)return 3;CaptureImageSelfTest();InkSelfTest();GradientSelfTest();Console.WriteLine("PASS style matching, opaque capture preparation and eighteen regular/bold fill/outline/background colour cases (light text with a dark outline and dark text with a white one on a sky, dark text on a light box), two vertical gradients and solid rejection");return 0;}catch(Exception e){Console.Error.WriteLine(e.Message);return 3;}}Console.InputEncoding=new UTF8Encoding(false);Console.OutputEncoding=new UTF8Encoding(false);string line;while((line=Console.ReadLine())!=null){Dictionary<string,object> d=null;try{if(line.Length>20000)throw new Exception("request too large");d=Json.Deserialize<Dictionary<string,object>>(line);var start=DateTime.UtcNow;Console.WriteLine(Json.Serialize(new{id=d["id"],result=Probe(d),elapsedMs=(DateTime.UtcNow-start).TotalMilliseconds}));}catch(Exception e){/* the request id goes back with the error, so the caller can act on it now instead of at its timeout */if(d!=null&&d.ContainsKey("id"))Console.WriteLine(Json.Serialize(new{id=d["id"],error=e.Message}));else Console.WriteLine(Json.Serialize(new{error=e.Message}));}}return 0;}
 }

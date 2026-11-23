@@ -53,13 +53,14 @@ function backup(db,root){
  db.exec(`VACUUM INTO '${file.replace(/'/g,"''")}'`);return file;
 }
 /* rows of one install: merge into the best row, soft-remove the rest */
-function mergeInstall(db,group,now){
+function mergeInstall(db,root,group,now){
  const {scored,tables}=rank(db,group),keep=scored[0],row=keep.row,orig=keep.o,lib=orig.library||(orig.library={});
  const variants=[...(lib.variants||[])],has=exe=>canonical(exe)===canonical(row.executable)||variants.some(v=>canonical(v.exe)===canonical(exe));
  let cover=row.cover,legacy=row.legacy_id,launched=row.last_launched_at,hidden=row.hidden_at;
  for(const d of scored.slice(1)){
   const drow=d.row,dorig=d.o,dlib=dorig.library||{};
   for(const v of [{label:path.basename(drow.executable||''),dir:dlib.dir,exe:drow.executable},...(dlib.variants||[])])if(v?.exe&&!has(v.exe))variants.push({...v,merged:true});
+  if(root)require('./sentence-scenes.cjs').mergeGame(db,root,drow.id,row.id);
   for(const t of tables)db.prepare(`UPDATE OR IGNORE "${t}" SET game_id=? WHERE game_id=?`).run(row.id,drow.id);
   /* user choices the kept row does not have yet (custom cover, manual VNDB pick, notes) carry over */
   for(const [k,v] of Object.entries(dorig))if(k!=='library'&&k!=='mergedInto'&&!(k in orig)){orig[k]=v;if(k==='coverCustom'&&drow.cover)cover=drow.cover;}
@@ -133,7 +134,7 @@ function dedupe(db,root,{now=Math.floor(Date.now()/1000),makeBackup=true}={}){
  let {installs}=plan(db);const out={merged:[],collections:[]};
  if(installs.length){
   if(makeBackup)try{backup(db,root);}catch(error){console.warn('library dedupe backup',error.message);installs=[];}
-  if(installs.length){db.exec('BEGIN IMMEDIATE');try{for(const g of installs)out.merged.push(mergeInstall(db,g,now));db.exec('COMMIT');}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}}
+  if(installs.length){db.exec('BEGIN IMMEDIATE');try{for(const g of installs)out.merged.push(mergeInstall(db,root,g,now));db.exec('COMMIT');}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}}
  }
  const {works}=plan(db);
  if(works.length){db.exec('BEGIN IMMEDIATE');try{for(const g of works){const r=collect(db,root,g);if(r)out.collections.push(r);}db.exec('COMMIT');}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}}

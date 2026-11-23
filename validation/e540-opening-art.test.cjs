@@ -19,7 +19,7 @@ test('the reader sends an art line before its translation arrives',()=>{
  const src=fs.readFileSync(path.join(root,'services','reader.cjs'),'utf8');
  const at=src.indexOf('async artText(message)');assert.ok(at>0);
  const body=src.slice(at,src.indexOf('async embedTranslate(',at));
- const early=body.indexOf("translation:''"),slow=body.indexOf('this.translator().translate(');
+ const early=body.indexOf("translation:''"),slow=body.indexOf('this.chainTranslate(');
  assert.ok(early>0&&slow>early,'early emit precedes the translator call');
  assert.match(body,/artJunk\(text,message\.rows,message\.sh\)/);assert.match(body,/artNoTranslation\(text,translation\)/);
 });

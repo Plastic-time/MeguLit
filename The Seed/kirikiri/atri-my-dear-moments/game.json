@@ -1,0 +1,67 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "2a4e0b0d212e6af24bde987fc379f0d89032edcd76b6bda9b14a4d2046536611",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "0a03432ec44995b6b3938a130d6419259d50485cd69482867d24b59fe41620e3",
+  "script": "a5e9dd22b8097c40f3853e56b491e7379495bcfcd994e3dc3fbfe34a388ee1d0",
+  "title": "4cf82b51eee761f104e7602d4810dc5e76fb900c9844475398858ececf02c947",
+  "steam": "1230140",
+  "vndb": "v27448"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "atri-my-dear-moments",
+ "builds": [
+  "1c9b98c9d1ef4eb9f07fb8083192dc7b6ca40ccc71534074f46bbb6860ae432a"
+ ],
+ "match": {
+  "exe": [
+   "ATRI-MyDearMoments-.exe"
+  ],
+  "titles": [
+   "ATRI -My Dear Moments-"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

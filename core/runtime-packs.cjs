@@ -3,10 +3,10 @@
 // with its download URLs, SHA-256, download size and unpacked size. The first-launch window installs
 // "base" (and optionally the rest); this store lets Settings install the remaining packs later.
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node:crypto'),{spawn}=require('node:child_process');
+const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process');
 
 /* E383 a mirror template may use {url} (whole GitHub URL), or {tag} and {file} (release tag and file name) for our own mirror dl.megulit.com */
-function mirrorUrl(template,url){const parts=String(url).split('/'),file=parts.pop()||'',tag=parts.pop()||'';return template.replace('{url}',url).replace('{tag}',tag).replace('{file}',file);}
+const mirrorUrl=(template,url)=>require('./download-sources.cjs').fill(typeof template==='string'?template:template.url,url);
 const MARKERS={base:'runtime/node.exe',reading:'runtime/reading/sudachidict_full/resources/system.dic',voice:'runtime/aivis/run.exe',archives:'runtime/garbro/ArcFormats.dll','runtime-dump':'runtime/runtime-dump/MeguLitDump64.dll','unity-text':'runtime/unity-text/MeguLitUnityText.dll'};
 /* E470 "archives": GARbro (morkt, MIT) downloaded only when a game's scripts sit in an archive MeguLit's own readers cannot open.
    onDemand packs are left out of "download full", unpack into their own dest folder (the upstream release is not laid out as runtime/...)
@@ -16,6 +16,8 @@ const ON_DEMAND_FILES=['GameRes.dll','ArcFormats.dll','GameData/Formats.dat'];
    "hidden": left out of status() (no row in Settings, nothing to switch), never removable, fetched by core/hook-native.cjs
    in the background the first time a game is hooked and injected by HookBridge once it is on disk. A pack may name the
    files that make it complete with "files"; without it the GARbro list above applies. */
+/* contract of an installed pack (its pack.json), 0 when there is none */
+const packContract=dir=>{try{return +JSON.parse(fs.readFileSync(path.join(dir,'pack.json'),'utf8').replace(/^﻿/,'')).contract||0;}catch{return 0;}};
 const packFiles=pack=>Array.isArray(pack?.files)&&pack.files.length?pack.files:ON_DEMAND_FILES;
 
 const SHARED=new Map();
@@ -26,7 +28,9 @@ class RuntimePacks{
  /* parsed once per change of runtime.json: installed() and status() ask for it on every reader and Settings poll */
  manifest(){const f=path.join(this.root,'setup','runtime.json');let k='';try{const s=fs.statSync(f);k=s.size+'|'+s.mtimeMs;}catch{}if(k&&this.manifestKey===k)return this.manifestCache;
   let m;try{m=JSON.parse(fs.readFileSync(f,'utf8').replace(/^﻿/,''));}catch{m={packs:{}};}this.manifestKey=k;this.manifestCache=m;return m;}
- installed(id){const marker=MARKERS[id];if(!marker||!fs.existsSync(path.join(this.root,marker)))return false;const p=this.manifest().packs?.[id],dest=p?.dest;return !dest||packFiles(p).every(f=>fs.existsSync(path.join(this.root,dest,f)));}
+ installed(id){const marker=MARKERS[id];if(!marker||!fs.existsSync(path.join(this.root,marker)))return false;const p=this.manifest().packs?.[id],dest=p?.dest;if(!dest)return true;if(!packFiles(p).every(f=>fs.existsSync(path.join(this.root,dest,f))))return false;
+   /* 2026-11-21 (P0, runtime-dump: the 2026-11-13 pack kept a stack overflow its source had fixed; files present = installed, so it was never fetched again): a manifest entry may name the pack contract it needs; an installed pack.json below it is not installed, and the pack is fetched again */
+   return packContract(path.join(this.root,dest))>=(+p.contract||0);}
  onDemand(id){return !!this.manifest().packs?.[id]?.onDemand;}
  status(){const m=this.manifest();return {version:m.version||'',packs:Object.entries(m.packs||{}).filter(([,p])=>!p.hidden).map(([id,p])=>{const j=this.jobs[id];return {id,size:p.size||0,unpacked:p.unpacked||0,onDemand:!!p.onDemand,license:p.license||'',installed:this.installed(id),job:j?{state:j.state,stage:j.stage,received:j.received,total:j.total,error:j.error}:null};})};}
  download(ids){
@@ -47,21 +51,20 @@ class RuntimePacks{
   const dest=path.resolve(this.root,p.dest);if(!dest.startsWith(path.resolve(this.root,'runtime')+path.sep))throw Error('PACK_DEST_OUTSIDE');fs.rmSync(dest,{recursive:true,force:true});delete this.jobs[id];return this.status();}
  cancel(){for(const job of Object.values(this.jobs)){if(['queued','downloading'].includes(job.state)){job.state='cancelled';job.controller?.abort();}}return this.status();}
  async install(id,pack,job){
-  const part=path.join(this.root,'runtime-'+id+'.part'),stage=path.join(this.root,'runtime-'+id+'.unpack');
-  let lastError=null;
-  // Mainland China (by time zone / locale, no IP lookup): try GitHub mirrors first. SHA-256 still has to match.
-  const direct=pack.urls||[],mirrored=(this.manifest().mirrors||[]).flatMap(m=>direct.map(u=>mirrorUrl(m,u)));
-  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'',china=['Asia/Shanghai','Asia/Chongqing','Asia/Harbin','Asia/Urumqi','PRC'].includes(tz);
-  for(const url of china?[...mirrored,...direct]:[...direct,...mirrored]){
-   job.state='downloading';job.stage='download';job.received=0;job.controller=new AbortController();
-   try{
-    const digest=await fetchTo(url,part,job);
-    if(digest.toLowerCase()!==String(pack.sha256).toLowerCase())throw Error('文件校验失败');
-    lastError=null;break;
-   }catch(error){lastError=error;try{fs.rmSync(part,{force:true});}catch{}if(job.state==='cancelled')throw error;}
-  }
-  if(lastError)throw lastError;
-  if(!direct.length&&!mirrored.length)throw Error('没有下载地址');
+  const part=path.join(this.root,'runtime-'+id+'.zip'),stage=path.join(this.root,'runtime-'+id+'.unpack');
+  /* 2026-11-19 (hundreds of mainland players: downloads crawled, stuck on dl.megulit.com): core/fast-download.cjs measures
+     every source at once and pulls Range pieces from the fast ones in parallel; a slow or silent connection is moved to
+     another source, finished pieces survive a retry (runtime-<id>.zip.part.json). Mainland China (time zone / locale, no IP
+     lookup) still lists the mirrors first; SHA-256 has to match. */
+  /* 2026-11-20: sources and their order from the same setup/runtime.json "mirrors" list setup uses (core/download-sources.cjs) */
+  const china=require('./fast-download.cjs').inChina(),list=require('./download-sources.cjs').normalize(this.manifest().mirrors||[]);
+  const all=(pack.urls||[]).flatMap(u=>require('./download-sources.cjs').expand(u,{china,list}));
+  if(!all.length)throw Error('没有下载地址');
+  job.state='downloading';job.stage='download';job.received=0;job.controller=new AbortController();
+  try{
+   await require('./fast-download.cjs').download({urls:all,china,dest:part,size:pack.size||0,sha256:pack.sha256,signal:job.controller.signal,userAgent:'MeguLit-runtime',
+    onProgress:p=>{job.received=p.received;if(p.total)job.total=p.total;},log:line=>{try{fs.mkdirSync(path.join(this.root,'logs'),{recursive:true});fs.appendFileSync(path.join(this.root,'logs','runtime-download.log'),new Date().toISOString()+' '+id+' '+line+'\n');}catch{}}});
+  }catch(error){throw /^(HASH|SIZE)_MISMATCH$/.test(error.code||'')?Error('文件校验失败'):error.code==='ABORTED'?error:Error(String(error.message||error).replace(/^DOWNLOAD_FAILED /,''));}
   job.stage='unpack';
   try{
   fs.rmSync(stage,{recursive:true,force:true});fs.mkdirSync(stage,{recursive:true});
@@ -80,21 +83,4 @@ class RuntimePacks{
   if(!this.installed(id))throw Error('安装不完整');
  }
 }
-// node:http(s) instead of fetch: follows GitHub's CDN redirects and streams with normal backpressure.
-function fetchTo(url,file,job,hops=0){
- return new Promise((resolve,reject)=>{
-  const lib=url.startsWith('https:')?require('node:https'):require('node:http');
-  const req=lib.get(url,{headers:{'User-Agent':'MeguLit-runtime'},signal:job.controller.signal},res=>{
-   if([301,302,303,307,308].includes(res.statusCode)&&res.headers.location){res.resume();if(hops>8)return reject(Error('重定向过多'));return resolve(fetchTo(new URL(res.headers.location,url).toString(),file,job,hops+1));}
-   if(res.statusCode!==200){res.resume();return reject(Error('HTTP '+res.statusCode));}
-   job.total=Number(res.headers['content-length'])||job.total;
-   const hash=createHash('sha256'),out=fs.createWriteStream(file);
-   res.on('data',chunk=>{hash.update(chunk);job.received+=chunk.length;});
-   res.on('error',e=>{out.destroy();reject(e);});out.on('error',reject);
-   out.on('finish',()=>{if(job.total&&job.received<job.total)return reject(Error('下载不完整'));resolve(hash.digest('hex'));});
-   res.pipe(out);
-  });
-  req.on('error',reject);
- });
-}
-module.exports={RuntimePacks,MARKERS,ON_DEMAND_FILES,mirrorUrl};
+module.exports={RuntimePacks,packContract,MARKERS,ON_DEMAND_FILES,mirrorUrl};

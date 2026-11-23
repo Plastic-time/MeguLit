@@ -30,3 +30,15 @@ test('#114: a wait marker lost while the pointer only hovers a game button does 
 test('#114: the Alt+T guide tells how to favourite a sentence',()=>{
  assert.match(fs.readFileSync(path.join(root,'web/reader/modules/polish.js'),'utf8'),/拖选文字：查词、加 Anki 或收藏句子/);
 });
+
+test('1.4.17 live: a line the player brought up by hand keeps its subtitle while the wait marker is lost without input; a click still hides at once',()=>{
+ /* 千恋＊万花 / 死に逝く君: the animated wait marker stopped being detected while the player kept reading; 8 s later MeguLit's
+    text hid and the game's own line came back. Lines that arrive without input (auto mode) keep the 8 s rule above. */
+ let now=0;const events=[];const im=new Immersion(e=>events.push(e.dialogVisible),()=>now);
+ im.configure({immersion:true,dialogDetection:'marker'});im.bind('g');
+ now=100;im.input();now=300;im.source('「手で進めた台詞」','krkr');
+ now=800;im.marker(true);im.tick();now=10000;im.marker(false);
+ for(let t=10500;t<=70000;t+=500){now=t;im.tick();}
+ assert.notEqual(events.at(-1),false,'60 s with the marker gone and no input: still shown');
+ now=71000;im.marker(true);im.tick();now=72000;im.input();im.marker(false);now=72700;im.tick();assert.equal(events.at(-1),false,'a click that makes the marker leave still hides in 0.6 s');
+});

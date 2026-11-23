@@ -28,9 +28,10 @@
 #include <vector>
 #include <map>
 #include <set>
-#include "minhook/include/MinHook.h"
+#include "../shared/minhook/include/MinHook.h"
 #include "modules/modules.h"
 #include "modules/dump_api.h"
+#include "threadflag.h"
 
 // ---- feature modules (modules/modules.h, docs/runtime-dump-pack.md) -------------------------------------------------
 #define MODULE(Name) void Name##Start(const wchar_t *out); void Name##Tick();
@@ -48,14 +49,15 @@ static StopSlot StopList[8]; static volatile LONG StopCount;
 void DumpOnStop(const char *module, DumpStopFn fn) { LONG i = InterlockedIncrement(&StopCount) - 1; if (i < 8) { StopList[i].name = module; MemoryBarrier(); StopList[i].fn = fn; } }
 static void StopOne(DumpStopFn fn) { __try { fn(); } __except (EXCEPTION_EXECUTE_HANDLER) {} }
 static void StopModules(const char *name) { LONG k = StopCount < 8 ? StopCount : 8; for (LONG i = 0; i < k; i++) if (StopList[i].fn && (!name || !strcmp(StopList[i].name, name))) StopOne(StopList[i].fn); }
-// Pack contract version, read by tests and by MeguLit to tell pack builds apart.
-extern "C" __declspec(dllexport) int MeguLitDumpVersion() { return 2; }
+// Pack contract version, read by tests and by MeguLit to tell pack builds apart. 3 (2026-11-21): the build with the zero-allocation
+// re-entry flag (cd35cbd4); HookBridge never loads a pack below 3 (contract 2 recursed into RtlAllocateHeap until the stack ran out).
+extern "C" __declspec(dllexport) int MeguLitDumpVersion() { return 3; }
 
 namespace {
 HMODULE Self;
 wchar_t Out[1024];
 CRITICAL_SECTION Gate;
-DWORD Tls = TLS_OUT_OF_INDEXES;
+ThreadFlags ThreadBusy;             // per-thread "inside a hook" flag, never allocates (threadflag.h)
 volatile LONG Ready, Seq;
 volatile DWORD ArmedUntil;          // tick until which heap allocations are watched (fast path check, no lock)
 volatile LONG ArmMin, ArmMax;       // size window for allocations after the last tracked read
@@ -68,11 +70,11 @@ const DWORD WatchMs = 8000;
 typedef ULONG(NTAPI *Crc32Fn)(ULONG, const void *, ULONG);
 Crc32Fn Crc32;
 
-// TlsGetValue/TlsSetValue reset the thread's last error; the hooks run right after the game's own API call, whose last
+// GetLastError-saving: TlsGetValue/TlsSetValue (used before 2026-11-20) reset the thread's last error; the hooks run right after the game's own API call, whose last
 // error the game is about to read (ERROR_FILE_NOT_FOUND, ERROR_ALREADY_EXISTS ...). Guard and Inside() keep it, and every
 // hook also saves it right after the original call and puts it back on every path (review 2026-11-13, item 1).
-struct Guard { bool was; DWORD e; Guard() { e = GetLastError(); was = TlsGetValue(Tls) != NULL; TlsSetValue(Tls, (void *)1); SetLastError(e); } ~Guard() { if (!was) TlsSetValue(Tls, NULL); SetLastError(e); } };
-bool Inside() { DWORD e = GetLastError(); bool r = Tls == TLS_OUT_OF_INDEXES || TlsGetValue(Tls) != NULL; SetLastError(e); return r; }
+struct Guard { bool was; DWORD e; Guard() { e = GetLastError(); was = ThreadBusy.Raise(); SetLastError(e); } ~Guard() { ThreadBusy.Lower(was); SetLastError(e); } };
+bool Inside() { return ThreadBusy.On(); }
 // Gate held by scope, so a C++ exception (bad_alloc) inside a hook cannot leave it locked (review item 4).
 struct Lock { Lock(); ~Lock(); };
 
@@ -697,7 +699,7 @@ void ModulesRun(bool starting) {
  }
 }
 DWORD WINAPI Run(void *) {
- TlsSetValue(Tls, (void *)1); // this thread's own file and heap use is never watched
+ThreadBusy.Raise(); // this thread's own file and heap use is never watched
  wchar_t self[1024], game[1024], root[1024];
  if (!GetModuleFileNameW(Self, self, 1024) || !GetModuleFileNameW(NULL, game, 1024)) return 0;
  for (int k = 0; k < 2; k++) { wchar_t *s = wcsrchr(self, L'\\'); if (!s) return 0; *s = 0; }
@@ -778,8 +780,8 @@ bool DumpActive(const char *module) {
  for (auto &m : Modules) if (m.name && module && !strcmp(m.name, module)) return !m.off;
  return true;
 }
-DumpScope::DumpScope() { e = GetLastError(); was = TlsGetValue(Tls) != NULL; TlsSetValue(Tls, (void *)1); SetLastError(e); }
-DumpScope::~DumpScope() { if (!was) TlsSetValue(Tls, NULL); SetLastError(e); }
+DumpScope::DumpScope() { e = GetLastError(); was = ThreadBusy.Raise(); SetLastError(e); }
+DumpScope::~DumpScope() { ThreadBusy.Lower(was); SetLastError(e); }
 bool DumpSkipped(const wchar_t *path) { try { return !path || Skipped(path); } catch (...) { return true; } }
 // MinHook freezes every other thread while it patches, then calls CloseHandle, VirtualProtect, heap functions on this
 // thread. A frozen thread may hold Gate (inside one of our hooks), so while MinHook runs this thread is marked as
@@ -806,14 +808,13 @@ extern "C" __declspec(dllexport) int MeguLitDumpSelfTest(int what, DWORD ms) {
 bool DumpReadable(const void *p, SIZE_T n) { return Readable(p, n); }
 
 // modules.h DumpQuiet: the same thread mark Guard sets, for module code that runs on game threads.
-bool DumpQuietEnter() { DWORD e = GetLastError(); bool was = Tls == TLS_OUT_OF_INDEXES || TlsGetValue(Tls) != NULL; if (Tls != TLS_OUT_OF_INDEXES) TlsSetValue(Tls, (void *)1); SetLastError(e); return was; }
-void DumpQuietLeave(bool was) { DWORD e = GetLastError(); if (!was && Tls != TLS_OUT_OF_INDEXES) TlsSetValue(Tls, NULL); SetLastError(e); }
+bool DumpQuietEnter() { return ThreadBusy.Raise(); }
+void DumpQuietLeave(bool was) { ThreadBusy.Lower(was); }
 
 BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, void *) {
  if (reason == DLL_PROCESS_ATTACH) {
   Self = h; DisableThreadLibraryCalls(h);
   InitializeCriticalSection(&Gate);
-  Tls = TlsAlloc();
   HMODULE pin; GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN, (LPCWSTR)&DllMain, &pin);
   HANDLE t = CreateThread(NULL, 0, Run, NULL, 0, NULL);
   if (t) CloseHandle(t);

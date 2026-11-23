@@ -34,7 +34,9 @@ function makeZip(dir,files,manifest){
  for(const [p,body] of Object.entries(files)){const to=path.join(src,...p.split('/'));fs.mkdirSync(path.dirname(to),{recursive:true});fs.writeFileSync(to,body);}
  fs.writeFileSync(path.join(src,'hot.json'),JSON.stringify(manifest));
  const zip=path.join(dir,'hot.zip');
- const r=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command','Compress-Archive -Path $env:S -DestinationPath $env:Z -Force'],{windowsHide:true,env:{...process.env,S:src,Z:zip}});
+ /* 2026-11-19 (Signed build of v1.4.17 on the runner: HOT_MANIFEST_MISSING) .NET ZipFile with the MeguLit folder as base, not the Compress-Archive cmdlet, whose module comes from whatever PSModulePath the parent shell left */
+ const env={...process.env,S:src,Z:zip};delete env.PSModulePath;
+ const r=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command','Add-Type -AssemblyName System.IO.Compression.FileSystem; if(Test-Path -LiteralPath $env:Z){Remove-Item -LiteralPath $env:Z -Force}; [IO.Compression.ZipFile]::CreateFromDirectory($env:S,$env:Z,[IO.Compression.CompressionLevel]::Optimal,$true)'],{windowsHide:true,env});
  assert.equal(r.status,0,String(r.stderr));return zip;
 }
 function makeRoot(){const root=fs.mkdtempSync(path.join(os.tmpdir(),'hot-'));fs.writeFileSync(path.join(root,'MeguLit.exe'),'exe');fs.mkdirSync(path.join(root,'web'));fs.writeFileSync(path.join(root,'web','app.js'),'old');return root;}

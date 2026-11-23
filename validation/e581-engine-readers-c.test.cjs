@@ -63,6 +63,13 @@ test('Entis: Cotopha image lines (Talk / Mess / AddSelect), inline and conststr 
  assert.deepEqual(entis.parse(F.csx(CJ)).lines,EL);assert.deepEqual(entis.parse(F.csx(CJ,{pooled:['「おはよう」','学校へ','Mess']})).lines,EL);
  assert.deepEqual(entis.parse(F.csx(CJ)).anchors,['ミナ','地の文']);assert.deepEqual(entis.parse(Buffer.from('Entis\x1a not an image')).lines,[]);
 });
+/* ヨスガノソラ / ハルカナソラ: the .noa archives hold only images and sound, the script image is system\yosuga.csx */
+test('Entis: a script image in system\\ next to the exe is read',t=>{
+ const game=tmp(t);
+ F.writeTree(game,{'data1.noa':F.noa({'bg.eri':Buffer.alloc(50)}),'voice.noa':F.noa({'v001.mio':Buffer.alloc(50)}),'system/yosuga.csx':F.csx(CJ),'system/title.noa':F.noa({'title.eri':Buffer.alloc(50)}),'yosuga.exe':'MZ'});
+ assert.equal(scenes.detect(game),'entis');
+ assert.deepEqual(scenes.read('entis',game).map(s=>[s.name,s.lines]),[['yosuga.csx',EL]]);
+});
 test('Entis: BSHF round trip, ERISA-N decoder survives arbitrary input',()=>{
  const p=Buffer.from('Entis\x1a'.padEnd(96,'x'));assert.deepEqual(entis.bshf(entis.bshf(p,'pass',true),'pass'),p);assert.notDeepEqual(entis.bshf(p,'pass',true),p);
  for(let s=1;s<6;s++){const junk=Buffer.from(Array.from({length:600},(_,i)=>(i*s*31+s)&255));try{const o=entis.nemesis(junk,256);assert.ok(o.length<=256);}catch(e){assert.match(e.message,/ERISA_N/);}}

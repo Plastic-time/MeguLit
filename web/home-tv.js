@@ -3,6 +3,7 @@ import {openLinesPicker} from './home-lines.js';
 import {createDepth,markFlat,cachedDaily,rememberDaily,dailyIsFresh,dailySignature,cachedActivity,rememberActivity} from './home-depth.js';
 import {exAttr,setExample} from './example-ruby.js';
 import {loadGsap} from './gsap-loader.js';
+import {seedBannerHTML,openSeedDialog} from './the-seed.js';
 import {createDock,openHandPicker,HAND_MAX} from './home-picker.js';
 import {pickHeadline,cachedHeadline,translateHeadline,headlineLabel,activitySummary,emptyActivityHTML} from './home-today.js';
 
@@ -272,14 +273,14 @@ function glowTo(fn,g){if(!fn)return;const layer=document.querySelector('.grimoir
 
 const SENSITIVE_WORD=()=>{const l=document.documentElement.lang||'';return l.startsWith('ja')?'センシティブな内容':l.startsWith('en')?'Sensitive content':'敏感内容';},HOT_WORD=()=>{
  const l=document.documentElement.lang||'';return l.startsWith('ja')?'今日のトップ':l.startsWith('en')?'Top story today':'今日热点';};
-function fitLeft(root){const left=root.querySelector('.tv-left'),title=root.querySelector('.tv-title');if(!left)return;/* 2026-11-13 (user: "左下角不要字") the game name is hidden while the library has games; the column then reaches down to the bottom bar */
+function fitLeft(root){const left=root.querySelector('.tv-left'),title=root.querySelector('.tv-title');if(!left)return;left.getAnimations?.().forEach(x=>x.cancel());/* 2026-11-13 (user: "左下角不要字") the game name is hidden while the library has games; the column then reaches down to the bottom bar */
  const titleShown=!!title&&getComputedStyle(title).display!=='none',bar=root.querySelector('.tv-dialog');if(titleShown||!bar){if(!title)return;/* 2026-11-13 (user: after a draw the heat map was gone): a title not laid out yet (mid card change) measures 0 high, which hid every block; measure only a laid-out title */if(!title.getBoundingClientRect().height)return;}
  /* 2026-11-12 (user: "还有我说的封面呢") the day's top news cover is kept longest: the small blocks go first, then the cover gets compact, and only then goes *//* 2026-11-13 (user: "大封面呢"): the title box reaches far above its letters (tall glyph cells), so blocks were hidden over empty space; compare with where the title's text is actually drawn */const inkTop=!titleShown?bar.getBoundingClientRect().top:(()=>{
  let top=Infinity;const walk=document.createTreeWalker(title,NodeFilter.SHOW_TEXT),range=document.createRange();for(let n=walk.nextNode();n;n=walk.nextNode()){if(!n.nodeValue.trim())continue;
  range.selectNodeContents(n);for(const r of range.getClientRects())if(r.width>0&&r.height>0)top=Math.min(top,r.top);}return Number.isFinite(top)?top:title.getBoundingClientRect().top;
  })(),fits=()=>left.getBoundingClientRect().bottom<=inkTop-14,hot=left.querySelector('.tv-hot-news'),parts=['.tv-heatsum','.tv-daily','.tv-hot-news','.tv-heat-card'].map(s=>left.querySelector(s)).filter(Boolean);
  /* 2026-11-15 (user: 每日热点的四个封面都要完整显示，没有例外) nothing is hidden or cropped any more: when the column is taller than the room above the title it is scaled down as a whole, covers keep their ratio */
- parts.forEach(p=>p.style.display='');hot?.classList.remove('is-compact');left.style.zoom='';let z=1;for(let k=0;k<3;k++){const r=left.getBoundingClientRect(),room=inkTop-14-r.top;if(r.bottom<=inkTop-14||room<=0)break;z=Math.max(.35,z*room/r.height);left.style.zoom=String(z);}}
+ parts.forEach(p=>p.style.display='');hot?.classList.remove('is-compact');left.style.zoom='';let z=1;for(let k=0;k<3;k++){const r=left.getBoundingClientRect(),room=inkTop-14-r.top;if(r.bottom<=inkTop-14||room<=0)break;z=Math.max(.35,z*room/r.height);left.style.zoom=String(z);}/* 2026-11-19 (user: 切换游戏时左列随标题行数跳高度): the column's size changes with the title's line count; the change is eased in (FLIP, transform only, 260 ms) instead of jumping; reduced motion jumps */{const r=left.getBoundingClientRect(),was=left.__flRect;left.__flRect={h:r.height,w:r.width};if(was&&was.h>0&&r.height>0&&Math.abs(was.h-r.height)>2&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&left.animate){left.style.transformOrigin='0 0';left.animate([{transform:'scale('+(was.w/r.width)+','+(was.h/r.height)+')'},{transform:'none'}],{duration:260,easing:'cubic-bezier(.16,1,.3,1)'});}}}
 
 export function cardify(card){const face=card.querySelector('.tv-face');let pressed=false,last=null;
  const set=(x,y)=>{if(card.dataset.busy){face.style.transform='';return;}card.classList.add('touch');const depth=pressed?1.6:1,rx=(.5-y)*20*depth,ry=(x-.5)*20*depth;
@@ -326,6 +327,9 @@ export function renderHomeTV(main,ctx){
   <div class="tv-rail"></div>
   <div class="tv-dialog"><span class="tv-who"></span><span class="tv-line"></span><div class="tv-act"></div></div></div>`;
  const root=main.querySelector('.tv-home'),$=s=>root.querySelector(s);
+ /* The Seed banner: a plaque on the right, above the recent-games rail */
+ {root.insertAdjacentHTML('beforeend',seedBannerHTML(locale,esc));
+  const b=root.querySelector('.seed-banner');b.addEventListener('click',()=>openSeedDialog({api,locale,esc}));}
  live={root,timer:0,beat:0,typer:0,depth:null};loadGsap().catch(()=>{});
  const art=(g,p)=>g.cover?`url("${String(g.cover).replace(/"/g,'%22')}") center/cover`:`linear-gradient(160deg,${p[0]},${p[2]} 70%)`;
  root.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{const to=b.dataset.go;if(to==='detail'){if(shown)onDetail(shown.id);return;}if(to==='words')navigate('learning',

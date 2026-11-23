@@ -1,0 +1,67 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "7e27e9fe3f3a8ba395b268036eb47ac62797de7ba6aeb22d8abab7ece997c989",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "bruns",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "31cfb428c04068aeef5ba1c5a3320fdd003d45be95d7869425326acde33b7389",
+  "title": "abb29c0dc5b1399e67a778addb4c0a8aa090dfdc914da1768524e413e1caa9b5",
+  "vndb": "v3030"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "dustmania-grotesque",
+ "builds": [
+  "3aa85167bbf9729e6db9cc73279dda8a3412c699b2f95fb97cce549e76e6418d"
+ ],
+ "match": {
+  "exe": [
+   "gameplay.exe"
+  ],
+  "titles": [
+   "ダストマニア・グロテスク　～解体挿入新書～",
+   "解体插入新书",
+   "[090522][Belisama] ダストマニア・グロテスク～解体挿入新書～"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

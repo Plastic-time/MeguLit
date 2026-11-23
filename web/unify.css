@@ -464,7 +464,7 @@ html:not(#u):not(#v) body .gm-lesson .gm-stepnav button{font-size:14px!important
 /* one left edge for every page: content starts at the main column's padding */
 html:not(#u):not(#v) body .main :is(.leaderboard-page,.dl,.about-page){padding-left:0!important;padding-right:0!important}
 /* leaderboard: the ranked cards fill their row whatever the count; values never break */
-html:not(#u):not(#v) body .leaderboard-page :is(.lb-gvalue,.lb-local strong,.lb-local b,.lb-mychip span,.leaderboard-local strong){white-space:nowrap}
+html:not(#u):not(#v) body .leaderboard-page :is(.lb-gvalue,.lb-local strong,.lb-local b,.lb-mychip-value,.leaderboard-local strong){white-space:nowrap}
 /* hot words 4–10: term, reason, then the count on the right */
 html:not(#u):not(#v) body .leaderboard-page .lb-honours li{grid-template-columns:44px minmax(160px,240px) minmax(0,1fr) auto!important}
 html:not(#u):not(#v) body .leaderboard-page .lb-honours .lb-honour-term{display:contents}
@@ -950,9 +950,9 @@ html:not(#u):not(#v):not(#w) body :is(.guide-panel,.dev-notice-page[data-page="2
 html:not(#u):not(#v):not(#w) body .guide-steps{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 48px}
 html:not(#u):not(#v):not(#w) body .guide-steps .guide-section{margin:0!important;padding:18px 0 14px!important;border:0!important;border-top:1px solid var(--u-line-2)!important;background:none!important}
 html:not(#u):not(#v):not(#w) body .guide-steps .guide-section h3{display:flex;align-items:baseline;gap:14px;margin:0 0 10px!important;font-family:var(--g-serif,serif)!important;font-size:19px!important;font-weight:600!important}
-html:not(#u):not(#v):not(#w) body .guide-steps ol{margin:0!important;padding:0!important;list-style:none;counter-reset:gs}
-html:not(#u):not(#v):not(#w) body .guide-steps ol li{counter-increment:gs;position:relative;padding:7px 0 7px 26px!important;border-bottom:1px solid var(--u-line);font-size:13.5px!important;font-weight:400!important;line-height:1.7}
-html:not(#u):not(#v):not(#w) body .guide-steps ol li::before{content:counter(gs);position:absolute;left:0;top:7px;font-family:var(--u-mono);font-size:11.5px;color:var(--g-t3,#a08a80)}
+html:not(#u):not(#v):not(#w) body .guide-steps ol{margin:0!important;padding:0!important;list-style:none}
+html:not(#u):not(#v):not(#w) body .guide-steps ol li{position:relative;padding:8px 0 8px 18px!important;border-bottom:1px solid var(--u-line);font-size:13.5px!important;font-weight:400!important;line-height:1.7}
+html:not(#u):not(#v):not(#w) body .guide-steps ol li::before{content:"";position:absolute;left:2px;top:17px;width:5px;height:5px;transform:rotate(45deg);background:color-mix(in srgb,var(--g-gold,#edb56e) 80%,transparent)}
 html:not(#u):not(#v):not(#w) body .guide-steps ol li::marker{content:none}
 html:not(#u):not(#v):not(#w) body .guide-steps .guide-keys>div{display:grid;grid-template-columns:110px 1fr;padding:7px 0;border-bottom:1px solid var(--u-line);font-size:13.5px}
 html:not(#u):not(#v):not(#w) body .guide-panel .dev-notice-updates{list-style:none!important;padding:0!important;border-top:1px solid var(--u-line-2)!important}
@@ -1870,3 +1870,20 @@ html:not(#u):not(#v) body .lib-field{-webkit-mask-image:linear-gradient(90deg,tr
 /* 2026-11-13 user (photosensitive epilepsy): the Explosion hit is a small warm glow at the point, never a window-wide white flash */
 html body .fx-flash{position:fixed;left:var(--x);top:var(--y);width:240px;height:240px;margin:-120px 0 0 -120px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,196,130,.6),rgba(255,140,80,.22) 60%,transparent);pointer-events:none;opacity:0}
 @media (prefers-reduced-motion:reduce){html body .fx-flash{display:none}}
+
+/* ---- start-up notice follows the window (user 2026-11-19: small windows cut the buttons off): the dialog is as large as the
+   viewport allows, its page scrolls inside, the actions stay pinned to the bottom edge, two columns become one on a
+   narrow window, and the three steps carry a small marker instead of 01 / 02 / 03 ---- */
+html:not(#u):not(#v):not(#w):not(#x) body dialog.game-dialog.dev-notice[open]{display:flex!important;flex-direction:column;width:min(1040px,calc(100vw - 32px))!important;height:auto!important;max-height:calc(100vh - var(--titlebar-height,56px) - 24px)!important;overflow:hidden!important;padding:36px 44px 0!important}
+html:not(#u):not(#v):not(#w):not(#x) body dialog.game-dialog.dev-notice[open]>.dev-notice-page:not([hidden]){flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain;padding-right:6px}
+html:not(#u):not(#v):not(#w):not(#x) body dialog.game-dialog.dev-notice .dev-notice-page[data-page="1"]>.dev-notice-actions{position:sticky;bottom:0;z-index:2;margin:0!important;padding:16px 0 18px;background:linear-gradient(to bottom,transparent,rgb(15,12,16) 16px)}
+html:not(#u):not(#v):not(#w):not(#x) body dialog.game-dialog.dev-notice .dev-notice-page:not([data-page="1"])>.dev-notice-actions{margin-top:0!important;padding:16px 0 18px}
+html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.guide-success li::before{content:"";width:7px;height:7px;top:calc(12px + .7em);left:15px;background:var(--g-gold);transform:rotate(45deg);font:0 serif}
+html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.guide-success li{padding-left:44px!important}
+@media (max-width:1000px){html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]:not([hidden]){grid-template-columns:1fr;grid-template-areas:"top" "title" "sub" "text" "form" "rule" "status" "succ" "upd" "note" "more" "act"}}
+@media (max-height:700px),(max-width:1000px){
+ html:not(#u):not(#v):not(#w):not(#x) body dialog.game-dialog.dev-notice[open]{padding:20px 26px 0!important}
+ html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>h2:not(.dev-notice-title2){font-size:clamp(26px,5vw,40px)!important}
+ html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.guide-success{margin-top:18px!important}
+ html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-notice-updates{max-height:200px!important}
+}

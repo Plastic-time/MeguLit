@@ -1,0 +1,303 @@
+{
+ "note": "Read-only captured bytes, one owned Under The Moon build. Diagnostic full input only, no proven text roles or screen transform.",
+ "sha256": "688b22b4619338fe6db648183e38582e17063e6706c7c11b132124f039ce1dda",
+ "fileBytes": 598016,
+ "entryRva": "0xf2a0",
+ "entry": {
+  "va": "0x40f2a0",
+  "hex": "81ecb800000053558bac24d4000000568bb424dc000000578bf88b8424d800000033db03c7399c24e8000000895c242089442450895c24487527c74424480100000053578d4c24445551e831c9020083c41085c0752e5f5e5d5b81c4b8000000c38b156ccd480052578d4424445550e80cc9020083c41085c07509891d6ccd480050ebbf391d6ccd48000f84b0070000395c24480f85a607000033c0894424608944246c8944246489442468b801000000668944246e66894424628d542454528d442450508b8424d4000000e81f2902008b8c24ec00000083c40838190f84980600008b8424e40000008d50018d49008a0883c00184c975f72bc283c0ff3bd8"
+ },
+ "prologue": [
+  {
+   "va": "0x40f2a0",
+   "hex": "81ecb8000000",
+   "instruction": "sub esp, 0xb8"
+  },
+  {
+   "va": "0x40f2a6",
+   "hex": "53",
+   "instruction": "push ebx"
+  },
+  {
+   "va": "0x40f2a7",
+   "hex": "55",
+   "instruction": "push ebp"
+  },
+  {
+   "va": "0x40f2a8",
+   "hex": "8bac24d4000000",
+   "instruction": "mov ebp, dword ptr [esp + 0xd4]"
+  },
+  {
+   "va": "0x40f2af",
+   "hex": "56",
+   "instruction": "push esi"
+  },
+  {
+   "va": "0x40f2b0",
+   "hex": "8bb424dc000000",
+   "instruction": "mov esi, dword ptr [esp + 0xdc]"
+  },
+  {
+   "va": "0x40f2b7",
+   "hex": "57",
+   "instruction": "push edi"
+  }
+ ],
+ "textPointerLoad": {
+  "va": "0x40f383",
+  "hex": "8b8424e4000000"
+ },
+ "fontHelper": {
+  "va": "0x43bc20",
+  "hex": "83ec3c6a3c8d4424046a0050e8ff7a01008b5424508b4c245483c40c837c244c00895424040f95c08d54241c890c24c744241090010000c644241780c644241900c6442418048d0485020000008844241ac644241b018bc62bd68d9b000000008a08880c0283c00184c975f48d0c2451ff1530b046008b54244033c985c00f95c189028bc183c43cc3"
+ },
+ "cacheProbe": {
+  "va": "0x436180",
+  "hex": "a13cb866008b0085c07417eb038d49008b48043911750539790474098b0085c075ee33c0c38b500433c08d0c763944ca400f95c0c3"
+ },
+ "cacheBranch": {
+  "va": "0x40f58d",
+  "hex": "8bd5e8ec6b020085c00f8598000000"
+ },
+ "cacheGet": {
+  "va": "0x40f634",
+  "hex": "8d8424900000005057558d4c24348bc6e8776b0200"
+ },
+ "originalReturn": {
+  "va": "0x40fa31",
+  "hex": "5f5e5d5b81c4b8000000c3"
+ },
+ "callers": [
+  {
+   "call": {
+    "va": "0x40dcea",
+    "hex": "e8b1150000"
+   },
+   "cleanup": {
+    "va": "0x40dcef",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x40df12",
+    "hex": "e889130000"
+   },
+   "cleanup": {
+    "va": "0x40df17",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x40e245",
+    "hex": "e856100000"
+   },
+   "cleanup": {
+    "va": "0x40e251",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x40e8d5",
+    "hex": "e8c6090000"
+   },
+   "cleanup": {
+    "va": "0x40e8da",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x40ef21",
+    "hex": "e87a030000"
+   },
+   "cleanup": {
+    "va": "0x40ef2d",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x410d91",
+    "hex": "e80ae5ffff"
+   },
+   "cleanup": {
+    "va": "0x410da1",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x411e9a",
+    "hex": "e801d4ffff"
+   },
+   "cleanup": {
+    "va": "0x411e9f",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x4121ab",
+    "hex": "e8f0d0ffff"
+   },
+   "cleanup": {
+    "va": "0x4121b4",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x41a1f2",
+    "hex": "e8a950ffff"
+   },
+   "cleanup": {
+    "va": "0x41a201",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x41a228",
+    "hex": "e87350ffff"
+   },
+   "cleanup": {
+    "va": "0x41a235",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x41a2fa",
+    "hex": "e8a14fffff"
+   },
+   "cleanup": {
+    "va": "0x41a309",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x41a349",
+    "hex": "e8524fffff"
+   },
+   "cleanup": {
+    "va": "0x41a34e",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x4225de",
+    "hex": "e8bdccfeff"
+   },
+   "cleanup": {
+    "va": "0x4225e3",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x422b60",
+    "hex": "e83bc7feff"
+   },
+   "cleanup": {
+    "va": "0x422b6c",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x422eb7",
+    "hex": "e8e4c3feff"
+   },
+   "cleanup": {
+    "va": "0x422ebc",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x423184",
+    "hex": "e817c1feff"
+   },
+   "cleanup": {
+    "va": "0x423190",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x423269",
+    "hex": "e832c0feff"
+   },
+   "cleanup": {
+    "va": "0x42326e",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x423529",
+    "hex": "e872bdfeff"
+   },
+   "cleanup": {
+    "va": "0x423535",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x4245e5",
+    "hex": "e8b6acfeff"
+   },
+   "cleanup": {
+    "va": "0x4245ea",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x425d82",
+    "hex": "e81995feff"
+   },
+   "cleanup": {
+    "va": "0x425d89",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x425e6f",
+    "hex": "e82c94feff"
+   },
+   "cleanup": {
+    "va": "0x425e74",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x4280bf",
+    "hex": "e8dc71feff"
+   },
+   "cleanup": {
+    "va": "0x4280c7",
+    "hex": "83c42c"
+   }
+  },
+  {
+   "call": {
+    "va": "0x428255",
+    "hex": "e84670feff"
+   },
+   "cleanup": {
+    "va": "0x428261",
+    "hex": "83c42c"
+   }
+  }
+ ]
+}

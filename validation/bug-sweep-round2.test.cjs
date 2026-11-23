@@ -7,8 +7,11 @@ test('unity font download that stalls ends in error so it can be retried',async 
  t.mock.timers.enable({apis:['setTimeout']});
  global.fetch=async(url,opt)=>({ok:true,status:200,headers:new Map(),body:(async function*(){yield Buffer.alloc(4);await new Promise((_,rej)=>opt.signal.addEventListener('abort',()=>rej(Error('stalled'))));})()});
  try{const u=new UnityFont(root);u.download();for(let i=0;i<20;i++)await new Promise(r=>setImmediate(r));
-  assert.equal(u.state.state,'downloading');t.mock.timers.tick(30001);for(let i=0;i<20&&u.state.state==='downloading';i++)await new Promise(r=>setImmediate(r));
-  assert.equal(u.state.state,'error');assert.equal(fs.existsSync(path.join(root,'cache','unity-font.zip.part')),false);}
+  assert.equal(u.state.state,'downloading');
+  /* 2026-11-19 core/fast-download.cjs: 15 s without data drops the connection; a source that sent something gets two more tries */
+  for(let k=0;k<12&&u.state.state==='downloading';k++){for(let i=0;i<300;i++)await new Promise(r=>setImmediate(r));t.mock.timers.tick(15001);}
+  for(let i=0;i<300&&u.state.state==='downloading';i++)await new Promise(r=>setImmediate(r));
+  assert.equal(u.state.state,'error');assert.equal(fs.existsSync(path.join(root,'cache','unity-font.zip')),false);}
  finally{t.mock.timers.reset();global.fetch=old;fs.rmSync(root,{recursive:true,force:true});}
 });
 

@@ -7,7 +7,7 @@ cd /d "%~dp0"
 if "%MEGULIT_VS%"=="" set "MEGULIT_VS=E:\Apps\build-tools\vs2022\Common7\Tools\VsDevCmd.bat"
 if "%MEGULIT_VS_X86%"=="" set "MEGULIT_VS_X86=E:\Apps\work\euphoria-test-build\toolchain\msvc\setup_x86.bat"
 if "%MEGULIT_BUILD_OUT%"=="" set "MEGULIT_BUILD_OUT=%~dp0obj"
-set MH=..\scncapture\minhook\src\hook.c ..\scncapture\minhook\src\buffer.c ..\scncapture\minhook\src\trampoline.c ..\scncapture\minhook\src\hde\hde32.c ..\scncapture\minhook\src\hde\hde64.c
+set MH=..\shared\minhook\src\hook.c ..\shared\minhook\src\buffer.c ..\shared\minhook\src\trampoline.c ..\shared\minhook\src\hde\hde32.c ..\shared\minhook\src\hde\hde64.c
 set FLAGS=/nologo /std:c++17 /O2 /MT /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN
 set LIBS=user32.lib gdi32.lib ole32.lib uuid.lib dxguid.lib
 if not exist "%MEGULIT_BUILD_OUT%\b32" mkdir "%MEGULIT_BUILD_OUT%\b32"
@@ -21,7 +21,7 @@ endlocal & setlocal
 cd /d "%~dp0"
 if "%MEGULIT_VS%"=="" set "MEGULIT_VS=E:\Apps\build-tools\vs2022\Common7\Tools\VsDevCmd.bat"
 if "%MEGULIT_BUILD_OUT%"=="" set "MEGULIT_BUILD_OUT=%~dp0obj"
-set MH=..\scncapture\minhook\src\hook.c ..\scncapture\minhook\src\buffer.c ..\scncapture\minhook\src\trampoline.c ..\scncapture\minhook\src\hde\hde32.c ..\scncapture\minhook\src\hde\hde64.c
+set MH=..\shared\minhook\src\hook.c ..\shared\minhook\src\buffer.c ..\shared\minhook\src\trampoline.c ..\shared\minhook\src\hde\hde32.c ..\shared\minhook\src\hde\hde64.c
 set FLAGS=/nologo /std:c++17 /O2 /MT /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN
 set LIBS=user32.lib gdi32.lib ole32.lib uuid.lib dxguid.lib
 call "%MEGULIT_VS%" -arch=x64 -host_arch=x64 -no_logo >nul || exit /b 1

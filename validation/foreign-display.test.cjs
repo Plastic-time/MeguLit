@@ -23,8 +23,8 @@ test('hook-control keeps the stream the foreign picker mapped to dialogue; a man
  assert.match(read('services/reader.cjs'),/case 'hookSelect':g\?\.hooks\.select\(r\.id,true\)/);
 });
 
-test('the previous translation goes as soon as the source line changes',()=>{
- assert.match(read('web/reader/modules/inject.js'),/if\(output&&text&&text!==bridge\.current&&enabled&&translationVisible&&output\.dataset\.state!=='pending'\)\{window\.TomeTypewriter\?\.stop\(output\);output\.replaceChildren\(\)/);
+test('the previous translation goes as soon as the source line changes (a line that only grew keeps it, typewriter-growing.test.cjs)',()=>{
+ assert.match(read('web/reader/modules/inject.js'),/if\(output&&text&&text!==bridge\.current&&enabled&&translationVisible&&output\.dataset\.state!=='pending'(?:&&!\(output\.dataset\.state==='ready'&&grown\(bridge\.current,text\)\))?\)\{(?:reserve\(text\);)?window\.TomeTypewriter\?\.stop\(output\);output\.replaceChildren\(\)/);
 });
 
 test('Chinese never falls back to the partial borrowed-code SubahibiFont, and YaHei comes before SimHei',()=>{

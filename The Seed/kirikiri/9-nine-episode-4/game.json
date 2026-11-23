@@ -1,0 +1,68 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "5433adf2278b455a9473f0db78a49e1adb14e7c92c2f586dd5539155497a966e",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "0e52a6b891ec762d5be47255b880002e94a8c57f6e320b6c553e03f1054fb7b6",
+  "script": "9b5b84fe1c8ad7442c6b63e0012c93a9db1a755879dd7ce34801f79963532000",
+  "title": "b97f5682a5b6f6973fc31770d91dda5f5903a4f0ef19de58bc8a44cc79f98a6c",
+  "steam": "1424660",
+  "vndb": "v26523"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "9-nine-episode-4",
+ "builds": [
+  "3ce1632fc76322899273c18af491ddac95384e82ce600a4b54811032603e6285"
+ ],
+ "match": {
+  "exe": [
+   "nine_yukiiro.exe"
+  ],
+  "titles": [
+   "9-nine-:Episode 4",
+   "9-nine-ゆきいろゆきはなゆきのあと"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

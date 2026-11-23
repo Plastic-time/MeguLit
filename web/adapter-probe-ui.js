@@ -83,7 +83,7 @@ export async function openProbeUpload({api,locale,esc,toast,ids=null,reason='man
   if(!problems.length){now.textContent=t.done+' · '+t.allGood;finish();showRecord();return;}
   let auto=null;try{auto=await p.autoStatus();}catch{}if(!dialog.isConnected)return;
   if(auto?.enabled){now.textContent=t.autoSending;let r;try{r=await p.autoRun(problems.map(x=>x.id));}catch{r={state:'failed',results:{}};}if(!dialog.isConnected)return;
-   const res=r?.results||{},lines=problems.map(x=>`<p class="probe-game"><b>${esc(x.title||x.id)}</b><span>${esc(stepLabel(x.step,locale))}</span><span>${esc(t.outcome[res[x.id]||r?.state]||'')}</span></p>`).join('');
+   const res=r?.results||{},lines=problems.map(x=>`<p class="probe-game"><b>${esc(x.title||x.id)}</b><span>${esc(stepLabel(x.step,locale))}</span><span>${esc(t.outcome[res[x.id]||r?.state]||'')}${res[x.id]==='failed'&&r?.errors?.[x.id]?' ('+esc(r.errors[x.id])+')':''}</span></p>`).join('');
    now.textContent=t.done;out.innerHTML=lines+`<p class="probe-now">${esc(t.autoNote)}</p>`;finish();if(Object.values(res).includes('sent'))done({state:'uploaded'});showRecord();return;}
   now.textContent=t.preparing;let prep;try{prep=await p.prepare(problems.map(x=>x.id));}catch{prep={error:'PREPARE'};}if(!dialog.isConnected)return;
   if(!prep?.hash){now.textContent=prep?.empty?t.done+' · '+t.allGood:t.failed;finish();return;}

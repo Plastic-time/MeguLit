@@ -1,0 +1,67 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "297d540abfcf8dc52b8725f492782cb777605bdef0957d364412f94cd6442492",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "unity",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "f22bb9069ae3593d59374ae705b9da9f3436501e4793fb4207d931e274cb2a62",
+  "title": "f648ad9bc385bdad68659915e2a02a16ec9425a4af0c7d5c8681e0c523c31995",
+  "steam": "3101040",
+  "vndb": "v50283"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "magical-girl-witch-trials",
+ "builds": [
+  "8bccd5415151accc86f2f6e093b45fac29da2a7bfdf06df953e62edf5b17c5be"
+ ],
+ "match": {
+  "exe": [
+   "manosaba.exe"
+  ],
+  "titles": [
+   "Magical Girl Witch Trials (魔法少女ノ魔女裁判)",
+   "魔法少女ノ魔女裁判"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

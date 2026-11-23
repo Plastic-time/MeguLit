@@ -10,22 +10,29 @@
 //         zlib index at 0x114: {u32 name length, Shift-JIS name, u32 offset, u32 size, u32 size, u32 packed, u32 packed size}.
 const fs=require('node:fs'),crypto=require('node:crypto'),zlib=require('node:zlib');
 
-const KEYS={saya:Buffer.from('763a14338b0dac040accfc13851cfacbb20b000b01f868486b460f8c34d42a96','hex')};
-/* every NPK2 key GARbro knows (Formats.dat, exported by tools/garbro-schemes.ps1 -Engine npk) plus Saya's: an NPK2 archive from
+const KEYS={
+ saya:Buffer.from('763a14338b0dac040accfc13851cfacbb20b000b01f868486b460f8c34d42a96','hex'),
+ saya18:Buffer.from('d0b71f3c4e24cecfddeea91d24b0403229a3e5330d2951826051d6c94af5af54','hex'),
+};
+/* every NPK2 key GARbro / MwareStuff knows (nitro-schemes.json npk2) plus Saya's: an NPK2 archive from
    another build or title is opened with whichever key turns its index into entries */
-const ALL_KEYS=[KEYS.saya,...Object.values(require('../services/original-engines/nitro-schemes.json').npk2).map(h=>Buffer.from(h,'hex'))];
+const ALL_KEYS=[...new Map([KEYS.saya,KEYS.saya18,...Object.values(require('../services/original-engines/nitro-schemes.json').npk2).map(h=>Buffer.from(h,'hex'))].map(k=>[k.toString('hex'),k])).values()];
 const SEGMENT=65536;
 
 function aes(decrypt,key,iv,data){const c=(decrypt?crypto.createDecipheriv:crypto.createCipheriv)('aes-256-cbc',key,iv);return Buffer.concat([c.update(data),c.final()]);}
 
-function isNpk2(buf){return buf.length>=0x20&&buf.toString('latin1',0,4)==='NPK2';}
+/* NPK3 is the same layout with zstd for packed segments (MwareStuff NPK3Tool) */
+const npkMajor=buf=>{if(buf.length<0x20)return 0;const m=buf.toString('latin1',0,4);return m==='NPK2'?2:m==='NPK3'?3:0;};
+function isNpk2(buf){return npkMajor(buf)>0;}
+const unpackSeg=(major,plain,unpacked)=>major===3?zlib.zstdDecompressSync(plain,{maxOutputLength:Math.max(unpacked,1)}):zlib.inflateRawSync(plain);
+const packSeg=(major,chunk)=>major===3?zlib.zstdCompressSync(chunk):zlib.deflateRawSync(chunk,{level:9});
 function readNpk(buf,key=KEYS.saya){
  if(!isNpk2(buf))throw Error('NPK_NOT_NPK2');
  const iv=Buffer.from(buf.subarray(8,24)),count=buf.readInt32LE(0x18),size=buf.readUInt32LE(0x1c);
  if(count<0||count>100000||0x20+size>buf.length)throw Error('NPK_HEADER');
  let idx;try{idx=aes(true,key,iv,buf.subarray(0x20,0x20+size));}catch{throw Error('NPK_KEY');}
  const entries=npkIndex(idx,count,buf.length);
- return {buf,key,iv,version:buf.readUInt32LE(4),entries};}
+ return {buf,key,iv,version:buf.readUInt32LE(4),major:npkMajor(buf),entries};}
 function readNpkAny(buf){let err;for(const k of ALL_KEYS){try{return readNpk(buf,k);}catch(e){err=e;}}throw err||Error('NPK_KEY');}
 /* E580 the decrypted index -> entries; shared with the script reader (services/original-engines/npk.cjs) */
 function npkIndex(idx,count,fileSize=Infinity){let o=0;const entries=[];
@@ -38,14 +45,14 @@ function npkIndex(idx,count,fileSize=Infinity){let o=0;const entries=[];
   entries.push({flag,name,length,hash,segments});}
  return entries;}
 function npkData(arc,entry){
- return Buffer.concat(entry.segments.map(s=>{const plain=aes(true,arc.key,arc.iv,arc.buf.subarray(s.offset,s.offset+s.stored)).subarray(0,s.size);return s.size<s.unpacked?zlib.inflateRawSync(plain):plain;}));}
+ return Buffer.concat(entry.segments.map(s=>{const plain=aes(true,arc.key,arc.iv,arc.buf.subarray(s.offset,s.offset+s.stored)).subarray(0,s.size);return s.size<s.unpacked?unpackSeg(arc.major,plain,s.unpacked):plain;}));}
 
 // Writes a new archive: entries whose data is given are packed again, the rest keep their encrypted segments as they are.
 function writeNpk(arc,replace=new Map()){
  const parts=[],items=arc.entries.map(e=>{
   const data=replace.get(e.name);
   if(!data)return {e,length:e.length,hash:e.hash,segments:e.segments.map(s=>({...s,bytes:arc.buf.subarray(s.offset,s.offset+s.stored)}))};
-  const segments=[];for(let at=0;at<data.length;at+=SEGMENT){const chunk=data.subarray(at,at+SEGMENT);let body=zlib.deflateRawSync(chunk,{level:9});if(body.length>=chunk.length)body=chunk;
+  const segments=[];for(let at=0;at<data.length;at+=SEGMENT){const chunk=data.subarray(at,at+SEGMENT);let body=packSeg(arc.major,chunk);if(body.length>=chunk.length)body=chunk;
    const bytes=aes(false,arc.key,arc.iv,body);segments.push({size:body.length,unpacked:chunk.length,stored:bytes.length,bytes});}
   return {e,length:data.length,hash:crypto.createHash('sha256').update(data).digest(),segments};});
  const indexSize=plain=>aes(false,arc.key,arc.iv,plain).length;
@@ -55,7 +62,7 @@ function writeNpk(arc,replace=new Map()){
   return Buffer.concat(rows);};
  // The index size depends only on the entry layout, so a first pass with placeholder offsets fixes the data start.
  const first=build(0),start=0x20+indexSize(first),index=aes(false,arc.key,arc.iv,build(start));
- const header=Buffer.alloc(0x20);header.write('NPK2',0,'latin1');header.writeUInt32LE(arc.version,4);arc.iv.copy(header,8);header.writeInt32LE(items.length,0x18);header.writeUInt32LE(index.length,0x1c);
+ const header=Buffer.alloc(0x20);header.write(arc.major===3?'NPK3':'NPK2',0,'latin1');header.writeUInt32LE(arc.version,4);arc.iv.copy(header,8);header.writeInt32LE(items.length,0x18);header.writeUInt32LE(index.length,0x1c);
  parts.push(header,index);for(const it of items)for(const s of it.segments)parts.push(s.bytes);
  return Buffer.concat(parts);}
 
@@ -71,9 +78,9 @@ function readPak(buf){
  return out;}
 
 // New archives from scratch (tests, and files the port adds): {name: Buffer}.
-function createNpk(files,{key=KEYS.saya,iv=crypto.randomBytes(16)}={}){
+function createNpk(files,{key=KEYS.saya,iv=crypto.randomBytes(16),major=2}={}){
  const entries=Object.keys(files).map(name=>({flag:0,name,length:0,hash:Buffer.alloc(32),segments:[]}));
- return writeNpk({buf:Buffer.alloc(0),key,iv,version:2,entries},new Map(Object.entries(files)));}
+ return writeNpk({buf:Buffer.alloc(0),key,iv,version:major===3?1:2,major,entries},new Map(Object.entries(files)));}
 function createPak(files,tag='SAYA'){
  const rows=[],bodies=[];let off=0;
  /* ASCII names only; folders are written with the engine's backslash */

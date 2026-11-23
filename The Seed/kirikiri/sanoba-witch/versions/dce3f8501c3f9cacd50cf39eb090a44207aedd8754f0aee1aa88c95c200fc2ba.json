@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "dce3f8501c3f9cacd50cf39eb090a44207aedd8754f0aee1aa88c95c200fc2ba",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "SabbatOfTheWitch_crack.exe",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "dce3f8501c3f9cacd50cf39eb090a44207aedd8754f0aee1aa88c95c200fc2ba",
+  "head": "4dfc60b86a8736d25122217d7b664ceeea0144589c6499a294277765c3d89a8b",
+  "pe": "1.2.0.3@619cbbc5"
+ },
+ "rev": 1
+}

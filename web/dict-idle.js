@@ -1,3 +1,4 @@
+import {requestUiFrame,cancelUiFrame} from './idle-gate.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* 2026-11-12 the dictionary's drifting field, made like the website hero (site/public/assets/js/spell.js; user: full
    screen, in layers, white or red at random, random sizes, the nearer the blurrier — real depth of field). Every glyph
@@ -41,14 +42,14 @@ function pickText(f){const P=f.pool||{phrases:[],saved:[],looked:f.words},r=Math
 /* (user 2026-11-13) a word glyph is coloured by how well it is known: new (and the ones you keep looking up) red, learning
    gold, known pale and quieter; kana and phrases stay neutral white */
 const TONE={fresh:'#e2505c',learning:'#f0c36a',known:'#c9ced8',plain:'#eceae6',stranger:'#ef8a92'};
-export function toneOf(text,kind,status,looked){
+export function toneOf(text,kind,status,looked,st=status.get(text)){
  if(kind!=='word'&&kind!=='related')return 'plain';
- const st=status.get(text);if(st===undefined)return looked.includes(text)?'fresh':kind==='related'?'stranger':'fresh';
+ if(st==null)return looked.includes(text)?'fresh':kind==='related'?'stranger':'fresh';
  return st<=0?'fresh':st===1?'learning':'known';
 }
 function make(f,anywhere,given){
  const pk=given||pickText(f),word=pk.kind!=='kana',text=pk.t,z=pk.z??Math.pow(Math.random(),1.3),shrink=pk.kind==='kana'?1:Math.max(.42,.85-text.length*.05),size=shrink*(13+z*62),blur=Math.abs(z-FOCUS)*(z>FOCUS?16:7);
- const tone=toneOf(text,pk.kind,f.status,f.words),color=TONE[tone],red=tone==='fresh',quiet=tone==='known'?.7:1;
+ const tone=toneOf(text,pk.kind,f.status,f.words,pk.status),color=TONE[tone],red=tone==='fresh',quiet=tone==='known'?.7:1;
  return {z,spr:sprite(text,size,blur,color),x:Math.random()*f.W,y:anywhere?Math.random()*f.H:f.H+60,vx:(Math.random()-.5)*6,vy:-(4+Math.random()*10)*(.4+z),rot:0,rot0:(Math.random()-.5)*.42,vr:0,sway:Math.random()*Math.PI*2,
   alpha:(.1+.3*(1-Math.abs(z-FOCUS)*1.4))*(red||word?1.3:1)*quiet,tone,text,ox:0,oy:0,wx:0,wy:0};
 }
@@ -62,7 +63,7 @@ function build(host){
 function frame(now){
  const f=field;if(!f||!f.cv.isConnected||!f.host.isConnected||!document.querySelector('#lookup-results')){f?.cv.remove();field=null;return;}
  const dt=Math.min(.05,(now-f.prev)/1000);f.prev=now;const ctx=f.ctx;ctx.clearRect(0,0,f.W,f.H);
- const pref=fxPref('dictField');if(!pref.on){if(!calm)setTimeout(()=>{if(field===f)f.raf=requestAnimationFrame(frame);},250);return;}
+ const pref=fxPref('dictField');if(!pref.on){if(!calm)setTimeout(()=>{if(field===f)f.raf=requestUiFrame(frame);},250);return;}
  const res=document.querySelector('#lookup-results'),busy=res&&(res.children.length||res.textContent.trim())?1:0;f.dim=(f.dim??1)+((busy?.45:1)-(f.dim??1))*Math.min(1,dt*3);
  const order=f.parts;f.pvx=(f.pvx||0)*Math.exp(-8*dt);f.pvy=(f.pvy||0)*Math.exp(-8*dt);
  /* (user: the field has no fixed places — a pushed glyph stays where it was pushed; the whole only rebalances, slowly)
@@ -102,13 +103,13 @@ function frame(now){
   ctx.globalAlpha=base;ctx.save();ctx.translate(p.x+p.ox,p.y+p.oy);ctx.rotate(p.rot+(p.orot||0));ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();
  }
  ctx.globalAlpha=1;
- if(!calm)f.raf=requestAnimationFrame(frame);
+ if(!calm)f.raf=requestUiFrame(frame);
 }
 let tick=0;
 function scan(){tick=0;const results=document.querySelector('#lookup-results');if(!results)return;const host=results.closest('#learning-content')||results.parentElement;if(!host)return;
  if(field&&field.host===host&&field.cv.isConnected)return;if(field){field.cv.remove();field=null;}
- build(host);requestAnimationFrame(frame);}
-new MutationObserver(()=>{if(!tick)tick=requestAnimationFrame(scan);}).observe(document.body,{childList:true,subtree:true});
+ build(host);requestUiFrame(frame);}
+new MutationObserver(()=>{if(!tick)tick=requestUiFrame(scan);}).observe(document.body,{childList:true,subtree:true});
 addEventListener('resize',()=>field?.fit());
 if(!calm){document.addEventListener('pointermove',e=>{if(!field)return;const now=performance.now(),dt=Math.max(8,now-(field.pt||now-16))/1000;if(field.pt){field.pvx=(e.clientX-field.mx)/dt;field.pvy=(e.clientY-field.my)/dt;}field.mx=e.clientX;field.my=e.clientY;field.pt=now;},{passive:true});
  /* a click (not on a control) sends a ring of force out from the pointer */
@@ -130,8 +131,8 @@ document.addEventListener('megulit:dict-gust',e=>{if(!field)return;const {x,y}=e
    and saved words, services/dict-related.cjs) float into the field out of the search box, in focus, coloured by how
    well they are known. They replace kana glyphs, so the field never grows. */
 export function relatedParts(f,list,from){
- const out=[];for(const r of list.slice(0,14)){if(r.status!==null&&r.status!==undefined)f.status.set(r.t,r.status);
-  const p=Object.assign(make(f,true,{t:r.t,kind:'related',z:FOCUS+(Math.random()-.5)*.16}),{x:from.x+(Math.random()-.5)*from.w*.6,y:from.y,fade:0,related:r.why});
+ const out=[];for(const r of list.slice(0,14)){
+  const p=Object.assign(make(f,true,{t:r.t,kind:'related',status:r.status,z:FOCUS+(Math.random()-.5)*.16}),{x:from.x+(Math.random()-.5)*from.w*.6,y:from.y,fade:0,related:r.why});
   const a=Math.random()*Math.PI*2,v=260+Math.random()*320;p.wx=Math.cos(a)*v;p.wy=Math.sin(a)*v*.7+120;p.wr=(Math.random()-.5)*3;out.push(p);}
  return out;
 }

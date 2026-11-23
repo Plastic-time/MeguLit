@@ -1,0 +1,289 @@
+{"t": "meta", "engine": "krkr-textrender", "kind": "live", "game": "死に逝く君、館に芽吹く憎悪", "about": "recorded 2026-11-19 off screen, new game, read-only profile, merged DLL: hook sentences and the glyph colour the engine side read (ToMe_CHARS color), in arrival order. Read yellow for 54 sentences, then white; one sentence was on screen for 170 ms and got no colour.", "min": 95}
+{"t": "drawn", "text": "特に何かの説明があったわけでもなく、それは起こった。", "color": "#fefe7f"}
+{"t": "status", "text": "特に何かの説明があったわけでもなく、それは起こった。"}
+{"t": "drawn", "text": "『彼ら』は突然現れて、世界を蹂躙し始めた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 1}
+{"t": "status", "text": "『彼ら』は突然現れて、世界を蹂躙し始めた。"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 2}
+{"t": "status", "text": "窃盗。"}
+{"t": "drawn", "text": "窃盗。", "color": "#fefe7f"}
+{"t": "drawn", "text": "器物破損。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 3}
+{"t": "status", "text": "器物破損。"}
+{"t": "drawn", "text": "強姦。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 4}
+{"t": "status", "text": "強姦。"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 5}
+{"t": "status", "text": "そして――殺人――――。"}
+{"t": "drawn", "text": "そして――殺人――――。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 6}
+{"t": "status", "text": "人間の側の法律を当てはめれば、ほとんどの犯罪行為が彼らの手によって為された。"}
+{"t": "drawn", "text": "人間の側の法律を当てはめれば、\nほとんどの犯罪行為が彼らの手によって為された。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 7}
+{"t": "status", "text": "当時、街には多くの人々が溢れていた。"}
+{"t": "drawn", "text": "当時、街には多くの人々が溢れていた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 8}
+{"t": "status", "text": "デパートで買い物をしたり、レストランで食事をしたり、公園でのんびりと過ごしたり……。"}
+{"t": "drawn", "text": "デパートで買い物をしたり、レストランで食事をしたり、\n公園でのんびりと過ごしたり……。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 9}
+{"t": "status", "text": "そこには普段と変わらない日常の姿があった。"}
+{"t": "drawn", "text": "そこには普段と変わらない日常の姿があった。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 10}
+{"t": "status", "text": "きっと今日も平和な一日。"}
+{"t": "drawn", "text": "きっと今日も平和な一日。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 11}
+{"t": "status", "text": "誰もがそう信じて疑っていなかった。"}
+{"t": "drawn", "text": "誰もがそう信じて疑っていなかった。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 12}
+{"t": "status", "text": "今日も明日も明後日も、こんな日々が永遠に続くと信じない理由がなかった。"}
+{"t": "drawn", "text": "今日も明日も明後日も、こんな日々が永遠に続くと\n信じない理由がなかった。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 13}
+{"t": "status", "text": "突然、『他の世界』から『別の存在』がやって来て、自分達の生活を破壊するなど、現実に起こると考えていた人間は一人もいなかった。"}
+{"t": "drawn", "text": "突然、『他の世界』から『別の存在』がやって来て、\n自分達の生活を破壊するなど、現実に起こると\n考えていた人間は一人もいなかった。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 14}
+{"t": "status", "text": "だが、それは現れた。"}
+{"t": "drawn", "text": "だが、それは現れた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 15}
+{"t": "status", "text": "唐突に出現して、人間の世界を全てひっくり返した。"}
+{"t": "drawn", "text": "唐突に出現して、人間の世界を全てひっくり返した。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 16}
+{"t": "status", "text": "――人間ではない存在。"}
+{"t": "drawn", "text": "――人間ではない存在。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 17}
+{"t": "status", "text": "見た目こそ似ている部分はあったが、明らかに人間のものではない能力を有していた。"}
+{"t": "drawn", "text": "見た目こそ似ている部分はあったが、\n明らかに人間のものではない能力を有していた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 18}
+{"t": "status", "text": "まるで映画や小説の中に出てくるような魔法。"}
+{"t": "drawn", "text": "まるで映画や小説の中に出てくるような魔法。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 19}
+{"t": "status", "text": "その魔法によって、人間が簡単に殺されていく現実。"}
+{"t": "drawn", "text": "その魔法によって、人間が簡単に殺されていく現実。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 20}
+{"t": "status", "text": "世界のルールは変わり、生き残った人間達には残酷な日々が始まった。"}
+{"t": "drawn", "text": "世界のルールは変わり、生き残った人間達には\n残酷な日々が始まった。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 21}
+{"t": "status", "text": "理由などない。"}
+{"t": "drawn", "text": "理由などない。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 22}
+{"t": "status", "text": "解決法もない。"}
+{"t": "drawn", "text": "解決法もない。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 23}
+{"t": "status", "text": "ただ、『そういう存在』がいたと、これはそういう物語……。"}
+{"t": "drawn", "text": "ただ、『そういう存在』がいたと、これはそういう物語……。", "color": "#fefe7f"}
+{"t": "drawn", "text": "「はあっ…………はあっ…………はあっ…………」", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 24}
+{"t": "status", "text": "「はあっ…………はあっ…………」"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 25}
+{"t": "status", "text": "肩で大きく息をしながら、美亜は深い森の中を歩いていた。"}
+{"t": "drawn", "text": "肩で大きく息をしながら、美亜は深い森の中を歩いていた。", "color": "#fefe7f"}
+{"t": "drawn", "text": "「はあっ…………はあっ…………はあっ…………」", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 26}
+{"t": "status", "text": "「はあっ…………」"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 27}
+{"t": "status", "text": "頭はぼんやりしていたし、身体はあちこち痛い。"}
+{"t": "drawn", "text": "頭はぼんやりしていたし、身体はあちこち痛い。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 28}
+{"t": "status", "text": "服はボロボロで、肌にはたくさんの擦り傷ができ、何時間も歩き続けた両足からは感覚が失くなり始めていた。"}
+{"t": "drawn", "text": "服はボロボロで、肌にはたくさんの擦り傷ができ、\n何時間も歩き続けた両足からは感覚が失くなり始めていた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 29}
+{"t": "status", "text": "「う、くっ……」"}
+{"t": "drawn", "text": "「う、くっ……」", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 30}
+{"t": "status", "text": "あまりにも足が痛み、美亜は歩くのを止めた。"}
+{"t": "drawn", "text": "あまりにも足が痛み、美亜は歩くのを止めた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 31}
+{"t": "status", "text": "逃げ始めてから、果たしてどのくらいの距離を移動したのか。"}
+{"t": "drawn", "text": "逃げ始めてから、果たしてどのくらいの距離を移動したのか。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 32}
+{"t": "status", "text": "気付けば森の中に飛び込んでいたが、その選択が正しかったのかどうかは、彼女自身よくわからなかった。"}
+{"t": "drawn", "text": "気付けば森の中に飛び込んでいたが、\nその選択が正しかったのかどうかは、\n彼女自身よくわからなかった。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 33}
+{"t": "status", "text": "「何で……こんな事に……」"}
+{"t": "drawn", "text": "「何で……こんな事に……」", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 34}
+{"t": "status", "text": "逃げてはいるものの、いまだに事態に対しては正確な理解が及んでいなかった。"}
+{"t": "drawn", "text": "逃げてはいるものの、いまだに事態に対しては\n正確な理解が及んでいなかった。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 35}
+{"t": "status", "text": "結局のところ、今、何が起こっているのか……。"}
+{"t": "drawn", "text": "結局のところ、今、何が起こっているのか……。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 36}
+{"t": "status", "text": "それがわからないまま逃げたのは、逃げなければ間違いなく美亜の命が失われていたからだ。"}
+{"t": "drawn", "text": "それがわからないまま逃げたのは、逃げなければ\n間違いなく美亜の命が失われていたからだ。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 37}
+{"t": "status", "text": "「夢じゃないの？　そうじゃないと……あんな……」"}
+{"t": "drawn", "text": "「夢じゃないの？そうじゃないと……あんな……」", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 38}
+{"t": "status", "text": "父親が死んだ。父親が死んだ。母親が死んだ。母親が死んだ。"}
+{"t": "drawn", "text": "母親が死んだ。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 39}
+{"t": "status", "text": "姉が死んだ。"}
+{"t": "drawn", "text": "姉が死んだ。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 40}
+{"t": "status", "text": "それが、ほんの数時間前に彼女の身に起こったことだった。"}
+{"t": "drawn", "text": "それが、ほんの数時間前に彼女の身に起こったことだった。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 41}
+{"t": "status", "text": "父親は、血の塊になって死んだ。"}
+{"t": "drawn", "text": "父親は、血の塊になって死んだ。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 42}
+{"t": "status", "text": "母親は、全身をねじられて死んだ。"}
+{"t": "drawn", "text": "母親は、全身をねじられて死んだ。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 43}
+{"t": "status", "text": "姉は、服を引き裂かれ、身体を弄られながら首筋に噛み付かれた。"}
+{"t": "drawn", "text": "姉は、服を引き裂かれ、身体を弄られながら\n首筋に噛み付かれた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 44}
+{"t": "status", "text": "その時、美亜は逃げ出していたが、やがて背後から聞こえてきたのは姉の断末魔だった。"}
+{"t": "drawn", "text": "その時、美亜は逃げ出していたが、やがて背後から\n聞こえてきたのは姉の断末魔だった。", "color": "#fefe7f"}
+{"t": "drawn", "text": "「何なの？あれって……何だったの？」", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 45}
+{"t": "status", "text": "「何なの？　あれって……何だったの？」"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 46}
+{"t": "status", "text": "美亜が見たのは、若い男が街中で大量虐殺を行っているところだった。"}
+{"t": "drawn", "text": "美亜が見たのは、若い男が街中で\n大量虐殺を行っているところだった。", "color": "#fefe7f"}
+{"t": "drawn", "text": "その殺し方は異常で、直接手で触れていないにも関わらず、\n多くの人々が何らかの形で命を落としていた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 47}
+{"t": "status", "text": "その殺し方は異常で、直接手で触れていないにも関わらず、多くの人々が何らかの形で命を落としていた。"}
+{"t": "drawn", "text": "身体が縦に引き裂かれたサラリーマンがいた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 48}
+{"t": "status", "text": "身体が縦に引き裂かれたサラリーマンがいた。"}
+{"t": "drawn", "text": "上半身と下半身が雑巾のように絞られた主婦がいた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 49}
+{"t": "status", "text": "上半身と下半身が雑巾のように絞られた主婦がいた。"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 50}
+{"t": "status", "text": "友達と歩いていた女子校生は、駅ビルの屋上と同じ高さまで浮かび上がった後、そこから垂直に落下して地面に叩き付けられた。"}
+{"t": "drawn", "text": "友達と歩いていた女子校生は、駅ビルの屋上と\n同じ高さまで浮かび上がった後、そこから\n垂直に落下して地面に叩き付けられた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 51}
+{"t": "status", "text": "氷漬けにされた人もいた。"}
+{"t": "drawn", "text": "氷漬けにされた人もいた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 52}
+{"t": "status", "text": "晴れているにも関わらず、雷に打たれた人もいた。"}
+{"t": "drawn", "text": "晴れているにも関わらず、雷に打たれた人もいた。", "color": "#fefe7f"}
+{"t": "expect", "color": "#fefe7f", "edge": null, "line": 53}
+{"t": "status", "text": "まるで、魔法。"}
+{"t": "drawn", "text": "まるで、魔法。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 54}
+{"t": "status", "text": "あまりにもファンタジーな表現だが、それが美亜の抱いた感想だった。"}
+{"t": "drawn", "text": "あまりにもファンタジーな表現だが、\nそれが美亜の抱いた感想だった。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 55}
+{"t": "status", "text": "「こんなの……嘘でしょう？」"}
+{"t": "drawn", "text": "「こんなの……嘘でしょう？」", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 56}
+{"t": "status", "text": "逃亡途中、スマートフォンから幾つかの情報を得ることができていた。"}
+{"t": "drawn", "text": "逃亡途中、スマートフォンから\n幾つかの情報を得ることができていた。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 57}
+{"t": "status", "text": "似たような殺戮が、日本の各地で起こっていること。"}
+{"t": "drawn", "text": "似たような殺戮が、日本の各地で起こっていること。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 58}
+{"t": "status", "text": "正確には、世界各地で起こっているとされる情報も流れていること。"}
+{"t": "drawn", "text": "正確には、世界各地で起こっているとされる情報も\n流れていること。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 59}
+{"t": "status", "text": "殺戮を行っているものの正体は不明だが、姿は人間に酷似していること。"}
+{"t": "drawn", "text": "殺戮を行っているものの正体は不明だが、\n姿は人間に酷似していること。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 60}
+{"t": "status", "text": "彼らは、まるで魔法か超能力といったような方法で、人間を殺すことができると言うこと。"}
+{"t": "drawn", "text": "彼らは、まるで魔法か超能力といったような方法で、\n人間を殺すことができると言うこと。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 61}
+{"t": "status", "text": "全く意味のわからない話だったが、それが今起こっている事の一端だった"}
+{"t": "drawn", "text": "全く意味のわからない話だったが、\nそれが今起こっている事の一端だった", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 62}
+{"t": "status", "text": "「あり得ない……こんな事、あるはずない……」"}
+{"t": "drawn", "text": "「あり得ない……こんな事、あるはずない……」", "color": "#fefefe"}
+{"t": "drawn", "text": "「こんなのが現実だったら……\n世界が、無茶苦茶になっちゃうじゃない」", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 63}
+{"t": "status", "text": "力なく笑って、美亜は近くの樹にもたれかかった。"}
+{"t": "drawn", "text": "力なく笑って、美亜は近くの樹にもたれかかった。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 64}
+{"t": "status", "text": "一度立ち止まってしまうと、それ以上動くことができない。"}
+{"t": "drawn", "text": "一度立ち止まってしまうと、それ以上動くことができない。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 65}
+{"t": "status", "text": "肉体的にも精神的にも、彼女は限界を迎えていた。"}
+{"t": "drawn", "text": "肉体的にも精神的にも、彼女は限界を迎えていた。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 66}
+{"t": "status", "text": "「みんな……死ぬの？」"}
+{"t": "drawn", "text": "「みんな……死ぬの？」", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 67}
+{"t": "status", "text": "ぼんやりと考えた後、人間に残された未来はそれしか浮かばなかった。"}
+{"t": "drawn", "text": "ぼんやりと考えた後、人間に残された未来は\nそれしか浮かばなかった。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 68}
+{"t": "status", "text": "何しろ相手は様々な怪奇現象を起こして、一瞬のうちに大量虐殺することが可能なのだ。"}
+{"t": "drawn", "text": "何しろ相手は様々な怪奇現象を起こして、\n一瞬のうちに大量虐殺することが可能なのだ。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 69}
+{"t": "status", "text": "たとえ警察が出動しても相手になるとは思えないし、もしかすると自衛隊の兵器でも対処できないかもしれない。"}
+{"t": "drawn", "text": "たとえ警察が出動しても相手になるとは思えないし、\nもしかすると自衛隊の兵器でも対処できないかもしれない。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 70}
+{"t": "status", "text": "そうなった場合、人間が一人残らず駆逐されても、全く不思議ではなかった。"}
+{"t": "drawn", "text": "そうなった場合、人間が一人残らず駆逐されても、\n全く不思議ではなかった。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 71}
+{"t": "status", "text": "「みんな……死んじゃったの？」"}
+{"t": "drawn", "text": "「みんな……死んじゃったの？」", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 72}
+{"t": "status", "text": "不意に、家族の顔が思い起こされた。"}
+{"t": "drawn", "text": "不意に、家族の顔が思い起こされた。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 73}
+{"t": "status", "text": "ほんの数時間前まで生きていたと言うのに、今は全員死んでしまった。"}
+{"t": "drawn", "text": "ほんの数時間前まで生きていたと言うのに、\n今は全員死んでしまった。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 74}
+{"t": "status", "text": "恐怖のあまり逃げ出したからこそ、美亜は生き残ることができたが、今ではその行動を後悔し始めていた。"}
+{"t": "drawn", "text": "恐怖のあまり逃げ出したからこそ、\n美亜は生き残ることができたが、\n今ではその行動を後悔し始めていた。", "color": "#fefefe"}
+{"t": "drawn", "text": "――あの時、家族と一緒に死んでおけば良かった。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 75}
+{"t": "status", "text": "――あの時、家族と一緒に死んでおけば良かった。"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 76}
+{"t": "status", "text": "苦痛の中で死ぬのは嫌だが、こうして自分だけ生き残ってしまっても何ら喜びを見出すことはできない。"}
+{"t": "drawn", "text": "苦痛の中で死ぬのは嫌だが、こうして自分だけ\n生き残ってしまっても何ら喜びを見出すことはできない。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 77}
+{"t": "status", "text": "むしろ、姉の断末魔が耳から離れず、思い出すだけで涙が溢れてきた。"}
+{"t": "drawn", "text": "むしろ、姉の断末魔が耳から離れず、\n思い出すだけで涙が溢れてきた。", "color": "#fefefe"}
+{"t": "drawn", "text": "両親は一瞬だったかもしれないが、\n姉はどれほど苦しかっただろう。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 78}
+{"t": "status", "text": "両親は一瞬だったかもしれないが、姉はどれほど苦しかっただろう。"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 79}
+{"t": "status", "text": "何が起こったのかわからないままに、どうしてあんな死に方をしなければならなかったのだろう。"}
+{"t": "drawn", "text": "何が起こったのかわからないままに、どうして\nあんな死に方をしなければならなかったのだろう。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 80}
+{"t": "status", "text": "そこに理由などあるはずもないのだが、美亜は何らかの答えを心の中で探してしまっていた。"}
+{"t": "drawn", "text": "そこに理由などあるはずもないのだが、\n美亜は何らかの答えを心の中で探してしまっていた。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 81}
+{"t": "status", "text": "「もうやだ……」"}
+{"t": "drawn", "text": "「もうやだ……」", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 82}
+{"t": "status", "text": "その場に座り込んで、美亜は膝を抱えた。"}
+{"t": "drawn", "text": "その場に座り込んで、美亜は膝を抱えた。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 83}
+{"t": "status", "text": "もう一歩も進めない。"}
+{"t": "drawn", "text": "もう一歩も進めない。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 84}
+{"t": "status", "text": "このままここで餓死するのなら、それでも構わないと思い始めていた。"}
+{"t": "drawn", "text": "このままここで餓死するのなら、\nそれでも構わないと思い始めていた。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 85}
+{"t": "status", "text": "「みんなのところ……行ったほうがいいよね」"}
+{"t": "drawn", "text": "「みんなのところ……行ったほうがいいよね」", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 86}
+{"t": "status", "text": "世界で何が起こっているのかなど、どうでもいい話だった。"}
+{"t": "drawn", "text": "世界で何が起こっているのかなど、どうでもいい話だった。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 87}
+{"t": "status", "text": "それがわかったところで、死んだ家族が帰って来るわけではない。"}
+{"t": "drawn", "text": "それがわかったところで、死んだ家族が\n帰って来るわけではない。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 88}
+{"t": "status", "text": "それならば、せめて苦痛のないままに死んでしまったほうが、よほど利口な選択と言えるはずだった。"}
+{"t": "drawn", "text": "それならば、せめて苦痛のないままに死んでしまったほうが、\nよほど利口な選択と言えるはずだった。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 89}
+{"t": "status", "text": "「……？」"}
+{"t": "drawn", "text": "「……？」", "color": "#fefefe"}
+{"t": "drawn", "text": "何かが聞こえた気がした。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 90}
+{"t": "status", "text": "何かが聞こえた気がした。"}
+{"t": "drawn", "text": "遠くのほうからだったが、人の声のような気がした。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 91}
+{"t": "status", "text": "遠くのほうからだったが、人の声のような気がした。"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 92}
+{"t": "status", "text": "「……………………」"}
+{"t": "drawn", "text": "「……………………」", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 93}
+{"t": "status", "text": "耳を澄ませてみるが、特には何も聞こえない。"}
+{"t": "drawn", "text": "耳を澄ませてみるが、特には何も聞こえない。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 94}
+{"t": "status", "text": "自分の気のせいだったのかと考えたが、何となくそうではないと感じていた。"}
+{"t": "drawn", "text": "自分の気のせいだったのかと考えたが、\n何となくそうではないと感じていた。", "color": "#fefefe"}
+{"t": "expect", "color": "#fefefe", "edge": null, "line": 95}
+{"t": "status", "text": "「あっちのほう……？」"}
+{"t": "drawn", "text": "「あっちのほう……？」", "color": "#fefefe"}

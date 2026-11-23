@@ -113,8 +113,9 @@ html:not(#u):not(#v):not(#w):not(#x) body .tv-home .tv-tl{opacity:.35}
 html:not(#u):not(#v):not(#w):not(#x) body .tv-home .tv-index{opacity:.45}
 /* the bottom bar: the game name without wide tracking */
 html:not(#u):not(#v):not(#w):not(#x) body .tv-home .tv-who{letter-spacing:.04em!important;font-size:14px!important}
-/* narrower windows: the cover and its ring step right so they never cover the first quoted line */
-@media (max-width:1560px){html:not(#u):not(#v):not(#w):not(#x) body .tv-home :is(.tv-cover,.tv-ring){translate:clamp(0px,calc((1560px - 100vw)*.22),70px) 0}}
+/* the cover and its ring step right, within the limit below */
+/* 2026-11-19 (user: 封面再右一点, 别和右侧统计挤): the cover and ring shift right by up to 64px, never past 40px short of the statistics column (their left edge is about 96vw - 90px, 70px of that is margin for the tilt); a narrow window no longer pushes the cover into them */
+@media (min-width:1px){html:not(#u):not(#v):not(#w):not(#x) body .tv-home :is(.tv-cover,.tv-ring){translate:max(0px,min(64px,calc(37vw - 170px - 29vmin))) 0}}
 
 /* Library: a game without cover art gets a designed title card (warm paper, its name set in the serif) instead of a
    grey box with an icon; the frame behind a still-loading cover is dark, not grey. */

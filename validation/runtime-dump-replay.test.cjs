@@ -24,7 +24,7 @@ test('corpus() survives more lines than a spread push can take',()=>{
 
 for(const name of ['euphoria-read.jsonl','joouhachi-read.jsonl','euphoria.jsonl','joouhachi.jsonl']){
  const file=path.join(REPLAY,name);
- test(`replay ${name}: captured lines come out of a compiled-script dump cleanly and are reported unpaired without a translation`,{skip:!fs.existsSync(file)},()=>{
+ test(`replay ${name}: captured lines come out of a compiled-script dump cleanly and are reported unpaired without a translation`,{skip:!fs.existsSync(file)&&'environment: recorded replay '+name+' not on this PC'},()=>{
   const lines=replayLines(file);if(lines.length<3)return;
   const{game,rd,h}=setup(),data=Buffer.concat(lines.flatMap(l=>[Buffer.from([0x10,0x02,0,0]),Buffer.from(l,'utf8'),Buffer.from([0])]));
   write(rd,game,[{source:'memory@1000',how:'seed',data}]);
@@ -38,7 +38,7 @@ for(const name of ['euphoria-read.jsonl','joouhachi-read.jsonl','euphoria.jsonl'
   assert.equal(h.harvest(game,{rebuild:true}).report.total,got.length);
  });}
 
-test('replay lines paired with a stand-in translation pair (every line accounted for)',{skip:!fs.existsSync(path.join(REPLAY,'euphoria-read.jsonl'))},()=>{
+test('replay lines paired with a stand-in translation pair (every line accounted for)',{skip:!fs.existsSync(path.join(REPLAY,'euphoria-read.jsonl'))&&'environment: recorded replay euphoria-read.jsonl not on this PC'},()=>{
  const lines=replayLines(path.join(REPLAY,'euphoria-read.jsonl')).slice(0,12);if(lines.length<4)return;
  const{game,rd,h}=setup(),enc=(arr)=>Buffer.concat(arr.flatMap(l=>[Buffer.from([0x10,0x02,0,0]),Buffer.from(l,'utf8'),Buffer.from([0])]));
  const zh=lines.map((l,i)=>'译'+String.fromCharCode(0x4e00+i*7)+'文'.repeat(Math.max(2,Math.round([...l].length*.8))));

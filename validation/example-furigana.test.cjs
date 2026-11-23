@@ -143,3 +143,51 @@ test('grammar lesson steps: no 01–06 numbers, names and 第 n / 6 步 stay',()
   assert.match(g,/aria-selected="\$\{i===s\}"><span>\$\{esc\(w\.steps\[k\]\)\}<\/span>/);
   assert.match(g,/data-stepof>/);
 });
+
+test('inline readings stay with their own occurrence in study examples and history exports',async t=>{
+ const {exampleRuby,gameRubyOf}=require('../services/example-ruby.cjs'),{DatabaseSync}=require('node:sqlite');
+ const raw='🌙 今日と <rきょう>今日</r>、｜今日《こんにち》。',text='🌙 今日と 今日、今日。';
+ const shown=async item=>(await exampleRuby(null,null,[item])).items[0];
+ const inline=await shown({text:raw});assert.equal(inline.text,text);
+ assert.deepEqual(inline.spans.map(s=>[s.start,s.end,s.reading]),[[6,8,'きょう'],[9,11,'こんにち']]);
+ const db=new DatabaseSync(':memory:');t.after(()=>db.close());db.exec('CREATE TABLE reading_events(id INTEGER PRIMARY KEY,text TEXT)');
+ db.prepare('INSERT INTO reading_events(text) VALUES(?)').run(raw);
+ const compact=text.replace(/\s+/g,''),pairs=gameRubyOf(db,compact);
+ assert.equal(exampleCardHtml(compact,[],{pairs}),'🌙今日と<ruby>今日<rt>きょう</rt></ruby>、<ruby>今日<rt>こんにち</rt></ruby>。');
+ const plain=await shown({text:'今日も今日も。',ruby:[['今日','きょう']]});
+ assert.deepEqual(plain.spans.map(s=>s.start),[0,3]);
+ const grammar=require('../services/grammar.cjs'),given=grammar.rubyPairs(raw);
+ const replay=await shown({text:compact,ruby:given});assert.deepEqual(replay.spans.map(s=>s.reading),['きょう','こんにち']);
+ const exported=exampleCardHtml(compact,[],{pairs:given,gameRuby:{'今日':'こんじつ'}});
+ assert.match(exported,/🌙<ruby>今日<rt>こんじつ<\/rt><\/ruby>と<ruby>今日<rt>きょう<\/rt>/);
+ const {applySpans}=await import('../web/example-ruby.js'),rare=await shown({text:'𠮷と<ruby>𠮷<rt>よし</rt></ruby>。'});
+ const doc=new Doc0(),el=h(doc,'p',{},rare.text);
+ assert.equal(applySpans(el,rare.text,rare.spans),1);assert.equal(el.html(),'𠮷と<ruby>𠮷<rt>よし</rt></ruby>。');
+ const wrapped='今\n日と今日と<rこんにち>今日</r>だ。';
+ const compacted=await shown({text:'今日と今日と今日だ。',ruby:grammar.rubyPairs(wrapped)});
+ assert.deepEqual(compacted.spans.map(s=>[s.start,s.end,s.reading]),[[6,8,'こんにち']]);
+ const label=await shown({text:'これは人工知能だ。',ruby:grammar.rubyPairs('これは<rAI>人工知能</r>だ。')});
+ assert.deepEqual(label.spans.map(s=>s.reading),['AI']);
+ const rich='赤い<br>花と<rはな>花</r>と花と花だ。',rendered=await shown({text:rich});
+ assert.equal(rendered.text,'赤い花と花と花と花だ。');assert.deepEqual(rendered.spans.map(s=>s.start),[4]);
+ const replayed=await shown({text:rendered.text,ruby:grammar.rubyPairs(rich)});
+ assert.deepEqual(replayed.spans,rendered.spans);
+ const alternative=await shown({text:'花と<ruby="はな">花</ruby>。'});assert.deepEqual(alternative.spans.map(s=>s.start),[2]);
+ const mismatched=await shown({text:'本と花。',ruby:[['花','はな',0],['花','はな',99],['花','はな',2],['花','か',2]]});
+ assert.deepEqual(mismatched.spans.map(s=>[s.start,s.reading]),[[2,'はな']]);
+});
+
+test('hydrating a saved sentence uses the same text as the returned reading spans',{timeout:2500},async t=>{
+ const {installExampleRuby}=await import('../web/example-ruby.js?saved-markup'),{exampleRuby}=require('../services/example-ruby.cjs');
+ const raw='<br>見上げると花が揺れた。',doc=new Doc0(),el=h(doc,'p',{},raw);
+ el.dataset={exr:raw,exrRuby:JSON.stringify([['花','はな']])};el.isConnected=true;
+ Object.assign(doc,{head:{append(){}},documentElement:{style:{setProperty(){}},classList:{toggle(){}}},querySelectorAll:()=>[el],addEventListener(){}});
+ for(const [name,value] of Object.entries({document:doc,MutationObserver:class{observe(){}}})){
+  const old=Object.getOwnPropertyDescriptor(globalThis,name);Object.defineProperty(globalThis,name,{value,configurable:true});
+  t.after(()=>{if(old)Object.defineProperty(globalThis,name,old);else delete globalThis[name];});
+ }
+ let received;const called=new Promise(r=>{received=r;});
+ installExampleRuby({api:async(action,args)=>{if(action==='settings_get')return {};const result=await exampleRuby(null,null,args.items);received();return result;}});
+ await called;await new Promise(r=>setImmediate(r));
+ assert.match(el.html(),/見上げると<ruby>花<rt>はな<\/rt><\/ruby>が揺れた/);
+});

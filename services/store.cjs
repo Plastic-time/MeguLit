@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS word_trash (
 );
 CREATE INDEX IF NOT EXISTS reading_by_game ON reading_sessions(game_id,started_at);
 CREATE INDEX IF NOT EXISTS events_by_time ON reading_events(read_at);
+CREATE TRIGGER IF NOT EXISTS grammar_reading_edit AFTER UPDATE OF text,game_id,original,read_at ON reading_events
+ WHEN OLD.text IS NOT NEW.text OR OLD.game_id IS NOT NEW.game_id OR OLD.original IS NOT NEW.original OR OLD.read_at IS NOT NEW.read_at
+ BEGIN INSERT INTO meta(key,value) VALUES('grammar-reading-revision',1)
+ ON CONFLICT(key) DO UPDATE SET value=value+1; END;
 CREATE INDEX IF NOT EXISTS lookups_by_time ON lookup_events(occurred_at);
 CREATE TABLE IF NOT EXISTS dictionary_entries (id INTEGER PRIMARY KEY, spelling TEXT NOT NULL, reading TEXT NOT NULL, definition TEXT NOT NULL, frequency INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS dictionary_forms (form TEXT NOT NULL, entry_id INTEGER NOT NULL, PRIMARY KEY(form,entry_id));
@@ -205,10 +209,13 @@ function imageData(root,folder,name) {
   const file=path.join(root,'data','assets',folder,name);
   if(!fs.existsSync(file)||fs.statSync(file).size>12*1024*1024)return '';
   const type={'.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp'}[path.extname(file).toLowerCase()];
-  return type?'data:'+type+';base64,'+fs.readFileSync(file).toString('base64'):'';
+  if(!type)return '';
+  /* a cover VNDB rates adult is tagged (#r18, ignored by the browser): web/nsfw.js veils it while the NSFW setting is off */
+  return 'data:'+type+';base64,'+fs.readFileSync(file).toString('base64')+(folder==='covers'&&require('./nsfw.cjs').isFlagged(root,name)?'#r18':'');
 }
 function games(db,root,{includeRemoved=false}={}) {
-  return db.prepare(`SELECT g.*, MAX(s.started_at) AS last_read_at, COALESCE(SUM(s.active_seconds),0) AS reading_seconds, COALESCE(SUM(s.characters),0) AS characters,(SELECT COUNT(DISTINCT e.word_id) FROM examples e JOIN vocabulary v ON v.id=e.word_id WHERE e.game_id=g.id) AS learned_words FROM games g LEFT JOIN reading_sessions s ON g.id=s.game_id ${includeRemoved?'':'WHERE g.removed_at IS NULL'} GROUP BY g.id ORDER BY MAX(COALESCE(g.last_launched_at,0),COALESCE(MAX(s.started_at),0)) DESC,g.title`).all().map(g=>{let catalog={},vndbManual='';try{const original=JSON.parse(g.original||'{}');catalog=original.library||{};vndbManual=original.vndbManual||'';}catch{}return({id:g.id,title:g.title,vndbId:String(vndbManual||catalog.vndbId||''),executable:g.executable,source:g.source,aliases:Array.isArray(catalog.names)?catalog.names:[],status:g.status,removed:g.removed_at!=null,hidden:g.hidden_at!=null,lastLaunchedAt:g.last_launched_at||null,lastPlayedAt:Math.max(g.last_launched_at||0,g.last_read_at||0)||null,readingSeconds:g.reading_seconds,characters:g.characters,learnedWords:g.learned_words,engine:String(catalog.engine||''),localeMode:catalog.localeMode||(catalog.localeJapanese===true?'japanese':'auto'),hookSupport:String(catalog.hook||'unknown'),cover:imageData(root,'covers',g.cover),available:!!g.executable&&fs.existsSync(g.executable)});});
+  /* the readonly verdict of another build is shown as untested (services/hook-verdict.cjs) */let version;const build=()=>version??=require('./hook-verdict.cjs').appVersion(root);
+  return db.prepare(`SELECT g.*, MAX(s.started_at) AS last_read_at, COALESCE(SUM(s.active_seconds),0) AS reading_seconds, COALESCE(SUM(s.characters),0) AS characters,(SELECT COUNT(DISTINCT e.word_id) FROM examples e JOIN vocabulary v ON v.id=e.word_id WHERE e.game_id=g.id) AS learned_words FROM games g LEFT JOIN reading_sessions s ON g.id=s.game_id ${includeRemoved?'':'WHERE g.removed_at IS NULL'} GROUP BY g.id ORDER BY MAX(COALESCE(g.last_launched_at,0),COALESCE(MAX(s.started_at),0)) DESC,g.title`).all().map(g=>{let catalog={},vndbManual='';try{const original=JSON.parse(g.original||'{}');catalog=original.library||{};vndbManual=original.vndbManual||'';}catch{}return({id:g.id,title:g.title,vndbId:String(vndbManual||catalog.vndbId||''),executable:g.executable,source:g.source,aliases:Array.isArray(catalog.names)?catalog.names:[],status:g.status,removed:g.removed_at!=null,hidden:g.hidden_at!=null,lastLaunchedAt:g.last_launched_at||null,lastPlayedAt:Math.max(g.last_launched_at||0,g.last_read_at||0)||null,readingSeconds:g.reading_seconds,characters:g.characters,learnedWords:g.learned_words,engine:String(catalog.engine||''),localeMode:catalog.localeMode||(catalog.localeJapanese===true?'japanese':'auto'),hookSupport:require('./hook-verdict.cjs').shown(catalog,build()),cover:imageData(root,'covers',g.cover),available:!!g.executable&&fs.existsSync(g.executable)});});
 }
 function home(db,root,now = new Date()) {
   const {start,end}=dayBounds(now);

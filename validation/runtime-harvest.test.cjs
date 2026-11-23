@@ -26,12 +26,13 @@ function decodings(buf){const out=[];for(const enc of ['shift_jis','utf-8','utf-
 const NEEDLES=[...new Set(rf.JP_LINES.flatMap(l=>{const c=[...l].filter(ch=>!PLACE.has(ch)&&!'、。！？「」…ー'.includes(ch));const out=[];for(let i=0;i+1<c.length;i++)out.push(c[i]+c[i+1]);return out;}))];
 const EN_NEEDLES=rf.ENGLISH.flatMap(e=>{const w=e.split(/\s+/);const out=[];for(let i=0;i+2<w.length;i++)out.push(w.slice(i,i+3).join(' '));return out;});
 /* every string in a JSON value, and every base64 / hex field decoded, in every encoding */
-function surfaces(value){const out=[];const walk=(v,k)=>{if(v&&typeof v==='object'&&typeof v.gzip==='string'){for(const t of decodings(d.partBytes(v)))out.push(t);}if(typeof v==='string'){out.push(v);if(v.length>=8&&/^[A-Za-z0-9+/]+=*$/.test(v)&&v.length%4===0)for(const t of decodings(Buffer.from(v,'base64')))out.push(t);if(/^(?:[0-9a-f]{2}){4,}$/.test(v))for(const t of decodings(Buffer.from(v,'hex')))out.push(t);}
+function surfaces(value){const out=[];out.binary=new Set();const bin=t=>{out.push(t);out.binary.add(t);};const walk=(v,k)=>{if(v&&typeof v==='object'&&typeof v.gzip==='string'){for(const t of decodings(d.partBytes(v)))bin(t);}if(typeof v==='string'){out.push(v);if(v.length>=8&&/^[A-Za-z0-9+/]+=*$/.test(v)&&v.length%4===0)for(const t of decodings(Buffer.from(v,'base64')))bin(t);if(/^(?:[0-9a-f]{2}){4,}$/.test(v))for(const t of decodings(Buffer.from(v,'hex')))bin(t);}
  else if(Array.isArray(v))v.forEach(x=>walk(x,k));else if(v&&typeof v==='object')for(const [kk,x] of Object.entries(v))walk(x,kk);};walk(value,'');return out;}
 /* where a leak sits (field path, which decoding, a few bytes around it), so a runner-only failure can be read from its log */
 function leakPaths(value){const out=[];const walk=(v,p)=>{if(typeof v==='string'||(v&&typeof v==='object'&&typeof v.gzip==='string')){const f=leaks(v);if(f.length){const bytes=typeof v!=='string'?d.partBytes(v):(v.length>=8&&/^[A-Za-z0-9+/]+=*$/.test(v)&&v.length%4===0)?Buffer.from(v,'base64'):null;const hits=bytes?decodings(bytes).map((t,i)=>{const r=f.map(n=>t.indexOf(n)).find(x=>x>=0);return r>=0?{dec:i,at:r,ctx:[...t.slice(Math.max(0,r-6),r+9)].map(c=>c.charCodeAt(0).toString(16)).join(' ')}:null;}).filter(Boolean):null;out.push({path:p,found:f.slice(0,5),len:bytes?bytes.length:v.length,hits});}return;}if(Array.isArray(v))v.forEach((x,i)=>walk(x,p+'['+i+']'));else if(v&&typeof v==='object')for(const [k,x] of Object.entries(v))walk(x,p+'.'+k);};walk(value,'');return out;}
-function leaks(value){const found=[];for(const s of surfaces(value)){for(const n of NEEDLES)if(s.includes(n))found.push(n);for(const n of EN_NEEDLES)if(s.includes(n))found.push(n);
- /* any kana run of 3+ that is not placeholders */const m=s.match(/[ぁ-ゖァ-ヺ]{3,}/g);if(m)for(const r of m)if([...r].some(ch=>!PLACE.has(ch)))found.push(r);}
+function leaks(value){const found=[],all=surfaces(value);for(const s of all){for(const n of NEEDLES)if(s.includes(n))found.push(n);for(const n of EN_NEEDLES)if(s.includes(n))found.push(n);
+ /* any kana run of 3+ that is not placeholders. 2026-11-19 (Signed build of v1.4.17: 「ブビビ」 in a 1 MB encrypted sample, no game
+    line has it): bytes decoded in seven encodings give a random 3-kana run every few dozen runs; decoded binary needs 6+ */const m=s.match(all.binary.has(s)?/[ぁ-ゖァ-ヺ]{6,}/g:/[ぁ-ゖァ-ヺ]{3,}/g);if(m)for(const r of m)if([...r].some(ch=>!PLACE.has(ch)))found.push(r);}
  return [...new Set(found)];}
 
 /* ---- detectors -------------------------------------------------------------------------------------------------------- */
@@ -64,6 +65,15 @@ test('index: the decrypted table in memory — stride, fields, count field, name
  assert.deepEqual(ix.entries.map(e=>e[0]),G.records.map(r=>r.offset));assert.deepEqual(ix.names.list.map(String),G.records.map(r=>r.name));
  assert.equal(ix.kinds.filter(([k])=>k==='text').length,G.scenes,'scenes open as text with the Blowfish key');assert.equal(ix.kinds[G.scenes][0],'png');
  assert.deepEqual({module:ix.locator.module,rva:ix.locator.rva},{module:0,rva:0x21010});assert.match(ix.slotSig[0].pattern,/^[0-9a-f]{12}\?{8}[0-9a-f]{8}$/);
+});
+test('index: found whole wherever the heap puts it — every 16-byte placement across a 4 KB block edge (E987)',()=>{
+ /* a live game's allocator places the table anywhere: next to dense key material, or with only a few records past a
+    block edge before other data; each placement must give the whole table, never a cut one or none */
+ const heap=rf.heapBlob(G),H=0x02000000,bad=[];
+ for(let pad=0;pad<4096;pad+=16){const bytes=Buffer.concat([Buffer.alloc(pad),heap.blob,Buffer.alloc(4096)]);
+  const sc=S.createScanner({archives:ARCH});sc.header({v:1,pid:1,bits:64,modules:[],regions:[{base:'0x'+H.toString(16),size:bytes.length,protect:4,type:0x20000}]});
+  sc.region({base:H,bytes,index:0});const c=sc.finish().indexes.map(i=>i.count);if(!c.includes(G.records.length))bad.push(pad+':'+c.join('/'));}
+ assert.deepEqual(bad,[],'placements with a cut or missing table');
 });
 test('scripts: decoded bytecode — opcode before the length byte, u8 length prefix, NUL terminator',()=>{
  const s=LOCAL.scripts[0];assert.ok(s);assert.equal(s.encoding,'sjis');assert.equal(s.lengthPrefix,'u8');assert.equal(s.terminator,'nul');assert.equal(s.opcodes[0].byte,'10');

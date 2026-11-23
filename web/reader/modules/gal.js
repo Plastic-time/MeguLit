@@ -93,14 +93,19 @@
    };
   const holdSurface = () => { document.body?.classList.add('tome-surface-pending'); clearTimeout(surfaceTimer); surfaceTimer = setTimeout(() => { releaseSurface();
    placeLayers(); apply(); }, 600); };
-  const releaseSurface = () => { clearTimeout(surfaceTimer); surfaceTimer = 0; document.body?.classList.remove('tome-surface-pending'); };
+  const releaseSurface = () => { clearTimeout(surfaceTimer); surfaceTimer = 0;
+    if (document.body?.classList.contains('tome-surface-pending')) {
+      document.body.classList.remove('tome-surface-pending');
+      bridge.gameFit?.schedule();
+    }
+  };
   addEventListener('resize', () => { if (!layoutInfo) return; if (surfaceMismatch(layoutInfo)) holdSurface(); else if (document.body?.classList.contains('tome-surface-pending')) {
    releaseSurface(); placeLayers(); apply(); } });
   const style = document.createElement('style');
   style.textContent = `
     .tome-island-layout-hint { display:none; }
     body.tome-island-active .tome-island-layout-hint { display:block; }
-    body.tome-island-active label:has(>select[name=galPreset]),body.tome-island-active [data-gal-drag],body.tome-island-active [data-gal-position-sync],body.tome-island-active .tome-live-position,body.tome-island-active .tome-manual-region-hint { display:none!important; }
+    body.tome-island-active label:has(>select[name=galPreset]),body.tome-island-active [data-gal-drag],body.tome-island-active [data-gal-anchor-reset],body.tome-island-active [data-gal-position-sync],body.tome-island-active .tome-live-position,body.tome-island-active .tome-manual-region-hint { display:none!important; }
     .sentence-window .sentence-text.tomoyo-furigana {
       --megulit-ruby-line:var(--tomoyo-gal-ruby-line-height,2.55);
       line-height:calc(var(--megulit-ruby-line) * 1em)!important;
@@ -126,6 +131,7 @@
     @media (prefers-reduced-motion:reduce) { .sentence-text .megulit-ruby-base::before { transition:none; } }
     body.tome-line-read .sentence-window:not(.tome-island-page) { --tomoyo-gal-color:var(--tomoyo-gal-read-color); --tomoyo-gal-gradient:var(--tomoyo-gal-read-gradient); --tomoyo-gal-fill:var(--tomoyo-gal-read-fill); --tomoyo-gal-jp-stroke:var(--tomoyo-gal-read-jp-stroke); --tomoyo-gal-cn-stroke:var(--tomoyo-gal-read-cn-stroke); --tomoyo-gal-jp-filter:var(--tomoyo-gal-read-jp-filter); --tomoyo-gal-cn-filter:var(--tomoyo-gal-read-cn-filter); }
     body.tome-line-color .sentence-window:not(.tome-island-page) { --tomoyo-gal-color:var(--tomoyo-gal-line-color); --tomoyo-gal-gradient:none; --tomoyo-gal-fill:currentColor; } /* E550 per-line colour (text-position.js paintLine) */
+    body.tome-line-edge .sentence-window:not(.tome-island-page) { --tomoyo-jp-stroke-color:var(--tomoyo-gal-line-edge); --tomoyo-ruby-stroke-color:var(--tomoyo-gal-line-edge); --tomoyo-cn-stroke-color:var(--tomoyo-gal-line-edge); } /* the outline the game drew this sentence with; furigana and the translation under it follow the line (they take its colour too) */
     body.tome-surface-pending .sentence-window, body.tome-surface-pending .tomoyo-native-mask, body.tome-surface-pending .tome-inline-wait { visibility:hidden!important; }
     body.tome-box-dragging .sentence-window { outline:2px dashed var(--theme-primary,#e0495a)!important; outline-offset:2px; cursor:move!important; }
     body.tome-box-dragging .sentence-window * { cursor:move!important; pointer-events:none!important; }
@@ -436,6 +442,9 @@
     const root = document.documentElement.style;
     const scaled = value => (value * gameScale).toFixed(2) + 'px';
     root.setProperty('--tomoyo-gal-jp-size', scaled(preferences.japaneseSize));
+    /* the anchored offset is on the root too: text-place re-pins on a root style change, so a new offset (slider, calibration,
+       回到游戏原字位置) moves the line at once even when nothing else changed */
+    root.setProperty('--megulit-anchor-offset', (Number(preferences.anchorDX) || 0) + ' ' + (Number(preferences.anchorDY) || 0));
     root.setProperty('--tomoyo-gal-cn-size', scaled(preferences.translationSize));
     const insets=appearance.insets(preferences);
     root.setProperty('--tomoyo-gal-pad-x', scaled(insets.padX));
@@ -462,9 +471,11 @@
      const safe=/^#[0-9a-f]{6}$/i.test(color)?color:'#ffffff',thin=visible>0&&visible<pixel;
      root.setProperty('--tomoyo-'+name+'-stroke',(thin?pixel*2:visible*2)+'px');
      root.setProperty('--tomoyo-'+name+'-stroke-color',thin?safe+Math.round(Math.max(.2,visible/pixel)*255).toString(16).padStart(2,'0'):safe);};
-    stroke('jp',preferences.japaneseOutline,preferences.japaneseOutlineWidth,preferences.japaneseOutlineColor);
-    stroke('cn',preferences.chineseOutline,preferences.chineseOutlineWidth,preferences.chineseOutlineColor);
-    stroke('ruby',preferences.rubyOutline,preferences.rubyOutlineWidth,preferences.rubyOutlineColor);
+    /* 2026-11-19 (user, 素晴らしき日々: "汉字描边啥情况，为啥一下这么丑一下又正常了"): a dark text colour drawn with a dark outline is a blot, and a profile saved before the outline followed the measured colour still holds that pair (black on black). Whatever the source of the two colours, dark text gets a white outline; every other pair is drawn as set. */
+    const luma=c=>{const m=/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c||'');return m?(.2126*parseInt(m[1],16)+.7152*parseInt(m[2],16)+.0722*parseInt(m[3],16))/255:null;},fillDark=preferences.textGradient!==true&&luma(preferences.textColor)!==null&&luma(preferences.textColor)<.35,readable=color=>fillDark&&(luma(color)===null?false:luma(color)<.35)?'#ffffff':color;
+    stroke('jp',preferences.japaneseOutline,preferences.japaneseOutlineWidth,readable(preferences.japaneseOutlineColor));
+    stroke('cn',preferences.chineseOutline,preferences.chineseOutlineWidth,readable(preferences.chineseOutlineColor));
+    stroke('ruby',preferences.rubyOutline,preferences.rubyOutlineWidth,readable(preferences.rubyOutlineColor));
     document.body.classList.toggle('megulit-english-style',preferences.englishEnabled);
     root.setProperty('--megulit-en-font',appearance.englishFonts[preferences.englishFont]);
     root.setProperty('--megulit-en-size',scaled(preferences.englishSize));
@@ -479,7 +490,7 @@
      const st=document.createElement('style');st.id='megulit-translation-blur-style';const T=['.tomoyo-cn-output','.megulit-choice-cn'],on=T.map(t=>'html.megulit-translation-blur body '+t+',html.megulit-translation-blur body.tomoyo-gal-bound '+t).join(','),
      shown=T.map(t=>'html.megulit-translation-blur body '+t+'.megulit-reveal,html.megulit-translation-blur body.tomoyo-gal-bound '+t+'.megulit-reveal,html.megulit-translation-blur body.tomoyo-gal-bound '+t+':hover').join(',');
      st.textContent=on+'{filter:blur(7px)!important;transition:filter .18s ease!important}'+shown+'{filter:var(--tomoyo-gal-cn-filter,none)!important}';document.head.append(st);
-     let readingSent=0;/* #134 (user: reading a word card's context explanation, a long one, the embedded subtitles vanished): while a look-up card or the selection card is open the reader is reading, wherever the pointer is; without this the marker rule hid the layer 8 s after the game's wait marker went out of sight */setInterval(()=>{
+     let readingSent=0;/* #134 (user: reading a word card's context explanation, a long one, the embedded subtitles vanished): while a look-up card or the selection card is open the reader is reading, wherever the pointer is; without this the marker rule hid the layer 8 s after the game's wait marker went out of sight */(window.__megulitReaderIntervals?.set||setInterval)(()=>{
      if(document.hidden||!document.body.classList.contains('tomoyo-gal-bound')||Date.now()-readingSent<1200)return;for(const n of document.querySelectorAll('.tomoyo-selection-card,.tooltip-entries')){
      const r=n.getBoundingClientRect();if(r.width>0&&r.height>0&&getComputedStyle(n).visibility!=='hidden'){readingSent=Date.now();try{window.__tomoyoTranslateRequest(JSON.stringify({
      type:'readerReading'}));}catch{}break;}}},1000);document.addEventListener('mousemove',e=>{/* Issue 127: the pointer on MeguLit's own text keeps the layer up (core/immersion.cjs reading) */{
@@ -541,7 +552,7 @@
     for (const key of Object.values(map).concat('japaneseOutline')) if (cleaned[key] !== preferences[key]) changed[key] = cleaned[key];
     if (changed.textColor) try { localStorage.setItem('tome-previous-text-color', preferences.textColor); } catch {}
     if(commitSynchronizedStyle)commitSynchronizedStyle(changed);syncOpenForm(changed);
-    preferences = cleaned; localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...preferences,translationPrompt:undefined})); send({ type:'galConfigure',
+    preferences = cleaned; localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...preferences,translationPrompt:undefined,anchorDX:undefined,anchorDY:undefined})); send({ type:'galConfigure',
      settings:preferences }); apply();
     return changed;
   };
@@ -559,7 +570,7 @@
   const styleOnly = values => { const { interfaceMode, bindEnabled, gameProcess, ...rest } = values || {}; return rest; };
   bridge.applyGalPreferences = (values = {}, options = {}) => { values = styleOnly(values); preferences = appearance.clean({ ...preferences, ...values }); const applied = {
    }; for (const key of Object.keys(values)) if (preferences[key] !== undefined) applied[key] = preferences[key]; if (!options.preview&&commitSynchronizedStyle) commitSynchronizedStyle(applied);
-   syncOpenForm(applied); if(!options.preview)localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...preferences,translationPrompt:undefined})); if(options.preview)send({
+   syncOpenForm(applied); if(!options.preview)localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...preferences,translationPrompt:undefined,anchorDX:undefined,anchorDY:undefined})); if(options.preview)send({
    type:'galPreview',settings:preferences});else if(options.persist!==false)send({ type:'galConfigure', settings:preferences }); apply(); return { ...preferences };
    };
   bridge.galPreferences = () => ({ ...preferences });
@@ -662,7 +673,7 @@
        <small class="tomoyo-hotkey-hint" data-gal-bind-hint>先开游戏后开 MeguLit，或 MeguLit 重开后，用这里或 Alt+M 重新连接</small>
        <div class="tome-window-bind-list"><label>游戏窗口<select name="galGame"><option value="">点击刷新选择窗口</option></select></label><button type="button" data-gal-refresh>刷新窗口</button><button type="button" data-gal-bind>绑定此窗口</button><button type="button" data-gal-unbind>解除绑定</button></div></div>
       <div class="tomoyo-cn-grid"><label>文本框左边距<input type="number" name="galX" min="0" max="95" step="0.1"></label><label>文本框上边距<input type="number" name="galY" min="0" max="95" step="0.1"></label><label>文字换行宽度<input type="number" name="galWidth" min="20" max="100" step="0.1"></label><input type="hidden" name="galHeight"><small class="tome-manual-region-hint">显示区域随实际文字增长，高度自动调整</small><small class="tome-island-layout-hint">按原文位置排布，文字可自然延伸到游戏窗口外</small></div>
-      <button type="button" data-gal-drag>拖动文本框</button>
+      <div class="tome-window-bind-row" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><button type="button" data-gal-drag>拖动文本框</button><button type="button" data-gal-anchor-reset>回到游戏原字位置</button></div>
       <div class="tome-position-sync"><button type="button" data-gal-position-sync>同步位置</button><small data-position-state></small></div>
       <div class="tome-game-style-sync"><label class="tome-auto-style-switch"><input type="checkbox" name="galAutoGameStyle">自动同步游戏原文样式</label><button type="button" data-game-style-sync>从游戏同步</button><small data-game-style-state></small></div>
       <label>原文替换方式<select name="galMaskMode"><option value="hook">Hook 引擎与原文替换内嵌</option></select></label>
@@ -689,8 +700,8 @@
       <label>字体搭配<select name="galStyle"><option value="classic">MS Mincho（日文明朝）／素晴汉化字体</option><option value="clean">MS Gothic（日文黑体）／素晴汉化字体</option><option value="custom">自定义 · 沿用下方译文设置</option></select></label>
       <div class="tomoyo-cn-grid"><label><input name="galJapaneseBold" type="checkbox">日文加粗</label><label><input name="galChineseBold" type="checkbox">中文加粗</label><label title="译文默认模糊，鼠标移上去才显示"><input name="galTranslationBlur" type="checkbox">译文模糊（悬停显示）</label></div>
       <label><input name="galTypewriter" type="checkbox">文字逐字显示</label>
-      <label>显示速度（字/秒）<input name="galTypewriterSpeed" type="number" min="5" max="120" step="1"></label>
-      <small>点击游戏或按空格可补全当前文字；按住 Ctrl 快速显示，不拦截游戏操作</small>
+      <label>速度（字/秒）<input name="galTypewriterSpeed" type="number" min="5" max="120" step="1"></label>
+      <small>点游戏或按空格补全当前句；按住 Ctrl 快速显示</small>
       <label>显示内容<select name="galDisplay"><option value="bilingual">日文＋假名／中文</option><option value="japanese">仅日文＋假名</option><option value="chinese">仅中文 · 接近汉化版</option><option value="bilingual-en">日文＋假名／英文</option><option value="english">仅英文</option><option value="none">不显示（只看游戏文本框）</option></select></label>
       <div class="tomoyo-cn-grid tomoyo-type-sizes"><label>中文字号<input name="galChineseSize" type="number" min="12" max="60"></label></div>
       <div class="tomoyo-cn-grid"><label>未读渐变<input name="galTextGradient" type="checkbox"></label><label>已读渐变<input name="galReadTextGradient" type="checkbox"></label><label>未读渐变上色<input name="galTextGradientTop" type="color"></label><label>未读渐变下色<input name="galTextGradientBottom" type="color"></label><label>已读渐变上色<input name="galReadTextGradientTop" type="color"></label><label>已读渐变下色<input name="galReadTextGradientBottom" type="color"></label><label>未读渐变起点（%）<input name="galTextGradientStart" type="number" min="0" max="95" step="1"></label><label>已读渐变起点（%）<input name="galReadTextGradientStart" type="number" min="0" max="95" step="1"></label></div>
@@ -704,7 +715,7 @@
     group.querySelector('.tomoyo-type-sizes').prepend(group.querySelector('[name=galJapaneseSize]').closest('label'));
     // Furigana position sliders sit directly under the furigana switch instead of inside a collapsed section.
     const rubyBlock=document.createElement('div');rubyBlock.className='tomoyo-ruby-position';
-    rubyBlock.innerHTML='<div class="tomoyo-ruby-size"><label>假名大小（相对正文）<input name="galRubyScale" type="number" min="0.2" max="0.85" step="0.01"></label></div><div class="tomoyo-cn-grid"><label>假名水平位置 X（右＋，px）<input name="galRubyOffsetX" type="number" min="-40" max="40" step="0.5"></label><label>假名垂直位置 Y（下＋，px）<input name="galRubyOffsetY" type="number" min="-100" max="100" step="0.5"></label><div class="megulit-ruby-rows" data-ruby-rows><span class="megulit-ruby-rows-title">按行微调 Y</span><div class="megulit-ruby-rows-chips" role="tablist"></div><output class="megulit-ruby-rows-value">0</output><input type="range" class="megulit-ruby-rows-slider" min="-60" max="60" step="0.5" value="0" aria-label="所选行的假名垂直位置"><input type="hidden" name="galRubyRowOffsets"><span class="megulit-ruby-rows-title">按行微调 X</span><span></span><output class="megulit-ruby-rows-value" data-axis-x>0</output><input type="range" class="megulit-ruby-rows-slider" data-axis-x min="-60" max="60" step="0.5" value="0" aria-label="所选行的假名水平位置"><input type="hidden" name="galRubyRowOffsetsX"></div></div><label><input name="galRubyOutline" type="checkbox">假名描边</label><div class="tomoyo-cn-grid"><label>假名描边颜色<input name="galRubyOutlineColor" type="color"></label><label>假名描边粗细<input name="galRubyOutlineWidth" type="number" min="0" max="2" step="0.05"></label></div>';
+    rubyBlock.innerHTML='<div class="tomoyo-ruby-size"><label title="相对正文字号的比例">假名大小<input name="galRubyScale" type="number" min="0.2" max="0.85" step="0.01"></label></div><div class="tomoyo-cn-grid"><label title="向右为正，单位 px">假名水平偏移<input name="galRubyOffsetX" type="number" min="-40" max="40" step="0.5"></label><label title="向下为正，单位 px">假名垂直偏移<input name="galRubyOffsetY" type="number" min="-100" max="100" step="0.5"></label><div class="megulit-ruby-rows" data-ruby-rows><span class="megulit-ruby-rows-title">单行微调</span><div class="megulit-ruby-rows-chips" role="tablist"></div><span class="megulit-ruby-axis" data-a="y">垂直</span><output class="megulit-ruby-rows-value">0</output><input type="range" class="megulit-ruby-rows-slider" min="-60" max="60" step="0.5" value="0" aria-label="所选行的假名垂直位置"><input type="hidden" name="galRubyRowOffsets"><span class="megulit-ruby-axis" data-a="x">水平</span><output class="megulit-ruby-rows-value" data-axis-x>0</output><input type="range" class="megulit-ruby-rows-slider" data-axis-x min="-60" max="60" step="0.5" value="0" aria-label="所选行的假名水平位置"><input type="hidden" name="galRubyRowOffsetsX"></div></div><label><input name="galRubyOutline" type="checkbox">假名描边</label><div class="tomoyo-cn-grid"><label>假名描边颜色<input name="galRubyOutlineColor" type="color"></label><label>假名描边粗细<input name="galRubyOutlineWidth" type="number" min="0" max="2" step="0.05"></label></div>';
     const rubyMenu=document.createElement('details');rubyMenu.className='tomoyo-ruby-menu';rubyMenu.innerHTML='<summary>注音字体与描边</summary>';
     const furiganaLabel=group.querySelector('[name=galFurigana]').closest('label');furiganaLabel.before(rubyMenu);rubyMenu.append(furiganaLabel,rubyBlock);
     const layout = document.createElement('details');
@@ -791,7 +802,7 @@
      fastMask:'galFastMask', maskStyle:'galMaskStyle', japaneseBold:'galJapaneseBold', chineseBold:'galChineseBold', translationBlur:'galTranslationBlur' };
     for(const [key] of fields)additional['english'+key[0].toLowerCase()+key.slice(1)]='galEnglish'+key;
     additional.scanAuto='galScanAuto';{const auto=f('galScanAuto'),sync=()=>{for(const n of ['galScanX','galScanY','galScanWidth','galScanHeight'])f(n).disabled=auto.checked;
-     };auto.addEventListener('change',sync);setInterval(sync,1000);}additional.relocateWaitMarker='galRelocateWaitMarker';additional.hideWaitMarker='galHideWaitMarker';
+     };auto.addEventListener('change',sync);(window.__megulitReaderIntervals?.set||setInterval)(sync,1000);}additional.relocateWaitMarker='galRelocateWaitMarker';additional.hideWaitMarker='galHideWaitMarker';
      const waitState=document.createElement('div');waitState.className='tomoyo-mask-state';waitState.setAttribute('data-gal-wait-state','');waitState.textContent='这两个开关一般不用开。只有像《素晴らしき日々》那样替换原文后，等待提示符一直在替换过的文字背景下面闪烁、影响阅读时，才推荐打开';
      f('galHideWaitMarker').closest('label').after(waitState);
     for (const [key,name] of Object.entries(additional)) {
@@ -830,6 +841,35 @@
     colorUndo.onclick=()=>{if(!previousColor)return;f('galTextColor').value=previousColor;f('galTextColor').dispatchEvent(new Event('input',{bubbles:true}));};
     f('galFurigana').checked = preferences.furigana; f('galJapaneseSize').value = preferences.japaneseSize;
     for (const [key, name] of Object.entries({ x: 'galX', y: 'galY', width: 'galWidth', height: 'galHeight' })) f(name).value = preferences[key];
+    /* 2026-11-19 (user: 「左右留白和边距现在都调整不了文本框位置了」): while the line is anchored on the game's own place the box
+       position fields are its offset from there (anchorDX/anchorDY, client %, default 0, may be negative); the box position
+       x/y of the reader's own box is kept apart and untouched */
+    /* 2026-11-21 (owner's recording, 千恋＊万花: dragging 文本框上边距 threw the text to mid-screen and 校准当前句 did not bring it back): the body class
+       comes and goes between lines and while the game draws a line itself, so a drag switched the fields between the offset and the reader's own
+       place halfway and wrote one into the other. The mode is the game's (placement on, anchored), stable for the whole drag. */
+    const anchoredNow = () => typeof bridge.textPlaceAnchorActive === 'function' ? !!bridge.textPlaceAnchorActive() : document.body.classList.contains('megulit-anchored');
+    /* 2026-11-19 (user, 千恋＊万花: 「我校准了之后调了一下换行长度，直接再也恢复不了正确位置了」): the meaning of the two fields is
+       fixed when they are filled. The menu had been opened on a line the game drew itself (box mode: the fields held x 24.63 /
+       y 79.7); the next line was anchored and dragging the wrap width wrote those numbers as an offset. A change of mode while
+       the menu is open fills the fields again for the new meaning; nothing is ever read in the other one. */
+    let fieldsAreOffset = false;
+    /* 2026-11-19 (user, 素晴らしき日々: 「默认的位置贼偏」): 回到游戏原字位置 clears this game's anchored offset at once and saves it to
+       the game's style profile (not an undo of unsaved edits); it needs the engine's glyph places, so without them it is greyed with the reason as its tooltip (the position state line below already says 本作品尚无引擎坐标) */
+    const anchorReset = group.querySelector('[data-gal-anchor-reset]'),
+     anchorResetWords = {zh:['回到游戏原字位置','本作品尚无引擎坐标'],en:['Back to the game text position','No engine positions for this game yet'],ja:['ゲームの文字位置に戻す','この作品はまだエンジン座標がありません']};
+    const paintAnchorReset = () => { const w = anchorResetWords[(window.__tomeI18n?.get?.()||'zh').slice(0,2)] || anchorResetWords.zh, on = document.body.classList.contains('megulit-anchored'); /* the button: this line sits on the game's places now (the fields use the stable mode, anchoredNow) */ anchorReset.dataset.noI18n = '';
+     anchorReset.textContent = w[0]; anchorReset.disabled = !on; anchorReset.title = on ? '' : w[1]; anchorReset.setAttribute('aria-disabled', String(!on)); };
+    const fillPosition = () => { fieldsAreOffset = anchoredNow(); if (fieldsAreOffset) { f('galX').value = Number(preferences.anchorDX) || 0; f('galY').value = Number(preferences.anchorDY) || 0; f('galX').min = f('galY').min = '-95'; } else { f('galX').value = preferences.x; f('galY').value = preferences.y; f('galX').min = f('galY').min = '0'; } };
+    fillPosition();
+    const modeWatch = new MutationObserver(() => { if (anchoredNow() !== fieldsAreOffset && document.body.contains(dialog)) { const was = syncingForm; syncingForm = true; try { fillPosition(); } finally { syncingForm = was; } } paintAnchorReset(); });
+    paintAnchorReset();
+    modeWatch.observe(document.body, { attributes: true, attributeFilter: ['class'] }); dialog.addEventListener('close', () => modeWatch.disconnect(), { once: true });
+    /* 2026-11-19 (user): with the text following the game's own glyph place there is no text box to pad: the two padding controls are greyed out with a one-line reason, and come back in box mode */
+    const syncPadding = () => { const off = anchoredNow(), labels = ['galPaddingX', 'galPaddingY'].map(n => f(n)?.closest('label')).filter(Boolean); if (!labels.length) return;
+      for (const l of labels) { l.classList.toggle('tome-pad-off', off); l.style.opacity = off ? '.45' : ''; l.style.pointerEvents = off ? 'none' : ''; for (const i of l.querySelectorAll('input')) i.disabled = off; }
+      let note = dialog.querySelector('.tome-pad-note'); if (!note) { note = document.createElement('small'); note.className = 'tome-pad-note'; note.textContent = '正文跟随游戏原字位置时不生效'; note.style.cssText = 'display:block;opacity:.7;font-size:11.5px;margin:2px 0 6px'; labels.at(-1).insertAdjacentElement('afterend', note); }
+      note.hidden = !off; };
+    queueMicrotask(syncPadding); const padWatch = new MutationObserver(syncPadding); padWatch.observe(document.body, { attributes: true, attributeFilter: ['class'] }); dialog.addEventListener('close', () => padWatch.disconnect(), { once: true });
     const sliderOutputs = [];
     for(const input of group.querySelectorAll('input[type=number]')){
       const output=document.createElement('output');output.className='tomoyo-slider-value';output.htmlFor=input.name;
@@ -858,12 +898,12 @@
     dialogFields.maskState.textContent = bridge.maskMessage || '局部遮字会在绑定游戏并收到原文后启动';
     const current = () => appearance.clean({ ...preferences, readTextColor: f('galReadTextColor').value.toLowerCase() === f('galTextColor').value.toLowerCase() ? '' : f('galReadTextColor').value,
      furigana: f('galFurigana').checked, japaneseSize: Number(f('galJapaneseSize').value), sizeSource: Number(f('galJapaneseSize').value)!==preferences.japaneseSize||Number(f('galChineseSize')?.value??preferences.translationSize)!==preferences.translationSize?'user':preferences.sizeSource,
-      x: Number(f('galX').value), y: Number(f('galY').value), width: Number(f('galWidth').value), height: Number(f('galHeight').value),
+      ...(fieldsAreOffset ? { x: preferences.x, y: preferences.y, anchorDX: Number(f('galX').value) || 0, anchorDY: Number(f('galY').value) || 0 } : { x: Number(f('galX').value), y: Number(f('galY').value), anchorDX: Number(preferences.anchorDX) || 0, anchorDY: Number(preferences.anchorDY) || 0 }), width: Number(f('galWidth').value), height: Number(f('galHeight').value),
       ...Object.fromEntries(Object.entries(additional).map(([key,name]) => [key, typeof defaults[key] === 'boolean' ? f(name).checked : f(name).value])) });
     const save = event => { if(bridge.gameStyleCommitReady?.()===false){event?.preventDefault();event?.stopImmediatePropagation();return;}preferences = current();
      if(event?.type==='submit'&&dialog.dataset.menuTab==='calibrate'&&bridge.saveGameProfileFromMenu){event.preventDefault();event.stopImmediatePropagation();bridge.saveGameProfileFromMenu(preferences);
      return;} if(preferences.textColor.toLowerCase()!==committed.textColor.toLowerCase()){previousColor=committed.textColor;localStorage.setItem(colorHistoryKey,
-     previousColor);colorUndo.disabled=false;} committed = { ...preferences }; localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...preferences,translationPrompt:undefined}));
+     previousColor);colorUndo.disabled=false;} committed = { ...preferences }; localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...preferences,translationPrompt:undefined,anchorDX:undefined,anchorDY:undefined}));
      send({ type: 'galConfigure', settings: preferences }); bridge.saveGameProfileFromMenu?.(preferences); apply(); };
     const updateMaskForm = () => { group.querySelector('[data-gal-full-color]').hidden = f('galMaskMode').value !== 'full';group.querySelector('[data-gal-hook-options]').hidden=f('galMaskMode').value!=='hook';
      };
@@ -879,7 +919,7 @@
       if (!f('galGame').value) { dialogFields.state.textContent = '先刷新并选择游戏窗口'; return; }
       preferences = current(); preferences.bindEnabled = true;
       committed = { ...preferences };
-      localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...preferences,translationPrompt:undefined}));
+      localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...preferences,translationPrompt:undefined,anchorDX:undefined,anchorDY:undefined}));
       const picked = f('galGame').selectedOptions[0];
       send({ type: 'galBind', hwnd: f('galGame').value, settings: preferences, title: picked?.dataset.title || '', processName: picked?.dataset.processName || '' });
     };
@@ -900,7 +940,7 @@
      y:e.clientY, gx:Number(f('galX').value), gy:Number(f('galY').value) }; try { e.target.setPointerCapture(e.pointerId); } catch {} };
     const dragMove = e => { if (!dragStart) return; e.preventDefault(); e.stopPropagation(); const dpr = Math.max(.5, Number(window.devicePixelRatio)||1), cw = layoutInfo?.clientWidth||window.innerWidth*dpr,
      ch = layoutInfo?.clientHeight||window.innerHeight*dpr;
-      f('galX').value = Math.round(Math.max(0, Math.min(95, dragStart.gx + (e.clientX-dragStart.x)*dpr*100/cw))*10)/10; f('galY').value = Math.round(Math.max(0,
+      const lo = fieldsAreOffset ? -95 : 0; f('galX').value = Math.round(Math.max(lo, Math.min(95, dragStart.gx + (e.clientX-dragStart.x)*dpr*100/cw))*10)/10; f('galY').value = Math.round(Math.max(lo,
        Math.min(95, dragStart.gy + (e.clientY-dragStart.y)*dpr*100/ch))*10)/10; if (!dragFrame) dragFrame = requestAnimationFrame(() => { dragFrame = 0; preview();
        }); };
     const dragUp = e => { if (!dragStart) return; e.stopPropagation(); dragStart = null; };
@@ -909,8 +949,12 @@
      };
     dragButton.onclick = () => { const on = !document.body.classList.contains('tome-box-dragging'); dragMode(on); if (!on) save(); };
     dragLabel(false); dialog.addEventListener('close', () => dragMode(false), { once:true });
+    bridge.galAnchorOffsetReset = () => anchorReset.onclick?.(); /* 校准当前句 / 仅校准位置 put the line back on the game's own place */
+    anchorReset.onclick = () => { if (!anchoredNow()) return; if (bridge.gameStyleCommitReady?.() === false) return; preferences = { ...current(), anchorDX: 0, anchorDY: 0 };
+     if (fieldsAreOffset) { const was = syncingForm; syncingForm = true; try { f('galX').value = 0; f('galY').value = 0; for (const update of sliderOutputs) update(); } finally { syncingForm = was; } }
+     committed = { ...preferences }; send({ type: 'galConfigure', settings: preferences }); bridge.saveGameProfileFromMenu?.(preferences); apply(); };
     form.addEventListener('submit', save, true);
-    dialog.addEventListener('close', () => { if(previewFrame){cancelAnimationFrame(previewFrame);previewFrame=0;}preferences = {...committed,interfaceMode:preferences.interfaceMode};
+    dialog.addEventListener('close', () => { if(previewFrame){cancelAnimationFrame(previewFrame);previewFrame=0;}/* issue 468 (寒蝉: Alt+T 里调小字号，一关设置又变大): a text size changed in the menu is the user's size, kept on close like the home settings' size (same value, sizeSource user); other unsaved edits are still dropped */{const size={japaneseSize:Number(f('galJapaneseSize')?.value),translationSize:Number(f('galChineseSize')?.value??committed.translationSize)};if(Number.isFinite(size.japaneseSize)&&Number.isFinite(size.translationSize)&&(size.japaneseSize!==committed.japaneseSize||size.translationSize!==committed.translationSize)){committed=appearance.clean({...committed,...size,sizeSource:'user'});localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...committed,translationPrompt:undefined,anchorDX:undefined,anchorDY:undefined}));send({ type: 'galConfigure', settings: committed });bridge.saveGameProfileFromMenu?.(committed);}}preferences = {...committed,interfaceMode:preferences.interfaceMode};
      dialogFields = null;commitSynchronizedStyle=null;/* 2026-11-16 Alt+T: closing only drops the menu's unsaved edits; re-sending the snapshot as a preview turned the embed off */if(bound)send({type:'galPreviewEnd'});setTimeout(()=>send({ type: 'galMenu', open: !!document.querySelector('.tomoyo-cn-dialog[open],.tome-backlog[data-open],.tomoyo-cn-dialog[data-leaving],.tome-backlog[data-leaving]') }),
      340);apply(); }, { once: true });
     send({ type: 'galWindows' }); send({ type: 'galMenu', open: true });

@@ -22,7 +22,7 @@
 #include <ddraw.h>
 #include <cstdio>
 #include <cwchar>
-#include "../scncapture/minhook/include/MinHook.h"
+#include "../shared/minhook/include/MinHook.h"
 
 namespace {
 enum class Mode { Fill, Native, Keep };

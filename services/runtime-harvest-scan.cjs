@@ -170,7 +170,9 @@ function createScanner({archives=[],pairs=[],budgetMs=90000,now=Date.now}={}){
  /* records of a fixed stride whose offset field stays inside an archive and whose offset/size fields tile it */
  function indexScan(base,w,b){const n=w.length;
   /* dense blocks: many words that could be an offset into the largest archive */
-  const BLOCK=1024;const dense=[];for(let s=0;s<n;s+=BLOCK){let ok=0,nz=0;for(let i=s;i<Math.min(n,s+BLOCK);i++){const v=w[i];if(v){nz++;if(v<=maxSize)ok++;}}if(ok>=24&&ok>=nz*.05)dense.push(s);}
+  /* blocks at half-block steps: a table up to half a block long lies whole in one of them, so its own words make that
+     block dense even when the blocks on either side are mostly other data */
+  const BLOCK=1024;const dense=[];for(let s=0;s<n;s+=BLOCK/2){let ok=0,nz=0;for(let i=s;i<Math.min(n,s+BLOCK);i++){const v=w[i];if(v){nz++;if(v<=maxSize)ok++;}}if(ok>=24&&ok>=nz*.05)dense.push(s);}
   if(!dense.length)return;
   /* a table that starts in the block before a dense one (its first records next to other data) is scanned from there */
   const spans=[];for(const s of dense){const from=Math.max(0,s-BLOCK),last=spans[spans.length-1];if(last&&last[1]>=from)last[1]=Math.min(n,s+BLOCK);else spans.push([from,Math.min(n,s+BLOCK)]);}
@@ -178,9 +180,11 @@ function createScanner({archives=[],pairs=[],budgetMs=90000,now=Date.now}={}){
    for(let stride=2;stride<=64;stride++){/* stride in words: 8..256 bytes */if(over())return;
     for(let phase=0;phase<stride;phase++){let runStart=-1,count=0,prev=-1;
      /* offsets in file order: each record's offset above the previous one (packers write entries in order) */
-     for(let i=from+phase;i<=to;i+=stride){const v=i<to?w[i]:0;const ok=i<to&&v<maxSize&&v>prev;
+     /* a run still going at the span's end follows the table past it: the tail may sit in a sparse block (a few
+        records before other data) that alone is not dense (E987: cut to 20 of 21 when the table crossed a 4 KB edge) */
+     for(let i=from+phase;;i+=stride){const inSpan=i<to,can=i<n&&(inSpan||runStart>=0);const v=can?w[i]:0;const ok=can&&v<maxSize&&v>prev;
       if(ok){if(runStart<0)runStart=i;count++;prev=v;}
-      else{if(count>=8)tryTable(base,w,b,runStart,count,stride);runStart=i<to&&v<maxSize?i:-1;count=runStart<0?0:1;prev=runStart<0?-1:v;}}}}}}
+      else{if(count>=8)tryTable(base,w,b,runStart,count,stride);if(!inSpan)break;runStart=v<maxSize?i:-1;count=runStart<0?0:1;prev=runStart<0?-1:v;}}}}}}
  function tryTable(base,w,b,at0,count0,stride){
   const key='ix'+(base+at0*4)+':'+stride;if(seen.has(key))return;
   /* a size field next to the offset (u32 at ±1..±4 words), u64 offsets (next word zero), packed + unpacked sizes */

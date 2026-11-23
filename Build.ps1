@@ -1,9 +1,36 @@
-﻿param([switch]$Check)
+﻿param([switch]$Check,[switch]$TestsOnly)
 $ErrorActionPreference = 'Stop'
 $taskRoot = $PSScriptRoot
 # Toolchain discovery (local offline tools folder, or a standard Windows setup); see tools/build-env.ps1.
 . (Join-Path $taskRoot 'tools/build-env.ps1')
 if ($taskProblems.Count) { $taskProblems | ForEach-Object { Write-Error "MISSING: $_" -ErrorAction Continue }; throw 'Build environment incomplete; run tools/check-env.ps1 for details' }
+function Invoke-TaskTests {
+ # Test resume (tools/test-resume.cjs): with the same code fingerprint only failed, new or edited test files run again;
+ # a changed fingerprint runs the whole suite. MEGULIT_TEST_STATE names the state file (Release.ps1: one per tag).
+ $taskState = if ($env:MEGULIT_TEST_STATE) { $env:MEGULIT_TEST_STATE } else { Join-Path $env:TEMP 'megulit-build-tests.json' }
+ $taskList = Join-Path $env:TEMP ('megulit-tests-run-' + $PID + '.txt')
+ & $taskNode (Join-Path $taskRoot 'tools/test-resume.cjs') select $taskState $taskRoot $taskList
+ if ($LASTEXITCODE -ne 0) { throw 'Test selection failed (tools/test-resume.cjs)' }
+ $taskRun = @(Get-Content -LiteralPath $taskList | Where-Object { $_ })
+ if (-not $taskRun.Count) { Write-Output 'tests: every test file passed with this code already; none run'; return }
+ # Cap test parallelism: at full CPU concurrency the timing-sensitive tests (runtime-harvest, relay-race, topmost/altt window checks) flake under load, though each passes alone. 2 keeps the suite fast while not saturating the machine.
+ # MEGULIT_TEST_CONCURRENCY (1-32) overrides the default 2 on a machine that keeps the timing-sensitive tests green at a higher value
+ $taskConcurrency = 2; if ($env:MEGULIT_TEST_CONCURRENCY -match '^\d+$' -and [int]$env:MEGULIT_TEST_CONCURRENCY -ge 1 -and [int]$env:MEGULIT_TEST_CONCURRENCY -le 32) { $taskConcurrency = [int]$env:MEGULIT_TEST_CONCURRENCY }
+ # Paths relative to the repository root: 544 absolute paths passed 32767 characters and Windows refused to start node ("filename or extension is too long").
+ Push-Location -LiteralPath $taskRoot
+ try { $taskTestOutput = & $taskNode --test --test-force-exit "--test-concurrency=$taskConcurrency" @($taskRun | ForEach-Object { $_.Replace('/','\') }) 2>&1 } finally { Pop-Location }
+ $taskTestExit = $LASTEXITCODE
+ $taskTestOutput | Set-Content -LiteralPath (Join-Path $taskRoot 'validation/automated-results.txt') -Encoding utf8
+ & $taskNode (Join-Path $taskRoot 'tools/test-resume.cjs') record $taskState $taskRoot $taskList (Join-Path $taskRoot 'validation/automated-results.txt') $taskTestExit
+ Remove-Item -LiteralPath $taskList -Force -ErrorAction SilentlyContinue
+ $taskTestText = $taskTestOutput -join "`n"
+ @{ recordedAt=[DateTime]::UtcNow.ToString('o'); exitCode=$taskTestExit; tests=[int]([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Groups[1].Value); passed=[int]([regex]::Match($taskTestText,'(?m)pass\s+(\d+)').Groups[1].Value); failed=[int]([regex]::Match($taskTestText,'(?m)fail\s+(\d+)').Groups[1].Value) } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskRoot 'validation/automated-results.json') -Encoding utf8
+ Write-Output ($taskTestOutput | Select-Object -Last 9)
+ # exit 3 = tests failed after a good build: Release.ps1 then retries only the failed test files, without building again
+ if ($taskTestExit -ne 0) { $taskTestOutput | Select-String -Pattern '^not ok' -Context 0,24 | ForEach-Object { Write-Output $_.Line; $_.Context.PostContext | Where-Object { $_ -match '^\s' } | ForEach-Object { Write-Output $_ } }; Write-Output 'Independent data checks failed; see validation/automated-results.txt'; exit 3 }
+ if (-not ([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Success) -or [int]([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Groups[1].Value) -eq 0) { throw 'Test runner reported zero tests' }
+}
+if ($TestsOnly) { Invoke-TaskTests; exit 0 }
 & (Join-Path $taskRoot 'tools/build-tray-icon.ps1')
 & $taskNode (Join-Path $taskRoot 'tools/prepare-reader.cjs')
 if ($LASTEXITCODE -ne 0) { throw 'Original overlay source preparation failed' }
@@ -45,6 +72,9 @@ foreach ($taskHelper in @(@('HookInjector32.exe','/platform:x86','HookInjector.c
  & $taskCsc /nologo /target:exe /optimize+ $taskHelper[1] ('/out:' + (Join-Path $taskRoot ('native\' + $taskHelper[0]))) @($taskHelper[2..($taskHelper.Count-1)] | ForEach-Object { Join-Path $taskRoot ('native\' + $_) })
  if ($LASTEXITCODE -ne 0) { throw "Native helper build failed: $($taskHelper[0])" }
 }
+# 2026-11-21 idle-time cold test: the game on a hidden desktop, muted, PostMessage input, client-area pictures (docs/cold-test.md)
+& $taskCsc /nologo /target:exe /optimize+ /platform:x64 /reference:System.Drawing.dll ('/out:' + (Join-Path $taskRoot 'native\ColdDesk.exe')) (Join-Path $taskRoot 'native\ColdDesk.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Native helper build failed: ColdDesk.exe' }
 & $taskNode --check (Join-Path $taskRoot 'services\bridge.cjs')
 if ($LASTEXITCODE -ne 0) { throw 'Service syntax check failed' }
 foreach ($taskScript in @('web/app.js','web/primary-buttons.js','web/library-grid-fit.js','web/tray-menu.js','web/launch-feedback.js','web/reader/game-ui.js','web/home-motion.js','web/library-refresh.js','web/series-library.js','web/series-i18n.js','web/game-reception.js','web/settings-autosave.js','web/path-picker.js','web/game-language.js','web/cn-version-guide.js','web/grid-motion.js','web/game-detail.js','web/adaptation-overview.js','web/diagnostics-ui.js','web/settings.js','web/settings-layout.js','web/settings-search.js','web/settings-help.js','web/select-control.js','web/translation-settings.js','web/speech-settings.js','web/voice-style.js','web/background-crop.js','web/backup-ui.js','web/settings-reset.js','web/anki-review.js','web/anki-fit.js','web/anki-card.js','web/reader/host-transport.js','web/reader/bootstrap.js','web/reader/learning-notice.js','web/reader/host-startup.js','web/reader/host-regions.js','web/reader/module-list.js','web/reader/mode.js','web/reader/word-status.js')) {
@@ -62,19 +92,7 @@ $env:LIB = (Join-Path $taskMsvc.FullName 'lib\x64')+';'+(Join-Path $taskSdk.Full
 & $taskCargo rustc $taskCargoNet --locked --release --features custom-protocol --manifest-path (Join-Path $taskRoot 'desktop\Cargo.toml') -- -C "linker=$taskLld" -C linker-flavor=lld-link -L ("native="+(Join-Path $taskMsvc.FullName 'lib\x64')) -L ("native="+(Join-Path $taskSdk.FullName 'ucrt\x64')) -L ("native="+(Join-Path $taskSdk.FullName 'um\x64'))
 if ($LASTEXITCODE -ne 0) { throw 'Independent desktop build failed' }
 $taskBuilt = Join-Path $taskRoot 'desktop\target\release\megulit.exe'
-if ($Check) {
- $taskTests = @(Get-ChildItem -LiteralPath (Join-Path $taskRoot 'validation') -Filter '*.test.cjs' -File -Recurse | ForEach-Object { $_.FullName })
- if (-not $taskTests.Count) { throw 'No tests found in validation/*.test.cjs; -Check must not pass with zero tests' }
- # Cap test parallelism: at full CPU concurrency the timing-sensitive tests (runtime-harvest, relay-race, topmost/altt window checks) flake under load, though each passes alone. 2 keeps the suite fast while not saturating the machine.
- $taskTestOutput = & $taskNode --test --test-concurrency=2 @taskTests 2>&1
- $taskTestExit = $LASTEXITCODE
- $taskTestOutput | Set-Content -LiteralPath (Join-Path $taskRoot 'validation/automated-results.txt') -Encoding utf8
- $taskTestText = $taskTestOutput -join "`n"
- @{ recordedAt=[DateTime]::UtcNow.ToString('o'); exitCode=$taskTestExit; tests=[int]([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Groups[1].Value); passed=[int]([regex]::Match($taskTestText,'(?m)pass\s+(\d+)').Groups[1].Value); failed=[int]([regex]::Match($taskTestText,'(?m)fail\s+(\d+)').Groups[1].Value) } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskRoot 'validation/automated-results.json') -Encoding utf8
- Write-Output ($taskTestOutput | Select-Object -Last 9)
- if ($taskTestExit -ne 0) { $taskTestOutput | Select-String -Pattern '^not ok' -Context 0,24 | ForEach-Object { Write-Output $_.Line; $_.Context.PostContext | Where-Object { $_ -match '^\s' } | ForEach-Object { Write-Output $_ } }; throw 'Independent data checks failed; see validation/automated-results.txt' }
- if (-not ([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Success) -or [int]([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Groups[1].Value) -eq 0) { throw 'Test runner reported zero tests' }
-}
+if ($Check) { Invoke-TaskTests }
 $taskOutput = Join-Path $taskRoot 'MeguLit.exe'
 try { Copy-Item -LiteralPath $taskBuilt -Destination $taskOutput -Force }
 catch [System.IO.IOException] {

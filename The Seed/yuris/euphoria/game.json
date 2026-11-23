@@ -1,0 +1,66 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "c83721a62ed75f2b69e1d003eeaec4ac91fc6afc9397414530c79dc0307067a8",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "yuris",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "b967661155a39c409ac977885790f2cc09b7f8cdc275cb1a837c91115e9c2278",
+  "script": "00b1fca5c8abfa1751017b90634aafdf555aecdaf60bdebd277a38e8ec9ef2b1",
+  "title": "065962dabf7819cd31e188b3de6569c4bb4af4f912ae33d93bd6fbdba66fed67",
+  "vndb": "v6540"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "euphoria",
+ "builds": [
+  "d30b992fc56a9e7ae8c3235664e929cd47eeaaa12ad74f8ddf8b7e15dec3184d"
+ ],
+ "match": {
+  "exe": [
+   "euphoria.exe"
+  ],
+  "titles": [
+   "euphoria"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

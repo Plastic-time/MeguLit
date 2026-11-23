@@ -7,6 +7,7 @@
 // which queues the line for a writer thread. The writer sends the lines to HookBridge over the pipe
 // \\.\pipe\MeguLitKrkr-<pid>; with no reader the lines are dropped. Every step is guarded: if anything is missing the
 // game runs untouched. KiriKiri SDK: native\krkrtext\sdk (tp_stub, W.Dee and contributors, GPL dual license).
+#include "../shared/MeguLitSafeRead.h"
 #include <windows.h>
 #include <objidl.h>
 #include <tlhelp32.h>
@@ -80,6 +81,19 @@ public:
  }
 };
 iTJSDispatch2 *HideFn;
+// engine-draw (docs/engine-draw-protocol.md): the control file MeguLit writes for this process, as a KiriKiri storage name
+// (file://./c/...). script.inc reads it itself with Array.load; no file = the behaviour before engine-draw.
+std::wstring CtlPath;
+void MakeCtlPath() {
+ wchar_t tmp[MAX_PATH]; DWORD n = GetTempPathW(MAX_PATH, tmp);
+ if (!n || n >= MAX_PATH || n < 3 || tmp[1] != L':') return;
+ wchar_t tail[64]; swprintf(tail, 64, L"MeguLit\\draw\\%lu.txt", GetCurrentProcessId());
+ std::wstring win = std::wstring(tmp, n) + tail, out = L"file://./";
+ wchar_t drive = win[0]; if (drive >= L'A' && drive <= L'Z') drive = (wchar_t)(drive + 32);
+ out += drive;
+ for (size_t i = 2; i < win.size(); i++) out += win[i] == L'\\' ? L'/' : win[i];
+ CtlPath = out;
+}
 
 // The TJS function the script reports through: one string argument, one protocol line.
 class ReportFunction : public tTJSDispatch {
@@ -109,7 +123,8 @@ bool Executable(uintptr_t p) {
  return p && VirtualQuery((void *)p, &m, sizeof m) && m.State == MEM_COMMIT &&
   (m.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) && !(m.Protect & PAGE_GUARD);
 }
-bool ReadPtr(const void *at, uintptr_t *v) { __try { *v = *(const uintptr_t *)at; return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
+/* P0 2026-11-20: never __try-read a guessed pointer blind (stack guard pages), see ../shared/MeguLitSafeRead.h */
+bool ReadPtr(const void *at, uintptr_t *v) { return MeguLitSafe::ReadPtr(at, v); }
 #ifdef _M_IX86
 // Calls exporter->QueryFunctionsByNarrowString and measures who cleaned the stack: 16 bytes left for the caller is
 // the cdecl interface this DLL is built for (TJS2 2.4.14 and later, every KiriKiri Z); 0 is an old stdcall engine.
@@ -238,9 +253,16 @@ void *FindExporter(std::string &why) {
 }
 
 // ---- running the script on the game thread ----------------------------------------------------------------------------
-const wchar_t *Script =
+// engine-draw 2026-11-21: script.inc is a list of raw-literal pieces joined here, so the whole script may pass the
+// 32,767-unit limit of one concatenated literal (each piece stays under 8,190).
+const wchar_t *const ScriptParts[] = {
 #include "script.inc"
-;
+};
+std::wstring ScriptText;
+const wchar_t *Script() {
+ if (ScriptText.empty()) for (const wchar_t *p : ScriptParts) ScriptText += p;
+ return ScriptText.c_str();
+}
 struct EvalCall { const wchar_t *source; std::wstring *result; std::wstring *error; };
 void TJS_USERENTRY EvalTry(void *data) {
  EvalCall *c = (EvalCall *)data;
@@ -253,6 +275,10 @@ void TJS_USERENTRY EvalTry(void *data) {
  if (HideFn) {
   tTJSVariant hide(HideFn, HideFn);
   global->PropSet(TJS_MEMBERENSURE, L"__megulitKrkrHide", NULL, &hide, global);
+ }
+ if (!CtlPath.empty()) {
+  tTJSVariant ctl(CtlPath.c_str());
+  global->PropSet(TJS_MEMBERENSURE, L"__megulitKrkrCtlPath", NULL, &ctl, global);
  }
  tTJSVariant scripts;
  if (TJS_FAILED(global->PropGet(0, L"Scripts", NULL, &scripts, global)) || scripts.Type() != tvtObject) { global->Release(); *c->error = L"no Scripts"; return; }
@@ -271,7 +297,7 @@ bool TJS_USERENTRY EvalCatch(void *data, const tTVPExceptionDesc &desc) {
 }
 void Tick() {
  std::wstring result, error;
- EvalCall call{Installed ? L"(typeof global.__megulitKrkrState=='Object'&&global.__megulitKrkrState!==void)?global.__megulitKrkrState.refresh():'lost'" : Script, &result, &error};
+ EvalCall call{Installed ? L"(typeof global.__megulitKrkrState=='Object'&&global.__megulitKrkrState!==void)?global.__megulitKrkrState.refresh():'lost'" : Script(), &result, &error};
  TVPDoTryBlock(EvalTry, EvalCatch, NULL, &call);
  std::string status = Utf8((error.empty() ? result : error).c_str());
  if (error.empty() && result.compare(0, 3, L"ok ") == 0) Installed = true;
@@ -348,6 +374,7 @@ DWORD WINAPI Run(void *) {
  if (!TVPInitImportStub((iTVPFunctionExporter *)exporter)) { SetStatus("off: stub"); return 0; }
  ReportFn = new ReportFunction();
  HideFn = new HideFunction();
+ MakeCtlPath();
  TickMessage = RegisterWindowMessageW(L"MeguLitKrkrTick-v1");
  for (;;) {
   Sleep(Installed ? 3000 : 1000);

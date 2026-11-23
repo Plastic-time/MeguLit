@@ -1,9 +1,11 @@
 
 #include "MinHook.h"
+#include "MeguLitSafeUnhook.h"
 #include "veh_hook.h"
 #include "lunarpc.h"
 #include "MeguLitGdiHide.h"
 #include "MeguLitMarks.h"
+int MeguLitEmbedArm(HookParam &hp, TextBuffer &buff, const ThreadParam &tp);
 extern WinMutex viewMutex;
 
 // - Unnamed helpers -
@@ -384,14 +386,15 @@ void TextHook::Send(hook_context *context)
 				buffer->type &= (~EMBED_ABLE);
 				canembed = false;
 			}
-			else if (checktranslatedok(buff))
-			{
-				buffer->type &= (~EMBED_ABLE);
-				canembed = true;
-			}
 			else
 			{
-				canembed = true;
+				/* MeguLit 2026-11-19 (MeguLitEmbedWait.h): a stream that is not selected never waits and leaves the shared answer
+				   buffer alone; a cached line (also one the bridge left unchanged) is not asked again; the answer event exists
+				   before the line goes out, so a fast answer is never lost */
+				int armed = MeguLitEmbedArm(hp, buff, tp);
+				if (armed > 0 || armed == -2)
+					buffer->type &= (~EMBED_ABLE); /* never for a stream that is not selected: its first line creates the thread, and the bridge must still see it as writable */
+				canembed = armed >= 0;
 			}
 		}
 
@@ -484,8 +487,12 @@ bool TextHook::InsertHookCode()
 	VirtualProtect(location, 10, PAGE_EXECUTE_READWRITE, DUMMY);
 	void *original;
 	MH_STATUS error;
+	/* a hook removed here earlier may have been kept (a thread could still have been inside): free it first. Its
+	   address is no TextHook's any more, so RemoveHook below would never clear it (that looped forever) */
+	MeguLitUnhook::RetryKept(location);
+	int tries = 0;
 	while ((error = MH_CreateHook(location, trampoline, &original)) != MH_OK)
-		if (error == MH_ERROR_ALREADY_CREATED)
+		if (error == MH_ERROR_ALREADY_CREATED && !MeguLitUnhook::IsKept(location) && tries++ < 4)
 			RemoveHook(address);
 		else
 			return Msg::Log(MH_StatusToString(error)), false;
@@ -575,19 +582,32 @@ bool TextHook::InsertReadCode()
 	return true;
 }
 
+/* MeguLit 2026-11-19 (死に逝く君、館に芽吹く憎悪: 0xC000041D at one fixed non-module address, Alt+M about 9 s after start):
+   a hook removed while the game thread was still inside it. useCount only covers the body of Send; a thread in the stub
+   before or after it, in Send's prologue/epilogue, or in MinHook's trampoline still returns to `original`, which
+   MH_RemoveHook frees. Removal goes through the shared flow (native/shared/MeguLitSafeUnhook.h): disable, wait for
+   useCount, check with every other thread suspended at once, free only then. A hook that does not get quiet within 2 s
+   keeps its trampoline (a few dozen bytes) instead of being freed under a thread; RetryKept frees it before this
+   address is hooked again. */
 void TextHook::RemoveHookCode()
 {
 	MH_DisableHook(location);
 	while (useCount != 0)
-		;
-	MH_RemoveHook(location);
+		Sleep(1);
+	void *original = *(void **)(trampoline + original_offset);
+	MeguLitUnhook::Span stub{(uintptr_t)trampoline, (uintptr_t)trampoline + sizeof(common_hook)};
+	const volatile LONG *counts[1] = {(const volatile LONG *)&useCount};
+	if (!MeguLitUnhook::RemoveMinHook(location, original, &stub, 1, counts, 1, 2000))
+		Msg::Log("MeguLit hook at %p kept, not freed: a thread may still return into it", location);
 }
 
+/* set by RemoveReadCode when the reader thread did not stop in time: Clear then leaves its buffer alone */
+static thread_local bool ReaderStillRunning = false;
 void TextHook::RemoveReadCode()
 {
 	SetEvent(readerEvent);
 	if (GetThreadId(readerThread) != GetCurrentThreadId())
-		WaitForSingleObject(readerThread, 1000);
+		ReaderStillRunning = WaitForSingleObject(readerThread, 1000) != WAIT_OBJECT_0;
 	CloseHandle(readerEvent);
 	CloseHandle(readerThread);
 }
@@ -596,6 +616,7 @@ void TextHook::Clear()
 {
 	if (address == 0)
 		return;
+	ReaderStillRunning = false;
 	if (savetypeforremove & DIRECT_READ)
 		RemoveReadCode();
 	else if (savetypeforremove & BREAK_POINT)
@@ -612,8 +633,16 @@ void TextHook::Clear()
 							 JIT_HP_Records.end());
 	}
 	std::scoped_lock lock(viewMutex);
-	memset(&hp, 0, sizeof(HookParam));
 	address = 0;
+	if (ReaderStillRunning)
+	{
+		/* MeguLit: the reader thread still uses hp and the buffer; it stops at its next wait (the event is closed).
+		   Keeping them is a small leak; freeing them under it was a crash */
+		Msg::Log("MeguLit reader of %s did not stop in 1 s: its buffer is kept", hp.name);
+		local_buffer = nullptr;
+		return;
+	}
+	memset(&hp, 0, sizeof(HookParam));
 	if (local_buffer)
 		delete[] local_buffer;
 }

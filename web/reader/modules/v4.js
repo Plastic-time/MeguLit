@@ -71,7 +71,7 @@
    keep.markSaved(args.text);status.textContent+=' · '+keep.t().also;paintKeep();}if(value.mediaWarning==='SCREENSHOT_UNAVAILABLE')status.textContent+=' · '+(document.documentElement.lang.startsWith('ja')?'ゲーム画像を取得できませんでした':document.documentElement.lang.startsWith('en')?'Game screenshot unavailable':'未获取到游戏截图');
    if(value.sentenceAudioSource){const labels={game:['例句：游戏原声','Example: game voice','例文：ゲーム音声'],synthesized:['例句：合成语音','Example: synthesized voice','例文：合成音声']};
    const lang=document.documentElement.lang;status.textContent+=' · '+labels[value.sentenceAudioSource][lang.startsWith('ja')?2:lang.startsWith('en')?1:0];}try{
-   window.__tomeAnkiMined?.({entry:result?.entries?.find(e=>e.id===entryId)||result?.entries?.[0],args,noteId:value.id,word});}catch{}}}catch(e){if(alive())status.textContent=e.message;
+   window.__tomeAnkiMined?.({entry:result?.entries?.find(e=>e.id===entryId)||result?.entries?.[0],args,noteId:value.id,word,wordMined:value.wordMined});}catch{}}}catch(e){if(alive())status.textContent=e.message;
    }finally{clearInterval(ticker);if(action==='anki'){ankiBusy=false;if(anki.dataset.state==='busy')delete anki.dataset.state;}if(alive()){audio.disabled=false;anki.disabled=minedKeys.has(minedKey());if(anki.disabled)markMined();
    }}}
   request('word',scope).then(value=>{if(!alive())return;word=value;status.textContent=(value.pronunciationForm==='lemma'?'原形朗读：':'')+(value.reading||value.surface)+(value.pitch?.length?' · 音调 '+value.pitch.join(' / '):'')+' · '+value.pitchSource;
@@ -82,7 +82,7 @@
    // Prepare the audio while the reader looks at the card; it only plays on click.
    if(!audio.disabled&&(value.pitch?.length||0)<=1)request('prefetch',scope).catch(()=>{});}).catch(e=>{if(alive())status.textContent=e.message;});
  };
- const oldStatus=b.galStatus;b.galStatus=m=>{oldStatus?.(m);if(m.hookSource!==undefined&&typeof m.hookSource==='string')b.hookSourceText=m.hookSource;if(m.type==='dialogCalibration')for(const node of document.querySelectorAll('[data-v4-calibration]'))node.textContent=m.message;
+ const oldStatus=b.galStatus;b.galStatus=m=>{oldStatus?.(m);if(m.hookSource!==undefined&&typeof m.hookSource==='string'){b.hookSourceText=m.hookSource;/* 2026-11-20 core/page-text.cjs: characters of the shown sentence the game drew before this line */b.hookSourceContinues=Number(m.hookSourceContinues)||0;}if(m.type==='dialogCalibration')for(const node of document.querySelectorAll('[data-v4-calibration]'))node.textContent=m.message;
   if(typeof m.hookSequence==='number')b.hookSequence=m.hookSequence;for(const k of ['processAttached','streamSelected','receivedText','replacementState','hookRecovering'])if(m[k]!==undefined)b[k]=m[k];
   if(typeof m.dialogVisible==='boolean'){document.body.classList.toggle('tomoyo-dialog-hidden',!m.dialogVisible);if(!m.dialogVisible)b.closeLocalSelection?.();}updateDiagnostic();
   };

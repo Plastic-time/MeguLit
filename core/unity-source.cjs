@@ -32,15 +32,23 @@ module.exports={rubySize,typewriter};
    held until the stream has been quiet for holdMs; the same paragraph again is not delivered twice. */
 const OPEN=/^[　「『（(【〈《“"]/u,DONE=/[。！？!?」』）)…―─〜~♪】>”"．.]$/u;
 function paragraphs(text){const out=[];for(const raw of String(text||'').split('\n')){const l=raw.replace(/\s+$/,'');if(!l.trim())continue;if(!out.length||OPEN.test(l))out.push(l);else out[out.length-1]+=l.replace(/^\s+/,'');}return out;}
+/* #468 (ひぐらしのなく頃に解: 「どうせ引き裂かれるなら、」 then 「身を引き裂かされる方が…」 0.3 s later, one setter call each, no typewriter):
+   a held paragraph is a typewriter state only while the next call grows it. A call that does not grow it means the held
+   text was complete: it is delivered at once, never dropped (the half sentence used to be lost, the reader's line no longer
+   matched the page and the OCR read took over). The rest of a sentence after a comma is joined downstream (core/page-text.cjs).
+   A stream that has never grown a paragraph holds an unfinished one only quickHoldMs (a comma piece of an append-only box). */
 class UnityBox{
- constructor(now,deliver,holdMs=3000){this.now=now;this.deliver=deliver;this.holdMs=holdMs;this.streams=new Map();}
+ constructor(now,deliver,holdMs=3000,quickHoldMs=350){this.now=now;this.deliver=deliver;this.holdMs=holdMs;this.quickHoldMs=quickHoldMs;this.streams=new Map();}
  feed(stream,text,payload){
   const paras=paragraphs(text);if(!paras.length)return;const last=paras[paras.length-1];
-  const s=this.streams.get(stream)||{shown:'',timer:null,held:null};this.streams.set(stream,s);
-  const key=last.replace(/\s+/g,'');if(key===s.shown){this.cancel(s);return;}
+  const s=this.streams.get(stream)||{shown:'',timer:null,held:null,typed:false};this.streams.set(stream,s);
+  const key=last.replace(/\s+/g,'');/* a paragraph that grows the one just released early is a typewriter too: hold its next states the full time */if(!s.held&&s.shown&&key.length>s.shown.length&&key.startsWith(s.shown))s.typed=true;
+  if(s.held){if(key.length>s.held.key.length&&key.startsWith(s.held.key))s.typed=true;else if(key!==s.held.key&&!s.typed)this.release(s);}/* a typewriter stream also carries other boxes between its steps (Tsuki: 「前略。」 amid a page being typed): there the held state is still dropped for the next one, as before */
+  if(key===s.shown){this.cancel(s);return;}
   if(DONE.test(last.trim())){this.cancel(s);s.shown=key;this.deliver(last,payload);return;}
-  this.cancel(s);s.held={key,last,payload};s.timer=setTimeout(()=>{const h=s.held;s.held=null;s.timer=null;if(!h||h.key===s.shown)return;s.shown=h.key;this.deliver(h.last,h.payload);},this.holdMs);s.timer.unref?.();
+  this.cancel(s);s.held={key,last,payload};s.timer=setTimeout(()=>this.release(s),s.typed?this.holdMs:this.quickHoldMs);s.timer.unref?.();
  }
+ release(s){const h=s.held;this.cancel(s);if(!h||h.key===s.shown)return;s.shown=h.key;this.deliver(h.last,h.payload);}
  cancel(s){clearTimeout(s.timer);s.timer=null;s.held=null;}
 }
 module.exports.paragraphs=paragraphs;module.exports.UnityBox=UnityBox;

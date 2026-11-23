@@ -47,8 +47,24 @@ function archiveSample(file,dir,budget){
   budget.raw+=head+tail;const h=d.sample(readRange(file,0,head),{max:head,compress:true});if(!h)return null;
   const t=d.sample(readRange(file,st.size-tail,tail),{max:tail,compress:true});if(t){for(const p of t.parts)p.at+=st.size-tail;for(const o of t.opaque)o.at+=st.size-tail;}
   return {size:st.size,parts:[...h.parts,...(t?.parts||[])],opaque:[...h.opaque,...(t?.opaque||[])],entropy:h.entropy};},Math.max(SAMPLE_HEAD,SAMPLE_TAIL));
- if(!s)return {name,role:'archive',size:st.size,dropped:'VERIFY'};
- return sized({name,role:'archive',size:st.size,head:sha(readHead(file,1<<20)),sample:{parts:s.parts,opaque:s.opaque,entropy:s.entropy}},s);}
+ /* S5 a window with one block of text in it used to drop the whole archive (Stand by you root.pfs, リビドー Script2.arc: dropped VERIFY, index lost):
+    keep every 64 KiB block that passes on its own, plus the regions the header points into (directories in the middle: rio, npa) */
+ const kept=s?{...s,parts:[...s.parts],opaque:[...s.opaque]}:blockSample(file,st.size,[[0,Math.min(st.size,SAMPLE_HEAD)],...st.size>SAMPLE_HEAD?[[Math.max(SAMPLE_HEAD,st.size-SAMPLE_TAIL),st.size]]:[]],budget);
+ if(kept&&st.size>SAMPLE_HEAD+SAMPLE_TAIL){const more=blockSample(file,st.size,headerPointers(file,st.size,SAMPLE_HEAD,st.size-SAMPLE_TAIL).map(at=>[at,Math.min(st.size-SAMPLE_TAIL,at+POINTER_SPAN)]),budget,SAMPLE_PACKED_MAX-packedSize(kept));if(more){kept.parts.push(...more.parts);kept.opaque.push(...more.opaque);}}
+ if(!kept||!kept.parts.length)return {name,role:'archive',size:st.size,dropped:'VERIFY'};
+ const s2=kept;
+ return sized({name,role:'archive',size:st.size,head:sha(readHead(file,1<<20)),sample:{parts:s2.parts,opaque:s2.opaque,entropy:s2.entropy},...s2.droppedBlocks?{droppedBlocks:s2.droppedBlocks}:{}},s2);}
+/* S5 offsets a header names: u32 / u64 little-endian values in the first 64 bytes that land between lo and hi (at most 3) */
+const POINTER_SPAN=1<<20,BLOCK_SPAN=64*1024;
+function headerPointers(file,size,lo,hi){let h;try{h=readRange(file,0,64);}catch{return [];}const out=[];
+ for(let o=0;o+4<=h.length&&out.length<3;o+=4){const x=h.readUInt32LE(o);if(x>=lo&&x<hi&&!out.some(y=>Math.abs(y-x)<POINTER_SPAN))out.push(x);}
+ return out.sort((a,b)=>a-b);}
+/* the 64 KiB blocks of the given ranges that pass desensitize.verify on their own, up to maxPacked compressed */
+function blockSample(file,size,ranges,budget,maxPacked=SAMPLE_PACKED_MAX){const parts=[],opaque=[];let packed=0,dropped=0;
+ for(const [a,b] of ranges)for(let at=a;at<b;at+=BLOCK_SPAN){const len=Math.min(BLOCK_SPAN,b-at);let buf;try{buf=readRange(file,at,len);}catch{continue;}budget.raw+=len;
+  const s=d.sample(buf,{max:len,compress:true});if(!s){dropped++;continue;}const p=packedSize(s);if(packed+p>maxPacked)return parts.length?{size,parts,opaque,entropy:0,droppedBlocks:dropped}:null;packed+=p;
+  for(const x of s.parts){x.at+=at;parts.push(x);}for(const o of s.opaque){o.at+=at;opaque.push(o);}}
+ return parts.length?{size,parts,opaque,entropy:0,droppedBlocks:dropped}:null;}
 /* a script: the whole file up to SCRIPT_MAX */
 function scriptSample(bytes,max=SCRIPT_MAX){return fitted(w=>d.sample(bytes.subarray(0,Math.min(w,bytes.length)),{max:Math.min(w,bytes.length),compress:true}),Math.min(max,bytes.length));}
 /* encrypted entries of an XP3 archive, for known-plaintext key candidates: [{data,ext}] */
@@ -75,10 +91,12 @@ function sampleGame({dir,executable,result}){
 /* ---- service side ----------------------------------------------------------------------------------------------- */
 const ALLOWED_STEPS=['unknown-pack','unsupported-engine','decrypt-failed','parse-failed','not-japanese','chinese-build','decode-suspect','low-pairing','timeout'];
 /* the uploaded part of a probe result: counts and names that went through maskString, nothing else */
-function publicResult(r){const inv=r.inventory||{};return {step:r.step,detail:String(r.detail||'').replace(/[^\x20-\x7e]/g,'?').slice(0,80),detected:r.detected||null,reader:String(r.reader||''),lines:r.lines|0,japaneseLines:r.japaneseLines|0,dialogueLines:r.dialogueLines|0,chineseLines:r.chineseLines|0,sizes:(r.sizes||[]).slice(0,4000).map(n=>n|0),
- pairing:r.pairing&&r.pairing.total?{total:r.pairing.total|0,paired:r.pairing.paired|0,unpaired:r.pairing.unpaired|0,rate:r.pairing.rate,reasons:r.pairing.reasons||{}}:null,
+function publicResult(r){const inv=r.inventory||{};return {step:r.step,original:/^(layer|backup)$/.test(r.original||'')?r.original:null,restore:r.restore?String(r.restore).replace(/[^\w:-]/g,'').slice(0,40):null,detail:String(r.detail||'').replace(/[^\x20-\x7e]/g,'?').slice(0,80),detected:r.detected||null,reader:String(r.reader||''),lines:r.lines|0,japaneseLines:r.japaneseLines|0,dialogueLines:r.dialogueLines|0,chineseLines:r.chineseLines|0,sizes:(r.sizes||[]).slice(0,4000).map(n=>n|0),
+ pairing:r.pairing&&r.pairing.total?{total:r.pairing.total|0,paired:r.pairing.paired|0,unpaired:r.pairing.unpaired|0,added:r.pairing.added|0,rate:r.pairing.rate,reasons:r.pairing.reasons||{}}:null,
  inventory:{files:inv.files|0,bytes:inv.bytes||0,scripts:inv.scripts|0,ext:Object.fromEntries(Object.entries(inv.ext||{}).filter(([k])=>/^[\x20-\x7e]{1,12}$/.test(k)).slice(0,60)),archives:(inv.archives||[]).slice(0,48).map(a=>({name:d.maskString(a.name).slice(0,120),size:a.size||0,magic:/^[0-9a-f]{0,16}$/.test(a.magic||'')?a.magic:'',format:/^[a-z0-9-]{0,20}$/.test(a.format||'')?a.format:'',engine:/^[a-z0-9-]{0,20}$/.test(a.engine||'')?a.engine:'',...(a.resource?{resource:true}:{}),...(a.count>1?{count:a.count|0}:{})})),markers:(inv.markers||[]).filter(m=>/^[a-z0-9-]{1,20}$/.test(m)).slice(0,8),engine:/^[a-z0-9-]{0,20}$/.test(inv.engine||'')?inv.engine:''},
- engines:(r.engines||[]).slice(0,60).map(e=>({id:String(e.id).slice(0,30),scenes:e.scenes|0,parsed:e.parsed|0,lines:e.lines|0,japaneseLines:e.japaneseLines|0,dialogueLines:e.dialogueLines|0,chineseLines:e.chineseLines|0,error:String(e.error||'').replace(/[^\x20-\x7e]/g,'?').slice(0,60),ms:e.ms|0})),
+ engines:(r.engines||[]).slice(0,60).map(e=>({id:String(e.id).slice(0,30),scenes:e.scenes|0,parsed:e.parsed|0,lines:e.lines|0,japaneseLines:e.japaneseLines|0,dialogueLines:e.dialogueLines|0,chineseLines:e.chineseLines|0,error:String(e.error||'').replace(/[^\x20-\x7e]/g,'?').slice(0,60),ms:e.ms|0,...e.routed?{routed:true}:{}})),
+ /* S5 the readers the fingerprint routed to, what the probe still needs (the GARbro pack), its budget */
+ tried:(Array.isArray(r.tried)?r.tried:[]).map(String).filter(t=>/^[a-z0-9-]{1,30}$/.test(t)).slice(0,24),...(/^[a-z-]{1,20}$/.test(r.needs||'')?{needs:r.needs}:{}),...(r.budgetMs>0?{budgetMs:r.budgetMs|0}:{}),
  unsupported:r.unsupported?{engine:String(r.unsupported.engine||'').slice(0,30),code:String(r.unsupported.code||'').replace(/[^\x20-\x7e]/g,'?').slice(0,40)}:null,preparing:r.preparing||null};}
 /* last line of defence: outside titles, the bundle may hold no kana/kanji but placeholders and kept punctuation */
 const TEXTISH=/[぀-ヿ㐀-鿿가-힯０-ｚ]/g;

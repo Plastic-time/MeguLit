@@ -15,23 +15,47 @@ const {stat}=require('./file-key.cjs');
 const memo=(map,key,make)=>{if(map.has(key))return map.get(key);const v=make();map.set(key,v);if(map.size>64)map.delete(map.keys().next().value);return v;};
 
 // ---- YPF --------------------------------------------------------------------------------------------------------
-// Index names are stored bitwise-NOT; their length byte is NOT-ed and then swapped through this table.
+// The length byte is NOT-ed and then swapped through this table.
 const SWAP=[0x03,0x48,0x06,0x35,0x0C,0x10,0x11,0x19,0x1C,0x1E,0x09,0x0B,0x0D,0x13,0x15,0x1B,0x20,0x23,0x26,0x29,0x2C,0x2F,0x2E,0x32];
 const swapLen=new Map();for(let i=0;i<SWAP.length;i+=2){swapLen.set(SWAP[i],SWAP[i+1]);swapLen.set(SWAP[i+1],SWAP[i]);}
 const sjis=kit.SJIS;
-function ypfIndex(buf,size,wide,swap){const count=buf.readUInt32LE(8),files=[];let p=32;
+// The whole directory shares one name mask. A numbered scene has a known stem and extension.
+function scriptNameMask(raw){
+ if(raw.length<8)return;
+ const mask=raw.at(-4)^0x2e;
+ if(((raw.at(-3)^mask)|32)!==0x79||((raw.at(-2)^mask)|32)!==0x62||((raw.at(-1)^mask)|32)!==0x6e)return;
+ if(/^(?:ysbin\\)?yst\d+\.ybn$/i.test(raw.map(c=>c^mask).toString('latin1')))return mask;
+}
+function hasSceneHeader(read,offset,packed,compressed){
+ try{
+  const prefix=read(offset,Math.min(packed,compressed?1024:4));
+  const data=compressed?zlib.inflateSync(prefix,{finishFlush:zlib.constants.Z_SYNC_FLUSH}):prefix;
+  return data.toString('latin1',0,4)==='YSTB';
+ }catch{return false;}
+}
+function ypfIndex(buf,size,wide,swap,read){const count=buf.readUInt32LE(8),files=[];let p=32,nameMask;
  for(let i=0;i<count;i++){if(p+5>buf.length)return null;let len=buf[p+4]^0xff;if(swap)len=swapLen.get(len)??len;p+=5;
-  if(p+len+(wide?22:18)>buf.length)return null;const raw=Buffer.from(buf.subarray(p,p+len));for(let k=0;k<raw.length;k++)raw[k]^=0xff;p+=len;
+  if(!len||p+len+(wide?22:18)>buf.length)return null;const name=buf.subarray(p,p+len);p+=len;
   const compressed=buf[p+1],unpacked=buf.readUInt32LE(p+2),packed=buf.readUInt32LE(p+6),offset=wide?Number(buf.readBigUInt64LE(p+10)):buf.readUInt32LE(p+10);p+=wide?22:18;
-  // Names are Shift-JIS and may hold codes it does not define (patch file names); only control bytes mean a bad parse.
-  if(!len||raw.some(c=>c<0x20)||offset+packed>size)return null;const name=sjis.decode(raw);
+  if(offset+packed>size)return null;
+  if(nameMask===undefined){
+   const mask=scriptNameMask(name);
+   if(mask===0xff||(mask!==undefined&&hasSceneHeader(read,offset,packed,compressed)))nameMask=mask;
+  }
   files.push({name,compressed,unpacked,packed,offset});}
+ for(const entry of files){
+  const raw=entry.name.map(c=>c^(nameMask??0xff));
+  // Shift-JIS patch names can contain undefined codes. Only control bytes rule out this layout.
+  if(raw.some(c=>c<0x20))return null;
+  entry.name=sjis.decode(raw);
+ }
  return files;}
 const ypfMemo=new Map();
 function ypfList(file){return memo(ypfMemo,file+'|'+stat(file),()=>{let fd;
  try{fd=fs.openSync(file,'r');const size=fs.fstatSync(fd).size,head=Buffer.alloc(32);fs.readSync(fd,head,0,32,0);if(head.toString('latin1',0,4)!=='YPF\0')return null;
   const indexSize=head.readUInt32LE(12),buf=Buffer.alloc(Math.min(size,32+indexSize));fs.readSync(fd,buf,0,buf.length,0);
-  for(const wide of [false,true])for(const swap of [true,false]){const files=ypfIndex(buf,size,wide,swap);if(files)return files;}
+  const read=(offset,length)=>{const b=Buffer.alloc(length);return b.subarray(0,fs.readSync(fd,b,0,length,offset));};
+  for(const wide of [false,true])for(const swap of [true,false]){const files=ypfIndex(buf,size,wide,swap,read);if(files)return files;}
   return null;
  }catch{return null;}finally{if(fd!==undefined)fs.closeSync(fd);}});}
 function ypfRead(file,e){const b=kit.readAt(file,e.offset,e.packed);return e.compressed?zlib.inflateSync(b):b;}
@@ -218,7 +242,8 @@ function moleBox(exeFile){return memo(moleMemo,exeFile+'|'+stat(exeFile),()=>{le
  }catch{return null;}finally{if(fd!==undefined)fs.closeSync(fd);}});}
 // Scene files of a YPF held in memory, first copy of each name.
 function ypfBufferScenes(buf){if(buf.length<32||buf.toString('latin1',0,4)!=='YPF\0')return [];const indexSize=buf.readUInt32LE(12);let files=null;
- for(const wide of [false,true])for(const swap of [true,false])if(!files)files=ypfIndex(buf.subarray(0,Math.min(buf.length,32+indexSize)),buf.length,wide,swap);
+ const read=(offset,length)=>buf.subarray(offset,offset+length);
+ for(const wide of [false,true])for(const swap of [true,false])if(!files)files=ypfIndex(buf.subarray(0,Math.min(buf.length,32+indexSize)),buf.length,wide,swap,read);
  const seen=new Set(),out=[];for(const e of files||[]){const name=e.name.replace(/^.*\\/,'');if(!YST(name)||seen.has(name.toLowerCase()))continue;seen.add(name.toLowerCase());
   const data=buf.subarray(e.offset,e.offset+e.packed);out.push({name,read:()=>e.compressed?zlib.inflateSync(data):data});}
  return out;}

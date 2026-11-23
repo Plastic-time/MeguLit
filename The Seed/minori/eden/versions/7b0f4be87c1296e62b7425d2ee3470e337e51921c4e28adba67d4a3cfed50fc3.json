@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "7b0f4be87c1296e62b7425d2ee3470e337e51921c4e28adba67d4a3cfed50fc3",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "eden_en.exe",
+ "engine": "minori",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "7b0f4be87c1296e62b7425d2ee3470e337e51921c4e28adba67d4a3cfed50fc3",
+  "head": "56a115c65d44cd688082d1ae907fbaa865d6556e9a3911c48f9ee608513a6036",
+  "pe": "1.9.0.1@54b7712c"
+ },
+ "rev": 1
+}

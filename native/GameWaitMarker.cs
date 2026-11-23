@@ -16,6 +16,7 @@ public sealed class GameWaitMarker:IDisposable{
  // Set while the reading layer is auto-hidden (no dialogue): keep reporting presence so the layer can come back when
  // the dialogue box (and its marker) returns, but put no patch on the game.
  public bool ProbeOnly;
+ public void ResetPresence(){Present=null;SeenStreak=MissStreak=0;}
  // Diagnostics: a short status line when the state changes, and an occasional copy of the scan area in logs\.
  string LastStatus="";DateTime LastStatusAt=DateTime.MinValue,LastFoundAt=DateTime.MinValue,LastDumpAt=DateTime.MinValue,BoundAt=DateTime.MinValue;
  public GameWaitMarker(Action<object> emit){Emit=emit;}
@@ -78,6 +79,8 @@ public sealed class GameWaitMarker:IDisposable{
    if(sprite!=null)sprite.Save(Path.Combine(folder,"marker-ok.png"),ImageFormat.Png);
    File.AppendAllText(Path.Combine(folder,"marker-stats.txt"),DateTime.Now.ToString("s")+" at "+bounds.X+","+bounds.Y+" "+bounds.Width+"x"+bounds.Height+" ok="+ExtractOk+" fail="+ExtractFail+" last="+(sprite!=null?"ok":ExtractReason)+"\r\n");}catch{}
  }
+ Bitmap Kept;
+ Bitmap Frame(int width,int height){if(Kept==null||Kept.Width!=width||Kept.Height!=height){if(Kept!=null)Kept.Dispose();Kept=new Bitmap(width,height,PixelFormat.Format32bppArgb);}return Kept;}
  public void Tick(IntPtr target,int width,int height,bool visible,int surfaceX,int surfaceY){
   if(!(Enabled||Relocate||PresenceWanted)||!visible||target==IntPtr.Zero){Hide();return;}
   if(target!=Target||width!=Width||height!=Height){Hide();Target=target;Width=width;Height=height;BoundAt=DateTime.UtcNow;LastFoundAt=DateTime.MinValue;AnimatedTarget=false;Known.Clear();ClearSaved();}
@@ -94,8 +97,11 @@ public sealed class GameWaitMarker:IDisposable{
   try{
    double mx=Math.Max(0,X-12),my=Math.Max(0,Y-6);var scan=GameTextMask.ScanRegion(width,height,mx,my,Math.Min(100-mx,W+(X-mx)+12),Math.Min(100-my,H+(Y-my)+6));
    if(scan.Width<16||scan.Height<16){ClearFrame();Cover.Hide();return;}
-   using(var image=new Bitmap(width,height,PixelFormat.Format32bppArgb)){
-    if(!GameCapture.Into(target,image,3)){Cover.Hide();if(GameCapture.Skipped){Status("game window moving or minimised; waiting");return;}ClearFrame();Status("capture failed");return;}
+   /* 2026-11-19 perf: only the scan area (with room for the patch, ring and cut-out around a marker) is read, into one
+      kept client-sized picture, instead of a new whole-window read 16-33 times a second; everything below only looks
+      inside that area */
+   {var image=Frame(width,height);
+    if(!GameCapture.Part(target,image,Rectangle.Intersect(Rectangle.Inflate(scan,10,10),new Rectangle(0,0,width,height)),width,height,3)){Cover.Hide();if(GameCapture.Skipped){Status("game window moving or minimised; waiting");return;}ClearFrame();Status("capture failed");return;}
     List<Rectangle> candidates;int darkCount,lightCount;
     using(var region=image.Clone(scan,PixelFormat.Format32bppArgb)){
      var dark=Detect(region);var light=DetectLight(region);darkCount=dark.Count;lightCount=light.Count;
@@ -325,5 +331,5 @@ public sealed class GameWaitMarker:IDisposable{
  }
  static byte[] Bytes(Bitmap image){var d=image.LockBits(new Rectangle(0,0,image.Width,image.Height),ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);try{var result=new byte[image.Width*image.Height*4];for(int y=0;y<image.Height;y++)Marshal.Copy(IntPtr.Add(d.Scan0,y*d.Stride),result,y*image.Width*4,image.Width*4);return result;}finally{image.UnlockBits(d);}}
  void ClearSaved(){foreach(var v in SavedClean.Values)v.Picture.Dispose();SavedClean.Clear();}
- public void Dispose(){Hide();ClearSaved();Cover.Dispose();}
+ public void Dispose(){Hide();ClearSaved();Cover.Dispose();if(Kept!=null){Kept.Dispose();Kept=null;}}
 }

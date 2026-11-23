@@ -41,26 +41,40 @@ const readAt=kit.readAt,{asarList,zipList,zipRead}=kit;
 
 function names(dir){try{return fs.readdirSync(dir);}catch{return [];}}
 const walk=(dir,depth)=>kit.walk(dir,depth,n=>/\.ks$/i.test(n),[],null);/* E577 kit.walk, every folder */
+const gameExe=n=>/\.exe$/i.test(n)&&!/^(nwjc|notification_helper|unins\d*|chromedriver|payload)\.exe$/i.test(n);
+const tyranoArchive=list=>list?.some(e=>/(^|\/)tyrano\/(tyrano|libs)/i.test(e.name))&&list.some(e=>KS(e.name));
+/* Old NW.js ships nw.pak without nw.dll. Only the game exe, not an installer or patch beside it,
+   carries both the Tyrano runtime and the scenario. Read just its ZIP directory to identify it. */
+function legacyExeBundles(dir,files){
+ if(!files.some(n=>/^nw\.pak$/i.test(n))||files.some(n=>/^nw\.dll$/i.test(n)))return [];
+ const out=[];
+ for(const n of files.filter(gameExe)){
+  const file=path.join(dir,n);
+  try{const entries=zipList(file);if(tyranoArchive(entries))out.push({kind:'zip',file,exe:true,entries});}catch{}
+ }
+ return out;
+}
 /* every place a Tyrano game keeps its scenario, as {kind, file, root} */
 function containers(dir){const out=[];
  for(const base of [dir,path.join(dir,'resources','app'),path.join(dir,'www')]){const sc=path.join(base,'data','scenario');if(fs.existsSync(sc))out.push({kind:'loose',root:base});}
  const asar=path.join(dir,'resources','app.asar');if(fs.existsSync(asar))out.push({kind:'asar',file:asar});
- for(const n of names(dir)){const f=path.join(dir,n);
+ const files=names(dir),nw=files.some(n=>/^nw\.dll$/i.test(n));
+ for(const n of files){const f=path.join(dir,n);
   if(/^package\.nw$/i.test(n))out.push({kind:'zip',file:f});
-  /* NW.js: the zip appended to the game's own exe (nw.dll beside it) */
-  else if(/\.exe$/i.test(n)&&!/^(nwjc|notification_helper|unins\d*|chromedriver|payload)\.exe$/i.test(n)&&names(dir).some(x=>/^nw\.dll$/i.test(x)))out.push({kind:'zip',file:f,exe:true});}
- return out;}
+  else if(nw&&gameExe(n))out.push({kind:'zip',file:f,exe:true});}
+ return out.concat(legacyExeBundles(dir,files));}
+function archiveList(c){try{return c.entries||(c.kind==='asar'?asarList(c.file):zipList(c.file));}catch{return null;}}
 function scenes(dir){const out=new Map();
  for(const c of containers(dir)){
   if(c.kind==='loose'){const sc=path.join(c.root,'data','scenario');for(const f of walk(sc,4)){const rel=path.relative(sc,f).replace(/\\/g,'/');out.set(rel.toLowerCase(),{name:rel,read:()=>fs.readFileSync(f)});}continue;}
-  let list=null;try{list=c.kind==='asar'?asarList(c.file):zipList(c.file);}catch{list=null;}if(!list)continue;
+  const list=archiveList(c);if(!list)continue;
   for(const e of list){if(!KS(e.name)||e.encrypted)continue;const rel=e.name.replace(/\\/g,'/').replace(/^.*?data\/scenario\//i,'');if(out.has(rel.toLowerCase()))continue;
    out.set(rel.toLowerCase(),{name:rel,read:c.kind==='asar'?()=>readAt(c.file,e.offset,e.size):()=>zipRead(c.file,e)});}}
  return [...out.values()].sort((a,b)=>a.name.localeCompare(b.name));}
 /* a Tyrano game: its scenario sits next to the engine (tyrano/ folder, or tyrano/*.js inside the container) */
 function isTyrano(dir){for(const c of containers(dir)){
   if(c.kind==='loose'){if(fs.existsSync(path.join(c.root,'tyrano','tyrano.base.js'))||fs.existsSync(path.join(c.root,'tyrano','libs')))return true;continue;}
-  let list=null;try{list=c.kind==='asar'?asarList(c.file):zipList(c.file);}catch{}if(list&&list.some(e=>/(^|\/)tyrano\/(tyrano|libs)/i.test(e.name))&&list.some(e=>KS(e.name)))return true;}
+  if(tyranoArchive(archiveList(c)))return true;}
  return false;}
 const engine={
  id:'tyrano',hint:'data\\scenario\\*.ks（或 app.asar / package.nw）',
@@ -69,4 +83,4 @@ const engine={
  sources:dir=>containers(dir).map(c=>c.file||path.join(c.root,'data','scenario')),
  parse,test:n=>/\.ks$/i.test(n),
 };
-module.exports={engine,parse,asarList,zipList,zipRead,containers,isTyrano,scenes};
+module.exports={engine,parse,asarList,zipList,zipRead,containers,isTyrano,scenes,legacyExeBundles};

@@ -44,7 +44,7 @@
 #include <map>
 #include <set>
 #include <algorithm>
-#include "../scncapture/minhook/include/MinHook.h"
+#include "../shared/minhook/include/MinHook.h"
 #include "GlyphMatch.h"
 
 #define MEGULIT_FONT_VERSION 3
@@ -93,8 +93,7 @@ Face FaceOf(HDC dc) {
 // DotMode: per-character records are reported (every MODE since spec 3). PaintDots: matched glyphs become dots (MODE dot*);
 // otherwise (MODE blank*, alias place*) blank glyphs (same metrics, no coverage) plus records with the cell origin on
 // screen, for the reader overlay that draws MeguLit's text where the game's would be (docs/text-architecture.md, "Placement").
-SRWLOCK HideLock = SRWLOCK_INIT; GlyphHide::Matcher Hide; GlyphHide::RasterVerdict Raster; volatile LONG MarkArmed = 0; volatile LONG HideOn = 0, DotMode = 0, BlindMode = 0, PaintDots = 0, CtlConnected = 0, MarkOn = 0; long MarkLast = 0;
-bool BlindAllowed();
+SRWLOCK HideLock = SRWLOCK_INIT; GlyphHide::Matcher Hide; GlyphHide::RasterVerdict Raster; volatile LONG MarkArmed = 0; volatile LONG HideOn = 0, DotMode = 0, PaintDots = 0, CtlConnected = 0, MarkOn = 0; long MarkLast = 0;
 struct IndexMap { HFONT font = NULL; long seq = -1; std::map<WORD, wchar_t> map; } Indexes;
 GlyphHide::Key KeyOf(const Face &f) { GlyphHide::Key k; k.face = f.name; k.size = f.size; return k; }
 void AnnounceLine(long seq, const std::wstring &text);
@@ -124,8 +123,8 @@ void Command(std::string l) {
  if (l.rfind("LINE ", 0) == 0) { long before = Hide.Sequence(); Hide.SetLine(Wide(l.substr(5)), GetTickCount()); if (Hide.Sequence() != before) Raster.NextLine(Hide.Current()); InterlockedExchange(&HideOn, Hide.Cached() ? 0 : 1); if (DotMode && Hide.Sequence() != before) { announce = Hide.Sequence(); text = Hide.Current(); } }
  else if (l == "OFF") { Hide.Off(); Extras.clear(); InterlockedExchange(&HideOn, 0); }
  else if (l == "MODE dot" || l == "MODE blank" || l == "MODE dot-blind" || l == "MODE blank-blind" || l == "MODE place" || l == "MODE place-blind") {
-  bool report = true, paint = l.rfind("MODE dot", 0) == 0, blind = l.size() > 6 && l.compare(l.size() - 6, 6, "-blind") == 0;
-  Hide.StopOnCache = !report; InterlockedExchange(&PaintDots, paint ? 1 : 0); InterlockedExchange(&DotMode, report ? 1 : 0); InterlockedExchange(&BlindMode, blind ? 1 : 0); if (blind) InterlockedExchange(&HideOn, 1); }
+  bool report = true, paint = l.rfind("MODE dot", 0) == 0;
+  Hide.StopOnCache = !report; InterlockedExchange(&PaintDots, paint ? 1 : 0); InterlockedExchange(&DotMode, report ? 1 : 0); }
  else if ((l.rfind("EXTRA n ", 0) == 0 || l.rfind("EXTRA o ", 0) == 0) && l.size() > 8) { char k = l[6]; std::wstring t = Stripped(Wide(l.substr(8)));
   if (!t.empty() && t.size() <= 200) { if (k == 'n') Extras.erase(std::remove_if(Extras.begin(), Extras.end(), [](const Extra &e) { return e.kind == 'n'; }), Extras.end());
    if (Extras.size() >= 16) Extras.erase(Extras.begin()); Extras.push_back(Extra{++ExtraSeq, k, t, GetTickCount()}); extra = "ToMe_GLYPHDOT extra id=" + std::to_string(ExtraSeq) + " kind=" + std::string(1, k) + " text=" + Utf8(t); } }
@@ -158,10 +157,7 @@ wchar_t FromIndex(HDC dc, UINT g) {
  auto it = Indexes.map.find((WORD)g); return it == Indexes.map.end() ? 0 : it->second;
 }
 void AfterDecision() { if (Hide.Cached()) InterlockedExchange(&HideOn, 0); }
-// Blind dots (MODE dot-blind, for streams whose text arrives after the glyphs are drawn): any CJK/kana glyph (or an
-// unmapped glyph index) under the dialogue font (learned, seeded with FONT, or the probe's leading font) becomes a dot
-// without waiting for the line; kind 'b', index -1. MeguLit maps them to the line by reading order when it arrives.
-bool BlindChar(wchar_t c) { return c == 0 || (c >= 0x3000 && !GlyphHide::Blank(c)) || (c >= 0xff01 && c <= 0xff5e); }
+// Legacy blind-mode spellings are accepted, but every hidden glyph must match the pushed dialogue line.
 // One glyph; dc may be NULL when c is already a character. sv/seq/ch (optional): what was served, for the dot report.
 bool DotsBlocked();
 bool HideGlyph(HDC dc, UINT c, bool index, const Face &f, bool render, GlyphHide::Served *sv = NULL, long *seq = NULL, wchar_t *chOut = NULL) {
@@ -169,7 +165,7 @@ bool HideGlyph(HDC dc, UINT c, bool index, const Face &f, bool render, GlyphHide
  AcquireSRWLockExclusive(&HideLock);
  wchar_t ch = index ? FromIndex(dc, c) : (wchar_t)c;
  bool r = ch && Hide.Glyph(ch, KeyOf(f), GetTickCount(), render, "ggo", sv); AfterDecision();
- if (!r && BlindMode && BlindChar(ch) && (ch || index) && Hide.BlindKey(KeyOf(f)) && BlindAllowed()) { r = true; if (sv) *sv = GlyphHide::Served{-1, 'b'}; }
+ // A font seed or a live pipe cannot identify dialogue: unmatched title/menu glyphs keep their pixels.
  if (seq) *seq = Hide.Sequence(); if (chOut) *chOut = ch;
  ReleaseSRWLockExclusive(&HideLock); return r;
 }
@@ -177,7 +173,7 @@ bool HideText(const std::wstring &s, const Face &f, const char *path, std::vecto
  if (s.empty() || DotsBlocked()) return false;
  AcquireSRWLockExclusive(&HideLock); bool r = Hide.Text(s, KeyOf(f), GetTickCount(), path, sv); AfterDecision(); long xid = 0;
  if (!r && DotMode && !Extras.empty() && ExtraMatch(s, sv, &xid)) { if (seq) *seq = xid; ReleaseSRWLockExclusive(&HideLock); return true; }
- if (!r && BlindMode && Hide.BlindKey(KeyOf(f)) && BlindAllowed()) { bool any = false; for (wchar_t c : s) any = any || (c && BlindChar(c)); if (any) { r = true; if (sv) { sv->assign(s.size(), GlyphHide::Served{}); for (size_t i = 0; i < s.size(); i++) if (s[i] && BlindChar(s[i])) (*sv)[i] = GlyphHide::Served{-1, 'b'}; } } } if (seq) *seq = Hide.Sequence(); ReleaseSRWLockExclusive(&HideLock); return r;
+ if (seq) *seq = Hide.Sequence(); ReleaseSRWLockExclusive(&HideLock); return r;
 }
 std::wstring FromIndices(HDC dc, const WORD *g, UINT n) {
  std::wstring w; if (!g || !n || n > 4096) return w;
@@ -243,6 +239,32 @@ void ServeDot(long seq, const char *path, const Dot &d) {
   if (++DotCount >= 48) DotFlushLocked(); }
  ReleaseSRWLockExclusive(&DotLock);
 }
+// The colour the game hands the text API for the current line (read / unread colours, dimming), reported per line because the
+// blank glyphs leave nothing of it on screen: ToMe_GLYPHDOT color seq=<n> rgb=<rrggbb> a=<aa> src=<text|gdip|d2d|run>.
+// Taken from the draw call itself (DC text colour, GDI+ / Direct2D solid brush); GetGlyphOutline has no colour (the engine
+// tints the bitmap itself: the GPU glyph trace reports those). Sent when it differs from the line's last one, 4 times a line at most.
+long ColSeq = -1; unsigned ColVal = 0; bool ColHas = false; int ColSent = 0;
+void ServeColor(long seq, const char *path, unsigned rgb, unsigned alpha) {
+ unsigned v = (rgb & 0xffffff) | ((alpha & 255) << 24); bool send = false;
+ AcquireSRWLockExclusive(&DotLock);
+ if (seq != ColSeq) { ColSeq = seq; ColHas = false; ColSent = 0; }
+ if ((!ColHas || v != ColVal) && ColSent < 4) { ColHas = true; ColVal = v; ColSent++; send = true; }
+ ReleaseSRWLockExclusive(&DotLock);
+ if (send) { char e[112]; sprintf_s(e, "ToMe_GLYPHDOT color seq=%ld rgb=%06x a=%02x src=%s", seq, rgb & 0xffffff, alpha & 255, path); Send(e); }
+}
+void ColorOfDc(long seq, HDC dc) { COLORREF c = GetTextColor(dc); if (c != CLR_INVALID) ServeColor(seq, "text", ((unsigned)GetRValue(c) << 16) | ((unsigned)GetGValue(c) << 8) | GetBValue(c), 255); }
+void ColorOfGdipBrush(long seq, const void *brush) {
+ typedef int(WINAPI *GBT)(void *, int *); typedef int(WINAPI *GSC)(void *, unsigned *); static GBT type; static GSC solid; static bool tried;
+ if (!tried) { tried = true; HMODULE gp = GetModuleHandleW(L"gdiplus.dll"); if (gp) { type = (GBT)GetProcAddress(gp, "GdipGetBrushType"); solid = (GSC)GetProcAddress(gp, "GdipGetSolidFillColor"); } }
+ int t = -1; unsigned argb = 0; if (!brush || !type || !solid || type((void *)brush, &t) || t != 0 || solid((void *)brush, &argb)) return;
+ ServeColor(seq, "gdip", argb & 0xffffff, argb >> 24);
+}
+void ColorOfD2DBrush(long seq, const char *path, ID2D1Brush *brush) {
+ ID2D1SolidColorBrush *s = NULL; if (!brush || FAILED(brush->QueryInterface(__uuidof(ID2D1SolidColorBrush), (void **)&s)) || !s) return;
+ D2D1_COLOR_F c = s->GetColor(); float op = s->GetOpacity(); s->Release();
+ auto ch = [](float v) { int n = (int)(v * 255.f + .5f); return (unsigned)(n < 0 ? 0 : n > 255 ? 255 : n); };
+ ServeColor(seq, path, (ch(c.r) << 16) | (ch(c.g) << 8) | ch(c.b), ch(c.a * op));
+}
 void AnnounceLine(long seq, const std::wstring &text) {
  AcquireSRWLockExclusive(&DotLock); if (seq != DotSeq) { DotFlushLocked(); DotSeq = seq; DotSeen.clear(); }
  if (seq != DotAnnounced) { DotAnnounced = seq; Send("ToMe_GLYPHDOT line seq=" + std::to_string(seq) + " text=" + Utf8(text)); }
@@ -276,9 +298,6 @@ bool DotsLive() {
 }
 // Dot mode answers "not matched" while the heartbeat says the player would see the marks.
 bool DotsBlocked() { return DotMode && PaintDots && !DotsLive(); }
-// Placement (blank glyphs): blind blanks only while HookBridge is connected, or in the first 20 s after load (early
-// injection runs before HookBridge connects); a game left alone never keeps hidden text.
-bool BlindAllowed() { return PaintDots || CtlConnected || GetTickCount64() - LoadedAt <= BeatGrace; }
 DWORD WINAPI BeatWatch(void *) {
  for (;;) { Sleep(250); if (!DotMode || !PaintDots) continue; bool live = DotsLive();
   if (!live && !InterlockedExchange(&BeatLapsed, 1)) { if (DotsServedCount) Send("ToMe_GLYPHDOT status needs-relaunch served=" + std::to_string(DotsServedCount)); else Send("ToMe_GLYPHDOT status paused"); }
@@ -332,13 +351,23 @@ void Report() {
 
 // ---- private fonts ---------------------------------------------------------------------------------------------------
 std::set<unsigned> Saved;
+// The disk write runs on a worker thread: the game's AddFontMemResourceEx / GdipPrivateAddMemoryFont call only hashes
+// the font and copies a new one (the caller may free its buffer once the call returns).
+struct SaveJob { unsigned h; DWORD size; unsigned char *data; };
+DWORD WINAPI SaveWorker(void *arg) {
+ SaveJob *j = (SaveJob *)arg; wchar_t path[1200]; swprintf_s(path, L"%smem-%08x.ttf", Dir, j->h); bool ok = true;
+ if (GetFileAttributesW(path) == INVALID_FILE_ATTRIBUTES) { HANDLE f = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL); if (f == INVALID_HANDLE_VALUE) ok = false; else { DWORD done = 0; BOOL w = WriteFile(f, j->data, j->size, &done, NULL); CloseHandle(f); if (!w || done != j->size) { DeleteFileW(path); ok = false; } } }
+ if (ok) Send("ToMe_FONTFILE kind=mem path=" + Utf8(path));
+ HeapFree(GetProcessHeap(), 0, j->data); HeapFree(GetProcessHeap(), 0, j); return 0;
+}
 void SaveMemory(const void *data, DWORD size) {
  if (!data || size < 1024 || size > 60u * 1024 * 1024 || !Dir[0]) return;
  unsigned h = 2166136261u; const unsigned char *p = (const unsigned char *)data; for (DWORD i = 0; i < size; i += (size > 65536 ? 7 : 1)) h = (h ^ p[i]) * 16777619u; h ^= size;
  EnterCriticalSection(&Gate); bool fresh = Saved.insert(h).second; LeaveCriticalSection(&Gate); if (!fresh) return;
- wchar_t path[1200]; swprintf_s(path, L"%smem-%08x.ttf", Dir, h);
- if (GetFileAttributesW(path) == INVALID_FILE_ATTRIBUTES) { HANDLE f = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL); if (f == INVALID_HANDLE_VALUE) return; DWORD done = 0; BOOL ok = WriteFile(f, data, size, &done, NULL); CloseHandle(f); if (!ok || done != size) { DeleteFileW(path); return; } }
- Send("ToMe_FONTFILE kind=mem path=" + Utf8(path));
+ SaveJob *j = (SaveJob *)HeapAlloc(GetProcessHeap(), 0, sizeof(SaveJob)); unsigned char *copy = j ? (unsigned char *)HeapAlloc(GetProcessHeap(), 0, size) : NULL;
+ if (!copy) { if (j) HeapFree(GetProcessHeap(), 0, j); return; }
+ memcpy(copy, data, size); j->h = h; j->size = size; j->data = copy;
+ HANDLE t = CreateThread(NULL, 0, SaveWorker, j, 0, NULL); if (t) CloseHandle(t); else { HeapFree(GetProcessHeap(), 0, copy); HeapFree(GetProcessHeap(), 0, j); }
 }
 void ReportFile(const std::wstring &file) {
  if (file.empty() || file.size() > 900) return; wchar_t win[MAX_PATH]; GetWindowsDirectoryW(win, MAX_PATH);
@@ -401,6 +430,7 @@ BOOL Dotted(HDC dc, int x, int y, UINT o, const RECT *r, const std::wstring &tex
    int ox = 0, oy = 0, bx = adv[i], by = tm.tmHeight; if (g != GDI_ERROR) { ox = gm.gmptGlyphOrigin.x; oy = tm.tmAscent - gm.gmptGlyphOrigin.y; bx = (int)gm.gmBlackBoxX; by = (int)gm.gmBlackBoxY; }
    RECT d = {pen + ox, top - rise + oy, pen + ox + (std::min)(side, bx), top - rise + oy + (std::min)(side, by)};
    if (paint && (!(o & ETO_CLIPPED) || !r || IntersectRect(&d, &d, r))) OExtTextOutW(dc, 0, 0, ETO_OPAQUE, &d, L"", 0, NULL);
+   if (sv[i].kind == 'd') ColorOfDc(seq, dc);
    ServeDot(seq, "text", Dot{sv[i].index, text[i], (int)tm.tmHeight, (int)tm.tmAscent, adv[i], ox, oy, side, sv[i].kind, PlaceLogical(dc, pen, top - rise)}); }
   pen += adv[i]; if (pdy) rise += dx[2 * i + 1];
  }
@@ -556,6 +586,7 @@ void GdipDots(void *g, const WCHAR *s, int len, void *font, const GpRectF *rc, c
    for (size_t j = 0; j < k; j++) { GpRectF box{}; int i = which[at + j]; if (!regions[j] || Gp.GetRegionBounds(regions[j], g, &box) || box.Width <= 0) continue;
     float x = (float)(int)(box.X + .5f), y = (float)(int)(box.Y + .5f); if (paint) Gp.FillRectangle(g, (void *)brush, x, y, (float)side, (float)side);
     Where at; at.x = (int)x; at.y = (int)y; strcpy_s(at.sp, "g");
+    if (sv[i].kind == 'd') ColorOfGdipBrush(seq, brush);
     ServeDot(seq, "gdip", Dot{sv[i].index, s[i], h, b, (int)(box.Width + .5f), 0, 0, side, sv[i].kind, at}); }
   for (void *r : regions) if (r) Gp.DeleteRegion(r);
  }
@@ -577,6 +608,7 @@ int WINAPI HGdipDrawDriverString(void *g, const UINT16 *s, INT n, const void *fo
     bool paint = PaintDots != 0; const float *p = (const float *)pos; int h = 0, b = 0; GdipCell(g, font, h, b); int side = paint ? DotSide(h) : 0, smoothing = 0; Gp.GetSmoothing(g, &smoothing); if (paint) Gp.SetSmoothing(g, 3);
     for (int i = 0; i < len; i++) if (sv[i].kind) { float x = (float)(int)(p[2 * i] + .5f), y = (float)(int)(p[2 * i + 1] - b + .5f); if (paint) Gp.FillRectangle(g, (void *)br, x, y, (float)side, (float)side);
      Where at; at.x = (int)x; at.y = (int)y; strcpy_s(at.sp, "g");
+     if (sv[i].kind == 'd') ColorOfGdipBrush(seq, br);
      ServeDot(seq, "gdip", Dot{sv[i].index, (wchar_t)s[i], h, b, i + 1 < len ? (int)(p[2 * i + 2] - p[2 * i] + .5f) : 0, 0, 0, side, sv[i].kind, at}); }
     if (paint) Gp.SetSmoothing(g, smoothing); }
    return 0; } }
@@ -635,6 +667,7 @@ void LayoutDots(ID2D1RenderTarget *rt, D2D1_POINT_2F at, IDWriteTextLayout *layo
   float base = ht.height * .8f, top = 0; for (UINT32 l = 0; l < lines; l++) { if (ht.top < top + lm[l].height - .01f) { base = lm[l].baseline; break; } top += lm[l].height; }
   int h = (int)(ht.height * dy / 96.f + .5f), side = PaintDots ? DotSide(h) : 0; float x = Snap(at.x + ht.left, dx), y = Snap(at.y + ht.top, dy);
   if (side) rt->FillRectangle(D2D1::RectF(x, y, x + side * 96.f / dx, y + side * 96.f / dy), brush);
+  if (sv[i].kind == 'd') ColorOfD2DBrush(seq, "d2d", brush);
   ServeDot(seq, "d2d", Dot{sv[i].index, text[i], h, (int)(base * dy / 96.f + .5f), (int)(ht.width * dx / 96.f + .5f), 0, 0, side, sv[i].kind, PlaceTarget(rt, at.x + ht.left, at.y + ht.top)}); }
  rt->SetAntialiasMode(mode);
 }
@@ -676,6 +709,7 @@ void STDMETHODCALLTYPE HDrawGlyphRun(ID2D1RenderTarget *rt, D2D1_POINT_2F at, co
     D2D1_ANTIALIAS_MODE mode = rt->GetAntialiasMode(); rt->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
     for (UINT32 i = 0; i < run->glyphCount; i++) { if (sv[i].kind) { float ox = run->glyphOffsets ? run->glyphOffsets[i].advanceOffset : 0, oy = run->glyphOffsets ? run->glyphOffsets[i].ascenderOffset : 0;
       float x = Snap(pen + ox, dx), y = Snap(at.y - asc - oy, dy); if (side) rt->FillRectangle(D2D1::RectF(x, y, x + side * 96.f / dx, y + side * 96.f / dy), brush);
+      if (sv[i].kind == 'd') ColorOfD2DBrush(seq, "run", brush);
       ServeDot(seq, "run", Dot{sv[i].index, text[i], h, (int)(asc * dy / 96.f + .5f), (int)(run->glyphAdvances[i] * dx / 96.f + .5f), 0, 0, side, sv[i].kind, PlaceTarget(rt, pen + ox, at.y - asc - oy)}); }
      pen += run->glyphAdvances[i]; }
     rt->SetAntialiasMode(mode); }
@@ -683,8 +717,11 @@ void STDMETHODCALLTYPE HDrawGlyphRun(ID2D1RenderTarget *rt, D2D1_POINT_2F at, co
  ODrawGlyphRun(rt, at, run, brush, mm);
 }
 
-bool Hook(HMODULE m, const char *name, void *detour, void **orig) { if (!m) return false; void *fn = (void *)GetProcAddress(m, name); if (!fn) return false; if (MH_CreateHook(fn, detour, orig) != MH_OK) return false; return MH_EnableHook(fn) == MH_OK; }
-bool HookAt(void *fn, void *detour, void **orig) { MH_STATUS s = MH_CreateHook(fn, detour, orig); if (s == MH_ERROR_ALREADY_CREATED) return true; return s == MH_OK && MH_EnableHook(fn) == MH_OK; }
+// 2026-11-19 (perf/minhook-freeze): hooks are queued and switched on together by Apply, so each batch freezes the game's
+// threads once instead of once per hook (MinHook suspends every other thread for each MH_EnableHook).
+bool Hook(HMODULE m, const char *name, void *detour, void **orig) { if (!m) return false; void *fn = (void *)GetProcAddress(m, name); if (!fn) return false; if (MH_CreateHook(fn, detour, orig) != MH_OK) return false; return MH_QueueEnableHook(fn) == MH_OK; }
+bool HookAt(void *fn, void *detour, void **orig) { MH_STATUS s = MH_CreateHook(fn, detour, orig); if (s == MH_ERROR_ALREADY_CREATED) return true; return s == MH_OK && MH_QueueEnableHook(fn) == MH_OK; }
+bool Apply() { return MH_ApplyQueued() == MH_OK; }
 bool GdipDone, DwriteDone, D2dDone;
 void LateHooks() {
  HMODULE gp = GetModuleHandleW(L"gdiplus.dll");
@@ -694,7 +731,7 @@ void LateHooks() {
   Hook(gp, "GdipPrivateAddFontFile", (void *)&HGdipPrivateAddFontFile, (void **)&OGdipPrivateAddFontFile);
   Hook(gp, "GdipDrawString", (void *)&HGdipDrawString, (void **)&OGdipDrawString);
   bool driver = Hook(gp, "GdipDrawDriverString", (void *)&HGdipDrawDriverString, (void **)&OGdipDrawDriverString);
-  GdipDotApis(gp);
+  GdipDotApis(gp); if (!Apply()) driver = false;
   Send(std::string("ToMe_FONT status gdiplus hooked") + (driver ? " driver" : "")); }
  HMODULE dw = GetModuleHandleW(L"dwrite.dll");
  if (dw && !DwriteDone) { DwriteDone = true;
@@ -704,7 +741,7 @@ void LateHooks() {
    bool a = HookAt(vt[15], (void *)&HCreateTextFormat, (void **)&OCreateTextFormat);
    bool b = HookAt(vt[7], (void *)&HCreateFontFileReference, (void **)&OCreateFontFileReference);
    bool c = HookAt(vt[18], (void *)&HCreateTextLayout, (void **)&OCreateTextLayout) && HookAt(vt[19], (void *)&HCreateGdiCompatibleTextLayout, (void **)&OCreateGdiCompatibleTextLayout);
-   factory->Release(); Send(std::string("ToMe_FONT status dwrite hooked ") + (a ? "format" : "-") + (b ? " file" : " -") + (c ? " layout" : " -")); } }
+   if (!Apply()) a = b = c = false; factory->Release(); Send(std::string("ToMe_FONT status dwrite hooked ") + (a ? "format" : "-") + (b ? " file" : " -") + (c ? " layout" : " -")); } }
  HMODULE d2 = GetModuleHandleW(L"d2d1.dll");
  if (d2 && !D2dDone) { D2dDone = true;
   // ID2D1RenderTarget: 27 DrawText, 28 DrawTextLayout, 29 DrawGlyphRun. d2d1.dll implements them once for its render targets; the
@@ -714,6 +751,7 @@ void LateHooks() {
    D2D1_RENDER_TARGET_PROPERTIES props = {D2D1_RENDER_TARGET_TYPE_DEFAULT, {DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED}, 0, 0, D2D1_RENDER_TARGET_USAGE_NONE, D2D1_FEATURE_LEVEL_DEFAULT};
    if (SUCCEEDED(factory->CreateDCRenderTarget(&props, &rt)) && rt) { void **vt = *(void ***)rt; ok = HookAt(vt[27], (void *)&HDrawText, (void **)&ODrawText) && HookAt(vt[28], (void *)&HDrawTextLayout, (void **)&ODrawTextLayout); run = HookAt(vt[29], (void *)&HDrawGlyphRun, (void **)&ODrawGlyphRun); rt->Release(); }
    factory->Release(); }
+  if (!Apply()) ok = run = false;
   Send(std::string("ToMe_FONT status d2d1 ") + (ok ? "hooked text" : "not hooked") + (run ? " run" : "")); }
 }
 
@@ -757,6 +795,7 @@ DWORD WINAPI Run(void *) {
  n += Hook(gdi, "AddFontMemResourceEx", (void *)&HAddFontMemResourceEx, (void **)&OAddFontMemResourceEx);
  n += Hook(gdi, "AddFontResourceExW", (void *)&HAddFontResourceExW, (void **)&OAddFontResourceExW);
  n += Hook(gdi, "AddFontResourceExA", (void *)&HAddFontResourceExA, (void **)&OAddFontResourceExA);
+ if (!Apply()) n = 0;
  Send("ToMe_FONT status gdi hooks " + std::to_string(n) + "/11");
  // Early injection (MeguLitLaunch<bit>.exe, docs/text-architecture.md): the starting mode and dialogue font come from the
  // game's environment, since HookBridge connects only later; then the launcher is told the hooks are in place.

@@ -71,6 +71,10 @@ int wmain(int argc, wchar_t **argv) {
  GLYPHMETRICS ref{}; std::vector<BYTE> before = Glyph(L'猫', GGO_GRAY8_BITMAP, &ref);
  Check(AnyBits(before), "before any line: the glyph has pixels");
 
+ Push("MODE blank-blind");
+ { char seed[96]; sprintf_s(seed, "FONT 28 %ls", Face); Push(seed); }
+ Check(AnyBits(Glyph(L'猫', GGO_GRAY8_BITMAP)), "blind mode plus remembered font before dialogue: title glyph keeps pixels");
+ Clear(); TextOutW(Dc, 0, 10, L"最初から", 4); Check(Ink() > 20, "blind mode before dialogue: title menu keeps pixels");
  Push("LINE 吾輩は猫である。名前はまだ無い。");
  for (const wchar_t *c = line; *c; c++) Glyph(*c, GGO_GRAY8_BITMAP); // first pass learns the dialogue font
  bool blank = true; GLYPHMETRICS gm{};
@@ -113,6 +117,8 @@ int wmain(int argc, wchar_t **argv) {
 
  Push("OFF");
  Check(AnyBits(Glyph(L'猫', GGO_GRAY8_BITMAP)), "after OFF: the line's glyph is drawn again");
+ Push("MODE blank-blind");
+ Check(AnyBits(Glyph(L'猫', GGO_GRAY8_BITMAP)), "after OFF and blind mode replay: original glyph stays visible");
  Clear(); ExtTextOutW(Dc, 0, 10, 0, NULL, line, (UINT)wcslen(line), NULL); Check(Ink() > 50, "after OFF: ExtTextOutW of the line drawn again");
  Push("LINE どこで生れたかとんと見当がつかぬ。");
  { char seed[96]; sprintf_s(seed, "FONT 28 %ls", Face); Push(seed); }

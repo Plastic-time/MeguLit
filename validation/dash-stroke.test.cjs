@@ -53,7 +53,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
     /* 2. tokens that arrive later (a new sentence) are tagged too */
     await page.evaluate(t => { const s = document.querySelector('.sentence-text'); s.innerHTML = t; }, tokens); await frame(); check(await strokes(), 'new sentence');
     /* 3. in-place drawing: half-width dash cells next to each other (16 px each at size 32), as the game lays them out */
-    await page.evaluate(() => { const b = window.__tomoyoChinese; b.textPlaceMode({ on: true });
+    await page.evaluate(() => { const b = window.__tomoyoChinese; b.textPlaceAnchor?.(false); b.textPlaceMode({ on: true });
       b.textPlace({ text: 'が――僕はコーヒー', client: [1280, 720], rects: [[100, 500, 32, 41], [132, 500, 16, 41], [148, 500, 16, 41], [164, 500, 32, 41], [196, 500, 32, 41], [228, 500, 32, 41], [260, 500, 32, 41], [292, 500, 32, 41], [324, 500, 32, 41]] }); });
     await frame();
     const placed = await strokes(); check(placed, 'in place');

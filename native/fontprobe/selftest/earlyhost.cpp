@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Early-injection self-test: started through MeguLitLaunch<bit>.exe with MEGULIT_GLYPH_MODE=dot-blind and
 // MEGULIT_GLYPH_FONT="28 <face>". Its very first act is to rasterise a glyph in the dialogue font, as an engine filling
-// its glyph cache at start-up would; that glyph must already be a dot (no HookBridge, no pushed line), while the same
+// its glyph cache at start-up would; that glyph must retain its pixels without any confirmed dialogue line, while the same
 // glyph in another size stays real. Writes PASS or FAIL <n> to <result file>. Usage: earlyhost.exe <face> <result file>
 #include <windows.h>
 #include <stdio.h>
@@ -21,7 +21,7 @@ int wmain(int argc, wchar_t **argv) {
  bool loaded = GetModuleHandleW(sizeof(void *) == 8 ? L"MeguLitFont64.dll" : L"MeguLitFont32.dll") != NULL;
  int failed = 0;
  printf("%s DLL loaded before the main thread ran\n", loaded ? "ok  " : "FAIL"); failed += !loaded;
- bool dot = first > 0 && first <= 9 && bx > 9; printf("%s first glyph in the dialogue font is a dot (%d px inked of a %dx%d box)\n", dot ? "ok  " : "FAIL", first, bx, by); failed += !dot;
+ bool dot = first > 20 && bx > 9; printf("%s first glyph without a dialogue line stays real (%d px inked of a %dx%d box)\n", dot ? "ok  " : "FAIL", first, bx, by); failed += !dot;
  bool real = other > 20; printf("%s same glyph in another size stays real (%d px)\n", real ? "ok  " : "FAIL", other); failed += !real;
  if (argc > 2) { FILE *f = NULL; if (!_wfopen_s(&f, argv[2], L"w") && f) { fprintf(f, failed ? "FAIL %d\n" : "PASS\n", failed); fclose(f); } }
  return failed;

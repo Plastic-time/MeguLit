@@ -24,7 +24,7 @@ const MAGIC_ENGINES=[
  ['LPK1','lpk','lucifen'],['GAMEDAT PAC','pjadv-pac','pjadv'],['DDP2','ddp','ddsystem'],['DDP3','ddp','ddsystem'],['ESC-ARC','escude-arc','escude'],
  ['HUNEXGGEFA10','hfa','hunex'],['SDTS','sdts','srpg'],['FORM','gamemaker','gamemaker'],['RPA-3.0','rpa','renpy'],['RPA-2.0','rpa','renpy'],
  ['RGSSAD\0','rgssad','rpgmaker'],['WOLF','wolf','wolf-rpg'],['AFAH','afa','system4'],['ALK0','alk','system4'],['VERS','ain','system4'],
- ['ARC2','arc2','advhd'],['ONS2','ons2','nscripter'],['AGAR','wad','spike-chunsoft'],['LINK','kaguya-link','kaguya'],['GPK2','gpk','gpk'],
+ ['ARC2','arc2','advhd'],['HyPack','hypack','kogado'],['ONS2','ons2','nscripter'],['AGAR','wad','spike-chunsoft'],['LINK','kaguya-link','kaguya'],['GPK2','gpk','gpk'],
  ['PACK','qlie-pack','qlie'],['FilePackVer','qlie-pack','qlie'],['EPK ','epk','ethornell'],['DXA','dxa','dxlib'],['AR2','ar2','tenco'],
  ['MRG\0','mrg','mrg'],['NNK','nnk','nnk'],['ARCX','arcx','arcx'],['SNPA','snpa','snpa'],['TCR','tcr','tcr'],
 ];
@@ -35,7 +35,7 @@ const NAME_ENGINES=[
  [/(^|\/)[^/]*_Data\/(resources|sharedassets\d*|globalgamemanagers|level\d+)(\.assets)?$/i,'unity',false],
  [/\.(ress|resource)$/i,'unity',true],
  [/(^|\/)[^/]*_Data\/(StreamingAssets\/)?.*\.(bundle|ab|unity3d)$/i,'unity',false],
- [/\.rio(\.\d+)?$/i,'age',false],[/\.rio\.(ici|ruo\d*)$/i,'age',true],[/\.ruo\d*$/i,'age',true],
+ [/(^|\/)rio\d*\.arc$/i,'advhd',false],[/\.rio(\.\d+)?$/i,'age',false],[/\.rio\.(ici|ruo\d*)$/i,'age',true],[/\.ruo\d*$/i,'age',true],
  [/\.pck$/i,null,false],/* engine from the magic: Leaf Filename / Siglus scene.pck */
  [/(^|\/)scene\.pck$/i,'siglus',false],[/(^|\/)gameexe\.dat$/i,'siglus',false],
  [/\.rpa$/i,'renpy',false],[/\.rgss(ad|2a|3a)$/i,'rpgmaker',false],[/\.wolf$/i,'wolf-rpg',false],[/\.xp3$/i,'kirikiri',false],

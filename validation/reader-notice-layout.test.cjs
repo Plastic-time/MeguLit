@@ -15,10 +15,12 @@ const PROBE=err=>`(async()=>{const old=document.querySelector('#reader-notice [d
 test('reader notice: one-line title and buttons, readable message, buttons wrap together on a narrow window',{skip:!hasEdge&&'Edge not installed',timeout:180000},async()=>{
  const temp=fs.mkdtempSync(path.join(process.env.MEGULIT_WORK||os.tmpdir(),'megulit-reader-notice-'));const root=path.join(temp,'root');fs.mkdirSync(root);
  const service=startService(root);let web,cdp;
- try{web=await startWeb(service);cdp=await startEdge(path.join(temp,'edge'));
+ // Let the app finish its initial reader health check before injecting the errors under test.
+ const startupError='READER_NATIVE_MISSING';
+ try{web=await startWeb({call:request=>request.action==='reader_status'?{error:startupError}:service.call(request)});cdp=await startEdge(path.join(temp,'edge'));
   await cdp.send('Page.navigate',{url:`http://127.0.0.1:${web.address().port}/#%7B%7D`});
-  let ready=false;for(let i=0;i<80&&!ready;i++){await sleep(250);ready=await cdp.evaluate('!!(window.__megulitTest&&document.querySelector("#reader-notice"))').catch(()=>false);}
-  assert.ok(ready,'app loaded');await sleep(1500);
+  let ready=false;for(let i=0;i<80&&!ready;i++){await sleep(250);ready=await cdp.evaluate('!!window.__megulitTest && document.querySelector("#reader-notice")?.title==='+JSON.stringify(startupError)).catch(()=>false);}
+  assert.ok(ready,'initial reader status displayed');
   for(const [w,narrow] of [[330,true],[760,false],[1920,false]]){
    await cdp.send('Emulation.setDeviceMetricsOverride',{width:w,height:720,deviceScaleFactor:1,mobile:false});await sleep(400);
    for(const err of ['SERVICE_FAILED','READER_START_TIMEOUT']){
@@ -33,5 +35,5 @@ test('reader notice: one-line title and buttons, readable message, buttons wrap 
     if(err==='SERVICE_FAILED'){assert.doesNotMatch(s.detail,/SERVICE_FAILED/,'no bare error code in the message');assert.match(s.detail,/游戏连接服务启动失败/);assert.equal(s.tip,'SERVICE_FAILED','raw code kept in the tooltip');}
     else assert.match(s.detail,/READER_START_TIMEOUT/);
    }}
- }finally{cdp?.stop();web?.close();await service.stop();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();web?.close();await service.stop();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });

@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "2141fbb5f5fdc10ee9b6bc6fba5dd571b6b64343da71255e456f09082c2f60e0",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "TheShell2.exe",
+ "engine": "artemis",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "2141fbb5f5fdc10ee9b6bc6fba5dd571b6b64343da71255e456f09082c2f60e0",
+  "head": "142b111e0ac935401a1bb7455d9bb670965e96b08236a41b15b5f6886d039ffb",
+  "pe": "0.0.0.0@6439425f"
+ },
+ "rev": 1
+}

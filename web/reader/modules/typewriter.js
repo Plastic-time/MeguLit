@@ -17,8 +17,8 @@
    timer=schedule(()=>tick(id),Math.min(50,1000/speed));
   }
   return {
-   start(length,{speed:next=35,instant=false}={}){
-    clear();serial++;total=Math.max(0,Math.floor(Number(length)||0));shown=base=0;speed=rate(next);started=now();running=total>0&&!instant;
+   start(length,{speed:next=35,instant=false,from=0}={}){
+    clear();serial++;total=Math.max(0,Math.floor(Number(length)||0));shown=base=Math.max(0,Math.min(total,Math.floor(Number(from)||0)));speed=rate(next);started=now();running=shown<total&&!instant;
     if(instant)shown=total;update(shown,total);
     if(running){const id=serial;timer=schedule(()=>tick(id),Math.min(50,1000/speed));}else done();
    },
@@ -37,9 +37,10 @@
  function stop(element){const state=active.get(element);if(!state)return;state.controller.stop();active.delete(element);}
  function finishAll(native=false){const now=root.performance?.now?.()||0;for(const state of [...active.values()])if(!native||now-state.started>=120)state.controller.finish();}
  function stopAll(){for(const [element,state]of active){state.controller.stop();delete element.dataset.tomeTyping;}active.clear();}
- function reveal(element,nodes,{instant=false}={}){
-  ensureStyle();stop(element);nodes=[...nodes];let painted=0;
-  for(const node of nodes)node.classList.add('tome-typewriter-pending');
+ /* from: the first characters are already on screen (the same line grew or was corrected): they stay shown and the typing goes on after them */
+ function reveal(element,nodes,{instant=false,from=0}={}){
+  ensureStyle();stop(element);nodes=[...nodes];from=Math.max(0,Math.min(nodes.length,Math.floor(Number(from)||0)));let painted=from;
+  for(const [i,node]of nodes.entries())node.classList.toggle('tome-typewriter-pending',i>=from);
   const state={controller:null,started:root.performance?.now?.()||0};
   state.controller=createReveal({schedule:root.requestAnimationFrame?fn=>root.requestAnimationFrame(()=>fn()):undefined,cancel:root.cancelAnimationFrame?id=>root.cancelAnimationFrame(id):undefined,
    update(count,total){
@@ -49,11 +50,11 @@
    },
    done(){delete element.dataset.tomeTyping;if(active.get(element)===state)active.delete(element);}
   });
-  active.set(element,state);state.controller.start(nodes.length,{speed,instant:instant||!enabled||skipping});
+  active.set(element,state);state.controller.start(nodes.length,{speed,from,instant:instant||!enabled||skipping});
  }
- function text(element,value,{instant=false}={}){
+ function text(element,value,{instant=false,from=0}={}){
   stop(element);const nodes=[...String(value)].map(character=>{const span=root.document.createElement('span');span.className=/^\p{Script=Latin}$/u.test(character)?'tome-translation-char megulit-latin':'tome-translation-char';span.textContent=character;return span;});
-  element.replaceChildren(...nodes);reveal(element,nodes,{instant});
+  element.replaceChildren(...nodes);reveal(element,nodes,{instant,from});
  }
  function configure(options={}){
   const next=options.enabled!==false,newSpeed=rate(options.speed);

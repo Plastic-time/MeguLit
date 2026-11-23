@@ -1,0 +1,67 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "136aa57fb45400eeea9e898c20a5ee7a4985f50cbe4b160a4e613fcfba5fc390",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "innocentgrey",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "5a9c26b18db8f38c93b853edc07dbf90826ffe4e093fc86122be54c99054e5a2",
+  "title": "fdd585495af82bb56549e86c95a94e3564f70967886b31eb153c11cb9a779c16",
+  "vndb": "v5922"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "utsuro-no-shoujo",
+ "builds": [
+  "72caa0a0b105f972e1fe7b0ea1ff491d91107d5aa14ac562d4eeac81a163f188"
+ ],
+ "match": {
+  "exe": [
+   "Innocentsetup.exe"
+  ],
+  "titles": [
+   "虚ノ少女",
+   "虚之少女",
+   "[130208][Innocent Grey] 虚ノ少女"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

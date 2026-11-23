@@ -104,12 +104,61 @@ function renpy(root){const game=path.join(root,'game');if(!fs.existsSync(game))r
  const resolve=name=>{const n=name.replace(/\\/g,'/').toLowerCase();return files.get(n)||[...files.values()].find(f=>f.rel.toLowerCase().endsWith('/'+n)||path.posix.basename(f.rel).toLowerCase()===path.posix.basename(n));};
  return {named,files:[...files.values()],resolve};}
 
+/* --- KiriKiri --- */
+/* 2026-11-19 (千恋＊万花: "未发现可导入的游戏字体文件" and MeguLit drew a default face): KiriKiri keeps its fonts inside the
+   xp3 archives, encrypted by the title's cx filter, and KAG games draw dialogue with pre-rendered glyph files
+   (mapPrerenderedFont, <name>_<size>.tft) as often as with outline fonts. Font entries are read with the game's filter
+   (cx-filter.cjs); outline fonts are imported as they are; the pre-rendered family with the most sizes (the dialogue
+   font: 千恋＊万花 font1_10..56 "スキップ", against headfont_20..36) is turned into an outline font from its largest size
+   (core/prerendered-font.cjs). Only this PC's cache is written; nothing is shared. */
+function krkrArchives(root){let list=[];try{list=fs.readdirSync(root).filter(n=>/\.xp3$/i.test(n));}catch{}
+ /* KiriKiri mounts patch*.xp3 over data.xp3: a later patch wins for the same name */
+ return list.sort((a,b)=>(/^patch/i.test(a)?1:0)-(/^patch/i.test(b)?1:0)||a.localeCompare(b)).map(n=>path.join(root,n));}
+function krkrText(buf){if(buf.length>5&&buf[0]===0xfe&&buf[1]===0xfe&&buf[3]===0xff&&buf[4]===0xfe){const mode=buf[2],d=buf.subarray(5);
+  if(mode===2){try{return zlib.inflateSync(d.subarray(16)).toString('utf16le');}catch{return '';}}let out='';for(let i=0;i+1<d.length;i+=2){let c=d.readUInt16LE(i);if(mode===1)c=((c&0xaaaa)>>1)|((c&0x5555)<<1);else if(c>=0x20)c^=((c&0xfe)<<8)^1;out+=String.fromCharCode(c);}return out;}
+ if(buf[0]===0xff&&buf[1]===0xfe)return buf.toString('utf16le',2);if(buf[0]===0xef&&buf[1]===0xbb&&buf[2]===0xbf)return buf.toString('utf8',3);return '';}
+function kirikiri(root,{match=true}={}){
+ const xp3=require('../services/original-engines/xp3.cjs'),entries=new Map(),notes=[];let filters=0;
+ for(const file of krkrArchives(root)){let l;try{l=xp3.list(file);}catch{continue;}if(!l)continue;
+  const wanted=l.files.filter(e=>/\.(ttf|otf|ttc|otc|tft|tjs)$/i.test(e.name)&&(/\.(tft|ttf|otf|ttc|otc)$/i.test(e.name)||/font/i.test(e.name))&&e.size>0&&e.size<=80<<20);if(!wanted.length)continue;
+  let decrypt;if(wanted.some(e=>e.encrypted)){decrypt=require('../services/original-engines/cx-filter.cjs').forArchive(file);if(decrypt)filters++;else notes.push(path.basename(file)+' encrypted, no known filter');}
+  for(const e of wanted)if(!e.encrypted||decrypt)entries.set(e.name.toLowerCase(),{archive:file,entry:e,decrypt});}
+ const read=v=>{try{return xp3.read(v.archive,v.entry,v.decrypt);}catch{return null;}};const label=v=>path.basename(v.archive)+' › '+v.entry.name;
+ /* outline fonts as they are */
+ const outline=[];for(const v of entries.values()){if(!/\.(ttf|otf|ttc|otc)$/i.test(v.entry.name))continue;const b=read(v);if(!b)continue;
+  const faces=b.toString('latin1',0,4)==='ttcf'?require('./game-fonts.cjs').collectionFaces(b):[b];for(const f of faces)if(sfntEnd(f,0))outline.push(candidate(f,label(v),v.entry.name));}
+ /* pre-rendered families: <base>_<size>.tft */
+ const families=new Map();for(const v of entries.values()){const m=/^(.*?)_?(\d+)\.tft$/i.exec(v.entry.name);if(!m)continue;const base=m[1].toLowerCase();const f=families.get(base)||{base:m[1],sizes:[]};f.sizes.push({size:Number(m[2]),v});families.set(base,f);}
+ /* the dialogue family: not a UI one (system / header / ruby / name / number), most sizes, largest size, most bytes */
+ const ui=f=>/(^|[\/_])(sys|system|head|header|ruby|name|num|number|small|mini)/i.test(f.base)?1:0,top=f=>Math.max(...f.sizes.map(s=>s.size)),bytes=f=>Math.max(...f.sizes.map(s=>s.v.entry.size));
+ const ranked=[...families.values()].sort((a,b)=>ui(a)-ui(b)||b.sizes.length-a.sizes.length||top(b)-top(a)||bytes(b)-bytes(a));
+ let prerendered=null;
+ if(ranked.length){const fam=ranked[0],big=fam.sizes.sort((a,b)=>b.size-a.size)[0];
+  /* the name the game's own font list gives the family ("name"=>"スキップ", "file"=>"font1_${size}.tft"), else the file base */
+  let name='';const stem=path.posix.basename(fam.base.split(String.fromCharCode(92)).join('/'));
+  for(const v of entries.values()){if(!/\.tjs$/i.test(v.entry.name))continue;const b=read(v);if(!b)continue;const text=krkrText(b);
+   for(const line of text.split(/\r?\n/)){if(line.toLowerCase().indexOf('"'+stem.toLowerCase()+'_')<0&&line.toLowerCase().indexOf("'"+stem.toLowerCase()+'_')<0)continue;const m=/["']name["']\s*=>\s*["']([^"']{1,40})["']/.exec(line);if(m&&!/^\*/.test(m[1])){name=m[1];break;}}if(name)break;}
+  prerendered={family:name||stem,source:label(big.v),sizes:fam.sizes.map(s=>s.size).sort((a,b)=>a-b),others:ranked.slice(1).map(f=>f.base)};
+  if(match){const b=read(big.v),sm=b&&require('./prerendered-font.cjs').sample(b);if(sm){prerendered.sample=sm;prerendered.glyphs=sm.total;prerendered.cell=sm.cell;}else notes.push(label(big.v)+' gave no glyph sample');}}
+ return {outline,prerendered,notes,filters,archives:krkrArchives(root).length};}
+
+/* --- any other engine's archives (GARbro) --- */
+/* 2026-11-19 fonts packed by engines MeguLit has no own reader for: GARbro (the on-demand "archives" pack, used here only
+   when already installed) extracts the font entries of up to 8 archives into this PC's cache. */
+function garbroArchives(root){try{const g=require('../services/original-engines/garbro.cjs');return g.installed()?g.archives(root).filter(f=>!/\.xp3$/i.test(f)).slice(0,8):[];}catch{return [];}}
+function garbroFonts(root,dir){const g=require('../services/original-engines/garbro.cjs'),found=[];
+ for(const a of garbroArchives(root)){const out=path.join(dir,'archive-'+crypto.createHash('sha256').update(a.toLowerCase()).digest('hex').slice(0,10));
+  for(const f of g.extractMatchSync(a,out,'\\.(ttf|otf|ttc|otc)$')){let b;try{b=fs.readFileSync(f);}catch{continue;}const faces=b.toString('latin1',0,4)==='ttcf'?require('./game-fonts.cjs').collectionFaces(b):[b];
+   for(const face of faces)if(sfntEnd(face,0))found.push(candidate(face,path.basename(a)+' › '+path.relative(out,f).split(path.sep).join('/'),path.basename(f)));}}
+ return found;}
+/* a pre-rendered sample this close to a real font is that font (MAGES: the right face 0.90 against 0.855 for the next) */
+const RECOGNISED=0.9;
 /* --- entry --- */
-function engineOf(root){if(unityData(root))return 'unity';if(['','USRDIR'].some(d=>fs.existsSync(path.join(root,d,'system.mpk'))))return 'mages';if(fs.existsSync(path.join(root,'game'))&&(fs.existsSync(path.join(root,'renpy'))||walk(path.join(root,'game'),n=>/\.(rpa|rpyc)$/i.test(n),1).length))return 'renpy';return '';}
+function engineOf(root){if(unityData(root))return 'unity';if(krkrArchives(root).length)return 'kirikiri';if(garbroArchives(root).length)return 'archive';if(['','USRDIR'].some(d=>fs.existsSync(path.join(root,d,'system.mpk'))))return 'mages';if(fs.existsSync(path.join(root,'game'))&&(fs.existsSync(path.join(root,'renpy'))||walk(path.join(root,'game'),n=>/\.(rpa|rpyc)$/i.test(n),1).length))return 'renpy';return '';}
 const safe=s=>String(s||'font').replace(/[^\p{L}\p{N}_ -]/gu,'').trim().slice(0,40)||'font';
-function save(dir,c,tag){fs.mkdirSync(dir,{recursive:true});const id=crypto.createHash('sha256').update(c.data).digest('hex').slice(0,10);const file=path.join(dir,tag+'-'+safe(c.family)+'-'+id+'.jp'+(c.data.readUInt32BE(0)===0x4f54544f?'.otf':'.ttf'));if(!fs.existsSync(file))fs.writeFileSync(file,c.data);return file;}
+function save(dir,c,tag){fs.mkdirSync(dir,{recursive:true});const id=crypto.createHash('sha256').update(c.data).digest('hex').slice(0,10);const file=path.join(dir,tag+'-'+safe(c.family)+'-'+id+(c.score===null?'.zh':'.jp')+(c.data.readUInt32BE(0)===0x4f54544f?'.otf':'.ttf'));if(!fs.existsSync(file))fs.writeFileSync(file,c.data);return file;}
 /* Scan one game folder. Returns {engine, face, family?, files:[font files to import], reason, candidates} or null. */
-function scan(root,cacheDir){const engine=engineOf(root);if(!engine)return null;const dir=path.join(cacheDir,crypto.createHash('sha256').update(root.toLowerCase()).digest('hex').slice(0,12));
+function scan(root,cacheDir,{matcher}={}){const engine=engineOf(root);if(!engine)return null;const dir=path.join(cacheDir,crypto.createHash('sha256').update(root.toLowerCase()).digest('hex').slice(0,12));
  if(engine==='unity'){const {found,sdf}=unity(root,unityData(root));const seen=new Set(),list=found.filter(c=>{const k=c.data.length+':'+c.family;if(seen.has(k))return false;seen.add(k);return true;});
   const ranked=list.filter(c=>c.score!==null).sort((a,b)=>b.score-a.score);const candidates=list.map(c=>({family:c.family,source:c.source,kana:c.kana,kanji:c.kanji,score:c.score}));
   if(ranked.length){const best=ranked[0];return {engine,face:best.family,files:[save(dir,best,'unity')],reason:'embedded '+best.source,candidates};}
@@ -119,16 +168,40 @@ function scan(root,cacheDir){const engine=engineOf(root);if(!engine)return null;
    the stroke-ratio family stays the fallback when nothing installed scores >= 0.8. */
   let near={face:''};try{const mf=require('./mages-font.cjs'),job=mf.sample(root);if(job)near={...mf.closest(mf.matchSync(job,dir)),size:job.cell};}catch{}
   return {engine,face:near.face||'',family:m.family,bold:near.face?near.bold:undefined,size:near.size,files:[],reason:'atlas '+m.atlas+' stroke ratio '+m.ratio.toFixed(2)+(near.face?' ~ '+near.face+' '+near.score:''),atlas:m,candidates:near.candidates};}
+ if(engine==='kirikiri'){const k=kirikiri(root);const files=[],seen=new Set();
+  /* every Japanese outline font becomes a choice and one Chinese font (a Chinese edition's own) serves the translation.
+     Every imported font is sent to the reader as font data (千恋＊万花 offered 42 MB): faces up to 8 MB, two Japanese
+     ones (one beside a pre-rendered dialogue font), one Chinese. */
+  const small=c=>c.data.length<=8<<20,ja=k.outline.filter(c=>c.score!==null&&small(c)).sort((a,b)=>b.score-a.score).slice(0,k.prerendered?1:2),zh=k.outline.filter(c=>c.score===null&&small(c)&&c.kanji>=1500&&OTHER_LANG.test(c.names.join(' ')+' '+c.source)).slice(0,1);
+  const labels={};for(const c of [...ja,...zh]){const key=c.data.length+':'+c.family;if(seen.has(key))continue;seen.add(key);const f=save(dir,c,'krkr');files.push(f);labels[f]=c.source;}
+  const candidates=k.outline.map(c=>({family:c.family,source:c.source,kana:c.kana,kanji:c.kanji,score:c.score}));
+  /* 2026-11-19 (user: 别描边): a pre-rendered dialogue font is recognised, not copied. Its glyphs are drawn against every
+     installed family and the game's own outline fonts (services/font-match.ps1); the closest real font is used. At
+     RECOGNISED or above it is taken as the game's face, below it is the closest one and the panel says so. */
+  if(k.prerendered){const p=k.prerendered;let match=null;
+   if(p.sample){/* every Japanese face of the game is a candidate; the one that matches is imported whatever its size */const pool=k.outline.filter(c=>c.score!==null&&c.data.length<=40<<20).map(c=>({c,file:save(dir,c,'krkr')}));
+    try{const list=(matcher||require('./mages-font.cjs').matchSync)({chars:p.sample.chars,glyphs:p.sample.glyphs,files:pool.map(x=>x.file)},dir),best=list[0];
+     if(best){const from=pool.find(x=>x.file&&best.file&&x.file.toLowerCase()===String(best.file).toLowerCase());
+      match={family:best.family,style:best.style||'',score:best.score,recognized:best.score>=RECOGNISED,source:from?from.c.source:'',candidates:list.slice(0,5).map(x=>({family:x.family,style:x.style,score:x.score,game:!!x.file}))};
+      if(from&&!files.includes(from.file)){files.unshift(from.file);labels[from.file]=from.c.source;}}}catch{}}
+   const why='pre-rendered '+p.source+' ('+(p.glyphs||0)+' glyphs, sizes '+p.sizes.join('/')+')'+(match?(match.recognized?' recognised as ':' closest ')+match.family+' '+match.score.toFixed(3):' no match');
+   return {engine,face:match?match.family:'',bold:match?match.style==='Bold':undefined,files,labels,reason:why,prerendered:{family:p.family,source:p.source,sizes:p.sizes,glyphs:p.glyphs,cell:p.cell,others:p.others},match,candidates,notes:k.notes,archives:k.archives};}
+  if(ja.length)return {engine,face:ja[0].family,files,labels,reason:'bundled '+ja[0].source,candidates,notes:k.notes,archives:k.archives};
+  return {engine,face:'',files,labels,reason:k.archives?'no font in '+k.archives+' archives':'no archives',candidates,notes:k.notes,archives:k.archives};}
+ if(engine==='archive'){const found=garbroFonts(root,dir),labels={},files=[];const ja=found.filter(c=>c.score!==null).sort((a,b)=>b.score-a.score).slice(0,2);
+  for(const c of ja){const f=save(dir,c,'archive');files.push(f);labels[f]=c.source;}
+  const candidates=found.map(c=>({family:c.family,source:c.source,kana:c.kana,kanji:c.kanji,score:c.score}));
+  return ja.length?{engine,face:ja[0].family,files,labels,reason:'bundled '+ja[0].source,candidates}:{engine,face:'',files,labels,reason:found.length?'no japanese font in the archives':'no font in the archives',candidates};}
  if(engine==='renpy'){const r=renpy(root);if(!r)return null;for(const n of r.named){const f=r.resolve(n.file);if(!f)continue;let buf;try{buf=f.read();}catch{continue;}const c=candidate(buf,f.rel);if(c.kana<80)continue;return {engine,face:c.family,files:[save(dir,c,'renpy')],reason:'gui.'+n.key+' = '+n.file,named:r.named};}
   /* no script names a Japanese font: the Japanese font file the game ships (game-fonts' own scan imports loose ones) */
   for(const f of r.files){let buf;try{buf=f.read();}catch{continue;}const c=candidate(buf,f.rel);if(c.score===null)continue;return {engine,face:c.family,files:[save(dir,c,'renpy')],reason:'bundled '+f.rel,named:r.named};}
   return {engine,face:'',files:[],reason:'no japanese font',named:r.named};}
  return null;}
 /* cached per game folder (a Unity scan reads hundreds of MB once) */
-function cached(root,cacheDir){const file=path.join(cacheDir,'engine-font-scan.json');let all={};try{all=JSON.parse(fs.readFileSync(file,'utf8'))||{};}catch{}const key=root.toLowerCase();const hit=all[key];
- if(hit&&hit.version===2&&(hit.files||[]).every(f=>fs.existsSync(f)))return hit;const result=scan(root,cacheDir);if(!result)return null;const keep={version:2,...result};
+function cached(root,cacheDir,force=false){const file=path.join(cacheDir,'engine-font-scan.json');let all={};try{all=JSON.parse(fs.readFileSync(file,'utf8'))||{};}catch{}const key=root.toLowerCase();const hit=all[key];
+ if(!force&&hit&&hit.version===3&&(hit.files||[]).every(f=>fs.existsSync(f)))return hit;const result=scan(root,cacheDir);if(!result)return null;const keep={version:3,...result};
  try{fs.mkdirSync(cacheDir,{recursive:true});all[key]=keep;fs.writeFileSync(file,JSON.stringify(all,null,1));}catch{}return keep;}
 /* run in a worker thread so the reader service keeps answering while hundreds of MB are read */
-function inWorker(root,cacheDir){return new Promise(resolve=>{try{const {Worker}=require('node:worker_threads');const w=new Worker(__filename,{workerData:{engineFontScan:{root,cacheDir}}});let done=false;const end=v=>{if(!done){done=true;resolve(v);}};w.once('message',end);w.once('error',()=>end(null));w.once('exit',()=>end(null));}catch{resolve(null);}});}
-{const wt=require('node:worker_threads');if(!wt.isMainThread&&wt.workerData&&wt.workerData.engineFontScan){const {root,cacheDir}=wt.workerData.engineFontScan;let r=null;try{r=cached(root,cacheDir);}catch{}wt.parentPort.postMessage(r);}}
-module.exports={inWorker,scan,cached,engineOf,sfntEnd,fontsIn,score,strokeStats,atlasFamily,png,unpickle,fontsInScript,fontsInRpyc,sdfNames};
+function inWorker(root,cacheDir,force=false){return new Promise(resolve=>{try{const {Worker}=require('node:worker_threads');const w=new Worker(__filename,{workerData:{engineFontScan:{root,cacheDir,force}}});let done=false;const end=v=>{if(!done){done=true;resolve(v);}};w.once('message',end);w.once('error',()=>end(null));w.once('exit',()=>end(null));}catch{resolve(null);}});}
+{const wt=require('node:worker_threads');if(!wt.isMainThread&&wt.workerData&&wt.workerData.engineFontScan){const {root,cacheDir,force}=wt.workerData.engineFontScan;let r=null;try{r=cached(root,cacheDir,force);}catch{}wt.parentPort.postMessage(r);}}
+module.exports={inWorker,scan,cached,engineOf,kirikiri,krkrText,RECOGNISED,sfntEnd,fontsIn,score,strokeStats,atlasFamily,png,unpickle,fontsInScript,fontsInRpyc,sdfNames};

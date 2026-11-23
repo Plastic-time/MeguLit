@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "engine": "siglus",
+  "game": "clannad",
+  "exeSha256": "116a1b6ab5902bb6dc49e25086b1ef6f07d941dbb090b497fb7a158e997dea2d",
+  "captureKind": "pending",
+  "build": { "commit": null, "hook32Sha256": null, "meguLitSha256": null },
+  "slot": { "number": null, "allocatedByRoot": false },
+  "roles": { "line": null, "name": null, "choice": null },
+  "checks": { "defaultOff": null, "optIn": null, "revoked": null, "ruby": null, "pageClear": null, "audioRestored": null, "processClosed": null },
+  "lines": [],
+  "artifacts": {},
+  "notes": "Pending real-game evidence, not a game acceptance receipt. Each line needs japanese, sourceId, hidden, dom, lookup, translationAck and advanced artifact IDs. Each role/check value is an artifact ID. Artifacts need path and sha256. Request a slot from root before any game launch."
+}

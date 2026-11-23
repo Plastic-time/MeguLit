@@ -10,8 +10,8 @@
    firstRun:'请先从标题画面开一个新存档（Start / New Game），随意推进几句对话，让 MeguLit 自动捕捉文本并同步内嵌。捕捉结果会自动保存到这部作品的设置里，以后启动就不用再这样做了，直接读档也能自动内嵌',gotIt:'知道了',unknown:'当前作品',cancel:'取消修改目前的新设置',
    save:'保存本作品设置',saving:'正在保存…',failed:'保存失败，新设置仍在预览，可重试',history:'历史设置记录（最近 7 次保存）',empty:'还没有保存记录',current:'当前已保存',restore:'预览此记录',historyPreview:'已载入历史设置供预览，确认后保存；取消可恢复载入前的设置',
    automatic:'新作品自动校准，已有作品自动载入保存设置',sync:'校准当前句',textSync:'仅校准文字',positionSync:'仅校准位置',waiting:'等待游戏正文',waitingSource:'尚未收到正文，下一句到达后自动校准',revealing:'正在准备原文，若本句已被隐藏，请推进一句',
-   measuring:'正在测量当前句…',sampling:'正在整理测量结果…',advance:'请在游戏里推进一句：内嵌时当前这句原文已被清空，会用下一句原文来测量',waitingOriginal:'本次未匹配，正在重试当前句',unmatched:'未能匹配当前原文，已恢复阅读；可推进一句再校准，或直接手动调整',
-   timeout:'测量超时，已恢复阅读，可重试',unavailable:'校准组件不可用，仍可手动调整并保存',retrying:'本次校准未完成，已恢复阅读，可手动调整或重试',measured:'测量结果已预览，尚未保存',applied:'校准结果已应用',cancelled:'已恢复修改前的设置',aligning:'正在对齐文字位置…',
+   measuring:'正在测量当前句…',sampling:'正在整理测量结果…',advance:'请在游戏里推进一句：内嵌时当前这句原文已被清空，会用下一句原文来测量',waitingOriginal:'本次未匹配，正在重试当前句',unmatched:'游戏画面上没找到这句日文原文（原文还被隐藏着，或不在扫描范围内），已恢复阅读；可推进一句再校准，或直接手动调整',
+   timeout:'测量超时，已恢复阅读，可重试',unavailable:'校准组件不可用，仍可手动调整并保存',autoGaveUp:'自动校准未完成，可手动校准或直接调整',retrying:'本次校准未完成，已恢复阅读，可手动调整或重试',measured:'测量结果已预览，尚未保存',applied:'校准结果已应用',cancelled:'已恢复修改前的设置',aligning:'正在对齐文字位置…',
    positionReady:'已按当前句调整固定位置',noSource:'本作品尚无引擎坐标，仍可校准固定位置或拖动文本框',needMap:'本作品坐标已收到，校准后会自动跟随',following:'正在跟随本作品的引擎坐标',ready:'本作品的坐标映射已校准',hint:'当前句可测时直接校准字号、字距、行距、颜色和位置；纵向两色渐变为估测，字体可选游戏文件或系统字体',
    notSaved:'预览不会覆盖已保存设置，确认后请保存',importText:'文字外观导入',importPosition:'位置与换行导入',importPick:'选择本机已保存的作品…',importSave:'保存',importNone:'本机还没有其他已保存的作品',importPreview:'已导入「{source}」的{part}供预览，保存只写入当前作品，取消可恢复',
    partText:'文字外观',partPosition:'位置与换行',importMissing:'没有找到该作品的设置'},
@@ -22,8 +22,8 @@
    automatic:'Calibrate new games automatically; restore saved settings for known games',sync:'Calibrate current line',textSync:'Text only',positionSync:'Position only',
    waiting:'Waiting for game dialogue',waitingSource:'No dialogue received yet; calibration starts with the next line',revealing:'Preparing original text; advance once if this line was already hidden',
    measuring:'Measuring the current line…',sampling:'Preparing measurement…',advance:'Advance one line in the game: embedding has cleared the current line, so the next original line is measured',
-   waitingOriginal:'No match yet; retrying the current line',unmatched:'Original text did not match; reader restored. Try the next line or adjust manually',timeout:'Measurement timed out; reader restored. Retry',
-   unavailable:'Calibration helper unavailable; manual adjustment and saving still work',retrying:'Calibration incomplete; reader restored. Retry or adjust manually',
+   waitingOriginal:'No match yet; retrying the current line',unmatched:'The Japanese original of this line was not found on the game screen (still hidden, or outside the scan area); reader restored. Try the next line or adjust by hand',timeout:'Measurement timed out; reader restored. Retry',
+   unavailable:'Calibration helper unavailable; manual adjustment and saving still work',autoGaveUp:'Automatic calibration did not finish; calibrate by hand or adjust directly',retrying:'Calibration incomplete; reader restored. Retry or adjust manually',
    measured:'Measurement previewed; not saved',applied:'Calibration applied',cancelled:'Restored settings from before these changes',aligning:'Aligning text position…',
    positionReady:'Fixed position adjusted from the current line',noSource:'No engine coordinates for this game; calibrate a fixed position or drag the text box',
    needMap:'Coordinates received for this game; it follows them once calibrated',following:'Following this game’s engine coordinates',ready:'Coordinate mapping calibrated for this game',
@@ -36,8 +36,8 @@
    unknown:'この作品',cancel:'現在の変更を取り消す',save:'この作品の設定を保存',saving:'保存中…',failed:'保存に失敗しました。プレビューは保持しています。再試行できます',history:'設定履歴（最近7回の保存）',empty:'保存履歴はありません',current:'現在の保存設定',
    restore:'この設定をプレビュー',historyPreview:'履歴をプレビュー中です。保存で適用し、取り消すと元に戻ります',automatic:'新しい作品は自動調整し、登録済み作品は保存設定を復元',sync:'現在の文を調整',textSync:'文字のみ',positionSync:'位置のみ',
    waiting:'ゲーム本文を待機中',waitingSource:'本文は未受信です。次の文から自動調整します',revealing:'原文を準備中です。既に非表示の文なら一度進めてください',measuring:'現在の文を測定中…',sampling:'測定結果を整理中…',advance:'ゲームを 1 文進めてください。埋め込み中は今の文の原文が消えているため、次の文で測定します',
-   waitingOriginal:'まだ一致しません。同じ文を再試行中',unmatched:'原文が一致しなかったため表示を復元しました。次の文で再試行するか手動調整できます',timeout:'測定がタイムアウトしました。表示は復元済みです',unavailable:'調整コンポーネントが利用できません。手動調整と保存は可能です',
-   retrying:'調整は未完了です。表示を復元しました。再試行か手動調整を行えます',measured:'測定結果をプレビュー中・未保存',applied:'調整結果を適用しました',cancelled:'変更前の設定に戻しました',aligning:'文字位置を調整中…',positionReady:'現在の文から固定位置を調整しました',
+   waitingOriginal:'まだ一致しません。同じ文を再試行中',unmatched:'ゲーム画面にこの文の原文が見つかりませんでした（原文が非表示のまま、または走査範囲外）。表示を復元しました。次の文で再試行するか手動で調整できます',timeout:'測定がタイムアウトしました。表示は復元済みです',unavailable:'調整コンポーネントが利用できません。手動調整と保存は可能です',
+   autoGaveUp:'自動調整は完了しませんでした。手動で調整するか、直接動かしてください',retrying:'調整は未完了です。表示を復元しました。再試行か手動調整を行えます',measured:'測定結果をプレビュー中・未保存',applied:'調整結果を適用しました',cancelled:'変更前の設定に戻しました',aligning:'文字位置を調整中…',positionReady:'現在の文から固定位置を調整しました',
    noSource:'この作品のエンジン座標は未対応です。固定位置の調整やドラッグは可能です',needMap:'この作品の座標を受信しました。調整すると自動で追従します',following:'この作品のエンジン座標に追従中',ready:'この作品の座標を調整済みです',hint:'表示中の文からサイズ・字間・行間・色・位置を調整します。縦2色のグラデーションは推定です。ゲームまたはシステムフォントを選択できます',
    notSaved:'プレビューは保存済みの設定を上書きしません。確認後に保存してください',importText:'文字の外観をインポート',importPosition:'位置と折り返しをインポート',importPick:'この PC に保存済みの作品を選択…',importSave:'保存',importNone:'ほかに保存済みの作品はまだありません',
    importPreview:'「{source}」の{part}をプレビュー中です。保存は現在の作品だけに書き込み、取り消しで元に戻します',partText:'文字の外観',partPosition:'位置と折り返し',importMissing:'その作品の設定が見つかりません'}
@@ -50,7 +50,7 @@
  const clamp=(v,a,z)=>Math.max(a,Math.min(z,v));
  let gameIdentity='',last={gameStyleState:'waiting'},message='',saving=null,saveSerial=0,aligning=false,correctionTimer=0,measurementSerial=0,repainting=false;
  const getMap=()=>window.__tomeTextPosition?.getMap?.()||null;
- function values(){const p=pick(b.galPreferences());if(window.__tomeTextPosition?.state?.().following){p.x=session.base.prefs.x;p.y=session.base.prefs.y;}return p;
+ function values(){const p=pick(b.galPreferences());const tp=window.__tomeTextPosition;if(tp?.state?.().following){p.x=session.base.prefs.x;p.y=session.base.prefs.y;/* a width the follow fitted to the window is not a setting either */const fw=tp.followState?.().setWidth;if(fw!=null&&p.width===fw&&Number.isFinite(Number(session.base.prefs.width)))p.width=session.base.prefs.width;}return p;
   }
  const dirty=()=>session.dirty(values(),getMap());
  const apply=(prefs,map,preview=true)=>{if(map!==undefined)window.__tomeTextPosition?.setMap?.(map);return b.applyGalPreferences(tools.followFont?tools.followFont(pick(prefs)):pick(prefs),{preview,persist:!preview});
@@ -64,7 +64,7 @@
  // Measurement (game client pixels) -> MeguLit settings (japaneseSize and spacing in px of a 1280-wide game).
  function convert(r){
   const s=r.style||{},cw=Number(r.width),ch=Number(r.height);if(!(cw>0&&ch>0))return null;const k=1280/cw,f=metrics(),out={autoScale:true,paddingX:0,paddingY:0};
-  for(const key of ['textColor','readTextColor','speechTextColor','narrationTextColor','textGradient','textGradientTop','textGradientBottom','readTextGradient','readTextGradientTop','readTextGradientBottom'])if(s[key]!==undefined)out[key]=s[key];
+  for(const key of ['textColor','readTextColor','speechTextColor','narrationTextColor','textGradient','textGradientTop','textGradientBottom','readTextGradient','readTextGradientTop','readTextGradientBottom'])if(s[key]!==undefined)out[key]=s[key];/* the outline measured with the fill (core/game-style-sync.cjs outlineFor): one colour for the Japanese line, its translation and the furigana */if(/^#[0-9a-f]{6}$/i.test(s.outlineColor||'')&&out.textColor!==undefined){out.japaneseOutlineColor=out.chineseOutlineColor=out.rubyOutlineColor=s.outlineColor;}
   const size=r.inkHeight>0?r.inkHeight*k/f.ink:Number(s.japaneseSize);if(Number.isFinite(size)&&size>4){out.japaneseSize=Math.round(size*10)/10;out.translationSize=Math.round(Math.max(12,
    Math.min(60,out.japaneseSize))*10)/10;}
   if(out.japaneseSize&&r.advance>0)out.japaneseSpacingPx=Math.round(clamp(r.advance*k-out.japaneseSize*f.adv,-out.japaneseSize*.45,out.japaneseSize)*10)/10;
@@ -82,20 +82,29 @@
  function correct(target){
   if(document.body.classList.contains('tome-style-probing'))return false;
   const text=document.querySelector('.sentence-text'),tok=text?.querySelector('.char-token');if(!tok)return false;const rect=tok.getBoundingClientRect();if(!rect.width||!rect.height)return false;
-  const root=getComputedStyle(document.documentElement),rx=parseFloat(root.getPropertyValue('--tomoyo-reader-x')),ry=parseFloat(root.getPropertyValue('--tomoyo-reader-y'));
-   if(!Number.isFinite(rx)||!Number.isFinite(ry))return false;
   const cs=getComputedStyle(tok),c=document.createElement('canvas').getContext('2d');c.font=cs.fontWeight+' '+cs.fontSize+' '+cs.fontFamily;
   const line=(text.textContent||'').split('\n')[0].slice(0,40)||tok.textContent,ml=c.measureText(line),m1=c.measureText(tok.textContent||line[0]||'あ');
   // An inline token's box is the font's content area; an inline-block one is centred in its line box.
   const content=ml.fontBoundingBoxAscent+ml.fontBoundingBoxDescent,top=cs.display==='inline'?rect.top:rect.top+(rect.height-content)/2;
   const inkTop=top+(ml.fontBoundingBoxAscent-ml.actualBoundingBoxAscent),inkLeft=rect.left-m1.actualBoundingBoxLeft;
   const dpr=Math.max(.5,Number(window.devicePixelRatio)||1),p=b.galPreferences(),cw=target.width,ch=target.height;
+  /* 2026-11-19 (user, 死に逝く君: 「校准当前句」 only moved the box while the line sat on the engine's glyph places, so the line
+     stayed ~100 px below the game's): anchored, the calibration lands in this game's offset from the engine's first glyph
+     (anchorDX/anchorDY, client %): offset += (the game's measured first ink - ours) / client. The box x/y is left alone. */
+  if(document.body.classList.contains('megulit-anchored')){const info=b.galLayoutInfo?.()||{},ox=(Number(info.clientX)||0)/dpr,oy=(Number(info.clientY)||0)/dpr;
+   const dx=target.inkLeft-(inkLeft-ox)*dpr,dy=target.inkTop-(inkTop-oy)*dpr;if(Math.abs(dx)<2&&Math.abs(dy)<2)return true;
+   const r1=v=>Math.round(v*10)/10;b.applyGalPreferences({anchorDX:r1(clamp((Number(p.anchorDX)||0)+dx*100/cw,-95,95)),anchorDY:r1(clamp((Number(p.anchorDY)||0)+dy*100/ch,-95,95))},{preview:true});return 'again';}
+  const root=getComputedStyle(document.documentElement),rx=parseFloat(root.getPropertyValue('--tomoyo-reader-x')),ry=parseFloat(root.getPropertyValue('--tomoyo-reader-y'));
+   if(!Number.isFinite(rx)||!Number.isFinite(ry))return false;
   const ax=p.x*cw/100+(inkLeft-rx)*dpr,ay=p.y*ch/100+(inkTop-ry)*dpr,dx=target.inkLeft-ax,dy=target.inkTop-ay;
   if(Math.abs(dx)<2&&Math.abs(dy)<2)return true;
   b.applyGalPreferences({x:clamp(p.x+dx*100/cw,0,95),y:clamp(p.y+dy*100/ch,0,95)},{preview:true});return 'again';}
  function runCorrection(target,done){let tries=0,passes=0;clearInterval(correctionTimer);const timer=setInterval(()=>{const r=correct(target);if(r===true||r==='again'&&++passes>=3||++tries>=6){
   clearInterval(timer);done?.(r===true);}},120);correctionTimer=timer;return timer;}
 
+ /* the one way a measured first ink (client device px: inkLeft/inkTop, client width/height) lands on the reader: box x/y, or the
+    game's anchored offset while the line sits on engine places; resolves true once our first ink is within 2 px */
+ b.alignToGameInk=target=>new Promise(done=>runCorrection(target,done));
  function stopMeasurement(){measurementSerial++;clearTimeout(correctionTimer);clearInterval(correctionTimer);aligning=false;document.body.classList.remove('tome-style-probing');
   send({type:'gameStyleCancel',key:session.key,owner});}
  b.gameProfileKey=()=>session.key;
@@ -125,7 +134,7 @@
  const firstRunPage=Date.now().toString(36);
  b.cancelGameSettings=()=>{if(saving)return false;stopMeasurement();importing=null;for(const select of document.querySelectorAll('[data-import-select]')){if(select.value){
   select.value='';select.dispatchEvent(new Event('change',{bubbles:true}));}}for(const button of document.querySelectorAll('[data-import-save]'))button.disabled=true;
-  const before=session.cancel();apply(before.prefs,before.map);message=t('cancelled');last={...last,gameStyleState:'cancelled'};paint();return true;};
+  const before=session.cancel();apply(before.prefs,before.map);/* the colour painted on the current sentence from a sample taken during the discarded calibration goes with it */b.lineColorReset?.();message=t('cancelled');last={...last,gameStyleState:'cancelled'};paint();return true;};
  function restore(id){if(saving)return;const version=session.select(id);if(!version)return;stopMeasurement();apply(version.prefs,version.map);message=t('historyPreview');
   last={...last,gameStyleState:'measured'};paint();}
  function resync(part='all'){
@@ -177,7 +186,7 @@
   else if(m.gameStyleState==='positionMap'&&!dirty())window.__tomeTextPosition?.setMap?.(m.gameStylePositionMap);
   last={...last,...m};paint();
  };
- const oldStatus=b.galStatus;b.galStatus=m=>{oldStatus?.(m);if(typeof m.gameStylePreview==='boolean')document.body.classList.toggle('tome-style-probing',m.gameStylePreview);
+ const oldStatus=b.galStatus;b.galStatus=m=>{oldStatus?.(m);if(typeof m.gameStylePreview==='boolean')document.body.classList.toggle('tome-style-probing',m.gameStylePreview);if(typeof m.gameStyleReveal==='boolean')document.body.classList.toggle('megulit-original-shown',m.gameStyleReveal);
   if(m.type==='gameClosed'){measurementSerial++;clearInterval(correctionTimer);aligning=false;document.body.classList.remove('tome-style-probing');}};
  b.calibrationMenuOpened=dialog=>{if(!session.key)session.load('',session.name,values(),getMap(),0,[]);wire(dialog);buildImports(dialog);send({type:'gameStyleImportList'});
   paint();};
@@ -223,11 +232,12 @@
     if(submit.textContent!==label)submit.textContent=label;}
    const box=dialog.querySelector('.tome-game-style-sync');if(box){
     const sync=box.querySelector('[data-game-style-sync]');if(sync){sync.dataset.noI18n='';sync.textContent=t('sync');sync.disabled=!!saving||aligning;sync.onclick=()=>{
-     send({type:'hookReselect',onlyIfBad:true});resync('all');};}
+     /* 2026-11-21 (owner: after 文本框上边距 moved the text, 校准当前句 did not bring it back): calibrating puts the line back on the game's own place (offset 0) */
+     window.__tomoyoChinese?.galAnchorOffsetReset?.();send({type:'hookReselect',onlyIfBad:true});resync('all');};}
     let textButton=box.querySelector('[data-calibrate-text]');if(!textButton){textButton=document.createElement('button');textButton.type='button';textButton.dataset.calibrateText='';
      textButton.dataset.noI18n='';textButton.onclick=()=>resync('text');box.append(textButton);}textButton.textContent=t('textSync');textButton.disabled=!!saving||aligning;
     const positionButton=dialog.querySelector('[data-gal-position-sync]');if(positionButton){positionButton.dataset.noI18n='';positionButton.textContent=t('positionSync');
-     positionButton.disabled=!!saving||aligning;positionButton.onclick=()=>resync('position');if(positionButton.parentElement!==box)box.append(positionButton);}
+     positionButton.disabled=!!saving||aligning;positionButton.onclick=()=>{window.__tomoyoChinese?.galAnchorOffsetReset?.();resync('position');};if(positionButton.parentElement!==box)box.append(positionButton);}
     let streamButton=box.querySelector('[data-calibrate-stream]');if(!streamButton){streamButton=document.createElement('button');streamButton.type='button';streamButton.dataset.calibrateStream='';
      streamButton.dataset.noI18n='';streamButton.onclick=()=>send({type:'hookReselect'});box.append(streamButton);}streamButton.textContent=({en:'Re-pick text stream',
      ja:'テキストストリームを選び直す'})[document.documentElement.lang?.slice(0,2)]||'重新选取文本流';
@@ -241,7 +251,7 @@
     let state=box.querySelector('[data-game-style-state]');if(!state){state=document.createElement('small');state.dataset.gameStyleState='';box.append(state);}state.dataset.noI18n='';
      state.setAttribute('role','status');const info=aligning?t('aligning'):message||t(last.gameStyleState==='profile'||last.gameStyleState==='saved'?'hint':last.gameStyleState);
      if(state.textContent!==info)state.textContent=info;
-    state.dataset.error=String(['saveFailed','unmatched','timeout','unavailable','retrying'].includes(last.gameStyleState));state.title=last.gameStyleReason||'';
+    state.dataset.error=String(['saveFailed','unmatched','timeout','unavailable','retrying','autoGaveUp'].includes(last.gameStyleState));state.title=last.gameStyleReason||'';
    }
    const position=dialog.querySelector('[data-position-state]');if(position){position.dataset.noI18n='';const tp=window.__tomeTextPosition?.state?.()||{},label=t(!tp.source?'noSource':!tp.calibrated?'needMap':tp.following?'following':'ready');
     if(position.textContent!==label)position.textContent=label;}
@@ -279,7 +289,9 @@
  .tome-calibration-version span{font-size:11.5px;font-variant-numeric:tabular-nums}
  .tome-calibration-version button{font-size:11.5px!important;margin:0!important}
  .tomoyo-cn-dialog footer{flex-wrap:wrap!important;gap:8px!important}
- body.tomoyo-ui-translation.tome-style-probing .sentence-window,body.tomoyo-ui-translation.tome-style-probing .tomoyo-cn-dialog,body.tomoyo-ui-translation.tome-style-probing .tomoyo-native-mask{visibility:hidden!important}
+ body.tomoyo-ui-translation.tome-style-probing .sentence-window,body.tomoyo-ui-translation.tome-style-probing .tomoyo-native-mask{visibility:hidden!important}
+ body.megulit-original-shown .sentence-window,body.megulit-original-shown .tomoyo-native-mask,body.megulit-original-shown #megulit-page-ahead{visibility:hidden!important}
+ /* the Alt+T menu stays: it never shows the source line, and the player is looking at it while calibrating (2026-11-19: it blinked on every sample) */
  /* The probe reads the screen (visible-client), overlays included. The backlog lists the current line too, so with it
     open the probe matched the source text inside the log and moved MeguLit's text onto it, again on every retry. Hide
     every panel that can show Japanese text over the game while measuring (its glass window goes with it). */

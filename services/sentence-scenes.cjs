@@ -86,5 +86,33 @@ function release(db,root,gameId,scene){
   fs.rmSync(path.join(dirOf(root,String(gameId)),file),{force:true});return true;
  }catch{return false;}
 }
+/* Copy referenced pictures before the transaction changes their game id. Source files stay available to rollback
+   checkpoints. Shared frames keep sharing a file; different pictures with the same name never overwrite each other. */
+function mergeGame(db,root,from,to){
+ const copied=new Map();
+ for(const row of db.prepare('SELECT id,original FROM saved_sentences WHERE game_id=?').all(from)){
+  const original=parse(row.original),scene=sceneOf(original);if(!scene)continue;
+  let next=copied.get(scene.file);
+  if(!next){
+   const source=path.join(dirOf(root,from),scene.file);
+   let bytes;
+   try{bytes=fs.readFileSync(source);}catch(error){if(error.code==='ENOENT')continue;throw error;}
+   const destination=dirOf(root,to);fs.mkdirSync(destination,{recursive:true});
+   next={...scene};let at=Date.now();
+   for(;;){
+    const target=path.join(destination,next.file);
+    try{fs.copyFileSync(source,target,fs.constants.COPYFILE_EXCL);break;}
+    catch(error){
+     if(error.code!=='EEXIST')throw error;
+     if(fs.readFileSync(target).equals(bytes))break;
+     next={...scene,at,file:scene.hash+'-'+at+'.jpg'};
+     at++;
+    }
+   }
+   copied.set(scene.file,next);
+  }
+  if(next.file!==scene.file)db.prepare('UPDATE saved_sentences SET original=? WHERE id=?').run(JSON.stringify({...original,scene:{...original.scene,...next}}),row.id);
+ }
+}
 function removeGame(root,gameId){try{if(root&&gameId)fs.rmSync(dirOf(root,String(gameId)),{recursive:true,force:true});}catch{}}
-module.exports={remember,attach,read,release,removeGame,sceneOf,keyOf,dirOf,MATCH,GAP};
+module.exports={remember,attach,read,release,removeGame,mergeGame,sceneOf,keyOf,dirOf,MATCH,GAP};

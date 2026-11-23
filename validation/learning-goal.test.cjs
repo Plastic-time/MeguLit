@@ -23,6 +23,51 @@ test('countdown counts days to each sitting and marks a past one',()=>{
   assert.equal(c[0].kind,'eju');assert.ok(c[0].past);
   assert.equal(c[1].kind,'jlpt');assert.equal(c[1].days,24);assert.ok(!c[1].past);
 });
+test('countdown changes at local midnight for both exams',()=>{
+  for(const [kind,month,day] of [['jlpt',12,6],['eju',6,21]]){
+    const goal={[kind]:{year:2026,month}};
+    for(const [offset,days] of [[-1,1],[0,0],[1,-1]]){
+      for(const hour of [0,8,9,23]){
+        const now=new Date(2026,month-1,day+offset,hour).getTime();
+        const [entry]=G.countdown(goal,now);
+        assert.equal(entry.days,days,`${kind} at ${new Date(now)}`);
+        assert.equal(entry.past,days<0);
+      }
+    }
+  }
+});
+test('a saved sitting keeps its year after New Year, editing and account sync',async t=>{
+  const root=tmp(),other=tmp();
+  t.after(()=>{fs.rmSync(root,{recursive:true,force:true});fs.rmSync(other,{recursive:true,force:true});});
+  const year=new Date().getFullYear()-1,december=new Date(year,11,1,12).getTime(),january=new Date(year+1,0,2,12).getTime();
+  const chosen=G.set(root,{goals:['jlpt','eju'],jlpt:{month:12,year},eju:{month:11,year}},december);
+  for(const goal of [G.get(root,january).goal,G.synced(root)]){
+    assert.deepEqual([goal.jlpt.year,goal.eju.year],[year,year]);
+  }
+  assert.ok(G.get(root,january).countdown.every(s=>s.past));
+  assert.equal(G.applySynced(other,chosen.goal),true);
+  const form=(await import('../web/learning-goal.js')).goalPickerHTML(G.get(other,january).goal,{esc:String,now:january});
+  for(const name of ['jlpt','eju'])assert.match(form,new RegExp('name="'+name+'-year">[^<]*(?:<option[^>]*>[^<]*</option>)*<option value="'+year+'" selected>'));
+  const edited=G.set(root,{...chosen.goal,jlpt:{...chosen.goal.jlpt,level:'N1'}},january);
+  assert.equal(edited.goal.jlpt.year,year);
+  assert.equal(G.get(root,january).goal.eju.year,year);
+  assert.equal(G.applySynced(other,edited.goal),true);
+  assert.equal(G.get(other,january).goal.jlpt.year,year);
+  assert.equal(G.set(other,{goals:['jlpt'],jlpt:{year,month:7}},january).goal.jlpt.year,year+1);
+  assert.equal(G.set(other,{goals:['jlpt'],jlpt:{year:1999}},january).goal.jlpt.year,year+1);
+  const recent={goals:['jlpt'],jlpt:{year:1999,month:12},savedAt:january+1};
+  assert.equal(G.applySynced(other,recent),true);
+  assert.equal(G.get(other,january+1).goal.jlpt.year,year+1);
+});
+test('the same saved sitting survives New Year in another time zone',()=>{
+  const savedAt=Date.parse('2027-01-01T04:30:00Z'),now=Date.parse('2027-02-01T12:00:00Z');
+  const source={goals:['jlpt'],jlpt:{month:12,year:2026},savedAt};
+  assert.equal(G.normalize(source,now,source).jlpt.year,2026);
+  const invalid={...source,jlpt:{month:12,year:2025}};
+  assert.equal(G.normalize(invalid,now,invalid).jlpt.year,2027);
+  const future={...source,savedAt:Date.parse('2038-12-01T12:00:00Z'),jlpt:{month:12,year:2043}};
+  assert.equal(G.normalize(future,now,future).jlpt.year,2027);
+});
 test('plan: goals decide which grammar categories come first and where review weighs',()=>{
   const jl=G.plan(G.normalize({goals:['jlpt'],jlpt:{level:'N2',full:true}},NOW));
   assert.equal(jl.level,'N2');assert.equal(jl.groups[0],'particle');assert.equal(jl.review.particle,3);

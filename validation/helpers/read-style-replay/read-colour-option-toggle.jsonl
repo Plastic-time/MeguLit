@@ -1,0 +1,102 @@
+{"t":"meta","engine":"krkr","kind":"synthetic","about":"the game setting that colours read text is switched off and on while playing"}
+{"t":"source","text":"静かな朝の光が部屋に差し込んでいた。（1）"}
+{"t":"line","raw":"ToMe_KRKR begin line=1 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=1 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=21 color=f7f77b paint=f:f7f77bff text=静かな朝の光が部屋に差し込んでいた。（1）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":1}
+{"t":"source","text":"「おはよう、今日は早いんだね」（2）"}
+{"t":"line","raw":"ToMe_KRKR begin line=2 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=2 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=18 color=f7f77b paint=f:f7f77bff text=「おはよう、今日は早いんだね」（2）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":2}
+{"t":"source","text":"彼女は窓の外を見つめたまま答えない。（3）"}
+{"t":"line","raw":"ToMe_KRKR begin line=3 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=3 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=21 color=f7f77b paint=f:f7f77bff text=彼女は窓の外を見つめたまま答えない。（3）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":3}
+{"t":"source","text":"「……昨日のこと、覚えてる？」（4）"}
+{"t":"line","raw":"ToMe_KRKR begin line=4 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=4 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=18 color=f7f77b paint=f:f7f77bff text=「……昨日のこと、覚えてる？」（4）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":4}
+{"t":"source","text":"俺は言葉に詰まって視線を落とした。（5）"}
+{"t":"line","raw":"ToMe_KRKR begin line=5 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=5 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=20 color=f7f77b paint=f:f7f77bff text=俺は言葉に詰まって視線を落とした。（5）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":5}
+{"t":"source","text":"静かな朝の光が部屋に差し込んでいた。（6）"}
+{"t":"line","raw":"ToMe_KRKR begin line=6 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=6 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=21 color=f7f77b paint=f:f7f77bff text=静かな朝の光が部屋に差し込んでいた。（6）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":6}
+{"t":"source","text":"「おはよう、今日は早いんだね」（7）"}
+{"t":"line","raw":"ToMe_KRKR begin line=7 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=7 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=18 color=f7f77b paint=f:f7f77bff text=「おはよう、今日は早いんだね」（7）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":7}
+{"t":"note","text":"option switched off: the game redraws the sentence on screen in white"}
+{"t":"line","raw":"ToMe_KRKR begin line=8 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=ffffff paint=f:ffffffff"}
+{"t":"line","raw":"ToMe_KRKR end line=8 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=18 color=ffffff paint=f:ffffffff text=「おはよう、今日は早いんだね」（7）"}
+{"t":"expect","color":"#ffffff","edge":null,"line":8,"note":"current sentence redrawn after the option changed"}
+{"t":"source","text":"彼女は窓の外を見つめたまま答えない。（8）"}
+{"t":"line","raw":"ToMe_KRKR begin line=9 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=ffffff paint=f:ffffffff"}
+{"t":"line","raw":"ToMe_KRKR end line=9 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=21 color=ffffff paint=f:ffffffff text=彼女は窓の外を見つめたまま答えない。（8）"}
+{"t":"expect","color":"#ffffff","edge":null,"line":9}
+{"t":"source","text":"「……昨日のこと、覚えてる？」（9）"}
+{"t":"line","raw":"ToMe_KRKR begin line=10 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=ffffff paint=f:ffffffff"}
+{"t":"line","raw":"ToMe_KRKR end line=10 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=18 color=ffffff paint=f:ffffffff text=「……昨日のこと、覚えてる？」（9）"}
+{"t":"expect","color":"#ffffff","edge":null,"line":10}
+{"t":"source","text":"俺は言葉に詰まって視線を落とした。（10）"}
+{"t":"line","raw":"ToMe_KRKR begin line=11 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=ffffff paint=f:ffffffff"}
+{"t":"line","raw":"ToMe_KRKR end line=11 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=21 color=ffffff paint=f:ffffffff text=俺は言葉に詰まって視線を落とした。（10）"}
+{"t":"expect","color":"#ffffff","edge":null,"line":11}
+{"t":"source","text":"静かな朝の光が部屋に差し込んでいた。（11）"}
+{"t":"line","raw":"ToMe_KRKR begin line=12 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=ffffff paint=f:ffffffff"}
+{"t":"line","raw":"ToMe_KRKR end line=12 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=22 color=ffffff paint=f:ffffffff text=静かな朝の光が部屋に差し込んでいた。（11）"}
+{"t":"expect","color":"#ffffff","edge":null,"line":12}
+{"t":"source","text":"「おはよう、今日は早いんだね」（12）"}
+{"t":"line","raw":"ToMe_KRKR begin line=13 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=ffffff paint=f:ffffffff"}
+{"t":"line","raw":"ToMe_KRKR end line=13 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=19 color=ffffff paint=f:ffffffff text=「おはよう、今日は早いんだね」（12）"}
+{"t":"expect","color":"#ffffff","edge":null,"line":13}
+{"t":"source","text":"彼女は窓の外を見つめたまま答えない。（13）"}
+{"t":"line","raw":"ToMe_KRKR begin line=14 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=ffffff paint=f:ffffffff"}
+{"t":"line","raw":"ToMe_KRKR end line=14 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=22 color=ffffff paint=f:ffffffff text=彼女は窓の外を見つめたまま答えない。（13）"}
+{"t":"expect","color":"#ffffff","edge":null,"line":14}
+{"t":"source","text":"「……昨日のこと、覚えてる？」（14）"}
+{"t":"line","raw":"ToMe_KRKR begin line=15 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=ffffff paint=f:ffffffff"}
+{"t":"line","raw":"ToMe_KRKR end line=15 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=19 color=ffffff paint=f:ffffffff text=「……昨日のこと、覚えてる？」（14）"}
+{"t":"expect","color":"#ffffff","edge":null,"line":15}
+{"t":"note","text":"option switched on again"}
+{"t":"source","text":"俺は言葉に詰まって視線を落とした。（15）"}
+{"t":"line","raw":"ToMe_KRKR begin line=16 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=16 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=21 color=f7f77b paint=f:f7f77bff text=俺は言葉に詰まって視線を落とした。（15）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":16}
+{"t":"source","text":"静かな朝の光が部屋に差し込んでいた。（16）"}
+{"t":"line","raw":"ToMe_KRKR begin line=17 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=17 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=22 color=f7f77b paint=f:f7f77bff text=静かな朝の光が部屋に差し込んでいた。（16）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":17}
+{"t":"source","text":"「おはよう、今日は早いんだね」（17）"}
+{"t":"line","raw":"ToMe_KRKR begin line=18 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=18 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=19 color=f7f77b paint=f:f7f77bff text=「おはよう、今日は早いんだね」（17）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":18}
+{"t":"source","text":"彼女は窓の外を見つめたまま答えない。（18）"}
+{"t":"line","raw":"ToMe_KRKR begin line=19 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=19 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=22 color=f7f77b paint=f:f7f77bff text=彼女は窓の外を見つめたまま答えない。（18）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":19}
+{"t":"source","text":"「……昨日のこと、覚えてる？」（19）"}
+{"t":"line","raw":"ToMe_KRKR begin line=20 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=20 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=19 color=f7f77b paint=f:f7f77bff text=「……昨日のこと、覚えてる？」（19）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":20}
+{"t":"source","text":"俺は言葉に詰まって視線を落とした。（20）"}
+{"t":"line","raw":"ToMe_KRKR begin line=21 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=f7f77b paint=f:f7f77bff"}
+{"t":"line","raw":"ToMe_KRKR end line=21 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=21 color=f7f77b paint=f:f7f77bff text=俺は言葉に詰まって視線を落とした。（20）"}
+{"t":"expect","color":"#f7f77b","edge":null,"line":21}
+{"t":"source","text":"静かな朝の光が部屋に差し込んでいた。（21）"}
+{"t":"line","raw":"ToMe_KRKR begin line=22 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=ffffff paint=f:ffffffff"}
+{"t":"line","raw":"ToMe_KRKR end line=22 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=22 color=ffffff paint=f:ffffffff text=静かな朝の光が部屋に差し込んでいた。（21）"}
+{"t":"expect","color":"#ffffff","edge":null,"line":22}
+{"t":"source","text":"「おはよう、今日は早いんだね」（22）"}
+{"t":"line","raw":"ToMe_KRKR begin line=23 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=ffffff paint=f:ffffffff"}
+{"t":"line","raw":"ToMe_KRKR end line=23 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=19 color=ffffff paint=f:ffffffff text=「おはよう、今日は早いんだね」（22）"}
+{"t":"expect","color":"#ffffff","edge":null,"line":23}
+{"t":"source","text":"彼女は窓の外を見つめたまま答えない。（23）"}
+{"t":"line","raw":"ToMe_KRKR begin line=24 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=ffffff paint=f:ffffffff"}
+{"t":"line","raw":"ToMe_KRKR end line=24 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=22 color=ffffff paint=f:ffffffff text=彼女は窓の外を見つめたまま答えない。（23）"}
+{"t":"expect","color":"#ffffff","edge":null,"line":24}
+{"t":"source","text":"「……昨日のこと、覚えてる？」（24）"}
+{"t":"line","raw":"ToMe_KRKR begin line=25 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=0 color=ffffff paint=f:ffffffff"}
+{"t":"line","raw":"ToMe_KRKR end line=25 same=0 nvl=0 x0=120 y0=540 x1=1000 y1=540 size=28 sw=1280 sh=720 n=19 color=ffffff paint=f:ffffffff text=「……昨日のこと、覚えてる？」（24）"}
+{"t":"expect","color":"#ffffff","edge":null,"line":25}

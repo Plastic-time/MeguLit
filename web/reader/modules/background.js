@@ -312,7 +312,7 @@
    const panel=document.createElement('section');panel.className='tome-bg-panel';panel.append(b.backgroundPanel());content.append(panel);}};nav.append(tab);nav.addEventListener('click',
    e=>{if(e.target.closest('button')&&!e.target.closest('[data-tome-bg-tab]')){content.classList.remove('tome-bg-selected');tab.classList.remove('active');}});}
   if(tab.textContent!==t('title'))tab.textContent=t('title');
- };setInterval(tick,600);let tickQueued=false;new MutationObserver(()=>{if(tickQueued)return;tickQueued=true;setTimeout(()=>{tickQueued=false;tick();},0);}).observe(document.body,
+ };(window.__megulitReaderIntervals?.set||setInterval)(tick,600);let tickQueued=false;new MutationObserver(()=>{if(tickQueued)return;tickQueued=true;setTimeout(()=>{tickQueued=false;tick();},0);}).observe(document.body,
   {childList:true,subtree:true});
 
  function menuLayer(dialog){if(dialog?.classList?.contains('tomoyo-cn-dialog')&&!dialog.querySelector(':scope>.tome-menu-bg')){const layer=document.createElement('div');
@@ -320,7 +320,7 @@
   }}
  // Added when the menu is shown, before its first frame (a timer used to add it up to 0.6 s later).
  for(const name of ['show','showModal']){const original=HTMLDialogElement.prototype[name];HTMLDialogElement.prototype[name]=function(){menuLayer(this);const result=original.apply(this,
-  arguments);requestAnimationFrame(()=>glassReport());return result;};}
+  arguments);/* 2026-11-19 (user: a focus ring sat on the menu's close button as soon as Alt+T opened it): opening is not keyboard navigation. The first focus goes to the panel itself, which draws no ring; Tab then walks the controls with MeguLit's own :focus-visible ring, a mouse click never shows one */if(this.classList.contains('tomoyo-cn-dialog')){const panel=this;let frames=0;/* the panel cannot take focus before its first frame: tried again for a moment, until it has it or the player has moved on */const grab=()=>{try{if(!panel.isConnected||!panel.open||document.activeElement===panel)return;const a=document.activeElement;if(a&&a!==document.body&&!panel.contains(a))return;if(!panel.hasAttribute('tabindex'))panel.tabIndex=-1;panel.focus({preventScroll:true});if(document.activeElement!==panel&&++frames<40)requestAnimationFrame(grab);}catch{}};grab();}requestAnimationFrame(()=>glassReport());return result;};}
  function warmLookupGlass(panel){if(!panel.matches('.tomoyo-selection-card')||!['glass','both'].includes(document.documentElement.dataset.tomeCardSurface))return;
   panel.dataset.glassPending='';panel.style.visibility='hidden';setTimeout(()=>revealLookupGlass(panel),350);}
  function revealLookupGlass(panel){if(!panel.hasAttribute('data-glass-pending'))return;panel.removeAttribute('data-glass-pending');panel.style.visibility='';cardEntrance(panel);
@@ -383,7 +383,7 @@
    const size=(glassArea.w/scale)+'px '+(glassArea.h/scale)+'px',pos=(glassArea.x/scale-left)+'px '+(glassArea.y/scale-top)+'px';
    if(layer.style.backgroundImage!==glassUrl)layer.style.backgroundImage=glassUrl;if(layer.style.backgroundSize!==size)layer.style.backgroundSize=size;if(layer.style.backgroundPosition!==pos)layer.style.backgroundPosition=pos;
     }}
- setInterval(glassReport,120);window.__tomeGlassReport=glassReport; // style probing hides panels and needs their glass gone at once
+ (window.__megulitReaderIntervals?.set||setInterval)(glassReport,120);window.__tomeGlassReport=glassReport; // style probing hides panels and needs their glass gone at once
  new MutationObserver(()=>{panels();requestAnimationFrame(()=>glassReport());}).observe(document.body,{childList:true});
  // Opening a panel starts the glass reports on its first frame (the 120 ms timer alone missed the start of the unfold).
  new MutationObserver(()=>requestAnimationFrame(()=>glassReport())).observe(document.body,{subtree:true,attributes:true,attributeFilter:["data-open","data-leaving",

@@ -1,0 +1,68 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "aa49a24cde4cfda31249b4d2bc1d4974245a74f2799b459d0729cc8ce3c9b164",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "da051b03d9f08418f9f61e1cc4a814b29c2748e97634c1a5af4cc331e544c7a8",
+  "script": "0305409f209763d1210037fad34c72ea6a31ac7057f88bb5b134e609e73069e2",
+  "title": "4b525a2afa65182e701a28b8d36c903328d75209e9a86eea5c9465ce3b9e476d",
+  "vndb": "v11093"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "tokei-jikake-no-leyline-3",
+ "builds": [
+  "0ed5c0e3f718224f89f1a990d3dac604745bcf71e0912449aad83782dc95c142"
+ ],
+ "match": {
+  "exe": [
+   "Ley-line4.exe"
+  ],
+  "titles": [
+   "時計仕掛けのレイライン －残影の夜が明ける時－",
+   "时钟机关的Leyline阳炎中彷徨的魔女",
+   "[130125][ユニゾンシフト：ブロッサム] 時計仕掛けのレイライン -残影の夜が明ける時-"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

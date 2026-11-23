@@ -25,7 +25,7 @@ public sealed class EmbedSourceBatch{
  public List<string> Parts(string output,DateTime now,out double ageMs){ageMs=0;string value=(output??"").Trim();if(value.Length==0||PageLines.Count<2)return null;
   for(int end=PageLines.Count-1;end>=1;end--){int at=value.Length;var parts=new List<string>();
    for(int i=end;i>=0&&at>0;i--){string line=PageLines[i];if(line.Length==0||line.Length>at||String.CompareOrdinal(value,at-line.Length,line,0,line.Length)!=0)break;parts.Insert(0,line);at-=line.Length;
-    if(at==0&&parts.Count>=2&&parts.Count<=40&&(now-PageTimes[i]).TotalSeconds<=15){ageMs=(now-PageTimes[i]).TotalMilliseconds;return parts;}}}
+    if(at==0&&parts.Count>=2&&parts.Count<=40&&(now-PageTimes[i]).TotalSeconds<=15){for(int k=parts.Count-1;k>0;k--)if(Continues(parts[k])){parts[k-1]+=parts[k];parts.RemoveAt(k);}if(parts.Count<2)return null;ageMs=(now-PageTimes[i]).TotalMilliseconds;return parts;}}}
   return null;}
  /* the lines that came in one burst with the newest (each within 300 ms of the next), oldest first */
  public List<string> Recent(DateTime now){var r=new List<string>();if((now-LastAt).TotalMilliseconds>1500)return r;for(int i=Lines.Count-1;i>=0;i--){if(i<Lines.Count-1&&(Times[i+1]-Times[i]).TotalMilliseconds>300)break;r.Insert(0,Lines[i]);}return r;}
@@ -58,7 +58,7 @@ public sealed class EmbedSourceBatch{
     if(offset<0||String.CompareOrdinal(value,offset,line,0,line.Length)!=0)break;
     // E251 (user: Ctrl-skip still dumped several lines): two or more recent lines at the end are enough; the start may
     // be a line recorded before the 1.5 s window.
-    if(i<end&&(offset==0||end-i>=1))return Japanese(Lines.GetRange(i,end-i+1),Lines[end]);
+    if(i<end&&(offset==0||end-i>=1)){int first=end;while(first>i&&Continues(Lines[first]))first--;if(first<end)return String.Concat(Lines.GetRange(first,end-first+1));return Japanese(Lines.GetRange(i,end-i+1),Lines[end]);}
     if(offset>0&&value[offset-1]=='\n'){
      offset--;
      if(offset>0&&value[offset-1]=='\r')offset--;
@@ -66,6 +66,47 @@ public sealed class EmbedSourceBatch{
    }
   }
   return output;
+ }
+ /* Artemis64x encodes each rt2 span separately. Only a complete quoted message reconstructed exactly from this flush
+    can replace the ordinary newest-line rule; unquoted pages and ambiguous buffers keep that rule. */
+ public string ArtemisQuoteLine(string output,DateTime now){
+  string fallback=LastLine(output,now),value=(output??"").Trim();
+  if(Lines.Count<2||(now-LastAt).TotalMilliseconds>1500)return fallback;
+  for(int end=Lines.Count-1;end>0;end--){int at=value.Length;var parts=new List<string>();
+   for(int i=end;i>=0&&at>0;i--){string part=Lines[i];if(part.Length>at||String.CompareOrdinal(value,at-part.Length,part,0,part.Length)!=0)break;
+    at-=part.Length;parts.Insert(0,part);if(at!=0)continue;
+    int start=-1;var quotes=new Stack<char>();
+    for(int p=0;p<parts.Count;p++){string s=parts[p];
+     if(quotes.Count==0){start=s.Length>0&&(s[0]=='「'||s[0]=='『')?p:-1;}
+     if(start<0)continue;
+     foreach(char ch in s){if(ch=='「'||ch=='『')quotes.Push(ch);else if(ch=='」'||ch=='』'){
+       if(quotes.Count==0||quotes.Pop()!=(ch=='」'?'「':'『'))return fallback;}}
+    }
+    if(start>=0&&start<parts.Count-1&&quotes.Count==0)return String.Concat(parts.GetRange(start,parts.Count-start));
+    return fallback;
+   }
+  }
+  return fallback;
+ }
+ public static bool ArtemisQuoteSelfTest(){
+  var now=DateTime.UtcNow;var batch=new EmbedSourceBatch();
+  string first="「鴻さん、男子の分の宿題は集め終わった。",tail="全員分あるはずだけど、気になるならもう一度確認して」";
+  batch.Add("義大",now);batch.Add(first,now);batch.Add(tail,now);
+  if(batch.ArtemisQuoteLine("義大"+first+tail,now)!=first+tail||batch.LastLine("義大"+first+tail,now)!=tail)return false;
+  var next=new EmbedSourceBatch();next.Add(first,now);next.Add(tail,now);next.Add("「次のページ。」",now);
+  if(next.ArtemisQuoteLine(first+tail+"「次のページ。」",now)!="「次のページ。」")return false;
+  if(batch.ArtemisQuoteLine("未記録"+first+tail,now)!=batch.LastLine("未記録"+first+tail,now))return false;
+  string[][] messages={
+   new[]{"鴻さん","「あっ、いつもありがとー♪","毎回手伝ってもらってるね」"},
+   new[]{"鴻さん","「そんなこと言って、忙しくてもやってくれてるでしょ？","今度ちゃんとお礼しないとね」"},
+   new[]{"鴻さん","「『本当』なの？","うん、本当だよ」"}
+  };
+  foreach(var parts in messages){var b=new EmbedSourceBatch();foreach(string s in parts)b.Add(s,now);
+   if(b.ArtemisQuoteLine(String.Concat(parts),now)!=parts[1]+parts[2])return false;}
+  string[][] unchanged={new[]{"一行目。","二行目。"},new[]{"設定","戻る"},new[]{"「はい。」","「はい。」"},new[]{first,tail,"メニュー"},new[]{"「閉じていない、","次の段。"}};
+  foreach(var parts in unchanged){var b=new EmbedSourceBatch();foreach(string s in parts)b.Add(s,now);string text=String.Concat(parts);
+   if(b.ArtemisQuoteLine(text,now)!=b.LastLine(text,now))return false;}
+  return batch.ArtemisQuoteLine("義大"+first+tail,now.AddSeconds(2))==batch.LastLine("義大"+first+tail,now.AddSeconds(2));
  }
  // E262 (user: EmbedKrkrZ showed 「あんたこそ誰よ」 four times): engines that draw one line several times (shadow, edge,
  // backlog layers) reach the host as one string holding N copies. A bracketed line repeated twice or more, or any line
@@ -77,6 +118,10 @@ public sealed class EmbedSourceBatch{
  // word in every language (「立即與前方最近的%lレイルロオド;鐵路人偶%l;…」), so kana inside markup says nothing.
  static readonly System.Text.RegularExpressions.Regex RubyMarkup=new System.Text.RegularExpressions.Regex("%l([^;%]*);([^%]*)%l;");
  static readonly System.Text.RegularExpressions.Regex ColorMarkup=new System.Text.RegularExpressions.Regex("#(?:[0-9a-fA-F]{6,8})?;");
+ /* 2026-11-19 (live 素晴らしき日々, BGI: 「そこに覆い被さる……重く真っ青な空は、」 then 「\x05いつでも当たり前の姿を…」 in one
+    message): a part that opens with a control mark (not a space or line break) goes on the page of the part before it, so
+    the batch keeps both; only the newest of separate lines is the line shown. */
+ static bool Continues(string s){return !String.IsNullOrEmpty(s)&&s[0]<' '&&!Char.IsWhiteSpace(s[0]);}
  static bool Kana(string s){s=RubyMarkup.Replace(s??"","");foreach(char ch in s)if(ch>='ぁ'&&ch<='ヿ'&&ch!='・'&&ch!='ー')return true;return false;}
  // One copy of a line however it was drawn: ruby markup to its word, colour codes and line breaks dropped.
  static string Plain(string s){s=RubyMarkup.Replace(s??"","$1");s=ColorMarkup.Replace(s,"");var b=new System.Text.StringBuilder(s.Length);foreach(char ch in s)if(!Char.IsWhiteSpace(ch))b.Append(ch);return b.ToString();}
@@ -118,6 +163,11 @@ public sealed class EmbedSourceBatch{
   batch.Add("でも、ないよりはましだ。",now);batch.Add("不過總比沒有好。",now);batch.Add("不过总比没有好。",now);
   return batch.LastLine("でも、ないよりはましだ。不過總比沒有好。不过总比没有好。",now)=="でも、ないよりはましだ。";
  }
+ static bool ContinueTest(){
+  var batch=new EmbedSourceBatch();var now=DateTime.UtcNow;string a="　そこに覆い被さる……重く真っ青な空は、",b="\x05いつでも当たり前の姿を私達に見せてくれる。";
+  batch.Add("　美しさとはほど遠い。",now);batch.Add(a,now);batch.Add(b,now);
+  var two=new EmbedSourceBatch();two.Add("One.",now);two.Add("Two.",now);double age;var three=new EmbedSourceBatch();three.Add("一つ目。",now);three.Add(a,now);three.Add(b,now);var pp=three.Parts("一つ目。"+a.Trim()+b,now,out age);return batch.LastLine(a+b,now)==a.Trim()+b&&two.LastLine("One.Two.",now)=="Two."&&batch.Parts(a.Trim()+b,now,out age)==null&&pp!=null&&pp.Count==2&&pp[1]==a.Trim()+b;
+ }
  static bool RepeatTest(){
   var batch=new EmbedSourceBatch();var now=DateTime.UtcNow;
   batch.Add("「うーい」",now);batch.Add("「うーい」",now);batch.Add("「あ、ナツく……」",now);
@@ -132,6 +182,6 @@ public sealed class EmbedSourceBatch{
    &&batch.LastLine("A real line. Two.",now)=="A real line. Two."
    &&batch.LastLine("One.Two.",now.AddSeconds(2))=="One.Two."
    &&batch.LastLine("Old line.One.Two.Three.",now)=="Three."
-   &&RepeatTest()&&LangTest()&&DrawnTest()&&Unrepeat("「あんたこそ誰よ」「あんたこそ誰よ」「あんたこそ誰よ」「あんたこそ誰よ」")=="「あんたこそ誰よ」"&&Unrepeat("はい。はい。")=="はい。はい。";
+   &&ContinueTest()&&RepeatTest()&&LangTest()&&DrawnTest()&&Unrepeat("「あんたこそ誰よ」「あんたこそ誰よ」「あんたこそ誰よ」「あんたこそ誰よ」")=="「あんたこそ誰よ」"&&Unrepeat("はい。はい。")=="はい。はい。";
  }
 }

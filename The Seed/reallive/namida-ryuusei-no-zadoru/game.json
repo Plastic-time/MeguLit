@@ -1,0 +1,64 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "aeee9acc87a33d9659861f3201144bfdf18bcea57f025a395dd9db953fe936fd",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "reallive",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "29582aac6837667dcabcd302db25654e6201a6067971d2f7847e662690c052f2",
+  "title": "fea33be33413cef427b4dbb69f6344fcc27aea318c9e3133c623ce13963a04c9"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "namida-ryuusei-no-zadoru",
+ "builds": [
+  "5654c6bdff43af5d796fcf54df23d8bad950b747bea656b0163f87cf8e16f225"
+ ],
+ "match": {
+  "exe": [
+   "AVG3216D.EXE"
+  ],
+  "titles": [
+   "[971128][ZERO] 涙 ～流星のザドル～ (SD ccd)"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

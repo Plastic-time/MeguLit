@@ -2,6 +2,7 @@
 'use strict';
 const crypto=require('node:crypto');
 const {cleanV4}=require('../core/v4-config.cjs');
+const activeRatings=new Set();
 class AnkiReviewer{
  constructor({config={},db,fetcher=fetch,speak=null,mediaDir='',voiceCheck=null,gameVoice=null}){this.config=cleanV4(config);this.db=db;this.fetch=fetcher;this.speak=speak;this.mediaDir=mediaDir;this.voiceCheck=voiceCheck;this.gameVoice=gameVoice;db.exec(`CREATE TABLE IF NOT EXISTS anki_actions(operation_id TEXT PRIMARY KEY,card_id INTEGER NOT NULL,ease INTEGER NOT NULL,status TEXT NOT NULL,result TEXT,created_at INTEGER NOT NULL);CREATE TABLE IF NOT EXISTS anki_review_events(operation_id TEXT PRIMARY KEY,card_id INTEGER NOT NULL,ease INTEGER NOT NULL,reviewed_at INTEGER NOT NULL);CREATE UNIQUE INDEX IF NOT EXISTS anki_one_pending_rating ON anki_actions(card_id) WHERE status='pending';`);}
  async call(action,params={}){
@@ -19,10 +20,18 @@ class AnkiReviewer{
  // mining deck (MeguLit or the user's own) selected by default.
  async status(){try{const version=await this.call('version');let decks;try{decks=orderDecks(await this.call('deckNamesAndIds'));}catch{decks=await this.call('deckNames');}
   const defaultDeck=decks.includes(this.config.ankiDeck)?this.config.ankiDeck:decks[0]||'';return {connected:true,version,decks,defaultDeck};}catch(error){return {connected:false,reason:error.message};}}
- async snapshot(expectedId=null){
+ async snapshot(expectedId=null,{recover=false}={}){
   let card;try{card=await this.call('guiCurrentCard');}catch(error){if(error.message==='ANKI_REVIEW_INACTIVE')return {done:true};throw error;}if(!card)return {done:true};
   if(expectedId!=null&&Number(card.cardId)!==Number(expectedId))throw Error('ANKI_CARD_CHANGED');
-  const previous=this.session(),shown=previous?.cardId===Number(card.cardId)&&previous.answerShown===true;
+  let recovered=false;
+  if(recover){
+   for(const action of this.db.prepare("SELECT operation_id,card_id FROM anki_actions WHERE status='pending'").all()){
+    if(activeRatings.has(action.operation_id))continue;
+    this.db.prepare("UPDATE anki_actions SET status='abandoned' WHERE operation_id=? AND status='pending'").run(action.operation_id);
+    if(action.card_id===Number(card.cardId))recovered=true;
+   }
+  }
+  const previous=recovered?null:this.session(),shown=previous?.cardId===Number(card.cardId)&&previous.answerShown===true;
   this.saveSession({cardId:Number(card.cardId),answerShown:shown,buttons:Array.isArray(card.buttons)?card.buttons.filter(n=>[1,2,3,4].includes(n)):[1,2,3,4]});
   const html=(card.css?'<style>'+String(card.css)+'</style>':'')+String((shown?card.answer:card.question)||'');
   return {done:false,cardId:Number(card.cardId),deck:card.deckName||'',answerShown:shown,buttons:Array.isArray(card.buttons)?card.buttons.filter(n=>[1,2,3,4].includes(n)):[1,2,3,4],intervals:card.nextReviews||[],hasAudio:/\[sound:|\[anki:play:|<audio\b/i.test(html),manualAudio:/<audio controls preload="none" src="tomoyo_/i.test(html),html:await this.withMedia(html,card)};
@@ -31,7 +40,7 @@ class AnkiReviewer{
   const decks=await this.call('deckNames');if(!decks.includes(deck))throw Error('ANKI_DECK_MISSING');
   // A deck with nothing left today: Anki refuses or shows its congratulations screen. Report it as finished.
   const opened=await this.call('guiDeckReview',{name:deck});this.saveSession(null);
-  const result=await this.snapshot().catch(error=>{if(opened)throw error;return {done:true};});
+  const result=await this.snapshot(null,{recover:true}).catch(error=>{if(opened)throw error;return {done:true};});
   if(result.done){let total=0;try{const stats=Object.values(await this.call('getDeckStats',{decks:[deck]}))[0];total=Number(stats?.total_in_deck)||0;}catch{}return {done:true,finished:true,deck,total,...await this.dayInfo(deck)};}
   return result;
  }
@@ -54,6 +63,7 @@ class AnkiReviewer{
   try{this.db.prepare('INSERT INTO anki_actions VALUES (?,?,?,?,?,?)').run(operationId,cardId,ease,'pending',null,Math.floor(Date.now()/1000));}catch(error){if(this.db.prepare("SELECT 1 FROM anki_actions WHERE card_id=? AND status='pending'").get(cardId))throw Error('ANKI_ACTION_PENDING');throw error;}
   // Once a rating may have reached Anki, never retry it automatically after a
   // network failure. Reloading the current card is the recovery operation.
+  activeRatings.add(operationId);
   try{
    if(!await this.call('guiAnswerCard',{ease}))throw Error('ANKI_FAILED');
    this.db.prepare('INSERT INTO anki_review_events VALUES (?,?,?,?)').run(operationId,cardId,ease,Math.floor(Date.now()/1000));
@@ -61,6 +71,7 @@ class AnkiReviewer{
    const result=await this.snapshot();if(result.done){result.finished=true;result.deck=card.deckName||'';}
    this.db.prepare("UPDATE anki_actions SET status='done',result=? WHERE operation_id=?").run(JSON.stringify(result),operationId);return result;
   }catch(error){throw Error(error.message==='ANKI_CARD_CHANGED'?error.message:'ANKI_RATING_UNCERTAIN');}
+  finally{activeRatings.delete(operationId);}
  }
  /* (user 2026-11-14 "读取游戏cv配音又失败") the card's own clips play in MeguLit first: practice cards are not Anki's review,
     so guiCurrentCard/guiPlayAudio fail there ("Gui review is not currently active"). Anki's player is only the fallback. */
@@ -75,7 +86,7 @@ class AnkiReviewer{
   const out=[];for(const name of [...new Set(names)].filter(n=>n&&!/[\\/]/.test(n)).slice(0,6)){const data=await this.mediaFile(name);if(!data)continue;const cache=require('../core/anki-media-cache.cjs'),clip={name,src:'data:'+cache.mimeOf(data,name)+';base64,'+data};if(cache.isSynth(this.mediaDir,name))clip.channel='sentence';out.push(clip);}return out;}
  /* one media file: MeguLit's own copy first, then Anki's media folder (copied here for next time) */
  async mediaFile(name){const cache=require('../core/anki-media-cache.cjs');const local=cache.read(this.mediaDir,name);if(local)return local;
-  const data=await this.call('retrieveMediaFile',{filename:name});if(typeof data!=='string'||!data||data.length>12*1024*1024)return null;cache.write(this.mediaDir,name,data);return data;}
+  const data=cache.boundedBase64(await this.call('retrieveMediaFile',{filename:name}));if(!data)return null;cache.write(this.mediaDir,name,data);return data;}
  async withMedia(html,card){
   const audio=require('./anki-media.cjs');let play=new Map();if(card&&/\[anki:play:[qa]:\d+\]/.test(html)){try{play=audio.playMap(card,await this.call('modelTemplates',{modelName:card.modelName}),html);}catch{}}
   const names=new Set([...play.values()].filter(name=>name&&!/[\\/]/.test(name)));for(const match of html.matchAll(/\[sound:([^\]\r\n]+)\]|(?:src|href)\s*=\s*["']([^"']+)["']/gi)){const name=match[1]||match[2];if(name&&!/^(?:https?:|data:|javascript:|#)/i.test(name)&&!/[\\/]/.test(name))names.add(name);}

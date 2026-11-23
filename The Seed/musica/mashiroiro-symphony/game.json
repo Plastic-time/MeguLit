@@ -1,0 +1,68 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "8bf789b1aa8248539bb9401fd9f421358c1e6427899444aa0542ac285e4ccda9",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "musica",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "048c8702e98b6db93c9bece2b26fb29e27f1aaec2c8d6492e1a910056cd3217c",
+  "script": "6008ef46408690b2757141d3d63599d06867e211b7a38e3670ec2b3713281a3b",
+  "title": "e91960d9143f3488846b0eb7b517dc7c725874890859ecffa6db70fb0388936b",
+  "vndb": "v1552"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "mashiroiro-symphony",
+ "builds": [
+  "05f51cfe00436c91c6a0102fb79d8e9d751b6ec88795b164b4640d953842f050"
+ ],
+ "match": {
+  "exe": [
+   "mashiroiro.exe"
+  ],
+  "titles": [
+   "ましろ色シンフォニー",
+   "纯白交响曲",
+   "[091030][ぱれっと] ましろ色シンフォニー -Love is pure white-"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

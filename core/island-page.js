@@ -81,6 +81,8 @@
     // The engine reports each line's own fill colour (read lines and unread lines differ in many games): follow it while
     // game style sync is on, otherwise keep the user's single text colour.
     const paint=w.TomoyoGameStyle.paintFor(p,r.read===true,pos.color||'');for(const [key,value]of Object.entries(w.TomoyoGameStyle.paintVariables(paint)))node.style.setProperty(key,value);
+    /* the opacity and outline the game drew this page line with (read lines dimmed or outlined differently); furigana follows */
+    {const lp=pos.style&&w.TomoyoGameStyle.linePaint?w.TomoyoGameStyle.linePaint(p,'',pos.color||'',pos.style):null;if(lp?.sampled)node.style.setProperty('--tomoyo-gal-color',lp.color);for(const key of ['--tomoyo-jp-stroke-color','--tomoyo-ruby-stroke-color'])if(lp?.sampled&&lp.edge)node.style.setProperty(key,lp.edge);else node.style.removeProperty(key);}
     // Translation wrap width (user, 2026-11-03: it ran far past the Japanese with no setting): 0 follows the Japanese
     // line's width; otherwise it may run on to that share of the game width (75 % by default, the old fixed value),
     // never past the game's right edge and never narrower than the Japanese.

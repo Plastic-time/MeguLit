@@ -3,6 +3,116 @@ process.env.MEGULIT_RELAY_BASE??='off';/* tests never reach the real relay */
 /* E415 日报 page: relay RSS parsing + D1 cache + routes, the bridge's cleaning and link gate, and the page markup. */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
 const relayDir=path.join(__dirname,'..','relay');
+test('long relay paragraphs keep Unicode characters intact across translation and retry',async()=>{
+ const daily=require('../services/daily.cjs'),url='https://www.4gamer.net/games/91/';
+ const start='文'.repeat(1999),tail='🌸最後',text=start+tail;
+ const fetch=async address=>({ok:true,json:async()=>address.endsWith('/api/news')?{items:[{link:url,title:'Fixture',fulltext:true}]}:
+  address.includes('/article?')?{paragraphs:[text,'別の段落。']}:{words:[]}});
+ const opts={env:{MEGULIT_RELAY_BASE:'https://relay.test'},fetch};
+ await daily.view('',null,opts);
+ const article=await daily.article('',url,opts);
+ assert.equal(article.via,'relay');
+ assert.deepEqual(article.paragraphs.map(p=>p.text),[text,'別の段落。']);
+ let missing=true;
+ const received=[],runtime={reviews:()=>({translate:async list=>{received.push(list);return {texts:list.map(t=>t===tail&&missing?'':t)};}})};
+ const run=()=>daily.translate('',runtime,article.paragraphs.map(p=>p.text),'zh',{withEngine:true,translateFree:async()=>''});
+ assert.deepEqual(await run(),{texts:['','別の段落。'],engine:'app',error:'ENGINE_EMPTY'});
+ missing=false;
+ assert.deepEqual((await run()).texts,[text,'別の段落。']);
+ assert.deepEqual(received,[[start,tail,'別の段落。'],[tail]]);
+});
+test('an incomplete single paragraph preserves the last translation error',async()=>{
+ const daily=require('../services/daily.cjs');
+ const text='失'.repeat(2000)+'末尾';
+ const runtime={reviews:()=>({translate:async()=>({texts:['','ending'],error:'MODEL_BUSY'})})};
+ await assert.rejects(daily.translate('',runtime,[text],'en',{translateFree:async()=>{throw Error('TRANSLATION_HTTP_429');}}),/TRANSLATION_FAILED:TRANSLATION_HTTP_429/);
+});
+test('long article paragraphs keep their full dictionary tokens',async()=>{
+ const daily=require('../services/daily.cjs'),url='https://www.4gamer.net/games/92/',text='日'.repeat(3999)+'🌸本語';
+ const fetch=async address=>({ok:true,json:async()=>address.endsWith('/api/news')?{items:[{link:url,title:'Fixture',fulltext:true}]}:
+  address.includes('/article?')?{paragraphs:[text]}:{words:[]}});
+ const chunks=[],learning={installed:()=>true,readings:{resolve:tokens=>tokens},tokenize:async t=>{
+  if([...t].length>4000)throw Error('TOKENIZER_LIMIT');
+  chunks.push(t);return [{surface:t,reading:'ご',readingSource:'dictionary'}];
+ }};
+ const opts={env:{MEGULIT_RELAY_BASE:'https://relay.test'},fetch,runtime:{learning:()=>learning}};
+ await daily.view('',null,opts);
+ const [p]=(await daily.article('',url,opts)).paragraphs;
+ assert.deepEqual(chunks,['日'.repeat(3999),'🌸本語']);
+ assert.equal(p.tokens.map(t=>t.s).join(''),text);
+ assert.ok(p.tokens.every(t=>t.r==='ご'));
+});
+test('translation keeps the end of a long news paragraph and its position in the article',async()=>{
+ const daily=require('../services/daily.cjs'),{GameReviews}=require('../services/game-reviews.cjs');
+ const first='前'.repeat(1700)+'。',second='次'.repeat(1600)+'。',third='終'.repeat(1600)+'。';
+ const body=first+second+third,texts=require('../services/news-article.cjs').paragraphs('<p>'+body+'</p><p>末尾。</p>');
+ const seen=[],reviews=new GameReviews('',undefined,{engine:()=>'follow',translate:async text=>{seen.push(text);return text;}});
+ for(const goal of ['en','zh']){
+  seen.length=0;
+  const result=await daily.translate('',{reviews:()=>reviews},texts,goal,{translateFree:async()=>''});
+  assert.deepEqual(result,[[first,second,third].join(goal==='en'?' ':''),'末尾。']);
+  assert.deepEqual(seen,[first,second,third,'末尾。']);
+ }
+});
+test('daily reports the configured engine error when both translations are empty',async()=>{
+ const daily=require('../services/daily.cjs'),runtime={reviews:()=>({translate:async()=>({texts:[''],error:'MODEL_BUSY'})})};
+ await assert.rejects(daily.translate('',runtime,['空の応答'],'en',{translateFree:async()=>''}),/TRANSLATION_FAILED:MODEL_BUSY/);
+});
+test('the daily machine settings use the reader fallback and keep its source in cache',async t=>{
+ const daily=require('../services/daily.cjs'),{Runtime}=require('../services/runtime.cjs');
+ const root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'megulit-daily-machine-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const runtime=Object.assign(Object.create(Runtime.prototype),{root,folder:root,gameReviews:{translate:async()=>({texts:['wrong']})}});
+ for(const reviewEngine of ['machine','follow']){
+  fs.writeFileSync(path.join(root,'preferences.json'),JSON.stringify({provider:'google',reviewEngine}));
+  const calls=[],options={withEngine:true,translateFree:async(_,o)=>{calls.push(o.preferred);return '译文';}};
+  const run=()=>daily.translate(root,runtime,['機械翻訳の設定 '+reviewEngine],'zh',options);
+  const expected={texts:['译文'],engine:'microsoft'};
+  assert.deepEqual(await run(),expected);
+  assert.deepEqual(await run(),expected);
+  assert.deepEqual(calls,['microsoft']);
+ }
+});
+test('English daily articles fall back when the selected local model is Chinese-only',async t=>{
+ const daily=require('../services/daily.cjs'),{Runtime}=require('../services/runtime.cjs');
+ const root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'megulit-daily-lang-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const runtime=Object.assign(Object.create(Runtime.prototype),{root,folder:root,local:()=>({ensure:async()=>{}}),
+  reviewTranslator:{translate:async()=> '中文译文'}});
+ for(const [provider,reviewEngine] of [['google','local'],['sakura','follow']]){
+  fs.writeFileSync(path.join(root,'preferences.json'),JSON.stringify({provider,reviewEngine}));
+  const text='言語のテスト '+provider,used=[];
+  const options={withEngine:true,translateFree:async(t,o)=>{used.push([t,o.target]);return 'English';}};
+  const result=await daily.translate(root,runtime,[text],'en',options);
+  assert.deepEqual(result,{texts:['English'],engine:'microsoft'});
+  assert.deepEqual(used,[[text,'en']]);
+  assert.deepEqual(await daily.translate(root,runtime,[text],'en',options),result);
+  assert.equal(used.length,1);
+  assert.deepEqual(await daily.translate(root,runtime,[text],'zh',options),{texts:['中文译文'],engine:'app'});
+ }
+});
+test('daily uses the configured review translator through the last article paragraph',async()=>{
+ const daily=require('../services/daily.cjs'),{GameReviews}=require('../services/game-reviews.cjs');
+ const reviews=new GameReviews('',undefined,{engine:()=>'api',translate:async text=>'translated '+text});
+ const list=Array.from({length:120},(_,i)=>'記事の段落 '+i);
+ const article=require('../services/news-article.cjs').paragraphs(list.map(t=>'<p>'+t+'</p>').join(''));
+ assert.deepEqual(article,list);
+ const fallback=[];
+ const result=await daily.translate('',{reviews:()=>reviews},article,'en',{withEngine:true,translateFree:async t=>{fallback.push(t);return 'fallback';}});
+ assert.deepEqual({length:result.texts.length,first:result.texts[0],last:result.texts.at(-1),fallback:fallback.length},
+  {length:120,first:'translated '+list[0],last:'translated '+list.at(-1),fallback:0});
+ assert.deepEqual(result,{texts:list.map(t=>'translated '+t),engine:'app'});
+});
+test('daily falls back only for missing paragraphs in a structured engine result',async()=>{
+ const daily=require('../services/daily.cjs'),texts=['記事の冒頭','記事の末尾'],used=[];
+ const runtime={reviews:()=>({translate:async()=>({texts:['opening',''],engine:'api',error:'MODEL_BUSY'})})};
+ const options={withEngine:true,translateFree:async t=>{used.push(t);return 'ending';}};
+ const expected={texts:['opening','ending'],engine:'app+microsoft'};
+ assert.deepEqual(await daily.translate('',runtime,texts,'en',options),expected);
+ assert.deepEqual(used,[texts[1]]);
+ assert.deepEqual(await daily.translate('',runtime,texts,'en',options),expected);
+ assert.deepEqual(used,[texts[1]]);
+});
 const load=name=>import(pathToFileURL(path.join(relayDir,'src',name)).href);
 const MIGRATIONS=fs.readdirSync(path.join(relayDir,'migrations')).filter(f=>f.endsWith('.sql')).sort().map(f=>fs.readFileSync(path.join(relayDir,'migrations',f),'utf8')).join('');
 function d1(){const db=new DatabaseSync(':memory:');db.exec(MIGRATIONS);const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>{db.prepare(sql).run(...args);return {success:true};}});return {prepare:sql=>stmt(sql)};}
@@ -197,7 +307,7 @@ test('Microsoft hint: the reader learns which engine answered (also from cache);
  assert.match(view,/当前为微软机器翻译，效果一般。想要更好的译文，可以在设置 › 翻译里接入自己的 AI API/);assert.match(view,/openSettings\?\.\('translation'\)/);assert.match(view,/data-rd-mt-x/);
  assert.match(require('./flat-source.cjs')(path.join(__dirname,'..','web','app.js')),/route==='daily'\)await mountDaily\(main,.*?openSettings:section=>\{settingsSection=section/);
  const inject=fs.readFileSync(path.join(__dirname,'..','web','reader','modules','inject.js'),'utf8');assert.match(inject,/bridge\.mtNotice = \(\) => \{\s*if \(bridge\.mtNoticed\) return;/);
- assert.match(fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8'),/if\(!this\.mtNoticed\)\{this\.mtNoticed=true;this\.runtime\.emit\('reader-event',\{type:'call',method:'mtNotice'/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8'),/r\.source==='mt'&&!chain\.isMt\(options\.provider\)&&!this\.mtNoticed\)\{this\.mtNoticed=true;this\.runtime\.emit\('reader-event',\{type:'call',method:'mtNotice'/,'said once when machine translation stood in for the chosen engine (services/translation-chain.cjs)');
  const page=await import(pathToFileURL(path.join(__dirname,'..','web','daily-view.js')).href);
  const esc=s=>String(s);const html=page.pageHTML({state:'ok',news:{items:[{title:'G',link:'https://a/1',source:'A',cat:'gal'},{title:'C',link:'https://a/2',source:'B',cat:'acg'}]},words:{words:[]}},{locale:'zh',esc,cat:'acg'});
  assert.match(html,/data-dl-cat="acg" aria-selected="true"/);assert.match(html,/<h2>C<\/h2>/);assert.doesNotMatch(html,/<h2>G<\/h2>/);

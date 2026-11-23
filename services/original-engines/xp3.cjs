@@ -41,7 +41,7 @@ function yuzNames(fd,index){const c=chunks(index,0,index.length).find(c=>/^(?:se
 // decrypt: a cx filter (cx-filter.cjs) applied to an encrypted entry's whole unpacked data.
 function read(file,entry,decrypt){
  const fd=fs.openSync(file,'r');
- try{const parts=entry.segments.map(s=>{const b=Buffer.alloc(s.packed);fs.readSync(fd,b,0,s.packed,s.offset);return s.zlib?zlib.inflateSync(b):b;});const out=Buffer.concat(parts);if(decrypt&&entry.encrypted)decrypt(entry.hash>>>0,0,out);return out;}finally{fs.closeSync(fd);}
+ try{const parts=entry.segments.map(s=>{const b=Buffer.alloc(s.packed);fs.readSync(fd,b,0,s.packed,s.offset);return s.zlib?zlib.inflateSync(b):b;});const out=Buffer.concat(parts);if(decrypt&&entry.encrypted)decrypt(entry.hash>>>0,0,out,0,out.length,entry);return out;}finally{fs.closeSync(fd);}
 }
 // Text of a script file: UTF-16LE with BOM, UTF-8 with BOM, or Shift-JIS / GBK guessed by the caller.
 function decodeText(buf){
@@ -50,13 +50,13 @@ function decodeText(buf){
  if(buf[0]===0xfe&&buf[1]===0xfe&&buf[2]<=2){const t=require('./kit.cjs').krkrScrambled(buf);return t===null?null:{text:t,encoding:'utf16le'};} // KiriKiri's own scrambled text (mode 0-2)
  return {buffer:buf,encoding:''};
 }
-// E297: the index's top-level chunk tags. An "Hxv4" chunk marks KiriKiri Z archives whose files only the game's cxdec v2
-// plug-in can open (the cold run in services/kirikiri-cold.cjs reads them through the game).
+// E297: the index's top-level chunk tags. An "Hxv4" chunk marks KiriKiri Z archives using cxdec v2 (HxCrypt).
 function indexTags(file){let fd;try{fd=fs.openSync(file,'r');const index=readIndex(fd,fs.fstatSync(fd).size);return index?[...new Set(chunks(index,0,index.length).map(c=>c.tag))]:[];}catch{return [];}finally{if(fd!==undefined)try{fs.closeSync(fd);}catch{}}}
+function hxChunk(file){let fd;try{fd=fs.openSync(file,'r');const index=readIndex(fd,fs.fstatSync(fd).size);if(!index)return null;const c=chunks(index,0,index.length).find(c=>c.tag==='Hxv4');if(!c||c.end-c.start<14)return null;const offset=Number(index.readBigInt64LE(c.start)),size=index.readUInt32LE(c.start+8);if(offset<0||size<=20||size>(64<<20))return null;const raw=Buffer.alloc(size);fs.readSync(fd,raw,0,size,offset);return raw;}catch{return null;}finally{if(fd!==undefined)try{fs.closeSync(fd);}catch{}}}
 // 2026-11-15 raw-bytes outlet for the adaptation contribution (services/adapter-contrib.cjs): the entries a filter keeps,
 // unpacked but not decrypted (an encrypted entry stays as stored; the maintainer decrypts it with the key found in the
 // program's code). [{name,data,encrypted}] or null when the file is not an XP3 archive.
 function rawEntries(file,{filter=()=>true,max=16<<20,limit=4000}={}){const t=list(file);if(!t)return null;const out=[];
  for(const e of t.files){if(out.length>=limit)break;if(!filter(e.name)||e.size>max||!e.segments.length)continue;try{out.push({name:e.name,data:read(file,e),encrypted:!!e.encrypted});}catch{}}
  return out;}
-module.exports={list,read,decodeText,MAGIC,indexTags,rawEntries};
+module.exports={list,read,decodeText,MAGIC,indexTags,hxChunk,rawEntries};

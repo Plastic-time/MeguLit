@@ -47,11 +47,34 @@
     [data-tomoyo-transparent] .sentence-text, [data-tomoyo-transparent] .tomoyo-cn-output { text-shadow:0 1px 3px #000c; }
   `;
   (document.head || document.documentElement).appendChild(style);
+  /* 2026-11-19 (BGI: one quotation the game adds to piece by piece, each stage a new line): the translation of a line that
+     grew stays on screen until the grown line's own arrives, which keeps what it shares with it and types only the rest */
+  const flat = v => String(v || '').replace(/[\s\u3000]+/g, ''), grown = (before, next) => { const a = flat(before), c = flat(next); return !!a && c.length > a.length && c.startsWith(a); };
+  /* 2026-11-21 (owner, 千恋＊万花: 「译文后出来的话就会把上面的挤上去」): the translation row keeps room for the translation from the moment the
+     Japanese is shown: the height the recent translations took, or an estimate from the Japanese length, whichever is more. A late
+     translation shows inside that room and never moves the Japanese (a block standing on its bottom edge grows upwards otherwise). */
+  const recentHeights = [];
+  /* the room a translation row of `text` needs, measured on the row element `el`: max(the last three settled translations,
+     the Japanese length at the row's width, one row). Shared with the page's earlier lines (hook-reader.js) */
+  function reserveHeight(text, el) {
+    const cs = getComputedStyle(el), size = parseFloat(cs.fontSize) || 20, lh = parseFloat(cs.lineHeight) || size * 1.4, width = el.clientWidth || row?.clientWidth || 600;
+    const estimate = Math.max(1, Math.ceil([...String(text || '').replace(/[\s\u3000]/g, '')].length * 1.2 * size / Math.max(size, width))) * lh;
+    return Math.ceil(Math.max(estimate, ...recentHeights, lh));
+  }
+  bridge.translationReserveFor = (text, el) => el ? reserveHeight(text, el) : 0;
+  function reserve(text) {
+    if (!output) return;
+    const h = reserveHeight(text, output);
+    output.style.minHeight = h + 'px'; bridge.translationReserve = h;
+  }
+  function settled() { if (!output || output.dataset.state !== 'ready' || !output.textContent.trim() || output.textContent === '翻译中…') return; const prev = output.style.minHeight; output.style.minHeight = ''; const h = output.getBoundingClientRect().height; output.style.minHeight = prev;
+    if (h > 0) { recentHeights.push(h); if (recentHeights.length > 3) recentHeights.shift(); if (h > (parseFloat(prev) || 0)) output.style.minHeight = Math.ceil(h) + 'px'; } }
   function setText(text, error = false, animate = false) {
     if (!output) return;
+    const was = output.dataset.state === 'ready' ? [...output.textContent] : [];
     output.dataset.state = error ? 'error' : 'ready';
     if (output.textContent === text) return;
-    if (animate && window.TomeTypewriter) window.TomeTypewriter.text(output, text);
+    if (animate && window.TomeTypewriter) { const now = [...text]; let from = 0; while (from < was.length && from < now.length && was[from] === now[from]) from++; window.TomeTypewriter.text(output, text, { from }); }
     else {
       window.TomeTypewriter?.stop(output); delete output.dataset.tomeTyping;
       const parts=text.split(/(\p{Script=Latin}+)/u);
@@ -61,6 +84,7 @@
       }));
     }
     output.style.opacity = error ? '.7' : '1';
+    settled();
   }
   function ensureRow(sentence) {
     const nextParent = sentence.closest('.sentence-window');
@@ -83,10 +107,16 @@
     }
     return true;
   }
+  /* 2026-11-21 (r26: two lines paired with the patch were never asked for): every way read() leaves without asking is noted once per line and
+     reason (reader-host.log, layoutDiagnostic kind translateSkip) */
+  let skipKey = '';
+  function skip(reason, text = '') { const k = reason + '|' + text; if (k === skipKey) return; skipKey = k; bridge.lastSkip = { reason, text: String(text).slice(0, 40) };
+    try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'layoutDiagnostic', kind: 'translateSkip', reason, text: String(text).slice(0, 40) })); } catch {} }
   function read() {
-    if(bridge.pageTranslationActive?.())return;
+    if(bridge.pageTranslationActive?.()){skip('page translation active');return;}
     const sentence = document.querySelector('.sentence-text');
     if (!sentence) {
+      skip('no sentence on screen');
       if (bridge.sourceText) { bridge.sourceText = ''; bridge.onSourceText?.(''); }
       if (output) window.TomeTypewriter?.stop(output);
       row?.remove();
@@ -97,16 +127,19 @@
       bridge.serial++;
       return;
     }
-    if (!ensureRow(sentence)) return;
+    if (!ensureRow(sentence)) { skip('no sentence window'); return; }
     const chars = sentence.querySelectorAll('.char-token');
     const text = (chars.length ? Array.from(chars, c => c.textContent).join('') : sentence.textContent).trim();
     if (text !== bridge.sourceText) { bridge.sourceText = text; bridge.onSourceText?.(text); }
-    if (!enabled || !translationVisible || !text || text === bridge.current) return;
+    if (!enabled || !translationVisible || !text || text === bridge.current) { skip(!enabled ? 'translation off' : !translationVisible ? 'translation hidden' : !text ? 'empty line' : 'already asked', text); return; }
+    const growing = grown(bridge.current, text) && output.dataset.state === 'ready' && !!output.textContent;
     bridge.current = text;
     const id = ++bridge.serial;
     bridge.lastTranslationError = '';
-    setText(bridge.quietTranslation ? '' : '翻译中…');
-    output.dataset.state = 'pending';
+    /* 2026-11-19 (素晴らしき日々: the grown line's request failed and 「翻译暂不可用」 replaced the translation already shown) a grown
+       line that gets no translation keeps the one on screen and asks again, twice at most (deliver) */
+    bridge.growingId = growing ? id : 0; if (!growing) bridge.growRetries = 0;
+    if (!growing) { reserve(text); setText(bridge.quietTranslation ? '' : '翻译中…'); output.dataset.state = 'pending'; }
     try {
       window.__tomoyoTranslateRequest(JSON.stringify({ id, text, options: bridge.options?.() || {} }));
     } catch {
@@ -120,9 +153,12 @@
     const chars = sentence?.querySelectorAll('.char-token');
     const text = sentence ? (chars?.length ? Array.from(chars,c=>c.textContent).join('') : sentence.textContent).trim() : '';
     if(text !== bridge.sourceText){bridge.sourceText=text;bridge.onSourceText?.(text);}
+    guard(text); try { pageGuard(); } catch {}
+    /* the translation row and its room exist from the first frame of the line, not 220 ms later */
+    if(sentence&&text&&enabled&&translationVisible&&!output?.isConnected&&ensureRow(sentence))reserve(text);
     /* 2026-11-13 (STEINS;GATE: each new line showed the previous line's translation for ~250 ms): the translation is
        requested after a 220 ms debounce, so the old one goes the moment the source line changes */
-    if(output&&text&&text!==bridge.current&&enabled&&translationVisible&&output.dataset.state!=='pending'){window.TomeTypewriter?.stop(output);output.replaceChildren();output.dataset.state='pending';}
+    if(output&&text&&text!==bridge.current&&enabled&&translationVisible&&output.dataset.state!=='pending'&&!(output.dataset.state==='ready'&&grown(bridge.current,text))){reserve(text);window.TomeTypewriter?.stop(output);output.replaceChildren();output.dataset.state='pending';}
     clearTimeout(bridge.timer);
     bridge.timer = setTimeout(read, 220);
   }
@@ -138,14 +174,76 @@
     host.appendChild(note);
     setTimeout(() => { note.style.opacity = '0'; setTimeout(() => note.remove(), 700); }, 9000);
   };
-  bridge.deliver = (id, text, error, message = '') => {
+  /* 2026-11-19 (user rule: no line stays 「未翻译」) a translation that came from the background retry (services/translation-chain.cjs)
+     fills the line still on screen when it shows none or an error; a line already translated is left as it is */
+  /* 2026-11-21 (owner, 千恋＊万花 中文版: a line paired with the patch shown without Chinese; r26: the patch stored, no lookup ever came): the
+     line on screen is the sentence the reader shows (bridge.sourceText), whether or not a request went out for it; it matches a filled
+     line written another way (ruby / brackets / blanks: the same normal form as services/reader.cjs, or one inside the other, 60 %) */
+  const normal = v => { let t = String(v || '').replace(/[｜|]([^《\[｜|]+)[《\[][^》\]]*[》\]]/g, '$1').replace(/《[^》]*》/g, '').replace(/\[[^\]]*\]/g, '').replace(/<[^>]*>/g, '').replace(/[\s\u3000\u200b\u001f]+/g, ''); for (let k = 0; k < 3; k++) t = t.replace(/^[「『“"（(【]+/, '').replace(/[」』”"）)】]+$/, ''); return t; };
+  const sameLine = (a, b) => { const x = normal(a), y = normal(b); if (!x || !y) return false; if (x === y) return true; const lx = [...x].length, ly = [...y].length; return (x.includes(y) || y.includes(x)) && Math.min(lx, ly) / Math.max(lx, ly) >= .6; };
+  /* 2026-11-21 translation guard: 600 ms, 1.5 s and 3 s after a line is shown, a line still without a translation is asked again by its
+     text (services/reader.cjs translateGuard: cache, script, fallback chain), past the "already asked" check and the request serial; after 3 s
+     a faint 「翻译中…」 stands where the translation will go, never an empty row */
+  let guardTimers = [], guardText = '';
+  const guardNote = (what, text) => { try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'layoutDiagnostic', kind: 'translationGuard', what, text: String(text).slice(0, 40) })); } catch {} };
+  const hasTranslation = () => output?.isConnected && output.dataset.state === 'ready' && !!output.textContent.trim() && output.textContent !== '翻译中…' && !bridge.lastTranslationError;
+  function guard(text) {
+    if (text === guardText) return; guardText = text; for (const t of guardTimers) clearTimeout(t); guardTimers = [];
+    if (!text || !enabled || !translationVisible) return;
+    for (const [ms, last] of [[600, false], [1500, false], [3000, true]]) guardTimers.push(setTimeout(() => {
+      if (guardText !== text || !sameLine(bridge.sourceText, text) || hasTranslation()) return;
+      guardNote(last ? 'still-missing' : 'retry', text);
+      try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'translateGuard', text })); } catch {}
+      if (last && output?.isConnected && (!output.textContent.trim() || output.textContent === '翻译中…')) { output.textContent = '翻译中…'; output.style.opacity = '.45'; output.dataset.state = 'pending'; }
+    }, ms));
+  }
+  bridge.translationGuard = guard;
+  /* the page's earlier lines (.tome-page-tr, hook-reader): each one still empty at 0.6 / 1.5 / 3 s after it was first seen is asked by its text */
+  const pageSeen = new Map();
+  function pageGuard() {
+    if (!enabled || !translationVisible) return; const now = performance.now();
+    for (const tr of document.querySelectorAll('.tome-page-lines .tome-page-tr')) {
+      const jp = [...(tr.parentElement?.querySelectorAll('.tome-page-char') || [])].map(c => c.textContent).join('').trim(); if (!jp) continue;
+      if (tr.textContent.trim()) { pageSeen.delete(jp); continue; }
+      let s = pageSeen.get(jp); if (!s) { s = { at: now, step: 0 }; pageSeen.set(jp, s); if (pageSeen.size > 200) pageSeen.delete(pageSeen.keys().next().value); }
+      const due = [600, 1500, 3000][s.step]; if (due == null || now - s.at < due) continue; s.step++;
+      guardNote(s.step === 3 ? 'still-missing page' : 'retry page', jp);
+      try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'translateGuard', text: jp })); } catch {}
+    }
+  }
+  /* 2026-11-21: a page line was first seen at the next 300 ms scan, so its 600 ms check came at 0.9 to 1.2 s; the scan is every 100 ms and also runs when a line is shown */
+  (window.__megulitReaderIntervals?.set||setInterval)(pageGuard, 100);
+  bridge.translationTarget = () => /^(english|bilingual-en)$/.test(bridge.galPreferences?.().display || '') || bridge.options?.().learnerLanguage === 'en' ? 'en' : 'zh';
+  bridge.acceptTranslationTarget = context => !context || context.target === bridge.translationTarget();
+  bridge.deliverBackfill = (source, text, kind = '', context = null) => {
+    if (!bridge.acceptTranslationTarget(context)) return;
+    if (!enabled || !translationVisible || !String(text || '').trim()) return;
+    const shown = bridge.sourceText || bridge.current;
+    if (!sameLine(shown, source)) { window.__tomoyoChinese?.pageTranslationFill?.(source, text); return; }
+    if (!output?.isConnected) { const s = document.querySelector('.sentence-window .sentence-text:not(.megulit-old-line)'); if (!s || !ensureRow(s)) return; }
+    const mine = sameLine(bridge.current, shown);
+    if (mine && output.dataset.state === 'ready' && output.textContent.trim() && !bridge.lastTranslationError && kind !== 'better') return;
+    if (!mine) { bridge.current = shown; bridge.serial++; }
+    output.dataset.state = 'ready';
+    bridge.lastTranslationError = ''; setText(text, false, true); bridge.alignText?.();
+  };
+  bridge.deliver = (id, text, error, message = '', context = null) => {
+    if (!bridge.acceptTranslationTarget(context)) return;
     if(bridge.deliverPageTranslation?.(id,text,error,message))return;
     if (id !== bridge.serial || !enabled || !translationVisible || !output?.isConnected) return;
+    if ((error || !String(text || '').trim()) && bridge.growingId === id && output.textContent) {
+      const source = bridge.current;
+      if ((bridge.growRetries = (bridge.growRetries || 0) + 1) <= 2) setTimeout(() => {
+        if (bridge.serial !== id || bridge.current !== source || !enabled || !translationVisible) return;
+        const again = ++bridge.serial; bridge.growingId = again;
+        try { window.__tomoyoTranslateRequest(JSON.stringify({ id: again, text: source, options: bridge.options?.() || {} })); } catch {}
+      }, 1500);
+      return;
+    }
     bridge.lastTranslationError = error ? message || '暂时无法翻译，请检查网络' : '';
     const local = /^LOCAL_RUNTIME_DOWNLOADING:?(\d*)/.exec(message||'') ? (Number(/:(\d+)/.exec(message)?.[1])>0 ? `正在下载本地翻译服务程序 ${/:(\d+)/.exec(message)[1]}%，下载完自动开始翻译` : '正在下载本地翻译服务程序，下载完自动开始翻译')
       : message === 'LOCAL_STARTING' ? '服务程序已就绪，正在启动本地模型…'
       : message === 'LOCAL_RUNTIME_DOWNLOAD_FAILED' ? '本地翻译服务程序下载失败 · 检查网络后翻到下一句会重试'
-      : message === 'LOCAL_MODEL_MISSING' ? '还没有下载本地翻译模型 · Alt+T 打开设置下载'
       : message === 'LOCAL_SERVER_FAILED' ? '本地模型没能启动（可能是显存不够）· 可以换小一点的模型或改用在线翻译'
       : message === 'LOCAL_RUNTIME_MISSING' ? '缺少本地翻译服务程序 · Alt+T 打开设置安装' : '';
     if (error && local) bridge.lastTranslationError = local;

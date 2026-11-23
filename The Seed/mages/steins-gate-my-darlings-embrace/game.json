@@ -1,0 +1,68 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "6cf4110184c440c870010977c1273b28836e4643d60c76b88ba069b6263553fa",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "mages",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "c465108832a97bd45e268bee668e8a0892ed313ae90d15bc68626cd54361cb8a",
+  "script": "e61ff6790f49a55a40076110d26464582f40590b81f362845013470cabda5af0",
+  "title": "d311ffbca5cd79d599938a3057e38feeab1491add1d6273fee6a6d50258be64c",
+  "steam": "970560",
+  "vndb": "v6618"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "steins-gate-my-darlings-embrace",
+ "builds": [
+  "a6dcce350d4c406ed78978da125575fb36bf97cf76a3fd980fb2554f0ffb88fb"
+ ],
+ "match": {
+  "exe": [
+   "Game.exe"
+  ],
+  "titles": [
+   "STEINS;GATE: My Darling's Embrace",
+   "STEINS;GATE 比翼恋理のだーりん"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

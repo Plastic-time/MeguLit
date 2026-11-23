@@ -139,5 +139,6 @@ function noaList(file){const st=kit.size(file)+':'+(fs.statSync(file).mtimeMs|0)
  if(l){const pw=passwordFor(file,l);for(const e of l)e.password=pw;}noaMemo.set(file,{st,list:l});return l;}
 const engine=kit.engine({id:'entis',hint:'*.noa / *.csx',
  archives:{name:/\.(noa|dat|arc)$/i,subs:['','data','Data'],entry:/\.csx$/i,list:noaList,read:(file,e)=>readNoa(file,e,e.password)},
- loose:{name:/\.csx$/i,subs:['','script','Script','data']},parse});
+ /* the game's one script image can sit in system\ next to the exe (ヨスガノソラ system\yosuga.csx, ハルカナソラ system\Haruka.csx) */
+ loose:{name:/\.csx$/i,subs:['','script','Script','data','system','System']},parse});
 module.exports={engine,parse,listNoa,readNoa,nemesis,bshf,csxLines,events,records,isCsx,exePasswords};

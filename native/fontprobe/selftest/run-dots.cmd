@@ -28,8 +28,8 @@ echo [64-bit]
 "%TEMP%\megulit-glyphdots64\host.exe" "%DLLDIR%\MeguLitFont64.dll" "%SHOTS%" || exit /b 1
 echo [32-bit]
 "%TEMP%\megulit-glyphdots32\host.exe" "%DLLDIR%\MeguLitFont32.dll" "%SHOTS%" || exit /b 1
-rem Early injection: MeguLitLaunch<bit>.exe starts a host that rasterises a dialogue glyph as its first act (dot-blind from
-rem the environment, no HookBridge). The launcher prints the pid; the host's exit code is its failure count.
+rem Early injection must keep startup/title glyphs intact until a dialogue line is confirmed.
+rem The legacy blind-mode environment request grants no permission to hide them.
 set "MEGULIT_GLYPH_MODE=dot-blind"
 set "MEGULIT_GLYPH_FONT=28 MS Gothic"
 for %%B in (64 32) do (

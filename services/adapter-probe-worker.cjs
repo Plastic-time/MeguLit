@@ -9,7 +9,7 @@ const path=require('node:path');
 try{const {RuntimePacks}=require('../core/runtime-packs.cjs');RuntimePacks.prototype.download=function(){return this.status();};RuntimePacks.prototype.ensure=async function(id){if(this.installed(id))return true;throw Error('PROBE_NO_DOWNLOAD');};}catch{}
 const {probeGame}=require('./adapter-probe-core.cjs');
 process.on('message',m=>{
- if(m?.type==='probe'){let result;try{result=probeGame({dir:m.dir,executable:m.executable,title:m.title},{budgetMs:m.budgetMs});}catch(e){result={schema:'megulit.probe-result',version:1,step:'parse-failed',detail:'PROBE_ERROR:'+String(e?.message||e).slice(0,60),engines:[],inventory:{files:0,bytes:0,ext:{},archives:[]},lines:0,japaneseLines:0};}
+ if(m?.type==='probe'){let result;try{const file=typeof m.progressFile==='string'?m.progressFile:'';result=probeGame({dir:m.dir,executable:m.executable,title:m.title},{budgetMs:m.budgetMs,progress:file?p=>require('node:fs').writeFileSync(file,JSON.stringify(p)):null});}catch(e){result={schema:'megulit.probe-result',version:1,step:'parse-failed',detail:'PROBE_ERROR:'+String(e?.message||e).slice(0,60),engines:[],inventory:{files:0,bytes:0,ext:{},archives:[]},lines:0,japaneseLines:0};}
   try{process.send({type:'result',id:m.id,result});}catch{}}
  else if(m?.type==='sample'){let result=null;try{result=require('./adapter-sample.cjs').sampleGame({dir:m.dir,executable:m.executable,result:m.result});}catch{}try{process.send({type:'result',id:m.id,result});}catch{}}
  else if(m?.type==='full'){let result=null;try{result=require('./probe-full.cjs').collect(m.job);}catch(e){result={error:String(e?.message||e).slice(0,80)};}try{process.send({type:'result',id:m.id,result});}catch{}}

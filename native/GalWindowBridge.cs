@@ -162,7 +162,7 @@ public class GalWindowBridge {
     // the input thread calls it directly, so a dragged panel's glass does not wait for the next bridge loop (E139).
     static void GlassCommand(Dictionary<string,object> d){var boxes=new List<GlassLayer.Box>();object rects;if(d.TryGetValue("rects",out rects)&&rects is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)rects){var rect=item as Dictionary<string,object>;if(rect==null||boxes.Count>=16)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)boxes.Add(new GlassLayer.Box((int)x,(int)y,(int)w,(int)h,(int)Num(rect,"radius",Num(d,"radius",0)),(int)Math.Max(0,Math.Min(60,Num(rect,"blur",18))),(int)Math.Max(0,Math.Min(95,Num(rect,"dim",0))),(int)Math.Max(0,Math.Min(300,Num(rect,"saturate",100))),(int)Math.Max(0,Math.Min(100,Num(rect,"alpha",100))),(int)Num(rect,"fx",x),(int)Num(rect,"fy",y),(int)Math.Max(0,Math.Min(16384,Num(rect,"fw",w))),(int)Math.Max(0,Math.Min(16384,Num(rect,"fh",h)))));}}
         Glass.Set(boxes,(int)Num(d,"radius",0));}
-    /* E533: Pass = painted (inside the window region) but never takes the pointer: art-text translations over game buttons */sealed class HitRegion{public Rect Bounds;public bool Pass;}
+    /* E533: Pass = painted (inside the window region) but never takes the pointer: art-text translations over game buttons */sealed class HitRegion{public Rect Bounds;public bool Pass;public bool Menu;}
     static readonly List<HitRegion> HitRegions=new List<HitRegion>();static string RegionKey="";
     [DllImport("user32.dll")]static extern int SetWindowRgn(IntPtr window,IntPtr region,bool redraw);
     [DllImport("gdi32.dll")]static extern IntPtr CreateRectRgn(int left,int top,int right,int bottom);
@@ -256,14 +256,22 @@ public class GalWindowBridge {
     static IntPtr PreferredOverlay=IntPtr.Zero;
     static int HostedFrameUpdates;
     public static int HostedStyle(int style){return (style&~0x00c40000)|unchecked((int)0x80000000);}
+    /* no edge of any kind, a tool window: the same value as chromeless_ex_style in desktop/src/window_chrome.rs */
+    public static int HostedExStyle(int ex){return (ex&~(0x00000001|0x00000100|0x00000200|0x00020000|0x00040000))|0x00000080;}
     static void PrepareHostedFrame(){
         // A dedicated transparent HWND is always a popup. Expanding its hit region
         // during menu drag must never reveal the saved ordinary-window caption.
-        int style=GetWindowLong(Overlay,-16),wanted=HostedStyle(style),ex=GetWindowLong(Overlay,-20),wantedEx=(ex&~0x00040000)|0x00000080;
-        if(style==wanted&&ex==wantedEx)return;
-        SetWindowLong(Overlay,-16,wanted);SetWindowLong(Overlay,-20,wantedEx);
+        /* 2026-11-19: the window's own process now keeps these bits off for good (desktop/src/window_chrome.rs, WM_STYLECHANGING).
+           This stays as the check from outside: an older MeguLit.exe, or a frame that shows up anyway, is put right and
+           logged with the size of the non-client area (reader-host.log "hostFrame"), 200 times at most. */
+        int style=GetWindowLong(Overlay,-16),wanted=HostedStyle(style),ex=GetWindowLong(Overlay,-20),wantedEx=HostedExStyle(ex);
+        Rect wr,cr;Point co=new Point();int ncLeft=0,ncTop=0,ncRight=0,ncBottom=0;
+        if(GetWindowRect(Overlay,out wr)&&GetClientRect(Overlay,out cr)&&ClientToScreen(Overlay,ref co)&&!IsIconic(Overlay)){ncLeft=co.X-wr.Left;ncTop=co.Y-wr.Top;ncRight=wr.Right-(co.X+cr.Right);ncBottom=wr.Bottom-(co.Y+cr.Bottom);}
+        bool framed=ncLeft!=0||ncTop!=0||ncRight!=0||ncBottom!=0;
+        if(style==wanted&&ex==wantedEx&&!framed)return;
+        if(style!=wanted)SetWindowLong(Overlay,-16,wanted);if(ex!=wantedEx)SetWindowLong(Overlay,-20,wantedEx);
         SetWindowPos(Overlay,IntPtr.Zero,0,0,0,0,0x0001|0x0002|0x0004|0x0010|0x0020);
-        if(++HostedFrameUpdates<=12)Emit(new{type="hostFrame",update=HostedFrameUpdates,styleBefore=style,styleAfter=GetWindowLong(Overlay,-16),exStyleBefore=ex,exStyleAfter=GetWindowLong(Overlay,-20)});
+        if(++HostedFrameUpdates<=200)Emit(new{type="hostFrame",update=HostedFrameUpdates,styleBefore=style,styleAfter=GetWindowLong(Overlay,-16),exStyleBefore=ex,exStyleAfter=GetWindowLong(Overlay,-20),nonClient=ncLeft+","+ncTop+","+ncRight+","+ncBottom});
     }
     static void FindOverlay(){
         // Self-test modes run without an overlay process (OverlayPid 0): never adopt, move or raise someone else's window.
@@ -291,11 +299,13 @@ public class GalWindowBridge {
         if(!Captured&&Overlay!=IntPtr.Zero&&IsWindow(Overlay)&&(RegionKey!=""||HitRegions.Count>0)){RegionKey="";HitRegions.Clear();SetWindowRgn(Overlay,IntPtr.Zero,true);}
         if(!Captured||!IsWindow(Overlay))return;ResetRegion();RestoreFrame();SetWindowLong(Overlay,-16,OriginalStyle);SetWindowPos(Overlay,new IntPtr(-2),OriginalRect.Left,OriginalRect.Top,OriginalRect.Right-OriginalRect.Left,OriginalRect.Bottom-OriginalRect.Top,0x0020|0x0040|0x0010);if(HadLayerAttributes)SetLayeredWindowAttributes(Overlay,OldLayerColor,OldLayerAlpha,OldLayerFlags);Captured=false;IsShown=true;}
     public static Rect Place(Rect area,double x,double y,double w,double h){int aw=Math.Max(1,area.Right-area.Left),ah=Math.Max(1,area.Bottom-area.Top);x=Math.Max(0,Math.Min(95,x));y=Math.Max(0,Math.Min(95,y));w=Math.Max(5,Math.Min(100,w));h=Math.Max(5,Math.Min(100,h));int l=area.Left+(int)Math.Round(aw*x/100),t=area.Top+(int)Math.Round(ah*y/100);return new Rect(l,t,l+Math.Max(120,(int)Math.Round(aw*w/100)),t+Math.Max(70,(int)Math.Round(ah*h/100)));}
-    public static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){return scan.IsEmpty?reader:new Rect(Math.Min(reader.Left,game.Left+scan.Left),Math.Min(reader.Top,game.Top+scan.Top),Math.Max(reader.Right,game.Left+scan.Right),Math.Max(reader.Bottom,game.Top+scan.Bottom));}
+    public /* 2026-11-19 (user: 只要显示器上还有位置就不要挤压汉字): the bottom of the work area (taskbar excluded) of the monitor the game client is on */
+static int WorkBottom(Rect area){try{return System.Windows.Forms.Screen.FromRectangle(new System.Drawing.Rectangle(area.Left,area.Top,Math.Max(1,area.Right-area.Left),Math.Max(1,area.Bottom-area.Top))).WorkingArea.Bottom;}catch{return area.Bottom;}}
+static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){return scan.IsEmpty?reader:new Rect(Math.Min(reader.Left,game.Left+scan.Left),Math.Min(reader.Top,game.Top+scan.Top),Math.Max(reader.Right,game.Left+scan.Right),Math.Max(reader.Bottom,game.Top+scan.Bottom));}
     static string ExecutableHash(uint pid){try{using(var sha=System.Security.Cryptography.SHA256.Create())using(var input=File.OpenRead(Process.GetProcessById((int)pid).MainModule.FileName))return BitConverter.ToString(sha.ComputeHash(input)).Replace("-","").ToLowerInvariant();}catch{return "";}}
     static void Bind(IntPtr target,bool activate=false){Scene.Reset();GameUi.Clear();if(target==IntPtr.Zero||target==Overlay||!IsWindow(target))throw new Exception("请选择有效的游戏窗口");FindOverlay();if(Overlay==IntPtr.Zero)throw new Exception("MeguLit 窗口尚未准备好，请稍后再绑定");if(TranslationMode)Capture();Target=target;HasLastRect=false;uint pid;GetWindowThreadProcessId(target,out pid);ForgetGame();TrackedGame=Process.GetProcessById((int)pid);TrackedGameStarted=TrackedGame.StartTime.ToUniversalTime().Ticks;WindowGoneAt=DateTime.MinValue;WantedProcess=ProcessName(pid);string executableHash=ExecutableHash(pid);Dialog.Reset();DialogVisible=true;if(activate){CoverEnabled=true;RevealGame(Target);
             // Binding from the menu keeps the menu open (and the keyboard on it); the game only comes forward without one.
-            if(!MenuOpen)SetForegroundWindow(GetAncestor(Target,2));LastZCheck=DateTime.MinValue;}if(AudioWanted)Audio.Start(pid);var gameCaption=new StringBuilder(512);GetWindowText(target,gameCaption,gameCaption.Capacity);Emit(new{type="bound",activateGame=activate,coverEnabled=CoverEnabled,bound=TranslationMode,gameProcessId=pid,gameStarted=Process.GetProcessById((int)pid).StartTime.ToUniversalTime().Ticks.ToString(),gameHwnd=target.ToInt64().ToString(),gameStyleKey=executableHash,gameTitle=gameCaption.ToString(),hookExact474=executableHash=="e77a11486b6d94a42f9d7d39fd768b4e763f163b977d3eaed94cf9e13217f995",interfaceMode=TranslationMode?"translation":"normal",processName=WantedProcess,message="游戏窗口已记住；在游戏里按 Alt+M 可重新绑定当前窗口"});}
+            if(!MenuOpen)SetForegroundWindow(GetAncestor(Target,2));LastZCheck=DateTime.MinValue;}if(AudioWanted)Audio.Start(pid);var gameCaption=new StringBuilder(512);GetWindowText(target,gameCaption,gameCaption.Capacity);Emit(new{type="bound",activateGame=activate,coverEnabled=CoverEnabled,bound=TranslationMode,gameProcessId=pid,gameStarted=Process.GetProcessById((int)pid).StartTime.ToUniversalTime().Ticks.ToString(),gameHwnd=target.ToInt64().ToString(),gameStyleKey=executableHash,gameTitle=gameCaption.ToString(),hookExact474=executableHash=="e77a11486b6d94a42f9d7d39fd768b4e763f163b977d3eaed94cf9e13217f995",interfaceMode=TranslationMode?"translation":"normal",processName=WantedProcess,gameExecutable=ProcessImage(pid),message="游戏窗口已记住；在游戏里按 Alt+M 可重新绑定当前窗口"});}
     // The game's own sound for Anki (GameAudio.cs): recorded only while MeguLit asks for it and a game is bound.
     static readonly GameAudio Audio=new GameAudio();static bool AudioWanted;
     // #113: binding, unbinding or closing never leaves the game unreachable. Its top-level window comes back if it is
@@ -378,11 +388,32 @@ public class GalWindowBridge {
         // Another application in front (Alt+Tab): the layer stays directly above the game, below that application.
         if(!front){if(!below)return;IntPtr above=GetWindow(gameTop,3);if(above==Overlay)return;SetWindowPos(Overlay,above==IntPtr.Zero?IntPtr.Zero:above,0,0,0,0,0x0001|0x0002|0x0010);
             Emit(new{type="coverDebug",text="Alt+T 菜单打开、前台是其他程序：阅读层放回游戏正上方"});return;}
-        if(menu&&(GetWindowLong(Overlay,-20)&8)==0)below=true;
-        if(!below)return;
-        // Menu open: topmost, so neither clicking the game nor focusing another MeguLit window puts the menu under the game.
-        SetWindowPos(Overlay,menu||GetAncestor(GetForegroundWindow(),3)==gameRoot?new IntPtr(-1):IntPtr.Zero,0,0,0,0,0x0001|0x0002|0x0010);
-        Emit(new{type="coverDebug",text=menu?"Alt+T 菜单打开：阅读层固定到游戏上方":"阅读层已移到前台游戏上方"});}
+        bool topmost=(GetWindowLong(Overlay,-20)&8)!=0;
+        if(!below&&(!Layer.Float||topmost)){if(LastRaise!="held"){LastRaise="held";Emit(new{type="layerRaise",how="held",above=true,topmost=topmost});}return;}
+        /* 2026-11-19 16:17 (user: 「一切屏回来就啥都没了」): back from another program the decision was right (float, shown) but the
+           topmost request did not take; the game, activated, lay above the layer and nothing checked. The raise now has a
+           result: asked, looked at, and when the layer is still under the game it is put directly above it in the normal
+           band (the same call that keeps it there while another program is in front), every pass until it holds. */
+        string how=ReaderLayerPolicy.Raise(new LayerZ(gameRoot,gameTop),Layer.Float);
+        bool aboveGame=!BelowGame(gameRoot,gameTop);topmost=(GetWindowLong(Overlay,-20)&8)!=0;
+        if(how!=LastRaise){LastRaise=how;Emit(new{type="layerRaise",how=how,above=aboveGame,topmost=topmost});}
+        if(below)Emit(new{type="coverDebug",text=menu?"Alt+T 菜单打开：阅读层固定到游戏上方":"阅读层已移到前台游戏上方"});}
+    static string LastRaise="";
+    [DllImport("user32.dll")]static extern bool AttachThreadInput(uint attach,uint to,bool on);
+    [DllImport("kernel32.dll")]static extern uint GetCurrentThreadId();
+    static bool BelowGame(IntPtr gameRoot,IntPtr gameTop){int steps=0;for(IntPtr h=GetWindow(Overlay,3);h!=IntPtr.Zero&&steps<400;h=GetWindow(h,3),steps++)if(h==gameRoot||h==gameTop)return true;return false;}
+    sealed class LayerZ:ReaderLayerPolicy.ILayerZ{
+        readonly IntPtr Root,Top;public LayerZ(IntPtr root,IntPtr top){Root=root;Top=top;}
+        public bool BelowGame(){return GalWindowBridge.BelowGame(Root,Top);}
+        public bool Topmost(){return (GetWindowLong(Overlay,-20)&8)!=0;}
+        public void RequestTopmost(){SetWindowPos(Overlay,new IntPtr(-1),0,0,0,0,0x0001|0x0002|0x0010);}
+        public void PlaceAboveGame(){IntPtr above=GetWindow(Top,3);if(above==Overlay)return;SetWindowPos(Overlay,above==IntPtr.Zero?IntPtr.Zero:above,0,0,0,0,0x0001|0x0002|0x0010);}
+        public void PlaceTop(){SetWindowPos(Overlay,IntPtr.Zero,0,0,0,0,0x0001|0x0002|0x0010);}
+        /* last step, only when every plain request was ignored: for the length of one call this thread shares the input
+           queue of the foreground thread, which is what makes the system take a z-order request; no focus changes */
+        public void ForceTopmost(){IntPtr fg=GetForegroundWindow();if(fg==IntPtr.Zero)return;uint pid;uint thread=GetWindowThreadProcessId(fg,out pid),self=GetCurrentThreadId();if(thread==0||thread==self)return;
+            if(!AttachThreadInput(self,thread,true))return;try{SetWindowPos(Overlay,new IntPtr(-1),0,0,0,0,0x0001|0x0002|0x0010);}finally{AttachThreadInput(self,thread,false);}}
+    }
     /* P0 2026-11-13 (user, ファタモルガーナの館 full screen: the game flashed and kept dropping to the desktop; Alt+T sent it
        to the desktop). A full-screen game (its window covers its whole monitor: KiriKiri fsmethod=cds, TOPMOST popup, E533)
        minimises itself as soon as it loses the foreground. MeguLit then must never take the foreground from it: the overlay
@@ -435,10 +466,14 @@ public class GalWindowBridge {
         else if(type=="choiceLocate"){object list;var options=new List<string>();if(d.TryGetValue("options",out list)&&list is System.Collections.ArrayList)foreach(object o in (System.Collections.ArrayList)list){string t=Convert.ToString(o);if(!String.IsNullOrWhiteSpace(t)&&t.Length<=120&&options.Count<12)options.Add(t);}if(PageLocate!=null&&Target!=IntPtr.Zero)PageLocate.RequestChoices(Target,options);}
         else if(type=="pageLocate"){if(PageLocate!=null&&Target!=IntPtr.Zero)PageLocate.Request(Target,Str(d,"text"),Bool(d,"art"));}
         /* 2026-11-12 art scan (OCR read path): MeguLit asks for it while no hook line is current; PageLocator reads the picture and emits artText */
-        else if(type=="artScan"){if(PageLocate!=null)PageLocate.Scan(Target,Bool(d,"on")&&Target!=IntPtr.Zero,Str(d,"dialog"),Str(d,"speaker"),Bool(d,"band"),Bool(d,"foreign"));}
+        else if(type=="artScan"){if(PageLocate!=null)PageLocate.Scan(Target,Bool(d,"on")&&Target!=IntPtr.Zero,Str(d,"dialog"),Str(d,"speaker"),Bool(d,"band"),Bool(d,"foreign"),Bool(d,"slow"));}
         else if(type=="maskAssist"){if(TextMask!=null)TextMask.Assist(Str(d,"source"));}
         else if(type=="hookVerifyCancel"){if(HookVerifier!=null)HookVerifier.Cancel();}
         else if(type=="gameAudio"){AudioWanted=Bool(d,"enabled");uint pid=0;if(AudioWanted&&Target!=IntPtr.Zero)GetWindowThreadProcessId(Target,out pid);if(AudioWanted&&pid!=0)Audio.Start(pid);else if(!AudioWanted)Audio.Stop();}
+        /* 2026-11-21 runtime sample: {type:"clientShot",id,maxEdge,maxBytes} -> the whole client area, full size + a scaled copy (GameAudio.ClientShot) */
+        else if(type=="clientShot"){string id=Str(d,"id");IntPtr target=Target;object me,mb;int maxEdge=d.TryGetValue("maxEdge",out me)?Math.Max(64,Math.Min(4096,Convert.ToInt32(me))):960,maxBytes=d.TryGetValue("maxBytes",out mb)?Math.Max(16*1024,Math.Min(2*1024*1024,Convert.ToInt32(mb))):150*1024;
+            ThreadPool.QueueUserWorkItem(delegate{string full="",small="";try{Rect rect;if(target!=IntPtr.Zero&&GetClientRect(target,out rect))GameAudio.ClientShot(target,rect.Right,rect.Bottom,maxEdge,maxBytes,out full,out small);}catch{}
+                try{Emit(new{type="clientShot",id=id,full=full,small=small});}catch{}});}
         else if(type=="sceneShot"){string id=Str(d,"id");IntPtr target=Target;
             ThreadPool.QueueUserWorkItem(delegate{string jpeg="",hash="";double score=0;try{Rect rect;if(target!=IntPtr.Zero&&GetClientRect(target,out rect))jpeg=GameAudio.SceneShot(target,rect.Right,rect.Bottom,out score,out hash);}catch{}
                 try{Emit(new{type="sceneShot",id=id,jpeg=jpeg,score=score,hash=hash});}catch{}});}
@@ -477,17 +512,17 @@ public class GalWindowBridge {
             string name=ProcessName(pid),image=ProcessImage(pid);if(name!="")WantedProcess=name;if(image!="")WantedExecutable=image;NextAutoBind=DateTime.MinValue;
             if(best!=IntPtr.Zero&&bestArea>=320L*240&&Target!=best){try{Bind(best);}catch{}}}
         else if(type=="bind"){WantedExecutable="";FindOverlay();if(Overlay!=IntPtr.Zero&&IsIconic(Overlay))ShowWindow(Overlay,4);if(d.TryGetValue("settings",out value)&&value is Dictionary<string,object>)Settings((Dictionary<string,object>)value);bool keepMenu=MenuOpen;InterfaceMode(true,false);if(keepMenu){MenuOpen=true;MenuFocusPending=true;}Bind(new IntPtr(Int64.Parse(Str(d,"hwnd"))),true);}
-        else if(type=="configure"){if(!ModeConfigured&&d.ContainsKey("interfaceMode")){ModeConfigured=true;InterfaceMode(Str(d,"interfaceMode")=="translation",false);}Settings(d);WantedProcess=Bool(d,"bindEnabled")?Str(d,"gameProcess"):"";if(!Bool(d,"bindEnabled")&&(Target!=IntPtr.Zero||TrackedGame!=null)){RevealGame(Target);ForgetGame();Target=IntPtr.Zero;Restore();Emit(new{type="bound",bound=false,message="已解除窗口绑定"});}}
+        else if(type=="configure"){if(!ModeConfigured&&d.ContainsKey("interfaceMode")){ModeConfigured=true;InterfaceMode(Str(d,"interfaceMode")=="translation",false);}Settings(d);WantedProcess=Bool(d,"bindEnabled")?Str(d,"gameProcess"):"";/* 2026-11-19 a remembered full path binds only that program (another game's BGI.exe is not this record); an old record without one still matches by name */if(Bool(d,"bindEnabled")&&WantedExecutable==""){string remembered=Str(d,"gameExecutable");if(remembered!="")WantedExecutable=remembered;}if(!Bool(d,"bindEnabled")&&(Target!=IntPtr.Zero||TrackedGame!=null)){RevealGame(Target);ForgetGame();Target=IntPtr.Zero;Restore();Emit(new{type="bound",bound=false,message="已解除窗口绑定"});}}
         else if(type=="pickWindow"){if(Bool(d,"active")){IntPtr fg=GetForegroundWindow();PickSkip=fg==IntPtr.Zero?IntPtr.Zero:GetAncestor(fg,2);PickUntil=DateTime.UtcNow.AddSeconds(15);}else PickUntil=DateTime.MinValue;Emit(new{type="pickWindow",active=PickUntil!=DateTime.MinValue});}
         else if(type=="unbind"){WantedExecutable="";WantedProcess="";RevealGame(Target);ForgetGame();Target=IntPtr.Zero;Restore();Emit(new{type="bound",bound=false,message="已解除窗口绑定"});}
         // The page passes where the button went down, so the strip stays under the same spot of the cursor even though
         // the drag only starts after a few pixels of movement.
         else if(type=="floatDrag"){if(TranslationMode&&Target==IntPtr.Zero&&Overlay!=IntPtr.Zero&&GetCursorPos(out DragStart)&&GetWindowRect(Overlay,out DragRect)){if(d.ContainsKey("x")&&d.ContainsKey("y")){DragStart.X=(int)Num(d,"x",DragStart.X);DragStart.Y=(int)Num(d,"y",DragStart.Y);}Dragging=true;}}
-        else if(type=="menu"){bool open=Bool(d,"open");if(open!=MenuOpen)RegionAckPending=false;if(open&&!MenuOpen){MenuFocusPending=true;FindOverlay();if(Overlay!=IntPtr.Zero&&IsIconic(Overlay))ShowWindow(Overlay,4);}bool returning=MenuOpen&&!open&&TranslationMode&&Target!=IntPtr.Zero&&GetAncestor(GetForegroundWindow(),2)==Overlay;MenuOpen=open;ReaderActivationPolicy();RefreshReaderPointer();if(returning)SetForegroundWindow(GetAncestor(Target,2));if(!open){MenuRegionReady=false;MenuFocusPending=false;}if(open&&!TranslationMode&&PreferredOverlay==IntPtr.Zero){FindOverlay();if(Overlay!=IntPtr.Zero){
+        else if(type=="menu"){LastReaderContext=null;ReaderLayerPolicy.Unsettle();bool open=Bool(d,"open");if(open!=MenuOpen)RegionAckPending=false;if(open&&!MenuOpen){MenuFocusPending=true;FindOverlay();if(Overlay!=IntPtr.Zero&&IsIconic(Overlay))ShowWindow(Overlay,4);}bool returning=MenuOpen&&!open&&TranslationMode&&Target!=IntPtr.Zero&&GetAncestor(GetForegroundWindow(),2)==Overlay;MenuOpen=open;ReaderActivationPolicy();RefreshReaderPointer();if(returning)SetForegroundWindow(GetAncestor(Target,2));if(!open){MenuRegionReady=false;MenuFocusPending=false;}if(open&&!TranslationMode&&PreferredOverlay==IntPtr.Zero){FindOverlay();if(Overlay!=IntPtr.Zero){
             // Only when needed: re-showing and re-activating the already visible, already active main window made it
             // hide and reappear once (with the Windows open animation) on the first menu after start.
             bool keepGame=FullscreenTarget()&&GetAncestor(GetForegroundWindow(),3)==GetAncestor(Target,3);if(!IsWindowVisible(Overlay))ShowWindow(Overlay,keepGame?4:5);if(!keepGame&&GetAncestor(GetForegroundWindow(),3)!=GetAncestor(Overlay,3))SetForegroundWindow(Overlay);IsShown=true;MenuFocusPending=false;}}}
-        else if(type=="hitRegions"){MenuRegionReady=Bool(d,"menuOpen");RegionAckPending=MenuRegionReady;HitRegions.Clear();object regions;if(d.TryGetValue("regions",out regions)&&regions is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)regions){var rect=item as Dictionary<string,object>;if(rect==null||HitRegions.Count>=256)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)HitRegions.Add(new HitRegion{Bounds=new Rect((int)x,(int)y,(int)(x+w),(int)(y+h)),Pass=Bool(rect,"pass")});}}
+        else if(type=="hitRegions"){MenuRegionReady=Bool(d,"menuOpen");RegionAckPending=MenuRegionReady;HitRegions.Clear();object regions;if(d.TryGetValue("regions",out regions)&&regions is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)regions){var rect=item as Dictionary<string,object>;if(rect==null||HitRegions.Count>=256)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)HitRegions.Add(new HitRegion{Bounds=new Rect((int)x,(int)y,(int)(x+w),(int)(y+h)),Pass=Bool(rect,"pass"),Menu=Bool(rect,"menu")});}}
             // Over a bound game apply the new region right away instead of in the next tick (which also captures the game
             // for text and marker detection and made the menu wait ~170 ms before it could open).
             if(TranslationMode&&Target!=IntPtr.Zero&&Overlay!=IntPtr.Zero&&Captured&&HasLastRect&&IsShown){ApplyRegion(LastRect.Right-LastRect.Left,LastRect.Bottom-LastRect.Top);AckRegion();}
@@ -514,11 +549,27 @@ public class GalWindowBridge {
         if(Overlay==IntPtr.Zero||!TranslationMode||Target==IntPtr.Zero)return;
         IntPtr fgWindow=GetForegroundWindow(),fg=GetAncestor(fgWindow,3),gameRoot=GetAncestor(Target,3),overlayRoot=GetAncestor(Overlay,3);
         bool alive=IsWindow(Target),iconic=alive&&IsIconic(Target);
+        /* no foreground window: an activation is in flight (menu closing, focus handed back to the game); the next event or tick decides */
+        if(fgWindow==IntPtr.Zero&&alive&&!iconic)return;
         uint fgPid=0,gamePid=0;GetWindowThreadProcessId(fgWindow,out fgPid);if(alive)GetWindowThreadProcessId(Target,out gamePid);
         bool gameFront=alive&&(fg==gameRoot||fgPid!=0&&(fgPid==gamePid||ImeHost(ProcessName(fgPid))));
         bool ownFront=fg==overlayRoot||MenuOpen&&MenuRegionReady&&fgPid!=0&&fgPid==(uint)OverlayPid;
+        /* #468: a screenshot tool in front of the game decides nothing; the layer stays where it is, in the picture */
+        if(alive&&!iconic&&!gameFront&&!ownFront&&CaptureSurfaceFront(fg))return;
         bool ok=TopmostGuard.MayFloat(alive,iconic,gameFront,ownFront);
         LayersMayFloat=ok;if(ok)return;
+        /* 2026-11-19 16:57 (user: 「切屏回来还是直接消失」; reader-host.log: layerRaise how:failed on every return). Sunk out of the
+           topmost band, the layer could not be raised again while the game held the foreground: every z-order request
+           from this process was ignored until MeguLit itself became the foreground (the menu). So the layer no longer
+           leaves the band when it is going to be hidden anyway (another program in front, the game minimised or gone):
+           it is hidden at once and keeps its place; coming back only shows it. It is sunk only where it stays visible
+           without floating (another MeguLit window in front). */
+        bool staysVisible=alive&&!iconic&&PreferredOverlay!=IntPtr.Zero&&fgPid!=0&&fgPid==(uint)OverlayPid&&fg!=overlayRoot;
+        if(!ReaderLayerPolicy.SinkOnLeave(staysVisible)){
+            bool hid=IsShown||IsWindowVisible(Overlay);if(hid){ShowWindow(Overlay,0);IsShown=false;}
+            try{Glass.Hide();}catch{}if(!alive||iconic)DropLayers();
+            if(hid)Emit(new{type="coverDebug",text="前台换成了别的程序/游戏最小化：阅读层隐藏，保留层级，回来直接显示 (event "+ev.ToString("x")+")"});
+            return;}
         bool moved=TopmostGuard.Sink(Overlay,alive&&!iconic?GetAncestor(Target,2):IntPtr.Zero);
         try{Glass.Hide();}catch{}
         if(!alive||iconic){if(IsShown){ShowWindow(Overlay,0);IsShown=false;}DropLayers();}
@@ -545,21 +596,54 @@ public class GalWindowBridge {
             NoActivateWindow=window;
         }
     }
+    /* 2026-11-21 (owner, STEINS;GATE with the Alt+T panel pinned open: clicks on words advanced the game; the host logged no
+       click at all while the panel was open): since 1.0.0 an open menu switched the gate off, so with the panel pinned every
+       click on the reader's text went to the game. The gate stays on while the menu is open: the panel and the text regions
+       are both MeguLit's (HitRegions carries both), everything else still reaches the game. */
+    internal static bool PointerGateOn(bool translation,bool menuOpen,bool overlay,bool shown){return translation&&overlay&&shown;}
     static void RefreshReaderPointer(){
         if(PointerGate==null)return;
         Rect client;
-        if(!TranslationMode||MenuOpen||Overlay==IntPtr.Zero||!IsShown||!GetClientRect(Overlay,out client)){
+        if(!PointerGateOn(TranslationMode,MenuOpen,Overlay!=IntPtr.Zero,IsShown)||!GetClientRect(Overlay,out client)){
             PointerGate.Current=null;return;
         }
         /* Issue #133 (WHITE ALBUM2: clicking a word went to the next line). The overlay floated unbound (Target zero), the
            gate was off, and the game, which polls the mouse button, took the click as well. Unbound, the gate still owns
            clicks on MeguLit's own text regions (never the whole overlay), so a polling game under it never sees them. */
-        if(Target==IntPtr.Zero){PointerGate.Current=new ReaderPointerGate.Context(Overlay,IntPtr.Zero,client,false,HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray());return;}
-        PointerGate.Current=new ReaderPointerGate.Context(Overlay,GetAncestor(Target,2),client,LookupOpen,HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray());
+        if(Target==IntPtr.Zero){PointerGate.Current=new ReaderPointerGate.Context(Overlay,IntPtr.Zero,client,false,HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray(),HitRegions.FindAll(h=>h.Menu).ConvertAll(h=>h.Bounds).ToArray());return;}
+        PointerGate.Current=new ReaderPointerGate.Context(Overlay,GetAncestor(Target,2),client,LookupOpen,HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray(),HitRegions.FindAll(h=>h.Menu).ConvertAll(h=>h.Bounds).ToArray());
     }
+    static bool? LastReaderContext;
+    /* 2026-11-19 one reading of the foreground per tick and one decision for the layer (native/ReaderLayerPolicy.cs):
+       float / shown / probes believed. Every place below uses it; none reads the foreground for itself any more. */
+    static ReaderLayerPolicy.State Layer;static bool ProbesSettled;static string LastLayerKey="";
+    static long NowMs(){return DateTime.UtcNow.Ticks/10000;}
+    static int FrontNow(){
+        IntPtr w=GetForegroundWindow();if(w==IntPtr.Zero)return ReaderLayerPolicy.None;
+        IntPtr fg=GetAncestor(w,3);uint fgPid=0,gamePid=0;GetWindowThreadProcessId(w,out fgPid);
+        bool target=Target!=IntPtr.Zero&&IsWindow(Target);if(target)GetWindowThreadProcessId(Target,out gamePid);
+        return ReaderLayerPolicy.Classify(true,target&&fg==GetAncestor(Target,3),target&&fgPid!=0&&(fgPid==gamePid||ImeHost(ProcessName(fgPid))),Overlay!=IntPtr.Zero&&fg==GetAncestor(Overlay,3),fgPid!=0&&fgPid==(uint)OverlayPid,target&&CaptureSurfaceFront(fg));}
+    /* #468: is this foreground root a screenshot surface over the game (ReaderLayerPolicy.CaptureSurface)? */
+    static bool CaptureSurfaceFront(IntPtr fg){
+        if(fg==IntPtr.Zero||Target==IntPtr.Zero||!IsWindow(Target))return false;
+        int style=GetWindowLong(fg,-16),ex=GetWindowLong(fg,-20);Rect w,c;var o=new Point();
+        if(!GetWindowRect(fg,out w)||!GetClientRect(Target,out c)||!ClientToScreen(Target,ref o))return false;
+        bool covers=w.Left<=o.X&&w.Top<=o.Y&&w.Right>=o.X+c.Right&&w.Bottom>=o.Y+c.Bottom;
+        return ReaderLayerPolicy.CaptureSurface((ex&8)!=0,(style&0x00C00000)==0x00C00000,covers,IsIconic(Target));}
+    static ReaderLayerPolicy.State DecideLayer(){
+        bool bound=TranslationMode&&Target!=IntPtr.Zero&&IsWindow(Target);
+        var s=ReaderLayerPolicy.Decide(bound?FrontNow():ReaderLayerPolicy.Foreign,MenuOpen,MenuRegionReady,PreferredOverlay!=IntPtr.Zero,bound&&IsIconic(Target),NowMs());
+        if(!bound){s.Float=false;s.Pinned=false;}
+        /* every change is logged (reader-host.log "layerState"): a report of the text vanishing is matched against it */
+        string key=s.Front+"|"+s.Float+"|"+s.Context+"|"+s.Pinned+"|"+MenuOpen+"|"+IsShown+"|"+DialogVisible+"|"+CoverEnabled;
+        if(bound&&key!=LastLayerKey){LastLayerKey=key;/* the place is checked in this pass, not up to 250 ms later */LastZCheck=DateTime.MinValue;Emit(new{type="layerState",front=s.Front,floating=s.Float,context=s.Context,pinned=s.Pinned,menu=MenuOpen,shown=IsShown,dialog=DialogVisible,cover=CoverEnabled,topmost=Overlay!=IntPtr.Zero&&(GetWindowLong(Overlay,-20)&8)!=0});}
+        return s;}
     static void ReaderInputTick(bool foregroundGame){ReaderActivationPolicy();RefreshReaderPointer();
         bool mouse=(GetAsyncKeyState(0x01)&0x8000)!=0,space=(GetAsyncKeyState(0x20)&0x8000)!=0,enter=(GetAsyncKeyState(0x0d)&0x8000)!=0;
         bool allowed=foregroundGame&&!MenuOpen&&!LookupOpen&&CoverEnabled&&!IsIconic(Target);
+        /* the probes are believed only after the game has been back in front, menu and word card closed, for the settle time; a click or key below is a fact and is reported at once */
+        bool settled=ReaderLayerPolicy.Settled(allowed,NowMs());ProbesSettled=settled;
+        if(LastReaderContext!=settled){LastReaderContext=settled;if(WaitMarker!=null)WaitMarker.ResetPresence();Emit(new{type="readerContext",active=settled});}
         bool complete=allowed&&((mouse&&!ReaderMouseDown&&!ReaderOwnsPointer())||(space&&!ReaderSpaceDown)||(enter&&!ReaderEnterDown));
         bool skip=allowed&&(GetAsyncKeyState(0x11)&0x8000)!=0;
         ReaderMouseDown=mouse;ReaderSpaceDown=space;ReaderEnterDown=enter;
@@ -572,6 +656,7 @@ public class GalWindowBridge {
         if(CheckGameExit())return;
         // Demote inherited/older topmost state in every mode, including minimised or foreign-application states.
         bool foregroundGame=TranslationMode&&Target!=IntPtr.Zero&&IsWindow(Target)&&!IsIconic(Overlay)&&GetAncestor(GetForegroundWindow(),3)==GetAncestor(Target,3);
+        Layer=DecideLayer();
         ReaderInputTick(foregroundGame);
         bool sceneInput=foregroundGame&&!MenuOpen&&!LookupOpen&&((GetAsyncKeyState(0x01)<0||GetAsyncKeyState(0x02)<0)&&!ReaderOwnsPointer()||GetAsyncKeyState(0x1B)<0||GetAsyncKeyState(0x20)<0||GetAsyncKeyState(0x0D)<0);
         if(sceneInput&&!ReaderMenuDown){GameUi.Clear();Scene.Input();}ReaderMenuDown=sceneInput;
@@ -580,7 +665,7 @@ public class GalWindowBridge {
         if(Target!=IntPtr.Zero&&GetClientRect(Target,out uiRect)&&ClientToScreen(Target,ref uiOrigin))GameUi.Tick(Target,new System.Drawing.Rectangle(uiOrigin.X,uiOrigin.Y,uiRect.Right,uiRect.Bottom),foregroundGame&&!MenuOpen&&!LookupOpen&&!IsIconic(Target));
         else GameUi.Clear();
         /* E578: the text-window probe runs with immersion off too (Scene.Full limits the rest to immersion) */
-        if(foregroundGame&&!MenuOpen&&!LookupOpen&&CoverEnabled&&Target!=IntPtr.Zero&&!GameCapture.Busy(Target)){
+        if(ProbesSettled&&Target!=IntPtr.Zero&&!GameCapture.Busy(Target)){
             Rect sceneRect;var sceneOrigin=new Point();if(GetClientRect(Target,out sceneRect)&&ClientToScreen(Target,ref sceneOrigin)){
                 /* E322: the game window itself, never the screen with MeguLit's own layer on it */string kept=Scene.Reason;bool? present=Scene.Tick(Target,sceneRect.Right,sceneRect.Bottom);if(present.HasValue)Emit(new{type="dialogScene",visible=present.Value,reason=Scene.Reason,box=Scene.Box});else if(Scene.Reason!=kept&&Scene.Reason.StartsWith("kept"))Emit(new{type="dialogSceneKept",reason=Scene.Reason});
             }
@@ -591,8 +676,8 @@ public class GalWindowBridge {
         uint hostGamePid=0;if(Target!=IntPtr.Zero)GetWindowThreadProcessId(Target,out hostGamePid);
         bool hostContext=hostForegroundPid==(uint)OverlayPid||hostForegroundPid==hostGamePid||ImeHost(ProcessName(hostForegroundPid));
         bool menuPinned=TranslationMode&&Target!=IntPtr.Zero&&MenuOpen&&MenuRegionReady&&hostContext;
-        LayersMayFloat=foregroundGame||menuPinned;
-        if(!foregroundGame&&!menuPinned&&(GetWindowLong(Overlay,-20)&8)!=0){if(Target!=IntPtr.Zero&&IsWindow(Target))TopmostGuard.Sink(Overlay,GetAncestor(Target,2));else SetWindowPos(Overlay,new IntPtr(-2),0,0,0,0,0x0001|0x0002|0x0010);}
+        LayersMayFloat=Layer.Float;
+        if(!Layer.Float&&(GetWindowLong(Overlay,-20)&8)!=0){if(Target!=IntPtr.Zero&&IsWindow(Target)){/* only a layer that stays visible leaves the topmost band; one that is hidden below keeps its place for the return */if(ReaderLayerPolicy.SinkOnLeave(Layer.Context&&!IsIconic(Target)))TopmostGuard.Sink(Overlay,GetAncestor(Target,2));}else SetWindowPos(Overlay,new IntPtr(-2),0,0,0,0,0x0001|0x0002|0x0010);}
         if(IsIconic(Overlay)){MenuFocusPending=false;if(MaskLayer!=null)MaskLayer.Hide();if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();return;}
         if(Dragging)DragTick();
         // Keep the current surface during the first menu construction instead of hiding and immediately showing it again.
@@ -630,12 +715,12 @@ public class GalWindowBridge {
         Rect probeRect;if(VisualDetection&&GetClientRect(Target,out probeRect)){bool? presence=Dialog.Tick(Target,probeRect.Right,probeRect.Bottom);if(presence.HasValue)Emit(new{type="dialogEvidence",visible=presence.Value});}
         // The game's own popups (IME candidate list, dialogs) belong to its process but not to its window tree: the IME
         // list of a Chinese input method used to hide the whole reading layer as "fg=other" in Subahibi.
-        uint fgPid=0,gamePid=0;GetWindowThreadProcessId(GetForegroundWindow(),out fgPid);GetWindowThreadProcessId(Target,out gamePid);bool gameOwned=fg==gameRoot||(fgPid!=0&&(fgPid==gamePid||ImeHost(ProcessName(fgPid))));
-        bool homeOwned=PreferredOverlay!=IntPtr.Zero&&fgPid==(uint)OverlayPid&&fg!=overlayRoot;bool contextActive=gameOwned||fg==overlayRoot||homeOwned;bool visible=ReadingVisible(contextActive||menuPinned,IsIconic(Target),IsIconic(Overlay),CoverEnabled,DialogVisible,MenuOpen&&MenuRegionReady);
+        uint fgPid=0,gamePid=0;GetWindowThreadProcessId(GetForegroundWindow(),out fgPid);GetWindowThreadProcessId(Target,out gamePid);bool gameOwned=Layer.Front==ReaderLayerPolicy.Game;
+        bool homeOwned=PreferredOverlay!=IntPtr.Zero&&Layer.Front==ReaderLayerPolicy.OwnHome;bool contextActive=gameOwned||Layer.Front==ReaderLayerPolicy.OwnLayer||homeOwned;bool visible=ReadingVisible(Layer.Context,IsIconic(Target),IsIconic(Overlay),CoverEnabled,DialogVisible,MenuOpen);/* 2026-11-16 #299 (Strawberry Nauts: the Alt+T menu vanished as it opened): an open menu keeps the layer up from the first tick, before its hit region is reported, whatever the engine's dialogue flag does */
         if(!contextActive)MenuFocusPending=false;
         // Another application in front: never topmost, also with the menu open (it stays visible, just above the game;
         // KeepAboveGame keeps it there). Topmost over everything after Alt+Tab was wrong (user, 2026-11-03).
-        if(!contextActive&&(GetWindowLong(Overlay,-20)&8)!=0)TopmostGuard.Sink(Overlay,GetAncestor(Target,2));
+        if(!Layer.Float&&(GetWindowLong(Overlay,-20)&8)!=0&&ReaderLayerPolicy.SinkOnLeave(Layer.Context&&!IsIconic(Target)))TopmostGuard.Sink(Overlay,GetAncestor(Target,2));
         if(!visible){if(IsShown){HideReason("menu="+MenuOpen+"/"+MenuRegionReady+" cover="+CoverEnabled+" dialog="+DialogVisible+" iconic="+IsIconic(Target)+" fg="+(fg==gameRoot?"game":fg==overlayRoot?"overlay":"other"));ShowWindow(Overlay,0);}IsShown=false;if(TextMask!=null)TextMask.Hide();
             // Hidden only because no dialogue was detected: keep looking for the wait marker, so its return brings the layer back.
             Rect probeClient;Point probeOrigin=new Point();
@@ -659,13 +744,13 @@ public class GalWindowBridge {
         // One pixel short of the desktop: a monitor-sized window that becomes foreground (Alt+T, a selection) is treated as a
         // fullscreen game by Wallpaper Engine and similar tools, which then pause or black out the wallpaper.
         Rect localReader=new Rect(reader.Left-box.Left,reader.Top-box.Top,reader.Right-box.Left,reader.Bottom-box.Top);
-        if(!HasLastRect||localReader.Left!=LastReaderRect.Left||localReader.Top!=LastReaderRect.Top||localReader.Right!=LastReaderRect.Right||localReader.Bottom!=LastReaderRect.Bottom||box.Right-box.Left!=LastRect.Right-LastRect.Left||box.Bottom-box.Top!=LastRect.Bottom-LastRect.Top){var scan=TextMask!=null?TextMask.SurfaceRegion(client.Right,client.Bottom):System.Drawing.Rectangle.Empty;Emit(new{type="layout",clientWidth=layoutW,clientHeight=layoutH,clientX=layoutX-box.Left,clientY=layoutY-box.Top,magpie=magpie,readerX=localReader.Left,readerY=localReader.Top,readerWidth=localReader.Right-localReader.Left,readerHeight=localReader.Bottom-localReader.Top,surfaceWidth=box.Right-box.Left,surfaceHeight=box.Bottom-box.Top,maskX=scan.X-(box.Left-origin.X),maskY=scan.Y-(box.Top-origin.Y)});LastReaderRect=localReader;}
+        if(!HasLastRect||localReader.Left!=LastReaderRect.Left||localReader.Top!=LastReaderRect.Top||localReader.Right!=LastReaderRect.Right||localReader.Bottom!=LastReaderRect.Bottom||box.Right-box.Left!=LastRect.Right-LastRect.Left||box.Bottom-box.Top!=LastRect.Bottom-LastRect.Top){var scan=TextMask!=null?TextMask.SurfaceRegion(client.Right,client.Bottom):System.Drawing.Rectangle.Empty;Emit(new{type="layout",clientWidth=layoutW,clientHeight=layoutH,clientX=layoutX-box.Left,clientY=layoutY-box.Top,magpie=magpie,readerX=localReader.Left,readerY=localReader.Top,readerWidth=localReader.Right-localReader.Left,readerHeight=localReader.Bottom-localReader.Top,workBottom=WorkBottom(area)-box.Top,surfaceWidth=box.Right-box.Left,surfaceHeight=box.Bottom-box.Top,maskX=scan.X-(box.Left-origin.X),maskY=scan.Y-(box.Top-origin.Y)});LastReaderRect=localReader;}
         ApplyRegion(box.Right-box.Left,box.Bottom-box.Top);
         /* 2026-11-13 (live test, game relaunched while bound: the reader stayed at the floating 160x28 spot at the screen bottom and
            the opening and first lines never showed, while the game hid its own text): the cached LastRect said the window
            was already placed. The real window rect is checked too, so a window moved by any other path is put back. */
         Rect placed;bool strayed=HasLastRect&&GetWindowRect(Overlay,out placed)&&(placed.Left!=box.Left||placed.Top!=box.Top||placed.Right!=box.Right||placed.Bottom!=box.Bottom);
-        if(strayed||!HasLastRect||!IsShown||box.Left!=LastRect.Left||box.Top!=LastRect.Top||box.Right!=LastRect.Right||box.Bottom!=LastRect.Bottom){SetWindowPos(Overlay,homeOwned?JustAboveGame(gameRoot):gameOwned?new IntPtr(-1):IntPtr.Zero,box.Left,box.Top,box.Right-box.Left,box.Bottom-box.Top,(uint)(0x0010|0x0040|(!HasLastRect?0x0020:0)));LastRect=box;HasLastRect=true;}IsShown=true;AckRegion();
+        if(strayed||!HasLastRect||!IsShown||box.Left!=LastRect.Left||box.Top!=LastRect.Top||box.Right!=LastRect.Right||box.Bottom!=LastRect.Bottom){SetWindowPos(Overlay,homeOwned?JustAboveGame(gameRoot):Layer.Float?new IntPtr(-1):IntPtr.Zero,box.Left,box.Top,box.Right-box.Left,box.Bottom-box.Top,(uint)(0x0010|0x0040|(!HasLastRect?0x0020:0)));LastRect=box;HasLastRect=true;}IsShown=true;AckRegion();
         FocusMenuOnce();
         /* 2026-11-14 (user, beta.36: a translation drawn big over MeguLit's own game page while a file picker was open):
            with a MeguLit window in front the layer went directly under that window. An unowned window of MeguLit (the file
@@ -688,6 +773,7 @@ public class GalWindowBridge {
         NoGhostWindows();
         if(args.Length==3&&args[0]=="--same-image"){Emit(new{type="sameImage",same=SameImage(args[1],args[2]),a=ImageIdentity(args[1]),b=ImageIdentity(args[2])});return 0;}
         if(args.Length>0&&args[0]=="--topmost-guard-self-test")return TopmostGuardSelfTest();
+        if(args.Length>0&&args[0]=="--layer-policy-self-test"){string failure=ReaderLayerPolicy.SelfTest();Emit(new{type="layer-policy-selftest",passed=failure=="",failure=failure});return failure==""?0:1;}
         if(args.Length>0&&args[0]=="--host-frame-self-test"){
             int original=0x16cf0000,hosted=HostedStyle(original);
             if((hosted&0x00c40000)!=0||(hosted&unchecked((int)0x80000000))==0||HostedStyle(hosted)!=hosted)return 8;
@@ -703,6 +789,8 @@ public class GalWindowBridge {
         if(args.Length>=1&&args[0]=="--page-locator-ocr-test"){string r=PageLocator.OcrSelfTest(args.Length>1?args[1]:null);Console.WriteLine(r=="0"?"PASS page locator OCR: three drawn paragraphs found, wrapped where they were drawn, boxes at the drawn margin":(r.StartsWith("skip")?"SKIP "+r:"FAIL page locator OCR: "+r));return r=="0"||r.StartsWith("skip")?0:13;}
         if(args.Length==3&&args[0]=="--choice-file"){Console.OutputEncoding=Encoding.UTF8;Console.Write(PageLocator.ChoiceFile(args[1],args[2]));return 0;}
 if(args.Length==2&&args[0]=="--art-scan-file"){Console.OutputEncoding=Encoding.UTF8;Console.Write(PageLocator.ScanFile(args[1]));return 0;}
+        if(args.Length>=1&&args[0]=="--art-scan-mask-test"){string r=PageLocator.ScanMaskSelfTest(args.Length>1?args[1]:null);Console.WriteLine(r=="0"?"PASS art scan mask: MeguLit's menu over a corner painted out, only the game's quote read":r.StartsWith("skip")?"SKIP "+r:"FAIL art scan mask: "+r);return r=="0"||r.StartsWith("skip")?0:1;}
+        if(args.Length>=2&&args[0]=="--art-scan-image"){Console.OutputEncoding=new System.Text.UTF8Encoding(false);Console.WriteLine(PageLocator.ScanImage(args[1],args.Length>2?args[2]:null));return 0;}
         if(args.Length>=1&&args[0]=="--art-scan-ocr-test"){string r=PageLocator.ScanOcrSelfTest(args.Length>1?args[1]:null);Console.WriteLine(r=="0"?"PASS art scan OCR: centred opening lines read and grouped, the text box with its name and dialogue left out":(r.StartsWith("skip")?"SKIP "+r:"FAIL art scan OCR: "+r));return r=="0"||r.StartsWith("skip")?0:15;}
         if(args.Length==1&&args[0]=="--art-scan-self-test"){string r=PageLocator.ScanSelfTest();Console.WriteLine(r=="0"?"PASS art scan: Japanese rows outside the dialogue grouped, shown after two reads, hidden after two misses":"FAIL art scan: "+r);return r=="0"?0:14;}
         if(args.Length==1&&args[0]=="--page-locator-self-test"){bool passed=PageLocator.SelfTest();Console.WriteLine(passed?"PASS page locator: hook line aligned to OCR rows, split where the game wrapped, OCR mistakes tolerated, punctuation kept on its row":"FAIL page locator");return passed?0:12;}
@@ -721,6 +809,8 @@ if(args.Length==2&&args[0]=="--art-scan-file"){Console.OutputEncoding=Encoding.U
         }
         if(args.Length>0&&args[0]=="--mode-self-test"){
             if(!GameSceneProbe.SelfTest())return 6;
+            if(!GameCapture.FreezeSelfTest())return 10;
+            if(!GameAudio.ClientShotSelfTest())return 9;
             Command(new Dictionary<string,object>{{"type","configure"},{"interfaceMode","translation"}});
             if(!TranslationMode)return 4;
             Command(new Dictionary<string,object>{{"type","configure"},{"interfaceMode","normal"}});
@@ -745,25 +835,29 @@ if(args.Length==2&&args[0]=="--art-scan-file"){Console.OutputEncoding=Encoding.U
         }
         if((args.Length!=1&&args.Length!=2)||!Int32.TryParse(args[0],out OverlayPid))return 2;
         if(args.Length==2){long handle;if(!Int64.TryParse(args[1],out handle))return 2;PreferredOverlay=new IntPtr(handle);uint owner;GetWindowThreadProcessId(PreferredOverlay,out owner);if(owner!=OverlayPid)return 2;}
-        HookVerifier=new GameHookVerifier(Emit);MaskLayer=new NativeMaskLayer();TextMask=new GameTextMask(MaskOutput);PageLocate=new PageLocator(Emit);
+        HookVerifier=new GameHookVerifier(Emit);MaskLayer=new NativeMaskLayer();TextMask=new GameTextMask(MaskOutput);PageLocate=new PageLocator(Emit);PageLocate.OwnPids=new uint[]{(uint)OverlayPid,(uint)System.Diagnostics.Process.GetCurrentProcess().Id};var ownPids=PageLocate.OwnPids;GameCapture.OwnParts=(ownHwnd,ownW,ownH)=>OwnCover.Parts(ownHwnd,ownW,ownH,ownPids);
         WaitMarker=new GameWaitMarker(Emit);
         try{SetProcessDpiAwarenessContext(new IntPtr(-4));}catch{}
         PointerGate=new ReaderPointerGate(Emit);
         TopmostGuard.Install((ev,h)=>GuardLayers(ev));
         InstallShowWatch();
-        bool hotkey=RegisterHotKey(IntPtr.Zero,0x541,0x4001,0x54),coverHotkey=RegisterHotKey(IntPtr.Zero,0x542,0x4001,0x48),modeHotkey=RegisterHotKey(IntPtr.Zero,0x543,0x4001,0x4d);
+        /* 2026-11-19 test copies running side by side (MEGULIT_NO_HOTKEYS=1): a copy in the background took Alt+T/H/M from the copy
+           in front and bound the wrong game; such a copy registers no global key at all, never retries and never ends other
+           helpers. Unset, everything below runs as before (users never set it) */
+        bool noHotkeys=Environment.GetEnvironmentVariable("MEGULIT_NO_HOTKEYS")=="1";
+        bool hotkey=!noHotkeys&&RegisterHotKey(IntPtr.Zero,0x541,0x4001,0x54),coverHotkey=!noHotkeys&&RegisterHotKey(IntPtr.Zero,0x542,0x4001,0x48),modeHotkey=!noHotkeys&&RegisterHotKey(IntPtr.Zero,0x543,0x4001,0x4d);
         /* E476: a helper left running by another MeguLit folder (an older download) holds Alt+T: end it and take the keys */
         /* E540: side-by-side test copies (MEGULIT_SIDE_BY_SIDE=1, E530) share the PC with other MeguLit folders on purpose;
            ending their helpers unbound every other copy's game, so a side-by-side copy goes without Alt+T instead */
         bool sideBySide=Environment.GetEnvironmentVariable("MEGULIT_SIDE_BY_SIDE")=="1";
-        if(!sideBySide&&(!hotkey||!coverHotkey||!modeHotkey)){if(EndForeignBridges()>0){Thread.Sleep(300);if(!hotkey)hotkey=RegisterHotKey(IntPtr.Zero,0x541,0x4001,0x54);if(!coverHotkey)coverHotkey=RegisterHotKey(IntPtr.Zero,0x542,0x4001,0x48);if(!modeHotkey)modeHotkey=RegisterHotKey(IntPtr.Zero,0x543,0x4001,0x4d);}}
+        if(!sideBySide&&!noHotkeys&&(!hotkey||!coverHotkey||!modeHotkey)){if(EndForeignBridges()>0){Thread.Sleep(300);if(!hotkey)hotkey=RegisterHotKey(IntPtr.Zero,0x541,0x4001,0x54);if(!coverHotkey)coverHotkey=RegisterHotKey(IntPtr.Zero,0x542,0x4001,0x48);if(!modeHotkey)modeHotkey=RegisterHotKey(IntPtr.Zero,0x543,0x4001,0x4d);}}
         Emit(new{type="ready",hotkey=hotkey,coverHotkey=coverHotkey,modeHotkey=modeHotkey,coverEnabled=true,interfaceMode="normal"});
         DateTime nextHotkeyTry=DateTime.UtcNow.AddSeconds(2);
         var input=new Thread(delegate(){string line;while((line=Console.ReadLine())!=null){try{var command=Json.Deserialize<Dictionary<string,object>>(line);if(Str(command,"type")=="glass"){GlassCommand(command);continue;}Commands.Enqueue(command);}catch{}}Running=false;});input.IsBackground=true;input.Start();
         try{while(Running){Dictionary<string,object> command;while(Commands.TryDequeue(out command)){try{Command(command);}catch(Exception error){Emit(new{type="error",message=error.Message});}}Msg message;while(PeekMessage(out message,IntPtr.Zero,0,0,1)){if(message.message==0x0312)MaskAltRelease();if(message.message==0x0312&&message.wParam.ToUInt64()==0x543){BindHotkey();}else if(message.message==0x0312&&message.wParam.ToUInt64()==0x542){ToggleCover();}else if(message.message==0x0312){Emit(new{type="hotkey"});}else{TranslateMessage(ref message);DispatchMessage(ref message);}}try{ModeRequestTick();PickTick();Tick();}catch{}
           /* E476: keys another program held are taken as soon as it lets go, so "not ready" heals by itself */
-          if((!hotkey||!coverHotkey||!modeHotkey)&&DateTime.UtcNow>=nextHotkeyTry){nextHotkeyTry=DateTime.UtcNow.AddSeconds(2);bool was=hotkey&&coverHotkey&&modeHotkey;if(!hotkey)hotkey=RegisterHotKey(IntPtr.Zero,0x541,0x4001,0x54);if(!coverHotkey)coverHotkey=RegisterHotKey(IntPtr.Zero,0x542,0x4001,0x48);if(!modeHotkey)modeHotkey=RegisterHotKey(IntPtr.Zero,0x543,0x4001,0x4d);if(hotkey||coverHotkey||modeHotkey)Emit(new{type="hotkeyState",hotkey=hotkey,coverHotkey=coverHotkey,modeHotkey=modeHotkey});}
-          try{Glass.Follow(Overlay,TranslationMode&&Target!=IntPtr.Zero&&LayersMayFloat&&IsShown&&Overlay!=IntPtr.Zero&&IsWindowVisible(Overlay)&&!IsIconic(Overlay)&&!IsIconic(Target));}catch{}Thread.Sleep(Dragging?8:Target==IntPtr.Zero?100:16);}}
+          if(!noHotkeys&&(!hotkey||!coverHotkey||!modeHotkey)&&DateTime.UtcNow>=nextHotkeyTry){nextHotkeyTry=DateTime.UtcNow.AddSeconds(2);bool was=hotkey&&coverHotkey&&modeHotkey;if(!hotkey)hotkey=RegisterHotKey(IntPtr.Zero,0x541,0x4001,0x54);if(!coverHotkey)coverHotkey=RegisterHotKey(IntPtr.Zero,0x542,0x4001,0x48);if(!modeHotkey)modeHotkey=RegisterHotKey(IntPtr.Zero,0x543,0x4001,0x4d);if(hotkey||coverHotkey||modeHotkey)Emit(new{type="hotkeyState",hotkey=hotkey,coverHotkey=coverHotkey,modeHotkey=modeHotkey});}
+          try{Glass.Follow(Overlay,TranslationMode&&Target!=IntPtr.Zero&&LayersMayFloat&&IsShown&&Overlay!=IntPtr.Zero&&IsWindowVisible(Overlay)&&!IsIconic(Overlay)&&!IsIconic(Target));}catch{}Thread.Sleep(Dragging?8:Target==IntPtr.Zero?250:16);}}
         finally{RevealGame(Target);TopmostGuard.Uninstall();UninstallShowWatch();ForgetGame();if(HookVerifier!=null)HookVerifier.Dispose();Restore();TextMask.Dispose();WaitMarker.Dispose();MaskLayer.Dispose();Glass.Dispose();if(hotkey)UnregisterHotKey(IntPtr.Zero,0x541);if(coverHotkey)UnregisterHotKey(IntPtr.Zero,0x542);if(modeHotkey)UnregisterHotKey(IntPtr.Zero,0x543);}return 0;
     }
 }

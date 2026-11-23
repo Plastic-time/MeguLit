@@ -1,0 +1,67 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "370050b637fe84c343ac160540c75c784fa0a1ccc8bb33f1c97e25e2cb11f18c",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "spikechunsoft",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "9df943cc71b43d207ce13ebdbf10403c514b2d1730c69e5c68fd21cf82d108a2",
+  "title": "8050a1467efede10ab4160a8b9fa3f593e538d91f7029d36670472ac4bedcea1",
+  "steam": "413410",
+  "vndb": "v7014"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "danganronpa-trigger-happy-havoc",
+ "builds": [
+  "9debd9f6aed2339e540aa9526ea3f16f38ad91c19ad9a842a5b0b2fab21303e3"
+ ],
+ "match": {
+  "exe": [
+   "DR1_us.exe"
+  ],
+  "titles": [
+   "Danganronpa: Trigger Happy Havoc",
+   "ダンガンロンパ 希望の学園と絶望の高校生"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

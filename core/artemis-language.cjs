@@ -17,11 +17,11 @@ function archives(gameDir){
 function entries(file){try{return sc().pfsList(file);}catch{return null;}}
 function readEntry(file,list,name){const e=list.files.find(f=>f.name.toLowerCase()===name.toLowerCase());return e?sc().pfsRead(file,e,list.key):null;}
 
-/* the text holds Japanese next to other languages */
+/* the text holds real Japanese next to other languages (not "*テキスト*" placeholders) */
 function multilingual(dir,files){
  for(const f of files){const list=entries(path.join(dir,f));if(!list)continue;
-  for(const e of list.files.filter(e=>/\.ast$/i.test(e.name)&&e.size>4000).slice(0,8)){let t='';try{t=sc().pfsRead(path.join(dir,f),e,list.key).toString('utf8');}catch{continue;}
-   if(/\bja\s*=\s*\{[^]{0,400}?[ぁ-ヿ]/.test(t)&&/\b(en|cn|tw|zh)\s*=\s*\{/.test(t))return true;}}
+  for(const e of list.files.filter(e=>/\.ast$/i.test(e.name)&&e.size>4000).slice(0,8)){let buf,t='';try{buf=sc().pfsRead(path.join(dir,f),e,list.key);t=buf.toString('utf8');}catch{continue;}
+   if(/\bja\s*=\s*\{/.test(t)&&/\b(en|cn|tw|zh)\s*=\s*\{/.test(t)&&sc().parseAst(buf).lines.some(l=>/[ぁ-ゖァ-ヺ]/.test(l)))return true;}}
  return false;
 }
 /* the game's Lua files (the last archive holding a name wins, like the engine) */
@@ -67,16 +67,37 @@ function pf8(files){
 function manifestPath(dir){return path.join(dir,BACKUP_DIR,'manifest.json');}
 function readManifest(dir){try{const m=JSON.parse(fs.readFileSync(manifestPath(dir),'utf8'));return m?.adapter===ADAPTER?m:null;}catch{return null;}}
 
-function plan(gameDir){
+/* engine-draw (docs/engine-draw-native.md, Artemis): options.bilingual = 'cn' | 'tw' also appends core/artemis-draw.lua to
+   system/image/boot.lua in the same archive: the engine draws the release's Chinese track itself, right under the Japanese */
+const DRAW_MARK=/MeguLit draw/;
+function drawBlock(sub,scale=0.8){
+ const t=fs.readFileSync(path.join(__dirname,'artemis-draw.lua'),'utf8').replace(/\r\n/g,'\n');
+ return t.replace('@SUB@',sub).replace('@SCALE@',String(scale));
+}
+function hasTrack(gameDir,files,sub){
+ for(const f of files){const list=entries(path.join(gameDir,f));if(!list)continue;
+  for(const e of list.files.filter(e=>/\.ast$/i.test(e.name)&&e.size>4000).slice(0,4)){let t='';try{t=sc().pfsRead(path.join(gameDir,f),e,list.key).toString('utf8');}catch{continue;}if(new RegExp('\\b'+sub+'\\s*=\\s*\\{').test(t))return true;}}
+ return false;
+}
+function plan(gameDir,options={}){
+ const sub=/^(cn|tw)$/.test(String(options.bilingual||''))?String(options.bilingual):null;
  for(const set of archives(gameDir)){
   if(!multilingual(gameDir,set.files))continue;
   const lua=luaFiles(gameDir,set.files);
-  if(lua.some(l=>MARKED.test(l.data.toString('utf8'))))return {state:'already',adapter:ADAPTER};
+  if(lua.some(l=>MARKED.test(l.data.toString('utf8'))||DRAW_MARK.test(l.data.toString('utf8'))))return {state:'already',adapter:ADAPTER};
   const changed=lua.map(l=>({...l,next:patchLua(l.data)})).filter(l=>l.next);
   if(!changed.length)return {state:'unsupported',reason:'ARTEMIS_NO_TEXT_LANGUAGE'};
+  /* no such track in this release, or no boot.lua with get_fontdata to append to: the Japanese fix alone */
+  const boot=lua.find(l=>/(^|[\\/])system[\\/]image[\\/]boot\.lua$/i.test(l.name));
+  const draw=sub&&boot&&/function\s+get_fontdata\b/.test(boot.data.toString('utf8'))&&hasTrack(gameDir,set.files,sub)?sub:null;
+  if(draw){
+   const at=changed.find(l=>l===boot||l.name===boot.name),from=at?at.next.data:boot.data;
+   const next={data:Buffer.concat([from,Buffer.from('\n'+drawBlock(draw,options.scale||0.8),'utf8')]),changed:(at?at.next.changed:0)};
+   if(at)at.next=next;else changed.push({...boot,next});
+  }
   const used=set.files.map(f=>/\.(\d{3})$/.exec(f)?.[1]).filter(Boolean).map(Number),n=Math.max(-1,...used)+1;
   if(n>999)return {state:'unsupported',reason:'ARTEMIS_NO_SLOT'};
-  return {state:'restorable',adapter:ADAPTER,file:set.base+'.'+String(n).padStart(3,'0'),lua:changed.map(l=>l.name),lines:changed.reduce((k,l)=>k+l.next.changed,0),files:changed.map(l=>({name:l.name,data:l.next.data}))};
+  return {state:'restorable',adapter:ADAPTER,file:set.base+'.'+String(n).padStart(3,'0'),lua:changed.map(l=>l.name),lines:changed.reduce((k,l)=>k+l.next.changed,0),files:changed.map(l=>({name:l.name,data:l.next.data})),...(draw?{bilingual:draw}:{})};
  }
  return null;
 }
@@ -86,9 +107,9 @@ function detect(gameDir){
  const p=plan(gameDir);if(!p)return {state:'none'};
  const {files,...rest}=p;return {...rest,files:files?files.length:0,cells:p.lines||0,pending:p.state==='restorable'?1:0};
 }
-function apply(gameDir){
+function apply(gameDir,options={}){
  gameDir=path.resolve(String(gameDir||''));if(readManifest(gameDir))throw Error('ALREADY_APPLIED');
- const p=plan(gameDir);if(!p||p.state!=='restorable')throw Error('NOTHING_TO_RESTORE');
+ const p=plan(gameDir,options);if(!p||p.state!=='restorable')throw Error('NOTHING_TO_RESTORE');
  const out=pf8(p.files),target=path.join(gameDir,p.file);
  if(fs.existsSync(target))throw Error('ARTEMIS_SLOT_TAKEN');
  /* read back through the same reader the engine layout is checked with */
@@ -96,7 +117,7 @@ function apply(gameDir){
  try{const list=entries(tmp);if(!list||p.files.some(f=>{const back=readEntry(tmp,list,f.name);return !back||!back.equals(f.data);}))throw Error('ROUNDTRIP_FAILED '+p.file);}catch(error){fs.rmSync(tmp,{force:true});throw error;}
  fs.mkdirSync(path.join(gameDir,BACKUP_DIR),{recursive:true});
  fs.renameSync(tmp,target);
- fs.writeFileSync(manifestPath(gameDir),JSON.stringify({version:1,adapter:ADAPTER,at:new Date().toISOString(),added:p.file,sha256:sha(out),lua:p.lua,from:p.from},null,1));
+ fs.writeFileSync(manifestPath(gameDir),JSON.stringify({version:1,adapter:ADAPTER,at:new Date().toISOString(),added:p.file,sha256:sha(out),lua:p.lua,from:p.from,...(p.bilingual?{bilingual:p.bilingual}:{})},null,1));
  return {applied:p.files.length,cells:p.lines,added:p.file};
 }
 function restore(gameDir){
@@ -114,4 +135,4 @@ function verify(gameDir){
  const list=entries(f),names=[].concat(m.lua),ok=list&&names.every(n=>{const b=readEntry(f,list,n);return b&&MARKED.test(b.toString('utf8'));});
  return ok?{ok:true}:{ok:false,reason:'TABLE_UNREADABLE',file:m.added};
 }
-module.exports={detect,apply,restore,verify,readManifest,ADAPTER,_internal:{pf8,patchLua,archives,plan}};
+module.exports={detect,apply,restore,verify,readManifest,ADAPTER,_internal:{pf8,patchLua,archives,plan,drawBlock,luaFiles,entries,readEntry}};

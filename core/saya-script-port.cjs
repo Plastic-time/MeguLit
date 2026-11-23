@@ -100,9 +100,10 @@ function port(steamScenes,japanese){
 
 // ---- Files ------------------------------------------------------------------------------------------------------
 const HEAD=(file,n)=>{try{const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(n);const got=fs.readSync(fd,b,0,n,0);return b.subarray(0,got);}finally{fs.closeSync(fd);}}catch{return Buffer.alloc(0);}};
-// The Steam build: script.npk in NPK2 that opens with the Saya key.
+// The Steam build: script.npk in NPK2 that opens with a known Saya key (all-ages or +18).
+function readSayaNpk(buf){let err;for(const k of [npk.KEYS.saya,npk.KEYS.saya18]){try{return npk.readNpk(buf,k);}catch(e){err=e;}}throw err;}
 function steamArchive(gameDir){const file=path.join(gameDir,'script.npk');if(!npk.isNpk2(HEAD(file,0x20)))return '';
- try{npk.readNpk(fs.readFileSync(file));return file;}catch{return '';}}
+ try{readSayaNpk(fs.readFileSync(file));return file;}catch{return '';}}
 // The 2003 release: script.pak with the SAYA tag, in the folder or up to three levels below it.
 function japaneseArchive(base){const stack=[[base,3]];
  while(stack.length){const [dir,depth]=stack.pop();let list;try{list=fs.readdirSync(dir,{withFileTypes:true});}catch{continue;}
@@ -113,7 +114,7 @@ function japaneseArchive(base){const stack=[[base,3]];
 function decodeJapanese(buf){return new TextDecoder('shift_jis').decode(buf);}
 
 function build(npkBuf,pakBuf){
- const arc=npk.readNpk(npkBuf),scenes={};
+ const arc=readSayaNpk(npkBuf),scenes={};
  for(const e of arc.entries)if(SCENE.test(e.name))scenes[e.name]=npk.npkData(arc,e).toString('utf8');
  if(!Object.keys(scenes).length)throw Error('SAYA_NO_SCENES');
  const japanese={};for(const e of npk.readPak(pakBuf))if(/\.(txt|nps)$/i.test(e.name))japanese[e.name]=decodeJapanese(e.read());
@@ -121,7 +122,7 @@ function build(npkBuf,pakBuf){
  const replace=new Map();for(const [name,text] of Object.entries(ported))if(text!==scenes[name])replace.set(name,Buffer.from(text,'utf8'));
  const buffer=npk.writeNpk(arc,replace);
  // Structure check: the new archive opens, every entry's SHA-256 matches, and scene files keep their line count.
- const check=npk.readNpk(buffer);if(check.entries.length!==arc.entries.length)throw Error('SAYA_VERIFY_COUNT');
+ const check=npk.readNpk(buffer,arc.key);if(check.entries.length!==arc.entries.length)throw Error('SAYA_VERIFY_COUNT');
  for(const e of check.entries){const d=npk.npkData(check,e);if(d.length!==e.length||!require('node:crypto').createHash('sha256').update(d).digest().equals(e.hash))throw Error('SAYA_VERIFY_HASH');
   if(SCENE.test(e.name)&&splitLines(d.toString('utf8')).length!==splitLines(scenes[e.name]).length)throw Error('SAYA_VERIFY_LINES');}
  return {buffer,report,changed:replace.size};}

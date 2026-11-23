@@ -1,0 +1,66 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "a6995d072865e7ff92ba5528443b597666f6ba31af0368b5feb59272510eb3ab",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "leaf",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "f1b94fc56b67572759842d5717608f4c477423e8360109b28a7be9cbe106df9e",
+  "script": "74c466b1989a3d5616d1cf650250096a28af4ccb015c072ef1d4984d9a744015",
+  "title": "d24e24a3f79dda895040b1b3582a05e90be3ead757f66df6287941fb45e57791",
+  "vndb": "v7771"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "white-album-2",
+ "builds": [
+  "c395d93f74695d2bb7a4fb2fe30486a5d37715b4c30bf20451883569bba3990b"
+ ],
+ "match": {
+  "exe": [
+   "WA2.exe"
+  ],
+  "titles": [
+   "WHITE ALBUM2"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

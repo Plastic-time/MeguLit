@@ -1,0 +1,67 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "4de6457d1fedab42e2929fa7f94f1328c4b9a4401b2f48b16b786dda31678eb4",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "nscripter",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "67ff7d6a021f7b039579b1f7255aeb904f02b01b303986a1844f69ea4f9038d9",
+  "script": "27c6c663ac7ec763cfb2b4c22766ccd728338b7da8916c30f258857586f2fc48",
+  "title": "f05c4ced6245f97405e0437b553a4db954cfb6d96d9fd80e620fce3486a68b58",
+  "vndb": "v7"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "tsukihime-v1-6",
+ "builds": [
+  "fee5d7e1835cc934a3422afa5fdebca28b5df6288b2bfee57d83fe4ff42048f3"
+ ],
+ "match": {
+  "exe": [
+   "Tsukihime.exe"
+  ],
+  "titles": [
+   "月姬 v1.6",
+   "[001229][TYPE-MOON] 月姬 v1.6"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

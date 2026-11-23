@@ -1,3 +1,4 @@
+import {requestUiFrame,cancelUiFrame} from './idle-gate.js';
 /* 2026-11-13 (user: "整个首页加景深效果，并参与鼠标互动，不要静止") home depth: every layer of the home page sits at its own depth and follows
    the pointer on a spring; near layers move more than far ones, far layers carry a fixed pre-set blur (CSS), and an idle page drifts very slightly.
    Only `translate`/`transform` are written per frame, so the loop stays on the compositor. Also holds the daily-news cache and the flat-picture
@@ -38,7 +39,7 @@ export function rememberActivity(v){memo.activity=v;return v;}
 export function resetHomeCache(){memo.daily=null;memo.at=0;memo.activity=null;verdicts.clear();}
 
 /* spring-driven multi-layer parallax. layers: [{el,z,base?}] (z>0 near, z<0 far); planes inside the 3D canvas get their translateZ kept */
-export function createDepth(root,{layers=[],canvas=null,planes=[],raf=globalThis.requestAnimationFrame?.bind(globalThis),caf=globalThis.cancelAnimationFrame?.bind(globalThis),
+export function createDepth(root,{layers=[],canvas=null,planes=[],raf=requestUiFrame,caf=cancelUiFrame,
  now=()=>performance.now()}={}){
  const reduced=globalThis.matchMedia?.('(prefers-reduced-motion:reduce)').matches;if(reduced||!raf)return {stop(){},frame(){},state:null,hold(){},neutral:fn=>fn()};
  const s={x:0,y:0,vx:0,vy:0,tx:0,ty:0,inside:false,hold:false,lastMove:-1e9,t0:now(),last:now(),id:0,alive:true};

@@ -1,14 +1,14 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const reset=require('../services/settings-reset.cjs'),wait=require('../services/wait-marker-migration.cjs');
-const tmp=()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-reset-'));fs.mkdirSync(path.join(root,'data','config'),{recursive:true});return root;};
+const tmp=t=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-reset-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));fs.mkdirSync(path.join(root,'data','config'),{recursive:true});return root;};
 const cfg=(root,name)=>path.join(root,'data','config',name);
 const put=(file,value)=>fs.writeFileSync(file,JSON.stringify(value));
 const get=file=>JSON.parse(fs.readFileSync(file,'utf8'));
 const key='a'.repeat(64);
 
-test('reset backs up, restores defaults, keeps non-setting data, and undo restores exact files',()=>{
- const root=tmp();
+test('reset backs up, restores defaults, keeps non-setting data, and undo restores exact files',t=>{
+ const root=tmp(t);
  put(cfg(root,'gal-preferences.json'),{japaneseFont:'mincho',japaneseSize:50,gameProcess:'BGI',bindEnabled:true});
  put(cfg(root,'text-defaults.json'),{textColor:'#ff0000'});
  put(cfg(root,'native-preferences.json'),{history_span:3});
@@ -36,8 +36,8 @@ test('reset backs up, restores defaults, keeps non-setting data, and undo restor
  assert.throws(()=>reset.undo(root,'../x'));
 });
 
-test('reset keeps only the latest five backups',()=>{
- const root=tmp();put(cfg(root,'gal-preferences.json'),{});
+test('reset keeps only the latest five backups',t=>{
+ const root=tmp(t);put(cfg(root,'gal-preferences.json'),{});
  for(let i=0;i<7;i++)reset.reset(root,1700000000000+i);
  assert.equal(fs.readdirSync(path.join(root,'data','config','settings-reset-backups')).length,5);
 });
@@ -48,8 +48,8 @@ test('wait marker switches default off on every engine path',()=>{
   assert.equal(s.clean({}).hideWaitMarker,false);assert.equal(s.clean({hideWaitMarker:true}).hideWaitMarker,true);}
 });
 
-test('wait marker migration turns both off once, globally and per work',()=>{
- const root=tmp();
+test('wait marker migration turns both off once, globally and per work',t=>{
+ const root=tmp(t);
  put(cfg(root,'gal-preferences.json'),{hideWaitMarker:true,relocateWaitMarker:true,japaneseSize:40});
  put(cfg(root,'game-style-profiles.json'),{entries:{[key]:{prefs:{hideWaitMarker:true},history:[{prefs:{relocateWaitMarker:true}}]},['b'.repeat(64)]:{name:'no prefs'}}});
  const {DatabaseSync}=require('node:sqlite'),db=new DatabaseSync(':memory:');db.exec('CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT)');
@@ -85,4 +85,16 @@ test('Alt+T menu has the same reset entry, wording and safeguards as the setting
  assert.ok(JSON.parse(read('web/reader/modules.json')).includes('settings-reset'));
  assert.match(read('web/reader/module-list.js'),/"settings-reset"/);
  assert.match(read('services/reader.cjs'),/case 'settingsReset':case 'settingsResetUndo':\{try\{const lib=require\('\.\/settings-reset\.cjs'\)/);
+});
+
+test('a reader that is open while settings are reset does not write the old styles back on its next save',t=>{
+ const root=tmp(t);
+ const A='a'.repeat(64),B='b'.repeat(64),file=cfg(root,'game-style-profiles.json');
+ put(file,{version:3,entries:{[A]:{name:'Game A',prefs:{textColor:'#ff0000'},savedAt:1,textSavedAt:1},[B]:{name:'Game B',prefs:{textColor:'#00ff00'},savedAt:1,textSavedAt:1}}});
+ const {GameStyleSync}=require('../core/game-style-sync.cjs'),{Runtime}=require('../services/runtime.cjs');
+ const sync=new GameStyleSync({native:root,config:path.join(root,'data','config')},()=>{},()=>({on(){},stdin:{write(){}},kill(){}}));sync.profileKey=A;sync.status=()=>{};
+ const runtime=new Runtime(root,()=>{});runtime.reader={gal:{styleSync:sync,preferences:{},preview(){},setGameAudio(){}},prefs:()=>({})};
+ reset.reset(root);for(const scope of ['text','panels'])runtime.settingsSaved({scope});/* what both reset entry points do */
+ assert.equal(sync.saveProfile({shadow:'none'},'text'),true);
+ const e=get(file).entries;assert.deepEqual(e[A].prefs,{shadow:'none'});assert.deepEqual(e[B].prefs,{});
 });

@@ -1,5 +1,12 @@
 #include "mages/mages.h"
 #include "mages/sgBlank.h"
+/* MeguLit 2026-11-20 (CHAOS;CHILD loaded at 0x00F40000 instead of 0x00430000: the hook read garbage and LunaHook dropped it with
+   "Sender error"): the scan for `mov al,[reg]` (8A 0x) walked byte by byte and stopped inside an absolute address the loader had
+   relocated (0F B6 0D 48 8D 8A 01: movzx ecx,[018A8D48]). It walks whole instructions now (MinHook's hde32, copied next to this
+   file by build-x86.cmd), so an operand byte is never taken for an opcode. */
+#ifndef _WIN64
+#include "hde32.h"
+#endif
 static void EmbedSteinsGate(hook_context *context, TextBuffer, HookParam *)
 {
     MEMORY_BASIC_INFORMATION memory{};
@@ -88,39 +95,27 @@ bool hookmages::MAGES()
     auto jzoff = *(BYTE *)(pos + 1);
     pos += jzoff + 2;
     auto hookaddr = pos;
-    for (int i = 0; i < 0x200; i++)
+    for (int i = 0; i < 0x100 && pos < hookaddr + 0x200; i++)
     {
-        if (((*(BYTE *)(pos)) == 0x8a))
+        hde32s hs{};
+        unsigned len = hde32_disasm((const void *)pos, &hs);
+        if (!len || (hs.flags & F_ERROR))
+            break;
+        if (hs.opcode == 0x8a && hs.modrm_mod == 0 && hs.modrm_reg == 0)
         {
-
-            switch (((*(BYTE *)(pos + 1))))
+            switch (hs.modrm_rm)
             {
-                // case 0:reg=pusha_eax_off;break;
-                // YU-NO
-                //.text:00431D63 89 0D 20 A9 BF 00             mov     dword_BFA920, ecx
-                // 在加载到内存后，有时变成89 0d 20 a9 8a 00，导致崩溃，且这个没有遇到过，故注释掉。
-            case 3:
-                offset = regoffset(ebx);
-                break;
-            case 1:
-                offset = regoffset(ecx);
-                break;
-            case 2:
-                offset = regoffset(edx);
-                break;
-            case 6:
-                offset = regoffset(esi);
-                break;
-            case 7:
-                offset = regoffset(edi);
-                break;
-            default:
-                offset = -1;
+            case 3: offset = regoffset(ebx); break;
+            case 1: offset = regoffset(ecx); break;
+            case 2: offset = regoffset(edx); break;
+            case 6: offset = regoffset(esi); break;
+            case 7: offset = regoffset(edi); break;
+            default: offset = -1;
             }
             if (offset != -1)
                 break;
         }
-        pos += 1;
+        pos += len;
     }
     if (offset == -1)
         return false;

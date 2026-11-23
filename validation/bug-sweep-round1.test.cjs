@@ -27,8 +27,10 @@ test('cg-rating idle shutdown detaches the worker before ending stdin',()=>{
  assert.match(read('services/cg-rating.cjs'),/setTimeout\(\(\)=>\{if\(worker===w\)worker=null;try\{w\.py\.stdin\.end\(\);/);
 });
 
+/* 2026-11-19 runtime packs download through core/fast-download.cjs, which writes through file handles closed in finally */
 test('runtime pack download closes the file stream when the response errors',()=>{
- assert.match(read('core/runtime-packs.cjs'),/res\.on\('error',e=>\{out\.destroy\(\);reject\(e\);\}\)/);
+ assert.match(read('core/runtime-packs.cjs'),/require\('\.\/fast-download\.cjs'\)\.download\(/);
+ const fd=read('core/fast-download.cjs');assert.match(fd,/finally\{clearInterval\(monitor\);await fh\.close\(\)/);assert.match(fd,/finally\{if\(fh\)await fh\.close\(\)/);
 });
 
 test('desktop close records the window size synchronously before flushing',()=>{

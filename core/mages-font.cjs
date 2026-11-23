@@ -47,14 +47,14 @@ function sample(root,{charset,count=80}={}){const mpk=mpkWithFont(root);if(!mpk)
  return {mpk,sheet:e.name,cell,chars:chars.join(''),glyphs,key:mpk.toLowerCase()+'|'+e.offset+'|'+st.size+'|'+st.mtimeMs};}
 const HOST=path.join(__dirname,'..','services','font-match.ps1');
 function runMatch(job,dir){return new Promise((resolve,reject)=>{fs.mkdirSync(dir,{recursive:true});const id=Date.now().toString(36)+Math.random().toString(36).slice(2,6),inF=path.join(dir,'match-'+id+'.json'),outF=path.join(dir,'match-'+id+'.out.json');
- fs.writeFileSync(inF,JSON.stringify({chars:job.chars,size:SIZE,glyphs:job.glyphs,em:64}));
+ fs.writeFileSync(inF,JSON.stringify({chars:job.chars,size:SIZE,glyphs:job.glyphs,em:64,files:job.files||[]}));
  const ps=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
  require('node:child_process').execFile(ps,['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',HOST,'-In',inF,'-Out',outF],{windowsHide:true,timeout:180000},error=>{
   let out=null;try{out=JSON.parse(fs.readFileSync(outF,'utf8'));}catch{}try{fs.unlinkSync(inF);}catch{}try{fs.unlinkSync(outF);}catch{}
   if(!Array.isArray(out))return reject(error||new Error('font match failed'));resolve(out);});});}
 /* Synchronous match (engine-font-scan runs in a worker thread): best installed families, or [] when PowerShell fails. */
 function matchSync(job,dir){fs.mkdirSync(dir,{recursive:true});const id=Date.now().toString(36)+Math.random().toString(36).slice(2,6),inF=path.join(dir,'match-'+id+'.json'),outF=path.join(dir,'match-'+id+'.out.json');
- fs.writeFileSync(inF,JSON.stringify({chars:job.chars,size:SIZE,glyphs:job.glyphs,em:64}));let out=[];
+ fs.writeFileSync(inF,JSON.stringify({chars:job.chars,size:SIZE,glyphs:job.glyphs,em:64,files:job.files||[]}));let out=[];
  try{const ps=path.join(process.env.SystemRoot||'C:\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');require('node:child_process').execFileSync(ps,['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',HOST,'-In',inF,'-Out',outF],{windowsHide:true,timeout:240000,stdio:'ignore'});out=JSON.parse(fs.readFileSync(outF,'utf8'));}catch{}
  for(const f of [inF,outF])try{fs.unlinkSync(f);}catch{}return Array.isArray(out)?out:[];}
 /* The closest installed face for a sample: {face, style, bold, score, candidates}; face '' below MIN_SCORE. */

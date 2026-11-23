@@ -8,6 +8,7 @@
 
 import { successHTML, guideHTML, GUIDE } from './guide-content.js';
 import { fillGuideLevel } from './guide-levels.js';
+import { seedPageHTML, seedWords, seedSeen, markSeedSeen, fillSeedCount } from './the-seed.js';
 
 const T = {
   zh: {
@@ -145,15 +146,16 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
   if ((shownThisLaunch && !force) || document.querySelector('.dev-notice')) return;
   shownThisLaunch = true;
   const t = words(locale), dialog = document.createElement('dialog');
-  dialog.className = 'game-dialog dev-notice';
+  dialog.className = 'game-dialog dev-notice seed-flow';
   dialog.innerHTML = `<div class="dev-notice-page" data-page="1"><div class="dev-notice-top"><span>${esc(t.noticeKicker)}</span><span>${esc(t.noticeTag)}</span></div>
 <h2>${esc(t.noticeTitle)}</h2><h2 class="dev-notice-title2">${esc(t.noticeTitle2)}</h2>${successHTML(locale, esc)}<p class="dev-notice-text">${esc(t.noticeText)}</p>
 <form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="secondary">${esc(t.submit)}</button></form><p class="dev-notice-rule">${esc(t.gameRule)}</p>
 <p class="feedback-status" role="status" aria-live="polite"></p>
 <ul class="dev-notice-updates" hidden></ul><p class="dev-notice-updates-note" hidden></p>
 <p class="dev-notice-more">${esc(t.noticeMore)}</p>
-<div class="dev-notice-actions"><button type="button" class="text-button" data-report>${esc(t.report)}</button><button type="button" class="primary" data-next>${esc(t.next)}</button></div></div>
-<div class="dev-notice-page" data-page="2" hidden><div class="dev-notice-top"><span>${esc(t.guideKicker)}</span><span>2 / 2</span></div>
+<div class="dev-notice-actions"><button type="button" class="text-button" data-report>${esc(t.report)}</button><button type="button" class="primary" data-next>${esc(seedWords(locale).next)}</button></div></div>
+<div class="dev-notice-page" data-page="seed" hidden>${seedPageHTML(locale, esc, { left: `<button type="button" class="text-button" data-back>${esc(t.back)}</button>`, right: `<button type="button" class="primary" data-next-guide>${esc(t.next)}</button>` })}</div>
+<div class="dev-notice-page" data-page="2" hidden><div class="dev-notice-top"><span>${esc(t.guideKicker)}</span><span data-page-no>3 / 3</span></div>
 <h2>${esc((GUIDE[locale] || GUIDE.zh).title)}</h2><div class="dev-notice-scroll">${guideHTML(locale, esc)}</div>
 <div class="dev-notice-actions"><button type="button" class="text-button" data-back>${esc(t.back)}</button><button type="button" class="secondary" data-ok>${esc(t.done)}</button></div></div>`;
   document.body.append(dialog);
@@ -172,10 +174,20 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
     status.dataset.state = result?.ok ? 'ok' : 'bad'; status.textContent = result?.ok ? t.gameSent : t.failed;
     if (result?.ok) game.value = '';
   };
-  const [one, two] = dialog.querySelectorAll('.dev-notice-page');
-  const page = n => { one.hidden = n !== 1; two.hidden = n !== 2; (n === 1 ? one : two).querySelector('.secondary').focus(); };
-  dialog.querySelector('[data-next]').onclick = () => page(2);
-  dialog.querySelector('[data-back]').onclick = () => page(1);
+  /* the start flow: notice -> The Seed (once, then remembered) -> tutorial; Back returns to the page you came from */
+  const [one, seed, two] = dialog.querySelectorAll('.dev-notice-page'), trail = [1];
+  const page = n => {
+    one.hidden = n !== 1; seed.hidden = n !== 'seed'; two.hidden = n !== 2;
+    const shown = n === 1 ? one : n === 'seed' ? seed : two;
+    const total = seedSeen() || n === 'seed' || trail.includes('seed') ? 3 : 2;
+    if (n === 'seed') seed.querySelector('[data-page-no]').textContent = '2 / 3';
+    if (n === 2) two.querySelector('[data-page-no]').textContent = total === 3 ? '3 / 3' : '2 / 2';
+    shown.querySelector('.secondary, .primary').focus();
+  };
+  fillSeedCount(seed, locale, api);
+  dialog.querySelector('[data-next]').onclick = () => { if (seedSeen()) { trail.push(2); page(2); } else { markSeedSeen(); trail.push('seed'); page('seed'); } };
+  dialog.querySelector('[data-next-guide]').onclick = () => { trail.push(2); page(2); };
+  dialog.querySelectorAll('[data-back]').forEach(b => { b.onclick = () => { trail.pop(); page(trail[trail.length - 1] || 1); }; });
   dialog.querySelector('[data-ok]').onclick = () => dialog.close();
   dialog.querySelector('[data-report]').onclick = () => { dialog.close(); openFeedback({ api, locale, esc, toast, version }); };
   dialog.showModal();
@@ -186,7 +198,7 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
 export function openGuide({ api, locale = 'zh', esc, toast, version = '', tab = 'guide' }) {
   document.querySelector('dialog.guide-panel')?.close();
   const t = words(locale), dialog = document.createElement('dialog'), tabs = [['updates', t.tabUpdates], ['guide', t.tabGuide], ['report', t.tabReport], ['game', t.tabGame]];
-  dialog.className = 'game-dialog dev-notice guide-panel';
+  dialog.className = 'game-dialog dev-notice seed-flow guide-panel';
   dialog.innerHTML = `<div class="dev-notice-top"><span>${esc(t.guideKicker)}</span><span>megulit</span></div>
 <h2>${esc(t.guide)}</h2>
 <nav class="guide-tabs" role="tablist">${tabs.map(([k, v]) => `<button type="button" role="tab" data-tab="${k}">${esc(v)}</button>`).join('')}</nav>

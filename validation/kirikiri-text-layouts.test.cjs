@@ -19,8 +19,11 @@ const text='*start\r\nこんにちは[l]\r\n';const u=Buffer.from(text,'utf16le'
 const head=Buffer.from([0xfe,0xfe,0,0xff,0xfe]);
 const m0=Buffer.from(u);for(let i=0;i<m0.length;i+=2){let c=m0.readUInt16LE(i);if(c>=0x20)c^=((c&0xfe)<<8)^1;m0.writeUInt16LE(c&0xffff,i);}
 assert.strictEqual(kit.decodeText(Buffer.concat([head,m0])),text);
-const text1='abc[l]こんにちは\r\n',u1=Buffer.from(text1,'utf16le'),m1=Buffer.from(u1);for(let i=0;i<m1.length;i+=2){let c=m1.readUInt16LE(i);if(c>=0x20)c=((c&0xaaaa)>>1)|((c&0x5555)<<1);m1.writeUInt16LE(c,i);}
+// mode 1 swaps the bits of every unit, as KiriKiri writes it (krkrz TextStream.cpp): CR LF are stored as 0E 05, a space as 10
+const text1='*start\r\nabc [l]「こんにちは！」\r\n',u1=Buffer.from(text1,'utf16le'),m1=Buffer.from(u1);for(let i=0;i<m1.length;i+=2){const c=m1.readUInt16LE(i);m1.writeUInt16LE(((c&0xaaaa)>>1)|((c&0x5555)<<1),i);}
+assert.strictEqual(m1.readUInt16LE(14),0x05);
 assert.strictEqual(kit.decodeText(Buffer.concat([Buffer.from([0xfe,0xfe,1,0xff,0xfe]),m1])),text1);
+assert.strictEqual(xp3.decodeText(Buffer.concat([Buffer.from([0xfe,0xfe,1,0xff,0xfe]),m1])).text,text1);
 const m2=Buffer.concat([Buffer.from([0xfe,0xfe,2,0xff,0xfe]),Buffer.alloc(16),zlib.deflateSync(u)]);
 assert.strictEqual(kit.decodeText(m2),text);
 assert.strictEqual(xp3.decodeText(Buffer.concat([head,m0])).text,text);

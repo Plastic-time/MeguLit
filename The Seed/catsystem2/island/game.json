@@ -1,0 +1,66 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "2bd98c92e0ccbd050f98ab7ffb9d95f3e283924f47784db9cae82fcc4e008314",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "catsystem2",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "143571ca1ebf072353b4c3e608ba6edce54efe4513f5fa2d8cad4db4697270ba",
+  "script": "17628a8525177c4b7431d1a3ceadc906b8e6a061c781d1a94c96242fb193e861",
+  "title": "28cd2c5c15d13978a6bc06d38092dbbafb31f5590aa3ac120f9f8d8c0e0708c4",
+  "vndb": "v18498"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "island",
+ "builds": [
+  "474cc11d875d7be9df9581f3a55d64698ccf4e760c44013df403cced85e505f1"
+ ],
+ "match": {
+  "exe": [
+   "ISLAND.exe"
+  ],
+  "titles": [
+   "ISLAND"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

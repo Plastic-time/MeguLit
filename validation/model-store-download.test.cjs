@@ -11,11 +11,13 @@ test('cancelled download never installs the partial .part as the model',async()=
  finally{global.fetch=old;fs.rmSync(root,{recursive:true,force:true});}
 });
 
-test('a complete leftover .part answered with 416 is finished instead of failing forever',async()=>{
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-ms-'));const old=global.fetch;const m=MODELS[0];
- fs.mkdirSync(path.join(root,'models'));fs.writeFileSync(path.join(root,'models',m.file+'.part'),'x'.repeat(50));
- global.fetch=async()=>({ok:false,status:416,headers:new Map(),body:null});
+/* 2026-11-19 core/fast-download.cjs: a .part whose state file says every byte arrived is installed without asking any server */
+test('a complete leftover .part with its state file is finished instead of downloaded again',async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-ms-'));const old=global.fetch;const m=MODELS[0];let asked=0;
+ const part=path.join(root,'models',m.file+'.part');fs.mkdirSync(path.join(root,'models'));fs.writeFileSync(part,'x'.repeat(50));fs.writeFileSync(part+'.json',JSON.stringify({v:1,size:50,sha256:'',done:[[0,50]]}));
+ global.fetch=async()=>{asked++;return {ok:false,status:416,headers:new Map(),body:null};};
  try{const s=new ModelStore(root);s.download(m.id);await wait(s,m.id);
-  assert.equal(s.jobs[m.id].state,'done');assert.equal(fs.statSync(path.join(root,'models',m.file)).size,50);}
+  assert.equal(s.jobs[m.id].state,'done');assert.equal(fs.statSync(path.join(root,'models',m.file)).size,50);assert.equal(asked,0);
+  assert.equal(fs.existsSync(part+'.json'),false);}
  finally{global.fetch=old;fs.rmSync(root,{recursive:true,force:true});}
 });

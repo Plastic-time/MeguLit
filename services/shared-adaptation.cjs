@@ -117,7 +117,7 @@ function importFor(root,{executable,engine='',library=null,styleSync=null,cheap=
  const record=doc.records[fp.key]?clean(doc.records[fp.key]):null;if(!record)return {applied:[],fingerprint:fp};
  const done=new Set(doc.applied[fp.key]?.parts||[]),applied=[];
  if(record.hook.stream&&!done.has('stream')){const file=streamFile(root,executable,fp.size);if(!fs.existsSync(file)){try{atomic(file,{...record.hook.stream,embeddable:record.hook.embed!=='readonly',shared:true,at:new Date().toISOString()});applied.push('stream');}catch{}}else done.add('stream');}
- if(library&&record.localeMode&&!library.localeMode&&!done.has('locale')){library.localeMode=record.localeMode;applied.push('locale');}
+ if(library&&record.localeMode&&!library.localeMode&&!done.has('locale')&&!(record.localeMode==='japanese'&&require('../core/locale-emulator.cjs').steamApi(executable))){library.localeMode=record.localeMode;applied.push('locale');}
  if(!cheap&&!done.has('profile')){const prefs={};if(record.layout.box)for(const[k,v]of Object.entries(BOX))prefs[v]=record.layout.box[k];if(record.layout.scan)for(const[k,v]of Object.entries(SCAN))prefs[v]=record.layout.scan[k];if(record.layout.colors)Object.assign(prefs,record.layout.colors);if(record.hook.profile)prefs.hookProfile=record.hook.profile;
   if(Object.keys(prefs).length){try{const key=profileKeyOf(executable),file=path.join(root,'data','config','game-style-profiles.json'),docP=readJSON(file),entries=docP.entries&&typeof docP.entries==='object'?docP.entries:{};
    if(!entries[key]&&!styleSync?.profiles?.[key]){const now=Date.now(),entry={name:'',prefs,savedAt:now,textSavedAt:record.layout.colors?now:0,positionSavedAt:record.layout.box?now:0,shared:true,history:[]};
@@ -132,10 +132,12 @@ function takeNotice(root,fp){if(!fp?.key)return false;const doc=read(root);if(!d
 
 /* ---- export --------------------------------------------------------------------------------------------------- */
 /* Writes the running game's record after a verified embed or a calibration save, then hands it to the relay. */
+/* the installed build (the appVersion option of exportFor shadows appVersion below) */
+function installedVersion(root){return appVersion(root);}
 function exportFor(root,{executable,engine='',library=null,hooks=null,styleSync=null,hookProfile='',appVersion='',sync=require('./shared-adaptation-sync.cjs')}={}){
  if(!executable||!enabled(root))return null;let fp;try{fp=fingerprint(executable,engine);}catch{return null;}if(!fp)return null;
  const profile=styleSync?.profile||null;
- const record=build({fingerprint:fp,stream:readStream(root,executable),embed:library?.hook,hookProfile,flowPage:hooks?.flowPage===true,profile,zeroLatency:zeroLatencyOf(root,executable),localeMode:library?.localeMode,appVersion});
+ const record=build({fingerprint:fp,stream:readStream(root,executable),embed:library?require('./hook-verdict.cjs').shown(library,installedVersion(root),''):undefined,hookProfile,flowPage:hooks?.flowPage===true,profile,zeroLatency:zeroLatencyOf(root,executable),localeMode:library?.localeMode,appVersion});
  const saved=save(root,record,'local');if(saved&&sync)Promise.resolve().then(()=>sync.push([saved],{root})).catch(()=>{});return saved;
 }
 function appVersion(root){try{const v=readJSON(path.join(root,'data','update-installed.json')).version;if(v)return String(v);}catch{}try{const m=/^version\s*=\s*"([^"]+)"/m.exec(fs.readFileSync(path.join(root,'desktop','Cargo.toml'),'utf8'));if(m)return m[1];}catch{}return '';}

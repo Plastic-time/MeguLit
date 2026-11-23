@@ -1,0 +1,68 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "bb7300388644d9cae5682a1cd8d66c1b7b878752f160846f4c2972f2ae8c05de",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "mages",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "3edd2d7fc3c34890b2236394b1ade15b21e7f880fb05aba836b8a22ec9aac334",
+  "script": "6f9131afcd8e6190f055ddb275b533bd7be1fc8ac4c7e1ae82e00a83bed5fe4f",
+  "title": "7530b7e0660789a3431dbe1eacbb3e350a78e2a6cde0f685f734c8060c4f28ee",
+  "steam": "930910",
+  "vndb": "v11660"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "steins-gate-linear-bounded-phenogram",
+ "builds": [
+  "29d8b394d720a517ded1b6d3bd2371241bc51009ee84e066404c4d4fc4e136ae"
+ ],
+ "match": {
+  "exe": [
+   "Game.exe"
+  ],
+  "titles": [
+   "STEINS;GATE: Linear Bounded Phenogram",
+   "STEINS;GATE 線形拘束のフェノグラム"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

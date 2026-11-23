@@ -24,6 +24,22 @@
  zh:{waiting:'游戏字体文件',waitHelp:'绑定游戏后，可把游戏目录中的独立字体文件加入上方字体列表；不读取游戏当前字号、颜色或排版',failed:'游戏字体文件暂不可用',empty:'未发现可导入的游戏字体文件',choose:'仍可在上方日文／中文字体列表中选择系统字体，选择后保存并应用',loaded:'已选择游戏字体文件',found:'可选择的游戏字体文件已加载',detail:'请在上方日文／中文字体列表中选择，或使用下方按钮；保存并应用后保留选择',apply:'选用找到的字体',rescan:'重新扫描字体文件',busy:'正在扫描游戏目录中的字体文件…',file:'游戏文件',systemGothic:'系统字体 · 日文黑体',systemMincho:'系统字体 · 日文明朝体',loadError:'找到了字体文件，但浏览器无法加载；可先在上方选择系统字体'},
  en:{waiting:'Game font files',waitHelp:'After binding a game, standalone fonts in its folder can be added to the font lists above; this does not detect current size, colour or layout',failed:'Game font files unavailable',empty:'No importable game font files found',choose:'Choose a system font in the Japanese / Chinese lists above, then Save and apply',loaded:'Game font files selected',found:'Game font files are available to select',detail:'Select them in the Japanese / Chinese lists above, or use the button below; Save and apply keeps the selection',apply:'Select detected fonts',rescan:'Scan font files again',busy:'Scanning the game folder for font files…',file:'game file',systemGothic:'system font · Japanese Gothic',systemMincho:'system font · Japanese Mincho',loadError:'Font files were found but could not be loaded; choose a system font above'},
  ja:{waiting:'ゲームのフォントファイル',waitHelp:'ゲームを固定すると、フォルダ内の独立したフォントを上の一覧に追加できます。現在の文字サイズ・色・配置は取得しません',failed:'ゲームのフォントを利用できません',empty:'取り込めるフォントファイルはありません',choose:'上の日本語／中国語フォントからシステムフォントを選び、保存して適用してください',loaded:'ゲームのフォントを選択中',found:'ゲームのフォントを選択できます',detail:'上の日本語／中国語フォント一覧か下のボタンから選択し、保存して適用してください',apply:'検出したフォントを選択',rescan:'フォントを再スキャン',busy:'ゲームフォルダのフォントをスキャン中…',file:'ゲーム内ファイル',systemGothic:'システムフォント・ゴシック体',systemMincho:'システムフォント・明朝体',loadError:'フォントは見つかりましたが読み込めませんでした。上からシステムフォントを選択できます'}};
+ /* 2026-11-19 (user: "扫描游戏字体现在基本上无法使用 要把它做成有用才行"): say which font is used and where it came from,
+    and when nothing is found, which sources were tried (game folder, archives, fonts the game registered, the name the
+    engine reports) instead of only "nothing found". */
+ const S={
+ zh:{using:'正在用游戏字体：',usingSystem:'正在用游戏字体名对应的系统字体：',picked:'找到了游戏字体，当前用的是你手选的字体',pickedDetail:'点“恢复为游戏原字体”改回游戏字体：',from:'来源：',none:'没有找到游戏字体',tried:'已查：',folder:'游戏目录字体文件',archive:'封包',registered:'游戏自己注册的字体',engine:'引擎报告的字体名',count:' 个',noArchive:'没有可读的封包',noFont:'里没有字体',bitmapOnly:'里只有预渲染字形',noName:'无',prerendered:'',recognised:'认出游戏字体：',closest:'游戏用的是预渲染字形，已选用最接近的字体：',similar:'相似度 ',need:'（认定为同一款需要 ',bitmap:'游戏字形：',called:'，游戏里叫 ',mem:'游戏内存',rest:'；仍可在上方列表选系统字体'},
+ en:{using:'Using the game font: ',usingSystem:'Using the system font named by the game: ',picked:'Game font found; your own pick is in use',pickedDetail:'Restore the game font to switch back to: ',from:'Source: ',none:'No game font found',tried:'Tried: ',folder:'font files in the game folder',archive:'archives',registered:'fonts the game registered',engine:'font name the engine reports',count:'',noArchive:'no readable archive',noFont:'hold no font',bitmapOnly:'hold only pre-rendered glyphs',noName:'none',prerendered:'',recognised:'Game font recognised: ',closest:'The game draws pre-rendered glyphs; the closest font is used: ',similar:'similarity ',need:' (the same face needs ',bitmap:'Game glyphs: ',called:', named in the game ',mem:'game memory',rest:'; a system font can still be chosen above'},
+ ja:{using:'ゲームのフォントを使用中：',usingSystem:'ゲームが指定した名前のシステムフォントを使用中：',picked:'ゲームのフォントがあります。選んだフォントを使用中',pickedDetail:'「ゲームのフォントに戻す」で切り替え：',from:'取得元：',none:'ゲームのフォントは見つかりませんでした',tried:'確認済み：',folder:'ゲームフォルダのフォントファイル',archive:'アーカイブ',registered:'ゲームが登録したフォント',engine:'エンジンが示すフォント名',count:'',noArchive:'読めるアーカイブなし',noFont:'にフォントなし',bitmapOnly:'はプリレンダー字形のみ',noName:'なし',prerendered:'',recognised:'ゲームのフォントを特定：',closest:'ゲームはプリレンダー字形を使用。最も近いフォントを使用中：',similar:'類似度 ',need:'（同一と判定するには ',bitmap:'ゲームの字形：',called:'、ゲーム内の名前 ',mem:'ゲームのメモリ',rest:'。上の一覧からシステムフォントも選べます'}};
+ const s=k=>(S[window.__tomeI18n?.get?.()]||S.zh)[k];
+ const sourceOf=f=>{const v=String(f?.source||'');if(f?.loaded==='mem')return s('mem')+' '+v.replace(/^内存 /,'');return v.replace(/ \(pre-rendered\)(#\d+)?$/,s('prerendered'));};
+ function tried(){const q=info?.sources||{},parts=[];
+  parts.push(s('folder')+' '+(q.folder?.found??0)+s('count'));
+  const a=q.archive;parts.push(s('archive')+(a?(a.engine?' ('+a.engine+') ':' ')+(a.found?a.found+s('count'):/^no (engine )?archives?$|^no engine archive$/.test(a.reason||'')?s('noArchive'):a.prerendered?s('bitmapOnly'):s('noFont')):' —'));
+  parts.push(s('registered')+' '+(q.registered?.found??0)+s('count'));
+  const named=q.engine?.face||q.probe?.face||'';parts.push(s('engine')+' '+(named||s('noName')));
+  return s('tried')+parts.join('；')+s('rest');}
+ function inUse(){const p=prefs(),select=document.querySelector('select[name=galJapaneseFont]');let key=select?.value||p.japaneseFont||'';if(key==='@game')key=p.japaneseFont||'';return {key,user:p.japaneseFontSource==='user'};}
  const t=k=>(T[window.__tomeI18n?.get?.()]||T.zh)[k];
  const fontsOf=lang=>(info?.fonts||[]).filter(f=>f.lang===lang&&loaded.has(f.id));
  const label=()=>info?.label||'游戏';
@@ -37,8 +53,15 @@
   const p={...prefs()},zh=fontsOf('zh'),ja=fontsOf('ja');for(const [name,key]of [['galJapaneseFont','japaneseFont'],['galChineseFont','chineseFont']]){const select=document.querySelector('select[name='+name+']');if(select)p[key]=select.value;}
   if(!info)return {state:'off',title:t('waiting'),detail:t('waitHelp')};
   if(info.status==='error')return {state:'off',title:t('failed'),detail:t('choose')};
-  if(!zh.length&&!ja.length)return {state:'off',title:t('empty'),detail:info.fonts?.length?t('loadError'):t('choose')};
-  const using=ja.some(f=>p.japaneseFont==='game:'+f.id)||zh.some(f=>p.chineseFont==='game:'+f.id);
+  const use=inUse(),hit=ja.find(f=>use.key==='game:'+f.id);
+  /* a pre-rendered game face is never claimed as the font in use: recognised (>= 0.90) or the closest real font */
+  const pr=info.sources?.archive;if(pr?.prerendered&&pr.match&&!use.user&&(use.key==='engine:'+pr.match.family||(hit&&hit.family===pr.match.family))){const m=pr.match;
+   return {state:'on',title:(m.recognized?s('recognised'):s('closest'))+m.family,detail:s('similar')+Number(m.score).toFixed(2)+(m.recognized?'':s('need')+'0.90）'.replace('）',window.__tomeI18n?.get?.()==='en'?')':'）'))+'；'+s('bitmap')+pr.prerendered.source+(pr.prerendered.family?s('called')+pr.prerendered.family:'')};}
+  if(hit)return {state:'on',title:s('using')+hit.family,detail:s('from')+sourceOf(hit)};
+  if(use.key.startsWith('engine:')&&!use.user)return {state:'on',title:s('usingSystem')+use.key.slice(7),detail:tried()};
+  if(!zh.length&&!ja.length)return {state:'off',title:s('none'),detail:info.fonts?.length?t('loadError'):tried()};
+  if(ja.length&&use.user)return {state:'found',title:s('picked'),detail:s('pickedDetail')+ja.map(f=>f.family).join('、')};
+  const using=zh.some(f=>p.chineseFont==='game:'+f.id);
   return {state:using?'on':'found',title:t(using?'loaded':'found'),detail:t('detail'),apply:!using};
  }
  function ensureBox(){

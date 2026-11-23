@@ -7,9 +7,9 @@
   const defaults = Object.freeze({
     translationPrompt:'',choiceFont:'game',choiceSelectedColor:'',choiceUnselectedColor:'',
     typewriter:true,typewriterSpeed:35, layoutVersion: 22, style: 'classic', display: 'bilingual', furigana: true, japaneseSize: 34,
-    translationSize: 30, rubyScale: .55, rubyOffsetX:0, rubyOffsetY:0, rubyRowOffsets:'',rubyRowOffsetsX:'', lineHeight: 0, lineHeightMode:'offset', translationLineHeight:0, japaneseSpacing:0, japaneseSpacingPx:0,chineseSpacingPx:0, gap: 6, translationWidth: 75,
+    translationSize: 30, rubyScale: .55, rubyOffsetX:0, rubyOffsetY:3, rubyRowOffsets:'',rubyRowOffsetsX:'', lineHeight: 0, lineHeightMode:'offset', translationLineHeight:0, japaneseSpacing:0, japaneseSpacingPx:0,chineseSpacingPx:0, gap: -2, translationWidth: 75,
     paddingX: 20, paddingY: 10, textColor: '#fffaf2', readTextColor: '', speechTextColor: '', narrationTextColor: '', textGradient:false, textGradientTop:'#fffaf2', textGradientBottom:'#a8c8ff', readTextGradient:false, readTextGradientTop:'#b0e2ff', readTextGradientBottom:'#639bd1', textGradientStart:0, readTextGradientStart:0, shadow: 'outline', autoScale: true,
-    bindEnabled: false, interfaceMode:'normal', gameProcess: 'BGI', x: 4, y: 70, width: 92, height: 27,
+    bindEnabled: false, interfaceMode:'normal', gameProcess: '', x: 4, y: 70, width: 92, height: 27, anchorDX: 0, anchorDY: 0,
     autoGameStyle:true, livePosition:false, hookProfile:'read', embedTranslation:false, hookAutoStart:true, hookHide:true, hookFast:true, mask: false, maskMode: 'hook', maskColor: '#171923',
     scanAuto: true, scanX: 2, scanY: 60, scanWidth: 96, scanHeight: 38, blurRadius: 13, maskPadding: 6, fastMask:true,
     maskVersion:26, maskStyle:'blend', japaneseBold:false, chineseBold:false, translationBlur:false,
@@ -80,6 +80,9 @@ if(typeof value.rubyRowOffsetsX==='string')result.rubyRowOffsetsX=value.rubyRowO
       result.japaneseSize = Math.max(34, result.japaneseSize);
       result.translationSize = Math.max(30, result.translationSize);
     }
+    /* 2026-11-20 (user: 假名注音默认往下调一点、译文和日文间距默认也小点): a saved settings blob from before moves once, ruby 3 px lower and the gap 8 px smaller (old default 6 = new default -2); typed values are saved with the mark and never move */
+    if (value.spacingDefaults !== 1 && value.layoutVersion !== undefined) { const n = v => Number.isFinite(Number(v)) && v !== '' && v !== null ? Number(v) : null; result.gap = Math.max(-28, Math.min(40, (n(value.gap) ?? 6) - 8)); result.rubyOffsetY = Math.max(-100, Math.min(100, Math.round(((n(value.rubyOffsetY) ?? 0) + 3) * 10) / 10)); }
+    result.spacingDefaults = 1; /* written by this version: core/gal-native.cjs moves only older saved spacing, once */
     for (const key of ['textColor','maskColor']) if (/^#[0-9a-f]{6}$/i.test(value[key])) result[key] = value[key];
     // Colour of lines the game marks as already read; empty = same as textColor.
     if (value.readTextColor === '' || /^#[0-9a-f]{6}$/i.test(value.readTextColor)) result.readTextColor = value.readTextColor;
@@ -88,12 +91,16 @@ if(typeof value.rubyRowOffsetsX==='string')result.rubyRowOffsetsX=value.rubyRowO
     if (['bilingual','japanese','chinese','bilingual-en','english','none'].includes(value.display)) result.display = value.display;
     if (['outline','soft','none'].includes(value.shadow)) result.shadow = value.shadow;
     if (typeof value.gameProcess === 'string') result.gameProcess = value.gameProcess.slice(0,100);
+    /* 2026-11-19 the remembered game is its full program path (many engines share a program name: BGI.exe, cs2.exe, SiglusEngine.exe) */
+    if (typeof value.gameExecutable === 'string') result.gameExecutable = value.gameExecutable.slice(0,1000);
+    /* 2026-11-19 the anchored line's offset from the game's own place (client %), kept apart from the box position x/y */
+    for (const k of ['anchorDX','anchorDY']) if (Number.isFinite(Number(value[k])) && value[k] !== '' && value[k] !== null) result[k] = Math.max(-95, Math.min(95, Math.round(Number(value[k]) * 10) / 10));
     return result;
   }
   /* E550 per-line colour (ファタモルガーナの館: narration grey #9d9d9d, speech white). lineKind: 'speech' for a line in
      brackets (「」『』（）, also after a speaker name), 'narration' otherwise. lineColor: the engine's colour for this line when
      it reported one (not near black over light text: that is an outline), else the colour learned for the line's kind, else ''
-     (the plain text colour applies). A user's own read/gradient colours always win, as in paintFor. */
+     (the plain text colour applies). In automatic mode a current draw overrides saved read/gradient colours. */
   function lineKind(text) {
     const t = String(text || '').replace(/^[\s　]+/, '');
     if (!t) return '';
@@ -102,19 +109,31 @@ if(typeof value.rubyRowOffsetsX==='string')result.rubyRowOffsetsX=value.rubyRowO
   function lineColor(settings, text='', engineColor='') {
     if (!settings || settings.autoGameStyle === false) return '';
     const own = settings.textGradient || settings.readTextGradient || !!settings.readTextColor && String(settings.readTextColor).toLowerCase() !== String(settings.textColor).toLowerCase();
-    if (own) return '';
     const hex = c => /^#[0-9a-f]{6}$/i.test(String(c || ''));
     const lum = c => { const v = [1,3,5].map(i => parseInt(String(c).slice(i, i + 2), 16)); return v[0] * .2126 + v[1] * .7152 + v[2] * .0722; };
     if (hex(engineColor) && !(lum(engineColor) < 48 && !(hex(settings.textColor) && lum(settings.textColor) < 96))) return engineColor.toLowerCase();
+    if (own) return '';
     const kind = lineKind(text), learned = kind && settings[kind + 'TextColor'];
     return hex(learned) ? learned.toLowerCase() : '';
   }
+  /* What to paint one sentence with, from what the game drew it with (style: fill, alpha, edge... from the engine's draw call or
+     the game's pixels). color: #rrggbb or #rrggbbaa (the game dims or fades read text), edge: the outline colour or ''.
+     sampled: the fill is this sentence's own evidence, not a learned or saved colour. null: nothing to override. */
+  function linePaint(settings, text='', engineColor='', style=null) {
+    const hex = c => /^#[0-9a-f]{6}$/i.test(String(c || '')), drawn = style && hex(style.fill) ? String(style.fill).toLowerCase() : '';
+    const fill = lineColor(settings, text, drawn || engineColor);
+    if (!fill) return null;
+    const aa = a => Math.round(Math.max(0, Math.min(1, a)) * 255).toString(16).padStart(2, '0');
+    const own = !!drawn && fill === drawn, sampled = own || hex(engineColor) && fill === String(engineColor).toLowerCase();
+    const alpha = own && style.animated !== true && Number.isFinite(style.alpha) && style.alpha > .02 && style.alpha < .98 ? style.alpha : 1; /* animated: a fade-in may be running, not the sentence's opacity */
+    const edge = own && hex(style.edge) && style.edge.toLowerCase() !== fill ? style.edge.toLowerCase() + (style.edgeAlpha > .02 && style.edgeAlpha < .98 ? aa(style.edgeAlpha) : '') : '';
+    return { color: fill + (alpha < 1 ? aa(alpha) : ''), edge, sampled };
+  }
   function paintFor(settings, read=false, engineColor='') {
     // An actual engine colour takes priority over a learned/manual gradient for that sentence.
-    // ...unless the user set read and unread apart (or a gradient): then their own colours win (user, 2026-11-02).
-    const own=settings.textGradient||settings.readTextGradient||!!settings.readTextColor&&String(settings.readTextColor).toLowerCase()!==String(settings.textColor).toLowerCase();
+    /* Saved read colours can come from calibration; they must not suppress this sentence's draw evidence. */
     /* An engine colour near black over a light text setting is a shadow/outline or an unset field, not the text (user: ISLAND sometimes came out black) */const lum=c=>{const v=[1,3,5].map(i=>parseInt(String(c).slice(i,i+2),16));return v[0]*.2126+v[1]*.7152+v[2]*.0722;};if(/^#[0-9a-f]{6}$/i.test(engineColor)&&lum(engineColor)<48&&!(/^#[0-9a-f]{6}$/i.test(settings.textColor)&&lum(settings.textColor)<96))engineColor='';
-    if(settings.autoGameStyle!==false&&!own&&/^#[0-9a-f]{6}$/i.test(engineColor))return {color:engineColor,gradient:'none',fill:'currentColor'};
+    if(settings.autoGameStyle!==false&&/^#[0-9a-f]{6}$/i.test(engineColor))return {color:engineColor,gradient:'none',fill:'currentColor'};
     const prefix=read?'readText':'text',on=settings[prefix+'Gradient'];
     return {color:read?(settings.readTextColor||settings.textColor):settings.textColor,
       gradient:on?'linear-gradient(to bottom, '+settings[prefix+'GradientTop']+' '+(Number(settings[prefix+'GradientStart'])||0)+'%, '+settings[prefix+'GradientBottom']+' 100%)':'none',fill:on?'transparent':'currentColor'};
@@ -150,8 +169,10 @@ if(typeof value.rubyRowOffsetsX==='string')result.rubyRowOffsetsX=value.rubyRowO
     const s=o.settings||defaults,layout=o.layout,dpr=Math.max(.5,Number(o.dpr)||1),previous=Number.isFinite(o.previous)&&o.previous>0?o.previous:1;
     const cw=Number(layout?.clientWidth),ch=Number(layout?.clientHeight);let scale;
     if(layout&&cw>0)scale=scaleForViewport(cw*s.width/100/dpr,s,o.bound);
-    else if(o.dialogOpen)return previous;
-    else scale=scaleForViewport(layout?Number(layout.readerWidth)/dpr:o.innerWidth,s,o.bound);
+    /* issue 468 (寒蝉, "一不小心就会显示得特别大"): without the game client's size the scale came from the reader layer's width,
+       which is the whole desktop (overlay) or the Alt+T-grown layer, so a windowed game's text jumped to monitor/1280 size
+       until the next layout. The scale only ever comes from the game client; without one it keeps the last one. */
+    else return o.bound?previous:1;
     if(o.bound&&ch>0&&s.sizeSource!=='user'){const largest=Math.max(Number(s.japaneseSize)||0,s.display==='japanese'?0:Number(s.translationSize)||0);if(largest>0)scale=Math.min(scale,ch/dpr*.06/largest);}
     return Math.max(.05,scale);
   }
@@ -228,5 +249,5 @@ if(typeof value.rubyRowOffsetsX==='string')result.rubyRowOffsetsX=value.rubyRowO
     if (!dark) return shadows[kind] || shadows.outline;
     return kind === 'soft' ? '0 1px 3px #fff9' : '-1px 0 0 #fff9,1px 0 0 #fff9,0 -1px 0 #fff9,0 1px 0 #fff9';
   }
-  return { defaults, clean, lineKind, lineColor, paintFor, paintVariables, lineHeightFor, insets, scaleForViewport, gameScaleFor, fonts, shadows, shadowFor, japaneseFonts,chineseFonts,englishFonts,fontOptions,outlineFor };
+  return { defaults, clean, lineKind, lineColor, linePaint, paintFor, paintVariables, lineHeightFor, insets, scaleForViewport, gameScaleFor, fonts, shadows, shadowFor, japaneseFonts,chineseFonts,englishFonts,fontOptions,outlineFor };
 });

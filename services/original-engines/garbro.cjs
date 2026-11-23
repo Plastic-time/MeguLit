@@ -72,6 +72,33 @@ async function unpack(file,{download=true}={}){
   if(!/GARBRO_TIMEOUT|PACK_/.test(error.message)){fs.mkdirSync(out,{recursive:true});fs.writeFileSync(failed,JSON.stringify({archive:file,version:v,error:error.message,at:Date.now()}));}
   throw error;}
 }
+/* S5 the same unpack, synchronous, for the probe worker (its probe is one synchronous call): only when the pack is already
+   installed (a probe never downloads), within timeout. → done.json info; throws PACK_NOT_INSTALLED / GARBRO_* like unpack */
+function unpackSync(file,{timeout=60000}={}){
+ const out=cacheDir(file),done=path.join(out,'done.json'),failed=path.join(out,'failed.json');
+ const ready=readJson(done);if(ready)return ready;if(!installed())throw Error('PACK_NOT_INSTALLED');
+ const v=version(),bad=readJson(failed);if(bad&&bad.version===v)throw Error(bad.error||'GARBRO_FAILED');
+ const tmp=out+'.part';fs.rmSync(tmp,{recursive:true,force:true});
+ try{const ps=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
+  const r=require('node:child_process').spawnSync(ps,['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',HOST,'-GarbroDir',DIR(),'-Mode','extract','-Archive',file,'-Out',tmp,'-Match',MATCH,'-Limit',String(LIMIT_FILES),'-MaxBytes',String(LIMIT_BYTES)],{windowsHide:true,encoding:'utf8',timeout,maxBuffer:16<<20});
+  if(r.error&&/ETIMEDOUT/.test(String(r.error.code||r.error.message)))throw Error('GARBRO_TIMEOUT');
+  let json=null;try{json=JSON.parse(String(r.stdout||'').trim().split(/\r?\n/).pop()||'');}catch{}
+  if(!json)throw Error('GARBRO_BAD_OUTPUT '+String(r.stderr||r.stdout||'').slice(0,300));if(json.error)throw Error(json.error);
+  if(!json.files?.length)throw Error('GARBRO_NO_SCRIPTS');
+  fs.rmSync(out,{recursive:true,force:true});fs.renameSync(tmp,out);
+  const info={archive:file,format:json.format,files:json.files,bytes:json.bytes,version:v,at:Date.now()};fs.writeFileSync(done,JSON.stringify(info));return info;
+ }catch(error){fs.rmSync(tmp,{recursive:true,force:true});
+  if(!/GARBRO_TIMEOUT|PACK_/.test(error.message)){fs.mkdirSync(out,{recursive:true});fs.writeFileSync(failed,JSON.stringify({archive:file,version:v,error:error.message,at:Date.now()}));}
+  throw error;}
+}
+/* 2026-11-19 game fonts: only the entries whose names match (font files), synchronously (engine-font-scan runs in a worker),
+   only when the pack is installed (a font scan never downloads it). -> list of extracted files, or [] */
+function extractMatchSync(file,out,match,{timeout=90000,maxBytes=200*1048576,limit=64}={}){if(!installed())return [];
+ try{fs.rmSync(out,{recursive:true,force:true});const ps=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
+  const r=require('node:child_process').spawnSync(ps,['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',HOST,'-GarbroDir',DIR(),'-Mode','extract','-Archive',file,'-Out',out,'-Match',match,'-Limit',String(limit),'-MaxBytes',String(maxBytes)],{windowsHide:true,encoding:'utf8',timeout,maxBuffer:16<<20});
+  let json=null;try{json=JSON.parse(String(r.stdout||'').trim().split(/\r?\n/).pop()||'');}catch{}
+  if(!json||json.error||!Array.isArray(json.files))return [];return json.files.map(f=>path.join(out,typeof f==='string'?f:(f.name||''))).filter(f=>{try{return fs.statSync(f).isFile();}catch{return false;}});
+ }catch{return [];}}
 const queue=[];let busy=false;
 function schedule(file){if(jobs.has(file))return;jobs.set(file,{state:'queued',startedAt:Date.now(),error:''});queue.push(file);pump();}
 async function pump(){if(busy)return;busy=true;try{while(queue.length){const file=queue.shift(),job=jobs.get(file);job.state='running';
@@ -97,4 +124,4 @@ const engine={id:'garbro',
   const startedAt=Math.min(...files.map(f=>jobs.get(f).startedAt)),pj=installed()?null:packs().status().packs.find(p=>p.id===PACK)?.job;
   return pj?{kind:'garbro',stage:'download',startedAt,received:pj.received,total:pj.total}:{kind:'garbro',stage:'unpack',startedAt};},
 };
-module.exports={engine,archives,unpack,run,decodeRuns,cacheDir,schedule,installed,version,readJson,MATCH,PACK,jobs};
+module.exports={engine,archives,unpack,unpackSync,extractMatchSync,run,decodeRuns,cacheDir,schedule,installed,version,readJson,MATCH,PACK,jobs};

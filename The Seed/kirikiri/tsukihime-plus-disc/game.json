@@ -1,0 +1,66 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "0d8a0d1625d8a13f73020e7d4ede8969178ba9798ed005ddd0e58e084e2ebeb3",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "ecd41166a882e7ff039359931096374848dd99fa2c8d2b840ebb8091da010a6b",
+  "script": "1143ebfbcc648e1397a6c00133daaee5f8262005e35ebb8f7ed29fa49bfb97c5",
+  "title": "4087e19946024f9f785566e3a1c7d845048c26782744d17f064d2608277bc10a",
+  "vndb": "v49"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "tsukihime-plus-disc",
+ "builds": [
+  "d96baf539a32a13b0016e371becf9ceae1d494556729363f5c9c65f2a3f21aab"
+ ],
+ "match": {
+  "exe": [
+   "PLUS+DISC.eXe"
+  ],
+  "titles": [
+   "月姬PLUS+DISC"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

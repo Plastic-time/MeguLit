@@ -19,8 +19,8 @@ test('glyph-dots: off by default; the placed setting turns on the launcher and p
       assert.equal(g.mode(root), 'blank', 'the old compositor choice now means placement (blank glyphs + positions)');
       fs.writeFileSync(path.join(root, 'data', 'config', 'gal-preferences.json'), JSON.stringify({textRenderer: 'placed'}));
       assert.equal(g.wanted(root), true); assert.deepEqual(g.bridgeEnv(root), {MEGULIT_GLYPH_MODE: 'blank', MEGULIT_GLYPH_ALL: '1'});
-      process.env.MEGULIT_GLYPH_MODE = 'dot'; assert.equal(g.mode(root), 'dot', 'dots only on request'); delete process.env.MEGULIT_GLYPH_MODE;
-      process.env.MEGULIT_CAPTURE_COMPOSITOR = '1'; assert.deepEqual(g.bridgeEnv(root), {MEGULIT_GLYPH_MODE: 'dot', MEGULIT_GLYPH_ALL: '1', MEGULIT_GLYPH_BLIND: '1'}, 'compositor tests keep dot-blind'); delete process.env.MEGULIT_CAPTURE_COMPOSITOR;
+      process.env.MEGULIT_GLYPH_MODE = 'dot'; assert.equal(g.mode(root), 'blank', 'dot glyphs are retired (owner 2026-11-21): a request for them is blank'); delete process.env.MEGULIT_GLYPH_MODE;
+      process.env.MEGULIT_CAPTURE_COMPOSITOR = '1'; assert.deepEqual(g.bridgeEnv(root), {MEGULIT_GLYPH_MODE: 'blank', MEGULIT_GLYPH_ALL: '1'}, 'dot glyphs are retired: the capture compositor gets blank glyphs too'); delete process.env.MEGULIT_CAPTURE_COMPOSITOR;
       assert.equal(g.earlyStart(root, exe, [], true), null, 'launcher binaries missing: plain start');
       for (const f of ['MeguLitLaunch32.exe', 'MeguLitFont32.dll']) fs.writeFileSync(path.join(root, 'native', f), 'x');
       let e = g.earlyStart(root, exe, ['-a'], true, {PATH: 'p', MEGULIT_GLYPH_FONT: 'stale'});
@@ -43,7 +43,7 @@ test('launch flow: direct starts use the launcher (helper, not indirect); Steam 
   /* ③ text paths (web/Unity) start the game themselves: no early glyph launcher then; the launcher starts the shadow program */assert.ok(b.includes("const early=steam||textPath?null:require('../core/glyph-dots.cjs').earlyStart(root,launchExe,companion?companionArgs:[],require('../core/locale-emulator.cjs').x86(game.executable),directEnv||process.env);"));
   assert.ok(b.includes("startProcess(early?early.file:steam?'explorer.exe':launchExe,early?early.args:"));
   assert.ok(b.includes('{helper:steam||!!early,indirect:steam,'), 'the launcher exiting is not the game exiting; a game that quits at once is still seen');
-  assert.ok(read('core/hook-native.cjs').includes("env:{...process.env,...require('./glyph-dots.cjs').bridgeEnv(path.join(this.folder,'..'))"));
+  assert.match(read('core/hook-native.cjs'),/env:\{\.\.\.process\.env,(?:MEGULIT_PROFILE:JSON\.stringify\(this\.bridgeProfile\(\)\),)?(?:\.\.\.\(this\.sourceLanguage\?\{MEGULIT_SOURCE_LANGUAGE:this\.sourceLanguage\}:\{\}\),)?\.\.\.require\('\.\/glyph-dots\.cjs'\)\.bridgeEnv\(path\.join\(this\.folder,'\.\.'\)\)/);
   const lc = read('core/locale-emulator.cjs');
   assert.ok(lc.includes("const early=require('./glyph-dots.cjs').earlyLocale(this.root,s.dir,launchExe);")&&lc.includes("trace('locale-early-failed'"),'日文环境 tries the early launcher, falls back to LEProc');
   assert.ok(read('native/fontprobe/Launch.cpp').includes('GetProcAddress(m, "LeCreateProcess")'),'launcher creates through LE loader');

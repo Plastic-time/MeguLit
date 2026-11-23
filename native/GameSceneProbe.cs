@@ -25,11 +25,16 @@ public sealed class GameSceneProbe : IDisposable {
  const int BandCell=48;
  const int BoxSettleMs=650;
  Bitmap frame;
+ DateTime pictureAt;
+ // the oldest print of another reader the probe takes as its picture now (it reads every 170 ms; Tick)
+ const int RecentMs=1000;
+ DateTime tickedAt;
  int[] last, baseline, lastBox, baseBox;
  DateTime inputAt, next, candidateAt;
  bool hidden,boxHidden;
  DateTime boxAt;
- int changed, returned;
+ int changed, returned, seen;
+ DateTime changedAt;
  int width, height;
  // Why the last hide / show / keep decision was taken; GalWindowBridge sends it with dialogScene for the reader log.
  public string Reason="";
@@ -38,10 +43,11 @@ public sealed class GameSceneProbe : IDisposable {
  public bool Full=true, Box;
 
  public void Reset(){last=null;baseline=null;lastBox=null;baseBox=null;changed=returned=0;hidden=boxHidden=false;inputAt=DateTime.MinValue;candidateAt=DateTime.MinValue;boxAt=DateTime.MinValue;}
- public void Line(){baseline=null;baseBox=null;changed=returned=0;hidden=boxHidden=false;inputAt=DateTime.MinValue;candidateAt=DateTime.MinValue;boxAt=DateTime.MinValue;}
- public void Input(){
+ public void Line(){baseline=null;baseBox=null;changed=returned=seen=0;hidden=boxHidden=false;inputAt=DateTime.MinValue;candidateAt=DateTime.MinValue;boxAt=DateTime.MinValue;}
+ public void Input(){Input(DateTime.UtcNow);}
+ public void Input(DateTime at){
   if(hidden||baseline!=null||last==null)return;
-  baseline=last;baseBox=lastBox;inputAt=DateTime.UtcNow;changed=0;candidateAt=DateTime.MinValue;boxAt=DateTime.MinValue;
+  baseline=last;baseBox=lastBox;inputAt=at;changed=seen=0;candidateAt=DateTime.MinValue;boxAt=DateTime.MinValue;
  }
  public static double Difference(int[] a,int[] b){return Difference(a,b,108);}
  public static double Difference(int[] a,int[] b,int limit){
@@ -82,6 +88,7 @@ public sealed class GameSceneProbe : IDisposable {
   if(pixels==null||box==null)return null;
   last=pixels;lastBox=box;
   if(baseline==null)return null;
+  seen++;
   double delta=Difference(baseline,pixels);
   if(hidden){
    /* a hidden text window comes back: the box band looks as it did before the input again */
@@ -93,11 +100,18 @@ public sealed class GameSceneProbe : IDisposable {
    double bandDelta=Difference(baseBox,box,BandCell);
    if(delta<=StillPicture&&bandDelta>=BoxOnly){if(boxAt==DateTime.MinValue)boxAt=now;else if((now-boxAt).TotalMilliseconds>=BoxSettleMs){hidden=boxHidden=true;Box=true;returned=0;Reason="text window hidden: box "+Math.Round(bandDelta*100)+"%, picture "+Math.Round(delta*100)+"%";return false;}return null;}
    boxAt=DateTime.MinValue;
-   if((now-inputAt).TotalMilliseconds>1900){Line();return null;}
-   if(!Full)return null;
-   changed=delta>=Changed?changed+1:0;
-   if(changed>=3)candidateAt=now;
-   return null;
+   if(Full){
+    if(delta>=Changed){if(changed==0)changedAt=now;changed++;}else changed=0;
+    /* held over three pictures (340 ms at the usual pace), or over two pictures that far apart; the settle time then counts
+       from where the third picture would have been */
+    if(changed>=2&&(now-changedAt).TotalMilliseconds>=340)candidateAt=changedAt.AddMilliseconds(340);
+   }
+   if(candidateAt==DateTime.MinValue){
+    /* 2026-11-21 (user, Aokana): a window read by PrintWindow gives a picture every 2 s (GameCapture, frozen BitBlt); the change
+       after an input is looked for over at least three pictures, not only 1.9 s */
+    if((now-inputAt).TotalMilliseconds>1900&&seen>=3){Line();return null;}
+    return null;
+   }
   }
   // A flash, shake or quick fade that settles back is not a scene change.
   if(delta<Changed){candidateAt=DateTime.MinValue;changed=0;return null;}
@@ -107,9 +121,16 @@ public sealed class GameSceneProbe : IDisposable {
   // The picture changed but the dialogue-box band did not: a background or CG behind a box that is still there.
   Reason="kept: picture changed "+Math.Round(delta*100)+"% but box only "+Math.Round(boxDelta*100)+"%";Line();return null;
  }
+ // #714 review: the probe was not called for longer than RecentMs (paused: not settled, busy). Pictures counted toward a
+ // decision before the pause say nothing about the picture now, so the counting starts again with the first one after it,
+ // the pictures seen since the input too (giving up needs three, Step). The baseline and a line already hidden stay.
+ internal void Resumed(DateTime now){
+  if(tickedAt!=DateTime.MinValue&&(now-tickedAt).TotalMilliseconds>RecentMs){changed=returned=seen=0;candidateAt=DateTime.MinValue;boxAt=DateTime.MinValue;}
+  tickedAt=now;
+ }
  public bool? Tick(IntPtr target,int w,int h){
   if(w<160||h<120||target==IntPtr.Zero)return null;
-  var now=DateTime.UtcNow;
+  var now=DateTime.UtcNow;Resumed(now);
   if(w!=width||h!=height){
    // A resize invalidates the old pixels, but must not re-show a hidden line.
    last=null;baseline=null;lastBox=null;baseBox=null;changed=returned=0;candidateAt=DateTime.MinValue;width=w;height=h;
@@ -119,7 +140,11 @@ public sealed class GameSceneProbe : IDisposable {
   next=now.AddMilliseconds(170);
   if(frame==null)frame=new Bitmap(w,h,PixelFormat.Format32bppArgb);
   // The game window's own picture, without MeguLit's overlay; a window that cannot be read now is skipped.
-  if(!GameCapture.Into(target,frame,2))return null;
+  /* 2026-11-21 Aokana: a frozen window is printed for every reader together once every 2 s; its last print is used here
+     when another reader had the turn. #714 review: only while it is at most RecentMs old. The probe reads every 170 ms, so an
+     older print came while it was paused; taken as a picture of now it could be a second changed picture of a text window
+     that has come back since. */
+  if(GameCapture.Into(target,frame,2))pictureAt=DateTime.UtcNow;else if(!GameCapture.Recent(target,frame,ref pictureAt,now,RecentMs))return null;
   return Step(frame,now);
  }
  // Synthetic pictures, no window: MeguLit's text is never in the picture now, a background change behind a box that
@@ -142,6 +167,29 @@ public sealed class GameSceneProbe : IDisposable {
    using(var bare=pic(Color.SkyBlue,Color.SkyBlue)){p.Line();run(day,170);p.Input();if(run(bare,1000)!=false)return false;if(run(day,600)!=true)return false;
     // a box that only blinks (a new line redrawing it) is not a hidden window
     p.Line();run(day,170);p.Input();run(bare,340);if(run(day,1200)==false)return false;}
+   /* 2026-11-21 Aokana: one picture every 2 s (PrintWindow): a CG that takes the box away hides by the second picture after it */
+   Func<Bitmap,int,bool?> slow=(img,n)=>{bool? r=null;for(int i=0;i<n;i++){t=t.AddMilliseconds(2000);var v=p.Step(img,t);if(v.HasValue)r=v;}return r;};
+   p.Line();slow(day,1);p.Input(t);if(slow(cg,2)!=false)return false;if(slow(day,2)!=true)return false;
+   // slow frames: old, new, new (first frame after input still old, then two changed frames) must still hide
+   p.Line();slow(day,1);p.Input(t);if(slow(day,1)!=null||slow(cg,2)!=false)return false;if(slow(day,2)!=true)return false;
+   // slow frames: old, old, old gives up on time (baseline cleared; later change without input does not hide)
+   p.Line();slow(day,1);p.Input(t);if(slow(day,3)!=null||p.baseline!=null||slow(cg,2)==false)return false;
+   // slow frames: old, new, old (a one-frame flash) does not hide and gives up on time
+   p.Line();slow(day,1);p.Input(t);if(slow(day,1)!=null||slow(cg,1)!=null||slow(day,1)!=null||p.baseline!=null||slow(cg,2)==false)return false;
+   // slow frames: old, old, new (first change only on frame 3) gives up on time rather than waiting for a fourth frame
+   p.Line();slow(day,1);p.Input(t);if(slow(day,2)!=null||slow(cg,1)!=null||p.baseline!=null||slow(cg,2)==false)return false;
+   using(var bare3=pic(Color.SkyBlue,Color.SkyBlue)){p.Line();slow(day,1);p.Input(t);if(slow(bare3,2)!=false)return false;if(slow(day,2)!=true)return false;}
+   /* #714 review: a pause between ticks. A changed picture before it and one after it (another reader's print, the probe's own
+      print failed) are not two in a row: the counting starts again after the pause. A change that holds after it still hides.
+      The same for the text window alone. */
+   p.Line();run(day,170);p.Input();t=t.AddMilliseconds(170);p.Resumed(t);if(p.Step(cg,t)!=null)return false;
+   t=t.AddMilliseconds(3000);p.Resumed(t);if(p.Step(cg,t)==false||run(day,600)==false)return false;
+   p.Line();run(day,170);p.Input();t=t.AddMilliseconds(3000);p.Resumed(t);if(run(cg,2000)!=false||run(day,600)!=true)return false;
+   using(var bare4=pic(Color.SkyBlue,Color.SkyBlue)){p.Line();run(day,170);p.Input();t=t.AddMilliseconds(170);p.Resumed(t);p.Step(bare4,t);
+    t=t.AddMilliseconds(3000);p.Resumed(t);if(p.Step(bare4,t)==false||run(day,600)==false)return false;}
+   // slow frames: old, new, a pause, new, new hides: giving up counts the pictures after the pause only (#714 review)
+   p.Line();slow(day,1);p.Input(t);if(slow(day,1)!=null||slow(cg,1)!=null)return false;p.Resumed(t);t=t.AddMilliseconds(3000);p.Resumed(t);
+   if(slow(cg,2)!=false||slow(day,2)!=true)return false;
    // E578: with immersion off (Full=false) a scene change is left alone, the text window is still followed.
    using(var bare2=pic(Color.SkyBlue,Color.SkyBlue)){p.Full=false;p.Line();run(day,170);p.Input();if(run(cg,2000)==false)return false;p.Line();run(day,170);p.Input();if(run(bare2,1000)!=false||!p.Box)return false;if(run(day,600)!=true)return false;p.Full=true;}
   }

@@ -14,8 +14,10 @@ const fs = require('node:fs'), path = require('node:path');
 const { rectsToClient } = require('./compositor-host.cjs');
 
 class OverlayPlacement {
-  constructor({ root, send = () => {} } = {}) {
-    this.root = root; this.send = send; this.client = [0, 0]; this.current = null; this.on = false;
+  constructor({ root, send = () => {}, trace = () => {}, replaced = () => false, hidden = () => {}, blanking = () => false } = {}) {
+    this.hidden = hidden; this.replaced = replaced; this.blanking = blanking; this.root = root; this.send = send; this.trace = trace; this.client = [0, 0]; this.current = null; this.on = false;
+    /* the running game's layered profile (core/profiles), set by gal-native setGameProfile; branches read this.profile.placement.* */
+    this.profile = require('./profiles/index.cjs').profileFor({});
   }
   wanted(preferences) {
     if (process.env.MEGULIT_CAPTURE_COMPOSITOR === '1') return false;
@@ -33,32 +35,83 @@ class OverlayPlacement {
     const size = state?.layout?.clientWidth ? state.layout : state;
     if (size?.clientWidth && size?.clientHeight) this.client = [size.clientWidth, size.clientHeight];
     const on = this.wanted(preferences) && state?.bound === true;
-    if (on !== this.on) { this.on = on; if (!on) { this.clear(); if (this.extraKey && this.extraKey !== '[]') this.send({ type: 'textPlaceExtra', items: [] }); this.extraKey = ''; } this.send({ type: 'textPlaceMode', on }); }
+    /* 2026-11-19 (user, 千恋＊万花: "有时候原文还是会出来一下，就一下，然后又没了"; log 11:20:44-48Z: the reader left for 3 s, the engine side
+       handed the text back to the game after its 1.6 s, the next line was drawn by the game (hidden=0), the reader came back with that
+       line at once and the engine hid the game's text 0.56 s later: two Japanese lines on each other in between). While MeguLit is
+       hiding the game's text, a line the game draws itself is on screen only until the hide is back; the reader is told so and leaves
+       the Japanese to the game for that time. Reading without hiding (the reader as a second text) is not touched. */
+    this.hiding = (preferences?.hookProfile === 'embed' || preferences?.hookProfile === 'euphoria474') && preferences?.hookHide !== false;
+    /* 2026-11-21 (owner, STEINS;GATE right after 千恋＊万花 in one MeguLit run: its lines came with no place and were pinned at 千恋＊万花's place and rows):
+       the reader is told which game the mode is for; another game starts with no place of its own */
+    const game = String(state?.gameProcessId || state?.gameHwnd || '');
+    if (on !== this.on || game !== this.game) { const was = this.on; this.on = on; if (game !== this.game) this.engineHidden = false; this.game = game; if (!on && was) { this.clear(); if (this.extraKey && this.extraKey !== '[]') this.send({ type: 'textPlaceExtra', items: [] }); this.extraKey = ''; } this.send(game ? { type: 'textPlaceMode', on, game } : { type: 'textPlaceMode', on }); }
   }
   clear() { if (this.current) { this.current = null; this.send({ type: 'textPlace', clear: true }); } }
+  /* 2026-11-19 (千恋＊万花 maximised, krkr drawing its text invisible, the reader still in its style box): why a reported line
+     was or was not placed, once per line, so a live log says which step stopped it */
+  why(key, text) { if (this.whyKey === key) return; this.whyKey = key; this.trace('placement ' + text); }
   hook(m) {
+    if (m && m.type === 'hookCharRects' && !this.on) this.why('off:' + m.line, 'off: line ' + (Number(m.line) || 0) + ' not placed (文字显示 is not 画进游戏画面, or no window bound)');
     if (!this.on || !m) return;
     /* engine position hooks (hookTextPos: line box in game-screen px) anchor lines that come without device positions */
     if (m.type === 'hookTextPos') { const k = m.sw > 0 && this.client[0] ? this.client[0] / m.sw : 1, ky = m.sh > 0 && this.client[1] ? this.client[1] / m.sh : k; if ([m.x0, m.y0, m.x1, m.size].every(Number.isFinite) && m.size > 0) this.anchor({ x: m.x0 * k, y: m.y0 * ky, size: m.size * ky, width: Math.max((m.x1 - m.x0) * k, m.size * ky * 16) }); return; }
     if (m.type === 'hookCharRects') {
+      if (m.engine !== 'gpu') this.engineSeen = true; /* an engine reports this game's lines with their places (krkr, renpy, …) */
       const chars = [...String(m.text || '')].map(c => c === '\u001f' ? '\n' : c), flat = [];
       for (const c of chars) if (c !== '\n' && c !== '\r') flat.push(c);
       const rects = rectsToClient(m, this.client[0], this.client[1]);
-      if (rects.length !== flat.length) return; // one rect per character is the protocol; anything else is not placeable
+      /* 2026-11-21 (ファタモルガーナの館, owner's recording 02:57Z: the line just read came back in white for 0.7 s after each click): an
+         engine that reports its cleared line (KiriKiri MessageLayer.clear, page.reportClear in the game's diff) sends it once more,
+         empty and not hidden. The game's page is gone: the reader never draws it again from its boxes. The line stays the placement's
+         last line (the next one is typed where it was) */
+      if (m.hidden !== true && !flat.length && !rects.length && m.engine !== 'gpu') { const id0 = String(m.engine || 'path') + ':' + (Number(m.line) || 0); if (this.current && !this.current.fallback && this.current.id === id0 && this.goneId !== id0) { this.goneId = id0; this.why('gone:' + id0, 'gone: line ' + (Number(m.line) || 0) + ' cleared by the game'); this.send({ type: 'textPlace', gone: true, text: this.current.text }); this.rowsCleared(id0); } return; }
+      if (rects.length !== flat.length) { this.why('count:' + m.line + ':' + rects.length, 'rejected: line ' + (Number(m.line) || 0) + ' has ' + rects.length + ' boxes for ' + flat.length + ' characters'); return; } // one rect per character is the protocol; anything else is not placeable
       const id = String(m.engine || 'path') + ':' + (Number(m.line) || 0);
       /* 2026-11-15 (沙耶の唄: MeguLit's Japanese drawn a few px off the game's own, unhidden line): the source says the game
          draws this line itself (not hidden yet, or never). The reader must not put its Japanese over it: it gets a
          `visible` note for this text and shows only the translation until the line is placed. */
-      if (m.hidden !== true) { if (this.current?.id === id) this.clear(); const vis = flat.join(''); if (vis && vis !== this.visibleKey) { this.visibleKey = vis; this.send({ type: 'textPlace', visible: true, text: vis }); } return; }
-      this.visibleKey = '';
-      this.emitLine({ id, engine: m.engine, text: flat.join(''), rects, client: this.client.slice() });
+      /* 2026-11-16 (1.4.16 live, user: 切一次屏之后文字层就不见了 再点一下才出来): after a focus change the game repaints the line it
+         already showed hidden from its cached glyphs, and the repaint reports it as not hidden. That is the same line,
+         still hidden on screen: it stays placed. */
+      if (m.hidden !== true && m.engine !== 'gpu' && this.current && !this.current.fallback && this.current.id === id && this.current.text === flat.join('')) return; /* GPU hiding is decided per frame: there, not hidden is the game showing it */
+      /* incr9 2026-11-21 (owner, 千恋＊万花 lines 100001..: 「お客さん」 drawn by nobody): the bridge blanks this stream's glyphs, so a line the
+         engine reports unhidden is not on screen: the reader draws its Japanese where the last line was; a hidden glyph later only places it */
+      if (m.hidden !== true && m.engine !== 'gpu' && require('./profiles/index.cjs').get(this.profile, 'placement.drawWhileBlanking', false) && this.blanking()) { this.why('sblank:' + id, 'fallback: line ' + (Number(m.line) || 0) + ' reported unhidden while the glyph layer blanks the stream (the reader draws it)'); return this.emitLine({ id, engine: m.engine || 'engine', text: flat.join(''), fallback: true, client: this.client.slice() }); }
+      if (m.hidden !== true) { this.why('shown:' + id, 'not placed: line ' + (Number(m.line) || 0) + ' is drawn by the game itself (hidden=0)'); if (this.current?.id === id) this.clear(); const vis = flat.join(''), vkey = vis + (m.emb ? '|emb' + m.emb : ''); if (vis && vkey !== this.visibleKey) { this.visibleKey = vkey; this.send({ type: 'textPlace', visible: true, text: vis, ...(this.hiding === true ? { hiding: true } : {}), ...(m.emb === 1 || m.emb === 2 ? { embedded: m.emb } : {}) }); } return; }
+      if (m.engine === 'gpu') this.gpuHiding = Date.now();
+      else this.engineHidden = true;
+      this.visibleKey = ''; this.why('placed:' + id + ':' + rects.length, 'placed: line ' + (Number(m.line) || 0) + ', ' + rects.length + ' characters, first box ' + (rects[0] ? [].concat(rects[0]).map(v => Math.round(Number(v) || 0)).join(',') : '-') + ' in client ' + this.client.join('x'));
+      this.emitLine({ id, engine: m.engine, text: flat.join(''), rects, client: this.client.slice(), ...(m.color ? { color: m.color } : {}), ...(typeof m.read === 'boolean' ? { read: m.read } : {}) });
+      if (m.engine !== 'gpu') this.rows({ id, text: flat.join(''), rects: this.current && !this.current.fallback && this.current.id === id ? this.current.rects : null });
     }
   }
+  /* 2026-11-21 (owner, ファタモルガーナの館 two-row page: the line above went undrawn once the reader moved on, the new one sat on the first
+     row): with page.engineRows the engine's lines make a page. A line joins it when the game has not cleared the page since (the
+     engine's clear report, page.reportClear) and its top is below every row already on it; otherwise it starts a new page. The page
+     goes to the reader as textPlacePage: every line on its own boxes, the earlier ones as old lines (ruby, lookups, the line colour) */
+  rows(l) {
+    const mode = require('./profiles/index.cjs').get(this.profile, 'page.engineRows', false);
+    if (mode === false || !l || !Array.isArray(l.rects) || !l.rects.length) return;
+    const ok = r => Array.isArray(r) && r.length >= 4, rs = l.rects.filter(ok); if (!rs.length) return;
+    const top = Math.min(...rs.map(r => r[1])), P = this.rowPage || (this.rowPage = []), at = P.findIndex(x => x.id === l.id);
+    if (at >= 0) P[at] = { id: l.id, text: l.text, rects: l.rects };
+    else { const bottom = P.length ? Math.max(...P.flatMap(x => x.rects.filter(ok).map(r => r[1] + r[3]))) : -Infinity;
+      if (P.length && top >= bottom - 2) this.why('rows:' + l.id, 'page: ' + l.id + ' goes on the page under ' + P[P.length - 1].id + ' (no clear since, starts below its rows)');
+      else { if (P.length) this.why('rows:' + l.id, 'page: ' + l.id + ' starts a new page (' + (top < bottom - 2 ? 'not below the page' : 'cleared') + ')'); P.length = 0; }
+      P.push({ id: l.id, text: l.text, rects: l.rects }); if (P.length > 12) P.shift(); }
+    if (mode === true || P.length >= 2) { this.rowsPaged = true; this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: P.map(x => ({ id: x.id, text: x.text, rects: x.rects })) }); }
+    else this.rowsUnpage();
+  }
+  /* auto (null): back to the line model once the page holds one line again */
+  rowsUnpage() { if (!this.rowsPaged) return; this.rowsPaged = false; this.pageKey = ''; this.send({ type: 'textPlacePage', lines: null }); }
+  rowsCleared(id) { if (!this.rowPage || !this.rowPage.length) return; this.why('rowsgone:' + id, 'page: cleared by the game with ' + id + ', its ' + this.rowPage.length + ' row(s) go'); this.rowPage = [];
+    if (require('./profiles/index.cjs').get(this.profile, 'page.engineRows', null) === true) this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: [] }); else this.rowsUnpage(); }
   /* ① MeguLitFont blank mode (record spec 3): the current line's table (hook-native state.hookGlyphDots) with a cell
      origin per character. Spaces: c = client px, m<W>x<H> / t<W>x<H> = a surface of that size (scaled to the client),
      g / - = no device position (not placeable). A character the engine drew from its glyph cache has no record: it sits
      right after the previous placed one on the same row (advance), as long as a later character of the line was drawn. */
   glyph(table) {
+    if (table && typeof table.text === 'string' && table.text && !this.on) this.why('goff:' + (Number(table.seq) || 0), 'off: glyph line ' + (Number(table.seq) || 0) + ' not placed (文字显示 is not 画进游戏画面, or no window bound)');
     if (!this.on || !table || typeof table.text !== 'string' || !table.text) return;
     const chars = [...table.text], { rects, drawn: recorded, sizes } = this.rectsOf(table, ['d', 'c']);
     const id = 'glyph:' + (Number(table.seq) || 0);
@@ -68,6 +121,29 @@ class OverlayPlacement {
        only the line's new characters, with holes. The game types in reading order, so a character before a drawn one
        has been drawn; the characters after the last record are let in once the line is complete (no new record for
        DoneAfter ms: a typing engine sends one every few tens of ms). */
+    if (recorded.size) this.hideSeen = true;
+    /* 2026-11-16 (QQ group, WHITE ALBUM: 「…そうなんだよなあ」 twice, MeguLit's a few px off the game's own): no character of
+       any line has come back as hidden by the game, so nothing proves the game's line is gone. A guessed place (anchor
+       estimate, locator) would put MeguLit's Japanese next to the game's own: the line goes out as `visible` instead
+       (the reader keeps the translation and never draws its Japanese over the game's). Every engine. */
+    /* 2026-11-20 (user, CHAOS;CHILD: 「对话框的字咋没了」): the GPU layer hides this game's lines (it placed one as hidden), so a line the
+       glyph path never saw hidden is still not the game's own drawing: the reader draws its Japanese where the last line was */
+    if (!this.hideSeen && this.gpuHiding && Date.now() - this.gpuHiding < 30 * 60 * 1000) { this.why('gfall:' + id, 'fallback: glyph line ' + (Number(table.seq) || 0) + ' unplaced while the GPU layer hides the game lines'); return this.emitLine({ id, engine: 'glyph', text: table.text, fallback: true, client: this.client.slice() }); }
+    /* 2026-11-21 (owner, STEINS;GATE: 「每次校准才出来一下日文」): the write-back (embed) has replaced and verified the game's original, so a glyph line
+       the glyph layer never saw hidden is not the game drawing the original: the reader keeps its Japanese (it was hidden as the game's own line
+       on every line and came back only while a calibration switched the mode) */
+    /* 2026-11-21 r29 (owner, 千恋＊万花: lines tripled, the place moving, the original flashing): only for a game whose lines no engine reports
+       with places (STEINS;GATE/MAGES); a game with an engine path (KiriKiri) keeps the note and its hide timing as before */
+    if (!this.hideSeen && !this.engineSeen && this.replaced()) { this.why('greplaced:' + id, 'not placed: glyph line ' + (Number(table.seq) || 0) + ' unhidden, but the write-back replaced the original (the reader draws it)'); if (this.current?.id === id) this.clear(); return; }
+    /* 2026-11-21 (owner incr9, 千恋＊万花: glyph lines 7-25 arrived as "the game draws it itself" between the KiriKiri lines placed hidden at
+       374,707): once an engine has placed one of this game's lines hidden, the engine's places are the source and the glyph path is only
+       the fallback for games without one. An unhidden glyph line then sends no `visible` note that could keep the reader's Japanese away. */
+    if (!this.hideSeen && this.engineHidden) { this.why('gengine:' + id, 'skipped: glyph line ' + (Number(table.seq) || 0) + ' (the engine path places the lines of this game)'); return; }
+    /* incr9 2026-11-21 (owner, 千恋＊万花: 「お客さん」「……ぁ？」 every short line 'has no hidden glyph yet', the game drew nothing, the reader
+       neither): with the bridge blanking the writable stream the line is hidden; the reader draws it, a late hidden glyph only places it */
+    if (!this.hideSeen && require('./profiles/index.cjs').get(this.profile, 'placement.drawWhileBlanking', false) && this.blanking()) { this.why('gblank:' + id, 'fallback: glyph line ' + (Number(table.seq) || 0) + ' has no hidden glyph yet, but the glyph layer blanks the stream (the reader draws it)'); return this.emitLine({ id, engine: 'glyph', text: table.text, fallback: true, client: this.client.slice() }); }
+    if (!this.hideSeen) this.why('gshown:' + id, 'not placed: glyph line ' + (Number(table.seq) || 0) + ' has no hidden glyph yet (the game draws it itself)');
+    if (!this.hideSeen) { const vis = chars.filter(c => !/\s/.test(c)).join(''); if (this.current?.id === id) this.clear(); if (vis && vis !== this.visibleKey) { this.visibleKey = vis; this.send({ type: 'textPlace', visible: true, text: vis, ...(this.hiding === true ? { hiding: true } : {}) }); } return; }
     const typed = this.typed(table, chars.length, recorded), drawn = new Set(chars.map((c, i) => i).filter(i => i < typed));
     let first = -1, last = -1; for (let i = 0; i < rects.length; i++) if (rects[i]) { if (first < 0) first = i; last = i; }
     if (last >= 0) {
@@ -80,9 +156,11 @@ class OverlayPlacement {
        exactly placed line of this game, or an outside locator: anchor()), one advance per character, wrapping at the
        anchor's width; only characters the game has drawn so far (typing). Without an anchor: fallback. */
     /* glyph-dots' locating marks learned this game's text position (core/glyph-locate-host.cjs) */
+    if (this.offFrame) { this.why('gsurf:' + id + ':' + this.offFrame, 'glyph line ' + (Number(table.seq) || 0) + ' drawn on a surface that is not the frame (' + this.offFrame + ', client ' + this.client.join('x') + '): its boxes are no screen position, laid out from the anchor'); }
     const located = this.locator?.(table, typed);
     if (Array.isArray(located) && located.length === chars.length && located.some(Boolean)) return this.emitLine({ id, engine: 'glyph', text: table.text, rects: located, client: this.client.slice(), located: true });
     if (this.anchorBox) return this.emitLine({ id, engine: 'glyph', text: table.text, rects: this.estimate(chars, drawn, sizes), client: this.client.slice(), approx: true });
+    this.why('gfall:' + id, 'not placed: glyph line ' + (Number(table.seq) || 0) + ' has no device position for its glyphs (' + rects.filter(Boolean).length + '/' + chars.length + ' with a place); the reader keeps its own box');
     this.emitLine({ id, engine: 'glyph', text: table.text, fallback: true, client: this.client.slice() });
   }
   /* how many characters of the line the game has drawn: up to the last one with a record, all of them once no record
@@ -99,6 +177,7 @@ class OverlayPlacement {
   /* one box per character of a glyph table (null = no record / no device position); kinds: record kinds that count */
   rectsOf(table, accept) {
     const chars = [...table.text], rects = new Array(chars.length).fill(null), kinds = new Array(chars.length).fill(''), [cw, ch] = this.client;
+    this.offFrame = '';
     const drawn = new Set(), sizes = [];
     for (const d of Array.isArray(table.dots) ? table.dots : []) {
       if (!d || !accept.includes(d.k) || !(d.i >= 0 && d.i < chars.length)) continue;
@@ -107,7 +186,13 @@ class OverlayPlacement {
       if (!d.at || kinds[d.i] === accept[0]) continue; /* first kind-d record of an index wins (shadow / outline passes, redraws) */
       const sp = String(d.at.space || ''), m = /^[mt](\d+)x(\d+)$/.exec(sp);
       let kx = 1, ky = 1;
-      if (m) { const w = +m[1], h = +m[2]; if (!(w > 0 && h > 0 && cw > 0 && ch > 0)) continue; kx = cw / w; ky = ch / h; }
+      /* 2026-11-19 (素晴らしき日々, voiced 「」 lines at the top of the game): a memory surface stands for the screen only when it
+         is the frame (the game's back buffer: the client's shape, any scale). Any other surface (a line or name sprite the
+         game blits somewhere later) has its own origin: its boxes are no screen position, the line is laid out from the
+         anchor of the last exactly placed line like an engine without device positions. */
+      if (m) { const w = +m[1], h = +m[2]; if (!(w > 0 && h > 0 && cw > 0 && ch > 0)) continue;
+        if (Math.abs(w / h - cw / ch) > 0.03 * (cw / ch)) { this.offFrame = sp; continue; }
+        kx = cw / w; ky = ch / h; }
       else if (sp !== 'c') continue;
       const hgt = d.h > 0 ? d.h : 0, adv = d.a > 0 ? d.a : hgt;
       if (!hgt) continue;
@@ -139,6 +224,16 @@ class OverlayPlacement {
       this.choiceSent = options.length > 0;
       this.send({ type: 'placeChoiceBoxes', sw: this.client[0], sh: this.client[1], items: options.map(i => { const r = i.rects; return { text: i.text, x0: Math.round(Math.min(...r.map(v => v[0]))), y0: Math.round(Math.min(...r.map(v => v[1]))), x1: Math.round(Math.max(...r.map(v => v[0] + v[2]))), y1: Math.round(Math.max(...r.map(v => v[1] + v[3]))) }; }) });
     }
+  }
+  /* options found from hidden lines no source carried (hook-native placedHidden): drawn as choices on their boxes, and given to the reader's
+     choice overlay (ruby + translation under each) */
+  hiddenChoices(items) {
+    if (!this.on || !Array.isArray(items) || items.length < 2) return;
+    const ok = items.map(i => ({ id: 'hidden:' + i.text, kind: 'o', text: i.text, rects: i.rects })).filter(i => Array.isArray(i.rects) && i.rects.length);
+    if (ok.length < 2) return;
+    this.extraKey = JSON.stringify(ok); this.send({ type: 'textPlaceExtra', items: ok, client: this.client.slice() }); this.choicesPlaced = true; this.choiceSent = true;
+    this.send({ type: 'placeChoiceBoxes', sw: this.client[0], sh: this.client[1], items: ok.map(i => { const r = i.rects; return { text: i.text, x0: Math.round(Math.min(...r.map(v => v[0]))), y0: Math.round(Math.min(...r.map(v => v[1]))), x1: Math.round(Math.max(...r.map(v => v[0] + v[2]))), y1: Math.round(Math.max(...r.map(v => v[1] + v[3]))) }; }) });
+    this.why('hchoice:' + ok.length, 'choices from hidden lines no source carried: ' + ok.map(i => i.text).join(' / ').slice(0, 80));
   }
   /* the dialogue area learned from an exactly placed line: left edge, first row top, row pitch, width, size */
   learn(rects) {
@@ -179,11 +274,18 @@ class OverlayPlacement {
       if (!Array.isArray(r) || r.length < 4 || !r.every(Number.isFinite)) return null;
       let [x, y, w, h] = r;
       if (!(w > 0 && h > 0) || x >= cw || y >= ch || x + w <= 0 || y + h <= 0) return null;
+      /* 2026-11-19 (user, 素晴らしき日々 installed 1.4.17: 「一说话字就飞不见了，位置也一直乱跑」; every voiced 「」 line had its first glyph
+         exactly on the client's top edge, firstGlyphTop = clientY, also on the test copy): a box more than half above the
+         client is not a screen position (an off-screen buffer, a surface drawn at its own origin); clamping it put the line at
+         the top of the game and taught the anchor that place. Such a box has no place. */
+      if (y < -h / 2) return null;
       w = Math.min(w, cw); h = Math.min(h, ch); x = Math.min(Math.max(x, 0), cw - w); y = Math.min(Math.max(y, 0), ch - h);
       return [x, y, w, h];
     });
     const ok = out.filter(Boolean);
     if (!ok.length) return null;
+    /* every box on the client's very top row (y 0): a buffer drawn at its own origin, never a dialogue line on screen */
+    if (ok.every(r => r[1] <= 0.5)) return null;
     if (ok.length > 1 && ok.every(r => r[0] === ok[0][0] && r[1] === ok[0][1])) return null;
     return out;
   }
@@ -213,14 +315,18 @@ class OverlayPlacement {
   emitLine(line) {
     if (!line.fallback) {
       const rects = OverlayPlacement.sane(line.rects, line.client);
-      line = rects ? { ...line, rects } : { id: line.id, engine: line.engine, text: line.text, fallback: true, client: line.client };
+      /* 2026-11-21 (owner: 「原地补画不就能二次认领了吗」): a line the game drew hidden goes to the source side with its boxes; a line no source
+         carried becomes a source line (furigana, translation, lookups) or, with others at once, the options of a choice */
+      if (rects) try { this.hidden({ text: line.text, rects, client: line.client }); } catch {}
+      if (!rects) this.why('insane:' + line.id + ':' + line.text, 'not placed: ' + line.id + ' has no box on the game client (off the client, or all on its top edge: a buffer drawn at its own origin); the reader keeps its own box and the anchor is not taught');
+      line = rects ? { ...line, rects } : { id: line.id, engine: line.engine, text: line.text, fallback: true, client: line.client, ...(line.color ? { color: line.color } : {}), ...(typeof line.read === 'boolean' ? { read: line.read } : {}) };
       if (rects && !line.approx) this.learn(rects);
     }
     const key = JSON.stringify(line);
     if (key === this.lastKey) return; this.lastKey = key; this.current = line;
     this.send({ type: 'textPlace', ...line });
   }
-  stop() { clearTimeout(this.doneTimer); this.typing = null; this.clear(); if (this.paged) { this.paged = false; this.pageKey = ''; this.send({ type: 'textPlacePage', awake: false, armed: false, lines: [] }); } if (this.extraKey && this.extraKey !== '[]') this.send({ type: 'textPlaceExtra', items: [] }); this.extraKey = ''; this.on = false; }
+  stop() { clearTimeout(this.doneTimer); this.typing = null; this.hideSeen = false; this.clear(); if (this.paged) { this.paged = false; this.pageKey = ''; this.send({ type: 'textPlacePage', awake: false, armed: false, lines: [] }); } if (this.extraKey && this.extraKey !== '[]') this.send({ type: 'textPlaceExtra', items: [] }); this.extraKey = ''; this.on = false; }
 }
 
 /* a typing engine sends a record every few tens of ms; this long without one, the line is complete */

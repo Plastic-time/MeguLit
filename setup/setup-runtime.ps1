@@ -1,18 +1,47 @@
 ﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # MeguLit first-launch setup.
-# The release zip ships without runtime\. This window lets the user pick:
-#   Lite  = base pack only (Node, Python, hooks, JMdict). Other packs can be added later in Settings.
-#   Full  = base + furigana dictionaries + voice engine, all at once.
-# Everything is installed into the chosen MeguLit folder (runtime\ next to MeguLit.exe), so a fresh
-# PC needs nothing preinstalled except the WebView2 Runtime (built into Windows 11).
-# Since 1.4.6 the window also asks where MeguLit lives and whether to put shortcuts on the desktop / Start menu.
+# The release zip ships without runtime\. This window installs all three runtime packs (base, reading, voice):
+# Node, Python, hooks, JMdict, furigana dictionaries and the voice engine, into runtime\ next to MeguLit.exe,
+# so a fresh PC needs nothing preinstalled except the WebView2 Runtime (built into Windows 11).
+# Since 1.4.20 there is no Full / Lite choice any more: the download starts the moment the window opens, into a
+# staging folder, while the user picks the install folder and shortcuts. "Install" copies MeguLit there (Use-Target)
+# and unpacks each pack there as soon as both the pack and the user are ready. Closing the window keeps the staged
+# files, so the next launch resumes. Only missing packs are fetched, which is also how a broken install repairs itself.
 # Group report (2026-11-12): a player opened MeguLit.exe straight from the archive viewer, so it ran from
 # %TEMP%\Rar$EXa..., installed onto a nearly full C: drive and left no shortcut. When the chosen folder is not
 # this one, the whole MeguLit folder is copied there first, then the new copy is started (exit 3 = moved).
 # Packs, URLs, SHA-256 and sizes come from setup\runtime.json. Exit 0 = runtime ready.
 param([Parameter(Mandatory=$true)][string]$Root)
 $ErrorActionPreference = 'Stop'
+# Boot timing (setup-ui.log, one line per step): where the time between the double click and the first window goes.
+$script:bootLog = $(if ($env:MEGULIT_SETUP_UILOG) { $env:MEGULIT_SETUP_UILOG } else { Join-Path $env:LOCALAPPDATA 'MeguLit\setup-ui.log' })
+$script:procStart = try { [Diagnostics.Process]::GetCurrentProcess().StartTime } catch { [DateTime]::Now }
+# Real start-up stages for the exe's loading screen (bar + one status line): "<0..1>|<text>" in <flag>.stage, read by the exe every 100 ms.
+$script:splashStages = @{ 'script-start' = @(0.22, '正在启动安装程序…'); 'winforms-loaded' = @(0.30, '正在启动安装程序…'); 'webview2-env-started' = @(0.38, '正在准备界面引擎…'); 'compiled' = @(0.48, '正在准备界面引擎…'); 'logic-built' = @(0.56, '正在载入安装逻辑…'); 'web-layer-start' = @(0.62, '正在载入界面…'); 'skin-window-shown' = @(0.72, '正在载入界面…'); 'page-poster' = @(0.86, '正在载入画面…'); 'page-frame1' = @(0.96, '马上就好') }
+function Set-SplashStage([string]$step) { if ($env:MEGULIT_SPLASH_FLAG -and $script:splashStages.ContainsKey($step)) { try { $s = $script:splashStages[$step]; [IO.File]::WriteAllText($env:MEGULIT_SPLASH_FLAG + '.stage', ([string]$s[0] + '|' + $s[1])) } catch {} } }
+function Boot-Mark([string]$step) { try { $n = [DateTime]::Now; [IO.Directory]::CreateDirectory((Split-Path $script:bootLog)) | Out-Null; [IO.File]::AppendAllText($script:bootLog, (Get-Date -Format 's') + ' boot step=' + $step + ' since_proc=' + [int]($n - $script:procStart).TotalMilliseconds + ' at=' + [DateTimeOffset]::Now.ToUnixTimeMilliseconds() + "`r`n") } catch {} ; Set-SplashStage $step }
+Boot-Mark 'script-start'
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+Boot-Mark 'winforms-loaded'
+# Splash: the first frame of the installer's opening clip, on screen before any C# is compiled (each Add-Type -TypeDefinition starts csc.exe,
+# seconds on a busy machine). The real window replaces it (setup-web.ps1 / the classic window's Shown). Only where the web skin is wanted.
+$script:splash = $null; $script:wv2EnvTask = $null
+if ($env:MEGULIT_SETUP_WEB -ne '0' -and (-not $env:MEGULIT_SETUP_TEST -or $env:MEGULIT_SETUP_WEB -eq '1') -and -not $env:MEGULIT_SETUP_PREVIEW -and -not $env:MEGULIT_SETUP_THEME -and -not $env:MEGULIT_SETUP_WEB_TEST -and -not $env:MEGULIT_NATIVE_SPLASH) {   # with the exe's animated native splash there is no PowerShell startup form at all (it cost ~1.4 s of Forms/GDI+ start-up and showed a still picture)
+  try { $bsPath = Join-Path $Root 'setup\ui-web\video\light\intro.jpg'
+    if (Test-Path $bsPath) { $bsForm = New-Object Windows.Forms.Form; $bsForm.FormBorderStyle = 'None'; $bsForm.StartPosition = 'CenterScreen'; $bsForm.ShowInTaskbar = $false; $bsForm.Text = 'MeguLit'; $bsForm.ClientSize = New-Object Drawing.Size(913, 584); $bsForm.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
+      $bsPic = New-Object Windows.Forms.PictureBox; $bsPic.Dock = 'Fill'; $bsPic.SizeMode = 'StretchImage'; $bsPic.Image = [Drawing.Image]::FromStream((New-Object IO.MemoryStream (,[IO.File]::ReadAllBytes($bsPath)))); $bsForm.Controls.Add($bsPic)
+      $bsForm.Show(); $bsForm.Refresh(); $script:splash = $bsForm; Boot-Mark 'splash-shown' } } catch { Boot-Mark ('splash-failed ' + ($_ -replace '\s+', ' ')) }
+  # WebView2 warms up while the rest of the setup is built: its browser process starts now, not when the skin window is created.
+  try { $bsWv = Join-Path $Root 'setup\webview2'; if (Test-Path (Join-Path $bsWv 'Microsoft.Web.WebView2.Core.dll')) { Add-Type -Path (Join-Path $bsWv 'Microsoft.Web.WebView2.Core.dll'); $env:PATH = (Join-Path $bsWv $(if ([Environment]::Is64BitProcess) { 'x64' } else { 'x86' })) + ';' + $env:PATH
+      $script:webData = $(if ($env:MEGULIT_SETUP_WEBVIEW2_DATA) { $env:MEGULIT_SETUP_WEBVIEW2_DATA } elseif ($env:WEBVIEW2_USER_DATA_FOLDER) { $env:WEBVIEW2_USER_DATA_FOLDER } else { Join-Path $env:LOCALAPPDATA ('MeguLit\setup-webview2' + $PID) })
+      $script:wv2EnvTask = [Microsoft.Web.WebView2.Core.CoreWebView2Environment]::CreateAsync($null, $script:webData, $null); Boot-Mark 'webview2-env-started' } } catch { $script:wv2EnvTask = $null; Boot-Mark ('webview2-prewarm-failed ' + ($_ -replace '\s+', ' ')) }
+}
+# The exe's animated native splash is dropped by a flag file once the skin shows its first video frame (or the classic window appears instead).
+function Release-NativeSplash([string]$why) { if ($env:MEGULIT_SPLASH_FLAG -and -not $script:splashReleased) { $script:splashReleased = $true
+    # the skin window must be in front and active BEFORE the loading screen fades (a window shown behind a topmost one is not activated): bring it up, then drop the flag
+    try { if ($script:win) { $script:win.BringFront(); $script:win.FadeIn(14, 280) } } catch { Boot-Mark ('bring-front failed ' + $_) }
+    try { [IO.File]::WriteAllText($env:MEGULIT_SPLASH_FLAG, $why) } catch {}; Boot-Mark ('native-splash-released why=' + $why) } }
+function Close-Splash { if ($script:splash) { try { $script:splash.Close(); $script:splash.Dispose() } catch {}; $script:splash = $null; Boot-Mark 'splash-closed' } }
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 [Windows.Forms.Application]::EnableVisualStyles()
 
@@ -20,8 +49,30 @@ $manifest = Get-Content -Raw -Encoding UTF8 (Join-Path $Root 'setup\runtime.json
 $packs = $manifest.packs
 $appSize = 40MB
 function MB($n) { if ($n -ge 1GB) { '{0:N1} GB' -f ($n/1GB) } else { '{0:N0} MB' -f ($n/1MB) } }
-$lite = @('base'); $full = @('base','reading','voice')
+$full = @('base','reading','voice')
 function Sum($ids, $field) { $t = 0; foreach ($i in $ids) { $t += $packs.$i.$field }; $t }
+
+# Test hooks (validation\setup-flow.test.cjs runs the real window on a hidden desktop):
+#   MEGULIT_SETUP_TEST=<file>      write events as JSON lines there; no shortcuts, no registry entry, no relaunch, no message boxes
+#   MEGULIT_SETUP_AUTOSTART=now|downloaded   press Install at once / once every pack is downloaded
+#   MEGULIT_SETUP_TARGET=<dir>     install location to fill in;  MEGULIT_SETUP_STAGING=<dir>  staging folder to use
+#   MEGULIT_SETUP_CLOSE_AT=<bytes> close the window once that many bytes are downloaded;  MEGULIT_SETUP_FREE=<bytes>  pretend free space
+$testLog = $env:MEGULIT_SETUP_TEST
+$clock = [Diagnostics.Stopwatch]::StartNew()
+function Note($kind, $data) {
+  if (-not $testLog) { return }
+  $o = [ordered]@{ t = $clock.ElapsedMilliseconds; kind = $kind }; if ($data) { foreach ($k in $data.Keys) { $o[$k] = $data[$k] } }
+  try { Add-Content -Encoding UTF8 $testLog (ConvertTo-Json -Compress $o) } catch {}
+}
+# An error inside a window event would otherwise only pop a .NET error box; in test mode it goes to the event log.
+if ($testLog) { [Windows.Forms.Application]::add_ThreadException({ param($s, $e) Note 'error' @{ text = $e.Exception.ToString() } }) }
+function Say([string]$text) { Note 'message' @{ text = $text }; if (-not $testLog) { [void][Windows.Forms.MessageBox]::Show($form, $text, 'MeguLit') } }
+
+# UI hooks: no-ops here, setupsetup-ui.ps1 (MEGULIT_SETUP_THEME) answers them. The logic never reads anything back from the UI layer.
+function UI-Progress($p) {}
+function UI-Fail([string]$kind, [string]$message) {}
+function UI-Done {}
+function UI-Preview([string]$state) {}
 
 # WebView2 Runtime is the one thing MeguLit cannot ship itself (Windows 11 has it; some Windows 10 PCs do not).
 function Has-WebView2 {
@@ -47,10 +98,11 @@ function Style-Button($b, [bool]$primary) {
   if ($primary) { $b.BackColor = $C.red; $b.FlatAppearance.BorderColor = $C.red; $b.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(222,72,82); $b.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(168,38,48) }
   else { $b.BackColor = $C.card; $b.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(64,40,43); $b.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(84,48,52) }
 }
-function Img($name) { $p = Join-Path $Root "setup\$name"; if (Test-Path $p) { [Drawing.Image]::FromFile($p) } }
+function Img($name) { $p = Join-Path $Root "setup\$name"; if (Test-Path $p) { try { [Drawing.Image]::FromFile($p) } catch {} } }
 $logo = Img 'logo.png'
 
 # Double-buffered panel so the hand-drawn line art does not flicker.
+Boot-Mark 'compile-1-start'
 Add-Type -ReferencedAssemblies System.Windows.Forms,System.Drawing -TypeDefinition @'
 public class GrimoirePanel : System.Windows.Forms.Panel {
   public GrimoirePanel() { this.DoubleBuffered = true; this.SetStyle(System.Windows.Forms.ControlStyles.ResizeRedraw, true); }
@@ -67,21 +119,15 @@ function Draw-Circle($g, $cx, $cy, $r, $color, $alpha) {
   }
   $p.Dispose()
 }
-function Draw-Book($g, $x, $y, $color) {
-  $p = Pen $color 255 1.6
-  $g.DrawBezier($p, $x, $y+4, $x+6, $y, $x+11, $y+1, $x+14, $y+4); $g.DrawBezier($p, $x+14, $y+4, $x+17, $y+1, $x+22, $y, $x+28, $y+4)
-  $g.DrawLine($p, $x, $y+4, $x, $y+20); $g.DrawLine($p, $x+28, $y+4, $x+28, $y+20); $g.DrawLine($p, $x+14, $y+4, $x+14, $y+22)
-  $g.DrawBezier($p, $x, $y+20, $x+6, $y+16, $x+11, $y+17, $x+14, $y+22); $g.DrawBezier($p, $x+14, $y+22, $x+17, $y+17, $x+22, $y+16, $x+28, $y+20)
-  $p.Dispose()
-}
 
 # The setup runs inside powershell.exe, so the taskbar grouped it with PowerShell and showed PowerShell's icon.
 # An own AppUserModelID gives the window its own taskbar entry with the MeguLit icon set below.
 try { Add-Type -Namespace MeguLit -Name Shell -MemberDefinition '[DllImport("shell32.dll")] public static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string id);'; [void][MeguLit.Shell]::SetCurrentProcessExplicitAppUserModelID('app.megulit.setup') } catch {}
+Boot-Mark 'compiled'
 $form = New-Object Windows.Forms.Form
-$form.Text = 'MeguLit'; $form.ClientSize = New-Object Drawing.Size(720,700); $form.StartPosition = 'CenterScreen'
+$form.Text = 'MeguLit'; $form.ClientSize = New-Object Drawing.Size(720,560); $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.BackColor = $C.bg; $form.ForeColor = $C.cream
-$exe = Join-Path $Root 'MeguLit.exe'; if (Test-Path $exe) { $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon($exe) }
+$exe = Join-Path $Root 'MeguLit.exe'; if (Test-Path $exe) { try { $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon($exe) } catch {} }
 
 function Label($text, $x, $y, $w, $h, $size, $bold, $color, $parent) {
   $l = New-Object Windows.Forms.Label; $l.Text = $text; $l.Location = New-Object Drawing.Point($x,$y); $l.Size = New-Object Drawing.Size($w,$h)
@@ -95,19 +141,13 @@ $stage = New-Object GrimoirePanel; $stage.Dock = 'Fill'; $stage.BackColor = $C.b
 $stage.add_Paint({ param($s,$e)
   $g = $e.Graphics; $g.SmoothingMode = 'AntiAlias'
   Draw-Circle $g 640 70 190 $C.red 46
-  Draw-Circle $g 40 560 150 $C.gold 30
+  Draw-Circle $g 40 500 150 $C.gold 30
   if ($logo) { $g.InterpolationMode = 'HighQualityBicubic'; $g.DrawImage($logo, 30, 18, 212, 81) }
-  $p = Pen $C.line 255 1; $g.DrawLine($p, 32, 122, 688, 122); $p.Dispose()
+  $p = Pen $C.line 255 1; $g.DrawLine($p, 32, 122, 688, 122); $g.DrawLine($p, 32, 282, 688, 282); $p.Dispose()
 })
 $form.Controls.Add($stage)
 
-# ---- choice page ----
-$choice = New-Object Windows.Forms.Panel; $choice.Location = New-Object Drawing.Point(0,124); $choice.Size = New-Object Drawing.Size(720,576); $choice.BackColor = [Drawing.Color]::Transparent
-$stage.Controls.Add($choice)
-[void](Label '第一次使用 MeguLit' 32 12 560 30 14 $true $C.cream $choice)
-[void](Label '先下载运行组件。它们都会装进 MeguLit 自己的文件夹，电脑上不用预先安装 Node.js、Python 或其他软件' 32 44 656 20 9 $false $C.muted $choice)
-[void](Label '组件包放在 MeguLit 的 GitHub Releases，里面是 Node.js、Python、LunaHook、AivisSpeech 等项目官方发布的原版文件，下载后逐个校验 SHA-256，被改动过的文件不会安装' 32 66 656 34 8 $false $C.muted $choice)
-# ---- install location ----
+# ---- install location + paths ----
 $sourceRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\')
 $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
 $fromArchive = ($sourceRoot + '\').StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -or $sourceRoot -match '\\(Rar\$|7z[A-Z0-9]|wz[A-Z0-9])'
@@ -119,89 +159,57 @@ function Default-Target {
   if ($best) { return (Join-Path $best.RootDirectory.FullName 'MeguLit') }
   return (Join-Path $env:LOCALAPPDATA 'Programs\MeguLit')
 }
+function Drive-Of($path) { try { [IO.Path]::GetPathRoot([IO.Path]::GetFullPath($path)).TrimEnd('\').ToUpper() } catch { '' } }
 function Drive-Free($path) {
+  if ($env:MEGULIT_SETUP_FREE) { return [long]$env:MEGULIT_SETUP_FREE }
   try { $q = [IO.Path]::GetPathRoot([IO.Path]::GetFullPath($path)); (New-Object IO.DriveInfo $q).AvailableFreeSpace } catch { 0 }
 }
-$free = Drive-Free (Default-Target)
-
-function Option($x, $title, $sub, $items, $pros, $cons, $ids, $primary, $badge) {
-  $p = New-Object GrimoirePanel; $p.Location = New-Object Drawing.Point($x,106); $p.Size = New-Object Drawing.Size(316,346); $p.BackColor = $C.card
-  $down = Sum $ids 'size'; $disk = (Sum $ids 'unpacked') + $appSize
-  $accent = if ($primary) { $C.red } else { $C.line }
-  $edgeColor = if ($primary) { $C.red } else { $C.line }
-  $p.add_Paint({ param($s,$e)
-    $g = $e.Graphics; $g.SmoothingMode = 'AntiAlias'
-    $b = New-Object Drawing.SolidBrush $accent; $g.FillRectangle($b, 0, 0, 316, $(if ($primary) { 4 } else { 2 }))
-    if ($primary) { $g.FillPolygon($b, [Drawing.Point[]]@((New-Object Drawing.Point(272,0)),(New-Object Drawing.Point(290,0)),(New-Object Drawing.Point(290,30)),(New-Object Drawing.Point(281,23)),(New-Object Drawing.Point(272,30)))) }; $b.Dispose()
-    Draw-Book $g 20 20 $(if ($primary) { $C.red } else { $C.muted })
-    $pen = Pen $edgeColor 255 $(if ($primary) { 2 } else { 1 }); $g.DrawRectangle($pen, 0, 0, 315, 345); $pen.Dispose()
-    $pen = Pen $C.line 255 1; $g.DrawLine($pen, 20, 262, 296, 262); $pen.Dispose()
-  }.GetNewClosure())
-  [void](Label $title 58 16 120 30 13 $true $C.cream $p)
-  if ($badge) { $bd = Label $badge 132 23 40 18 8 $true $C.cream $p; $bd.BackColor = $C.red; $bd.TextAlign = 'MiddleCenter'; $bd.AutoSize = $false }
-  [void](Label $sub 59 44 220 18 8 $false $C.muted $p)
-  [void](Label '包含 / Includes' 20 68 280 18 8 $true $(if ($primary) { $C.red } else { $C.muted }) $p)
-  [void](Label (($items | ForEach-Object { '·  ' + $_ }) -join "`n") 20 86 286 68 9 $false $C.cream $p)
-  [void](Label (($pros | ForEach-Object { '✓  ' + $_ }) -join "`n") 20 158 286 52 9 $false $C.gold $p)
-  [void](Label (($cons | ForEach-Object { '–  ' + $_ }) -join "`n") 20 212 286 48 8 $false $C.muted $p)
-  [void](Label ('下载约 ' + (MB $down)) 20 270 140 22 10 $true $C.cream $p)
-  $warn = if ($free -lt $disk * 1.1) { $C.red } else { $C.muted }
-  [void](Label ('占用磁盘约 ' + (MB $disk)) 160 272 140 20 9 $false $warn $p)
-  $b = New-Object Windows.Forms.Button; $b.Text = $(if ($primary) { '安装' + $title + '（推荐）' } else { '只装' + $title }); $b.FlatStyle = 'Flat'
-  $b.Location = New-Object Drawing.Point(20,$(if ($primary) { 298 } else { 302 })); $b.Size = New-Object Drawing.Size(276,$(if ($primary) { 38 } else { 30 }))
-  $b.Font = New-Object Drawing.Font($ui, $(if ($primary) { 11 } else { 9 }), $(if ($primary) { [Drawing.FontStyle]::Bold } else { [Drawing.FontStyle]::Regular })); $b.ForeColor = $C.cream; $b.Cursor = 'Hand'
-  Style-Button $b $primary; if (-not $primary) { $b.FlatAppearance.BorderColor = $C.line; $b.ForeColor = $C.muted }
-  $b.Tag = $ids; $b.add_Click({ param($s) Start-Install $s.Tag })
-  $p.Controls.Add($b); $choice.Controls.Add($p)
-  if ($primary) { $form.AcceptButton = $b }
-}
-$baseItems = @('Node.js 运行时（程序后台服务）','Python 3（分词与注音）','文本 Hook 引擎（读取游戏文字）','JMdict 日英 / 日中离线词典')
-Option 32 '完整版' 'FULL · 一次装齐，开箱即用' @('精简版的全部组件','SudachiDict / UniDic 注音分词词典','AivisSpeech 语音引擎（朗读、原声补全）') @('注音和分词更准，生僻词、人名读音更可靠','朗读、制卡配音、原声补全马上能用','装完就不用再下载，断网也能用') @('下载约大五倍，第一次要多等一会','本地翻译模型不含在内，要用时在设置里下载') $full $true '推荐'
-Option 372 '精简版' 'LITE · 先用起来' $baseItems @('下载最小，几分钟就能开始玩','读取台词、点读查词、在线翻译都能用') @('第一次显示注音时才补装词典，要等一下','没有语音：朗读、配音要以后在「设置 → 语音 / 词典」补装') $lite $false ''
-
 $runtimeDir = Join-Path $Root 'runtime'
-[void](Label '安装位置' 32 465 70 20 9 $true $C.cream $choice)
-$pathBox = New-Object Windows.Forms.TextBox; $pathBox.Location = New-Object Drawing.Point(104,462); $pathBox.Size = New-Object Drawing.Size(452,24)
-$pathBox.Font = New-Object Drawing.Font($ui, 9); $pathBox.BackColor = $C.card; $pathBox.ForeColor = $C.cream; $pathBox.BorderStyle = 'FixedSingle'
-$pathBox.Text = Default-Target; $choice.Controls.Add($pathBox)
-$browse = New-Object Windows.Forms.Button; $browse.Text = '更改… Browse'; $browse.Location = New-Object Drawing.Point(566,461); $browse.Size = New-Object Drawing.Size(122,26)
-$browse.Font = New-Object Drawing.Font($ui, 9); Style-Button $browse $false; $browse.FlatAppearance.BorderColor = $C.line; $choice.Controls.Add($browse)
-function Check($text, $x, $w) {
-  $cb = New-Object Windows.Forms.CheckBox; $cb.Text = $text; $cb.Checked = $true; $cb.Location = New-Object Drawing.Point($x,494); $cb.Size = New-Object Drawing.Size($w,22)
-  $cb.Font = New-Object Drawing.Font($ui, 9); $cb.ForeColor = $C.cream; $cb.BackColor = [Drawing.Color]::Transparent; $cb.FlatStyle = 'Flat'; $cb.Cursor = 'Hand'
-  $choice.Controls.Add($cb); $cb
+# base needs Python's core library too: an interrupted install once left node.exe but no Lib\zipfile.
+$markers = @{ base = @('runtime\node.exe','runtime\python\python.exe','runtime\python\Lib\zipfile\__init__.py','runtime\python\Lib\encodings\__init__.py'); reading = 'runtime\reading\sudachidict_full\resources\system.dic'; voice = 'runtime\aivis\run.exe' }
+$names = @{ base = '基础组件'; reading = '注音分词词典'; voice = '语音引擎' }
+# Only what is missing is fetched and installed: this is also the repair path for a half-installed runtime.
+function Missing($dir) { @($full | Where-Object { $id = $_; @($markers[$id] | Where-Object { -not (Test-Path (Join-Path $dir $_)) }).Count -gt 0 }) }
+
+# ---- staging folder ----
+# The packs download before the user has picked a folder, so they go to a staging folder that survives a closed
+# window (next launch resumes from there; %LOCALAPPDATA%\MeguLit\setup-staging.txt remembers which one). It sits
+# inside the suggested install folder, so the common case (keep the suggestion) needs no second copy of 600 MB;
+# tar reads the packs from there into the chosen folder, which works across drives just the same.
+$stageName = '.megulit-download'
+$pointer = Join-Path $env:LOCALAPPDATA 'MeguLit\setup-staging.txt'
+function Writable($dir) {
+  try { New-Item -ItemType Directory -Force $dir -ErrorAction Stop | Out-Null; $p = Join-Path $dir ('.w-' + $PID); [IO.File]::WriteAllText($p, 'ok'); Remove-Item $p -Force; $true } catch { $false }
 }
-$deskCheck = Check '在桌面创建快捷方式' 32 190
-$menuCheck = Check '添加到开始菜单' 226 170
-$freeLabel = Label '' 400 496 288 20 8 $false $C.muted $choice; $freeLabel.TextAlign = 'MiddleRight'
-function Update-Free { $f = Drive-Free $pathBox.Text; $freeLabel.Text = '所在磁盘可用 ' + (MB $f); $freeLabel.ForeColor = $(if ($f -lt ((Sum $full 'unpacked') + $appSize) * 1.1) { $C.red } else { $C.muted }) }
-$pathBox.add_TextChanged({ Update-Free }); Update-Free
-$browse.add_Click({
-  $d = New-Object Windows.Forms.FolderBrowserDialog; $d.Description = '选择 MeguLit 的安装位置（会在里面建 MeguLit 文件夹）'; $d.ShowNewFolderButton = $true
-  if ($d.ShowDialog($form) -eq 'OK') {
-    $picked = $d.SelectedPath
-    if ((Split-Path $picked -Leaf) -ne 'MeguLit' -and -not (Test-Path (Join-Path $picked 'MeguLit.exe'))) { $picked = Join-Path $picked 'MeguLit' }
-    $pathBox.Text = $picked
+function Pick-Staging($bytes) {
+  if ($env:MEGULIT_SETUP_STAGING) { $d = $env:MEGULIT_SETUP_STAGING; [void](Writable $d); return $d }
+  try { $old = (Get-Content -Raw -Encoding UTF8 $pointer -ErrorAction Stop).Trim(); if ($old -and (Test-Path $old) -and (Writable $old)) { return $old } } catch {}
+  $pick = $null
+  foreach ($d in @((Join-Path (Default-Target) $stageName), (Join-Path $env:LOCALAPPDATA "MeguLit\$stageName"))) {
+    if ((Drive-Free $d) -ge $bytes + 64MB -and (Writable $d)) { $pick = $d; break }
   }
-})
-$noteText = if ($fromArchive) { '你是在压缩包里直接打开的：选好安装位置后，MeguLit 会整个复制过去再安装，以后从快捷方式打开就行' } else { '运行组件装进安装位置下的 runtime 文件夹，不会写到别处 · 以后移动 MeguLit 文件夹，组件会跟着一起走' }
-$note = Label $noteText 32 524 656 20 8 $fromArchive $(if ($fromArchive) { $C.gold } else { $C.muted }) $choice; $note.AutoEllipsis = $true
-if (-not $webview) {
-  $link = New-Object Windows.Forms.LinkLabel; $link.Text = '这台电脑缺少 Microsoft Edge WebView2 运行时，MeguLit 的界面需要它：点这里去微软官网下载安装'
-  $link.Location = New-Object Drawing.Point(32,548); $link.Size = New-Object Drawing.Size(656,20); $link.Font = New-Object Drawing.Font($ui, 8, [Drawing.FontStyle]::Bold)
-  $link.LinkColor = $C.red; $link.ActiveLinkColor = $C.gold; $link.BackColor = [Drawing.Color]::Transparent
-  $link.add_LinkClicked({ Start-Process 'https://developer.microsoft.com/microsoft-edge/webview2/' })
-  $choice.Controls.Add($link)
+  if (-not $pick) { $pick = Join-Path $env:LOCALAPPDATA "MeguLit\$stageName"; [void](Writable $pick) }
+  try { New-Item -ItemType Directory -Force (Split-Path $pointer) | Out-Null; [IO.File]::WriteAllText($pointer, $pick) } catch {}
+  $pick
+}
+$want = Missing (Default-Target)
+$stageDir = Pick-Staging (Sum $want 'size')
+# Older setups (before 1.4.20) kept runtime-<id>.setup.part(.json) next to MeguLit.exe: carry them over so they resume.
+foreach ($id in $full) {
+  foreach ($ext in '', '.json') {
+    $old = Join-Path $sourceRoot ("runtime-$id.setup.part" + $ext); $new = Join-Path $stageDir ("runtime-$id.setup.part" + $ext)
+    if ((Test-Path $old) -and -not (Test-Path $new)) { try { Move-Item $old $new -ErrorAction Stop } catch {} }
+  }
 }
 
-# ---- progress page ----
-$progress = New-Object Windows.Forms.Panel; $progress.Location = New-Object Drawing.Point(0,124); $progress.Size = New-Object Drawing.Size(720,576); $progress.BackColor = [Drawing.Color]::Transparent; $progress.Visible = $false
+# ---- progress (top) ----
+$progress = New-Object Windows.Forms.Panel; $progress.Location = New-Object Drawing.Point(0,124); $progress.Size = New-Object Drawing.Size(720,156); $progress.BackColor = [Drawing.Color]::Transparent
 $stage.Controls.Add($progress)
-$title = Label '正在下载运行组件…' 32 40 640 32 14 $true $C.cream $progress
-$status = Label '' 32 84 656 44 9 $false $C.muted $progress
+$title = Label '正在下载运行组件…' 32 10 520 30 14 $true $C.cream $progress
+$status = Label '' 32 80 656 70 9 $false $C.muted $progress
 # Hand-drawn progress bar: rounded dark track, crimson-to-gold fill, a soft shimmer while unpacking.
 $script:barValue = 0; $script:barBusy = $false; $script:barPhase = 0.0
-$bar = New-Object GrimoirePanel; $bar.Location = New-Object Drawing.Point(32,132); $bar.Size = New-Object Drawing.Size(656,14); $bar.BackColor = [Drawing.Color]::Transparent
+$bar = New-Object GrimoirePanel; $bar.Location = New-Object Drawing.Point(32,56); $bar.Size = New-Object Drawing.Size(584,14); $bar.BackColor = [Drawing.Color]::Transparent
 function Round-Rect($x, $y, $w, $h) {
   $r = [math]::Min($h, $w); $gp = New-Object Drawing.Drawing2D.GraphicsPath
   if ($w -le 0) { return $gp }
@@ -229,77 +237,828 @@ $bar.add_Paint({ param($s,$e)
   $edge = Pen $C.line 255 1; $g.DrawPath($edge, $track); $edge.Dispose()
 })
 $progress.Controls.Add($bar)
-$percent = Label '' 600 104 88 20 9 $true $C.gold $progress; $percent.TextAlign = 'MiddleRight'
+$percent = Label '' 620 52 68 20 9 $true $C.gold $progress; $percent.TextAlign = 'MiddleRight'
 $shimmer = New-Object Windows.Forms.Timer; $shimmer.Interval = 30
 $shimmer.add_Tick({ $script:barPhase = ($script:barPhase + 0.012) % 1.0; $bar.Invalidate() })
 function Set-Bar([int]$value) { $script:barBusy = $false; $shimmer.Stop(); $script:barValue = [math]::Max(0, [math]::Min(1000, $value)); $percent.Text = if ($value -gt 0) { ('{0:N0}%' -f ($script:barValue / 10)) } else { '' }; $bar.Invalidate() }
 function Set-Busy { $script:barBusy = $true; $percent.Text = ''; $shimmer.Start(); $bar.Invalidate() }
-$whereLabel = Label ('安装位置：' + $runtimeDir) 32 160 656 20 8 $false $C.muted $progress; $whereLabel.AutoEllipsis = $true
 $button = New-Object Windows.Forms.Button; $button.Text = '取消 Cancel'; $button.FlatStyle = 'Flat'; $button.ForeColor = $C.cream
-$button.Font = New-Object Drawing.Font($ui, 9, [Drawing.FontStyle]::Bold); Style-Button $button $false; $button.FlatAppearance.BorderColor = $C.red; $button.Location = New-Object Drawing.Point(568,200); $button.Size = New-Object Drawing.Size(120,34); $button.Cursor = 'Hand'
+$button.Font = New-Object Drawing.Font($ui, 9, [Drawing.FontStyle]::Bold); Style-Button $button $false; $button.FlatAppearance.BorderColor = $C.red; $button.Location = New-Object Drawing.Point(568,8); $button.Size = New-Object Drawing.Size(120,32); $button.Cursor = 'Hand'
 $progress.Controls.Add($button)
 
-$client = New-Object Net.WebClient; $client.Headers.Add('User-Agent','MeguLit-setup')
-$script:queue = @(); $script:index = 0; $script:urlIndex = 0; $script:done = $false; $script:mode = ''
-$names = @{ base = '基础组件'; reading = '注音分词词典'; voice = '语音引擎' }
-# base needs Python's core library too: an interrupted install once left node.exe but no Lib\zipfile.
-$markers = @{ base = @('runtime\node.exe','runtime\python\python.exe','runtime\python\Lib\zipfile\__init__.py','runtime\python\Lib\encodings\__init__.py'); reading = 'runtime\reading\sudachidict_full\resources\system.dic'; voice = 'runtime\aivis\run.exe' }
+# ---- install location (bottom) ----
+$choice = New-Object Windows.Forms.Panel; $choice.Location = New-Object Drawing.Point(0,290); $choice.Size = New-Object Drawing.Size(720,270); $choice.BackColor = [Drawing.Color]::Transparent
+$stage.Controls.Add($choice)
+[void](Label '装到哪里' 32 0 400 28 12 $true $C.cream $choice)
+[void](Label ('运行组件（Node.js、Python、文本 Hook、注音词典、AivisSpeech 语音引擎，共约 ' + (MB (Sum $full 'size')) + '）已经在后台下载了，趁这会儿选好位置。组件都是各项目官方发布的原版文件，逐个校验 SHA-256，被改动过的不会安装') 32 30 656 36 8 $false $C.muted $choice)
+[void](Label '安装位置' 32 79 70 20 9 $true $C.cream $choice)
+$pathBox = New-Object Windows.Forms.TextBox; $pathBox.Location = New-Object Drawing.Point(104,76); $pathBox.Size = New-Object Drawing.Size(452,24)
+$pathBox.Font = New-Object Drawing.Font($ui, 9); $pathBox.BackColor = $C.card; $pathBox.ForeColor = $C.cream; $pathBox.BorderStyle = 'FixedSingle'
+$pathBox.Text = $(if ($env:MEGULIT_SETUP_TARGET) { $env:MEGULIT_SETUP_TARGET } else { Default-Target }); $choice.Controls.Add($pathBox)
+$browse = New-Object Windows.Forms.Button; $browse.Text = '更改… Browse'; $browse.Location = New-Object Drawing.Point(566,75); $browse.Size = New-Object Drawing.Size(122,26)
+$browse.Font = New-Object Drawing.Font($ui, 9); Style-Button $browse $false; $browse.FlatAppearance.BorderColor = $C.line; $choice.Controls.Add($browse)
+function Check($text, $x, $w) {
+  $cb = New-Object Windows.Forms.CheckBox; $cb.Text = $text; $cb.Checked = $true; $cb.Location = New-Object Drawing.Point($x,108); $cb.Size = New-Object Drawing.Size($w,22)
+  $cb.Font = New-Object Drawing.Font($ui, 9); $cb.ForeColor = $C.cream; $cb.BackColor = [Drawing.Color]::Transparent; $cb.FlatStyle = 'Flat'; $cb.Cursor = 'Hand'
+  $choice.Controls.Add($cb); $cb
+}
+$deskCheck = Check '在桌面创建快捷方式' 32 190
+$menuCheck = Check '添加到开始菜单' 226 170
+$freeLabel = Label '' 400 110 288 20 8 $false $C.muted $choice; $freeLabel.TextAlign = 'MiddleRight'
+$noteText = if ($fromArchive) { '你是在压缩包里直接打开的：点「安装」后 MeguLit 会整个复制到这里再装组件，以后从快捷方式打开就行' } else { '运行组件装进安装位置下的 runtime 文件夹，不会写到别处 · 以后移动 MeguLit 文件夹，组件会跟着一起走' }
+$note = Label $noteText 32 140 656 20 8 $fromArchive $(if ($fromArchive) { $C.gold } else { $C.muted }) $choice; $note.AutoEllipsis = $true
+if (-not $webview) {
+  $link = New-Object Windows.Forms.LinkLabel; $link.Text = '这台电脑缺少 Microsoft Edge WebView2 运行时，MeguLit 的界面需要它：点这里去微软官网下载安装'
+  $link.Location = New-Object Drawing.Point(32,164); $link.Size = New-Object Drawing.Size(656,20); $link.Font = New-Object Drawing.Font($ui, 8, [Drawing.FontStyle]::Bold)
+  $link.LinkColor = $C.red; $link.ActiveLinkColor = $C.gold; $link.BackColor = [Drawing.Color]::Transparent
+  $link.add_LinkClicked({ Start-Process 'https://developer.microsoft.com/microsoft-edge/webview2/' })
+  $choice.Controls.Add($link)
+}
+$confirm = New-Object Windows.Forms.Button; $confirm.Text = '安装 Install'; $confirm.Location = New-Object Drawing.Point(508,196); $confirm.Size = New-Object Drawing.Size(180,38)
+$confirm.Font = New-Object Drawing.Font($ui, 11, [Drawing.FontStyle]::Bold); Style-Button $confirm $true; $choice.Controls.Add($confirm); $form.AcceptButton = $confirm
 
+# Space the chosen drive needs: unpacked packs (+ the program when it is copied there), plus whatever still has to
+# be downloaded when the staging folder is on that same drive (packs are deleted right after they are unpacked).
+function Need-Bytes($path) {
+  $ids = Missing $path
+  $n = (Sum $ids 'unpacked')
+  try { if ([IO.Path]::GetFullPath($path).TrimEnd('\') -ine $sourceRoot) { $n += $appSize } } catch {}
+  if ((Drive-Of $path) -eq (Drive-Of $stageDir)) { $n += [math]::Max(0, (Sum $want 'size') - (Stage-Bytes)) }
+  [long]($n * 1.1)
+}
+function Update-Free {
+  $f = Drive-Free $pathBox.Text; $need = Need-Bytes $pathBox.Text
+  $freeLabel.Text = '所在磁盘可用 ' + (MB $f) + ' · 需要约 ' + (MB $need); $freeLabel.ForeColor = $(if ($f -lt $need) { $C.red } else { $C.muted })
+}
+$pathBox.add_TextChanged({ Update-Free })
+$browse.add_Click({
+  $d = New-Object Windows.Forms.FolderBrowserDialog; $d.Description = '选择 MeguLit 的安装位置（会在里面建 MeguLit 文件夹）'; $d.ShowNewFolderButton = $true
+  if ($d.ShowDialog($form) -eq 'OK') {
+    $picked = $d.SelectedPath
+    if ((Split-Path $picked -Leaf) -ne 'MeguLit' -and -not (Test-Path (Join-Path $picked 'MeguLit.exe'))) { $picked = Join-Path $picked 'MeguLit' }
+    $pathBox.Text = $picked
+  }
+})
+
+$script:fetch = $null; $script:done = $false; $script:mode = ''
 # ---- download source ----
 # Users in mainland China often get very slow GitHub downloads. We do not look up the user's IP
 # (that would send it to a third-party geo service); the system time zone / UI language is enough
-# to decide whether to probe mirrors. When it looks like China, every source gets a short ranged
-# download and the fastest wins. Mirrors only relay the same GitHub file; SHA-256 still has to match.
+# to decide the source order. Mirrors only relay the same GitHub file; SHA-256 still has to match.
 $inChina = ([TimeZoneInfo]::Local.Id -eq 'China Standard Time') -or ((Get-Culture).Name -eq 'zh-CN')
-function Source-Name($url) { ([Uri]$url).Host }
+# 2026-11-19: players in China sat on dl.megulit.com (Cloudflare R2, throttled there after the first MB) at 9 / 178 MB.
+# 2026-11-20: setup\runtime.json "mirrors" is the one source list for both downloaders (core\download-sources.cjs reads
+# the same entries for the app): url template ({url} = the GitHub URL, {tag}/{file} = its release tag and file name),
+# own (only MeguLit's own release files are there), cn / world order (only the tie-break: every source is probed in
+# parallel and ranked by speed), trust (first-party: used alone after a SHA-256 mismatch), max (connections at most,
+# kept low for free public relays), off (listed, not used yet). A plain string is a relay (order 2, not trusted).
+function Mirror-List($mirrors) {
+  $l = @(foreach ($m in @($mirrors)) {
+    if ($m -is [string]) { [pscustomobject]@{ url = $m; cn = 2; world = 2; trust = $false; own = $false; max = 0 } }
+    elseif ($m -and $m.url -and -not $m.off) { $m }
+  })
+  if (-not ($l | Where-Object { $_.url -eq '{url}' })) { $l += [pscustomobject]@{ url = '{url}'; cn = 9; world = 0; trust = $true; own = $false; max = 0 } }
+  $l
+}
+function Mirror-Host($template) { if ($template.StartsWith('{url}')) { 'github.com' } else { ([Uri]($template -replace '\{[a-z]+\}', 'x')).Host } }
+function Rank-Sources($urls, [bool]$china, $mirrors) {
+  $hosts = @{}; foreach ($m in (Mirror-List $mirrors)) { $h = Mirror-Host $m.url; if (-not $hosts.ContainsKey($h)) { $hosts[$h] = $m } }
+  $all = @($urls)
+  $rows = for ($i = 0; $i -lt $all.Count; $i++) {
+    $m = $hosts[([Uri]$all[$i]).Host]
+    $r = if (-not $m) { 5 } elseif ($china) { [double]$m.cn } else { [double]$m.world }
+    [pscustomobject]@{ u = $all[$i]; r = $r; i = $i }
+  }
+  @($rows | Sort-Object r, i | ForEach-Object { $_.u } | Select-Object -Unique)
+}
 function Candidates($id) {
-  $direct = @($packs.$id.urls)
-  $mirrored = foreach ($m in @($manifest.mirrors)) { foreach ($u in $direct) { $seg = $u.Split('/'); $m.Replace('{url}', $u).Replace('{tag}', $seg[-2]).Replace('{file}', $seg[-1]) } }
-  if ($inChina) { @($mirrored) + $direct } else { $direct + @($mirrored) }
+  $list = Mirror-List $manifest.mirrors
+  $urls = foreach ($u in @($packs.$id.urls)) {
+    $own = $u -match '^https://github\.com/ilynthn/MeguLit/releases/download/'; $seg = $u.Split('/')
+    foreach ($m in $list) { if ($own -or -not $m.own) { $m.url.Replace('{url}', $u).Replace('{tag}', $seg[-2]).Replace('{file}', $seg[-1]) } }
+  }
+  Rank-Sources $urls $inChina $manifest.mirrors
 }
-function Probe($url) {
-  try {
-    $req = [Net.HttpWebRequest]::Create($url); $req.AddRange(0, 1048575); $req.Timeout = 6000; $req.ReadWriteTimeout = 6000; $req.UserAgent = 'MeguLit-setup'
-    $sw = [Diagnostics.Stopwatch]::StartNew(); $res = $req.GetResponse(); $stream = $res.GetResponseStream()
-    $buf = New-Object byte[] 65536; $n = 0
-    while ($sw.ElapsedMilliseconds -lt 6000) { $r = $stream.Read($buf, 0, $buf.Length); if ($r -le 0) { break }; $n += $r }
-    $res.Close(); if ($n -lt 65536) { return 0 }
-    return $n / [math]::Max(0.05, $sw.Elapsed.TotalSeconds)
-  } catch { return 0 }
+# first-party hosts and per-host connection limits for MeguFetch, from the same list
+function Source-Hints($mirrors) {
+  $trust = @(); $limits = @()
+  foreach ($m in (Mirror-List $mirrors)) { $h = Mirror-Host $m.url; if ($m.trust) { $trust += $h }; if ($m.max -gt 0) { $limits += ($h + '=' + [int]$m.max) } }
+  @{ trust = [string[]]$trust; limits = [string[]]$limits }
 }
-function Order-Sources($id) {
-  $list = @(Candidates $id)
-  if (-not $inChina -or $list.Count -lt 2) { return $list }
-  $status.Text = '正在为你挑选最快的下载源（GitHub / 国内镜像）…'; $form.Refresh()
-  $scored = foreach ($u in $list) { [Windows.Forms.Application]::DoEvents(); [pscustomobject]@{ url = $u; speed = (Probe $u) } }
-  $ok = @($scored | Where-Object { $_.speed -gt 0 } | Sort-Object speed -Descending | ForEach-Object { $_.url })
-  $bad = @($scored | Where-Object { $_.speed -le 0 } | ForEach-Object { $_.url })
-  return $ok + $bad
+# Multi-source segmented downloader (compiled on first use, runs on background threads; the window only polls it).
+# The old single WebClient stayed on whichever source answered first, even at 20 KB/s, and threw the .part away on retry.
+# Now: all sources are probed at once for ~3 s, the file is fetched as 4 MB Range segments over 8 connections from the
+# fastest sources, a connection far below the average or silent for 15 s is dropped and its segment goes elsewhere, and
+# finished segments are listed in runtime-<id>.setup.part.json so Retry or the next launch only fetches what is missing.
+# A source answering 200 instead of 206 (no Range) is only used alone, for the whole file.
+# validation\setup-download.test.cjs runs this class against local throttled servers.
+$fetchSource = @'
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Security.Cryptography;
+
+public class MeguSource {
+  public string Url, Live, Host, Why;
+  public int Order, Active, Strikes, Max;
+  public double ProbeSpeed, Speed;
+  public long ProbeBytes, Bytes, Length = -1, WinBytes, Recent;
+  public int Range = -1;   /* -1 unknown, 0 no (200 only), 1 yes (206) */
+  public bool Dead, Trust;
+  public DateTime CoolUntil;   /* cooled down after an error until then */
 }
 
+public class MeguConn {
+  public MeguSource Src; public int Seg; public long Len, Got, WinGot;
+  public HttpWebRequest Req; public DateTime Started, LastData; public double RecentSpeed;
+  public volatile bool Killed; public string KillWhy;
+  /* end game: a duplicate of the same segment from another source; Lost = the twin won, stop writing */
+  public MeguConn Twin; public bool IsDup; public volatile bool Lost; public readonly object WriteLock = new object();
+  /* a segment may be split into parts in the tail: Offset/Len are this part's bytes; Settled = counted once */
+  public long Offset; public bool Settled;
+}
+
+/* Downloads one file from several mirrors at once: parallel speed probe, HTTP Range segments on
+   several connections (fast sources take more segments), slow or stalled connections are dropped and
+   their segment goes to another source, finished segments are remembered in <part>.json so a retry or
+   a restart only fetches what is missing. The whole file is checked against SHA-256 at the end.
+   2026-11-20 "super assembly" (same rules as core\fast-download.cjs, after aria2's multi-source HTTP):
+   - connections start at Connections (at least one per usable source) and grow by 2 every other 1.5 s window while the
+     line is not full (the total still rises by ScaleGain, or the speed per connection stays above ScaleKeep of what it
+     was), up to MaxConnections; after a stop it tries again 10 s later
+   - each source holds a share of the connections in proportion to its speed (+1), at most MaxPerSource; slower
+     sources (>= 5 % of the best) are used once the fast ones are full
+   - tail: nothing left to hand out, so a free connection takes the second half of the biggest running part (down to
+     MinSplit); then the end game fetches the rest of the part that would finish last again from another source into
+     memory, the first to finish is written and the other is cancelled; a failed part only hands back what it had not
+     written yet
+   - an error cools a source down (CoolMs, doubling up to CoolMaxMs) while another one carries on; dropped for good
+     only on 401/403/404/410/416, an HTML page, a wrong size, or MaxStrikes errors
+   - after a SHA-256 mismatch with relays involved, the second round uses the first-party sources only (TrustedHosts) */
+public class MeguFetch {
+  public string[] Urls; public string Part; public long Size; public string Sha;
+  public int Connections = 8, MaxConnections = 16, MaxPerSource = 8, SegmentSize = 4 << 20, ProbeMs = 3000, ProbeCapMs = 4000, StallMs = 15000, SlowGraceMs = 6000;
+  public int CoolMs = 5000, CoolMaxMs = 60000, MaxStrikes = 6, DupMinMs = 1000, MinSplit = 512 << 10;
+  public bool EndGame = true;
+  public long ProbeMaxBytes = 16L << 20;
+  public double SlowRatio = 0.3, ScaleGain = 1.08, ScaleKeep = 0.8, UseFloor = 0.05, ScaleSec = 1.5;
+  public string UserAgent = "MeguLit-setup";
+  /* first-party hosts (setup\runtime.json "trust"); *.megulit.com and github.com always count */
+  public static string[] TrustedHosts = new string[0];
+  /* "host=n": at most n connections to that host (free public relays get few) */
+  public static string[] HostLimits = new string[0];
+  public string[] Trusted;
+
+  public volatile string Phase = "idle";
+  public string Error = "";
+  public long Resumed, ProbeElapsedMs, Steals, SlowKills, StallKills, Dups, DupWins, Cooldowns;
+  public int Target, MaxTarget;
+  public bool Single;
+  public double TotalSpeed;
+  public List<MeguSource> Sources = new List<MeguSource>();
+
+  readonly object gate = new object();
+  readonly List<MeguConn> conns = new List<MeguConn>();
+  readonly LinkedList<int> pending = new LinkedList<int>();
+  readonly LinkedList<long[]> retry = new LinkedList<long[]>();   /* {segment, offset, length} left by a failed part */
+  int[] parts;
+  readonly StringBuilder log = new StringBuilder();
+  readonly DateTime t0 = DateTime.UtcNow;
+  bool[] done; int segCount; long doneBytes; volatile bool cancel; string failWhy;
+  Thread main;
+
+  // read-only view for the interface layer: which segments are finished / running and how far the running ones are (changes no download behaviour)
+  public void Snap(byte[] st, float[] fr) {
+    lock (gate) { if (done == null) return;
+      for (int i = 0; i < segCount && i < st.Length; i++) { st[i] = done[i] ? (byte)2 : (byte)0; fr[i] = done[i] ? 1f : 0f; }
+      foreach (MeguConn c in conns) { if (c.IsDup || c.Lost || c.Len <= 0) continue; int i = c.Seg; if (i < 0 || i >= st.Length || done[i]) continue; st[i] = 1; fr[i] = Math.Min(1f, fr[i] + (float)c.Got / (float)SegmentSize); }
+    }
+  }
+  public string StatePath { get { return Part + ".json"; } }
+  public string LogText() { lock (log) return log.ToString(); }
+  void Log(string s) { lock (log) log.AppendFormat("{0,6:0.0}s {1}\r\n", (DateTime.UtcNow - t0).TotalSeconds, s); }
+
+  public long Received {
+    get { lock (gate) { long n = doneBytes; foreach (MeguConn c in conns) if (!c.IsDup && !c.Lost) n += Interlocked.Read(ref c.Got); return Math.Min(n, Size); } }
+  }
+  public string SourceLabel() {
+    lock (gate) {
+      MeguSource top = null; int busy = 0;
+      foreach (MeguSource s in Sources) {
+        if (s.Active == 0 && s.Recent == 0) continue;
+        if (s.Active > 0) busy++;
+        if (top == null || s.Recent > top.Recent || (s.Recent == top.Recent && s.Bytes > top.Bytes)) top = s;
+      }
+      if (top == null) return "";
+      return busy > 1 ? top.Host + " 等 " + busy + " 个源" : top.Host;
+    }
+  }
+
+  public void Start() {
+    main = new Thread(Run); main.IsBackground = true; main.Start();
+  }
+  public void Cancel() {
+    cancel = true;
+    lock (gate) { foreach (MeguConn c in conns) Kill(c, "cancel"); Monitor.PulseAll(gate); }
+  }
+  public bool Wait(int ms) { return main == null || main.Join(ms); }
+
+  void Run() {
+    FileStream held = null;
+    try {
+      /* Two setup windows on one folder must not write the same file: the second one takes its own. */
+      for (int k = 0; held == null; k++) {
+        string p = k == 0 ? Part : Part + "-" + k;
+        try { held = new FileStream(p + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose); Part = p; }
+        catch (IOException) { if (k >= 20) throw; }
+      }
+      if (ServicePointManager.DefaultConnectionLimit < 64) ServicePointManager.DefaultConnectionLimit = 64;
+      segCount = (int)((Size + SegmentSize - 1) / SegmentSize);
+      for (int i = 0; i < Urls.Length; i++) {
+        MeguSource s = new MeguSource(); s.Url = Urls[i]; s.Live = Urls[i]; s.Host = new Uri(Urls[i]).Authority; s.Order = i; s.Trust = IsTrusted(s.Url); s.Max = LimitOf(s.Url); Sources.Add(s);
+      }
+      for (int round = 0; round < 2; round++) {
+        LoadState();
+        bool complete = Resumed == Size;
+        if (!complete) {
+          if (round == 0) Probe();
+          if (cancel) { Phase = "cancelled"; return; }
+          Phase = "download";
+          if (HasRangeSource()) Segmented();
+          if (!cancel && failWhy == null && doneBytes < Size) WholeFile();
+          if (cancel) { Phase = "cancelled"; return; }
+          if (failWhy != null || doneBytes < Size) { Fail(failWhy ?? "所有下载源都失败了"); return; }
+        }
+        Phase = "verify";
+        string hash = Hash();
+        if (hash == Sha.ToUpperInvariant()) { TryDelete(StatePath); Log("sha256 ok"); Phase = "done"; return; }
+        Log("sha256 mismatch " + hash + (round == 0 ? ", downloading again from scratch" : ""));
+        TryDelete(StatePath); TryDelete(Part);
+        if (round == 1) { Fail("文件校验失败，可能下载不完整"); return; }
+        /* a relay may have served a different file: with a first-party source still there, the relays sit out */
+        bool relays = false, firsts = false;
+        foreach (MeguSource s in Sources) { if (!s.Trust && s.Bytes > 0) relays = true; if (s.Trust && !s.Dead) firsts = true; }
+        if (relays && firsts) foreach (MeguSource s in Sources) if (!s.Trust && !s.Dead) { s.Dead = true; s.Why = "not first-party, after a hash mismatch"; Log(s.Host + " dropped: " + s.Why); }
+        foreach (MeguSource s in Sources) { s.CoolUntil = DateTime.MinValue; s.Bytes = 0; }
+      }
+    } catch (Exception e) { if (cancel) Phase = "cancelled"; else Fail(e.Message); }
+    finally { if (held != null) held.Dispose(); }
+  }
+  void Fail(string why) { Error = why; Log("failed: " + why); Phase = "failed"; }
+  static int LimitOf(string url) {
+    Uri u = new Uri(url);
+    if (HostLimits != null) foreach (string l in HostLimits) { int k = l == null ? -1 : l.LastIndexOf('='); int n; if (k > 0 && (string.Equals(l.Substring(0, k), u.Host, StringComparison.OrdinalIgnoreCase) || string.Equals(l.Substring(0, k), u.Authority, StringComparison.OrdinalIgnoreCase)) && int.TryParse(l.Substring(k + 1), out n)) return n; }
+    return 0;
+  }
+  bool IsTrusted(string url) {
+    string h = new Uri(url).Host.ToLowerInvariant();
+    if (h == "github.com" || h.EndsWith(".githubusercontent.com") || h == "megulit.com" || h.EndsWith(".megulit.com")) return true;
+    foreach (string[] list in new string[][] { TrustedHosts, Trusted }) if (list != null) foreach (string t in list) if (t != null && (string.Equals(t, h, StringComparison.OrdinalIgnoreCase) || string.Equals(t, url, StringComparison.OrdinalIgnoreCase))) return true;
+    return false;
+  }
+
+  /* ---------- resume state ---------- */
+  void LoadState() {
+    done = new bool[segCount]; parts = new int[segCount]; retry.Clear(); doneBytes = 0; Resumed = 0; Single = false; failWhy = null;
+    try {
+      if (File.Exists(StatePath) && File.Exists(Part) && new FileInfo(Part).Length == Size) {
+        string j = File.ReadAllText(StatePath);
+        if (Num(j, "size") == Size && Num(j, "segment") == SegmentSize && Str(j, "sha256") == Sha.ToUpperInvariant()) {
+          foreach (Match m in Regex.Matches(Str(j, "done"), @"\d+")) { int k = int.Parse(m.Value); if (k < segCount && !done[k]) { done[k] = true; doneBytes += SegLen(k); } }
+        }
+      }
+    } catch { }
+    Resumed = doneBytes;
+    if (doneBytes == 0) {
+      for (int i = 0; ; i++) {
+        try { using (FileStream f = new FileStream(Part, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) f.SetLength(Size); break; }
+        catch (IOException) { if (i >= 30) throw; Thread.Sleep(500); }
+      }
+      TryDelete(StatePath);
+    } else Log("resume: " + doneBytes + " of " + Size + " bytes already here");
+    pending.Clear();
+    for (int i = 0; i < segCount; i++) if (!done[i]) pending.AddLast(i);
+  }
+  void SaveState() {
+    StringBuilder d = new StringBuilder();
+    for (int i = 0; i < segCount; i++) if (done[i]) { if (d.Length > 0) d.Append(','); d.Append(i); }
+    try { File.WriteAllText(StatePath, "{\"size\":" + Size + ",\"segment\":" + SegmentSize + ",\"sha256\":\"" + Sha.ToUpperInvariant() + "\",\"done\":\"" + d + "\"}"); } catch { }
+  }
+  static long Num(string j, string k) { Match m = Regex.Match(j, "\"" + k + "\"\\s*:\\s*(\\d+)"); return m.Success ? long.Parse(m.Groups[1].Value) : -1; }
+  static string Str(string j, string k) { Match m = Regex.Match(j, "\"" + k + "\"\\s*:\\s*\"([^\"]*)\""); return m.Success ? m.Groups[1].Value : ""; }
+  long SegLen(int k) { return Math.Min(Size, (long)(k + 1) * SegmentSize) - (long)k * SegmentSize; }
+  static void TryDelete(string p) { try { if (File.Exists(p)) File.Delete(p); } catch { } }
+
+  /* ---------- parallel probe ---------- */
+  HttpWebRequest Make(string url) {
+    HttpWebRequest r = (HttpWebRequest)WebRequest.Create(url);
+    r.UserAgent = UserAgent; r.Timeout = StallMs; r.ReadWriteTimeout = StallMs; r.KeepAlive = true;
+    return r;
+  }
+  static int StatusOf(WebException e) { HttpWebResponse r = e.Response as HttpWebResponse; return r == null ? 0 : (int)r.StatusCode; }
+  static long TotalFromContentRange(string cr) { if (cr == null) return -1; Match m = Regex.Match(cr, @"/(\d+)"); return m.Success ? long.Parse(m.Groups[1].Value) : -1; }
+
+  void Probe() {
+    Phase = "probe";
+    List<HttpWebRequest> reqs = new List<HttpWebRequest>();
+    List<Thread> threads = new List<Thread>();
+    DateTime start = DateTime.UtcNow;
+    int running = Sources.Count;
+    foreach (MeguSource src in Sources) {
+      MeguSource s = src;
+      HttpWebRequest req = Make(s.Url); req.Timeout = ProbeCapMs; req.ReadWriteTimeout = ProbeCapMs; req.AddRange(0L);
+      lock (reqs) reqs.Add(req);
+      Thread t = new Thread(delegate() {
+        try {
+          using (HttpWebResponse res = (HttpWebResponse)req.GetResponse()) {
+            s.Live = res.ResponseUri.AbsoluteUri;
+            if ((int)res.StatusCode == 206) { s.Range = 1; s.Length = TotalFromContentRange(res.Headers["Content-Range"]); }
+            else { s.Range = 0; s.Length = res.ContentLength; }
+            if ((res.ContentType ?? "").StartsWith("text/html", StringComparison.OrdinalIgnoreCase)) { s.Dead = true; s.Why = "HTML page"; return; }
+            Stream st = res.GetResponseStream(); byte[] buf = new byte[65536];
+            while ((DateTime.UtcNow - start).TotalMilliseconds < ProbeMs && Interlocked.Read(ref s.ProbeBytes) < ProbeMaxBytes) {
+              int n = st.Read(buf, 0, buf.Length); if (n <= 0) break; Interlocked.Add(ref s.ProbeBytes, n);
+            }
+            double sec = Math.Max(0.05, (DateTime.UtcNow - start).TotalSeconds);
+            s.ProbeSpeed = s.ProbeBytes / sec;
+          }
+        } catch (WebException e) {
+          int code = StatusOf(e);
+          if (code >= 400) { s.Dead = true; s.Why = "HTTP " + code; }
+          else if (s.ProbeBytes > 0) s.ProbeSpeed = s.ProbeBytes / Math.Max(0.05, (DateTime.UtcNow - start).TotalSeconds);
+          else s.Why = e.Status.ToString();
+        } catch (Exception e) { if (s.ProbeBytes == 0) s.Why = e.Message; }
+        finally { try { req.Abort(); } catch { } Interlocked.Decrement(ref running); }
+      });
+      t.IsBackground = true; threads.Add(t); t.Start();
+    }
+    while (running > 0 && !cancel && (DateTime.UtcNow - start).TotalMilliseconds < ProbeMs + 150) Thread.Sleep(30);
+    /* A source still connecting or mid-read gets scored on what it managed so far, then its request is dropped. */
+    foreach (MeguSource s in Sources) if (s.ProbeSpeed == 0 && s.ProbeBytes > 0) s.ProbeSpeed = s.ProbeBytes / Math.Max(0.05, (DateTime.UtcNow - start).TotalSeconds);
+    lock (reqs) foreach (HttpWebRequest r in reqs) { try { r.Abort(); } catch { } }
+    foreach (Thread t in threads) t.Join(Math.Max(0, ProbeCapMs - (int)(DateTime.UtcNow - start).TotalMilliseconds));
+    ProbeElapsedMs = (long)(DateTime.UtcNow - start).TotalMilliseconds;
+    foreach (MeguSource s in Sources) {
+      if (!s.Dead && Size > 0 && s.Length > 0 && s.Length != Size) { s.Dead = true; s.Why = "size " + s.Length; }
+      s.Speed = s.ProbeSpeed;
+      Log(string.Format("probe {0}: {1:0.00} MB/s range={2}{3}", s.Host, s.ProbeSpeed / 1048576, s.Range, s.Dead ? " dead " + s.Why : (s.Why != null ? " (" + s.Why + ")" : "")));
+    }
+  }
+
+  /* ---------- segmented download ---------- */
+  bool HasRangeSource() { lock (gate) { foreach (MeguSource s in Sources) if (!s.Dead && s.Range != 0) return true; return false; } }
+  bool Cooling(MeguSource s) { return s.CoolUntil > DateTime.UtcNow; }
+  bool Usable(MeguSource s) { return !s.Dead && s.Range != 0 && !Cooling(s); }
+  double BestSpeed() { double b = 0; foreach (MeguSource s in Sources) if (Usable(s) && s.Speed > b) b = s.Speed; return b; }
+  /* A source's share of the connections follows its speed; one back from a cool-down gets one until it delivers. Caller holds gate. */
+  int CapOf(MeguSource s) {
+    if (s.Strikes > 0) return 1;
+    double sum = 0; foreach (MeguSource x in Sources) if (Usable(x)) sum += Math.Max(1.0, x.Speed);
+    if (sum <= 0) return 1;
+    return Math.Max(1, Math.Min(s.Max > 0 ? Math.Min(s.Max, MaxPerSource) : MaxPerSource, (int)Math.Ceiling(Target * Math.Max(1.0, s.Speed) / sum) + 1));
+  }
+  /* Fast sources first; slower ones (>= UseFloor of the best) only once the fast ones are full. Caller holds gate. */
+  MeguSource Pick(MeguSource not) {
+    double best = BestSpeed();
+    for (int pass = 0; pass < 2; pass++) {
+      MeguSource pick = null; double score = -1;
+      foreach (MeguSource s in Sources) {
+        if (s == not || !Usable(s) || s.Active >= CapOf(s)) continue;
+        if (s.Speed < best * (pass == 0 ? SlowRatio : UseFloor)) continue;
+        double sc = s.Speed / (1 + 0.6 * s.Active);
+        if (sc > score || (sc == score && pick != null && s.Order < pick.Order)) { score = sc; pick = s; }
+      }
+      if (pick != null) return pick;
+    }
+    return null;
+  }
+  bool OthersAlive(MeguSource me) { foreach (MeguSource s in Sources) if (s != me && !s.Dead && s.Range != 0) return true; return false; }
+  bool OthersUsable(MeguSource me) { foreach (MeguSource s in Sources) if (s != me && Usable(s)) return true; return false; }
+  int Busy() { int n = 0; foreach (MeguSource s in Sources) n += s.Active; return n; }
+  void Kill(MeguConn c, string why) {
+    if (c.Killed) return; c.KillWhy = why; c.Killed = true;
+    HttpWebRequest r = c.Req; if (r != null) { try { r.Abort(); } catch { } }
+  }
+  /* An error: cool the source down while another one can carry on (alone it is asked again after a second); dropped after MaxStrikes. Caller holds gate. */
+  void Strike(MeguSource s, string why) {
+    s.Strikes++; s.Speed *= 0.5;
+    bool others = OthersAlive(s);
+    if (s.Strikes >= (others ? MaxStrikes : MaxStrikes * 2)) { s.Dead = true; s.Why = "too many errors (" + why + ")"; Log(s.Host + " dropped: " + s.Why); return; }
+    int ms = OthersUsable(s) ? Math.Min(CoolMaxMs, CoolMs << Math.Min(10, s.Strikes - 1)) : Math.Min(1000, CoolMs);
+    s.CoolUntil = DateTime.UtcNow.AddMilliseconds(ms); Cooldowns++;
+    Log(string.Format("{0} cools down {1:0.0} s ({2})", s.Host, ms / 1000.0, why));
+  }
+
+  void Segmented() {
+    int usable = 0; lock (gate) foreach (MeguSource s in Sources) if (!s.Dead && s.Range != 0) usable++;
+    Target = Math.Max(1, Math.Min(Math.Max(Connections, usable), MaxConnections)); MaxTarget = Target;
+    int workers = Math.Max(Target, MaxConnections);
+    List<Thread> ts = new List<Thread>();
+    for (int i = 0; i < workers; i++) { Thread t = new Thread(Worker); t.IsBackground = true; ts.Add(t); t.Start(i); }
+    DateTime win = DateTime.UtcNow, growAt = DateTime.MinValue; long winDone = doneBytes; double lastScale = -1, lastPer = -1; bool skip = false;
+    while (true) {
+      bool alive = false; foreach (Thread t in ts) if (t.IsAlive) alive = true;
+      if (!alive) break;
+      Thread.Sleep(250);
+      lock (gate) {
+        DateTime now = DateTime.UtcNow;
+        double sec = (now - win).TotalSeconds;
+        if (sec >= ScaleSec) {
+          long rec = doneBytes; foreach (MeguConn c in conns) if (!c.IsDup) rec += c.Got;
+          TotalSpeed = Math.Max(0, rec - winDone) / sec; winDone = rec;
+          foreach (MeguSource s in Sources) { s.Recent = s.WinBytes; s.WinBytes = 0; }
+          foreach (MeguConn c in conns) { c.RecentSpeed = c.WinGot / Math.Max(0.25, (now - (c.Started > win ? c.Started : win)).TotalSeconds); c.WinGot = 0; }
+          /* a source's speed follows its running connections too: one that slowed down mid-segment stops getting new work at once */
+          foreach (MeguSource s in Sources) {
+            double sum = 0; int k = 0; foreach (MeguConn c in conns) if (c.Src == s && !c.IsDup && !c.Killed && (now - c.Started).TotalSeconds >= 1) { sum += c.RecentSpeed; k++; }
+            if (k > 0) s.Speed = s.Speed * 0.5 + (sum / k) * 0.5;
+          }
+          win = now;
+          /* more connections while that still makes the whole download faster (the window right after a step only settles) */
+          int live = 0; foreach (MeguConn c in conns) if (!c.IsDup) live++;
+          double per = TotalSpeed / Math.Max(1, live);
+          if (skip) skip = false;
+          else if (now >= growAt && Target < MaxConnections && (pending.Count > 0 || retry.Count > 0 || Splittable())) {
+            if (lastScale < 0 || TotalSpeed >= lastScale * ScaleGain || per >= lastPer * ScaleKeep) { lastScale = TotalSpeed; lastPer = per; Target = Math.Min(MaxConnections, Target + 2); MaxTarget = Math.Max(MaxTarget, Target); skip = true; Log(string.Format("connections {0} ({1:0.00} MB/s)", Target, TotalSpeed / 1048576)); Monitor.PulseAll(gate); }
+            else { growAt = now.AddSeconds(10); lastScale = -1; Log(string.Format("connections stay {0} ({1:0.00} MB/s)", Target, TotalSpeed / 1048576)); }
+          }
+        }
+        foreach (MeguConn c in conns) {
+          if (c.Killed) continue;
+          if ((now - c.LastData).TotalMilliseconds > StallMs) { StallKills++; Kill(c, "stall"); continue; }
+          if (c.IsDup || HasTwin(c) || (now - c.Started).TotalMilliseconds <= SlowGraceMs || c.Len - c.Got <= 256 * 1024) continue;
+          /* slow = far below the other connections to the same source, or far below a faster source that has room */
+          double same = 0; int k = 0; foreach (MeguConn o in conns) if (o != c && o.Src == c.Src && !o.IsDup && !o.Killed) { same += o.RecentSpeed; k++; }
+          same = k > 0 ? same / k : 0;
+          double free = 0; foreach (MeguSource s in Sources) if (s != c.Src && Usable(s) && s.Active < CapOf(s) && s.Speed > free) free = s.Speed;
+          /* with work still waiting, a connection far below the average one gives its slot (and its unwritten bytes) back */
+          double avg = 0; int na = 0; if (pending.Count > 0 || retry.Count > 0) foreach (MeguConn o in conns) if (o != c && !o.IsDup && !o.Killed) { avg += o.RecentSpeed; na++; }
+          avg = na > 0 ? avg / na : 0;
+          if (c.RecentSpeed < Math.Max(Math.Max(same, free), avg) * SlowRatio) { SlowKills++; Kill(c, "slow"); }
+        }
+      }
+    }
+    lock (gate) { if (!cancel && doneBytes < Size && failWhy == null && HasRangeSource()) failWhy = "所有下载源都失败了"; }
+  }
+
+  /* An exception on a worker thread would end the whole setup process: it fails the download instead. */
+  void Worker(object idObj) {
+    try { WorkerLoop((int)idObj); }
+    catch (Exception e) { lock (gate) { if (failWhy == null && !cancel) failWhy = "下载线程出错：" + e.Message; Log("worker crashed: " + e); Monitor.PulseAll(gate); } }
+  }
+  void WorkerLoop(int id) {
+    while (true) {
+      MeguConn c = null;
+      lock (gate) {
+        while (true) {
+          if (cancel || failWhy != null || doneBytes >= Size) { Monitor.PulseAll(gate); return; }
+          if (id >= Target) { if (Busy() == 0 && pending.Count == 0) return; Monitor.Wait(gate, 300); continue; }
+          MeguSource s = Pick(null);
+          if (retry.Count > 0 && s != null) {
+            /* the rest of a part whose connection failed */
+            long[] r = retry.First.Value; retry.RemoveFirst();
+            c = new MeguConn(); c.Src = s; c.Seg = (int)r[0]; c.Offset = r[1]; c.Len = r[2]; c.Started = c.LastData = DateTime.UtcNow;
+            s.Active++; conns.Add(c); break;
+          }
+          if (pending.Count > 0 && s != null) {
+            int seg = pending.First.Value; pending.RemoveFirst();
+            c = new MeguConn(); c.Src = s; c.Seg = seg; c.Offset = (long)seg * SegmentSize; c.Len = SegLen(seg); c.Started = c.LastData = DateTime.UtcNow;
+            parts[seg] = 1;
+            s.Active++; conns.Add(c); break;
+          }
+          /* tail: split the biggest running part in two, then race the slowest remainder from another source */
+          if (pending.Count == 0 && retry.Count == 0 && s != null) {
+            c = Split(s); if (c != null) break;
+            if (EndGame) { c = Dup(); if (c != null) break; }
+          }
+          if (Busy() == 0 && (pending.Count > 0 || retry.Count > 0) && s == null) {
+            /* every source cooling down: wait; every source gone: give up */
+            if (!HasRangeSource()) return;
+            bool cool = false; foreach (MeguSource x in Sources) if (!x.Dead && x.Range != 0 && Cooling(x)) cool = true;
+            if (!cool) { failWhy = "所有下载源都失败了"; Monitor.PulseAll(gate); return; }
+          }
+          if (Busy() == 0 && pending.Count == 0 && retry.Count == 0 && doneBytes < Size) return;
+          Monitor.Wait(gate, 300);
+        }
+      }
+      Fetch(c);
+    }
+  }
+  /* Tail (aria2 style): the running part with the most bytes left gives its second half to a free connection. Caller holds gate. */
+  MeguConn Split(MeguSource s) {
+    MeguConn big = null; long left = 0;
+    foreach (MeguConn c in conns) {
+      if (c.Killed || c.IsDup || HasTwin(c) || c.Lost || c.Seg < 0) continue;
+      long l = c.Len - Interlocked.Read(ref c.Got); if (l > left) { left = l; big = c; }
+    }
+    if (big == null || left < 2L * MinSplit) return null;
+    MeguConn d;
+    lock (big.WriteLock) {
+      long got = Interlocked.Read(ref big.Got), rest = big.Len - got; if (rest < 2L * MinSplit) return null;
+      long keep = got + ((rest / 2 + 65535) / 65536) * 65536;
+      d = new MeguConn(); d.Src = s; d.Seg = big.Seg; d.Offset = big.Offset + keep; d.Len = big.Len - keep;
+      big.Len = keep;
+    }
+    d.Started = d.LastData = DateTime.UtcNow; parts[d.Seg]++; s.Active++; conns.Add(d); Steals++;
+    return d;
+  }
+  /* End game: the remainder of the part that would finish last is fetched again from another source. Caller holds gate. */
+  MeguConn Dup() {
+    MeguConn worst = null; double worstEta = 0; DateTime now = DateTime.UtcNow;
+    foreach (MeguConn c in conns) {
+      if (c.Killed || c.IsDup || HasTwin(c) || c.Lost || c.Seg < 0 || (now - c.Started).TotalMilliseconds < DupMinMs) continue;
+      double sp = c.RecentSpeed > 0 ? c.RecentSpeed : c.Got / Math.Max(0.05, (now - c.Started).TotalSeconds);
+      double eta = (c.Len - c.Got) / Math.Max(1.0, sp);
+      if (eta > worstEta) { worstEta = eta; worst = c; }
+    }
+    if (worst == null || worstEta * 1000 < DupMinMs) return null;
+    MeguSource s = Pick(worst.Src) ?? Pick(null);
+    if (s == null) return null;
+    MeguConn d = new MeguConn();
+    lock (worst.WriteLock) { long got = Interlocked.Read(ref worst.Got); d.Offset = worst.Offset + got; d.Len = worst.Len - got; }
+    if (d.Len <= 0 || d.Len / Math.Max(1.0, s.Speed) + 0.3 > worstEta) return null;
+    d.Src = s; d.Seg = worst.Seg; d.IsDup = true; d.Twin = worst; worst.Twin = d;
+    d.Started = d.LastData = now; s.Active++; conns.Add(d); Dups++;
+    Log(string.Format("end game: seg {0} rest also from {1} (eta {2:0.0} s on {3})", d.Seg, s.Host, worstEta, worst.Src.Host));
+    return d;
+  }
+  bool Splittable() { foreach (MeguConn c in conns) if (!c.Killed && !c.IsDup && !c.Lost && c.Seg >= 0 && c.Len - c.Got >= 2L * MinSplit) return true; return false; }
+  bool HasTwin(MeguConn c) { return c.Twin != null && conns.Contains(c.Twin); }
+  /* A part is finished (written by its own connection or by the end-game copy); a segment is done when all its parts are. Caller holds gate. */
+  void PartDone(MeguConn part) {
+    if (part.Settled) return; part.Settled = true;
+    int k = part.Seg; doneBytes += part.Len;
+    if (--parts[k] == 0 && !done[k]) { done[k] = true; SaveState(); }
+  }
+  /* A part failed and no copy of it is still running: what it wrote counts, the rest goes back as a part of its own. Caller holds gate. */
+  void PartFailed(MeguConn part) {
+    if (part.Settled) return; part.Settled = true;
+    int k = part.Seg; long got = Math.Min(Interlocked.Read(ref part.Got), part.Len); doneBytes += got;
+    if (got < part.Len) retry.AddFirst(new long[] { k, part.Offset + got, part.Len - got });
+    else if (--parts[k] == 0 && !done[k]) { done[k] = true; SaveState(); }
+  }
+
+  void Fetch(MeguConn c) {
+    MeguSource s = c.Src; long start = c.Offset, reqLen = c.Len; string err = null; int code = 0; bool wrongSize = false, noRange = false, timedOut = false, won = false;
+    string used = s.Live;
+    try {
+      HttpWebRequest req = Make(used); req.AddRange(start, start + reqLen - 1);
+      lock (gate) { if (c.Killed) throw new WebException("killed"); c.Req = req; }
+      using (HttpWebResponse res = (HttpWebResponse)req.GetResponse()) {
+        if ((int)res.StatusCode != 206) { noRange = true; throw new WebException("no range (HTTP " + (int)res.StatusCode + ")"); }
+        if ((res.ContentType ?? "").StartsWith("text/html", StringComparison.OrdinalIgnoreCase)) { wrongSize = true; throw new WebException("HTML page instead of the file"); }
+        string cr = res.Headers["Content-Range"] ?? "";
+        Match m = Regex.Match(cr, @"bytes\s+(\d+)-(\d+)/(\d+)");
+        if (!m.Success || long.Parse(m.Groups[1].Value) != start || long.Parse(m.Groups[2].Value) != start + reqLen - 1 || long.Parse(m.Groups[3].Value) != Size) { wrongSize = true; throw new WebException("bad Content-Range " + cr); }
+        s.Live = res.ResponseUri.AbsoluteUri;
+        byte[] buf = new byte[65536];
+        using (Stream st = res.GetResponseStream()) {
+          if (c.IsDup) {
+            /* end-game copy: kept in memory, written only if it wins */
+            byte[] all = new byte[c.Len];
+            while (c.Got < c.Len) {
+              int n = st.Read(all, (int)c.Got, (int)Math.Min(65536, c.Len - c.Got)); if (n <= 0) break;
+              lock (gate) { c.Got += n; c.WinGot += n; s.WinBytes += n; s.Bytes += n; c.LastData = DateTime.UtcNow; }
+              if (c.Killed) break;
+            }
+            if (c.Got != c.Len) throw new WebException(c.Killed ? c.KillWhy : "short read");
+            MeguConn o = c.Twin;
+            lock (gate) { won = o != null && !o.Settled && !c.Killed; if (won) lock (o.WriteLock) { o.Lost = true; } }
+            if (won) {
+              lock (gate) Kill(o, "lost");
+              using (FileStream f = new FileStream(Part, FileMode.Open, FileAccess.Write, FileShare.ReadWrite, 1 << 16)) { f.Seek(start, SeekOrigin.Begin); f.Write(all, 0, all.Length); f.Flush(true); }
+            }
+          } else {
+            using (FileStream f = new FileStream(Part, FileMode.Open, FileAccess.Write, FileShare.ReadWrite, 1 << 16)) {
+              f.Seek(start, SeekOrigin.Begin);
+              while (true) {
+                long room = c.Len - c.Got; if (room <= 0) break;
+                int n = st.Read(buf, 0, (int)Math.Min(buf.Length, room)); if (n <= 0) break;
+                /* a split may have shortened this part while the read was running */
+                lock (c.WriteLock) { if (c.Lost) break; n = (int)Math.Min(n, c.Len - c.Got); if (n <= 0) break; f.Write(buf, 0, n); }
+                lock (gate) { c.Got += n; c.WinGot += n; s.WinBytes += n; s.Bytes += n; c.LastData = DateTime.UtcNow; }
+                if (c.Got >= c.Len) break;
+              }
+              f.Flush(true);
+            }
+            if (c.Got != c.Len && !c.Lost) throw new WebException("short read");
+          }
+        }
+        /* the rest of a shortened part is not wanted */
+        if (c.Len < reqLen) { try { req.Abort(); } catch { } }
+      }
+    } catch (WebException e) { err = e.Message; code = StatusOf(e); timedOut = e.Status == WebExceptionStatus.Timeout; }
+    catch (Exception e) { err = e.Message; }
+    lock (gate) {
+      s.Active--; conns.Remove(c);
+      MeguConn twin = c.Twin; bool twinRuns = twin != null && conns.Contains(twin) && !twin.Killed;
+      double sec = Math.Max(0.05, (DateTime.UtcNow - c.Started).TotalSeconds);
+      if (c.Lost) {
+        /* the end-game copy won and wrote the rest of this part */
+      } else if (err == null && !c.IsDup) {
+        PartDone(c);
+        if (twinRuns) Kill(twin, "lost race");
+        s.Speed = s.Speed <= 0 ? c.Len / sec : s.Speed * 0.6 + (c.Len / sec) * 0.4; s.Range = 1;
+        if (s.Strikes > 0) s.Strikes--;
+      } else if (err == null && won) {
+        PartDone(twin); DupWins++; Log("seg " + c.Seg + " rest won by " + s.Host);
+        s.Speed = s.Speed <= 0 ? c.Len / sec : s.Speed * 0.6 + (c.Len / sec) * 0.4;
+        if (s.Strikes > 0) s.Strikes--;
+      } else if (err == null) {
+        /* end-game copy finished second: nothing to do */
+      } else {
+        /* a copy that failed hands its part back only when the part's own connection is gone too (or it had stopped that one) */
+        if (c.IsDup) { if (twin != null && (won || !twinRuns)) PartFailed(twin); }
+        else if (!twinRuns) PartFailed(c);
+        /* else: the end-game copy still runs and settles this part */
+        if (c.Killed) {
+          if (c.KillWhy == "slow") s.Speed = Math.Min(s.Speed, Math.Max(c.RecentSpeed, c.Got / sec));
+          if (c.KillWhy == "stall") { s.Speed *= 0.4; Strike(s, "stall"); }
+          if (c.KillWhy != "cancel" && c.KillWhy != "lost race" && c.KillWhy != "lost") Log("seg " + c.Seg + " " + c.KillWhy + " on " + s.Host + string.Format(" ({0:0.00} MB/s)", c.RecentSpeed / 1048576));
+        } else if (timedOut) { StallKills++; s.Speed *= 0.4; Log("seg " + c.Seg + " stall on " + s.Host + " (no data for " + StallMs / 1000 + " s)"); Strike(s, "stall"); }
+        else if (noRange) { s.Range = 0; Log(s.Host + ": no Range support"); }
+        else if (wrongSize || code == 401 || code == 404 || code == 403 || code == 410 || code == 416) { s.Dead = true; s.Why = code > 0 ? "HTTP " + code : err; Log(s.Host + " dropped: " + s.Why); }
+        else if (used != s.Url) { s.Live = s.Url; Log(s.Host + ": redirect target failed, back to " + s.Url); }
+        else { Log("seg " + c.Seg + " error on " + s.Host + ": " + err); Strike(s, code > 0 ? "HTTP " + code : err); }
+      }
+      Monitor.PulseAll(gate);
+    }
+  }
+
+  /* ---------- sources without Range: one connection, whole file ---------- */
+  void WholeFile() {
+    List<MeguSource> list = new List<MeguSource>();
+    foreach (MeguSource s in Sources) if (!s.Dead && s.Range == 0) list.Add(s);
+    list.Sort(delegate(MeguSource a, MeguSource b) { int k = b.Speed.CompareTo(a.Speed); return k != 0 ? k : a.Order.CompareTo(b.Order); });
+    if (list.Count == 0) return;
+    Single = true; failWhy = null;
+    foreach (MeguSource s in list) {
+      if (cancel) return;
+      lock (gate) { doneBytes = 0; for (int i = 0; i < segCount; i++) done[i] = false; pending.Clear(); }
+      TryDelete(StatePath);
+      MeguConn c = new MeguConn(); c.Src = s; c.Seg = -1; c.Len = Size; c.Started = c.LastData = DateTime.UtcNow;
+      lock (gate) { s.Active++; conns.Add(c); }
+      string err = null; bool[] over = new bool[1];
+      Thread dog = new Thread(delegate() {
+        while (!c.Killed && !over[0]) {
+          Thread.Sleep(250);
+          lock (gate) { if ((DateTime.UtcNow - c.LastData).TotalMilliseconds > StallMs) { StallKills++; Kill(c, "stall"); } TotalSpeed = s.Speed; }
+        }
+      });
+      dog.IsBackground = true; dog.Start();
+      try {
+        HttpWebRequest req = Make(s.Url);
+        lock (gate) { if (c.Killed) throw new WebException("killed"); c.Req = req; }
+        using (HttpWebResponse res = (HttpWebResponse)req.GetResponse())
+        using (Stream st = res.GetResponseStream())
+        using (FileStream f = new FileStream(Part, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 1 << 16)) {
+          byte[] buf = new byte[65536];
+          while (true) {
+            int n = st.Read(buf, 0, buf.Length); if (n <= 0) break;
+            f.Write(buf, 0, n);
+            lock (gate) { c.Got += n; s.WinBytes += n; s.Bytes += n; c.LastData = DateTime.UtcNow; s.Speed = c.Got / Math.Max(0.05, (DateTime.UtcNow - c.Started).TotalSeconds); }
+            if (c.Got > Size) throw new WebException("file larger than expected");
+          }
+        }
+        if (c.Got != Size) throw new WebException("short read");
+      } catch (Exception e) { err = c.Killed ? c.KillWhy : e.Message; }
+      over[0] = true;
+      lock (gate) { s.Active--; conns.Remove(c); if (err == null) { doneBytes = Size; for (int i = 0; i < segCount; i++) done[i] = true; } }
+      if (err == null) return;
+      Log("whole-file " + s.Host + " failed: " + err);
+      if (cancel) return;
+      s.Dead = true; s.Why = err;
+    }
+    failWhy = "所有下载源都失败了";
+  }
+
+  string Hash() {
+    for (int i = 0; ; i++) {
+      try {
+        using (FileStream f = new FileStream(Part, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1 << 20))
+        using (SHA256 h = SHA256.Create()) return BitConverter.ToString(h.ComputeHash(f)).Replace("-", "");
+      } catch (IOException) { if (i >= 30) throw; Thread.Sleep(500); }
+    }
+  }
+}
+'@
+function Ensure-Engine {
+  if (-not ('MeguFetch' -as [type])) { Add-Type -TypeDefinition $fetchSource }
+  $h = Source-Hints $manifest.mirrors; [MeguFetch]::TrustedHosts = $h.trust; [MeguFetch]::HostLimits = $h.limits
+}
+
+# ---- download queue (starts with the window) ----
+# dl = packs to fetch in order; ready = verified packs waiting to be unpacked; a pack is unpacked only after Install.
+# A finished pack gets <part>.ok (its SHA-256), so a window closed after a pack completed does not fetch it again.
+$script:dl = New-Object Collections.ArrayList; foreach ($id in $want) { [void]$script:dl.Add($id) }
+$script:dlPos = 0; $script:fetchId = ''; $script:ready = New-Object Collections.ArrayList; $script:fetched = 0L
+$script:confirmed = $false; $script:busy = $false; $script:copying = $false; $script:failKind = ''; $script:installLine = ''
+function Part($id) { Join-Path $stageDir ("runtime-$id.setup.part") }
+function Ok-Part($id) {
+  $p = Part $id
+  try { (Test-Path ($p + '.ok')) -and (Test-Path $p) -and (Get-Item $p).Length -eq [long]$packs.$id.size -and (Get-Content -Raw ($p + '.ok')).Trim() -eq ([string]$packs.$id.sha256).ToUpperInvariant() } catch { $false }
+}
+function Stage-Bytes {
+  $n = 0L
+  foreach ($id in $want) { $p = Part $id; if (Ok-Part $id) { $n += [long]$packs.$id.size } elseif (Test-Path ($p + '.json')) { try { $j = Get-Content -Raw ($p + '.json'); $m = [regex]::Match($j, '"done":"([^"]*)"'); $s = [long][regex]::Match($j, '"segment":(\d+)').Groups[1].Value; $n += $s * @($m.Groups[1].Value.Split(',') | Where-Object { $_ }).Count } catch {} } }
+  $n
+}
+function Total-Bytes { $t = 0L; foreach ($id in $script:dl) { $t += [long]$packs.$id.size }; $t }
+function Got-Bytes { $n = $script:fetched; if ($script:fetch) { $n += $script:fetch.Received }; $n }
+function Downloads-Done { $script:dlPos -ge $script:dl.Count -and -not $script:fetch }
+
+function Show-State {
+  if ($script:mode -eq 'failed') { return }
+  $title.Text = if ($script:copying) { '正在复制 MeguLit…' }
+    elseif ($script:busy) { '正在安装运行组件…' }
+    elseif (Downloads-Done) { if ($script:confirmed) { '正在安装运行组件…' } else { '下载好了，点「安装」就开始装' } }
+    elseif ($script:confirmed) { '正在下载运行组件…（下完自动安装）' }
+    else { '正在下载运行组件…' }
+}
+
+function Next-Download {
+  while ($script:dlPos -lt $script:dl.Count -and (Ok-Part $script:dl[$script:dlPos])) {
+    $id = $script:dl[$script:dlPos]; [void]$script:ready.Add(@{ id = $id; part = (Part $id) }); $script:fetched += [long]$packs.$id.size; $script:dlPos++
+    Note 'downloaded' @{ id = $id; reused = $true }
+  }
+  if ($script:dlPos -ge $script:dl.Count) {
+    Set-Bar 1000; $status.Text = ('运行组件都下载好了（{0}）' -f (MB (Total-Bytes))) + $script:installLine; Note 'all-downloaded' @{}
+    UI-Progress @{ phase = 'waiting'; count = $script:dl.Count; total = (Total-Bytes); totalGot = (Total-Bytes) }
+    Show-State; Pump; return
+  }
+  $id = $script:dl[$script:dlPos]; $script:fetchId = $id
+  $script:mode = ''; $status.ForeColor = $C.muted; $button.Text = '取消 Cancel'; Style-Button $button $false; $button.FlatAppearance.BorderColor = $C.red
+  $status.Text = ('[{0}/{1}] {2}：正在同时测速所有下载源（GitHub / 国内镜像），挑最快的几个一起下载…' -f ($script:dlPos+1), $script:dl.Count, $names[$id]); Show-State
+  UI-Progress @{ phase = 'probe'; idx = $script:dlPos; count = $script:dl.Count; name = $names[$id]; got = 0; size = [long]$packs.$id.size; total = (Total-Bytes); totalGot = (Got-Bytes) }
+  try { Ensure-Engine } catch { Fail 'download' ('下载组件加载失败：' + $_.Exception.Message); return }
+  $f = New-Object MeguFetch
+  $f.Urls = [string[]]@(Candidates $id); $f.Part = Part $id; $f.Size = [long]$packs.$id.size; $f.Sha = [string]$packs.$id.sha256
+  $script:fetch = $f; $f.Start(); $poll.Start()
+  Note 'download-start' @{ id = $id }
+}
+$poll = New-Object Windows.Forms.Timer; $poll.Interval = 200
+function Fail([string]$kind, [string]$message) {
+  $script:mode = 'failed'; $script:failKind = $kind; $status.ForeColor = $C.red; Set-Bar 0
+  $title.Text = if ($kind -eq 'install') { '安装没完成' } else { '下载中断了' }
+  $hint = if ($kind -eq 'install') { '磁盘空间不足或文件被占用时会这样，点「重试」再来一次 / Retry' } else { '检查网络后点「重试」，已下载的部分会接着用 / Check your connection and retry' }
+  $status.Text = $message + "`n" + $hint; $button.Text = '重试 Retry'; Style-Button $button $true
+  UI-Fail $kind $message
+  Note 'failed' @{ kind = $kind; message = $message }
+}
+$poll.add_Tick({
+  $f = $script:fetch; if (-not $f) { $poll.Stop(); return }
+  $id = $script:fetchId; $head = '[{0}/{1}] ' -f ($script:dlPos+1), $script:dl.Count
+  switch ($f.Phase) {
+    'download' {
+      $got = Got-Bytes; Set-Bar ([int][math]::Min(1000, 1000 * $got / [math]::Max(1, (Total-Bytes))))
+      $speed = if ($f.TotalSpeed -gt 0) { '  ·  {0:N1} MB/s' -f ($f.TotalSpeed / 1MB) } else { '' }
+      $src = $f.SourceLabel(); $from = if ($src) { '  ·  来源 ' + $src } else { '' }
+      $resumed = if ($f.Resumed -gt 0) { '（接着上次）' } else { '' }
+      $status.Text = $head + ('正在下载{0}{1}  {2:N0} / {3:N0} MB{4}{5}' -f $names[$id], $resumed, ($f.Received/1MB), ($f.Size/1MB), $speed, $from) + $script:installLine
+      UI-Progress @{ phase = 'download'; idx = $script:dlPos; count = $script:dl.Count; name = $names[$id]; got = $f.Received; size = $f.Size; speed = $f.TotalSpeed; src = $src; resumed = ($f.Resumed -gt 0); total = (Total-Bytes); totalGot = $got }
+      if ($env:MEGULIT_SETUP_CLOSE_AT -and $got -ge [long]$env:MEGULIT_SETUP_CLOSE_AT) { Note 'close' @{ got = $got }; $form.Close() }
+    }
+    'verify' { $status.Text = $head + ('正在校验{0}… / Verifying' -f $names[$id]) + $script:installLine; UI-Progress @{ phase = 'verify'; idx = $script:dlPos; count = $script:dl.Count; name = $names[$id]; got = $f.Size; size = $f.Size; total = (Total-Bytes); totalGot = (Got-Bytes) } }
+    'done' {
+      $poll.Stop(); $script:fetch = $null; Save-FetchLog $f $id
+      try { [IO.File]::WriteAllText($f.Part + '.ok', ([string]$packs.$id.sha256).ToUpperInvariant()) } catch {}
+      $script:fetched += [long]$packs.$id.size; [void]$script:ready.Add(@{ id = $id; part = $f.Part }); $script:dlPos++
+      Note 'downloaded' @{ id = $id; resumed = $f.Resumed; confirmed = $script:confirmed }
+      if ($env:MEGULIT_SETUP_CLOSE_AT -and (Got-Bytes) -ge [long]$env:MEGULIT_SETUP_CLOSE_AT) { Note 'close' @{ got = (Got-Bytes) }; $form.Close(); return }
+      Next-Download; Pump
+    }
+    'failed' { $poll.Stop(); $script:fetch = $null; Save-FetchLog $f $id; Fail 'download' ('下载失败：' + $f.Error) }
+  }
+})
+# Probe results and every dropped connection go to logs\setup-download.log, so a "slow download" report can be read.
+function Save-FetchLog($f, $id) {
+  try { $d = Join-Path $Root 'logs'; New-Item -ItemType Directory -Force $d | Out-Null; Add-Content -Encoding UTF8 (Join-Path $d 'setup-download.log') ("== " + (Get-Date -Format s) + " " + $id + " " + $f.Phase + "`r`n" + $f.LogText()) } catch {}
+}
+
+# ---- Install: copy MeguLit to the chosen folder, then unpack each pack there as soon as it is downloaded ----
 # Resolve the chosen folder; copy MeguLit there when it is not this folder. Returns $false (and says why) when it cannot.
 $script:moved = $false
 function Use-Target {
   $raw = $pathBox.Text.Trim().Trim('"')
   try { $target = [IO.Path]::GetFullPath($raw).TrimEnd('\') } catch { $target = $null }
-  if (-not $raw -or -not $target -or -not [IO.Path]::IsPathRooted($raw)) { [void][Windows.Forms.MessageBox]::Show($form, '请填写完整的安装位置，例如 D:\MeguLit', 'MeguLit'); return $false }
+  if (-not $raw -or -not $target -or -not [IO.Path]::IsPathRooted($raw)) { Say '请填写完整的安装位置，例如 D:\MeguLit'; return $false }
   if ($target -ieq $sourceRoot) { return $true }
-  if ($target.StartsWith($sourceRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { [void][Windows.Forms.MessageBox]::Show($form, '安装位置不能放在当前 MeguLit 文件夹里面，换一个位置吧', 'MeguLit'); return $false }
-  if ((Test-Path $target) -and -not (Test-Path (Join-Path $target 'MeguLit.exe')) -and @(Get-ChildItem -Force $target -ErrorAction SilentlyContinue).Count -gt 0) { $target = Join-Path $target 'MeguLit' }
-  try {
-    New-Item -ItemType Directory -Force $target -ErrorAction Stop | Out-Null
-    $probe = Join-Path $target ('.megulit-write-' + $PID); [IO.File]::WriteAllText($probe, 'ok'); Remove-Item $probe -Force
-  } catch { [void][Windows.Forms.MessageBox]::Show($form, ('这个位置不能写入：' + $target + "`n换一个位置吧，例如 D:\MeguLit（Program Files 需要管理员权限）"), 'MeguLit'); return $false }
-  $choice.Visible = $false; $progress.Visible = $true; $button.Enabled = $false
-  $title.Text = '正在复制 MeguLit…'; $status.ForeColor = $C.muted; $status.Text = ('正在把 MeguLit 复制到 ' + $target); $whereLabel.Text = '安装位置：' + $target; Set-Busy; $form.Refresh()
-  $copyArgs = @("`"$sourceRoot`"", "`"$target`"", '/E', '/R:2', '/W:1', '/NP', '/NFL', '/NDL', '/NJH', '/NJS', '/XD', "`"$sourceRoot\logs`"", "`"$sourceRoot\cache`"", 'runtime-*.unpack', '/XF', 'runtime-*.part')
+  if ($target.StartsWith($sourceRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { Say '安装位置不能放在当前 MeguLit 文件夹里面，换一个位置吧'; return $false }
+  # The staging folder may already live in the suggested folder; it does not make that folder "taken".
+  if ((Test-Path $target) -and -not (Test-Path (Join-Path $target 'MeguLit.exe')) -and @(Get-ChildItem -Force $target -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne $stageName }).Count -gt 0) { $target = Join-Path $target 'MeguLit' }
+  if (-not (Writable $target)) { Say ('这个位置不能写入：' + $target + "`n换一个位置吧，例如 D:\MeguLit（Program Files 需要管理员权限）"); return $false }
+  $script:copying = $true; Show-State; Note 'copy-start' @{ target = $target }
+  $copyArgs = @("`"$sourceRoot`"", "`"$target`"", '/E', '/R:2', '/W:1', '/NP', '/NFL', '/NDL', '/NJH', '/NJS', '/XD', "`"$sourceRoot\logs`"", "`"$sourceRoot\cache`"", "`"$stageDir`"", $stageName, 'runtime-*.unpack', '/XF', 'runtime-*.part*')
   $copy = Start-Process -FilePath "$env:SystemRoot\System32\robocopy.exe" -ArgumentList $copyArgs -WindowStyle Hidden -PassThru
   $null = $copy.Handle
   while (-not $copy.HasExited) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
-  $copy.WaitForExit(); $button.Enabled = $true
+  $copy.WaitForExit(); $script:copying = $false; Show-State
   if ($copy.ExitCode -ge 8 -or -not (Test-Path (Join-Path $target 'MeguLit.exe'))) {
-    Set-Bar 0; $choice.Visible = $true; $progress.Visible = $false
-    [void][Windows.Forms.MessageBox]::Show($form, ('复制到 ' + $target + ' 没成功（robocopy ' + $copy.ExitCode + '），检查磁盘空间后再试一次'), 'MeguLit'); return $false
+    Say ('复制到 ' + $target + ' 没成功（robocopy ' + $copy.ExitCode + '），检查磁盘空间后再试一次'); return $false
   }
   $script:Root = $target; $script:runtimeDir = Join-Path $target 'runtime'; $script:moved = $true
   return $true
@@ -341,17 +1100,26 @@ function Register-Uninstall {
     foreach ($n in 'NoModify','NoRepair') { New-ItemProperty -Path $k -Name $n -Value 1 -PropertyType DWord -Force | Out-Null }
   } catch {}
 }
-function Start-Install($ids) {
-  if (-not (Use-Target)) { return }
-  $whereLabel.Text = '安装位置：' + $runtimeDir
-  $script:queue = @($ids | Where-Object { $id = $_; @($markers[$id] | Where-Object { -not (Test-Path (Join-Path $Root $_)) }).Count -gt 0 })
-  $script:index = 0; $choice.Visible = $false; $progress.Visible = $true; Next-Pack
+function Lock-Choice([bool]$locked) { foreach ($ctl in $pathBox, $browse, $deskCheck, $menuCheck, $confirm) { $ctl.Enabled = -not $locked } }
+function Confirm-Install {
+  if ($script:confirmed) { return }
+  $f = Drive-Free $pathBox.Text; $need = Need-Bytes $pathBox.Text
+  if ($f -lt $need) { Say ('「' + $pathBox.Text + '」所在的磁盘空间不够：需要约 ' + (MB $need) + '，只剩 ' + (MB $f) + "`n换一个空间大一点的盘吧"); return }
+  Lock-Choice $true
+  if (-not (Use-Target)) { Lock-Choice $false; return }
+  $script:confirmed = $true; $confirm.Text = '已确认'; $note.ForeColor = $C.gold; $note.Text = '安装到 ' + $Root + '：组件下载完就自动装好，不用再点'
+  Note 'confirmed' @{ root = $Root; moved = $script:moved; downloadsDone = (Downloads-Done) }
+  # The chosen folder may lack packs the suggested one had (or the other way round): fetch what this folder needs.
+  foreach ($id in (Missing $Root)) { if (-not $script:dl.Contains($id)) { [void]$script:dl.Add($id); $script:want += $id } }
+  Show-State
+  # the download (speed probe included) starts now, not before: from here on the progress is the real one
+  if (-not $script:fetch -and $script:mode -ne 'failed' -and $script:dlPos -lt $script:dl.Count) { Note 'download-after-confirm' @{ pos = $script:dlPos; count = $script:dl.Count }; Next-Download }
+  Pump
 }
-function Current { $script:queue[$script:index] }
-# Each download attempt gets its own file name: antivirus scanners often hold a freshly written
-# file for a few seconds, and reusing one name made every retry fail with "file in use".
+$confirm.add_Click({ Confirm-Install })
+
+# One stable staged file per pack so Retry or the next launch resumes it. Unpack folders get a fresh name per attempt.
 $script:attempt = 0
-function Part { Join-Path $Root ('runtime-' + (Current) + '-' + $script:attempt + '.part') }
 # Remove/move with patience: retry for ~15 s while another process (antivirus, indexer, an old
 # MeguLit still running) holds the file, instead of failing the whole install on the first try.
 function With-Retry([scriptblock]$op) {
@@ -370,51 +1138,34 @@ function Stop-RuntimeProcesses {
   $prefix = [IO.Path]::GetFullPath($runtimeDir).TrimEnd('\') + '\'
   Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { try { $_.Kill(); $_.WaitForExit(3000) | Out-Null } catch {} }
 }
-function Next-Pack {
-  if ($script:index -ge $script:queue.Count) { $script:done = $true; $form.Close(); return }
-  $script:urlIndex = 0; $script:sources = @(Order-Sources (Current)); Start-Download
-}
-function Start-Download {
-  $script:stage = 'download'; $script:mode = 'download'; $button.Text = '取消 Cancel'; Style-Button $button $false; $button.FlatAppearance.BorderColor = $C.red; $status.ForeColor = $C.muted; Set-Bar 0
-  $title.Text = '正在下载运行组件…'
-  $status.Text = ('[{0}/{1}] 正在下载{2}…  来源 {3}' -f ($script:index+1), $script:queue.Count, $names[(Current)], (Source-Name $script:sources[$script:urlIndex]))
-  $script:attempt++
-  if (Test-Path (Part)) { try { Remove-Item (Part) -Force -ErrorAction Stop } catch { $script:attempt++ } }
-  $client.DownloadFileAsync([Uri]$script:sources[$script:urlIndex], (Part))
-}
-function Fail([string]$message) {
-  $script:mode = 'failed'; $status.ForeColor = $C.red; Set-Bar 0
-  $title.Text = if ($script:stage -eq 'unpack') { '安装没完成' } else { '下载中断了' }
-  $hint = if ($script:stage -eq 'unpack') { '磁盘空间不足或文件被占用时会这样，点「重试」再来一次 / Retry' } else { '检查网络后点「重试」 / Check your connection and retry' }
-  $status.Text = $message + "`n" + $hint; $button.Text = '重试 Retry'; Style-Button $button $true
-}
-
-$client.add_DownloadProgressChanged({ param($s,$e)
-  $total = [math]::Max($e.TotalBytesToReceive, $packs.(Current).size)
-  Set-Bar ([int][math]::Min(1000, 1000 * $e.BytesReceived / $total))
-  $status.Text = ('[{0}/{1}] 正在下载{2}  {3:N0} / {4:N0} MB  ·  来源 {5}' -f ($script:index+1), $script:queue.Count, $names[(Current)], ($e.BytesReceived/1MB), ($total/1MB), (Source-Name $script:sources[$script:urlIndex]))
-})
-$client.add_DownloadFileCompleted({ param($s,$e)
-  if ($e.Cancelled) { return }
-  if ($e.Error) {
-    if ($script:urlIndex + 1 -lt $script:sources.Count) { $script:urlIndex++; Start-Download; return }
-    $msg = if ($e.Error.InnerException) { $e.Error.InnerException.Message } else { $e.Error.Message }
-    Fail ('下载失败：' + $msg); return
-  }
+# Unpacks every ready pack once the user has pressed Install; re-entered from the poll timer, guarded by busy.
+function Pump {
+  if (-not $script:confirmed -or $script:busy -or $script:copying -or $script:mode -eq 'failed') { return }
+  $script:busy = $true
   try {
-    $part = Part; $unpack = Join-Path $Root ('runtime-' + (Current) + '-' + $script:attempt + '.unpack')
-    $script:stage = 'unpack'
-    $status.Text = '正在校验… / Verifying'; $form.Refresh()
-    $hash = $null; With-Retry { $script:hashValue = (Get-FileHash -Algorithm SHA256 $part -ErrorAction Stop).Hash }; $hash = $script:hashValue
-    if ($hash -ne $packs.(Current).sha256.ToUpper()) {
-      try { Remove-Item $part -Force -ErrorAction Stop } catch {}
-      if ($script:urlIndex + 1 -lt $script:sources.Count) { $script:urlIndex++; Start-Download; return }
-      throw '文件校验失败，可能下载不完整'
+    while ($script:ready.Count -gt 0) {
+      $r = $script:ready[0]
+      if (@(Missing $Root) -contains $r.id) { if (-not (Install-Pack $r.id $r.part)) { return } }
+      Remove-Staged $r.part; $script:ready.RemoveAt(0)
     }
-    $status.Text = ('正在解压{0}… / Unpacking' -f $names[(Current)]); Set-Busy; $form.Refresh()
+  } finally { $script:busy = $false; $script:installLine = '' }
+  if (Downloads-Done) {
+    if (@(Missing $Root).Count -eq 0) { $script:done = $true; Note 'installed' @{ root = $Root }; UI-Done; $form.Close() }
+    else { Fail 'install' ('安装后仍缺少：' + ((Missing $Root | ForEach-Object { $names[$_] }) -join '、')) }
+  } else { Show-State }
+}
+function Remove-Staged($part) { foreach ($p in $part, ($part + '.json'), ($part + '.ok')) { if (Test-Path $p) { try { Remove-Item $p -Force -ErrorAction Stop } catch {} } } }
+function Install-Pack([string]$id, [string]$part) {
+  try {
+    $script:attempt++; $unpack = Join-Path $Root ('runtime-' + $id + '-' + $script:attempt + '.unpack')
+    $script:installLine = "`n" + ('正在解压{0}到 {1}… / Unpacking' -f $names[$id], $runtimeDir); Show-State
+    if (-not $script:fetch) { $status.Text = $script:installLine.Trim(); Set-Busy }
+    UI-Progress @{ phase = 'unpack'; count = $script:dl.Count; name = $names[$id]; dir = $runtimeDir; total = (Total-Bytes); totalGot = (Total-Bytes) }
+    Note 'unpack-start' @{ id = $id }
     if (Test-Path $unpack) { With-Retry { Remove-Item $unpack -Recurse -Force -ErrorAction Stop } }
     New-Item -ItemType Directory $unpack | Out-Null
-    $tar = Start-Process -FilePath "$env:SystemRoot\System32\tar.exe" -ArgumentList @('-xf', "`"$part`"", '-C', "`"$unpack`"") -NoNewWindow -PassThru
+    # tar reads the staged pack in place, from whichever drive it is on, and writes into the install folder.
+    $tar = Start-Process -FilePath "$env:SystemRoot\System32\tar.exe" -ArgumentList @('-xf', "`"$part`"", '-C', "`"$unpack`"") -WindowStyle Hidden -PassThru
     $null = $tar.Handle  # keep the handle so ExitCode is readable after exit
     while (-not $tar.HasExited) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
     $tar.WaitForExit()
@@ -428,26 +1179,61 @@ $client.add_DownloadFileCompleted({ param($s,$e)
     }
     # Leftovers are harmless; never fail an install that already succeeded over a temp file.
     try { Remove-Item $unpack -Recurse -Force -ErrorAction Stop } catch {}
-    try { Remove-Item $part -Force -ErrorAction Stop } catch {}
-    $script:index++; Next-Pack
-  } catch { Fail ('安装失败：' + $_.Exception.Message) }
-})
+    Note 'unpacked' @{ id = $id }
+    return $true
+  } catch { Fail 'install' ('安装失败：' + $_.Exception.Message); return $false }
+}
 
+Boot-Mark 'logic-built'
+$uiLayer = Join-Path $sourceRoot 'setup/setup-ui.ps1'; $themeName = 'classic'; if (Test-Path $uiLayer) { . $uiLayer }
+# New interface as a skin on top of this window (falls back to this window when anything is wrong; see setup-web.ps1)
+Boot-Mark 'ui-layer-loaded'
+$webLayer = Join-Path $sourceRoot 'setup/setup-web.ps1'; if (Test-Path $webLayer) { try { . $webLayer } catch { try { Add-Content -Encoding UTF8 (Join-Path $env:LOCALAPPDATA 'MeguLit\setup-ui.log') ((Get-Date -Format 's') + ' web layer failed to load: ' + $_) } catch {} } }
 $button.add_Click({
-  if ($script:mode -eq 'failed') { $script:urlIndex = 0; Start-Download }
-  else { $client.CancelAsync(); $form.Close() }
+  if ($script:mode -eq 'failed') {
+    $script:mode = ''; $status.ForeColor = $C.muted; $button.Text = '取消 Cancel'; Style-Button $button $false; $button.FlatAppearance.BorderColor = $C.red
+    if ($script:failKind -eq 'download') { Next-Download } else { Show-State; Pump }
+  }
+  else { if ($script:fetch) { $poll.Stop(); $script:fetch.Cancel() }; $form.Close() }
 })
-$form.add_FormClosing({ if (-not $script:done) { $client.CancelAsync() } })
-# MEGULIT_SETUP_PREVIEW=<png>: render the choice page to an image and exit (used to check the layout).
-if ($env:MEGULIT_SETUP_PREVIEW) { $form.add_Shown({ if ($env:MEGULIT_SETUP_PREVIEW_STATE -eq 'failed') { $choice.Visible = $false; $progress.Visible = $true; $script:stage = 'download'; Fail '下载失败：无法连接到服务器' }; if ($env:MEGULIT_SETUP_PREVIEW_STATE -eq 'progress') { $choice.Visible = $false; $progress.Visible = $true; $status.Text = '[1/3] 正在下载基础组件  47 / 107 MB  ·  来源 github.com'; Set-Bar 440 }; $form.Refresh(); $bmp = New-Object Drawing.Bitmap $form.Width, $form.Height; $form.DrawToBitmap($bmp, (New-Object Drawing.Rectangle 0,0,$form.Width,$form.Height)); $bmp.Save($env:MEGULIT_SETUP_PREVIEW); $form.Close() }) }
-[void]$form.ShowDialog()
-$client.Dispose()
-Get-ChildItem $Root -Filter 'runtime-*.part' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+$form.add_Shown({ Close-Splash; Release-NativeSplash 'classic-shown'; Boot-Mark ('classic-shown web=' + [bool]$script:webActive + ' opacity=' + $form.Opacity + ' pos=' + $form.Location.X + ',' + $form.Location.Y + $(if ($script:webActive) { ' (invisible control surface, not a visible window)' } else { ' (the classic window is the real UI)' })) })
+$form.add_FormClosing({ if (-not $script:done -and $script:fetch) { $poll.Stop(); $script:fetch.Cancel() } })
+$form.add_Shown({ Update-Free; Note 'shown' @{ stage = $stageDir; want = ($want -join ',') }; if (-not $env:MEGULIT_SETUP_PREVIEW -and $env:MEGULIT_SETUP_PREFETCH -eq '1') { Next-Download } })   # nothing is downloaded, probed or prefetched before the user presses Install (tests may opt in with MEGULIT_SETUP_PREFETCH=1)
+if ($testLog) { $deskCheck.Checked = $false; $menuCheck.Checked = $false }
+if ($env:MEGULIT_SETUP_AUTOSTART -eq 'now') { $form.add_Shown({ Confirm-Install }) }
+if ($env:MEGULIT_SETUP_AUTOSTART -eq 'downloaded') {
+  $auto = New-Object Windows.Forms.Timer; $auto.Interval = 200
+  $auto.add_Tick({ if ((Downloads-Done) -and $script:mode -ne 'failed') { $auto.Stop(); Confirm-Install } }); $auto.Start()
+}
+# MEGULIT_SETUP_PREVIEW=<png prefix>: render the window to <prefix>-<state>.png for each state in MEGULIT_SETUP_PREVIEW_STATE
+# (comma list; default downloading) with fake data and exit. No download starts. Used to review the layouts.
+if ($env:MEGULIT_SETUP_PREVIEW) {
+  $form.add_Shown({ if ($script:fetch) { $poll.Stop(); $script:fetch.Cancel(); $script:fetch = $null }
+    Note 'preview' @{ s = $env:MEGULIT_SETUP_PREVIEW_STATE }; $states = if ($env:MEGULIT_SETUP_PREVIEW_STATE) { $env:MEGULIT_SETUP_PREVIEW_STATE.Split(',') } else { @('downloading') }
+    foreach ($st in $states) { try {
+      if ($themeName -in 'line','steps','hero') { UI-Preview $st }
+      elseif ($st -like 'failed*') { Fail 'download' '下载失败：无法连接到服务器' }
+      else { $title.Text = '正在下载运行组件…'; $status.Text = '[1/3] 正在下载基础组件  47 / 107 MB  ·  6.8 MB/s  ·  来源 cn-dl.megulit.com 等 3 个源'; Set-Bar 140 }
+      Note 'shot' @{ st = $st }; $form.Refresh(); $bmp = New-Object Drawing.Bitmap $form.Width, $form.Height; $form.DrawToBitmap($bmp, (New-Object Drawing.Rectangle 0,0,$form.Width,$form.Height)); $bmp.Save($env:MEGULIT_SETUP_PREVIEW + '-' + $st + '.png'); $bmp.Dispose()
+    } catch { Note 'error' @{ text = $_.ToString() + ' @ ' + $_.InvocationInfo.PositionMessage } } }
+    $script:done = $false; $form.Close() })
+}
+# With the web skin the setup window is only the invisible control surface: a modal loop would disable the skin's window (no mouse, no keys), so run a plain message loop instead.
+if ($script:webActive) { [Windows.Forms.Application]::Run($form) } else { [void]$form.ShowDialog() }
+if ($script:fetch) { $script:fetch.Cancel(); [void]$script:fetch.Wait(3000) }
+# Staged packs stay for resuming until the install is through; only per-attempt leftovers are swept.
+Get-ChildItem $Root -Filter 'runtime-*.part' -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^runtime-[a-z]+-\d+\.part$' } | Remove-Item -Force -ErrorAction SilentlyContinue
 Get-ChildItem $Root -Directory -Filter 'runtime-*.unpack' -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 if ($script:done -and (Test-Path (Join-Path $Root 'runtime\node.exe'))) {
+  # Done: drop the staging folder (and the empty suggested folder it lived in, if the user went elsewhere) and the pointer.
+  try { Remove-Item $stageDir -Recurse -Force -ErrorAction Stop } catch {}
+  $parent = Split-Path $stageDir
+  if ((Split-Path $stageDir -Leaf) -eq $stageName -and $parent -ine $Root -and $parent -ine $sourceRoot -and (Test-Path $parent) -and @(Get-ChildItem -Force $parent).Count -eq 0) { try { Remove-Item $parent -Force } catch {} }
+  if (-not $env:MEGULIT_SETUP_STAGING) { try { Remove-Item $pointer -Force -ErrorAction SilentlyContinue } catch {} }
+  if ($testLog) { Note 'exit' @{ code = $(if ($script:moved) { 3 } else { 0 }) }; exit $(if ($script:moved) { 3 } else { 0 }) }
   Make-Shortcuts
   Register-Uninstall
   # Installed somewhere else: start that copy (its own single-instance lock) and tell this exe to quit (exit 3 = not ready here).
   if ($script:moved) { Start-Process -FilePath (Join-Path $Root 'MeguLit.exe') -WorkingDirectory $Root; exit 3 }
   exit 0
-} else { exit 1 }
+} else { Note 'exit' @{ code = 1 }; exit 1 }

@@ -25,15 +25,20 @@ function link(db,targetId,source,{now=Math.floor(Date.now()/1000)}={}){
   if(row.executable&&inside(path.dirname(row.executable),dir)){mark(db,row,targetId,now);linked.push(row.id);}
  return linked;
 }
-const vndb=o=>String(o?.library?.vndbId||o?.vndbId||'').toLowerCase();
+const vndb=o=>String(o?.vndbManual||o?.library?.vndbId||o?.vndbId||'').toLowerCase();
+const hasImport=row=>row.executable&&fs.existsSync(path.join(path.dirname(row.executable),IMPORT_DIR));
 /* backfill(db): imports made before link() existed */
 function backfill(db,{now=Math.floor(Date.now()/1000)}={}){
  const rows=db.prepare('SELECT id,executable,original,hidden_at FROM games WHERE removed_at IS NULL').all(),linked=[];
- for(const target of rows){
-  const o=parse(target);if(o.library?.sourcesLinked||!target.executable||!vndb(o))continue;
-  if(!fs.existsSync(path.join(path.dirname(target.executable),IMPORT_DIR,'manifest.json'))&&!fs.existsSync(path.join(path.dirname(target.executable),IMPORT_DIR)))continue;
-  for(const row of rows){if(row===target||row.hidden_at||!row.executable)continue;const r=parse(row);
-   if(r.library?.source!=='folder'||r.library?.originalFor||vndb(r)!==vndb(o)||inside(path.dirname(row.executable),path.dirname(target.executable)))continue;
+ const works=Map.groupBy(rows,row=>vndb(parse(row)));
+ for(const [id,editions] of works){
+  if(!id)continue;
+  const targets=editions.filter(hasImport);
+  // Older manifests carry no source path. With two imported editions the VNDB id cannot identify the destination.
+  if(targets.length!==1)continue;
+  const target=targets[0],o=parse(target);if(o.library?.sourcesLinked)continue;
+  for(const row of editions){if(row===target||row.hidden_at||!row.executable)continue;const r=parse(row);
+   if(r.library?.source!=='folder'||r.library?.originalFor||inside(path.dirname(row.executable),path.dirname(target.executable)))continue;
    mark(db,row,target.id,now);row.hidden_at=now;linked.push(row.id);}
   o.library={...(o.library||{}),sourcesLinked:true};db.prepare('UPDATE games SET original=? WHERE id=?').run(JSON.stringify(o),target.id);
  }

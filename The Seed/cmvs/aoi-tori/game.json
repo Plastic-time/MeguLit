@@ -1,0 +1,66 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "78ce2c13a9bbbc29fbb40eb20a6c2b4ab991498daadbf0239c519667b73b9d13",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "cmvs",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "title": "24b322bff9ac68c5d201f8a053bbe3df8495a1fb5db984aafca57e5cfc931fc8",
+  "steam": "2741260",
+  "vndb": "v21523"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "aoi-tori",
+ "builds": [
+  "3a2ec3af6a16a4f36d72faf9e7cb14e2bcc883fbf22fb31da5d69434cc53727e"
+ ],
+ "match": {
+  "exe": [
+   "cmvs32.exe"
+  ],
+  "titles": [
+   "Aoi Tori",
+   "アオイトリ"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

@@ -6,6 +6,7 @@
 import {cleanupProbeFull} from './probe-full.js';
 import {pulse,probeStats,cleanupProbeStats} from './probe-stats.js';
 import {DASHBOARD_HTML} from './dashboard.js';
+import {refreshSeedStatsSafe,seedStatsGet} from './seed-stats.js';
 import {LIMITS,validateLeaderboard,validateBoardQuery,validateAdaptationRecord,validateKeys,validateMeta,issueBody,validateHot,INSTALL_ID,HEX64} from './validate.js';
 /* E379 accounts (relay/ACCOUNTS.md) and community features (avatars, hot words) */
 import {handleAccounts,isAccountsPath,authenticate,ROTATED} from './accounts.js';
@@ -20,6 +21,11 @@ import {newsGet,hotWordsDailyGet,refreshDaily,imageGet,articleGet} from './daily
 /* E562 adapter packs, before/after reports, desensitized probe uploads */
 import {adaptersRoute} from './adapters.js';
 import {contribRoute,cleanupContrib} from './contrib.js';
+/* 2026-11-21 game diffs per exe hash: calibration reports in, our signed diffs out (relay/src/auto-profile.js) */
+import {profileRoute} from './auto-profile.js';
+/* 2026-11-21 Cardinal replay scores in, auto diffs verified / sent to the repair queue (relay/src/cardinal.js) */
+import {cardinalRoute} from './cardinal.js';
+import {monumentGet,monthsGet,findGet,meGet} from './torch-credit.js';
 
 /* requests per window; key prefix → [limit, seconds] */
 /* 2026-11-13 (user: 限制太大了; api.megulit.com answered 429 to a whole IP for over a minute): reads are loosened, writes,
@@ -27,7 +33,7 @@ import {contribRoute,cleanupContrib} from './contrib.js';
    internet café or a school behind one IP no longer share 120 a minute; 'ip-shared' still caps one IP as a whole.
    Old: ip 120/60 s, lb-get 60, adapt-get 120/h, avatar-get 600, hot 60, daily 60, daily-img 240, release 30,
    social-get 120, forum-get 120. */
-export const RATE={ip:[600,60],user:[600,60],'ip-shared':[3000,60],'adapt-feed':[60,3600],'adapt-pack':[1200,3600],'adapt-report':[30,3600],probe:[64,3600],contrib:[96,3600],'probe-full':[300,3600],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[300,60],'adapt-post':[30,3600],'adapt-get':[600,3600],diag:[20,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[1200,60],report:[20,3600],hot:[300,60],daily:[300,60],'daily-img':[900,60],release:[120,60],appeal:[3,86400],profile:[30,3600],'social-get':[600,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400],'forum-get':[600,60],'forum-post':[5,3600],'forum-reply':[30,3600],'forum-day':[60,86400],'forum-ip':[40,3600],'forum-img':[60,3600]};
+export const RATE={ip:[600,60],user:[600,60],'ip-shared':[3000,60],'adapt-feed':[60,3600],'adapt-pack':[1200,3600],'adapt-report':[30,3600],'autoprof-report':[30,3600],'cardinal-score':[60,3600],'autoprof-credit':[30,3600],'profile-runtime':[6,3600],probe:[64,3600],contrib:[96,3600],'probe-full':[300,3600],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[300,60],'adapt-post':[30,3600],'adapt-get':[600,3600],diag:[20,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[1200,60],report:[20,3600],hot:[300,60],daily:[300,60],'daily-img':[900,60],release:[120,60],appeal:[3,86400],profile:[30,3600],'social-get':[600,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400],'forum-get':[600,60],'forum-post':[5,3600],'forum-reply':[30,3600],'forum-day':[60,86400],'forum-ip':[40,3600],'forum-img':[60,3600]};
 const encoder=new TextEncoder();
 const hex=buffer=>[...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');
 export async function sha256(value){return hex(await crypto.subtle.digest('SHA-256',typeof value==='string'?encoder.encode(value):value));}
@@ -294,7 +300,14 @@ export async function handle(request,env,now=new Date(),ctx=null){
   /* 2026-11-15 adaptation contribution packages, consented in the app (relay/src/contrib.js) */
   else if(path.startsWith('/api/contrib/'))response=await contribRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else if((path==='/dashboard'||path==='/probe/dashboard')&&request.method==='GET')response=new Response(DASHBOARD_HTML,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'public, max-age=60','x-content-type-options':'nosniff'}});
-  else if(path==='/api/probe/stats'&&request.method==='GET')response=await probeStats(env,now,{json,fail});
+  else if(path==='/api/seed/stats'&&(request.method==='GET'||request.method==='HEAD')){const r=await seedStatsGet(env,{json,fail},ctx,now);response=request.method==='HEAD'?new Response(null,{status:r.status,headers:r.headers}):r;}
+  else if(path==='/api/probe/stats'&&request.method==='GET')response=await probeStats(env,now,{json,fail},ctx);
+  else if(path==='/api/torch/months')response=request.method==='GET'?await monthsGet(env,url,{json,fail},ctx):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/torch/find')response=request.method==='GET'?await findGet(env,url,{json,fail},ctx):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/torch/me')response=request.method==='GET'?await meGet(env,url,ip,{json,fail},/^[0-9a-f]{64}$/):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/torch/monument')response=request.method==='GET'?await monumentGet(env,url,{json,fail},ctx):fail('METHOD_NOT_ALLOWED',405);
+  else if(path.startsWith('/api/cardinal/'))response=await cardinalRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
+  else if(path==='/api/game-profile'||path.startsWith('/api/game-profile/'))response=await profileRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else if(path.startsWith('/api/adapters/')||path==='/api/probe'||path.startsWith('/api/probe/'))response=await adaptersRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else response=fail('NOT_FOUND',404);
   /* 2026-11-16 live-usage pulse: a MeguLit client touched the relay (probe-stats.js); aggregate, no identity kept */
@@ -308,7 +321,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
 export async function scheduled(event,env,ctx){
  /* every 30 minutes: website feedback still waiting for its GitHub issue; the weekly cron settles hot words */
  if(event?.cron==='20 21 * * *'){const job=refreshDaily(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
- if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null),cleanupForumImages(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupContrib(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeFull(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeStats(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0)]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
+ if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null),cleanupForumImages(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupContrib(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeFull(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),cleanupProbeStats(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0),refreshSeedStatsSafe(env,new Date(event?.scheduledTime||Date.now()))]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
  const when=new Date(event?.scheduledTime||Date.now());const job=settleDue(env,when).then(async done=>{await cleanupAvatars(env,when).catch(()=>0);return done;});if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
 /* a token rotated while answering any request goes back on that answer, whichever endpoint it was */
 export default {fetch:async(request,env,ctx)=>{const response=await handle(request,env,new Date(),ctx);const token=ROTATED.get(request);if(!token||response.headers.get('x-megulit-token'))return response;const copy=new Response(response.body,response);copy.headers.set('x-megulit-token',token);return copy;},scheduled};

@@ -6,7 +6,7 @@
    priority, and remembered per game (data/cg-cache/<game>/ratings.json); until a picture is rated it is not shown.
    The models (17 MB + 150 MB) and the Python packages are fetched the first time the switch needs them; nothing is
    sent anywhere, the pictures never leave the computer. */
-const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{createHash}=require('node:crypto'),{execFile,spawn}=require('node:child_process'),{Readable,Transform}=require('node:stream'),{pipeline}=require('node:stream/promises');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{createHash}=require('node:crypto'),{execFile,spawn}=require('node:child_process');
 const REVISION='46be80bfe01a415efa5aa7c025528cac82a8b88a',REPOSITORY='deepghs/anime_rating';
 const MODELS=[
  {name:'rating-small.onnx',file:'mobilenetv3_v1_pruned_ls0.1/model.onnx',size:16827558,sha256:'76e5c44704421e2b6431a2dbb395f8943e205e59f415a5614b16f0601b55544d'},
@@ -20,16 +20,15 @@ const script=path.join(__dirname,'cg-rating.py');
 const log=(root,m)=>{try{fs.appendFileSync(path.join(root,'logs','cg-rating.log'),new Date().toISOString()+' '+m+'\n');}catch{}};
 function ready(root){try{return MODELS.every(m=>fs.statSync(modelPath(root,m)).size===m.size)&&['onnxruntime','numpy','PIL'].every(p=>fs.existsSync(path.join(pylib(root),p)))&&!!pythonExe();}catch{return false;}}
 function run(file,args,timeout){return new Promise((resolve,reject)=>execFile(file,args,{windowsHide:true,timeout,maxBuffer:8<<20},(e,out,err)=>e?reject(Object.assign(e,{stderr:String(err||'')})):resolve(String(out||''))));}
+/* 2026-11-19: core/fast-download.cjs measures every source at once and pulls the fast ones in parallel Range pieces; a
+   slow or silent connection moves to another source, finished pieces survive a retry. Size and SHA-256 still decide. */
+async function fetchHfModel(root,m,file,urls,log){
+ try{log(root,m.name+' from '+urls.length+' sources');await require('../core/fast-download.cjs').download({urls,dest:file,size:m.size,sha256:m.sha256,log:line=>log(root,m.name+' '+line)});}
+ catch(e){throw Error('MODEL_DOWNLOAD_FAILED '+String((e.last&&e.last.message)||e.message||''));}
+}
 async function fetchModel(root,m){
- const file=modelPath(root,m),tmp=file+'.part';if(fs.existsSync(file)&&fs.statSync(file).size===m.size)return;let last;
- for(const source of HF){const url=source+'/'+REPOSITORY+'/resolve/'+REVISION+'/'+m.file,controller=new AbortController();let idle=setTimeout(()=>controller.abort(),30000);
-  try{log(root,m.name+' from '+source);const response=await fetch(url,{signal:controller.signal});if(!response.ok||!response.body)throw Error('HTTP '+response.status);
-   const hash=createHash('sha256');let size=0;const check=new Transform({transform(chunk,enc,done){clearTimeout(idle);idle=setTimeout(()=>controller.abort(),30000);size+=chunk.length;if(size>m.size)return done(Error('too large'));hash.update(chunk);done(null,chunk);}});
-   await pipeline(Readable.fromWeb(response.body),check,fs.createWriteStream(tmp));
-   if(size!==m.size||hash.digest('hex')!==m.sha256){fs.rmSync(tmp,{force:true});throw Error('checksum');}
-   fs.renameSync(tmp,file);return;
-  }catch(e){last=e;log(root,'model source failed '+source+' '+(controller.signal.aborted?'stalled':e.message));}finally{clearTimeout(idle);}}
- throw Error('MODEL_DOWNLOAD_FAILED '+(last?.message||''));}
+ const file=modelPath(root,m);if(fs.existsSync(file)&&fs.statSync(file).size===m.size)return;
+ await fetchHfModel(root,m,file,HF.map(source=>source+'/'+REPOSITORY+'/resolve/'+REVISION+'/'+m.file),log);}
 async function installPackages(root){
  const py=pythonExe();if(!py)throw Error('PYTHON_MISSING');const target=pylib(root);if(['onnxruntime','numpy','PIL'].every(p=>fs.existsSync(path.join(target,p))))return;let last;
  for(const index of PYPI){try{log(root,'pip '+(index||'pypi.org'));fs.rmSync(target,{recursive:true,force:true});

@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "0ed5c0e3f718224f89f1a990d3dac604745bcf71e0912449aad83782dc95c142",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "Ley-line4.exe",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "0ed5c0e3f718224f89f1a990d3dac604745bcf71e0912449aad83782dc95c142",
+  "head": "d92aebfff89ab78d548ce34ba265ec32f4861d1757d1cb612c1c5d16f2c57760",
+  "pe": "2.30.2.420@48e616e2"
+ },
+ "rev": 1
+}

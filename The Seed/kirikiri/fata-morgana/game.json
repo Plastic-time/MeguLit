@@ -1,0 +1,82 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "610c5f4de9d30efb2f9e95da17f894585dee00354f7075d73e07b28c86a77a55",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false,
+   "orphanDraw": false
+  },
+  "page": {
+   "pairByDrawn": true,
+   "reportClear": true,
+   "engineRows": true,
+   "keepHeld": true
+  },
+  "choice": {
+   "pageFrames": [
+    "^選択肢$"
+   ],
+   "filters": [
+    "^(選択肢|選択ライン)",
+    "のテーマ"
+   ],
+   "contentInterleave": true,
+   "dropEffectFrames": true
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "14f2eeb02177b6fafb4b20fd50cfa6be9974a42648e65a7faab7cf2bda6de027",
+  "script": "cec198aae14478a3a2d8260033cdaaf5544c3b7bddbf27fb760256e4a3415d3d",
+  "title": "b875bbc5bee84c5b84c550da5934f1115f680233162baf3120f30d9822940cb3",
+  "vndb": "v12402"
+ },
+ "seedFormat": 1,
+ "status": "owner-ok",
+ "slug": "fata-morgana",
+ "builds": [
+  "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42"
+ ],
+ "match": {
+  "exe": [
+   "fata.exe",
+   "fata_jp.exe",
+   "fata_cn.exe",
+   "fata_en.exe"
+  ],
+  "titles": [
+   "ファタモルガーナの館",
+   "The House in Fata Morgana",
+   "魔女之馆",
+   "法塔莫尔加纳之馆",
+   "海市蜃楼之馆"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 8
+}

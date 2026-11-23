@@ -105,8 +105,8 @@
    '优先使用游戏原声，并在答案附游戏截图':['Prefer the game’s own voice and add a game screenshot to the answer','ゲーム本来の音声を優先し、答えにゲーム画面を添付'],'下载推荐声音（男 4 女 4）':['Download recommended voices (4 male, 4 female)',
    'おすすめ音声をダウンロード（男性 4・女性 4）'],'情感／风格':['Emotion / style','感情・スタイル'],'朗读声音':['Reading voice','読み上げ音声'],'文字':['Text','文字'],
   '文字逐字显示':['Typewriter text','文字を一文字ずつ表示'],
-  '显示速度（字/秒）':['Reveal speed (characters/sec)','表示速度（文字/秒）'],
-  '点击游戏或按空格可补全当前文字；按住 Ctrl 快速显示，不拦截游戏操作':['Click the game or press Space to reveal the current text; hold Ctrl for instant text. Game input is passed through','ゲームをクリックするかスペースで全文表示、Ctrl長押しで即時表示。ゲームの操作は妨げません'],
+  '速度（字/秒）':['Speed (chars/sec)','速度（文字/秒）'],'显示速度（字/秒）':['Reveal speed (characters/sec)','表示速度（文字/秒）'],
+  '点击游戏或按空格可补全当前文字；按住 Ctrl 快速显示，不拦截游戏操作':['Click the game or press Space to reveal the current text; hold Ctrl for instant text. Game input is passed through','ゲームをクリックするかスペースで全文表示、Ctrl長押しで即時表示。ゲームの操作は妨げません'],'点游戏或按空格补全当前句；按住 Ctrl 快速显示':['Click or press Space to finish the line; hold Ctrl for instant text','クリックかスペースで文を最後まで表示、Ctrl 長押しで即時表示'],
    '位置':['Layout','位置'],'内嵌':['Embedding','埋め込み'],'学习':['Study','学習'],'外观':['Appearance','外観'],'关于':['About','情報'],
   '切换界面':['Switch view','表示切替'],'开关菜单':['Toggle menu','メニュー開閉'],'绑定窗口':['Bind window','ウィンドウ割り当て'],'Alt+M 绑定窗口 · Alt+T 开关菜单 · 拖动即时预览':['Alt+M bind window · Alt+T toggle menu · drag to preview','Alt+M ウィンドウ割り当て · Alt+T メニュー開閉 · ドラッグでプレビュー'],'Alt+M 绑定当前游戏窗口，Alt+T 开关菜单':['Alt+M binds the game window in front, Alt+T toggles the menu','Alt+M 前面のゲームウィンドウを割り当て、Alt+T メニュー開閉'],'在台词上拖选文字：查词、加 Anki 或收藏句子':['Drag across a line: look up, add to Anki or save the sentence','台詞をドラッグで選択：辞書・Anki 追加・文を保存'],
    '开关内嵌 / 覆盖':['Toggle inline / overlay','埋め込み・オーバーレイ切替'],'随时一键关闭 / 恢复内嵌（连同全部 MeguLit 覆盖），用来对比游戏原文':['turns inline text (and every MeguLit overlay) off or back on at any time, to compare with the original game text',
@@ -139,7 +139,7 @@
    '原位置遮盖方式':['Cover for the original spot','元の位置の覆い方'],'游戏真实画面（等待符闪灭时截取）':["Game's real picture (taken while the marker blinks off)",'ゲームの実画面（マークが消えた瞬間を取得）'],'周围色推算融合':['Estimated from surrounding colours',
    '周囲の色から推定してなじませる'],'迁移时自动隐藏原位置；提取不可靠时保留原等待符（单独隐藏仍按下方开关）':['Moving hides the original position; uncertain extraction keeps it there (separate hiding follows the switch below)',
    '移動中は元の位置を隠します。抽出できない場合は元の位置に残します（個別の非表示は下の設定に従います）'],'恢复上一个颜色':['Restore previous color','前の文字色に戻す'],
-  '假名注音':['Furigana','ふりがな'],'汉字上方自动注音（本地）':['Auto furigana above kanji (local)','漢字の上に自動ふりがな（ローカル）'],'假名大小（相对正文）':['Furigana size (relative)','ふりがなの大きさ（本文比）'],
+  '假名大小':['Furigana size','ふりがなの大きさ'],'假名水平偏移':['Furigana X offset','ふりがな横オフセット'],'假名垂直偏移':['Furigana Y offset','ふりがな縦オフセット'],'单行微调':['Per-row tweak','行ごと調整'],'垂直':['Vertical','縦'],'水平':['Horizontal','横'],'假名注音':['Furigana','ふりがな'],'汉字上方自动注音（本地）':['Auto furigana above kanji (local)','漢字の上に自動ふりがな（ローカル）'],'假名大小（相对正文）':['Furigana size (relative)','ふりがなの大きさ（本文比）'],
    '假名水平位置 X（右＋，px）':['Furigana X offset (px)','ふりがな横位置 X（px）'],'假名垂直位置 Y（下＋，px）':['Furigana Y offset (px)','ふりがな縦位置 Y（px）'],'假名描边':['Furigana outline','ふりがなの縁取り'],
    '假名描边颜色':['Furigana outline color','ふりがなの縁取り色'],'假名描边粗细':['Furigana outline width','ふりがなの縁取りの太さ'],
   '日文字体与描边':['Japanese font & outline','日本語フォントと縁取り'],'中文字体与描边':['Chinese font & outline','中国語フォントと縁取り'],'日文字体':['Japanese font','日本語フォント'],'中文字体':['Chinese font',
@@ -234,8 +234,8 @@ Object.assign(ZH,{"隐藏点击等待图标（绘制 Hook，仅支持已适配�
   "只覆盖当前确认的一个等待符，取邻近像素融合；不会累积历史遮挡位置": ["Covers one confirmed current wait icon using nearby pixels; no saved or accumulated mask positions.", "確認済みの待機アイコン1個のみ、周囲の色で補完します。過去の位置は保存しません。"]});
  // Sentences built from numbers + English words (e.g. "494 sentences read"): [regex, 中文, 日本語] with $1… placeholders.
  Object.assign(ZH,{'语音':['Voice','音声'],'记录':['Log','ログ'],'朗读语音':['Speech voice','読み上げ音声'],'Anki 制卡':['Anki cards','Anki カード作成'],'保存语音设置':['Save voice settings',
-  '音声設定を保存'],'■ 停止':['■ Stop','■ 停止'],'绑定游戏后检测版本':['Detected after binding a game','ゲームをバインドすると判定'],'选择下方 Hook 启动方式，再在游戏里推进一句':['Choose a hook mode below, then advance one line in the game',
-  '下のフック方式を選び、ゲームで1行進めてください'],'检查游戏自身画面，翻译覆盖层不计入检查':['Checks the game\'s own picture; the overlay is not counted','ゲーム自体の画面を確認します（オーバーレイは対象外）'],'检查范围沿用下方「原文字扫描范围」；画面检查只在本机处理':['The check uses the scan range below; screenshots never leave this PC',
+  '音声設定を保存'],'■ 停止':['■ Stop','■ 停止'],'绑定游戏后检测版本':['Detected after binding a game','ゲームをバインドすると判定'],'在游戏里点一下推进一句，MeguLit 就会开始读':['Choose a hook mode below, then advance one line in the game',
+  '下のフック方式を選び、ゲームで1行進めてください'],'只检查游戏自己的画面，MeguLit 的译文不算在内':['Checks the game\'s own picture; the overlay is not counted','ゲーム自体の画面を確認します（オーバーレイは対象外）'],'检查范围沿用下方「原文字扫描范围」；画面检查只在本机处理':['The check uses the scan range below; screenshots never leave this PC',
   '確認範囲は下の「原文スキャン範囲」。画面確認はこの PC 内だけで行います'],'对话文本流':['Dialogue text stream','セリフのテキストストリーム'],'原文隐藏':['Hide original text','原文の非表示'],'点击等待图标':['Click-wait icon','クリック待ちアイコン'],
   '状态与诊断':['Status & diagnostics','状態と診断']});
  Object.assign(ZH,{'画面边缘检测区域（按游戏窗口百分比，窗口缩放后自动适配）':['Edge detection area (percent of the game window; follows window resizing)','画面端検出の範囲（ゲームウィンドウに対する％。サイズ変更に自動で追従）'],

@@ -178,16 +178,16 @@ int wmain(int argc, wchar_t **argv) {
    ff->Release(); f->Release(); fam->Release(); sys->Release(); }
   if (brush) brush->Release(); format->Release(); rt->Release(); }
 
- // Blind dots (MODE dot-blind): text never pushed, dialogue font -> dots (kind b); another size -> untouched.
- { Push("MODE dot-blind"); const std::wstring blind = L"見知らぬ天井だった"; Measure(blind); Clear(); std::vector<POINT> e; bool same = true; DrawGgo(blind, GGO_GRAY8_BITMAP, X0, base, e, same); (void)same; Dots("blind-ggo", e);
+ // A blind mode request cannot identify unpushed title/menu text from a shared dialogue font.
+ { Push("MODE dot-blind"); const std::wstring blind = L"見知らぬ天井だった"; Measure(blind); Clear(); std::vector<POINT> e; bool same = true; DrawGgo(blind, GGO_GRAY8_BITMAP, X0, base, e, same); (void)same; Check(Ink() > 100, "unmatched glyphs under the dialogue font stay real in blind mode");
   HFONT tiny = CreateFontW(-16, 0, 0, 0, 400, 0, 0, 0, SHIFTJIS_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, Face); SelectObject(Dc, tiny); Clear(); TextOutW(Dc, X0, Y0, blind.c_str(), (int)blind.size()); Check(Ink() > 100, "blind: the same text in another size is drawn normally"); SelectObject(Dc, dialogue); DeleteObject(tiny);
-  Push("MODE dot"); Sleep(200); Check(Got.find(":b:") != std::string::npos, "blind dots reported with kind b"); }
+  Push("MODE dot"); Sleep(200); Check(Got.find(":b:") == std::string::npos, "unmatched title/menu glyphs never reported as blind dots"); }
  // Compositor heartbeat (owner rule: the player never sees marks): dots only while the beat says presenting and fresh.
  { InterlockedExchange(&Ticking, 0); Sleep(150); Beat *bt = Bt;
   auto inked = [&](wchar_t c) { MAT2 m = {{0, 1}, {0, 0}, {0, 0}, {0, 1}}; GLYPHMETRICS gm{}; DWORD n = GetGlyphOutlineW(Dc, c, GGO_GRAY8_BITMAP, &gm, 0, NULL, &m); if (n == GDI_ERROR || !n) return -1; std::vector<BYTE> b(n); GetGlyphOutlineW(Dc, c, GGO_GRAY8_BITMAP, &gm, n, b.data(), &m); int k = 0; for (BYTE x : b) k += x != 0; return k; };
   if (bt) {
    *bt = {0x4243474D, 1, GetCurrentProcessId(), 1, GetTickCount64(), 1};
-   Push("MODE dot-blind"); Check(inked(L'鳥') > 0 && inked(L'鳥') <= 16, "heartbeat presenting and fresh: dot");
+   ++Seq; Push("LINE 鳥魚馬羊"); Push("MODE dot-blind"); Check(inked(L'鳥') > 0 && inked(L'鳥') <= 16, "heartbeat presenting and fresh: dot");
    bt->presenting = 0; Check(inked(L'魚') > 30, "heartbeat presenting=0: real glyph at once");
    Sleep(500); Check(Got.find("ToMe_GLYPHDOT status needs-relaunch") != std::string::npos, "lapse after served dots: needs-relaunch reported");
    bt->presenting = 1; bt->tick = GetTickCount64(); Check(inked(L'馬') > 0 && inked(L'馬') <= 16, "heartbeat back: new glyphs are dots again");
@@ -255,8 +255,8 @@ int wmain(int argc, wchar_t **argv) {
    Check(named == 3 && chosen == 5 && where, "extra records: 3 name characters at their cell origins, 5 choice characters (" + std::to_string(named) + "/" + std::to_string(chosen) + ")");
    Push("EXTRA-CLEAR o"); Clear(); TextOutW(Dc, 100, 10, L"やめておく", 5); Check(Ink() > 100, "choices cleared: drawn normally again");
    SelectObject(Dc, dialogue); DeleteObject(plate); }
-  // Blind placement: a line never pushed, dialogue font -> blank, kind b.
-  { Push("MODE blank-blind"); const std::wstring blind = L"見知らぬ天井だった"; Measure(blind); Clear(); std::vector<POINT> e; bool same = true; DrawGgo(blind, GGO_GRAY8_BITMAP, X0, base, e, same); Check(Ink() == 0, "place-blind ggo: no ink"); }
+  // Placement also needs a matching line, even with a blind-mode request.
+  { Push("MODE blank-blind"); const std::wstring blind = L"見知らぬ天井だった"; Measure(blind); Clear(); std::vector<POINT> e; bool same = true; DrawGgo(blind, GGO_GRAY8_BITMAP, X0, base, e, same); Check(Ink() > 100, "place-blind: unmatched title/menu text keeps its ink"); }
   Push("MODE dot"); }
  Push("OFF"); Sleep(400);
  { Clear(); TextOutW(Dc, X0, Y0, A.c_str(), (int)A.size()); Save("after-off"); Check(Ink() > 500, "after OFF: the line is drawn in full again"); }
@@ -280,6 +280,9 @@ int wmain(int argc, wchar_t **argv) {
     else chars = false; a = b + 1; } }
   bool all = count.size() == l.size(); for (auto &c : count) all = all && c.second == 1;
   Check(line && all && chars && path, "report " + tag + "(" + SeqPath[seq] + (Placed.count(seq) ? ", place " + Placed[seq].sp : "") + "): line text, every index once, character and kind d, " + (Placed.count(seq) ? "no dot, cell origin in the right space" : "dot side 3"));
+  // the colour of the draw itself, for the reader to paint the hidden line with (read / unread colours): the host draws black, opaque
+  { const std::string &pth = SeqPath[seq]; bool want = pth == "text" || pth == "gdip" || pth == "d2d" || pth == "run"; bool any = Got.find("ToMe_GLYPHDOT color " + tag) != std::string::npos;
+   Check(want ? Got.find("ToMe_GLYPHDOT color " + tag + "rgb=000000 a=ff src=" + pth) != std::string::npos : !any, "colour " + tag + "(" + pth + "): " + (want ? "the draw's colour reported (black, opaque)" : "none from GetGlyphOutline, the engine tints the bitmap itself")); }
  }
  printf(Failed ? "FAIL %d\n" : "PASS\n", Failed); return Failed ? 1 : 0;
 }

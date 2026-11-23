@@ -325,7 +325,10 @@ function parseLines(text,g){const lines=[],anchors=[];let pending='';
  return {lines,anchors};}
 function parseStrings(buf,g){const lines=[],anchors=[];const op=g.opcode,enc=g.encoding&&g.encoding!=='auto'?g.encoding:'shift_jis';let at=buf.indexOf(op);
  while(at>=0&&lines.length<LIMITS.entries){let p=at+op.length,len=0,end=0;
-  if(g.length==='u8'){len=buf[p];p+=1;}else if(g.length==='u16le'){if(p+2>buf.length)break;len=buf.readUInt16LE(p);p+=2;}else if(g.length==='u32le'){if(p+4>buf.length)break;len=buf.readUInt32LE(p);p+=4;}else{end=buf.indexOf(0,p);if(end<0)break;len=end-p;}
+  if(g.length==='u8'){len=buf[p];p+=1;}else if(g.length==='u16le'){if(p+2>buf.length)break;len=buf.readUInt16LE(p);p+=2;}else if(g.length==='u32le'){if(p+4>buf.length)break;len=buf.readUInt32LE(p);p+=4;}
+  /* NUL-terminated: in UTF-16LE the terminator is 00 00 on a code unit; one 00 byte is half of '　', '一' or an ASCII letter */
+  else if(enc==='utf-16le'){end=-1;for(let q=p;q+1<buf.length;q+=2)if(buf[q]===0&&buf[q+1]===0){end=q;break;}if(end<0)break;len=end-p;}
+  else{end=buf.indexOf(0,p);if(end<0)break;len=end-p;}
   if(len>0&&len<=LIMITS.lineChars*4&&p+len<=buf.length){let s=decodeWith(buf.subarray(p,p+len),enc).replace(/\0+$/,'');for(const r of g.strip){r.lastIndex=0;s=s.replace(r,'');}s=s.trim();
    if(s&&/[^\x00-\x7f]/.test(s)&&chars(s)>=g.minChars&&!(g.dropNames&&g.name&&g.name.test(s)))lines.push(s);at=buf.indexOf(op,p+len);}
   else at=buf.indexOf(op,at+1);}

@@ -48,7 +48,7 @@ test('automatic calibration keeps a hand-set size; a sync the user starts measur
 
 test('page modes use the hand-set size instead of the game\'s',()=>{
  const src=read('web/reader/modules/island-page.js');
- assert.match(src,/function userSize\(p\)\{if\(p\.sizeSource!=='user'\)return 0;/);
+ assert.match(src,/function userSize\(p,cn\)\{if\(p\.sizeSource!=='user'\)return 0;/);
  assert.match(src,/function placeGrid\(G\)\{let info=/);
  assert.match(src,/const own=userSize\(p\);if\(own\)\{const f=own\/size;size=own;pitch\*=f;rowH\*=f;\}/);
  assert.match(src,/const own=userSize\(p\);if\(own\)\{width\*=own\/size;size=own;\}/);

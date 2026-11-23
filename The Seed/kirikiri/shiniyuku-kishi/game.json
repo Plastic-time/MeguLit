@@ -1,0 +1,68 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "5a235420335cab342f1216202f5ce2c31f6f5e618695c84ae355e65c63839b75",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "158a6edab97ee809a4f0fd9b76008339d69360be4bb1e71e5d1bf60415a1731d",
+  "script": "6d5d42d92f479950a70442f2c739224dd8236823b99ebca2cbddcc55eb60b566",
+  "title": "7dc413e2147ff8d7349abd5df2368c210926d6414724357631a6c57b56575f34",
+  "vndb": "v49274"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "shiniyuku-kishi",
+ "builds": [
+  "017ab8a718356000a6c8dfb83718c594498e7d7b12390566e0f2baa48f99a1d5"
+ ],
+ "match": {
+  "exe": [
+   "bug05nknk.exe"
+  ],
+  "titles": [
+   "死に逝く騎士、異世界に響く断末魔",
+   "濒死的骑士、于异世界中响彻的绝唱",
+   "archive"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { pickAsset, assetSha256, shapeLatest, shapeReleases, REPO } from '../mirror/src/release.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -14,10 +15,9 @@ const out = path.join(root, 'site', 'public', 'data');
 fs.mkdirSync(out, { recursive: true });
 
 // ---- engines ---------------------------------------------------------------------------------------------------------
-const lib = fs.readFileSync(path.join(root, 'core', 'library.cjs'), 'utf8');
-const block = lib.slice(lib.indexOf('const ENGINES=['), lib.indexOf('];', lib.indexOf('const ENGINES=[')));
-const detected = [...block.matchAll(/\{name:(['"])(.+?)\1,hook:(true|null)(,generic:true)?/g)]
-  .map(m => ({ name: m[2], generic: Boolean(m[4]) }));
+// The engine list lives in services/original-engines/registry.cjs (core/library.cjs only re-exports it).
+const { ENGINES } = createRequire(import.meta.url)(path.join(root, 'services', 'original-engines', 'registry.cjs'));
+const detected = ENGINES.filter(e => e && typeof e.name === 'string').map(e => ({ name: e.name, generic: Boolean(e.generic) }));
 if (detected.length < 20) throw new Error(`engine parse found only ${detected.length} engines`);
 
 // Engines with their own adapter (zero-latency bilingual tables, Japanese import or page layout). Each entry names the

@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "9debd9f6aed2339e540aa9526ea3f16f38ad91c19ad9a842a5b0b2fab21303e3",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "DR1_us.exe",
+ "engine": "spikechunsoft",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "9debd9f6aed2339e540aa9526ea3f16f38ad91c19ad9a842a5b0b2fab21303e3",
+  "head": "bd3fd1db78ec1f3bc5d94a483c4ed60477c48e34bae035db5b4cfd42351c84a9",
+  "pe": "0.0.0.0@57c6d3f9"
+ },
+ "rev": 1
+}

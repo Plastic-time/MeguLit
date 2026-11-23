@@ -36,8 +36,10 @@
  function captionFeedback(){const id=String(state.gameProcessId||'')+'|'+String(state.gameStarted||'');if(feedbackShown.has(id))return;feedbackShown.add(id);document.querySelector('.megulit-embed-feedback')?.remove();
   const n=document.createElement('div');n.className='megulit-embed-feedback';n.setAttribute('role','status');n.textContent=feedbackCopy()[0];
   n.style.cssText='font:13px/1.6 Meiryo,"Microsoft YaHei",sans-serif;color:#ffd9a8;background:rgba(40,20,10,.78);border:1px solid rgba(255,190,120,.35);border-radius:8px;padding:6px 10px;margin-top:8px;text-shadow:none;-webkit-text-stroke:0;cursor:pointer;transition:opacity .6s ease;';
-  const host=document.querySelector('.sentence-window');if(host)host.appendChild(n);else{n.style.cssText+='position:fixed;z-index:2147481500;left:50%;bottom:24px;transform:translateX(-50%);max-width:min(620px,calc(100vw - 32px));';
-   document.body.appendChild(n);}
+  /* 2026-11-21 (owner screenshot, ファタモルガーナの館: a narrow brown box over the line's last character and the translation): inside the sentence
+     window an anchored line (text-place.js max-width, game row breaks) squeezed it into a strip at the line's end. It is its own box, fixed */
+  n.style.cssText+='position:fixed;z-index:2147481500;left:50%;bottom:24px;transform:translateX(-50%);width:max-content;max-width:min(620px,calc(100vw - 32px));margin:0;';
+  document.body.appendChild(n);
   const close=()=>{n.style.opacity='0';setTimeout(()=>n.remove(),650);};n.addEventListener('click',e=>{e.stopPropagation();close();},{capture:true});setTimeout(close,
    8000);}
  const previous=b.galStatus;b.galStatus=m=>{previous(m);state={...state,...m};/* E416: the reader knows when the hook can only read (the game's text stays visible); fallbacks key off this class only */if('hookEmbedUnsupported' in m||'hookProfile' in m)document.body.classList.toggle('megulit-readonly-hook',
@@ -52,7 +54,7 @@
  `;document.head.append(style);
  function text(node,value){if(node.textContent!==value)node.textContent=value;}
  function paint(p){
-for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookPref==='hookHide'?state.hookHide===true:state[cb.dataset.hookPref]!==false;if(cb.checked!==v&&document.activeElement!==cb)cb.checked=v;
+{const fx=p.querySelector('[data-hook-fx]');if(fx){fx.hidden=!(state.readModeHint===true&&state.hookHide===true);/* 2026-11-21 (owner) read mode is only ever switched by the user: a self-check or text-effects verdict shows this hint and a button, nothing switches by itself */const why=typeof state.readReason==='string'?state.readReason:'',t=fx.querySelector('[data-hook-fx-why]'),bt=fx.querySelector('[data-hook-fx-back]');if(t)t.textContent='这部游戏可能有显示问题，可以手动切读模式'+(why?'（'+why+'）':'');if(bt)bt.textContent='切读模式';}}for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookPref==='hookHide'?state.hookHide===true:state[cb.dataset.hookPref]!==false;if(cb.checked!==v&&document.activeElement!==cb)cb.checked=v;
  }
   {const hiding=['embed','euphoria474'].includes(state.hookProfile),threads=state.hookThreads||[],sel=threads.find(t=>t.selected);let tone='idle',parts=[];
    if(state.hookProfile==='off'){parts.push('Hook 已停止');}
@@ -65,13 +67,13 @@ for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookP
     // Chosen automatically: embed when the game's stream can be embedded, otherwise read + OCR cover.
     text(p.querySelector('[data-hook-mode]'),state.hookProfile==='off'?'Hook 已停止':state.hookProfile==='euphoria474'?'自动：YU-RIS 0.474 绘制隐藏原文':state.hookProfile==='embed'?'自动：LunaHook 内嵌，在引擎内隐藏原文':state.hookAutoOcr?'自动：只读取台词 + OCR 遮盖原文（当前已发现的文本流没有提供内嵌）':state.hookHide?'自动：只读取台词，等待可内嵌的文本流':'自动：只读取台词（未开启隐藏原文）');
   const proof=p.querySelector('[data-hook-proof]');proof.dataset.state=state.hookCheckState||'waiting';
-  text(p.querySelector('[data-hook-message]'),state.hookEmbedUnsupported?feedbackCopy()[0]:state.hookCheckMessage||'选择下方 Hook 启动方式，再在游戏里推进一句');
+  text(p.querySelector('[data-hook-message]'),state.hookEmbedUnsupported?feedbackCopy()[0]:state.hookCheckMessage||'在游戏里点一下推进一句，MeguLit 就会开始读');
   {const row=p.querySelector('[data-hook-feedback-row]'),show=state.hookEmbedUnsupported===true&&state.hookProfile!=='off';if(row.hidden===show)row.hidden=!show;
    text(row.querySelector('button'),feedbackCopy()[1]);}
   text(p.querySelector('[data-hook-connection]'),state.hookProfile==='off'?'已停止':state.processAttached?'游戏已连接':'等待游戏连接');
   text(p.querySelector('[data-hook-capture]'),state.receivedText&&state.hookCaptureCharacters?'已捕捉 '+state.hookCaptureCharacters+' 字':'等待新台词');
   text(p.querySelector('[data-hook-hide]'),state.hookVisualVerified?'隐藏检查通过':state.hookCheckState==='visible'?'原文仍可见':state.hookProfile==='read'?'仅读取':'画面待确认');
-  text(p.querySelector('[data-hook-time]'),state.hookCheckedAt?'上次通过 '+new Date(state.hookCheckedAt).toLocaleTimeString()+' · 扫描区内未识别到日文':'检查游戏自身画面，翻译覆盖层不计入检查');
+  text(p.querySelector('[data-hook-time]'),state.hookCheckedAt?'上次通过 '+new Date(state.hookCheckedAt).toLocaleTimeString()+' · 扫描区内未识别到日文':'只检查游戏自己的画面，MeguLit 的译文不算在内');
   p.querySelector('[data-hook-force]').hidden=!(state.hookCheckState==='unverified'&&!state.hookBaselineVerified&&['euphoria474','embed'].includes(state.hookProfile));
   const threads=state.hookThreads||[],key=JSON.stringify(threads);if(p.dataset.threadKey!==key){p.dataset.threadKey=key;const list=p.querySelector('[data-hook-streams]');
    list.replaceChildren();if(!threads.length){const e=document.createElement('small');e.textContent='还没有发现文本流，在游戏里推进一句';list.append(e)};for(const t of threads.slice(0,
@@ -88,7 +90,7 @@ for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookP
   const p=document.createElement('section');p.className='tome-hooks';p.setAttribute('aria-label','Hook 引擎启动与效果检查');
   p.innerHTML=`<div class="tome-hook-main">
     <div class="tome-hook-summary" data-hook-summary><i data-hook-dot></i><span data-hook-summary-text></span></div>
-    <label class="tome-hook-switch"><input type="checkbox" data-hook-pref="hookHide"><span>隐藏游戏原文</span></label>
+    <label class="tome-hook-switch"><input type="checkbox" data-hook-pref="hookHide"><span>隐藏游戏原文</span></label><div class="tome-hook-fx" data-hook-fx hidden><span data-hook-fx-why>这部游戏可能有显示问题，可以手动切读模式</span> <button type="button" data-hook-fx-back>切读模式</button></div>
     <small class="tome-hook-hint">开或关之后约 3 秒，从下一句开始生效；当前已显示的那句不会立刻变</small>
     <div class="tome-hook-actions"><button type="button" data-hook-reselect title="当前文本流读到的是乱码或不是台词时，换一条文本流">文本不对？重新选取文本流</button></div>
     <label class="tome-hook-switch"><input type="checkbox" data-hook-pref="hookAutoStart">全自动：读取台词、同步原文样式并内嵌</label>
@@ -102,6 +104,7 @@ for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookP
     <h5>已发现的文本流</h5><div data-hook-streams><small>还没有发现文本流，在游戏里推进一句</small></div>
    </details>`;
   p.querySelector('[data-hook-restart]').onclick=()=>send({type:'hookStart',profile:'auto'});
+  {const back=p.querySelector('[data-hook-fx-back]');if(back)back.onclick=()=>{state={...state,hookHide:false,readModeHint:false};send({type:'hookPrefs',settings:{hookHide:false}});};}
   p.querySelector('[data-hook-reselect]').onclick=()=>send({type:'hookReselect'});
   p.querySelector('[data-hook-feedback]').onclick=openFeedback;
   for(const cb of p.querySelectorAll('[data-hook-pref]'))cb.onchange=()=>{state={...state,[cb.dataset.hookPref]:cb.checked};send({type:'hookPrefs',settings:{[cb.dataset.hookPref]:cb.checked}});

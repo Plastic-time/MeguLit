@@ -20,7 +20,7 @@ test('the page draws art text as invisible, readable characters plus the transla
 });
 test('the art request reaches PageLocator and its answer the page, with a translation',()=>{
  assert.match(read('core/gal-native.cjs'),/this\.hooks\.artLocate=text=>\{[^}]*type:'pageLocate',text,art:true/);
- assert.match(read('core/gal-native.cjs'),/message\.type==='artText'\)\{this\.onEvent\(message\)/);
+ /* 2026-11-19 drawn over the picture only with artText on; read lines go to the reader either way (ocr-read-lines.test.cjs) */assert.match(read('core/gal-native.cjs'),/message\.type==='artText'\)\{if\(this\.preferences\?\.artText===true&&message\.once!==true\)this\.onEvent\(message\);this\.hooks\.ocrLine\(message\)/);
  assert.match(read('native/GalWindowBridge.cs'),/PageLocate\.Request\(Target,Str\(d,"text"\),Bool\(d,"art"\)\)/);
  assert.match(read('native/PageLocator.cs'),/void LocateArt\(/);
  assert.match(read('services/reader.cjs'),/message\.type==='artText'\)\{this\.artText\(message\)/);
@@ -36,16 +36,17 @@ test('the art scan is wanted while no hook line is current and skips the current
 });
 test('GalNative sends the art scan state to the bridge only when it changes, off when not bound',()=>{
  const {GalNative}=require('../core/gal-native.cjs');const sent=[];const g=Object.create(GalNative.prototype);
- g.send=m=>sent.push(m);g.preferences={artText:true};g.state={bound:true};/* 2026-11-15: art text runs only when switched on */let st={on:true,dialog:'',speaker:'',band:false};g.hooks={artScanState:()=>st};
+ g.send=m=>sent.push(m);g.preferences={artText:true};g.state={bound:true};let st={on:true,dialog:'',speaker:'',band:false},quiet=[];g.hooks={artScanState:(now,q)=>{quiet.push(q);return st;}};
  g.artScan();g.artScan();assert.equal(sent.length,1);assert.equal(sent[0].type,'artScan');assert.equal(sent[0].on,true);
  g.state.bound=false;g.artScan();assert.equal(sent.length,2);assert.equal(sent[1].on,false);
- g.preferences={artText:false};g.state.bound=true;g.artScan();assert.equal(sent.length,2,'turned off: stays off');
+ /* 2026-11-19 OCR read lines: without artText the scan still runs, after 5 s without a hook line; ocrReadLines:false turns it off */g.preferences={artText:false};g.state.bound=true;g.artScan();assert.equal(sent.length,3);assert.equal(sent[2].on,true);assert.equal(quiet[quiet.length-1],5000);assert.equal(quiet[0],2000);
+ g.preferences={artText:false,ocrReadLines:false};g.artScan();assert.equal(sent.length,4,'both off: off');assert.equal(sent[3].on,false);
  assert.match(read('native/GalWindowBridge.cs'),/type=="artScan"\)\{if\(PageLocate!=null\)PageLocate\.Scan\(Target,/);
  assert.match(read('native/PageLocator.cs'),/public void Scan\(IntPtr target, bool on, string dialog, string speaker, bool band\)/);
 });
 test('the OCR read path reads only, diffs the frame first and never writes to the game',()=>{
  const src=read('native/PageLocator.cs'),scan=src.slice(src.indexOf('// ---- art scan'),src.indexOf(' void Report(Found f,'));
- assert.match(scan,/!Changed\(last, thumb\)/);assert.match(scan,/Thread\.Sleep\(busy \? 400 : 700\)/);assert.match(scan,/source = "ocr"/);
+ assert.match(scan,/!Changed\(last, thumb\)/);assert.match(scan,/Thread\.Sleep\(busy \? 400 : ScanSlow \? 1500 : 700\)/);assert.match(scan,/source = "ocr"/);
  assert.doesNotMatch(scan,/WriteProcessMemory|SendMessage|PostMessage|SetWindowPos|FillRect/);
 });
 test('a stale art show waiting for its translation is dropped once the line was hidden (E540: the line itself went out at once)',async()=>{

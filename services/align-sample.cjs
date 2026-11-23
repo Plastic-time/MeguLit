@@ -47,14 +47,24 @@ function score(z,j){
 }
 /* A Chinese line that is a translation: prose, not Japanese, not just the Japanese line again. */
 const translated=(z,j)=>typeof z==='string'&&prose(z)&&!japaneseLine(z)&&/[一-鿿]/.test(z)&&String(z).replace(/\s/g,'')!==String(j||'').replace(/\s/g,'');
-/* total / paired / unpaired with reasons over every translated line. */
-function census(zh,ja){
- let total=0,paired=0;const reasons={};
+/* S9 a sound effect written out as a line: Chinese onomatopoeia characters only (咚, 喀啷喀啷, 啪唧, 喀啦啦啦……) or Japanese
+   katakana only (ガチャ; not またか), no quote, at most 8 characters. A name (奥兹, 若い男) or a sentence (再一次——) is not one. */
+const ONOMATOPOEIA=/^[咚咣喀啷哧扑啪唧嘎咯咔嚓唰叽磅刹啦呼砰嗖哗咕噗嘭轰叮当铃嘀哒嘟呜吱咻哐锵噔噼啵嗒咂沙哒呱嘶咻]+$/,KANA_ONLY=/^[ァ-ヺーッ]+$/;
+const soundLike=f=>{if(!f||!f.len||f.len>8||f.punct.quote)return false;const b=f.t.replace(/[\s　、。，．,.!！?？…‥―—～~〜]/g,'');return ONOMATOPOEIA.test(b)||KANA_ONLY.test(b);};
+const addedSound=z=>soundLike(features(z));
+/* total / paired / unpaired with reasons over every translated line. S9: a line with no Japanese line that is a sound effect
+   the translation spelled out, or that the aligner proved the translation added (added: indices), is the translation's
+   own: counted in added {count,sound,line}, not in total / unpaired. */
+function census(zh,ja,addedIdx,rewrittenIdx){
+ let total=0,paired=0;const reasons={},own=new Set(addedIdx||[]),rewritten=new Set(rewrittenIdx||[]),added={count:0,sound:0,line:0,rewritten:0};
  for(let i=0;i<zh.length;i++){if(!translated(zh[i],ja[i]))continue;total++;const j=ja[i];
   /* an original line in Latin letters ("OK", "Hello World") is still that line's original */
-  const why=typeof j!=='string'||!j.trim()?'no-japanese-line':'';
+  /* S9 a sound effect the translation spells out (咚, 喀啷喀啷) where the Japanese only plays a sound has no line to pair */
+  const none=typeof j!=='string'||!j.trim();if(none&&(addedSound(zh[i])||own.has(i)||rewritten.has(i))){total--;added.count++;added[addedSound(zh[i])?'sound':own.has(i)?'line':'rewritten']++;continue;}
+  /* rewritten (in added): a Chinese line beside Japanese lines the translation dropped or rewrote, its own content */
+  const why=none?'no-japanese-line':'';
   if(why)reasons[why]=(reasons[why]||0)+1;else paired++;}
- return {total,paired,unpaired:total-paired,reasons};
+ return {total,paired,unpaired:total-paired,reasons,added};
 }
 /* Up to n sample positions spread evenly over the translated lines, deterministic (same script, same sample). */
 function pick(zh,ja,n){
@@ -137,13 +147,13 @@ function verify(zh,ja,options={}){
  if(!first.ok||options.force){const r=realign(zh,ja,options);
   if(r&&r.scenes){const [z,j]=options.into==='ja'?[r.lines,ja]:[zh,r.lines],again=sample(z,j,options);
    realigned={scenes:r.scenes,moved:r.moved,dropped:r.dropped,accepted:again.ok,before:summary(first)};if(again.ok){lines=r.lines;ruby=r.ruby;}final=again;}}
- const c=options.into==='ja'?census(lines||zh,ja):census(zh,lines||ja);
+ const c=options.into==='ja'?census(lines||zh,ja):census(zh,lines||ja,lines?null:options.added,lines?null:options.rewritten);
  /* a script that still fails after realignment is another version (or another game) */
  const reason=final.ok?'':realigned?'different-version':final.reason;
- return {ok:final.ok,reason,total:c.total,paired:c.paired,unpaired:c.unpaired,reasons:c.reasons,sample:final,realigned,...(lines?{lines,ruby}:{})};
+ return {ok:final.ok,reason,total:c.total,paired:c.paired,unpaired:c.unpaired,reasons:c.reasons,added:c.added,sample:final,realigned,...(lines?{lines,ruby}:{})};
 }
 const summary=s=>({sampled:s.sampled,matched:s.matched,rate:s.rate,contrast:s.contrast,driftShift:s.driftShift,reason:s.reason});
 /* What is kept in the game's state and shown: counts and the sample, a few examples cut short. */
 function report(v){const cut=t=>String(t??'').slice(0,60);
- return {ok:v.ok,reason:v.reason,total:v.total,paired:v.paired,unpaired:v.unpaired,reasons:v.reasons,sample:{...summary(v.sample),examples:(v.sample.examples||[]).slice(0,3).map(e=>({index:e.index,zh:cut(e.zh),ja:cut(e.ja),better:e.better}))},realigned:v.realigned};}
-module.exports={verify,report,sample,realign,census,score,features,plain,translated};
+ return {ok:v.ok,reason:v.reason,total:v.total,paired:v.paired,unpaired:v.unpaired,reasons:v.reasons,added:v.added,sample:{...summary(v.sample),examples:(v.sample.examples||[]).slice(0,3).map(e=>({index:e.index,zh:cut(e.zh),ja:cut(e.ja),better:e.better}))},realigned:v.realigned};}
+module.exports={verify,report,sample,realign,census,score,features,plain,translated,soundLike};

@@ -87,7 +87,7 @@ test('always on (no switch); three faults for a game switch it off',()=>{const{g
 
 // Output of the shared stand-in game (native/runtimedump/selftest/run.ps1, case cases/Voice.cpp), when it has run here.
 const NATIVE=process.env.MEGULIT_VOICE_SELFTEST||'H:\MeguLit-Work\runtime-dump-selftest';
-for(const bit of ['32','64'])test(`native stand-in game x${bit}: every voiced line gets its own voice`,{skip:!fs.existsSync(path.join(NATIVE,'game'+bit,'voice-truth.json'))},()=>{
+for(const bit of ['32','64'])test(`native stand-in game x${bit}: every voiced line gets its own voice`,{skip:!fs.existsSync(path.join(NATIVE,'game'+bit,'voice-truth.json'))&&'environment: native stand-in game x'+bit+' not built on this PC'},()=>{
  process.env.MEGULIT_RUNTIME_DUMP=path.join(NATIVE,'out'+bit);for(const m of ['../services/runtime-dump.cjs','../services/voice-harvest.cjs'])delete require.cache[require.resolve(m)];
  const vh=require('../services/voice-harvest.cjs'),game=path.join(NATIVE,'game'+bit);
  const truth=JSON.parse(fs.readFileSync(path.join(game,'voice-truth.json'),'utf8'));

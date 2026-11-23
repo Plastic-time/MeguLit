@@ -1,0 +1,67 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "02580aee705ca97ffd0098a2d4d7d10416c0a785ae33ee9f85aaaad3924c9216",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "nitropak",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "32c9716be5bd4899ee7ccf67d21f0dd6b998202e5d1e007dc0f0fbf7934d6880",
+  "script": "b9f2cc17ef6caca92403c8f2e9bbe5cb9a788ce1ff61f40b3de82bf2448771a5",
+  "title": "1edfa8cba606567749430cdcf4cde0102caa048a5f0182a1a223c94f7fefcb7d",
+  "vndb": "v97"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "saya-no-uta-jp",
+ "builds": [
+  "d3c47ed8b085fbfb51390d37a0a3f5a476364d13de7a852c20aee0ec4b81c8a1"
+ ],
+ "match": {
+  "exe": [
+   "saya.exe"
+  ],
+  "titles": [
+   "沙耶の唄",
+   "[031226][Nitro+] 沙耶の唄"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

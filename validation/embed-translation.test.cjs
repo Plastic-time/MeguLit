@@ -37,14 +37,14 @@ test('the reader translates a held line once and shares it with the page',async(
  const src=fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8');
  assert.match(src,/if\(message\.type==='hookEmbedRequest'\)\{this\.embedTranslate\(message\.id,message\.text\);return;\}/);
  assert.match(src,/this\.gal\?\.hooks\?\.embedReply\(id,hide\?'':trans,/);
- assert.match(src,/\{const cached=this\.embedCached\(text\);if\(cached\)return cached;\}/);
+ assert.match(src,/\{const cached=this\.embedCached\(text,undefined,\{language:cacheLanguage\}\);if\(cached\)return cached;\}/);
 });
 
 test('the native bridge holds the line, answers with the translation, and lets the original through on timeout',()=>{
  const cs=fs.readFileSync(path.join(__dirname,'..','native','HookBridge.cs'),'utf8');
  assert.match(cs,/Emit\(new\{type="embedRequest",id=id,text=text\}\)/);
- assert.match(cs,/new Timer\(_=>FinishEmbed\(id,null\),null,3700,Timeout\.Infinite\)/);
- assert.match(cs,/type=="embedReply"/);assert.match(cs,/TranslateMode\?4000u:1000u/);
+ assert.match(cs,/new Timer\(_=>FinishEmbed\(id,null,true\),null,\(int\)TranslateGiveUpMs,Timeout\.Infinite\)/);
+ assert.match(cs,/type=="embedReply"/);assert.match(cs,/TranslateMode\?TranslateWaitMs:HideWaitMs/);assert.match(cs,/const uint TranslateWaitMs=150,TranslateGiveUpMs=110;/,'translate mode never holds the game thread longer than a short budget (2026-11-20 lip sync)');assert.match(cs,/new Timer\(_=>FinishEmbed\(id,null,true\),null,\(int\)TranslateGiveUpMs/,'a late translation hides the line instead of freezing the game');assert.doesNotMatch(cs,/4000u:HideWaitMs|,3700,Timeout/);assert.match(cs,/embed answer ms <1:/,'bridge answer time is reported');assert.match(cs,/const uint HideWaitMs=100;/,'hide mode waits at most about 100 ms (2026-11-19 embed wait)');
 });
 
 // Chinese-patched game read in Japanese (original-text import): the patch's own line becomes the translation, ready
@@ -57,4 +57,13 @@ test('a matched patch line is cached as the translation of its Japanese original
  Object.assign(r,{root:'Z:/no-root',runtime:{},translator:()=>({translate:async()=>{calls++;return 'x';}})});
  r.embedCached('おはよう、春希','早上好，春希');
  assert.equal(r.embedCached('おはよう、 春希'),'早上好，春希','whitespace does not matter');assert.equal(calls,0);
+});
+
+test('CLANNAD diagnostic script labels with no pairing result do not throw, and the next paired line still resolves',()=>{
+ const {h,events}=hook(),traces=[];h.trace=t=>traces.push(t);h.originalText={kind:'patch',resolve:text=>text==='雪…'?{status:'exact',indices:[9094],translation:'雪…'}:null};
+ for(const text of ['tret','seen0414','《渚の名前》《秋生の名前》《'])assert.equal(h.originalTextFor(text),text);
+ assert.deepEqual(events.filter(e=>e.type==='hookPatchTranslation'),[]);
+ assert.equal(traces.some(t=>t.startsWith('original-text error ')),false);
+ assert.equal(h.originalTextFor('雪…'),'雪…');
+ assert.deepEqual(events.find(e=>e.type==='hookPatchTranslation'),{type:'hookPatchTranslation',japanese:'雪…',chinese:'雪…',machine:false});
 });

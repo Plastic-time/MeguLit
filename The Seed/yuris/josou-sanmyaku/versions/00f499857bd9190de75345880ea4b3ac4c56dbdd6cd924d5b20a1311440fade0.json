@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "00f499857bd9190de75345880ea4b3ac4c56dbdd6cd924d5b20a1311440fade0",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "女装山脈.exe",
+ "engine": "yuris",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "00f499857bd9190de75345880ea4b3ac4c56dbdd6cd924d5b20a1311440fade0",
+  "head": "37678e3df50e2ee46da0e0c1e34151ca9402be3bf98d5debe5474a4eee790408",
+  "pe": "1.0.0.0@4dc98131"
+ },
+ "rev": 1
+}

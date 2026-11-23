@@ -61,6 +61,13 @@ pub fn no_accent_border(window:&tauri::WebviewWindow){
   if let Ok(handle)=window.hwnd(){let no_border=0xfffffffeu32;DwmSetWindowAttribute(handle.0 as *mut c_void,34,&no_border,4);}
  }
 }
+// 2026-11-19: the reader overlay never shows a system frame, whoever changes its style later (desktop/src/window_chrome.rs).
+// Installed on the thread that owns the window, right after it is built and before it is ever shown.
+pub fn chromeless(window:&tauri::WebviewWindow){
+ #[cfg(windows)]{
+  if let Ok(handle)=window.hwnd(){let raw=handle.0 as isize;let _=window.run_on_main_thread(move||unsafe{crate::window_chrome::install(raw as *mut std::ffi::c_void);});}
+ }
+}
 pub fn configure_home_frame(window:&tauri::WebviewWindow){
  if window.label()!="main"{return;}
  #[cfg(windows)]unsafe{

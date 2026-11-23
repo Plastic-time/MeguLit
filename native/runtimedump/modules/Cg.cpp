@@ -172,7 +172,20 @@ void Trim() {
   if (!c->wait.empty()) Dropped.push_back(c->wait);
  }
 }
-bool RawCopy(void *dst, const void *src, DWORD n) { __try { memcpy(dst, src, n); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
+// Never reads in place (2026-11-20): a memcpy under __try still raises a first-chance access violation every game and
+// overlay vectored handler sees (the CHAOS;CHILD crash log had one here) and silently eats a stack's guard page. Pages are
+// checked with VirtualQuery and copied with ReadProcessMemory, which fails quietly.
+bool RawCopy(void *dst, const void *src, DWORD n) {
+ DWORD e = GetLastError(); bool ok = src != NULL;
+ for (ULONG_PTR a = (ULONG_PTR)src, end = a + n; ok && a < end; ) {
+  MEMORY_BASIC_INFORMATION mi;
+  if (!VirtualQuery((void *)a, &mi, sizeof mi) || mi.State != MEM_COMMIT || (mi.Protect & (PAGE_GUARD | PAGE_NOACCESS)) || !(mi.Protect & 0xEE)) ok = false;
+  else a = (ULONG_PTR)mi.BaseAddress + mi.RegionSize;
+ }
+ SIZE_T got = 0;
+ ok = ok && ReadProcessMemory(GetCurrentProcess(), src, dst, n, &got) && got == n;
+ SetLastError(e); return ok;
+}
 
 void See(const char *source, const char *how, const unsigned char *p, DWORD n) {
  if (!Inited || n > MaxBytes || n < 32) return;

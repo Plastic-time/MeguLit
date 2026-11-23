@@ -114,23 +114,26 @@ class GameFonts{
     info={root,label:info?.label||gameLabel(root),engine:engineOf(root),exe:path.basename(exe),fonts,scannedAt:Date.now(),autoApplied:force?false:!!info?.autoApplied};
     this.manifest[key]=info;this.save();
    }
-   this.current={status:'ready',...info};this.onChange(this.current);return this.current;
+   this.current={status:'ready',...info,sources:{...(this.current?.root===info.root?this.current.sources:{}),folder:{found:info.fonts.filter(f=>!f.loaded).length}}};this.onChange(this.current);return this.current;
   })();
   try{return await this.running;}finally{this.running=null;}
  }
  /* A font the game loaded itself (font probe: AddFontMemResourceEx data saved by the hook, or a private font file outside the
     Windows font folder). Added to the current game's fonts so the reader can use it with FontFace like a bundled font. */
- addFile(file,kind='file'){const c=this.current;if(!c||c.status!=='ready'||!file)return null;let buffer;try{const s=fs.statSync(file);if(!s.isFile()||s.size<MIN_FONT/4||s.size>MAX_FONT)return null;buffer=fs.readFileSync(file);}catch{return null;}
+ addFile(file,kind='file',label=''){const c=this.current;if(!c||c.status!=='ready'||!file)return null;let buffer;try{const s=fs.statSync(file);if(!s.isFile()||s.size<MIN_FONT/4||s.size>MAX_FONT)return null;buffer=fs.readFileSync(file);}catch{return null;}
   const key=c.root.toLowerCase(),dir=path.join(this.cacheDir,sha(key).slice(0,12)),added=[];fs.mkdirSync(dir,{recursive:true});
   const faces=collectionFaces(buffer);for(let face=0;face<faces.length;face++){const data=faces[face],id=sha(data).slice(0,10);if(c.fonts.some(f=>f.id===id))continue;
    const names=allNames(data),kind2=classify(data,path.basename(file)+' '+names.join(' '));if(!kind2)continue;
    const target=path.join(dir,id+(data.readUInt32BE(0)===0x4f54544f?'.otf':'.ttf'));try{fs.writeFileSync(target,kind2.data);}catch{continue;}
-   const entry={id,lang:kind2.lang,legacy:kind2.legacy,family:familyName(data)||names[0]||path.basename(file,path.extname(file)),names,source:(kind==='mem'?'内存 ':'')+path.basename(file)+(faces.length>1?'#'+face:''),file:target,loaded:kind};
+   const entry={id,lang:kind2.lang,legacy:kind2.legacy,family:familyName(data)||names[0]||path.basename(file,path.extname(file)),names,source:label?label+(faces.length>1?'#'+face:''):(kind==='mem'?'内存 ':'')+path.basename(file)+(faces.length>1?'#'+face:''),file:target,loaded:kind};
    c.fonts.push(entry);added.push(entry);}
   if(added.length){if(this.manifest[key]){this.manifest[key].fonts=c.fonts;this.save();}this.onChange(this.current);}return added;}
+ /* 2026-11-19 (user: "扫描游戏字体现在基本上无法使用"): what each source gave for this game, so the font panel can say what was
+    tried instead of only "nothing found". kind: folder | archive | registered | engine | probe */
+ note(kind,value){const c=this.current;if(!c||c.status!=='ready')return;c.sources={...(c.sources||{}),[kind]:value};this.onChange(c,true);}/* light: no font data again */
  markApplied(){if(!this.current?.root)return;const key=this.current.root.toLowerCase();if(this.manifest[key]){this.manifest[key].autoApplied=true;this.current.autoApplied=true;this.save();}}
  // What the UI needs: metadata plus font data to register with FontFace.
  payload(withData=true){const c=this.current;if(!c||c.status!=='ready')return c||null;
-  return {...c,fonts:c.fonts.map(f=>{let data='';if(withData)try{data=fs.readFileSync(this.fontFile(f)).toString('base64');}catch{}return {id:f.id,lang:f.lang,legacy:f.legacy,family:f.family,names:f.names||[],source:f.source,format:String(this.fontFile(f)||f.file).toLowerCase().endsWith('.otf')?'opentype':'truetype',data};})};}
+  return {...c,fonts:c.fonts.map(f=>{let data='';if(withData)try{data=fs.readFileSync(this.fontFile(f)).toString('base64');}catch{}return {id:f.id,lang:f.lang,legacy:f.legacy,family:f.family,names:f.names||[],source:f.source,loaded:f.loaded||'',format:String(this.fontFile(f)||f.file).toLowerCase().endsWith('.otf')?'opentype':'truetype',data};})};}
 }
 module.exports={GameFonts,classify,familyName,allNames,gameLabel,engineOf,scan,exePath,collectionFaces};

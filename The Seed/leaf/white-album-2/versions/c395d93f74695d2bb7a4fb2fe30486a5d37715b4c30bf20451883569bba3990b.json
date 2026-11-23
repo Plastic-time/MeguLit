@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "c395d93f74695d2bb7a4fb2fe30486a5d37715b4c30bf20451883569bba3990b",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "WA2.exe",
+ "engine": "leaf",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "c395d93f74695d2bb7a4fb2fe30486a5d37715b4c30bf20451883569bba3990b",
+  "head": "459fba8abe7a50eab2db6b075946f30909f9e5aa0dafc30d2d62b8d1e6c03f1f",
+  "pe": "0.0.0.0@4ef97200"
+ },
+ "rev": 1
+}

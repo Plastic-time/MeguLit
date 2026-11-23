@@ -1,0 +1,23 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "d3c47ed8b085fbfb51390d37a0a3f5a476364d13de7a852c20aee0ec4b81c8a1",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "saya.exe",
+ "engine": "nitropak",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "d3c47ed8b085fbfb51390d37a0a3f5a476364d13de7a852c20aee0ec4b81c8a1",
+  "head": "ac8cba01be91465c53e8ac6dd52c40c079430dbba8c2d18c5d0abe3eb6d88276",
+  "pe": "1.0.0.0@3fcf9e96"
+ },
+ "rev": 1
+}

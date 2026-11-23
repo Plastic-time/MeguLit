@@ -25,3 +25,13 @@ test('reallive: Seen.txt index, header, second-level key picked by the text it g
 test('reallive: a Chinese patch Seen.txt (GBK) reads as Chinese',()=>{
  const gb=Buffer.concat([Buffer.from('#\x01\x02\x03\x04\x05\x06\x07','latin1'),Buffer.from([0xc4,0xe3,0xba,0xc3,0xa3,0xa1]),Buffer.from('\n\x10\x00','latin1'),Buffer.alloc(700,0x2c)]);
  const d=rl.bytecode(scenario(gb,10002,null),null);assert.deepEqual(rl.parse(d).lines,['你好！']);});
+test('reallive: a Chinese patch Seen.txt with the second-level key REGNAME names reads all its lines',()=>{
+ const gb=Buffer.concat([Buffer.from('#\x01\x02\x03\x04\x05\x06\x07','latin1'),Buffer.from([0xc4,0xe3,0xba,0xc3,0xa3,0xa1]),Buffer.from('\n\x10\x00','latin1'),Buffer.alloc(700,0x2c)]);
+ const d=rl.bytecode(scenario(gb,110002,'clannad-full-voice'),'clannad-full-voice');assert.ok(d);assert.deepEqual(rl.parse(d).lines,['你好！']);});
+test('reallive: quoted pieces are one line, so a patch\'s 【name】 stays on its line',()=>{
+ const q=Buffer.from('"','latin1'),gb=Buffer.concat([Buffer.from('#\x01\x02\x03\x04\x05\x06\x07','latin1'),
+  q,Buffer.from([0xa1,0xbe]),q,q,Buffer.from([0xc5,0xae,0xba,0xa2]),q,q,Buffer.from([0xa1,0xbf]),q,q,Buffer.from([0xa1,0xb8,0xc4,0xe3,0xba,0xc3,0xa1,0xb9]),q,
+  Buffer.from('\n\x10\x00','latin1'),Buffer.alloc(700,0x2c)]);
+ assert.deepEqual(rl.parse(gb).lines,['【女孩】「你好」']);});
+test('reallive: a kana-less line in a Japanese scenario stays Shift-JIS',()=>{
+ assert.deepEqual(rl.parse(code('「あい」','あいう','名名')).lines,['「あい」','あいう','名名']);});

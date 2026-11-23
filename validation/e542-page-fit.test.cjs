@@ -57,10 +57,46 @@ test('E542 fit: a block that fits stays as it is; one too tall at 60 % moves up,
  const q=fit.plan({top:50,bottom:1100},client,fit.MIN);assert.strictEqual(q.shift,-46);assert.ok(q.room>0,'the rest scrolls inside the translation');
 });
 
+test('the same sentence refits on a resized or moved client without carrying over the previous shift',()=>{
+ const props={},classes=new Set(['tomoyo-gal-bound']);
+ let layout={clientX:0,clientY:120,clientWidth:600,clientHeight:300},anchor=300,frame;
+ const scale=()=>Number(props['--megulit-fit']??1);
+ const rect=(start,height)=>{const top=anchor+start+(parseFloat(props['--megulit-fit-shift'])||0);return {top,bottom:top+height,height};};
+ const jp={getBoundingClientRect:()=>rect(0,100)};
+ const cn={getBoundingClientRect:()=>rect(100,120*scale())};
+ const win={getBoundingClientRect:()=>rect(0,100+120*scale()),classList:{contains:()=>false},
+  querySelectorAll:selector=>selector==='.sentence-text'?[jp]:[jp,cn],querySelector:()=>cn};
+ const bridge={galLayoutInfo:()=>layout,galLayout:next=>{layout=next;}};
+ const window={__tomoyoChinese:bridge,devicePixelRatio:1,addEventListener(){},requestAnimationFrame(cb){frame=cb;return 1;},
+  document:{head:{append(){}},createElement:()=>({}),querySelectorAll:()=>[win],
+   body:{classList:{contains:key=>classes.has(key),toggle:(key,on)=>on?classes.add(key):classes.delete(key)}},
+   documentElement:{style:{setProperty:(name,value)=>{props[name]=value;}}}}};
+ fit.install(window);
+ const flush=()=>{for(let i=0;i<10&&frame;i++){const run=frame;frame=null;run();}assert.equal(frame,null);};
+ bridge.galStatus({hookSource:'同じ行'});flush();
+ const compact=bridge.gameFit.state();
+ assert.ok(compact.shift<0&&compact.fit<1);
+ assert.ok(win.getBoundingClientRect().bottom<=420);
+ bridge.galLayout({...layout});flush();
+ assert.deepStrictEqual(bridge.gameFit.state(),compact,'another poll with identical client geometry keeps its fit');
+ classes.add('tome-surface-pending');
+ bridge.galLayout({clientX:0,clientY:300,clientWidth:1100,clientHeight:600});flush();
+ assert.deepStrictEqual(bridge.gameFit.state(),compact,'new native bounds do not fit the old hidden layout');
+ classes.delete('tome-surface-pending');
+ anchor=330;bridge.gameFit.schedule();flush();
+ assert.deepStrictEqual(bridge.gameFit.state(),{fit:1,shift:0,room:0});
+ assert.deepStrictEqual(win.getBoundingClientRect(),{top:330,bottom:550,height:220});
+});
+
 test('E542 fit: loaded in the reader, only for the bound dialogue window, reset by a new line',()=>{
  assert.ok(JSON.parse(read('web/reader/modules.json')).includes('game-fit'));assert.match(read('web/reader/module-list.js'),/"game-fit"/);
  const src=read('web/reader/modules/game-fit.js');
- assert.match(src,/body\.tomoyo-gal-bound\.megulit-fit-on \.sentence-window:not\(\.tome-island-page\)/);
+ assert.match(src,/body\.tomoyo-gal-bound\.megulit-fit-on'\+own\+' \.sentence-window:not\(\.tome-island-page\)/);assert.match(src,/const own=':not\(\.megulit-anchored\):not\(\.megulit-placed\)';/,'never on a line text-place.js places');
  assert.match(src,/m\.hookSource!==line\)\{line=m\.hookSource;reset\(\);/);
  assert.doesNotMatch(src,/background:/,'nothing is drawn over the game');
+});
+test('2026-11-16 (user: 不要自动调日文字体大小): the fit never scales the Japanese, only the translation',()=>{
+ const s=require('fs').readFileSync(require('path').join(__dirname,'../web/reader/modules/game-fit.js'),'utf8');
+ assert.doesNotMatch(s,/\.sentence-text\{font-size:calc\([^)]*--megulit-fit/);
+ assert.match(s,/\.tomoyo-cn-output\{font-size:calc\(var\(--tomoyo-gal-cn-size,24px\) \* var\(--megulit-fit,1\)\)/);
 });

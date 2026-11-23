@@ -67,3 +67,52 @@ test('the background lines change with an opacity/transform stagger, not a glyph
  assert(fn.length>200);assert.doesNotMatch(src,/scrambleScript|GLYPHS|noise\(/);assert.match(fn,/\.animate\(/);
  for(const prop of fn.match(/\{opacity:[^}]*\}/g))assert.match(prop,/^\{opacity:[^,}]+(,transform:'translate3d\([^)]*\)')?\}$/,prop);
 });
+
+test('the picker limits distinct story lines after filtering and preserves older saved marks',t=>{
+ const {db,root}=fixture(t),ev=db.prepare("INSERT INTO reading_events(game_id,text,read_at) VALUES('g',?,?)"),sv=db.prepare("INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES('g',?,?,'{}')");
+ sv.run('風が吹いていた。',1);sv.run('家に帰ろう。',2);sv.run('明日まで待とう。',3);
+ ev.run('風が吹いていた。',8);ev.run('今日は晴れだね。',9);
+ ev.run('今日は晴れだね。 ',10);ev.run('ゲームを終了しますか？',11);
+ assert.deepEqual(lines.list(db,root,'g',{limit:2}).lines,[
+  {text:'今日は晴れだね。',at:10000,saved:false},{text:'風が吹いていた。',at:8000,saved:true}
+ ]);
+});
+
+test('automatic home lines find the saved story or recent dialogue behind menu prompts',t=>{
+ const {db}=fixture(t),ev=db.prepare('INSERT INTO reading_events(game_id,text,read_at) VALUES(?,?,?)'),sv=db.prepare("INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES(?,?,?,'{}')");
+ ev.run('read','風が吹いていた。',1);ev.run('read','今日は晴れだね。',2);
+ ev.run('saved','新しい台詞だよ。',400);
+ sv.run('saved','古いお気に入りだね。',1);
+ for(let i=0;i<205;i++){ev.run('read','ゲームを終了しますか？',i+10);sv.run('saved','ゲームを終了しますか？'+(i?' '.repeat(i):''),i+10);}
+ assert.deepEqual(lines.auto(db,'read'),['風が吹いていた。','今日は晴れだね。']);
+ assert.deepEqual(lines.auto(db,'saved'),['古いお気に入りだね。']);
+});
+
+test('old timestamps and mixed seconds and milliseconds keep chronological order',t=>{
+ const {db,root}=fixture(t),ev=db.prepare("INSERT INTO reading_events(game_id,text,read_at) VALUES('g',?,?)"),sv=db.prepare("INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES('g',?,?,'{}')");
+ sv.run('古い台詞です。',-100);sv.run('昨日の台詞です。',-1);ev.run('昔の台詞です。',-2);
+ ev.run('今の台詞です。',1700000001);ev.run('今の台詞です。',1700000000000);
+ assert.deepEqual(lines.list(db,root,'g').lines.map(r=>r.at),[1700000001000,-1000,-2000,-100000]);
+});
+
+test('automatic selections stop at eight saved or six read lines in chronological order',t=>{
+ const {db}=fixture(t),ev=db.prepare("INSERT INTO reading_events(game_id,text,read_at) VALUES('read',?,?)"),sv=db.prepare("INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES('saved',?,?,'{}')");
+ for(let i=0;i<9;i++){ev.run('第'+i+'回の台詞です。',1600000000000+i);sv.run('第'+i+'回の台詞です。',1600000000000+i);}
+ for(const stmt of [ev,sv])stmt.run('最新の台詞ですよ。',1750000000);
+ assert.deepEqual(lines.auto(db,'read'),[4,5,6,7,8].map(i=>'第'+i+'回の台詞です。').concat('最新の台詞ですよ。'));
+ assert.deepEqual(lines.auto(db,'saved'),['最新の台詞ですよ。',...[8,7,6,5,4,3,2].map(i=>'第'+i+'回の台詞です。')]);
+});
+test('searching a displayed phrase preserves the saved mark across whitespace variants',async t=>{
+ const {db,root}=fixture(t),save=db.prepare("INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES('g',?,1,'{}')"),read=db.prepare("INSERT INTO reading_events(game_id,text,read_at) VALUES('g',?,2)");
+ save.run('空から　光が来た。');read.run('空から 光が来た。');read.run('空から強い光が来た。');
+ for(const q of ['空から 光','空から　光','空から\t光']){
+  assert.deepEqual(lines.list(db,root,'g',{query:q,limit:1}).lines,[{text:'空から 光が来た。',at:2000,saved:true}]);
+ }
+ assert.equal(lines.list(db,root,'g',{query:'空から 強い光'}).lines.length,0);
+ save.run('これは　AΣΑ と書く。');read.run('これは 違うAΣΑ と書く。');
+ assert.deepEqual(lines.list(db,root,'g',{query:'これは aΣ'}).lines.map(r=>r.text),['これは AΣΑ と書く。']);
+ save.run('空から強い風が来た。');assert.deepEqual(lines.list(db,root,'g',{query:'空から 風'}).lines,[]);
+ const {lineSearch}=await import('../web/home-lines.js');
+ const hits=lines.list(db,root,'g',{query:'これは aΣ'}).lines;
+ assert.deepEqual(lineSearch(hits,'これは　aΣ'),hits);
+});

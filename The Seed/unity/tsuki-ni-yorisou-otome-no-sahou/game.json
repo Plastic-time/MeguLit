@@ -1,0 +1,68 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "95822df7dbb17d92072c5fc4230c8204e87b26be259825568cf51ca31961f9ca",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "unity",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "5a8446df33742a81a1401494a349401a37eea8ac57e8c48743e5e881358485a7",
+  "script": "10749e9634e1ed988c5e2e30c8739e99f9b6ab087479345d7879210e0fee642c",
+  "title": "da05c00d0ca916fa4552116cb5a084c69c095f09d2f1a4bffc1b8c5b5f933ba1",
+  "steam": "1776970",
+  "vndb": "v10680"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "tsuki-ni-yorisou-otome-no-sahou",
+ "builds": [
+  "c7375fbb24e54a960d784530809e1a3f8c5f0463104b6fad60c50d4d3916a16c"
+ ],
+ "match": {
+  "exe": [
+   "Tsukiniyorisou.exe"
+  ],
+  "titles": [
+   "Tsuki ni Yorisou Otome no Sahou",
+   "月に寄りそう乙女の作法"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

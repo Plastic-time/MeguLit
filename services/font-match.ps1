@@ -18,22 +18,27 @@ public static class MeguFontMatch{
    Func<int,int,double> g=(a,b)=>{if(a<x0)a=x0;if(a>x1)a=x1;if(b<y0)b=y0;if(b>y1)b=y1;return px[b*d.Stride+a*4+1];};
    outp[y*size+x]=(byte)Math.Round(g(ix,iy)*(1-fx)*(1-fy)+g(ix+1,iy)*fx*(1-fy)+g(ix,iy+1)*(1-fx)*fy+g(ix+1,iy+1)*fx*fy);}
   return outp;}
- public static string Run(string chars,int size,byte[][] glyphs,float em){
-  var res=new List<string>();var fams=new InstalledFontCollection().Families;var seen=new HashSet<string>();
-  var list=new List<Tuple<double,string,string>>();double best=0;
+ static string Esc(string s){return s.Replace("\\","\\\\").Replace("\"","\\\"");}
+ /* files: font files that are not installed (2026-11-19: a game's own outline fonts read from its archives) join the
+    installed families as candidates; their result carries the file. GDI+ cannot open CFF (.otf) outlines: skipped. */
+ public static string Run(string chars,int size,byte[][] glyphs,float em,string[] files){
+  var fams=new List<FontFamily>(new InstalledFontCollection().Families);var fileOf=new Dictionary<FontFamily,string>();var pfc=new PrivateFontCollection();
+  if(files!=null)foreach(var f in files){try{int before=pfc.Families.Length;pfc.AddFontFile(f);var all=pfc.Families;foreach(var fam in all){bool known=false;foreach(var k in fileOf.Keys)if(k.Name==fam.Name)known=true;if(!known){fileOf[fam]=f;fams.Add(fam);}}}catch{}}
+  var list=new List<Tuple<double,string,string,string>>();double best=0;
   using(var bmp=new Bitmap((int)(em*1.6)+16,(int)(em*1.6)+16))using(var gr=Graphics.FromImage(bmp)){gr.SmoothingMode=SmoothingMode.AntiAlias;
-   foreach(var fam in fams){if(fam.Name.StartsWith("@"))continue;foreach(var st in new[]{FontStyle.Regular}){if(!fam.IsStyleAvailable(st))continue;
+   foreach(var fam in fams){if(fam.Name.StartsWith("@"))continue;string file;fileOf.TryGetValue(fam,out file);foreach(var st in new[]{FontStyle.Regular}){if(!fam.IsStyleAvailable(st))continue;
     double tot=0;int n=0;bool bad=false;
     for(int i=0;i<chars.Length&&i<glyphs.Length;i++){if(glyphs[i]==null)continue;
      gr.Clear(Color.Black);using(var path=new GraphicsPath()){path.AddString(chars[i].ToString(),fam,(int)st,em,new Point(8,4),StringFormat.GenericTypographic);gr.FillPath(Brushes.White,path);}
      var g=Norm(bmp,size);if(g==null){bad=true;break;}double diff=0;for(int k=0;k<g.Length;k++)diff+=Math.Abs(g[k]-glyphs[i][k]);tot+=1-diff/g.Length/255.0;n++;
      if((n==6&&tot/n<0.7)||(n==12&&tot/n<best-0.04)){bad=true;break;}}
-    if(!bad&&n>0){list.Add(Tuple.Create(tot/n,fam.Name,st.ToString()));if(tot/n>best)best=tot/n;}}}}
+    if(!bad&&n>0){list.Add(Tuple.Create(tot/n,fam.Name,st.ToString(),file));if(tot/n>best)best=tot/n;}}}}
   list.Sort((a,b)=>b.Item1.CompareTo(a.Item1));
-  var sb=new System.Text.StringBuilder("[");for(int i=0;i<list.Count&&i<8;i++){if(i>0)sb.Append(',');sb.Append("{\"family\":\""+list[i].Item2.Replace("\\","\\\\").Replace("\"","\\\"")+"\",\"style\":\""+list[i].Item3+"\",\"score\":"+list[i].Item1.ToString("0.0000",System.Globalization.CultureInfo.InvariantCulture)+"}");}
+  var sb=new System.Text.StringBuilder("[");for(int i=0;i<list.Count&&i<8;i++){if(i>0)sb.Append(',');sb.Append("{\"family\":\""+Esc(list[i].Item2)+"\",\"style\":\""+list[i].Item3+"\",\"score\":"+list[i].Item1.ToString("0.0000",System.Globalization.CultureInfo.InvariantCulture)+(list[i].Item4!=null?",\"file\":\""+Esc(list[i].Item4)+"\"":"")+"}");}
   return sb.Append("]").ToString();}}
 '@
 $job=Get-Content -LiteralPath $In -Raw -Encoding UTF8|ConvertFrom-Json
 $glyphs=[byte[][]]@($job.glyphs|ForEach-Object{if($_){,[Convert]::FromBase64String($_)}else{,$null}})
-$json=[MeguFontMatch]::Run([string]$job.chars,[int]$job.size,$glyphs,[float]$(if($job.em){$job.em}else{64}))
+$files=[string[]]@($job.files|Where-Object{$_})
+$json=[MeguFontMatch]::Run([string]$job.chars,[int]$job.size,$glyphs,[float]$(if($job.em){$job.em}else{64}),$files)
 [IO.File]::WriteAllText($Out,$json,(New-Object Text.UTF8Encoding($false)))

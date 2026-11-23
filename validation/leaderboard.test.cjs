@@ -205,8 +205,7 @@ test('E394 个人主页: leaderboard fields leave 联网服务, search lands on 
  const layout=await import(pathToFileURL(path.join(__dirname,'..','web','settings-layout.js')).href);
  const fields=[{scope:'online',key:'leaderboardEnabled'},{scope:'online',key:'leaderboardName'},{scope:'online',key:'leaderboardShareGames'},{scope:'online',key:'relayUrl'}];
  assert.deepEqual(layout.visibleFields('online',fields).map(f=>f.key),['relayUrl']);
- /* E404 个人主页 is a panel now, not a settings page */
- assert.ok(!layout.navigation.some(c=>c.ids.includes('personal')),'no 个人主页 page in the settings nav');
+ assert.ok(layout.navigation.some(c=>c.ids.includes('personal')),'the settings nav opens the shared profile panel');
  const search=await import('data:text/javascript;base64,'+fs.readFileSync(path.join(__dirname,'..','web','settings-search.js')).toString('base64'));
  const entries=search.globalSearchEntries({fields:fields.map(f=>({...f,label:{zh:f.key==='leaderboardName'?'排行榜昵称':f.key,en:f.key}}))},{});
  assert.equal(entries.find(e=>e.key==='leaderboardName').scope,'personal');assert.equal(entries.find(e=>e.key==='relayUrl').scope,'online');
@@ -305,7 +304,7 @@ test('E404 the 我的主页 chip shows on every tab and opens the panel; signed 
  const follow=view.leaderboardHTML({...base,joined:true,account:true,name:'めぐみん',tab:'follow',self:{avatar:null},social:{state:'ok',following:[],kindred:[],avatars:{}}},'ja',esc);
  assert.match(chip(follow),/マイページ/);assert.match(chip(follow),/めぐみん/);
  const board=view.leaderboardHTML({...base,joined:true,account:true,name:'A',tab:'board',board:{state:'ok',entries:[{rank:3,name:'A',value:9,me:true}],me:{rank:3,value:9}}},'en',esc);
- assert.match(chip(board),/My profile/);assert.doesNotMatch(chip(board),/#3/,'E419 no rank on the chip');assert.match(chip(board),/data-lb-me/);
+ assert.match(chip(board),/My profile/);assert.doesNotMatch(chip(board),/#3/,'E419 no rank on the chip');assert.match(chip(board),/data-lb-me/);assert.match(chip(board),/<span class="lb-mychip-value">[^<]+<\/span>/,'the value has its own class: .lb-mychip>span also hit the default avatar');assert.doesNotMatch(chip(guest),/lb-mychip-value/,'signed out: no value, so the avatar span is the only span');
  for(const html of [guest,follow,board])assert.equal((chip(html).match(/<small>/g)||[]).length,1,'same two-line chip in every state');
  const settings=fs.readFileSync(path.join(__dirname,'..','web','settings.js'),'utf8');assert.match(settings,/section==='personal'\)\{openProfilePanel/);assert.doesNotMatch(settings,/mountProfileSettings/);
  const panel=fs.readFileSync(path.join(__dirname,'..','web','profile-panel.js'),'utf8');assert.match(panel,/mountEmailLogin/);assert.match(panel,/onSignedOut:\(\)=>paint\(\)/);

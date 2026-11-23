@@ -85,6 +85,7 @@ static void GlResolve() {
  Hook<802>(get("glBufferSubData", NULL), HBufferSubData); Hook<802>(get("glBufferSubDataARB", NULL), HBufferSubData);
  Hook<803>(get("glMapBuffer", NULL), HMapBuffer); Hook<803>(get("glMapBufferARB", NULL), HMapBuffer); Hook<804>(get("glMapBufferRange", NULL), HMapBufferRange);
  Hook<805>(get("glUnmapBuffer", NULL), HUnmapBuffer); Hook<805>(get("glUnmapBufferARB", NULL), HUnmapBuffer);
+ Apply();
  Log("gl resolved: program api=%d buffers hooked=%d", GlGetActiveAttrib != NULL, (int)Hooked[801].size() + (int)Hooked[802].size() + (int)Hooked[805].size());
 }
 static GlProg ProgOf(GLuint p) {
@@ -177,8 +178,8 @@ static int InstallGL(HMODULE gl) {
  *(FARPROC *)&pglGetIntegerv = GetProcAddress(gl, "glGetIntegerv"); *(FARPROC *)&pglIsEnabled = GetProcAddress(gl, "glIsEnabled"); *(FARPROC *)&pglGetPointerv = GetProcAddress(gl, "glGetPointerv");
  *(FARPROC *)&pglGetFloatv = GetProcAddress(gl, "glGetFloatv"); *(FARPROC *)&pglGetTexLevelParameteriv = GetProcAddress(gl, "glGetTexLevelParameteriv");
  if (!pglGetIntegerv || !pglIsEnabled || !pglGetPointerv || !pglGetFloatv || !pglGetTexLevelParameteriv) return 0;
- int n = 0; auto h = [&](HMODULE m, const char *name, void *hook, void **orig) { void *t = m ? (void *)GetProcAddress(m, name) : NULL; if (t && MH_CreateHook(t, hook, orig) == MH_OK && MH_EnableHook(t) == MH_OK) n++; };
+ int n = 0; auto h = [&](HMODULE m, const char *name, void *hook, void **orig) { void *t = m ? (void *)GetProcAddress(m, name) : NULL; if (t && MH_CreateHook(t, hook, orig) == MH_OK && MH_QueueEnableHook(t) == MH_OK) n++; };
  h(gl, "glDrawArrays", (void *)HglDrawArrays, (void **)&OglDrawArrays); h(gl, "glDrawElements", (void *)HglDrawElements, (void **)&OglDrawElements);
  h(GetModuleHandleW(L"gdi32.dll"), "SwapBuffers", (void *)HSwapBuffers, (void **)&OSwapBuffers);
- return n;
+ return Apply() ? n : 0;
 }

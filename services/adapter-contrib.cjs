@@ -47,8 +47,11 @@ const isBeta=v=>/^\d+\.\d+\.\d+-beta\.\d+$/i.test(String(v||'').replace(/^v/,'')
    ask: the update card should show the consent text (public build, nothing decided yet)
    notice: the beta note has not been shown yet (the beta default stays off until it has) */
 function consentState(root,{version=appVersion(root)}={}){
- const lib=readJSON(libFile(root)),beta=isBeta(version),decided=typeof lib.adapterContrib==='boolean',noticed=Number(lib.adapterContribNoticeAt)>0;
- return {enabled:decided?lib.adapterContrib:beta&&noticed,decided,beta,ask:!decided&&!beta,notice:!decided&&beta&&!noticed};}
+ const f=libFile(root);let lib=readJSON(f);const beta=isBeta(version);
+ /* 2026-11-16: a beta player who saw the note (switch on) has agreed; record it once so a public build never asks again */
+ if(typeof lib.adapterContrib!=='boolean'&&Number(lib.adapterContribNoticeAt)>0){lib={...lib,adapterContrib:true,adapterContribAt:Date.now(),adapterContribSource:'beta-notice'};try{atomic(f,lib);}catch{}}
+ const decided=typeof lib.adapterContrib==='boolean',noticed=Number(lib.adapterContribNoticeAt)>0;
+ return {enabled:decided?lib.adapterContrib:false,decided,beta,ask:!decided&&!beta,notice:!decided&&beta&&!noticed};}
 const enabled=(root,o)=>consentState(root,o).enabled;
 /* the player's decision (the update card or Settings). Turning it off also deletes whatever is waiting locally. */
 function setConsent(root,on,{source='settings'}={}){const f=libFile(root);atomic(f,{...readJSON(f),adapterContrib:on===true,adapterContribAt:Date.now(),adapterContribSource:String(source).slice(0,20)});
