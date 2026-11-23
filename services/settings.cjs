@@ -3,6 +3,7 @@
 const fs=require('node:fs'),path=require('node:path');
 const {fields,groups}=require('./settings-schema.cjs');
 const gameStyle=require('../core/game-style.js');
+const profileTools=require('../core/game-profile.js');
 const {cleanV4}=require('../core/v4-config.cjs');
 const {cleanPreferences}=require('../core/preferences.cjs');
 const {readJSON}=require('./store.cjs');
@@ -39,8 +40,11 @@ class Settings{
     const session=readJSON(this.file('gal-preferences.json')),modern=Object.hasOwn(preset,'japaneseSize')||Object.hasOwn(preset,'translationSize');
     const global=gameStyle.clean({...(Object.keys(session||{}).length?gameStyle.clean(session):{}),...preset,...(modern?{layoutVersion:22}:{})});/* the session file alone takes the one-time spacing move (core/game-style.js), never the preset typed here */
     const entry=profile?readJSON(this.file('game-style-profiles.json')).entries?.[profile]:null;
-    /* Older settings pages could save the global renderer into a game profile. */
-    return entry?gameStyle.clean({...global,...entry.prefs,textRenderer:global.textRenderer}):global;
+    if(!entry?.prefs)return global;
+    /* a work starts from the built-in sizes and the preset (GameStyleSync.base), never the last session: its page shows those, so a
+       save of the whole form for another field does not turn a session size into this work's own */
+    const work=require('../core/text-defaults.cjs').workBase(this.folder);
+    return gameStyle.clean({...global,...Object.fromEntries(profileTools.sizeKeys.map(k=>[k,work[k]])),sizeSource:work.sizeSource||'',...profileTools.normalize(entry).prefs,textRenderer:global.textRenderer});
   }
   if(v4Scopes.has(scope))return cleanV4(readJSON(this.file('v4-preferences.json')));
   if(nativeScopes.has(scope))return {...nativeDefaults,...readJSON(this.file('native-preferences.json'))};
@@ -64,6 +68,13 @@ class Settings{
   const providers={};for(const option of fields.find(field=>field.scope==='translation'&&field.key==='provider').options){const provider=option.value,base=resolveOptions({provider});providers[provider]={models:require('../core/engines.cjs').modelsFor(provider),defaultBaseUrl:base.baseUrl||'',defaultModel:base.model||'',baseUrl:base.baseUrl||'',model:base.model||(provider==='gpt'?'gpt-4.1-mini':''),editable:provider==='gpt'||ENGINES[provider]?.editable===true,keyless:provider==='google'||ENGINES[provider]?.keyless===true,...translationProfiles[provider]};}
   return {groups,fields:availableFields,values,providers,profile,profiles:Object.entries(entries).filter(([key])=>/^[a-f0-9]{64}$/.test(key)).map(([key,entry])=>({id:key,name:String(entry.name||key.slice(0,12)),savedAt:entry.savedAt||0})),hasSavedKeys:fs.existsSync(this.file('secrets.dpapi'))};
  }
+ /* Issues 119 / 800: a text size changed in Settings reaches the running work too; it stops holding sizes of its own and follows
+    Settings from now on (copying the sizes in kept them frozen in that work after the next change). */
+ releaseSizes(profile,keys=profileTools.sizeKeys){const file=this.file('game-style-profiles.json'),document=readJSON(file),entry=document.entries?.[profile];if(!entry?.prefs)return false;
+  /* an old entry is read as one first: its copied 34 / 30 go together, the size not changed here is not left behind as the work's own */
+  const prefs={...profileTools.normalize(entry).prefs};let hit=false;for(const key of keys)if(key in prefs){delete prefs[key];hit=true;}
+  if(!profileTools.sizeKeys.some(key=>key in prefs)&&'sizeSource' in prefs){delete prefs.sizeSource;hit=true;}
+  if(!hit&&entry.sizes===1)return false;document.entries[profile]={...entry,prefs,sizes:1};atomic(file,document);return true;}
  save({scope,values,profile='',appendFolders=false}){
   if(!groups.some(group=>group.id===scope))throw Error('SETTINGS_SCOPE_INVALID');
   if(profile&&(!/^[a-f0-9]{64}$/.test(profile)||!readJSON(this.file('game-style-profiles.json')).entries?.[profile]))throw Error('SETTINGS_PROFILE_INVALID');
@@ -88,8 +99,8 @@ class Settings{
     if(profile){
       if(!/^[a-f0-9]{64}$/.test(profile))throw Error('SETTINGS_PROFILE_INVALID');
       const document=readJSON(this.file('game-style-profiles.json'));const entry=document.entries?.[profile];if(!entry)throw Error('SETTINGS_PROFILE_INVALID');
-      const saved={...entry.prefs};for(const key of written)saved[key]=cleaned[key];const now=Date.now();
-      document.entries[profile]={...entry,prefs:saved,savedAt:now,textSavedAt:scope==='position'?entry.textSavedAt:now,positionSavedAt:scope==='position'?now:entry.positionSavedAt,history:[{id:String(now),savedAt:now,prefs:saved,positionMap:entry.positionMap||null},...(entry.history||[])].slice(0,7)};document.version=3;atomic(this.file('game-style-profiles.json'),document);
+      const work=require('../core/text-defaults.cjs').workBase(this.folder),own=profileTools.normalize(entry)?.prefs||{},saved=profileTools.ownSizes({...own,...Object.fromEntries(written.map(key=>[key,cleaned[key]]))},work,own);const now=Date.now();
+      document.entries[profile]={...entry,prefs:saved,sizes:1,savedAt:now,textSavedAt:scope==='position'?entry.textSavedAt:now,positionSavedAt:scope==='position'?now:entry.positionSavedAt,history:[{id:String(now),savedAt:now,prefs:saved,positionMap:entry.positionMap||null},...(entry.history||[])].slice(0,7)};document.version=3;atomic(this.file('game-style-profiles.json'),document);
     }else if(scope==='text'){
       const presets=require('../core/text-defaults.cjs'),keys=written,style=Object.fromEntries(keys.filter(presets.isTextKey).map(k=>[k,cleaned[k]])),rest=Object.fromEntries(keys.filter(k=>!presets.isTextKey(k)).map(k=>[k,cleaned[k]]));
       if(Object.keys(style).length)presets.write(this.folder,style);if(Object.keys(rest).length)atomic(this.file('gal-preferences.json'),{...readJSON(this.file('gal-preferences.json')),...rest});
