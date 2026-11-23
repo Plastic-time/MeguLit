@@ -1,10 +1,8 @@
 'use strict';
 const fs=require('node:fs');
 const {kana}=require('./furigana.js');
-const {parseNumber,readNumber,counterReading}=require('./counter-reading.cjs');
+const {numberTokens}=require('./counter-reading.cjs');
 const hasKanji=s=>/[\p{Script=Han}々〆]/u.test(s||'');
-/* A numeral token (数詞, or plain digits from a tokenizer without part of speech) whose value is a whole number. */
-const numeral=t=>(Array.isArray(t.grammar)?t.grammar[1]==='数詞':/^[0-9０-９,，]+$/.test(t.surface))&&parseNumber(t.surface)!==null;
 /* Readings consumers may show: settled by the dictionary or read from a number and its counter, not the tokenizer's guess. */
 const settled=t=>t?.readingSource==='dictionary'||t?.readingSource==='number';
 function pronunciation(s){return kana(s).replace(/([おこそとのほもよろごぞどぼぽょ])(?:う|お)/g,'$1ー').replace(/([うくすつぬふむゆるぐずづぶぷゅ])う/g,'$1ー').replace(/([いきしちにひみりぎじぢびぴ])い/g,'$1ー').replace(/[びぴ]/g,'ひ').replace(/[ぶぷ]/g,'ふ');}
@@ -30,6 +28,8 @@ function createReadingResolver(file=require('node:path').join(require('./paths.c
   }
   function resolve(tokens){
     load();if(!Array.isArray(tokens)||tokens.length>4000)return [];
+    // Usually done by LocalLearning.tokenize already; tokens from the UniDic engine come here directly.
+    tokens=numberTokens(tokens);
     const result=[];
     for(let i=0;i<tokens.length;i++){
       const token=tokens[i];if(!token||typeof token.surface!=='string')continue;
@@ -43,13 +43,8 @@ function createReadingResolver(file=require('node:path').join(require('./paths.c
           const reading=choose(merged,pron,true);if(reading){best={surface:merged,reading};stop=j;}
         }
       }
-      // Number + counter (10分 じゅっぷん) unless a longer dictionary word starts here (一日中 いちにちじゅう).
-      const next=tokens[i+1],counted=numeral(token)&&typeof next?.surface==='string'&&!(best&&stop>i+1)?counterReading(surface,next.surface):'';
-      if(counted){const {subtokens,...rest}=token;void subtokens;const word=surface+next.surface;
-        result.push({...rest,surface:word,reading:counted,base_form:word,normalized:word,end:Number.isInteger(next.end)?next.end:token.end,pitch:[],lexeme:null,reading_ambiguous:false,readingSource:'number'});i++;continue;}
       if(best){result.push({...token,...best,readingSource:'dictionary'});i=stop;continue;}
-      // SudachiDict reads digits one by one (10 イチレイ).
-      if(numeral(token)){result.push({...token,reading:readNumber(parseNumber(surface)),pitch:[],lexeme:null,readingSource:'number'});continue;}
+      if(token.readingSource==='number'){result.push(token);continue;}
       if(!hasKanji(surface)){result.push(token);continue;}
       let reading=choose(surface,expected);
       if(!reading&&typeof token.base_form==='string'){

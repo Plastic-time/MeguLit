@@ -8,7 +8,15 @@ function plainKana(s){let out='';for(const ch of katakana(s).replace(/[^ァ-ヴ�
 function vowel(ch){if(!ch)return '';const rows={ア:'アカサタナハマヤラワガザダバパァャ',イ:'イキシチニヒミリギジヂビピィ',ウ:'ウクスツヌフムユルグズヅブプゥュッ',エ:'エケセテネヘメレゲゼデベペェ',オ:'オコソトノホモヨロヲゴゾドボポォョ'};for(const [v,set]of Object.entries(rows))if(set.includes(ch))return v;return '';}
 function sameReading(phrases,reading){const engine=(phrases||[]).flatMap(p=>[...(p.moras||[]),...(p.pause_mora?[p.pause_mora]:[])]).map(m=>m.text||'').join('');return plainKana(engine)===plainKana(reading);}
 function accentKana(reading,accent){const m=morae(reading);if(!m.length||!Number.isInteger(accent)||accent<0||accent>m.length)throw Error('UniDic 音调无法可靠对应当前词，请选择确定的读音');m.splice(accent===0?m.length:accent,0,"'");return m.join('');}
-function clipKey(word,c,auto,accent){return createHash('sha256').update(JSON.stringify([c.aivisUrl,c.aivisSpeaker,c.aivisSpeed,word.surface,word.reading,auto?'auto':accent,word.ambiguous?'engine-reading':'','unidic-lite-1.0.8-v2',...(word.tuning?[word.tuning]:[])])).digest('hex');}
+/* Our reading in AquesTalk kana with the engine's own phrases and accents, when they have as many morae (the engine read
+   10分 ジップン', ours is じゅっぷん → ジュップン'). Kana sent as ordinary text is parsed again and split oddly (ジュ'ッ/プ'ン),
+   so that stays the last resort. '' when the morae do not line up. */
+function engineAccentKana(phrases,reading){
+ const ours=morae(reading),list=Array.isArray(phrases)?phrases:[];if(!ours.length||!list.length)return '';
+ if(list.reduce((n,p)=>n+(p.moras?.length||0),0)!==ours.length)return '';
+ let k=0;return list.map((p,i)=>{const n=p.moras.length,part=ours.slice(k,k+n);k+=n;const a=Number.isInteger(p.accent)&&p.accent>=1&&p.accent<=n?p.accent:n;part.splice(a,0,"'");return part.join('')+(i<list.length-1?(p.pause_mora?'、':'/'):'');}).join('');
+}
+function clipKey(word,c,auto,accent){return createHash('sha256').update(JSON.stringify([c.aivisUrl,c.aivisSpeaker,c.aivisSpeed,word.surface,word.reading,auto?'auto':accent,word.ambiguous?'engine-reading':'','unidic-lite-1.0.8-v3',...(word.tuning?[word.tuning]:[])])).digest('hex');}
 class Speech{
  constructor(folder,fetcher=fetch){this.folder=path.join(folder,'audio-cache');this.fetch=fetcher;this.pending=new Map();this.chain=Promise.resolve();this.latestPrefetch='';this.explicit=new Set();}
  async api(base,route,options={}){const r=await this.fetch(base+route,{...options,redirect:'error',signal:AbortSignal.timeout(45000)});if(!r.ok)throw Error('AivisSpeech 请求失败：HTTP '+r.status);return r;}
@@ -31,7 +39,9 @@ class Speech{
    // AivisSpeech uses kana as ordinary text, not AquesTalk. Explicit phrases
    // determine the reading and accent; do not assign AquesTalk to query.kana.
    if(!auto)query.accent_phrases=await(await this.api(c.aivisUrl,'/accent_phrases?'+new URLSearchParams({text:pron,speaker,is_kana:'true'}),{method:'POST'})).json();
-   else if(word.reading&&!word.ambiguous&&!sameReading(query.accent_phrases,word.reading)){const byKana=await(await this.api(c.aivisUrl,'/audio_query?'+new URLSearchParams({text:katakana(word.reading),speaker}),{method:'POST'})).json();query.accent_phrases=byKana.accent_phrases;}
+   else if(word.reading&&!word.ambiguous&&!sameReading(query.accent_phrases,word.reading)){const aligned=engineAccentKana(query.accent_phrases,word.reading);
+    if(aligned)query.accent_phrases=await(await this.api(c.aivisUrl,'/accent_phrases?'+new URLSearchParams({text:aligned,speaker,is_kana:'true'}),{method:'POST'})).json();
+    else{const byKana=await(await this.api(c.aivisUrl,'/audio_query?'+new URLSearchParams({text:katakana(word.reading),speaker}),{method:'POST'})).json();query.accent_phrases=byKana.accent_phrases;}}
    query.kana=word.surface||word.reading;query.speedScale=c.aivisSpeed;
    /* 学习模块的发音调校（抑扬、前后留白）；朗读和制卡不传，保持原样 */
    if(word.tuning){const t=word.tuning;if(Number.isFinite(t.intonation))query.intonationScale=t.intonation;if(Number.isFinite(t.pre))query.prePhonemeLength=t.pre;if(Number.isFinite(t.post))query.postPhonemeLength=t.post;}
@@ -39,4 +49,4 @@ class Speech{
  }
  prune(){const files=fs.readdirSync(this.folder).filter(n=>/^[a-f0-9]{64}\.wav$/.test(n)).map(n=>({n,time:fs.statSync(path.join(this.folder,n)).mtimeMs})).sort((a,b)=>b.time-a.time);for(const f of files.slice(300))fs.unlinkSync(path.join(this.folder,f.n));}
 }
-module.exports={Speech,accentKana,morae,sameReading,clipKey};
+module.exports={Speech,accentKana,engineAccentKana,morae,sameReading,clipKey};

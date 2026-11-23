@@ -116,4 +116,27 @@ function counterReading(numberText, counter) {
   return head + tail + rule.base;
 }
 
-module.exports = { parseNumber, readNumber, counterReading, COUNTERS };
+/* Tokens with numbers read by value and a number + counter joined into one word (readingSource 'number'), so furigana,
+   the speech button and cards share one reading. The pieces stay as subtokens for dictionary lookup; the UniDic accent of
+   the pieces does not fit the word, so speech estimates it. A numeral is a 数詞 token, or plain digits without part of
+   speech. Tokens already read here pass through unchanged. */
+const isNumeral = t => typeof t?.surface === 'string' && (Array.isArray(t.grammar) ? t.grammar[1] === '数詞' : /^[0-9０-９,，]+$/.test(t.surface)) && parseNumber(t.surface) !== null;
+function numberTokens(tokens) {
+  if (!Array.isArray(tokens)) return tokens;
+  const out = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i], next = tokens[i + 1];
+    if (!isNumeral(token) || token.readingSource === 'number') { out.push(token); continue; }
+    const joined = typeof next?.surface === 'string' && (!Number.isInteger(token.end) || token.end === next.start) ? counterReading(token.surface, next.surface) : '';
+    if (joined) {
+      const word = token.surface + next.surface;
+      out.push({ ...token, surface: word, reading: joined, base_form: word, normalized: word, end: Number.isInteger(next.end) ? next.end : token.end,
+        pitch: [], lexeme: null, reading_ambiguous: false, subtokens: [token, next], readingSource: 'number' });
+      i++; continue;
+    }
+    out.push({ ...token, reading: readNumber(parseNumber(token.surface)), pitch: [], lexeme: null, readingSource: 'number' });
+  }
+  return out;
+}
+
+module.exports = { parseNumber, readNumber, counterReading, numberTokens, COUNTERS };

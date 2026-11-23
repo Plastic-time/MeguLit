@@ -67,3 +67,45 @@ test('example sentences and the daily page show the number reading',()=>{
  assert.deepEqual(exampleSpans(text,out,[]).map(s=>[s.start,s.end,s.reading]),[[2,4,'さんぼん']]);
  assert.match(fs.readFileSync(path.join(__dirname,'..','services','daily.cjs'),'utf8'),/settled\(t\)\?String\(t\.reading/);
 });
+
+/* 2026-11-23 (user: the speech button said something else than the furigana): furigana, the speech button and lookup all read
+   LocalLearning.tokenize(). The worker is stubbed with the SudachiDict Full tokens of these lines; JMdict entries are real. */
+const {LocalLearning}=require('../core/learning-native.cjs');
+const {engineAccentKana}=require('../core/speech.cjs');
+const LINES={
+ 'あと10分だけ':[tok('あと','アト','名詞,普通名詞,副詞可能',0,2),tok('10','イチレイ',NUM,2,4),tok('分','フン',COUNT,4,5),tok('だけ','ダケ','助詞,副助詞,*',5,7)],
+ '3本のペン':[tok('3','サン',NUM,0,1),tok('本','ポン','接尾辞,名詞的,助数詞',1,2),tok('の','ノ','助詞,格助詞,*',2,3),tok('ペン','ペン','名詞,普通名詞,一般',3,5)],
+ '私は行く':[{...tok('私','ワタクシ','代名詞,*,*',0,1),pitch:[0]},tok('は','ワ','助詞,係助詞,*',1,2),tok('行く','イク','動詞,非自立可能,*',2,4)],
+};
+const ENTRIES=[{id:1,spellings:['分'],readings:['ふん','ぶん','ぶ'],pos:['noun (common) (futsuumeishi)'],definitions:['minute']},{id:2,spellings:['分だけ'],readings:['ぶんだけ'],pos:['noun (common) (futsuumeishi)'],definitions:['to the extent']},
+ {id:3,spellings:['本'],readings:['ほん'],pos:['noun (common) (futsuumeishi)'],definitions:['book']},{id:4,spellings:['本の'],readings:['ほんの'],pos:['noun (common) (futsuumeishi)'],definitions:['mere']},{id:5,spellings:['私'],readings:['わたし','わたくし'],pos:['noun (common) (futsuumeishi)'],definitions:['I']}];
+function stubbed(){
+ const L=new LocalLearning(path.join(os.tmpdir(),'megulit-counter-learning'));L.ready=async()=>{};
+ L.worker={stdin:{write(line){const {id,text}=JSON.parse(line);const p=L.pending.get(id);clearTimeout(p.timer);L.pending.delete(id);p.resolve(JSON.parse(JSON.stringify(LINES[text])));}}};
+ L.load=function(){if(this.index)return;this.index=new Map();this.byId=new Map();this.english=new Map();for(const e of ENTRIES){this.byId.set(e.id,e);for(const k of [...e.spellings,...e.readings]){const ids=this.index.get(k)||[];ids.push(e.id);this.index.set(k,ids);}}};
+ return L;
+}
+
+test('the counter is read with its number before JMdict joins it with the next word (分だけ, 本の)',async()=>{
+ const L=stubbed();
+ assert.deepEqual((await L.tokenize('あと10分だけ')).map(t=>[t.surface,t.reading]),[['あと','アト'],['10分','じゅっぷん'],['だけ','ダケ']]);
+ assert.deepEqual((await L.tokenize('3本のペン')).map(t=>[t.surface,t.reading]),[['3本','さんぼん'],['の','ノ'],['ペン','ペン']]);
+});
+
+test('the speech button says what the furigana shows',async()=>{
+ const L=stubbed();
+ const piece=await L.word({text:'あと10分だけ',start:4,end:5});
+ assert.deepEqual(piece.spoken,{surface:'10分',reading:'じゅっぷん',pitch:[],ambiguous:false},'a click on 分 says the whole number word');
+ assert.equal(piece.surface,'分','the card keeps the selected word');
+ const me=await L.word({text:'私は行く',start:0,end:1});
+ assert.equal(me.reading,'わたし');assert.deepEqual(me.pitch,[],'the accent of わたくし is not spoken for わたし');
+ assert.match(fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8'),/synthesize\(word\.spoken\?\{\.\.\.word,\.\.\.word\.spoken\}:word/);
+});
+
+test('our reading keeps the engine phrases and accents when the morae line up',()=>{
+ // AivisSpeech 1.2.0 reads 10分 as ジップン' (accent 4): sending ジュップン as plain text came back as ジュ'ッ/プ'ン.
+ const phrase=(text,accent,pause=false)=>({moras:require('../core/speech.cjs').morae(text).map(m=>({text:m})),accent,...(pause?{pause_mora:{text:'、'}}:{})});
+ assert.equal(engineAccentKana([phrase('ジップン',4)],'じゅっぷん'),"ジュップン'");
+ assert.equal(engineAccentKana([phrase('コレハ',1,true),phrase('ジップン',4)],'これはじゅっぷん'),"コ'レハ、ジュップン'");
+ assert.equal(engineAccentKana([phrase('ジップン',4)],'さんじゅっぷん'),'','different mora counts leave it to the old fallback');
+});
