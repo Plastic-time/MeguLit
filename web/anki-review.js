@@ -131,7 +131,7 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
   landing.innerHTML='<h2>'+esc(t.title)+'</h2><p class="muted">'+esc(t.text)+'</p><ol class="anki-install-tips">'+t.tips.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol><div class="anki-install-bar" hidden><i></i></div><p class="muted u-status" data-install-state hidden></p><div class="review-controls"><button class="primary" data-install-go>'+esc(t.go)+'</button></div>';
   const go=landing.querySelector('[data-install-go]'),bar=landing.querySelector('.anki-install-bar'),fill=bar.querySelector('i'),line=landing.querySelector('[data-install-state]');
   const paint=r=>{bar.hidden=false;line.hidden=false;const pct=r.total?Math.min(100,Math.round(r.received/r.total*100)):0;fill.style.width=(r.phase==='downloading'?pct:100)+'%';
-   line.textContent=r.phase==='downloading'?t.downloading+' · '+pct+'% · '+(r.received/1048576).toFixed(0)+' / '+(r.total/1048576).toFixed(0)+' MB':r.phase==='installing'?t.installing:r.phase==='connecting'?t.connecting:r.phase==='done'?t.done:r.phase==='error'?(/CANCELLED/.test(r.error)?t.cancelled:t.failed+'（'+r.error+'）'):'';
+   line.textContent=r.phase==='downloading'?t.downloading+' · '+pct+'% · '+(r.received/1048576).toFixed(0)+' / '+(r.total/1048576).toFixed(0)+' MB':r.phase==='installing'?t.installing:r.phase==='connecting'?t.connecting:r.phase==='done'?t.done:r.phase==='error'?(/CANCELLED/.test(r.error)?t.cancelled:r.error==='ANKI_OFFLINE'?reason(r.error):t.failed+'（'+r.error+'）'):'';
     };
   go.onclick=async()=>{go.disabled=true;go.hidden=true;try{paint(await api('anki_install'));}catch(error){go.disabled=false;go.hidden=false;toast(reason(error));
    return;}

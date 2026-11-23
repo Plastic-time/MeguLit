@@ -35,7 +35,7 @@ function start(root,{runtime=null,fetcher=fetch,find=()=>require('./anki-process
    if(!find())throw Error('ANKI_EXECUTABLE_MISSING');
    await require('./anki-process.cjs').installAnkiConnect(process.env,{locate:find,fresh:true}).then(r=>log(root,'ankiconnect '+(r.already?'already there':'installed'))).catch(e=>log(root,'ankiconnect '+e.message));
    if(china){process.env.UV_DEFAULT_INDEX??='https://pypi.tuna.tsinghua.edu.cn/simple';process.env.UV_INDEX_URL??='https://pypi.tuna.tsinghua.edu.cn/simple';}
-   if(runtime?.ankiProcess)await runtime.ankiProcess().start({hide:false}).catch(e=>log(root,'start '+e.message));
+   if(runtime?.ankiProcess)await runtime.ankiProcess().start({hide:false});
    state.phase='done';log(root,'done');
   }catch(e){state.phase='error';state.error=String(e.message||e).slice(0,120);log(root,'error '+state.error);}finally{job=null;}})();
  return status();
