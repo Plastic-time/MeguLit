@@ -93,7 +93,12 @@
    };
   const holdSurface = () => { document.body?.classList.add('tome-surface-pending'); clearTimeout(surfaceTimer); surfaceTimer = setTimeout(() => { releaseSurface();
    placeLayers(); apply(); }, 600); };
-  const releaseSurface = () => { clearTimeout(surfaceTimer); surfaceTimer = 0; document.body?.classList.remove('tome-surface-pending'); };
+  const releaseSurface = () => { clearTimeout(surfaceTimer); surfaceTimer = 0;
+    if (document.body?.classList.contains('tome-surface-pending')) {
+      document.body.classList.remove('tome-surface-pending');
+      bridge.gameFit?.schedule();
+    }
+  };
   addEventListener('resize', () => { if (!layoutInfo) return; if (surfaceMismatch(layoutInfo)) holdSurface(); else if (document.body?.classList.contains('tome-surface-pending')) {
    releaseSurface(); placeLayers(); apply(); } });
   const style = document.createElement('style');
