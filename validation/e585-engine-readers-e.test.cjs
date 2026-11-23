@@ -72,6 +72,29 @@ test('the Ikura probe reports a missing script key and keeps the scene sample',t
  assert.ok(samples.some(s=>s.name==='s001.isf'&&s.role==='script:ikura'));
 });
 
+test('Ikura GDL finds the matching embedded table for SECRETFILTER scripts',t=>{
+ const dir=tmp(t),executable=path.join(dir,'game.exe');
+ const alphabet='G5FXIL094MPRKWCJ3OEBVA7HQ2SU8Y6TZ1ND';
+ const table=Buffer.alloc(0x800,0x47);
+ table.write('10',0x500);
+ table[0]=0x35; // Add 1 to the first position in block 0.
+ table[16]=0x46; // Add 2 to the same position in block 1.
+ const image=key=>Buffer.concat([Buffer.from('MZ\0'),key,Buffer.alloc(4),Buffer.from(alphabet+'\0')]);
+ const wrong=Buffer.from(table);
+ wrong[4]=0x35; // This changes the first ISF version byte.
+ const plain=isfOf(F.sjis,IJA,{version:0x9795});
+ assert.ok(plain.length>32&&plain.length<1024);
+ const encrypted=plain.map((byte,i)=>byte^(i%16?0x47:i===0?0x35:0x58));
+ F.writeTree(dir,{ISF:F.mpx({'s001.isf':Buffer.concat([encrypted,Buffer.from('SECRETFILTER100a')])}),
+  'decoy.exe':image(wrong),'game.exe':image(table)});
+ const result=require('../services/adapter-probe-core.cjs').probeGame({dir,executable,title:'Fixture'});
+ assert.equal(result.step,'ok');
+ assert.equal(result.detected,'ikura');
+ assert.equal(result.japaneseLines,3);
+ assert.deepEqual(scenes.read('ikura',dir)[0].lines,IJA);
+ assert.equal(scenes.unsupportedReason(dir),null);
+});
+
 /* ---- ExHIBIT -------------------------------------------------------------------------------------------------- */
 const rldOf=(enc,L,o)=>F.rld([F.rldSay('記述',L[0],enc),F.rldSay('ひなた',L[1],enc),{op:0x0c,ints:[],strs:[enc('1 第一章')]},F.rldChoice([L[2],L[3]],enc),F.rldSay('*',L[4],enc)],{...o,enc});
 const RJA=['「おはよう」\n朝の光。','《漢字:かんじ》を読む。','教室へ行く','屋上へ行く','ありがとう。'],RZH=['“早上好”\n晨光。','读《汉字:かんじ》。','去教室','去屋顶','谢谢。'];
