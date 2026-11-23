@@ -12,13 +12,13 @@ function setup(t,{gameRunning}){
  const exe=path.join(root,'game.exe'),pe=Buffer.alloc(0x100);pe.write('MZ',0,'latin1');pe.writeUInt32LE(0x80,60);pe.writeUInt32LE(0x4550,0x80);pe.writeUInt16LE(0x14c,0x84);fs.writeFileSync(exe,pe);
  const saved={start:readiness.startProcess,wait:readiness.waitForVisibleGame,early:dots.earlyLocale,font:paths.fontDot};
  t.after(()=>{readiness.startProcess=saved.start;readiness.waitForVisibleGame=saved.wait;dots.earlyLocale=saved.early;paths.fontDot=saved.font;});
- const started=[];let waits=0;
- readiness.startProcess=async file=>{started.push(path.basename(file));return {pid:100+started.length,exit:null};};
+ const started=[],commands=[];let waits=0;
+ readiness.startProcess=async (file,args)=>{started.push(path.basename(file));commands.push(args);return {pid:100+started.length,exit:null};};
  readiness.waitForVisibleGame=async()=>{if(waits++===0)throw Error('GAME_WINDOW_NOT_READY');return {pid:7};};
- dots.earlyLocale=()=>({file:path.join(root,'MeguLitLaunch32.exe'),args:[],env:{}});paths.fontDot=()=>null;
+ dots.earlyLocale=(_root,_dir,target,_env,args)=>({file:path.join(root,'MeguLitLaunch32.exe'),args:[target,...args],env:{}});paths.fontDot=()=>null;
  const le=new LocaleEmulator(root);le.status=async()=>({installed:true,dir:root,path:path.join(root,'LEProc.exe'),profile:'ja'});
  le.processes=async()=>gameRunning?[{pid:7,visible:false}]:[];
- return {le,exe,started};
+ return {le,exe,started,commands};
 }
 
 test('a game whose window is slow after the early launcher is not started a second time',async t=>{
@@ -26,8 +26,9 @@ test('a game whose window is slow after the early launcher is not started a seco
  await assert.rejects(le.launch(exe),/GAME_WINDOW_NOT_READY/);
  assert.deepEqual(started,['MeguLitLaunch32.exe']);
 });
-test('a launcher that started no game still falls back to LEProc',async t=>{
- const {le,exe,started}=setup(t,{gameRunning:false});
- const r=await le.launch(exe);
+test('a launcher that started no game still falls back to LEProc with the original arguments',async t=>{
+ const {le,exe,started,commands}=setup(t,{gameRunning:false}),args=['-language=jp','-wheel=message'];
+ const r=await le.launch(exe,{args});
  assert.deepEqual(started,['MeguLitLaunch32.exe','LEProc.exe']);assert.equal(r.gamePid,7);
+ assert.deepEqual(commands,[[exe,...args],['-runas','ja',exe,...args]]);
 });

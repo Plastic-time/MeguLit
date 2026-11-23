@@ -11,7 +11,7 @@
 //  - the foreground is classified once per tick; "no foreground window" (an activation in flight) is never a fact of its
 //    own: the last known front is kept (for at most HoldMs)
 //  - the game and MeguLit's own layer in front are the same context: handing the keyboard between them moves nothing
-//  - only a foreign program in front (or the game minimised) takes the layer out of the topmost band
+//  - a foreign program in front takes the layer out of the topmost band, keeping it visible directly above the game
 //  - the screen probes (wait marker, text-window and scene compare, game UI) are believed only after the game has been
 //    in front, with no menu and no word card, for SettleMs without a break (Settled()); a click or key is a fact and is
 //    reported at once
@@ -57,9 +57,9 @@ internal static class ReaderLayerPolicy {
         }else{NoneSince=-1;Anchor=front;}
         State s=new State();s.Front=Anchor;
         bool game=Anchor==Game,own=Anchor==OwnLayer,home=Anchor==OwnHome;
-        s.Pinned=menu&&menuReady&&(game||own||home);
-        s.Float=!gameIconic&&(game||own||s.Pinned);
-        s.Context=game||own||home&&homeCounts||s.Pinned;
+        s.Pinned=menu&&menuReady&&(game||own);
+        s.Float=!gameIconic&&(game||own);
+        s.Context=!gameIconic&&(game||own||home&&(homeCounts||menu&&menuReady)||Anchor==Foreign);
         return s;
     }
 
@@ -147,10 +147,10 @@ internal static class ReaderLayerPolicy {
                     if(!s.Float||!s.Context)return "random run "+run+" step "+step+": front "+front+" menu "+menu+" float "+s.Float+" context "+s.Context;
                 }
             }
-            /* 3. a foreign program in front sinks the layer at once, also with the menu open; back on the game it floats again */
+            /* 3. a foreign program in front takes precedence, but the layer stays visible over the game */
             Reset();Decide(Game,false,false,false,false,0);
             State foreign=Decide(Foreign,true,true,false,false,16);
-            if(foreign.Float||foreign.Context)return "foreign program in front: layer kept floating or shown";
+            if(foreign.Float||!foreign.Context)return "foreign program in front: layer floated or lost visibility";
             if(!Decide(Game,false,false,false,false,32).Float)return "back on the game: layer not floating";
             /* 4. the game minimised never floats; no foreground for longer than HoldMs counts as foreign */
             if(Decide(Game,false,false,false,true,48).Float)return "minimised game: layer floating";
@@ -158,19 +158,24 @@ internal static class ReaderLayerPolicy {
             if(!Decide(None,false,false,false,false,500).Float)return "no foreground for 0.5 s: layer sunk";
             Decide(None,false,false,false,false,600);
             if(Decide(None,false,false,false,false,1600).Float)return "no foreground for over 1 s: layer still floating";
-            /* 4b. #468: a screenshot surface over the game keeps the layer floating and shown for any time; a normal
-                   program after it still hides it; a screenshot surface while another program was in front shows nothing */
+            /* 4b. #468: a screenshot surface preserves visibility and the last z-order policy indefinitely */
             Reset();Decide(Game,false,false,false,false,0);
             for(long ct=16;ct<60000;ct+=997){State c=Decide(Capture,false,false,false,false,ct);if(!c.Float||!c.Context)return "screenshot surface in front: layer sunk or hidden at "+ct+" ms";}
-            if(Decide(Foreign,false,false,false,false,60100).Context)return "normal program after a screenshot: layer still shown";
-            if(Decide(Capture,false,false,false,false,60200).Context)return "screenshot over another program: layer shown";
+            State left=Decide(Foreign,false,false,false,false,60100);
+            State shot=Decide(Capture,false,false,false,false,60200);
+            if(left.Float||!left.Context||shot.Float||!shot.Context)return "background game under a screenshot: wrong visibility or z-order";
             if(!CaptureSurface(true,false,true,false)||CaptureSurface(false,false,true,false)||CaptureSurface(true,true,true,false)||CaptureSurface(true,false,false,false)||CaptureSurface(true,false,true,true))return "capture surface rule";
             if(Classify(true,false,false,false,false,true)!=Capture||Classify(true,false,false,false,false,false)!=Foreign||Classify(true,true,false,false,false,true)!=Game)return "classify capture";
-            /* 5. another MeguLit window in front: shown only where the main window hosts the layer, pinned by an open menu */
+            /* 5. Dragging MeguLit's main window in front of the game always takes precedence over the reading layer. */
             Reset();
             if(Decide(OwnHome,false,false,false,false,0).Context)return "MeguLit window in front without hosting: layer shown";
             if(!Decide(OwnHome,false,false,true,false,16).Context||Decide(OwnHome,false,false,true,false,16).Float)return "hosting MeguLit window in front: wrong";
-            if(!Decide(OwnHome,true,true,false,false,32).Float)return "menu open under a MeguLit window: not pinned";
+            if(!Decide(Game,true,true,true,false,24).Float)return "menu over foreground game: layer not raised";
+            foreach(int foreground in new[]{OwnHome,None,OwnHome}){
+                State duringDrag=Decide(foreground,true,true,true,false,32);
+                if(duringDrag.Float||duringDrag.Pinned||!duringDrag.Context)return "open menu covered the foreground MeguLit window";
+            }
+            if(!Decide(Game,true,true,true,false,64).Pinned)return "menu did not return above the foreground game";
             /* 6. probes: silent through every menu / focus change and for SettleMs after the game is back */
             Unsettle();
             if(Settled(true,0)||Settled(true,699))return "probes believed before the settle time";
@@ -216,9 +221,7 @@ internal static class ReaderLayerPolicy {
                     Raise(z,true);if(z.BelowGame())return "random focus run "+run+" step "+step+": second pass lost the place";
                 }
             }
-            /* 8. recorded 2026-11-19 16:57 (layerRaise how:failed on every return): while the game holds the foreground the
-                  system ignores every z-order request for the layer. Leaving by hiding keeps the layer in the topmost
-                  band, so the return needs no request at all; leaving by sinking (the code before) ends under the game. */
+            /* 8. Hiding is reserved for the minimised/hidden game; another app in front must see its own window above the overlay. */
             if(SinkOnLeave(false)||!SinkOnLeave(true))return "leave rule";
             {
                 var z=new ModelZ{LayerTopmost=true,RefuseAll=true};
@@ -230,7 +233,7 @@ internal static class ReaderLayerPolicy {
                 before.ForceWorks=true;if(Raise(before,true)!="attached"||before.BelowGame())return "last step not taken";
             }
             for(int run=0;run<2000;run++){
-                var z=new ModelZ{LayerTopmost=true,RefuseAll=true};Reset();t=0;Decide(Game,false,false,false,false,t);
+                var z=new ModelZ{LayerTopmost=true,RefuseTopmost=random.Next(2)==0};Reset();t=0;Decide(Game,false,false,false,false,t);
                 for(int step=0;step<40;step++){
                     t+=random.Next(16,9000);int roll=random.Next(6);bool minimised=random.Next(7)==0;
                     int front=roll<3?Game:roll<5?Foreign:OwnLayer;
@@ -238,8 +241,10 @@ internal static class ReaderLayerPolicy {
                     State s=Decide(front,false,false,false,minimised,t);bool shown=s.Context&&!minimised;
                     if(!s.Float&&SinkOnLeave(shown))z.Sink();
                     if(shown)z.Show();else z.Hide();
-                    if(shown&&s.Float&&z.BelowGame())return "random leave/return run "+run+" step "+step+": layer under the game, every request refused";
-                    if(shown!=(front!=Foreign&&!minimised))return "random leave/return run "+run+" step "+step+": shown "+shown+" with front "+front;
+                    if(shown&&s.Float){Raise(z,true);if(z.BelowGame())return "random leave/return: layer under the game";}
+                    if(shown&&front==Foreign&&(z.LayerTopmost||z.BelowGame()||z.Order.IndexOf('L')<z.Order.IndexOf('O')))
+                        return "background overlay must be between the foreign window and the game";
+                    if(shown==minimised)return "foreground switch changed visibility independently of minimisation";
                 }
             }
             if(Classify(false,true,true,true,true)!=None||Classify(true,true,false,true,true)!=OwnLayer||Classify(true,false,true,false,true)!=Game||Classify(true,false,false,false,true)!=OwnHome||Classify(true,false,false,false,false)!=Foreign)return "classify";

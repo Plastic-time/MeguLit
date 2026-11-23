@@ -10,7 +10,8 @@ test('relay survives a failed write; the hook is reinstalled when it goes quiet'
  assert.match(s,/foreach\(var item in events\.GetConsumingEnumerable\(\)\)\{try\{emit\(item\);\}catch\(System\.IO\.IOException\)\{\}/);
  assert.match(s,/new Thread\(Guard\)\{IsBackground=true,Name="Reader mouse hook guard"\}\.Start\(\);/);
  assert.match(s,/internal const uint StaleMs=2000;/);
- assert.match(s,/if\(message\.Id!=Reinstall\)continue;\r?\n\s*UnhookWindowsHookEx\(hook\);hook=SetWindowsHookEx\(14,callback,GetModuleHandle\(null\),0\);/);
+ assert.match(s,/var replacement=SetWindowsHookEx\(14,callback,GetModuleHandle\(null\),0\);[\s\S]+?if\(replacement!=IntPtr\.Zero\)\{UnhookWindowsHookEx\(hook\);hook=replacement;\}/);
+ assert.match(s,/hookThread!=0&&inputChanged&&Stale\(lastHook,now,now\)/,'idle after a healthy movement does not reinstall the hook');
  assert.match(s,/IntPtr Filter\(int code,IntPtr message,ref Mouse mouse\)\{\r?\n\s*lastHook=GetTickCount\(\);/,'every hook callback counts as alive');
  assert.match(s,/if\(!Stale\(1000,3500,3600\)\|\|Stale\(4000,3500,4100\)\|\|Stale\(1000,1500,2900\)\|\|Stale\(1000,3500,9000\)\)return false;/,'decision covered by the bridge self-test');
 });

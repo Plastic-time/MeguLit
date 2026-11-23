@@ -87,6 +87,9 @@
   body:not(.tomoyo-ui-translation) .tome-menu-bg{display:none}
   /* The backlog and the lookup card use the same layer as the Alt+T menu, each with its own values. */
   body.tomoyo-ui-translation .tome-backlog,body.tomoyo-ui-translation .tomoyo-selection-card{background:transparent!important;isolation:isolate}
+  /* Keep the lookup background in the scroll viewport on the compositor. A scroll listener
+     that moves it after scrolling leaves frames where the background travels with the content. */
+  .tomoyo-selection-card>.tome-menu-bg{position:sticky;inset:0 auto auto 0;height:var(--tome-card-viewport-height,0px);margin-bottom:calc(-1 * var(--tome-card-viewport-height,0px))}
   /* The backlog fades its children in with an animation that fills forwards, which pinned this layer at opacity 1: the
      log's own panel opacity (26%) showed fully opaque (user, 2026-11-03). The layer keeps its opacity setting instead. */
   .tome-backlog>.tome-menu-bg{animation:none!important}
@@ -325,18 +328,26 @@
   panel.dataset.glassPending='';panel.style.visibility='hidden';setTimeout(()=>revealLookupGlass(panel),350);}
  function revealLookupGlass(panel){if(!panel.hasAttribute('data-glass-pending'))return;panel.removeAttribute('data-glass-pending');panel.style.visibility='';cardEntrance(panel);
   window.__tomoyoHitRegionsRefresh?.(true);}
- function cardEntrance(panel){if(matchMedia('(prefers-reduced-motion: reduce)').matches||!panel.animate)return;try{panel.animate([{translate:'0 8px',scale:'.97',
-  filter:'opacity(0)'},{translate:'0 0',scale:'1',filter:'opacity(1)'}],{duration:180,easing:'cubic-bezier(.2,.8,.2,1)'});}catch{}}
+ function cardEntrance(panel){if(panel.__tomeMoved||matchMedia('(prefers-reduced-motion: reduce)').matches||!panel.animate)return;try{panel.__tomeEntrance=panel.animate([
+  {filter:'opacity(0)'},{filter:'opacity(1)'}],{duration:180,easing:'cubic-bezier(.2,.8,.2,1)'});}catch{}}
  // Backlog panel and lookup card are appended to body: give each the same background layer as soon as it appears.
  const panels=()=>{for(const n of document.querySelectorAll('body>.tome-backlog,body>.tomoyo-selection-card'))if(!n.querySelector(':scope>.tome-menu-bg')){const l=document.createElement('div');
-  l.className='tome-menu-bg';l.setAttribute('aria-hidden','true');l.append(document.createElement('b'),document.createElement('i'));n.prepend(l);/* #115 (user: scrolling the lookup card down left it with no background): the layer is absolute inside a scrolling panel, so it follows the scroll offset */const follow=()=>{
-  l.style.transform=n.scrollTop?'translateY('+n.scrollTop+'px)':'';};n.addEventListener('scroll',follow,{passive:true});follow();warmLookupGlass(n);}};
+  l.className='tome-menu-bg';l.setAttribute('aria-hidden','true');l.append(document.createElement('b'),document.createElement('i'));n.prepend(l);
+  if(n.matches('.tomoyo-selection-card')){
+   const fit=()=>{const height=n.clientHeight+'px';if(l.style.getPropertyValue('--tome-card-viewport-height')!==height)l.style.setProperty('--tome-card-viewport-height',height);};
+   const size=new ResizeObserver(fit);size.observe(n);fit();
+   warmLookupGlass(n);
+  }else{
+   const follow=()=>{l.style.transform=n.scrollTop?'translateY('+n.scrollTop+'px)':'';};
+   n.addEventListener('scroll',follow,{passive:true});follow();
+  }
+ }};
  // Glass panels (user, 2026-11-03): the menu can be dragged anywhere on the desktop, so the bridge puts a live
  // Windows-blurred window under each glass panel; a captured game frame (E87/E95) showed the game even over the desktop.
  // Reported every animation frame while one is open (dragging and the open/close animations move it by transform).
  let glassKey='',glassFrame=0;const glassHeld=new WeakMap();
  /* during a drag or resize the panel list cannot change: kept instead of a selector query every frame and every picture */
- let glassLive=null;const glassPanels=()=>glassLive&&glassLive.every(l=>l.isConnected&&l.parentElement?.matches('.tomoyo-menu-resizing,.tome-menu-dragging'))?glassLive:(glassLive=null,glassQuery());
+ let glassLive=null;const glassPanels=()=>glassLive&&glassLive.every(l=>l.isConnected&&l.parentElement?.matches('.tomoyo-menu-resizing,.tome-menu-dragging,[data-lookup-drag]'))?glassLive:(glassLive=null,glassQuery());
  const glassQuery=()=>[...document.querySelectorAll('.tomoyo-cn-dialog[open]>.tome-menu-bg,.tomoyo-cn-dialog[data-leaving]>.tome-menu-bg,.tome-backlog[data-open]>.tome-menu-bg,.tome-backlog[data-leaving]>.tome-menu-bg,body>.tomoyo-selection-card>.tome-menu-bg')].filter(l=>{
   const k=l.parentElement.matches('.tomoyo-cn-dialog')?'menu':l.parentElement.matches('.tome-backlog')?'log':'card';return ['glass','both'].includes(document.documentElement.dataset['tome'+k[0].toUpperCase()+k.slice(1)+'Surface']);
   });
@@ -355,7 +366,7 @@
       its magnifier read each time (and read the whole screen while live): the drag fell to 20-40 ms frames. The drag
       keeps the read where it was and the picture rides along with the panel's transform; a resize reads, once, as far as
       the screen edge on the sides being dragged, so a growing panel never shows an empty band. One full update on release. */
-   const live=p.matches('.tomoyo-menu-resizing,.tome-menu-dragging');if(live&&glassHeld.has(p))return glassHeld.get(p);if(!live)glassHeld.delete(p);
+   const live=p.matches('.tomoyo-menu-resizing,.tome-menu-dragging,[data-lookup-drag]');if(live&&glassHeld.has(p))return glassHeld.get(p);if(!live)glassHeld.delete(p);
    const r=p.getBoundingClientRect(),v=gcfg.panels[p.matches('.tomoyo-cn-dialog')?'menu':p.matches('.tome-backlog')?'log':'card'],fw=Math.max(r.width,
    p.offsetWidth||0)+96,fh=Math.max(r.height,p.offsetHeight||0)+96,cx=(r.left+r.right)/2,cy=(r.top+r.bottom)/2,op=Math.max(0,Math.min(1,parseFloat(getComputedStyle(p).opacity)));
    const edge=live?String(p.dataset.tomeResizeEdge||''):'';let fl=cx-fw/2,ft=cy-fh/2,fr=cx+fw/2,fb=cy+fh/2;
@@ -365,7 +376,7 @@
    blur:Math.round((Number(v.glassBlur)||0)*scale),dim:Number(v.glassDim)||0,saturate:Number.isFinite(Number(v.glassSaturate))?Number(v.glassSaturate):100};if(live)glassHeld.set(p,rect);return rect;}).filter(r=>r.width>2&&r.height>2).slice(0,
    16);
   const radius=rects[0]?.radius||0,key=JSON.stringify(rects);
-  if(!glassLive&&list.some(p=>p.matches('.tomoyo-menu-resizing,.tome-menu-dragging')))glassLive=list.map(p=>p.querySelector(':scope>.tome-menu-bg')).filter(Boolean);
+  if(!glassLive&&list.some(p=>p.matches('.tomoyo-menu-resizing,.tome-menu-dragging,[data-lookup-drag]')))glassLive=list.map(p=>p.querySelector(':scope>.tome-menu-bg')).filter(Boolean);
   if(key!==glassKey){glassKey=key;try{window.__tomoyoTranslateRequest(JSON.stringify({type:'galGlass',rects,radius}));}catch{}}
   placeGlass(list);
   if(rects.length&&!glassFrame)glassFrame=requestAnimationFrame(()=>{glassFrame=0;glassReport();});};
@@ -377,7 +388,7 @@
  // Lines the picture up with the screen behind each glass panel. The layer sits 40 px outside the panel's unscaled box
  // (the open animation scales the panel around its centre, and the picture with it).
  function placeGlass(list){const scale=Number(devicePixelRatio)||1;for(const p of list){const layer=p.querySelector(':scope>.tome-menu-bg>b');if(!layer)continue;
-   if(p.matches('.tome-menu-dragging')&&glassArea&&layer.style.backgroundImage)continue; /* dragged: the picture moves with the panel's transform */
+   if(p.matches('.tome-menu-dragging,[data-lookup-drag]')&&glassArea&&layer.style.backgroundImage)continue; /* dragged: the picture moves with the panel's transform */
    if(!glassArea){if(layer.style.backgroundImage)layer.style.backgroundImage='';continue;}
    const r=p.getBoundingClientRect(),w=p.offsetWidth||r.width,h=p.offsetHeight||r.height,left=(r.left+r.right)/2-w/2-40,top=(r.top+r.bottom)/2-h/2-40;
    const size=(glassArea.w/scale)+'px '+(glassArea.h/scale)+'px',pos=(glassArea.x/scale-left)+'px '+(glassArea.y/scale-top)+'px';
