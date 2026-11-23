@@ -17,6 +17,7 @@ function resources(policy,{platform=process.platform,freemem=os.freemem,statfs=f
   if(!Number.isFinite(ram)||ram<4*1024**3)return false;
   // The collector inherits TEMP, TMP, and cwd from stateRoot. The reader writes under appRoot.
   const destinations=[policy.stateRoot,policy.appRoot];
+  if(policy.captureRoot!==undefined)destinations.push(policy.captureRoot);
   // The isolated-game collector creates its disposable sibling tree on the pinned game's volume.
   const args=policy.collector?.args;
   if(args?.[0]==='--isolated-game'){

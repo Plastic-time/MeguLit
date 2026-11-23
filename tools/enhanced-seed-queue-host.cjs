@@ -109,7 +109,7 @@ async function guardedTick(cfg,policy,work){
   } finally { releaseLock(); }
 }
 
-function createCollector({samples,policy,signProfile,reviewer,runHost=Runner.runHost}){
+function createCollector({samples,policy,signProfile,reviewer,requestFile,runHost=Runner.runHost}){
  return async(c,{baseline,signal})=>{
    const matches=samples.filter(s=>protocol.identity(s.identity)&&s.identity.exe===c.key&&(!c.script||s.identity.script===c.script)&&(!c.engine||s.identity.engine===c.engine));
    if(matches.length!==1)return null;
@@ -119,6 +119,11 @@ function createCollector({samples,policy,signProfile,reviewer,runHost=Runner.run
    protocol.profileShape({...doc,signature:{alg:'ed25519',keyId:'shape',value:'A'.repeat(86)+'=='}},identity);
    const profile=await signProfile(doc);
    const request={schema:'megulit.cardinal-trusted-request',version:1,exe,identity,candidate:profile,baseline,torchNo:c.torchNo};
+   if(requestFile){
+     signal?.throwIfAborted();
+     if(!protocol.same(diff.unsigned(profile),doc)||!await protocol.verify(profile,policy.profileKeys))throw Error('HOST_PROFILE_SIGNATURE');
+     Runner.atomic(requestFile,request);
+   }
    const result=await runHost(request,policy,{signal,signing:reviewer});
    return result.state==='reviewed'?{profile,review:result.review}:null;
  };
@@ -148,7 +153,9 @@ async function main(args){
  const service=args[1]==='--service';
  const configFile=service?args[0]:args[1];
  if(!configFile||!path.isAbsolute(configFile))throw Error('HOST_CONFIGURATION');
- const cfg=Runner.readJSON(configFile),{policy,samples}=cfg;
+ const cfg=Runner.readJSON(configFile),{samples}=cfg;
+ if(typeof cfg.policy==='string'&&!path.isAbsolute(cfg.policy))throw Error('HOST_CONFIGURATION');
+ const policy=typeof cfg.policy==='string'?Runner.readJSON(cfg.policy):cfg.policy;
  const base=baseURL(service?cfg.base:args[0]);
  if(!Array.isArray(samples)||samples.length>4096||!policy||(samples.length&&!policy.collector?.file))throw Error('HOST_CONFIGURATION');
  if(service){
@@ -170,7 +177,7 @@ async function main(args){
  const signing=cfg.publisher?{...cfg.publisher,keys}:{keys,store:process.env.ENHANCED_KEY_STORE,id:process.env.ENHANCED_PUBLISHER_ID,vault:process.env.ENHANCED_VAULT};
  const sign=publisherSigner(signing),signProfile=publisherSigner({...signing,scope:'profile'});
  const reviewer=cfg.reviewer||(signing.store?{store:signing.store,vault:signing.vault,id:process.env.ENHANCED_REVIEWER_ID}:undefined);
- const collect=samples.length?createCollector({samples,policy,signProfile,reviewer}):null;
+ const collect=samples.length?createCollector({samples,policy,signProfile,reviewer,requestFile:path.join(policy.stateRoot,'current-request.json')}):null;
  if(collect&&(!path.isAbsolute(policy.collector.file)||fs.statSync(policy.collector.file).size>64*1024**2||
     crypto.createHash('sha256').update(fs.readFileSync(policy.collector.file)).digest('hex')!==policy.collector.sha256))throw Error('COLLECTOR_CONFIGURATION');
  const stop=new AbortController(),abort=()=>stop.abort();

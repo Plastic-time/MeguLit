@@ -67,8 +67,9 @@ test('report to durable claim, pause, signed review, scan, release and client ch
  let signedCount=0;
  const hostOptions={base:'https://fixture.invalid',token:env.ENHANCED_HOST_TOKEN,keys:f.keys,
    fetcher:(url,options)=>handle(new Request(url,options),env,time),
-   collect:createCollector({samples:[{identity:f.identity,exe:'game.exe'}],policy:f.keys,
+   collect:createCollector({samples:[{identity:f.identity,exe:'game.exe'}],policy:f.keys,requestFile:path.join(root,'current-request.json'),
      signProfile:p=>f.publisher.sign(p),runHost:async(request,policy,{signal})=>{
+       assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,'current-request.json'),'utf8')),request);
        assert.deepEqual(request.baseline,release);assert.equal(signal.aborted,false);
        assert.equal(request.exe,'game.exe');assert.equal(request.candidate.source,'auto');
        return {state:'reviewed',review:await f.review(request.candidate,request.baseline,{mean:.97,torchNo:request.torchNo})};
