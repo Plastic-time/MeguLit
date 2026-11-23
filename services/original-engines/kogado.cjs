@@ -97,7 +97,7 @@ function parse(buf){const b=Buffer.isBuffer(buf)?buf:Buffer.from(buf),magic=b.to
  const header=magic==='SR01'?0x28:magic==='SKTR'||magic==='SK20'?0x34:0;
  if(header&&b.length>=header+12){const at=b.readUInt32LE(header),size=b.readUInt32LE(header+4),n=b.readUInt32LE(header+8);
   if(at+size<=b.length&&n<0x100000){const strs=[];let p=at;for(let i=0;i<n&&p+2<=at+size;i++){const len=b.readUInt16LE(p);if(len<2||p+len>at+size)break;let e=p+len;while(e>p+2&&b[e-1]===0)e--;strs.push(b.subarray(p+2,e));p+=len;}
-   if(strs.length){const text=kit.decodeText(Buffer.concat(strs.flatMap(s=>[s,Buffer.from('\n')])));return {lines:text.split('\n').filter(t=>/[^\x00-\x7f]/.test(t)),anchors:[]};}}}
+   if(strs.length){const text=magic==='SK20'?strs.map(s=>s.toString('utf8')).join('\n'):kit.decodeText(Buffer.concat(strs.flatMap(s=>[s,Buffer.from('\n')])));return {lines:text.split('\n').filter(t=>/[^\x00-\x7f]/.test(t)),anchors:[]};}}}
  return {lines:kit.decodeRuns(b),anchors:[]};}
 const engine={id:'kogado',hint:'Script.pak（HyPack）',scenes,archives:scenes,sources:archives,parse,test:n=>/\.kgo$/i.test(n),_internal:{list,mariel,read}};
 module.exports={engine,list,mariel,parse};

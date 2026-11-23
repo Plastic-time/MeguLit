@@ -40,13 +40,48 @@ test('HyPack Cocotte reads consecutive range blocks, resets the model after a st
  assert.strictEqual(probe.detected,'kogado');
  assert.strictEqual(probe.japaneseLines,3);
 });
-test('HyPack remaster reads the UTF-8 SK20 string table',()=>{
+test('HyPack remaster reads SK20 entries as UTF-8 even when a neighboring entry is malformed',()=>{
  const lines=['雨下得越来越大了。','我们先去车站避雨吧。'];
- const raw=sr01(lines);
+ const raw=sr01([...lines,'bad glyph']);
  raw.write('SK20');
  raw.copy(raw,0x34,0x28,0x34);
  raw.fill(0,0x28,0x34);
- assert.deepStrictEqual(kogado.parse(raw).lines,lines);
+ raw[raw.indexOf('bad glyph')]=0xff;
+ assert.deepStrictEqual(kogado.parse(raw).lines,[...lines,'�ad glyph']);
+});
+test('HyPack Cocotte rejects malformed blocks and oversized entries before reading them',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hyp-cocotte-invalid-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const block=bytes=>Buffer.concat([u16(bytes.length+4),u16(1),Buffer.from(bytes)]);
+ const valid=block([0,0,0]);
+ const entries=[
+  {name:'badRow',unpacked:1,stored:block([1,1,0])},
+  {name:'shortHeader',unpacked:1,stored:Buffer.concat([valid,Buffer.from([0])])},
+  {name:'shortRange',unpacked:1,stored:block([0])},
+  {name:'tooLarge',unpacked:64*1024*1024+1,stored:valid},
+ ];
+ fs.writeFileSync(path.join(dir,'Script.pak'),hypack(entries.map(e=>({...e,ext:'kgo',type:2}))));
+ const alloc=Buffer.alloc;
+ t.mock.method(Buffer,'alloc',(size,...args)=>{
+  assert.ok(size<=64*1024*1024,'Refuse the entry before allocating its output');
+  return alloc(size,...args);
+ });
+ const list=kogado.engine.scenes(dir);
+ assert.strictEqual(list.length,entries.length);
+ for(const s of list)assert.throws(()=>s.read(),{code:'HYPACK_COCOTTE'},s.name);
+});
+test('HyPack with no readable Cocotte scripts retains the probe error and Kogado identity',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hyp-cocotte-failed-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ fs.writeFileSync(path.join(dir,'Script.pak'),hypack([
+  {name:'bad',ext:'kgo',type:2,unpacked:1,stored:Buffer.from([0])},
+  {name:'resource',ext:'bin',type:0,unpacked:4096,stored:Buffer.alloc(4096)},
+ ]));
+ const result=core.probeGame({dir,executable:'',title:'Fixture'});
+ assert.strictEqual(result.step,'parse-failed');
+ assert.strictEqual(result.detail,'kogado:HYPACK_COCOTTE');
+ assert.deepStrictEqual(result.unsupported,{engine:'kogado',code:'HYPACK_COCOTTE'});
+ assert.strictEqual(require('../services/probe-identity.cjs').engineOf(result),'kogado');
 });
 test('AdvHD v2 ARC (UTF-16 names): Rio.arc .ws2 messages and names',()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ws2-'));const rot=b=>Buffer.from(b.map(x=>((x<<2)|(x>>>6))&255));
