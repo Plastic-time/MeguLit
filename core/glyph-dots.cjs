@@ -51,8 +51,8 @@ function earlyStart(root, exe, args, x86, baseEnv = process.env) {
 /* 日文环境: the launcher creates the game through Locale Emulator's LoaderDll (ja-JP, cp932), still suspended. LoaderDll
    finds LocaleEmulator.dll beside the process that calls it, so a copy of MeguLitLaunch32.exe is kept in the LE folder
    (refreshed when the shipped one changes). Returns null when off or when the copy cannot be placed (LEProc is used). */
-function earlyLocale(root, leDir, exe, baseEnv = process.env) {
-  const start = earlyStart(root, exe, [], true, baseEnv);
+function earlyLocale(root, leDir, exe, baseEnv = process.env, args = []) {
+  const start = earlyStart(root, exe, args, true, baseEnv);
   if (!start || !leDir) return null;
   try {
     const copy = path.join(leDir, 'MeguLitLaunch32.exe'), a = fs.statSync(start.file);

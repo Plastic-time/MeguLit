@@ -30,14 +30,29 @@ internal sealed class ReaderPointerGate {
     [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
     [DllImport("kernel32.dll")] static extern uint GetTickCount();
 
+    static bool Contains(GalWindowBridge.Rect rect,int x,int y){return x>=rect.Left&&x<rect.Right&&y>=rect.Top&&y<rect.Bottom;}
+
+    internal sealed class LookupGrip {
+        readonly GalWindowBridge.Rect area;
+        readonly GalWindowBridge.Rect[] controls;
+        internal LookupGrip(GalWindowBridge.Rect area,GalWindowBridge.Rect[] controls){this.area=area;this.controls=controls;}
+        internal bool Hit(int x,int y){
+            if(!Contains(area,x,y))return false;
+            foreach(var control in controls)if(Contains(control,x,y))return false;
+            return true;
+        }
+    }
+
     internal sealed class Context {
         internal readonly IntPtr Overlay,Game;
         internal readonly GalWindowBridge.Rect Client;
         internal readonly bool Lookup;
         internal readonly GalWindowBridge.Rect[] Hits,Menus,LookupPanels;
-        internal Context(IntPtr overlay,IntPtr game,GalWindowBridge.Rect client,bool lookup,GalWindowBridge.Rect[] hits,GalWindowBridge.Rect[] menus=null,GalWindowBridge.Rect[] lookupPanels=null){
+        internal readonly LookupGrip Grip;
+        internal Context(IntPtr overlay,IntPtr game,GalWindowBridge.Rect client,bool lookup,GalWindowBridge.Rect[] hits,GalWindowBridge.Rect[] menus=null,GalWindowBridge.Rect[] lookupPanels=null,LookupGrip grip=null){
             Overlay=overlay;Game=game;Client=client;Lookup=lookup;Hits=hits;Menus=menus??new GalWindowBridge.Rect[0];
             LookupPanels=lookupPanels??new GalWindowBridge.Rect[0];
+            Grip=grip;
         }
         internal bool InMenu(int x,int y){foreach(var rect in Menus)if(Contains(rect,x,y))return true;return false;}
         // Keep Alt+T's native slider and resize gestures. The lookup card also sits over polling games.
@@ -50,7 +65,6 @@ internal sealed class ReaderPointerGate {
             foreach(var rect in Hits)if(Contains(rect,x,y))return true;
             return false;
         }
-        static bool Contains(GalWindowBridge.Rect rect,int x,int y){return x>=rect.Left&&x<rect.Right&&y>=rect.Top&&y<rect.Bottom;}
     }
 
     internal volatile Context Current;
@@ -69,12 +83,13 @@ internal sealed class ReaderPointerGate {
     sealed class Gesture {
         internal Context Owner;
         internal int Button=-1;
-        internal bool Accept(int down,int up,bool move,Context initial){
+        internal bool DragLookup;
+        internal bool Accept(int down,int up,bool move,Context initial,bool dragLookup=false){
             if(Owner!=null)return up==Button||move;
             if(down<0||initial==null)return false;
-            Owner=initial;Button=down;return true;
+            Owner=initial;Button=down;DragLookup=down==0&&dragLookup;return true;
         }
-        internal void End(){Owner=null;Button=-1;}
+        internal void End(){Owner=null;Button=-1;DragLookup=false;}
     }
     readonly Gesture gesture=new Gesture();
     uint lastMove;
@@ -149,8 +164,8 @@ internal sealed class ReaderPointerGate {
         return (GetAsyncKeyState(0x12)<0?1:0)|(GetAsyncKeyState(0x11)<0?2:0)|(GetAsyncKeyState(0x10)<0?8:0);
     }
 
-    static bool NeedsWheelHitTest(bool inPanel,bool overOverlay,bool overGame,bool gameActive){
-        return overOverlay||inPanel&&overGame&&gameActive;
+    static bool NeedsWheelHitTest(bool lookupOpen,bool inPanel,bool overOverlay,bool overGame,bool gameActive){
+        return overOverlay||overGame&&gameActive&&(lookupOpen||inPanel);
     }
 
     bool RouteWheel(int message,Mouse mouse){
@@ -162,7 +177,9 @@ internal sealed class ReaderPointerGate {
         var under=GetAncestor(WindowFromPoint(mouse.Position),2);
         var foreground=GetAncestor(GetForegroundWindow(),2);
         bool active=context.Game!=IntPtr.Zero&&(foreground==context.Game||foreground==context.Overlay);
-        if(!NeedsWheelHitTest(context.InMenu(point.X,point.Y),under==context.Overlay,under==context.Game,active))return false;
+        // The card can move before the native window region catches up. Resolve against the live card in that gap.
+        bool lookupOpen=context.Lookup||context.LookupPanels.Length>0;
+        if(!NeedsWheelHitTest(lookupOpen,context.InMenu(point.X,point.Y),under==context.Overlay,under==context.Game,active))return false;
         // Keep the real wheel out of the game until the WebView has resolved the current DOM target.
         if(pendingWheels.Count>=128)return true;
         int id=Interlocked.Increment(ref wheelSequence);
@@ -209,7 +226,10 @@ internal sealed class ReaderPointerGate {
         if(context==null)return false;
         var point=mouse.Position;
         if(!ScreenToClient(context.Overlay,ref point)){
-            if(gesture.Owner!=null&&up==gesture.Button){gesture.End();return true;}
+            if(gesture.Owner!=null&&up==gesture.Button){
+                if(gesture.DragLookup)events.Add(new{type="readerPointer",kind="lookupDragCancel",x=0,y=0});
+                gesture.End();return true;
+            }
             return false;
         }
         if(gesture.Owner==null&&index>=0&&context.NativeMenu(point.X,point.Y))return false;
@@ -223,14 +243,16 @@ internal sealed class ReaderPointerGate {
             if(foreground!=context.Game&&foreground!=context.Overlay&&under!=context.Overlay)return false;
             if(under!=context.Overlay&&under!=context.Game)return false;
         }
-        if(!gesture.Accept(index,up,moving,context))return false;
-        if(moving&&unchecked(mouse.Time-lastMove)<12)return false;
-        lastMove=mouse.Time;
-        int modifiers=Modifiers();
-        var kind=index>=0?"mousePressed":up>=0?"mouseReleased":"mouseMoved";
+        if(!gesture.Accept(index,up,moving,context,index==0&&context.Grip!=null&&context.Grip.Hit(point.X,point.Y)))return false;
+        if(moving&&unchecked(mouse.Time-lastMove)<8)return false;
+        lastMove=index>=0?unchecked(mouse.Time-8):mouse.Time;
+        // A grip drag follows the hook's button lifecycle. Real Windows hover moves still reach WebView2
+        // and cannot cancel the drag or compete with a relayed, pressed Chromium pointer.
+        var kind=gesture.DragLookup?(index>=0?"lookupDragStart":up>=0?"lookupDragEnd":"lookupDragMove"):
+            (index>=0?"mousePressed":up>=0?"mouseReleased":"mouseMoved");
         int button=gesture.Button;
-        events.Add(new{type="readerPointer",kind,x=point.X,y=point.Y,button=moving?-1:button,buttons=up>=0?0:1<<button,modifiers});
-        if(!moving)events.Add(new{type="hostFrame",pointer=index>=0?"down":"up",isolated=true,button,x=mouse.Position.X,y=mouse.Position.Y,foreground=GetForegroundWindow().ToInt64(),overlay=context.Overlay.ToInt64(),game=context.Game.ToInt64(),lookup=context.Lookup});
+        events.Add(new{type="readerPointer",kind,x=point.X,y=point.Y,button=moving?-1:button,buttons=up>=0?0:1<<button,modifiers=Modifiers()});
+        if(!moving)events.Add(new{type="hostFrame",pointer=index>=0?"down":"up",isolated=true,button,x=mouse.Position.X,y=mouse.Position.Y,foreground=GetForegroundWindow().ToInt64(),overlay=context.Overlay.ToInt64(),game=context.Game.ToInt64(),lookup=context.Lookup,lookupDrag=gesture.DragLookup});
         if(up>=0)gesture.End();
         // Mouse motion still updates the real cursor and hover. Only the relayed move carries a pressed button.
         return !moving;
@@ -250,9 +272,15 @@ internal sealed class ReaderPointerGate {
         var lookup=new Context(IntPtr.Zero,IntPtr.Zero,client,true,hits,hits,hits);
         if(!line.Hit(300,620)||line.Hit(800,620)||line.Hit(900,600)||lookup.Hit(900,600)||lookup.Hit(-1,600)||lookup.Hit(1920,600))return false;
         if(!lookup.Hit(300,620)||lookup.NativeMenu(300,620)||!lookup.InMenu(300,620))return false;
-        if(!NeedsWheelHitTest(false,true,false,true)||!NeedsWheelHitTest(true,false,true,true)||
-           NeedsWheelHitTest(false,false,true,true)||NeedsWheelHitTest(true,false,false,false))return false;
+        if(!NeedsWheelHitTest(false,false,true,false,true)||!NeedsWheelHitTest(false,true,false,true,true)||
+           !NeedsWheelHitTest(true,false,false,true,true)||NeedsWheelHitTest(false,false,false,true,true)||
+           NeedsWheelHitTest(true,true,false,false,true)||NeedsWheelHitTest(true,true,false,true,false))return false;
         var gesture=new Gesture();
+        var grip=new LookupGrip(new GalWindowBridge.Rect(200,600,800,660),new[]{new GalWindowBridge.Rect(600,610,700,650)});
+        if(!grip.Hit(300,620)||grip.Hit(650,620)||grip.Hit(800,620))return false;
+        if(!gesture.Accept(0,-1,false,lookup,true)||!gesture.DragLookup||!gesture.Accept(-1,-1,true,null)||
+           !gesture.DragLookup||!gesture.Accept(-1,0,false,null))return false;
+        gesture.End();if(gesture.DragLookup)return false;
         if(!gesture.Accept(0,-1,false,line)||!gesture.Accept(-1,-1,true,null)||gesture.Accept(-1,1,false,null)||!gesture.Accept(-1,0,false,null))return false;
         gesture.End();
         if(!gesture.Accept(0,-1,false,lookup)||!gesture.Accept(-1,0,false,null))return false;

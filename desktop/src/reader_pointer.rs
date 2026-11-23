@@ -5,9 +5,17 @@ use webview2_com::{CallDevToolsProtocolMethodCompletedHandler, CoTaskMemPWSTR};
 
 pub fn dispatch(app: &AppHandle, event: &Value) {
     let Some(window) = app.get_webview_window("reader") else { return };
-    let Some(kind @ ("mousePressed" | "mouseReleased" | "mouseMoved" | "mouseWheel" | "wheelHitTest")) = event["kind"].as_str() else { return };
+    let Some(kind @ ("mousePressed" | "mouseReleased" | "mouseMoved" | "mouseWheel" | "wheelHitTest" |
+        "lookupDragStart" | "lookupDragMove" | "lookupDragEnd" | "lookupDragCancel")) = event["kind"].as_str() else { return };
     let wheel_id = event["id"].as_i64().filter(|_| kind == "wheelHitTest");
     if kind == "wheelHitTest" && wheel_id.is_none() { return; }
+    let lookup_drag_phase = match kind {
+        "lookupDragStart" => Some("start"),
+        "lookupDragMove" => Some("move"),
+        "lookupDragEnd" => Some("end"),
+        "lookupDragCancel" => Some("cancel"),
+        _ => None,
+    };
     let Some(x) = event["x"].as_i64() else { return };
     let Some(y) = event["y"].as_i64() else { return };
     let button = match event["button"].as_i64() {
@@ -38,6 +46,9 @@ pub fn dispatch(app: &AppHandle, event: &Value) {
             let y = y as f64 / (scale * zoom);
             let method = if let Some(id) = wheel_id {
                 packet = json!({"expression": format!("window.__megulitResolveWheel?.({id},{x},{y})")});
+                "Runtime.evaluate"
+            } else if let Some(phase) = lookup_drag_phase {
+                packet = json!({"expression": format!("window.__megulitLookupDrag?.('{phase}',{x},{y})")});
                 "Runtime.evaluate"
             } else {
                 packet["x"] = json!(x);

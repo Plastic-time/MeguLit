@@ -41,3 +41,83 @@ test('Alt+T header drag: no glass message or picture re-placement per frame, one
   const after=await cdp.evaluate(STATE);assert.equal(after.dragging,false);assert.ok(after.glass>mid.glass,'release sends the new glass read');assert.ok(after.fx<first.fx-300,'the read moved with the panel: '+JSON.stringify([first.fx,after.fx]));
  }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });
+
+test('lookup background stays in the viewport before the scroll event and at the end of the card',
+ {skip:!hasEdge&&'Edge not installed',timeout:60000},async()=>{
+ const temp=fs.mkdtempSync(path.join(process.env.MEGULIT_WORK||os.tmpdir(),'megulit-lookup-scroll-'));
+ let server,cdp;
+ try{
+  server=await serve();cdp=await startEdge(path.join(temp,'edge'));
+  await cdp.send('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/reader/index.html'});
+  let ready=false;
+  for(let i=0;i<120&&!ready;i++){await sleep(100);ready=await cdp.evaluate('!!window.__TOME_READER_READY__').catch(()=>false);}
+  assert.ok(ready);
+  await cdp.evaluate("(()=>{window.__tomoyoMode.set('translation');document.body.classList.add('tomoyo-gal-bound');document.documentElement.dataset.tomeCardSurface='image';const card=document.createElement('div');card.className='tomoyo-selection-card';card.style.cssText='top:80px;left:100px;width:320px;height:190px';const content=document.createElement('div');content.style.height='760px';content.textContent='Scroll fixture';card.append(content);document.body.append(card);return true})()");
+  await sleep(160);
+  const result=await cdp.evaluate("(()=>{const card=document.querySelector('.tomoyo-selection-card'),bg=card.querySelector('.tome-menu-bg'),content=bg.nextElementSibling,top=content.getBoundingClientRect().top;return [35,200,10000].map(at=>{card.scrollTop=at;const a=card.getBoundingClientRect(),b=bg.getBoundingClientRect();return {offset:b.top-a.top-card.clientTop,height:b.height,viewport:card.clientHeight,contentShift:top-content.getBoundingClientRect().top,scroll:card.scrollTop}})})()");
+  for(const sample of result){
+   assert.ok(sample.scroll>0);
+   assert.equal(sample.contentShift,sample.scroll);
+   assert.ok(Math.abs(sample.offset)<1,JSON.stringify(sample));
+   assert.equal(sample.height,sample.viewport);
+  }
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+});
+
+test('lookup drags on the first press and routes wheel input at its new position',
+ {skip:!hasEdge&&'Edge not installed',timeout:60000},async()=>{
+ const temp=fs.mkdtempSync(path.join(process.env.MEGULIT_WORK||os.tmpdir(),'megulit-lookup-drag-'));
+ let server,cdp;
+ try{
+  server=await serve();cdp=await startEdge(path.join(temp,'edge'));
+  await cdp.send('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/reader/index.html'});
+  for(let i=0;i<120&&!await cdp.evaluate('!!window.__TOME_READER_READY__').catch(()=>false);i++)await sleep(100);
+  await cdp.evaluate("(()=>{window.__tomoyoMode.set('translation');document.body.classList.add('tomoyo-gal-bound');window.__tomoyoChinese.localLookup=async()=>({entries:[]});window.__tomoyoChinese.openLocalSelection({text:'台詞です',start:0,end:2},{left:innerWidth/2,right:innerWidth/2+30,top:innerHeight*.72,bottom:innerHeight*.72+20,width:30,height:20});return true})()");
+  await sleep(280);
+  await cdp.evaluate("(()=>{const p=document.querySelector('.tomoyo-selection-card'),spacer=document.createElement('div');p.style.height='180px';p.querySelector('header').style.setProperty('padding-top','24px','important');spacer.style.height='1000px';p.querySelector('.tomoyo-selection-body').append(spacer);})()");
+  await sleep(90);
+  await cdp.evaluate("(()=>{const p=document.querySelector('.tomoyo-selection-card');p.style.top='';p.style.bottom='180px';})()");
+  const bounds="(()=>{const p=document.querySelector('.tomoyo-selection-card'),r=p.getBoundingClientRect();return [Math.round(r.left),Math.round(r.top)]})()";
+  const start=await cdp.evaluate(bounds),[x,y]=await cdp.evaluate("(()=>{const r=document.querySelector('.tomoyo-selection-card>header').getBoundingClientRect();return [Math.round(r.left+r.width/3),Math.round(r.top+8)]})()");
+  assert.ok(await cdp.evaluate("parseFloat(document.querySelector('.tomoyo-selection-card').style.bottom)>0"),'fixture starts anchored by its bottom');
+  const mouse=(type,x,y,buttons)=>cdp.send('Input.dispatchMouseEvent',{type,x,y,button:type==='mouseMoved'?'none':'left',buttons,clickCount:1});
+  const native=(phase,x,y)=>cdp.evaluate(`window.__megulitLookupDrag(${JSON.stringify(phase)},${x},${y})`);
+  const grip=await cdp.evaluate("window.__sent.findLast(m=>m.type==='galHitRegions'&&m.lookupGrip)?.lookupGrip");
+  assert.ok(grip.area.width>0&&grip.controls.length>0,'report the visible grip and its interactive controls to Windows');
+  await native('start',x,y);
+  assert.deepEqual(await cdp.evaluate(bounds),start,'pressing the header must not clear the card position');
+  await cdp.evaluate("(()=>{const extra=document.createElement('div');extra.style.height='38px';document.querySelector('.tomoyo-selection-body').append(extra);})()");
+  await sleep(42);
+  assert.deepEqual(await cdp.evaluate(bounds),start,'a dictionary update during the press must not re-anchor the card');
+  const reports=()=>cdp.evaluate("window.__sent.filter(m=>m.type==='galHitRegions'&&m.lookupDrag).length");
+  const beforeMove=await reports();
+  assert.ok(beforeMove>0,'expand the paint region on press');
+  await mouse('mouseMoved',x+120,y+43,0);
+  await cdp.evaluate("dispatchEvent(new PointerEvent('lostpointercapture',{pointerId:1,buttons:0}));dispatchEvent(new PointerEvent('pointercancel',{pointerId:1,buttons:0}));");
+  await native('move',x+120,y+43);
+  await sleep(40);
+  const moved=await cdp.evaluate(bounds);
+  assert.deepEqual(moved,[start[0]+120,start[1]+43],'follow the first drag before any native acknowledgement');
+  assert.equal(await reports(),beforeMove,'moving does not rebuild the window region');
+  assert.deepEqual(await cdp.evaluate(`(()=>{const p=document.querySelector('.tomoyo-selection-card'),surface=document.elementFromPoint(12,12);
+   return [getComputedStyle(surface).cursor,getComputedStyle(p.querySelector('header button')).cursor];})()`),['grabbing','grabbing']);
+  await native('end',x+120,y+43);
+  assert.ok(await cdp.evaluate("!document.querySelector('.tome-lookup-drag-surface')"));
+  const wheel=await cdp.evaluate(`(()=>{const p=document.querySelector('.tomoyo-selection-card'),r=p.getBoundingClientRect();
+   __megulitResolveWheel(1,r.right-.5,r.top+.5);__megulitResolveWheel(2,r.right-36,r.top+60);__megulitResolveWheel(3,${start[0]}+8,${start[1]}+8);
+   return {targets:window.__sent.filter(m=>m.type==='galWheelDecision').map(m=>m.panel),inside:[r.right-36,r.top+60]};})()`);
+  assert.deepEqual(wheel.targets,[true,true,false],'the current card edge and body own the wheel, its old position is outside');
+  await cdp.send('Input.dispatchMouseEvent',{type:'mouseWheel',x:wheel.inside[0],y:wheel.inside[1],deltaX:0,deltaY:120});
+  await sleep(180);
+  assert.ok(await cdp.evaluate("document.querySelector('.tomoyo-selection-card').scrollTop")>0);
+  await cdp.evaluate("document.querySelector('.tomoyo-selection-card').scrollTop=0");
+  await mouse('mouseMoved',x+220,y+110,0);
+  assert.deepEqual(await cdp.evaluate(bounds),moved);
+  assert.equal(await cdp.evaluate("!!document.querySelector('[data-lookup-drag]')"),false);
+  await mouse('mousePressed',x+120,y+43,1);
+  await mouse('mouseReleased',x+147,y+59,0);
+  await mouse('mouseMoved',x+250,y+150,0);
+  await sleep(100);
+  assert.deepEqual(await cdp.evaluate(bounds),[moved[0]+27,moved[1]+16],'a fast release commits the final pointer coordinates even if no move was relayed');
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+});

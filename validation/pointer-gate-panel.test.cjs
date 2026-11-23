@@ -8,12 +8,14 @@ test('lookup card presses use the pointer gate while Alt+T controls retain nativ
  assert.match(g,/if\(gesture\.Owner==null&&index>=0&&context\.NativeMenu\(point\.X,point\.Y\)\)return false;/);
  assert.match(g,/foreach\(var rect in LookupPanels\)if\(Contains\(rect,x,y\)\)return false;/);
  assert.doesNotMatch(b,/LookupOpen\?CreateRectRgn/,'lookup does not expand the overlay input region');
- assert.match(fs.readFileSync(path.join(__dirname,'..','web','reader','modules','interaction.js'),'utf8'),/menu:isMenu,lookup/);
+ assert.match(g,/context\.Grip\.Hit\(point\.X,point\.Y\)/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','web','reader','modules','interaction.js'),'utf8'),/menu:isMenu,\.\.\.\(lookup\?\{lookup:true\}/);
 });
 test('the live DOM resolves ambiguous wheel events before the bridge forwards them to the game',()=>{
  const g=N('ReaderPointerGate.cs'),r=fs.readFileSync(path.join(__dirname,'..','desktop','src','reader_pointer.rs'),'utf8');
  const web=fs.readFileSync(path.join(__dirname,'..','web','reader','modules','interaction.js'),'utf8');
- assert.match(g,/NeedsWheelHitTest\(false,true,false,true\)/,'a stale native rectangle still needs a DOM hit test on the reader window');
+ assert.match(g,/NeedsWheelHitTest\(false,false,true,false,true\)/,'a stale native rectangle still needs a DOM hit test on the reader window');
+ assert.match(g,/NeedsWheelHitTest\(true,false,false,true,true\)/,'a moved lookup card needs a live hit test even when Windows reports the game below it');
  assert.match(g,/kind="wheelHitTest"/);
  assert.match(g,/if\(panel\)\{[\s\S]+?kind="mouseWheel"/);
  assert.match(g,/else\{\s*var foreground=GetAncestor\(GetForegroundWindow\(\),2\);[\s\S]+?PostGameWheel\(context\.Game,wheel\);/);

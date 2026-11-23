@@ -110,7 +110,7 @@ class LocaleEmulator{
   }finally{if(path.dirname(stage)===path.dirname(this.dir)&&stage.startsWith(this.dir+'.stage-'))try{fs.rmSync(stage,{recursive:true,force:true});}catch{}}
  }
  async processes(exe){const output=await new Promise((resolve,reject)=>execFile(path.join(this.root,'native','GalWindowBridge.exe'),['--process-status',exe],{windowsHide:true,timeout:2500,encoding:'utf8'},(error,out)=>error?reject(Error('LE_PROCESS_CHECK_FAILED')):resolve(out)));const result=JSON.parse(output.trim());if(result.type!=='gameProcesses'||!Array.isArray(result.processes))throw Error('LE_PROCESS_CHECK_FAILED');return result.processes;}
- async launch(exe,{trace=()=>{},alsoExe=''}={}){
+ async launch(exe,{trace=()=>{},alsoExe='',args=[]}={}){
   /* 2026-11-16 (user: 启动游戏后很久才绑定窗口): a DRM/launcher program started in the Japanese environment may never show a
      window of its own (2DJGAME 打开游戏.exe starts the engine and idles hidden), so waiting for the launcher alone sat out
      the whole 15 s timeout before MeguLit even looked for the game. With alsoExe the game program's visible window counts too. */
@@ -125,7 +125,7 @@ class LocaleEmulator{
   let result;
   /* Text architecture ①: with 文字显示 = compositor the game is created through LE's loader by MeguLitLaunch32 (dots before
      the first glyph, core/glyph-dots.cjs); any failure falls back to LEProc below with the late attach */
-  const early=require('./glyph-dots.cjs').earlyLocale(this.root,s.dir,launchExe);
+  const early=require('./glyph-dots.cjs').earlyLocale(this.root,s.dir,launchExe,process.env,args);
   /* ③ dot font rides along the same launcher (MEGULIT_LAUNCH_EXTRA, crash canary keyed on the launched program) */
   const fontDot=early?require('./text-paths-launch.cjs').fontDot(this.root,launchExe,early,trace):null;
   if(early){try{const child=await startProcess(early.file,early.args,path.dirname(launchExe),'LE_SPAWN_FAILED',spawn,early.env);trace('locale-early-started',{pid:child.pid});
@@ -137,7 +137,7 @@ class LocaleEmulator{
     if(error.message==='GAME_WINDOW_NOT_READY'){let running=[];try{running=await this.processes(launchExe);if(!running.length&&launchExe!==exe)running=await this.processes(exe);}catch{}
      if(running.length){trace('locale-early-slow-window',{pid:running[0].pid});throw error;}}}}
   for(let attempt=0;;attempt++){
-   const child=await startProcess(s.path,['-runas',s.profile,launchExe],path.dirname(launchExe),'LE_SPAWN_FAILED',spawn);
+   const child=await startProcess(s.path,['-runas',s.profile,launchExe,...args],path.dirname(launchExe),'LE_SPAWN_FAILED',spawn);
    trace('locale-helper-started',{pid:child.pid,alias:launchExe!==exe,...(attempt?{retry:attempt}:{})});
    try{result=await waitForVisibleGame(async()=>{
      const matches=await this.processes(launchExe);

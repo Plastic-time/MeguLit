@@ -8,15 +8,16 @@
  window.__tomeWaitForSurface=(node,ready,maxWait=700)=>{
   if(!document.body.classList.contains('tomoyo-ui-translation')){requestAnimationFrame(ready);return;}
   let ack=null,finished=false,frame=0;
+  const valid=()=>node.isConnected&&!node.hasAttribute('data-leaving');
   const cleanup=()=>{finished=true;clearInterval(timer);cancelAnimationFrame(frame);removeEventListener('tome-region-applied',receive);};
-  const check=()=>{if(finished)return;if(!node.isConnected||node.hasAttribute('data-leaving')){cleanup();return;}
+  const check=()=>{if(finished)return;if(!valid()){cleanup();return;}
    if(!ack||frame)return;const scale=devicePixelRatio||1;if(Math.abs(innerWidth*scale-ack.surfaceWidth)>2||Math.abs(innerHeight*scale-ack.surfaceHeight)>2)return;
-   const w=innerWidth,h=innerHeight;frame=requestAnimationFrame(()=>{frame=requestAnimationFrame(()=>{frame=0;if(!finished&&node.isConnected&&!node.hasAttribute('data-leaving')&&w===innerWidth&&h===innerHeight){cleanup();ready();}});});
+   const w=innerWidth,h=innerHeight;frame=requestAnimationFrame(()=>{frame=requestAnimationFrame(()=>{frame=0;if(!finished&&valid()&&w===innerWidth&&h===innerHeight){cleanup();ready();}});});
   };
   const receive=e=>{ack=e.detail;check();};addEventListener('tome-region-applied',receive);
   // Never wait forever: if the size acknowledgement does not arrive or never matches (DPI rounding, bridge restart),
   // the panel is shown after 700 ms anyway, as the former fixed fallback did.
-  const started=Date.now(),timer=setInterval(()=>{check();if(finished)return;if(Date.now()-started>=maxWait){cleanup();if(node.isConnected&&!node.hasAttribute('data-leaving'))ready();return;}window.__tomoyoHitRegionsRefresh?.(true);},Math.min(150,Math.max(30,Math.floor(maxWait/2))));
+  const started=Date.now(),timer=setInterval(()=>{check();if(finished)return;if(Date.now()-started>=maxWait){cleanup();if(valid())ready();return;}window.__tomoyoHitRegionsRefresh?.(true);},Math.min(150,Math.max(30,Math.floor(maxWait/2))));
   window.__tomoyoHitRegionsRefresh?.(true);
  };
  let queued=false,last='';const watched=new WeakSet(),resize=new ResizeObserver(schedule);
@@ -24,7 +25,10 @@
  // The lookup card and its dropdowns need the native pointer gate even when the game polls mouse buttons.
  const MENUS='.tomoyo-cn-dialog,.tome-backlog,.mg-select-pop,.tome-color-panel,.tomoyo-selection-card';
  window.__megulitResolveWheel=(id,x,y)=>{
-  const panel=!!document.elementFromPoint(x,y)?.closest(MENUS);
+  const lookup=document.querySelector('.tomoyo-selection-card');
+  const box=lookup&&getComputedStyle(lookup).visibility==='visible'?lookup.getBoundingClientRect():null;
+  const inLookup=box&&x>=box.left&&x<box.right&&y>=box.top&&y<box.bottom;
+  const panel=!!(inLookup||document.elementFromPoint(x,y)?.closest(MENUS));
   window.__tomoyoTranslateRequest(JSON.stringify({type:'galWheelDecision',id,panel}));
  };
  function schedule(){if(queued)return;queued=true;queueMicrotask(report);}
@@ -51,6 +55,21 @@
  // Pending typewriter spans keep their layout but contribute no painted region until they become visible.
  function textBoxes(node){if(node.matches('.tome-page-lines>div,.tomoyo-cn-output')){const range=document.createRange();range.selectNodeContents(node);return [...range.getClientRects()];}return [...node.getClientRects()];}
  function compact(rects){while(rects.length>256){let best=-1,cost=Infinity;for(let i=0;i<rects.length-1;i++){const a=rects[i],b=rects[i+1];if(a.menu||b.menu)continue;const c=Math.max(a.x+a.width,b.x+b.width)-Math.min(a.x,b.x)+Math.max(a.y+a.height,b.y+b.height)-Math.min(a.y,b.y);if(c<cost){cost=c;best=i;}}if(best<0)break;const a=rects[best],b=rects[best+1],x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);rects.splice(best,2,{x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y,menu:false});}return rects;}
+ function lookupGripBox(scale){
+  const grip=window.__tomoyoChinese?.lookupGrip?.();
+  if(!grip||getComputedStyle(grip.head).visibility!=='visible')return null;
+  if(!watched.has(grip.head)){resize.observe(grip.head);watched.add(grip.head);}
+  const card=grip.head.parentElement.getBoundingClientRect();
+  const clipped=node=>{
+   const r=node.getBoundingClientRect(),left=Math.max(0,card.left,r.left),top=Math.max(0,card.top,r.top);
+   const right=Math.min(innerWidth,card.right,r.right),bottom=Math.min(innerHeight,card.bottom,r.bottom);
+   if(right<=left||bottom<=top)return null;
+   const x=Math.floor(left*scale),y=Math.floor(top*scale);
+   return {x,y,width:Math.ceil(right*scale)-x,height:Math.ceil(bottom*scale)-y};
+  };
+  const area=clipped(grip.head);
+  return area&&{area,controls:[...grip.controls].map(clipped).filter(Boolean)};
+ }
  // While the menu is dragged it moves by transform every frame; recomputing the window region per frame queues
  // SetWindowRgn calls the native side cannot keep up with (the panel is clipped mid-drag and keeps "moving" after
  // release). Hold one whole-layer region for the drag; release recomputes it from the real content.
@@ -59,6 +78,9 @@
  let missSent=0;function missDiag(regions){const now=Date.now();if(now-missSent<2000)return;missSent=now;const scale=Number(devicePixelRatio)||1,inside=(x,y)=>regions.some(r=>x*scale>=r.x&&x*scale<r.x+r.width&&y*scale>=r.y&&y*scale<r.y+r.height);let chars=0,missed=0;const where={},rows=new Set();for(const t of document.querySelectorAll('.sentence-window .char-token,.sentence-window .tome-page-char,.tome-page-lines>div')){if(t.matches('.tome-page-lines>div')&&t.querySelector('.tome-page-char'))continue;const st=getComputedStyle(t);if(st.display==='none'||st.visibility==='hidden'||Number(st.opacity)===0)continue;for(const r of t.getClientRects()){if(!r.width||!r.height||!/[\u3040-\u30ff\u4e00-\u9fff]/.test(t.textContent||''))continue;chars++;rows.add(Math.round(r.top/8));if(!inside(r.left+r.width/2,r.top+r.height/2)){missed++;const k=(t.parentElement?.className||t.className||'?').toString().slice(0,40);where[k]=(where[k]||0)+1;}}}if(!chars)return;try{window.__tomoyoTranslateRequest(JSON.stringify({type:'layoutDiagnostic',kind:'hitRegions',regions:regions.length,japaneseChars:chars,japaneseRows:rows.size,outside:missed,outsideIn:Object.entries(where).map(([k,v])=>k+':'+v).join(' ').slice(0,200)}));}catch{}}
  function report(){queued=false;if(document.querySelector('.tome-menu-dragging,.tomoyo-menu-resizing')){const scale=Number(devicePixelRatio)||1,regions=[{x:0,y:0,width:Math.ceil(innerWidth*scale),height:Math.ceil(innerHeight*scale),menu:true}],key=JSON.stringify({regions,menuOpen:true});if(key!==last){last=key;try{window.__tomoyoTranslateRequest(JSON.stringify({type:'galHitRegions',regions,menuOpen:true}));}catch{}}return;}const regions=[],scale=Number(devicePixelRatio)||1,bound=document.body?.classList.contains('tomoyo-gal-bound')||document.body?.classList.contains('tomoyo-ui-translation');
   const menuOpen=!!document.querySelector('.tomoyo-cn-dialog[open],.tomoyo-cn-dialog[data-leaving],.tome-backlog[data-open],.tome-backlog[data-leaving]');
+  const lookupDrag=Number(document.querySelector('.tomoyo-selection-card[data-lookup-drag]')?.dataset.lookupDrag)||0;
+  const dragKey=lookupDrag?`lookup:${lookupDrag}:${menuOpen}:${innerWidth}:${innerHeight}:${scale}`:'';
+  if(dragKey&&last===dragKey)return;
   if(bound)for(const node of document.querySelectorAll(NODES)){if(node.closest('body.megulit-choice-covers-line .sentence-window:not(.tome-island-page),body.megulit-choice-only .sentence-window:not(.tome-island-page)'))continue;if(!watched.has(node)){resize.observe(node);watched.add(node);}const style=getComputedStyle(node),isMenu=node.matches(MENUS);
    if(node.matches('.tomoyo-cn-output')&&node.querySelector('.tome-translation-char'))continue;
    const followsPaintedBox=node.matches('.tomoyo-selection-card,.tomoyo-menu-resizing,.tome-dragging');
@@ -68,9 +90,10 @@
    if(sentence?.classList.contains('tomoyo-furigana')){const font=parseFloat(style.fontSize)||16,scale=parseFloat(getComputedStyle(sentence).getPropertyValue('--tomoyo-ruby-scale'))||.55,root=getComputedStyle(document.documentElement),offY=parseFloat(root.getPropertyValue('--tomoyo-ruby-offset-y'))||0,offX=parseFloat(root.getPropertyValue('--tomoyo-ruby-offset-x'))||0;top=r.top-font*(scale*1.3+.2)-Math.max(0,-offY)-4;side=Math.max(6,Math.abs(offX)+font*.6);}
    const x=Math.max(0,r.left-side),y=Math.max(0,top),right=Math.min(innerWidth,r.right+side),bottom=Math.min(innerHeight,r.bottom+(isMenu?0:6)+Math.max(0,sentence?.classList.contains('tomoyo-furigana')?(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tomoyo-ruby-offset-y'))||0):0));
    const lookup=node.matches('.tomoyo-selection-card')||node.matches('.mg-select-pop')&&document.body.classList.contains('tomoyo-selection-open');
-   if(right>x&&bottom>y)regions.push({x:Math.floor(x*scale),y:Math.floor(y*scale),width:Math.ceil((right-x)*scale),height:Math.ceil((bottom-y)*scale),menu:isMenu,lookup});}}
+   if(right>x&&bottom>y){const leftPx=Math.floor(x*scale),topPx=Math.floor(y*scale);regions.push({x:leftPx,y:topPx,width:Math.ceil(right*scale)-leftPx,height:Math.ceil(bottom*scale)-topPx,menu:isMenu,...(lookup?{lookup:true}:{})});}}}
   regions.sort((a,b)=>Number(a.menu)-Number(b.menu)||a.y-b.y||a.x-b.x);
-  const merged=[];for(const r of regions){const p=merged.at(-1);if(p&&!p.menu&&!r.menu&&Math.abs(p.y-r.y)<=2&&Math.abs(p.height-r.height)<=2&&r.x<=p.x+p.width+2&&r.x+r.width>=p.x-2){/* Union on both sides: a region sorted first only by a 1px higher top (the moved wait marker) used to keep its left edge and drop the whole Japanese line left of it. */const top=Math.min(p.y,r.y),bottom=Math.max(p.y+p.height,r.y+r.height),left=Math.min(p.x,r.x);p.width=Math.max(p.x+p.width,r.x+r.width)-left;p.x=left;p.y=top;p.height=bottom-top;}else merged.push({...r});}regions.splice(0,regions.length,...compact(merged));/* E533: art-text translations are painted (window region) but pass the pointer to the game (pass): a title card or button under them stays clickable *//* 2026-11-15 choices (ruby + translation over the game's options) and the placed name plate / options (text-place.js) are painted the same way: the click reaches the game's own button */if(bound)for(const node of document.querySelectorAll('.megulit-art-item .megulit-art-cn,.megulit-choice,.megulit-choice-cn,#megulit-place-extras span,#megulit-page-ahead>i')){const r=node.getBoundingClientRect();if(!r.width||!r.height||regions.length>=250)continue;const x=Math.max(0,r.left-8),y=Math.max(0,r.top-6),right=Math.min(innerWidth,r.right+8),bottom=Math.min(innerHeight,r.bottom+6);if(right>x&&bottom>y)regions.push({x:Math.floor(x*scale),y:Math.floor(y*scale),width:Math.ceil((right-x)*scale),height:Math.ceil((bottom-y)*scale),menu:false,pass:true});}const key=JSON.stringify({regions,menuOpen});if(key!==last){last=key;repaint();try{window.__tomoyoTranslateRequest(JSON.stringify({type:'galHitRegions',regions,menuOpen}));}catch{}try{missDiag(regions.filter(r=>!r.pass));}catch{}}
+  const merged=[];for(const r of regions){const p=merged.at(-1);if(p&&!p.menu&&!r.menu&&Math.abs(p.y-r.y)<=2&&Math.abs(p.height-r.height)<=2&&r.x<=p.x+p.width+2&&r.x+r.width>=p.x-2){/* Union on both sides: a region sorted first only by a 1px higher top (the moved wait marker) used to keep its left edge and drop the whole Japanese line left of it. */const top=Math.min(p.y,r.y),bottom=Math.max(p.y+p.height,r.y+r.height),left=Math.min(p.x,r.x);p.width=Math.max(p.x+p.width,r.x+r.width)-left;p.x=left;p.y=top;p.height=bottom-top;}else merged.push({...r});}regions.splice(0,regions.length,...compact(merged));/* E533: art-text translations are painted (window region) but pass the pointer to the game (pass): a title card or button under them stays clickable *//* 2026-11-15 choices (ruby + translation over the game's options) and the placed name plate / options (text-place.js) are painted the same way: the click reaches the game's own button */if(bound)for(const node of document.querySelectorAll('.megulit-art-item .megulit-art-cn,.megulit-choice,.megulit-choice-cn,#megulit-place-extras span,#megulit-page-ahead>i')){const r=node.getBoundingClientRect();if(!r.width||!r.height||regions.length>=250)continue;const x=Math.max(0,r.left-8),y=Math.max(0,r.top-6),right=Math.min(innerWidth,r.right+8),bottom=Math.min(innerHeight,r.bottom+6);if(right>x&&bottom>y)regions.push({x:Math.floor(x*scale),y:Math.floor(y*scale),width:Math.ceil((right-x)*scale),height:Math.ceil((bottom-y)*scale),menu:false,pass:true});}const lookupGrip=lookupGripBox(scale),message={type:'galHitRegions',regions,menuOpen,lookupDrag,lookupGrip};
+  const key=dragKey||JSON.stringify(message);if(key!==last){last=key;repaint();try{window.__tomoyoTranslateRequest(JSON.stringify(message));}catch{}try{missDiag(regions.filter(r=>!r.pass));}catch{}}
  }
- new MutationObserver(schedule).observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['style','class','hidden','open','data-open','data-leaving']});addEventListener('resize',schedule);document.addEventListener('scroll',schedule,true);document.addEventListener('transitionend',schedule,true);document.addEventListener('animationend',schedule,true);schedule();
+ new MutationObserver(schedule).observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['style','class','hidden','open','data-open','data-leaving','data-lookup-drag']});addEventListener('resize',schedule);document.addEventListener('scroll',schedule,true);document.addEventListener('transitionend',schedule,true);document.addEventListener('animationend',schedule,true);schedule();
 })();

@@ -163,23 +163,42 @@ public class GalWindowBridge {
     static void GlassCommand(Dictionary<string,object> d){var boxes=new List<GlassLayer.Box>();object rects;if(d.TryGetValue("rects",out rects)&&rects is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)rects){var rect=item as Dictionary<string,object>;if(rect==null||boxes.Count>=16)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)boxes.Add(new GlassLayer.Box((int)x,(int)y,(int)w,(int)h,(int)Num(rect,"radius",Num(d,"radius",0)),(int)Math.Max(0,Math.Min(60,Num(rect,"blur",18))),(int)Math.Max(0,Math.Min(95,Num(rect,"dim",0))),(int)Math.Max(0,Math.Min(300,Num(rect,"saturate",100))),(int)Math.Max(0,Math.Min(100,Num(rect,"alpha",100))),(int)Num(rect,"fx",x),(int)Num(rect,"fy",y),(int)Math.Max(0,Math.Min(16384,Num(rect,"fw",w))),(int)Math.Max(0,Math.Min(16384,Num(rect,"fh",h)))));}}
         Glass.Set(boxes,(int)Num(d,"radius",0));}
     /* E533: Pass = painted (inside the window region) but never takes the pointer: art-text translations over game buttons */sealed class HitRegion{public Rect Bounds;public bool Pass;public bool Menu;public bool Lookup;}
-    static readonly List<HitRegion> HitRegions=new List<HitRegion>();static string RegionKey="";
+    static readonly List<HitRegion> HitRegions=new List<HitRegion>();static string RegionKey="";static int LookupDragRegion;
+    static ReaderPointerGate.LookupGrip LookupGrip;
+    static bool ReadHitBounds(Dictionary<string,object> value,out Rect bounds){
+        bounds=new Rect();if(value==null)return false;
+        double x=Num(value,"x",0),y=Num(value,"y",0),w=Num(value,"width",0),h=Num(value,"height",0);
+        if(!(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768))return false;
+        bounds=new Rect((int)x,(int)y,(int)(x+w),(int)(y+h));return true;
+    }
+    static ReaderPointerGate.LookupGrip ReadLookupGrip(Dictionary<string,object> value){
+        object data,region,blocked;Rect area;
+        if(!value.TryGetValue("lookupGrip",out data))return null;
+        var grip=data as Dictionary<string,object>;
+        if(grip==null||!grip.TryGetValue("area",out region)||!ReadHitBounds(region as Dictionary<string,object>,out area))return null;
+        var controls=new List<Rect>();
+        if(grip.TryGetValue("controls",out blocked)&&blocked is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)blocked){
+            Rect box;if(controls.Count>=64)return null;
+            if(ReadHitBounds(item as Dictionary<string,object>,out box))controls.Add(box);
+        }}
+        return new ReaderPointerGate.LookupGrip(area,controls.ToArray());
+    }
     [DllImport("user32.dll")]static extern int SetWindowRgn(IntPtr window,IntPtr region,bool redraw);
     [DllImport("gdi32.dll")]static extern IntPtr CreateRectRgn(int left,int top,int right,int bottom);
     [DllImport("gdi32.dll")]static extern int CombineRgn(IntPtr result,IntPtr a,IntPtr b,int mode);
     [DllImport("gdi32.dll")]static extern int GetRgnBox(IntPtr region,out Rect box);
     [DllImport("gdi32.dll")]static extern bool DeleteObject(IntPtr value);
     static void MaskOutput(object value){var d=Json.Deserialize<Dictionary<string,object>>(Json.Serialize(value));if(Str(d,"type")!="maskFrame"){Emit(value);return;}if(Bool(d,"clear")){MaskLayer.Hide();return;}try{MaskLayer.Frame(Str(d,"png"),(int)Num(d,"x",0),(int)Num(d,"y",0),(int)Num(d,"width",0),(int)Num(d,"height",0));}catch{MaskLayer.Hide();}}
-    static void ResetRegion(){RegionKey="";HitRegions.Clear();if(Overlay!=IntPtr.Zero){SetWindowRgn(Overlay,OriginalRegion,true);OriginalRegion=IntPtr.Zero;}}
+    static void ResetRegion(){RegionKey="";LookupDragRegion=0;LookupGrip=null;HitRegions.Clear();if(Overlay!=IntPtr.Zero){SetWindowRgn(Overlay,OriginalRegion,true);OriginalRegion=IntPtr.Zero;}}
     public static Rect Clip(Rect r,int width,int height){return new Rect(Math.Max(0,r.Left),Math.Max(0,r.Top),Math.Min(width,r.Right),Math.Min(height,r.Bottom));}
     static void ApplyRegion(int width,int height){
         int dx=0,dy=0;Rect wr;Point co=new Point();
         if(GetWindowRect(Overlay,out wr)&&ClientToScreen(Overlay,ref co)){dx=Math.Max(0,Math.Min(64,co.X-wr.Left));dy=Math.Max(0,Math.Min(64,co.Y-wr.Top));}
         width+=dx;height+=dy;
-        string key=width+":"+height+":"+dx+":"+dy+":"+String.Join(";",HitRegions.ConvertAll(h=>h.Bounds.Left+","+h.Bounds.Top+","+h.Bounds.Right+","+h.Bounds.Bottom));
+        string key=width+":"+height+":"+dx+":"+dy+":"+(LookupDragRegion>0?"lookup-drag":String.Join(";",HitRegions.ConvertAll(h=>h.Bounds.Left+","+h.Bounds.Top+","+h.Bounds.Right+","+h.Bounds.Bottom)));
         if(key==RegionKey)return;
-        IntPtr region=CreateRectRgn(0,0,0,0);
-        foreach(var hit in HitRegions){var h=hit.Bounds;var rect=Clip(new Rect(h.Left+dx,h.Top+dy,h.Right+dx,h.Bottom+dy),width,height);
+        IntPtr region=LookupDragRegion>0?CreateRectRgn(0,0,width,height):CreateRectRgn(0,0,0,0);
+        if(LookupDragRegion==0)foreach(var hit in HitRegions){var h=hit.Bounds;var rect=Clip(new Rect(h.Left+dx,h.Top+dy,h.Right+dx,h.Bottom+dy),width,height);
             if(rect.Right<=rect.Left||rect.Bottom<=rect.Top)continue;
             // Keep the CSS corner pixels; a Win32 rounded region has only binary coverage and clips away antialiasing.
             IntPtr part=CreateRectRgn(rect.Left,rect.Top,rect.Right,rect.Bottom);
@@ -543,7 +562,10 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
             // Only when needed: re-showing and re-activating the already visible, already active main window made it
             // hide and reappear once (with the Windows open animation) on the first menu after start.
             bool keepGame=FullscreenTarget()&&GetAncestor(GetForegroundWindow(),3)==GetAncestor(Target,3);if(!IsWindowVisible(Overlay))ShowWindow(Overlay,keepGame?4:5);if(!keepGame&&GetAncestor(GetForegroundWindow(),3)!=GetAncestor(Overlay,3))SetForegroundWindow(Overlay);IsShown=true;MenuFocusPending=false;}}}
-        else if(type=="hitRegions"){MenuRegionReady=Bool(d,"menuOpen");RegionAckPending=MenuRegionReady;HitRegions.Clear();object regions;if(d.TryGetValue("regions",out regions)&&regions is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)regions){var rect=item as Dictionary<string,object>;if(rect==null||HitRegions.Count>=256)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)HitRegions.Add(new HitRegion{Bounds=new Rect((int)x,(int)y,(int)(x+w),(int)(y+h)),Pass=Bool(rect,"pass"),Menu=Bool(rect,"menu"),Lookup=Bool(rect,"lookup")});}}
+        else if(type=="hitRegions"){MenuRegionReady=Bool(d,"menuOpen");HitRegions.Clear();object regions;if(d.TryGetValue("regions",out regions)&&regions is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)regions){var rect=item as Dictionary<string,object>;Rect bounds;if(HitRegions.Count>=256)break;if(ReadHitBounds(rect,out bounds))HitRegions.Add(new HitRegion{Bounds=bounds,Pass=Bool(rect,"pass"),Menu=Bool(rect,"menu"),Lookup=Bool(rect,"lookup")});}}
+            LookupGrip=ReadLookupGrip(d);
+            LookupDragRegion=TranslationMode&&HitRegions.Exists(h=>h.Lookup)?(int)Math.Max(0,Math.Min(Int32.MaxValue,Num(d,"lookupDrag",0))):0;
+            RegionAckPending=MenuRegionReady;
             // Over a bound game apply the new region right away instead of in the next tick (which also captures the game
             // for text and marker detection and made the menu wait ~170 ms before it could open).
             if(TranslationMode&&Target!=IntPtr.Zero&&Overlay!=IntPtr.Zero&&Captured&&HasLastRect&&IsShown){ApplyRegion(LastRect.Right-LastRect.Left,LastRect.Bottom-LastRect.Top);AckRegion();}
@@ -553,7 +575,7 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
             else if(PreferredOverlay!=IntPtr.Zero&&(!TranslationMode||Target==IntPtr.Zero)&&Overlay!=IntPtr.Zero&&IsShown&&MenuOpen&&MenuRegionReady&&HitRegions.Count>0){Rect menuClient;if(GetClientRect(Overlay,out menuClient)){ApplyRegion(menuClient.Right,menuClient.Bottom);AckRegion();}}
             RefreshReaderPointer();}
         else if(type=="glass")GlassCommand(d);
-        else if(type=="lookup"){LookupOpen=Bool(d,"open")&&TranslationMode&&CoverEnabled;RefreshReaderPointer();}
+        else if(type=="lookup"){bool open=Bool(d,"open");LookupOpen=open&&TranslationMode&&CoverEnabled;if(!open){LookupDragRegion=0;LookupGrip=null;}RefreshReaderPointer();}
         else if(type=="wheelDecision"){int id;if(PointerGate!=null&&Int32.TryParse(Str(d,"id"),out id))PointerGate.ResolveWheel(id,Bool(d,"panel"));}
         else if(type=="quit")Running=false;
     }
@@ -632,7 +654,7 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         PointerGate.Current=new ReaderPointerGate.Context(Overlay,GetAncestor(Target,2),client,LookupOpen,
             HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray(),
             HitRegions.FindAll(h=>h.Menu).ConvertAll(h=>h.Bounds).ToArray(),
-            HitRegions.FindAll(h=>h.Lookup).ConvertAll(h=>h.Bounds).ToArray());
+            HitRegions.FindAll(h=>h.Lookup).ConvertAll(h=>h.Bounds).ToArray(),LookupGrip);
     }
     static bool? LastReaderContext;
     /* 2026-11-19 one reading of the foreground per tick and one decision for the layer (native/ReaderLayerPolicy.cs):

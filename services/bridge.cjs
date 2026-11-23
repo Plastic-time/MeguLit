@@ -113,7 +113,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   const elevation=require('./locale-launch.cjs').requiresAdministrator(game.executable);if(privateLaunchPolicy&&(elevation||windowsLaunch))throw Error(privatePublisherPolicy?'OWNER_PUBLISHER_ELEVATION_UNSUPPORTED':'OWNER_STEAM_ELEVATION_UNSUPPORTED');
   /* E370: a first launch with nothing saved here starts from a matching shared adaptation record (stream memory before the Hook starts, locale mode for this launch) */
   try{const before=profile.localeMode,shared=require('./shared-adaptation.cjs');shared.importFor(root,{executable:game.executable,engine:profile.engine||'',library:profile,styleSync:runtime?.reader?.gal?.styleSync});if(profile.localeMode!==before){original.library=profile;db.prepare('UPDATE games SET original=? WHERE id=?').run(JSON.stringify(original),id);}}catch{}
-  let wheelLaunch=!privateLaunchPolicy&&!steamAppid&&!launchVia&&!elevation&&!windowsLaunch&&profile.localeMode!=='japanese'&&
+  let wheelLaunch=!privateLaunchPolicy&&!steamAppid&&!launchVia&&!elevation&&!windowsLaunch&&
    !require('../core/library-mode.cjs').libraryOnly(root)?require('./fata-wheel.cjs').launchPlan(game.executable):null;
   if(wheelLaunch&&require('./locale-launch.cjs').requiresAdministrator(wheelLaunch.executable))wheelLaunch=null;
   // Let the reader bind as soon as the game window appears, including when starting the shared language engine directly.
@@ -158,7 +158,15 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   if(rgssPath&&!launchVia&&!elevation&&!windowsLaunch)await prepareEnginePath();
   let state;
   // "Japanese system environment": non-Unicode Japanese games (WA2) show their own dialogs garbled under a Chinese locale.
-  if(wheelLaunch){
+  if(wheelLaunch&&profile.localeMode==='japanese'&&require('../core/locale-emulator.cjs').x86(wheelLaunch.executable)){
+   stage='locale-start';
+   const lib=runtime?.library?.()||new(require('../core/library.cjs').Library)(require('../core/layout.cjs'));
+   const options={trace,args:wheelLaunch.args};
+   let result=await lib.locale.launch(wheelLaunch.executable,options);
+   if(result.needLocaleEmulator){await lib.locale.ensure();result=await lib.locale.launch(wheelLaunch.executable,options);if(result.needLocaleEmulator)throw Error('LOCALE_EMULATOR_REQUIRED');}
+   state={pid:result.gamePid,locale:'japanese'};
+   trace('language-launcher-window-wheel',{executable:path.basename(wheelLaunch.executable),pid:state.pid,locale:state.locale});
+  }else if(wheelLaunch){
    stage='process-start';markLaunch(id,'process-start');
    const {startProcess,waitForVisibleGame}=require('./game-readiness.cjs');
    const child=await startProcess(wheelLaunch.executable,wheelLaunch.args,path.dirname(wheelLaunch.executable),'GAME_LAUNCH_FAILED');

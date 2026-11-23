@@ -513,7 +513,12 @@ class Reader{
    case 'galLookup':g?.send({type:'lookup',open:r.open===true});break;
    case 'galWheelDecision':if(Number.isSafeInteger(r.id))g?.send({type:'wheelDecision',id:r.id,panel:r.panel===true});break;
    case 'galFloatDrag':if([r.x,r.y].every(Number.isFinite))g?.send({type:'floatDrag',x:r.x,y:r.y});break;
-   case 'galHitRegions':if(Array.isArray(r.regions)&&r.regions.length<=256&&r.regions.every(x=>[x.x,x.y,x.width,x.height].every(Number.isFinite)))g?.send({type:'hitRegions',regions:r.regions,menuOpen:r.menuOpen===true});break;
+   case 'galHitRegions':{
+    const validRect=x=>x&&[x.x,x.y,x.width,x.height].every(Number.isFinite);
+    if(!Array.isArray(r.regions)||r.regions.length>256||!r.regions.every(validRect))break;
+    const grip=r.lookupGrip,lookupGrip=validRect(grip?.area)&&Array.isArray(grip.controls)&&grip.controls.length<=64&&grip.controls.every(validRect)?grip:null;
+    g?.send({type:'hitRegions',regions:r.regions,menuOpen:r.menuOpen===true,lookupDrag:Number.isSafeInteger(r.lookupDrag)?r.lookupDrag:0,lookupGrip});break;
+   }
    case 'galGlass':if(Array.isArray(r.rects)&&r.rects.length<=16&&r.rects.every(x=>[x.x,x.y,x.width,x.height].every(Number.isFinite)))g?.send({type:'glass',rects:r.rects,radius:Number(r.radius)||18});break;
    case 'galToggleCover':g?.send({type:'toggleCover'});break;
    case 'galToggleMode':g?.send({type:'toggleMode'});break;
