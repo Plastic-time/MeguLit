@@ -3,11 +3,13 @@
 /* Furigana for example sentences taken from the user's own read lines (2026-11-14, user: 所有地方提取例句出来的时候记得注音啊).
    One place decides which reading a kanji run gets, in the owner's order:
    1. the game's own ruby captured with the line (source ruby: <rよみ>漢字</r>, ｜漢字《よみ》, ISLAND pairs …);
-   2. the reading the dictionary settled for that word in this context (readings.resolve → readingSource 'dictionary');
+   2. the reading the dictionary settled for that word in this context, or read from a number and its counter
+      (readings.resolve → settled: readingSource 'dictionary' or 'number');
    3. never the tokenizer's own guess, never a name (固有名詞) without game ruby: those stay bare.
    Output is a list of spans {start,end,reading,source} in characters (code points) of the plain text; kana runs never
    get ruby and okurigana is kept outside the ruby (泣い → <ruby>泣<rt>な</rt></ruby>い). */
 const {extractSourceRuby}=require('./source-ruby.cjs');
+const {settled}=require('./reading.cjs');
 const KANJI=/[\p{Script=Han}々〆ヶ]/u;
 const hira=v=>String(v||'').replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96));
 const isName=t=>{const g=Array.isArray(t.grammar)?t.grammar:[];return g.includes('固有名詞')||/固有名詞/.test(String(t.pos||''))||/固有名詞/.test(String(t.pos_detail||''));};
@@ -53,7 +55,7 @@ function exampleSpans(text,tokens,pairs=[]){
     if(start<0||chars.slice(start,start+surface.length).join('')!==surface.join('')){start=chars.join('').length?indexOf(chars,surface,cursor):-1;}
     if(start<0)continue;const end=start+surface.length;cursor=end;
     if(!KANJI.test(surface.join('')))continue;
-    if(t.readingSource!=='dictionary'||t.rawReading===true)continue;
+    if(!settled(t)||t.rawReading===true)continue;
     if(isName(t))continue;
     const s=coreSpan(chars,start,end,t.reading);if(!s||!free(s.start,s.end))continue;
     out.push({...s,source:'dictionary'});take(s.start,s.end);
