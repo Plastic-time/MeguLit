@@ -48,7 +48,7 @@ function inventory(dir,{depth=2,limit=6000,deadline=Infinity}={}){
  walk(dir,0);inv.archives.sort((a,b)=>b.size-a.size);return inv;}
 
 /* readers that scan whole folders for anything text-like: they must never outrank or delay a dedicated reader */
-const GENERIC=new Set(['garbro','unity-assets','cpk']),DEDICATED_JP=30,GENERIC_MS=30000;
+const GENERIC=new Set(['html5','garbro','unity-assets','cpk']),DEDICATED_JP=30,GENERIC_MS=30000;
 const DECRYPT=/decrypt|encrypt|cipher|key|filter|scheme|CX|PROTECT|TPM/i;
 const KANA=/[ぁ-ゖァ-ヺ]/;
 /* reader outcomes that are not failures of the reader: it ran and the folder had nothing for it */
@@ -66,7 +66,7 @@ function runEngines(dir,{deadline,routed=[],progress=()=>{},only=null}){
  const scenes=require('./original-engines/scenes.cjs'),out=[];
  /* the GARbro last resort never runs over a folder whose KiriKiri cx archives MeguLit decrypts itself (detect() skips it the same way): on a cold cache it spent 20-80 s unpacking them for nothing and the probe timed out (ATRI) */
  let skipGarbro=false;try{skipGarbro=scenes.ownCx(dir);}catch{}
- /* E610 dedicated readers first, in scenes.detect order; the generic scans (garbro, unity-assets, cpk) only when no dedicated reader read a sizeable amount of Japanese, and each with its own time cap */
+ /* E610 dedicated readers first, in scenes.detect order; the generic scans (HTML5, garbro, unity-assets, cpk) only when no dedicated reader read a sizeable amount of Japanese, and each with its own time cap */
  const ids=Object.keys(scenes.ENGINES),first=routed.filter(i=>ids.includes(i)),rest=ids.filter(i=>!first.includes(i)),order=[...first.filter(i=>!GENERIC.has(i)),...rest.filter(i=>!GENERIC.has(i)),...first.filter(i=>GENERIC.has(i)),...rest.filter(i=>GENERIC.has(i))];let dedicatedJp=0;
  /* S5 routing: the readers the fingerprint / registry name run first (never starved by the budget) and are always listed, a reader that found nothing as NO_SCENES */
  const isRouted=new Set(first);
