@@ -19,7 +19,7 @@ async function reconcile(root,rows,signal){
  }
 }
 
-function subscribe(root,{base,Socket=globalThis.WebSocket,fetcher=fetch,apply=reconcile}={}){
+function subscribe(root,{base,Socket=globalThis.WebSocket,fetcher=fetch,apply=reconcile,onReplay}={}){
  if(!Socket||process.env.MEGULIT_OFFLINE==='1'||process.env.MEGULIT_CARDINAL_REPLAY==='1')return;
  const bases=base?[base]:relay.seedBases(root,'receive');
  if(!bases.length)return;
@@ -40,6 +40,7 @@ function subscribe(root,{base,Socket=globalThis.WebSocket,fetcher=fetch,apply=re
    }
    if(changes.length)await apply(root,changes,signal);
    signal.throwIfAborted();cursor=end;more=changes.length===128;
+   onReplay?.({base,cursor,changes,more});
   }while(more);
  }
  async function run(){
