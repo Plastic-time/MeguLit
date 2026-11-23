@@ -49,7 +49,7 @@ function inventory(dir,{depth=2,limit=6000,deadline=Infinity}={}){
 
 /* readers that scan whole folders for anything text-like: they must never outrank or delay a dedicated reader */
 const GENERIC=new Set(['html5','garbro','unity-assets','cpk']),DEDICATED_JP=30,GENERIC_MS=30000;
-const DECRYPT=/decrypt|encrypt|cipher|key|filter|scheme|CX|PROTECT|TPM/i;
+const DECRYPT=/decrypt|encrypt|cipher|key|filter|scheme|CX|PROTECT|TPM|^IKURA_SECRET$/i;
 const KANA=/[ぁ-ゖァ-ヺ]/;
 /* reader outcomes that are not failures of the reader: it ran and the folder had nothing for it */
 const SOFT_ERROR=/^(NO_SCENES|BUDGET)$/;

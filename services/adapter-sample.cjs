@@ -82,7 +82,7 @@ function sampleGame({dir,executable,result}){
  if(['unknown-pack','unsupported-engine','decrypt-failed','timeout','parse-failed'].includes(step)){
   const pick=archives.filter(f=>!/\.(ogg|png|wav|mp4|webm|avi|wmv)$/i.test(f)).sort((a,b)=>SCRIPTY.test(path.basename(b))-SCRIPTY.test(path.basename(a))).slice(0,3);
   for(const f of pick){if(room())try{samples.push(archiveSample(f,dir,budget));}catch{}entries.push(...xp3Entries(f),...opaqueBlocks(f));}}
- if(step==='parse-failed'){
+ if(step==='parse-failed'||(step==='decrypt-failed'&&result?.unsupported?.code==='IKURA_SECRET')){
   /* the scenes a reader opened but could not cut into lines */
   try{const scenes=require('./original-engines/scenes.cjs'),opened=(result.engines||[]).filter(e=>e.scenes>0&&!e.lines).map(e=>e.id);
    for(const id of opened){const list=scenes.ENGINES[id]?.scenes(dir)||[];for(const s of list.slice(0,PER_GAME_SAMPLES-samples.length>0?PER_GAME_SAMPLES-samples.length:0)){if(!room())break;let b;try{b=s.read();}catch{continue;}budget.raw+=Math.min(b.length,SCRIPT_MAX);const sampled=scriptSampleResult(b),sm=sampled.sample;
