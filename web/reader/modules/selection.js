@@ -202,7 +202,12 @@
   const r=n.getBoundingClientRect(),c=getComputedStyle(n);return [Math.round(r.left),Math.round(r.top),Math.round(r.width),Math.round(r.height),c.visibility,c.opacity,
   c.display,String(n.textContent||'').slice(0,8)];}),under:document.elementsFromPoint(e.clientX,e.clientY).slice(0,4).map(n=>String(n.className?.baseVal??n.className??n.tagName).slice(0,
   40))}));}catch{}}
- document.addEventListener('pointerdown',e=>{if(inOwn(e.target))return;if(card&&!e.target.closest?.('.sentence-text'))close();const token=tokenAt(e);pointerTrace('down',
+ function lookupTarget(e){
+  if(inOwn(e.target)||e.target?.closest?.('button,a,input,select,textarea,.megulit-art-item,.megulit-choice'))return null;
+  const token=tokenAt(e);
+  return token?.closest('.megulit-art-row')?null:token;
+ }
+ document.addEventListener('pointerdown',e=>{if(inOwn(e.target))return;const token=lookupTarget(e);if(card&&!token)close();pointerTrace('down',
   e,token);if(!token||e.button!==0)return;down={x:e.clientX,y:e.clientY,token};clearTimeout(hold);if(e.pointerType==='touch')hold=setTimeout(()=>{suppressUntil=Date.now()+700;
   const selection=selected();selection?show(selection.args,selection.anchor):showPoint(token);},480);},true);
  /* E422 (user, WoH, screen recording: dragging over the text, the red highlight jumped to 「魔法」, 「見たコト」, 「とは違」 in
@@ -233,9 +238,8 @@
   e.stopImmediatePropagation();suppressUntil=Date.now()+500;pointerTrace('double',e,token);showPoint(token);}return;}const selection=selected();if(selection){e.stopImmediatePropagation();
   suppressUntil=Date.now()+500;show(selection.args,selection.anchor);}};document.addEventListener('pointerup',finish,true);document.addEventListener('mouseup',finish,
   true);document.addEventListener('pointercancel',()=>{clearTimeout(hold);if(down?.drag)getSelection()?.removeAllRanges();down=null;},true);
- document.addEventListener('click',e=>{const token=e.target.closest?.('.sentence-text')?tokenAt(e):null;if(token&&Date.now()>=suppressUntil){pointerTrace('click',
-  e,token);e.preventDefault();e.stopImmediatePropagation();showPoint(token);return;}if(Date.now()<suppressUntil&&e.target.closest?.('.sentence-text')){e.preventDefault();
-  e.stopImmediatePropagation();}},true);
+ document.addEventListener('click',e=>{const token=lookupTarget(e);if(!token)return;e.preventDefault();e.stopImmediatePropagation();
+  if(Date.now()>=suppressUntil){pointerTrace('click',e,token);showPoint(token);}},true);
  document.addEventListener('contextmenu',e=>{if(!e.target.closest?.('.sentence-text'))return;e.preventDefault();e.stopImmediatePropagation();const selection=selected(),
   token=tokenAt(e);if(selection)show(selection.args,selection.anchor);else if(token)showPoint(token);},true);
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&card){e.stopPropagation();close();}},true);addEventListener('resize',place);const source=b.onSourceText;

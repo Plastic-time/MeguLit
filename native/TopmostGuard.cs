@@ -161,7 +161,7 @@ internal static class TopmostGuard {
             if(!Within(()=>IsTopmost(layer)&&GetWindow(browser,2)==game))return "setup";
             /* another program in front of the game */
             Sink(layer,game);
-            Func<bool> placed=()=>!IsTopmost(layer)&&GetWindow(browser,2)==layer&&GetWindow(layer,2)==game;
+            Func<bool> placed=()=>IsWindowVisible(layer)&&!IsTopmost(layer)&&GetWindow(browser,2)==layer&&GetWindow(layer,2)==game;
             if(!Within(placed))return IsTopmost(layer)?"still topmost after another program came in front":"not directly above the game under the program in front";
             /* a second pass leaves a placed layer alone (only checked while nothing else has slipped in between) */
             if(placed()&&Sink(layer,game))return "second pass moved the layer again";

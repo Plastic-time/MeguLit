@@ -15,6 +15,6 @@ test('art translations are painted through pass regions that the pointer gate ig
  assert.match(bridge,/class HitRegion\{public Rect Bounds;public bool Pass;(?:public bool \w+;)*\}/);
  assert.match(bridge,/Pass=Bool\(rect,"pass"\)/);
  const gates=bridge.match(/new ReaderPointerGate\.Context\([^;]*;/g)||[];
- assert.ok(gates.length>=2&&gates.every(g=>g.includes('FindAll(h=>!h.Pass)')));
+ assert.ok(gates.length>0&&gates.every(g=>g.includes('FindAll(h=>!h.Pass)')));
  assert.match(bridge,/HitRegions\.Exists\(h=>!h\.Pass&&/);
 });

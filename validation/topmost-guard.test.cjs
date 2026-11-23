@@ -10,7 +10,7 @@ test('bridge: foreground hook installed, bound-game demotion goes through Topmos
   const s = read('native/GalWindowBridge.cs');
   assert.match(s, /TopmostGuard\.Install\(\(ev,h\)=>GuardLayers\(ev\)\)/);
   assert.match(s, /finally\{RevealGame\(Target\);TopmostGuard\.Uninstall\(\);/);
-  assert.match(s, /if\(!Layer\.Float&&\(GetWindowLong\(Overlay,-20\)&8\)!=0&&ReaderLayerPolicy\.SinkOnLeave\(Layer\.Context&&!IsIconic\(Target\)\)\)TopmostGuard\.Sink\(Overlay,GetAncestor\(Target,2\)\);/, 'another program in front: no HWND_NOTOPMOST (top of the normal band = above the browser)');
+  assert.match(s, /if\(IsShown&&TopmostGuard\.Sink\(Overlay,GetAncestor\(Target,2\)\)\)/, 'another program in front: place the visible layer just above the game');
   assert.match(s, /Glass\.Follow\(Overlay,TranslationMode&&Target!=IntPtr\.Zero&&LayersMayFloat&&/, 'the topmost glass host only while the layer may float');
   assert.match(s, /Target=IntPtr\.Zero;DropLayers\(\);Restore\(\);/, 'game window gone: masks / markers / glass dropped');
   assert.match(s, /ModeFallbackAt=DateTime\.UtcNow;\s*DropLayers\(\);Restore\(\);/, 'game exit: masks / markers / glass dropped');

@@ -190,13 +190,12 @@ test('an empty line of origin leave is an inference for the arbiter; a real empt
  h.immersion.source('','krkr','leave');h.advance(2000);assert.equal(h.immersion.visible,true,'refused while frozen');
  h.immersion.source('','krkr');h.advance(600);assert.equal(h.immersion.visible,false,'the hook itself said the text is gone');
 });
-test('leaving hides the layer in place instead of sinking it; only a layer that stays visible leaves the topmost band',()=>{
+test('switching to another application keeps the layer visible in the game z-order and freezes mask sampling',()=>{
  const s=fs.readFileSync(path.join(__dirname,'..','native','GalWindowBridge.cs'),'utf8'),p=fs.readFileSync(path.join(__dirname,'..','native','ReaderLayerPolicy.cs'),'utf8');
- assert.match(s,/if\(!ReaderLayerPolicy\.SinkOnLeave\(staysVisible\)\)\{\s*bool hid=IsShown\|\|IsWindowVisible\(Overlay\);if\(hid\)\{ShowWindow\(Overlay,0\);IsShown=false;\}/);
- assert.equal((s.match(/TopmostGuard\.Sink\(Overlay,/g)||[]).length,4);
- assert.equal((s.match(/ReaderLayerPolicy\.SinkOnLeave\(/g)||[]).length,4,'every sink of the layer asks the rule first');
- assert.match(p,/public static bool SinkOnLeave\(bool layerStaysVisible\)\{return layerStaysVisible;\}/);
- assert.match(p,/return after sinking: the old way does not fail with every request refused/);
+ assert.match(s,/if\(!alive\|\|iconic\)\{\s*if\(IsShown\|\|IsWindowVisible\(Overlay\)\)ShowWindow\(Overlay,0\);\s*IsShown=false;DropLayers\(\);return;/);
+ assert.match(s,/if\(IsShown&&TopmostGuard\.Sink\(Overlay,GetAncestor\(Target,2\)\)\)/);
+ assert.match(s,/if\(contextActive&&TextMask!=null\)TextMask\.Tick/);
+ assert.match(p,/if\(foreign\.Float\|\|!foreign\.Context\)/);
 });
 test('the bridge looks at the order after every raise and has a way out when topmost is not taken',()=>{
  const s=fs.readFileSync(path.join(__dirname,'..','native','GalWindowBridge.cs'),'utf8'),p=fs.readFileSync(path.join(__dirname,'..','native','ReaderLayerPolicy.cs'),'utf8');

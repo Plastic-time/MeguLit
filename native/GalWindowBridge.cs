@@ -162,7 +162,7 @@ public class GalWindowBridge {
     // the input thread calls it directly, so a dragged panel's glass does not wait for the next bridge loop (E139).
     static void GlassCommand(Dictionary<string,object> d){var boxes=new List<GlassLayer.Box>();object rects;if(d.TryGetValue("rects",out rects)&&rects is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)rects){var rect=item as Dictionary<string,object>;if(rect==null||boxes.Count>=16)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)boxes.Add(new GlassLayer.Box((int)x,(int)y,(int)w,(int)h,(int)Num(rect,"radius",Num(d,"radius",0)),(int)Math.Max(0,Math.Min(60,Num(rect,"blur",18))),(int)Math.Max(0,Math.Min(95,Num(rect,"dim",0))),(int)Math.Max(0,Math.Min(300,Num(rect,"saturate",100))),(int)Math.Max(0,Math.Min(100,Num(rect,"alpha",100))),(int)Num(rect,"fx",x),(int)Num(rect,"fy",y),(int)Math.Max(0,Math.Min(16384,Num(rect,"fw",w))),(int)Math.Max(0,Math.Min(16384,Num(rect,"fh",h)))));}}
         Glass.Set(boxes,(int)Num(d,"radius",0));}
-    /* E533: Pass = painted (inside the window region) but never takes the pointer: art-text translations over game buttons */sealed class HitRegion{public Rect Bounds;public bool Pass;public bool Menu;}
+    /* E533: Pass = painted (inside the window region) but never takes the pointer: art-text translations over game buttons */sealed class HitRegion{public Rect Bounds;public bool Pass;public bool Menu;public bool Lookup;}
     static readonly List<HitRegion> HitRegions=new List<HitRegion>();static string RegionKey="";
     [DllImport("user32.dll")]static extern int SetWindowRgn(IntPtr window,IntPtr region,bool redraw);
     [DllImport("gdi32.dll")]static extern IntPtr CreateRectRgn(int left,int top,int right,int bottom);
@@ -176,9 +176,9 @@ public class GalWindowBridge {
         int dx=0,dy=0;Rect wr;Point co=new Point();
         if(GetWindowRect(Overlay,out wr)&&ClientToScreen(Overlay,ref co)){dx=Math.Max(0,Math.Min(64,co.X-wr.Left));dy=Math.Max(0,Math.Min(64,co.Y-wr.Top));}
         width+=dx;height+=dy;
-        string key=width+":"+height+":"+dx+":"+dy+":"+LookupOpen+":"+String.Join(";",HitRegions.ConvertAll(h=>h.Bounds.Left+","+h.Bounds.Top+","+h.Bounds.Right+","+h.Bounds.Bottom));
+        string key=width+":"+height+":"+dx+":"+dy+":"+String.Join(";",HitRegions.ConvertAll(h=>h.Bounds.Left+","+h.Bounds.Top+","+h.Bounds.Right+","+h.Bounds.Bottom));
         if(key==RegionKey)return;
-        IntPtr region=LookupOpen?CreateRectRgn(0,0,width,height):CreateRectRgn(0,0,0,0);
+        IntPtr region=CreateRectRgn(0,0,0,0);
         foreach(var hit in HitRegions){var h=hit.Bounds;var rect=Clip(new Rect(h.Left+dx,h.Top+dy,h.Right+dx,h.Bottom+dy),width,height);
             if(rect.Right<=rect.Left||rect.Bottom<=rect.Top)continue;
             // Keep the CSS corner pixels; a Win32 rounded region has only binary coverage and clips away antialiasing.
@@ -393,12 +393,6 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
     static bool RegionAckPending;
     static void AckRegion(){if(!RegionAckPending||!MenuOpen)return;Rect r;if(!GetClientRect(Overlay,out r))return;if(TranslationMode&&Target!=IntPtr.Zero){var screen=System.Windows.Forms.SystemInformation.VirtualScreen;if(r.Right!=screen.Width||Math.Abs(r.Bottom-screen.Height)>1)return;}RegionAckPending=false;Emit(new{type="regionApplied",surfaceWidth=r.Right,surfaceHeight=r.Bottom});}
     static void KeepAboveGame(IntPtr gameRoot){KeepAboveGame(gameRoot,true);}
-    /* insert-after handle for "directly above the game" (a non-topmost insert-after also drops topmost) */
-    static IntPtr JustAboveGame(IntPtr gameRoot){IntPtr gameTop=Target!=IntPtr.Zero?GetAncestor(Target,2):IntPtr.Zero;if(gameTop==IntPtr.Zero)gameTop=gameRoot;if(gameTop==IntPtr.Zero)return new IntPtr(1);IntPtr above=GetWindow(gameTop,3);return above==Overlay?GetWindow(Overlay,3):above;}
-    static void StayAboveGameOnly(IntPtr gameRoot){
-        IntPtr gameTop=Target!=IntPtr.Zero?GetAncestor(Target,2):IntPtr.Zero;if(gameTop==IntPtr.Zero)gameTop=gameRoot;if(gameTop==IntPtr.Zero)return;
-        IntPtr above=GetWindow(gameTop,3);if(above==Overlay)return;
-        SetWindowPos(Overlay,above,0,0,0,0,0x0001|0x0002|0x0010);}
     static void KeepAboveGame(IntPtr gameRoot,bool front){
         bool menu=MenuOpen&&MenuRegionReady;
         if((DateTime.UtcNow-LastZCheck).TotalMilliseconds<(menu?100:250))return;LastZCheck=DateTime.UtcNow;
@@ -411,8 +405,7 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         // Some game renderers draw over an inactive ordinary window even after HWND_TOP.
         // Menu open: made topmost at once (not only after the game got above it), so a click on the game cannot cover it.
         // Another application in front (Alt+Tab): the layer stays directly above the game, below that application.
-        if(!front){if(!below)return;IntPtr above=GetWindow(gameTop,3);if(above==Overlay)return;SetWindowPos(Overlay,above==IntPtr.Zero?IntPtr.Zero:above,0,0,0,0,0x0001|0x0002|0x0010);
-            Emit(new{type="coverDebug",text="Alt+T 菜单打开、前台是其他程序：阅读层放回游戏正上方"});return;}
+        if(!front){TopmostGuard.Sink(Overlay,gameTop);return;}
         bool topmost=(GetWindowLong(Overlay,-20)&8)!=0;
         if(!below&&(!Layer.Float||topmost)){if(LastRaise!="held"){LastRaise="held";Emit(new{type="layerRaise",how="held",above=true,topmost=topmost});}return;}
         /* 2026-11-19 16:17 (user: 「一切屏回来就啥都没了」): back from another program the decision was right (float, shown) but the
@@ -550,7 +543,7 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
             // Only when needed: re-showing and re-activating the already visible, already active main window made it
             // hide and reappear once (with the Windows open animation) on the first menu after start.
             bool keepGame=FullscreenTarget()&&GetAncestor(GetForegroundWindow(),3)==GetAncestor(Target,3);if(!IsWindowVisible(Overlay))ShowWindow(Overlay,keepGame?4:5);if(!keepGame&&GetAncestor(GetForegroundWindow(),3)!=GetAncestor(Overlay,3))SetForegroundWindow(Overlay);IsShown=true;MenuFocusPending=false;}}}
-        else if(type=="hitRegions"){MenuRegionReady=Bool(d,"menuOpen");RegionAckPending=MenuRegionReady;HitRegions.Clear();object regions;if(d.TryGetValue("regions",out regions)&&regions is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)regions){var rect=item as Dictionary<string,object>;if(rect==null||HitRegions.Count>=256)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)HitRegions.Add(new HitRegion{Bounds=new Rect((int)x,(int)y,(int)(x+w),(int)(y+h)),Pass=Bool(rect,"pass"),Menu=Bool(rect,"menu")});}}
+        else if(type=="hitRegions"){MenuRegionReady=Bool(d,"menuOpen");RegionAckPending=MenuRegionReady;HitRegions.Clear();object regions;if(d.TryGetValue("regions",out regions)&&regions is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)regions){var rect=item as Dictionary<string,object>;if(rect==null||HitRegions.Count>=256)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)HitRegions.Add(new HitRegion{Bounds=new Rect((int)x,(int)y,(int)(x+w),(int)(y+h)),Pass=Bool(rect,"pass"),Menu=Bool(rect,"menu"),Lookup=Bool(rect,"lookup")});}}
             // Over a bound game apply the new region right away instead of in the next tick (which also captures the game
             // for text and marker detection and made the menu wait ~170 ms before it could open).
             if(TranslationMode&&Target!=IntPtr.Zero&&Overlay!=IntPtr.Zero&&Captured&&HasLastRect&&IsShown){ApplyRegion(LastRect.Right-LastRect.Left,LastRect.Bottom-LastRect.Top);AckRegion();}
@@ -560,7 +553,8 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
             else if(PreferredOverlay!=IntPtr.Zero&&(!TranslationMode||Target==IntPtr.Zero)&&Overlay!=IntPtr.Zero&&IsShown&&MenuOpen&&MenuRegionReady&&HitRegions.Count>0){Rect menuClient;if(GetClientRect(Overlay,out menuClient)){ApplyRegion(menuClient.Right,menuClient.Bottom);AckRegion();}}
             RefreshReaderPointer();}
         else if(type=="glass")GlassCommand(d);
-        else if(type=="lookup"){bool open=Bool(d,"open")&&TranslationMode&&CoverEnabled;if(open!=LookupOpen){LookupOpen=open;HasLastRect=false;Rect client;if(Overlay!=IntPtr.Zero&&IsShown&&GetClientRect(Overlay,out client))ApplyRegion(client.Right,client.Bottom);RefreshReaderPointer();}}
+        else if(type=="lookup"){LookupOpen=Bool(d,"open")&&TranslationMode&&CoverEnabled;RefreshReaderPointer();}
+        else if(type=="wheelDecision"){int id;if(PointerGate!=null&&Int32.TryParse(Str(d,"id"),out id))PointerGate.ResolveWheel(id,Bool(d,"panel"));}
         else if(type=="quit")Running=false;
     }
     static bool ReaderMouseDown,ReaderSpaceDown,ReaderEnterDown,ReaderSkipHeld;
@@ -570,13 +564,18 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
     /* 2026-11-15 (user: 「不要让幽灵窗口抢我桌面置顶」): set by the foreground hook and every tick; the glass host and the
        reading layer float above the game only while this holds (native/TopmostGuard.cs) */
     static volatile bool LayersMayFloat;
+    static bool GameOnDesktop(){
+        if(!IsWindowVisible(Target)||IsIconic(Target))return false;
+        int cloaked;
+        return DwmGetWindowAttribute(Target,14,out cloaked,4)!=0||cloaked==0;
+    }
     /* Foreground / minimise event (TopmostGuard hook, runs in this thread's PeekMessage): the same decision as the tick,
        at once. Another program in front, the game minimised or gone: the layer leaves the topmost band directly above the
        game (under the program now in front), the glass host hides; minimised or gone also hides the layer and its masks. */
     static void GuardLayers(uint ev){
         if(Overlay==IntPtr.Zero||!TranslationMode||Target==IntPtr.Zero)return;
         IntPtr fgWindow=GetForegroundWindow(),fg=GetAncestor(fgWindow,3),gameRoot=GetAncestor(Target,3),overlayRoot=GetAncestor(Overlay,3);
-        bool alive=IsWindow(Target),iconic=alive&&IsIconic(Target);
+        bool alive=IsWindow(Target),iconic=alive&&!GameOnDesktop();
         /* no foreground window: an activation is in flight (menu closing, focus handed back to the game); the next event or tick decides */
         if(fgWindow==IntPtr.Zero&&alive&&!iconic)return;
         uint fgPid=0,gamePid=0;GetWindowThreadProcessId(fgWindow,out fgPid);if(alive)GetWindowThreadProcessId(Target,out gamePid);
@@ -586,22 +585,14 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         if(alive&&!iconic&&!gameFront&&!ownFront&&CaptureSurfaceFront(fg))return;
         bool ok=TopmostGuard.MayFloat(alive,iconic,gameFront,ownFront);
         LayersMayFloat=ok;if(ok)return;
-        /* 2026-11-19 16:57 (user: 「切屏回来还是直接消失」; reader-host.log: layerRaise how:failed on every return). Sunk out of the
-           topmost band, the layer could not be raised again while the game held the foreground: every z-order request
-           from this process was ignored until MeguLit itself became the foreground (the menu). So the layer no longer
-           leaves the band when it is going to be hidden anyway (another program in front, the game minimised or gone):
-           it is hidden at once and keeps its place; coming back only shows it. It is sunk only where it stays visible
-           without floating (another MeguLit window in front). */
-        bool staysVisible=alive&&!iconic&&PreferredOverlay!=IntPtr.Zero&&fgPid!=0&&fgPid==(uint)OverlayPid&&fg!=overlayRoot;
-        if(!ReaderLayerPolicy.SinkOnLeave(staysVisible)){
-            bool hid=IsShown||IsWindowVisible(Overlay);if(hid){ShowWindow(Overlay,0);IsShown=false;}
-            try{Glass.Hide();}catch{}if(!alive||iconic)DropLayers();
-            if(hid)Emit(new{type="coverDebug",text="前台换成了别的程序/游戏最小化：阅读层隐藏，保留层级，回来直接显示 (event "+ev.ToString("x")+")"});
-            return;}
-        bool moved=TopmostGuard.Sink(Overlay,alive&&!iconic?GetAncestor(Target,2):IntPtr.Zero);
+        if(!alive||iconic){
+            if(IsShown||IsWindowVisible(Overlay))ShowWindow(Overlay,0);
+            IsShown=false;DropLayers();return;
+        }
+        // Yield z-order to the foreground application without revealing the game's original text.
+        if(IsShown&&TopmostGuard.Sink(Overlay,GetAncestor(Target,2)))
+            Emit(new{type="coverDebug",text="前台换成了别的程序：阅读层保留在游戏正上方 (event "+ev.ToString("x")+")"});
         try{Glass.Hide();}catch{}
-        if(!alive||iconic){if(IsShown){ShowWindow(Overlay,0);IsShown=false;}DropLayers();}
-        if(moved)Emit(new{type="coverDebug",text="前台换成了别的程序/游戏最小化：阅读层退出置顶，放在游戏正上方、其他程序下面 (event "+ev.ToString("x")+")"});
     }
     /* game gone or minimised: no MeguLit mask / marker / glass window stays on the desktop (they are created again on use) */
     static void DropLayers(){
@@ -638,8 +629,10 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         /* Issue #133 (WHITE ALBUM2: clicking a word went to the next line). The overlay floated unbound (Target zero), the
            gate was off, and the game, which polls the mouse button, took the click as well. Unbound, the gate still owns
            clicks on MeguLit's own text regions (never the whole overlay), so a polling game under it never sees them. */
-        if(Target==IntPtr.Zero){PointerGate.Current=new ReaderPointerGate.Context(Overlay,IntPtr.Zero,client,false,HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray(),HitRegions.FindAll(h=>h.Menu).ConvertAll(h=>h.Bounds).ToArray());return;}
-        PointerGate.Current=new ReaderPointerGate.Context(Overlay,GetAncestor(Target,2),client,LookupOpen,HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray(),HitRegions.FindAll(h=>h.Menu).ConvertAll(h=>h.Bounds).ToArray());
+        PointerGate.Current=new ReaderPointerGate.Context(Overlay,GetAncestor(Target,2),client,LookupOpen,
+            HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray(),
+            HitRegions.FindAll(h=>h.Menu).ConvertAll(h=>h.Bounds).ToArray(),
+            HitRegions.FindAll(h=>h.Lookup).ConvertAll(h=>h.Bounds).ToArray());
     }
     static bool? LastReaderContext;
     /* 2026-11-19 one reading of the foreground per tick and one decision for the layer (native/ReaderLayerPolicy.cs):
@@ -660,8 +653,8 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         return ReaderLayerPolicy.CaptureSurface((ex&8)!=0,(style&0x00C00000)==0x00C00000,covers,IsIconic(Target));}
     static ReaderLayerPolicy.State DecideLayer(){
         bool bound=TranslationMode&&Target!=IntPtr.Zero&&IsWindow(Target);
-        var s=ReaderLayerPolicy.Decide(bound?FrontNow():ReaderLayerPolicy.Foreign,MenuOpen,MenuRegionReady,PreferredOverlay!=IntPtr.Zero,bound&&IsIconic(Target),NowMs());
-        if(!bound){s.Float=false;s.Pinned=false;}
+        var s=ReaderLayerPolicy.Decide(bound?FrontNow():ReaderLayerPolicy.Foreign,MenuOpen,MenuRegionReady,PreferredOverlay!=IntPtr.Zero,bound&&!GameOnDesktop(),NowMs());
+        if(!bound){s.Float=false;s.Pinned=false;s.Context=false;}
         /* every change is logged (reader-host.log "layerState"): a report of the text vanishing is matched against it */
         string key=s.Front+"|"+s.Float+"|"+s.Context+"|"+s.Pinned+"|"+MenuOpen+"|"+IsShown+"|"+DialogVisible+"|"+CoverEnabled;
         if(bound&&key!=LastLayerKey){LastLayerKey=key;/* the place is checked in this pass, not up to 250 ms later */LastZCheck=DateTime.MinValue;Emit(new{type="layerState",front=s.Front,floating=s.Float,context=s.Context,pinned=s.Pinned,menu=MenuOpen,shown=IsShown,dialog=DialogVisible,cover=CoverEnabled,topmost=Overlay!=IntPtr.Zero&&(GetWindowLong(Overlay,-20)&8)!=0});}
@@ -698,12 +691,6 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
                 /* E322: the game window itself, never the screen with MeguLit's own layer on it */string kept=Scene.Reason;bool? present=Scene.Tick(Target,sceneRect.Right,sceneRect.Bottom);if(present.HasValue)Emit(new{type="dialogScene",visible=present.Value,reason=Scene.Reason,box=Scene.Box});else if(Scene.Reason!=kept&&Scene.Reason.StartsWith("kept"))Emit(new{type="dialogSceneKept",reason=Scene.Reason});
             }
         }
-        // Alt+T menu open over a bound game: the layer stays above the game whatever is in front (user, 2026-11-03: dragging
-        // between MeguLit and the menu, the foreground checks below demoted or hid it and the menu fell under the game).
-        uint hostForegroundPid;GetWindowThreadProcessId(GetForegroundWindow(),out hostForegroundPid);
-        uint hostGamePid=0;if(Target!=IntPtr.Zero)GetWindowThreadProcessId(Target,out hostGamePid);
-        bool hostContext=hostForegroundPid==(uint)OverlayPid||hostForegroundPid==hostGamePid||ImeHost(ProcessName(hostForegroundPid));
-        bool menuPinned=TranslationMode&&Target!=IntPtr.Zero&&MenuOpen&&MenuRegionReady&&hostContext;
         LayersMayFloat=Layer.Float;
         if(!Layer.Float&&(GetWindowLong(Overlay,-20)&8)!=0){if(Target!=IntPtr.Zero&&IsWindow(Target)){/* only a layer that stays visible leaves the topmost band; one that is hidden below keeps its place for the return */if(ReaderLayerPolicy.SinkOnLeave(Layer.Context&&!IsIconic(Target)))TopmostGuard.Sink(Overlay,GetAncestor(Target,2));}else SetWindowPos(Overlay,new IntPtr(-2),0,0,0,0,0x0001|0x0002|0x0010);}
         if(IsIconic(Overlay)){MenuFocusPending=false;if(MaskLayer!=null)MaskLayer.Hide();if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();return;}
@@ -744,15 +731,13 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         // The game's own popups (IME candidate list, dialogs) belong to its process but not to its window tree: the IME
         // list of a Chinese input method used to hide the whole reading layer as "fg=other" in Subahibi.
         uint fgPid=0,gamePid=0;GetWindowThreadProcessId(GetForegroundWindow(),out fgPid);GetWindowThreadProcessId(Target,out gamePid);bool gameOwned=Layer.Front==ReaderLayerPolicy.Game;
-        bool homeOwned=PreferredOverlay!=IntPtr.Zero&&Layer.Front==ReaderLayerPolicy.OwnHome;bool contextActive=gameOwned||Layer.Front==ReaderLayerPolicy.OwnLayer||homeOwned;bool visible=ReadingVisible(Layer.Context,IsIconic(Target),IsIconic(Overlay),CoverEnabled,DialogVisible,MenuOpen);/* 2026-11-16 #299 (Strawberry Nauts: the Alt+T menu vanished as it opened): an open menu keeps the layer up from the first tick, before its hit region is reported, whatever the engine's dialogue flag does */
+        bool homeOwned=PreferredOverlay!=IntPtr.Zero&&Layer.Front==ReaderLayerPolicy.OwnHome;bool contextActive=gameOwned||Layer.Front==ReaderLayerPolicy.OwnLayer||homeOwned;
+        bool visible=ReadingVisible(Layer.Context,IsIconic(Target),IsIconic(Overlay),CoverEnabled,DialogVisible,MenuOpen);
         if(!contextActive)MenuFocusPending=false;
-        // Another application in front: never topmost, also with the menu open (it stays visible, just above the game;
-        // KeepAboveGame keeps it there). Topmost over everything after Alt+Tab was wrong (user, 2026-11-03).
-        if(!Layer.Float&&(GetWindowLong(Overlay,-20)&8)!=0&&ReaderLayerPolicy.SinkOnLeave(Layer.Context&&!IsIconic(Target)))TopmostGuard.Sink(Overlay,GetAncestor(Target,2));
         if(!visible){if(IsShown){HideReason("menu="+MenuOpen+"/"+MenuRegionReady+" cover="+CoverEnabled+" dialog="+DialogVisible+" iconic="+IsIconic(Target)+" fg="+(fg==gameRoot?"game":fg==overlayRoot?"overlay":"other"));ShowWindow(Overlay,0);}IsShown=false;if(TextMask!=null)TextMask.Hide();
             // Hidden only because no dialogue was detected: keep looking for the wait marker, so its return brings the layer back.
             Rect probeClient;Point probeOrigin=new Point();
-            if(WaitMarker!=null&&WaitMarker.PresenceWanted&&!DialogVisible&&CoverEnabled&&!IsIconic(Target)&&GetClientRect(Target,out probeClient)&&ClientToScreen(Target,ref probeOrigin)){WaitMarker.ProbeOnly=true;WaitMarker.ScreenX=probeOrigin.X;WaitMarker.ScreenY=probeOrigin.Y;WaitMarker.Tick(Target,probeClient.Right,probeClient.Bottom,true,0,0);}
+            if(contextActive&&WaitMarker!=null&&WaitMarker.PresenceWanted&&!DialogVisible&&CoverEnabled&&!IsIconic(Target)&&GetClientRect(Target,out probeClient)&&ClientToScreen(Target,ref probeOrigin)){WaitMarker.ProbeOnly=true;WaitMarker.ScreenX=probeOrigin.X;WaitMarker.ScreenY=probeOrigin.Y;WaitMarker.Tick(Target,probeClient.Right,probeClient.Bottom,true,0,0);}
             else if(WaitMarker!=null)WaitMarker.Hide();
             return;}
         // Bind() only captures the window frame when already in translation mode. Auto-binding at startup happens in normal mode,
@@ -778,20 +763,20 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
            the opening and first lines never showed, while the game hid its own text): the cached LastRect said the window
            was already placed. The real window rect is checked too, so a window moved by any other path is put back. */
         Rect placed;bool strayed=HasLastRect&&GetWindowRect(Overlay,out placed)&&(placed.Left!=box.Left||placed.Top!=box.Top||placed.Right!=box.Right||placed.Bottom!=box.Bottom);
-        if(strayed||!HasLastRect||!IsShown||box.Left!=LastRect.Left||box.Top!=LastRect.Top||box.Right!=LastRect.Right||box.Bottom!=LastRect.Bottom){SetWindowPos(Overlay,homeOwned?JustAboveGame(gameRoot):Layer.Float?new IntPtr(-1):IntPtr.Zero,box.Left,box.Top,box.Right-box.Left,box.Bottom-box.Top,(uint)(0x0010|0x0040|(!HasLastRect?0x0020:0)));LastRect=box;HasLastRect=true;}IsShown=true;AckRegion();
+        if(strayed||!HasLastRect||!IsShown||box.Left!=LastRect.Left||box.Top!=LastRect.Top||box.Right!=LastRect.Right||box.Bottom!=LastRect.Bottom){SetWindowPos(Overlay,Layer.Float?new IntPtr(-1):TopmostGuard.Slot(Overlay,GetAncestor(Target,2)),box.Left,box.Top,box.Right-box.Left,box.Bottom-box.Top,(uint)(0x0010|0x0040|(!HasLastRect?0x0020:0)));LastRect=box;HasLastRect=true;}IsShown=true;AckRegion();
         FocusMenuOnce();
         /* 2026-11-14 (user, beta.36: a translation drawn big over MeguLit's own game page while a file picker was open):
            with a MeguLit window in front the layer went directly under that window. An unowned window of MeguLit (the file
            picker, a popup) is its own root, so the layer landed above the main window. The layer now sits directly above the
            game, under every other window, so it only ever covers the game. */
-        if(homeOwned)StayAboveGameOnly(gameRoot);
-        KeepAboveGame(gameRoot,contextActive&&!homeOwned);
+        KeepAboveGame(gameRoot,Layer.Float);
         if(magpie&&contextActive&&!homeOwned&&(DateTime.UtcNow-MagpieRaisedAt).TotalMilliseconds>250){MagpieRaisedAt=DateTime.UtcNow;SetWindowPos(Overlay,new IntPtr(-1),0,0,0,0,0x0001|0x0002|0x0010);}
         /* Magpie pauses while its source window is not in front: outside the Alt+T menu (which needs the keyboard and hands focus back when it closes) the reading layer never keeps the foreground from the scaled game. */
         if(magpie&&!MenuOpen&&fg==overlayRoot&&(DateTime.UtcNow-MagpieFocusAt).TotalMilliseconds>400){MagpieFocusAt=DateTime.UtcNow;SetForegroundWindow(gameRoot);}
         MaskLayer.Origin(Overlay,Target,box.Left,box.Top);
-        if(TextMask!=null)TextMask.Tick(Target,origin.X,origin.Y,client.Right,client.Bottom,CoverEnabled,box.Left-origin.X,box.Top-origin.Y);
-        if(WaitMarker!=null){WaitMarker.ProbeOnly=false;WaitMarker.ScreenX=origin.X;WaitMarker.ScreenY=origin.Y;WaitMarker.Tick(Target,client.Right,client.Bottom,CoverEnabled,box.Left-origin.X,box.Top-origin.Y);}
+        // Keep the last cover when another application can obscure the area being sampled.
+        if(contextActive&&TextMask!=null)TextMask.Tick(Target,origin.X,origin.Y,client.Right,client.Bottom,CoverEnabled,box.Left-origin.X,box.Top-origin.Y);
+        if(contextActive&&WaitMarker!=null){WaitMarker.ProbeOnly=false;WaitMarker.ScreenX=origin.X;WaitMarker.ScreenY=origin.Y;WaitMarker.Tick(Target,client.Right,client.Bottom,CoverEnabled,box.Left-origin.X,box.Top-origin.Y);}
     }
     [DllImport("user32.dll")]static extern void DisableProcessWindowsGhosting();
     public static void NoGhostWindows(){try{DisableProcessWindowsGhosting();}catch{}}

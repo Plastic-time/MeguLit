@@ -45,7 +45,10 @@ function activeGameForProgram(db,exe){
  const exact=rows.filter(row=>canonical(row.executable)===target);
  if(exact.length)return exact.length===1?exact[0]:null;
  const variants=rows.filter(row=>knownPrograms(row,JSON.parse(row.original||'{}').library||{}).some(file=>canonical(file)===target));
- return variants.length===1?variants[0]:null;
+ if(variants.length||path.basename(target)!=='fata.exe')return variants.length===1?variants[0]:null;
+ const {launchPlan}=require('./fata-wheel.cjs');
+ const launchers=rows.filter(row=>canonical(launchPlan(row.executable)?.executable)===target);
+ return launchers.length===1?launchers[0]:null;
 }
 function reconcile(root,items,{restoreRemoved=false,confirmedFolderMatches}={}){const db=openStore(root);let added=0,updated=0,committed=false;db.exec('BEGIN IMMEDIATE');try{
  if(restoreRemoved){const revive=db.prepare('UPDATE games SET removed_at=NULL WHERE id=?');for(const row of db.prepare('SELECT id,executable,original FROM games WHERE removed_at IS NOT NULL').all())if(!JSON.parse(row.original||'{}').mergedInto&&row.executable&&fs.statSync(row.executable,{throwIfNoEntry:false})?.isFile())revive.run(row.id);}

@@ -65,3 +65,14 @@ test('outside lookup gesture is consumed through release and clears selection',a
  assert.equal(state.isDismissing(),false);assert.equal(removed,1);assert.equal(cleared,2);assert.deepEqual(messages,[true,false]);
  assert.equal(fire('pointerdown'),false);assert.equal(fire('click'),false);
 });
+
+test('game-overlay lookup leaves outside input to native hit testing',async()=>{
+ const {installLookupDismiss}=await import('../web/reader/lookup-dismiss.js');
+ const listeners=new Map();
+ const document={querySelector:()=>({contains:()=>false}),createElement:()=>assert.fail('outside-input shield created'),
+  body:{classList:{contains:name=>name==='tomoyo-ui-translation'}},addEventListener:(type,callback)=>listeners.set(type,callback)};
+ const state=installLookupDismiss({bridge:()=>assert.fail('unexpected WebView dismissal'),send:()=>assert.fail('unexpected gesture relay')},
+  {document,MutationObserver:class{observe(){}}});
+ listeners.get('pointerdown')({preventDefault:()=>assert.fail('outside press swallowed')});
+ assert.equal(state.isDismissing(),false);
+});

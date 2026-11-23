@@ -44,6 +44,7 @@ class Reader{
   if(message.type==='hookPatchTranslation'){if(this.zeroLatencyEnabled?.(this.targetLanguage?.())&&(message.machine||message.filled||message.japanese===message.chinese))return;if(typeof message.japanese==='string'&&typeof message.chinese==='string'&&message.chinese.length<=4000){
    if(!message.machine&&!message.filled&&message.chinese.trim())this.logVisibility({type:'patchLine'});this.embedCached(message.japanese,message.chinese.trim(),{language:'',source:message.filled?'filled':message.machine?'machine':this.gal?.hooks?.originalText?.kind==='original'?'official':'patch'});/* 2026-11-21 (owner, 千恋＊万花 中文版, r26 21:40:06 / 21:40:10: the patch translation stored, the reader never asked for it): a stored patch line is offered to the line on screen at once; the reader fills it when that line shows no translation of its own */try{if(message.chinese.trim())this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[message.japanese,message.chinese.trim(),message.filled?'filled':message.machine===true?'machine':this.gal?.hooks?.originalText?.kind==='original'?'official':'patch',{target:'zh'}]});}catch{}/* learning: remember which lines carry a human translation (group patch / official Chinese) */if(!message.machine&&!message.filled){const source=this.gal?.hooks?.originalText?.kind==='original'?'official':'group';this.humanLine(message.japanese,{text:message.chinese.trim(),source});if(this.gameId)this.stats.translation(this.gameId,message.japanese,message.chinese.trim(),source);}}return;}
   if(message.type==='hostFrame'){
+   if(message.dismissLookup===true)this.emit('reader-event',{type:'call',method:'closeLocalSelection',args:[]});
    try{logSink.append(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),...message})+'\n');}catch{}
    return;
   }
@@ -510,6 +511,7 @@ class Reader{
    case 'galUnbind':Reader.prototype.clearGameVisuals.call(this);this.visualIdentity='';this.translator().clearContext();g?.save({...g.preferences,bindEnabled:false});this.stats.reset();break;
    case 'galMenu':/* opening and closing the menu both freeze every inferred hide/show (core/immersion.cjs), whatever the bridge reports */if(r.open===true)this.immersion?.context(false);this.immersion?.menu?.(r.open===true);g?.send({type:'menu',open:r.open===true});break;
    case 'galLookup':g?.send({type:'lookup',open:r.open===true});break;
+   case 'galWheelDecision':if(Number.isSafeInteger(r.id))g?.send({type:'wheelDecision',id:r.id,panel:r.panel===true});break;
    case 'galFloatDrag':if([r.x,r.y].every(Number.isFinite))g?.send({type:'floatDrag',x:r.x,y:r.y});break;
    case 'galHitRegions':if(Array.isArray(r.regions)&&r.regions.length<=256&&r.regions.every(x=>[x.x,x.y,x.width,x.height].every(Number.isFinite)))g?.send({type:'hitRegions',regions:r.regions,menuOpen:r.menuOpen===true});break;
    case 'galGlass':if(Array.isArray(r.rects)&&r.rects.length<=16&&r.rects.every(x=>[x.x,x.y,x.width,x.height].every(Number.isFinite)))g?.send({type:'glass',rects:r.rects,radius:Number(r.radius)||18});break;

@@ -1,14 +1,24 @@
 'use strict';
-/* Owner 2026-11-21: with b31d1ae6 every Alt+T slider in every game stopped dragging (headless it dragged): the gate, now on
-   while the menu is open, took the panel's gestures. A gesture that starts on the panel goes to the WebView untouched. */
 const test=require('node:test'),assert=require('node:assert'),fs=require('fs'),path=require('path');
 const N=f=>fs.readFileSync(path.join(__dirname,'..','native',f),'utf8');
-test('panel gestures pass the pointer gate',()=>{
+test('lookup card presses use the pointer gate while Alt+T controls retain native drags',()=>{
  const g=N('ReaderPointerGate.cs'),b=N('GalWindowBridge.cs');
- assert.match(b,/class HitRegion\{public Rect Bounds;public bool Pass;public bool Menu;/);
- assert.match(b,/Menu=Bool\(rect,"menu"\)/,'the page\'s menu flag is kept');
- assert.match(b,/HitRegions\.FindAll\(h=>h\.Menu\)\.ConvertAll\(h=>h\.Bounds\)\.ToArray\(\)\);/);
- assert.match(g,/if\(gesture\.Owner==null&&index>=0&&context\.InMenu\(point\.X,point\.Y\)\)return false;/,'a press on the panel is not taken: press, moves and release go to the WebView');
- assert.match(g,/if\(!c\.InMenu\(1500,400\)\|\|c\.InMenu\(300,620\)\|\|!c\.Hit\(300,620\)\)return false;/,'self-test');
- assert.match(fs.readFileSync(path.join(__dirname,'..','web','reader','modules','interaction.js'),'utf8'),/menu:isMenu/,'regions carry the menu flag');
+ assert.match(b,/Lookup=Bool\(rect,"lookup"\)/);
+ assert.match(b,/HitRegions\.FindAll\(h=>h\.Lookup\)\.ConvertAll\(h=>h\.Bounds\)\.ToArray\(\)/);
+ assert.match(g,/if\(gesture\.Owner==null&&index>=0&&context\.NativeMenu\(point\.X,point\.Y\)\)return false;/);
+ assert.match(g,/foreach\(var rect in LookupPanels\)if\(Contains\(rect,x,y\)\)return false;/);
+ assert.doesNotMatch(b,/LookupOpen\?CreateRectRgn/,'lookup does not expand the overlay input region');
+ assert.match(fs.readFileSync(path.join(__dirname,'..','web','reader','modules','interaction.js'),'utf8'),/menu:isMenu,lookup/);
+});
+test('the live DOM resolves ambiguous wheel events before the bridge forwards them to the game',()=>{
+ const g=N('ReaderPointerGate.cs'),r=fs.readFileSync(path.join(__dirname,'..','desktop','src','reader_pointer.rs'),'utf8');
+ const web=fs.readFileSync(path.join(__dirname,'..','web','reader','modules','interaction.js'),'utf8');
+ assert.match(g,/NeedsWheelHitTest\(false,true,false,true\)/,'a stale native rectangle still needs a DOM hit test on the reader window');
+ assert.match(g,/kind="wheelHitTest"/);
+ assert.match(g,/if\(panel\)\{[\s\S]+?kind="mouseWheel"/);
+ assert.match(g,/else\{\s*var foreground=GetAncestor\(GetForegroundWindow\(\),2\);[\s\S]+?PostGameWheel\(context\.Game,wheel\);/);
+ assert.match(g,/PostMessage\(game,\(uint\)wheel\.Message,/);
+ assert.match(r,/window\.__megulitResolveWheel/);
+ assert.match(r,/if kind == "mouseWheel" \{\s*packet\["deltaX"\]/);
+ assert.match(web,/document\.elementFromPoint\(x,y\)\?\.closest\(MENUS\)/);
 });
