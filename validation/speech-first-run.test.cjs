@@ -133,7 +133,7 @@ test('a model installed at publication keeps its original bytes',async t=>{
  assert.deepEqual(fs.readFileSync(path.join(dir,files[1])),data);
 });
 
-test('stopping during a download aborts it and never spawns the engine',async t=>{
+test('closing during a download waits for staging cleanup and never spawns the engine',async t=>{
  const opaque=Promise.withResolvers();
  const {dir,starts,services}=rig(t,({id,download,opts})=>{
   if(id!==ids[1]||!download)return;
@@ -143,8 +143,23 @@ test('stopping during a download aborts it and never spawns the engine',async t=
  const job=services.ensureSpeech(undefined,false);
  const stopped=assert.rejects(job,/语音启动已取消/);
  await Promise.race([opaque.promise,job]);
- await services.stopSpeech();
- await stopped;
+ const staging=fs.readdirSync(dir).find(name=>name.startsWith('.megulit-first-voices-'));
+ assert.ok(staging);
+ assert.deepEqual(fs.readdirSync(path.join(dir,staging)),[ids[0]+'.aivmx']);
+ await services.stop();
  assert.deepEqual(starts,[]);
  assert.deepEqual(fs.readdirSync(dir),[]);
+ await stopped;
+});
+
+test('closing while BERT prepares does not wait for its uncancellable work',async t=>{
+ const {dir,starts,services}=rig(t),entered=Promise.withResolvers(),bert=Promise.withResolvers();
+ services.prepare=()=>{entered.resolve();return bert.promise;};
+ const job=services.ensureSpeech(undefined,false),stopped=assert.rejects(job,/语音启动已取消/);
+ await entered.promise;
+ await services.stop();
+ assert.deepEqual(starts,[]);
+ assert.deepEqual(fs.readdirSync(dir),[]);
+ bert.resolve();
+ await stopped;
 });
