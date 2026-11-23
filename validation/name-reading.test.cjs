@@ -68,16 +68,18 @@ function stubbed(lines){
  return L;
 }
 
-test('furigana, lookup and the speech button read the bound game’s names, and a new game drops them',async()=>{
+test('the reader’s furigana, lookup and speech button read the bound game’s names, other pages do not, and a new game drops them',async()=>{
  const L=stubbed({'昂晴君':[tok('昂','ノボル',NOUN,0,1),tok('晴','ハレ',NOUN,1,2),tok('君','クン','接尾辞,名詞的,一般',2,3)]});
  assert.equal((await L.tokenize('昂晴君'))[0].reading,'ノボル');
  L.useNames(new Map([['昂晴','こうせい']]));
- assert.deepEqual((await L.tokenize('昂晴君')).map(t=>[t.surface,t.reading]),[['昂晴','こうせい'],['君','クン']],'the furigana cached before is dropped');
+ const N={names:true};
+ assert.deepEqual((await L.tokenize('昂晴君',N)).map(t=>[t.surface,t.reading]),[['昂晴','こうせい'],['君','クン']],'the furigana cached before is dropped');
+ assert.equal((await L.tokenize('昂晴君'))[0].reading,'ノボル','daily news, examples and grammar counts read the text without the game’s names');
  // The dictionary entry found for the selection is another word; the speech button still says the name.
  L.request=async()=>({surface:'昂晴',entries:[{id:9,spellings:['昂晴'],readings:['のぼりはれ']}],morphology:{base:'昂晴'}});
- const name=await L.word({text:'昂晴君',start:0,end:2});assert.equal(name.reading,'こうせい');assert.equal(name.ambiguous,false);
- assert.deepEqual((await L.word({text:'昂晴君',start:1,end:2})).spoken,{surface:'昂晴',reading:'こうせい',pitch:[],ambiguous:false},'a click on 晴 says the whole name');
- L.useNames(null);assert.equal((await L.tokenize('昂晴君'))[0].reading,'ノボル');
+ const name=await L.word({text:'昂晴君',start:0,end:2},undefined,N);assert.equal(name.reading,'こうせい');assert.equal(name.ambiguous,false);
+ assert.deepEqual((await L.word({text:'昂晴君',start:1,end:2},undefined,N)).spoken,{surface:'昂晴',reading:'こうせい',pitch:[],ambiguous:false},'a click on 晴 says the whole name');
+ L.useNames(null);assert.equal((await L.tokenize('昂晴君',N))[0].reading,'ノボル');
  const reader=fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8');
  assert.match(reader,/this\.gameId=game\?\.id\|\|null;this\.bindNames\(game\);/);
  assert.match(reader,/gameNames\(vndbId,\{titles,folder:path\.join\(this\.root,'cache','vndb-names'\)/);
@@ -85,6 +87,8 @@ test('furigana, lookup and the speech button read the bound game’s names, and 
  assert.match(reader,/if\(!vndbId&&!titles\.some\(Boolean\)\)return;/,'and is not skipped for having no id');
  assert.equal(reader.match(/this\.gameId=null;this\.runtime\.localLearning\?\.useNames\(null\);/g)?.length,2,'game change and game exit');
  assert.match(reader,/readings\.resolve\(this\.runtime\.learning\(\)\.withNames\(r\.result\)\)/,'the UniDic engine path too');
+ assert.match(reader,/learning\(\)\.request\(r\.command,r\.args,r\.language\|\|this\.prefs\(\)\.learnerLanguage\|\|'zh',\{names:true\}\)/,'the reader page furigana');
+ assert.match(reader,/learning\(\)\.word\(args,args\.entryId,\{names:true\}\)/,'the reader card and speech button');
 });
 
 test('the speech button says a full name as its family and given name',async()=>{
@@ -136,4 +140,16 @@ test('a game without a VNDB id is found by a title that matches a VNDB title or 
  answer={'Unknown':undefined};await gameNames('',{titles:['Unknown'],folder,find,fetcher:characters,now:1000+2*86400e3});
  await gameNames('',{titles:['Unknown'],folder,find,fetcher:characters,now:1000+2*86400e3});
  assert.deepEqual(searched,['去人たち','Unknown','Unknown','Unknown'],'an unreachable VNDB is asked again next time');
+});
+
+test('a damaged or future-dated name cache is replaced, not trusted',async()=>{
+ const folder=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-names-bad-'));test.after(()=>fs.rmSync(folder,{recursive:true,force:true}));
+ const characters=async()=>({ok:true,json:async()=>({results:[{name:'Tosaki Kana',original:'戸崎 鹿南'}],more:false})});
+ fs.writeFileSync(path.join(folder,'titles.json'),'"x"');
+ assert.equal((await gameNames('',{titles:['去人たち'],folder,find:async()=>({id:'v19216'}),fetcher:characters,now:1000})).get('鹿南'),'かな');
+ assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'titles.json'),'utf8'))['去人たち'].id,'v19216');
+ fs.writeFileSync(path.join(folder,'v19216.json'),JSON.stringify({at:1e20,characters:[{name:'Old',original:'古'}]}));
+ let asked=0;const fetcher=async(...a)=>{asked++;return characters(...a);};
+ assert.equal((await gameNames('v19216',{folder,fetcher,now:2000})).get('鹿南'),'かな','a cache written in the future (a clock set back) is fetched again');
+ assert.equal(asked,1);
 });

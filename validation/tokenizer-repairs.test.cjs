@@ -21,6 +21,18 @@ const SUDACHI={
  '性に合わない':[['性','セイ','名詞,普通名詞,一般,*,*,*'],['に','ニ','助詞,格助詞,*,*,*,*'],['合わ','アワ','動詞,非自立可能,*,*,五段-ワア行,未然形-一般','合う'],['ない','ナイ','助動詞,*,*,*,助動詞-ナイ,終止形-一般']],
  '見に来た':[['見','ミ','動詞,非自立可能,*,*,上一段-マ行,連用形-一般','見る'],['に','ニ','助詞,格助詞,*,*,*,*'],['来','キ','動詞,非自立可能,*,*,カ行変格,連用形-一般','来る'],['た','タ','助動詞,*,*,*,助動詞-タ,終止形-一般']],
  '気もなかった':[['気','キ','名詞,普通名詞,一般,*,*,*'],['も','モ','助詞,係助詞,*,*,*,*'],['なかっ','ナカッ','形容詞,非自立可能,*,*,形容詞,連用形-促音便','ない'],['た','タ','助動詞,*,*,*,助動詞-タ,終止形-一般']],
+ 'あんた方':[['あんた','アンタ','代名詞,*,*,*,*,*'],['方','カタ','接尾辞,名詞的,一般,*,*,*']],
+ '〇〇さん':[['〇〇','レイキゴウ','名詞,数詞,*,*,*,*'],['さん','サン','接尾辞,名詞的,一般,*,*,*']],
+ '一五歳':[['一五','イチゴ','名詞,数詞,*,*,*,*'],['歳','サイ','接尾辞,名詞的,助数詞,*,*,*']],
+ '二八':[['二八','ニハチ','名詞,数詞,*,*,*,*']],
+ '〇月':[['〇','レイ','名詞,数詞,*,*,*,*'],['月','ガツ','名詞,普通名詞,助数詞可能,*,*,*']],
+ '三分咲き':[['三','サン','名詞,数詞,*,*,*,*'],['分','フン','名詞,普通名詞,助数詞可能,*,*,*'],['咲き','サキ','名詞,普通名詞,一般,*,*,*']],
+ '二三日':[['二三','ニサン','名詞,数詞,*,*,*,*'],['日','ニチ','名詞,普通名詞,助数詞可能,*,*,*']],
+ '二〇二六年':[['二〇二六','ニレイニロク','名詞,数詞,*,*,*,*'],['年','ネン','名詞,普通名詞,助数詞可能,*,*,*']],
+ '数万人':[['数','スウ','名詞,数詞,*,*,*,*'],['万','マン','名詞,数詞,*,*,*,*'],['人','ニン','接尾辞,名詞的,一般,*,*,*']],
+ '3分の1':[['3','サン','名詞,数詞,*,*,*,*'],['分','ブン','接尾辞,名詞的,サ変可能,*,*,*'],['の','ノ','助詞,格助詞,*,*,*,*'],['1','イチ','名詞,数詞,*,*,*,*']],
+ '3分の休憩':[['3','サン','名詞,数詞,*,*,*,*'],['分','ブン','接尾辞,名詞的,サ変可能,*,*,*'],['の','ノ','助詞,格助詞,*,*,*,*'],['休憩','キュウケイ','名詞,普通名詞,サ変可能,*,*,*']],
+ '一は来た':[['一','イチ','名詞,数詞,*,*,*,*'],['は','ハ','助詞,係助詞,*,*,*,*'],['来','キ','動詞,非自立可能,*,*,カ行変格,連用形-一般','来る'],['た','タ','助動詞,*,*,*,助動詞-タ,終止形-一般']],
  '上':[['上','ウエ','名詞,普通名詞,副詞可能,*,*,*']],
  '方':[['方','ホウ','名詞,普通名詞,一般,*,*,*']],
  '的':[['的','マト','名詞,普通名詞,一般,*,*,*']],
@@ -55,6 +67,7 @@ test('suffixes that attach to kana words keep their reading',async()=>{
  assert.equal(await read(L,'ちゃん的には','的'),'テキ');  // 形状詞的: ちゃん的には, ありす風
  assert.equal(await read(L,'さわり方を','方'),'カタ');    // after a 連用形 it is the way of doing
  assert.equal(await read(L,'さん達の','達'),'タチ');      // alone 達 is the given name トオル
+ assert.equal(await read(L,'あんた方','方'),'カタ');      // after a pronoun: honorific (がた), not ほう
  assert.equal(await read(L,'小さき','小'),'サ');          // a prefix before more kana is a split word
 });
 
@@ -63,6 +76,36 @@ test('対 between two numbers is a score or a match-up',async()=>{
  assert.equal(await read(L,'０対２','対'),'たい');
  assert.equal(await read(L,'対２','対'),'ツイ');
  assert.equal(await read(L,'二対の','対'),'タイ');   // a pair counter (につい) is not a score; left as SudachiDict reads it
+});
+
+test('numbers that are not a plain count stay as SudachiDict and the dictionary read them',async()=>{
+ const L=stubbed();
+ assert.equal(await read(L,'〇〇さん','〇〇'),'レイキゴウ');        // a placeholder, not zero
+ assert.equal(await read(L,'〇月','〇'),'レイ');                    // 〇月〇日: a date left blank
+ assert.equal(await read(L,'三分咲き','三分'),'さんぶ');              // a tenth of full bloom
+ assert.equal(await read(L,'二三日','二三'),'ニサン');              // two or three days, not 23
+ assert.equal(await read(L,'二〇二六年','二〇二六年'),'にせんにじゅうろくねん'); // written with a zero, it is positional
+ assert.equal(await read(L,'一五歳','一五歳'),'じゅうごさい');        // in place before a counter
+ assert.equal(await read(L,'二八','二八'),'ニハチ');                  // without one it may be 2 and 8
+ assert.equal(await read(L,'数万人','万'),'マン');                  // several ten thousands, not いちまん
+ assert.equal(await read(L,'3分の1','3分'),'さんぶん');              // a fraction
+ assert.equal(await read(L,'3分の休憩','3分'),'さんぷん');            // three minutes
+});
+
+test('a VNDB name written with a numeral keeps the name reading',async()=>{
+ const L=stubbed();L.useNames(new Map([['一','はじめ']]));
+ const [name]=await L.tokenize('一は来た',{names:true});
+ assert.deepEqual([name.surface,name.reading,name.readingSource],['一','はじめ','name']);
+ assert.equal((await L.tokenize('一は来た'))[0].reading,'いち','pages other than the reader read the numeral');
+});
+
+test('furigana still being made when the game changes uses the new game’s names',async()=>{
+ const L=stubbed(),sync=L.worker;let answer;
+ L.worker={stdin:{write(line){const {id,text}=JSON.parse(line);answer=()=>{const p=L.pending.get(id);clearTimeout(p.timer);L.pending.delete(id);p.resolve(tokens(text));};}}};
+ L.useNames(new Map([['一','はじめ']]));
+ const late=L.tokenize('一は来た',{names:true});await new Promise(r=>setImmediate(r));
+ L.useNames(null);answer();assert.equal((await late)[0].reading,'いち');
+ L.worker=sync;assert.equal((await L.tokenize('一は来た',{names:true}))[0].reading,'いち','and that is what is cached');
 });
 
 test('an idiom ending in an inflected verb is found under its dictionary form',async()=>{

@@ -84,7 +84,7 @@ function nameTokens(tokens,names){
   let hit=null;
   for(let j=Math.min(tokens.length,i+4)-1;j>=i&&!hit;j--){
    // Empty tokens (SudachiDict splits … into … and two empty marks) are never part of a name.
-   const part=tokens.slice(i,j+1);if(part.some((t,k)=>typeof t?.surface!=='string'||!t.surface||t.readingSource==='number'||k&&Number.isInteger(part[k-1].end)&&part[k-1].end!==t.start))continue;
+   const part=tokens.slice(i,j+1);if(part.some((t,k)=>typeof t?.surface!=='string'||!t.surface||k&&Number.isInteger(part[k-1].end)&&part[k-1].end!==t.start))continue;
    const surface=part.map(t=>t.surface).join(''),reading=names.get(surface);if(!reading)continue;
    // A one-kanji name right before another word is the kanji's own use: 新 in 新技, 新食感 reads しん, and so does the prefix
    // in 新スキル (篝シナリオ is still Kagari's). A title, 家 or 本人 after it is still the name (希本人, 希先輩, 鳳家).
@@ -123,11 +123,14 @@ async function vndbTitle(title,fetcher=fetch){
   return null;
  }catch{return undefined;}
 }
+/* A cache entry written less than ttl ago; one dated in the future (a clock set back) is stale. */
+const fresh=(entry,now,ttl)=>Number.isFinite(entry?.at)&&entry.at<=now&&now-entry.at<ttl;
 async function vnForTitles(titles,{folder,find,now}){
- const file=folder?path.join(folder,'titles.json'):'';let known={};try{if(file)known=JSON.parse(fs.readFileSync(file,'utf8'))||{};}catch{}
+ const file=folder?path.join(folder,'titles.json'):'';let known={};try{if(file)known=JSON.parse(fs.readFileSync(file,'utf8'));}catch{}
+ if(!known||typeof known!=='object'||Array.isArray(known))known={};
  const search=find||vndbTitle;let found='',changed=false;
  for(const title of [...new Set((titles||[]).map(t=>String(t||'').trim()).filter(Boolean))]){
-  const seen=known[title];if(seen&&now-seen.at<(seen.id?WEEK:DAY)){if(seen.id){found=seen.id;break;}continue;}
+  const seen=known[title];if(fresh(seen,now,seen?.id?WEEK:DAY)){if(seen.id){found=seen.id;break;}continue;}
   const vn=await search(title);if(vn===undefined)continue;
   known[title]={id:vn?.id||null,at:now};changed=true;if(vn?.id){found=vn.id;break;}
  }
@@ -140,7 +143,7 @@ async function gameNames(vndbId,{folder,fetcher=fetch,lookup,now=Date.now(),titl
  const id=/^v?(\d+)$/i.exec(String(vndbId||''))?.[1];if(!id)return new Map();
  const file=folder?path.join(folder,'v'+id+'.json'):'';let cached=null;
  try{if(file)cached=JSON.parse(fs.readFileSync(file,'utf8'));}catch{}
- if(cached&&Array.isArray(cached.characters)&&now-cached.at<WEEK)return new Map(characterNames(cached.characters,lookup));
+ if(Array.isArray(cached?.characters)&&fresh(cached,now,WEEK))return new Map(characterNames(cached.characters,lookup));
  try{
   const characters=[];
   for(let page=1;page<=20;page++){
@@ -150,7 +153,7 @@ async function gameNames(vndbId,{folder,fetcher=fetch,lookup,now=Date.now(),titl
   }
   if(file){fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify({at:now,vndbId:'v'+id,characters}));fs.renameSync(file+'.tmp',file);}
   return new Map(characterNames(characters,lookup));
- }catch{return new Map(characterNames(cached?.characters||[],lookup));}
+ }catch{return new Map(characterNames(Array.isArray(cached?.characters)?cached.characters:[],lookup));}
 }
 
 module.exports={romajiKana,characterNames,nameTokens,gameNames,vndbTitle};

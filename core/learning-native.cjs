@@ -18,7 +18,7 @@ function chinesePos(tag){
  return extra[tag]||tag;
 }
 class LocalLearning{
- constructor(folder,onStatus=()=>{}){this.folder=folder;this.onStatus=onStatus;this.pending=new Map();this.serial=0;this.cache=new Map();this.readings=createReadingResolver();this.names=new Map();this.namesVersion=0;this.progress={stage:this.installed()?'ready':'idle',percent:this.installed()?100:null};}
+ constructor(folder,onStatus=()=>{}){this.folder=folder;this.onStatus=onStatus;this.pending=new Map();this.serial=0;this.cache=new Map();this.readings=createReadingResolver();this.names=new Map();this.progress={stage:this.installed()?'ready':'idle',percent:this.installed()?100:null};}
  python(){const own=require('./layout.cjs').python;return fs.existsSync(own)?own:'python.exe';}
  runtimeFolder(){return require('./layout.cjs').reading;}
  installed(){return fs.existsSync(path.join(this.runtimeFolder(),'sudachidict_full/resources/system.dic'));}
@@ -113,26 +113,30 @@ class LocalLearning{
     game's layout, not a word boundary; SudachiDict cut every word it ran through (黒 / ず / ん, 見 / つ / め). The sentence is tokenized
     without its line breaks and every token's start / end (code points) is mapped back onto the text as given; the breaks come back as
     blank tokens, so callers see the same text and indices as before. */
- async tokenizeWhole(text){
+ async tokenizeWhole(text,options){
   const lineBreak=c=>c==='\u000d'||c==='\u000a';
-  if(![...text].some(lineBreak))return this.tokenize(text);
+  if(![...text].some(lineBreak))return this.tokenize(text,options);
   const chars=[...text],keep=[];chars.forEach((c,i)=>{if(!lineBreak(c))keep.push(i);});
-  const flat=keep.map(i=>chars[i]).join('');if(!flat)return this.tokenize(text);
-  const tokens=await this.tokenize(flat),at=k=>k>=keep.length?chars.length:keep[k],out=[];
+  const flat=keep.map(i=>chars[i]).join('');if(!flat)return this.tokenize(text,options);
+  const tokens=await this.tokenize(flat,options),at=k=>k>=keep.length?chars.length:keep[k],out=[];
   let pos=0;for(const t of tokens){const start=at(t.start),end=t.end>0?keep[Math.min(t.end,keep.length)-1]+1:start;
    if(start>pos){const gap=chars.slice(pos,start).join('');out.push({surface:gap,base_form:gap,normalized:gap,reading:'',pos:'空白',start:pos,end:start});}
    out.push({...t,start,end,surface:chars.slice(start,end).join('')});pos=end;}
   if(pos<chars.length){const gap=chars.slice(pos).join('');out.push({surface:gap,base_form:gap,normalized:gap,reading:'',pos:'空白',start:pos,end:chars.length});}
   return out;
  }
- async tokenize(text){
-  if(this.cache.has(text))return this.cache.get(text);await this.ready();const version=this.namesVersion;
+ /* names: read the running game's character names (the reader); other pages (daily news, examples, grammar counts)
+    read the text without them. */
+ async tokenize(text,{names=false}={}){
+  const key=(names?'names\u0000':'')+text;
+  if(this.cache.has(key))return this.cache.get(key);await this.ready();
   const tokens=await this.raw(text);
   /* 2026-11-23 (user: the speech button said わたくし and ぶん where furigana showed わたし and ふん): furigana, the speech
      button, lookup and cards all read these tokens, so the contextual readings (私 わたし, 10分 じゅっぷん) are settled here
      once instead of in the reader page only. Numbers first: JMdict would otherwise join the counter with what follows
      (10分だけ as 10 + 分だけ ぶんだけ, 3本の as 3 + 本の ほんの). */
-  const corrected=contextual(text,this.readings.settle(this.dictionaryWords(numberTokens(this.withNames(await this.strayAffixes(tokens))))));if(version===this.namesVersion)this.cache.set(text,corrected);if(this.cache.size>200)this.cache.delete(this.cache.keys().next().value);return corrected;
+  const plain=await this.strayAffixes(tokens);
+  const corrected=contextual(text,this.readings.settle(this.dictionaryWords(numberTokens(names?this.withNames(plain):plain))));this.cache.set(key,corrected);if(this.cache.size>200)this.cache.delete(this.cache.keys().next().value);return corrected;
  }
  /* SudachiDict tokens for a text as the worker gives them. */
  raw(text){return new Promise((resolve,reject)=>{const id=++this.serial,timer=setTimeout(()=>{this.pending.delete(id);reject(Error('本地分词等待超时，请检查 Full 组件状态'));},45000);this.pending.set(id,{resolve,reject,timer});this.worker.stdin.write(JSON.stringify({id,text})+'\n');});}
@@ -140,14 +144,15 @@ class LocalLearning{
     SudachiDict read そのうち上の二人 with 上 as the suffix ジョウ (理論上), いとしき人 with 人 as ニン (三人) and ばか者 with 者
     as シャ. A kana word, a mark or the line edge is no word to attach to, so the kanji takes the reading SudachiDict gives
     it on its own (上 ウエ, 人 ヒト, 者 モノ) when that is a common noun or an adjective. Productive suffixes stay: 的 and 風
-    are 形状詞的 (ちゃん的には), a suffix after a 連用形 is the way of doing (さわり方 かた, 絡まれ方), a prefix
+    are 形状詞的 (ちゃん的には), a suffix after a 連用形 is the way of doing (さわり方 かた, 絡まれ方), one after a pronoun is honorific
+    or plural (あんた方 がた), a prefix
     before more kana is a split word (小さき, 小じゃれた), and a lone reading that is a name or a particle
     (好 ヨシミ, 達 トオル, 宛 ズツ) is no word either. Judged on 44k real game lines. */
  async strayAffixes(tokens){
   if(!Array.isArray(tokens))return tokens;const out=[];this.alone??=new Map();
   const loose=t=>!t||/^[\p{Script=Hiragana}ー]+$/u.test(t.surface||'')||t.pos==='補助記号'||!String(t.surface||'').trim();
   const g=t=>Array.isArray(t?.grammar)?t.grammar:[];
-  const stray=(t,before,after)=>g(t)[0]==='接尾辞'?g(t)[1]==='名詞的'&&loose(before)&&!String(g(before)[5]).startsWith('連用形')&&!/^[\p{Script=Han}々]/u.test(after?.surface||''):
+  const stray=(t,before,after)=>g(t)[0]==='接尾辞'?g(t)[1]==='名詞的'&&loose(before)&&g(before)[0]!=='代名詞'&&!String(g(before)[5]).startsWith('連用形')&&!/^[\p{Script=Han}々]/u.test(after?.surface||''):
    g(t)[0]==='接頭辞'&&(!after||!after.surface.trim()||['補助記号','記号','助詞'].includes(g(after)[0]));
   for(let i=0;i<tokens.length;i++){
    const t=tokens[i];
@@ -159,8 +164,9 @@ class LocalLearning{
   return out;
  }
  /* The running game's character names from VNDB (name-reading.cjs); null when no game is bound. Furigana made with the
-    previous game's names is dropped. */
- useNames(names){this.names=names instanceof Map?names:new Map();this.namesVersion++;this.cache.clear();}
+    previous game's names is dropped; tokenize() reads the names after its last await, so a call still running when the
+    game changes uses the new ones. */
+ useNames(names){this.names=names instanceof Map?names:new Map();this.cache.clear();}
  withNames(tokens){return nameTokens(tokens,this.names);}
  // Whole adjacent tokens that together spell one JMdict word with a single reading are that word: Sudachi split
  // 後一歩 into 後一 (ゴイチ) + 歩 (アユミ, a given name), so furigana and speech said ごいちあゆみ while the dictionary card
@@ -258,8 +264,8 @@ class LocalLearning{
    groups.push(group);
   }return groups;
  }
- async word(args,entryId){
-  const result=await this.request('lookup_exact',args,'zh'),tokens=await this.tokenize(args.text),token=tokens.find(t=>t.start===args.start&&t.end===args.end),head=tokens.find(t=>t.start===args.start),entry=result.entries?.find(e=>e.id===entryId)||result.entries?.[0],m=result.morphology||{};
+ async word(args,entryId,options){
+  const result=await this.request('lookup_exact',args,'zh',options),tokens=await this.tokenize(args.text,options),token=tokens.find(t=>t.start===args.start&&t.end===args.end),head=tokens.find(t=>t.start===args.start),entry=result.entries?.find(e=>e.id===entryId)||result.entries?.[0],m=result.morphology||{};
   let chosen=token,reading=token?.reading||m.reading||'',surface=result.surface,pronunciationForm='surface';
   if(!chosen&&head?.lexeme?.base===m.base&&entry?.readings?.some(r=>kana(r)===kana(head.lexeme.reading))){chosen=head;reading=head.lexeme.reading;surface=m.base;pronunciationForm='lemma';}
   /* 2026-11-19 (user, 千恋＊万花: うたたね could not be mined, 「当前词没有确定读音」): Sudachi cut the line うたた｜ねし, so a selection
@@ -290,9 +296,9 @@ class LocalLearning{
   return {...(spoken?{spoken}:{}),...(chosen?.parts?{parts:chosen.parts}:{}),surface,clickedSurface:result.surface,base:m.base||result.surface,reading,pitch:chosen?.pitch||[],pitchSource:chosen?.pitch_source||(phrase?'词组 · 音调由语音引擎估计':'UniDic 未匹配 · 音调由语音引擎估计'),pronunciationForm,ambiguous,pos:m.wordClass||entry?.pos?.join('、')||'',meaning:entry?.definition_groups?.map(g=>g.text).join('\n')||entry?.definitions?.join('\n')||'',sentence:args.text};
  }
 
- async request(command,args,language='zh'){
+ async request(command,args,language='zh',options){
   const text=args.text;if(typeof text!=='string'||[...text].length>4000)throw Error('无效查词文本');
-  const tokens=await this.tokenizeWhole(text);if(command==='tokenize_text')return tokens;
+  const tokens=await this.tokenizeWhole(text,options);if(command==='tokenize_text')return tokens;
   this.load();const groups=this.groups(tokens).flatMap(t=>{
     const found=[t.base_form,t.normalized,t.surface].some(k=>this.index.has(k));
     return !found&&t.subtokens?.length>1?this.groups(t.subtokens):[t];

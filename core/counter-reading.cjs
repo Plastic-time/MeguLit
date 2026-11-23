@@ -8,22 +8,31 @@ const DIGITS = { '〇': 0, '零': 0, '一': 1, '二': 2, '三': 3, '四': 4, '�
 const SMALL = { '十': 10, '百': 100, '千': 1000 };
 const LARGE = { '万': 1e4, '億': 1e8 };
 
-/* Value of 10, １０, 1,000, 三百, 二〇二六, 2万5千. null when it is not a plain whole number. */
+/* Value of 10, １０, 1,000, 三百, 二〇二六, 2万5千. null when it is not a plain whole number: 〇〇 is a placeholder (〇〇さん),
+   adjacent kanji digits are an estimate (二三日 にさんにち, 四五人), and 万 or 億 with no number before it is 数万 or 何億. */
 function parseNumber(text) {
   const s = String(text || '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[,，](?=\d{3})/g, '');
-  if (!s || s.length > 16) return null;
+  if (!s || s.length > 16 || /^[〇零]+$/.test(s)) return null;
   if (/^\d+$/.test(s)) { const n = Number(s); return /^0\d/.test(s) || n >= 1e12 ? null : n; }
-  // Positional kanji (二〇二六) has no unit characters.
-  if (/^[〇零一二三四五六七八九]+$/.test(s) && s.length > 1) return Number([...s].map(c => DIGITS[c]).join(''));
+  // Positional kanji (二〇二六) has no unit characters and a zero in it.
+  if (/^[一二三四五六七八九][〇零一二三四五六七八九]*[〇零][〇零一二三四五六七八九]*$/.test(s)) return Number([...s].map(c => DIGITS[c]).join(''));
   let total = 0, section = 0, digit = null;
   for (const c of s) {
     if (/\d/.test(c) || c in DIGITS) { if (digit !== null && !/\d/.test(c)) return null; digit = (digit !== null ? digit * 10 : 0) + (/\d/.test(c) ? Number(c) : DIGITS[c]); }
     else if (c in SMALL) { section += (digit === null ? 1 : digit) * SMALL[c]; digit = null; }
-    else if (c in LARGE) { total += (section + (digit || 0) || 1) * LARGE[c]; section = 0; digit = null; }
+    else if (c in LARGE) { if (!section && digit === null) return null; total += (section + (digit || 0)) * LARGE[c]; section = 0; digit = null; }
     else return null;
   }
   const n = total + section + (digit || 0);
   return Number.isSafeInteger(n) && n < 1e12 ? n : null;
+}
+
+/* Kanji digits written in place without a zero (一五歳 is 15) count only before a counter, and two neighbouring digits do
+   not: 二三日 and 四五人 are an estimate (so is 一二度, while 一二歳 for 12 then reads いちに). */
+function placed(text) {
+  if (!/^[一二三四五六七八九][一二三四五六七八九]+$/.test(String(text || ''))) return null;
+  const d = [...text].map(c => DIGITS[c]);
+  return d.length === 2 && d[1] === d[0] + 1 ? null : Number(d.join(''));
 }
 
 const ONES = ['', 'いち', 'に', 'さん', 'よん', 'ご', 'ろく', 'なな', 'はち', 'きゅう'];
@@ -120,7 +129,7 @@ function counterReading(numberText, counter) {
    the speech button and cards share one reading. The pieces stay as subtokens for dictionary lookup; the UniDic accent of
    the pieces does not fit the word, so speech estimates it. A numeral is a 数詞 token, or plain digits without part of
    speech. Tokens already read here pass through unchanged. */
-const isNumeral = t => typeof t?.surface === 'string' && (Array.isArray(t.grammar) ? t.grammar[1] === '数詞' : /^[0-9０-９,，]+$/.test(t.surface)) && parseNumber(t.surface) !== null;
+const isNumeral = t => typeof t?.surface === 'string' && t.readingSource !== 'name' && (Array.isArray(t.grammar) ? t.grammar[1] === '数詞' : /^[0-9０-９,，]+$/.test(t.surface)) && parseNumber(t.surface) !== null;
 function numberTokens(tokens) {
   if (!Array.isArray(tokens)) return tokens;
   const out = [];
@@ -128,15 +137,20 @@ function numberTokens(tokens) {
     const token = tokens[i], next = tokens[i + 1];
     // A score or a match-up: SudachiDict reads ０対２ and 5対5 with 対 as the pair counter ツイ (一対の).
     if (token?.surface === '対' && isNumeral(tokens[i - 1]) && isNumeral(next)) { out.push({ ...token, reading: 'たい', pitch: [], lexeme: null, readingSource: 'number' }); continue; }
-    if (!isNumeral(token) || token.readingSource === 'number') { out.push(token); continue; }
-    const joined = typeof next?.surface === 'string' && (!Number.isInteger(token.end) || token.end === next.start) ? counterReading(token.surface, next.surface) : '';
+    const plain = isNumeral(token), value = plain ? parseNumber(token.surface) : token?.grammar?.[1] === '数詞' && token.readingSource !== 'name' ? placed(token.surface) : null;
+    if (value === null || token.readingSource === 'number') { out.push(token); continue; }
+    const touching = typeof next?.surface === 'string' && (!Number.isInteger(token.end) || token.end === next.start);
+    /* 分 of a fraction or a tenth is ぶ: 3分の1 さんぶんのいち, 八分咲き はちぶざき. */
+    const after = tokens[i + 2], tenth = touching && next.surface === '分' && (after?.surface === 'の' && isNumeral(tokens[i + 3]) ? 'ぶん' : /^咲/.test(after?.surface || '') ? 'ぶ' : '');
+    const joined = tenth ? readNumber(value) + tenth : touching ? counterReading(plain ? token.surface : String(value), next.surface) : '';
+    if (!joined && !plain) { out.push(token); continue; }
     if (joined) {
       const word = token.surface + next.surface;
       out.push({ ...token, surface: word, reading: joined, base_form: word, normalized: word, end: Number.isInteger(next.end) ? next.end : token.end,
         pitch: [], lexeme: null, reading_ambiguous: false, subtokens: [token, next], readingSource: 'number' });
       i++; continue;
     }
-    out.push({ ...token, reading: readNumber(parseNumber(token.surface)), pitch: [], lexeme: null, readingSource: 'number' });
+    out.push({ ...token, reading: readNumber(value), pitch: [], lexeme: null, readingSource: 'number' });
   }
   return out;
 }
