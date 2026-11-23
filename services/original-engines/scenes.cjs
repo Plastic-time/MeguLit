@@ -252,10 +252,40 @@ function tlPairs(files){const langs=new Map();
 /* E566 compiled scripts: a game without .rpy sources is read from its .rpyc files (loose or in .rpa archives), and a
    compiled tl/<language> translation pairs by the translate identifier of each line (renpy-rpyc.cjs). */
 const rpyc=require('./renpy-rpyc.cjs');
-function renpyScenes(dir){const g=gameDir(dir),out=new Map();
+const parseRenpyRaw=buf=>rpyc.isRpyc(buf)?rpyc.parse(buf):parseRpy(buf);
+const japaneseLangStats=values=>{let total=0,ja=0,zh=0;for(const v of values){if(!v)continue;total++;if(KANA_LINE.test(v))ja++;else if(HAN_LINE.test(v))zh++;}return {total,ja,zh};};
+function renpyBaseScenes(g){const out=new Map();
  for(const [key,s] of rpyc.scripts(g))out.set(key,{name:key,read:s.read});
  for(const file of walk(g,4,RPY).filter(outsideTl)){const name=path.relative(g,file).replace(/\\/g,'/').toLowerCase();out.set(name,{name,read:()=>fs.readFileSync(file)});}
  return [...out.values()].sort((a,b)=>a.name.localeCompare(b.name));}
+function renpyJapaneseTl(g,base,{deadline=Infinity}={}){
+ if(!base.length||Date.now()>deadline)return null;
+ let baseJp=0,nonEmpty=0;
+ for(const s of base.slice(0,64)){if(Date.now()>deadline)return null;let parsed;try{parsed=parseRenpyRaw(s.read());}catch{continue;}
+  if(!parsed.lines.length)continue;
+  nonEmpty++;
+  for(const line of parsed.lines)if(KANA_LINE.test(line))baseJp++;
+  if(baseJp>=5)return null;
+  if(nonEmpty>=8)break;}
+ const langs=new Map(),get=lang=>{const k=String(lang||'').toLowerCase();let l=langs.get(k);if(!l){l={pairs:new Map(),ids:new Map(),strings:new Map(),files:new Set()};langs.set(k,l);}return l;};
+ for(const file of walk(g,5,RPY).filter(f=>!outsideTl(f))){if(Date.now()>deadline)return null;
+  for(const [lang,pairs] of tlPairs([file])){const l=get(lang);l.files.add(file);for(const [k,v] of pairs)if(v&&!l.pairs.has(k))l.pairs.set(k,v);}}
+ if(Date.now()>deadline)return null;
+ for(const [,s] of rpyc.scripts(g,{tl:true})){if(Date.now()>deadline)return null;let t;try{t=rpyc.translations(s.read());}catch{continue;}
+  if(!t.lang||/^none$/i.test(t.lang))continue;const l=get(t.lang);if(/\.rpyc$/i.test(s.source||''))l.files.add(s.source);
+  for(const [k,v] of t.ids)if(v&&!l.ids.has(k))l.ids.set(k,v);for(const [k,v] of t.strings)if(v&&!l.strings.has(k))l.strings.set(k,v);}
+ let best=null,bestScore=0;
+ for(const l of langs.values()){
+  const a=japaneseLangStats([...l.ids.values(),...l.strings.values()]),b=japaneseLangStats(l.pairs.values());
+  const st=a.ja>=b.ja?a:b;
+  if(st.ja>0&&st.ja>=st.zh&&st.ja>=st.total*0.25&&st.ja>bestScore){best=l;bestScore=st.ja;}
+ }
+ return best&&bestScore>baseJp*2?{...best,score:bestScore}:null;}
+function renpyScenes(dir,{deadline=Infinity}={}){const g=gameDir(dir),base=renpyBaseScenes(g),jp=renpyJapaneseTl(g,base,{deadline});
+ if(!jp)return base;
+ return base.map(s=>({name:s.name,read:s.read,parse(){const parsed=parseRenpyRaw(s.read()),src=parsed.lines;let hit=false;
+  const lines=src.map((t,k)=>{const id=parsed.ids?.[k],v=(id&&jp.ids.get(id))||jp.pairs.get(t)||jp.strings.get(t)||'';if(!v)return t;hit=true;return v;});
+  return hit?{...parsed,lines,sourceLines:src}:parsed;}}));}
 /* compiled tl files of a patch (or of the game's own tl folders): per language, id -> text and old -> new */
 function rpycTl(dirs){const langs=new Map(),add=buf=>{const t=rpyc.translations(buf);if(!t.lang||/^none$/i.test(t.lang))return;const l=langs.get(t.lang)||{ids:new Map(),strings:new Map()};langs.set(t.lang,l);for(const [k,v] of t.ids)if(!l.ids.has(k))l.ids.set(k,v);for(const [k,v] of t.strings)if(!l.strings.has(k))l.strings.set(k,v);};
  const seen=new Set();for(const d of dirs){let names;try{names=fs.readdirSync(d);}catch{continue;}
@@ -267,8 +297,8 @@ const chineseScore=values=>{let score=0;for(const v of values)if(/[一-鿿]/.tes
 const renpy={
  id:'renpy',hint:'game\\tl\\<语言> 文件夹',
  scenes:renpyScenes,
- archives:()=>[],sources:dir=>{const g=gameDir(dir);return [...walk(g,4,RPY).filter(outsideTl),...walk(g,4,n=>/\.rpyc$/i.test(n)).filter(outsideTl),...walk(g,3,n=>/\.rpa$/i.test(n))];},
- parse:buf=>rpyc.isRpyc(buf)?rpyc.parse(buf):parseRpy(buf),test:n=>RPY(n)||/\.rpyc$/i.test(n),
+ archives:()=>[],sources:dir=>{const g=gameDir(dir),base=renpyBaseScenes(g),jp=renpyJapaneseTl(g,base);return [...walk(g,4,RPY).filter(outsideTl),...walk(g,4,n=>/\.rpyc$/i.test(n)).filter(outsideTl),...walk(g,3,n=>/\.rpa$/i.test(n)),...(jp?[...jp.files]:[])];},
+ parse:parseRenpyRaw,test:n=>RPY(n)||/\.rpyc$/i.test(n),
  // The patch: the tl language whose translations are most Chinese. A source line is looked up by its text (.rpy tl,
  // old/new string tables) and, for compiled scripts, by its translate identifier (E566).
  patchLines(base,found){
@@ -278,8 +308,8 @@ const renpy={
   let comp=null,compScore=0;
   for(const [,l] of rpycTl(found.dirs)){const score=chineseScore([...l.ids.values(),...l.strings.values()]);if(score>compScore){comp=l;compScore=score;}}
   if(!best&&!comp)return null;
-  const lookup=(t,id)=>{if(comp&&id&&comp.ids.has(id))return comp.ids.get(id);if(best&&best.has(t))return best.get(t);if(comp&&comp.strings.has(t))return comp.strings.get(t);return null;};
-  return base.map(scene=>{let hit=false;const lines=scene.lines.map((t,k)=>{const v=lookup(t,scene.ids?.[k]);if(v==null)return t;hit=true;return v;});return {...scene,patched:hit,lines};});
+  const lookup=(t,id,src)=>{if(comp&&id&&comp.ids.has(id))return comp.ids.get(id);if(best&&best.has(t))return best.get(t);if(best&&src!=null&&best.has(src))return best.get(src);if(comp&&comp.strings.has(t))return comp.strings.get(t);if(comp&&src!=null&&comp.strings.has(src))return comp.strings.get(src);return null;};
+  return base.map(scene=>{let hit=false;const lines=scene.lines.map((t,k)=>{const v=lookup(t,scene.ids?.[k],scene.sourceLines?.[k]);if(v==null)return t;hit=true;return v;});return {...scene,patched:hit,lines};});
  },
 };
 
@@ -764,7 +794,7 @@ const siglusPck=require('./siglus-pck.cjs').engine;
 const ENGINES={'adapter-pack':adapterPack,'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,tyrano,kirikiri,artemis,renpy,siglus,'siglus-pck':siglusPck,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,fpd,yuris,aquaplus,'aquaplus-pck':aquaplusPck,'leaf-pak':leafPak,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,'spike-wad':spikeWad,pwaat,naninovel,yarnspinner,utage,'mages-cpk':magesCpk,aokana,'unity-assets':unityAssets,drv3,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,'nitro-npa':nitroNpa,iga,paz,bruns,'re-pak':rePak,fvp,advhd,kogado,reallive,vgprompter,majiro,softpal,systemnnn,liar,rgss,silky,tmrhiro,nekosdk,ikura,exhibit,eagls,ast,seraph,interheart,nexas,malie,shiinario,cmvs,lucifen,kaguya,lcse,yuka,qlie,entis,alicesoft,marble,rugp,...webbundle,plaintext:require('./plaintext.cjs').engine,circus,whale,ddsystem,aoi,kid,...makers,escude,eushully,pjadv,luca,stuff,stcm2,slg:F4A_SCAN.slg,cpk:F4A_SCAN.cpk,evbox:F4A_SCAN.evbox,ism:F4A_SCAN.ism,glib2:F4A_SCAN.glib2,tanuki:F4A_SCAN.tanuki,yaneurao:F4A_SCAN.yaneurao,rits:F4A_SCAN.rits,bluegale:F4A_SCAN.bluegale,cyberworks:F4A_SCAN.cyberworks,dxlib:F4A_SCAN.dxlib,garbro};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
- for(const s of scenes.slice(0,64)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */
+ for(const s of scenes.slice(0,64)){try{if((s.parse?s.parse():ENGINES[id].parse(s.read())).lines.length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */
 /* GARbro is the last resort: a folder MeguLit's own cx reader owns (encrypted KiriKiri Z xp3, cache still decrypting)
    stays unread until that cache is ready instead of going to GARbro (9-nine- Ep4 / ATRI read as garbro). */
 function ownCx(dir){return cxArchives(dir).some(f=>{try{return xp3.list(f)?.files.some(e=>e.encrypted);}catch{return false;}});}
@@ -776,7 +806,7 @@ function detect(dir){if(readable('adapter-pack',dir))return 'adapter-pack';
  for(const id of Object.keys(ENGINES)){if(id==='adapter-pack'||hint.includes(id))continue;if(id==='garbro'&&ownCx(dir))continue;if(readable(id,dir))return id;}return null;}
 function read(id,dir,overlay){const engine=ENGINES[id];
  // E449 a release's Chinese column gets the filled translations of the lines it leaves empty (fill.cjs).
- const list=engine.scenes(dir).map(s=>{const replaced=overlay?.get(s.name.toLowerCase());let parsed={lines:[],anchors:[]};try{parsed=engine.parse(replaced||s.read());}catch{}return fill.scene({name:s.name,...parsed,patched:!!replaced});});
+ const list=engine.scenes(dir).map(s=>{const replaced=overlay?.get(s.name.toLowerCase());let parsed={lines:[],anchors:[]};try{parsed=replaced?engine.parse(replaced):(s.parse?s.parse():engine.parse(s.read()));}catch{}return fill.scene({name:s.name,...parsed,patched:!!replaced});});
  return engine.annotate?engine.annotate(dir,list):list;}
 function fingerprint(id,dir){
  // Rebuild multilingual KiriKiri indexes that omitted captions in tag arguments.
