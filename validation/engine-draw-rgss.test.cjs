@@ -114,6 +114,7 @@ test('production launch focuses a running owned shadow before any observer prepa
  };
  modules['../core/library-mode.cjs']={libraryOnly:()=>false};
  modules['./embedded-japanese-jobs.cjs']=require('../services/embedded-japanese-jobs.cjs');
+ modules['./fata-wheel.cjs']=require('../services/fata-wheel.cjs');
  const sandbox={module:{exports:{}},__dirname:path.join(__dirname,'..','services'),process:{env:{MEGULIT_ROOT:dir}},Buffer,require:name=>{if(name in modules)return modules[name];if(['node:fs','node:path','node:crypto','node:child_process'].includes(name))return require(name);throw Error('unexpected launch dependency '+name);}};
  require('node:vm').runInNewContext(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),sandbox);
  const db={prepare:()=>({get:()=>game,run(){}})},runtime={prepareGame(){},bindLaunched:pid=>bound.push(pid)};const result=await sandbox.module.exports.launch(db,'one',runtime);

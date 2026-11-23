@@ -131,6 +131,7 @@ function launchHarness(mode,existing,{stopError=false}={}){
   './embedded-japanese-jobs.cjs':require('../services/embedded-japanese-jobs.cjs'),
   '../core/steam-owned.cjs':{launchAppid:()=>'',partOf:()=>null},'./game-language.cjs':{originalExecutable:()=>{calls.push('jp-check');return {blocked:false};}},
   '../core/drm-wrap.cjs':{plan:()=>null},'./locale-launch.cjs':{requiresAdministrator:()=>false},
+  './fata-wheel.cjs':require('../services/fata-wheel.cjs'),
   './shared-adaptation.cjs':{importFor(){}},'./japanese-restore-options.cjs':{forExecutable:()=>({})},
   '../core/japanese-restore.cjs':{repairNameColumns:()=>{calls.push('jp-repair');return {};},repairShared:()=>({}),_internal:{yurisPlan:()=>null}},
   './japanese-auto-run.cjs':{beforeLaunch:()=>calls.push('jp-auto')},'../core/japanese-auto.cjs':{launchResult(){}},
