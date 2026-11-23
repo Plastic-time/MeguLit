@@ -9,7 +9,20 @@
   function refresh(){if(!current)return;const f=flags();if(!f){policy='';return;}const next=target()+'|'+f.enabled+'|'+f.visible;if(next!==policy){policy=next;send({type:'cardinalPairPolicy',schema:1,client,revision:++revision,target:target(),...f});}schedule();}
   function visible(node){if(!node?.isConnected||d.visibilityState!=='visible'||node.checkVisibility?.({checkOpacity:true,checkVisibilityCSS:true})===false)return false;for(let el=node;el;el=el.parentElement){const css=w.getComputedStyle(el);if(el.hidden||css.display==='none'||css.visibility==='hidden'||css.visibility==='collapse'||Number(css.opacity)===0)return false;}const r=node.getBoundingClientRect();return r.width>0&&r.height>0&&r.right>0&&r.bottom>0&&r.left<w.innerWidth&&r.top<w.innerHeight;}
   function inkVisible(child,node){let range;try{const content=child.textContent||'',start=content.search(/\S/u);if(start<0)return true;const end=content.length-(content.match(/\s*$/u)?.[0].length||0);range=d.createRange();range.setStart(child,start);range.setEnd(child,end);const rects=[...range.getClientRects()].filter(r=>r.width>0&&r.height>0);if(!rects.length)return false;const clip={left:0,top:0,right:w.innerWidth,bottom:w.innerHeight};
-   for(let el=node;el;el=el.parentElement){const css=w.getComputedStyle(el),x=/^(hidden|clip|scroll|auto|overlay)$/.test(css.overflowX||css.overflow||''),y=/^(hidden|clip|scroll|auto|overlay)$/.test(css.overflowY||css.overflow||'');if(!x&&!y)continue;const r=el.getBoundingClientRect(),sx=el.offsetWidth>0?r.width/el.offsetWidth:1,sy=el.offsetHeight>0?r.height/el.offsetHeight:1,left=r.left+(el.clientLeft||0)*sx,top=r.top+(el.clientTop||0)*sy,right=Number.isFinite(el.clientWidth)?left+el.clientWidth*sx:r.right,bottom=Number.isFinite(el.clientHeight)?top+el.clientHeight*sy:r.bottom;if(x){clip.left=Math.max(clip.left,left);clip.right=Math.min(clip.right,right);}if(y){clip.top=Math.max(clip.top,top);clip.bottom=Math.min(clip.bottom,bottom);}}
+   // Overflow outside a viewport-fixed subtree does not clip its glyphs. A transformed
+   // or containing ancestor reestablishes the containing block and its normal clipping.
+   let outsideFixed=false;
+   for(let el=node;el;el=el.parentElement){
+    const css=w.getComputedStyle(el);
+    if(outsideFixed){
+     const establishesBlock=['transform','translate','rotate','scale','perspective','filter','backdropFilter'].some(k=>css[k]&&css[k]!=='none')||
+      /(?:^|\s)(?:layout|paint|content|strict)(?:$|\s)/.test(css.contain||'')||css.contentVisibility==='auto'||
+      /(?:^|,)(?:transform|translate|rotate|scale|perspective|filter|backdrop-filter|contain)(?:,|$)/.test((css.willChange||'').replace(/\s/g,''));
+     if(!establishesBlock)continue;
+     outsideFixed=false;
+    }
+    if(css.position==='fixed')outsideFixed=true;
+    const x=/^(hidden|clip|scroll|auto|overlay)$/.test(css.overflowX||css.overflow||''),y=/^(hidden|clip|scroll|auto|overlay)$/.test(css.overflowY||css.overflow||'');if(!x&&!y)continue;const r=el.getBoundingClientRect(),sx=el.offsetWidth>0?r.width/el.offsetWidth:1,sy=el.offsetHeight>0?r.height/el.offsetHeight:1,left=r.left+(el.clientLeft||0)*sx,top=r.top+(el.clientTop||0)*sy,right=Number.isFinite(el.clientWidth)?left+el.clientWidth*sx:r.right,bottom=Number.isFinite(el.clientHeight)?top+el.clientHeight*sy:r.bottom;if(x){clip.left=Math.max(clip.left,left);clip.right=Math.min(clip.right,right);}if(y){clip.top=Math.max(clip.top,top);clip.bottom=Math.min(clip.bottom,bottom);}}
    return rects.every(r=>r.left>=clip.left-.01&&r.top>=clip.top-.01&&r.right<=clip.right+.01&&r.bottom<=clip.bottom+.01);
   }catch{return false;}finally{range?.detach?.();}}
   function text(node){if(!visible(node))return null;let value='';const css=w.getComputedStyle(node),transparent=color=>color==='transparent'||/^rgba\([^)]*,\s*0(?:\.0*)?\s*\)$/.test(color||'');for(const child of node.childNodes||[]){if(child.nodeType===3){const part=child.textContent||'';if(part.trim()&&(transparent(css.color)||transparent(css.webkitTextFillColor)||!inkVisible(child,node)))return null;value+=part;}else if(child.nodeType===1&&child.tagName!=='RT'&&child.tagName!=='RP'){const part=text(child);if(part===null)return null;value+=part;}}return value;}

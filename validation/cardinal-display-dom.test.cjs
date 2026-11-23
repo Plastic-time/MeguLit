@@ -75,3 +75,14 @@ test('marked menu selection retains the bound occurrence when identical text is 
  assert.equal(observed.episode,'instance-2');assert.deepEqual(observed.rect,{x:0,y:0,width:400,height:30});
  assert.doesNotMatch(JSON.stringify(observed),/answer|same/);
 });
+
+test('viewport-fixed dialogue escapes outer overflow while a transformed containing block clips it',()=>{
+ const h=harness(),outer=node(null),panel=node(null,{parent:outer}),jp=node('????',{parent:panel}),cn=node('??',{parent:panel});
+ outer.style.overflow='hidden';outer.getBoundingClientRect=()=>rect(0,0,1000,0);panel.style.position='fixed';
+ h.pairs.availability('????','??');
+ h.b.cardinalPair.bind(h.source('????',1),jp,cn);h.flush();
+ assert.equal(h.pairs.snapshot(1).paired,1);
+ outer.style.transform='translateX(0px)';
+ h.b.cardinalPair.bind(h.source('????',2),jp,cn);h.flush();
+ assert.equal(h.pairs.snapshot(1).unobserved,1);
+});
