@@ -1,4 +1,4 @@
-# Enhanced Seed queue and trusted host
+# Seed review queue and trusted host
 
 The coordinator applies migration 0039 after 0038 and updates the main relay, scan gateway and scan host together. The Dashboard uses the existing authenticated ordinary-policy endpoint and revision. Pausing invalidates all outstanding leases immediately. Uploads continue to accumulate. Existing published releases remain available through the usual changes and lookup APIs.
 

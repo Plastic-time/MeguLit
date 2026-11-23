@@ -1,4 +1,4 @@
-# Automatic sharing of ordinary calibrations
+# Automatic sharing of Seed calibrations
 
 The desktop's existing sharing switch sends one optional `ordinary` candidate alongside its calibration report. The private launcher separately permits ordinary calibration submissions and signed reception on the two built-in relay hosts. Private reports include only the restricted calibration and optional script fingerprint. Each eligible submission enters a durable D1 job before acknowledgement. Older report formats continue to work. The signed feed still uses `megulit.game-diff` and the existing exact-version receiver and disk cache
 
@@ -40,7 +40,7 @@ Deploy the gateway separately with `relay/scan-service/gateway/wrangler.toml`. O
 
 ### Dashboard control
 
-Open `/dashboard#seed-admin` on either relay and connect with the administrator credential. **自动处理普通与增强 Seed** controls the ordinary and enhanced publication queues on both domains. New installations default to enabled with migration `0038_ordinary_publish_policy.sql`. A clean, verified eligible upload publishes automatically. An infected candidate is quarantined. Temporary scan failures stay pending for retry
+Open `/dashboard#seed-admin` on either relay and connect with the administrator credential. **自动处理 Seed** controls automatic processing on both domains, including scanning and game review. New installations default to enabled with migration `0038_ordinary_publish_policy.sql`. A clean, verified eligible upload publishes automatically. An infected candidate is quarantined. Temporary scan failures stay pending for retry
 
 Pausing invalidates active publication leases while preserving queued uploads and published versions. Resuming starts processing again. The scanner indicator independently probes the authenticated gateway, Windows service and ClamAV definitions. An offline scanner leaves uploads queued. **高级管理 → 历史审核目录** contains the separate catalog of repository snapshots, reports, candidates and signed records
 
