@@ -39,3 +39,11 @@ test('E610 integrate: Chinese majority needs twice the Japanese; big script with
  assert.equal(classify({engines:[e('garbro',{lines:500000,japaneseLines:90000,dialogueLines:90000,chineseLines:0}),e('fvp',{lines:40000,japaneseLines:5000,dialogueLines:40000,chineseLines:0})],inventory:inv}).detected,'fvp');
  assert.equal(classify({engines:[e('garbro',{lines:5000,japaneseLines:4000,dialogueLines:5000,chineseLines:0}),e('kirikiri',{lines:100,japaneseLines:3,dialogueLines:100,chineseLines:0})],inventory:inv}).detected,'garbro');
 });
+test('Cyrillic and Hangul multi-word dialogue lines count as dialogue and classify as not-japanese',()=>{
+ const ru=Array.from({length:120},(_,i)=>`Помоги мне купить молоко номер ${i}`);
+ const c=countLines(ru);
+ assert.equal(c.dialogue,120);assert.equal(c.japanese,0);assert.equal(c.chinese,0);
+ assert.equal(judgeLanguage({lines:120,japaneseLines:0,dialogueLines:c.dialogue,chineseLines:0,title:'Milk'}),'not-japanese');
+ const ko=countLines(['우유를 사러 가자.','오늘은 날씨가 좋다.','단어']);
+ assert.equal(ko.dialogue,2);assert.equal(ko.japanese,0);
+});

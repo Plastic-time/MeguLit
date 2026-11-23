@@ -57,8 +57,9 @@ const HAN=/[㐀-鿿]/;
 /* E600 language counting. dialogue = a line that can be spoken text: script commands, identifiers, file names and
    resource paths are not (they would drown the ratio of games with many of them). chinese = Han and no kana. */
 const PATHISH=/^[\w.\-\/\\:$%]+$/,SCRIPTISH_LINE=/^[@#\[<*;%$&]|^[A-Za-z_][\w.]*\s*[(=]|\.(png|jpe?g|bmp|ogg|wav|mp3|ks|tjs|txt|ws2|scr|mjo|bsc|ybn|dat|arc|xp3)\b/i;
+const NON_CJK_PROSE=/(?:[A-Za-z]+|[\u0400-\u04FF]+|[\uAC00-\uD7AF]+)\s+(?:[A-Za-z]+|[\u0400-\u04FF]+|[\uAC00-\uD7AF]+)/;
 function lineKind(l){const t=String(l).trim();if(!t||PATHISH.test(t)||SCRIPTISH_LINE.test(t)&&!KANA.test(t))return 0;
- if(KANA.test(t))return 3;if(HAN.test(t))return 2;return /[A-Za-z]+\s+[A-Za-z]+/.test(t)?1:0;}
+ if(KANA.test(t))return 3;if(HAN.test(t))return 2;return NON_CJK_PROSE.test(t)?1:0;}
 /* → {dialogue,japanese,chinese} over a list of lines; japanese keeps the old meaning (any kana, whole list) */
 function countLines(lines){let dialogue=0,japanese=0,chinese=0;for(const l of lines||[]){if(KANA.test(l))japanese++;const k=lineKind(l);if(k)dialogue++;if(k===2)chinese++;}return {dialogue,japanese,chinese};}
 /* every engine of scenes.cjs, plus System4 / BGI from original-text.cjs, with a per-engine time cap */
