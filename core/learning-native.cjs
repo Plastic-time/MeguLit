@@ -131,7 +131,7 @@ class LocalLearning{
      button, lookup and cards all read these tokens, so the contextual readings (私 わたし, 10分 じゅっぷん) are settled here
      once instead of in the reader page only. Numbers first: JMdict would otherwise join the counter with what follows
      (10分だけ as 10 + 分だけ ぶんだけ, 3本の as 3 + 本の ほんの). */
-  const corrected=contextual(text,this.dictionaryWords(numberTokens(tokens)));this.cache.set(text,corrected);if(this.cache.size>200)this.cache.delete(this.cache.keys().next().value);return corrected;
+  const corrected=contextual(text,this.readings.settle(this.dictionaryWords(numberTokens(tokens))));this.cache.set(text,corrected);if(this.cache.size>200)this.cache.delete(this.cache.keys().next().value);return corrected;
  }
  // Whole adjacent tokens that together spell one JMdict word with a single reading are that word: Sudachi split
  // 後一歩 into 後一 (ゴイチ) + 歩 (アユミ, a given name), so furigana and speech said ごいちあゆみ while the dictionary card
