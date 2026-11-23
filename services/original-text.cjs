@@ -713,7 +713,17 @@ function contributionScript(root,exe,id){
  const embedded=require('./embedded-japanese.cjs'),em=embedded.manifest(dir);
  if(em)return embedded._internal.valid(dir,em)?em.indexSha256:'';
  const entry=providerEntry(root,dir.toLowerCase(),id==null?undefined:String(id)),state=entry?.[1];
- if(!state?.runtime?.sha256)return '';
+ if(!state?.runtime?.sha256){
+  // A loose compiled Ren'Py entry script can identify the installed variant before any original-text index exists.
+  try{
+   if(!fs.statSync(path.join(dir,'renpy','__init__.py')).isFile())return '';
+   const file=require('./torch-receive.cjs').scriptPath(exe,'game/script.rpyc');
+   const stat=fs.statSync(file);
+   if(!stat.isFile()||stat.size<11||stat.size>16*1024*1024)return '';
+   const bytes=fs.readFileSync(file);
+   return bytes.toString('latin1',0,10)==='RENPY RPC2'?crypto.createHash('sha256').update(bytes).digest('hex'):'';
+  }catch{return '';}
+ }
  try{if(fingerprint({engine:state.runtime.engine||'system4',target:state.runtime.file})!==state.runtime.sha256)return '';}catch{return '';}
  try{
   const hashes=[scriptDigest(state.runtime.index)];
