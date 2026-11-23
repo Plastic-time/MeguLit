@@ -38,7 +38,7 @@ function codeOffset(buf,size){
 }
 /* IsfDecoder in GARbro describes the symbol order and the 64-row update cycle. */
 function secretReader(table){
- const symbols=Uint8Array.from(table.toUpperCase(),char=>ALPHABET.indexOf(char));
+ const symbols=Uint8Array.from(table,char=>ALPHABET.indexOf(char));
  const delta=i=>(symbols[0x500+i]-symbols[0x100+i]+36)%36;
  const hex=ALPHABET[delta(0)]+ALPHABET[delta(1)];
  if(!/^[0-9A-F]{2}$/.test(hex))return null;
@@ -57,17 +57,18 @@ function secretReader(table){
   return out;
  };
 }
-function installedSecretReaders(dir){
- const readers=[];
- for(const file of kit.files(dir,{name:/\.exe$/i})){
+function installedSecretReaders(files){
+ const readers=[],tables=new Set();
+ for(const file of files){
   const image=kit.head(file,4*1024*1024);
   if(image.toString('latin1',0,2)!=='MZ')continue;
   const alphabetAt=image.indexOf(ALPHABET);
   let end=alphabetAt;
   while(end>0&&alphabetAt-end<16&&image[end-1]===0)end--;
   if(end<TABLE_BYTES)continue;
-  const table=image.toString('latin1',end-TABLE_BYTES,end);
-  if(/[^0-9A-Z]/i.test(table))continue;
+  const table=image.toString('latin1',end-TABLE_BYTES,end).toUpperCase();
+  if(/[^0-9A-Z]/.test(table)||tables.has(table))continue;
+  tables.add(table);
   const reader=secretReader(table);
   if(reader)readers.push(reader);
  }
@@ -95,26 +96,54 @@ function parse(buf){const b=decode(buf);if(!b)return {lines:[],anchors:[]};const
 const engine=kit.engine({id:'ikura',hint:'无扩展名 SM2MPX10 / DRS 归档（*.isf）',
  archives:{name:/^[^.]+$/,list},loose:{name:/\.(isf|snr)$/i,subs:['','script']},parse,test:isScript});
 const scriptScenes=engine.scenes;
-function gameParser(dir){
- let readers;
+function selectReader(files,scenes){
+ let candidates=installedSecretReaders(files).map(read=>({read,scenes:0,lines:0}));
+ for(const scene of scenes){
+  if(!candidates.length)return null;
+  const buf=scene.read();
+  if(!isEncoded(buf))continue;
+  const stored=buf.subarray(0,-0x10);
+  candidates=candidates.filter(({read})=>{
+   const header=read(stored.subarray(0,8));
+   return codeOffset(header,stored.length)&&[0x9795,0xd197,0xce89].includes(header.readUInt16LE(4));
+  });
+  // A table copy can decrypt the header while changing the instruction stream later.
+  if(candidates.length>1)for(const candidate of candidates){
+   const {lines}=parse(candidate.read(stored));
+   if(lines.length)candidate.scenes++;
+   candidate.lines+=lines.length;
+  }
+ }
+ const [best,next]=candidates.sort((a,b)=>b.scenes-a.scenes||b.lines-a.lines);
+ return best&&(!next||best.scenes!==next.scenes||best.lines!==next.lines)?best.read:null;
+}
+const readersByDirectory=new Map();
+function directoryReader(dir,scenes){
+ const files=kit.files(dir,{name:/\.exe$/i});
+ const stamp=[...files,...engine.sources(dir)].sort().map(file=>{
+  try{const s=fs.statSync(file);return [file,s.size,s.mtimeMs,s.ctimeMs];}catch{return [file];}
+ });
+ const key=JSON.stringify(stamp),cached=readersByDirectory.get(dir);
+ if(cached?.key===key)return cached.read;
+ let read;
+ try{read=selectReader(files,scenes);}catch{return null;}
+ readersByDirectory.set(dir,{key,read});
+ if(readersByDirectory.size>8)readersByDirectory.delete(readersByDirectory.keys().next().value);
+ return read;
+}
+function gameParser(dir,scenes){
+ let read;
  return buf=>{
   if(!isEncoded(buf))return parse(buf);
-  readers??=installedSecretReaders(dir);
-  const stored=buf.subarray(0,-0x10);
-  for(const read of readers){
-   const header=read(stored.subarray(0,8));
-   if(!codeOffset(header,stored.length)||![0x9795,0xd197,0xce89].includes(header.readUInt16LE(4)))continue;
-   const parsed=parse(read(stored));
-   if(parsed.lines.length)return parsed;
-  }
-  return {lines:[],anchors:[]};
+  if(read===undefined)read=directoryReader(dir,scenes);
+  return read?parse(read(buf.subarray(0,-0x10))):{lines:[],anchors:[]};
  };
 }
 engine.scenes=dir=>{
- const read=gameParser(dir);
- return scriptScenes(dir).map(scene=>({...scene,parse:()=>read(scene.read())}));
+ const scenes=scriptScenes(dir),read=gameParser(dir,scenes);
+ return scenes.map(scene=>({...scene,parse:()=>read(scene.read())}));
 };
 /* a game whose scripts are SECRETFILTER-encoded needs its secret: say so instead of showing no text */
-engine.unsupported=dir=>{let encoded=false;const read=gameParser(dir);for(const sc of scriptScenes(dir)){let buf;try{buf=sc.read();}catch{continue;}if(isEncoded(buf))encoded=true;if(read(buf).lines.length)return '';}return encoded?'IKURA_SECRET':'';};
+engine.unsupported=dir=>{let encoded=false;const scenes=scriptScenes(dir),read=gameParser(dir,scenes);for(const sc of scenes){let buf;try{buf=sc.read();}catch{continue;}if(isEncoded(buf))encoded=true;if(read(buf).lines.length)return '';}return encoded?'IKURA_SECRET':'';};
 engine.REASONS={IKURA_SECRET:'这个 Ikura GDL 游戏的剧本带 SECRETFILTER 加密，需要该作品的密钥，暂时读不了'};
 module.exports={engine,parse,list,decode,isEncoded,pmLines,mpxList,drsList};

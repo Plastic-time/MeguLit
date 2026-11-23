@@ -50,6 +50,7 @@ const IJA=['「おはよう」と彼女は言った。','静かな午後だっ�
 const isfOf=(enc,L,o)=>F.isf([[0x01,Buffer.from([1,0])],F.pm(L[0],{enc,name:3,voice:'v001'}),[0x84,Buffer.from([0,0,0,0])],F.pm(L[1],{enc}),F.pm(L[2],{enc})],o);
 test('Ikura GDL: SM2MPX10 and DRS archives, ISF version transforms, PM 0xFF text lines in order; SECRETFILTER titles are reported',t=>{
  for(const version of [0x9795,0xd197,0xce89])assert.deepEqual(ikura.parse(isfOf(F.sjis,IJA,{version})).lines,IJA,'version '+version.toString(16));
+ assert.deepEqual(ikura.parse(Buffer.alloc(7)).lines,[]);
  /* a record over 127 bytes uses the two-byte length */
  assert.equal(ikura.parse(F.isf([F.pm('あ'.repeat(90))])).lines[0],'あ'.repeat(90));
  const game=tmp(t);F.writeTree(game,{SCR:F.mpx({'s001.isf':isfOf(F.sjis,IJA),'bg.bin':Buffer.alloc(40,3)}),OLD:F.drs({'S002.ISF':isfOf(F.sjis,IJA),'X.BIN':Buffer.alloc(30)}),'game.exe':'MZ'});
@@ -93,6 +94,70 @@ test('Ikura GDL finds the matching embedded table for SECRETFILTER scripts',t=>{
  assert.equal(result.japaneseLines,3);
  assert.deepEqual(scenes.read('ikura',dir)[0].lines,IJA);
  assert.equal(scenes.unsupportedReason(dir),null);
+
+ const invalidSymbol=Buffer.from(table);
+ invalidSymbol[0x7ff]=0x2e;
+ const notExecutable=image(table);
+ notExecutable.write('XX');
+ const isf=path.join(dir,'ISF'),marker=Buffer.from('SECRETFILTER100a');
+ const invalidWidth=Buffer.alloc(0x800,0x47);
+ const zeroWidth=Buffer.from(invalidWidth);
+ zeroWidth.write('00',0x500);
+ const rejects=(candidate,bytes)=>{
+  fs.writeFileSync(executable,candidate);
+  fs.writeFileSync(isf,F.mpx({'s001.isf':Buffer.concat([bytes,marker])}));
+  assert.deepEqual(ikura.engine.scenes(dir)[0].parse().lines,[]);
+ };
+ rejects(notExecutable,encrypted);
+ rejects(image(invalidSymbol),encrypted);
+ rejects(image(invalidWidth),plain);
+ const from=Uint8Array.from;
+ const initialize=t.mock.method(Uint8Array,'from',(input,...args)=>{
+  assert.notEqual(input.length,0,'Reject a zero-width key before initializing its state');
+  return from.call(Uint8Array,input,...args);
+ });
+ rejects(image(zeroWidth),plain);
+ assert.ok(initialize.mock.calls.every(({arguments:[input]})=>input.length!==0));
+});
+
+test('Ikura GDL uses one validated table across scenes and repeats the 64-row cycle',t=>{
+ const dir=tmp(t),alphabet='G5FXIL094MPRKWCJ3OEBVA7HQ2SU8Y6TZ1ND';
+ const table=Buffer.alloc(0x800,0x47);
+ table.write('10',0x500);
+ table[0]=0x35;
+ table[16]=0x46;
+ const image=key=>Buffer.concat([Buffer.from('MZ\0'),key,Buffer.alloc(4),Buffer.from(alphabet+'\0')]);
+ const opening='あ'.repeat(8)+'!';
+ const long=[opening,...Array.from({length:48},(_,i)=>IJA[i%IJA.length]+(i+1))];
+ const short=[opening,...IJA];
+ const store=lines=>{
+  const plain=F.isf(lines.map(text=>F.pm(text,{enc:F.sjis})));
+  const encrypted=plain.map((byte,i)=>{
+   const block=Math.floor(i/16),cycle=Math.floor(block/64);
+   const state=cycle*3+(block%64===0?1:3);
+   return byte^(i%16?0x47:alphabet.charCodeAt(state%36));
+  });
+  return Buffer.concat([encrypted,Buffer.from('SECRETFILTER100a')]);
+ };
+ const encrypted=store(long);
+ assert.ok(encrypted.length>64*16+16);
+ const unreadable=Buffer.from(table);
+ unreadable[9]=encrypted[9]; // This leaves the first eight bytes valid and zeros the first instruction length.
+ const partial=Buffer.from(table);
+ partial[8*16+1]=0x35; // Both headers still validate, but later instructions and text differ.
+ F.writeTree(dir,{ISF:F.mpx({'s001.isf':encrypted,'s002.isf':store(short)}),
+  'a-no-text.exe':image(unreadable),'b-partial.exe':image(partial),'game.exe':image(table)});
+ const kit=require('../services/original-engines/kit.cjs'),head=kit.head;
+ const scans=t.mock.method(kit,'head',(file,limit)=>head(file,limit));
+ assert.equal(ikura.engine.unsupported(dir),'');
+ assert.deepEqual(scenes.read('ikura',dir).map(scene=>scene.lines),[long,short]);
+ assert.equal(scans.mock.calls.filter(({arguments:[file,limit]})=>/\.exe$/i.test(file)&&limit===4*1024*1024).length,3);
+
+ const corrupt=Buffer.from(encrypted);
+ corrupt[4]^=0xff;
+ F.writeTree(dir,{ISF:F.mpx({'s001.isf':encrypted,'s002.isf':store(short),'s003.isf':corrupt})});
+ assert.equal(ikura.engine.unsupported(dir),'IKURA_SECRET');
+ assert.deepEqual(scenes.read('ikura',dir).map(scene=>scene.lines),[[],[],[]]);
 });
 
 /* ---- ExHIBIT -------------------------------------------------------------------------------------------------- */
