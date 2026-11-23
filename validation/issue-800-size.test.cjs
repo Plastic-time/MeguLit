@@ -107,10 +107,10 @@ test('a size set to the old built-in value for one game is kept, in the game and
  assert.equal(other.launch().japaneseSize,34);assert.equal(other.stored().sizes,1);
 });
 
-test('an old entry keeps the size changed by hand; the one equal to the global size of its time follows Settings',t=>{
+test('an old entry keeps marked sizes even when one matches the global size',t=>{
  const {settings,launch}=fixture(t,{prefs:{japaneseSize:34,translationSize:26,sizeSource:'user'}});
  settings.save({scope:'text',values:{japaneseSize:24,translationSize:20}});
- assert.deepEqual([launch().japaneseSize,launch().translationSize],[24,26]);
+ assert.deepEqual([launch().japaneseSize,launch().translationSize],[34,26]);
  const english=fixture(t,{prefs:{japaneseSize:34,translationSize:30,englishSize:34}});
  english.settings.save({scope:'text',values:{japaneseSize:24,translationSize:20,englishSize:22}});
  assert.deepEqual([english.launch().japaneseSize,english.launch().translationSize,english.launch().englishSize],[24,20,22]);
@@ -192,12 +192,12 @@ function oldAltT(settings,changes,at=Date.now()){
  return prefs;
 }
 
-test('sizes an old release saved with Alt+T: the inherited global size follows Settings, a size picked by hand stays',t=>{
+test('sizes an old release saved with Alt+T stay when their provenance is ambiguous',t=>{
  const cases=[
-  ['colour only, the global 24 copied with its mark',{textColor:'#ffeeaa'},22],
+  ['colour only, the global 24 copied with its mark',{textColor:'#ffeeaa'},24],
   ['34 picked in the menu',{japaneseSize:34},34],
-  // the menu left at the global 24 saves the same record as the colour change: it cannot be told apart and follows Settings
-  ['24 left as the global one',{japaneseSize:24,textColor:'#ffeeaa'},22]];
+  // The legacy marker does not say whether any particular value was inherited or picked for this work.
+  ['24 left as the global one',{japaneseSize:24,textColor:'#ffeeaa'},24]];
  for(const [name,changes,expected] of cases)for(const resave of ['','Alt+T','page']){
   const {settings,launch,stored}=fixture(t);
   settings.save({scope:'text',values:{japaneseSize:24}});
@@ -211,7 +211,7 @@ test('sizes an old release saved with Alt+T: the inherited global size follows S
   assert.equal(launch().japaneseSize,expected,name+(resave?', saved again from '+resave:'')+': restart after Settings changed with the game closed');
   assert.equal(settings.get(key).values.text.japaneseSize,expected,name+': the work\'s page');
   settings.save({scope:'text',values:{translationSize:20}});
-  assert.equal(launch().translationSize,20,name+': the copied 30 follows Settings too');
+  assert.equal(launch().translationSize,30,name+': the old mark also covers the ambiguous translation size');
  }
 });
 
@@ -289,6 +289,18 @@ test('an old colour-only preset edit before upgrade never clears a manual work s
  oldAltT(settings,{japaneseSize:34},at);
  fs.writeFileSync(preset,JSON.stringify({japaneseSize:24,sizeSource:'user',textColor:'#ffeeaa'}));
  fs.utimesSync(preset,new Date(at+1000),new Date(at+1000));
+ assert.equal(launch().japaneseSize,34);
+ assert.equal(settings.get(key).values.text.japaneseSize,34);
+});
+
+test('a pre-upgrade global size matching a manual work size does not erase the override',t=>{
+ const {settings,launch,stored}=fixture(t),preset=path.join(settings.folder,'text-defaults.json');
+ fs.writeFileSync(preset,JSON.stringify({japaneseSize:24,sizeSource:'user'}));
+ oldAltT(settings,{japaneseSize:34});
+ fs.writeFileSync(preset,JSON.stringify({japaneseSize:34,sizeSource:'user'}));
+ assert.equal(launch().japaneseSize,34);
+ settings.save({scope:'text',values:{japaneseSize:24}});
+ assert.equal(stored().prefs.japaneseSize,34);
  assert.equal(launch().japaneseSize,34);
  assert.equal(settings.get(key).values.text.japaneseSize,34);
 });

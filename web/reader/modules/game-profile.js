@@ -20,18 +20,15 @@
  function ownSizes(prefs,base,owned){const out={...prefs},has=k=>!!owned&&Object.hasOwn(owned,k);let kept=false;
   for(const k of sizeKeys){if(!(k in out))continue;if(!has(k)&&Number(out[k])===Number(base?.[k]))delete out[k];else kept=true;}
   if(!kept&&'sizeSource' in out&&!has('sizeSource'))delete out.sizeSource;return out;}
- /* Entries from before sizes:1 copied the built-in sizes of that time (34 / 30 / 34) into every saved work: those follow Settings now.
-    Only when every size the entry holds is that copy and none is marked sizeSource 'user' (Alt+T and the per-work page marked a size
-    changed there). An old save also copied the global sizes of its time, with the global mark: given the global sizes an old entry
-    was saved under (base), sizes equal to them are inherited and follow Settings too. A size picked equal to the global one cannot be
-    told apart from a copy and follows Settings. A different value could be a manual override; a preset's file time cannot tell which. */
+ /* Entries from before sizes:1 often copied the old built-in sizes (34 / 30 / 34). An unmarked copy follows Settings.
+    Old Alt+T saves could also copy a global 'user' mark. Preserve these values because the old file cannot distinguish them from
+    sizes chosen for the work, even when a value matches the current global preset. */
  const legacySizes={japaneseSize:34,translationSize:30,englishSize:34};
  function map(value){if(value===null)return null;if(!value||typeof value!=='object'||![value.s,value.bx,value.by,value.dx,value.dy,value.cw,value.ch].every(Number.isFinite)||value.s<=.1||value.s>=10||value.cw<=0||value.ch<=0||['bx','by','dx','dy'].some(k=>Math.abs(value[k])>20000))return undefined;const out={};for(const key of ['engine','s','bx','by','dx','dy','cw','ch'])if(key==='engine'?typeof value[key]==='string'&&value[key].length<40:Number.isFinite(value[key]))out[key]=value[key];return out;}
  function version(value){if(!value||!Number.isFinite(value.savedAt)||value.savedAt<=0)return null;const m=map(value.positionMap);return {id:String(value.id||value.savedAt).slice(0,80),savedAt:value.savedAt,prefs:pick(value.prefs),positionMap:m===undefined?null:m};}
- function normalize(entry,base){if(!entry||!entry.prefs)return null;const prefs=pick(entry.prefs);if('lineHeight' in prefs&&prefs.lineHeightMode!=='offset'){prefs.lineHeight=Number(prefs.lineHeight)-(Number(prefs.lineHeight)>=0?1.95:0);prefs.lineHeightMode='offset';}const textSavedAt=entry.textSavedAt??(textKeys.some(k=>k in prefs)?entry.savedAt:0),positionSavedAt=entry.positionSavedAt??(positionKeys.some(k=>k in prefs)?entry.savedAt:0);const history=Array.isArray(entry.history)?entry.history.map(version).filter(Boolean).sort((a,b)=>b.savedAt-a.savedAt).slice(0,7):[];
+ function normalize(entry){if(!entry||!entry.prefs)return null;const prefs=pick(entry.prefs);if('lineHeight' in prefs&&prefs.lineHeightMode!=='offset'){prefs.lineHeight=Number(prefs.lineHeight)-(Number(prefs.lineHeight)>=0?1.95:0);prefs.lineHeightMode='offset';}const textSavedAt=entry.textSavedAt??(textKeys.some(k=>k in prefs)?entry.savedAt:0),positionSavedAt=entry.positionSavedAt??(positionKeys.some(k=>k in prefs)?entry.savedAt:0);const history=Array.isArray(entry.history)?entry.history.map(version).filter(Boolean).sort((a,b)=>b.savedAt-a.savedAt).slice(0,7):[];
   if(entry.sizes!==1){const held=sizeKeys.filter(k=>k in prefs);
    if(prefs.sizeSource!=='user'&&held.every(k=>Number(prefs[k])===legacySizes[k]))for(const k of held)delete prefs[k];
-   else if(base)for(const k of held)if(Number(prefs[k])===Number(base[k]))delete prefs[k];
    if(!sizeKeys.some(k=>k in prefs))delete prefs.sizeSource;}
   return {...entry,prefs,textSavedAt,positionSavedAt,history,sizes:1};}
  const copy=v=>v==null?null:JSON.parse(JSON.stringify(v));
