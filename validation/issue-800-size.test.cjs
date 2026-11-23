@@ -125,12 +125,14 @@ test('saving an old entry from its page in Settings does not freeze the copied d
  assert.equal(launch().japaneseSize,22);
 });
 
-test('a work\'s page compares with the size the game starts from, not the last session',t=>{
- const {settings,launch}=fixture(t,{prefs:{x:10}});
+test('a work\'s page shows the size the game starts with, not the last session, and a colour change keeps following Settings',t=>{
+ const {settings,launch,stored}=fixture(t,{prefs:{x:10},sizes:1});
  fs.writeFileSync(path.join(settings.folder,'gal-preferences.json'),JSON.stringify({japaneseSize:28.5,layoutVersion:22}));
- const page=settings.get(key).values.text;assert.equal(page.japaneseSize,28.5);
+ const page=settings.get(key).values.text;assert.equal(page.japaneseSize,launch().japaneseSize);assert.equal(page.japaneseSize,34);
  settings.save({scope:'text',profile:key,values:{...page,textColor:'#ffeeaa'}});
- assert.equal(launch().japaneseSize,28.5,'the size the page showed is the one the game starts with');
+ assert.equal('japaneseSize' in stored().prefs,false,'the whole form was sent for a colour');assert.equal(stored().prefs.textColor,'#ffeeaa');
+ settings.save({scope:'text',values:{japaneseSize:22}});
+ assert.equal(launch().japaneseSize,22,'the next start follows Settings');assert.equal(settings.get(key).values.text.japaneseSize,22);
 });
 
 test('a game\'s own size reaches another PC with cloud sync',t=>{

@@ -36,7 +36,11 @@ class Settings{
     const session=readJSON(this.file('gal-preferences.json')),modern=Object.hasOwn(preset,'japaneseSize')||Object.hasOwn(preset,'translationSize');
     const global=gameStyle.clean({...(Object.keys(session||{}).length?gameStyle.clean(session):{}),...preset,...(modern?{layoutVersion:22}:{})});/* the session file alone takes the one-time spacing move (core/game-style.js), never the preset typed here */
     const entry=profile?profileTools.normalize(readJSON(this.file('game-style-profiles.json')).entries?.[profile]):null;
-    return entry?gameStyle.clean({...global,...entry.prefs}):global;
+    if(!entry)return global;
+    /* a work starts from the built-in sizes and the preset (GameStyleSync.base), never the last session: its page shows those, so a
+       save of the whole form for another field does not turn a session size into this work's own */
+    const work=require('../core/text-defaults.cjs').workBase(this.folder);
+    return gameStyle.clean({...global,...Object.fromEntries(profileTools.sizeKeys.map(k=>[k,work[k]])),sizeSource:work.sizeSource||'',...entry.prefs});
   }
   if(v4Scopes.has(scope))return cleanV4(readJSON(this.file('v4-preferences.json')));
   if(nativeScopes.has(scope))return {...nativeDefaults,...readJSON(this.file('native-preferences.json'))};
