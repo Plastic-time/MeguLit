@@ -8,7 +8,7 @@
    - the folder carries a translation's own files (*_cn.dll/.mys/.pak, readme_cn, 汉化补丁备份, 原版备份, <exe>.org backups)
      and the program name is Chinese only (no kana, no Latin word), which a Japanese release never ships. */
 const fs=require('node:fs'),path=require('node:path');
-const {languageHint,isLauncher}=require('./launcher-language.cjs');
+const {languageHint,launcherLanguage,isLauncher}=require('./launcher-language.cjs');
 const ZH_TAG=/(?:^|[_. -])(?:cn|chs|cht|zh|sc|tc|chinese)(?=$|[_. -])/i;
 const ZH_WORD=/汉化|漢化|中文|简体|繁體|簡體/;
 const KANA=/[ぁ-ゟ゠-ヿ]/,HAN=/[一-鿿]/;
@@ -28,7 +28,8 @@ function inspect(executable){
  if(hint==='ja')return out;
  const markers=list.filter(e=>marker(e.name,e.isDirectory())).map(e=>e.name);
  const chineseOnly=n=>{const st=n.replace(/\.exe$/i,'');return HAN.test(st)&&!KANA.test(st)&&!/[A-Za-z]{3}/.test(st);};
- const launchers=list.filter(e=>e.isFile()&&isLauncher(e.name)&&e.name.toLowerCase()!==name.toLowerCase()&&languageHint(e.name)!=='zh'&&!chineseOnly(e.name)).map(e=>e.name);
+ const programs=list.filter(e=>e.isFile()&&isLauncher(e.name)&&e.name.toLowerCase()!==name.toLowerCase()).map(e=>e.name);
+ const launchers=programs.filter(n=>!['zh','en'].includes(launcherLanguage(n,programs))&&!chineseOnly(n));
  const chineseName=chineseOnly(name);
  if(hint==='zh')out.evidence.push('name');
  else if(markers.length&&chineseName)out.evidence.push('chinese-name');

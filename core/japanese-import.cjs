@@ -6,7 +6,7 @@
 // keeps its script in separate archives (Nitroplus .npa), the user can point at a Japanese original's program and the
 // script archives plus that program are copied in. Every replaced file is backed up first and undo puts it back.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const {languageHint,isLauncher}=require('./launcher-language.cjs');
+const {languageHint,launcherLanguage,isLauncher}=require('./launcher-language.cjs');
 
 const BACKUP_DIR='.megulit-japanese-import';
 const TRANSLATED=/(汉化|漢化|中文|简体|簡體|繁体|繁體|(?:^|[-_ .])(chs|cht|cn|sc|tc|zh|chinese)(?=$|[-_ .]))/i;
@@ -62,7 +62,9 @@ function plan(dir,exe,source){
   if(current&&current.equals(data))continue;
   files.push({name,data,current});
  }
- const exeName=path.basename(source),exeTarget=path.join(dir,exeName),exeData=fs.readFileSync(source);
+ const exeName=path.basename(source),exeTarget=path.join(dir,exeName);
+ if(launcherLanguage(exeTarget)==='en')throw Error('IMPORT_SOURCE_NOT_JAPANESE');
+ const exeData=fs.readFileSync(source);
  if(isFile(exeTarget)&&!fs.readFileSync(exeTarget).equals(exeData))throw Error('IMPORT_EXE_CONFLICT');
  return {dir,adapter,files,exeName,exeTarget,exeData,addExe:!isFile(exeTarget)};
 }

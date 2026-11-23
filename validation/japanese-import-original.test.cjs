@@ -98,6 +98,37 @@ test('a Japanese release of another build becomes the game program instead of be
  fs.rmSync(base,{recursive:true,force:true});
 });
 
+test('Japanese file import chooses the Japanese sibling through preview and apply',async t=>{
+ const base=fs.mkdtempSync(path.join(os.tmpdir(),'jio-multilingual-'));
+ t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+ for(const layout of ['shared','separate','installed']){
+  const separate=layout==='separate',game=path.join(base,layout,'game'),jp=path.join(base,layout,'source');
+  put(game,separate?{'Game_zh.exe':'host','script.pak':'zh'}:{'Game_zh.exe':'host','data.xp3':'zh','image.xp3':'cg'});
+  put(jp,{'Game_English.exe':Buffer.alloc(52000),'Game.exe':Buffer.alloc(46000),'data.xp3':'ja','image.xp3':'cg'});
+  put(layout==='installed'?game:jp,{'Game_JP.exe':Buffer.alloc(separate?12000:40000)});
+  const executable=path.join(game,'Game_zh.exe'),before=tree(game);
+  const preview=await jio.preview(game,jp,executable);
+  assert.equal(preview.state,separate?'separate':'preview');
+  assert.equal(preview.exe,'Game_JP.exe');
+  const applied=await jio.apply(game,jp,executable);
+  assert.equal(applied.exe,path.join(separate?jp:game,'Game_JP.exe'));
+  if(!separate)jio.restore(game);
+  assert.deepStrictEqual(tree(game),before);
+ }
+});
+
+test('removing a same-folder overlay reports the Japanese sibling before writing files',async t=>{
+ const game=fs.mkdtempSync(path.join(os.tmpdir(),'jio-overlay-multilingual-'));
+ t.after(()=>fs.rmSync(game,{recursive:true,force:true}));
+ put(game,{'Game_en.exe':'english','Game_jp.exe':'japanese','data.xp3':'release','data.xp3.sig':'sig','patch.xp3':'patch'});
+ const executable=path.join(game,'Game_en.exe'),before=tree(game);
+ assert.equal((await jio.preview(game,game,executable)).exe,'Game_jp.exe');
+ assert.deepEqual(tree(game),before);
+ assert.equal((await jio.apply(game,game,executable)).exe,path.join(game,'Game_jp.exe'));
+ jio.restore(game);
+ assert.deepEqual(tree(game),before);
+});
+
 test('a disc image is reported as one, not as another game',async()=>{
  const base=fs.mkdtempSync(path.join(os.tmpdir(),'jio-disc-')),game=path.join(base,'steam'),jp=path.join(base,'disc');
  put(game,{'Saya_Steam.exe':'x','script.npk':'a'});put(jp,{'saya.cue':'FILE "saya.bin" BINARY','saya.bin':'x'});

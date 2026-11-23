@@ -62,6 +62,12 @@ test('b) a Japanese copy of the same work in a sibling folder is offered as the 
  assert.equal(cg.similar('Riddle Joker','千恋万花'),false);assert.equal(cg.similar('[ゆずソフト] 千恋＊万花 v1.2','千恋万花 [汉化版]'),true);
  fs.rmSync(base,{recursive:true,force:true});
 });
+test('b) a nearby multilingual copy offers its Japanese program ahead of its English and unmarked programs',()=>{
+ const base=tmp('nearby-multilingual'),g=path.join(base,'Story [汉化版]');
+ put(base,{'Story [汉化版]/Game_zh.exe':'x','Story/Game.exe':'x','Story/Game_en.exe':'x','Story/Game_jp.exe':'x'});
+ const nearby=cg.scanRestore(g,path.join(g,'Game_zh.exe')).found.filter(x=>x.kind==='nearby');
+ assert.deepEqual(nearby.map(x=>x.path),[path.join(base,'Story','Game_jp.exe')]);
+});
 test('online: VNDB releases name Japanese patches and official Japanese+Chinese releases',()=>{
  const r=cg.parseReleases([
   {title:'Some VN',patch:false,official:true,languages:[{lang:'ja'}]},

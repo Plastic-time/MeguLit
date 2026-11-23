@@ -3,6 +3,7 @@
 const {test,after}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {DatabaseSync}=require('node:sqlite');
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-fata-launch-'));
 const previousRoot=process.env.MEGULIT_ROOT;
 process.env.MEGULIT_ROOT=root;
@@ -37,6 +38,38 @@ test('recognizes each language launcher that names the shared game executable',(
  assert.equal(launchTarget(file('fata_ru.exe')),null);
  fs.unlinkSync(file('data_jp.xp3'));
  assert.equal(launchTarget(file('fata_jp.exe')),null);
+});
+
+function englishSelection(t){
+ const {file,game}=fixture(),english=file('fata_en.exe');
+ fs.unlinkSync(file('fata.exe'));
+ fs.writeFileSync(english,'MZ');
+ const db=new DatabaseSync(':memory:');
+ t.after(()=>db.close());
+ db.exec('CREATE TABLE games(id TEXT, executable TEXT, original TEXT, removed_at INTEGER)');
+ db.prepare('INSERT INTO games(id,executable,original) VALUES (?,?,?)').run(game.id,english,game.original);
+ return {db,file,game,language:require('../services/game-language.cjs')};
+}
+
+test('the English standalone program can switch to the Japanese and Chinese siblings',t=>{
+ const {db,file,game,language}=englishSelection(t);
+ const status=language.inspect(db,game.id,root);
+ assert.deepEqual(status.versions,{ja:file('fata_jp.exe'),zh:file('fata_zh.exe')});
+ assert.equal(status.current,'en');
+ assert.equal(language.select(db,game.id,'ja',null,root).executable,file('fata_jp.exe'));
+});
+
+test('finding the Japanese original from the English standalone program saves the Japanese sibling',t=>{
+ const {db,file,game,language}=englishSelection(t);
+ assert.equal(language.originalExecutable(db,game.id,root,'find').executable,file('fata_jp.exe'));
+ assert.equal(db.prepare('SELECT executable FROM games WHERE id=?').get(game.id).executable,file('fata_jp.exe'));
+});
+
+test('similarly named programs without a Japanese release keep their own families',t=>{
+ const {db,file,game,language}=englishSelection(t);
+ fs.unlinkSync(file('data_jp.xp3'));
+ fs.unlinkSync(file('fata_jp.exe'));
+ assert.deepEqual(language.inspect(db,game.id,root).versions,{});
 });
 
 test('the shared game window maps back to a single library entry even without saved variants',()=>{
