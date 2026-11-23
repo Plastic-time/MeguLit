@@ -42,6 +42,10 @@ function profileInput(s,sh){const out={...(s.input||{})};for(const k of ['shared
  }out[f+'Rev']=p.rev|0;};put(sh.game,'Game');put(sh.version,'');if(sh.match)out.match=sh.match;}
  /* the game prints let a built-in seed (The Seed/) find its game by archive / script / VNDB / title */
  if(s.prints)out.prints=s.prints;
+ if(s.reviewCandidate && sh===s.shared){
+  out.official=s.reviewCandidate.settings;
+  out.prints=s.reviewCandidate.prints;
+ }
  return out;}
 function verifiedLocal(s){const st=s.stored;
  return !!s.script&&st?.source!=='gate'&&(st?.verifiedScript===s.script||st?.cold?.verdict==='pass'&&st.cold.measured?.length>0);}
@@ -80,6 +84,7 @@ function settle(s){const shared=feed.forExe(s.shared,s.key,s.input?.exe||s.exe,{
 /* profile: the game's layered profile without the auto layer; input: its profileFor input */
 function start(reader,exe,profile=null,input=null,options={}){stop();profile=profile||Profiles.profileFor({exe});input=input||{exe};
  const s={reader,exe,pid:Number(reader.gamePid),birth:String(reader.gameBirth||''),key:'',input,profile,stored:null,shared:null,layer:null,from:'',calibrated:false,skipFeed:!!options.skipFeed,ver:version(reader.root)};
+ if(options.reviewCandidate && options.skipFeed)s.reviewCandidate=options.reviewCandidate;
  s.check=new SelfCheck({thresholds:profile.selfCheck||{},record:true,onWindow:r=>windowDone(s,r)});
  /* the runtime sample only with the player's consent (runtime-sample.cjs enabled, default off) */
  s.sample=require('./runtime-sample.cjs').enabled(reader.root)?new RuntimeSample({exe,engine:profile.engine,app:s.ver}):null;
@@ -94,6 +99,12 @@ function bindKey(s,key){const {reader}=s;s.key=key;const script=require('./origi
  if(!admission.eligible){s.stored=null;s.calibrationPending=admission.missing;hookTrace(reader,'selfCheck calibration pending key='+key+' missing='+admission.missing.join(','));reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'calibrationPending',key,reason:'观测不足，等待重新校准',missing:admission.missing});}
  s.calibrated=!!s.stored;if(s.stored)s.check.recording=null;
  s.shared=s.skipFeed?null:feed.layer(feed.cached(reader.root,key),key,{exe:s.exe,script});if(s.shared&&feed.rejected(reader.root,key,s.shared))s.shared=null;
+ if(s.reviewCandidate){
+  const candidate=s.reviewCandidate;
+  if(candidate.key!==key)throw Error('LIVE_REVIEW_EXE');
+  const version={source:'official',settings:candidate.settings,mode:candidate.mode,rev:candidate.rev};
+  s.shared={...version,version,exact:true,match:'exe'};
+ }
  if(s.shared?.torchBound&&!s.check.w.lines&&!s.check.windows.length)s.check.t={...s.check.t,...Profiles.profileFor(inputOf(s)).selfCheck};
  const c=settle(s);
  if(s.stored?.source==='gate'&&c?.from!=='local-gate')reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'gateSuperseded',key,previousAt:s.stored.at,layer:c?.from||'none'});

@@ -72,6 +72,23 @@ if (root && /^(?:[a-f0-9]{32}|[a-f0-9]{64})$/.test(challenge) &&
     const {DisplayPairs}=require(path.join(root,'core','cardinal','display-pairs.cjs'));
     const target=process.env.MEGULIT_DIALOGUE_TARGET;
     delete process.env.MEGULIT_DIALOGUE_TARGET;
+    const fs=require('node:fs');
+    const reviewFile=path.join(root,'review-'+challenge+'.json');
+    const review=fs.existsSync(reviewFile)?JSON.parse(fs.readFileSync(reviewFile,'utf8')):null;
+    const identity=require(path.join(root,'services/cardinal/identity.cjs'));
+    if(review){
+      const selfCheck=require(path.join(root,'services/self-check-live.cjs'));
+      const start=selfCheck.start;
+      // The supervisor checked both files in this immutable game copy before
+      // creating the challenge-scoped record and starting this private Reader.
+      if(review.challenge!==challenge || review.candidate.key!==review.identity.exe ||
+          review.candidate.prints.script!==review.identity.script)throw Error('LIVE_REVIEW_IDENTITY');
+      selfCheck.start=function(reader,exe,profile,input,options){
+        if(path.resolve(exe).toLowerCase()!==review.exe.toLowerCase() || reader.gamePid!==review.pid ||
+            String(reader.gameBirth)!==review.birth)throw Error('LIVE_REVIEW_SESSION');
+        return start(reader,exe,profile,input,{...options,key:review.identity.exe,skipFeed:true,reviewCandidate:review.candidate});
+      };
+    }
     let boundGal;
     if(target){
       const {HookNative}=require(path.join(root,'core','hook-native.cjs'));
@@ -89,6 +106,7 @@ if (root && /^(?:[a-f0-9]{32}|[a-f0-9]{64})$/.test(challenge) &&
           if(frame.challenge!==challenge || frame.sequence!==++sequence || !state?.bound ||
               String(state.gameProcessId)+'|'+state.gameStarted!==target)throw Error('LIVE_DIALOGUE_BINDING');
           const m={type:'hookSource',origin:'live',text:frame.text,sourceName:'RenPyCharacterCallback'};
+          if(review && identity.hashObject(boundGal.profile)!==review.profileHash)throw Error('LIVE_EFFECTIVE_PROFILE');
           write({kind:'gameDialogue',wireNs:process.hrtime.bigint().toString(),m,sequence});
           boundGal.hooks.source(m,m.sourceName);
         }

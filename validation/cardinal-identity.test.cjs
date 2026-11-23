@@ -12,6 +12,16 @@ test.after(()=>{Jobs._reset();Tape.clear();for(const dir of dirs){assert.ok(path
 test('unchanged real files bind full exe/script/config hashes and copy without credentials',async()=>{const h=fixture(),captured=h.capture(),proof=await I.prepare(captured,{data:h.data,game:h.game});
  assert.equal(proof.scripts[0].sha256,sha(fs.readFileSync(h.script)));assert.equal(proof.candidate.seedRev,'v1');assert.equal((await I.verify(proof,{data:h.data,game:h.game})).digest,proof.digest);
  const destination=path.join(h.root,'copy');await I.copyData(proof,{data:h.data,destination,game:h.game});assert.deepEqual(fs.readFileSync(path.join(destination,'config','gal-preferences.json')),fs.readFileSync(h.setting));assert.equal(fs.existsSync(path.join(destination,'config','secrets.dpapi')),false);assert.ok(!JSON.stringify(proof).includes('TEST_SENTINEL'));});
+test('review copies and rechecks script-qualified calibration for this executable',async()=>{
+ const h=fixture(),dir=path.join(h.data,'config','auto-profiles');fs.mkdirSync(dir);
+ const name=h.key+'.'+sha(fs.readFileSync(h.script))+'.json',file=path.join(dir,name);
+ fs.writeFileSync(file,'{}');fs.writeFileSync(path.join(dir,'f'.repeat(64)+'.json'),'{}');
+ const proof=await I.prepare(h.capture(),{data:h.data,game:h.game}),destination=path.join(h.root,'review');
+ await I.copyData(proof,{data:h.data,destination,game:h.game});
+ assert.deepEqual(fs.readdirSync(path.join(destination,'config','auto-profiles')),[name]);
+ fs.writeFileSync(file,'{"changed":true}');
+ await assert.rejects(I.verify(proof,{data:h.data,game:h.game}),/CARDINAL_IDENTITY_CHANGED/);
+});
 for(const kind of ['config','candidate','script','new-script','exe'])test('queued '+kind+' change is rejected before replay preparation',async()=>{const h=fixture(),captured=h.capture();
  if(kind==='config')fs.writeFileSync(h.setting,JSON.stringify({japaneseSize:32}));if(kind==='candidate')fs.writeFileSync(h.cache,JSON.stringify({version:1,key:h.key,diff:{rev:2}}));if(kind==='script')fs.appendFileSync(h.script,'\n次の台詞');if(kind==='new-script')fs.writeFileSync(path.join(path.dirname(h.script),'new.ks'),'新章');if(kind==='exe')fs.appendFileSync(h.exe,'changed');
  await assert.rejects(I.prepare(captured,{data:h.data,game:h.game}),/CARDINAL_IDENTITY_CHANGED/);});

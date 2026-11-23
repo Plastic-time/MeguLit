@@ -151,7 +151,12 @@ async function main(req,cfg,port,cancel){
   }
   const store=require(path.join(lib,'services/store.cjs')).openStore(readerRoot);
   try{store.prepare('INSERT INTO games(id,title,executable) VALUES(?,?,?)').run('cardinal-'+crypto.randomUUID(),ctx?.proof.context.title||path.basename(source,path.extname(source)),game.exe);}finally{store.close();}
-  measurement=new LiveMeasurement(game,profile);
+  if(ctx){
+   const review={challenge:req.challenge,pid:game.pid,birth:game.birth,exe:game.exe,
+    candidate:ctx.request.candidate,identity:ctx.request.identity,profileHash:ctx.proof.candidate.profileHash};
+   fs.writeFileSync(path.join(readerRoot,'review-'+req.challenge+'.json'),JSON.stringify(review),{flag:'wx'});
+  }
+  measurement=new LiveMeasurement(game,profile,ctx?.proof.candidate.profileHash);
   const journal=fs.openSync(path.join(eventsDir,'events.jsonl'),'wx');
   let used=0;
   try{
@@ -161,6 +166,7 @@ async function main(req,cfg,port,cancel){
     if(used>64*1024**2)fail('LIVE_EVIDENCE_LIMIT');fs.writeSync(journal,line);
     measurement.frame(f);
    },stop);
+   if(ctx)await wait(()=>measurement.appliedHash===ctx.proof.candidate.profileHash && measurement.counts.bound && measurement.pageId);
    if(!Array.isArray(cfg.inputs)||cfg.inputs.length>1000)fail('LIVE_INPUT_PLAN');
    for(const step of cfg.inputs){const command=control(step);timers.push(setTimeout(()=>{if(!ended&&!err)gameWorker.input(command);},step.at));}
    await wait(()=>measurement.counts.pairs>=30 && measurement.counts.pairs===measurement.counts.sources &&

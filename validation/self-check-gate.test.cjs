@@ -99,6 +99,37 @@ try{
  const sample=JSON.parse(fs.readFileSync(path.join(root,'data','runtime-samples',key,'sample.json'),'utf8'));assert.strictEqual(sample.schema,'megulit.runtime-sample');assert.ok(sample.lines.length>=20);assert.ok(sample.boxes.length>0);assert.ok(sample.drops.length>0);assert.strictEqual(sample.exe,'game_x.exe');
  live.stop();gal.textEffectsHold=null;calls.length=0;
  assert.ok(logged.some(e=>e.what==='sessionEnd'&&e.closedWindows>0));
+ /* An independent reviewer receives only the claimed calibration. It must
+    recreate exactly the runner's version layer and still see live changes. */
+ const P=require('../core/profiles/index.cjs'),I=require('../services/cardinal/identity.cjs');
+ const {LiveMeasurement}=require('../services/cardinal-live-measurement.cjs');
+ const reviewRoot=path.join(root,'reviewer');fs.mkdirSync(reviewRoot);
+ const input={exe,title:path.basename(exe,path.extname(exe)),engine:'krkr'};
+ const candidate={key,mode:stored.mode,settings:stored.settings,rev:7,prints:{exe:key,script:'a'.repeat(64)}};
+ const expected=P.profileFor({...input,exeSha256:key,official:candidate.settings,officialRev:7,match:'exe',prints:candidate.prints});
+ const proc={exe,pid:11,birth:'123',hwnd:'22'};
+ const observed=new LiveMeasurement(proc,expected,I.hashObject(expected));
+ const observe=p=>observed.frame({kind:'profile',exe,profile:p});
+ const report=m=>observed.frame({kind:'native',wireNs:process.hrtime.bigint().toString(),m});
+ const {GalNative}=require('../core/gal-native.cjs');
+ const reviewGal={hooks:{},notify(){},hookPrefs(){return {};},textEffects:GalNative.prototype.textEffects,setGameProfile:GalNative.prototype.setGameProfile};
+ const reviewReader={...reader,root:reviewRoot,gamePid:proc.pid,gameBirth:proc.birth,gal:reviewGal};
+ const options={key,skipFeed:true,reviewCandidate:candidate};
+ assert.throws(()=>live.start(reviewReader,exe,P.profileFor(input),input,{...options,key:'f'.repeat(64)}),/LIVE_REVIEW_EXE/);
+ const session=live.start(reviewReader,exe,P.profileFor(input),input,options);
+ assert.equal(session.calibrated,true);assert.equal(session.check.recording,null);
+ observed.frame({kind:'page',pageId:'unit-page'});
+ report({type:'bound',bound:true,gameProcessId:11,gameStarted:'123',gameHwnd:'22'});
+ const source={type:'hookSource',origin:'live',text:'unit'};
+ assert.throws(()=>report(source),/LIVE_EFFECTIVE_PROFILE/);
+ assert.throws(()=>observe(P.profileFor(input)),/LIVE_EFFECTIVE_PROFILE/);
+ reviewGal.setGameProfile(P.profileFor(live.inputOf(session)),input);
+ observe(reviewGal.profile);report(source);
+ for(const l of he.split('\n'))if(l>=FATA[0]&&l<FATA[1])live.feedTrace(l);
+ assert.strictEqual(I.hashObject(P.profileFor(live.inputOf(session))),I.hashObject(expected));
+ live.setPresentation(reviewRoot,key,'nvl');
+ assert.throws(()=>observe(reviewReader.gal.profile),/LIVE_PROFILE_CHANGED/);
+ live.stop();
  live.start(reader,reader.gameExe);assert.strictEqual(calls.length,1,'stored read mode applies at the next start');
  gal.textEffectsHold=null;live.recalibrate(reader);assert.strictEqual(ap.load(root,key),null,'重新校准 forgets the stored diff');assert.ok(live.current().check.recording,'and records again');
  live.stop();

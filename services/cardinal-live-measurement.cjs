@@ -7,7 +7,8 @@ const Identity=require('./cardinal/identity.cjs');
 const path=require('node:path');
 
 class LiveMeasurement {
- constructor(game,profile) {
+ constructor(game,profile,expectedHash) {
+  this.expectedHash=expectedHash;
   this.game=game; this.profile=profile; this.counts={native:0,bound:0,sources:0,episodes:0,acceptedAcks:0,domSamples:0,visibleTranslations:0,pairs:0};
   this.nativeCounts={}; this.steps=[]; this.samples=[]; this.episodes=[]; this.acks=[]; this.seen=new Set();
   this.hide=NativeHide.collector(); this.choices=[]; this.regions=[];
@@ -22,6 +23,7 @@ class LiveMeasurement {
    if(path.resolve(f.exe).toLowerCase()===this.game.exe.toLowerCase()) {
     const hash=Identity.hashObject(f.profile);
     if(this.appliedHash && hash!==this.appliedHash && c.sources)throw Error('LIVE_PROFILE_CHANGED');
+    if(this.expectedHash && hash!==this.expectedHash)throw Error('LIVE_EFFECTIVE_PROFILE');
     this.appliedHash=hash;
    }
    return;
@@ -43,6 +45,7 @@ class LiveMeasurement {
     this.steps.push({gwb:m});
    }
    if(m.type==='hookSource'){
+    if(this.expectedHash && this.appliedHash!==this.expectedHash)throw Error('LIVE_EFFECTIVE_PROFILE');
     c.sources++;
     if(!this.clock || !this.pageId)throw Error('LIVE_SOURCE_BEFORE_BIND');
     if(!m.text || !(m.origin==='live'||(m.origin===undefined && m.hookActive===true && Number.isSafeInteger(m.streamProbe)))||m.recovering||m.hookRecovering)throw Error('LIVE_SOURCE_ORIGIN');
