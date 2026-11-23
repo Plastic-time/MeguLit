@@ -55,7 +55,8 @@
       if (!reading.startsWith('わたくし')) return token;
       const next = tokens[i + 1]?.surface || '';
       if (humble || /^(?:ども|共)/.test(token.surface.slice(1) || next)) return token;
-      return { ...token, reading: 'わたし' + reading.slice(4) };
+      // The UniDic accent belongs to わたくし: speech estimates the accent of わたし itself.
+      return { ...token, reading: 'わたし' + reading.slice(4), pitch: [], lexeme: null };
     });
   }
   // Readings the game prints itself (its ruby), learned per work, replace guessed ones wherever that word appears:

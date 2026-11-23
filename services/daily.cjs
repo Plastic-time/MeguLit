@@ -143,13 +143,13 @@ function articleTexts(values,toText){
 }
 async function fromRelay(base,link,fetcher){const r=await get(base+'/api/news/article?link='+encodeURIComponent(link),fetcher);return r.state==='ok'&&Array.isArray(r.data?.paragraphs)?{title:str(r.data.title,200),paragraphs:articleTexts(r.data.paragraphs,p=>typeof p==='string'?p:'').filter(Boolean),via:'relay'}:null;}
 async function fromSite(link,options){const page=await require('./fast-fetch.cjs').getText(link,{fetch:options.fetch,doh:options.doh});if(!page.ok)return null;const x=require('./news-article.cjs').extract(page.text,page.url||link);return x.paragraphs.length?{...x,via:page.via}:null;}
-/* readings only when the dictionary settled them (readingSource 'dictionary'), never the tokenizer's guess */
+/* readings only when settled (the dictionary's, or a number and its counter), never the tokenizer's guess */
 async function tokens(text,learning){
  if(!learning)return null;
  try{
   const list=[];
   for(const part of splitParagraph(text,4000))list.push(...learning.readings.resolve(await learning.tokenize(part)));
-  return list.map(t=>({s:String(t.surface||''),b:String(t.base_form&&t.base_form!=='*'?t.base_form:t.surface||''),r:t.readingSource==='dictionary'?String(t.reading||''):''})).filter(t=>t.s);
+  return list.map(t=>({s:String(t.surface||''),b:String(t.base_form&&t.base_form!=='*'?t.base_form:t.surface||''),r:require('../core/reading.cjs').settled(t)?String(t.reading||''):''})).filter(t=>t.s);
  }catch{return null;}
 }
 async function article(root,link,options={}){
