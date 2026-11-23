@@ -25,7 +25,7 @@ export function seedAdminClient(score){
   const scanner=p?scannerLabels[p.scanner]||'未确认':'未确认';
   const next=!p?.enabled||p.scanner==='offline'||p.scanner==='unready'||p.scanner==='unconfigured'?'上传留在队列':p.scanner==='online'?'扫描通过后自动签发下发':p.scanner==='busy'?'等待空闲后继续处理':'等待确认扫描服务状态';
   $('policy-state').textContent=p?state+'，待处理 '+p.pending+' 份，扫描服务'+scanner+'，'+next:'正在确认自动处理状态';
-  if(p?.enhanced)$('policy-state').textContent=state+' · 待处理任务 '+(p.pending+p.enhanced.pending)+' 项 · 扫描中 '+p.scanning+' · 实测中 '+p.enhanced.active+' · 扫描服务'+scanner+' · '+(p.enhanced.host==='online'?'实测宿主在线':'等待可信实测宿主');
+  if(p?.enhanced)$('policy-state').textContent=state+' · 待处理任务 '+p.pendingSeeds+' 项 · 扫描中 '+p.scanning+' · 实测中 '+p.enhanced.active+' · 扫描服务'+scanner+' · '+(p.enhanced.host==='online'?'实测宿主在线':'等待可信实测宿主');
   buttons();
  }
  async function readPolicy(){

@@ -7,7 +7,7 @@ import {wakeClients} from './seed-notifications.js';
 import {boundedJSON} from './ordinary-seed.js';
 
 const enabled="(SELECT enabled FROM ordinary_publish_policy WHERE id=1)=1";
-const live="EXISTS(SELECT 1 FROM seed_admin_items WHERE id=enhanced_seed_jobs.id AND state<>'deleted')";
+const live="EXISTS(SELECT 1 FROM seed_admin_items WHERE id=enhanced_seed_jobs.id AND state<>'deleted') AND NOT EXISTS(SELECT 1 FROM seed_lifecycle_block b WHERE b.id=enhanced_seed_jobs.id)";
 const owned="id=? AND lease=? AND state='pending' AND available_at>? AND "+enabled+" AND "+live;
 const leaseSeconds=300;
 

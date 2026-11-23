@@ -40,6 +40,7 @@
 import gameDiff from '../../core/game-diff.cjs';
 import {wakeClients} from './seed-notifications.js';
 import ordinary from '../../core/ordinary-seed.cjs';
+import {seedStatus} from './seed-lifecycle.js';
 import {enqueueEnhanced} from './enhanced-seed.js';
 import {boundedJSON, enqueue, processJob, status as ordinaryStatus} from './ordinary-seed.js';
 import protocol from '../../core/torch-release.cjs';
@@ -111,7 +112,7 @@ async function best(env,layer,key){const rows=(await env.DB.prepare('SELECT sour
  const row=rows.find(r=>r.source==='official')||rows.find(r=>r.source==='auto');if(!row)return null;let document;try{document=JSON.parse(row.body);}catch{return null;}
  if(ordinary.signed(document)&&await ordinaryBlocked(env.DB,await protocol.hash(document)))return null;
  return await blockedProfile(env.DB,document)?null:document;}
-async function ordinaryBlocked(db,hash){return !!await db.prepare("SELECT 1 FROM torch_release_revocations WHERE profile_hash=? UNION ALL SELECT 1 FROM seed_malware_current WHERE profile_hash=? AND state='infected' LIMIT 1").bind(hash,hash).first();}
+async function ordinaryBlocked(db,hash){return !!await db.prepare("SELECT 1 FROM torch_release_revocations WHERE profile_hash=? UNION ALL SELECT 1 FROM seed_malware_current WHERE profile_hash=? AND state='infected' UNION ALL SELECT 1 FROM ordinary_seed_jobs j JOIN seed_lifecycle_block b ON b.id=coalesce(j.seed_id,j.id) WHERE j.profile_hash=? LIMIT 1").bind(hash,hash,hash).first();}
 
 /* ---- picks ---------------------------------------------------------------------------------------------------------- */
 async function settle(env,layer,key,now){const since=sec(now)-PROFILE_LIMITS.keepDays*86400;
@@ -155,7 +156,8 @@ async function report(request,env,ip,now,{json,fail,ctx}){
  await register(env,'version',r.key,r.prints,['head','pe'],t);if(gid)await register(env,'game',gid,r.prints,['exe',...GAME_KINDS],t);
  const reporter=owner||ip;
  const raw=await noteUpload(env,r.key,reporter,cr,now);
- const uploadId=candidate?await protocol.hash({ordinary:candidate,reporter}):undefined;
+ const normalized=candidate||ordinary.normalize({key:r.key,mode:r.mode,settings:r.settings,...(variant?{prints:{script:variant}}:{})});
+ const uploadId=normalized?await protocol.hash({ordinary:normalized,reporter}):await protocol.hash({key:r.key,settingsHash:hash,reporter});
  const item=await noteSeedUpload(env.DB,r,hash,reporter,raw.torchNo,now,uploadId);
  /* 2026-11-21 kind: 'newVersion' = a shared diff found by head / pe / the game (not this exe) failed its first window here (the
     client's reason starts 「同游戏新版本」): this build needs its own version layer; 'broken' = the self-check stepped it down */
@@ -164,13 +166,13 @@ async function report(request,env,ip,now,{json,fail,ctx}){
  await settle(env,'version',r.key,now);if(gid)await settle(env,'game',gid,now);
  let job=null;
  const enhanced=r.source!=='gate'&&(!candidate||r.engine&&variant)?await enqueueEnhanced(env.DB,item,r,raw.torchNo,now):null;
- if(candidate){job=await enqueue(env.DB,candidate,now);if(job.state==='pending'&&env.ORDINARY_SCAN_URL&&ctx?.waitUntil)ctx.waitUntil(processJob(env,job.id,now));}
+ if(candidate){job=await enqueue(env.DB,candidate,now,item);if(job.state==='pending'&&env.ORDINARY_SCAN_URL&&ctx?.waitUntil)ctx.waitUntil(processJob(env,job.id,now));}
  if(owner&&r.source!=='gate'&&(candidate||Object.keys(body.value.profile.settings||{}).length&&ordinary.normalize({key:r.key,mode:r.mode,settings:body.value.profile.settings}))){
   await engrave(env.DB,{owner,key:r.key,no:raw.torchNo,time:t,credit:cr,preferred:alias,declaredWork:r.prints.vndb});
  }
  const shown=owner&&creditOut(await carvingFor(env.DB,raw.torchNo));
  const credit=shown?{...shown,engraved:true}:{torchNo:raw.torchNo,name:cr.name??null,at:raw.at,engraved:false};
- return json({ok:true,...(job?{ordinary:job}:{}),...(enhanced?{enhanced}:{}),queued:r.source==='gate',game:gid||null,torchNo:credit.torchNo,name:credit.name,at:credit.at,credit},201);}
+ return json({ok:true,seed:await seedStatus(env.DB,item),...(job?{ordinary:job}:{}),...(enhanced?{enhanced}:{}),queued:r.source==='gate',game:gid||null,torchNo:credit.torchNo,name:credit.name,at:credit.at,credit},201);}
 async function lookup(env,url,exeFromPath,{json,fail}){const q=Object.fromEntries(['exe','head','pe','pack','script','steam','vndb','title'].map(k=>[k,url.searchParams.get(k)||'']));if(exeFromPath)q.exe=exeFromPath;
  const prints=gamePrint.check(q);if(!Object.keys(prints).length)return fail('NO_PRINTS',400);
  const previous=url.searchParams.get('ordinary');
@@ -185,7 +187,8 @@ async function lookup(env,url,exeFromPath,{json,fail}){const q=Object.fromEntrie
  if((have!==null||haveGame!==null)&&String(version?.diff?.rev??'')===String(have??'')&&String(game?.diff?.rev??'')===String(haveGame??''))return new Response(null,{status:304,headers:{'cache-control':'public, max-age=3600'}});
  const hashOf=async(d,script)=>(await sha256(d.mode+'|'+canonical(d.settings)+(script?'|'+script:''))).slice(0,32);
  if(version)version.credit=await creditOfDiff(env,'version',version.key,version.diff,hashOf);if(game)game.credit=await creditOfDiff(env,'game',game.key,game.diff,hashOf);
- const out=x=>x?{match:x.match,key:x.key,diff:x.diff,credit:x.credit}:null;const top=version||game;
+ if(version&&ordinary.signed(version.diff))version.seedId=(await env.DB.prepare('SELECT coalesce(seed_id,id) AS id FROM ordinary_seed_jobs WHERE profile_hash=?').bind(await protocol.hash(version.diff)).first())?.id;
+ const out=x=>x?{...(x.seedId?{seedId:x.seedId}:{}),match:x.match,key:x.key,diff:x.diff,credit:x.credit}:null;const top=version||game;
  return json({schema:'megulit.game-diff-feed',version:2,key:prints.exe||'',match:top.match,versionLayer:out(version),gameLayer:out(game),diff:top.diff,credit:top.credit},200,{'cache-control':'public, max-age=3600'});}
 async function runtimePost(request,env,ip,now,{json,fail,readJSON}){const body=await readJSON(request,Math.ceil(PROFILE_LIMITS.runtime*4/3)+4096);if(body.error)return fail(body.error,body.error==='PAYLOAD_TOO_LARGE'?413:400);const v=body.value||{};
  if(v.version!==1||!KEY.test(String(v.key||''))||!/^[0-9a-f]{64}$/.test(String(v.sha256||''))||typeof v.data!=='string'||v.identity!==undefined&&!/^[0-9a-f]{64}$/.test(String(v.identity)))return fail('INVALID_RUNTIME');
@@ -245,6 +248,7 @@ const OURS={'/api/game-profile/picks':['GET',picksGet,'q'],'/api/game-profile/qu
  '/api/game-profile/signed':['POST',signedPost,'b'],'/api/game-profile/withdraw':['POST',withdraw,'b'],'/api/game-profile/queue/close':['POST',queueClose,'b']};
 /* router; null when the path is not one of these */
 export async function profileRoute(request,env,ip,now,url,path,deps){const {fail,hit}=deps,m=request.method;
+ if(path==='/api/game-profile/seed-status'){const id=url.searchParams.get('id');if(m!=='GET'||!KEY.test(id||''))return fail('INVALID_REQUEST',400);const seed=await seedStatus(env.DB,id);return seed?deps.json(seed,200,{'cache-control':'no-store'}):fail('NOT_FOUND',404);}
  if(path==='/api/game-profile/ordinary-status'){const id=url.searchParams.get('id');if(m!=='GET'||!KEY.test(id||''))return fail('INVALID_REQUEST',400);const job=await ordinaryStatus(env.DB,id);return job?deps.json(job,200,{'cache-control':'no-store'}):fail('NOT_FOUND',404);}
  if(path==='/api/game-profile/report')return m==='POST'?(await hit(env,'autoprof-report',ip,now.getTime())?report(request,env,ip,now,deps):fail('RATE_LIMITED',429)):fail('METHOD_NOT_ALLOWED',405);
  if(path==='/api/game-profile/runtime')return m==='POST'?(await hit(env,'profile-runtime',ip,now.getTime())?runtimePost(request,env,ip,now,deps):fail('RATE_LIMITED',429)):fail('METHOD_NOT_ALLOWED',405);

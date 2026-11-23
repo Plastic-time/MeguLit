@@ -150,17 +150,31 @@ test('one temporary account upload upgrades a scanned Seed in place and preserve
  });
  const library=require('../services/store.cjs').openStore(peer);
  library.prepare("INSERT INTO games(id,title,executable) VALUES('7','Fixture',?)").run(exe);library.close();
- let submissions=0,ack;
+ let submissions=0,ack,retryUpload;
  const sent=await feed.report(root,{key,engine:f.identity.engine,source:'calibration',mode:'hide',settings:{page:{effectFrames:true}}},
    {prints:{script:f.identity.script},fetcher:async(url,init)=>{
-     submissions++;const res=await dispatch(url,{...init,headers:{...init.headers,authorization:'Bearer '+token}});
+     submissions++;retryUpload=()=>dispatch(url,{...init,headers:{...init.headers,authorization:'Bearer '+token}});
+     const res=await retryUpload();
      ack=await res.clone().json();return res;
    }});
  assert.equal(sent.state,'sent',JSON.stringify(ack));assert.equal(submissions,1);assert.ok(ack.ordinary.id&&ack.enhanced.id);
+ const seedId=ack.seed.id;
+ const retried=await Promise.all([retryUpload(),retryUpload()]);
+ for(const response of retried){assert.equal(response.status,201);assert.deepEqual((await response.json()).seed,ack.seed);}
+ assert.equal(db.raw.prepare('SELECT count(*) AS n FROM seed_admin_uploads WHERE item_id=?').get(seedId).n,1);
+ const get=async route=>(await dispatch(base+'/api/'+route)).json();
+ const status=()=>get('game-profile/seed-status?id='+seedId);
+ const policy=async()=>(await dispatch(base+'/api/seed-admin/ordinary-policy',{headers:{authorization:'Bearer '+env.ADAPTER_ADMIN_TOKEN}})).json();
+ assert.equal(seedId,ack.enhanced.id);assert.deepEqual(await status(),ack.seed);
+ assert.deepEqual(ack.seed.steps,{scan:'pending',review:'pending'});
+ assert.equal((await policy()).pendingSeeds,1);
  const carvings=()=>db.raw.prepare('SELECT torch_no,game_key FROM torch_carvings ORDER BY torch_no').all();
  const credit=carvings();assert.equal(credit.length,1);assert.equal(credit[0].torch_no,ack.credit.torchNo);
  const {processJob}=await import('../relay/src/ordinary-seed.js');
  await processJob(env,ack.ordinary.id,now);
+ const scanned=await status();assert.equal(scanned.state,'published');assert.equal(scanned.notificationKey,seedId);
+ const ordinaryLookup=await get('game-profile?exe='+key+'&script='+f.identity.script);
+ assert.equal(ordinaryLookup.versionLayer.seedId,seedId);
  const notices=[],applied=[],sessions=require('../services/self-check-live.cjs');
  const reader={root:peer,gameId:'7',gal:{hooks:{notify:m=>notices.push(m)},setGameProfile:p=>applied.push(p)}};
  const session=sessions.start(reader,exe,null,{exe,engine:f.identity.engine},{key});t.after(()=>sessions.stop());
@@ -172,6 +186,10 @@ test('one temporary account upload upgrades a scanned Seed in place and preserve
  assert.equal(await processOne({base,token:'host',keys:f.keys,fetcher:dispatch,
    collect:createCollector({samples:[{exe:'game.exe',identity:f.identity}],policy:f.keys,signProfile:p=>f.publisher.sign(p),
      runHost:async r=>({state:'reviewed',review:await f.review(r.candidate,null,{torchNo:r.torchNo})})}),sign:p=>f.publisher.sign(p)}),true);
+ assert.equal((await policy()).pendingSeeds,0);
+ assert.equal((await get('torch-release?exe='+key)).seedId,seedId);
+ assert.deepEqual(await status(),{...scanned,steps:{scan:'published',review:'published'}});
+ assert.equal(db.raw.prepare('SELECT count(*) AS n FROM seed_deliveries WHERE seed_id=?').get(seedId).n,1);
  const enhanced=(await receive()).receipt;
  assert.equal(enhanced.origin,'torch-release');assert.equal(enhanced.credit.torchNo,ack.credit.torchNo);
  reader.gal.hooks.beforeDialogue({hookSequence:2,hookSource:'next'});
@@ -180,4 +198,11 @@ test('one temporary account upload upgrades a scanned Seed in place and preserve
  assert.equal(notices.length,firstNotices);assert.deepEqual(carvings(),credit);
  assert.deepEqual(fs.readdirSync(feed.dir(peer)).filter(n=>n===key+'.json'),[key+'.json']);
  assert.equal((await receiver.installed(peer,key,{keys:f.keys,exe})).hash,enhanced.hash);
+ const release=(await get('torch-release?exe='+key)).release;
+ const revoked=f.publisher.sign({schema:'megulit.torch-revocation',version:1,profileHash:release.review.candidateHash,reason:'review-withdrawn'});
+ const {revoke}=await import('../relay/src/torch-release.js');await revoke(db,revoked,env,now);
+ assert.equal((await status()).state,'withdrawn');
+ assert.equal((await dispatch(base+'/api/torch-release?exe='+key)).status,410);
+ const hash=await protocol.hash(ordinaryLookup.versionLayer.diff);
+ assert.equal((await dispatch(base+'/api/game-profile?exe='+key+'&script='+f.identity.script+'&ordinary='+hash)).status,410);
 });

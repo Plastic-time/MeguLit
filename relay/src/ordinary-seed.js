@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+import {pendingSeeds} from './seed-lifecycle.js';
 import ordinary from '../../core/ordinary-seed.cjs';
 import diff from '../../core/game-diff.cjs';
 import protocol from '../../core/torch-release.cjs';
@@ -23,13 +24,14 @@ export async function boundedJSON(message, limit) {
   } catch { return {error:'INVALID_JSON'}; }
   finally { reader.releaseLock(); }
 }
-export async function enqueue(db, data, now) {
+export async function enqueue(db, data, now, seedId=null) {
   const id = await protocol.hash(data), body = diff.canonical(data);
-  await db.prepare(`INSERT INTO ordinary_seed_jobs(id,game_key,candidate,issued_at,revision)
-    SELECT ?,?,?,?,1+max(coalesce((SELECT max(revision) FROM ordinary_seed_jobs WHERE game_key=?),0),
+  await db.prepare(`INSERT INTO ordinary_seed_jobs(id,game_key,candidate,issued_at,seed_id,revision)
+    SELECT ?,?,?,?,?,1+max(coalesce((SELECT max(revision) FROM ordinary_seed_jobs WHERE game_key=?),0),
       coalesce((SELECT max(rev) FROM game_diffs WHERE layer='version' AND game_key=?),0),
       coalesce((SELECT rev FROM auto_profile_picks WHERE layer='version' AND game_key=?),0))
-    WHERE true ON CONFLICT(id) DO NOTHING`).bind(id,data.key,body,now.toISOString(),data.key,data.key,data.key).run();
+    WHERE true ON CONFLICT(id) DO UPDATE SET seed_id=excluded.seed_id
+      WHERE ordinary_seed_jobs.seed_id IS NULL AND excluded.seed_id IS NOT NULL`).bind(id,data.key,body,now.toISOString(),seedId,data.key,data.key,data.key).run();
   return status(db,id);
 }
 export const status = (db,id) => db.prepare('SELECT id,state,revision,retry_reason AS retryReason FROM ordinary_seed_jobs WHERE id=?').bind(id).first();
@@ -72,7 +74,7 @@ export async function processJob(env,id,now=new Date()) {
     const block = await profileBlock(result.signed,{profileHash:result.hash}), body = diff.canonical(result.signed);
     const [,stored] = await db.batch([
       db.prepare(`UPDATE ordinary_seed_jobs SET state=CASE
-        WHEN EXISTS(SELECT 1 FROM torch_release_revocations WHERE profile_hash=?) OR
+        WHEN EXISTS(SELECT 1 FROM seed_lifecycle_block b WHERE b.id=ordinary_seed_jobs.seed_id) OR EXISTS(SELECT 1 FROM torch_release_revocations WHERE profile_hash=?) OR
              EXISTS(SELECT 1 FROM seed_malware_current WHERE profile_hash=? AND state='infected') OR
              EXISTS(SELECT 1 FROM seed_admin_items WHERE ${block.sql}) THEN 'blocked'
         WHEN EXISTS(SELECT 1 FROM torch_release_winners WHERE game_key=?) OR
@@ -133,5 +135,5 @@ export async function ordinaryPolicyRoute(request,env,now,ctx,{json,fail,readJSO
     (SELECT count(*) FROM ordinary_seed_jobs WHERE state='pending' AND lease IS NOT NULL AND retry_at>?) AS scanning
     FROM ordinary_publish_policy WHERE id=1`).bind(Math.floor(now.getTime()/1000)).first(),scannerState(env)]);
   if(!row)return fail('NOT_CONFIGURED',503);
-  return json({enabled:!!row.enabled,revision:row.revision,changedAt:row.changed_at,pending:row.pending,scanning:row.scanning,scanner,enhanced:{...enhanced,host:enhanced.lastSeen!=null&&time-enhanced.lastSeen<=300?'online':'waiting'}});
+  return json({enabled:!!row.enabled,revision:row.revision,changedAt:row.changed_at,pendingSeeds:await pendingSeeds(db),pending:row.pending,scanning:row.scanning,scanner,enhanced:{...enhanced,host:enhanced.lastSeen!=null&&time-enhanced.lastSeen<=300?'online':'waiting'}});
 }

@@ -40,10 +40,6 @@ async function setup(t,{live=false}={}) {
   const gateway='http://127.0.0.1:'+await listener(t,server(config))+'/scan';
   const f=fixture(),env={...f.env,ORDINARY_SCAN_URL:gateway,ORDINARY_PUBLIC_KEYS:JSON.stringify([publicKey]),ORDINARY_SCAN_TOKEN:config.ORDINARY_SCAN_TOKEN};
   const db=database();
-  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0031_torch_changes.sql'),'utf8'));
-  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0033_ordinary_seeds.sql'),'utf8'));
-  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0038_ordinary_publish_policy.sql'),'utf8'));
-  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0039_enhanced_seed_jobs.sql'),'utf8'));
   db.raw.exec('CREATE TABLE rate_limits(bucket TEXT PRIMARY KEY,count INTEGER,reset_at INTEGER)');
   t.after(()=>db.raw.close());
   const worker=await import('../relay/src/worker.js');
@@ -173,10 +169,6 @@ function recToInput({key,mode,settings}){return {key,mode,settings};}
 test('indeterminate receipts and untrusted publisher keys leave the job pending',async t=>{
   const jobs=await import('../relay/src/ordinary-seed.js'), protocol=require('../core/torch-release.cjs');
   const db=database();t.after(()=>db.raw.close());
-  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0031_torch_changes.sql'),'utf8'));
-  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0033_ordinary_seeds.sql'),'utf8'));
-  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0038_ordinary_publish_policy.sql'),'utf8'));
-  db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations/0039_enhanced_seed_jobs.sql'),'utf8'));
   const f=fixture(),thing=await jobs.enqueue(db,clean,new Date()),row=await db.prepare('SELECT * FROM ordinary_seed_jobs').first();
   const doc=ordinary.document(clean,thing.revision,row.issued_at);
   const signer=require('./helpers/torch-release.cjs').signer('ordinary-untrusted'),signed=signer.sign(doc);
@@ -286,7 +278,6 @@ test('policy pause fences in-flight scans across resume and keeps accepted uploa
  const {enqueue,processJob,retryJobs,ordinaryPolicyRoute}=await import('../relay/src/ordinary-seed.js');
  const P=require('../core/torch-release.cjs'),signer=require('./helpers/torch-release.cjs').signer('ordinary-fixture');
  const db=database();t.after(()=>db.raw.close());
- for(const f of ['0031_torch_changes.sql','0033_ordinary_seeds.sql','0038_ordinary_publish_policy.sql'])db.raw.exec(fs.readFileSync(path.join(__dirname,'../relay/migrations',f),'utf8'));
  const env={DB:db,ORDINARY_SCAN_URL:'https://scanner.invalid/scan',ORDINARY_SCAN_TOKEN:'fixture',ORDINARY_PUBLIC_KEYS:JSON.stringify([signer.public])};
  const h={json:x=>Response.json(x),fail:(error,status)=>Response.json({error},{status}),readJSON:async r=>({value:await r.json()})};
  const change=(enabled,revision)=>ordinaryPolicyRoute(new Request('https://fixture/policy',{method:'POST',body:JSON.stringify({enabled,revision})}),env,new Date(),null,h);
