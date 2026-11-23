@@ -54,8 +54,8 @@ class PageText {
     const newest = lastPart === this.recent.length - 1;
     if (best === k.length) {
       if (parts >= 2) return this.ended = true, this.paging = true, { drop: 'page drawn again (' + parts + ' lines)' };
-      /* the current line again (its new part, after it was shown joined to the line before) */
-      if (newest && (k.length >= 6 || now - this.recent[lastPart].at < 650)) return this.ended = true, this.paging = true, { drop: 'current line again' };
+      /* One redrawn line ends an established page. ADV streams also resend the current line. */
+      if (newest && (k.length >= 6 || now - this.recent[lastPart].at < 650)) return this.ended = true, { drop: 'current line again' };
       /* one earlier line alone again: the current line is another one, and it was shown only a moment ago */
       /* (only the line just before: a game started again from the title shows its first lines again, and they are read) */
       if (lastPart === this.recent.length - 2 && k.length >= 6 && now - this.recent[lastPart].at < REDRAW_MS) return { drop: 'earlier line drawn again' };
@@ -65,9 +65,10 @@ class PageText {
     if (best < 6) return { text: raw };
     /* the shown line grown (a sentence the game adds to piece by piece, core/sentence-pieces.cjs): the whole of it is the line */
     if (parts === 1 && newest && (!ENDED.test(this.recent[lastPart].key) || unfinished(this.recent[lastPart].key))) return { text: raw };
-    /* the page came whole with its new part (skipping): the lines shown before it are no longer what the reader stacks above
-       it (live, Ctrl-skip piled every skipped line into one wall); the new part starts the stack again */
-    this.ended = true; this.paging = true;
+    /* The new part starts a fresh page if paging is already known. One old line plus a new one may just be a buffered
+       flush. Start paging only when the prefix contains two or more lines that were already shown. */
+    this.ended = true;
+    if (parts >= 2) this.paging = true;
     return { text: tail(raw, best), page: parts };
   }
   /* the text the reader shows for `text` (the new part), and how much of it came before */

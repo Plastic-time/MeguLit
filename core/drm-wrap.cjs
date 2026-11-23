@@ -8,6 +8,7 @@
    Any engine, any folder: evidence is read from the files only.
    Not evidence: KiriKiri Z's "-- SIGNATURE - SHA256/PSS/RSA --" .sig files (every file of a signed release has one). */
 const fs=require('node:fs'),path=require('node:path');
+const {isVersionedUpdater}=require('./launcher-language.cjs');
 
 const RULES=[
  {kind:'softdenchi',name:{zh:'软电池（SoftDenchi）正版验证',en:'SoftDenchi licence check',ja:'ソフト電池の認証'},needles:['soft-denchi','SoftDenchi','softdenchi','SdWrap']},
@@ -70,7 +71,9 @@ function replacementFor(list,target,allowTranslated){return list.filter(e=>usabl
    {kind, name:{zh,en,ja}, executable, launchVia, original, wrapped, changed, launcherNames, alternatives} */
 function plan(exe,{allowTranslated=true,source=''}={}){
  exe=String(exe||'');if(!/\.exe$/i.test(exe)||!stat(exe))return null;
- const dir=path.dirname(exe),list=classify(dir),self=list.find(e=>e.name.toLowerCase()===path.basename(exe).toLowerCase());if(!self)return null;
+ // An updater can have its own DRM, so exclude it before selecting either an engine or a launcher.
+ const list=classify(path.dirname(exe)).filter(e=>!isVersionedUpdater(e.name));
+ const self=list.find(e=>e.name.toLowerCase()===path.basename(exe).toLowerCase());if(!self)return null;
  const engines=list.filter(e=>e.role==='protected').sort((a,b)=>b.size-a.size);
  let target=null;
  if(self.role==='protected')target=self;

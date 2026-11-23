@@ -9,12 +9,18 @@ function languageHint(name){
  if(/日文|日语|日本語|原版|(?:^|[_. -])(?:japanese|original|jp|ja)(?=$|[_. -])/i.test(stem))return 'ja';
  return '';
 }
+// Some vendor updaters append Update or Updata and a version directly to the game's name.
+function versionedUpdaterStem(name){
+ const base=path.basename(String(name||'')),suffix=/(?:update|updata)[_. -]*\d+(?:\.\d+)+\.exe$/i.exec(base);
+ return suffix?base.slice(0,suffix.index).replace(/[_. -]+$/,''):null;
+}
+const isVersionedUpdater=name=>versionedUpdaterStem(name)!==null;
 function isLauncher(name){
  const stem=path.basename(String(name||'')).replace(/\.exe$/i,'');
- return /\.exe$/i.test(name)&&!/^(?:unins|uninstall|setup|install|config|settings?|patch|update|vcredist|dxsetup|crashpad|unitycrashhandler)|(?:^|[_. -])(?:uninstall|installer|install|setup|config|settings?|patch|updater|update)(?=$|[_. -]|\d)|补丁|補丁|卸载|卸載|パッチ/i.test(stem)&&!/(?:chs|cht|cn|sc|tc|zh)patch(?=$|[_. -]|\d)/i.test(stem);
+ return /\.exe$/i.test(name)&&!isVersionedUpdater(name)&&!/^(?:unins|uninstall|setup|install|config|settings?|patch|update|vcredist|dxsetup|crashpad|unitycrashhandler)|(?:^|[_. -])(?:uninstall|installer|install|setup|config|settings?|patch|updater|update)(?=$|[_. -]|\d)|补丁|補丁|卸载|卸載|パッチ/i.test(stem)&&!/(?:chs|cht|cn|sc|tc|zh)patch(?=$|[_. -]|\d)/i.test(stem);
 }
 function family(file){
  const stem=path.basename(file).replace(/\.exe$/i,'');
  return stem.replace(chineseSuffix,'').replace(japaneseSuffix,'').replace(/[_. -]+$/,'').toLowerCase();
 }
-module.exports={languageHint,isLauncher,family};
+module.exports={languageHint,isLauncher,isVersionedUpdater,versionedUpdaterStem,family};

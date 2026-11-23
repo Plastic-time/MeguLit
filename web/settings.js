@@ -28,7 +28,7 @@ let settingsRender=0;
 /* v1.1.5 (user: redundant labels): under a tab named "Alt+T 菜单", show "背景模糊" instead of "Alt+T 菜单 · 背景模糊" */
 function pageLabel(label,page){if(!page||!label||!label.startsWith(page))return label;const rest=label.slice(page.length).replace(/^\s*[·・:：-]?\s*/,'');return rest||label;
  }
-export async function renderSettings({main,api,invoke,text,locale,esc,toast,heading,basicSettings,isCurrent,onSaved,section,setSection,profile,setProfile}){
+export async function renderSettings({main,api,invoke,text,locale,esc,toast,heading,basicSettings,isCurrent,onSaved,onProfileClose,section,setSection,profile,setProfile}){
  await leaveSettings();stopTranslation();stopTranslation=()=>{};const renderId=++settingsRender;
  const labels={zh:{general:'常规与外观',global:'全局默认',profile:'按游戏设置',apiKey:'API 密钥',keyHint:'留空保留已有密钥，密钥仅由当前 Windows 账户加密保存',saveKey:'保存密钥',keySaved:'密钥已加密保存',invalid:'设置值无效，请检查后重试',
   selectProfile:'选择已保存的游戏配置',saved:'设置已保存',savedHint:'游戏内设置将由独立阅读服务读取',emptyProfiles:'绑定并保存游戏设置后，可在这里选择',models:'离线模型',modelHint:'保留已下载的模型文件；只在使用对应引擎时运行',refreshVoices:'刷新声音列表',
@@ -43,8 +43,8 @@ export async function renderSettings({main,api,invoke,text,locale,esc,toast,head
  const cacheKey=profile||'';const data=main.__settingsData?.key===cacheKey?main.__settingsData.data:await api('settings_get',{profile});main.__settingsData={key:cacheKey,
   data};if(!isCurrent()||renderId!==settingsRender)return;
  /* E404 个人主页 is a panel now: an old link or a search hit opens it over 联网服务 */
- if(section==='personal'){openProfilePanel({api,locale,esc,toast,openSettings:next=>{setSection(next);renderSettings({main,api,invoke,text,locale,esc,toast,heading,
-  basicSettings,isCurrent,onSaved,section:next,setSection,profile,setProfile}).catch(()=>toast(text.serviceFailed));}}).catch(()=>toast(text.serviceFailed));section='online';
+ if(section==='personal'){openProfilePanel({api,locale,esc,toast,onClose:onProfileClose,openSettings:next=>{setSection(next);renderSettings({main,api,invoke,text,locale,esc,toast,heading,
+  basicSettings,isCurrent,onSaved,onProfileClose,section:next,setSection,profile,setProfile}).catch(()=>toast(text.serviceFailed));}}).catch(()=>toast(text.serviceFailed));section='online';
   setSection(section);}
  if(section&&!data.groups.some(group=>group.id===section)&&section!=='data'&&section!=='account')section='general';
  const sectionName=id=>id==='general'?labels.general:id==='personal'?profileLabel[locale]||profileLabel.zh:id==='account'?accountLabel[locale]||accountLabel.zh:id==='data'?{
@@ -68,9 +68,9 @@ export async function renderSettings({main,api,invoke,text,locale,esc,toast,head
   animation=items.animate([{height:height+'px',opacity},{height:(expand?fullHeight:0)+'px',opacity:expand?1:0}],{duration:matchMedia('(prefers-reduced-motion:reduce)').matches?0:190,
   easing:'cubic-bezier(.2,.8,.2,1)'});animation.onfinish=()=>{category.open=expand;delete category.dataset.expanded;};};});
  main.querySelectorAll('[data-section]').forEach(button=>button.onclick=()=>{setSection(button.dataset.section);renderSettings({main,api,invoke,text,locale,esc,
-  toast,heading,basicSettings,isCurrent,onSaved,section:button.dataset.section,setSection,profile,setProfile}).catch(()=>toast(text.serviceFailed));});
+  toast,heading,basicSettings,isCurrent,onSaved,onProfileClose,section:button.dataset.section,setSection,profile,setProfile}).catch(()=>toast(text.serviceFailed));});
  const search=mountSettingsSearch({content,data,text,locale,esc,navigate:async item=>{setSection(item.scope);await renderSettings({main,api,invoke,text,locale,esc,
-  toast,heading,basicSettings,isCurrent,onSaved,section:item.scope,setSection,profile,setProfile});const area=main.querySelector('.settings-content');const field=area.querySelector('form')?.elements.namedItem(item.key);
+  toast,heading,basicSettings,isCurrent,onSaved,onProfileClose,section:item.scope,setSection,profile,setProfile});const area=main.querySelector('.settings-content');const field=area.querySelector('form')?.elements.namedItem(item.key);
   if(field){const row=field.closest('.settings-row'),page=row?.closest('[data-page-panel]');if(page)area.querySelector(`[data-page="${page.dataset.pagePanel}"]`)?.click();
   if(item.scope==='dictionary'&&item.key.startsWith('lookupProfiles.')){const provider=area.querySelector('[name=lookupProvider]');provider.value=item.key.split('.')[1];
   provider.dispatchEvent(new Event('change',{bubbles:true}));}if(row?.dataset.unavailable==='true')area.querySelector('[data-kind=api]')?.click();row?.scrollIntoView({
@@ -169,7 +169,7 @@ export async function renderSettings({main,api,invoke,text,locale,esc,toast,head
  enhanceSelects(content);
  form.querySelectorAll('input[type=color]').forEach(element=>element.oninput=()=>element.dataset.empty='false');
  content.querySelector('#settings-profile')?.addEventListener('change',event=>{const nextProfile=event.target.value;setProfile(nextProfile);renderSettings({main,
-  api,invoke,text,locale,esc,toast,heading,basicSettings,isCurrent,onSaved,section,setSection,profile:nextProfile,setProfile}).catch(()=>toast(text.serviceFailed));
+  api,invoke,text,locale,esc,toast,heading,basicSettings,isCurrent,onSaved,onProfileClose,section,setSection,profile:nextProfile,setProfile}).catch(()=>toast(text.serviceFailed));
   });
  mountSettingsAutosave({form,locale,status:saveStatus,save:async update=>{const result=await api('settings_save',{scope:section,values:update,profile});if(['background',
   'panels'].includes(section)){const ui=await api('ui_state');for(const[key,value]of Object.entries(ui))localStorage.setItem(key,value);}delete main.__settingsData;
