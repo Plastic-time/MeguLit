@@ -52,8 +52,9 @@ test('the hook repairs Shift-JIS read as GBK before anything else sees the line'
 test('with a MeguLit window in front the reading layer stays directly above the game, never above MeguLit',()=>{
  const src=fs.readFileSync(path.join(__dirname,'../native/GalWindowBridge.cs'),'utf8');
  assert.doesNotMatch(src,/SetWindowPos\(Overlay,fg,/);assert.doesNotMatch(src,/homeOwned\?fg:/);
- assert.match(src,/if\(homeOwned\)StayAboveGameOnly\(gameRoot\);/);
- assert.match(src,/static void StayAboveGameOnly\(IntPtr gameRoot\)\{[\s\S]{0,300}IntPtr above=GetWindow\(gameTop,3\);if\(above==Overlay\)return;\s*SetWindowPos\(Overlay,above,/);
+ assert.match(src,/bool ownFront=GetAncestor\(fgWindow,2\)==Overlay;/);
+ assert.match(src,/bool settingsFromHome=!bound&&PreferredOverlay!=IntPtr\.Zero/);
+ assert.match(src,/if\(!front\)\{TopmostGuard\.Sink\(Overlay,gameTop\);return;\}/);
 });
 
 /* 2026-11-14 02:50 (same game, user screenshot): the game drew 「遠くで引きさく、モーター音が響いているのに気がついた。」 itself,

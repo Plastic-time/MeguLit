@@ -57,9 +57,9 @@ internal static class ReaderLayerPolicy {
         }else{NoneSince=-1;Anchor=front;}
         State s=new State();s.Front=Anchor;
         bool game=Anchor==Game,own=Anchor==OwnLayer,home=Anchor==OwnHome;
-        s.Pinned=menu&&menuReady&&(game||own||home);
-        s.Float=!gameIconic&&(game||own||s.Pinned);
-        s.Context=!gameIconic&&(game||own||home&&homeCounts||s.Pinned||Anchor==Foreign);
+        s.Pinned=menu&&menuReady&&(game||own);
+        s.Float=!gameIconic&&(game||own);
+        s.Context=!gameIconic&&(game||own||home&&(homeCounts||menu&&menuReady)||Anchor==Foreign);
         return s;
     }
 
@@ -166,11 +166,16 @@ internal static class ReaderLayerPolicy {
             if(left.Float||!left.Context||shot.Float||!shot.Context)return "background game under a screenshot: wrong visibility or z-order";
             if(!CaptureSurface(true,false,true,false)||CaptureSurface(false,false,true,false)||CaptureSurface(true,true,true,false)||CaptureSurface(true,false,false,false)||CaptureSurface(true,false,true,true))return "capture surface rule";
             if(Classify(true,false,false,false,false,true)!=Capture||Classify(true,false,false,false,false,false)!=Foreign||Classify(true,true,false,false,false,true)!=Game)return "classify capture";
-            /* 5. another MeguLit window in front: shown only where the main window hosts the layer, pinned by an open menu */
+            /* 5. Dragging MeguLit's main window in front of the game always takes precedence over the reading layer. */
             Reset();
             if(Decide(OwnHome,false,false,false,false,0).Context)return "MeguLit window in front without hosting: layer shown";
             if(!Decide(OwnHome,false,false,true,false,16).Context||Decide(OwnHome,false,false,true,false,16).Float)return "hosting MeguLit window in front: wrong";
-            if(!Decide(OwnHome,true,true,false,false,32).Float)return "menu open under a MeguLit window: not pinned";
+            if(!Decide(Game,true,true,true,false,24).Float)return "menu over foreground game: layer not raised";
+            foreach(int foreground in new[]{OwnHome,None,OwnHome}){
+                State duringDrag=Decide(foreground,true,true,true,false,32);
+                if(duringDrag.Float||duringDrag.Pinned||!duringDrag.Context)return "open menu covered the foreground MeguLit window";
+            }
+            if(!Decide(Game,true,true,true,false,64).Pinned)return "menu did not return above the foreground game";
             /* 6. probes: silent through every menu / focus change and for SettleMs after the game is back */
             Unsettle();
             if(Settled(true,0)||Settled(true,699))return "probes believed before the settle time";

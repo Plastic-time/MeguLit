@@ -61,20 +61,25 @@ internal static class TopmostGuard {
 
     public static bool IsTopmost(IntPtr h){return h!=IntPtr.Zero&&(GetWindowLong(h,-20)&0x8)!=0;}
 
+    public static bool IsAbove(IntPtr layer,IntPtr game){
+        int steps=0;
+        for(IntPtr h=GetWindow(game,3);h!=IntPtr.Zero&&steps<2000;h=GetWindow(h,3),steps++)if(h==layer)return true;
+        return false;
+    }
+
     public static bool ShowAtBottom(IntPtr window){
         // Show and place in the same call. SW_SHOWNOACTIVATE can still show above the current app.
         return SetWindowPos(window,new IntPtr(1),0,0,0,0,NoSizeMoveActivate|0x0040);
     }
 
-    /// <summary>Where a layer goes when it may not float: directly above the game, i.e. after the nearest normal
-    /// (non-topmost) window above it; HWND_TOP of the normal band when only topmost windows lie above the game (it is then
-    /// the top normal window itself); HWND_BOTTOM without a usable game window.</summary>
+    /// <summary>Where a layer goes when it may not float: after the nearest visible ordinary window above the game.
+    /// Use the top of the ordinary band when no such window exists, or HWND_BOTTOM without a usable game window.</summary>
     public static IntPtr Slot(IntPtr layer,IntPtr game){
         if(game==IntPtr.Zero||!IsWindow(game)||IsIconic(game))return new IntPtr(1);
         int steps=0;
         for(IntPtr h=GetWindow(game,3);h!=IntPtr.Zero&&steps<2000;h=GetWindow(h,3),steps++){
             if(h==layer)continue;
-            if(!IsTopmost(h))return h;
+            if(!IsTopmost(h)&&IsWindowVisible(h)&&!IsIconic(h))return h;
         }
         return IntPtr.Zero;
     }
@@ -85,17 +90,22 @@ internal static class TopmostGuard {
         if(layer==IntPtr.Zero||!IsWindow(layer))return false;
         IntPtr slot=Slot(layer,game);
         bool topmost=IsTopmost(layer);
-        if(!topmost&&slot!=IntPtr.Zero&&slot!=new IntPtr(1)&&GetWindow(slot,2)==layer)return false; /* already right under it */
-        if(!topmost&&slot==IntPtr.Zero)return false; /* normal window, nothing normal above the game: nothing to cover */
-        if(topmost&&slot==IntPtr.Zero){
-            /* only topmost windows above the game: leaving the topmost band (NOTOPMOST = top of the normal band) is
-               exactly "directly above the game" */
-            SetWindowPos(layer,new IntPtr(-2),0,0,0,0,NoSizeMoveActivate);return true;
+        if(!topmost&&slot!=IntPtr.Zero&&slot!=new IntPtr(1)&&IsAbove(slot,layer)&&IsAbove(layer,game))return false;
+        if(slot==IntPtr.Zero){
+            // No ordinary predecessor can anchor the layer. HWND_NOTOPMOST does nothing to a layer that is already ordinary.
+            if(IsTopmost(game))return topmost&&SetWindowPos(layer,new IntPtr(-2),0,0,0,0,NoSizeMoveActivate)&&!IsTopmost(layer);
+            if(!topmost&&IsAbove(layer,game))return false;
+            // Inserting after a real sibling works even when Windows accepts HWND_TOP without moving the layer ahead of the game.
+            // An invisible IME window can provide that insertion point without affecting which visible application is in front.
+            IntPtr previous=GetWindow(game,3);
+            IntPtr anchor=previous!=IntPtr.Zero&&!IsTopmost(previous)?previous:topmost?new IntPtr(-2):IntPtr.Zero;
+            return SetWindowPos(layer,anchor,0,0,0,0,NoSizeMoveActivate)&&
+                !IsTopmost(layer)&&IsAbove(layer,game);
         }
         /* inserting after a normal window (or at the bottom) also ends topmost */
-        SetWindowPos(layer,slot,0,0,0,0,NoSizeMoveActivate);
-        if(IsTopmost(layer)){SetWindowPos(layer,new IntPtr(-2),0,0,0,0,NoSizeMoveActivate);SetWindowPos(layer,slot,0,0,0,0,NoSizeMoveActivate);}
-        return true;
+        bool moved=SetWindowPos(layer,slot,0,0,0,0,NoSizeMoveActivate);
+        if(IsTopmost(layer)){SetWindowPos(layer,new IntPtr(-2),0,0,0,0,NoSizeMoveActivate);moved=SetWindowPos(layer,slot,0,0,0,0,NoSizeMoveActivate);}
+        return moved&&!IsTopmost(layer)&&(slot==new IntPtr(1)||IsAbove(layer,game));
     }
 
     /// <summary>Policy table (no windows). The live z-order is checked by --topmost-guard-self-test with stand-in windows.</summary>
@@ -155,6 +165,14 @@ internal static class TopmostGuard {
         IntPtr browser=Stand("browser"),layer=Stand("layer");
         try{
             if(game==IntPtr.Zero||browser==IntPtr.Zero||layer==IntPtr.Zero)return "stand-in windows";
+            // Returning from another application can put the game at the top of the ordinary band, ahead of an ordinary reader.
+            SetWindowPos(game,IntPtr.Zero,0,0,0,0,NoSizeMoveActivate);
+            SetWindowPos(layer,new IntPtr(1),0,0,0,0,NoSizeMoveActivate);
+            if(!Within(()=>Slot(layer,game)==IntPtr.Zero&&!IsAbove(layer,game)))return "ordinary layer recovery setup";
+            IntPtr previousForeground=GetForegroundWindow();
+            if(!Sink(layer,game)||!Within(()=>IsAbove(layer,game)&&!IsTopmost(layer)))return "ordinary layer remained behind the game";
+            if(GetForegroundWindow()!=previousForeground)return "ordinary layer recovery changed focus";
+            if(Sink(layer,game))return "recovered layer moved again";
             /* bottom of the desktop: browser directly above the game; the layer topmost */
             SetWindowPos(browser,new IntPtr(1),0,0,0,0,NoSizeMoveActivate);SetWindowPos(game,new IntPtr(1),0,0,0,0,NoSizeMoveActivate);
             SetWindowPos(layer,new IntPtr(-1),0,0,0,0,NoSizeMoveActivate);
@@ -163,6 +181,9 @@ internal static class TopmostGuard {
             Sink(layer,game);
             Func<bool> placed=()=>IsWindowVisible(layer)&&!IsTopmost(layer)&&GetWindow(browser,2)==layer&&GetWindow(layer,2)==game;
             if(!Within(placed))return IsTopmost(layer)?"still topmost after another program came in front":"not directly above the game under the program in front";
+            // This stand-in belongs to the reader's process, just like the main window. Moving it across the game keeps its spot.
+            if(!SetWindowPos(browser,IntPtr.Zero,-31000,-31000,0,0,0x0001|0x0004|0x0010|0x0200)||!Within(placed))
+                return "moving the main window lost its place above the layer";
             /* a second pass leaves a placed layer alone (only checked while nothing else has slipped in between) */
             if(placed()&&Sink(layer,game))return "second pass moved the layer again";
             if(!Within(placed))return "second pass lost the place";

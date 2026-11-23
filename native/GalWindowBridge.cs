@@ -411,45 +411,53 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
     // opening animation until then, so a half-opened menu never shows through the old, text-only region.
     static bool RegionAckPending;
     static void AckRegion(){if(!RegionAckPending||!MenuOpen)return;Rect r;if(!GetClientRect(Overlay,out r))return;if(TranslationMode&&Target!=IntPtr.Zero){var screen=System.Windows.Forms.SystemInformation.VirtualScreen;if(r.Right!=screen.Width||Math.Abs(r.Bottom-screen.Height)>1)return;}RegionAckPending=false;Emit(new{type="regionApplied",surfaceWidth=r.Right,surfaceHeight=r.Bottom});}
-    static void KeepAboveGame(IntPtr gameRoot){KeepAboveGame(gameRoot,true);}
     static void KeepAboveGame(IntPtr gameRoot,bool front){
         bool menu=MenuOpen&&MenuRegionReady;
-        if((DateTime.UtcNow-LastZCheck).TotalMilliseconds<(menu?100:250))return;LastZCheck=DateTime.UtcNow;
         /* E472 (user: fullscreen ファタモルガーナの館 showed no text): a game window owned by a hidden application window (KiriKiri 2:
            TVPWindowForm owned by TApplication) has that hidden window as its root owner, so the visible form going topmost
            fullscreen above the layer was never seen. Both the root owner and the game's own top-level window count. */
         IntPtr gameTop=Target!=IntPtr.Zero?GetAncestor(Target,2):IntPtr.Zero;if(gameTop==IntPtr.Zero)gameTop=gameRoot;
-        bool below=false;int steps=0;for(IntPtr h=GetWindow(Overlay,3);h!=IntPtr.Zero&&steps<400;h=GetWindow(h,3),steps++)if(h==gameRoot||h==gameTop){below=true;break;}
+        bool below=BelowGame(gameRoot,gameTop);
+        DateTime now=DateTime.UtcNow;
+        if((now-LastZCheck).TotalMilliseconds<(below?32:menu?100:250))return;LastZCheck=now;
         // Raise only over the foreground game. Menus and foreign applications always use ordinary z-order.
         // Some game renderers draw over an inactive ordinary window even after HWND_TOP.
         // Menu open: made topmost at once (not only after the game got above it), so a click on the game cannot cover it.
         // Another application in front (Alt+Tab): the layer stays directly above the game, below that application.
         if(!front){TopmostGuard.Sink(Overlay,gameTop);return;}
         bool topmost=(GetWindowLong(Overlay,-20)&8)!=0;
-        if(!below&&(!Layer.Float||topmost)){if(LastRaise!="held"){LastRaise="held";Emit(new{type="layerRaise",how="held",above=true,topmost=topmost});}return;}
+        if(!below&&topmost){if(LastRaise!="held"){LastRaise="held";Emit(new{type="layerRaise",how="held",above=true,topmost=topmost});}return;}
         /* 2026-11-19 16:17 (user: 「一切屏回来就啥都没了」): back from another program the decision was right (float, shown) but the
            topmost request did not take; the game, activated, lay above the layer and nothing checked. The raise now has a
            result: asked, looked at, and when the layer is still under the game it is put directly above it in the normal
            band (the same call that keeps it there while another program is in front), every pass until it holds. */
-        string how=ReaderLayerPolicy.Raise(new LayerZ(gameRoot,gameTop),Layer.Float);
+        string how=ReaderLayerPolicy.Raise(new LayerZ(gameRoot,gameTop),front);
         bool aboveGame=!BelowGame(gameRoot,gameTop);topmost=(GetWindowLong(Overlay,-20)&8)!=0;
         if(how!=LastRaise){LastRaise=how;Emit(new{type="layerRaise",how=how,above=aboveGame,topmost=topmost});}
-        if(below)Emit(new{type="coverDebug",text=menu?"Alt+T 菜单打开：阅读层固定到游戏上方":"阅读层已移到前台游戏上方"});}
+        if(below&&aboveGame)Emit(new{type="coverDebug",text=menu?"Alt+T 菜单打开：阅读层固定到游戏上方":"阅读层已移到前台游戏上方"});}
     static string LastRaise="";
     [DllImport("user32.dll")]static extern bool AttachThreadInput(uint attach,uint to,bool on);
     [DllImport("kernel32.dll")]static extern uint GetCurrentThreadId();
-    static bool BelowGame(IntPtr gameRoot,IntPtr gameTop){int steps=0;for(IntPtr h=GetWindow(Overlay,3);h!=IntPtr.Zero&&steps<400;h=GetWindow(h,3),steps++)if(h==gameRoot||h==gameTop)return true;return false;}
+    static bool BelowGame(IntPtr gameRoot,IntPtr gameTop){
+        // A hidden owner (for example KiriKiri's TApplication) cannot cover the reader.
+        return !TopmostGuard.IsAbove(Overlay,gameTop)||gameRoot!=IntPtr.Zero&&gameRoot!=gameTop&&
+            IsWindowVisible(gameRoot)&&!IsIconic(gameRoot)&&!TopmostGuard.IsAbove(Overlay,gameRoot);
+    }
     sealed class LayerZ:ReaderLayerPolicy.ILayerZ{
+        const uint PlaceFlags=0x0001|0x0002|0x0010|0x0200|0x0400; // NOSIZE, NOMOVE, NOACTIVATE, NOOWNERZORDER, NOSENDCHANGING
         readonly IntPtr Root,Top;public LayerZ(IntPtr root,IntPtr top){Root=root;Top=top;}
         public bool BelowGame(){return GalWindowBridge.BelowGame(Root,Top);}
         public bool Topmost(){return (GetWindowLong(Overlay,-20)&8)!=0;}
-        public void RequestTopmost(){SetWindowPos(Overlay,new IntPtr(-1),0,0,0,0,0x0001|0x0002|0x0010);}
-        public void PlaceAboveGame(){IntPtr above=GetWindow(Top,3);if(above==Overlay)return;SetWindowPos(Overlay,above==IntPtr.Zero?IntPtr.Zero:above,0,0,0,0,0x0001|0x0002|0x0010);}
-        public void PlaceTop(){SetWindowPos(Overlay,IntPtr.Zero,0,0,0,0,0x0001|0x0002|0x0010);}
+        public void RequestTopmost(){SetWindowPos(Overlay,new IntPtr(-1),0,0,0,0,PlaceFlags);}
+        public void PlaceAboveGame(){
+            IntPtr above=GetWindow(Top,3);
+            if(above!=Overlay)SetWindowPos(Overlay,above,0,0,0,0,PlaceFlags);
+        }
+        public void PlaceTop(){SetWindowPos(Overlay,IntPtr.Zero,0,0,0,0,PlaceFlags);}
         /* last step, only when every plain request was ignored: for the length of one call this thread shares the input
            queue of the foreground thread, which is what makes the system take a z-order request; no focus changes */
         public void ForceTopmost(){IntPtr fg=GetForegroundWindow();if(fg==IntPtr.Zero)return;uint pid;uint thread=GetWindowThreadProcessId(fg,out pid),self=GetCurrentThreadId();if(thread==0||thread==self)return;
-            if(!AttachThreadInput(self,thread,true))return;try{SetWindowPos(Overlay,new IntPtr(-1),0,0,0,0,0x0001|0x0002|0x0010);}finally{AttachThreadInput(self,thread,false);}}
+            if(!AttachThreadInput(self,thread,true))return;try{RequestTopmost();}finally{AttachThreadInput(self,thread,false);}}
     }
     /* P0 2026-11-13 (user, ファタモルガーナの館 full screen: the game flashed and kept dropping to the desktop; Alt+T sent it
        to the desktop). A full-screen game (its window covers its whole monitor: KiriKiri fsmethod=cds, TOPMOST popup, E533)
@@ -463,12 +471,16 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
     static void FocusMenuOnce(){
         if(!MenuOpen||!MenuRegionReady||!MenuFocusPending)return;
         if(TranslationMode&&FullscreenTarget()){MenuFocusPending=false;return;}
-        IntPtr foreground=GetAncestor(GetForegroundWindow(),3),overlayRoot=GetAncestor(Overlay,3),gameRoot=Target==IntPtr.Zero?IntPtr.Zero:GetAncestor(Target,3);
-        // A queued menu-open must not pull the keyboard back after the user switched applications.
-        uint foregroundPid;GetWindowThreadProcessId(GetForegroundWindow(),out foregroundPid);bool ownHome=PreferredOverlay!=IntPtr.Zero&&foregroundPid==(uint)OverlayPid;
-        if(IsIconic(Overlay)||(foreground!=overlayRoot&&foreground!=gameRoot&&!ownHome)){MenuFocusPending=false;return;}
+        IntPtr foreground=GetForegroundWindow();
+        bool readerFront=GetAncestor(foreground,2)==Overlay;
+        bool bound=TranslationMode&&Target!=IntPtr.Zero;
+        bool gameFront=bound&&GetAncestor(foreground,3)==GetAncestor(Target,3);
+        // Opening the unbound settings from MeguLit's home is allowed. A bound reader cannot take focus from it.
+        uint foregroundPid;GetWindowThreadProcessId(foreground,out foregroundPid);
+        bool settingsFromHome=!bound&&PreferredOverlay!=IntPtr.Zero&&foregroundPid==(uint)OverlayPid;
+        if(IsIconic(Overlay)||!(readerFront||gameFront||settingsFromHome)){MenuFocusPending=false;return;}
         if((GetAsyncKeyState(0x12)&0x8000)!=0)return;
-        MenuFocusPending=false;if(foreground!=overlayRoot)SetForegroundWindow(Overlay);
+        MenuFocusPending=false;if(!readerFront)SetForegroundWindow(Overlay);
     }
     // One startup.log line ("Visibility: ...") each time the bridge hides the MeguLit window, with the deciding state.
     static void HideReason(string why){Emit(new{type="coverDebug",text="阅读层隐藏 ("+(TranslationMode?"translation":"normal")+", target="+(Target!=IntPtr.Zero)+") "+why});}
@@ -596,17 +608,23 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
        game (under the program now in front), the glass host hides; minimised or gone also hides the layer and its masks. */
     static void GuardLayers(uint ev){
         if(Overlay==IntPtr.Zero||!TranslationMode||Target==IntPtr.Zero)return;
-        IntPtr fgWindow=GetForegroundWindow(),fg=GetAncestor(fgWindow,3),gameRoot=GetAncestor(Target,3),overlayRoot=GetAncestor(Overlay,3);
+        IntPtr fgWindow=GetForegroundWindow(),fg=GetAncestor(fgWindow,3),gameRoot=GetAncestor(Target,3);
         bool alive=IsWindow(Target),iconic=alive&&!GameOnDesktop();
         /* no foreground window: an activation is in flight (menu closing, focus handed back to the game); the next event or tick decides */
         if(fgWindow==IntPtr.Zero&&alive&&!iconic)return;
         uint fgPid=0,gamePid=0;GetWindowThreadProcessId(fgWindow,out fgPid);if(alive)GetWindowThreadProcessId(Target,out gamePid);
         bool gameFront=alive&&(fg==gameRoot||fgPid!=0&&(fgPid==gamePid||ImeHost(ProcessName(fgPid))));
-        bool ownFront=fg==overlayRoot||MenuOpen&&MenuRegionReady&&fgPid!=0&&fgPid==(uint)OverlayPid;
+        bool ownFront=GetAncestor(fgWindow,2)==Overlay;
         /* #468: a screenshot tool in front of the game decides nothing; the layer stays where it is, in the picture */
-        if(alive&&!iconic&&!gameFront&&!ownFront&&CaptureSurfaceFront(fg))return;
+        if(alive&&!iconic&&!gameFront&&!ownFront&&fgPid!=(uint)OverlayPid&&CaptureSurfaceFront(fg))return;
         bool ok=TopmostGuard.MayFloat(alive,iconic,gameFront,ownFront);
-        LayersMayFloat=ok;if(ok)return;
+        LayersMayFloat=ok;
+        if(ok){
+            // Activation can reorder the game ahead of the reader before the next capture/placement tick.
+            LastZCheck=DateTime.MinValue;
+            if(IsShown&&IsWindowVisible(Overlay)&&!IsIconic(Overlay))KeepAboveGame(gameRoot,true);
+            return;
+        }
         if(!alive||iconic){
             if(IsShown||IsWindowVisible(Overlay))ShowWindow(Overlay,0);
             IsShown=false;DropLayers();return;
@@ -665,7 +683,7 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         IntPtr w=GetForegroundWindow();if(w==IntPtr.Zero)return ReaderLayerPolicy.None;
         IntPtr fg=GetAncestor(w,3);uint fgPid=0,gamePid=0;GetWindowThreadProcessId(w,out fgPid);
         bool target=Target!=IntPtr.Zero&&IsWindow(Target);if(target)GetWindowThreadProcessId(Target,out gamePid);
-        return ReaderLayerPolicy.Classify(true,target&&fg==GetAncestor(Target,3),target&&fgPid!=0&&(fgPid==gamePid||ImeHost(ProcessName(fgPid))),Overlay!=IntPtr.Zero&&fg==GetAncestor(Overlay,3),fgPid!=0&&fgPid==(uint)OverlayPid,target&&CaptureSurfaceFront(fg));}
+        return ReaderLayerPolicy.Classify(true,target&&fg==GetAncestor(Target,3),target&&fgPid!=0&&(fgPid==gamePid||ImeHost(ProcessName(fgPid))),Overlay!=IntPtr.Zero&&GetAncestor(w,2)==Overlay,fgPid!=0&&fgPid==(uint)OverlayPid,target&&CaptureSurfaceFront(fg));}
     /* #468: is this foreground root a screenshot surface over the game (ReaderLayerPolicy.CaptureSurface)? */
     static bool CaptureSurfaceFront(IntPtr fg){
         if(fg==IntPtr.Zero||Target==IntPtr.Zero||!IsWindow(Target))return false;
@@ -753,7 +771,7 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         // The game's own popups (IME candidate list, dialogs) belong to its process but not to its window tree: the IME
         // list of a Chinese input method used to hide the whole reading layer as "fg=other" in Subahibi.
         uint fgPid=0,gamePid=0;GetWindowThreadProcessId(GetForegroundWindow(),out fgPid);GetWindowThreadProcessId(Target,out gamePid);bool gameOwned=Layer.Front==ReaderLayerPolicy.Game;
-        bool homeOwned=PreferredOverlay!=IntPtr.Zero&&Layer.Front==ReaderLayerPolicy.OwnHome;bool contextActive=gameOwned||Layer.Front==ReaderLayerPolicy.OwnLayer||homeOwned;
+        bool contextActive=gameOwned||Layer.Front==ReaderLayerPolicy.OwnLayer;
         bool visible=ReadingVisible(Layer.Context,IsIconic(Target),IsIconic(Overlay),CoverEnabled,DialogVisible,MenuOpen);
         if(!contextActive)MenuFocusPending=false;
         if(!visible){if(IsShown){HideReason("menu="+MenuOpen+"/"+MenuRegionReady+" cover="+CoverEnabled+" dialog="+DialogVisible+" iconic="+IsIconic(Target)+" fg="+(fg==gameRoot?"game":fg==overlayRoot?"overlay":"other"));ShowWindow(Overlay,0);}IsShown=false;if(TextMask!=null)TextMask.Hide();
@@ -792,7 +810,7 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
            picker, a popup) is its own root, so the layer landed above the main window. The layer now sits directly above the
            game, under every other window, so it only ever covers the game. */
         KeepAboveGame(gameRoot,Layer.Float);
-        if(magpie&&contextActive&&!homeOwned&&(DateTime.UtcNow-MagpieRaisedAt).TotalMilliseconds>250){MagpieRaisedAt=DateTime.UtcNow;SetWindowPos(Overlay,new IntPtr(-1),0,0,0,0,0x0001|0x0002|0x0010);}
+        if(magpie&&contextActive&&(DateTime.UtcNow-MagpieRaisedAt).TotalMilliseconds>250){MagpieRaisedAt=DateTime.UtcNow;SetWindowPos(Overlay,new IntPtr(-1),0,0,0,0,0x0001|0x0002|0x0010);}
         /* Magpie pauses while its source window is not in front: outside the Alt+T menu (which needs the keyboard and hands focus back when it closes) the reading layer never keeps the foreground from the scaled game. */
         if(magpie&&!MenuOpen&&fg==overlayRoot&&(DateTime.UtcNow-MagpieFocusAt).TotalMilliseconds>400){MagpieFocusAt=DateTime.UtcNow;SetForegroundWindow(gameRoot);}
         MaskLayer.Origin(Overlay,Target,box.Left,box.Top);

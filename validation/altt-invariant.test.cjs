@@ -199,7 +199,7 @@ test('switching to another application keeps the layer visible in the game z-ord
 });
 test('the bridge looks at the order after every raise and has a way out when topmost is not taken',()=>{
  const s=fs.readFileSync(path.join(__dirname,'..','native','GalWindowBridge.cs'),'utf8'),p=fs.readFileSync(path.join(__dirname,'..','native','ReaderLayerPolicy.cs'),'utf8');
- assert.match(s,/string how=ReaderLayerPolicy\.Raise\(new LayerZ\(gameRoot,gameTop\),Layer\.Float\);/);
+ assert.match(s,/string how=ReaderLayerPolicy\.Raise\(new LayerZ\(gameRoot,gameTop\),front\);/);
  assert.match(s,/type="layerRaise",how=how,above=aboveGame,topmost=topmost/);
  assert.doesNotMatch(s,/SetWindowPos\(Overlay,Layer\.Float\?new IntPtr\(-1\):IntPtr\.Zero,0,0,0,0,0x0001\|0x0002\|0x0010\);\s*Emit\(new\{type="coverDebug"/,'a raise that asks and never looks');
  assert.match(p,/if\(!z\.BelowGame\(\)\)return z\.Topmost\(\)\?"topmost":"above-game";\s*z\.PlaceAboveGame\(\);/);
