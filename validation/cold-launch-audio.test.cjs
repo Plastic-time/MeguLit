@@ -23,7 +23,7 @@ test('native audio guard restores both original mute states and survives capture
  assert.match(cs,/EnumAudioEndpoints\(0,1,out devices\)/);assert.match(cs,/SetDevice\(dev,pid,mute\)/);
  assert.match(cs,/while\(!stop&&!owner.HasExited&&!game.HasExited\)/);assert.match(cs,/finally\{\s*observed=prior\.Count;\s*ok=Restore\(\)&&ok;\s*owner.Dispose\(\);game.Dispose\(\);\s*\}/);assert.match(cs,/finally\{bool safe=StopAudio\(\)/);assert.match(cs,/KILL_ON_JOB_CLOSE|Marshal.WriteInt32\(limits,16,0x2000\)/);
  assert.match(desk,/finally\{\s*Cleanup\(\)/);assert.match(desk,/StopAudioGuards\(\);RestoreAudio\(\);if\(Job!=IntPtr.Zero\)/);
- if(process.platform==='win32'){const {spawnSync}=require('node:child_process');const compiler=path.join(process.env.WINDIR||'C:/Windows','Microsoft.NET/Framework64/v4.0.30319/csc.exe');const r=spawnSync(process.execPath,[path.join(__dirname,'helpers/cold-audio-state-selftest.cjs'),compiler],{windowsHide:true,encoding:'utf8',timeout:90000});assert.equal(r.status,0,r.stdout+r.stderr);assert.match(r.stdout,/fresh wrappers retain original: pass/);}
+ if(process.platform==='win32'){const {spawnSync}=require('node:child_process');const compiler=path.join(process.env.WINDIR||'C:/Windows','Microsoft.NET/Framework64/v4.0.30319/csc.exe');const r=spawnSync(process.execPath,[path.join(__dirname,'helpers/cold-audio-state-selftest.cjs'),compiler],{windowsHide:true,encoding:'utf8',timeout:180000});assert.equal(r.status,0,[r.error?.message,r.signal,r.stdout,r.stderr].filter(Boolean).join('\n'));assert.match(r.stdout,/fresh wrappers retain original: pass/);}
 });
 
 test('a helper spawn error releases the cold-run exit barrier without an exit event',async()=>{

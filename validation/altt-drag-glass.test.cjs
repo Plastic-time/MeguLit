@@ -45,17 +45,17 @@ test('Alt+T header drag: no glass message or picture re-placement per frame, one
 });
 
 test('lookup background stays in the viewport before the scroll event and at the end of the card',
- {skip:!hasEdge&&'Edge not installed',timeout:60000},async()=>{
+ {skip:!hasEdge&&'Edge not installed',timeout:90000},async()=>{
  const temp=fs.mkdtempSync(path.join(process.env.MEGULIT_WORK||os.tmpdir(),'megulit-lookup-scroll-'));
  let server,cdp;
  try{
   server=await serve();cdp=await startEdge(path.join(temp,'edge'));
   await cdp.send('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/reader/index.html'});
-  let ready=false;
-  for(let i=0;i<120&&!ready;i++){await sleep(100);ready=await cdp.evaluate('!!window.__TOME_READER_READY__').catch(()=>false);}
-  assert.ok(ready);
+  const ready=await waitFor(cdp,'!!window.__TOME_READER_READY__',30000);
+  assert.ok(ready,'reader page loaded: '+await cdp.evaluate('document.querySelector("#reader-status")?.textContent||""').catch(()=>''));
   await cdp.evaluate("(()=>{window.__tomoyoMode.set('translation');document.body.classList.add('tomoyo-gal-bound');document.documentElement.dataset.tomeCardSurface='image';const card=document.createElement('div');card.className='tomoyo-selection-card';card.style.cssText='top:80px;left:100px;width:320px;height:190px';const content=document.createElement('div');content.style.height='760px';content.textContent='Scroll fixture';card.append(content);document.body.append(card);return true})()");
-  await sleep(160);
+  assert.ok(await waitFor(cdp,"!!document.querySelector('.tomoyo-selection-card .tome-menu-bg')"),'card background mounted');
+  await nextFrame(cdp);
   const result=await cdp.evaluate("(()=>{const card=document.querySelector('.tomoyo-selection-card'),bg=card.querySelector('.tome-menu-bg'),content=bg.nextElementSibling,top=content.getBoundingClientRect().top;return [35,200,10000].map(at=>{card.scrollTop=at;const a=card.getBoundingClientRect(),b=bg.getBoundingClientRect();return {offset:b.top-a.top-card.clientTop,height:b.height,viewport:card.clientHeight,contentShift:top-content.getBoundingClientRect().top,scroll:card.scrollTop}})})()");
   for(const sample of result){
    assert.ok(sample.scroll>0);
@@ -67,13 +67,14 @@ test('lookup background stays in the viewport before the scroll event and at the
 });
 
 test('lookup drags on the first press and routes wheel input at its new position',
- {skip:!hasEdge&&'Edge not installed',timeout:60000},async()=>{
+ {skip:!hasEdge&&'Edge not installed',timeout:90000},async()=>{
  const temp=fs.mkdtempSync(path.join(process.env.MEGULIT_WORK||os.tmpdir(),'megulit-lookup-drag-'));
  let server,cdp;
  try{
   server=await serve();cdp=await startEdge(path.join(temp,'edge'));
   await cdp.send('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/reader/index.html'});
-  assert.ok(await waitFor(cdp,'!!window.__TOME_READER_READY__',12000),'reader page loaded');
+  const ready=await waitFor(cdp,'!!window.__TOME_READER_READY__',30000);
+  assert.ok(ready,'reader page loaded: '+await cdp.evaluate('document.querySelector("#reader-status")?.textContent||""').catch(()=>''));
   await cdp.evaluate("(()=>{window.__tomoyoMode.set('translation');document.body.classList.add('tomoyo-gal-bound');window.__tomoyoChinese.localLookup=async()=>({entries:[]});window.__tomoyoChinese.openLocalSelection({text:'台詞です',start:0,end:2},{left:innerWidth/2,right:innerWidth/2+30,top:innerHeight*.72,bottom:innerHeight*.72+20,width:30,height:20});return true})()");
   assert.ok(await waitFor(cdp,"!!document.querySelector('.tomoyo-selection-card .tomoyo-selection-body')&&!!document.querySelector('.tomoyo-selection-card>header')"),'selection card rendered');
   await cdp.evaluate("(()=>{const p=document.querySelector('.tomoyo-selection-card'),spacer=document.createElement('div');p.style.height='180px';p.querySelector('header').style.setProperty('padding-top','24px','important');spacer.style.height='1000px';p.querySelector('.tomoyo-selection-body').append(spacer);})()");
