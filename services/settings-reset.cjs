@@ -8,7 +8,9 @@ const fs=require('node:fs'),path=require('node:path');
 const CONFIG_FILES=['gal-preferences.json','text-defaults.json','v4-preferences.json','native-preferences.json','preferences.json','game-style-profiles.json'];
 const UI_KEYS=['tome-background','tome-menu-background'];
 const KEEP_BACKUPS=5;
-function atomic(file,text){fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,text);fs.renameSync(tmp,file);}
+function atomic(file,text,modifiedAt){fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,text);
+ if(Number.isFinite(modifiedAt)&&modifiedAt>=0&&modifiedAt<8.64e15)fs.utimesSync(tmp,new Date(),modifiedAt/1000);
+ fs.renameSync(tmp,file);}
 function readText(file){try{return fs.readFileSync(file,'utf8');}catch{return null;}}
 function parse(text){try{const v=JSON.parse(text);return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}catch{return {};}}
 function paths(root){const config=path.join(root,'data','config');return {config,ui:path.join(root,'data','ui-state.json'),backups:path.join(config,'settings-reset-backups')};}
@@ -17,7 +19,8 @@ function reset(root,now=Date.now()){
  for(const name of CONFIG_FILES)files[name]=readText(path.join(p.config,name));
  files['ui-state.json']=readText(p.ui);
  fs.mkdirSync(dir,{recursive:true});
- fs.writeFileSync(path.join(dir,'manifest.json'),JSON.stringify({id,createdAt:new Date(now).toISOString(),files:Object.fromEntries(Object.entries(files).map(([k,v])=>[k,v!==null]))},null,2));
+ const presetModifiedAt=files['text-defaults.json']===null?undefined:fs.statSync(path.join(p.config,'text-defaults.json'),{throwIfNoEntry:false})?.mtimeMs;
+ fs.writeFileSync(path.join(dir,'manifest.json'),JSON.stringify({id,createdAt:new Date(now).toISOString(),presetModifiedAt,files:Object.fromEntries(Object.entries(files).map(([k,v])=>[k,v!==null]))},null,2));
  for(const[name,text]of Object.entries(files))if(text!==null)fs.writeFileSync(path.join(dir,name),text);
  for(const name of CONFIG_FILES){
   const file=path.join(p.config,name);if(files[name]===null)continue;
@@ -47,7 +50,9 @@ function undo(root,id){
  for(const[name,existed]of Object.entries(manifest.files)){
   if(name!=='ui-state.json'&&!CONFIG_FILES.includes(name))continue;
   const target=name==='ui-state.json'?p.ui:path.join(p.config,name);
-  if(existed){const text=readText(path.join(dir,name));if(text===null)throw Error('SETTINGS_RESET_UNDO_INVALID');atomic(target,text);}
+  if(existed){const text=readText(path.join(dir,name));if(text===null)throw Error('SETTINGS_RESET_UNDO_INVALID');
+   // An older backup cannot establish that the preset was newer than a work's save.
+   atomic(target,text,name==='text-defaults.json'?manifest.presetModifiedAt??0:undefined);}
   else fs.rmSync(target,{force:true});
  }
  return {restored:true,id:String(id)};

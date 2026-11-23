@@ -257,3 +257,49 @@ test('spacing migration and a new colour-only preset edit do not make a known ol
  assert.equal(stored().sizes,1);
  assert.equal(stored().prefs.japaneseSize,34);
 });
+
+test('a running work uses the same migrated size when a position change refreshes it',t=>{
+ const {settings,launch}=fixture(t),preset=path.join(settings.folder,'text-defaults.json'),at=Date.now()-60000;
+ fs.writeFileSync(preset,JSON.stringify({japaneseSize:24,sizeSource:'user'}));
+ oldAltT(settings,{textColor:'#ffeeaa'},at);
+ fs.writeFileSync(preset,JSON.stringify({japaneseSize:22,sizeSource:'user'}));
+ fs.utimesSync(preset,new Date(at+1000),new Date(at+1000));
+ const {Runtime}=require('../services/runtime.cjs'),runtime=new Runtime(settings.root);
+ const g={styleSync:{profileKey:key,reloadProfiles(){}},preferences:{},preview(){},setGameAudio(){}};
+ runtime.reader={gal:g,prefs:()=>({})};
+ const values={x:24};settings.save({scope:'position',values});runtime.settingsSaved({scope:'position',values});
+ assert.equal(g.preferences.japaneseSize,launch().japaneseSize);
+ assert.equal(g.preferences.japaneseSize,22);
+});
+
+test('reset and undo restore the preset timestamp used to distinguish an old override',t=>{
+ const {settings,launch}=fixture(t),preset=path.join(settings.folder,'text-defaults.json'),at=Date.now()-60000;
+ fs.writeFileSync(preset,JSON.stringify({japaneseSize:22,sizeSource:'user',spacingDefaults:1}));
+ fs.utimesSync(preset,new Date(at-1000),new Date(at-1000));
+ oldAltT(settings,{japaneseSize:34},at);
+ assert.equal(launch().japaneseSize,34);
+ const reset=require('../services/settings-reset.cjs'),{id}=reset.reset(settings.root);
+ reset.undo(settings.root,id);
+ assert.equal(Math.trunc(fs.statSync(preset).mtimeMs),at-1000);
+ assert.equal(launch().japaneseSize,34);
+});
+
+test('a legacy override without a save timestamp is not removed based on the preset timestamp',t=>{
+ const {settings,launch,stored}=fixture(t,{savedAt:undefined,textSavedAt:undefined,prefs:{japaneseSize:34,sizeSource:'user'}});
+ fs.writeFileSync(path.join(settings.folder,'text-defaults.json'),JSON.stringify({japaneseSize:22,sizeSource:'user'}));
+ assert.equal(launch().japaneseSize,34);
+ settings.save({scope:'text',values:{textColor:'#ffeeaa'}});
+ assert.equal(stored().prefs.japaneseSize,34);
+});
+
+test('synced legacy sizes follow the incoming save time regardless of the receiving work',t=>{
+ const at=Date.now()-60000,{kinds}=require('../services/account.cjs');
+ for(const entry of [undefined,{savedAt:at-1000,textSavedAt:at-1000,prefs:{japaneseSize:24,sizeSource:'user'}}]){
+  const {settings,launch,stored}=fixture(t,entry),preset=path.join(settings.folder,'text-defaults.json');
+  fs.writeFileSync(preset,JSON.stringify({japaneseSize:22,sizeSource:'user'}));
+  fs.utimesSync(preset,new Date(at),new Date(at));
+  kinds.settings.apply(null,key,{data:{name:'SomeGame',prefs:{japaneseSize:34,sizeSource:'user'}},updated_at:at+1000},settings.root);
+  assert.equal(launch().japaneseSize,34);
+  assert.equal(stored().savedAt,at+1000);
+ }
+});
