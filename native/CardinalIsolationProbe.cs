@@ -155,8 +155,32 @@ internal static class CardinalIsolationProbe {
                 Directory.Delete(root,true);
         }
     }
+    internal static void AuditRuntimeReads(string probeRoot,string readerRoot,IntPtr sid) {
+        if(!Path.IsPathRooted(readerRoot) || !readerRoot.StartsWith(@"F:\",StringComparison.OrdinalIgnoreCase))
+            throw new IOException("LIVE_READER_ROOT");
+        foreach(string group in new[]{"hook","megulithook"}){
+            string folder=Path.Combine(readerRoot,"runtime",group);
+            if(!Directory.Exists(folder))continue;
+            foreach(string file in Directory.GetFiles(folder,"*.dll")){
+                int code=RunRestricted(Path.Combine(probeRoot,"bin","probe.exe"),"read-runtime \""+file+"\"",sid);
+                Console.Error.WriteLine("runtime-read result="+code+" file="+file);
+            }
+        }
+    }
+
     static int Main(string[] args) {
         try {
+            if(args.Length==2 && args[0]=="read-runtime"){
+                try{
+                    using(var token=WindowsIdentity.GetCurrent()){
+                        int restricted,length;
+                        Check(GetTokenInformation(token.Token,29,out restricted,sizeof(int),out length));
+                        if(restricted!=1)return 18;
+                    }
+                    using(var stream=File.OpenRead(args[1]))return stream.ReadByte()<0?38:0;
+                } catch(IOException error){return error.HResult & 65535;}
+                  catch(UnauthorizedAccessException error){return error.HResult & 65535;}
+            }
             if(args.Length==3 && args[0]=="child") return Measure(args[1],args[2]);
             if(args.Length!=1)throw new ArgumentException("Supply a reachable public IPv4 TCP/443 control endpoint");
             WithIsolation(args[0],Assembly.GetExecutingAssembly().Location,null);

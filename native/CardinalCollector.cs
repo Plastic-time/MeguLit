@@ -18,7 +18,7 @@ using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
-internal static class CardinalCollector {
+internal static partial class CardinalCollector {
     static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 300000 };
     [DllImport("iphlpapi.dll")]
     static extern uint GetExtendedTcpTable(IntPtr table, ref int size, bool sort, int family, int tableClass, uint reserved);
@@ -75,6 +75,7 @@ internal static class CardinalCollector {
                 var reply=Json.DeserializeObject(Encoding.UTF8.GetString(body.ToArray())) as Dictionary<string,object>;
                 if (!Equals(reply["id"],1)) throw new IOException("CDP_COMMAND_ID");
                 var result=(Dictionary<string,object>)reply["result"];
+                if(result.ContainsKey("exceptionDetails"))throw new IOException("CDP_EVALUATION_FAILED");
                 var value=(Dictionary<string,object>)result["result"];
                 return value.ContainsKey("value") ? value["value"] as string : null;
             }
@@ -128,7 +129,7 @@ internal static class CardinalCollector {
     [DllImport("kernel32.dll",SetLastError=true)]
     static extern bool GetNamedPipeClientProcessId(SafePipeHandle pipe,out uint pid);
 
-    static void VerifyImage(IntPtr job,Process process,string expected) {
+    internal static void VerifyImage(IntPtr job,Process process,string expected) {
         bool member;
         if(!IsProcessInJob(process.Handle,job,out member) || !member || process.HasExited ||
            !String.Equals(process.MainModule.FileName,expected,StringComparison.OrdinalIgnoreCase))
@@ -276,11 +277,29 @@ internal static class CardinalCollector {
             if(!allowed.Contains(key))Environment.SetEnvironmentVariable(key,null);
     }
 
+    static void VerifyLiveBundle() {
+        var root=AppDomain.CurrentDomain.BaseDirectory;
+        using(var manifest=typeof(CardinalCollector).Assembly.GetManifestResourceStream("cardinal-bundle.txt"))
+        using(var reader=new StreamReader(manifest))
+        using(var sha=System.Security.Cryptography.SHA256.Create()){
+            string line;
+            while((line=reader.ReadLine())!=null){
+                string file=Path.Combine(root,line.Substring(65));
+                using(var input=File.OpenRead(file)){
+                    string actual=BitConverter.ToString(sha.ComputeHash(input)).Replace("-","");
+                    if(actual!=line.Substring(0,64))throw new IOException("LIVE_BUNDLE_CHANGED");
+                }
+            }
+        }
+    }
+
     [STAThread] public static int Main(string[] args) {
         try {
             if(args.Length==2 && args[0]=="--webview-probe" && Regex.IsMatch(args[1],"^cardinal-[a-f0-9]{32}$"))
                 return ProbeChild(Path.Combine(@"F:\",args[1]));
             StripCredentials();
+            Console.InputEncoding=new UTF8Encoding(false);
+            Console.OutputEncoding=new UTF8Encoding(false);
             int port=0;
             if(args.Length>=2 && args[args.Length-2]=="--cdp-port") {
                 if(!int.TryParse(args.Last(),out port) || port<1 || port>65535)throw new IOException("CDP_PORT_INVALID");
@@ -291,6 +310,13 @@ internal static class CardinalCollector {
                 socket.ExclusiveAddressUse=true;
                 try { socket.Start(); } finally { socket.Stop(); }
             }
+            if(args.Length==2 && args[0]=="--live-reader")return LiveReader(args[1],port);
+            if((args.Length==1 && args[0]=="--live") || (args.Length==0 && File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"cardinal-live-host.json")))){
+                VerifyLiveBundle();
+                if(port==0){var listener=new System.Net.Sockets.TcpListener(IPAddress.Loopback,0);listener.Start();
+                    try{port=((IPEndPoint)listener.LocalEndpoint).Port;}finally{listener.Stop();}}
+                return LiveHost(port);
+            }
             if(args.Length==3 && args[0]=="--reader-windows" && Regex.IsMatch(args[2],@"\ACardinal[a-f0-9]{32}\z"))return ReaderProbe(args[1],port,args[2]);
             if(args.Length==2 && args[0]=="--reader-probe")return ReaderProbe(args[1],port);
             if(args.SequenceEqual(new[]{"--probe"})) {
@@ -298,6 +324,8 @@ internal static class CardinalCollector {
                 Directory.CreateDirectory(dir);
                 return Probe(dir);
             }
+            bool worker=args.Length>1 && args[0]=="--game-worker";
+            if(worker)args=args.Skip(1).ToArray();
             string saveDir="savedata";
             string template=null,templateHash=null;
             if(args.Length==9 && args[0]=="--isolated-game" && args[6]=="--save-template") {
@@ -320,7 +348,8 @@ internal static class CardinalCollector {
             if(!Equals(req["schema"],"megulit.trusted-capture-request") || !Equals(req["version"],1) ||
                 !Regex.IsMatch((string)req["challenge"],"\\A[a-f0-9]{64}\\z") ||
                 !Regex.IsMatch((string)req["reporter"],"\\A[a-zA-Z0-9_-]{1,80}\\z"))throw new IOException("CAPTURE_REQUEST");
-            string failure=isolated ? CardinalGameCapture.Run(req,args[1],args[2],args[3],saveDir,template,templateHash) : "OS_SAVE_NETWORK_ISOLATION_UNAVAILABLE";
+            string failure=isolated ? CardinalGameCapture.Run(req,args[1],args[2],args[3],saveDir,template,templateHash,worker) : "OS_SAVE_NETWORK_ISOLATION_UNAVAILABLE";
+            if(worker && failure==null)return 0;
             Console.WriteLine(Json.Serialize(new {schema="megulit.capture-failure",challenge=req["challenge"],reporter=req["reporter"],
                 reason=failure,signed=false}));
             return 2;

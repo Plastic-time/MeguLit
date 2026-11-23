@@ -51,7 +51,7 @@ internal static class CardinalGameCapture {
         using(var input=File.OpenRead(file))
         using(var sha=SHA256.Create())return BitConverter.ToString(sha.ComputeHash(input)).Replace("-","").ToLowerInvariant();
     }
-    internal static string Run(Dictionary<string,object> req,string hostExe,string hostHash,string address,string saveDir,string template,string templateHash) {
+    internal static string Run(Dictionary<string,object> req,string hostExe,string hostHash,string address,string saveDir,string template,string templateHash,bool worker=false) {
         var source=Path.GetFullPath(hostExe);
         if(!source.StartsWith(@"F:\",StringComparison.OrdinalIgnoreCase) ||
             !String.Equals(source,Path.GetFullPath((string)req["exe"]),StringComparison.OrdinalIgnoreCase))
@@ -62,10 +62,15 @@ internal static class CardinalGameCapture {
         if(baseDir.Length<=3 || !Equals(identity["exe"],hostHash) || Digest(source)!=hostHash)throw new IOException("GAME_ALLOWLIST_IDENTITY");
         var output=Console.Out;
         string why="GAME_OBSERVATION_INCOMPLETE";
+        string challenge=(string)req["challenge"];
+        var json=new System.Web.Script.Serialization.JavaScriptSerializer();
+        Action<object> send=value=>{if(worker){output.WriteLine(json.Serialize(new {challenge,value}));output.Flush();}};
+        bool observedWindow=false;
         try {
             Console.SetOut(Console.Error);
             string probe=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"CardinalIsolationProbe.exe");
             CardinalIsolationProbe.WithIsolation(address,probe,delegate(string root,IntPtr sid) {
+                if(worker)CardinalIsolationProbe.AuditRuntimeReads(root,(string)req["readerRoot"],sid);
                 string game=Directory.CreateDirectory(Path.Combine(root,"game")).FullName;
                 CopyAssets(baseDir,game,saveDir);
                 string exe=Path.Combine(game,Path.GetFileName(source));
@@ -87,7 +92,22 @@ internal static class CardinalGameCapture {
                 Console.Error.WriteLine("Game desktop "+desktop);
                 int code;
                 try { code=ColdDesk.Run(new[]{"run",exe,"--seconds",seconds.ToString()},desktop,null,
-                    delegate(IntPtr job,int pid) { return false; },
+                    delegate(IntPtr job,int pid) {
+                        using(var gameProcess=System.Diagnostics.Process.GetProcessById(pid)) {
+                            if(gameProcess.HasExited)return true;
+                            if(!observedWindow){
+                                var hwnd=ColdDesk.RootWindow(pid);
+                                if(hwnd!=IntPtr.Zero){
+                                    CardinalCollector.VerifyImage(job,gameProcess,exe);
+                                    observedWindow=true;
+                                    send(new {type="game",pid,birth=gameProcess.StartTime.ToUniversalTime().Ticks.ToString(),
+                                        hwnd=hwnd.ToInt64().ToString(),desktop,exe,jobAssigned=true,hiddenDesktop=true,
+                                        savesIsolated=true,networkBlocked=true,privateCopy=true,owned=true,parentWatchdog=true});
+                                }
+                            }
+                            return false;
+                        }
+                    },
                     delegate(string image,string desk,out IntPtr process,out IntPtr thread,out int pid) {
                         CardinalIsolationProbe.Child child;
                         try { child=CardinalIsolationProbe.Launch(image,"",sid,desk,true); }
@@ -99,9 +119,11 @@ internal static class CardinalGameCapture {
                     }); } finally { if(!CloseDesktop(handle))throw new Win32Exception(); }
                 if(code!=0)why="GAME_JOB_FAILED";
                 else if(!ColdDesk.AudioReadback)why="GAME_AUDIO_READBACK_MISSING";
+                else if(observedWindow && worker)why=null;
             });
         } catch(Win32Exception error) { why="ISOLATED_WIN32_"+error.NativeErrorCode; }
         finally {Console.SetOut(output);}
+        if(why==null)send(new {type="cleanup",treeExited=true,audioRestored=true,ownershipReleased=true});
         return why;
     }
 }

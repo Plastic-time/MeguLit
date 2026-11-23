@@ -80,7 +80,11 @@ function capture(context,reporter,challenge,{signal,spawnChild=spawn,resourceChe
  });
 }
 async function evaluate(report,context,reporter,challenge){
- if(!report||report.schema!=='megulit.trusted-capture'||report.version!==1||report.challenge!==challenge||report.reporter!==reporter.id||report.source!=='native-live-dom'||!verifyCapture(report,reporter))fail('TRUSTED_CAPTURE_ATTESTATION');
+ if(!verifyCapture(report,reporter))fail('TRUSTED_CAPTURE_ATTESTATION');
+ return evaluateEvidence(report,context,reporter,challenge);
+}
+function evaluateEvidence(report,context,reporter,challenge){
+ if(!report||report.schema!=='megulit.trusted-capture'||report.version!==1||report.challenge!==challenge||report.reporter!==reporter.id||report.source!=='native-live-dom')fail('TRUSTED_CAPTURE_ATTESTATION');
  if(!P.same(report.identity,context.request.identity)||report.candidateHash!==context.candidateHash||report.appliedProfileHash!==context.proof.candidate.profileHash||report.configHash!==context.proof.config.digest||report.identityDigest!==context.proof.digest)fail('TRUSTED_CAPTURE_BINDING');
  const p=report.process,c=report.cleanup;if(!p||!Number.isSafeInteger(p.pid)||p.pid<1||!/^[1-9]\d{0,29}$/.test(p.birth)||['owned','jobAssigned','hiddenDesktop','privateCopy','savesIsolated','networkBlocked','parentWatchdog'].some(k=>p[k]!==true))fail('TRUSTED_PROCESS_ISOLATION');
  if(!c||['treeExited','audioRestored','ownershipReleased'].some(k=>c[k]!==true))fail('TRUSTED_CAPTURE_CLEANUP_UNCONFIRMED');
@@ -103,6 +107,22 @@ async function evaluate(report,context,reporter,challenge){
  const doc={record:Score.record({key:context.request.identity.exe,result,cardinalRev:P.REV}),detail:result.detail,unreliable:false,errors:[]};
  if(!Upload.eligible(doc)||result.lines<30||result.detail.sourceCoverage.rate!==1||result.detail.contentCoverage.rate!==1||result.detail.visibility.rate!==1||result.lines!==sources.length)fail('TRUSTED_CARDINAL_INELIGIBLE');
  return {reporter:reporter.id,runId:report.runId,total:result.total,lines:result.lines,timing,eligibility:{pairSource:'live-display',pairReliable:true,leakObserved:true,timelineSource:'measured-delivery',timelineReliable:true,choiceReliable:true,unreliable:false,errors:[]}};
+}
+async function storeMeasuredCapture(body,context,reporter,challenge,dir,loadKey){
+ evaluateEvidence(body,context,reporter,challenge);
+ const payload=Buffer.from(D.canonical(body));
+ if(payload.length+512>MAX_CAPTURE)fail('LIVE_CAPTURE_LIMIT');
+ const key=loadKey();
+ if(key.asymmetricKeyType!=='ed25519'||crypto.createPublicKey(key).export({type:'spki',format:'der'}).toString('base64')!==reporter.publicKey)fail('LIVE_REPORTER_KEY');
+ const signature={alg:'ed25519',keyId:reporter.id,value:crypto.sign(null,payload,key).toString('base64')};
+ const pending=path.join(dir,'capture.pending'),final=path.join(dir,'capture.json');
+ fs.writeFileSync(pending,JSON.stringify({...body,signature}),{flag:'wx'});
+ try{
+  const stored=readJSON(pending,MAX_CAPTURE);
+  await evaluate(stored,context,reporter,challenge);
+  fs.linkSync(pending,final);
+  return stored;
+ }finally{fs.unlinkSync(pending);}
 }
 async function externalSign(body,policy){
  const file=process.env.MEGULIT_CARDINAL_REVIEW_KEY,id=process.env.MEGULIT_CARDINAL_REVIEW_KEY_ID;if(!file||!id||!path.isAbsolute(file)||inside(REPO,path.resolve(file)))fail('TRUSTED_REVIEW_KEY_UNAVAILABLE');
@@ -144,4 +164,4 @@ async function runHost(request,policy,dependencies={}){
  }finally{if(slot&&!unsafe)try{slot.release();}catch{}}
 }
 function status(){return {state:'awaiting-trusted-run',reason:'TRUSTED_LIVE_COLLECTOR_UNAVAILABLE',signed:false,availableSources:{coldCapture:'scene-export-only',coldTest:'native-only-no-reader',cardinalDriver:'offline-replay'},requiredCapabilities:CAPABILITIES};}
-module.exports={runHost,prepare,evaluate,capture,resources,status,readJSON,atomic,reviewerSigner,MAX_CAPTURE,MAX_REQUEST,CAPABILITIES};
+module.exports={runHost,prepare,evaluate,storeMeasuredCapture,capture,resources,status,readJSON,atomic,reviewerSigner,MAX_CAPTURE,MAX_REQUEST,CAPABILITIES};

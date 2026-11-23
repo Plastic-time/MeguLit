@@ -126,6 +126,10 @@ static class ColdDesk{
    return count<8;
   },IntPtr.Zero);
  }
+ internal static IntPtr RootWindow(int pid){
+  uint owner;var hwnd=GameWin;
+  return hwnd!=IntPtr.Zero && GetWindowThreadProcessId(hwnd,out owner)!=0 && owner==pid && JobPids().Contains(owner) ? hwnd : IntPtr.Zero;
+ }
  static IntPtr Biggest(){IntPtr best=IntPtr.Zero;long area=-1;var pids=new HashSet<uint>(JobPids());EnumProc cb=(h,_)=>{uint p;GetWindowThreadProcessId(h,out p);if(!pids.Contains(p)||!IsWindowVisible(h))return true;RECT r;GetWindowRect(h,out r);long s=(long)(r.R-r.L)*(r.B-r.T);if(s>area){area=s;best=h;}return true;};
   EnumDesktopWindows(Desk,cb,IntPtr.Zero);return best;}
  static Dictionary<uint,Process> audioGuards=new Dictionary<uint,Process>();
@@ -172,7 +176,7 @@ static class ColdDesk{
    Emit("{\"type\":\"shot\",\"ok\":true,\"path\":"+Q(file)+",\"w\":"+tw+",\"h\":"+th+",\"black\":"+(black?"true":"false")+"}");}}
 
  static bool StopUnassigned(IntPtr process){try{TerminateProcess(process,1);return WaitForSingleObject(process,4000)==0;}catch{return false;}}
- internal static int Run(string[] a,string desktop=DESK,string childArgument=null,Func<IntPtr,int,bool> observe=null,SuspendedLaunch restricted=null){string exe=Path.GetFullPath(a[1]);int seconds=600,parentPid=0;for(int i=2;i<a.Length-1;i++){if(a[i]=="--seconds")seconds=Math.Max(10,int.Parse(a[i+1]));if(a[i]=="--parent-pid")parentPid=int.Parse(a[i+1]);}
+ internal static int Run(string[] a,string desktop=DESK,string childArgument=null,Func<IntPtr,int,bool> observe=null,SuspendedLaunch restricted=null,bool readerOnly=false){string exe=Path.GetFullPath(a[1]);int seconds=600,parentPid=0;for(int i=2;i<a.Length-1;i++){if(a[i]=="--seconds")seconds=Math.Max(10,int.Parse(a[i+1]));if(a[i]=="--parent-pid")parentPid=int.Parse(a[i+1]);}
   requireObservedAudio=restricted!=null;
   using(var owner=Process.GetCurrentProcess())Emit("{\"type\":\"owner\",\"pid\":"+owner.Id+",\"started\":"+Q(owner.StartTime.ToUniversalTime().Ticks.ToString())+"}");
   ImageName=Path.GetFileNameWithoutExtension(exe);
@@ -188,7 +192,7 @@ static class ColdDesk{
   WatchParent(parentPid);ResumeThread(pi.hThread);CloseHandle(pi.hThread);pi.hThread=IntPtr.Zero;StartedAt=DateTime.UtcNow;
   string started="";try{started=Process.GetProcessById(pi.dwProcessId).StartTime.ToUniversalTime().Ticks.ToString();}catch{}
   Emit("{\"type\":\"started\",\"pid\":"+pi.dwProcessId+",\"started\":"+Q(started)+"}");
-  var cmds=new Queue<string>();var reader=new Thread(()=>{string l;try{while((l=Console.In.ReadLine())!=null){if(l.Trim()=="kill" || (observe!=null && l.Trim()=="{\"type\":\"stop\"}")){RequestStop();return;}if(observe==null)lock(cmds)cmds.Enqueue(l);}}catch{}RequestStop();});reader.IsBackground=true;reader.Start();
+  var cmds=new Queue<string>();var reader=new Thread(()=>{string l;try{while((l=Console.In.ReadLine())!=null){if(l.Trim()=="kill" || (observe!=null && l.Trim()=="{\"type\":\"stop\"}")){RequestStop();return;}if(observe==null || (restricted!=null && (l.StartsWith("key ") || l.StartsWith("click "))))lock(cmds)cmds.Enqueue(l);}}catch{}RequestStop();});reader.IsBackground=true;reader.Start();
   uint baseInput=0;{var li=new LASTINPUTINFO();li.cbSize=(uint)Marshal.SizeOf(li);GetLastInputInfo(ref li);baseInput=li.dwTime;}
   int lastW=0,lastH=0;IntPtr lastHwnd=IntPtr.Zero;DateTime lastMute=DateTime.MinValue,lastPower=DateTime.MinValue;bool everAlive=false;DateTime goneAt=DateTime.MinValue;bool wasFull=Quns()>=2&&Quns()<=4;
   var end=DateTime.UtcNow.AddSeconds(seconds);
@@ -197,6 +201,7 @@ static class ColdDesk{
    /* the user is back: end now, before anything else */
    {var li=new LASTINPUTINFO();li.cbSize=(uint)Marshal.SizeOf(li);if(observe==null && GetLastInputInfo(ref li)&&li.dwTime!=baseInput){Emit("{\"type\":\"input\"}");why="input";break;}}
    string c=null;lock(cmds)if(cmds.Count>0)c=cmds.Dequeue();
+   if(c!=null && restricted!=null && RootWindow(pi.dwProcessId)==IntPtr.Zero)throw new IOException("GAME_INPUT_WINDOW_CHANGED");
    if(c!=null){var p=c.Trim().Split(new[]{' '},3);try{switch(p[0]){
      case "key":Key(Convert.ToUInt32(p[1]),true,true);break;
      case "keydown":Key(Convert.ToUInt32(p[1]),true,false);break;
@@ -216,7 +221,7 @@ static class ColdDesk{
     if((DateTime.UtcNow-goneAt).TotalSeconds>12){uint code=0;GetExitCodeProcess(pi.hProcess,out code);Emit("{\"type\":\"exited\",\"code\":"+code+"}");why="exited";break;}}
    var w=Biggest();if(w!=IntPtr.Zero){RECT r;GetClientRect(w,out r);int cw=r.R-r.L,ch=r.B-r.T;if(w!=lastHwnd||cw!=lastW||ch!=lastH){lastHwnd=w;lastW=cw;lastH=ch;GameWin=w;if(restricted!=null)ReadGameDialog(w);var t=new StringBuilder(256);GetWindowText(w,t,256);Activate();
      Emit("{\"type\":\"window\",\"hwnd\":"+Q(w.ToInt64().ToString())+",\"w\":"+cw+",\"h\":"+ch+",\"title\":"+Q(t.ToString())+"}");}}
-   if((DateTime.UtcNow-lastMute).TotalMilliseconds>700){lastMute=DateTime.UtcNow;Mute();}
+   if(!readerOnly && (DateTime.UtcNow-lastMute).TotalMilliseconds>700){lastMute=DateTime.UtcNow;Mute();}
    if((DateTime.UtcNow-lastPower).TotalSeconds>5){lastPower=DateTime.UtcNow;if(Ac()=="false")Emit("{\"type\":\"power\",\"ac\":false}");int q=Quns();bool full=q>=2&&q<=4;if(full&&!wasFull)Emit("{\"type\":\"fullscreen\",\"on\":true}");wasFull=full;}
    if(DateTime.UtcNow>end){Emit("{\"type\":\"timeout\"}");why="timeout";break;}
    Thread.Sleep(100);}

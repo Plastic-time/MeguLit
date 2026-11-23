@@ -76,3 +76,19 @@ test('reviewer CLI rejects partial, duplicate, unknown or relative signing argum
 test('DPAPI configured store inside sample/app/state is refused before the module is loaded',async t=>{const f=setup(t);for(const root of ['appRoot','sampleRoot','stateRoot']){let loads=0;const sign=Runner.reviewerSigner({store:path.join(f.policy[root],'keys'),id:'reviewer',vault:path.join(f.dir,'KeyVault.exe')},()=>{loads++;throw Error('not allowed');});await assert.rejects(sign({},f.policy),{code:'TRUSTED_REVIEW_KEY_UNAVAILABLE'});assert.equal(loads,0);}});
 
 test('actual CLI run wiring preserves missing-collector status without loading the DPAPI module',async t=>{const f=setup(t),CLI=require('../tools/cardinal-trusted-runner.cjs');f.policy.collector.capabilities=[];const request=path.join(f.dir,'request.json'),policy=path.join(f.dir,'policy.json'),review=path.join(f.policy.stateRoot,'review.json'),status=path.join(f.policy.stateRoot,'status.json');fs.writeFileSync(request,JSON.stringify(f.request));fs.writeFileSync(policy,JSON.stringify(f.policy));const modulePath=require.resolve('../services/maintainer-signing.cjs'),before=require.cache[modulePath];const result=await CLI.main(['run',request,policy,review,status,'--key-store',path.join(f.dir,'existing-store'),'--reviewer-id','reviewer','--vault',path.join(f.dir,'KeyVault.exe')]);assert.equal(result.state,'awaiting-trusted-run');assert.equal(result.reason,'TRUSTED_LIVE_COLLECTOR_UNAVAILABLE');assert.equal(result.signed,false);assert.equal(fs.existsSync(review),false);assert.equal(JSON.parse(fs.readFileSync(status)).signed,false);assert.equal(require.cache[modulePath],before);});
+
+test('measured capture checks eligibility before key use and verifies the stored signature',async t=>{
+ const f=setup(t),challenge=crypto.randomBytes(32).toString('hex');
+ const ctx=await Runner.prepare(f.request,f.policy,{resourceCheck:()=>true});
+ const {privateKey,publicKey}=crypto.generateKeyPairSync('ed25519');
+ const reporter={...f.reporters[0].public,publicKey:publicKey.export({type:'spki',format:'der'}).toString('base64')};
+ const body=report(ctx,reporter,challenge,{sign:b=>b});
+ let reads=0;const load=()=>{reads++;return privateKey;};
+ await assert.rejects(Runner.storeMeasuredCapture({...body,domAcks:[]},ctx,reporter,challenge,f.dir,load),/TRUSTED_DOM_ACK/);
+ assert.equal(reads,0);
+ await assert.rejects(Runner.storeMeasuredCapture(body,ctx,reporter,challenge,f.dir,()=>crypto.generateKeyPairSync('ed25519').privateKey),/LIVE_REPORTER_KEY/);
+ const stored=await Runner.storeMeasuredCapture(body,ctx,reporter,challenge,f.dir,load);
+ assert.deepEqual(Runner.readJSON(path.join(f.dir,'capture.json'),Runner.MAX_CAPTURE),stored);
+ assert.equal((await Runner.evaluate(stored,ctx,reporter,challenge)).lines,30);
+ await assert.rejects(Runner.evaluate({...stored,runId:crypto.randomUUID()},ctx,reporter,challenge),/ATTESTATION/);
+});
