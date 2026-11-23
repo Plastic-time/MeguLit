@@ -422,4 +422,4 @@ class Synopses{
   return out;
  }
 }
-module.exports={_moegirlText:moegirlText,searchNames,machine,restoreTool,Library,Synopses,engineOf,findGame,steamGames,steamAppidFor,folderGames,findSteam,registryString,findVariants,steamParts,isTranslated,playableGame};
+module.exports={_moegirlText:moegirlText,norm,searchNames,machine,restoreTool,Library,Synopses,engineOf,findGame,steamGames,steamAppidFor,folderGames,findSteam,registryString,findVariants,steamParts,isTranslated,playableGame};

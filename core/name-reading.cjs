@@ -71,6 +71,9 @@ function nameParts(surface,reading,names){
  }
  return null;
 }
+/* A reading without the long vowels romaji without macrons drops: ou → o, uu → u, ei → e (えいぞう → えぞ, ゆうま → ゆま).
+   Nothing wider: 青海 あおうみ and おうみ must stay different. */
+function withoutLong(s){return String(s||'').replace(/([おこそとのほもよろごぞどぼぽょうくすつぬふむゆるぐずづぶぷゅ])う/g,'$1').replace(/([えけせてねへめれげぜでべぺ])い/g,'$1');}
 const NAME=['名詞','固有名詞','人名','一般'];
 const TITLES=new Set(['様','君','殿','氏','嬢','先輩','先生','姉','兄','姉さん','兄さん','姉ちゃん','兄ちゃん','本人','自身','達','家','一人','姫','ちゃん','さん','くん']);
 /* Tokens that spell a known name (one token, or pieces the tokenizer cut 昂｜晴) read as the name. Tokens that keep their
@@ -89,6 +92,9 @@ function nameTokens(tokens,names){
    const next=tokens[j+1],touching=next&&(!Number.isInteger(next.start)||next.start===part.at(-1).end),word=next?.surface||'';
    if([...surface].length===1&&touching&&!TITLES.has(word)&&(/^\p{Script=Han}/u.test(word)||/^\p{Script=Katakana}/u.test(word)&&['接頭辞','接尾辞'].includes((part[0].grammar||[])[0])))continue;
    hit={part,surface,reading,stop:j};
+   // VNDB romaji often drops long vowels (戸崎 瑛三 Tosaki Eizo, as the official site's thumb_eizo.jpg): when the tokenizer
+   // reads the same sounds with the long vowel written out (えいぞう), its spelling is kept.
+   const said=kana(part.map(t=>t.reading||'').join(''));if(said.length>reading.length&&withoutLong(said)===withoutLong(reading))hit.reading=said;
   }
   if(!hit){out.push(tokens[i]);continue;}
   const first=hit.part[0],last=hit.part.at(-1),same=hit.part.length===1,parts=nameParts(hit.surface,hit.reading,names);
@@ -99,9 +105,38 @@ function nameTokens(tokens,names){
  return out;
 }
 
-const WEEK=7*24*3600e3;
+const WEEK=7*24*3600e3,DAY=24*3600e3;
+/* A library game without a VNDB id (added by hand: The Song of Saya, 去人たち) is looked up by its titles, and only a VNDB
+   title that is the same after normalizing counts (vndbTitle). The answer is kept in titles.json: a found id
+   for a week, "not on VNDB" for a day, nothing when VNDB was unreachable. */
+/* VNDB search for one title. A VNDB title or alias counts when it, or one part of it around ~ or : (Saya no Uta ~ The Song
+   of Saya), is the same title after normalizing; undefined when VNDB could not be asked. */
+async function vndbTitle(title,fetcher=fetch){
+ const {norm}=require('./library.cjs'),want=norm(title);if(!want)return null;
+ try{
+  const r=await fetcher('https://api.vndb.org/kana/vn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filters:['search','=',title],fields:'title,alttitle,titles.title,aliases',sort:'searchrank',results:20}),signal:AbortSignal.timeout(9000)});
+  if(!r.ok)return undefined;
+  for(const vn of (await r.json()).results||[]){
+   const names=[vn.title,vn.alttitle,...(vn.titles||[]).map(t=>t?.title),...(vn.aliases||[])].filter(n=>typeof n==='string');
+   if(names.some(n=>[n,...n.split(/\s*[~～〜:：]\s*/u)].some(p=>norm(p)===want)))return {id:vn.id};
+  }
+  return null;
+ }catch{return undefined;}
+}
+async function vnForTitles(titles,{folder,find,now}){
+ const file=folder?path.join(folder,'titles.json'):'';let known={};try{if(file)known=JSON.parse(fs.readFileSync(file,'utf8'))||{};}catch{}
+ const search=find||vndbTitle;let found='',changed=false;
+ for(const title of [...new Set((titles||[]).map(t=>String(t||'').trim()).filter(Boolean))]){
+  const seen=known[title];if(seen&&now-seen.at<(seen.id?WEEK:DAY)){if(seen.id){found=seen.id;break;}continue;}
+  const vn=await search(title);if(vn===undefined)continue;
+  known[title]={id:vn?.id||null,at:now};changed=true;if(vn?.id){found=vn.id;break;}
+ }
+ if(file&&changed){fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(known));fs.renameSync(file+'.tmp',file);}
+ return found;
+}
 /* The game's names from VNDB, kept in cache/vndb-names/<id>.json for a week and used as they are when VNDB is unreachable. */
-async function gameNames(vndbId,{folder,fetcher=fetch,lookup,now=Date.now()}={}){
+async function gameNames(vndbId,{folder,fetcher=fetch,lookup,now=Date.now(),titles,find}={}){
+ if(!vndbId&&titles?.length)vndbId=await vnForTitles(titles,{folder,find,now});
  const id=/^v?(\d+)$/i.exec(String(vndbId||''))?.[1];if(!id)return new Map();
  const file=folder?path.join(folder,'v'+id+'.json'):'';let cached=null;
  try{if(file)cached=JSON.parse(fs.readFileSync(file,'utf8'));}catch{}
@@ -118,4 +153,4 @@ async function gameNames(vndbId,{folder,fetcher=fetch,lookup,now=Date.now()}={})
  }catch{return new Map(characterNames(cached?.characters||[],lookup));}
 }
 
-module.exports={romajiKana,characterNames,nameTokens,gameNames};
+module.exports={romajiKana,characterNames,nameTokens,gameNames,vndbTitle};

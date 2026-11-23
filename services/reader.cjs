@@ -162,11 +162,12 @@ class Reader{
   this.gal?.hooks?.trace?.('game font confirmed ('+reason+'): '+JSON.stringify(values?.japaneseFont||''));return values;}
  /* Furigana and the speech button read the game's character names as VNDB lists them (昂晴 こうせい, not のぼるはる). */
  bindNames(game){
-  let vndbId='';try{vndbId=JSON.parse(game?.original||'{}').library?.vndbId||'';}catch{}
+  // A game without a VNDB id is found on VNDB by its titles (name-reading.cjs vnForTitles).
+  let vndbId='',titles=[];try{const lib=JSON.parse(game?.original||'{}').library||{};vndbId=lib.vndbId||'';titles=[game?.title,...(Array.isArray(lib.names)?lib.names:[])];}catch{}
   // Names are an extra: no learning module, or any failure here, never stops binding the game.
   let learning;try{learning=this.runtime.learning?.();}catch{}if(typeof learning?.useNames!=='function')return;
-  const gameId=game?.id||null;learning.useNames(null);if(!vndbId)return;
-  require('../core/name-reading.cjs').gameNames(vndbId,{folder:path.join(this.root,'cache','vndb-names'),lookup:s=>learning.readings.lookup(s)})
+  const gameId=game?.id||null;learning.useNames(null);if(!vndbId&&!titles.some(Boolean))return;
+  require('../core/name-reading.cjs').gameNames(vndbId,{titles,folder:path.join(this.root,'cache','vndb-names'),lookup:s=>learning.readings.lookup(s)})
    .then(names=>{if(this.gameId===gameId)learning.useNames(names);}).catch(()=>{});
  }
  /* fonts the font probe saved for this game (cache/font-probe/<FNV-1a of the lower-case game folder>/mem-*.ttf) */

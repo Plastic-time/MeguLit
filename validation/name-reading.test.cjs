@@ -3,7 +3,7 @@
 // (Cafe Stella: 昂晴 のぼるはれ, 明月 あかつき, 希 まれ); VNDB lists 高嶺 昂晴 as Takamine Kousei. The VNDB rows below are
 // copied from api.vndb.org/kana/character for v26414 and v751 on 2026-11-23.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-const {romajiKana,characterNames,nameTokens,gameNames}=require('../core/name-reading.cjs');
+const {romajiKana,characterNames,nameTokens,gameNames,vndbTitle}=require('../core/name-reading.cjs');
 const {LocalLearning}=require('../core/learning-native.cjs');
 
 const tok=(surface,reading,grammar,start,end)=>({surface,reading,grammar:grammar.split(','),pos:grammar.split(',')[0],base_form:surface,start,end,pitch:[1]});
@@ -80,7 +80,9 @@ test('furigana, lookup and the speech button read the bound game’s names, and 
  L.useNames(null);assert.equal((await L.tokenize('昂晴君'))[0].reading,'ノボル');
  const reader=fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8');
  assert.match(reader,/this\.gameId=game\?\.id\|\|null;this\.bindNames\(game\);/);
- assert.match(reader,/gameNames\(vndbId,\{folder:path\.join\(this\.root,'cache','vndb-names'\)/);
+ assert.match(reader,/gameNames\(vndbId,\{titles,folder:path\.join\(this\.root,'cache','vndb-names'\)/);
+ assert.match(reader,/titles=\[game\?\.title,\.\.\.\(Array\.isArray\(lib\.names\)\?lib\.names:\[\]\)\]/,'a game without a VNDB id is looked up by its titles');
+ assert.match(reader,/if\(!vndbId&&!titles\.some\(Boolean\)\)return;/,'and is not skipped for having no id');
  assert.equal(reader.match(/this\.gameId=null;this\.runtime\.localLearning\?\.useNames\(null\);/g)?.length,2,'game change and game exit');
  assert.match(reader,/readings\.resolve\(this\.runtime\.learning\(\)\.withNames\(r\.result\)\)/,'the UniDic engine path too');
 });
@@ -101,4 +103,37 @@ test('the speech button says a full name as its family and given name',async()=>
  const word={surface:'高嶺昂晴',reading:'たかみねこうせい',pitch:[],ambiguous:false,parts:[{surface:'高嶺',reading:'たかみね'},{surface:'昂晴',reading:'こうせい'}]};
  await new Speech(folder,engine).synthesize(word,{aivisUrl:'http://127.0.0.1:10101',aivisSpeaker:0});
  assert.deepEqual(synthesized.accent_phrases.map(p=>p.moras.map(m=>m.text).join('')),['タカミネ','コウセイ']);
+});
+
+test('VNDB romaji without long vowels keeps the tokenizer’s long vowel, and nothing wider',()=>{
+ // 戸崎 瑛三 is Tosaki Eizo on VNDB and thumb_eizo.jpg on the official site; 高畠 青海 is おうみ (VNDB and Wikipedia).
+ const names=new Map([['瑛三','えいぞ'],['青海','おうみ'],['祐磨','ゆうま']]);
+ const read=t=>nameTokens([t],names)[0].reading;
+ assert.equal(read(tok('瑛三','エイゾウ',NOUN,0,2)),'えいぞう');
+ assert.equal(read(tok('青海','アオウミ',NOUN,0,2)),'おうみ');
+ assert.equal(read(tok('祐磨','ユマ',NOUN,0,2)),'ゆうま','a shorter tokenizer reading never wins');
+});
+
+test('a game without a VNDB id is found by a title that matches a VNDB title or one part of it',async()=>{
+ const results=[{id:'v97',title:'Saya no Uta',alttitle:'沙耶の唄',titles:[{title:'Saya no Uta ~ The Song of Saya'}],aliases:["Saya's Song"]},
+  {id:'v751',title:'Rewrite',alttitle:null,titles:[{title:'Rewrite'}],aliases:[]}];
+ const asked=[];const fetcher=async(url,o)=>{asked.push(JSON.parse(o.body).filters[2]);return {ok:true,json:async()=>({results})};};
+ assert.deepEqual(await vndbTitle('The Song of Saya',fetcher),{id:'v97'});
+ assert.deepEqual(await vndbTitle('沙耶の唄',fetcher),{id:'v97'});
+ assert.equal(await vndbTitle('Rewrite+',fetcher),null,'a near title is not the game');
+ assert.equal(await vndbTitle('Saya',fetcher),null);
+ assert.equal(await vndbTitle('x',async()=>{throw Error('offline');}),undefined);
+
+ const folder=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-titles-'));test.after(()=>fs.rmSync(folder,{recursive:true,force:true}));
+ const searched=[];let answer={'去人たち':{id:'v19216'},'Unknown':null};
+ const find=async t=>{searched.push(t);return answer[t];};
+ const characters=async()=>({ok:true,json:async()=>({results:[{name:'Tosaki Kana',original:'戸崎 鹿南'}],more:false})});
+ assert.equal((await gameNames('',{titles:['去人たち'],folder,find,fetcher:characters,now:1000})).get('鹿南'),'かな');
+ assert.equal((await gameNames('',{titles:['Unknown'],folder,find,fetcher:characters,now:1000})).size,0);
+ answer={};// VNDB unreachable now: the found id is kept a week, "not on VNDB" a day
+ await gameNames('',{titles:['去人たち','Unknown'],folder,find,fetcher:characters,now:1000+3600e3});
+ assert.deepEqual(searched,['去人たち','Unknown']);
+ answer={'Unknown':undefined};await gameNames('',{titles:['Unknown'],folder,find,fetcher:characters,now:1000+2*86400e3});
+ await gameNames('',{titles:['Unknown'],folder,find,fetcher:characters,now:1000+2*86400e3});
+ assert.deepEqual(searched,['去人たち','Unknown','Unknown','Unknown'],'an unreachable VNDB is asked again next time');
 });
