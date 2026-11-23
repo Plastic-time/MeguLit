@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
-const scriptFile=s=>typeof s==='string'&&s.length>0&&s.length<=200&&!/[\\:\x00-\x1f]/.test(s)&&s.split('/').length<=4&&s.split('/').every(p=>p&&p!=='.'&&p!=='..'&&!/[. ]$/.test(p))&&/\.(xp3|pck|arc|dat|int|rpa|rpyc|ks|scr|nsa|bin|ykc|pack|mes|txt)$/i.test(s);
+const scriptFile=s=>typeof s==='string'&&s.length>0&&s.length<=200&&!/[\\:\x00-\x1f]/.test(s)&&s.split('/').length<=4&&s.split('/').every(p=>p&&p!=='.'&&p!=='..'&&!/[. ]$/.test(p))&&/\.(xp3|pck|arc|dat|int|rpa|rpyc|ks|scr|spt|nsa|bin|ykc|pack|mes|txt)$/i.test(s);
 const hash = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const only = (v, keys) => object(v) && Object.keys(v).every(k => keys.includes(k));
