@@ -221,67 +221,43 @@ test('a size saved under the rule stays when Settings moves to it and on',t=>{
  assert.equal(launch().japaneseSize,24);
 });
 
-test('an old preset changed after saving a work leaves ambiguous sizes in history and follows the preset',t=>{
- for(const changes of [{textColor:'#ffeeaa'},{japaneseSize:34,textColor:'#ffeeaa'}])for(const resave of ['Alt+T','work settings','global settings']){
-  const {settings,launch,stored}=fixture(t),preset=path.join(settings.folder,'text-defaults.json');
-  const at=Date.now()-60000;
-  fs.writeFileSync(preset,JSON.stringify({japaneseSize:24,sizeSource:'user',spacingDefaults:1}));
-  fs.utimesSync(preset,new Date(at-1000),new Date(at-1000));
-  const old=oldAltT(settings,changes,at);
-  fs.writeFileSync(preset,JSON.stringify({japaneseSize:22,sizeSource:'user',spacingDefaults:1}));
-  fs.utimesSync(preset,new Date(at+1000),new Date(at+1000));
-  assert.equal(launch().japaneseSize,22);
-  assert.equal(settings.get(key).values.text.japaneseSize,22);
-  if(resave==='Alt+T'){const sync=new GameStyleSync({config:settings.folder},()=>{});sync.profileKey=key;
-   assert.equal(sync.saveProfile({...sync.effective(sync.profiles[key]),textColor:'#eeeeee'},'text'),true);}
-  if(resave==='work settings')settings.save({scope:'text',profile:key,values:{...settings.get(key).values.text,textColor:'#eeeeee'}});
-  if(resave==='global settings')settings.save({scope:'text',values:{textColor:'#eeeeee'}});
-  assert.equal(Object.hasOwn(stored().prefs,'japaneseSize'),false);
-  assert.equal(stored().history.find(e=>e.savedAt===at).prefs.japaneseSize,old.japaneseSize);
-  assert.equal(stored().prefs.textColor,resave==='global settings'?'#ffeeaa':'#eeeeee');
-  settings.save({scope:'text',values:{japaneseSize:20}});
-  assert.equal(launch().japaneseSize,20);
- }
-});
-
-test('spacing migration and a new colour-only preset edit do not make a known old override ambiguous',t=>{
- const {settings,launch,stored}=fixture(t),preset=path.join(settings.folder,'text-defaults.json');
+test('indistinguishable old saves keep their sizes until the running work is told to follow Settings',t=>{
+ const captures=[];
+ const scenarios=[{global:24,changes:{textColor:'#ffeeaa'}},{global:22,changes:{textColor:'#ffeeaa',japaneseSize:24}}];
  const at=Date.now()-60000;
- fs.writeFileSync(preset,JSON.stringify({japaneseSize:24,sizeSource:'user',gap:6}));
- fs.utimesSync(preset,new Date(at-1000),new Date(at-1000));
- oldAltT(settings,{japaneseSize:34},at);
- assert.equal(launch().japaneseSize,34);
- assert.equal(Math.trunc(fs.statSync(preset).mtimeMs),at-1000);
- settings.save({scope:'text',values:{textColor:'#ffeeaa'}});
- assert.equal(launch().japaneseSize,34);
- assert.equal(stored().sizes,1);
- assert.equal(stored().prefs.japaneseSize,34);
+ for(const scenario of scenarios){
+  const {settings,launch,stored}=fixture(t),preset=path.join(settings.folder,'text-defaults.json');
+  fs.writeFileSync(preset,JSON.stringify({japaneseSize:scenario.global,sizeSource:'user',textColor:'#ffffff'}));
+  fs.utimesSync(preset,new Date(at-1000),new Date(at-1000));
+  oldAltT(settings,scenario.changes,at);
+  fs.writeFileSync(preset,JSON.stringify({japaneseSize:22,sizeSource:'user',textColor:'#dddddd'}));
+  fs.utimesSync(preset,new Date(at+1000),new Date(at+1000));
+  captures.push({work:stored(),preset:fs.readFileSync(preset,'utf8'),mtime:Math.trunc(fs.statSync(preset).mtimeMs)});
+  assert.equal(launch().japaneseSize,24);
+  assert.equal(settings.get(key).values.text.japaneseSize,24);
+  const {Runtime}=require('../services/runtime.cjs'),runtime=new Runtime(settings.root);
+  const g={styleSync:{profileKey:key,reloadProfiles(){}},preferences:{},preview(){},setGameAudio(){}};
+  runtime.reader={gal:g,prefs:()=>({})};
+  const sizesBefore=settings.read('text'),values={japaneseSize:21};
+  settings.save({scope:'text',values});runtime.settingsSaved({scope:'text',values,sizesBefore});
+  assert.equal(g.preferences.japaneseSize,21);
+  assert.equal('japaneseSize' in stored().prefs,false);
+  assert.equal(stored().prefs.textColor,'#ffeeaa');
+  settings.save({scope:'text',values:{japaneseSize:22}});
+  assert.equal(launch().japaneseSize,22);
+ }
+ assert.deepEqual(captures[0],captures[1]);
 });
 
-test('a running work uses the same migrated size when a position change refreshes it',t=>{
- const {settings,launch}=fixture(t),preset=path.join(settings.folder,'text-defaults.json'),at=Date.now()-60000;
- fs.writeFileSync(preset,JSON.stringify({japaneseSize:24,sizeSource:'user'}));
- oldAltT(settings,{textColor:'#ffeeaa'},at);
- fs.writeFileSync(preset,JSON.stringify({japaneseSize:22,sizeSource:'user'}));
- fs.utimesSync(preset,new Date(at+1000),new Date(at+1000));
+test('a position change refreshes the running work with its startup size',t=>{
+ const {settings,launch}=fixture(t,{prefs:{x:10},sizes:1});
+ fs.writeFileSync(path.join(settings.folder,'gal-preferences.json'),JSON.stringify({japaneseSize:28.5,layoutVersion:22}));
  const {Runtime}=require('../services/runtime.cjs'),runtime=new Runtime(settings.root);
  const g={styleSync:{profileKey:key,reloadProfiles(){}},preferences:{},preview(){},setGameAudio(){}};
  runtime.reader={gal:g,prefs:()=>({})};
  const values={x:24};settings.save({scope:'position',values});runtime.settingsSaved({scope:'position',values});
  assert.equal(g.preferences.japaneseSize,launch().japaneseSize);
- assert.equal(g.preferences.japaneseSize,22);
-});
-
-test('reset and undo restore the preset timestamp used to distinguish an old override',t=>{
- const {settings,launch}=fixture(t),preset=path.join(settings.folder,'text-defaults.json'),at=Date.now()-60000;
- fs.writeFileSync(preset,JSON.stringify({japaneseSize:22,sizeSource:'user',spacingDefaults:1}));
- fs.utimesSync(preset,new Date(at-1000),new Date(at-1000));
- oldAltT(settings,{japaneseSize:34},at);
- assert.equal(launch().japaneseSize,34);
- const reset=require('../services/settings-reset.cjs'),{id}=reset.reset(settings.root);
- reset.undo(settings.root,id);
- assert.equal(Math.trunc(fs.statSync(preset).mtimeMs),at-1000);
- assert.equal(launch().japaneseSize,34);
+ assert.equal(g.preferences.japaneseSize,34);
 });
 
 test('a legacy override without a save timestamp is not removed based on the preset timestamp',t=>{
@@ -305,4 +281,14 @@ test('legacy cloud overrides with unknown provenance do not depend on either rec
   assert.equal(launch().japaneseSize,34);
   assert.equal(stored().sizes,1);
  }
+});
+
+test('an old colour-only preset edit before upgrade never clears a manual work size',t=>{
+ const {settings,launch}=fixture(t),preset=path.join(settings.folder,'text-defaults.json'),at=Date.now()-60000;
+ fs.writeFileSync(preset,JSON.stringify({japaneseSize:24,sizeSource:'user',textColor:'#ffffff'}));
+ oldAltT(settings,{japaneseSize:34},at);
+ fs.writeFileSync(preset,JSON.stringify({japaneseSize:24,sizeSource:'user',textColor:'#ffeeaa'}));
+ fs.utimesSync(preset,new Date(at+1000),new Date(at+1000));
+ assert.equal(launch().japaneseSize,34);
+ assert.equal(settings.get(key).values.text.japaneseSize,34);
 });
