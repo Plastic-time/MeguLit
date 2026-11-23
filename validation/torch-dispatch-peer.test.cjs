@@ -7,7 +7,7 @@ if(typeof vm.SourceTextModule!=='function'){
  test('shared receiver wiring executes all fourteen cases in an owned bounded VM child',()=>{
   assert.notEqual(process.env.MEGULIT_TORCH_PEER_VM_CHILD,'1','VM_CHILD_UNAVAILABLE');
   const env={...process.env,MEGULIT_PEER_SOURCE_ROOT:sourceRoot,MEGULIT_TORCH_PEER_VM_CHILD:'1'};delete env.NODE_TEST_CONTEXT;
-  const child=require('node:child_process').spawnSync(process.execPath,['--max-old-space-size=128','--experimental-vm-modules','--test-timeout=4000','--test',__filename],{env,windowsHide:true,timeout:5000,maxBuffer:1024*1024,encoding:'utf8'});
+  const child=require('node:child_process').spawnSync(process.execPath,['--max-old-space-size=128','--experimental-vm-modules','--test-timeout=4000','--test-reporter=tap','--test',__filename],{env,windowsHide:true,timeout:5000,maxBuffer:1024*1024,encoding:'utf8'});
   assert.ifError(child.error);assert.equal(child.signal,null);assert.equal(child.status,0,child.stdout+'\n'+child.stderr);
   for(const line of ['tests 14','pass 14','fail 0','cancelled 0','skipped 0','todo 0'])assert.match(child.stdout,new RegExp('^# '+line+'\\r?$','m'));
   assert.match(child.stdout,/PEER_SOURCE_SHA256/);console.log(child.stdout);
