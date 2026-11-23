@@ -6,6 +6,8 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),http=require('node:http');
 const {startEdge}=require('./library-views-perf.cjs');
 const ROOT=path.join(__dirname,'..'),WEB=path.join(ROOT,'web'),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const waitFor=async(cdp,expr,ms=5000)=>{const end=Date.now()+ms;while(Date.now()<end){const v=await cdp.evaluate(expr).catch(()=>false);if(v)return v;await sleep(25);}return false;};
+const nextFrame=cdp=>cdp.evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
 const hasEdge=[process.env.MEGULIT_EDGE,'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe','C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'].some(p=>p&&fs.existsSync(p));
 const STUB=`<script>window.__sent=[];window.__TAURI_INTERNALS__={transformCallback:()=>1,invoke:async(cmd,args)=>{const r=args&&args.request||{};
  if(cmd==='service'){if(r.action==='home')return {preferences:{language:'zh',themeMode:'dark'},games:[]};if(r.action==='ui_state')return {};
@@ -71,31 +73,32 @@ test('lookup drags on the first press and routes wheel input at its new position
  try{
   server=await serve();cdp=await startEdge(path.join(temp,'edge'));
   await cdp.send('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/reader/index.html'});
-  for(let i=0;i<120&&!await cdp.evaluate('!!window.__TOME_READER_READY__').catch(()=>false);i++)await sleep(100);
+  assert.ok(await waitFor(cdp,'!!window.__TOME_READER_READY__',12000),'reader page loaded');
   await cdp.evaluate("(()=>{window.__tomoyoMode.set('translation');document.body.classList.add('tomoyo-gal-bound');window.__tomoyoChinese.localLookup=async()=>({entries:[]});window.__tomoyoChinese.openLocalSelection({text:'台詞です',start:0,end:2},{left:innerWidth/2,right:innerWidth/2+30,top:innerHeight*.72,bottom:innerHeight*.72+20,width:30,height:20});return true})()");
-  await sleep(280);
+  assert.ok(await waitFor(cdp,"!!document.querySelector('.tomoyo-selection-card .tomoyo-selection-body')&&!!document.querySelector('.tomoyo-selection-card>header')"),'selection card rendered');
   await cdp.evaluate("(()=>{const p=document.querySelector('.tomoyo-selection-card'),spacer=document.createElement('div');p.style.height='180px';p.querySelector('header').style.setProperty('padding-top','24px','important');spacer.style.height='1000px';p.querySelector('.tomoyo-selection-body').append(spacer);})()");
-  await sleep(90);
+  await nextFrame(cdp);
   await cdp.evaluate("(()=>{const p=document.querySelector('.tomoyo-selection-card');p.style.top='';p.style.bottom='180px';})()");
+  await nextFrame(cdp);
   const bounds="(()=>{const p=document.querySelector('.tomoyo-selection-card'),r=p.getBoundingClientRect();return [Math.round(r.left),Math.round(r.top)]})()";
   const start=await cdp.evaluate(bounds),[x,y]=await cdp.evaluate("(()=>{const r=document.querySelector('.tomoyo-selection-card>header').getBoundingClientRect();return [Math.round(r.left+r.width/3),Math.round(r.top+8)]})()");
   assert.ok(await cdp.evaluate("parseFloat(document.querySelector('.tomoyo-selection-card').style.bottom)>0"),'fixture starts anchored by its bottom');
   const mouse=(type,x,y,buttons)=>cdp.send('Input.dispatchMouseEvent',{type,x,y,button:type==='mouseMoved'?'none':'left',buttons,clickCount:1});
   const native=(phase,x,y)=>cdp.evaluate(`window.__megulitLookupDrag(${JSON.stringify(phase)},${x},${y})`);
-  const grip=await cdp.evaluate("window.__sent.findLast(m=>m.type==='galHitRegions'&&m.lookupGrip)?.lookupGrip");
-  assert.ok(grip.area.width>0&&grip.controls.length>0,'report the visible grip and its interactive controls to Windows');
+  const grip=await waitFor(cdp,"window.__sent.findLast(m=>m.type==='galHitRegions'&&m.lookupGrip)?.lookupGrip");
+  assert.ok(grip&&grip.area.width>0&&grip.controls.length>0,'report the visible grip and its interactive controls to Windows');
   await native('start',x,y);
   assert.deepEqual(await cdp.evaluate(bounds),start,'pressing the header must not clear the card position');
   await cdp.evaluate("(()=>{const extra=document.createElement('div');extra.style.height='38px';document.querySelector('.tomoyo-selection-body').append(extra);})()");
-  await sleep(42);
+  await nextFrame(cdp);
   assert.deepEqual(await cdp.evaluate(bounds),start,'a dictionary update during the press must not re-anchor the card');
   const reports=()=>cdp.evaluate("window.__sent.filter(m=>m.type==='galHitRegions'&&m.lookupDrag).length");
-  const beforeMove=await reports();
+  const beforeMove=await waitFor(cdp,"window.__sent.filter(m=>m.type==='galHitRegions'&&m.lookupDrag).length");
   assert.ok(beforeMove>0,'expand the paint region on press');
   await mouse('mouseMoved',x+120,y+43,0);
   await cdp.evaluate("dispatchEvent(new PointerEvent('lostpointercapture',{pointerId:1,buttons:0}));dispatchEvent(new PointerEvent('pointercancel',{pointerId:1,buttons:0}));");
   await native('move',x+120,y+43);
-  await sleep(40);
+  await nextFrame(cdp);
   const moved=await cdp.evaluate(bounds);
   assert.deepEqual(moved,[start[0]+120,start[1]+43],'follow the first drag before any native acknowledgement');
   assert.equal(await reports(),beforeMove,'moving does not rebuild the window region');
@@ -108,8 +111,7 @@ test('lookup drags on the first press and routes wheel input at its new position
    return {targets:window.__sent.filter(m=>m.type==='galWheelDecision').map(m=>m.panel),inside:[r.right-36,r.top+60]};})()`);
   assert.deepEqual(wheel.targets,[true,true,false],'the current card edge and body own the wheel, its old position is outside');
   await cdp.send('Input.dispatchMouseEvent',{type:'mouseWheel',x:wheel.inside[0],y:wheel.inside[1],deltaX:0,deltaY:120});
-  await sleep(180);
-  assert.ok(await cdp.evaluate("document.querySelector('.tomoyo-selection-card').scrollTop")>0);
+  assert.ok(await waitFor(cdp,"document.querySelector('.tomoyo-selection-card').scrollTop>0"),'wheel scrolled the card');
   await cdp.evaluate("document.querySelector('.tomoyo-selection-card').scrollTop=0");
   await mouse('mouseMoved',x+220,y+110,0);
   assert.deepEqual(await cdp.evaluate(bounds),moved);
@@ -117,7 +119,7 @@ test('lookup drags on the first press and routes wheel input at its new position
   await mouse('mousePressed',x+120,y+43,1);
   await mouse('mouseReleased',x+147,y+59,0);
   await mouse('mouseMoved',x+250,y+150,0);
-  await sleep(100);
+  await nextFrame(cdp);
   assert.deepEqual(await cdp.evaluate(bounds),[moved[0]+27,moved[1]+16],'a fast release commits the final pointer coordinates even if no move was relayed');
  }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });
