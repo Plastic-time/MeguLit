@@ -76,3 +76,15 @@ test('restore tool is wired: list, detect, import, undo and the launch message',
   assert.match(app, /restoreApi\('jp_import_apply',\{id,source,\.\.\.\(p\.archive\?\{archiveToken:p\.archiveToken\}:\{\}\)\}\)/);
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'web', 'launch-feedback.js'), 'utf8'), /纯汉化包/);
 });
+
+test('single-program import refuses to write an English sibling as the Japanese executable', t => {
+  const g = muramasa();
+  t.after(() => fs.rmSync(g.root, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(g.zh, 'Muramasa_jp.exe'), 'Japanese launcher');
+  const source = path.join(g.ja, 'Muramasa_en.exe');
+  fs.writeFileSync(source, big('en'));
+  assert.throws(() => ji.preview(g.zh, g.chs, source), /IMPORT_SOURCE_NOT_JAPANESE/);
+  assert.throws(() => ji.apply(g.zh, g.chs, source), /IMPORT_SOURCE_NOT_JAPANESE/);
+  assert.strictEqual(fs.readFileSync(path.join(g.zh, 'nss.npa'), 'utf8'), 'chinese script');
+  assert.ok(!fs.existsSync(path.join(g.zh, ji.BACKUP_DIR)));
+});

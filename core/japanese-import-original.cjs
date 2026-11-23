@@ -7,7 +7,7 @@
 // 汉化) are moved aside, and files only the Japanese release has are added. preview() lists all of it before anything
 // is written; apply() moves the replaced files into the backup folder; restore() puts every one back.
 const fs=require('node:fs'),fsp=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto'),{spawn}=require('node:child_process');
-const {languageHint,isLauncher}=require('./launcher-language.cjs');
+const {languageHint,launcherLanguage,isLauncher,localLaunchers,preferJapaneseLauncher}=require('./launcher-language.cjs');
 
 const BACKUP_DIR='.megulit-japanese-import',STAGING_DIR='.megulit-japanese-staging',ADAPTER='original-files';
 const npa=()=>require('./japanese-import-npa.cjs');
@@ -94,8 +94,10 @@ async function discUnpack(gameDir,image){
    game program becomes this game's Japanese program. */
 function separateLauncher(base){
  const found=[];const scan=(dir,depth)=>{let list;try{list=fs.readdirSync(dir,{withFileTypes:true});}catch{return;}
-  for(const e of list){const f=path.join(dir,e.name);if(e.isFile()&&/\.exe$/i.test(e.name)&&isLauncher(e.name)&&languageHint(e.name)!=='zh'&&(stat(f)?.size||0)>=20000)found.push(f);else if(e.isDirectory()&&depth>0&&!SKIP_DIR.test(e.name)&&!/(?:bak|backup|patch|补丁|備份|备份)/i.test(e.name))scan(f,depth-1);}};
- scan(base,3);found.sort((a,b)=>a.split(path.sep).length-b.split(path.sep).length||(stat(b)?.size||0)-(stat(a)?.size||0));return found[0]||'';}
+  for(const e of list){const f=path.join(dir,e.name);if(e.isFile()&&isLauncher(e.name))found.push(f);else if(e.isDirectory()&&depth>0&&!SKIP_DIR.test(e.name)&&!/(?:bak|backup|patch|补丁|備份|备份)/i.test(e.name))scan(f,depth-1);}};
+ scan(base,3);
+ const launchers=found.filter(f=>(stat(f)?.size||0)>=20000).sort((a,b)=>a.split(path.sep).length-b.split(path.sep).length||(stat(b)?.size||0)-(stat(a)?.size||0));
+ return preferJapaneseLauncher(launchers,found);}
 function freeFolder(dir){let out=dir,n=2;while(fs.existsSync(out))out=dir+' ('+(n++)+')';return out;}
 function separatePlan(gameDir,source,info){
  const exe=separateLauncher(info.base);
@@ -103,9 +105,10 @@ function separatePlan(gameDir,source,info){
  /* E348: an InstallShield setup (data1.hdr + dataN.cab) is unpacked directly into a folder next to the archive or image;
     the setup program never runs. Anything else that only installs (msi, other setups) still becomes a mountable .iso. */
  if(!exe){const hdr=require('./installshield.cjs').findHeader(info.base);if(hdr){let files=[];try{files=require('./installshield.cjs').gameFiles(hdr);}catch{}
-  const launcher=files.filter(f=>/\.exe$/i.test(f.name)&&isLauncher(f.name)&&languageHint(f.name)!=='zh').sort((a,b)=>b.size-a.size)[0];
+  const launcher=preferJapaneseLauncher(files.filter(f=>isLauncher(f.name)).sort((a,b)=>b.size-a.size)
+   .map(f=>path.join(f.dir.replace(/^[\\/]+/,''),f.name)));
   if(launcher){const name=path.basename(source).replace(/\.(zip|7z|rar|iso|cue|bin|img)$/i,'').replace(/\s*\((?:bin|iso|img)[^)]*\)\s*$/i,'').replace(/[<>:"|?*]/g,'').trim()||'Japanese';
-   return {root:path.dirname(hdr),cab:hdr,exe:path.join(launcher.dir.replace(/^[\\/]+/,''),launcher.name),target:freeFolder(path.join(path.dirname(path.resolve(source)),name)),move:true};}}}
+   return {root:path.dirname(hdr),cab:hdr,exe:launcher,target:freeFolder(path.join(path.dirname(path.resolve(source)),name)),move:true};}}}
  if(!exe&&info.image){const installer=fs.readdirSync(info.base).some(n=>/^(setup|install|autorun)\.(exe|inf)$/i.test(n))||walk(info.base,5000).some(r=>/\.(cab|msi)$/i.test(r));
   if(installer)return {installer:true,image:info.image};}
  if(!exe){const disc=(()=>{const stack=[[info.base,2]];while(stack.length){const [d,depth]=stack.pop();let list;try{list=fs.readdirSync(d,{withFileTypes:true});}catch{continue;}for(const e of list){if(e.isFile()&&/\.(bin|cue|iso|mdf|mds|ccd|img|nrg)$/i.test(e.name)&&(e.name.match(/\.(cue|iso|mds|ccd|nrg)$/i)||(stat(path.join(d,e.name))?.size||0)>50e6))return true;if(e.isDirectory()&&depth>0)stack.push([path.join(d,e.name),depth-1]);}}return false;})();throw Error(disc?'IMPORT_DISC_IMAGE':'IMPORT_SOURCE_NO_MATCH');}
@@ -122,7 +125,9 @@ async function plan(gameDir,source,executable,{archiveOnly=false}={}){
  if(archiveOnly)throw Error('IMPORT_NPA_CONFIRM');
  const info=await sourceRoot(gameDir,source),{root,staged}=info;
  if(info.overlay){
-  return {gameDir,root:gameDir,staged:false,replace:[],add:[],remove:info.overlay.overlays.map(o=>({file:o.file,size:o.size})),exe:'',overlay:true};}
+  const exe=launcherLanguage(executable)==='en'?preferJapaneseLauncher([executable],localLaunchers(path.dirname(executable))):'';
+  return {gameDir,root:gameDir,staged:false,replace:[],add:[],remove:info.overlay.overlays.map(o=>({file:o.file,size:o.size})),
+   exe:exe?path.relative(gameDir,exe):'',overlay:true};}
  /* E409: Steam Saya + the 2003 Japanese script.pak: port the Japanese script into this build's script.npk instead */
  const saya=require('./saya-script-port.cjs').detect(gameDir,info.base);if(saya)return {gameDir,port:saya};
  /* E409 (user 2026-11-11): Steam Saya is never switched to the old saya.exe; only the script port is offered */
@@ -135,8 +140,9 @@ async function plan(gameDir,source,executable,{archiveOnly=false}={}){
   else{const size=stat(from)?.size||0;addedBytes+=size;add.push({file:rel,from,size});}}
  for(const rel of ours)if(!them.has(rel.toLowerCase())&&OVERRIDE(path.basename(rel)))remove.push({file:rel,size:stat(path.join(gameDir,rel))?.size||0});
  if(addedBytes>MAX_ADDED)throw Error('IMPORT_TOO_LARGE');
- const launchers=theirs.filter(r=>!r.includes(path.sep)&&isLauncher(r)&&languageHint(r)!=='zh').sort((a,b)=>(stat(path.join(root,b))?.size||0)-(stat(path.join(root,a))?.size||0));
- return {gameDir,root,staged,replace,add,remove,exe:launchers[0]||''};}
+ const launchers=theirs.filter(r=>!r.includes(path.sep)&&isLauncher(r)).sort((a,b)=>(stat(path.join(root,b))?.size||0)-(stat(path.join(root,a))?.size||0));
+ const installed=[...new Set([...launchers,...ours.filter(r=>!r.includes(path.sep)&&isLauncher(r))])];
+ return {gameDir,root,staged,replace,add,remove,exe:preferJapaneseLauncher(launchers,installed)};}
 
 async function preview(gameDir,source,executable){
  const p=await plan(gameDir,source,executable),list=a=>a.map(({file,size})=>({file,size}));

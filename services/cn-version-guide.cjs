@@ -13,7 +13,7 @@
    Everything here is generic: names, folders and file contents, never a per-game rule. Nothing is changed on disk except
    the cache and the user's copy of the sites file. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const {languageHint,isLauncher,family}=require('../core/launcher-language.cjs');
+const {languageHint,launcherLanguage,isLauncher,family,preferJapaneseLauncher}=require('../core/launcher-language.cjs');
 
 const ZH_TAG=/汉化|漢化|中文|简体|簡體|繁体|繁體|简中|繁中|(?:^|[^a-z])(?:chs|cht|cn|sc|tc|zh|zh[-_]?(?:cn|tw|hans|hant)|chinese|schinese|tchinese)(?:[^a-z]|$)/i;
 const JA_TOKEN=/日文|日语|日語|日本語|原版|生肉|(?:^|[^a-z])(?:ja|jp|jpn|japanese|ja[-_]jp)(?:[^a-z]|$)/i;
@@ -94,7 +94,7 @@ function launchers(dir,depth){
  const out=[];walk(dir,depth,(file,e)=>{if(e.isFile()&&isLauncher(e.name)&&!/^unins/i.test(e.name))out.push(file);});
  return out.filter(f=>!path.relative(dir,f).split(path.sep).slice(0,-1).some(p=>BACKUP_DIR.test(p)));
 }
-const japaneseProgram=f=>{const n=path.basename(f);return languageHint(n)==='ja'||kana(n)&&!ZH_TAG.test(n)&&languageHint(n)!=='zh';};
+const japaneseProgram=(f,programs)=>{const n=path.basename(f),hint=launcherLanguage(f,programs);return hint==='ja'||!hint&&kana(n)&&!ZH_TAG.test(n);};
 function scanRestore(dir,exe,{swap=null,restore=null,languages=null}={}){
  const found=[],own=key(exe);
  if(swap?.available&&swap.active!=='ja')found.push({kind:'swap',fix:'swap',rel:swap.backup||'',exe:swap.exe||''});
@@ -107,7 +107,8 @@ function scanRestore(dir,exe,{swap=null,restore=null,languages=null}={}){
  const backups=top.filter(n=>{const m=BACKUP_FILE.exec(n);return m&&top.some(o=>o.toLowerCase()===m[1].toLowerCase());});
  const patchActive=languages?.issue==='CHINESE_PATCH_ACTIVE'||!!uninstaller||backups.length>0;
  /* A Japanese program beside the Chinese one */
- const jp=[...new Set([...(languages?.versions?.ja?[languages.versions.ja]:[]),...launchers(dir,1).filter(f=>key(f)!==own&&japaneseProgram(f)&&(!exe||family(f)===family(exe)||kana(path.basename(f))))])].filter(f=>key(f)!==own&&isFile(f));
+ const programs=launchers(dir,1),stem=family(exe,programs);
+ const jp=[...new Set([...(languages?.versions?.ja?[languages.versions.ja]:[]),...programs.filter(f=>key(f)!==own&&japaneseProgram(f,programs)&&(!exe||family(f,programs)===stem||kana(path.basename(f))))])].filter(f=>key(f)!==own&&isFile(f));
  /* with a swap or restore offered, that one-click fix already brings the Japanese program back */
  if(!found.some(x=>x.fix==='swap'||x.fix==='restore'))for(const f of jp.slice(0,2))found.push(patchActive?{kind:'japanese-exe-blocked',path:f,rel:rel(dir,f),fix:uninstaller?'reveal':'',reveal:uninstaller?path.join(dir,uninstaller):''}:{kind:'japanese-exe',path:f,rel:rel(dir,f),fix:'exe'});
  if(uninstaller)found.push({kind:'uninstaller',path:path.join(dir,uninstaller),rel:uninstaller,fix:'reveal'});
@@ -128,12 +129,13 @@ function scanRestore(dir,exe,{swap=null,restore=null,languages=null}={}){
 /* A Japanese copy of the same work in a sibling folder: 千恋万花 [汉化] next to 千恋＊万花 */
 function nearby(dir,exe){
  const parent=path.dirname(dir);if(parent===dir)return [];
- const out=[],title=path.basename(dir);
+ const out=[],title=path.basename(dir),stem=family(exe);
  for(const e of list(parent)){
   if(!e.isDirectory()||key(path.join(parent,e.name))===key(dir)||SKIP_DIR.test(e.name)||ZH_TAG.test(e.name)||!similar(e.name,title))continue;
-  const sub=path.join(parent,e.name),progs=launchers(sub,1).filter(f=>languageHint(f)!=='zh'&&!ZH_TAG.test(path.basename(f)));
-  if(!progs.length)continue;
-  const pick=progs.find(f=>exe&&family(f)===family(exe))||progs.find(japaneseProgram)||progs[0];
+  const sub=path.join(parent,e.name),programs=launchers(sub,1).filter(f=>languageHint(f)!=='zh'&&!ZH_TAG.test(path.basename(f)));
+  if(!programs.length)continue;
+  const pick=preferJapaneseLauncher(programs.filter(f=>exe&&family(f,programs)===stem),programs)||
+   programs.find(f=>japaneseProgram(f,programs))||preferJapaneseLauncher(programs);
   out.push({kind:'nearby',path:pick,dir:sub,rel:path.join('..',e.name,path.relative(sub,pick)),fix:'exe'});
   if(out.length>=2)break;
  }
