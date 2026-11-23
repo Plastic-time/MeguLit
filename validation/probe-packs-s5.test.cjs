@@ -40,6 +40,14 @@ test('HyPack Cocotte reads consecutive range blocks, resets the model after a st
  assert.strictEqual(probe.detected,'kogado');
  assert.strictEqual(probe.japaneseLines,3);
 });
+test('HyPack remaster reads the UTF-8 SK20 string table',()=>{
+ const lines=['雨下得越来越大了。','我们先去车站避雨吧。'];
+ const raw=sr01(lines);
+ raw.write('SK20');
+ raw.copy(raw,0x34,0x28,0x34);
+ raw.fill(0,0x28,0x34);
+ assert.deepStrictEqual(kogado.parse(raw).lines,lines);
+});
 test('AdvHD v2 ARC (UTF-16 names): Rio.arc .ws2 messages and names',()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ws2-'));const rot=b=>Buffer.from(b.map(x=>((x<<2)|(x>>>6))&255));
  const sjEnc=t=>Buffer.from(require('../services/original-engines/kit.cjs').encodeSjis(t));

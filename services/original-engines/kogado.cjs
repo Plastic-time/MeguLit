@@ -4,8 +4,8 @@
    ArcFormats/Hypatia/ArcKogado.cs: "HyPack" u16 version (0x100 / 0x200 / 0x300 / 0x301), u32 data size (index at
    0x10 + it), u32 count; entries of 32 / 40 / 48 bytes: name[0x15], ext[3], u32 offset (from 0x10), then (v2+) u32
    unpacked size, u32 stored size, u8 compression (0 none, 1 Mariel LZ, 2 Cocotte BWT + range coder, 3 XOR 0xFF).
-   A .kgo scene ends with its string table: u32 offset, size and count at 0x28 in SR01 and 0x34 in SKTR, each string
-   u16 length (counting itself) + bytes + NUL. Strings are Shift-JIS (a Chinese patch: GBK; kit.decodeText tells). */
+   A .kgo scene ends with its string table: u32 offset, size and count at 0x28 in SR01 or 0x34 in SKTR and SK20.
+   Each string has a u16 length (counting itself), text bytes and NUL padding. SK20 uses UTF-8. */
 const fs=require('node:fs'),path=require('node:path'),kit=require('./kit.cjs');
 const {rangeModel,rangeDecode}=require('./shiinario-crypt.cjs');
 const ENTRY={0x100:32,0x200:40,0x300:48,0x301:48};
@@ -94,7 +94,7 @@ function archives(dir){let names=[];try{names=fs.readdirSync(dir);}catch{return 
 function scenes(dir){const out=[];for(const f of archives(dir))for(const e of list(f)||[])if(SCRIPT.test(e.name))out.push({name:e.name,read:()=>read(f,e)});return out;}
 /* The scene's string table, with the generic text scan for other formats. */
 function parse(buf){const b=Buffer.isBuffer(buf)?buf:Buffer.from(buf),magic=b.toString('latin1',0,4);
- const header=magic==='SR01'?0x28:magic==='SKTR'?0x34:0;
+ const header=magic==='SR01'?0x28:magic==='SKTR'||magic==='SK20'?0x34:0;
  if(header&&b.length>=header+12){const at=b.readUInt32LE(header),size=b.readUInt32LE(header+4),n=b.readUInt32LE(header+8);
   if(at+size<=b.length&&n<0x100000){const strs=[];let p=at;for(let i=0;i<n&&p+2<=at+size;i++){const len=b.readUInt16LE(p);if(len<2||p+len>at+size)break;let e=p+len;while(e>p+2&&b[e-1]===0)e--;strs.push(b.subarray(p+2,e));p+=len;}
    if(strs.length){const text=kit.decodeText(Buffer.concat(strs.flatMap(s=>[s,Buffer.from('\n')])));return {lines:text.split('\n').filter(t=>/[^\x00-\x7f]/.test(t)),anchors:[]};}}}
