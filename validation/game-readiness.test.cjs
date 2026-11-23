@@ -31,6 +31,36 @@ test('a Josou child sampled before exiting without a window also gets the confir
  const splash=[[{pid:10,visible:true}],[]];
  await assert.rejects(waitForVisibleGame(async()=>splash.shift(),opts),e=>e.message==='GAME_PROCESS_EXITED'&&!e.detail);
 });
+test('a clean startup handoff gets a short wait for the replacement game window',async t=>{
+ t.mock.timers.enable({apis:['Date']});
+ const exit=()=>({code:0,signal:null}),trace=[],samples=[[],[],[{pid:42,visible:true}],[{pid:42,visible:true}]];
+ const sleep=async ms=>t.mock.timers.tick(ms);
+ const state=await waitForVisibleGame(async()=>samples.shift(),{exit,stableSamples:2,trace:stage=>trace.push(stage),sleep});
+ assert.deepEqual(state,{pid:42});
+ assert.deepEqual(trace,['game-process-exited','game-process-seen']);
+ assert.equal(samples.length,0);
+});
+test('a clean exit without a replacement still fails promptly, and crashes still fail immediately',async t=>{
+ t.mock.timers.enable({apis:['Date']});
+ let waits=0;
+ const sleep=async ms=>{waits++;t.mock.timers.tick(ms);};
+ const exitedAt=Date.now();
+ await assert.rejects(waitForVisibleGame(async()=>[],{exit:()=>({code:0,signal:null}),sleep}),{message:'GAME_PROCESS_EXITED',exitedAt});
+ assert.equal(waits,4);
+ for(const exit of [()=>({code:1,signal:null}),()=>({code:0,signal:'SIGTERM'}),()=>({code:null,signal:null})]){
+  await assert.rejects(waitForVisibleGame(async()=>[],{exit,sleep}),/GAME_PROCESS_EXITED/);
+  assert.equal(waits,4);
+ }
+});
+test('a replacement that disappears before showing a window has no clean launcher exit time',async t=>{
+ t.mock.timers.enable({apis:['Date']});
+ for(const prefix of [[],[[]]]){
+  const samples=[...prefix,[{pid:42,visible:false}],[]];
+  await assert.rejects(waitForVisibleGame(async()=>samples.shift(),{exit:()=>({code:0,signal:null}),sleep:async ms=>t.mock.timers.tick(ms)}),
+   error=>error.message==='GAME_PROCESS_EXITED'&&error.exitedAt===undefined);
+  assert.equal(samples.length,0);
+ }
+});
 test('v1.1.0: failed process queries do not fail a launch',async()=>{
  const opts={attempts:5,interval:1,sleep:async()=>{}};let n=0;
  /* a few failures, then the window shows */
@@ -38,9 +68,10 @@ test('v1.1.0: failed process queries do not fail a launch',async()=>{
  /* never answered: launched but unverified */
  assert.deepEqual(await waitForVisibleGame(async()=>{throw Error('PROCESS_QUERY_FAILED');},opts),{pid:null,unverified:true});
 });
-test('a clean direct exit waits for confirmed absence before retrying the launch',async()=>{
+test('a clean direct exit waits for confirmed absence before retrying the launch',async t=>{
+ t.mock.timers.enable({apis:['Date']});
  const clean={code:0,signal:null};
- const options={exit:()=>clean,stableSamples:2,sleep:async()=>{}};
+ const options={exit:()=>clean,stableSamples:2,sleep:async ms=>t.mock.timers.tick(ms)};
  const samples=[[],[{pid:42,visible:true}],[{pid:42,visible:true}]];
  assert.deepEqual(await waitForVisibleGame(async()=>samples.shift(),options),{pid:42});
  let count=0,ended=null;

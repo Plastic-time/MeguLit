@@ -42,7 +42,7 @@ function engineOf(dir){const f=listing(dir);for(const e of ENGINES)if(e.test(f))
 function emulatorTarget(dir){
  for(const f of [path.join(dir,'SmartSteamEmu','launcher.ini'),path.join(dir,'launcher.ini')]){let b;try{b=fs.readFileSync(f);}catch{continue;}
   const text=b[0]===0xff&&b[1]===0xfe?b.toString('utf16le'):b.toString('utf8'),m=/^\s*Target\s*=\s*(.+?)\s*$/mi.exec(text);if(!m)continue;
-  const name=path.basename(m[1].replace(/\\/g,'/'));const file=path.join(dir,name);try{if(/\.exe$/i.test(name)&&fs.statSync(file).isFile())return file;}catch{}}
+  const name=path.basename(m[1].replace(/\\/g,'/'));const file=path.join(dir,name);try{if(/\.exe$/i.test(name)&&!launcher.isVersionedUpdater(name)&&fs.statSync(file).isFile())return file;}catch{}}
  return '';}
 function mainExe(dir,translatedDir=false){
  if(!translatedDir&&isTranslated(dir))return ''; 

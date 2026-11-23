@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path');
-const {languageHint,isLauncher,family}=require('../core/launcher-language.cjs');
+const {languageHint,isLauncher,versionedUpdaterStem,family}=require('../core/launcher-language.cjs');
 const key=file=>path.normalize(file).toLowerCase();
 const isFile=file=>{try{return fs.statSync(file).isFile();}catch{return false;}};
 function get(db,id){const row=db.prepare('SELECT * FROM games WHERE id=? AND removed_at IS NULL').get(String(id));if(!row)throw Error('GAME_NOT_FOUND');return {row,original:JSON.parse(row.original||'{}')};}
@@ -122,6 +122,12 @@ function originalExecutable(db,id,root,mode,executable){
   const kana=f=>/[぀-ヿ]/.test(path.parse(f).name);
   if(!selected||!kana(selected)){const own=candidates.filter(f=>path.dirname(f).toLowerCase()===dir.toLowerCase()&&kana(f)&&!/ツール|チェック|設定|アンインストール|インストール|ランチャー/.test(path.parse(f).name)&&['.cf','.exe.sig','.exe.emb'].some(x=>isFile(f.replace(/\.exe$/i,'')+x)||isFile(f+x.replace(/^\.exe/,''))));
    if(own.length===1)selected=own[0];}
+  const updaterStem=versionedUpdaterStem(row.executable);
+  if(updaterStem!==null){const target=key(path.join(path.dirname(row.executable),updaterStem+'.exe'));
+   const canResolve=updaterStem&&!localTranslated&&!['zh','en'].includes(lib.contentLanguage);
+   const matches=canResolve?candidates.filter(f=>key(f)===target
+    &&!require('../core/library.cjs').isTranslated(f)&&!require('../core/translated-launcher.cjs').inspect(f).translated):[];
+   selected=matches.length===1?matches[0]:'';}
  }else if(mode!=='select')throw Error('INVALID_EXECUTABLE');
  if(!valid(selected)||legacyBlocked&&key(selected)===key(row.executable))throw Error('JAPANESE_EXECUTABLE_REQUIRED');
  const steamProgram=lib.source==='steam'&&key(row.executable)===key(selected);

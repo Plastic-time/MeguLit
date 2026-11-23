@@ -146,6 +146,64 @@ function device(t,r,clock){
 }
 async function signIn(dev,r,email='megumin@example.com'){await dev.a.requestCode(email);return dev.a.verify(email,r.lastCode());}
 
+test('client sync uploads a long bilingual saved sentence with the other pending sentences',async t=>{
+ const r=relay(),clock={now:T0.getTime()},A=device(t,r,clock),B=device(t,r,clock);
+ const text='読'.repeat(3000),translation='读'.repeat(3000);
+ A.run(db=>{
+  const {save}=require('../services/saved-sentences.cjs');
+  save(db,{text,translation},1000);
+  save(db,{text:'短い文',translation:'短句'},2000);
+ });
+ await signIn(A,r);clock.now+=61000;await signIn(B,r);
+ const result=await A.a.sync();
+ assert.equal(result.summary.sentences.pushed,2);
+ assert.equal(result.pending.sentences||0,0);
+ await B.a.sync();
+ const rows=B.run(db=>db.prepare('SELECT text,translation FROM saved_sentences ORDER BY created_at').all());
+ assert.deepEqual(rows.map(row=>[row.text,row.translation]),[[text,translation],['短い文','短句']]);
+});
+
+test('raising the cap never admits a truncated migrated sentence under the original text key',async t=>{
+ const r=relay(),clock={now:T0.getTime()},A=device(t,r,clock),B=device(t,r,clock);
+ const text='読'.repeat(3001);
+ A.run(db=>db.prepare("INSERT INTO saved_sentences(text,created_at,original) VALUES(?,1,'{}')").run(text));
+ await signIn(A,r);clock.now+=61000;await signIn(B,r);
+ // Older clients clipped the payload after deriving the key from the complete text.
+ const transport=A.a.fetcher;
+ A.a.fetcher=(url,init)=>{
+  if(init.method==='PUT'&&url.endsWith('/sync/sentences')){
+   const payload=JSON.parse(init.body);
+   for(const record of payload.records)record.data.text=record.data.text.slice(0,3000);
+   init={...init,body:JSON.stringify(payload)};
+  }
+  return transport(url,init);
+ };
+ await assert.rejects(A.a.sync(),{code:'RECORD_TOO_LARGE'});
+ assert.equal(A.a.status().pending.sentences,1);
+ assert.equal(A.run(db=>db.prepare('SELECT text FROM saved_sentences').get().text),text);
+ await B.a.sync();
+ assert.equal(B.run(db=>db.prepare('SELECT COUNT(*) AS n FROM saved_sentences').get().n),0);
+});
+
+test('the relay bounds the size of each serialized sentence in bytes',async()=>{
+ const {validateRecord,RECORD_CAP}=await load(),updated_at=T0.getTime();
+ assert.deepEqual(account.RECORD_CAP,RECORD_CAP);
+ const body=length=>({key:'s:a',updated_at,data:{text:'x'.repeat(length-Buffer.byteLength('{"text":""}'))}});
+ assert.equal(validateRecord('sentences',body(40*1024),updated_at).error,undefined);
+ assert.equal(validateRecord('sentences',body(40*1024+1),updated_at).error,'RECORD_TOO_LARGE');
+});
+
+test('the larger-record safeguard keeps existing sync keys and rejects missing original text',async()=>{
+ const {handleAccounts,sha256}=await load(),r=relay(),a=await login(handleAccounts,r),updated_at=T0.getTime();
+ const send=(kind,key,data)=>handleAccounts(req('PUT','/api/sync/'+kind,{records:[{key,updated_at,data}]},
+  {authorization:'Bearer '+a.token}),r.env,T0);
+ const key='s:'+(await sha256('undefined')).slice(0,32),translation='読'.repeat(3000);
+ assert.equal((await send('sentences',key,{text:'legacy'})).status,200,'small legacy records keep their previous behavior');
+ assert.equal((await send('sentences','legacy-key',{text:'legacy',translation})).status,200,'older opaque keys are not content hashes');
+ assert.equal((await send('words',key,{definition:translation})).status,200,'the rule only applies to saved sentences');
+ assert.equal((await send('sentences',key,{translation})).status,413,'a matching hash of undefined cannot stand in for original text');
+});
+
 test('client: not configured / logged out stays local; login keeps the token in the vault file, not in profile.json',async t=>{
  const r=relay(),clock={now:T0.getTime()},dev=device(t,r,clock);
  const plain=new account.Account(dev.root,{env:{MEGULIT_RELAY_BASE:'off'},vault:(a,v)=>v});
@@ -241,7 +299,7 @@ test('UI and wiring: settings page, bridge hook, ACCOUNTS.md router note',()=>{
 test('account page sync preserves oversized sentences, other records and retry state',async t=>{
  const r=relay(),clock={now:T0.getTime()},dev=device(t,r,clock);
  await signIn(dev,r);
- const large='海'.repeat(2900);
+ const large='海'.repeat(14000);
  dev.run(db=>{
   const insert=db.prepare("INSERT INTO saved_sentences(text,created_at,original) VALUES(?,1,'{}')");
   insert.run(large);insert.run('small');
@@ -260,7 +318,7 @@ test('account page sync preserves oversized sentences, other records and retry s
  const count=()=>r.env.DB.raw.prepare("SELECT COUNT(*) n FROM sync_records WHERE kind='sentences'").get().n;
  assert.equal(count(),1);
  assert.equal(dev.a.status().pending.sentences,1);
- assert.equal(dev.run(db=>db.prepare('SELECT length(text) n FROM saved_sentences ORDER BY n DESC').get().n),2900);
+ assert.equal(dev.run(db=>db.prepare('SELECT length(text) n FROM saved_sentences ORDER BY n DESC').get().n),large.length);
  dev.run(db=>db.prepare("UPDATE saved_sentences SET translation='changed' WHERE text='small'").run());
  let intercept='GET';
  options.fetch=async(url,init)=>url.includes('/sync/sentences')&&init.method===intercept?new Response('<html/>'):online(url,init);

@@ -8,6 +8,7 @@
    Any engine, any folder: evidence is read from the files only.
    Not evidence: KiriKiri Z's "-- SIGNATURE - SHA256/PSS/RSA --" .sig files (every file of a signed release has one). */
 const fs=require('node:fs'),path=require('node:path');
+const {isVersionedUpdater}=require('./launcher-language.cjs');
 
 const RULES=[
  {kind:'softdenchi',name:{zh:'软电池（SoftDenchi）正版验证',en:'SoftDenchi licence check',ja:'ソフト電池の認証'},needles:['soft-denchi','SoftDenchi','softdenchi','SdWrap']},
@@ -59,7 +60,8 @@ function classify(dir){
   else if(e.c.kind){role='protected';kind=e.c.kind;reason='text';}
   return {name:e.name,file:e.file,size:e.size,role,kind,reason};});
 }
-const usable=(e,allowTranslated)=>e.role==='clean'&&!NOT_LAUNCHER.test(e.name)&&!VERSIONED_UPDATER.test(e.name)&&(allowTranslated||!TRANSLATED_NAME.test(e.name.replace(/\.exe$/i,'')))&&e.size>=20000;
+const updater=name=>isVersionedUpdater(name)||VERSIONED_UPDATER.test(name);
+const usable=(e,allowTranslated)=>e.role==='clean'&&!NOT_LAUNCHER.test(e.name)&&!updater(e.name)&&(allowTranslated||!TRANSLATED_NAME.test(e.name.replace(/\.exe$/i,'')))&&e.size>=20000;
 /* A small clean program beside a protected one starts it (crack / translation launcher); a clean one of about the same
    size is the engine program itself with the protection removed. Named launchers first, then the larger file. */
 function launchersFor(list,target,allowTranslated){
@@ -73,7 +75,7 @@ function plan(exe,{allowTranslated=true,source='',savedDrm}={}){
  exe=String(exe||'');if(!/\.exe$/i.test(exe)||!stat(exe))return null;
  const dir=path.dirname(exe),selected=path.basename(exe);
  // Repair an old automatic correction only while its original launcher and wrapper still match.
- if(VERSIONED_UPDATER.test(selected)&&typeof savedDrm?.from==='string'&&typeof savedDrm?.wrapped==='string'&&
+ if(updater(selected)&&typeof savedDrm?.from==='string'&&typeof savedDrm?.wrapped==='string'&&
     path.isAbsolute(savedDrm.from)&&path.resolve(path.dirname(savedDrm.from)).toLowerCase()===path.resolve(dir).toLowerCase()){
   const restored=plan(savedDrm.from,{allowTranslated,source});
   if(restored&&restored.kind===savedDrm.kind&&path.resolve(restored.wrapped).toLowerCase()===path.resolve(savedDrm.wrapped).toLowerCase()&&
@@ -81,8 +83,9 @@ function plan(exe,{allowTranslated=true,source='',savedDrm}={}){
    return {...restored,original:exe,changed:true,restoredFromUpdater:true};
   }
  }
- const list=classify(dir),self=list.find(e=>e.name.toLowerCase()===selected.toLowerCase());if(!self)return null;
- const ignoredUpdaters=list.filter(e=>e.role==='clean'&&VERSIONED_UPDATER.test(e.name)).map(e=>e.name);
+ const entries=classify(dir),list=entries.filter(e=>!updater(e.name));
+ const self=list.find(e=>e.name.toLowerCase()===selected.toLowerCase());if(!self)return null;
+ const ignoredUpdaters=entries.filter(e=>updater(e.name)).map(e=>e.name);
  const engines=list.filter(e=>e.role==='protected').sort((a,b)=>b.size-a.size);
  let target=null;
  if(self.role==='protected')target=self;

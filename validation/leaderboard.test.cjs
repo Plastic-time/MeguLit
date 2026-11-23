@@ -228,8 +228,7 @@ test('E394 个人主页: leaderboard fields leave 联网服务, search lands on 
  const layout=await import(pathToFileURL(path.join(__dirname,'..','web','settings-layout.js')).href);
  const fields=[{scope:'online',key:'leaderboardEnabled'},{scope:'online',key:'leaderboardName'},{scope:'online',key:'leaderboardShareGames'},{scope:'online',key:'relayUrl'}];
  assert.deepEqual(layout.visibleFields('online',fields).map(f=>f.key),['relayUrl']);
- /* E404 个人主页 is a panel now, not a settings page */
- assert.ok(!layout.navigation.some(c=>c.ids.includes('personal')),'no 个人主页 page in the settings nav');
+ assert.ok(layout.navigation.some(c=>c.ids.includes('personal')),'the settings nav opens the shared profile panel');
  const search=await import('data:text/javascript;base64,'+fs.readFileSync(path.join(__dirname,'..','web','settings-search.js')).toString('base64'));
  const entries=search.globalSearchEntries({fields:fields.map(f=>({...f,label:{zh:f.key==='leaderboardName'?'排行榜昵称':f.key,en:f.key}}))},{});
  assert.equal(entries.find(e=>e.key==='leaderboardName').scope,'personal');assert.equal(entries.find(e=>e.key==='relayUrl').scope,'online');

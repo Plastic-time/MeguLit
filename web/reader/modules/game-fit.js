@@ -48,7 +48,7 @@
    'html body.tomoyo-gal-bound.megulit-fit-room'+own+' .sentence-window:not(.tome-island-page) .tomoyo-cn-output{min-height:0!important;max-height:var(--megulit-fit-room,4em)!important;overflow-y:auto!important;overscroll-behavior:contain}'+
    'html body.tomoyo-gal-bound'+own+' .sentence-window.megulit-ocr-notice{translate:0 var(--notice-shift,0px)!important;box-sizing:border-box!important;max-height:var(--notice-height)!important;overflow-y:auto!important;overscroll-behavior:contain}';
   (d.head||d.documentElement).append(css);
-  let fit=1,shift=0,room=0,line='',frame=0;
+  let fit=1,shift=0,room=0,line='',frame=0,clientGeometry='';
   let notice=false,noticeWindow=null,noticeShift=0;
   const main=()=>[...d.querySelectorAll('.sentence-window')].find(n=>!n.classList.contains('tome-island-page'));
   function set(){const r=d.documentElement.style,c=d.body.classList;
@@ -115,10 +115,13 @@
   }
   function check(){frame=0;
    if(!d.body?.classList.contains('tomoyo-gal-bound')){reset();return;}
+   if(d.body.classList.contains('tome-surface-pending'))return;
    /* 2026-11-15 in-place drawing (text-place.js): every character sits on the game's own place and the window fills the client, so there is nothing to fit; measuring it shrank the text and switched the translation's height limit on and off every frame (the translation's second line flashed) */
    if(d.body.classList.contains('megulit-placed')||d.body.classList.contains('megulit-anchored')||b.textPlaceOwns?.()===true){reset();return;}/* 2026-11-20 (user, CHAOS;CHILD: 「译文为啥都这么小」): a line anchored on the game's own place is fitted by text-place.js against the monitor's work area (translation at most 15 % smaller); fitting it again to the game client shrank two-row sentences' translation to 60 % */
    const info=b.galLayoutInfo?.(),win=main();if(!win||!info||!(info.clientHeight>0))return;
    const dpr=Math.max(.5,Number(w.devicePixelRatio)||1),client={top:info.clientY/dpr,bottom:(info.clientY+info.clientHeight)/dpr};
+   const geometry=[info.clientX,info.clientY,info.clientWidth,info.clientHeight,dpr].join(':');
+   if(geometry!==clientGeometry){clientGeometry=geometry;reset();}
    if(notice){fitNotice(win,client);return;}
    if(win.classList.contains('tomoyo-hook-reader')&&win.querySelector('.sentence-text')){
     fitTranslation(win.querySelector('.tomoyo-cn-output'),Math.min(client.bottom,w.innerHeight)-MARGIN);return;
@@ -153,7 +156,7 @@
   if(typeof layoutBefore==='function')b.galLayout=layout=>{const r=layoutBefore(layout);watch();schedule();return r;};
   w.addEventListener('resize',schedule);
   if(w.MutationObserver)new w.MutationObserver(()=>{watch();schedule();}).observe(d.body||d.documentElement,{childList:true});
-  b.gameFit={check,state:()=>({fit,shift,room})};
+  b.gameFit={check,schedule,state:()=>({fit,shift,room})};
  }
  if(typeof module!=='undefined'&&module.exports)module.exports={plan,MIN,MARGIN,install};
  if(root&&root.document)install(root);

@@ -1209,7 +1209,7 @@ function restoreSettingsScroll(section){const target=settingsScroll.get(section)
  if(c&&c.querySelector('form,section,.panel')){c.classList.remove('g-enter');void c.offsetWidth;c.classList.add('g-enter');if(target)c.scrollTo({top:target,behavior:'smooth'});
  return;}if(++tries<60)requestAnimationFrame(step);};requestAnimationFrame(step);}
 async function settings(token){
-  await renderSettings({main:document.querySelector('#main'),api,invoke,text,locale,esc,toast,heading,basicSettings,isCurrent:()=>token===pageToken,section:settingsSection,
+  await renderSettings({main:document.querySelector('#main'),api,invoke,text,locale,esc,toast,heading,basicSettings,isCurrent:()=>token===pageToken,section:settingsSection,onProfileClose:paintTopProfile,
    setSection:value=>{rememberSettingsScroll();try{localStorage.setItem('megulit-settings-section',value||'');}catch{}settingsSection=value;restoreSettingsScroll(value);
    },profile:settingsProfile,setProfile:value=>settingsProfile=value,onSaved:async result=>{const next=await api('home'),reload=!result?.scope||result.scope==='background-toggle';
    const image=reload?(next.preferences.homeBackground?await api('background'):''):undefined;model=next;setAppearance();if(reload)applyBackground(image);}});

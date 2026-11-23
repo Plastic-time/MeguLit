@@ -35,7 +35,7 @@ async function startProcess(file,args,cwd,errorCode,spawnProcess=spawn,env=null)
 }
 async function waitForVisibleGame(query,{attempts=60,interval=250,stableSamples=4,timeout=15000,exit,helper=false,helperError='LE_HELPER_FAILED',checkHelperHandoff=false,indirect=false,trace=()=>{},sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
  let pid=null,stable=0,seenProcess=false,exitLogged=false,answered=false,lastError=null;
- let absentAfterHandoff=0,sawWindow=false,absenceStartedAt;
+ let absentAfterHandoff=0,sawWindow=false,absenceStartedAt,cleanExitAt=null;
  const deadline=Date.now()+timeout;
  for(let i=0;i<attempts&&Date.now()<deadline;i++){
   /* A process query can fail on some PCs (security software holding the helper, first-run scan past the timeout).
@@ -51,9 +51,12 @@ async function waitForVisibleGame(query,{attempts=60,interval=250,stableSamples=
   if(game){sawWindow=true;stable=pid===game.pid?stable+1:1;pid=game.pid;if(stable>=stableSamples)return {pid};}
   else{pid=null;stable=0;}
   const ended=exit?.();
-  if(ended&&!exitLogged){trace(helper?'launch-helper-exited':'game-process-exited',ended);exitLogged=true;}
-  // A direct launcher may exit cleanly before its replacement is visible to the process query.
-  const directHandoff=!helper&&!indirect&&!sawWindow&&ended?.code===0&&!ended.signal;
+  if(ended&&!exitLogged){
+   trace(helper?'launch-helper-exited':'game-process-exited',ended);exitLogged=true;
+   if(!helper&&!indirect&&ended.code===0&&!ended.signal&&!sawWindow)cleanExitAt=Date.now();
+  }
+  if(processes.length)cleanExitAt=null;
+  const directHandoff=cleanExitAt!==null;
   const checkingMissingChild=(checkHelperHandoff||directHandoff)&&!sawWindow;
   if(!processes.length&&!checkingMissingChild&&((ended&&!helper)||seenProcess&&!indirect))throw Error('GAME_PROCESS_EXITED');
   if(!processes.length&&helper&&!indirect&&ended&&(ended.code!==0||ended.signal))throw Error(helperError);
@@ -61,7 +64,7 @@ async function waitForVisibleGame(query,{attempts=60,interval=250,stableSamples=
   else if(handoffComplete&&checkingMissingChild){
    if(!absentAfterHandoff)absenceStartedAt=Date.now();
    absentAfterHandoff++;
-   if(directHandoff&&absentAfterHandoff>=2)throw Object.assign(Error('GAME_PROCESS_EXITED'),{absenceStartedAt});
+   if(directHandoff&&absentAfterHandoff>=2&&(Date.now()-cleanExitAt>=1000||i+1===attempts||Date.now()+interval>=deadline))throw Object.assign(Error('GAME_PROCESS_EXITED'),{exitedAt:cleanExitAt,absenceStartedAt});
    if(!directHandoff&&absentAfterHandoff>=2)throw Object.assign(Error('GAME_PROCESS_EXITED'),{detail:'HELPER_FINISHED_WITHOUT_GAME'});
   }
   if(i+1<attempts)await sleep(interval);

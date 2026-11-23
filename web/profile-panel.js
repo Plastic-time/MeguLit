@@ -72,11 +72,15 @@ export async function openProfilePanel({api,locale,esc,toast,onClose=()=>{},open
  };
 
  async function paintHero(hero){
-  const h=HERO[locale]||HERO.zh,d=await heroData(api);if(!hero.isConnected)return;
+  const data=await heroData(api);if(hero.isConnected)renderHero(hero,data);
+ }
+
+ function renderHero(hero,d){
+  const h=HERO[locale]||HERO.zh;
   const nf=new Intl.NumberFormat({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale]||'zh-CN'),st=d.stats||{},sec=Number(st.seconds)||0;
   const time=sec>=3600?`${Math.floor(sec/3600)}<small>${h.h}</small>${Math.floor(sec%3600/60)}<small>${h.m}</small>`:`${Math.floor(sec/60)}<small>${h.m}</small>`;
-  const lv=readerLevel(d.stats,d.school),cw=classWords(locale);const initial=esc([...(d.name||'?')][0]||'?');
-  hero.innerHTML=`<div class="profile-hero-id"><button type="button" class="profile-hero-avatar" data-hero-avatar title="${h.pick}" aria-label="${h.pick}">${d.pic?.image&&d.pic.status==='approved'?`<img src="${esc(d.pic.image)}" alt="">`:initial}<span class="profile-hero-avatar-edit" aria-hidden="true">${h.pick}</span></button><div class="profile-hero-who"><h3><button type="button" class="profile-hero-name" data-hero-name title="${h.rename}">${esc(d.name||h.rename)}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11.5V13h1.5l6.8-6.8-1.5-1.5L3 11.5zm9.7-6.2a.6.6 0 000-.9l-1-1a.6.6 0 00-.9 0l-.8.8 1.9 1.9.8-.8z"/></svg></button></h3>${d.pic&&['pending','rejected'].includes(d.pic.status)?`<small class="profile-hero-note" data-status="${esc(d.pic.status)}">${d.pic.status==='pending'?h.checking:h.rejected}</small>`:''}<div class="profile-rank"><span class="profile-rank-lv">Lv.<b>${lv.level}</b></span><span class="profile-rank-name">${d.school?`<i class="profile-school" style="--c:${SCHOOLS[d.school].color}">${esc(elementName(d.school,locale))}</i>`:''}${esc(rankTitle(lv.level,locale,d.school))}${lv.level>=SCHOOL_LEVEL?`<button type="button" class="profile-class-go${lv.locked?' is-due':''}" data-class-go>${d.school?cw.again:cw.open}</button>`:`<small class="profile-class-locked">${cw.locked(SCHOOL_LEVEL)}</small>`}</span><span class="profile-rank-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${lv.need}" aria-valuenow="${lv.into}" aria-label="${h.xp}"><i style="--p:${(lv.into/lv.need*100).toFixed(1)}%"></i></span><span class="profile-rank-xp">${lv.locked?`<b class="profile-rank-due">${esc(cw.due)}</b>`:`${nf.format(lv.into)} / ${nf.format(lv.need)} ${h.xp}`}</span></div></div></div>
+  const lv=readerLevel(d.stats,d.school),cw=classWords(locale);
+  hero.innerHTML=`<div class="profile-hero-id"><button type="button" class="profile-hero-avatar" data-hero-avatar title="${h.pick}" aria-label="${h.pick}"></button><div class="profile-hero-who"><h3><button type="button" class="profile-hero-name" data-hero-name title="${h.rename}"><span data-hero-name-text>${esc(d.name||h.rename)}</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11.5V13h1.5l6.8-6.8-1.5-1.5L3 11.5zm9.7-6.2a.6.6 0 000-.9l-1-1a.6.6 0 00-.9 0l-.8.8 1.9 1.9.8-.8z"/></svg></button></h3><small class="profile-hero-note" hidden></small><div class="profile-rank"><span class="profile-rank-lv">Lv.<b>${lv.level}</b></span><span class="profile-rank-name">${d.school?`<i class="profile-school" style="--c:${SCHOOLS[d.school].color}">${esc(elementName(d.school,locale))}</i>`:''}${esc(rankTitle(lv.level,locale,d.school))}${lv.level>=SCHOOL_LEVEL?`<button type="button" class="profile-class-go${lv.locked?' is-due':''}" data-class-go>${d.school?cw.again:cw.open}</button>`:`<small class="profile-class-locked">${cw.locked(SCHOOL_LEVEL)}</small>`}</span><span class="profile-rank-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${lv.need}" aria-valuenow="${lv.into}" aria-label="${h.xp}"><i style="--p:${(lv.into/lv.need*100).toFixed(1)}%"></i></span><span class="profile-rank-xp">${lv.locked?`<b class="profile-rank-due">${esc(cw.due)}</b>`:`${nf.format(lv.into)} / ${nf.format(lv.need)} ${h.xp}`}</span></div></div></div>
 <dl class="profile-hero-figs"><div><dt>${h.time}</dt><dd>${time}</dd></div><div><dt>${h.chars}</dt><dd>${nf.format(Number(st.characters)||0)}</dd></div><div><dt>${h.words}</dt><dd>${nf.format(Number(st.words)||0)}</dd></div><div><dt>${h.streak}</dt><dd>${nf.format(Number(st.streak)||0)}<small>${h.days}</small></dd></div></dl>
 ${d.favorites.length?`<div class="profile-hero-fav"><h4>${h.fav}</h4><ol>${d.favorites.map(f=>`<li>${esc(f.title||f)}</li>`).join('')}</ol></div>`:''}`;
   hero.insertAdjacentHTML('beforeend',`<button type="button" class="secondary" data-edit-profile>${h.edit}</button>`);
@@ -87,11 +91,57 @@ ${d.favorites.length?`<div class="profile-hero-fav"><h4>${h.fav}</h4><ol>${d.fav
     when not joined yet (the picture only exists there); the name uses the
     same name check as before, and into the local setting otherwise. */
  function bindHero(hero,d,h){
+  const board=()=>d.board||{},sync=v=>{const f=body.querySelector('[name=leaderboardName]');if(f)f.value=v;};
+  const avatarBtn=hero.querySelector('[data-hero-avatar]');
+  const paintAvatar=()=>{
+   const button=hero.querySelector('[data-hero-avatar]'),avatarNote=hero.querySelector('.profile-hero-note');
+   const initial=esc([...(d.name||'?')][0]||'?'),status=d.pic?.status;
+   button.innerHTML=`${d.pic?.image&&status==='approved'?`<img src="${esc(d.pic.image)}" alt="">`:initial}<span class="profile-hero-avatar-edit" aria-hidden="true">${h.pick}</span>`;
+   avatarNote.hidden=status!=='pending'&&status!=='rejected';
+   avatarNote.dataset.status=status||'';
+   avatarNote.textContent=status==='pending'?h.checking:status==='rejected'?h.rejected:'';
+  };
+  paintAvatar();
+  let choosingAvatar=false;
+  avatarBtn.onclick=async()=>{
+   if(choosingAvatar||hero.querySelector('form'))return;
+   choosingAvatar=true;
+   const w=avatarCropWords(locale);
+   try{
+    const file=await pickImageFile();if(!file)return;
+    let data;try{data=await cropAvatarFile(file,locale);}catch(error){toast(w[error.message]||w.unreadable);return;}
+    if(!data||!hero.isConnected)return;
+    avatarBtn.classList.add('is-busy');
+    if(!board().joined){toast(h.joining);await api('profile_name_save',{name:d.name,joinBoard:true});d.board={...board(),joined:true};}
+    const r=await api('leaderboard_avatar_set',{data});if(r?.state!=='ok'){toast(h.offline);return;}
+    toast(r.status==='approved'?w.approved:r.status==='rejected'?w.rejected:w.pending);
+    d.pic={status:r.status,image:r.status==='approved'?data:''};if(hero.isConnected)paintAvatar();window.dispatchEvent(new Event('megulit-profile-changed'));
+   }catch(e){toast(String(e?.message||h.offline));}
+   finally{choosingAvatar=false;avatarBtn.classList.remove('is-busy');}
+  };
   const lv0=readerLevel(d.stats,d.school);
   hero.querySelector('[data-class-go]')?.addEventListener('click',()=>openRite({api,locale,esc,toast,current:d.school,pending:lv0.pending,xpTotal:lv0.xp+lv0.pending,
    onDone:()=>paintHero(hero)}));
-  const edit=async(pick=false)=>{
+  const nameBtn=hero.querySelector('[data-hero-name]');
+  nameBtn.onclick=()=>{
    if(hero.querySelector('form'))return;
+   const input=document.createElement('input');input.type='text';input.maxLength=16;input.value=d.name||'';input.className='profile-hero-name-input';input.setAttribute('aria-label',
+    h.rename);
+   nameBtn.replaceWith(input);input.focus();input.select();let done=false;
+   const finish=async save=>{if(done)return;done=true;const v=input.value.trim();
+    if(save&&v&&v!==d.name){try{
+     const result=await api('profile_name_save',{name:v,joinBoard:false});
+     d.name=result.name;sync(d.name);window.dispatchEvent(new Event('megulit-profile-changed'));toast(h.saved);
+    }catch(e){toast(String(e?.message||h.offline));}}
+    if(!input.isConnected)return;
+    const focused=document.activeElement===input;
+    nameBtn.querySelector('[data-hero-name-text]').textContent=d.name;
+    input.replaceWith(nameBtn);paintAvatar();if(focused)nameBtn.focus();};
+   input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();finish(true);}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();finish(false);}};
+   input.onblur=()=>finish(true);
+  };
+  const edit=()=>{
+   if(hero.querySelector('form')||choosingAvatar||hero.querySelector('.profile-hero-name-input'))return;
    const words=avatarCropWords(locale),form=document.createElement('form');
    form.className='profile-identity-form';
    form.innerHTML=`<label>${h.rename} <input name="nickname" maxlength="16" required></label>
@@ -117,7 +167,7 @@ ${d.favorites.length?`<div class="profile-hero-fav"><h4>${h.fav}</h4><ol>${d.fav
      if(name!==board.name||(picture&&!board.joined)){
       const saved=await api('profile_name_save',{name,joinBoard:!!picture});
       input.value=saved.name;
-      hero.querySelector('[data-hero-name]').firstChild.textContent=saved.name;
+      d.name=saved.name;sync(d.name);nameBtn.querySelector('[data-hero-name-text]').textContent=saved.name;
      }
      if(picture){
       const result=await api('leaderboard_avatar_set',{data:picture});
@@ -134,11 +184,9 @@ ${d.favorites.length?`<div class="profile-hero-fav"><h4>${h.fav}</h4><ol>${d.fav
      window.dispatchEvent(new Event('megulit-profile-changed'));
     }
    };
-   if(pick)await choose();
+
   };
   hero.querySelector('[data-edit-profile]').onclick=()=>edit();
-  hero.querySelector('[data-hero-name]').onclick=()=>edit();
-  hero.querySelector('[data-hero-avatar]').onclick=()=>edit(true);
  }
  async function paint(){
   let state;try{state=await api('account_status',{autoSync:false});}catch{state=null;}

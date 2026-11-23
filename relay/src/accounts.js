@@ -20,7 +20,8 @@ export const ROTATE_GRACE = 30 * 86400; /* the previous token keeps working this
 export const ROTATED = new WeakMap();   /* request -> the token issued while answering it */
 export const KINDS = ['words', 'sentences', 'reading', 'settings'];
 export const KIND_CAP = { words: 8 << 20, sentences: 4 << 20, reading: 1 << 20, settings: 512 << 10 };
-export const RECORD_CAP = { words: 32 << 10, sentences: 8 << 10, reading: 1 << 10, settings: 32 << 10 };
+// A saved sentence sends two strings of up to 3,000 UTF-16 units. JSON can escape each unit as six bytes.
+export const RECORD_CAP = { words: 32 << 10, sentences: 40 << 10, reading: 1 << 10, settings: 32 << 10 };
 export const PUT_MAX_RECORDS = 500;
 export const PUT_MAX_BYTES = 2 << 20;
 export const PULL_LIMIT = 500;
@@ -323,6 +324,10 @@ async function syncPush(request, env, auth, kind, now) {
   const incoming = new Map();
   for (const raw of list) {
     const r = validateRecord(kind, raw, now.getTime()); if (r.error) return fail(r.error, r.error === 'RECORD_TOO_LARGE' ? 413 : 400, { key: typeof raw?.key === 'string' ? raw.key.slice(0, 200) : '' });
+    // Older clients can send a truncated legacy sentence under the hash of its full original text.
+    if (kind === 'sentences' && encoder.encode(r.json ?? '').length > (8 << 10) && /^s:[a-f0-9]{32}$/.test(r.key)) {
+      if (typeof r.data.text !== 'string' || r.key !== 's:' + (await sha256(r.data.text)).slice(0, 32)) return fail('RECORD_TOO_LARGE', 413, { key: r.key });
+    }
     incoming.set(r.key, newerRecord(incoming.get(r.key), r));
   }
   const id = auth.account.id, keys = [...incoming.keys()], existing = new Map();

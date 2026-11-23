@@ -64,13 +64,34 @@ class VoicePack{
   if(!file||!/^[a-f0-9]{64}$/i.test(String(file.checksum||''))||!(file.file_size>0))throw Error('AivisHub 没有 '+voice.name+' 的 AIVMX 文件信息');
   if(!['ACML 1.0','CC0'].includes(file.license_type))throw Error(voice.name+' 的许可已变为 '+file.license_type+'，已跳过');
   const target=path.join(this.dir,voice.uuid+'.aivmx'),tmp=target+'.tome-download';progress.bytes=0;progress.size=file.file_size;
+  const endpoint=API+voice.uuid+'/download?model_type=AIVMX',downloader=require('./fast-download.cjs');
+  let source=endpoint,renewal,renewed=false;
+  const redirected=response=>response.ok&&response.redirected&&response.url?.startsWith('https://')?response.url:'';
+  const renewSource=async options=>{
+   const response=await this.fetchVoice(endpoint,{...options,headers:{...options.headers,Range:'bytes=0-0'},signal:AbortSignal.any([signal,AbortSignal.timeout(downloader.DEFAULTS.probeCapMs)])});
+   const next=redirected(response);
+   void response.body?.cancel().catch(()=>{});
+   if(!next)return false;
+   source=next;renewed=true;
+   return true;
+  };
+  // Reuse the HTTPS URL reached by the initial request so later ranges don't each request a new AivisHub link.
+  const fetchModel=async(_url,options)=>{
+   const url=source,usedRenewal=renewed,response=await this.fetchVoice(url,options);
+   if(url===endpoint){source=redirected(response)||source;return response;}
+   if(response.status!==403||usedRenewal)return response;
+   void response.body?.cancel().catch(()=>{});
+   // Several ranges can receive the same refusal. Share one bounded request for a new link.
+   if(!await (renewal??=renewSource(options).catch(()=>false)))return response;
+   return this.fetchVoice(source,options);
+  };
   try{
-   await require('./fast-download.cjs').download({
-    urls:[API+voice.uuid+'/download?model_type=AIVMX'],dest:tmp,size:file.file_size,sha256:String(file.checksum).toLowerCase(),
-    // Each Range goes through the rate-limited Hub before reaching storage. Keep one resumable stream per voice.
-    connections:1,maxConnections:1,segment:file.file_size,probeCapMs:90000,
+   await downloader.download({
+    urls:[endpoint],dest:tmp,size:file.file_size,sha256:String(file.checksum).toLowerCase(),
+    // Reuse the signed storage URL for ranges and allow the initial connection time to settle.
+    probeCapMs:90000,
     fetch:async(url,opts)=>{
-     const response=await this.fetchVoice(url,opts);
+     const response=await fetchModel(url,opts);
      if(response.status===429){
       await response.body?.cancel?.();
       throw Object.assign(Error('HTTP 429'),{fatal:true});
@@ -83,7 +104,7 @@ class VoicePack{
   }catch(e){
    const corrupt=['HASH_MISMATCH','SIZE_MISMATCH'].includes(e.code);
    // Explicit cancellation discards the download. Transport errors keep the hash-bound Range checkpoint for retry.
-   if(corrupt||job?.controller.signal.aborted){
+   if(corrupt||e.last?.status===403||/HTTP 403/.test(e.last?.message||'')||job?.controller.signal.aborted){
     for(const f of [tmp,tmp+'.part',tmp+'.part.json'])try{fs.unlinkSync(f);}catch{}
    }
    if(corrupt)throw Error(voice.name+' 校验失败');
