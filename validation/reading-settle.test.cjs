@@ -36,7 +36,7 @@ test('right readings the dictionary lists differently are kept',()=>{
  assert.ok(out.every((t,i)=>t===tokens[i]));
 });
 
-test('LocalLearning.tokenize settles single words after numbers and dictionary words',()=>{
+test('LocalLearning.tokenize settles single words after names, numbers and dictionary words',()=>{
  const src=fs.readFileSync(path.join(__dirname,'..','core','learning-native.cjs'),'utf8');
- assert.match(src,/contextual\(text,this\.readings\.settle\(this\.dictionaryWords\(numberTokens\(tokens\)\)\)\)/);
+ assert.match(src,/contextual\(text,this\.readings\.settle\(this\.dictionaryWords\(numberTokens\(this\.withNames\(tokens\)\)\)\)\)/);
 });

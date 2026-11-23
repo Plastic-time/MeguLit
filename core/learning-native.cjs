@@ -3,6 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:chil
 const {createReadingResolver}=require('./reading.cjs');
 const {kana,contextual}=require('./furigana.js');
 const {numberTokens}=require('./counter-reading.cjs');
+const {nameTokens}=require('./name-reading.cjs');
 const {InstallProgress}=require('./install-progress.cjs');
 const {conjugation}=require('./morphology.cjs');
 const {definitionGroups}=require('./definitions.cjs');
@@ -17,7 +18,7 @@ function chinesePos(tag){
  return extra[tag]||tag;
 }
 class LocalLearning{
- constructor(folder,onStatus=()=>{}){this.folder=folder;this.onStatus=onStatus;this.pending=new Map();this.serial=0;this.cache=new Map();this.readings=createReadingResolver();this.progress={stage:this.installed()?'ready':'idle',percent:this.installed()?100:null};}
+ constructor(folder,onStatus=()=>{}){this.folder=folder;this.onStatus=onStatus;this.pending=new Map();this.serial=0;this.cache=new Map();this.readings=createReadingResolver();this.names=new Map();this.namesVersion=0;this.progress={stage:this.installed()?'ready':'idle',percent:this.installed()?100:null};}
  python(){const own=require('./layout.cjs').python;return fs.existsSync(own)?own:'python.exe';}
  runtimeFolder(){return require('./layout.cjs').reading;}
  installed(){return fs.existsSync(path.join(this.runtimeFolder(),'sudachidict_full/resources/system.dic'));}
@@ -125,18 +126,22 @@ class LocalLearning{
   return out;
  }
  async tokenize(text){
-  if(this.cache.has(text))return this.cache.get(text);await this.ready();
+  if(this.cache.has(text))return this.cache.get(text);await this.ready();const version=this.namesVersion;
   const tokens=await new Promise((resolve,reject)=>{const id=++this.serial,timer=setTimeout(()=>{this.pending.delete(id);reject(Error('本地分词等待超时，请检查 Full 组件状态'));},45000);this.pending.set(id,{resolve,reject,timer});this.worker.stdin.write(JSON.stringify({id,text})+'\n');});
   /* 2026-11-23 (user: the speech button said わたくし and ぶん where furigana showed わたし and ふん): furigana, the speech
      button, lookup and cards all read these tokens, so the contextual readings (私 わたし, 10分 じゅっぷん) are settled here
      once instead of in the reader page only. Numbers first: JMdict would otherwise join the counter with what follows
      (10分だけ as 10 + 分だけ ぶんだけ, 3本の as 3 + 本の ほんの). */
-  const corrected=contextual(text,this.readings.settle(this.dictionaryWords(numberTokens(tokens))));this.cache.set(text,corrected);if(this.cache.size>200)this.cache.delete(this.cache.keys().next().value);return corrected;
+  const corrected=contextual(text,this.readings.settle(this.dictionaryWords(numberTokens(this.withNames(tokens)))));if(version===this.namesVersion)this.cache.set(text,corrected);if(this.cache.size>200)this.cache.delete(this.cache.keys().next().value);return corrected;
  }
  // Whole adjacent tokens that together spell one JMdict word with a single reading are that word: Sudachi split
  // 後一歩 into 後一 (ゴイチ) + 歩 (アユミ, a given name), so furigana and speech said ごいちあゆみ while the dictionary card
  // knew あといっぽ (user, 2026-11-03). Only when the joined guess differs from the dictionary reading; up to 4 tokens,
  // longest first, never across punctuation or a gap.
+ /* The running game's character names from VNDB (name-reading.cjs); null when no game is bound. Furigana made with the
+    previous game's names is dropped. */
+ useNames(names){this.names=names instanceof Map?names:new Map();this.namesVersion++;this.cache.clear();}
+ withNames(tokens){return nameTokens(tokens,this.names);}
  dictionaryWords(tokens){
   if(!Array.isArray(tokens)||tokens.length<2)return tokens;this.load();const out=[];
   for(let i=0;i<tokens.length;i++){let best=null,stop=i;
@@ -238,12 +243,13 @@ class LocalLearning{
                        : prefix + (tens && ones ? 'ジュウ' : '') + minutes[ones];
     surface = selected; chosen = null; phrase = true; pronunciationForm = 'phrase';
   }
-  const ambiguous=!reading||!!chosen?.reading_ambiguous||!phrase&&!fixed&&!!entry&&!entry.readings?.some(r=>kana(r)===kana(reading));
+  // A VNDB character name is the reading even where the dictionary entry is another word (希 まれ for Nozomi).
+  const ambiguous=!reading||!!chosen?.reading_ambiguous||!phrase&&!fixed&&chosen?.readingSource!=='name'&&!!entry&&!entry.readings?.some(r=>kana(r)===kana(reading));
   /* A piece of a number word (分 of 10分): the furigana reads the whole word (じゅっぷん), so the speech button says that word;
      the card keeps the selected word. */
-  const number=!token&&tokens.find(t=>t.readingSource==='number'&&t.start<=args.start&&args.end<=t.end);
-  const spoken=number?{surface:number.surface,reading:number.reading,pitch:[],ambiguous:false}:null;
-  return {...(spoken?{spoken}:{}),surface,clickedSurface:result.surface,base:m.base||result.surface,reading,pitch:chosen?.pitch||[],pitchSource:chosen?.pitch_source||(phrase?'词组 · 音调由语音引擎估计':'UniDic 未匹配 · 音调由语音引擎估计'),pronunciationForm,ambiguous,pos:m.wordClass||entry?.pos?.join('、')||'',meaning:entry?.definition_groups?.map(g=>g.text).join('\n')||entry?.definitions?.join('\n')||'',sentence:args.text};
+  const number=!token&&tokens.find(t=>(t.readingSource==='number'||t.readingSource==='name')&&t.start<=args.start&&args.end<=t.end);
+  const spoken=number?{surface:number.surface,reading:number.reading,pitch:[],ambiguous:false,...(number.parts?{parts:number.parts}:{})}:null;
+  return {...(spoken?{spoken}:{}),...(chosen?.parts?{parts:chosen.parts}:{}),surface,clickedSurface:result.surface,base:m.base||result.surface,reading,pitch:chosen?.pitch||[],pitchSource:chosen?.pitch_source||(phrase?'词组 · 音调由语音引擎估计':'UniDic 未匹配 · 音调由语音引擎估计'),pronunciationForm,ambiguous,pos:m.wordClass||entry?.pos?.join('、')||'',meaning:entry?.definition_groups?.map(g=>g.text).join('\n')||entry?.definitions?.join('\n')||'',sentence:args.text};
  }
 
  async request(command,args,language='zh'){

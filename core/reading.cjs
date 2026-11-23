@@ -3,8 +3,8 @@ const fs=require('node:fs');
 const {kana}=require('./furigana.js');
 const {numberTokens}=require('./counter-reading.cjs');
 const hasKanji=s=>/[\p{Script=Han}々〆]/u.test(s||'');
-/* Readings consumers may show: settled by the dictionary or read from a number and its counter, not the tokenizer's guess. */
-const settled=t=>t?.readingSource==='dictionary'||t?.readingSource==='number';function pronunciation(s){return kana(s).replace(/([おこそとのほもよろごぞどぼぽょ])(?:う|お)/g,'$1ー').replace(/([うくすつぬふむゆるぐずづぶぷゅ])う/g,'$1ー').replace(/([いきしちにひみりぎじぢびぴ])い/g,'$1ー').replace(/[びぴ]/g,'ひ').replace(/[ぶぷ]/g,'ふ');}
+/* Readings consumers may show: settled by the dictionary, read from a number and its counter or a VNDB character name, not the tokenizer's guess. */
+const settled=t=>t?.readingSource==='dictionary'||t?.readingSource==='number'||t?.readingSource==='name';function pronunciation(s){return kana(s).replace(/([おこそとのほもよろごぞどぼぽょ])(?:う|お)/g,'$1ー').replace(/([うくすつぬふむゆるぐずづぶぷゅ])う/g,'$1ー').replace(/([いきしちにひみりぎじぢびぴ])い/g,'$1ー').replace(/[びぴ]/g,'ひ').replace(/[ぶぷ]/g,'ふ');}
 function createReadingResolver(file=require('node:path').join(require('./paths.cjs').resources,'jmdict.json')){
   let index;
   function load(){
@@ -43,7 +43,7 @@ function createReadingResolver(file=require('node:path').join(require('./paths.c
         }
       }
       if(best){result.push({...token,...best,readingSource:'dictionary'});i=stop;continue;}
-      if(token.readingSource==='number'){result.push(token);continue;}
+      if(token.readingSource==='number'||token.readingSource==='name'){result.push(token);continue;}
       if(!hasKanji(surface)){result.push(token);continue;}
       let reading=choose(surface,expected);
       if(!reading&&typeof token.base_form==='string'){
@@ -71,7 +71,7 @@ function createReadingResolver(file=require('node:path').join(require('./paths.c
     const touches=(a,b)=>!Number.isInteger(a?.end)||!Number.isInteger(b?.start)||a.end===b.start;
     const same=(a,b)=>pronunciation(a).replace(/ぢ/g,'じ').replace(/づ/g,'ず')===pronunciation(b).replace(/ぢ/g,'じ').replace(/づ/g,'ず');
     return tokens.map((token,i)=>{
-      if(!token||typeof token.surface!=='string'||token.readingSource==='number'||!hasKanji(token.surface)||!token.reading)return token;
+      if(!token||typeof token.surface!=='string'||token.readingSource==='number'||token.readingSource==='name'||!hasKanji(token.surface)||!token.reading)return token;
       const g=Array.isArray(token.grammar)?token.grammar:[];
       if(token.base_form!==token.surface||g[1]==='固有名詞'||['接頭辞','接尾辞'].includes(g[0]))return token;
       if((kanjiAt(tokens[i-1],true)&&touches(tokens[i-1],token))||(kanjiAt(tokens[i+1],false)&&touches(token,tokens[i+1])))return token;
@@ -80,6 +80,8 @@ function createReadingResolver(file=require('node:path').join(require('./paths.c
       return {...token,reading:list[0],readingSource:'dictionary',pitch:[]};
     });
   }
-  return {resolve,settle};
+  /* JMdict readings of one spelling (a kanji's own readings tell あきづき from あきずき for 明月). */
+  function lookup(surface){load();return index.get(surface)||[];}
+  return {resolve,settle,lookup};
 }
 module.exports={createReadingResolver,pronunciation,settled};
