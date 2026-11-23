@@ -16,8 +16,9 @@ function defaultVoiceRateLimited(file,attemptStart){
  }catch{return false;}
  finally{if(fd!==undefined)fs.closeSync(fd);}
 }
+const DEFAULT_VOICE_PREP_MS=45000;
 class Services{
- constructor(root,options={}){this.root=root;this.children=[];this.starting=null;this.epoch=0;this.controller=new AbortController();this.fetch=options.fetch||fetch;this.prepare=options.prepare||require('./speech-setup.cjs').prepareSpeechModel;this.spawn=options.spawn||spawn;this.exe=options.exe||require('./layout.cjs').aivis;this.killTree=options.killTree||killTree;this.releasing=Promise.resolve();this.game='';this.log=message=>fs.appendFileSync(path.join(this.root,'logs','speech-engine.log'),message+'\n');}
+ constructor(root,options={}){this.root=root;this.children=[];this.starting=null;this.preparingDefaultVoices=null;this.epoch=0;this.controller=new AbortController();this.fetch=options.fetch||fetch;this.prepare=options.prepare||require('./speech-setup.cjs').prepareSpeechModel;this.spawn=options.spawn||spawn;this.exe=options.exe||require('./layout.cjs').aivis;this.killTree=options.killTree||killTree;this.releasing=Promise.resolve();this.game='';this.log=message=>fs.appendFileSync(path.join(this.root,'logs','speech-engine.log'),message+'\n');}
  async gameEvent(message,config){
   if(message.type==='gameClosed'){this.game='';await this.stopSpeech();this.log('[MeguLit] game closed; owned speech process tree released');return;}
   if(!['bound','snapshot'].includes(message.type)||!message.gameProcessId)return;
@@ -31,7 +32,7 @@ class Services{
  }
  rememberSpeakers(list){if(!Array.isArray(list)||!list.length)return;try{const file=path.join(this.root,'cache','speakers.json');fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(list));fs.renameSync(file+'.tmp',file);}catch{}}
  cachedSpeakers(){try{const list=JSON.parse(fs.readFileSync(path.join(this.root,'cache','speakers.json'),'utf8'));return Array.isArray(list)?list:[];}catch{return [];}}
- async stopSpeech(){this.epoch++;this.controller.abort();this.controller=new AbortController();this.starting=null;const children=this.children.splice(0);const previous=this.releasing;this.releasing=Promise.allSettled([previous,...children.map(child=>this.killTree(child))]);await this.releasing;}
+ async stopSpeech(){const voiceCleanup=this.preparingDefaultVoices;this.epoch++;this.controller.abort();this.controller=new AbortController();this.starting=null;const children=this.children.splice(0);const previous=this.releasing;this.releasing=Promise.allSettled([previous,voiceCleanup,...children.map(child=>this.killTree(child))]);await this.releasing;}
  ensureSpeech(url='http://127.0.0.1:10101',gpu=true){
   if(this.stopping)return Promise.reject(Error('程序正在退出'));if(this.starting)return this.starting;
   const epoch=this.epoch,signal=this.controller.signal,check=()=>{if(this.stopping||epoch!==this.epoch)throw Error('语音启动已取消');};
@@ -39,7 +40,13 @@ class Services{
   const job=(async()=>{await this.releasing;check();const ready=await probe();check();if(ready)return;
    if(url!=='http://127.0.0.1:10101')throw Error('无法连接所配置的 AivisSpeech 地址，请先启动对应引擎');
    const exe=this.exe;if(!fs.existsSync(exe))throw Error('缺少 AivisSpeech 引擎，请完整解压语音组件');
+   // Keep time for the engine's ordinary startup when the model host is slow or unreachable.
+   const voicePrepSignal=AbortSignal.any([signal,AbortSignal.timeout(DEFAULT_VOICE_PREP_MS)]);
    await this.prepare(this.log);check();
+   let voices;
+   try{voices=require('./voice-pack.cjs').prepareDefaultVoices({fetch:this.fetch,signal:voicePrepSignal});this.preparingDefaultVoices=voices;await voices;}
+   catch(e){check();this.log('[MeguLit] default voice preparation failed; AivisSpeech will handle first-run setup: '+e.message);}
+   finally{if(this.preparingDefaultVoices===voices)this.preparingDefaultVoices=null;}
    const marker=path.join(this.root,'cache','speech-gpu-unavailable'),modes=gpu&&!fs.existsSync(marker)?['--use_gpu','--no-use_gpu']:['--no-use_gpu'];
    const logFile=path.join(this.root,'logs','speech-engine.log');
    for(const mode of modes){check();this.log('[MeguLit] starting AivisSpeech with '+mode);const log=fs.openSync(logFile,'a');let child,attemptStart;try{attemptStart=fs.fstatSync(log).size;child=this.spawn(exe,['--host','127.0.0.1','--port','10101',mode],{cwd:path.dirname(exe),windowsHide:true,stdio:['ignore',log,log]});}finally{fs.closeSync(log);}this.children.push(child);let failed=false;child.on('error',()=>{failed=true;});child.on('exit',()=>{failed=true;});
