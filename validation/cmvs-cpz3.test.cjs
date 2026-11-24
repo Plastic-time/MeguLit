@@ -10,6 +10,7 @@ const { probeGame } = require('../services/adapter-probe-core.cjs');
 const { locate, readScript } = require('../services/original-text.cjs');
 const cmvs = require('../services/original-engines/cmvs.cjs');
 const kit = require('../services/original-engines/kit.cjs');
+const { unsupportedReason } = require('../services/original-engines/scenes.cjs');
 
 // Synthetic index and entries. The CPZ3 constants and inverse cipher follow the cmvs-rs format notes.
 const cipherWords = [
@@ -90,7 +91,7 @@ test('CMVS reads CPZ3 PS2A scenes through the probe and original reader', t => {
   const { root, pack, executable } = game(t);
   const first = ['海から冷たい風が吹いてくる。', '「ここで待ち合わせしよう。」'];
   const second = ['今日は何を持って行こうか。', '歩きながらゆっくり話した。'];
-  const scripts = { 'a01.ps2': ps2a(first), 'a02.ps2': ps2a(second) };
+  const scripts = { 'a02.ps2': ps2a(second), 'a01.ps2': ps2a(first) };
   assert.ok(Object.values(scripts).some(script => script.length % 4));
   fs.writeFileSync(path.join(pack, 'script.cpz'), cpz3(scripts));
 
@@ -100,6 +101,11 @@ test('CMVS reads CPZ3 PS2A scenes through the probe and original reader', t => {
   assert.equal(probe.engines.find(engine => engine.id === 'cmvs').scenes, 2);
   assert.equal(probe.japaneseLines, 4);
   assert.deepEqual(readScript(locate(root, 'cmvs')).lines, [...first, ...second]);
+
+  const patch = path.join(root, 'FileHook');
+  fs.mkdirSync(patch);
+  fs.writeFileSync(path.join(patch, 'a01.ps2'), ps2a(['静かに待とう。', '船の明かりが見えた。']));
+  assert.deepEqual(cmvs.engine.originalLines(root), [...first, ...second]);
 });
 
 test('CMVS rejects a CPZ3 index or script entry with the wrong checksum', t => {
@@ -112,6 +118,7 @@ test('CMVS rejects a CPZ3 index or script entry with the wrong checksum', t => {
   const probe = probeGame({ dir: root, executable });
   assert.equal(probe.step, 'parse-failed');
   assert.equal(probe.detail, 'cmvs:CMVS_CPZ3_ARCHIVE');
+  assert.match(unsupportedReason(root).detail, /CPZ3/);
 
   const wrongEntry = cpz3(entries);
   wrongEntry[wrongEntry.length - 1] ^= 1;
@@ -163,6 +170,8 @@ test('a damaged same-name CPZ3 scene cannot hide a readable CPZ6 scene', t => {
   const probe = probeGame({ dir: root, executable });
   assert.equal(probe.step, 'ok');
   assert.equal(probe.engines.find(engine => engine.id === 'cmvs').scenes, 1);
+  const [archived] = cmvs.engine.archives(root);
+  assert.deepEqual(cmvs.engine.parse(archived.read()).lines, lines);
   assert.equal(probe.japaneseLines, 1);
   assert.deepEqual(readScript(locate(root, 'cmvs')).lines, lines);
 
