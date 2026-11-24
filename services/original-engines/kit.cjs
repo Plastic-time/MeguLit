@@ -155,15 +155,15 @@ const widthOf=type=>type==='u64le'?8:INT[type][0];
 function table(file,spec,{maxIndex=64<<20}={}){const fsz=size(file);if(fsz<8)return null;
  const idx=readAt(file,0,Math.min(fsz,maxIndex));if(spec.magic&&idx.toString('latin1',0,spec.magic.length)!==spec.magic)return null;
  try{const count=spec.count?rdInt(idx,spec.count.type,spec.count.at):Infinity;if(spec.count&&(count<0||count>500000))return null;
-  let p=typeof spec.entries==='number'?spec.entries:rdInt(idx,spec.entries.type,spec.entries.at);if(p<0)return null;const raw=[];
-  for(let n=0;n<count&&p<idx.length&&n<500000;n++){const e={};
-   for(const f of spec.fields){if(f.type==='skip'){if(p+f.size>idx.length)return null;p+=f.size;continue;}
-    if(f.type==='cstr'||f.type==='pstr8'){let nb;if(f.type==='cstr'){if(p+f.size>idx.length)return null;nb=idx.subarray(p,p+f.size);p+=f.size;const z=nb.indexOf(0);if(z>=0&&!spec.nameCipher)nb=nb.subarray(0,z);}else{if(p>=idx.length)return null;const len=idx[p];if(p+1+len>idx.length)return null;nb=idx.subarray(p+1,p+1+len);p+=1+len;}
+  let p=typeof spec.entries==='number'?spec.entries:rdInt(idx,spec.entries.type,spec.entries.at);if(p<0)return null;const raw=[];let cut=false;
+  for(let n=0;n<count&&p<idx.length&&n<500000;n++){const e={};let bad=false;
+   for(const f of spec.fields){if(f.type==='skip'){if(p+f.size>idx.length){bad=true;break;}p+=f.size;continue;}
+    if(f.type==='cstr'||f.type==='pstr8'){let nb;if(f.type==='cstr'){if(p+f.size>idx.length){bad=true;break;}nb=idx.subarray(p,p+f.size);p+=f.size;const z=nb.indexOf(0);if(z>=0&&!spec.nameCipher)nb=nb.subarray(0,z);}else{if(p>=idx.length){bad=true;break;}const len=idx[p];if(p+1+len>idx.length){bad=true;break;}nb=idx.subarray(p+1,p+1+len);p+=1+len;}
      nb=Buffer.from(nb);if(spec.nameCipher==='not')for(let i=0;i<nb.length;i++)nb[i]=~nb[i]&255;else if(spec.nameCipher?.xor!==undefined)for(let i=0;i<nb.length;i++)nb[i]^=spec.nameCipher.xor;
      const z=nb.indexOf(0);e.name=new TextDecoder(spec.encoding||'shift_jis').decode(z>=0?nb.subarray(0,z):nb);continue;}
-    if(p+widthOf(f.type)>idx.length)return null;const v=rdInt(idx,f.type,p);p+=widthOf(f.type);if(f.name)e[f.name]=v;}
-   raw.push(e);}
-  if(spec.count&&raw.length!==count)return null;
+    if(p+widthOf(f.type)>idx.length){bad=true;break;}const v=rdInt(idx,f.type,p);p+=widthOf(f.type);if(f.name)e[f.name]=v;}
+   if(bad){cut=true;break;}raw.push(e);}
+  if(cut&&(!raw.length||spec.base==='after-index'))return null;
   const base=spec.base==='after-index'?p:typeof spec.base==='number'?spec.base:spec.base?rdInt(idx,spec.base.type,spec.base.at):0;
   const out=[];for(let i=0;i<raw.length;i++){const e=raw[i];let offset=base+e.offset,sz=e.size;
    if(spec.sizeFrom==='next'){const next=i+1<raw.length?base+raw[i+1].offset:fsz;sz=next-offset;}
@@ -269,8 +269,8 @@ function zipRead(file,e){if(e.encrypted)throw Error('ZIP_ENCRYPTED');const fsz=s
  const h=readAt(file,e.local,30);if(h.length<30||h.readUInt32LE(0)!==0x04034b50)throw Error('ZIP_LOCAL');if(h.readUInt16LE(6)&1)throw Error('ZIP_ENCRYPTED');
  const at=e.local+30+h.readUInt16LE(26)+h.readUInt16LE(28);if(!Number.isSafeInteger(e.comp)||e.comp<0||at+e.comp>fsz)throw Error('ZIP_TRUNCATED');
  const data=readAt(file,at,e.comp);if(data.length!==e.comp)throw Error('ZIP_TRUNCATED');
- if(e.method===0){if(e.raw!==undefined&&data.length!==e.raw)throw Error('ZIP_SIZE');return data;}
- if(e.method===8){const out=zlib.inflateRawSync(data,{maxOutputLength:256<<20});if(e.raw!==undefined&&out.length!==e.raw)throw Error('ZIP_SIZE');return out;}
+ if(e.method===0){if(e.raw>0&&e.raw!==0xffffffff&&data.length!==e.raw)throw Error('ZIP_SIZE');return data;}
+ if(e.method===8){const out=zlib.inflateRawSync(data,{maxOutputLength:256<<20});if(e.raw>0&&e.raw!==0xffffffff&&out.length!==e.raw)throw Error('ZIP_SIZE');return out;}
  throw Error('ZIP_METHOD_'+e.method);}
 
 /* ---- names (E605: every reader built its own TextDecoder('shift_jis') and cut fixed-size archive names at NUL by hand)

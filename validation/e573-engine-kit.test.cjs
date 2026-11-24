@@ -80,7 +80,7 @@ test('kit malformed guard #43: krkrScrambled requires a complete 5-byte FE FE <m
  const u16=Buffer.from('あ','utf16le');const m1=Buffer.alloc(2);const c=u16.readUInt16LE(0);m1.writeUInt16LE(((c&0xaaaa)>>1)|((c&0x5555)<<1),0);
  assert.equal(kit.decodeText(Buffer.concat([Buffer.from([0xfe,0xfe,1,0xff,0xfe]),m1])),'あ');
 });
-test('kit malformed guard #35: table() rejects negative offsets, truncated fields and incomplete counts',t=>{
+test('kit malformed guard #35: table() rejects negative offsets and truncated fields while keeping parsed entries on over-counted tables',t=>{
  const d=tmp(t);
  const neg=Buffer.alloc(16+16+8);neg.write('PACK',0,'latin1');neg.writeUInt32LE(1,8);neg.write('a.txt',16,'latin1');neg.writeUInt32LE(8,24);neg.writeInt32LE(-4,28);
  const negFile=path.join(d,'neg.pak');fs.writeFileSync(negFile,neg);
@@ -88,9 +88,10 @@ test('kit malformed guard #35: table() rejects negative offsets, truncated field
  const truncPstr=Buffer.concat([Buffer.from('ARCX','latin1'),Buffer.from([2,0,0,0]),Buffer.from([20,0,0,0,4]),Buffer.from('ab')]);
  const truncPstrFile=path.join(d,'trunc-pstr.pak');fs.writeFileSync(truncPstrFile,truncPstr);
  assert.equal(kit.table(truncPstrFile,{magic:'ARCX',count:{at:4,type:'u32le'},entries:8,fields:[{name:'offset',type:'u32le'},{name:'name',type:'pstr8'}],sizeFrom:'next'}),null);
- const shortCnt=Buffer.alloc(16+16);shortCnt.write('PACK',0,'latin1');shortCnt.writeUInt32LE(3,8);shortCnt.write('a.txt',16,'latin1');shortCnt.writeUInt32LE(0,24);shortCnt.writeUInt32LE(32,28);
- const shortCntFile=path.join(d,'short-cnt.pak');fs.writeFileSync(shortCntFile,shortCnt);
- assert.equal(kit.table(shortCntFile,{magic:'PACK',count:{at:8,type:'u32le'},entries:16,fields:[{name:'name',type:'cstr',size:8},{name:'size',type:'u32le'},{name:'offset',type:'u32le'}]}),null);
+ /* over-counted index where entry 0 is complete and in bounds keeps entry 0 instead of dropping the whole archive */
+ const overCnt=Buffer.alloc(16+16);overCnt.write('PACK',0,'latin1');overCnt.writeUInt32LE(3,8);overCnt.write('a.txt',16,'latin1');overCnt.writeUInt32LE(0,24);overCnt.writeUInt32LE(32,28);
+ const overCntFile=path.join(d,'over-cnt.pak');fs.writeFileSync(overCntFile,overCnt);
+ assert.deepEqual(kit.table(overCntFile,{magic:'PACK',count:{at:8,type:'u32le'},entries:16,fields:[{name:'name',type:'cstr',size:8},{name:'size',type:'u32le'},{name:'offset',type:'u32le'}]}).map(e=>e.name),['a.txt']);
 });
 test('kit malformed guard #42: asarList() handles malformed JSON roots, null child nodes and deep nesting',t=>{
  const d=tmp(t);
@@ -128,4 +129,7 @@ test('kit malformed guard #40: zipRead() rejects encrypted, truncated and size-m
  fs.writeFileSync(zSz8,mkZip('a.txt',Buffer.from('hello world'),{method:8,badRaw:99}));
  assert.throws(()=>kit.zipRead(zSz0,kit.zipList(zSz0)[0]),/ZIP_SIZE/);
  assert.throws(()=>kit.zipRead(zSz8,kit.zipList(zSz8)[0]),/ZIP_SIZE/);
+ /* ZIP64 sentinel raw=0xffffffff and zero-raw deflated entries remain readable */
+ const z64=path.join(d,'z64.zip');fs.writeFileSync(z64,mkZip('a.txt',Buffer.from('hello world'),{method:8,badRaw:0xffffffff}));
+ assert.equal(kit.zipRead(z64,kit.zipList(z64)[0]).toString(),'hello world');
 });
