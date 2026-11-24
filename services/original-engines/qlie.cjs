@@ -12,7 +12,7 @@
                       key.fkey and the title's game key (exe resource TFORM1 IconKeyImage, else a probe-supplied key).
                       3.1: two table generators (methods 1 / 2), method 2 mixes key.fkey or the pack's own pack_keyfile.
                       "1PC\xFF" entries are QLIE's byte-pair compression.
-     *.s              plain text, Shift-JIS (UTF-16LE when it holds NUL). @ ^ \ ％ lines are commands; 【name】 lines are
+     *.s              plain text, Shift-JIS (UTF-16LE when it has a BOM or holds NUL). @ ^ \ ％ lines are commands; 【name】 lines are
                       speakers; name,message lines (the \w+,name,text form); ^select,a,b,c lists choices; [n] is a break.
    Per-title parameter: only a 3.0 pack with key.fkey whose exe has no IconKeyImage needs the game key; it comes from an
    adapter pack (params target "qlie-key": {gameKey: hex of 256 bytes, keyFile?: hex}). Every candidate is tried and the
@@ -127,7 +127,7 @@ function resolveGameKey(entries){const ctx=entries[0]?.ctx;if(!ctx||ctx.f.major!
  if(ok(null))return;ctx.gameKey=exe||null;}
 
 /* ---- script grammar (VNTextPatch's reading of .s) ----------------------------------------------------------------- */
-const text=buf=>buf.includes(0)?buf.toString('utf16le').replace(/^﻿/,''):kit.decoder([buf]).decode(buf);
+const text=buf=>buf[0]===0xff&&buf[1]===0xfe?buf.toString('utf16le',2):buf.includes(0)?buf.toString('utf16le'):kit.decoder([buf]).decode(buf);
 const clean=t=>kit.trimBoth(t.replace(/\[rb,([^,\]]*),[^\]]*\]/g,'$1').replace(/\[n\]/g,'\n').replace(/\[[^\]\n]*\]/g,''));
 function parse(buf){const lines=[],anchors=[];
  for(const raw of text(buf).split(/\r?\n/)){const t=raw.trim();if(!t)continue;

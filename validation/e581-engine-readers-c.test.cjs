@@ -28,6 +28,25 @@ test('QLIE: .s grammar (names, name,message lines, choices, ruby, [n]); UTF-16 s
  const r=qlie.parse(F.sjis(QS));assert.deepEqual(r.lines,QL);assert.ok(r.anchors.includes('【ミナ】'));
  assert.deepEqual(qlie.parse(Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from(QS,'utf16le')])).lines,QL);
 });
+test('QLIE: UTF-16LE BOM is honoured even when a Japanese-only script contains no NUL bytes',t=>{
+ const nulFree=Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from('「二つ目」','utf16le')]);
+ assert.equal(nulFree.includes(0),false,'fixture must contain no NUL bytes');
+ assert.deepEqual(qlie.parse(nulFree).lines,['「二つ目」']);
+ assert.deepEqual(qlie.parse(Buffer.from([0xff,0xfe])),{lines:[],anchors:[]});
+ assert.deepEqual(qlie.parse(Buffer.from('「二つ目」\r\n','utf16le')).lines,['「二つ目」']);
+ assert.deepEqual(qlie.parse(F.sjis('「二つ目」')).lines,['「二つ目」']);
+ assert.deepEqual(qlie.parse(F.gbk('“第二个”')).lines,['“第二个”']);
+ const dir=tmp(t);
+ F.writeTree(dir,{'GameData/data0.pack':F.qliePack({'s001.s':nulFree},{version:'3.1'}),'game.exe':'MZ'});
+ assert.deepEqual(scenes.read('qlie',dir)[0].lines,['「二つ目」']);
+ // resolveGameKey() also decodes probe scripts via text(): a 3.0 keyed pack with a NUL-free BOM UTF-16LE script
+ const keyFile=Buffer.from(Array.from({length:256},(_,i)=>(i*17+5)&255)),gameKey=Buffer.from(Array.from({length:256},(_,i)=>(i*31+9)&255));
+ const kdir=tmp(t);
+ const nulFreeKana=Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from('「おはよう、ございます」','utf16le')]);
+ assert.equal(nulFreeKana.includes(0),false);
+ F.writeTree(kdir,{'GameData/data0.pack':F.qliePack({'s001.s':nulFreeKana},{version:'3.0',keyFile,gameKey}),'game.exe':F.pe([{type:10,name:'RESKEY',data:keyFile},{type:10,name:'TFORM1',data:F.tform(gameKey)}])});
+ assert.deepEqual(scenes.read('qlie',kdir)[0].lines,['「おはよう、ございます」']);
+});
 test('QLIE: 1PC byte-pair compression',()=>{const p=Buffer.from('xxABxxABAB yy');assert.deepEqual(qlie.unpack(F.qliePc(p)),p);assert.equal(qlie.unpack(Buffer.from('nope')),null);});
 for(const version of ['1.0','2.0','3.0','3.1'])test(`QLIE: pack ${version} lists, decrypts and reads (packed entry too)`,t=>{
  const dir=tmp(t);F.writeTree(dir,{'GameData/data0.pack':F.qliePack({'scenario/s001.s':F.sjis(QS),'scenario/s002.s':F.sjis('「二つ目」'),'sys/a.png':Buffer.alloc(40,1)},{version,packed:new Set(['scenario/s002.s'])}),'game.exe':'MZ'});
