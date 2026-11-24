@@ -63,7 +63,21 @@ function lzDecode(src){const size=src.readUInt32LE(0),end=Math.min(src.length,sr
 // ---- Text ---------------------------------------------------------------------------------------------------------
 function dec(b){try{return new TextDecoder('utf-8',{fatal:true}).decode(b);}catch{return kit.SJIS.decode(b);}}
 // One code page for a whole file: UTF-8 (WOLF 3), else Shift-JIS or (a Chinese patch) GBK, whichever reads cleaner.
-function codepage(bufs){const all=Buffer.concat(bufs.slice(0,4000));try{new TextDecoder('utf-8',{fatal:true}).decode(all);return 'utf-8';}catch{}
+// GB2312 pairs in 0xC2..0xDF + 0xA1..0xBF (e.g. "去小山石" -> "ȥСɽʯ") are valid 2-byte UTF-8, so 2-byte-only UTF-8
+// whose non-ASCII bytes are all valid GB2312 pairs must look like Latin-1 in ASCII context to stay UTF-8.
+function isUtf8Text(sample,all){
+ let t;try{t=new TextDecoder('utf-8',{fatal:true}).decode(all);}catch{return false;}
+ if(!/[^\x00-\x7f]/.test(t))return true;
+ if(/[\u0080-\u009f]/.test(t))return false;
+ if(/[^\x00-\u07ff]/.test(t))return true;
+ if(all.some(b=>b>=0x80&&b<=0xa0))return true;
+ if(/[^\x00-\u00ff]/.test(t))return false;
+ const s=sample.map(b=>clean(new TextDecoder('utf-8').decode(b)).text).join('\n');
+ if(/[\u00a0-\u00bf][\u0080-\u00ff]|[\u0080-\u00ff][\u00a0-\u00bf]/.test(s))return false;
+ return /[A-Za-z][\u00c0-\u00ff]|[\u00c0-\u00ff][A-Za-z]|[A-Za-z0-9] ?[\u00a0-\u00bf]|[\u00a0-\u00bf] ?[A-Za-z0-9]/.test(s);}
+function codepage(bufs){const sample=bufs.slice(0,4000),sep=Buffer.from([10]);
+ const all=sample.length>1?Buffer.concat(sample.flatMap((b,i)=>i?[sep,b]:[b])):sample[0]||Buffer.alloc(0);
+ if(isUtf8Text(sample,all))return 'utf-8';
  /* E577 Shift-JIS vs GBK: kit.codepage */return kit.codepage(all);}
 function clean(text){const ruby=[];let t=String(text??'').replace(/\r/g,'');
  t=t.replace(/\\r\[([^,\]]+),([^\]]+)\]/g,(_,base,reading)=>{ruby.push([base,reading]);return base;});
