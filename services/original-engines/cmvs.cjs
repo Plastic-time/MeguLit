@@ -210,7 +210,14 @@ function open(file,params){const fsz=kit.size(file),pk=paramsKey(params),stamp=p
    find:for(const sc of sets)for(const v of sc.md5){const x=readIndex(raw,h,v,sc,fsz);if(x&&x.entries.length){r={...x,h,sc};break find;}}}}catch{r=null;}
  if(stamp!==null){if(memo.size>64)memo.clear();memo.set(stamp,r);}return r;}
 const list=file=>open(file)?.entries||null;
-function read(file,e,params){const a=open(file,params),data=kit.readAt(file,e.offset,e.size);if(!a||!a.h.encrypted)return data;
+const CVNS_MAX_SCRIPT_BODY=64<<20;
+/* An all-literal LZSS stream adds one flag byte per eight bytes, plus the script header. */
+const CVNS_MAX_PACKED_SCRIPT=0x30+CVNS_MAX_SCRIPT_BODY+(CVNS_MAX_SCRIPT_BODY>>>3);
+function read(file,e,params){
+ const a=open(file,params);
+ if(a?.version<3&&e.size>CVNS_MAX_PACKED_SCRIPT)return Buffer.alloc(0);
+ const data=kit.readAt(file,e.offset,e.size);
+ if(!a||!a.h.encrypted)return data;
  if(a.version===1)return decryptCpz1(data);
  if(a.version===2)return data.length===e.size&&flatChecksum(data)===e.checksum?decryptCpz2(data,e.key):Buffer.alloc(0);
  const {h,sc,md5}=a,v=a.values||ZERO7;let seed=(((((h.master^e.key)>>>0)+h.dirCount)>>>0)^v.resXor)>>>0;seed=(seed-sc.entrySub)>>>0;seed=(seed^((h.entryKey+v.seedAdd)>>>0))>>>0;
@@ -226,16 +233,15 @@ function read(file,e,params){const a=open(file,params),data=kit.readAt(file,e.of
    Chinese release of a CPZ7 title keeps its scripts unpacked in FileHook\ */
 const scriptSize=buf=>buf.readUInt32LE(0x14)+4*buf.readUInt32LE(0x10)+buf.readUInt32LE(0x18)+buf.readUInt32LE(0x1c);
 const scriptLzss={window:0x800,start:0x7df,lenBits:5,minMatch:2};
+function unpackPss0(buf){
+ if(buf.length<0x30||buf.toString('latin1',0,4)!=='PSS0')return null;
+ const expected=buf.readUInt32LE(0x28);
+ if(expected!==scriptSize(buf)||expected>CVNS_MAX_SCRIPT_BODY||buf.readUInt32LE(0x24)!==buf.length-0x30)return null;
+ const body=kit.lzss(buf.subarray(0x30),expected,scriptLzss);
+ return body.length===expected?Buffer.concat([buf.subarray(0,0x30),body]):null;
+}
 function unpackPs2(buf){
- if(buf.length<0x30)return null;
- const magic=buf.toString('latin1',0,4);
- if(magic==='PSS0'){
-  const expected=buf.readUInt32LE(0x28);
-  if(expected!==scriptSize(buf)||expected>(64<<20)||buf.readUInt32LE(0x24)!==buf.length-0x30)return null;
-  const body=kit.lzss(buf.subarray(0x30),expected,scriptLzss);
-  return body.length===expected?Buffer.concat([buf.subarray(0,0x30),body]):null;
- }
- if(magic!=='PS2A')return null;
+ if(buf.length<0x30||buf.toString('latin1',0,4)!=='PS2A')return null;
  if(0x30+scriptSize(buf)===buf.length)return buf;
  const key=buf.readUInt32LE(12),shift=((key>>>20)%5)+1,k=((key>>>24)+(key>>>3))&255;
  const body=Buffer.from(buf.subarray(0x30).map(b=>kit.ror(k^((b-0x7C)&255),shift)));
@@ -243,6 +249,7 @@ function unpackPs2(buf){
 }
 const PUSH=Buffer.from([1,2,0x20,1]),PUSH_END=Buffer.from([0x0f,2,0x30,4]);
 const RESOURCE=/\.(ogg|wav|mv2|pb3|pb2|ps3|ps2|cur|cmv|mgv|png|bmp)\b/i;
+const CVNS_RESOURCE=/^\S+\.pss$/i;
 const DIALOGUE_PUNCT=/[「」『』。、！？…]/;
 /* the pushed strings in code order; an empty one stays as an empty buffer, so the n-th push of two builds of one script
    is the same line. A push with no NUL within MAX_PUSH bytes is a damaged text section (a wrong key, a cut file) and
@@ -258,27 +265,51 @@ const clean=t=>kit.trimBoth(t.replace(/\\n/g,'\n'));
    Capitalised word is text; resource ids, control codes (\wc) and lower-case identifiers stay anchors */
 const prose=t=>/[A-Za-z]/.test(t)&&(/\s/.test(t)||/[,.!?"'\u2026]/.test(t)||/^[A-Z][a-z]+$/.test(t));
 /* every push as {kind, t}: 'line' (text the game shows), 'anchor' (a file name or command) or '' (empty) */
-function texts(buf){const d=unpackPs2(buf);if(!d)return [];const list=pushed(d),dec=kit.decoder(list.filter(s=>s.length));
+function texts(buf){const cvns=buf.toString('latin1',0,4)==='PSS0',d=cvns?unpackPss0(buf):unpackPs2(buf);if(!d)return [];const list=pushed(d),dec=kit.decoder(list.filter(s=>s.length));
  return list.map(s=>{const t=!s.length?'':s.some(c=>c>=0x80)?clean(dec.decode(s)):s.toString('latin1');if(!t)return {kind:'',t};
-  if((RESOURCE.test(t)&&!DIALOGUE_PUNCT.test(t))||(kit.ascii(t)&&!prose(t)))return {kind:'anchor',t};return {kind:'line',t:kit.ascii(t)?clean(t):t};});}
+  if(((RESOURCE.test(t)||(cvns&&CVNS_RESOURCE.test(t)))&&!DIALOGUE_PUNCT.test(t))||(kit.ascii(t)&&!prose(t)))return {kind:'anchor',t};return {kind:'line',t:kit.ascii(t)?clean(t):t};});}
 function parse(buf){const lines=[],anchors=[];for(const x of texts(buf)){if(x.kind==='line')lines.push(x.t);else if(x.kind==='anchor')anchors.push(x.t);}return {lines,anchors};}
 
-const PS=/\.ps[23]$/i,ARCHIVE_SCRIPT=/\.ps[23s]$/i;
+const PS=/\.ps[23]$/i,PSS=/\.pss$/i;
+function listScripts(file){
+ const archive=open(file);
+ if(!archive)return null;
+ const ext=archive.version<3?PSS:PS;
+ const entries=archive.entries.filter(entry=>ext.test(entry.name));
+ return entries.length?entries:null;
+}
 /* CMVS games keep their archives in data/pack (青い鳥, アマツツミ) */
 const SUBS=['','data/pack','pack'],PS_SUBS=['','script','patch','FileHook','data/code','data/update','data'];
 /* A supported CPZ archive in the usual pack folders is enough to identify the engine. */
-const packed=dir=>kit.files(dir,{name:/\.cpz$/i,subs:['data/pack','pack'],max:4}).some(f=>/^CPZ[12567]$/.test(kit.head(f,4).toString('latin1')));
-/* a CPZ the reader cannot open and no readable script anywhere (loose .ps3 in data/code count) */
-/* → the version (5/6/7) of the first CPZ that does not open, or 0 */
-const cpzFail=dir=>{const all=kit.files(dir,{name:/\.cpz$/i,subs:SUBS});if(all.some(f=>list(f)?.some(e=>ARCHIVE_SCRIPT.test(e.name)))||kit.files(dir,{name:PS,subs:PS_SUBS,max:1}).length)return 0;
- for(const f of all){const m=/^CPZ([567])$/.exec(kit.head(f,4).toString('latin1'));if(m&&!open(f))return +m[1];}return 0;};
+const SUPPORTED_CPZ=/^CPZ([12567])$/;
+const packed=dir=>kit.files(dir,{name:/\.cpz$/i,subs:['data/pack','pack'],max:4}).some(f=>SUPPORTED_CPZ.test(kit.head(f,4).toString('latin1')));
+/* Only report an unreadable archive when there is no usable script pack or loose script. */
+const cpzFail=dir=>{const all=kit.files(dir,{name:/\.cpz$/i,subs:SUBS});if(all.some(listScripts)||kit.files(dir,{name:PS,subs:PS_SUBS,max:1}).length)return 0;
+ let legacy=0;
+ for(const f of all){
+  const match=SUPPORTED_CPZ.exec(kit.head(f,4).toString('latin1'));
+  if(!match||open(f))continue;
+  const version=+match[1];
+  if(version>=5)return version;
+  legacy||=version;
+ }
+ return legacy;
+};
 const cpz7=dir=>cpzFail(dir)>0;
-/* CPZ7 keeps its old code; a CPZ5/6 whose index checks out but no known md5 variant decodes is a scheme (key) problem */
-const failCode=dir=>{const v=cpzFail(dir);return !v?'':v===7?'CMVS_CPZ7':'CMVS_CPZ'+v+'_KEY';};
+/* CVNS has no per-title scheme lookup. A fixed-cipher archive that cannot open is a format failure. */
+const failCode=dir=>{
+ const version=cpzFail(dir);
+ if(!version)return '';
+ if(version<5)return 'CMVS_CPZ'+version+'_ARCHIVE';
+ return version===7?'CMVS_CPZ7':'CMVS_CPZ'+version+'_KEY';
+};
 const engine=kit.engine({id:'cmvs',hint:'*.cpz（*.pss / *.ps3）',
- archives:{name:/\.cpz$/i,magic:'CPZ',subs:SUBS,list:f=>{const l=list(f);return l&&l.some(e=>ARCHIVE_SCRIPT.test(e.name))?l:null;},read,entry:ARCHIVE_SCRIPT},
+ archives:{name:/\.cpz$/i,magic:'CPZ',subs:SUBS,list:listScripts,read},
  loose:{name:PS,subs:PS_SUBS},parse,
- extra:{unsupported:failCode,REASONS:{CMVS_CPZ5_KEY:'这部 CMVS 作品的 CPZ5 归档用了未知的密钥常数，暂时读不了剧本',CMVS_CPZ6_KEY:'这部 CMVS 作品的 CPZ6 归档用了未知的密钥常数，暂时读不了剧本',CMVS_CPZ7:'这部 CMVS 作品的 CPZ7 归档解不开（start.ps3 里没找到它的注册参数，或者常数和已知作品不同），暂时读不了剧本'},
+ extra:{unsupported:failCode,REASONS:{
+  CMVS_CPZ1_ARCHIVE:'这部 CVNS 作品的 CPZ1 封包索引读不了，请检查安装文件是否完整',
+  CMVS_CPZ2_ARCHIVE:'这部 CVNS 作品的 CPZ2 封包索引读不了，请检查安装文件是否完整',
+  CMVS_CPZ5_KEY:'这部 CMVS 作品的 CPZ5 归档用了未知的密钥常数，暂时读不了剧本',CMVS_CPZ6_KEY:'这部 CMVS 作品的 CPZ6 归档用了未知的密钥常数，暂时读不了剧本',CMVS_CPZ7:'这部 CMVS 作品的 CPZ7 归档解不开（start.ps3 里没找到它的注册参数，或者常数和已知作品不同），暂时读不了剧本'},
   originalLines:dir=>originalLines(dir)}});
 /* An official Chinese release keeps the Japanese scripts in data/pack and lays plain Chinese ones over them in
    FileHook\ (its loader reads those first), so the running script is Chinese and the archives hold its original. Both
@@ -288,4 +319,4 @@ function originalLines(dir){const arch=new Map();
  for(const f of kit.files(dir,{name:/\.cpz$/i,magic:'CPZ',subs:SUBS}))for(const e of engine.archiveEntries(f)||[])arch.set(e.name.toLowerCase(),e);
  return engine.scenes(dir).flatMap(s=>{let own=[];try{own=texts(s.read());}catch{}const a=arch.get(s.name.toLowerCase());let ja=null;try{ja=a&&texts(a.read());}catch{}
   return own.flatMap((x,i)=>x.kind!=='line'?[]:[ja&&ja.length===own.length&&ja[i].kind==='line'?ja[i].t:'']);});}
-module.exports={engine,packed,parse,texts,originalLines,header,open,list,read,unpackPs2,pushed,md5Words,table,stage1,dirCipher,entryCipher,scheme,DEFAULT,DEFAULT7,DEFAULTS,indexKey,startValues,rotl,rotr};
+module.exports={engine,packed,parse,texts,originalLines,header,open,list,read,unpackPs2,unpackPss0,pushed,md5Words,table,stage1,dirCipher,entryCipher,scheme,DEFAULT,DEFAULT7,DEFAULTS,indexKey,startValues,rotl,rotr};
