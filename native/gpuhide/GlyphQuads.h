@@ -379,12 +379,16 @@ struct GlyphLearner {
   for (auto &kv : groups) {
    Group &g = kv.second; std::vector<Rect> fresh, live;
    for (auto &s : g.keys) if ((int)(s.second.firstAt - since) >= 0 && !EarlierGlyph(kv.first, s.first)) fresh.push_back(s.second.r);
-   const std::vector<Rect> &last = g.prevFrame == frameNo - 1 ? g.frame : g.prev; for (auto &r : last) if (earlierRects.empty() || !Earlier(r)) live.push_back(r);
+   const bool currentFrame = g.prevFrame == frameNo - 1;
+   const std::vector<Rect> &last = currentFrame ? g.frame : g.prev; for (auto &r : last) if (earlierRects.empty() || !Earlier(r)) live.push_back(r);
    std::vector<Rect> a = Chars(Cluster(Chars(live))), b = Chars(Cluster(Chars(fresh)));
    if (log && (now / 500) != ((now - 17) / 500)) log("frame %u group rt=%p %ux%u live=%u fresh=%u n=%u", frameNo, g.rt, g.tw, g.th, (unsigned)a.size(), (unsigned)b.size(), n);
    std::vector<Rect> keep; const std::vector<Rect> *hit = Match(a, b, keep); if (!hit) continue;
    if (learned && (g.rtW != areaW || g.rtH != areaH)) continue;
-   const bool moved = learned && !reported && Relocated(a, b);
+   // A partial line or older page row may still occupy the band. Compare positions only on its own target.
+   Rect screen{};
+   const bool moved = learned && !reported && !hitSent && currentFrame && g.rt == areaRt &&
+    ToScreen(g.rt, g.rtW, g.rtH, screen) && Relocated(a, b);
    if (learned && !atlases.count(AtlasKey(NULL, g.tex))) {
     if (moved && movedGroup) ambiguousMove = true;
     else if (moved) { movedGroup = &g; movedRects.swap(a); }

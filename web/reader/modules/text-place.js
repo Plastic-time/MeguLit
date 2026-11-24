@@ -189,15 +189,20 @@
     // A GPU-placed dialogue can move to the client edge. Move only the translation so the Japanese keeps its anchor.
     if (row && anchor.gpu && !page && tr?.height) {
       const rb = rowRect(), top = Math.max(0, cy0), bottom = Math.min(cy0 + chc, workLimit());
-      const room = Math.floor(bottom - top);
-      if (rb.height > 0 && rb.bottom > bottom && room > 0) {
-        const height = Math.min(room, rb.height), lastTop = bottom - height;
-        const above = Math.min(lastTop, sentence.getBoundingClientRect().top - Math.max(4, tr.height * .2) - height);
-        if (rb.height > room) {
-          set(row, 'max-height', room + 'px'); set(row, 'overflow-y', 'auto'); set(row, 'overscroll-behavior', 'contain');
+      if (rb.height > 0 && rb.bottom > bottom && bottom > top) {
+        const jp = sentence.getBoundingClientRect(), gap = Math.max(4, tr.height * .2);
+        const upperEdge = Math.min(bottom, jp.top - gap), lowerEdge = Math.max(top, rb.top, jp.bottom + gap);
+        const aboveRoom = Math.floor(upperEdge - top), belowRoom = Math.floor(bottom - lowerEdge);
+        const above = rb.height <= aboveRoom || aboveRoom >= belowRoom;
+        const room = above ? aboveRoom : belowRoom;
+        if (room > 0) {
+          if (rb.height > room) {
+            set(row, 'max-height', room + 'px'); set(row, 'overflow-y', 'auto'); set(row, 'overscroll-behavior', 'contain');
+          }
+          const y = above ? upperEdge - Math.min(room, rb.height) : lowerEdge;
+          set(row, 'translate', '0 ' + (y - rb.top) + 'px');
+          return;
         }
-        set(row, 'translate', '0 ' + ((above >= top ? above : lastTop) - rb.top) + 'px');
-        return;
       }
     }
     if (row && roomBelow && !anchor.center && tr && tr.height) { const glyph = tr.height;

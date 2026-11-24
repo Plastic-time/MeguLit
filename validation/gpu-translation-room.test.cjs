@@ -55,14 +55,18 @@ test('a GPU-placed translation stays inside the game client without moving the J
 
     await translate('我没有抛弃你。'.repeat(240));
     const long = await layout();
-    assert.ok(long.row.top >= clientTop - .05 && long.row.bottom <= clientBottom + .05, JSON.stringify(long));
+    assert.ok(long.row.top >= clientTop - .05 && long.row.bottom < long.jp.top, JSON.stringify(long));
     assert.equal(long.overflow, 'auto');
     assert.equal(long.glyph.top, bottom.glyph.top);
 
-    await setLine('そういうことだ。', 360);
+    await setLine('そういうことだ。', 190);
     await translate('就是这样。');
     const next = await layout();
     assert.equal(next.offset, '');
     assert.ok(next.cn.top >= next.jp.bottom && next.cn.bottom < clientBottom);
+    await translate('就是这样。'.repeat(240));
+    const longBelow = await layout();
+    assert.ok(longBelow.row.top > longBelow.jp.bottom && longBelow.row.bottom <= clientBottom + .05, JSON.stringify(longBelow));
+    assert.equal(longBelow.overflow, 'auto');
   } finally { await browser.close(); }
 });
