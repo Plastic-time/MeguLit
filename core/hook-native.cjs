@@ -20,6 +20,7 @@ function speakerName(raw){const n=String(raw||'').replace(/[\x00-\x1f]/g,'').rep
 /* side-stream text waits this long for the dialogue line of the same moment before it may be art text */const AUX_ART_DELAY_MS=120;
 /* OCR read lines (2026-11-19): a read group waits this long for the rest of the screen's groups; this many groups at once is a menu or settings page; a hook line this recent is current; the same text again within this long is the same screen */
 const HOOK_RETRY_MAX=6,HOOK_ATTACH_GRACE_MS=45000,OCR_LINE_SETTLE_MS=500,OCR_LINE_MAX_BLOCKS=4,OCR_LINE_QUIET_MS=5000,OCR_LINE_REPEAT_MS=60000,OCR_LINE_STALE_MS=60000;
+const SKIP_BURST_GAP_MS=300,SKIP_BURST_SETTLE_MS=400,SKIP_BURST_MAX_HOLD_MS=800;
 const QUOTE_OPEN='「『（(',QUOTE_CLOSE='」』）)';
 function splitSpeaker(raw,known){const s=String(raw||'');const t=s.replace(/^[\s　]+/,'');if(!t)return {name:'',text:s};
  const kn=n=>!!known&&typeof known.has==='function'&&known.has(n);
@@ -1137,14 +1138,29 @@ class HookNative{
  deliverSource(text,origin,engine='',nativeLine=0,authority){if(require('./danganronpa-pc-source.cjs').shouldBlock(this,authority,origin))return;
   if(require('./unity-il2cpp-source.cjs').shouldBlock(this.textPath,authority||{origin},this.target))return;
   if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,authority,this.target)||require('./artemis-session.cjs').shouldBlock(this.textPath,authority,this.target,origin,this.wanted!==false))return;
-  const now=this.now(),live=!engine&&!nativeLine&&(origin||'live')==='live',S=this.skipBurst||(this.skipBurst={last:0,held:null,timer:null,count:0});
+  const now=this.now(),live=!engine&&!nativeLine&&(origin||'live')==='live',S=this.skipBurst||(this.skipBurst={last:0,held:null,timer:null,count:0,startedAt:0});
   if(!live||this.stashFlush){if(this.stashFlush)S.last=now;this.emitSource(text,origin,engine,nativeLine,authority);return;}
   {const last=this.lastOfMerged(text);if(last!==text){this.trace('merged skip text: kept the last line of '+text.length+' chars');text=last;/* 2026-11-19 (素晴らしき日々: 「それか、…とか言ってるヤツだ。」 untranslated) the script translation was looked up for the merged text; the kept line is looked up itself */try{this.originalTextFor(text);}catch{}}}
   const gap=now-S.last;S.last=now;
-  if(gap>=300&&!S.held){S.count=0;this.emitSource(text,origin,engine,nativeLine,authority);return;}
-  S.count++;S.held={text,origin};clearTimeout(S.timer);
-  if(S.count===1)this.trace('skip burst: holding lines until the game stops');
-  const serial=this.serial;S.timer=setTimeout(()=>{const held=S.held;S.held=null;S.timer=null;if(!held||serial!==this.serial)return;this.trace('skip burst settled; skipped='+(S.count-1));S.count=0;this.emitSource(held.text,held.origin);},400);S.timer.unref?.();
+  clearTimeout(S.timer);
+  if(gap>=SKIP_BURST_GAP_MS){
+   if(S.held)this.trace('skip burst settled; skipped='+S.count+' (normal pace)');
+   S.held=null;S.timer=null;S.count=0;
+   this.emitSource(text,origin,engine,nativeLine,authority);return;
+  }
+  if(!S.held){S.startedAt=now;this.trace('skip burst: holding lines until the game stops');}
+  S.count++;S.held={text,origin};
+  // Keep the deadline tied to the first held line, even if new lines keep arriving.
+  const wait=Math.min(SKIP_BURST_SETTLE_MS,Math.max(0,SKIP_BURST_MAX_HOLD_MS-(now-S.startedAt)));
+  const serial=this.serial;
+  S.timer=setTimeout(()=>{
+   const held=S.held,count=S.count;
+   S.held=null;S.timer=null;S.count=0;
+   if(!held||serial!==this.serial)return;
+   this.trace('skip burst settled; skipped='+(count-1));
+   this.emitSource(held.text,held.origin);
+  },wait);
+  S.timer.unref?.();
  }
  /* E270 (user, ATRI: one line was often typed out twice): games re-send the shown line when the voice ends or the
     window repaints, seconds later (after a long voice) and sometimes with different line breaks. The same line (ignoring
