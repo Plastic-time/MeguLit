@@ -37,9 +37,9 @@ function clean(t){return t.replace(RB,'$1').replace(/\[n\]/g,'\n').replace(/\[[^
 // Which part after the Japanese is Simplified Chinese (else Traditional), found by its characters.
 function chineseSlot(rows){if(!rows.length)return -1;let width=0;for(const r of rows)if(r.length>width)width=r.length;
  let best=-1,bestSimp=false,bestDiff=-Infinity,bestN=-1;
- for(let i=1;i<width;i++){let n=0,kana=0,hans=0,hant=0;
-  for(const r of rows){const t=clean(r[i]||'');if(!t)continue;if(KANA.test(t)){kana++;continue;}if(!HAN.test(t))continue;n++;hans+=(t.match(HANS)||[]).length;hant+=(t.match(HANT)||[]).length;}
-  if(n<rows.length*.3||kana>=n)continue;
+ for(let i=1;i<width;i++){let n=0,hans=0,hant=0;
+  for(const r of rows){const t=clean(r[i]||'');if(!t||!HAN.test(t))continue;n++;hans+=(t.match(HANS)||[]).length;hant+=(t.match(HANT)||[]).length;}
+  if(n<rows.length*.3)continue;
   const simp=hans>hant,diff=hans-hant;
   if(best<0||simp&&!bestSimp||(simp===bestSimp&&(simp?diff>bestDiff:n>bestN||n===bestN&&diff>bestDiff))){best=i;bestSimp=simp;bestDiff=diff;bestN=n;}}
  return best;}

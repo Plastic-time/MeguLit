@@ -26,7 +26,7 @@ test('Unity TextAssets: 日本語※简体※繁體 lines read as Japanese with 
  fs.rmSync(dir,{recursive:true,force:true});
 });
 
-test('Unity TextAssets: chineseSlot ignores English/kana/tag columns, prefers Simplified over Traditional, and keeps short Chinese scenes',()=>{
+test('Unity TextAssets: chineseSlot ignores English/pure-kana/tag columns, keeps Chinese with kana speakers, prefers Simplified over Traditional, and keeps short Chinese scenes',()=>{
  const ut=scenes.ENGINES['unity-text'],cs=ut._internal.chineseSlot;
  // 1. 日本語※English※繁體中文: English (hans-hant=0) must not beat Traditional Chinese (hans-hant<0)
  const dirTri=tmp('ut-en-hant-');
@@ -64,20 +64,20 @@ test('Unity TextAssets: chineseSlot ignores English/kana/tag columns, prefers Si
   ['この問題を見て。','請看這個問題。','请看这个问题。'],
  ]),2);
 
- // 4. Kana-heavy backup column and partially-Han English column must not beat full Traditional Chinese
- // Even as the sole second column, a kana-heavy Japanese backup (>=50% kana, >=30% kanji-only names) is not Chinese
+ // 4. Chinese column keeping Japanese kana speaker names (e.g. 【りそな】早上好) or kana particles still resolves slot 1 (matching main)
  assert.strictEqual(cs([
-  ['【大蔵】','【大蔵】'],
-  ['【りそな】','【里想奈】'],
+  ['【りそな】おはよう、学校へ行こう。','【りそな】早上好，我们一起去学校吧。'],
+  ['【りそな】大変です。','【りそな】不好了。'],
+ ]),1);
+ assert.strictEqual(cs([
+  ['【りそな】おはよう、学校へ行こう。','【りそな】早上好，我们一起去学校吧。','【里想奈】早安，我們一起去學校吧。'],
+  ['【りそな】この話を聞いて。','【りそな】请听我说这件事。','【里想奈】請聽我說這件事。'],
+ ]),1);
+ // Pure-kana column without Han is skipped; partially-Han English column must not beat full Traditional Chinese
+ assert.strictEqual(cs([
   ['おはようございます。','おはようございます。'],
-  ['みんなと学校へ行きましょう。','みんなと学校へ行きましょう。'],
+  ['ありがとう。','ありがとう。'],
  ]),-1);
- assert.strictEqual(cs([
-  ['【大蔵】','【大蔵】','【大藏】'],
-  ['【りそな】','【りそな】','【里想奈】'],
-  ['おはようございます。','おはようございます。','早安，今天天氣真好。'],
-  ['みんなと学校へ行きましょう。','みんなと学校へ行きましょう。','我們一起去學校吧。'],
- ]),2);
  assert.strictEqual(cs([
   ['東京へ行く。','Go to 東京.','前往東京。'],
   ['大阪へ行く。','Go to 大阪.','前往大阪。'],
