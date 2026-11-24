@@ -78,19 +78,30 @@ test('siglus: voiced reuses parseSs prefixes, quoted R lines, @lsv2_line, and $l
  assert.deepEqual(s.voiced('$lsv2_koe(5,0)$lsv2_name("名(仮)") 「あ」R\n「次」'),[{text:'「あ」',koe:5},{text:'「次」',koe:null}]);
  assert.deepEqual(pck.parseSs(Buffer.from('$lsv2_koe(5,0)$lsv2_name("名(仮)") 「あ」R','utf8')),{lines:['「あ」'],anchors:[],speakers:['名(仮)']});
  assert.deepEqual(s.voiced('@KOE(5,0)【名】「あ」R\n「次」'),[{text:'「あ」',koe:5},{text:'「次」',koe:null}]);
- assert.deepEqual(s.voiced('@KOE(5,0)\n@mes(1,【名】,「6"の板」)\n@KOE(6,0)\n「次」'),[{text:'「次」',koe:6}]);
+ /* 「…」/『…』 inside @mes and plain lines are treated as quoted spans, so ", (, ,, ; stay intact while trailing @mes args are not glued */
+ assert.deepEqual(s.voiced('@KOE(5,0)\n@mes(1,【名】,「6"の板」)\n@KOE(6,0)\n「次」'),[{text:'「6"の板」',koe:5},{text:'「次」',koe:6}]);
+ assert.deepEqual(s.voiced('@KOE(5,0)\n@mes(1, 【名】, 「1, 000円」)\n@mes(1,【名】,「あ,い」,「う」)\n@mes(1,【名】,「あ」,9)\n@KOE(7,0)\n@mes(1,【名】,「あ(い」)'),
+  [{text:'「1, 000円」',koe:5},{text:'「あ,い」',koe:null},{text:'「あ」',koe:null},{text:'「あ(い」',koe:7}]);
+ assert.deepEqual(s.voiced('@KOE(5,0)\n「あ;い」\n@KOE(6,0)\n@mes(1,【名】,「あ;い」)'),[{text:'「あ;い」',koe:5},{text:'「あ;い」',koe:6}]);
+ assert.deepEqual(pck.parseSs(Buffer.from('@mes(1, 【名】, 「1, 000円」)\n@mes(1,【名】,「あ」,9)\n@lsv2_line(1, 「あ」, 「い」)R','utf8')).lines,['「1, 000円」','「あ」','「あ」,「い」']);
+ /* Unparsed dialogue-shaped lines clear pending, while ordinary commands with quotes or 「…」 and #define keep pending */
+ assert.deepEqual(s.voiced('@KOE(5,0)\n@mes(1,【名】,)\n@KOE(6,0)\n「次」'),[{text:'「次」',koe:6}]);
+ assert.deepEqual(s.voiced('@KOE(5,0)\n"未闭合台词\n「次」'),[{text:'「次」',koe:null}]);
  assert.deepEqual(s.voiced('@KOE(5,0)\n#z01 @mes(1,【名】,「あ」)\n「次」'),[{text:'「次」',koe:null}]);
+ assert.deepEqual(s.voiced('@KOE(5,0)\n@bgm("x")\n「あ」\n@KOE(6,0)\n@bgm("x")\n@mes(1,【名】,「い」)'),[{text:'「あ」',koe:5},{text:'「い」',koe:6}]);
+ assert.deepEqual(s.voiced('if(a){\n@KOE(1,0)\n}else{\n@KOE(2,0)\n}\n@se("door")\n「あ」'),[{text:'「あ」',koe:1},{text:'「あ」',koe:2}]);
+ assert.deepEqual(s.voiced('KOE(5,0)\n$flag = "x"\nS[0] = "x"\n@select("a","b")\n@lsv2_face(「笑」)\nswitch(a=="x"){\ncase "a":\ngoto("lbl")\nfarcall("s01",1)\n「あ」'),[{text:'「あ」',koe:5}]);
+ assert.deepEqual(s.voiced('$lsv2_koe(5,0)\n$lsv2_face("smile")\n$lsv2_name("名") 「あ」R'),[{text:'「あ」',koe:5}]);
+ assert.deepEqual(s.voiced('@KOE(5,0)\n#define TXT "「x」"\n「あ」'),[{text:'「あ」',koe:5}]);
  assert.deepEqual(s.voiced('#z01 @KOE(5,0)\n#define FOO "「宏」"\n「あ」'),[{text:'「あ」',koe:null}]);
  assert.deepEqual(s.voiced('@mes(1,【名】,「あ」) ; @KOE(9,0)\n「次」'),[{text:'「あ」',koe:null},{text:'「次」',koe:null}]);
  assert.deepEqual(s.voiced('$lsv2_koe(1002,002)$lsv2_name("朱音") @lsv2_line(200, 「本当？」)R\nKOE(1003,003)【小鳥】"「こんにちは」"R;>>メモ'),
   [{text:'「本当？」',koe:1002},{text:'「こんにちは」',koe:1003}]);
- assert.deepEqual(s.voiced('【名】KOE(5,6) "「前置き」"R\nKOE(9,0)\n【名】\n#inc_start\n「マクロ内」\n#inc_end\n「本番」NL\nif(mode=="a"){\n@KOE(10,0)\n}else if(mode=="b"){\n@KOE(11,0)\n}\n$lsv2_name("朱音")\n「分岐」R'),
-  [{text:'「前置き」',koe:5},{text:'「本番」',koe:9},{text:'「分岐」',koe:10},{text:'「分岐」',koe:11}]);
+ assert.deepEqual(s.voiced('【名】KOE(5,6) "「前置き」"R\nKOE(9,0)\n【名】\n#inc_start\n「マクロ内」\n#inc_end\n「本番」NL'),
+  [{text:'「前置き」',koe:5},{text:'「本番」',koe:9}]);
  /* One KOE call before multi-run quoted line attaches only to the first run, never duplicated onto later runs */
  assert.deepEqual(s.voiced('KOE(1,0)\n"「一」" "「二」"R\nKOE(2,0)\n「三」'),[{text:'「一」',koe:1},{text:'「二」',koe:null},{text:'「三」',koe:2}]);
- assert.deepEqual(s.voiced('mykoe(99,0)\nfoo$lsv2_koe(88,0)\n"「KOE(77,0)と言った」"R\n@KOE(12,0)@mes(1, 【名】, 「1, 000円」)\n$lsv2_koe(13,0) @lsv2_line(1, 「あ, い」)R'),
-  [{text:'「KOE(77,0)と言った」',koe:null},{text:'「1, 000円」',koe:12},{text:'「あ, い」',koe:13}]);
- assert.deepEqual(pck.parseSs(Buffer.from('@mes(1, 【名】, 「1, 000円」)\n@lsv2_line(1, 「あ, い」)R','utf8')).lines,['「1, 000円」','「あ, い」']);});
+ assert.deepEqual(s.voiced('mykoe(99,0)\nfoo$lsv2_koe(88,0)\n"「KOE(77,0)と言った」"R'),[{text:'「KOE(77,0)と言った」',koe:null}]);});
 test('aquaplus: the voice call (char,256,0,0,n) before message k names <scene>_<n>_<char> for the k-th non-name text',()=>{const a=require('../services/original-engines/aquaplus.cjs');
  const w=[];const push=v=>w.push(5,3,v),call=id=>w.push(4,id);w.push(0,0,0);
  push(0);push(256);push(0);push(0);push(0);call(138);push(0);push(1);call(131);push(1);push(1);call(131);push(5);push(256);push(0);push(0);push(1);call(138);push(2);push(1);call(131);

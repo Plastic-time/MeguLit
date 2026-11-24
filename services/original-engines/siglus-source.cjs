@@ -58,13 +58,16 @@ function sources(file){const b=fs.readFileSync(file);if(b.length<96)return [];co
  return out;}
 const decode=raw=>{if(raw[0]===0xff&&raw[1]===0xfe)return raw.toString('utf16le',2);if(raw[0]===0xef&&raw[1]===0xbb)return raw.toString('utf8',3);
  try{return new TextDecoder('utf-8',{fatal:true}).decode(raw);}catch{return kit.SJIS.decode(raw);}};
-/* Strip // and ; comments only outside double-quoted strings */
+/* Strip // and ; comments outside "...", 「...」 and 『...』 */
 function stripLineComment(raw){
- let inQ=false;
+ let inQ=false,k1=0,k2=0;
  for(let i=0;i<raw.length;i++){
   const c=raw[i];
   if(inQ){if(c==='\\'&&i+1<raw.length){i++;continue;}if(c==='"')inQ=false;continue;}
+  if(k1||k2){if(c==='「')k1++;else if(c==='」'&&k1)k1--;else if(c==='『')k2++;else if(c==='』'&&k2)k2--;continue;}
   if(c==='"'){inQ=true;continue;}
+  if(c==='「'){k1++;continue;}
+  if(c==='『'){k2++;continue;}
   if(c===';'||c==='/'&&raw[i+1]==='/')return raw.slice(0,i);
  }
  return raw;
@@ -85,26 +88,32 @@ function unquote(s){
  return s;
 }
 function callEnd(s,openPos){
- let depth=1,inQ=false;
+ let depth=1,inQ=false,k1=0,k2=0;
  for(let i=openPos+1;i<s.length;i++){
   const c=s[i];
   if(inQ){if(c==='\\'&&i+1<s.length){i++;continue;}if(c==='"')inQ=false;continue;}
+  if(k1||k2){if(c==='「')k1++;else if(c==='」'&&k1)k1--;else if(c==='『')k2++;else if(c==='』'&&k2)k2--;continue;}
   if(c==='"'){inQ=true;continue;}
+  if(c==='「'){k1++;continue;}
+  if(c==='『'){k2++;continue;}
   if(c==='(')depth++;
   else if(c===')'&&--depth===0)return i+1;
  }
  return -1;
 }
-function callArgs(t,cmdRe,maxArgs=Infinity){
+function callArgs(t,cmdRe){
  const at=t.search(cmdRe);if(at<0)return null;
- let i=t.indexOf('(',at)+1,depth=1,inQ=false,start=i;const args=[];
+ let i=t.indexOf('(',at)+1,depth=1,inQ=false,k1=0,k2=0,start=i;const args=[];
  for(;i<t.length;i++){
   const c=t[i];
   if(inQ){if(c==='\\'&&i+1<t.length){i++;continue;}if(c==='"')inQ=false;continue;}
+  if(k1||k2){if(c==='「')k1++;else if(c==='」'&&k1)k1--;else if(c==='『')k2++;else if(c==='』'&&k2)k2--;continue;}
   if(c==='"'){inQ=true;continue;}
+  if(c==='「'){k1++;continue;}
+  if(c==='『'){k2++;continue;}
   if(c==='(')depth++;
   else if(c===')'){if(--depth===0){args.push(t.slice(start,i).trim());break;}}
-  else if(c===','&&depth===1&&args.length+1<maxArgs){args.push(t.slice(start,i).trim());start=i+1;}
+  else if(c===','&&depth===1){args.push(t.slice(start,i).trim());start=i+1;}
  }
  return depth===0?args:null;
 }
@@ -133,7 +142,7 @@ function parseSsLine(t){
  let sp='';
  const lsvName=t.match(/\$lsv2_name\s*\(\s*"((?:[^"\\]|\\.)*)"\s*\)/i);
  if(lsvName)sp=lsvName[1].replace(/\\(.)/g,'$1');
- const mes=callArgs(t,/@mes\s*\(/i,3);
+ const mes=callArgs(t,/@mes\s*\(/i);
  if(mes){
   const bracket=t.match(/^[^@]*【([^】]+)】/);
   if(!sp&&bracket)sp=bracket[1];
@@ -141,9 +150,9 @@ function parseSsLine(t){
   if(mes.length===2){const txt=unquote(mes[1]);return txt?[{text:txt,speaker:sp}]:[];}
   return [];
  }
- const lsv=callArgs(t,/@lsv2_line\s*\(/i,2);
+ const lsv=callArgs(t,/@lsv2_line\s*\(/i);
  if(lsv&&lsv.length>=2){
-  const txt=unquote(lsv[1]).trim();
+  const txt=unquote(lsv.slice(1).join(',')).trim();
   return txt?[{text:txt,speaker:sp}]:[];
  }
  const {rest,sp:bkSp}=stripPrefixes(t);
@@ -170,19 +179,20 @@ function walkSs(text,onLine){
    (@KOE(…060) in one branch, @KOE(…080) in the other, one shared @mes after).
    When one source line splits into multiple quoted runs (e.g. "「一」" "「二」"R), the preceding KOE attaches
    to the first run only and later runs on that line get koe:null, matching one voice clip per KOE call without
-   duplicating the clip across segments. If a line looks like dialogue but yields 0 parsed items, clear pending
-   so the voice does not leak onto a later unrelated line. */
+   duplicating the clip across segments. If a line looks like dialogue (@mes/@lsv2_line or leading 「『（")
+   but yields 0 parsed items, clear pending so the voice does not leak onto a later unrelated line. */
 // E461 a /* … */ block is a comment (Summer Pockets keeps staff notes with 「…」 lines in them): no line, no voice.
-const DIALOGUE_HINT=/@mes\s*\(|@lsv2_line\s*\(|[「"]/i;
+const UNPARSED_DIALOGUE=/@mes\s*\(|@lsv2_line\s*\(|^[「『（"]/i;
+const HASH_DIALOGUE=/@mes\s*\(|@lsv2_line\s*\(/i;
 function voiced(text){const out=[];let pending=[];
  walkSs(text,(t,items,skipped)=>{
-  if(skipped){if(DIALOGUE_HINT.test(t))pending=[];return;}
+  if(skipped){if(HASH_DIALOGUE.test(t))pending=[];return;}
   for(const k of stripQuoted(t).matchAll(/(?:^|[^\w])(?:(?:ex)?koe|\$lsv2_koe)\s*\(\s*0*(\d+)/gi))pending.push(Number(k[1]));
   if(items.length){
    for(const {text:m} of items){if(pending.length)for(const koe of pending)out.push({text:m,koe});else out.push({text:m,koe:null});pending=[];}
   }else{
    const {rest}=stripPrefixes(t);
-   if(rest&&DIALOGUE_HINT.test(rest)&&!/^(?:\}\s*)?(?:if|else)\b/i.test(rest))pending=[];
+   if(rest&&UNPARSED_DIALOGUE.test(rest))pending=[];
   }
  });
  return out;}
