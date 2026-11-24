@@ -140,9 +140,16 @@ function luminance(rgb) {
 // Remove the glyphs to sample their composited background. The text scan pairs screenshots
 // so borders and clipped pixels beside the glyphs do not count as the text background.
 async function contrastDetails(cdp, selectors, directText = false) {
- const before = directText ? await cdp.send('Page.captureScreenshot',{format:'png'}) : null;
+ for (let attempt=0; attempt<3; attempt++) {
+  const readings = await measureContrast(cdp,selectors,directText);
+  if (readings) return readings;
+ }
+ assert.fail('Panel text moved between the contrast captures');
+}
+
+async function measureContrast(cdp,selectors,directText) {
  const probes = await cdp.evaluate(`(${function (selectors,directText) {
-  const text = new Set();
+  const text = new Set(), positions = [];
   const palette = new OffscreenCanvas(1,1).getContext('2d',{willReadFrequently:true});
   const probes = selectors.map(selector => {
    const target = document.querySelector(selector);
@@ -164,6 +171,7 @@ async function contrastDetails(cdp, selectors, directText = false) {
     let alpha = fg[3]/255;
     for (let ancestor=parent; ancestor; ancestor=ancestor.parentElement) alpha *= Number(getComputedStyle(ancestor).opacity);
     if (!alpha) continue;
+    if (directText) positions.push([range,range.getBoundingClientRect()]);
     for (const {left,top,right,bottom} of range.getClientRects()) {
      if (left >= 0 && top >= 0 && right <= innerWidth && bottom <= innerHeight && right-left > 2 && bottom-top > 2)
       areas.push({fg,alpha,color,text:node.textContent.trim(),box:[Math.ceil(left),Math.ceil(top),Math.floor(right)-Math.ceil(left),Math.floor(bottom)-Math.ceil(top)]});
@@ -174,11 +182,16 @@ async function contrastDetails(cdp, selectors, directText = false) {
    return areas;
   });
   const savedStyles = [...text].map(node => [node,node.getAttribute('style')]);
-  for (const node of text) {
-   node.style.setProperty('color','transparent','important');
-   node.style.setProperty('text-shadow','none','important');
-   node.style.setProperty('transition','none','important');
-  }
+  window.maskContrastProbe = () => {
+   for (const node of text) {
+    node.style.setProperty('-webkit-text-fill-color','transparent','important');
+    node.style.setProperty('text-shadow','none','important');
+   }
+  };
+  window.contrastProbeIsStable = () => positions.every(([range,before]) => {
+   const after = range.getBoundingClientRect();
+   return ['x','y','width','height'].every(key => Math.abs(before[key]-after[key]) < 1);
+  });
   window.restoreContrastProbe = () => {
    for (const [node,style] of savedStyles) {
     if (style === null) node.removeAttribute('style');
@@ -189,7 +202,11 @@ async function contrastDetails(cdp, selectors, directText = false) {
  }})(${JSON.stringify(selectors)},${directText})`);
  try {
   const boxes = probes.flat().map(area => area.box);
+  const before = directText ? await cdp.send('Page.captureScreenshot',{format:'png'}) : null;
+  await cdp.evaluate('window.maskContrastProbe()');
+  if (before) await frame(cdp);
   const result = await screenshotPixels(cdp,boxes);
+  if (before && !await cdp.evaluate('window.contrastProbeIsStable()')) return null;
   const withText = before ? await screenshotPixels(cdp,boxes,before.data) : [];
   const readings = probes.map(areas => areas.map(({fg,alpha,color,text}) => {
    const pixels = result.shift(), painted = withText.shift();
@@ -206,7 +223,8 @@ async function contrastDetails(cdp, selectors, directText = false) {
   }).reduce((worst,reading) => reading.ratio < worst.ratio ? reading : worst));
   return Object.fromEntries(selectors.map((selector,i) => [selector,readings[i]]));
  } finally {
-  await cdp.evaluate('window.restoreContrastProbe(); delete window.restoreContrastProbe;');
+  await cdp.evaluate('window.restoreContrastProbe(); delete window.restoreContrastProbe; delete window.maskContrastProbe; delete window.contrastProbeIsStable;');
+  if (directText) await frame(cdp);
  }
 }
 async function contrast(cdp,selectors) {
@@ -336,6 +354,12 @@ async function menuPictureTextSamples(cdp,load,fixture) {
  const readings = {};
  await load(fixture);
  await openMenu(cdp);
+ await cdp.evaluate(`(() => {
+  const style = document.createElement('style');
+  style.textContent = '.tomoyo-cn-dialog *, .tome-backlog *, .tomoyo-selection-card *{transition:none!important;animation:none!important;overflow-anchor:none!important}';
+  document.head.appendChild(style);
+  return document.fonts.ready.then(() => true);
+ })()`);
  const tabs = await cdp.evaluate(`[...document.querySelectorAll('${menu} [data-menu-key]')].map(n=>n.dataset.menuKey)`);
  for (const tab of tabs) {
   await cdp.evaluate(`document.querySelector('${menu} [data-menu-key="${tab}"]').click()`);

@@ -147,7 +147,7 @@ ${G} .tomoyo-selection-card>.tome-menu-bg::after{opacity:max(calc(var(--tome-p-a
 /* Bind the theme, control and polish text tokens at the panel, where the picture palette is in effect. */
 ${picturePanels}{color-scheme:dark;--ink2:#e6ded3;--ink3:#ddd5cb;--redi:#ffd0d4;
  --tome-picture-text:var(--ink);--tome-picture-muted:var(--ink3);--tome-picture-accent:var(--redi);
- --tome-picture-on-accent:#fff;--tome-picture-reading:#efd49c;
+ --tome-picture-on-accent:#fff;--tome-picture-reading:#efd49c;--tome-picture-text-opacity:1;--tome-picture-inactive-control-opacity:.35;
  --theme-text:var(--ink);--theme-textSecondary:var(--ink3);--theme-primary:var(--mgc-red);
  --theme-background:#14161b;--theme-surface:#24272e;--theme-border:#393e49;
  --mg-text:var(--ink);--mg-sub:var(--ink3);--mg-accent:var(--theme-primary);--mg-tint:color-mix(in srgb,var(--mg-accent) 14%,transparent);
