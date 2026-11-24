@@ -20,6 +20,7 @@ function speakerName(raw){const n=String(raw||'').replace(/[\x00-\x1f]/g,'').rep
 /* side-stream text waits this long for the dialogue line of the same moment before it may be art text */const AUX_ART_DELAY_MS=120;
 /* OCR read lines (2026-11-19): a read group waits this long for the rest of the screen's groups; this many groups at once is a menu or settings page; a hook line this recent is current; the same text again within this long is the same screen */
 const HOOK_RETRY_MAX=6,HOOK_ATTACH_GRACE_MS=45000,OCR_LINE_SETTLE_MS=500,OCR_LINE_MAX_BLOCKS=4,OCR_LINE_QUIET_MS=5000,OCR_LINE_REPEAT_MS=60000,OCR_LINE_STALE_MS=60000;
+const SKIP_BURST_GAP_MS=300,SKIP_BURST_SETTLE_MS=400,SKIP_BURST_MAX_HOLD_MS=800;
 const QUOTE_OPEN='「『（(',QUOTE_CLOSE='」』）)';
 function splitSpeaker(raw,known){const s=String(raw||'');const t=s.replace(/^[\s　]+/,'');if(!t)return {name:'',text:s};
  const kn=n=>!!known&&typeof known.has==='function'&&known.has(n);
@@ -58,7 +59,10 @@ class HookNative{
     script provider knows where pages start and most pages hold more than one line (HuneX tables, multilingual KiriKiri
     [cm]/[l]). Every page rule (page clears, no duplicates, row continuation, no marker/box auto-hide, no preflight) follows. */
  /* E422: the reader's skip key (Ctrl / the game's skip held), for the bridge's skip-burst rule. */
- skipHeld(v){const held=v===true;if(held===this.skipKey)return;if(held&&this.pageQueue?.rest.length){const q=this.pageQueue;this.pageQueue=null;this.source({...q.base,text:q.rest[q.rest.length-1]},q.name);}this.skipKey=held;if(this.process)this.send({type:'skipHeld',held});}
+ skipHeld(v){const held=v===true;if(held===this.skipKey)return;if(held&&this.pageQueue?.rest.length){const q=this.pageQueue;this.pageQueue=null;this.source({...q.base,text:q.rest[q.rest.length-1]},q.name);}this.skipKey=held;
+  const burst=this.skipBurst;
+  if(burst){if(held){clearTimeout(burst.settle);burst.settle=null;}else if(burst.held||this.state.hookSourcePreview)this.settleSkipBurst(burst);}
+  if(this.process)this.send({type:'skipHeld',held});}
  /* 2026-11-12 (user, ファタモルガーナの館: "这死馆也没有上一句渐暗"): the script guess (flowGame: many multi-sentence pages) is
     overruled by the engine itself: once its page DLL reports lines (with their real places, box or full page), the game is not laid out as a flow page */
  get flowPage(){const confirmed=this.profile?.page?.presentation;
@@ -1137,14 +1141,41 @@ class HookNative{
  deliverSource(text,origin,engine='',nativeLine=0,authority){if(require('./danganronpa-pc-source.cjs').shouldBlock(this,authority,origin))return;
   if(require('./unity-il2cpp-source.cjs').shouldBlock(this.textPath,authority||{origin},this.target))return;
   if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,authority,this.target)||require('./artemis-session.cjs').shouldBlock(this.textPath,authority,this.target,origin,this.wanted!==false))return;
-  const now=this.now(),live=!engine&&!nativeLine&&(origin||'live')==='live',S=this.skipBurst||(this.skipBurst={last:0,held:null,timer:null,count:0});
+  const now=this.now(),live=!engine&&!nativeLine&&(origin||'live')==='live',S=this.skipBurst||(this.skipBurst={last:0,held:null,settle:null,cap:null,count:0});
   if(!live||this.stashFlush){if(this.stashFlush)S.last=now;this.emitSource(text,origin,engine,nativeLine,authority);return;}
   {const last=this.lastOfMerged(text);if(last!==text){this.trace('merged skip text: kept the last line of '+text.length+' chars');text=last;/* 2026-11-19 (素晴らしき日々: 「それか、…とか言ってるヤツだ。」 untranslated) the script translation was looked up for the merged text; the kept line is looked up itself */try{this.originalTextFor(text);}catch{}}}
   const gap=now-S.last;S.last=now;
-  if(gap>=300&&!S.held){S.count=0;this.emitSource(text,origin,engine,nativeLine,authority);return;}
-  S.count++;S.held={text,origin};clearTimeout(S.timer);
-  if(S.count===1)this.trace('skip burst: holding lines until the game stops');
-  const serial=this.serial;S.timer=setTimeout(()=>{const held=S.held;S.held=null;S.timer=null;if(!held||serial!==this.serial)return;this.trace('skip burst settled; skipped='+(S.count-1));S.count=0;this.emitSource(held.text,held.origin);},400);S.timer.unref?.();
+  if(gap>=SKIP_BURST_GAP_MS&&!this.skipKey){
+   if(S.held)this.trace('skip burst settled; skipped='+S.count+' (normal pace)');
+   clearTimeout(S.cap);clearTimeout(S.settle);S.cap=S.settle=S.held=null;S.count=0;
+   this.emitSource(text,origin,engine,nativeLine,authority);
+   if(this.state.hookSourcePreview)this.notify({hookSourcePreview:false});
+   return;
+  }
+  S.count++;S.held={text,origin,authority,sequence:this.state.hookSequence};
+  if(!S.cap){
+   this.trace('skip burst: holding lines until the game stops');
+   const serial=this.serial;
+   S.cap=setTimeout(()=>{S.cap=null;if(serial===this.serial)this.flushSkipBurst(S,true);},SKIP_BURST_MAX_HOLD_MS);
+   S.cap.unref?.();
+  }
+  if(!this.skipKey)this.settleSkipBurst(S);
+ }
+ settleSkipBurst(S){
+  clearTimeout(S.settle);
+  const serial=this.serial;
+  S.settle=setTimeout(()=>{S.settle=null;if(serial===this.serial)this.flushSkipBurst(S,false);},SKIP_BURST_SETTLE_MS);
+  S.settle.unref?.();
+ }
+ flushSkipBurst(S,preview){
+  if(!preview){clearTimeout(S.cap);S.cap=null;}
+  const held=S.held,count=S.count;
+  S.held=null;S.count=0;
+  if(held&&held.sequence===this.state.hookSequence){
+   this.trace('skip burst settled; skipped='+(count-1)+(preview?' (preview)':''));
+   this.emitSource(held.text,held.origin,'',0,held.authority,preview);
+  }
+  if(!preview&&this.state.hookSourcePreview)this.notify({hookSourcePreview:false});
  }
  /* E270 (user, ATRI: one line was often typed out twice): games re-send the shown line when the voice ends or the
     window repaints, seconds later (after a long voice) and sometimes with different line breaks. The same line (ignoring
@@ -1183,7 +1214,7 @@ class HookNative{
  placedHidden(raw,info){const text=String(raw||'').replace(/\u001f/g,'\n').replace(/\n/g,''),f=HookNative.flat(text);if(!f||f.length<2)return;const seen=()=>(this.recentSources||[]).some(s=>s.includes(f)||f.includes(s));if(seen()){if(Array.isArray(info?.rects)&&info.rects.length)this.lastDialogRects=info.rects;return;}if((this.placedWait||(this.placedWait=new Map())).has(f))return;
   const serial=this.serial,t=setTimeout(()=>{this.placedWait.delete(f);if(serial!==this.serial||seen())return;const B=this.hiddenBatch||(this.hiddenBatch={items:[],timer:null});B.items.push({text,rects:info?.rects||null});clearTimeout(B.timer);B.timer=setTimeout(()=>{const items=B.items.splice(0);if(serial!==this.serial)return;const boxed=items.filter(i=>Array.isArray(i.rects)&&i.rects.length);if(items.length>=2&&boxed.length===items.length&&items.every(i=>!HookNative.interleaved?.(i.text,Profiles.get(this.profile,'choice.contentInterleave',false)===true))&&HookNative.choiceShape(items,this.lastDialogRects)){this.trace('placement lines without a source line, taken as '+items.length+' options');try{this.onHiddenChoices?.(items);}catch{}return;}for(const i of items){if(Array.isArray(i.rects)&&i.rects.length)this.lastDialogRects=i.rects;this.trace('placement line without a source line, delivered from the placement chars='+HookNative.flat(i.text).length);/* r34: 4 of the 8 misses were script lines delivered from the placement, which never went through the pairing (no patch-text); they do now */try{this.originalTextFor(i.text);}catch{}this.deliverSource(i.text,'placement');}},200);B.timer.unref?.();},450);t.unref?.();this.placedWait.set(f,t);if(this.placedWait.size>16){const k=this.placedWait.keys().next().value;clearTimeout(this.placedWait.get(k));this.placedWait.delete(k);}}
  giveWay(ms){this.send({type:'engineGiveWay',ms:Math.max(0,Math.min(10000,Number(ms)||3000))});}
- emitSource(text,origin,engine='',nativeLine=0,authority){if(require('./danganronpa-pc-source.cjs').shouldBlock(this,authority,origin))return;if(require('./unity-il2cpp-source.cjs').shouldBlock(this.textPath,authority||{origin},this.target))return;if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,authority,this.target)||require('./artemis-session.cjs').shouldBlock(this.textPath,authority,this.target,origin,this.wanted!==false))return;{const f=HookNative.flat(text);if(f){(this.recentSources||(this.recentSources=[])).push(f);if(this.recentSources.length>24)this.recentSources.shift();}}this.positionsCheck?.();
+ emitSource(text,origin,engine='',nativeLine=0,authority,preview=false){if(require('./danganronpa-pc-source.cjs').shouldBlock(this,authority,origin))return;if(require('./unity-il2cpp-source.cjs').shouldBlock(this.textPath,authority||{origin},this.target))return;if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,authority,this.target)||require('./artemis-session.cjs').shouldBlock(this.textPath,authority,this.target,origin,this.wanted!==false))return;{const f=HookNative.flat(text);if(f){(this.recentSources||(this.recentSources=[])).push(f);if(this.recentSources.length>24)this.recentSources.shift();}}this.positionsCheck?.();
   try{this.textPath?.want(text);}catch{}
   const scriptStep=authority===SCRIPT_PAGE_ROW;
   const authored=scriptStep||this.filterHookRedraws()&&this.pageScriptParts(text).length===1;
@@ -1219,7 +1250,7 @@ class HookNative{
   const part=text;let continues=0;/* not when the engine named a new speaker after the last line */if(paged&&!this.filterHookRedraws()&&!(this.speaker&&this.speaker.at>(this.lastSourceAt||0))){const c=this.pageText.continuation(text,this.now());if(c){this.trace('sentence continues the shown line ('+c.continues+' chars before)');text=c.text;continues=c.continues;}}
   this.beforeDialogue?.({hookSequence:(this.state.hookSequence||0)+1,hookSource:text,hookSourceOrigin:origin,hookSourceContinues:continues});
   this.learnBareName(text);
-  const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;/* E416 the choice detector learns every dialogue line and speaker, whatever the engine */(this.choice||(this.choice=this.newChoiceCapture())).noteDialogue(text,speaker);/* E407 a new dialogue line ends the choice screen */if(text.replace(/\s+/g,'')!==String(this.lastSource||'').replace(/\s+/g,''))this.clearChoices('new dialogue line',400,text);this.lastSource=text;this.lastSourceAt=this.now();/* #468 the lines the game's own text gave (never an OCR line): an OCR reading of the same page is refused (ocrLineRefused) */if(origin!=='ocr'){const R=this.hookRecent||(this.hookRecent=[]);R.push({key:HookNative.flat(text),at:this.now()});if(R.length>24)R.shift();}this.palFlush?.();this.lastSourceStream=this.sourceStream||'';this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.textEffectsLine(text,this.fxNext===true||origin==='placement');if(paged){/* the reader keeps the page's earlier lines above this one while the page stays (web hook-reader.js) */if(!continues&&this.pageText.pages){const same=this.pageText.samePage(this.now());this.pageSaidSame=same;this.emit({type:'hookPage',engine:'text',line:(this.state.hookSequence||0)+1,same,at:this.now()});}this.pageText.shown(part,text,this.now());}this.notify({...(this.lineUnreadable?(this.lineUnreadable=false,{hookLineUnreadable:false}):{}),hookActive:true,...(origin==='ocr'||engine==='saya-page-ocr'?{}:{processAttached:true,streamSelected:true,hookRecovering:false}),hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookFlowGrid:engine==='nvl'?(this.flowGridName||''):'',...(()=>{const f=engine==='nvl'?this.flowLayout(text):null;/* E410 */return {hookFlowPageStart:f?.pageStart===true,hookFlowRow:f?.row||'',hookSourceIndex:Number.isSafeInteger(f?.index)?f.index:-1};})(),hookSourceContinues:continues,hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:engine==='saya-page-ocr'?'画面文字已匹配原版剧本':origin==='ocr'?'已读取画面文字':text.trim()?'已收到真实游戏台词':'收到空文本信号'});
+  const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;/* E416 the choice detector learns every dialogue line and speaker, whatever the engine */(this.choice||(this.choice=this.newChoiceCapture())).noteDialogue(text,speaker);/* E407 a new dialogue line ends the choice screen */if(text.replace(/\s+/g,'')!==String(this.lastSource||'').replace(/\s+/g,''))this.clearChoices('new dialogue line',400,text);this.lastSource=text;this.lastSourceAt=this.now();/* #468 the lines the game's own text gave (never an OCR line): an OCR reading of the same page is refused (ocrLineRefused) */if(origin!=='ocr'){const R=this.hookRecent||(this.hookRecent=[]);R.push({key:HookNative.flat(text),at:this.now()});if(R.length>24)R.shift();}this.palFlush?.();this.lastSourceStream=this.sourceStream||'';this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.textEffectsLine(text,this.fxNext===true||origin==='placement');if(paged){/* the reader keeps the page's earlier lines above this one while the page stays (web hook-reader.js) */if(!continues&&this.pageText.pages){const same=this.pageText.samePage(this.now());this.pageSaidSame=same;this.emit({type:'hookPage',engine:'text',line:(this.state.hookSequence||0)+1,same,at:this.now()});}this.pageText.shown(part,text,this.now());}this.notify({...(this.lineUnreadable?(this.lineUnreadable=false,{hookLineUnreadable:false}):{}),hookActive:true,...(origin==='ocr'||engine==='saya-page-ocr'?{}:{processAttached:true,streamSelected:true,hookRecovering:false}),hookSource:text,...(preview||this.state.hookSourcePreview?{hookSourcePreview:preview}:{}),hookSpeaker:speaker,hookSourceEngine:engine,hookFlowGrid:engine==='nvl'?(this.flowGridName||''):'',...(()=>{const f=engine==='nvl'?this.flowLayout(text):null;/* E410 */return {hookFlowPageStart:f?.pageStart===true,hookFlowRow:f?.row||'',hookSourceIndex:Number.isSafeInteger(f?.index)?f.index:-1};})(),hookSourceContinues:continues,hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:engine==='saya-page-ocr'?'画面文字已匹配原版剧本':origin==='ocr'?'已读取画面文字':text.trim()?'已收到真实游戏台词':'收到空文本信号'});
   this.il2cppShown=require('./unity-il2cpp-source.cjs').tagged(authority)?{authority,sequence:this.state.hookSequence}:null;
  }
  /* #141 (CLANNAD: a bare name sent as its own string, with no brackets, before the 「…」 line). A short name-like line
@@ -1324,7 +1355,7 @@ class HookNative{
   // Launch can bind the Lua token before Reader's asynchronous profile lookup reaches this hook
   if(this.textPath instanceof require('./artemis-session.cjs').ArtemisSession)tasks.push(attempt(()=>this.textPath.stop()));
   tasks.push(attempt(()=>draw?.stop()).then(()=>{if(this.engineDraw===draw)this.engineDraw=null;}));
-  tasks.push(attempt(()=>{this.embedModeSent=undefined;this.probing=false;if(this.lineUnreadable){this.lineUnreadable=false;this.notify({hookLineUnreadable:false});}if(this.state?.scriptSource)this.notify({scriptSource:false});if(this.state?.embedTranslating)this.notify({embedTranslating:false});clearTimeout(this.skipBurst?.timer);this.skipBurst=null;this.pageReset();this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.retryAt=0;this.attempt=0;this.markerKey='';this.waitTarget=null;}));
+  tasks.push(attempt(()=>{this.embedModeSent=undefined;this.probing=false;if(this.lineUnreadable){this.lineUnreadable=false;this.notify({hookLineUnreadable:false});}if(this.state?.scriptSource)this.notify({scriptSource:false});if(this.state?.embedTranslating)this.notify({embedTranslating:false});clearTimeout(this.skipBurst?.settle);clearTimeout(this.skipBurst?.cap);this.skipBurst=null;this.skipKey=false;if(this.state?.hookSourcePreview)this.notify({hookSourcePreview:false});this.pageReset();this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.retryAt=0;this.attempt=0;this.markerKey='';this.waitTarget=null;}));
   // Even failed control revocation must request and await the owned helper's shutdown.
   // HookBridge checks game exit and releases the hide layers before its final stdout drain (up to 2 s).
   if(old)this.stoppingBridge={child:old,pid:this.pid,started:this.started};

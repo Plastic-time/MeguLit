@@ -688,6 +688,7 @@
    tip.style.cssText='position:fixed;left:50%;top:9%;transform:translateX(-50%);z-index:2147483000;max-width:min(560px,86vw);padding:10px 18px;border-radius:12px;background:rgba(18,12,14,.92);color:#f3e6da;font:500 14px/1.6 "Microsoft YaHei",sans-serif;box-shadow:0 12px 32px rgba(0,0,0,.45);pointer-events:none;transition:opacity .3s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
    document.body.append(tip); setTimeout(()=>{tip.style.opacity='0';setTimeout(()=>tip.remove(),350);},message.ok===true?2600:4500); };
   bridge.galStatus = message => {
+    if (typeof message.hookSourcePreview === 'boolean') bridge.setHookSourcePreview?.(message.hookSourcePreview);
     if ('hookSource' in message || message.type==='gameClosed') {
       const page=!!message.hookSource && ['saya-page-ocr','saya-script-read'].includes(message.hookSourceEngine);
       document.body.classList.toggle('megulit-saya-page',page);

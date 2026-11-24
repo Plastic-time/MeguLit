@@ -111,12 +111,12 @@ class Reader{
     message={...message,cardinalPair:{...cardinalPair,markEpisode}};
     if(this.gal)this.gal.sentenceDiagnosticEpisode=markEpisode;
    }}catch{}
-  if(message.cardinalPair)require('./torch-local-trial.cjs').source(this,message,message.cardinalPair);
+  if(message.cardinalPair&&!message.hookSourcePreview)require('./torch-local-trial.cjs').source(this,message,message.cardinalPair);
   if(typeof message.hookSource==='string'){/* #468 a reader line read by OCR marks the game for the probe upload (adapter-probe.cjs markRuntime), once per game and session */if(message.hookSourceOrigin==='ocr'&&this.gameId&&message.hookSource.trim()){const seen=this.ocrMarked||(this.ocrMarked=new Set());if(!seen.has(this.gameId)){seen.add(this.gameId);try{require('./adapter-probe.cjs').markRuntime(this.root,this.gameId,'ocr-fallback','reader lines came from OCR');}catch{}}}this.gal?.send({type:'markerSource',text:message.hookSource});if(!message.hookRecovering&&message.hookSourceOrigin!=='history'){
    if(message.hookSource&&message.hookSource!==this.immersion.currentText)this.gal?.send({type:'dialogSceneLine'});
    this.immersion.source(message.hookSource,message.hookSourceEngine,message.hookSourceOrigin);
    /* E287: translate the next few lines the script leaves untranslated, so they are ready before the game reaches them. */
-   if(typeof message.hookSource==='string'&&message.hookSource.trim())require('./script-prefetch.cjs').ahead(this).catch(()=>{});
+   if(message.hookSource.trim()&&!message.hookSourcePreview)require('./script-prefetch.cjs').ahead(this).catch(()=>{});
    if(typeof message.hookSource==='string'&&message.hookSource.trim()){require('./scene-shots.cjs').maybe(this);require('./sentence-scenes.cjs').remember(this);}
   }if(!message.hookRecovering&&message.hookSourceOrigin!=='history'&&message.hookSource){this.lastLine=message.hookSource;
    /* E598 text from the game after an automatic switch: it works */
