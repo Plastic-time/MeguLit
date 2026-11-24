@@ -46,9 +46,9 @@ function parseKs(buf){
   if(t[0]==='@'||t[0]==='*'){vt.see(t);if(ascii(t))anchors.push(t);continue;}
   // A tag whose name is Japanese is a macro that prints that word (女王蜂の王房: [輝夜] [めのう] for character names,
   // [輝夜ruby] with its reading, [漢字'よみ] for ruby); keep the word, drop the reading.
-  const text=t.replace(/\[([぀-ヿ一-鿿々ー]+)(?:ruby|'[^\]]*)?\]/g,'$1').replace(/\[[^\]]*\]/g,'').trim();
+  const text=t.replace(/\[\[|\[([぀-ヿ一-鿿々ー]+)(?:ruby|'[^\]]*)?\]/g,(m,jp)=>m==='[['?'\x01':jp).replace(/\[[^\]]*\]/g,'').replace(/\x01/g,'[').trim();
   if(!text){vt.see(t);if(ascii(t))anchors.push(t);continue;}vt.see(t);/* E450 a speaker label line (【名前】) passes its voice on to the speech after it */if(!/^【[^】]*】$/.test(text))voices[lines.length]=vt.take();
-  const pairs=[...t.matchAll(/\[([぀-ヿ一-鿿々ー]+)'([^\]]+)\]/g)].map(m=>[m[1],m[2]]);if(pairs.length)ruby[lines.length]=pairs;
+  const pairs=[];for(const m of t.matchAll(/\[\[|\[([぀-ヿ一-鿿々ー]+)'([^\]]+)\]/g))if(m[1])pairs.push([m[1],m[2]]);if(pairs.length)ruby[lines.length]=pairs;
   lines.push(text);}
  // the game's own readings ([漢字'よみ]), only when the script has any
  const out=ruby.length?{lines,anchors,ruby:lines.map((_,i)=>ruby[i]||null)}:{lines,anchors};const v=voiceRef.keep(lines.map((_,i)=>voices[i]||null));if(v)out.voices=v;return out;
