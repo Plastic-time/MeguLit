@@ -814,8 +814,10 @@ const ENGINES={'adapter-pack':adapterPack,'nitroplus-n4':nitroplusN4,'kirikiri-l
 // The engine whose running scripts this folder holds, if any can be read.
 const acceptsExecutable=(id,executable)=>id!=='sia'||!executable||isSiaExecutable(executable);
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
+ // Compiled Ivory scenes have their own scan and leave the original GARbro sample limit intact.
+ const sampled=id==='garbro'?scenes.filter(s=>!s.compiledIvory).slice(0,64).concat(scenes.filter(s=>s.compiledIvory)):scenes.slice(0,64);
  // SIA script order is by filename, with control-only PACs mixed among the dialogue scenes.
- for(const s of id==='sia'?scenes:scenes.slice(0,64)){try{if((s.parse?s.parse():ENGINES[id].parse(s.read())).lines.length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */
+ for(const s of id==='sia'?scenes:sampled){try{if((s.parse?s.parse():ENGINES[id].parse(s.read())).lines.length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */
 /* GARbro is the last resort: a folder MeguLit's own cx reader owns (encrypted KiriKiri Z xp3, cache still decrypting)
    stays unread until that cache is ready instead of going to GARbro (9-nine- Ep4 / ATRI read as garbro). */
 function ownCx(dir){return cxArchives(dir).some(f=>{try{return xp3.list(f)?.files.some(e=>e.encrypted);}catch{return false;}});}
@@ -831,8 +833,9 @@ function read(id,dir,overlay){const engine=ENGINES[id];
  return engine.annotate?engine.annotate(dir,list):list;}
 function fingerprint(id,dir){
  // Rebuild multilingual KiriKiri indexes that omitted captions in tag arguments.
- const format=id==='kirikiri-lang'?'caption-text-v1\n':'';
- const sources=ENGINES[id].sources(dir).sort().map(f=>path.basename(f)+'|'+stat(f)).join('\n');
+ const files=ENGINES[id].sources(dir).sort();
+ const format=id==='kirikiri-lang'?'caption-text-v1\n':id==='garbro'?garbro.cacheStamp(files):'';
+ const sources=files.map(f=>path.basename(f)+'|'+stat(f)).join('\n');
  return crypto.createHash('sha256').update(id+'\n'+format+sources).digest('hex');
 }
 /* E294 (user: say that the first use needs 30-90 s of unpacking instead of "not supported"): what a game that cannot

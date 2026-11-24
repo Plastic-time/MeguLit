@@ -6,7 +6,9 @@ const MAX_SCENE_BYTES=1<<20;
 const MAX_TEXT_UNITS=2048;
 const HEADERS=new Map([['cTEX',16],['cFNM',16],['cCOD',28]]);
 
-// The AGS 1.6.2 NTK loader conditionally swaps each bit pair, then XORs the rotating seed.
+// Independently implemented from static analysis of the AGS 1.6.2 NTK loader.
+// Archive extraction uses MeguLit's existing GARbro runtime (morkt, MIT).
+// The loader conditionally swaps each bit pair, then XORs the rotating seed.
 function decipher(data,seed){
  const result=Buffer.allocUnsafe(data.length);
  for(let at=0;at<data.length;at+=4){
@@ -52,7 +54,7 @@ function lineEnds(text){
 function lineAt(text,ends,offset){
  if(offset%2||offset>=text.length)return '';
  const end=ends[offset/2];
- if(end-offset>MAX_TEXT_UNITS*2)return '';
+ if(end===text.length||end-offset>MAX_TEXT_UNITS*2)return '';
  const bytes=Buffer.allocUnsafe(end-offset);
  let length=0;
  for(let at=offset;at<end;at+=2){

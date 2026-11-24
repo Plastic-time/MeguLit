@@ -46,12 +46,33 @@ let packsRef=null;
 function packs(){if(!packsRef){const {RuntimePacks}=require('../../core/runtime-packs.cjs');packsRef=RuntimePacks.shared(ROOT());}return packsRef;}
 function installed(){try{return packs().installed(PACK);}catch{return false;}}
 function version(){try{return String(fs.statSync(path.join(DIR(),'ArcFormats.dll')).size);}catch{return '0';}}
-function key(file){const st=fs.statSync(file),format=scriptPack(file)?.cacheKey||'';return crypto.createHash('sha256').update(path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+format).digest('hex').slice(0,24);}
-function cacheDir(file){return path.join(CACHE(),key(file));}
+function key(file,format=''){const st=fs.statSync(file);return crypto.createHash('sha256').update(path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+format).digest('hex').slice(0,24);}
+function cacheDir(file){return path.join(CACHE(),key(file,scriptPack(file)?.cacheKey));}
 function readJson(file){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}}
 function cachedFailure(cache,v=version()){
  const bad=readJson(path.join(cache,'failed.json'));
  return bad?.version===v&&!TRANSIENT_FAILURE.test(bad.error||'')?bad:null;
+}
+
+const ivoryName=rel=>rel.replace(/\\/g,'/').toLowerCase();
+function pairedIvory(names,rel){
+ const stem=ivoryName(rel).slice(0,-4);
+ return names.has(stem+'.txt')&&names.has(stem+'.hpb');
+}
+
+function previousIvoryCache(file){
+ const dir=path.join(CACHE(),key(file)),info=readJson(path.join(dir,'done.json'));
+ if(!Array.isArray(info?.files))return null;
+ const names=new Set(info.files.map(ivoryName));
+ return info.files.some(rel=>/\.txt$/i.test(rel)&&pairedIvory(names,rel))?{dir,info}:null;
+}
+
+function ivoryUpgrades(dir){
+ return archives(dir).filter(file=>{
+  if(!scriptPack(file)?.cacheKey)return false;
+  const cache=cacheDir(file);
+  return !readJson(path.join(cache,'done.json'))&&!cachedFailure(cache)&&previousIvoryCache(file);
+ });
 }
 
 // Archives in the game folder (and one level down) worth handing to GARbro, script-looking names first.
@@ -137,29 +158,43 @@ const {decodeRuns}=kit;
 // Engine interface used by scenes.cjs.
 const engine={id:'garbro',
  sources:dir=>archives(dir),
+ // Let a previously readable index refresh when its archive gains compiled scenes.
+ cacheStamp(files){
+  return files.flatMap(file=>{
+   if(!scriptPack(file)?.cacheKey)return [];
+   const cache=cacheDir(file),info=readJson(path.join(cache,'done.json'));
+   if(!Array.isArray(info?.files)){
+    return !cachedFailure(cache)&&previousIvoryCache(file)&&installed()?['ivory:upgrading\n']:[];
+   }
+   const names=new Set(info.files.map(ivoryName));
+   return [...names].filter(rel=>/\.ntk$/.test(rel)&&!pairedIvory(names,rel)).sort().map(rel=>'ivory:'+rel+'\n');
+  }).join('');
+ },
  scenes(dir){
   const out=[];
-  for(const file of archives(dir)){let c;try{c=cacheDir(file);}catch{continue;}const info=readJson(path.join(c,'done.json'));
+  for(const file of archives(dir)){let c;try{c=cacheDir(file);}catch{continue;}
+   const pack=scriptPack(file),ready=readJson(path.join(c,'done.json'));
+   const previous=!ready&&pack?.cacheKey?previousIvoryCache(file):null;
+   if(!ready&&!cachedFailure(c)&&!cacheOnly.getStore()&&(!previous||installed()))schedule(file);
+   const info=ready||previous?.info;
    if(info){
-    const pack=scriptPack(file),names=pack?.paired?new Set(info.files.map(name=>name.toLowerCase())):null;
+    const names=pack?.paired?new Set(info.files.map(ivoryName)):null;
+    if(previous)c=previous.dir;
     for(const rel of info.files){
      if(pack&&!pack.entries.test(rel))continue;
      const compiled=names&&/\.ntk$/i.test(rel);
      if(names){
-      const stem=rel.slice(0,-4).toLowerCase(),paired=names.has(stem+'.txt')&&names.has(stem+'.hpb');
+      const paired=pairedIvory(names,rel);
       if(compiled?paired:(!paired||!/\.txt$/i.test(rel)))continue;
      }
      const entry=path.join(c,rel);
      const read=compiled?()=>kit.readAt(entry,0,Math.min(fs.statSync(entry).size,ivoryNtk.MAX_SCENE_BYTES+1)):()=>fs.readFileSync(entry);
      const scene={name:path.basename(file)+'/'+rel.replace(/\\/g,'/'),read};
-     if(compiled)scene.parse=()=>ivoryNtk.parse(read());
+     if(compiled){scene.parse=()=>ivoryNtk.parse(read());scene.compiledIvory=true;}
      else if(pack)scene.parse=()=>kit.lineGrammar(kit.SJIS.decode(read()),{comment:pack.comment,anchor:SCRIPT_COMMAND,strip:[]});
      out.push(scene);
     }
-    continue;
    }
-   if(cachedFailure(c))continue;
-   if(!cacheOnly.getStore())schedule(file);
   }
   return out;
  },
@@ -169,4 +204,4 @@ const engine={id:'garbro',
   const startedAt=Math.min(...files.map(f=>jobs.get(f).startedAt)),pj=installed()?null:packs().status().packs.find(p=>p.id===PACK)?.job;
   return pj?{kind:'garbro',stage:'download',startedAt,received:pj.received,total:pj.total}:{kind:'garbro',stage:'unpack',startedAt};},
 };
-module.exports={engine,archives,unpack,unpackSync,extractMatchSync,run,decodeRuns,cacheDir,cachedFailure,schedule,installed,version,readJson,MATCH,PACK,jobs,withCached:fn=>cacheOnly.run(true,fn)};
+module.exports={engine,archives,ivoryUpgrades,unpack,unpackSync,extractMatchSync,run,decodeRuns,cacheDir,cachedFailure,schedule,installed,version,readJson,MATCH,PACK,jobs,withCached:fn=>cacheOnly.run(true,fn)};
