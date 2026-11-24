@@ -135,11 +135,11 @@ test('a new HxCrypt profile retries only its empty scene cache',t=>{
  fs.mkdirSync(cacheDir);
  const scenes=require('../services/original-engines/scenes.cjs');
 
- function seedCache(name,scheme,docs){
+ function seedCache(name,scheme,docs,count=2){
   const dir=path.join(tmp,name);
   fs.mkdirSync(dir);
   const file=path.join(dir,'data.xp3');
-  const entries=['「おはよう。」','「おかえりなさい。」'].map((ja,i)=>({
+  const entries=['「おはよう。」','「おかえりなさい。」'].slice(0,count).map((ja,i)=>({
    id:BigInt(i+1)|(i?0x100000000n:0n),key:BigInt(1234+i),adlr:i,
    data:buildPsb({name:i+'.ks',scenes:[{texts:[[null,null,[[null,ja]]]]}]}),
   }));
@@ -149,7 +149,7 @@ test('a new HxCrypt profile retries only its empty scene cache',t=>{
   const cache=path.join(cacheDir,hash.slice(0,24)+'.json');
   const previous=JSON.stringify({schema:1,file,docs});
   fs.writeFileSync(cache,previous);
-  return {dir,cache,previous};
+  return {dir,file,cache,previous};
  }
 
  const empty=seedCache('empty',profile,[]);
@@ -166,6 +166,24 @@ test('a new HxCrypt profile retries only its empty scene cache',t=>{
  const unrelated=seedCache('unrelated',stella,[]);
  assert.equal(scenes.cxPrepareSync(unrelated.dir),0);
  assert.deepEqual(scenes.read('kirikiri-cx',unrelated.dir),[]);
+
+ // An index that matches the profile can still yield no scenes.
+ const incomplete=seedCache('incomplete',profile,[],1);
+ const other=path.join(incomplete.dir,'late.xp3');
+ fs.copyFileSync(empty.file,other);
+ const engine=scenes.ENGINES['kirikiri-cx'];
+ const checks=[];
+ const getRevision=cx.hxCacheRevision;
+ t.mock.method(cx,'hxCacheRevision',file=>{
+  checks.push(scenes.withCxProbe(()=>engine.scenes(incomplete.dir).length));
+  return getRevision(file);
+ });
+ assert.equal(scenes.cxPrepareSync(incomplete.dir,{deadline:Date.now()-1}),0);
+ assert.deepEqual(checks,[],'an expired probe does not inspect old caches');
+ assert.equal(scenes.cxPrepareSync(incomplete.dir),2);
+ assert.deepEqual(checks,[2],'the missing cache is built before retrying the empty cache');
+ assert.ok(engine.sources(incomplete.dir).includes(incomplete.cache),'an empty retry keeps the previous fingerprint source');
+ assert.equal(scenes.cxPrepareSync(incomplete.dir),0,'an empty retry stays cached');
 });
 
 test('the 2025 HxCrypt profile matches native entry streams with either open flag',()=>{

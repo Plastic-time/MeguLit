@@ -498,6 +498,7 @@ const os=require('node:os');
 const MEDIA_XP3=/^(?:bg|fg|ev|sd)?image|^(?:bgm|voice|sound|se|movie|video|thum|emote|font|sysse)/i;
 const cxArchives=dir=>{try{return fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f)&&!MEDIA_XP3.test(f)).map(f=>path.join(dir,f));}catch{return [];}};
 const cxCache=(file,version=7)=>{const st=fs.statSync(file);return path.join(os.tmpdir(),'megulit-cx',crypto.createHash('sha256').update(path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+'|'+version).digest('hex').slice(0,24)+'.json');};
+const cxRetryCache=file=>cxCache(file,'7-hx-2025');
 const cxBuilds=new Map(),cxMemo=new Map(),cxQueue=[],cxStarted=new Map();let cxRunning=false;
 const finishedCxWorkers=new WeakSet();
 let cxProbe=null;
@@ -506,17 +507,30 @@ function cxCachedDocs(out){
  try{const st=fs.statSync(out),hit=cxMemo.get(out);if(hit&&hit.at===st.mtimeMs)return hit.docs;const docs=JSON.parse(fs.readFileSync(out,'utf8')).docs||[];cxMemo.set(out,{at:st.mtimeMs,docs});return docs;}catch{}
  return null;
 }
-function cxCachePath(file){
- const out=cxCache(file);
- // Retry an empty cache only when a newly supported filter opens this archive.
- if(cxCachedDocs(out)?.length!==0)return out;
+function cxReadCache(file,out){
+ // Keep the read path and fingerprint until a retry actually has scenes.
+ const retry=cxRetryCache(file);
+ return fs.existsSync(retry)&&cxCachedDocs(out)?.length===0&&cxCachedDocs(retry)?.length?retry:out;
+}
+function cxRetryPath(file,out){
+ const retry=cxRetryCache(file);
+ if(cxBuilds.has(retry)||fs.existsSync(retry)||cxCachedDocs(out)?.length!==0)return null;
+ // Recheck eligibility if the old cache was replaced in this process.
  const cached=cxMemo.get(out);
  cached.revision??=require('./cx-filter.cjs').hxCacheRevision(file);
- return cached.revision?cxCache(file,'7-'+cached.revision):out;
+ return cached.revision?retry:null;
+}
+function cxEnqueue(file,out){
+ cxBuilds.set(out,null);cxStarted.set(out,Date.now());cxQueue.push({file,out});cxNext();
 }
 function cxDocs(file){
- let out;try{out=cxCachePath(file);}catch{return null;}
- const docs=cxCachedDocs(out);if(docs)return docs;
+ let out,docs;try{
+  out=cxCache(file);docs=cxCachedDocs(cxReadCache(file,out));
+  if(docs){
+   if(!docs.length&&!cxProbe){const retry=cxRetryPath(file,out);if(retry)cxEnqueue(file,retry);}
+   return docs;
+  }
+ }catch{return null;}
  // Keep the earlier scenes available while rebuilding caches that omitted Riddle PSB files.
  let legacy=null;try{legacy=cxCachedDocs(cxCache(file,6));}catch{}
  if(cxProbe)return legacy;
@@ -524,7 +538,7 @@ function cxDocs(file){
   // Only archives that look like cx KiriKiri (encrypted entries) are worth a worker; one worker at a time.
   /* E595 a translation's patch.xp3 keeps its scene files unencrypted (each byte XOR-ed, which the worker undoes) */
   let list;try{list=xp3.list(file);}catch{list=null;}if(!list||!list.files.some(e=>e.encrypted||/\.scn$/i.test(e.name)))return legacy||[];
-  cxBuilds.set(out,null);cxStarted.set(out,Date.now());cxQueue.push({file,out});cxNext();
+  cxEnqueue(file,out);
  }
  return legacy;
 }
@@ -533,7 +547,17 @@ function cxDocs(file){
    the missing caches in this thread, within a deadline; the probe calls it before reading. */
 function cxPrepareSync(dir,{deadline=Infinity}={}){let built=0;
  const size=f=>{try{return fs.statSync(f).size;}catch{return 0;}},order=cxArchives(dir).sort((a,b)=>(/^scn/i.test(path.basename(b))-/^scn/i.test(path.basename(a)))||size(a)-size(b));
- for(const file of order){let out;try{out=cxCachePath(file);}catch{continue;}if(fs.existsSync(out)||cxBuilds.has(out))continue;
+ // Retry old empty caches after building missing ones, within the remaining budget.
+ const missing=[],cached=[];
+ for(const file of order){let base;try{base=cxCache(file);}catch{continue;}
+  if(cxBuilds.has(base))continue;
+  const hasCache=fs.existsSync(base);
+  (hasCache?cached:missing).push({file,base,hasCache});
+ }
+ for(const {file,base,hasCache} of missing.concat(cached)){
+  if(Date.now()>=deadline){if(!hasCache&&cxProbe)cxProbe.deferred=true;break;}
+  let out;try{out=hasCache?cxRetryPath(file,base):base;}catch{continue;}
+  if(!out||fs.existsSync(out)||cxBuilds.has(out))continue;
   if(Date.now()>=deadline){if(cxProbe)cxProbe.deferred=true;break;}
   const attempt=out+'.'+process.pid+'.'+crypto.randomUUID()+'.tmp';
   if(Number.isFinite(deadline)){
@@ -547,7 +571,7 @@ function cxPrepareSync(dir,{deadline=Infinity}={}){let built=0;
     if(Date.now()>=deadline||status===0){if(cxProbe)cxProbe.deferred=true;break;}
     // The worker has finished its attempt; only teardown is still pending.
     finishedCxWorkers.add(worker);
-    if(status===1){if(cxCachePath(file)!==out||Date.now()>=deadline){if(cxProbe)cxProbe.deferred=true;break;}fs.renameSync(attempt,out);built++;}
+    if(status===1){if(cxCache(file)!==base||Date.now()>=deadline){if(cxProbe)cxProbe.deferred=true;break;}fs.renameSync(attempt,out);built++;}
    }catch{}finally{if(worker)try{worker.terminate().then(cleanExited,()=>{});}catch{}}
   }else try{if(require('./cx-worker.cjs').prepare(file,attempt)){fs.renameSync(attempt,out);built++;}}catch{}finally{try{fs.rmSync(attempt,{force:true});}catch{}}
  }
@@ -578,7 +602,7 @@ const kirikiriCx={
   return [...byName.values()].map(x=>({name:x.name,read:()=>Buffer.from(JSON.stringify(x.d))})).sort((a,b)=>a.name.localeCompare(b.name));},
  archives:()=>[],
  // Keep the previous source fingerprint until the replacement cache is published.
- sources:dir=>cxArchives(dir).flatMap(f=>{let c='';try{c=cxCachePath(f);if(!fs.existsSync(c))c=cxCache(f,6);}catch{}return c?[f,c]:[f];}),
+ sources:dir=>cxArchives(dir).flatMap(f=>{let c='';try{c=cxReadCache(f,cxCache(f));if(!fs.existsSync(c))c=cxCache(f,6);}catch{}return c?[f,c]:[f];}),
  // ruby: the game's own readings for each Japanese line ([base, reading] pairs), used before any dictionary reading.
  parse(buf){const doc=JSON.parse(buf.toString('utf8')),lines=[],zh=[],ruby=[],voices=[];
   /* the Chinese slot is found by its text (ATRI: ja/en/zh-Hans/zh-Hant; PureStation: ja/zh-Hans/zh-Hant; 9-nine-: ja/en/zh-Hant) */
@@ -851,7 +875,10 @@ function fingerprint(id,dir){
 function preparing(dir){
  if(cxProbe?.deferred)return {kind:'budget'};
  const viaGarbro=(()=>{try{return garbro.preparing(dir);}catch{return null;}})();if(viaGarbro)return viaGarbro;
- let started=0;for(const file of cxArchives(dir)){let out;try{out=cxCachePath(file);}catch{continue;}if(cxBuilds.has(out)&&!finishedCxWorkers.has(cxBuilds.get(out)))started=Math.min(started||Infinity,cxStarted.get(out)||Date.now());}
+ let started=0;for(const file of cxArchives(dir)){
+  let paths;try{paths=[cxCache(file),cxRetryCache(file)];}catch{continue;}
+  for(const out of paths)if(cxBuilds.has(out)&&!finishedCxWorkers.has(cxBuilds.get(out)))started=Math.min(started||Infinity,cxStarted.get(out)||Date.now());
+ }
  if(started)return {kind:'unpack',startedAt:started};
  const archives=cxArchives(dir);if(!archives.length)return null;
  let encrypted=false;for(const file of archives){try{if(xp3.list(file)?.files.some(e=>e.encrypted)){encrypted=true;break;}}catch{}}
