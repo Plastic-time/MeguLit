@@ -1,0 +1,104 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "a4dd60c046dc24b89dfbda6315b6b6bb4b920a843dcdca32d0ab458728b16121",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false,
+   "orphanDraw": true
+  },
+  "page": {
+   "reportClear": false,
+   "engineRows": false,
+   "filterHookRedraws": false,
+   "hookAnnotationPatterns": [],
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "pageFrames": [],
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "cardinal": {
+   "rev": 8,
+   "lines": 60,
+   "maxGapMs": 1500,
+   "sampleMs": 90,
+   "minIntervalMin": 30,
+   "maxLagMs": 80,
+   "weights": {
+    "row": 3,
+    "stable": 1,
+    "clean": 2,
+    "clear": 1,
+    "choice": 1,
+    "pair": 1,
+    "leak": 2
+   },
+   "thresholds": {
+    "settleMs": 300,
+    "shownRate": 0.9,
+    "stablePx": 0,
+    "cnOverlapPx": 2,
+    "lineMs": 700,
+    "burstMs": 300,
+    "calibGapMs": 1000,
+    "calibWatchMs": 2500,
+    "choiceMs": 3000,
+    "staleChars": 4,
+    "preflightMs": 1500
+   }
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "tyrano",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "742be9985129d9a433573f3acb742da484dbe02ab4f48f5d1fb2d7b57b850f77",
+  "title": "b398cdb080de9ede3f25df6b9b0df3af366d5791d0d9529c5b53e06dfbe91775",
+  "steam": "3702160",
+  "vndb": "v31672"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "irohanihoheto",
+ "builds": [
+  "ae48e22e19ce591036829a2085867f285cdfe2c63b13208ad71a3ab5275f9264"
+ ],
+ "match": {
+  "exe": [
+   "irohanihoheto.exe"
+  ],
+  "titles": [
+   "Irohanihoheto",
+   "イロハニホヘト",
+   "花开溢香唤春来"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

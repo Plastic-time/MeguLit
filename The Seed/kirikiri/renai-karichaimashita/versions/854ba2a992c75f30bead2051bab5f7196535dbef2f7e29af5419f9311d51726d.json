@@ -1,0 +1,33 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "854ba2a992c75f30bead2051bab5f7196535dbef2f7e29af5419f9311d51726d",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": false
+  },
+  "draw": {
+   "advhdInput": false,
+   "cmvsInput": false,
+   "fvpInput": false,
+   "minoriInput": false,
+   "spikechunsoftInput": false,
+   "kemcoSprites": false,
+   "embed": false,
+   "embedTranslation": true,
+   "viaRoles": []
+  }
+ },
+ "exe": "恋愛、借りちゃいました.exe",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "854ba2a992c75f30bead2051bab5f7196535dbef2f7e29af5419f9311d51726d",
+  "head": "34c23940353ecb828ea5130e85c5e95152154555e77b305eea733ba9a5ea5c05",
+  "pe": "1.3.3.7@57aadc2a"
+ },
+ "rev": 1
+}

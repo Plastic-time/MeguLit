@@ -1,0 +1,103 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "3bb6e76211a063415ddda747958eeb72161e99f0ac88fac93755f16e9603dc2e",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false,
+   "orphanDraw": true
+  },
+  "page": {
+   "reportClear": false,
+   "engineRows": false,
+   "filterHookRedraws": false,
+   "hookAnnotationPatterns": [],
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "pageFrames": [],
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "cardinal": {
+   "rev": 8,
+   "lines": 60,
+   "maxGapMs": 1500,
+   "sampleMs": 90,
+   "minIntervalMin": 30,
+   "maxLagMs": 80,
+   "weights": {
+    "row": 3,
+    "stable": 1,
+    "clean": 2,
+    "clear": 1,
+    "choice": 1,
+    "pair": 1,
+    "leak": 2
+   },
+   "thresholds": {
+    "settleMs": 300,
+    "shownRate": 0.9,
+    "stablePx": 0,
+    "cnOverlapPx": 2,
+    "lineMs": 700,
+    "burstMs": 300,
+    "calibGapMs": 1000,
+    "calibWatchMs": 2500,
+    "choiceMs": 3000,
+    "staleChars": 4,
+    "preflightMs": 1500
+   }
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "silkys",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "37d500f29b3f9b810faae8d246edba6346ce2d9e51679fe1c70698606b5d0600",
+  "title": "7dea4a3dcac450408f211804592217269cf9d67f4be802779ec13c214ef7977c",
+  "vndb": "v8731"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "boku-no-kanojo-wa-gatenkei",
+ "builds": [
+  "c06d0f883541388ef5445bb47b0e2a625095ee90acd904f554a1614227840917"
+ ],
+ "match": {
+  "exe": [
+   "AI6WIN_CH.exe"
+  ],
+  "titles": [
+   "Boku no Kanojo wa Gatenkei",
+   "ボクの彼女はガテン系",
+   "我的女友是蓝领"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

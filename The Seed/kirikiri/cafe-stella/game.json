@@ -1,0 +1,104 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "72589c57ba542f3d9231abd2f321556ec58d5e43a4be4ce588d5f5b402c49523",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false,
+   "orphanDraw": true
+  },
+  "page": {
+   "reportClear": false,
+   "engineRows": false,
+   "filterHookRedraws": false,
+   "hookAnnotationPatterns": [],
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "pageFrames": [],
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "cardinal": {
+   "rev": 8,
+   "lines": 60,
+   "maxGapMs": 1500,
+   "sampleMs": 90,
+   "minIntervalMin": 30,
+   "maxLagMs": 80,
+   "weights": {
+    "row": 3,
+    "stable": 1,
+    "clean": 2,
+    "clear": 1,
+    "choice": 1,
+    "pair": 1,
+    "leak": 2
+   },
+   "thresholds": {
+    "settleMs": 300,
+    "shownRate": 0.9,
+    "stablePx": 0,
+    "cnOverlapPx": 2,
+    "lineMs": 700,
+    "burstMs": 300,
+    "calibGapMs": 1000,
+    "calibWatchMs": 2500,
+    "choiceMs": 3000,
+    "staleChars": 4,
+    "preflightMs": 1500
+   }
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "75a0c874ae27571c4ac3c9cdb80e6085bcb82946cfab26f0736ddf5f2eefd7a6",
+  "title": "29d67e7ea5da0cfe861c70b96162ad2edc42c9c64e2492d7f42965166f23aa81",
+  "vndb": "v26414"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "cafe-stella",
+ "builds": [
+  "0dd0b3bcc5dcdda257f50ef52f121f919a7453c2afa614f8f82124cb92351d50"
+ ],
+ "match": {
+  "exe": [
+   "CafeStella.exe"
+  ],
+  "titles": [
+   "Cafe Stella",
+   "喫茶ステラと死神の蝶",
+   "星光咖啡馆与死神之蝶",
+   "Café Stella and the Reaper's Butterflies"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

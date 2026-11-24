@@ -1,0 +1,103 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "628d80502df41ed66a39c8761ecbd8b4a4c59a47b27590d1ff53c5864269184c",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false,
+   "orphanDraw": true
+  },
+  "page": {
+   "reportClear": false,
+   "engineRows": false,
+   "filterHookRedraws": false,
+   "hookAnnotationPatterns": [],
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "pageFrames": [],
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "cardinal": {
+   "rev": 8,
+   "lines": 60,
+   "maxGapMs": 1500,
+   "sampleMs": 90,
+   "minIntervalMin": 30,
+   "maxLagMs": 80,
+   "weights": {
+    "row": 3,
+    "stable": 1,
+    "clean": 2,
+    "clear": 1,
+    "choice": 1,
+    "pair": 1,
+    "leak": 2
+   },
+   "thresholds": {
+    "settleMs": 300,
+    "shownRate": 0.9,
+    "stablePx": 0,
+    "cnOverlapPx": 2,
+    "lineMs": 700,
+    "burstMs": 300,
+    "calibGapMs": 1000,
+    "calibWatchMs": 2500,
+    "choiceMs": 3000,
+    "staleChars": 4,
+    "preflightMs": 1500
+   }
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "fvp",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "407df8ede0281e599c1a671e896891679ac86609bb1379eda1c312d1741f365a",
+  "title": "033074f9eedae0b7ae971013473bf20e3446309484dd4b57abe8d500c6093e4c",
+  "vndb": "v5834"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "irotoridori-no-sekai",
+ "builds": [
+  "e7749bfb633b1d536a53ef2dea07b289cb2bdc264e506d87cb2e7b9bda41d947"
+ ],
+ "match": {
+  "exe": [
+   "World.exe"
+  ],
+  "titles": [
+   "Irotoridori no Sekai",
+   "いろとりどりのセカイ",
+   "五彩斑斓的世界"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

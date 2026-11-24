@@ -1,0 +1,105 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "6514b9367292eab4661f99f7aa97227a3ee56ae726e85eae7d74dcc16192458e",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false,
+   "orphanDraw": true
+  },
+  "page": {
+   "reportClear": false,
+   "engineRows": false,
+   "filterHookRedraws": false,
+   "hookAnnotationPatterns": [],
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "pageFrames": [],
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "cardinal": {
+   "rev": 8,
+   "lines": 60,
+   "maxGapMs": 1500,
+   "sampleMs": 90,
+   "minIntervalMin": 30,
+   "maxLagMs": 80,
+   "weights": {
+    "row": 3,
+    "stable": 1,
+    "clean": 2,
+    "clear": 1,
+    "choice": 1,
+    "pair": 1,
+    "leak": 2
+   },
+   "thresholds": {
+    "settleMs": 300,
+    "shownRate": 0.9,
+    "stablePx": 0,
+    "cnOverlapPx": 2,
+    "lineMs": 700,
+    "burstMs": 300,
+    "calibGapMs": 1000,
+    "calibWatchMs": 2500,
+    "choiceMs": 3000,
+    "staleChars": 4,
+    "preflightMs": 1500
+   }
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "aokana",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "abaff53f3309c9de264f9ae5e32473daaae2e60de540e831ba48458f7afea659",
+  "title": "f07d9a4e3215f2dd331b110ce362f0e3763a0a8924fa9e86d15239c38658236a",
+  "steam": "1044620",
+  "vndb": "v12849"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "aokana",
+ "builds": [
+  "9c6a938189d4e18dfdbd1891204e35d7b3ed1f8325f24386d354b5838721eb91"
+ ],
+ "match": {
+  "exe": [
+   "Aokana.exe"
+  ],
+  "titles": [
+   "Aokana",
+   "蒼の彼方のフォーリズム",
+   "苍之彼方的四重奏",
+   "Aokana - Four Rhythms Across the Blue"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

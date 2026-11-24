@@ -1,0 +1,103 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "5d45d3789e7c4d63798cf5a17ae55aeaa3c20a701abdaa46d68ff43d7372368e",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false,
+   "orphanDraw": true
+  },
+  "page": {
+   "reportClear": false,
+   "engineRows": false,
+   "filterHookRedraws": false,
+   "hookAnnotationPatterns": [],
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "pageFrames": [],
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "cardinal": {
+   "rev": 8,
+   "lines": 60,
+   "maxGapMs": 1500,
+   "sampleMs": 90,
+   "minIntervalMin": 30,
+   "maxLagMs": 80,
+   "weights": {
+    "row": 3,
+    "stable": 1,
+    "clean": 2,
+    "clear": 1,
+    "choice": 1,
+    "pair": 1,
+    "leak": 2
+   },
+   "thresholds": {
+    "settleMs": 300,
+    "shownRate": 0.9,
+    "stablePx": 0,
+    "cnOverlapPx": 2,
+    "lineMs": 700,
+    "burstMs": 300,
+    "calibGapMs": 1000,
+    "calibWatchMs": 2500,
+    "choiceMs": 3000,
+    "staleChars": 4,
+    "preflightMs": 1500
+   }
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "yuris",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "02c1e4020c991696f04226dc760e8519c69d16c60783022667ce045408ec6d7a",
+  "title": "77f7f3e5353c64ff43f49b5a9c26a8805e2e597429512678e3f459a7621fcf73",
+  "vndb": "v22636"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "erewhon",
+ "builds": [
+  "b2910792c61effeb3728e81406b8dc317759f648fa1b2140c49629ef94d798fa"
+ ],
+ "match": {
+  "exe": [
+   "erewhon.exe"
+  ],
+  "titles": [
+   "Erewhon",
+   "Erewhon 乌有乡",
+   "乌有乡"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

@@ -1,0 +1,104 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "3c8d645f51be3337ba036aa6bf8b98d4362201e1a6023e1eb3e3fbf99a4f1c71",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false,
+   "orphanDraw": true
+  },
+  "page": {
+   "reportClear": false,
+   "engineRows": false,
+   "filterHookRedraws": false,
+   "hookAnnotationPatterns": [],
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "pageFrames": [],
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "cardinal": {
+   "rev": 8,
+   "lines": 60,
+   "maxGapMs": 1500,
+   "sampleMs": 90,
+   "minIntervalMin": 30,
+   "maxLagMs": 80,
+   "weights": {
+    "row": 3,
+    "stable": 1,
+    "clean": 2,
+    "clear": 1,
+    "choice": 1,
+    "pair": 1,
+    "leak": 2
+   },
+   "thresholds": {
+    "settleMs": 300,
+    "shownRate": 0.9,
+    "stablePx": 0,
+    "cnOverlapPx": 2,
+    "lineMs": 700,
+    "burstMs": 300,
+    "calibGapMs": 1000,
+    "calibWatchMs": 2500,
+    "choiceMs": 3000,
+    "staleChars": 4,
+    "preflightMs": 1500
+   }
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "f26749492490470381934162de6e867e411e65faa0599b224a522257b05393e9",
+  "title": "129f9a9095fdca977fad67a932d3d9bca760b4aefe64da39ba0bbbb7c2540f87",
+  "vndb": "v32811"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "futamata-renai",
+ "builds": [
+  "07a2a3d6aa665e3e2c4958fbf9fecfd93a5c9baac797813a152736b1edba3245"
+ ],
+ "match": {
+  "exe": [
+   "フタマタ恋愛.exe"
+  ],
+  "titles": [
+   "Futamata Renai",
+   "フタマタ恋愛",
+   "Futamata Ren'ai: Two Times the Trouble",
+   "二股恋爱"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}
