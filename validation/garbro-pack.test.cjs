@@ -157,6 +157,28 @@ test('cold adapter probe leaves GARbro extraction to the synchronous fallback',t
  assert.equal(g.jobs.has(archive),false);
 });
 
+test('GARbro can retry a missing temporary directory from an earlier extraction',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'garbro-stale-failure-')),game=path.join(root,'game');
+ const previous=process.env.MEGULIT_GARBRO_CACHE;
+ process.env.MEGULIT_GARBRO_CACHE=path.join(root,'cache');
+ t.after(()=>{if(previous==null)delete process.env.MEGULIT_GARBRO_CACHE;else process.env.MEGULIT_GARBRO_CACHE=previous;fs.rmSync(root,{recursive:true,force:true});});
+ const {RuntimePacks}=require('../core/runtime-packs.cjs'),g=require('../services/original-engines/garbro.cjs');
+ t.mock.method(RuntimePacks.prototype,'installed',()=>false);
+ t.mock.method(RuntimePacks.prototype,'ensure',async()=>{throw Error('PACK_NOT_INSTALLED');});
+ const probe=require('../services/adapter-probe-core.cjs'),original=require('../services/original-text.cjs');
+ fs.mkdirSync(game);
+ const archive=path.join(game,'script.pak'),executable=path.join(game,'game.exe');
+ fs.writeFileSync(archive,Buffer.alloc(20000));fs.writeFileSync(executable,'MZ');
+ const cache=g.cacheDir(archive);fs.mkdirSync(cache,{recursive:true});
+ const fail=error=>fs.writeFileSync(path.join(cache,'failed.json'),JSON.stringify({version:g.version(),error}));
+ fail('GARBRO_NO_SCRIPTS');
+ assert.equal(probe.probeGame({dir:game,executable}).needs,undefined);
+ assert.equal(original.scanRunning(root,'1',executable).status,'unsupported');
+ fail("ENOENT: no such file or directory, rename '"+cache+".part' -> '"+cache+"'");
+ assert.equal(probe.probeGame({dir:game,executable}).needs,'garbro');
+ assert.equal(original.scanRunning(root,'1',executable).status,'preparing');
+});
+
 test('host loads the Formats.dat key database and tries every scheme GARbro lists',()=>{const h=fs.readFileSync(path.join(repo,'services','garbro-host.ps1'),'utf8');assert.match(h,/DeserializeScheme/);assert.match(h,/GetAccessWidget()/);assert.match(h,/NEEDS_SCHEME/);});
 
 const live=process.env.MEGULIT_GARBRO_TEST_DIR;

@@ -182,7 +182,7 @@ function probeInScope({dir,executable,title},{budgetMs=60000,progress=null}={}){
     unpack them now when the pack is installed (a probe never downloads it), else say the pack is what is missing */
  let garbroNeed=0;
  if(!engines.some(e=>e.lines>0))try{const g=require('./original-engines/garbro.cjs'),scenes=require('./original-engines/scenes.cjs');
-  const files=scenes.ownCx(dir)?[]:g.archives(dir).filter(f=>{const c=g.cacheDir(f);return !g.readJson(path.join(c,'done.json'))&&g.readJson(path.join(c,'failed.json'))?.version!==g.version();});
+  const files=scenes.ownCx(dir)?[]:g.archives(dir).filter(f=>{const c=g.cacheDir(f);return !g.readJson(path.join(c,'done.json'))&&!g.cachedFailure(c);});
   if(files.length&&g.installed()){report({stage:'garbro-unpack',engines});for(const f of files){const left=deadline-Date.now()-3000;if(left<5000)break;try{g.unpackSync(f,{timeout:left});}catch{}}
    const again=runEngines(dir,{deadline:Math.max(deadline,Date.now()+GENERIC_MS),only:['garbro']}).find(e=>e.id==='garbro');if(again){const i=engines.findIndex(e=>e.id==='garbro');if(i>=0)engines[i]=again;else engines.push(again);}}
   else if(files.length)garbroNeed=files.length;}catch{}

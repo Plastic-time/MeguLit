@@ -24,6 +24,8 @@ const SCRIPTY=/script|scenario|scene|scn|story|text|txt|data|system|sys|main|gam
 const MEDIA='png|bmp|jpe?g|gif|tga|dds|webp|psd|tlg\\d?|pna|bmx|g00|pic|ani|eri|mio|cps|hg[23]|ogg|wav|mp3|m4a|opus|flac|ahx|hca|at3|wma|mp4|wmv|avi|mpe?g|webm|ogv|mov|ttf|otf|ttc|fnt|pmx|x|fbx';
 const MATCH='^(?!.*\\.('+MEDIA+')$).+';
 const LIMIT_BYTES=512*1048576,LIMIT_FILES=20000,MAX_ARCHIVES=12,MAX_LEGACY_SCRIPT_PACKS=2,MIN_SIZE=16384;
+// Older probes could lose the temporary extraction directory to a second unpack.
+const TRANSIENT_FAILURE=/GARBRO_TIMEOUT|PACK_|^ENOENT: .*?, rename /;
 const SCRIPT_PACKS={
  '.pbz':{magic:'PBZ1',entries:/\.scr$/i,comment:/^;/},
  '.pk':{magic:'fPK ',entries:/\.(?:txt|hpb)$/i,comment:/^#/,paired:true}
@@ -46,6 +48,10 @@ function version(){try{return String(fs.statSync(path.join(DIR(),'ArcFormats.dll
 function key(file){const st=fs.statSync(file);return crypto.createHash('sha256').update(path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs).digest('hex').slice(0,24);}
 function cacheDir(file){return path.join(CACHE(),key(file));}
 function readJson(file){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}}
+function cachedFailure(cache,v=version()){
+ const bad=readJson(path.join(cache,'failed.json'));
+ return bad?.version===v&&!TRANSIENT_FAILURE.test(bad.error||'')?bad:null;
+}
 
 // Archives in the game folder (and one level down) worth handing to GARbro, script-looking names first.
 function archives(dir){
@@ -81,7 +87,7 @@ async function unpack(file,{download=true}={}){
  const out=cacheDir(file),done=path.join(out,'done.json'),failed=path.join(out,'failed.json');
  const ready=readJson(done);if(ready)return ready;
  if(!installed()){if(!download)throw Error('PACK_NOT_INSTALLED');await packs().ensure(PACK);}
- const v=version(),bad=readJson(failed);if(bad&&bad.version===v)throw Error(bad.error||'GARBRO_FAILED');
+ const v=version(),bad=cachedFailure(out,v);if(bad)throw Error(bad.error||'GARBRO_FAILED');
  const tmp=out+'.part';fs.rmSync(tmp,{recursive:true,force:true});
  try{
   const r=await run(['-Mode','extract','-Archive',file,'-Out',tmp,'-Match',scriptPack(file)?.entries.source||MATCH,'-Limit',String(LIMIT_FILES),'-MaxBytes',String(LIMIT_BYTES)]);
@@ -89,7 +95,7 @@ async function unpack(file,{download=true}={}){
   fs.rmSync(out,{recursive:true,force:true});fs.renameSync(tmp,out);
   const info={archive:file,format:r.format,files:r.files,bytes:r.bytes,version:v,at:Date.now()};fs.writeFileSync(done,JSON.stringify(info));return info;
  }catch(error){fs.rmSync(tmp,{recursive:true,force:true});
-  if(!/GARBRO_TIMEOUT|PACK_/.test(error.message)){fs.mkdirSync(out,{recursive:true});fs.writeFileSync(failed,JSON.stringify({archive:file,version:v,error:error.message,at:Date.now()}));}
+  if(!TRANSIENT_FAILURE.test(error.message)){fs.mkdirSync(out,{recursive:true});fs.writeFileSync(failed,JSON.stringify({archive:file,version:v,error:error.message,at:Date.now()}));}
   throw error;}
 }
 /* S5 the same unpack, synchronous, for the probe worker (its probe is one synchronous call): only when the pack is already
@@ -97,7 +103,7 @@ async function unpack(file,{download=true}={}){
 function unpackSync(file,{timeout=60000}={}){
  const out=cacheDir(file),done=path.join(out,'done.json'),failed=path.join(out,'failed.json');
  const ready=readJson(done);if(ready)return ready;if(!installed())throw Error('PACK_NOT_INSTALLED');
- const v=version(),bad=readJson(failed);if(bad&&bad.version===v)throw Error(bad.error||'GARBRO_FAILED');
+ const v=version(),bad=cachedFailure(out,v);if(bad)throw Error(bad.error||'GARBRO_FAILED');
  const tmp=out+'.part';fs.rmSync(tmp,{recursive:true,force:true});
  try{const ps=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
   const r=require('node:child_process').spawnSync(ps,['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',HOST,'-GarbroDir',DIR(),'-Mode','extract','-Archive',file,'-Out',tmp,'-Match',scriptPack(file)?.entries.source||MATCH,'-Limit',String(LIMIT_FILES),'-MaxBytes',String(LIMIT_BYTES)],{windowsHide:true,encoding:'utf8',timeout,maxBuffer:16<<20});
@@ -108,7 +114,7 @@ function unpackSync(file,{timeout=60000}={}){
   fs.rmSync(out,{recursive:true,force:true});fs.renameSync(tmp,out);
   const info={archive:file,format:json.format,files:json.files,bytes:json.bytes,version:v,at:Date.now()};fs.writeFileSync(done,JSON.stringify(info));return info;
  }catch(error){fs.rmSync(tmp,{recursive:true,force:true});
-  if(!/GARBRO_TIMEOUT|PACK_/.test(error.message)){fs.mkdirSync(out,{recursive:true});fs.writeFileSync(failed,JSON.stringify({archive:file,version:v,error:error.message,at:Date.now()}));}
+  if(!TRANSIENT_FAILURE.test(error.message)){fs.mkdirSync(out,{recursive:true});fs.writeFileSync(failed,JSON.stringify({archive:file,version:v,error:error.message,at:Date.now()}));}
   throw error;}
 }
 /* 2026-11-19 game fonts: only the entries whose names match (font files), synchronously (engine-font-scan runs in a worker),
@@ -146,7 +152,7 @@ const engine={id:'garbro',
     }
     continue;
    }
-   if(readJson(path.join(c,'failed.json'))?.version===version())continue;
+   if(cachedFailure(c))continue;
    if(!cacheOnly.getStore())schedule(file);
   }
   return out;
@@ -157,4 +163,4 @@ const engine={id:'garbro',
   const startedAt=Math.min(...files.map(f=>jobs.get(f).startedAt)),pj=installed()?null:packs().status().packs.find(p=>p.id===PACK)?.job;
   return pj?{kind:'garbro',stage:'download',startedAt,received:pj.received,total:pj.total}:{kind:'garbro',stage:'unpack',startedAt};},
 };
-module.exports={engine,archives,unpack,unpackSync,extractMatchSync,run,decodeRuns,cacheDir,schedule,installed,version,readJson,MATCH,PACK,jobs,withCached:fn=>cacheOnly.run(true,fn)};
+module.exports={engine,archives,unpack,unpackSync,extractMatchSync,run,decodeRuns,cacheDir,cachedFailure,schedule,installed,version,readJson,MATCH,PACK,jobs,withCached:fn=>cacheOnly.run(true,fn)};
