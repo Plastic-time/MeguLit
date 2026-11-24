@@ -155,7 +155,7 @@ test('full-screen embed: a new sentence dims the earlier ones, a page turn clear
 // Japanese, 30 more once its translation is in).
 function fakeWindow(layout){
  class ClassList{constructor(e){this.e=e;}get set(){return new Set(this.e.className.split(/\s+/).filter(Boolean));}contains(c){return this.set.has(c);}add(...c){const s=this.set;for(const x of c)s.add(x);this.e.className=[...s].join(' ');}remove(...c){const s=this.set;for(const x of c)s.delete(x);this.e.className=[...s].join(' ');}toggle(c,on){if(on===undefined)on=!this.contains(c);on?this.add(c):this.remove(c);return on;}}
- class Style{constructor(){this.props={};}set cssText(v){this.props={};for(const part of v.split(';')){const i=part.indexOf(':');if(i>0)this.props[part.slice(0,i).trim()]=part.slice(i+1).trim();}}setProperty(k,v){this.props[k]=v;}getPropertyValue(k){return this.props[k]||'';}get top(){return this.props.top;}}
+ class Style{constructor(){this.props={};}set cssText(v){this.props={};for(const part of v.split(';')){const i=part.indexOf(':');if(i>0)this.props[part.slice(0,i).trim()]=part.slice(i+1).trim();}}setProperty(k,v){this.props[k]=v;}removeProperty(k){delete this.props[k];}getPropertyValue(k){return this.props[k]||'';}get top(){return this.props.top;}}
  class El{constructor(tag){this.tag=tag;this.className='';this.children=[];this.parent=null;this.dataset={};this.style=new Style();this.classList=new ClassList(this);this.hidden=false;this._text='';}
   get isConnected(){let e=this;while(e.parent)e=e.parent;return e===doc.documentElement;}
   set textContent(v){this.children=[];this._text=String(v);}get textContent(){return this._text+this.children.map(c=>c.textContent).join('');}
@@ -206,6 +206,29 @@ test('NVL without engine positions (魔法使いの夜): lines go down the page 
  assert.ok(shown.length<16,'the full page turned: earlier lines are gone');
  assert.equal(shown.at(-1)[2],'bright');assert.ok(shown.slice(0,-1).every(p=>p[2]==='dim'));
  assert.equal(shown[0][1],60,'the new page starts at the top again');
+});
+
+test('positioned pages report the visible row even when another row asks later',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const observer=global.MutationObserver;global.MutationObserver=class{observe(){}};t.after(()=>{global.MutationObserver=observer;});
+ const {w,b,sent}=fakeWindow({clientWidth:1280,clientHeight:720});
+ const view=require('../web/reader/modules/island-page.js');view.install(w);
+ const say=(text,line)=>b.islandPage.accept({hookSource:text,hookSourceEngine:'krkr',hookSequence:line,hookSourceLine:line});
+ const place=(text,line)=>b.islandPage.position({engine:'krkr_screen_v1',line,token:view.token(text),x0:0,y0:60*line,x1:500,y1:60*line,size:24});
+ const settle=(text,line)=>b.islandPage.page({engine:'krkr',line,same:true,token:view.token(text)});
+ const scope=()=>sent.findLast(m=>m.type==='pageTranslationCurrent');
+ const earlier='昨日の雨は激しかったね。', visible='ここはどこなんだろう？', next='明日は遠くへ旅に出よう。';
+ say(earlier,1);say(visible,2);place(visible,2);settle(visible,2);
+ const visibleRequest=sent.find(m=>m.text===visible);
+ assert.equal(scope().currentId,visibleRequest.id);
+ assert.ok(sent.indexOf(scope())<sent.indexOf(visibleRequest));
+ t.mock.timers.tick(1200);
+ assert.ok(sent.find(m=>m.text===earlier).id>visibleRequest.id);
+ assert.equal(scope().currentId,visibleRequest.id);
+ say(next,3);settle(next,3);
+ assert.equal(scope().currentId,visibleRequest.id);
+ place(next,3);
+ assert.equal(scope().currentId,sent.find(m=>m.text===next).id);
 });
 
 test('NVL fast-forward shows previews and translates only the final line',t=>{

@@ -33,6 +33,10 @@ test('reader: every line has a translation within 3 s (request lost, answer late
     assert.deepEqual(await out(), ['翻译中…', '0.45']);
     await page.evaluate(() => window.__tomoyoChinese.deliverBackfill('「？？？　例のイベントって？」', '“你说的活动是？”', 'late')); await page.waitForTimeout(100);
     assert.equal((await out())[0], '“你说的活动是？”');
-    assert.ok(await page.evaluate(() => window.__sent.filter(m => m.kind === 'translationGuard').length >= 3), 'guard steps noted');
+    const sent = await page.evaluate(() => window.__sent);
+    assert.ok(sent.filter(m => m.kind === 'translationGuard').length >= 3, 'guard steps noted');
+    for (const guard of sent.filter(m => m.type === 'translateGuard')) {
+      assert.equal(guard.visibleSerial, sent.find(m => m.id && m.text === guard.text)?.id);
+    }
   } finally { await browser.close(); }
 });

@@ -60,7 +60,7 @@ function createTranslationService(fetcher = fetch, environmentKey = '') {
     if (key.trim()) keys.set(base, key.trim());
   }
   function hasKey(base, provider) { return keyless(provider) || !!keyFor(normalizeBase(base)); }
-  async function translate(text, options = {}, isCurrent = () => true) {
+  async function translate(text, options = {}, isCurrent = () => true, foreground) {
     if (typeof text !== 'string' || !text.trim() || text.length > 4000) throw new Error('台词为空或过长');
     options = resolveOptions(options);
     if (!supportsTranslationTarget(options.provider, options.learnerLanguage)) {
@@ -78,7 +78,7 @@ function createTranslationService(fetcher = fetch, environmentKey = '') {
     while(context.length&&JSON.stringify(context).length>8000)context.shift();
     // The sentence translation follows the learner language (Sakura is a Chinese-only model and stays Chinese).
     const lang = options.learnerLanguage === 'en' && options.provider !== 'sakura' ? 'en' : 'zh';
-    if (options.provider === 'google') return google(text, isCurrent, lang);
+    if (options.provider === 'google') return google(text, isCurrent, lang, foreground);
     const base = normalizeBase(options.baseUrl || 'https://api.openai.com/v1');
     const engine = ENGINES[options.provider];
     const model = (options.model || (engine ? engine.model : 'gpt-4.1-mini') || '').trim();
@@ -95,7 +95,7 @@ function createTranslationService(fetcher = fetch, environmentKey = '') {
       if (!isCurrent()) throw new Error('Superseded sentence');
       if (engine && engine.kind === 'mt') {
         const result = options.provider==='microsoft'
-          ? await require('./translate.cjs').translateFree(text,{fetcher,source:'ja',target:lang,preferred:'microsoft',isCurrent})
+          ? await require('./translate.cjs').translateFree(text,{fetcher,source:'ja',target:lang,preferred:'microsoft',isCurrent,foreground})
           : await machineTranslate(options.provider, text, apiKey, fetcher, AbortSignal.timeout(20000), lang);
         if (typeof result !== 'string' || !result.trim()) throw new Error('翻译引擎返回了空内容');
         return result.trim();

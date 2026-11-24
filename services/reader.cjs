@@ -17,7 +17,7 @@ class Reader{
  prefs(){return cleanPreferences(readJSON(path.join(this.folder,'preferences.json')));}
  clearGameVisuals(){
   this.retryQueue?.clear();this.strictMtCache?.clear();this.embedCache?.clear();this.embedOrigins?.clear();this.gal?.hooks?.trackPairs?.clear();this.sentenceMarks=null;
-  this.visualGeneration=(this.visualGeneration||0)+1;this.latest=(Number(this.latest)||0)+1;this.lookup=(Number(this.lookup)||0)+1;this.pageScope='';
+  this.visualGeneration=(this.visualGeneration||0)+1;this.latest=(Number(this.latest)||0)+1;this.lookup=(Number(this.lookup)||0)+1;this.pageScope='';this.pagePriorities?.clear();
   this.artTurns?.clear();this.artTurns=new Map();this.drawUi?.items?.clear();this.drawUi?.groups?.clear();this.drawUi=null;this.gameUiPreview=null;
   this.emit('reader-event',{type:'artText',clear:true});this.emit('reader-event',{hookSource:null,hookChoices:null,receivedText:false});
  }
@@ -439,10 +439,10 @@ class Reader{
  }
  async translate(request,returned={}){const options=this.requestOptions(request),cacheLanguage=this.targetLanguage(options);const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;const generation=this.visualGeneration,stillBound=()=>this.active()&&this.visualGeneration===generation;const current=()=>stillBound()&&(pageKey?this.pageScope===pageKey:this.latest===request.id);const gameId=this.gameId;
   const local=this.localTranslation(text,cacheLanguage,returned);if(local)return local;
-  try{const r=await this.chainTranslate(text,options,{id:request.id,current});if(!stillBound())return '';Object.assign(returned,{source:r.source,provider:r.provider,...(r.cached&&{cached:true})});if(gameId)this.stats.translation(gameId,text,r.text);this.embedCached(text,r.text,{language:cacheLanguage,source:r.source,provider:r.provider});/* 2026-11-21 (owner, 千恋＊万花 r34: lines the patch did not pair got their fallback translation 1 to 8 s later, after the reader had moved on, and it was dropped): a late answer still fills the line wherever it is shown (on screen, the page's earlier lines, the log) */if(!current()&&r?.text)try{this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[text,r.text,'late',{target:cacheLanguage,source:r.source,provider:r.provider}]});}catch{}return r.text;}
+  try{const r=await this.chainTranslate(text,options,{id:request.id,current,foreground:()=>request.id===(pageKey?this.pagePriorities?.get(pageKey)?.id:this.latest)});if(!stillBound())return '';Object.assign(returned,{source:r.source,provider:r.provider,...(r.cached&&{cached:true})});if(gameId)this.stats.translation(gameId,text,r.text);this.embedCached(text,r.text,{language:cacheLanguage,source:r.source,provider:r.provider});/* 2026-11-21 (owner, 千恋＊万花 r34: lines the patch did not pair got their fallback translation 1 to 8 s later, after the reader had moved on, and it was dropped): a late answer still fills the line wherever it is shown (on screen, the page's earlier lines, the log) */if(!current()&&r?.text)try{this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[text,r.text,'late',{target:cacheLanguage,source:r.source,provider:r.provider}]});}catch{}return r.text;}
   catch(error){if(stillBound())this.translationRetries().add(text,{gameId,options});throw error;}}
  /* One line through the fallback chain (services/translation-chain.cjs). options: the reader's resolved options. */
- async chainTranslate(text,options,{id=null,current:previous=()=>true}={}){if(!this.active())throw Error('READER_DISABLED');const current=()=>this.active()&&previous();const requestLanguage=this.targetLanguage(options),cacheLanguage=requestLanguage;const chain=require('./translation-chain.cjs');this.loadKeys();
+ async chainTranslate(text,options,{id=null,current:previous=()=>true,foreground}={}){if(!this.active())throw Error('READER_DISABLED');const current=()=>this.active()&&previous();const requestLanguage=this.targetLanguage(options),cacheLanguage=requestLanguage;const chain=require('./translation-chain.cjs');this.loadKeys();
   let localInstalled=false;try{localInstalled=!!this.runtime.local().status().installed&&this.runtime.models().status().models.some(m=>m.installed);}catch{}
   const strict=this.zeroLatencyEnabled(requestLanguage);
   const profiles=strict&&this.folder?readJSON(path.join(this.folder,'translation-profiles.json')):{};
@@ -467,7 +467,7 @@ class Reader{
    const key=strict&&chain.isMt(o.provider)?JSON.stringify([game,requestLanguage,o.provider,text]):null;
    if(key&&this.strictMtCache?.has(key)){cachedProvider=o.provider;return this.strictMtCache.get(key);}
    if(chain.isLocal(opts.provider))await this.localReady(opts,id,current);
-   const value=normalizeTranslation(await this.translator().translate(text,opts,current));
+   const value=normalizeTranslation(await this.translator().translate(text,opts,current,foreground));
    if(key&&value&&generation===this.visualGeneration&&game===this.gameId){
     this.strictMtCache??=new Map();this.strictMtCache.set(key,value);
     if(this.strictMtCache.size>800)this.strictMtCache.delete(this.strictMtCache.keys().next().value);
@@ -509,6 +509,13 @@ class Reader{
    case 'cardinalPair':{const accepted=require('../core/cardinal/tape.cjs').pairObserved(r,this.cardinalTarget());if(accepted)require('./torch-local-trial.cjs').feedback(this,r);this.logVisibility({type:'layoutDiagnostic',kind:'cardinalPair',episode:String(r.episode||'').slice(0,80),scope:String(r.scope||'').slice(0,80),target:String(r.target||'').slice(0,35),observed:r.observed===true,paired:r.paired===true,accepted});break;}
    case 'choiceTranslations':{const result=await this.choiceTranslations(r);reply('deliverChoiceTranslations',r.request,result);break;}
    case 'pageTranslationScope':this.pageScope=String(r.key||'').slice(0,100);break;
+   // Priority updates may arrive before the page scope or after a later row is visible.
+   case 'pageTranslationCurrent':{const key=String(r.key||'').slice(0,100),revision=r.revision;
+    if(!key||!Number.isSafeInteger(revision)||revision<=(this.pagePriorities?.get(key)?.revision||0))break;
+    this.pagePriorities??=new Map();this.pagePriorities.delete(key);
+    this.pagePriorities.set(key,{revision,id:Number.isSafeInteger(r.currentId)?r.currentId:null});
+    if(this.pagePriorities.size>8)this.pagePriorities.delete(this.pagePriorities.keys().next().value);
+    break;}
    case 'galSource':if(typeof r.text==='string'&&r.text.length<=4000){this.translator().observeSource(r.text);g?.send({type:'source',text:r.text});}break;
    case 'layoutDiagnostic':/* E407: where the line was drawn against the game's text (ruby rows, offsets, hide state) */{const v={};for(const [k,x]of Object.entries(r))if(k!=='type'&&Object.keys(v).length<40&&(typeof x==='number'&&Number.isFinite(x)||typeof x==='boolean'||typeof x==='string'&&x.length<=200))v[k]=x;this.logVisibility({type:'layoutDiagnostic',...v});}break;
    case 'perfDiagnostic':try{const file=path.join(this.root,'logs','reader-perf.log');logSink.append(file,JSON.stringify({at:new Date().toISOString(),...r})+'\n',{rotate:1<<20,rotateSuffix:'.1'});}catch{}break;
@@ -542,11 +549,15 @@ class Reader{
     else reply('galStatus',{hookReselectState:'unbound'});
     break;
    /* 2026-11-21 (owner: 「再加个兜底的检测有没有译文，没有的话就再查赶紧补上」): the reader's translation guard asks for a line still without a
-      translation, by its text (no serial, no current-line check): the cache, the script, then the fallback chain; the answer fills the line wherever it is shown */
+      translation by its text. A visible line also supplies its serial for queue priority. The answer can still fill an earlier row. */
    case 'translateGuard':{const text=String(r.text||'');if(!text.trim()||text.length>4000)break;const tr=x=>{try{g?.hooks?.trace?.('translation guard '+x+' '+JSON.stringify(text.slice(0,24)));}catch{}};
     const generation=this.visualGeneration,current=()=>this.active()&&this.visualGeneration===generation;
+    const serial=Number.isSafeInteger(r.visibleSerial)?r.visibleSerial:null;
+    // The guard can be the first request to reach the host for the visible line.
+    if(serial!==null&&serial>this.latest)this.latest=serial;
+    const foreground=serial===null?undefined:()=>this.latest===serial;
     (async()=>{const cacheLanguage=this.targetLanguage();const returned={};let t=this.localTranslation(text,cacheLanguage,returned);
-     if(t){tr('fill cache');}else{tr('retry chain');try{const result=await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current});if(!current())return;t=result.text;Object.assign(returned,{source:result.source,provider:result.provider});if(t)this.embedCached(text,t,{language:cacheLanguage,...returned});}catch(e){if(current())tr('still-missing '+String(e?.message||e).slice(0,40));}}
+     if(t){tr('fill cache');}else{tr('retry chain');try{const result=await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current,foreground});if(!current())return;t=result.text;Object.assign(returned,{source:result.source,provider:result.provider});if(t)this.embedCached(text,t,{language:cacheLanguage,...returned});}catch(e){if(current())tr('still-missing '+String(e?.message||e).slice(0,40));}}
      if(t&&current())this.emit('reader-event',{type:'call',method:'deliverBackfill',args:[text,t,'guard',{target:cacheLanguage,...returned}]});})();break;}
    case 'engineGiveWay':g?.hooks?.giveWay?.(r.ms);break; /* 2026-11-21: a hidden line the reader cannot draw goes back to the game */
    case 'hookSelect':g?.hooks.select(r.id,true);break;

@@ -214,7 +214,7 @@
     for (const [ms, last] of [[600, false], [1500, false], [3000, true]]) guardTimers.push(setTimeout(() => {
       if (sourcePreview || guardText !== text || !sameLine(bridge.sourceText, text) || hasTranslation()) return;
       guardNote(last ? 'still-missing' : 'retry', text);
-      try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'translateGuard', text })); } catch {}
+      try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'translateGuard', text, visibleSerial: bridge.serial })); } catch {}
       if (last && output?.isConnected && (!output.textContent.trim() || output.textContent === '翻译中…')) { output.textContent = '翻译中…'; output.style.opacity = '.45'; output.dataset.state = 'pending'; }
     }, ms));
   }
