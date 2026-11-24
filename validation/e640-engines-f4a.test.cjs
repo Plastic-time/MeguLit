@@ -116,6 +116,35 @@ test('Willadv: a Will ARC whose scripts are not the first extension is recognise
  assert.equal(library.engineOf(game)?.name,'Willadv');assert.equal(scenes.detect(game),'advhd');
  const own=scenes.read('advhd',game);assert.deepEqual(own[0].lines,['ひなた',JA[0],JA[1]]);
 });
+test('Willadv: 13-byte name Will ARC with short (<=9 byte) names is not misread as 9-byte layout',t=>{
+ const advhd=E('advhd'),u32=F.u32,fixed=(s,n)=>{const b=Buffer.alloc(n);Buffer.from(s,'latin1').copy(b);return b;};
+ const script=F.wsc('ひなた',JA[0],JA[1]);
+ const single=tmp(t),arc13=F.willArc({WSC:{s01:script}},{nameSize:13});put(single,'Rio.arc',arc13);
+ assert.deepEqual(scenes.read('advhd',single)[0].lines,['ひなた',JA[0],JA[1]]);
+ const multi=tmp(t);put(multi,'data.arc',F.willArc({OGG:{bgm01:Buffer.alloc(80,1)},WSC:{s01:script,s02:F.wsc('真琴',JA[1],JA[2])}},{nameSize:13}));
+ const own=scenes.read('advhd',multi);assert.equal(own.length,2);
+ assert.deepEqual(own[0].lines,['ひなた',JA[0],JA[1]]);assert.deepEqual(own[1].lines,['真琴',JA[1],JA[2]]);
+ /* listFile and head-sliced list() on a 13-byte short-name archive */
+ assert.deepEqual(advhd.listFile(path.join(single,'Rio.arc')),[{name:'s01.wsc',size:script.length,offset:37}]);
+ assert.deepEqual(advhd.list(arc13.subarray(0,48),arc13.length),[{name:'s01.wsc',size:script.length,offset:37}]);
+ /* strict-mode scoring pins */
+ const mkSingle=(nameSize,name,size,off,total)=>{const b=Buffer.alloc(total);b.writeInt32LE(1,0);b.write('WSC',4,'latin1');b.writeUInt32LE(1,8);b.writeUInt32LE(16,12);
+  fixed(name,nameSize).copy(b,16);b.writeUInt32LE(size,16+nameSize);b.writeUInt32LE(off,16+nameSize+4);return b;};
+ /* pins o >= dirEnd: 9-byte size=0 entry with 16B pre-gap and 16B trailing bytes stays 9-byte */
+ assert.deepEqual(advhd.list(mkSingle(9,'s01',0,49,65)),[{name:'s01.wsc',size:0,offset:49}]);
+ /* pins bytes > 0: 13-byte 6-byte name, 5000B payload, pre-gap and trailing bytes */
+ assert.deepEqual(advhd.list(mkSingle(13,'s00001',5000,53,5069)),[{name:'s00001.wsc',size:5000,offset:53}]);
+ /* pins maxEnd === fileSize: 13-byte 10-byte name (non-zero byte 9), 5000B payload, pre-gap, exact EOF */
+ assert.deepEqual(advhd.list(mkSingle(13,'abcdefghij',5000,165,5165)),[{name:'abcdefghij.wsc',size:5000,offset:165}]);
+ /* pins minOff === dirEnd: 13-byte 11-byte name, 200B payload starting right at dirEnd, large fileSize so maxEnd !== fileSize */
+ const minOffPin=mkSingle(13,'R22GKQ9OZ22',200,37,237);
+ assert.deepEqual(advhd.list(minOffPin,minOffPin.length+1.5e9),[{name:'R22GKQ9OZ22.wsc',size:200,offset:37}]);
+ /* loose fallback preserves legacy shapes base could read: (1) 9-byte size=0 offset=0, (2) directory placed after data (+16B tail pins 9-before-13 order) */
+ assert.deepEqual(advhd.list(mkSingle(9,'s01',0,0,33)),[{name:'s01.wsc',size:0,offset:0}]);
+ const dirAfter=Buffer.alloc(16+16+17+16);dirAfter.writeInt32LE(1,0);dirAfter.write('WSC',4,'latin1');dirAfter.writeUInt32LE(1,8);dirAfter.writeUInt32LE(32,12);
+ fixed('s01',9).copy(dirAfter,32);dirAfter.writeUInt32LE(16,41);dirAfter.writeUInt32LE(16,45);
+ assert.deepEqual(advhd.list(dirAfter),[{name:'s01.wsc',size:16,offset:16}]);
+});
 
 /* ---- archive + generic scan ----------------------------------------------------------------------------------------- */
 const TXT=enc=>F.textScript(JA,enc),TXZ=()=>F.textScript(ZH,gbk);

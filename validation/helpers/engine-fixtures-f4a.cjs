@@ -92,8 +92,8 @@ function stcm2(actions,enc=sjis){const start=0x50,parts=[];let at=start;
  return Buffer.concat([h,...parts,Buffer.from('EXPORT_DATA\0','latin1'),Buffer.from('COLLECTION_LINK\0','latin1'),Buffer.alloc(0x40)]);}
 
 /* ---- Will ARC (Willadv) --------------------------------------------------------------------------------------------- */
-function willArc(groups){const exts=Object.keys(groups);let dir=4+exts.length*12;const head=[u32(exts.length)],idx=[],datas=[];let dataAt=dir+exts.reduce((n,e)=>n+Object.keys(groups[e]).length*17,0);
- for(const e of exts){head.push(fixed(e,4),u32(Object.keys(groups[e]).length),u32(dir));for(const [n,b] of Object.entries(groups[e])){const enc=e==='WSC'?Buffer.from(b.map(c=>((c<<2)|(c>>>6))&255)):b;idx.push(fixed(n,9),u32(enc.length),u32(dataAt));datas.push(enc);dataAt+=enc.length;dir+=17;}}
+function willArc(groups,{nameSize=9}={}){const exts=Object.keys(groups),rec=nameSize+8;let dir=4+exts.length*12;const head=[u32(exts.length)],idx=[],datas=[];let dataAt=dir+exts.reduce((n,e)=>n+Object.keys(groups[e]).length*rec,0);
+ for(const e of exts){head.push(fixed(e,4),u32(Object.keys(groups[e]).length),u32(dir));for(const [n,b] of Object.entries(groups[e])){const enc=e==='WSC'?Buffer.from(b.map(c=>((c<<2)|(c>>>6))&255)):b;idx.push(fixed(n,nameSize),u32(enc.length),u32(dataAt));datas.push(enc);dataAt+=enc.length;dir+=rec;}}
  return Buffer.concat([...head,...idx,...datas]);}
 /* a .wsc with one spoken (0x42) and one narrated (0x41) line */
 const wsc=(name,say,narr,enc=sjis)=>Buffer.concat([Buffer.from([0,0x42,1,0,0,0,0]),z(enc(name)),z(enc(say)),Buffer.from([0,0x41,1,0,0,0]),z(enc(narr)),Buffer.from([0])]);
