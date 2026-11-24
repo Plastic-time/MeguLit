@@ -260,6 +260,54 @@ test('multilingual KiriKiri pairs literal caption commands with their Chinese te
  assert.deepEqual(p.cont,[1]);
 });
 
+test('multilingual KiriKiri keeps KAG escaped [[ brackets as literal [ without starting a tag',()=>{
+ const {parse}=require('../services/original-engines/krkr-lang.cjs');
+ const run=(ja,zh)=>parse(Buffer.from(JSON.stringify(zh===undefined?{ja}:{ja,zh})));
+ const esc=run([
+  '*start',
+  '記号[[を押す。[p]',
+  '[cm]',
+  '[[[p]',
+  '[cm]',
+  '[[l]続き[p]',
+  '[cm]',
+  '[c text="表[[記"][p]',
+ ].join('\n'));
+ assert.deepEqual(esc.lines,['記号[を押す。','[','[l]続き','表[[記']);
+ assert.deepEqual(esc.starts,[0,1,2,3]);
+ assert.deepEqual(esc.cont,[]);
+});
+
+test('multilingual KiriKiri splits pages on @cm/@ct/@er line commands without matching prefix-similar commands',()=>{
+ const {parse}=require('../services/original-engines/krkr-lang.cjs');
+ const run=(ja,zh)=>parse(Buffer.from(JSON.stringify(zh===undefined?{ja}:{ja,zh})));
+ const clears=run([
+  '*start',
+  '一頁目。[p]',
+  '@cm',
+  '二頁目。[p]',
+  '@CT',
+  '三頁目。[p]',
+  '@er',
+  '四頁目。[p]',
+ ].join('\n'));
+ assert.deepEqual(clears.lines,['一頁目。','二頁目。','三頁目。','四頁目。']);
+ assert.deepEqual(clears.starts,[0,1,2,3]);
+ assert.ok(clears.anchors.includes('@cm')&&clears.anchors.includes('@CT')&&clears.anchors.includes('@er'));
+
+ const nonClears=run([
+  '*start',
+  '同じ頁一。[p]',
+  '@cmd',
+  '@ctx',
+  '@erase',
+  '@cm_custom',
+  '同じ頁二。[p]',
+ ].join('\n'));
+ assert.deepEqual(nonClears.lines,['同じ頁一。\n同じ頁二。']);
+ assert.deepEqual(nonClears.starts,[0]);
+});
+
 test('E414: a page game by its own script turns on every page rule; a game whose pages hold one line does not',t=>{
  const f=fixture(t);f.hook.flowPage=false;
  const page=(starts,known)=>({kind:'patch',resolve:()=>({status:'exact',indices:[0]}),flowGame:()=>{let multi=0;for(const i of starts)if(known.includes(i+1)&&!starts.includes(i+1))multi++;return multi/starts.length>=.15;},flowLayout:()=>null});

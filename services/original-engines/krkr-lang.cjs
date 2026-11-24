@@ -38,14 +38,15 @@ function scripts(file){const t=list(file);if(!t)return [];return t.files.filter(
 const INLINE_IF=/\[if exp="[^"]*"\]([^\[]*)\[endif\](?:\[if exp="[^"]*"\][^\[]*\[endif\])+/gi;
 const ascii=t=>/^[\x20-\x7e]*$/.test(t);
 // The multilingual prologue also draws captions from literal [c text="…"] commands.
-const INLINE_TAG=/\[c\s+text\s*=\s*(?:"([^"]*)"|'([^']*)')\s*\]|\[(?:[^\]"']|"[^"]*"|'[^']*')*\]/gi;
+const INLINE_TAG=/\[\[|\[c\s+text\s*=\s*(?:"([^"]*)"|'([^']*)')\s*\]|\[(?:[^\]"']|"[^"]*"|'[^']*')*\]/gi;
 function parseRow(line){
  const parts=[];let text='',at=0,clear=false;
  for(const match of line.matchAll(INLINE_TAG)){
   const [tag,doubleQuoted,singleQuoted]=match;
   text+=line.slice(at,match.index);
   at=match.index+tag.length;
-  if(/^\[l\]$/i.test(tag)){parts.push(text);text='';}
+  if(tag==='[[')text+='[';
+  else if(/^\[l\]$/i.test(tag)){parts.push(text);text='';}
   else if(/^\[(?:cm|er|ct)\]$/i.test(tag))clear=true;
   else text+=doubleQuoted??singleQuoted??'';
  }
@@ -59,7 +60,7 @@ function blocks(text){const out=[],anchors=[];let rows=[],code=false;const close
   if(/^(?:@iscript\b|\[iscript\])/i.test(t)){code=true;continue;}if(code){if(/^(?:@endscript\b|\[endscript\])/i.test(t))code=false;continue;}
   if(!t||t[0]===';')continue;
   if(t[0]==='*'){if(ascii(t))anchors.push(t);close(t.includes('|')?t:null);continue;}
-  if(t[0]==='@'){if(ascii(t))anchors.push(t);continue;}
+  if(t[0]==='@'){if(ascii(t))anchors.push(t);if(/^@(?:cm|er|ct)(?:\s|$)/i.test(t))close(null);continue;}
   const {parts,clear}=parseRow(t.replace(INLINE_IF,'$1'));
   if(parts.length)rows.push(parts);else if(ascii(t))anchors.push(t);
   if(clear)close(null);}
