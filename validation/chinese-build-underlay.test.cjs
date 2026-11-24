@@ -74,3 +74,82 @@ test('probe: a Chinese patch over the Japanese release reads as Japanese (origin
  const c=game(dir=>{writeXp3(path.join(dir,'data.xp3'),[['scenario/a.ks',ks(zh)]]);});
  const q=probeGame({dir:c.dir,executable:c.exe,title:'t'},{budgetMs:30000});assert.equal(q.step,'chinese-build');assert.equal(q.original,null);assert.equal(typeof q.restore,'string');
 });
+
+function writeTree(dir,files){for(const [rel,data] of Object.entries(files)){const full=path.join(dir,rel);fs.mkdirSync(path.dirname(full),{recursive:true});fs.writeFileSync(full,data);}}
+
+test('QLIE: Chinese overlay packs (GameData/data9.pack + root data6.pack) over Japanese GameData/data6.pack adopt the underlying Japanese scenes',()=>{
+ const F=require('./helpers/engine-fixtures-c.cjs'),{probeGame}=require('../services/adapter-probe-core.cjs');
+ const ja1=[],zh1=[],zhRoot=[],ja2=[];for(let i=0;i<10;i++){ja1.push(...JA);zh1.push(...ZH);zhRoot.push(...ZH.map(l=>l+'（修正）'));}for(let i=0;i<2;i++)ja2.push(...JA);
+ const sFile=lines=>lines.join('\r\n')+'\r\n';
+ const g=game(dir=>{
+  writeTree(dir,{
+   'GameData/data6.pack':F.qliePack({'scenario/s01.s':F.sjis(sFile(ja1)),'scenario/s02.s':F.sjis(sFile(ja2))},{version:'3.1'}),
+   'GameData/data8.pack':Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0,0,0,0]),
+   'GameData/data9.pack':F.qliePack({'scenario/s01.s':F.gbk(sFile(zh1))},{version:'3.1'}),
+   'data6.pack':F.qliePack({'scenario/s01.s':F.gbk(sFile(zhRoot))},{version:'3.1'}),
+   'UnInstallData.pack':Buffer.from('not-a-qlie-pack-header'),
+  });
+ });
+ const running=scenes.read('qlie',g.dir).flatMap(s=>s.lines);
+ assert.deepEqual(running,[...zhRoot,...ja2]);
+ assert.deepEqual(scenes.ENGINES.qlie.originalLines(g.dir),[...ja1,...ja2]);
+ const r=probeGame({dir:g.dir,executable:g.exe,title:'t'},{budgetMs:30000});
+ assert.equal(r.step,'ok',JSON.stringify(r.engines));
+ assert.equal(r.detail,'qlie');
+ assert.equal(r.original,'layer');
+ assert.equal(r.japaneseLines,ja1.length+ja2.length);
+ const s=ot.scanRunning(g.root,'q',g.exe);
+ assert.ok(s.original?.index,JSON.stringify(s));
+ assert.equal(s.original.auto,true);
+ assert.deepEqual(JSON.parse(fs.readFileSync(s.original.index,'utf8')).lines,[...ja1,...ja2]);
+});
+
+test('QLIE: GameData/data7.pack over data0.pack, loose scenario/*.s over data0.pack, and GameData/gamedata dedup adopt underlying Japanese',()=>{
+ const F=require('./helpers/engine-fixtures-c.cjs'),qlie=require('../services/original-engines/qlie.cjs'),{probeGame}=require('../services/adapter-probe-core.cjs');
+ const ja=[],zh=[];for(let i=0;i<10;i++){ja.push(...JA);zh.push(...ZH);}
+ const sFile=lines=>lines.join('\r\n')+'\r\n';
+ const gTwo=game(dir=>{
+  writeTree(dir,{
+   'GameData/data0.pack':F.qliePack({'s01.s':F.sjis(sFile(ja))},{version:'3.1'}),
+   'GameData/data7.pack':F.qliePack({'s01.s':F.gbk(sFile(zh))},{version:'3.1'}),
+  });
+ });
+ assert.deepEqual(scenes.read('qlie',gTwo.dir).flatMap(s=>s.lines),zh);
+ assert.deepEqual(scenes.ENGINES.qlie.originalLines(gTwo.dir),ja);
+ const rTwo=probeGame({dir:gTwo.dir,executable:gTwo.exe,title:'t'},{budgetMs:30000});
+ assert.equal(rTwo.step,'ok',JSON.stringify(rTwo.engines));assert.equal(rTwo.original,'layer');assert.equal(rTwo.japaneseLines,ja.length);
+ const deduped=qlie._internal.dedupFiles([path.join(gTwo.dir,'GameData','data0.pack'),path.join(gTwo.dir,'gamedata','data0.pack')]);
+ if(process.platform==='win32')assert.equal(deduped.length,1);
+ const gLoose=game(dir=>{
+  writeTree(dir,{
+   'GameData/data0.pack':F.qliePack({'s01.s':F.sjis(sFile(ja))},{version:'3.1'}),
+   'GameData/scenario/s01.s':F.gbk(sFile(zh)),
+  });
+ });
+ assert.deepEqual(scenes.read('qlie',gLoose.dir).flatMap(s=>s.lines),zh);
+ assert.deepEqual(scenes.ENGINES.qlie.originalLines(gLoose.dir),ja);
+});
+
+test('QLIE: single Chinese pack, Chinese-over-Chinese packs, and plain Japanese pack do not mis-adopt originals',()=>{
+ const F=require('./helpers/engine-fixtures-c.cjs'),{probeGame}=require('../services/adapter-probe-core.cjs');
+ const ja=[],zh=[];for(let i=0;i<10;i++){ja.push(...JA);zh.push(...ZH);}
+ const sFile=lines=>lines.join('\r\n')+'\r\n';
+ const singleZh=game(dir=>{writeTree(dir,{'GameData/data0.pack':F.qliePack({'s01.s':F.gbk(sFile(zh))},{version:'3.1'})});});
+ assert.equal(scenes.ENGINES.qlie.originalLines(singleZh.dir),null);
+ const r1=probeGame({dir:singleZh.dir,executable:singleZh.exe,title:'t'},{budgetMs:30000});
+ assert.equal(r1.step,'chinese-build');assert.equal(r1.original,null);
+ const s1=ot.scanRunning(singleZh.root,'q1',singleZh.exe);assert.notEqual(s1.status,'ready');assert.ok(!s1.original);
+ const zhOverZh=game(dir=>{
+  writeTree(dir,{
+   'GameData/data6.pack':F.qliePack({'s01.s':F.gbk(sFile(zh))},{version:'3.1'}),
+   'GameData/data9.pack':F.qliePack({'s01.s':F.gbk(sFile(zh))},{version:'3.1'}),
+  });
+ });
+ assert.equal(scenes.ENGINES.qlie.originalLines(zhOverZh.dir),null);
+ const r2=probeGame({dir:zhOverZh.dir,executable:zhOverZh.exe,title:'t'},{budgetMs:30000});
+ assert.equal(r2.step,'chinese-build');assert.equal(r2.original,null);
+ const plainJa=game(dir=>{writeTree(dir,{'GameData/data0.pack':F.qliePack({'s01.s':F.sjis(sFile(ja))},{version:'3.1'})});});
+ assert.equal(scenes.ENGINES.qlie.originalLines(plainJa.dir),null);
+ const r3=probeGame({dir:plainJa.dir,executable:plainJa.exe,title:'t'},{budgetMs:30000});
+ assert.equal(r3.step,'ok');assert.equal(r3.original,null);assert.equal(r3.japaneseLines,ja.length);
+});
