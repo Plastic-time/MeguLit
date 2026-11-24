@@ -84,6 +84,30 @@ test('YU-RIS: a Chinese update*.ypf beside the program is the running script (no
  fs.rmSync(base,{recursive:true,force:true});
 });
 
+test('YU-RIS: update*.ypf overrides base scenes before filtering out textless scenes',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yuris-upd-empty-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ put(dir,{
+  'pac/ysbin.ypf':ypf([
+   ['ysbin\\yst00100.ybn',ystb(['ふるい。'].map(sjis))],
+   ['ysbin\\yst00101.ybn',ystb(['もと。'].map(sjis))],
+   ['ysbin\\yst00102.ybn',ystb([])],
+  ]),
+  'pac/update1.ypf':ypf([
+   ['ysbin\\yst00100.ybn',ystb([])],
+   ['ysbin\\yst00101.ybn',ystb(['こうしん。'].map(sjis))],
+   ['ysbin\\yst00102.ybn',ystb(['ついか。'].map(sjis))],
+  ]),
+  'pac/update2.ypf':ypf([
+   ['ysbin\\yst00101.ybn',ystb([])],
+   ['ysbin\\yst00103.ybn',ystb(['しんき。'].map(sjis))],
+  ]),
+ });
+ const scenes=yuris.scenes(dir);
+ assert.deepStrictEqual(scenes.map(s=>s.name),['yst00102.ybn','yst00103.ybn']);
+ assert.deepStrictEqual(scenes.map(s=>yuris.parse(s.read()).lines),[['ついか。'],['しんき。']]);
+});
+
 // The user's own install (skipped elsewhere): 女装山脈 with the 萌空 1.1 patch, whose text is coded for the loader's font.
 const REAL='E:\\GAL\\女装山脉';
 test('YU-RIS real data: 女装山脈 Japanese ysbin lines pair with the 1.1 Chinese patch',{skip:!fs.existsSync(path.join(REAL,'pac','ysbin.ypf'))&&'女装山脈 not installed'},async()=>{

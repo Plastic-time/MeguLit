@@ -278,9 +278,10 @@ const textMemo=new Map();
 function hasText(file,s){return memo(textMemo,file+'|'+stat(file)+'|'+s.name,()=>{try{return words(s.read()).raw.length>0;}catch{return false;}});}
 const yuris={
  id:'yuris',hint:'update1.ypf（或 pac\\ysbin.ypf）',
- scenes(dir){const base=ysbinOf(dir);if(!base)return [];const out=new Map();
-  for(const file of [base,...updates(dir)])for(const s of ypfScenes(file))if(hasText(file,s))out.set(s.name.toLowerCase(),s);
-  return [...out.values()].sort((a,b)=>a.name.localeCompare(b.name));},
+ scenes(dir){const base=ysbinOf(dir);if(!base)return [];const latest=new Map();
+  for(const file of [base,...updates(dir)])for(const s of ypfScenes(file))latest.set(s.name.toLowerCase(),{file,s});
+  const out=[];for(const {file,s} of latest.values())if(hasText(file,s))out.push(s);
+  return out.sort((a,b)=>a.name.localeCompare(b.name));},
  archives:dir=>updates(dir).reverse().flatMap(ypfScenes),
  sources:dir=>{const base=ysbinOf(dir);return base?[base,...updates(dir)]:[];},
  parse,test:()=>false,
