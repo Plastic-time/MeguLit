@@ -23,21 +23,22 @@ function twister(seed){const mt=new Array(624);seed>>>=0;for(let i=0;i<624;i++){
    ArcINT.cs: the passphrase is the exe's resource of type V_CODE2 (name DATA), Blowfish under KEY_CODE/KEY (each byte ^ 0xCD, else
    "windmill"); its key is a CRC-32 (MSB-first) fold of the Shift-JIS bytes; entry i's name key is the first Twister output
    seeded with key + i. */
-function peResource(file,type,name){let b;try{b=fs.readFileSync(file);}catch{return null;}if(b.readUInt16LE(0)!==0x5a4d)return null;const pe=b.readUInt32LE(0x3c);if(b.readUInt32LE(pe)!==0x4550)return null;
- const nsec=b.readUInt16LE(pe+6),opt=pe+24,magic=b.readUInt16LE(opt),dirs=opt+(magic===0x20b?112:96),rva=b.readUInt32LE(dirs+2*8);if(!rva)return null;
+function peResource(file,type,name){try{const b=fs.readFileSync(file);if(b.readUInt16LE(0)!==0x5a4d)return null;const pe=b.readUInt32LE(0x3c);if(b.readUInt32LE(pe)!==0x4550)return null;
+ const nsec=b.readUInt16LE(pe+6),opt=pe+24,magic=b.readUInt16LE(opt);if(magic!==0x10b&&magic!==0x20b)return null;
+ const dirs=opt+(magic===0x20b?112:96),rva=b.readUInt32LE(dirs+2*8);if(!rva)return null;
  const secs=[];for(let i=0;i<nsec;i++){const s=opt+b.readUInt16LE(pe+20)+i*40;secs.push({va:b.readUInt32LE(s+12),vs:Math.max(b.readUInt32LE(s+8),b.readUInt32LE(s+16)),raw:b.readUInt32LE(s+20)});}
  const off=v=>{const s=secs.find(s=>v>=s.va&&v<s.va+s.vs);return s?v-s.va+s.raw:-1;};const base=off(rva);if(base<0)return null;
- const label=p=>{const n=b.readUInt16LE(base+p);return b.toString('utf16le',base+p+2,base+p+2+n*2);};
+ const label=p=>{const n=b.readUInt16LE(base+p);if(base+p+2+n*2>b.length)return '';return b.toString('utf16le',base+p+2,base+p+2+n*2);};
  const find=(dir,want)=>{const n=b.readUInt16LE(base+dir+12)+b.readUInt16LE(base+dir+14);for(let i=0;i<n;i++){const e=base+dir+16+i*8,id=b.readUInt32LE(e),to=b.readUInt32LE(e+4);
    if(want===null||((id&0x80000000)&&label(id&0x7fffffff).toUpperCase()===want))return to;}return null;};
  let t=find(0,type);if(t===null||!(t&0x80000000))return null;t=find(t&0x7fffffff,name);if(t===null||!(t&0x80000000))return null;t=find(t&0x7fffffff,null);if(t===null||(t&0x80000000))return null;
- const leaf=base+t,data=off(b.readUInt32LE(leaf)),size=b.readUInt32LE(leaf+4);return data<0?null:Buffer.from(b.subarray(data,data+size));}
+ const leaf=base+t,data=off(b.readUInt32LE(leaf)),size=b.readUInt32LE(leaf+4);return data<0||data+size>b.length?null:Buffer.from(b.subarray(data,data+size));}catch{return null;}}
 const CRC=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let c=i<<24;for(let k=0;k<8;k++)c=c&0x80000000?(c<<1)^0x04c11db7:c<<1;t[i]=c>>>0;}return t;})();
 function passKey(pass){let key=0xffffffff;for(const c of pass)key=(~CRC[((key>>>24)^c)&255]^(key<<8))>>>0;return key>>>0;}
 // The passphrase key of the game in this folder, or null.
 function gameKey(dir){let names=[];try{names=fs.readdirSync(dir).filter(n=>/\.exe$/i.test(n));}catch{}
  for(const n of names){const file=path.join(dir,n),code=peResource(file,'V_CODE2','DATA');if(!code||code.length<8)continue;let key=peResource(file,'KEY_CODE','KEY');
-  key=key?Buffer.from(key.map(v=>v^0xcd)):Buffer.from('windmill');const plain=new Blowfish(key).decryptBuffer(Buffer.from(code));const z=plain.indexOf(0);return passKey(plain.subarray(0,z<0?plain.length:z));}
+  key=key&&key.length?Buffer.from(key.map(v=>v^0xcd)):Buffer.from('windmill');const plain=new Blowfish(key).decryptBuffer(Buffer.from(code));const z=plain.indexOf(0);return passKey(plain.subarray(0,z<0?plain.length:z));}
  return null;}
 const ALPHA='zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA';
 function decipherName(raw,key){let k=((key>>>24)+(key>>>16)+(key>>>8)+key)&255;const out=Buffer.from(raw);let i=0;
