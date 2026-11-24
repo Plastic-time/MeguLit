@@ -100,3 +100,12 @@ test('reallive: score() checks JUNK on double-byte bytes only so kana-less Engli
  assert.ok(dec);
  assert.deepEqual(rl.parse(dec).lines,['「よし」','理樹 VS 真人','謙吾 VS 恭介','Lv 5 鈴','HP 100 最大','「あい」','「あいう」','「いう」','「あう」']);
 });
+test('reallive: score() preserves base double-byte junk penalty across unclosed 0x22 when auto-picking keys',()=>{
+ const xorKey=(buf,key)=>{const d=Buffer.from(buf);for(const [k,off,len] of key)for(let i=0;i<len&&off+i<d.length;i++)d[off+i]^=k[i%16];return d;};
+ const plain=Buffer.alloc(429,0x2c),junk=Buffer.from([0xaa,0x99,0x22,0x9b,0x5b]);
+ const ex=xorKey(Buffer.alloc(429),rl.KEYS['little-busters-ex']),lb=xorKey(Buffer.alloc(429),rl.KEYS['little-busters']);
+ for(let j=0;j<junk.length;j++)plain[399+j]=junk[j]^ex[399+j]^lb[399+j];
+ const dec=rl.bytecode(scenario(plain,1110002,'little-busters-ex'),null);
+ assert.ok(dec);
+ assert.deepEqual(dec,plain);
+});
