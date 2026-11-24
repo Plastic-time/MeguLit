@@ -22,5 +22,6 @@ test('the live DOM resolves ambiguous wheel events before the bridge forwards th
  assert.match(g,/PostMessage\(game,\(uint\)wheel\.Message,/);
  assert.match(r,/window\.__megulitResolveWheel/);
  assert.match(r,/if kind == "mouseWheel" \{\s*packet\["deltaX"\]/);
- assert.match(web,/document\.elementFromPoint\(x,y\)\?\.closest\(MENUS\)/);
+ assert.match(web,/document\.elementFromPoint\(x,y\)/);
+ assert.match(web,/\.closest\(MENUS\)/);
 });

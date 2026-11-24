@@ -80,8 +80,13 @@ test('a GPU-placed translation stays inside the game client without moving the J
       const occupied = y => regions.some(r => !r.pass && x * devicePixelRatio >= r.x && x * devicePixelRatio < r.x + r.width &&
         y * devicePixelRatio >= r.y && y * devicePixelRatio < r.y + r.height);
       const wheel = y => { window.__megulitResolveWheel(1, x, y); return window.packets.at(-1).panel; };
-      return { visible: occupied(inside), clipped: occupied(outside), wheelInside: wheel(inside), wheelOutside: wheel(outside) };
+      const beforeMenu = { visible: occupied(inside), clipped: occupied(outside), wheelInside: wheel(inside), wheelOutside: wheel(outside) };
+      const menu = document.createElement('div');
+      menu.className = 'mg-select-pop';
+      menu.style.cssText = `position:fixed;left:${x - 5}px;top:${outside - 5}px;width:20px;height:20px`;
+      document.body.append(menu);
+      return { ...beforeMenu, wheelMenu: wheel(outside) };
     }, scroll);
-    assert.deepEqual(hits, { visible: true, clipped: false, wheelInside: true, wheelOutside: false });
+    assert.deepEqual(hits, { visible: true, clipped: false, wheelInside: true, wheelOutside: false, wheelMenu: true });
   } finally { await browser.close(); }
 });
