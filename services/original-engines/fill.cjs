@@ -10,7 +10,7 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 let table=null;
 function entries(){if(table)return table;try{table=JSON.parse(fs.readFileSync(path.join(__dirname,'filled.json'),'utf8')).lines||{};}catch{table={};}return table;}
 const key=t=>crypto.createHash('sha1').update(String(t).normalize('NFC'),'utf8').digest('hex');
-const ASSET=/^[^\s「」『』（）]{1,40}\.(?:tga|ani|png|bmp|jpg|ogg|wav|mpg|wmv|psd)$/i;
+const ASSET=/^[^\x00-\x1f\x7f\s<>|?*"':「」『』（）()【】［］\[\]！？!?。、，,．…・：；“”‘’※♪→～―—]{1,40}\.(?:tga|ani|png|bmp|jpg|ogg|wav|mpg|wmv|psd)$/i;
 function lookup(ja){if(ASSET.test(ja))return {zh:'',source:'asset'};const t=entries()[key(ja)];return t?{zh:t,source:'filled'}:null;}
 // A parsed scene with a zh column: fills the gaps, adds zhSource (release / filled / asset / '').
 function scene(s){if(!s||!Array.isArray(s.lines)||!Array.isArray(s.zh))return s;const zh=s.zh.slice(),src=[];
