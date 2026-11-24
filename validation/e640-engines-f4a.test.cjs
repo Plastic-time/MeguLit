@@ -15,11 +15,20 @@ const pairs=(own,zh)=>{assert.equal(zh.length,own.length,'line counts differ');r
 const JA=['「おはよう」と彼女は言った。','今日はいい天気ですね。','ありがとう、また明日。'],ZH=['“早上好”她说道。','今天天气真好啊。','谢谢，明天见。'];
 
 /* ---- Escude --------------------------------------------------------------------------------------------------------- */
-const OUTER='！？　。「」、…をぁぃぅぇぉゃゅょっーあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわん゛゜',INNER='!?｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ';
-const inner=s=>[...s].map(c=>{const i=[...OUTER].indexOf(c);return i<0?c:[...INNER][i];}).join('');
+const ESCUDE_PAIRS=[
+ ['!','！'],['?','？'],['\uf8f0','　'],['｡','。'],['｢','「'],['｣','」'],['､','、'],['･','…'],
+ ['ｦ','を'],['ｧ','ぁ'],['ｨ','ぃ'],['ｩ','ぅ'],['ｪ','ぇ'],['ｫ','ぉ'],['ｬ','ゃ'],['ｭ','ゅ'],['ｮ','ょ'],['ｯ','っ'],['ｰ','ー'],
+ ['ｱ','あ'],['ｲ','い'],['ｳ','う'],['ｴ','え'],['ｵ','お'],['ｶ','か'],['ｷ','き'],['ｸ','く'],['ｹ','け'],['ｺ','こ'],
+ ['ｻ','さ'],['ｼ','し'],['ｽ','す'],['ｾ','せ'],['ｿ','そ'],['ﾀ','た'],['ﾁ','ち'],['ﾂ','つ'],['ﾃ','て'],['ﾄ','と'],
+ ['ﾅ','な'],['ﾆ','に'],['ﾇ','ぬ'],['ﾈ','ね'],['ﾉ','の'],['ﾊ','は'],['ﾋ','ひ'],['ﾌ','ふ'],['ﾍ','へ'],['ﾎ','ほ'],
+ ['ﾏ','ま'],['ﾐ','み'],['ﾑ','む'],['ﾒ','め'],['ﾓ','も'],['ﾔ','や'],['ﾕ','ゆ'],['ﾖ','よ'],
+ ['ﾗ','ら'],['ﾘ','り'],['ﾙ','る'],['ﾚ','れ'],['ﾛ','ろ'],['ﾜ','わ'],['ﾝ','ん'],['ﾞ','゛'],['ﾟ','゜'],
+];
+const ESCUDE_TO_INNER=new Map(ESCUDE_PAIRS.map(([i,o])=>[o,i]));
+const escr1Bytes=s=>Buffer.concat([...s].map(c=>{const i=ESCUDE_TO_INNER.get(c);if(i==='\uf8f0')return Buffer.from([0xa0]);return kit.encodeSjis(i||c);}));
 test('Escude: ESC-ARC2 / ESC-ARC1 index cipher, acp LZW, ESCR1_00 strings (half-width hiragana mapped back), ESCR_NEW .001',t=>{
  assert.equal(escude.lzw(F.acp(Buffer.from('hello acp')).subarray(8),9).toString(),'hello acp');
- const enc=s=>kit.encodeSjis(s),s1=F.escr1(['bg01',...JA.map(inner),'se_02'],enc),s2=F.escr1(['真琴',inner('きょうもがんばろう。')],enc);
+ const s1=F.escr1(['bg01',...JA,'se_02'],escr1Bytes),s2=F.escr1(['真琴','きょうもがんばろう。'],escr1Bytes);
  const game=tmp(t);put(game,'script.bin',F.escArc({'scr/0001.bin':s1,'scr/0002.bin':F.acp(s2)}));put(game,'gpr.bin',Buffer.alloc(32,1));
  assert.equal(library.engineOf(game)?.name,'Escude');assert.equal(scenes.detect(game),'escude');
  const v1=tmp(t);put(v1,'script.bin',F.escArc({'0001.bin':s1},{version:1}));assert.deepEqual(escude.list(path.join(v1,'script.bin')).map(e=>e.name),['0001.bin']);
@@ -30,6 +39,17 @@ test('Escude: ESC-ARC2 / ESC-ARC1 index cipher, acp LZW, ESCR1_00 strings (half-
  /* ESCR_NEW: the messages live in <name>.001 */
  const mess=escude.parse(F.escrMess(JA));assert.deepEqual(mess.lines,JA);pairs(mess.lines,escude.parse(F.escrMess(ZH,gbk)).lines);
  assert.deepEqual(escude.parse(Buffer.alloc(40,3)).lines,[]);
+});
+test('Escude: ESCR1_00 half-width kana, punctuation, voiced marks, and 0xA0 full-width space align 1:1',()=>{
+ /* real ESCR1_00 byte encoding: 0xA0 = full-width space, 0xA1..0xDF = 。「」、…をぁ..ん゛゜, 0x21/0x3F = ！/？ */
+ const fullPunct='真琴！？　。「」、…をぁぃぅぇぉゃゅょっーあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわん゛゜';
+ const raw=F.escr1([fullPunct],escr1Bytes);
+ assert.deepEqual(escude.parse(raw).lines,[fullPunct]);
+ /* single-byte 0xA0 becomes full-width space while a Shift-JIS trail byte 0xA0 (0x82 0xA0 = あ) stays intact */
+ const mixed=Buffer.concat([Buffer.from([0x82,0xa0,0xa0,0xa6,0xa7,0xb1,0xde,0xdf])]);
+ const withRaw=F.escr1([mixed],b=>b);
+ assert.deepEqual(escude.parse(withRaw).lines,['あ　をぁあ゛゜']);
+ assert.equal(escude.restring('!?\uf8f0｡｢｣､･ｦｧｱﾝﾞﾟ'),'！？　。「」、…をぁあん゛゜');
 });
 
 /* ---- PJADV ---------------------------------------------------------------------------------------------------------- */
