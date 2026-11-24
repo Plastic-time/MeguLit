@@ -19,7 +19,7 @@
  // The Alt+T menu, backlog and lookup card each have their own six values (user, 2026-11-03: the menu's opacity changed
  // the other two). Old saves held one shared set: each panel starts from it.
  const PANELS=['menu','log','card'],PANEL_KEYS=['blur','dim','saturate','alpha','radius','border','glassBlur','glassDim','glassSaturate'];
- const pictureLimit=48,highlightStart=40;
+ const pictureLimit=48,highlightStart=40,pictureInkTint=10;
  {const old=gcfg.panels||{},next={};for(const p of PANELS){next[p]={};for(const k of PANEL_KEYS){const v=Number(old[p]?.[k]??gcfg[k]??gameDefaults[k]);next[p][k]=Number.isFinite(v)?v:gameDefaults[k];
   }}gcfg.panels=next;}
  const T={
@@ -83,7 +83,7 @@
   .tomoyo-cn-dialog{--tome-p-glass-blur:var(--tome-menu-glass-blur,18px);--tome-p-glass-bright:var(--tome-menu-glass-bright,1);--tome-p-glass-sat:var(--tome-menu-glass-sat,1);--tome-p-alpha:var(--tome-menu-alpha,.62);--tome-p-image:var(--tome-menu-image,none);--tome-p-radius:var(--tome-menu-radius,18px);--tome-p-border:var(--tome-menu-border,.08)}
   .tome-backlog{--tome-p-glass-blur:var(--tome-log-glass-blur,18px);--tome-p-glass-bright:var(--tome-log-glass-bright,1);--tome-p-glass-sat:var(--tome-log-glass-sat,1);--tome-p-alpha:var(--tome-log-alpha,.62);--tome-p-image:var(--tome-log-image,none);--tome-p-radius:var(--tome-log-radius,18px);--tome-p-border:var(--tome-log-border,.08)}
   .tomoyo-selection-card{--tome-p-glass-blur:var(--tome-card-glass-blur,18px);--tome-p-glass-bright:var(--tome-card-glass-bright,1);--tome-p-glass-sat:var(--tome-card-glass-sat,1);--tome-p-alpha:var(--tome-card-alpha,.62);--tome-p-image:var(--tome-card-image,none);--tome-p-radius:var(--tome-card-radius,18px);--tome-p-border:var(--tome-card-border,.08)}
-  .tome-menu-bg{--tome-p-picture-limit:${pictureLimit};position:absolute;inset:0;z-index:-1;border-radius:inherit;overflow:hidden;pointer-events:none;background:var(--theme-surface,#121218);opacity:var(--tome-p-alpha,.62)}
+  .tome-menu-bg{--tome-p-picture-limit:${pictureLimit};--tome-p-picture-ink-tint:${pictureInkTint};position:absolute;inset:0;z-index:-1;border-radius:inherit;overflow:hidden;pointer-events:none;background:var(--theme-surface,#121218);opacity:var(--tome-p-alpha,.62)}
   .tome-menu-bg>i{position:absolute;inset:0;background-position:center;background-size:cover;background-image:var(--tome-p-image,none);will-change:transform}
   ${[['menu','.tomoyo-cn-dialog'],['log','.tome-backlog'],['card','.tomoyo-selection-card']].map(([p,selector])=>
    `${selector}{--tome-p-readable-image:var(--tome-${p}-readable-image);--tome-p-picture-peak:var(--tome-${p}-picture-peak);--tome-p-picture-tint:var(--tome-${p}-picture-tint)}`).join('\n')}
@@ -221,7 +221,7 @@
   let median=0,seen=histogram[0];while(seen<brightness.length/2)seen+=histogram[++median];
   // Near-black photos keep the ink tint. Darker midtones use a neutral grey backing nearer their own shade.
   // Return to the ink tint for daylight photos to keep their usual translucency.
-  const tint=10+Math.round(35*Math.max(0,Math.min(1,(median-16)/12,(96-median)/48)));
+  const tint=pictureInkTint+Math.round(35*Math.max(0,Math.min(1,(median-16)/12,(96-median)/48)));
   if(peak<=pictureLimit)return {peak,tint};
   const slope=(pictureLimit-highlightStart)/(peak-highlightStart);
   for(let j=0,i=0;j<brightness.length;j++,i+=4){
@@ -278,7 +278,7 @@
   if(!source){pictureSource='';for(const p of PANELS)showPanelPicture(p,'');dropPanelImages();return;}
   if(source!==pictureSource){pictureSource=source;sourceVersion++;}
   const keys=PANELS.map(p=>{const {blur,dim,saturate}=settings[p];return [sourceVersion,blur,dim,saturate].join('|');});
-  if(PANELS.every((p,i)=>panelKeys[p]===keys[i]))return;
+  if(PANELS.every((p,i)=>panelKeys[p]===keys[i])){dropPanelImages();return;}
   menuTimer=setTimeout(async()=>{
    try{
     const img=new Image();img.src=source;await img.decode();

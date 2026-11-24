@@ -94,7 +94,7 @@
  .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>:not(button){grid-column:1/-1}
  .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button,.tome-window-bind-row:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button{width:100%;min-width:0;margin:0!important;justify-content:center;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  /* one obvious action: 校准当前句 is the main button (full width, filled); the partial ones sit under it as quiet small buttons */
- .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-game-style-sync]{grid-column:1/-1;height:38px!important;font-weight:700;color:#fff!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 80%,transparent)!important;border-color:transparent!important}
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-game-style-sync]{grid-column:1/-1;height:38px!important;font-weight:700;color:var(--tome-picture-on-accent,#fff)!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 80%,transparent)!important;border-color:transparent!important}
  .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-game-style-sync]:hover:not(:disabled){background:var(--menu-accent,#e0495a)!important}
  .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-calibrate-text],.tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-gal-position-sync],.tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-calibrate-stream]{height:28px!important;font-size:12px!important;font-weight:400!important;color:var(--theme-textSecondary,#aaa)!important;background:transparent!important;border-color:var(--menu-border,#34343a)!important}
  .tome-window-bind-row:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}
@@ -107,9 +107,9 @@
  .tome-ac-bindbar>small{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px!important;color:var(--theme-text,#e8e9ec)!important}
  .tome-ac-bindbar>small::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:#d9a441;vertical-align:1px}
  .tome-ac-bindbar[data-bound=true]>small::before{background:#45c47f}
- .tome-ac-bindbar>button{flex:none;padding:4px 10px!important;border:0!important;background:transparent!important;color:color-mix(in srgb,var(--menu-accent,#e0495a) 55%,#fff)!important;cursor:pointer;font-size:12.5px;border-radius:6px!important}
+ .tome-ac-bindbar>button{flex:none;padding:4px 10px!important;border:0!important;background:transparent!important;color:var(--tome-picture-accent,color-mix(in srgb,var(--menu-accent,#e0495a) 55%,#fff))!important;cursor:pointer;font-size:12.5px;border-radius:6px!important}
  .tome-ac-bindbar>button:hover{background:color-mix(in srgb,var(--menu-accent,#e0495a) 14%,transparent)!important}
- .tome-ac-bindbar>button.tome-ac-bind-cta{color:#fff!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 80%,transparent)!important;border-radius:6px!important;font-weight:700}
+ .tome-ac-bindbar>button.tome-ac-bind-cta{color:var(--tome-picture-on-accent,#fff)!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 80%,transparent)!important;border-radius:6px!important;font-weight:700}
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-ac-off{display:none!important}
  .tome-ac:not(#q1):not(#q2):not(#q3) details.tome-ac-pane{border:0!important;background:transparent!important;margin-top:0!important}
  .tome-ac:not(#q1):not(#q2):not(#q3) details.tome-ac-pane>summary{display:none!important}

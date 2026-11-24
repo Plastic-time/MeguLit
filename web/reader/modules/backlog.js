@@ -85,7 +85,7 @@
     selection only see the original characters. */
  .tome-log-src[data-ruby]{padding-top:.42em;line-height:max(var(--log-lh,1.75),2.15)}
  .tome-log-rb{position:relative}
- .tome-log-rb::before{content:attr(data-reading);position:absolute;left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:-.28em;white-space:nowrap;font:400 .55em/1 var(--tomoyo-ruby-font,var(--log-jp-font));letter-spacing:0;color:color-mix(in srgb,var(--theme-text,#eee) 78%,transparent);pointer-events:none;user-select:none}
+ .tome-log-rb::before{content:attr(data-reading);position:absolute;left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:-.28em;white-space:nowrap;font:400 .55em/1 var(--tomoyo-ruby-font,var(--log-jp-font));letter-spacing:0;color:var(--tome-picture-muted,color-mix(in srgb,var(--theme-text,#eee) 78%,transparent));pointer-events:none;user-select:none}
  .tome-backlog[data-open]{will-change:scale,opacity;animation:tome-log-in .22s cubic-bezier(.16,1,.3,1) both} .tome-backlog[data-open][data-shown]{will-change:auto;animation:none}
  .tome-backlog[data-leaving]{pointer-events:none;will-change:scale,opacity;animation:tome-log-out .17s cubic-bezier(.5,0,.75,0) both}
  .tome-backlog[data-open]>*{animation:tome-log-content .3s cubic-bezier(.3,0,.2,1) both}
@@ -94,7 +94,7 @@
  @keyframes tome-log-content{from{opacity:0}35%{opacity:0}to{opacity:1}}
  .tome-backlog header{display:flex;align-items:center;gap:12px;padding:18px 16px 14px 24px;flex:none}
  .tome-log-heading{display:flex;flex-direction:column;gap:1px;min-width:0}
- .tome-log-heading span{font:700 10px/1.2 Consolas,"Cascadia Mono",monospace;letter-spacing:.32em;color:var(--log-accent)}
+ .tome-log-heading span{font:700 10px/1.2 Consolas,"Cascadia Mono",monospace;letter-spacing:.32em;color:var(--tome-picture-accent,var(--log-accent))}
  .tome-log-heading h3{margin:0;font-size:19px;font-weight:700;letter-spacing:.05em;line-height:1.35}
  .tome-log-count{align-self:flex-end;margin-bottom:3px;font-size:11.5px;color:var(--theme-textSecondary,#999);white-space:nowrap}
  .tome-log-search{flex:1;display:flex;justify-content:flex-end;min-width:0}
@@ -119,15 +119,15 @@
  .tome-log-item[data-latest]{background:linear-gradient(90deg,color-mix(in srgb,var(--log-accent) 13%,transparent),color-mix(in srgb,var(--log-accent) 3%,transparent))}
  .tome-log-item[data-latest]::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:0 3px 3px 0;background:var(--log-accent);box-shadow:0 0 10px var(--log-accent)}
  .tome-log-name{padding-top:calc((var(--log-jp-size,18px) * var(--log-lh,1.75) - 22px) / 2);text-align:right;min-width:0}
- .tome-log-name b{display:inline-block;max-width:100%;padding:1px 9px;border-radius:6px;background:color-mix(in srgb,var(--log-accent) 16%,transparent);color:color-mix(in srgb,var(--log-accent) 70%,var(--theme-text,#eee));font:700 12.5px/20px var(--log-jp-font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
- .tome-log-name i{font-style:normal;font-size:11px;line-height:22px;color:color-mix(in srgb,var(--theme-text,#eee) 32%,transparent)}
+ .tome-log-name b{display:inline-block;max-width:100%;padding:1px 9px;border-radius:6px;background:color-mix(in srgb,var(--log-accent) 16%,transparent);color:var(--tome-picture-text,color-mix(in srgb,var(--log-accent) 70%,var(--theme-text,#eee)));font:700 12.5px/20px var(--log-jp-font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .tome-log-name i{font-style:normal;font-size:11px;line-height:22px;color:var(--tome-picture-muted,color-mix(in srgb,var(--theme-text,#eee) 32%,transparent))}
  .tome-log-body{min-width:0}
  .tome-log-src{font-family:var(--log-jp-font);font-size:var(--log-jp-size,18px);line-height:var(--log-lh,1.75);white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;color:var(--theme-text,#eee)}
  body:has(.tome-backlog[data-open]) .tomoyo-selection-card{z-index:2147482600!important}
- .tome-log-tr{margin-top:5px;padding-left:12px;border-left:2px solid color-mix(in srgb,var(--log-accent) 45%,transparent);font-family:var(--log-cn-font);font-size:var(--log-tr-size,14.5px);line-height:calc(var(--log-lh,1.75) - .05);white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;color:color-mix(in srgb,var(--theme-text,#eee) 72%,transparent)}
+ .tome-log-tr{margin-top:5px;padding-left:12px;border-left:2px solid color-mix(in srgb,var(--log-accent) 45%,transparent);font-family:var(--log-cn-font);font-size:var(--log-tr-size,14.5px);line-height:calc(var(--log-lh,1.75) - .05);white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;color:var(--tome-picture-muted,color-mix(in srgb,var(--theme-text,#eee) 72%,transparent))}
  :is(.tome-backlog,.tome-log-preview)[data-no-tr] .tome-log-tr{display:none}
  .tome-log-tr[data-missing]{border-left-color:color-mix(in srgb,var(--theme-text,#eee) 14%,transparent);font-size:12px;opacity:.6}
- .tome-log-time{position:absolute;right:16px;top:15px;font:11px/1.4 Consolas,"Cascadia Mono",monospace;color:color-mix(in srgb,var(--theme-text,#eee) 36%,transparent);display:none}
+ .tome-log-time{position:absolute;right:16px;top:15px;font:11px/1.4 Consolas,"Cascadia Mono",monospace;color:var(--tome-picture-muted,color-mix(in srgb,var(--theme-text,#eee) 36%,transparent));display:none}
  :is(.tome-backlog,.tome-log-preview)[data-time] .tome-log-time{display:block}
  .tome-log-actions{position:absolute;right:10px;top:10px;display:flex;gap:2px;opacity:0;transition:opacity .12s}
  .tome-log-item:hover .tome-log-actions{opacity:1}
@@ -136,13 +136,13 @@
  .tome-log-actions button:hover{background:color-mix(in srgb,var(--theme-text,#eee) 9%,transparent);color:var(--theme-text,#eee)}
  .tome-log-actions button[data-done]{color:#3ddc7a}
  .tome-log-actions svg{width:14px;height:14px}
- .tome-log-break{display:flex;align-items:center;gap:12px;margin:14px 14px 4px;font:11px/1 Consolas,"Cascadia Mono",monospace;letter-spacing:.08em;color:color-mix(in srgb,var(--theme-text,#eee) 38%,transparent)}
+ .tome-log-break{display:flex;align-items:center;gap:12px;margin:14px 14px 4px;font:11px/1 Consolas,"Cascadia Mono",monospace;letter-spacing:.08em;color:var(--tome-picture-muted,color-mix(in srgb,var(--theme-text,#eee) 38%,transparent))}
  .tome-log-break::before,.tome-log-break::after{content:"";flex:1;height:1px;background:color-mix(in srgb,var(--theme-text,#eee) 9%,transparent)}
  .tome-log-hit{background:color-mix(in srgb,var(--log-accent) 35%,transparent);color:inherit;border-radius:3px;padding:0 1px}
  .tome-log-empty{padding:56px 20px;text-align:center;color:var(--theme-textSecondary,#999);font-size:13px}
- .tome-backlog footer{flex:none;padding:8px 24px 12px;font-size:11px;color:color-mix(in srgb,var(--theme-text,#eee) 38%,transparent);border-top:1px solid color-mix(in srgb,var(--theme-text,#eee) 6%,transparent)}
+ .tome-backlog footer{flex:none;padding:8px 24px 12px;font-size:11px;color:var(--tome-picture-muted,color-mix(in srgb,var(--theme-text,#eee) 38%,transparent));border-top:1px solid color-mix(in srgb,var(--theme-text,#eee) 6%,transparent)}
  .tomoyo-menu-header .tome-menu-close{all:unset;position:absolute;right:22px;top:18px;padding:4px 10px;border-radius:8px;border:1px solid color-mix(in srgb,var(--theme-text,#eee) 14%,transparent);font:400 20px/1 Consolas,"Cascadia Mono",monospace;letter-spacing:.08em;color:var(--theme-textSecondary,#aaa);cursor:pointer}
- .tomoyo-menu-header .tome-menu-close:hover,.tomoyo-cn-dialog[data-log-page] .tomoyo-menu-header .tome-menu-close{color:var(--theme-primary,#e0495a);border-color:var(--theme-primary,#e0495a)}
+ .tomoyo-menu-header .tome-menu-close:hover,.tomoyo-cn-dialog[data-log-page] .tomoyo-menu-header .tome-menu-close{color:var(--tome-picture-accent,var(--theme-primary,#e0495a));border-color:var(--theme-primary,#e0495a)}
  .tomoyo-menu-header{position:relative}
  .tome-log-settings .tome-log-preview{--log-accent:var(--theme-primary,#e0495a);position:relative;margin:4px 0 14px;color:var(--theme-text,#e8e9ec);border-radius:12px;border:1px solid color-mix(in srgb,var(--theme-text,#eee) 9%,transparent);background:color-mix(in srgb,var(--theme-background,#111) 55%,transparent);overflow:hidden}
  .tome-log-settings .tome-log-preview .tome-log-item{padding-right:14px}
@@ -150,7 +150,7 @@
  .tome-log-settings .tome-log-row{display:flex;align-items:center;gap:10px;margin:0 0 12px}
  .tome-log-settings .tome-log-row>span{flex:none;width:96px;font-size:13px}
  .tome-log-settings .tome-log-row>select,.tome-log-settings .tome-log-row>input[type=range]{flex:1;min-width:0}
- .tome-log-settings .tome-log-row output{flex:none;min-width:42px;text-align:right;font:600 11.5px/1.6 Consolas,"Cascadia Mono",monospace;color:var(--theme-primary,#e0495a)}
+ .tome-log-settings .tome-log-row output{flex:none;min-width:42px;text-align:right;font:600 11.5px/1.6 Consolas,"Cascadia Mono",monospace;color:var(--tome-picture-accent,var(--theme-primary,#e0495a))}
  .tome-log-settings .tome-log-row small{flex:none;color:var(--theme-textSecondary,#999);font-size:11px}
  .tome-log-settings .tome-log-toggles{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin:0 0 12px}
  .tome-log-settings .tome-log-toggles label{display:flex;align-items:center;gap:8px;font-size:13px;margin:0}

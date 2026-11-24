@@ -137,8 +137,10 @@ function luminance(rgb) {
  }).reduce((sum,value,i) => sum + value * [.2126,.7152,.0722][i], 0);
 }
 
-// Remove the glyphs after taking their positions and colors, leaving the composited background in the screenshot.
+// Remove the glyphs to sample their composited background. The text scan pairs screenshots
+// so borders and clipped pixels beside the glyphs do not count as the text background.
 async function contrastDetails(cdp, selectors, directText = false) {
+ const before = directText ? await cdp.send('Page.captureScreenshot',{format:'png'}) : null;
  const probes = await cdp.evaluate(`(${function (selectors,directText) {
   const text = new Set();
   const palette = new OffscreenCanvas(1,1).getContext('2d',{willReadFrequently:true});
@@ -186,17 +188,21 @@ async function contrastDetails(cdp, selectors, directText = false) {
   return probes;
  }})(${JSON.stringify(selectors)},${directText})`);
  try {
-  const result = await screenshotPixels(cdp,probes.flat().map(area => area.box));
+  const boxes = probes.flat().map(area => area.box);
+  const result = await screenshotPixels(cdp,boxes);
+  const withText = before ? await screenshotPixels(cdp,boxes,before.data) : [];
   const readings = probes.map(areas => areas.map(({fg,alpha,color,text}) => {
-   const pixels = result.shift();
-   let min = Infinity;
+   const pixels = result.shift(), painted = withText.shift();
+   let min = Infinity, glyphMin = Infinity;
    for (let i=0; i<pixels.length; i+=4) {
     const rgb = pixels.slice(i,i+3);
     const back = luminance(rgb);
     const front = luminance(rgb.map((channel,k) => channel*(1-alpha)+fg[k]*alpha));
-    min = Math.min(min,(Math.max(front,back)+.05)/(Math.min(front,back)+.05));
+    const ratio = (Math.max(front,back)+.05)/(Math.min(front,back)+.05);
+    min = Math.min(min,ratio);
+    if (painted && rgb.some((channel,k) => Math.abs(channel-painted[i+k]) >= 8)) glyphMin = Math.min(glyphMin,ratio);
    }
-   return {ratio:min,color,rgb:fg.slice(0,3),alpha,text};
+   return {ratio:Number.isFinite(glyphMin)?glyphMin:min,color,rgb:fg.slice(0,3),alpha,text};
   }).reduce((worst,reading) => reading.ratio < worst.ratio ? reading : worst));
   return Object.fromEntries(selectors.map((selector,i) => [selector,readings[i]]));
  } finally {
@@ -207,8 +213,8 @@ async function contrast(cdp,selectors) {
  return Object.fromEntries(Object.entries(await contrastDetails(cdp,selectors)).map(([selector,reading]) => [selector,reading.ratio]));
 }
 
-async function screenshotPixels(cdp, boxes) {
- const {data} = await cdp.send('Page.captureScreenshot',{format:'png'});
+async function screenshotPixels(cdp, boxes, data) {
+ if (!data) ({data} = await cdp.send('Page.captureScreenshot',{format:'png'}));
  return cdp.evaluate(`(${async function (data, boxes) {
   const image = new Image();
   image.src = 'data:image/png;base64,' + data;
@@ -247,6 +253,153 @@ async function openPhrase(cdp) {
   await b.openLocalSelection({text:phrase,start:0,end:phrase.length},{left:500,right:560,top:480,bottom:510,width:60,height:30});
  }})()`);
  await waitFor(cdp, `!!document.querySelector('.tomoyo-selection-card .tomoyo-chunk-role')`);
+}
+
+async function visiblePanelText(cdp, root) {
+ const labels = await cdp.evaluate(`(${function (root) {
+  const panel = document.querySelector(root);
+  const surface = panel.querySelector(':scope > .tome-menu-bg').getBoundingClientRect();
+  const walk = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
+  const elements = new Map();
+  for (let node; (node = walk.nextNode());) {
+   const element = node.parentElement, text = node.textContent.trim();
+   if (!text || elements.has(element) || element.closest('style,script,option,[hidden],[aria-hidden=true]')) continue;
+   if (getComputedStyle(element).visibility !== 'visible') continue;
+   const range = document.createRange();
+   range.selectNodeContents(node);
+   const rects = [...range.getClientRects()];
+   const whole = rects.every(r => r.width>2 && r.height>2 && r.left>=surface.left && r.top>=surface.top &&
+    r.right<=surface.right && r.bottom<=surface.bottom && r.left>=0 && r.top>=0 && r.right<=innerWidth && r.bottom<=innerHeight);
+   if (!rects.length || !whole) continue;
+   let visible = true;
+   for (let parent = element; parent; parent = parent.parentElement) {
+    const style = getComputedStyle(parent), bounds = parent.getBoundingClientRect();
+    const clipped = rects.some(r =>
+     (/auto|scroll|hidden|clip/.test(style.overflowX) && (r.left<bounds.left-2 || r.right>bounds.right+2)) ||
+     (/auto|scroll|hidden|clip/.test(style.overflowY) && (r.top<bounds.top-2 || r.bottom>bounds.bottom+2)));
+    if (style.opacity === '0' || clipped) { visible = false; break; }
+    if (parent === panel) break;
+   }
+   if (visible) elements.set(element, [text, element.localName, element.className || ''].join(' | '));
+  }
+  return [...elements].map(([element,label],index) => {
+   element.dataset.panelTextProbe = index;
+   return label;
+  });
+ }})(${JSON.stringify(root)})`);
+ if (!labels.length) return [];
+ const selectors = labels.map((_,index) => `[data-panel-text-probe="${index}"]`);
+ try {
+  const readings = await contrastDetails(cdp,selectors,true);
+  return selectors.map((selector,index) => ({label:labels[index],...readings[selector]}));
+ } finally {
+  await cdp.evaluate(`document.querySelectorAll('[data-panel-text-probe]').forEach(n=>delete n.dataset.panelTextProbe)`);
+ }
+}
+
+async function openAiResult(cdp, kind, text, selector) {
+ await cdp.evaluate(`(${function (kind,text) {
+  const original = window.__tomoyoTranslateRequest, bridge = window.__tomoyoChinese;
+  window.__tomoyoTranslateRequest = raw => {
+   const message = JSON.parse(raw);
+   if (message.type !== 'lookupExplain') return original(raw);
+   queueMicrotask(() => bridge.lookupDeliver(message.id,{kind,text},''));
+  };
+  document.querySelector('.tomoyo-selection-card [data-mg-ai="'+kind+'"]').click();
+ }})(${JSON.stringify(kind)},${JSON.stringify(text)})`);
+ await waitFor(cdp, `!!document.querySelector('${selector}')`);
+ await cdp.evaluate(`document.querySelector('${selector}').scrollIntoView({block:'center'})`);
+}
+
+const frame = cdp => cdp.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+async function sampleMenuPage(cdp,scene,readings) {
+ await frame(cdp);
+ await cdp.evaluate(`(() => {
+  const content = document.querySelector('${menu} .tomoyo-menu-content');
+  for (const details of content.querySelectorAll('details')) if (details.offsetHeight) details.open = true;
+  content.scrollTop = 0;
+ })()`);
+ let scroll = 0;
+ do {
+  await frame(cdp);
+  readings[`${scene}/${scroll}`] = await visiblePanelText(cdp,menu);
+  scroll = await cdp.evaluate(`(() => {
+   const content = document.querySelector('${menu} .tomoyo-menu-content');
+   const previous = content.scrollTop;
+   content.scrollTop = previous + Math.max(1,content.clientHeight-90);
+   return content.scrollTop > previous ? content.scrollTop : 0;
+  })()`);
+ } while (scroll);
+}
+
+async function menuPictureTextSamples(cdp,load,fixture) {
+ const readings = {};
+ await load(fixture);
+ await openMenu(cdp);
+ const tabs = await cdp.evaluate(`[...document.querySelectorAll('${menu} [data-menu-key]')].map(n=>n.dataset.menuKey)`);
+ for (const tab of tabs) {
+  await cdp.evaluate(`document.querySelector('${menu} [data-menu-key="${tab}"]').click()`);
+  await sampleMenuPage(cdp,`Alt+T/${tab}`,readings);
+  if (tab !== 'text') continue;
+  const sub = `${textTab} .mg-subtabs > button`;
+  const items = await cdp.evaluate(`[...document.querySelectorAll('${sub}')].map(b=>({text:b.textContent,selected:b.getAttribute('aria-selected')==='true'}))`);
+  for (const [index,{text,selected}] of items.entries()) {
+   if (selected) continue;
+   await cdp.evaluate(`document.querySelectorAll('${sub}')[${index}].click()`);
+   await sampleMenuPage(cdp,`Alt+T/text/${text}`,readings);
+  }
+ }
+ const save = `${menu} footer button[type=submit]`;
+ await cdp.send('DOM.enable');
+ await cdp.send('CSS.enable');
+ const {root} = await cdp.send('DOM.getDocument');
+ const {nodeId} = await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector:save});
+ for (const pseudo of ['hover','active']) {
+  await cdp.send('CSS.forcePseudoState',{nodeId,forcedPseudoClasses:[pseudo]});
+  await frame(cdp);
+  const result = await contrastDetails(cdp,[save]);
+  readings[`Alt+T/save/${pseudo}`] = [{label:save,...result[save]}];
+ }
+ await cdp.send('CSS.forcePseudoState',{nodeId,forcedPseudoClasses:[]});
+ await cdp.evaluate(`document.querySelector('${save}').disabled = true`);
+ await frame(cdp);
+ const disabled = await contrastDetails(cdp,[save]);
+ readings['Alt+T/save/disabled'] = [{label:save,...disabled[save]}];
+ return readings;
+}
+
+async function pictureTextSamples(cdp,load,themeMode) {
+ const fixture = {...white,themeMode,accent:'#ffffff',state:opaquePictures};
+ const readings = await menuPictureTextSamples(cdp,load,fixture);
+ const backlog = '.tome-backlog[data-shown]', card = '.tomoyo-selection-card';
+ await load({...fixture,state:{...opaquePictures,...speakerState(),'tome-log-settings':'{"showTime":true}'}});
+ await openLog(cdp);
+ readings['对话记录/菜单'] = await visiblePanelText(cdp,backlog);
+ await cdp.evaluate(`(() => {
+  const input = document.querySelector('${backlog} input[type=search]');
+  input.value = '晴';
+  input.dispatchEvent(new Event('input',{bubbles:true}));
+ })()`);
+ const hit = '.tome-log-hit';
+ await waitFor(cdp,`!!document.querySelector('${hit}')`);
+ const search = await contrastDetails(cdp,[hit]);
+ readings['对话记录/搜索'] = [{label:hit,...search[hit]}];
+
+ await load(fixture);
+ await openPhrase(cdp);
+ await frame(cdp);
+ readings['点读卡/多词'] = await visiblePanelText(cdp,card);
+ await load(fixture);
+ await openCard(cdp);
+ await frame(cdp);
+ readings['点读卡/单词'] = await visiblePanelText(cdp,card);
+ await openAiResult(cdp,'summary','① 整理窗边｜把窗台上的东西排好\n② 打开窗户｜开窗通风\n本句：①，整理窗台。\n补充说明。','.mg-sum-row[data-match] b');
+ await frame(cdp);
+ readings['点读卡/归纳义项'] = await visiblePanelText(cdp,card);
+ await openAiResult(cdp,'explain','意思：打开窗户。\n语气：普通。\n注意：对象是窗户。','.mg-ai-tag');
+ await frame(cdp);
+ readings['点读卡/上下文解释'] = await visiblePanelText(cdp,card);
+ return readings;
 }
 
 async function menuPixel(cdp) {
@@ -300,7 +453,29 @@ if (require.main === module) {
   await waitFor(cdp, `!!document.querySelector('.tome-backlog .tome-log-hit')`);
   assertAA(await contrast(cdp,['.tome-backlog .tome-log-hit']));
  }));
+ test('all panel text stays readable in both themes over a white picture and white game', {...options,timeout:150000},() => withReader(async (cdp,load) => {
+  for (const themeMode of ['dark','light']) {
+   const samples = await pictureTextSamples(cdp,load,themeMode);
+   const settings = {[backgroundKey]:JSON.stringify({panels:{menu:{alpha:20,dim:0,blur:0,saturate:100}}})};
+   const cappedDark = await menuPictureTextSamples(cdp,load,{...white,themeMode,home:[48,48,48],state:settings});
+   for (const [page,readings] of Object.entries(cappedDark)) samples[`暗图/${page}`] = readings;
+   for (const [panel,expected] of [
+    ['Alt+T/text/0','tomoyo-slider-value'], ['对话记录/菜单','司'],
+    ['点读卡/多词','tomoyo-chunk-role'], ['点读卡/归纳义项','整理窗边'], ['点读卡/上下文解释','mg-ai-tag'],
+   ]) {
+    assert.ok(samples[panel].some(x => x.label.includes(expected) || x.text.includes(expected)), `${themeMode}: ${panel} omitted ${expected}`);
+   }
+   const failures = Object.entries(samples).flatMap(([panel,readings]) => readings.filter(x=>x.ratio<4.5)
+    .map(x=>`${panel} · ${x.label} · ${x.color} · ${x.ratio.toFixed(2)}:1`));
+   assert.deepEqual(failures,[],`${themeMode} panel text below 4.5:1:\n${failures.join('\n')}`);
+  }
+ }));
  test('dark grey and dark blue pictures stay within a few RGB levels of the original',options,() => withReader(async (cdp,load) => {
+  const opacity = () => cdp.evaluate(`Number(getComputedStyle(document.querySelector('${menu} .tome-menu-bg')).opacity)`);
+  const savedLow = {[backgroundKey]:JSON.stringify({panels:{menu:{alpha:30,dim:0,blur:0,saturate:100}}})};
+  await load({...white,state:savedLow});
+  await openMenu(cdp);
+  const brightOpacity = await opacity();
   for (const [home,alpha,expected] of [
    [[48,48,48],30,[48,48,48]],
    [[10,21,80],30,[37,40,58]],
@@ -311,6 +486,7 @@ if (require.main === module) {
    await openMenu(cdp);
    const pixel = await menuPixel(cdp);
    assert.ok(pixel.every((channel,i) => Math.abs(channel-expected[i]) <= 4), `at ${alpha}% with ${home}, got ${pixel}; expected ${expected}`);
+   if (alpha === 30) assert.ok(await opacity() <= brightOpacity + 1e-6, `dark picture ${home} must use the bright picture opacity cap`);
   }
  }));
  test('clearing a picture restores the saved opacity and plain composite',options,() => withReader(async (cdp,load) => {
@@ -326,6 +502,56 @@ if (require.main === module) {
   assert.deepEqual(result,{alpha:'0.3',saved});
   const pixel = await menuPixel(cdp);
   assert.ok(pixel.every((channel,i) => Math.abs(channel-[45,48,69][i]) <= 1), JSON.stringify(pixel));
+ }));
+ test('canceling a picture render releases unused images and keeps the visible cache',options,() => withReader(async (cdp,load) => {
+  const settings = (menuDim,logDim) => JSON.stringify({panels:{menu:{dim:menuDim},log:{dim:logDim},card:{dim:30}}});
+  await load({backdrop:'#fff',state:{[backgroundKey]:settings(20,30)}});
+  await cdp.evaluate(`(${function () {
+   const create = URL.createObjectURL.bind(URL), revoke = URL.revokeObjectURL.bind(URL);
+   const toBlob = HTMLCanvasElement.prototype.toBlob;
+   const state = window.panelPictureTest = {live:new Set(),stale:new Set(),reclaimed:false};
+   URL.createObjectURL = blob => {
+    const url = create(blob);
+    const ref = 'url("'+url+'")';
+    state.live.add(ref);
+    if (state.resuming) state.stale.add(ref);
+    return url;
+   };
+   URL.revokeObjectURL = url => {
+    const ref = 'url("'+url+'")';
+    state.live.delete(ref);
+    if (state.stale.delete(ref)) state.reclaimed = true;
+    revoke(url);
+   };
+   let jpegs = 0;
+   HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
+    if (state.defer && type === 'image/jpeg' && ++jpegs === 2) {
+     return toBlob.call(this,blob => {state.resume = () => callback(blob);},type,quality);
+    }
+    return toBlob.call(this,callback,type,quality);
+   };
+  }})()`);
+  const refresh = setting => cdp.evaluate(`localStorage.setItem('${backgroundKey}',${JSON.stringify(setting)});
+   window.__tomoyoChinese.hostRefreshAppearance()`);
+  await cdp.evaluate('window.panelFixturePictures.home = [255,255,255]');
+  await refresh(settings(20,30));
+  const image = panel => `document.documentElement.style.getPropertyValue('--tome-${panel}-image')`;
+  await waitFor(cdp, `${image('card')}.startsWith('url(')`);
+  const log = await cdp.evaluate(image('log'));
+  assert.equal(log,await cdp.evaluate(image('card')),'panels with identical effects must reuse the same image');
+  await cdp.evaluate('window.panelPictureTest.defer = true');
+  await refresh(settings(21,31));
+  await waitFor(cdp,`typeof window.panelPictureTest.resume === 'function'`);
+  await refresh(settings(21,30));
+  await cdp.evaluate(`window.panelPictureTest.resuming = true; window.panelPictureTest.resume()`);
+  await waitFor(cdp,`window.panelPictureTest.reclaimed && window.panelPictureTest.stale.size === 0`);
+  const unused = await cdp.evaluate(`(() => {
+   const css = document.documentElement.style;
+   const refs = new Set(['menu','log','card'].flatMap(p=>['image','readable-image'].map(prop=>css.getPropertyValue('--tome-'+p+'-'+prop))));
+   return [...window.panelPictureTest.live].filter(url=>!refs.has(url));
+  })()`);
+  assert.equal(await cdp.evaluate(image('log')),log,'a canceled result must leave the selected log picture in place');
+  assert.deepEqual(unused,[],'the partial update must release images with no panel references');
  }));
  test('other panel modes keep their original opacity even when a picture is loaded',options,() => withReader(async (cdp,load) => {
   for (const [surface,expected] of [['plain','0.3'],['glass','1'],['both','1']]) {
@@ -364,4 +590,4 @@ if (require.main === module) {
  }));
 }
 
-module.exports = {contrast,contrastDetails,menuPixel,menuText,logText,cardText,logState,phraseText,speakerState,opaquePictures,openMenu,openLog,openCard,openPhrase,waitFor,withReader};
+module.exports = {contrast,contrastDetails,menuPixel,menuText,logText,cardText,logState,phraseText,speakerState,opaquePictures,openMenu,openLog,openCard,openPhrase,pictureTextSamples,waitFor,withReader};
