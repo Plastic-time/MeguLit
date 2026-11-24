@@ -435,3 +435,22 @@ test('backupOriginal rejects Chinese backups, unrelated-game backups, and leaves
  const rS4Ja=probeGame({dir:gS4Ja.dir,executable:gS4Ja.exe,title:'t'},{budgetMs:30000});
  assert.equal(rS4Ja.step,'ok');assert.equal(rS4Ja.original,null);assert.equal(rS4Ja.japaneseLines,ja.length);
 });
+
+test('readAin cache invalidates when the same .ain path is rewritten in place with identical byte size',()=>{
+ const F=require('./helpers/engine-fixtures.cjs');
+ const lines1=['「あいうえお」','「さしすせそ」'];
+ const lines2=['「かきくけこ」','「たちつてと」'];
+ const buf1=makeSys4Ain(lines1,F.sjis,{mt:true});
+ const buf2=makeSys4Ain(lines2,F.sjis,{mt:true});
+ assert.equal(buf1.length,buf2.length);
+ const g=game(dir=>{fs.writeFileSync(path.join(dir,'live.ain'),buf1);});
+ const ainFile=path.join(g.dir,'live.ain');
+ const t0=Math.floor(Date.now()/1000);
+ fs.utimesSync(ainFile,t0,t0);
+ const r1=ot.readAin(ainFile);
+ assert.deepEqual(r1.lines,lines1);
+ fs.writeFileSync(ainFile,buf2);
+ fs.utimesSync(ainFile,t0+2,t0+2);
+ const r2=ot.readAin(ainFile);
+ assert.deepEqual(r2.lines,lines2);
+});
