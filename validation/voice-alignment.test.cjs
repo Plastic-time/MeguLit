@@ -21,7 +21,15 @@ test('aquaplus: a message shows the string its 3 <n> names, not the k-th string 
  p2(0);p2(256);p2(0);p2(0);p2(10);c2(138);p2(0);p2(1);c2(131);
  p2(1);p2(256);p2(0);p2(0);p2(11);c2(138);p2(1);p2(1);c2(131);
  const bnrNoStr=Buffer.alloc(w2.length*4);w2.forEach((v,i)=>bnrNoStr.writeInt32LE(v,i*4));
- assert.deepEqual(a._internal.sceneVoices('3905',shiftJis(noTag.join(',')),bnrNoStr),[{text:'「やあ」',ref:'3905_0010_00'},{text:'「もう一つだけ」',ref:'3905_0011_01'}]);});
+ assert.deepEqual(a._internal.sceneVoices('3905',shiftJis(noTag.join(',')),bnrNoStr),[{text:'「やあ」',ref:'3905_0010_00'},{text:'「もう一つだけ」',ref:'3905_0011_01'}]);
+ /* Direct 3 <n> path: pointing at a Japanese asset falls back to msgs[k], while pointing at dialogue ending in a filename keeps that dialogue */
+ const {encodeSjis}=require('../services/original-engines/kit.cjs');
+ const mixed=['','bak','春希','「やあ」','ギター.tga','かずさ','これ見て！写真.jpg'];
+ const w3=[0,0,0];const p3=v=>w3.push(5,3,v),c3=id=>w3.push(4,id),s3=n=>w3.push(6,30,3,n);
+ p3(0);p3(256);p3(0);p3(0);p3(10);c3(138);s3(4);p3(0);p3(1);c3(131);
+ p3(1);p3(256);p3(0);p3(0);p3(11);c3(138);s3(6);p3(1);p3(1);c3(131);
+ const bnrMixed=Buffer.alloc(w3.length*4);w3.forEach((v,i)=>bnrMixed.writeInt32LE(v,i*4));
+ assert.deepEqual(a._internal.sceneVoices('3905',encodeSjis(mixed.join(',')),bnrMixed),[{text:'「やあ」',ref:'3905_0010_00'},{text:'これ見て！写真.jpg',ref:'3905_0011_01'}]);});
 
 // Shift-JIS for the test strings (Node has no Shift-JIS encoder): a table of the characters used.
 function shiftJis(s){const T={'春':'8f74','希':'8af3','「':'8175','」':'8176','や':'82e2','あ':'82a0','ギ':'834d','タ':'835e','ー':'815b','か':'82a9','ず':'82b8','さ':'82b3','も':'82e0','う':'82a4','一':'88ea','つ':'82c2','だ':'82be','け':'82af','地':'926e','の':'82cc','文':'95b6','。':'8142','１':'8250','２':'8251','．':'8144','話':'9862','す':'82b7','帰':'8b41','る':'82e9','そ':'82bb','れ':'82ea','で':'82c5'};

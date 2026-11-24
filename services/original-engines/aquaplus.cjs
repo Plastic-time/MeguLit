@@ -11,7 +11,7 @@ const kit=require('./kit.cjs');/* E577 shared engine kit */
    characters. GLYPHS is what those cells show, matched against 方正准圆 GBK (the font they were drawn with); other cells
    are the game's own and read as Shift-JIS. Only used when fon.pak is that exact build (its atlas entry sizes). */
 const fs=require('node:fs'),path=require('node:path');
-const {stat}=require('./file-key.cjs'),fill=require('./fill.cjs');
+const {stat}=require('./file-key.cjs');
 const listMemo=new Map();
 // Index: "KCAP", 2 words, count, then 44-byte entries (compressed flag, 24-byte name, crc, unpacked size, offset, size).
 /* E577 the KCAP index is a kit table: 44-byte entries {u32 compressed (1), name[24], 4, u32 size, u32 offset, u32 packed} */
@@ -31,8 +31,8 @@ const RUBY=/<R([^|>]*)\|([^>]*)>/g;
 // E461 <F16…> and <W10…> wrap text (font size, wait): the tag and its closing > are dropped, the text kept
 function clean(t){return t.replace(RUBY,'$1').replace(/<[A-Za-z]+\d*>?/g,'').replace(/>/g,'').replace(/\\n/g,'\n');}
 const ASCII=/^[\x20-\x7e]*$/;
-const isAnchor=tok=>ASCII.test(tok)||fill.ASSET.test(tok);
-const sameAnchor=(a,b)=>a===b||(!ASCII.test(a)||!ASCII.test(b))&&fill.ASSET.test(a)&&fill.ASSET.test(b)&&path.extname(a).toLowerCase()===path.extname(b).toLowerCase();
+const ASSET=/^(?!.*\\n)[^\x00-\x1f\x7f\s<>|?*"':「」『』（）()【】［］\[\]！？!?。、，,．…・：；“”‘’]{1,40}\.(?:amp|tga|ani|png|bmp|jpg|ogg|wav|mpg|wmv|psd)$/i;
+const isAnchor=tok=>ASCII.test(tok)||ASSET.test(tok);
 function parse(buf,decode=b=>sjis.decode(b)){const lines=[],anchors=[],ruby=[];
  for(const tok of decode(buf).split(',')){if(!tok)continue;if(isAnchor(tok)){anchors.push(tok);continue;}
   const pairs=[];for(const m of tok.matchAll(RUBY))if(m[1]&&m[2])pairs.push([m[1],m[2]]);
@@ -78,11 +78,11 @@ const aquaplus={
   const ck=pick('ck-gal.pak');if(!ck||!kcapList(ck))return null;
   const fon=[path.join(path.dirname(ck),'fon.pak'),pick('fon.pak')].find(f=>f&&fs.existsSync(f));if(!fon||!fonMatches(fon))return null;
   const byName=new Map(kcapList(ck).filter(e=>TXT(e.name)).map(e=>[e.name.toLowerCase(),e]));let any=false;
-  const list=base.map(scene=>{const e=byName.get(scene.name.toLowerCase());if(!e)return scene;let w;try{w=parse(kcapRead(ck,e),patchDecode);}catch{return scene;
+  const list=base.map(scene=>{const e=byName.get(scene.name.toLowerCase());if(!e)return scene;let raw,w;try{raw=kcapRead(ck,e);w=parse(raw,patchDecode);}catch{return scene;
    }
    if(w.lines.length!==scene.lines.length)return {...scene,skipped:'count'};
-   const n=scene.anchors.length;let same=0;for(let k=0;k<Math.min(n,w.anchors.length);k++)if(sameAnchor(scene.anchors[k],w.anchors[k]))same++;
-   if(n>=5&&(w.anchors.length!==n||same<n*.9))return {...scene,skipped:'anchors'};
+   const pa=parse(raw).anchors,n=scene.anchors.length;let same=0;for(let k=0;k<Math.min(n,pa.length);k++)if(pa[k]===scene.anchors[k])same++;
+   if(n>=5&&(pa.length!==n||same<n*.9))return {...scene,skipped:'anchors'};
    any=true;return {...scene,patched:true,lines:w.lines};});
   return any?list:null;},
  _internal:{kcapList,kcapRead,lzss,clean,cell,patchDecode,fonMatches},
