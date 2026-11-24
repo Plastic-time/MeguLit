@@ -48,22 +48,38 @@ function decompress(src,dlen,key){const dst=Buffer.alloc(dlen);let s=8,d=0,m=8,b
 function index(b){const out=[];if(b.length<80000)return out;for(let i=0;i<10000;i++){const o=b.readInt32LE(i*8),n=b.readInt32LE(i*8+4);if(o>0&&n>0&&o+n<=b.length)out.push({id:i,offset:o,length:n});}return out;}
 function header(d){if(d.length<0x1d0||d.readInt32LE(0)!==0x1d0)return null;const v=d.readInt32LE(4);if(v!==10002&&v!==110002&&v!==1110002)return null;
  return {version:v,xor2:v!==10002,at:d.readInt32LE(0x20),dlen:d.readInt32LE(0x24),clen:d.readInt32LE(0x28)};}
-// Text runs: double-byte Shift-JIS (or GBK) characters, with ASCII spaces and digits inside a run.
+// Text runs: double-byte Shift-JIS (or GBK) characters; quoted pieces ("…") also keep ASCII and single-char tokens.
 const lead=c=>(c>=0x81&&c<=0x9f)||(c>=0xe0&&c<=0xfc);
-/* Quoted pieces ("…""【""名前""】""「…」") are one text token (rlvm: the quotes are not printed). A Chinese patch writes
-   every line that way, so 【 and 】 alone were dropped and the name became a line of its own. */
-function runs(code){const out=[];let i=0;
- const ch=j=>j+1<code.length&&(lead(code[j])||(code[j]>=0xa1&&code[j]<=0xfe))&&code[j+1]>=0x40&&code[j+1]!==0x7f;
+const dblChar=(code,j)=>j+1<code.length&&(lead(code[j])||(code[j]>=0xa1&&code[j]<=0xfe))&&code[j+1]>=0x40&&code[j+1]!==0x7f;
+/* Base double-byte scan kept for key scoring so auto-picking second-level keys is unaffected by quoted-text rules. */
+function keyRuns(code){const out=[];let i=0;
  while(i<code.length){if(!lead(code[i])&&!(code[i]>=0xa1&&code[i]<=0xfe)){i++;continue;}const st=i;let dbl=0,quoted=false;
-  for(;;){if(ch(i)){i+=2;dbl++;continue;}if(code[i]===0x22){let j=i;while(code[j]===0x22)j++;if(ch(j)){i=j;quoted=true;continue;}}break;}
+  for(;;){if(dblChar(code,i)){i+=2;dbl++;continue;}if(code[i]===0x22){let j=i;while(code[j]===0x22)j++;if(dblChar(code,j)){i=j;quoted=true;continue;}}break;}
   if(dbl>=2)out.push(quoted?Buffer.from(code.subarray(st,i).filter(b=>b!==0x22)):code.subarray(st,i));if(i===st)i++;}
+ return out;}
+/* Quoted pieces ("…""【""名前""】""「…」") are one text token (rlvm: the quotes are not printed). Check double-byte first
+   inside quotes so Shift-JIS 0x5c trail bytes never escape '"'; unquoted runs stay double-byte only as before. */
+function runs(code){const out=[];let i=0;
+ const ch=j=>dblChar(code,j);
+ const readQuoted=at=>{const raw=[],dbl=[];let j=at+1,n=0;while(j<code.length){
+   if(ch(j)){raw.push(code[j],code[j+1]);dbl.push(code[j],code[j+1]);n++;j+=2;continue;}
+   const c=code[j];if(c===0x22)return {next:j+1,raw,dbl,n};
+   if(c===0x5c&&j+1<code.length&&code[j+1]===0x22){raw.push(code[j+1]);j+=2;continue;}
+   if(c>=0x20&&c<=0x7e){raw.push(c);j++;continue;}
+   return null;}return null;};
+ while(i<code.length){if(code[i]!==0x22&&!lead(code[i])&&!(code[i]>=0xa1&&code[i]<=0xfe)){i++;continue;}
+  const st=i,raw=[],dbl=[];let n=0,quoted=false;
+  for(;;){if(ch(i)){raw.push(code[i],code[i+1]);dbl.push(code[i],code[i+1]);n++;i+=2;continue;}
+   if(code[i]===0x22){const q=readQuoted(i);if(q&&(q.n>0||n>0)){for(const x of q.raw)raw.push(x);for(const x of q.dbl)dbl.push(x);n+=q.n;quoted=true;i=q.next;continue;}}break;}
+  if(n>=2||(quoted&&n>=1)){const b=Buffer.from(raw);if(quoted&&raw.length!==dbl.length)b._dbl=Buffer.from(dbl);out.push(b);}
+  if(i===st)i++;}
  return out;}
 const KANA=/[ぁ-ゖァ-ヺ]/,HAN=/[一-鿿]/;
 // Japanese if Shift-JIS reads it with kana; else GBK when that is clean Chinese (a patched Seen.txt).
 // Bytes a wrong key leaves behind read as half-width katakana and stray Latin letters: not text.
 const JUNK=/[｡-ﾟ�]|[A-Za-z`^~|\\]/;
-function text(raw){const a=sj.decode(raw);if(KANA.test(a)&&!JUNK.test(a))return a;const b=gbk.decode(raw);if(HAN.test(b)&&!JUNK.test(b)&&!/[ぁ-ゖ]/.test(b))return b;return '';}
-const score=code=>{let n=0;for(const r of runs(code)){const t=text(r);if(t&&KANA.test(t))n++;else if(JUNK.test(sj.decode(r)))n--;}return n;};
+function text(raw){const d=raw._dbl||raw,a=sj.decode(d);if(KANA.test(a)&&!JUNK.test(a))return sj.decode(raw);const b=gbk.decode(d);if(HAN.test(b)&&!JUNK.test(b)&&!/[ぁ-ゖ]/.test(b))return gbk.decode(raw);return '';}
+const score=code=>{let n=0;for(const r of keyRuns(code)){const t=text(r);if(t&&KANA.test(t))n++;else if(JUNK.test(sj.decode(r)))n--;}return n;};
 // One scenario's bytecode: the second key named by the archive (REGNAME), else the one that gives the most Japanese.
 function bytecode(raw,keyName){const h=header(raw);if(!h||h.at<=0||h.at+h.clen>raw.length||h.dlen<=0||h.dlen>64<<20)return null;const src=raw.subarray(h.at,h.at+h.clen);
  if(!h.xor2)return decompress(src,h.dlen,null);
@@ -76,8 +92,8 @@ const tidy=t=>t.replace(/^[\s　]+|[\s　]+$/g,'');
 /* The language is decided per scenario: in a Japanese one a line without kana (「４月１５日（火）」, 「声…」) is still
    Shift-JIS, not GBK (it came out as 「係寧侾俆擔」) */
 function parse(buf){const lines=[];const code=Buffer.isBuffer(buf)?buf:Buffer.from(buf),list=runs(code);
- let ja=0,zh=0;for(const r of list){const t=text(r);if(!t)continue;if(KANA.test(t))ja++;else zh++;}
- const sjis=r=>{const a=sj.decode(r);return JUNK.test(a)?'':a;};
+ let ja=0,zh=0;for(const r of list){if((r._dbl||r).length<=2)continue;const t=text(r);if(!t)continue;if(KANA.test(t))ja++;else zh++;}
+ const sjis=r=>JUNK.test(sj.decode(r._dbl||r))?'':sj.decode(r);
  for(const r of list){const t=tidy(ja>zh?sjis(r):text(r));if(t&&(KANA.test(t)||HAN.test(t)))lines.push(t);}
  return {lines,anchors:[]};}
 // REGNAME in Gameexe.ini picks the second key (rlvm archive.cc), when the folder has one.
