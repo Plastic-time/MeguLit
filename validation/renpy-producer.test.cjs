@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path'),{spawnSync}=require('node:child_process');
-const root=path.join(__dirname,'..');
-function capture(){
- const result=spawnSync('python',['-I',path.join(root,'native/renpytext/selftest/producer.py'),path.join(root,'native/MeguLitRenpy.py')],{encoding:'utf8',windowsHide:true,timeout:5000,maxBuffer:256*1024});
- assert.equal(result.status,0,result.stderr);return JSON.parse(result.stdout);
-}
+const test=require('node:test'),assert=require('node:assert/strict');
+const {runRenpySelfTest}=require('./helpers/renpy-selftest.cjs');
 test('RenPy producer binds native ruby by glyph identity, preserves codepoint offsets and emits bounded UTF16 wire',()=>{
- const got=capture();
+ const got=runRenpySelfTest('producer.py');
  const expected=[
   ['漢字。',[[0,2,'かんじ']]],['漢字',[[0,1,'かん'],[1,1,'じ']]],['漢字',[[0,2,'かんじ']]],
   ['漢字 漢字',[[3,2,'べつ']]],['😀 漢\x1f漢字',[[3,2,'よみ']]],['漢',[[0,1,'𠮷']]],

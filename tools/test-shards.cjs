@@ -3,7 +3,7 @@
 /* Splits validation/*.test.cjs into CI shards of similar duration. tools/test-timings.json holds each file's
    recorded milliseconds (from tools/test-file-times.mjs); a file without a record counts as the median. Files go,
    longest first, to the shard with the least total so far, so every file lands in exactly one shard.
-   Usage: node tools/test-shards.cjs <shard> <count>          prints that shard's files, one per line
+   Usage: node tools/test-shards.cjs <shard> <count> [parallelism]  prints that shard's files, one per line
           node tools/test-shards.cjs --update <times.json>...  replaces the timings with the recorded ones */
 const fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..');
@@ -23,9 +23,11 @@ function median(values) {
   return s[Math.floor(s.length / 2)];
 }
 
-function shards(files, timings, count) {
+function shards(files, timings, count, parallelism = 1) {
   const fallback = median(files.map(f => timings[f]).filter(Number.isFinite));
-  const cost = f => (Number.isFinite(timings[f]) ? timings[f] : fallback);
+  // CI runs the real-time replay alone. Each millisecond reserves every test slot on that runner.
+  const cost = f => (Number.isFinite(timings[f]) ? timings[f] : fallback)
+    * (f === 'validation/games-regression.test.cjs' ? parallelism : 1);
   const order = [...files].sort((a, b) => cost(b) - cost(a) || (a < b ? -1 : a > b ? 1 : 0));
   const out = Array.from({ length: count }, () => ({ total: 0, files: [] }));
   for (const f of order) {
@@ -48,10 +50,11 @@ if (require.main === module) {
     fs.writeFileSync(timingsFile, JSON.stringify(kept, null, 1) + '\n');
     console.log('recorded ' + Object.keys(kept).length + ' of ' + current.size + ' test files');
   } else {
-    const index = Number(args[0]), count = Number(args[1]);
-    if (!Number.isInteger(count) || count < 1 || !Number.isInteger(index) || index < 1 || index > count) {
-      console.error('usage: node tools/test-shards.cjs <shard 1..count> <count>'); process.exit(2);
+    const index = Number(args[0]), count = Number(args[1]), parallelism = Number(args[2] ?? 1);
+    if (!Number.isInteger(count) || count < 1 || !Number.isInteger(index) || index < 1 || index > count ||
+        !Number.isSafeInteger(parallelism) || parallelism < 1) {
+      console.error('usage: node tools/test-shards.cjs <shard 1..count> <count> [parallelism]'); process.exit(2);
     }
-    for (const f of shards(testFiles(), readTimings(), count)[index - 1].files) console.log(f);
+    for (const f of shards(testFiles(), readTimings(), count, parallelism)[index - 1].files) console.log(f);
   }
 }

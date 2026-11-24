@@ -1,5 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
+const {compileRoslyn}=require('./helpers/roslyn-compile.cjs');
 const base=path.join(__dirname,'../native/unitytext'),source=fs.readFileSync(path.join(base,'MeguLitUnityText.cs'),'utf8');
 function method(name){const start=source.indexOf(name);assert.ok(start>=0,name);let p=source.indexOf('{',start),n=0,end=p;for(;end<source.length;end++){if(source[end]==='{')n++;else if(source[end]==='}'&&--n===0)break;}return source.slice(start,end+1);}
 test('actual bounded KEMCO helper rejects incomplete snapshots and keeps page, role and permission identities separate',()=>{
@@ -47,9 +48,8 @@ class Check {
  }
  static void Main(){Console.OutputEncoding=new System.Text.UTF8Encoding(false);new Check().Run();}
 }`);
-  const compiler=process.env.MEGULIT_ROSLYN_CSC||'E:/Apps/build-tools/vs2022/MSBuild/Current/Bin/Roslyn/csc.exe';
-  let r=spawnSync(compiler,['/nologo','/codepage:65001','/out:'+path.join(dir,'check.exe'),path.join(base,'KemcoSpriteSnapshot.cs'),path.join(dir,'check.cs')],{windowsHide:true,encoding:'utf8',timeout:15000});assert.ifError(r.error);assert.equal(r.status,0,r.stdout+r.stderr);
-  r=spawnSync(path.join(dir,'check.exe'),[],{windowsHide:true,encoding:'utf8',timeout:5000});assert.ifError(r.error);assert.equal(r.status,0,r.stdout+r.stderr);
+  compileRoslyn(['/nologo','/codepage:65001','/out:'+path.join(dir,'check.exe'),path.join(base,'KemcoSpriteSnapshot.cs'),path.join(dir,'check.cs')]);
+  const r=spawnSync(path.join(dir,'check.exe'),[],{windowsHide:true,encoding:'utf8',timeout:5000});assert.ifError(r.error);assert.equal(r.status,0,r.stdout+r.stderr);
   const lines=r.stdout.trim().split(/\r?\n/);assert.match(lines.pop(),/^PASS 4\d$/);const {parseChars}=require('../core/text-paths.cjs');
   const parsed=lines.map(l=>{const x=parseChars(l);assert.ok(x,l);assert.equal(x.hidden,false);return x;});
   assert.equal(parsed[0].text,'日本');assert.equal(parsed[3].role,'name');assert.equal(parsed[4].role,'choice');assert.equal(parsed[5].text,'');assert.equal(parsed[6].line,parsed[2].line);
