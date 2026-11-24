@@ -112,11 +112,11 @@ const memo=new Map();
 function list(file){const f=footer(file);if(!f||f.count<=0||f.count>500000||f.index<0||f.index>=f.size){memo.delete(file);return null;}
  let stat;try{stat=fs.statSync(file);}catch{memo.delete(file);return null;}
  const st=stat.size+':'+stat.mtimeMs+(f.major===3?':'+keyFileStamp(file):'');
- const m=memo.get(file);if(m&&m.st===st)return m.list;let idx;try{idx=kit.readAt(file,f.index,f.size-0x1C-f.index);}catch{return null;}
+ const m=memo.get(file);if(m&&m.st===st)return m.list;let idx;try{idx=kit.readAt(file,f.index,f.size-0x1C-f.index);}catch{memo.delete(file);return null;}
  const arcKey=arcKeyOf(file,f),tries=f.major===1?[{v:1,withHash:false,nameKeyV2:false},{v:2,withHash:false,nameKeyV2:true},{v:2,withHash:true,nameKeyV2:true}]
   :f.major===2?[{v:2,withHash:true,nameKeyV2:true}]:f.major===3?[{v:3,withHash:true,nameKeyV2:true,unicode:f.minor===1}]:[];
  let out=null,mode=null;for(const t of tries){out=parseIndex(idx,f,{...t,nameKey:t.v===3?arcKey:0xC4,arcKey});if(out&&out.length&&out.every(e=>e.name&&!/[\0-\x1f]/.test(e.name))){mode=t;break;}out=null;}
- if(!out)return null;let keyFile=f.major===3?keyFileFor(file):null;const ctx={file,f,mode,arcKey,keyFile0:keyFile,gameKey:null,gameKeyFp:null};
+ if(!out){memo.delete(file);return null;}let keyFile=f.major===3?keyFileFor(file):null;const ctx={file,f,mode,arcKey,keyFile0:keyFile,gameKey:null,gameKeyFp:null};
  /* 3.x with a key file: entries after "pack_keyfile" use that entry's decrypted bytes as the key file */
  for(const e of out){e.keyFile=keyFile;e.ctx=ctx;if(f.major===3&&keyFile&&/pack_keyfile/i.test(e.name)){try{keyFile=decode(e,true);}catch{}}}
  memo.set(file,{st,list:out});return out;}
