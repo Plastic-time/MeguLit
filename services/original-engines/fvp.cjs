@@ -21,12 +21,13 @@ const tidy=s=>s.replace(/\r?\n/g,'\n').replace(/^[\s　]+|[\s　]+$/g,'');
 // The translated string at the same place in the patched file (up to its first NUL), or ''.
 // A string too long for its place is moved: the push is replaced by a jump (0x06, u32 target) into code the patch
 // appends after the original, which pushes the translation and jumps back.
-function twin(z,p){if(!z||p.at+6>z.length)return '';let at=p.at;
+function twin(z,p,origRaw){if(!z||p.at+6>z.length)return '';let at=p.at;
  if(z[at]===0x06){const to=z.readUInt32LE(at+1);at=-1;for(let i=to;i<Math.min(z.length-2,to+48);i++)if(z[i]===0x0E){const n=z[i+1];if(n>=2&&i+2+n<=z.length&&z[i+1+n]===0){at=i;break;}}if(at<0)return '';}
  else if(z[at]!==0x0E||z[at+1]!==p.n)return '';
- const n=z[at+1],raw=z.subarray(at+2,at+1+n),cut=raw.indexOf(0);
- // What the patched game shows, kana and all (speaker labels it kept, a line left in Japanese): it is the translation.
- const s=tidy(gbk.decode(cut>=0?raw.subarray(0,cut):raw));return s&&!s.includes('�')?s:'';}
+ const n=z[at+1],raw=z.subarray(at+2,at+1+n),cut=raw.indexOf(0),slice=cut>=0?raw.subarray(0,cut):raw;
+ // Unchanged bytes in a Chinese twin are still Shift-JIS, not GBK; leave empty so patchLines keeps the Japanese original.
+ if(origRaw&&slice.equals(origRaw))return '';
+ const s=tidy(gbk.decode(slice));return s&&!s.includes('�')?s:'';}
 /* E449 Chinese patches that leave the .hcb alone and serve the text from a "cnpack" next to it (五彩斑斓的曙光,
    loaded by its chn.dll): u32 count, then records {u32 key, u16 size, bytes}. A record is AES-128-ECB (zero padded);
    the key is picked by bits 16-17 of the record key k: MD5 of String(k) (raw), the first 16 hex digits of that MD5,
@@ -46,13 +47,13 @@ function cnpack(pack,b){const crypto=require('node:crypto'),out=new Map();if(pac
  for(let i=0;i<cnt&&p+6<=pack.length;i++){const k=pack.readUInt32LE(p),size=pack.readUInt16LE(p+4),data=pack.subarray(p+6,p+6+size);p+=6+size;
   const at=pushAt(swap(k));if(at<0||out.has(at))continue;
   try{const d=crypto.createDecipheriv('aes-128-ecb',keyOf(k),null);d.setAutoPadding(false);const n=data.length&~15;const plain=Buffer.concat([d.update(data.subarray(0,n)),d.final()]);
-   let e=plain.length;while(e>4&&plain[e-1]===0)e--;const cut=plain.indexOf(0,4);const s=tidy(gbk.decode(plain.subarray(4,cut>=4&&cut<e?cut:e)));if(s&&!s.includes('�'))out.set(at,s);}catch{}}
+   let e=plain.length;while(e>4&&plain[e-1]===0)e--;const cut=plain.indexOf(0,4),slice=plain.subarray(4,cut>=4&&cut<e?cut:e),orig=b.subarray(at+2,at+1+b[at+1]);if(slice.equals(orig))continue;const s=tidy(gbk.decode(slice));if(s&&!s.includes('�'))out.set(at,s);}catch{}}
  return out;}
 function parse(buf){let b=Buffer.isBuffer(buf)?buf:Buffer.from(buf),z=null,cn=null;
  if(b.subarray(0,8).equals(MAGIC)){const n=b.readUInt32LE(8);z=b.subarray(12+n);b=b.subarray(12,12+n);}
  else if(b.subarray(0,8).equals(CN)){const n=b.readUInt32LE(8);const pack=b.subarray(12+n);b=b.subarray(12,12+n);cn=cnpack(pack,b);}
  const lines=[],zh=[],voices=[];let prevEnd=0;
- for(const p of pushes(b)){const s=tidy(sj.decode(b.subarray(p.at+2,p.at+1+p.n)));const from=prevEnd;prevEnd=p.at+2+p.n;if(!s||!PROSE.test(s)||s.includes('�')||ASSET(s))continue;lines.push(s);zh.push(cn?cn.get(p.at)||'':twin(z,p));voices.push(voiceAt(b,p.at,from));}
+ for(const p of pushes(b)){const orig=b.subarray(p.at+2,p.at+1+p.n),s=tidy(sj.decode(orig));const from=prevEnd;prevEnd=p.at+2+p.n;if(!s||!PROSE.test(s)||s.includes('�')||ASSET(s))continue;lines.push(s);zh.push(cn?cn.get(p.at)||'':twin(z,p,orig));voices.push(voiceAt(b,p.at,from));}
  const v=require('./voice-ref.cjs').keep(voices),out=z||cn?{lines,anchors:[],zh}:{lines,anchors:[]};if(v)out.voices=v;return out;}
 /* E450 a spoken line's voice: the int the script pushes (0x0A, u32) just before the text, then the voice call's
    argument shuffles (0x08); voice.bin names the clip with that number in nine digits (10024540 -> 010024540). */

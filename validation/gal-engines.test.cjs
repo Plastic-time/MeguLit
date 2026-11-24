@@ -145,6 +145,33 @@ test('fvp: a cnpack (AES-128-ECB per record, key by bits 16-17, byte-swapped pus
  const n=Buffer.alloc(4);n.writeUInt32LE(hcb.length);
  const r=parse(Buffer.concat([Buffer.from('FVP+CN\0\0','latin1'),n,hcb,cnt,rec,data]));
  assert.deepEqual(r.lines,['「あい」']);assert.deepEqual(r.zh,['你好']);});
+test('fvp: unchanged Shift-JIS bytes in a Chinese twin or cnpack are left empty instead of decoded as GBK mojibake',()=>{
+ const {parse,engine}=require('../services/original-engines/fvp.cjs'),{encodeSjis}=require('../services/original-engines/kit.cjs'),crypto=require('node:crypto');
+ const head=n=>{const h=Buffer.alloc(4);h.writeUInt32LE(n,0);return h;};
+ const mkPush=raw=>Buffer.concat([Buffer.from([0x0E,raw.length+1]),raw,Buffer.from([0])]);
+ const u1=encodeSjis('「おはよう」'),u2=encodeSjis('「あい」'),u3=encodeSjis('「ありがとう」');
+ const p1=mkPush(u1),p2=mkPush(u2),p3=mkPush(u3);
+ const jpCode=Buffer.concat([p1,p2,p3]),jp=Buffer.concat([head(4+jpCode.length),jpCode]);
+ /* Twin .hcb: p1 unchanged in-place, p2 translated to GBK '你好', p3 moved via 0x06 jump with unchanged Shift-JIS bytes */
+ const zh2=Buffer.from([0xc4,0xe3,0xba,0xc3]);
+ const z2=Buffer.concat([Buffer.from([0x0E,u2.length+1]),zh2,Buffer.alloc(u2.length+1-zh2.length)]);
+ const jump=Buffer.alloc(p3.length);jump[0]=0x06;jump.writeUInt32LE(4+jpCode.length,1);
+ const zh=Buffer.concat([head(4+jpCode.length),p1,z2,jump,p3]);
+ const n=Buffer.alloc(4);n.writeUInt32LE(jp.length);
+ const r=parse(Buffer.concat([Buffer.from('FVP+ZH\0\0','latin1'),n,jp,zh]));
+ assert.deepEqual(r.lines,['「おはよう」','「あい」','「ありがとう」']);
+ assert.deepEqual(r.zh,['','你好','']);
+ const patched=engine.patchLines([{name:'game.hcb',...r}]);
+ assert.deepEqual(patched[0].lines,['「おはよう」','你好','「ありがとう」']);
+ /* cnpack: an unchanged Shift-JIS record is also skipped instead of decoded as GBK mojibake */
+ const at1=4+1,k1=(((at1&255)<<24)|((at1>>>8&255)<<16)|((at1>>>16&255)<<8)|(at1>>>24))>>>0;
+ const key1=crypto.createHash('md5').update(String(k1)).digest();
+ const plain1=Buffer.alloc(32);Buffer.from([1,2,3,4]).copy(plain1,0);u1.copy(plain1,4);
+ const c1=crypto.createCipheriv('aes-128-ecb',key1,null);c1.setAutoPadding(false);const data1=Buffer.concat([c1.update(plain1),c1.final()]);
+ const rec1=Buffer.alloc(6);rec1.writeUInt32LE(k1,0);rec1.writeUInt16LE(data1.length,4);
+ const cnt=Buffer.alloc(4);cnt.writeUInt32LE(1);
+ const rc=parse(Buffer.concat([Buffer.from('FVP+CN\0\0','latin1'),n,jp,cnt,rec1,data1]));
+ assert.deepEqual(rc.zh,['','','']);});
 test('kirikiri: KAG scenarios kept as .txt under a scenario folder count as scripts, list files do not',()=>{
  const src=require('node:fs').readFileSync(require.resolve('../services/original-engines/scenes.cjs'),'utf8');
  const m=/const KS=(n=>[^\n]+);/.exec(src);const KS=eval(m[1]);
