@@ -74,8 +74,8 @@ test('CMVS: a CPZ7 archive that does not open is reported',t=>{
  const game=tmp(t),c=F.cpz({'a.ps3':F.ps2a(['x'])});c.write('CPZ7',0,'latin1');F.writeTree(game,{'script.cpz':c});
  assert.equal(cmvs.list(path.join(game,'script.cpz')),null);assert.equal(scenes.unsupportedReason(game)?.code,'CMVS_CPZ7');
 });
-test('CMVS: open() memo keys include custom params and CPZ7 start.ps3, and read() retains the opened scheme',t=>{
- /* 1) custom params: failed default open() must not block a subsequent open(file, customParams), and read() must use that scheme */
+test('CMVS: open() memo keys include custom params and CPZ7 start.ps3, and read(file, e, params) respects file updates',t=>{
+ /* 1) custom params: failed default open() must not block open(file, customParams), and read(file, e, params) decrypts even on a copied entry */
  const customParams={md5:{Custom:{init:['0x12345678','0x9abcdef0','0x0fedcba9','0x87654321'],out:[[0,'^','0x11223344'],[1,'+','0x22334455'],[2,'-','0x33445566'],[3,'^','0x44556677']]}}};
  const wrongParams={md5:{Wrong:{init:['0xaaaaaaaa','0xbbbbbbbb','0xcccccccc','0xdddddddd'],out:[[0,'^','0x1'],[1,'+','0x2'],[2,'-','0x3'],[3,'^','0x4']]}}};
  const d1=tmp(t),cpzFile=path.join(d1,'custom.cpz');
@@ -83,15 +83,30 @@ test('CMVS: open() memo keys include custom params and CPZ7 start.ps3, and read(
  assert.equal(cmvs.open(cpzFile),null);
  const opened=cmvs.open(cpzFile,customParams);
  assert.equal(opened?.variant,'Custom');
- assert.deepEqual(cmvs.parse(cmvs.read(cpzFile,opened.entries[0])).lines,['さくら','「おはよう、遅刻するよ」','朝の光が差し込む。']);
+ assert.deepEqual(cmvs.parse(cmvs.read(cpzFile,{...opened.entries[0]},customParams)).lines,['さくら','「おはよう、遅刻するよ」','朝の光が差し込む。']);
  assert.equal(cmvs.open(cpzFile,wrongParams),null);
- /* 2) CPZ7 start.ps3 dependency: adding or removing start.ps3 invalidates the cached open() result */
- const values={resXor:0x5F66BA7D,seedAdd:0xA6E98C19,fileStep:0x6AF47E21,dirStep:0x3E65BAB5},d2=tmp(t);
+ /* 2) in-place file update with same layout and new master key: read() with a previously listed entry re-opens and reads the new content */
+ const dUp=tmp(t),upFile=path.join(dUp,'script.cpz');
+ fs.writeFileSync(upFile,F.cpz({'scene/a01.ps3':F.ps2a(['さくら'])},{master:0x1234ABCD}));
+ const oldEntry=cmvs.list(upFile)[0];
+ assert.deepEqual(cmvs.parse(cmvs.read(upFile,oldEntry)).lines,['さくら']);
+ fs.writeFileSync(upFile,F.cpz({'scene/a01.ps3':F.ps2a(['あかり'])},{master:0x0BADF00D}));
+ const tNext=new Date(Date.now()+10000);fs.utimesSync(upFile,tNext,tNext);
+ assert.deepEqual(cmvs.parse(cmvs.read(upFile,oldEntry)).lines,['あかり']);
+ /* 3) CPZ7 start.ps3 dependency: adding, modifying in place, or removing start.ps3 invalidates the cached open() result */
+ const values={resXor:0x5F66BA7D,seedAdd:0xA6E98C19,fileStep:0x6AF47E21,dirStep:0x3E65BAB5};
+ const otherValues={resXor:0x11111111,seedAdd:0x22222222,fileStep:0x33333333,dirStep:0x44444444},d2=tmp(t);
  F.writeTree(d2,{'data/pack/script.cpz':F.cpz7({'scene/a01.ps3':F.ps2a(CM_JA)},{values})});
  const cpz7File=path.join(d2,'data/pack/script.cpz'),startFile=path.join(d2,'data/pack/start.ps3');
  assert.equal(cmvs.open(cpz7File),null);
  fs.writeFileSync(startFile,F.startPs3([{path:'data\\pack\\script.cpz',values}]));
  assert.deepEqual(scenes.read('cmvs',d2).filter(s=>s.lines.length)[0].lines,['さくら','「おはよう、遅刻するよ」','朝の光が差し込む。']);
+ fs.writeFileSync(startFile,F.startPs3([{path:'data\\pack\\script.cpz',values:otherValues}]));
+ const tMod=new Date(Date.now()+20000);fs.utimesSync(startFile,tMod,tMod);
+ assert.equal(cmvs.open(cpz7File),null);
+ fs.writeFileSync(startFile,F.startPs3([{path:'data\\pack\\script.cpz',values}]));
+ const tBack=new Date(Date.now()+30000);fs.utimesSync(startFile,tBack,tBack);
+ assert.equal(cmvs.open(cpz7File)?.variant,'Aoi');
  fs.rmSync(startFile);
  assert.equal(cmvs.open(cpz7File),null);
 });
@@ -111,7 +126,7 @@ test('Lucifen: SCRIPT.LPK (trie index, LZSS, entry + whole-content crypt) with e
   assert.equal(library.engineOf(game)?.name,'Lucifen');assert.equal(scenes.detect(game),'lucifen');
   const own=scenes.read('lucifen',game).filter(s=>s.lines.length),zh=patchLines('lucifen',patch).filter(s=>s.lines.length);pairs(own,zh);assert.equal(zh[0].lines[1],'“你好”');}
 });
-test('Lucifen: open() memo keys include custom params and read() retains the opened scheme',t=>{
+test('Lucifen: open() memo keys include custom params and read(file, e, params) respects file updates',t=>{
  const customParams={schemes:[{name:'Custom',key1:'0x11223344',key2:'0x55667788',contentXor:'0x3c',rotatePattern:'0x12345678'}]};
  const wrongParams={schemes:[{name:'Wrong',key1:'0x99887766',key2:'0x55443322',contentXor:'0x11',rotatePattern:'0x87654321'}]};
  const customScheme=lucifen.schemes(customParams)[0],d=tmp(t),lpkFile=path.join(d,'SCRIPT.LPK');
@@ -119,8 +134,16 @@ test('Lucifen: open() memo keys include custom params and read() retains the ope
  assert.equal(lucifen.open(lpkFile),null);
  const opened=lucifen.open(lpkFile,customParams);
  assert.equal(opened?.scheme.name,'Custom');
- assert.deepEqual(lucifen.parse(lucifen.read(lpkFile,opened.entries[0])).lines,['翔','「こんにちは」','空が青い。','教室へ行く','屋上へ行く']);
+ assert.deepEqual(lucifen.parse(lucifen.read(lpkFile,{...opened.entries[0]},customParams)).lines,['翔','「こんにちは」','空が青い。','教室へ行く','屋上へ行く']);
  assert.equal(lucifen.open(lpkFile,wrongParams),null);
+ /* in-place file rewrite with a different default scheme and new script content: old entry reads the new content */
+ const dUp=tmp(t),upFile=path.join(dUp,'SCRIPT.LPK');
+ fs.writeFileSync(upFile,F.lpk({'a01.sob':F.sob([{say:'一本目。'}])},{scheme:lucifen.DEFAULT[0]}));
+ const oldEntry=lucifen.list(upFile)[0];
+ assert.deepEqual(lucifen.parse(lucifen.read(upFile,oldEntry)).lines,['一本目。']);
+ fs.writeFileSync(upFile,F.lpk({'a01.sob':F.sob([{say:'二本目。'}])},{scheme:lucifen.DEFAULT[1]}));
+ const tNext=new Date(Date.now()+10000);fs.utimesSync(upFile,tNext,tNext);
+ assert.deepEqual(lucifen.parse(lucifen.read(upFile,oldEntry)).lines,['二本目。']);
 });
 
 /* ---- KaGuYa ------------------------------------------------------------------------------------------------------ */

@@ -134,7 +134,7 @@ function open7(file,h,fsz,params){if(h.mode>1||h.keySize<24)return null;const n=
  for(const values of tries)for(const v of sc.md5){const x=readIndex(idx,h,v,sc,fsz,{...values,base:h.indexAt+n+h.keySize});if(x&&x.entries.length)return {...x,h,sc,values};}
  return null;}
 
-const memo=new Map(),opened=new WeakMap();
+const memo=new Map();
 const paramsKey=p=>{if(!p)return '';try{return JSON.stringify(p);}catch{return null;}};
 function startStamp(file){const out=[];let dir=path.dirname(file);
  for(let up=0;up<3;up++){const s=path.join(dir,'start.ps3');if(kit.isFile(s)){try{const st=fs.statSync(s);out.push(s+':'+st.size+':'+st.mtimeMs);}catch{}}
@@ -147,10 +147,9 @@ function open(file,params){const fsz=kit.size(file),pk=paramsKey(params),stamp=p
   else if(h){const sets=params?ORDER.map(n=>scheme(params,n)):h.version===5?CPZ5_SETS:DEFAULTS,raw=kit.readAt(file,h.indexAt,h.dirSize+h.fileSize);
   if(raw.length===h.dirSize+h.fileSize&&md5sum(raw).equals(h.indexMd5))
    find:for(const sc of sets)for(const v of sc.md5){const x=readIndex(raw,h,v,sc,fsz);if(x&&x.entries.length){r={...x,h,sc};break find;}}}}catch{r=null;}
- if(r)for(const e of r.entries)opened.set(e,r);
  if(stamp!==null){if(memo.size>64)memo.clear();memo.set(stamp,r);}return r;}
 const list=file=>open(file)?.entries||null;
-function read(file,e){const a=opened.get(e)||open(file),data=kit.readAt(file,e.offset,e.size);if(!a||!a.h.encrypted)return data;
+function read(file,e,params){const a=open(file,params),data=kit.readAt(file,e.offset,e.size);if(!a||!a.h.encrypted)return data;
  const {h,sc,md5}=a,v=a.values||ZERO7;let seed=(((((h.master^e.key)>>>0)+h.dirCount)>>>0)^v.resXor)>>>0;seed=(seed-sc.entrySub)>>>0;seed=(seed^((h.entryKey+v.seedAdd)>>>0))>>>0;
  const t=table(md5[3],h.master,sc.factor),kb=Buffer.alloc(64);for(let i=0;i<16;i++)kb.writeUInt32LE(sc.secret[i],i*4);
  const low=(md5[1]>>>2)&255,sk=Array.from({length:16},(_,i)=>{for(let q=0;q<4;q++)kb[i*4+q]=low^t[kb[i*4+q]];return (kb.readUInt32LE(i*4)^seed)>>>0;});
