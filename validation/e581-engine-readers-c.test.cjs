@@ -200,3 +200,34 @@ test('Marble: mg_data.mbl folder is recognised and read; a GBK patch (mg_data2) 
  const ja=scenes.read('marble',game)[0],tr=marble.parse(scenes.ENGINES.marble.archives(patch)[0].read());
  assert.equal(ja.lines.length,90);assert.equal(tr.lines.length,ja.lines.length);assert.equal(tr.lines[1],'窗外正在下雨。');
 });
+test('Marble: opened() cache invalidates when adapter-pack marble-key is added, replaced, or removed without changing the .mbl file',t=>{
+ const packs=require('../services/adapter-packs.cjs'),orig=packs.params;t.after(()=>{packs.params=orig;});
+ const dir=tmp(t),script=Array.from({length:30},()=>MS).flat(),plain=F.marbleScript(script);
+ const keyHex=Buffer.from(Array.from({length:73},(_,i)=>(i*37+19)&255)),wrongHex=Buffer.from(Array.from({length:73},(_,i)=>(i*13+7)&255));
+ const mblFile=path.join(dir,'mg_data.mbl');
+ F.writeTree(dir,{'mg_data.mbl':F.mbl({'s001.s':kit.xor(plain,keyHex)}),'marble.exe':'MZ'});
+ const entries=marble.list(mblFile);
+ /* 1. No pack key yet: >64-byte key cannot be cracked by column analysis, so cache records cipher:null */
+ packs.params=()=>[];
+ assert.equal(scenes.read('marble',dir).length,0);
+ /* 2. Wrong pack key (plus empty/malformed entries) still fails without throwing */
+ const wrong=[{value:{key:''}},{value:{hex:'zz'}},{value:{title:'Wrong',hex:wrongHex.toString('hex')},pack:'p@1'}];
+ packs.params=target=>target==='marble-key'?wrong:[];
+ assert.equal(scenes.read('marble',dir).length,0);
+ /* 3. Replacing with the right key (same count 1, same file size & mtime) must invalidate cache and decrypt */
+ const right=[{value:{title:'Right',hex:keyHex.toString('hex')},pack:'p@2'}];
+ packs.params=target=>target==='marble-key'?right:[];
+ const got=scenes.read('marble',dir);
+ assert.equal(got.length,1);assert.deepEqual(got[0].lines.slice(0,3),ML);
+ assert.deepEqual(marble.parse(marble.decode(mblFile,entries[0])).lines.slice(0,3),ML);
+ /* 4. Removing the pack key must also invalidate the cached cipher */
+ packs.params=()=>[];
+ assert.equal(scenes.read('marble',dir).length,0);
+ /* 5. Same check with a cp932 text key ({key}) */
+ const dir2=tmp(t),textKey='長い合言葉テスト零壱弐参四五六七八九十甲乙丙丁戊己庚辛壬癸春夏秋冬東西南北青龍白虎朱雀玄武';
+ F.writeTree(dir2,{'mg_data.mbl':F.mbl({'s001.s':kit.xor(plain,kit.encodeSjis(textKey))}),'marble.exe':'MZ'});
+ assert.equal(scenes.read('marble',dir2).length,0);
+ const byText=[{value:{title:'TextKey',key:textKey},pack:'p@3'}];
+ packs.params=target=>target==='marble-key'?byText:[];
+ assert.deepEqual(scenes.read('marble',dir2)[0].lines.slice(0,3),ML);
+});
