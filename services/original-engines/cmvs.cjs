@@ -137,7 +137,7 @@ function open7(file,h,fsz,params){if(h.mode>1||h.keySize<24)return null;const n=
 const memo=new Map();
 const paramsKey=p=>{if(!p)return '';try{return JSON.stringify(p);}catch{return null;}};
 function startStamp(file){const out=[];let dir=path.dirname(file);
- for(let up=0;up<3;up++){const s=path.join(dir,'start.ps3');if(kit.isFile(s)){try{const st=fs.statSync(s);out.push(s+':'+st.size+':'+st.mtimeMs);}catch{}}
+ for(let up=0;up<3;up++){const s=path.join(dir,'start.ps3');let st=null;try{st=fs.statSync(s,{throwIfNoEntry:false});}catch{}if(st&&st.isFile())out.push(s+':'+st.size+':'+st.mtimeMs);
   const upDir=path.dirname(dir);if(upDir===dir)break;dir=upDir;}
  return out.join(';');}
 /* {version, entries, md5, h, sc[, values]} for a CPZ5/CPZ6/CPZ7 archive; null for anything else */
