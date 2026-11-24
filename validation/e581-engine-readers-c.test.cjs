@@ -108,7 +108,15 @@ test('AliceSoft: ZU-marked UTF-8 SCO decodes message runs, inline choices, and /
   B('{'),F.expr(1),F.u32(0),B('$'),F.u32(0x100),U('戦う'),B('$'),B('$'),F.u32(0x120),U('逃げる'),B('$'),B(']'),
   B('/!'),U('メッセージ命令'),Buffer.from([0]),F.A]);
  const want=['ランス\n「よう、冒険だ」','戦う','逃げる','メッセージ命令'];
- assert.deepEqual(alice.parse(utf8Page).lines,want);
+ /* call scoLines directly (not via module-level lastOpts) to verify walk()'s default ZU auto-detection */
+ assert.deepEqual(alice.scoLines(utf8Page),want);
+ /* invalid UTF-8 lead byte must stop before a non-continuation command byte (A = page break) instead of swallowing it */
+ const badLead=F.sco([B('ZU\x41\x7f'),U('あい'),Buffer.from([0xe3]),F.A,U('次'),F.A]);
+ assert.deepEqual(alice.scoLines(badLead),['あい\ufffd','次']);
+ /* truncated UTF-8 sequence at EOF must stop at buffer end without reading past length */
+ const truncRun=Buffer.concat([U('あい'),Buffer.from([0xe3,0x81])]);
+ assert.deepEqual(alice.messageRun(truncRun,0,true),['あい\ufffd',8,8]);
+ assert.deepEqual(alice.scoLines(F.sco([B('ZU\x41\x7f'),truncRun])),['あい\ufffd']);
  const game=tmp(t);F.writeTree(game,{'RanceSA.ALD':F.ald([{name:'01.SCO',volume:1,data:utf8Page}]),'System3.exe':'MZ'});
  assert.deepEqual(scenes.read('alicesoft',game)[0].lines,want);
 });

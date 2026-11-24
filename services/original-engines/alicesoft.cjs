@@ -79,7 +79,7 @@ const MSG=0x2f|0x21<<8,AIN_MSG=0x2f|0x7c<<8,AIN_H=0x2f|0x7d<<8,AIN_HH=0x2f|0x7e<
 /* the message run at p: [bytes (expanded Shift-JIS) or string (utf8), next] */
 function messageRun(c,p,utf8){const out=[];const s=p;
  while(p<c.length&&(c[p]===0x20||c[p]>0x80)){const x=c[p];
-  if(utf8){const len=x<0x80?1:x<0xe0?2:x<0xf0?3:4,stop=Math.min(p+len,c.length);while(p<stop)out.push(c[p++]);continue;}
+  if(utf8){const len=x<0xc2||x>0xf4?1:x<0xe0?2:x<0xf0?3:4;out.push(c[p++]);for(let k=1;k<len&&c[p]>=0x80&&c[p]<=0xbf;k++)out.push(c[p++]);continue;}
   if(lead(x)&&p+1<c.length){out.push(x,c[p+1]);p+=2;continue;}
   if(x===0x20||x>=0xa1&&x<=0xdd){const w=x===0x20?0x8140:KANA[x-0xa0];out.push(w>>8,w&255);p++;continue;}
   out.push(x);p++;}
