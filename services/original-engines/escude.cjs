@@ -39,9 +39,9 @@ function lzw(src,unpacked){const out=Buffer.alloc(unpacked),dict=new Int32Array(
 const unpack=b=>b.length>8&&b.toString('latin1',0,4)==='acp\0'?lzw(b.subarray(8),b.readUInt32BE(4)):b;
 
 /* half-width forms the engine uses for hiragana / punctuation in ESCR1_00 strings (acpx_script.py _string_format;
-   0xA0 decodes to U+F8F0 in CP932 -> full-width space, while WHATWG shift_jis rejects single-byte 0xA0) */
+   single-byte 0xA0 -> full-width space is handled in decodeV1 because WHATWG shift_jis rejects 0xA0) */
 const PAIRS=[
- ['!','！'],['?','？'],['\uf8f0','　'],['｡','。'],['｢','「'],['｣','」'],['､','、'],['･','…'],
+ ['!','！'],['?','？'],['｡','。'],['｢','「'],['｣','」'],['､','、'],['･','…'],
  ['ｦ','を'],['ｧ','ぁ'],['ｨ','ぃ'],['ｩ','ぅ'],['ｪ','ぇ'],['ｫ','ぉ'],['ｬ','ゃ'],['ｭ','ゅ'],['ｮ','ょ'],['ｯ','っ'],['ｰ','ー'],
  ['ｱ','あ'],['ｲ','い'],['ｳ','う'],['ｴ','え'],['ｵ','お'],['ｶ','か'],['ｷ','き'],['ｸ','く'],['ｹ','け'],['ｺ','こ'],
  ['ｻ','さ'],['ｼ','し'],['ｽ','す'],['ｾ','せ'],['ｿ','そ'],['ﾀ','た'],['ﾁ','ち'],['ﾂ','つ'],['ﾃ','て'],['ﾄ','と'],
@@ -51,10 +51,10 @@ const PAIRS=[
 ];
 const MAP=new Map(PAIRS);
 const restring=t=>[...t].map(c=>MAP.get(c)||c).join('');
-function decodeV1(b){if(!b.includes(0xa0))return kit.SJIS.decode(b);const out=[];
- for(let i=0;i<b.length;i++){const c=b[i];if((c>=0x81&&c<=0x9f||c>=0xe0&&c<=0xfc)&&i+1<b.length){out.push(c,b[++i]);continue;}
-  if(c===0xa0){out.push(0x81,0x40);continue;}out.push(c);}
- return kit.SJIS.decode(Buffer.from(out));}
+function decodeV1(b){if(!b.includes(0xa0))return kit.SJIS.decode(b);const out=Buffer.allocUnsafe(b.length*2);let o=0;
+ for(let i=0;i<b.length;i++){const c=b[i];if((c>=0x81&&c<=0x9f||c>=0xe0&&c<=0xfc)&&i+1<b.length){out[o++]=c;out[o++]=b[++i];continue;}
+  if(c===0xa0){out[o++]=0x81;out[o++]=0x40;continue;}out[o++]=c;}
+ return kit.SJIS.decode(out.subarray(0,o));}
 /* the strings of a script in table order: ESCR1_00 (.bin) or the ESCR_NEW message file (.001) */
 function strings(b){const tag=b.toString('latin1',0,8);
  if(tag==='ESCR1_00'){const n=b.readUInt32LE(8);if(n>500000||12+n*4+4>b.length)return null;const codeLen=b.readUInt32LE(12+n*4),block=12+n*4+4+codeLen+4;if(block>b.length)return null;

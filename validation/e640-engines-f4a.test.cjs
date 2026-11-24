@@ -41,15 +41,15 @@ test('Escude: ESC-ARC2 / ESC-ARC1 index cipher, acp LZW, ESCR1_00 strings (half-
  assert.deepEqual(escude.parse(Buffer.alloc(40,3)).lines,[]);
 });
 test('Escude: ESCR1_00 half-width kana, punctuation, voiced marks, and 0xA0 full-width space align 1:1',()=>{
- /* real ESCR1_00 byte encoding: 0xA0 = full-width space, 0xA1..0xDF = 。「」、…をぁ..ん゛゜, 0x21/0x3F = ！/？ */
- const fullPunct='真琴！？　。「」、…をぁぃぅぇぉゃゅょっーあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわん゛゜';
- const raw=F.escr1([fullPunct],escr1Bytes);
- assert.deepEqual(escude.parse(raw).lines,[fullPunct]);
- /* single-byte 0xA0 becomes full-width space while a Shift-JIS trail byte 0xA0 (0x82 0xA0 = あ) stays intact */
- const mixed=Buffer.concat([Buffer.from([0x82,0xa0,0xa0,0xa6,0xa7,0xb1,0xde,0xdf])]);
- const withRaw=F.escr1([mixed],b=>b);
- assert.deepEqual(escude.parse(withRaw).lines,['あ　をぁあ゛゜']);
- assert.equal(escude.restring('!?\uf8f0｡｢｣､･ｦｧｱﾝﾞﾟ'),'！？　。「」、…をぁあん゛゜');
+ /* independent of PAIRS: raw ESCR1_00 bytes 0x21, 0x3F, 0xA0, 0xA1..0xDF must parse to acpx_script.py external literal */
+ const rawAll=Buffer.from([0x21,0x3f,0xa0,...Array.from({length:0xdf-0xa1+1},(_,i)=>0xa1+i)]);
+ const expectedExternal='！？　。「」、…をぁぃぅぇぉゃゅょっーあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわん゛゜';
+ assert.deepEqual(escude.parse(F.escr1([rawAll],b=>b)).lines,[expectedExternal]);
+ /* single-byte 0xA0 becomes full-width space while Shift-JIS 2-byte pairs (82 A0, 9F A0, E0 A0, FC 4B) and a trailing dangling lead byte stay intact */
+ const mixed=Buffer.from([0x82,0xa0,0x9f,0xa0,0xe0,0xa0,0xfc,0x4b,0xa0,0xa6,0xa7,0xb1,0xde,0xdf]);
+ const dangling=Buffer.from([0xa0,0x90,0x5e,0x82]);
+ assert.deepEqual(escude.parse(F.escr1([mixed,dangling],b=>b)).lines,['あ泛燿黑　をぁあ゛゜','真\ufffd']);
+ assert.equal(escude.restring('!?｡｢｣､･ｦｧｱﾝﾞﾟ'),'！？。「」、…をぁあん゛゜');
 });
 
 /* ---- PJADV ---------------------------------------------------------------------------------------------------------- */
