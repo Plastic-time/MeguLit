@@ -184,18 +184,24 @@ jobs:
           name: native-binaries
           path: native
 
-      # validation/reader-bootstrap.test.cjs reads tauri's core.js from the locked crate in the Cargo registry.
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: desktop
-          cache-targets: false
-          save-if: ${{ matrix.shard == 1 }}
-
-      - name: cargo fetch
+      # validation/reader-bootstrap.test.cjs reads tauri's core.js from the locked crate in a Cargo registry. Unpack only
+      # that crate, checked against its Cargo.lock checksum, instead of installing Rust and fetching every dependency.
+      - name: Locked tauri crate
         shell: pwsh
-        run: cargo fetch --locked --manifest-path desktop/Cargo.toml
+        run: |
+          $m = [regex]::Match((Get-Content desktop/Cargo.lock -Raw), 'name = "tauri"\s+version = "([^"]+)"\s+source = "registry\+https://github\.com/rust-lang/crates\.io-index"\s+checksum = "([0-9a-f]{64})"')
+          if (-not $m.Success) { throw 'desktop/Cargo.lock has no crates.io tauri package' }
+          $version = $m.Groups[1].Value
+          $crate = Join-Path $env:RUNNER_TEMP "tauri-$version.crate"
+          Invoke-WebRequest "https://static.crates.io/crates/tauri/tauri-$version.crate" -OutFile $crate
+          if ((Get-FileHash $crate -Algorithm SHA256).Hash -ne $m.Groups[2].Value) { throw "tauri-$version.crate does not match its Cargo.lock checksum" }
+          $cargoHome = Join-Path $env:RUNNER_TEMP 'cargo'
+          $src = Join-Path $cargoHome 'registry\src\index.crates.io'
+          New-Item -ItemType Directory -Force $src | Out-Null
+          tar -xzf $crate -C $src
+          if ($LASTEXITCODE) { throw "could not unpack tauri-$version.crate" }
+          if (-not (Test-Path (Join-Path $src "tauri-$version\scripts\core.js"))) { throw "tauri-$version has no scripts/core.js" }
+          "CARGO_HOME=$cargoHome" >> $env:GITHUB_ENV
 
       - name: Unit and integration tests
         shell: pwsh
@@ -208,11 +214,23 @@ jobs:
           $tests = @(Get-ChildItem validation -Filter *.test.cjs -File | ForEach-Object { Join-Path 'validation' $_.Name })
           if (-not $tests.Count) { throw 'No tests found' }
           # --test-force-exit: a test file that leaves a handle open (a browser, a server) still ends when its tests have finished
-          node --test --test-force-exit --test-shard=${{ matrix.shard }}/3 @tests 2>&1 | Tee-Object -FilePath test-output.txt
+          # test-file-times.json records each file's duration for balancing the shards.
+          node --test --test-force-exit --test-shard=${{ matrix.shard }}/3 `
+            --test-reporter=tap --test-reporter-destination=stdout `
+            --test-reporter=./tools/test-file-times.mjs --test-reporter-destination=test-file-times.json `
+            @tests 2>&1 | Tee-Object -FilePath test-output.txt
           if ($LASTEXITCODE) { throw 'Tests failed' }
           $count = [regex]::Match((Get-Content test-output.txt -Raw), '(?m)^(?:#|ℹ) tests (\d+)').Groups[1].Value
           if (-not $count -or [int]$count -eq 0) { throw 'Test runner reported zero tests' }
           "Ran $count tests"
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: test-file-times-${{ matrix.shard }}
+          path: test-file-times.json
+          if-no-files-found: warn
+          retention-days: 14
 
   full-build:
     name: Full Build.ps1 -Check (manual)
