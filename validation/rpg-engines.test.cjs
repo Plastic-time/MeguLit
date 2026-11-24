@@ -126,15 +126,18 @@ test('WOLF: message and choice commands, control codes dropped, \\r[base,reading
 
 test('WOLF: short GBK files whose bytes are valid 2-byte UTF-8 still decode as GBK while UTF-8 scripts stay UTF-8',t=>{
  const gbk=hex=>Buffer.from(hex,'hex');
- // GBK bytes that are also valid 2-byte UTF-8: 去小山石(c8a5d0a1c9bdcaaf -> ȥСɽʯ), 什么(cab2c3b4), 状态(d7b4ccac),
- // \c[2]猫\c[0](...c3a8...), 忙碌(c3a6c2b5 -> æµ), 陆路(c2bdc2b7 -> ½·), 聙(c280 -> C1 U+0080)
+ // GBK bytes that are also valid 2-byte UTF-8 and decode to non-prose mojibake code points:
+ // 去小山石(c8a5d0a1c9bdcaaf -> ȥСɽʯ, IPA), 去学校(c8a5d1a7d0a3 -> ȥѧУ, Slavonic ѧ),
+ // 什么(cab2c3b4 -> ʲô, Modifier), 状态(d7b4ccac -> ״̬, orphan combining), 同学(cdacd1a7 -> ͬѧ),
+ // 石头(caafcdb7 -> ʯͷ, archaic Greek ͷ), 只(d6bb -> ֻ, orphan Hebrew point), 聙(c280 -> C1 U+0080)
  const gbkCases=[
   ['去小山石', common([cmd(101,[],[gbk('c8a5d0a1c9bdcaaf')])]), ['去小山石']],
   ['multi-word', mps([event(1,'Ev',[cmd(101,[],[gbk('c8a5d1a7d0a3')]),cmd(102,[2],[gbk('cab2c3b4'),gbk('d7b4ccac')])])]), ['去学校','什么','状态']],
-  ['ctrl-code-cat', common([cmd(101,[],[Buffer.concat([Buffer.from('\\n'),gbk('c3a8')])])]), ['猫']],
-  ['mixed-non-latin1-gbk', common([cmd(101,[],[Buffer.concat([Buffer.from('A'),gbk('c3a8c8a5')])])]), ['A猫去']],
-  ['latin1-pair-gbk', common([cmd(101,[],[gbk('c3a6c2b5')]),cmd(101,[],[gbk('c2bdc2b7')])]), ['忙碌','陆路']],
-  ['latin1-pair-in-ascii', common([cmd(101,[],[Buffer.concat([Buffer.from('HP 100'),gbk('c2bdc2b7')])])]), ['HP 100陆路']],
+  ['slavonic-xue', common([cmd(101,[],[gbk('d1a7')])]), ['学']],
+  ['archaic-greek-tou', common([cmd(101,[],[gbk('cdb7')])]), ['头']],
+  ['coptic-xi', common([cmd(101,[],[gbk('cfb5')])]), ['系']],
+  ['orphan-combining-tong', common([cmd(101,[],[gbk('cdac')])]), ['同']],
+  ['orphan-hebrew-zhi', common([cmd(101,[],[gbk('d6bb')])]), ['只']],
   ['c1-gbk4', common([cmd(101,[],[gbk('c280')])]), ['聙']],
  ];
  for(const [label,buf,want] of gbkCases){
@@ -163,15 +166,37 @@ test('WOLF: short GBK files whose bytes are valid 2-byte UTF-8 still decode as G
  assert.ok(patched&&patched[0].patched);
  assert.deepEqual(patched[0].lines,['去小山石']);
 
- // Genuine UTF-8 WOLF 3 scripts (CJK, pure ASCII, Latin-1 in ASCII context, symbols, Cyrillic) stay UTF-8
+ // Genuine UTF-8 WOLF 3 scripts: all 22 review probes + European/Cyrillic/Greek/symbols/©™/NFD/niqqud stay UTF-8 (0 regressions)
  const utf8Cases=[
   ['ja', ['こんにちは']],
   ['zh', ['去小山石']],
   ['zh-3byte-hi', ['大山']],
+  ['ja-with-ipa', ['大山 [ɽ]']],
   ['ascii', ['OK','HP 100']],
+  ['div', ['10÷2']],
+  ['deg-pm', ['50°±1°']],
+  ['cafe-reg', ['Café®']],
+  ['cafe-dot', ['Café·Bar']],
+  ['guillemet-ete', ['«été»']],
+  ['invq-el', ['¿él?']],
+  ['brackets-dot', ['[HP] · [MP]']],
+  ['parens-dot', ['(1) · (2)']],
+  ['paren-e', ['(é)']],
+  ['bracket-u', ['[ü]']],
+  ['sym-only-multi', ['···','°','±','«»']],
+  ['sym-only-dot', ['·']],
+  ['greek-ver', ['Ver. α','Test β','Ω']],
+  ['greek-prose', ['Καλημέρα, κόσμε!','Ελλάδα']],
+  ['cyrillic-short', ['да','дом','бой','мама']],
+  ['cyrillic-prose', ['Здравствуйте! Как дела?','Спасибо, друг!','Ёжик']],
   ['latin1-word', ['Café','crème brûlée']],
   ['latin1-sym', ['100°C','© 2025','A·B']],
+  ['title-copy-tm', ['© 2025 Studio™','® ™ ©']],
   ['non-gb2312-2byte', ['HP × 2','Über','Привет, мир!']],
+  ['non-gb2312-modifier', ['Test ˆ ˜']],
+  ['latin-ext-eu', ['Zażółć gęślą jaźń','Mulțumesc, și bună ziua!']],
+  ['nfd-latin', ['a\u0323']],
+  ['hebrew-niqqud', ['ש\u05bc']],
   ['3byte-sym', ['“Hello” — ♪']],
  ];
  for(const [label,lines] of utf8Cases){

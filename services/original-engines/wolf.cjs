@@ -63,21 +63,20 @@ function lzDecode(src){const size=src.readUInt32LE(0),end=Math.min(src.length,sr
 // ---- Text ---------------------------------------------------------------------------------------------------------
 function dec(b){try{return new TextDecoder('utf-8',{fatal:true}).decode(b);}catch{return kit.SJIS.decode(b);}}
 // One code page for a whole file: UTF-8 (WOLF 3), else Shift-JIS or (a Chinese patch) GBK, whichever reads cleaner.
-// GB2312 pairs in 0xC2..0xDF + 0xA1..0xBF (e.g. "去小山石" -> "ȥСɽʯ") are valid 2-byte UTF-8, so 2-byte-only UTF-8
-// whose non-ASCII bytes are all valid GB2312 pairs must look like Latin-1 in ASCII context to stay UTF-8.
-function isUtf8Text(sample,all){
+// GB2312 pairs in 0xC2..0xDF + 0xA1..0xBF (e.g. "去小山石" -> "ȥСɽʯ") are valid 2-byte UTF-8. Reject only
+// 2-byte-only UTF-8 whose bytes are valid GB2312 and contain C1 controls or non-prose mojibake code points
+// (IPA/modifiers, archaic Greek/Coptic, historic Slavonic, orphan combining/cantillation marks), keeping all
+// genuine 2-byte UTF-8 (Latin-1/Ext, modern Greek, Cyrillic, symbols, NFD accents, Hebrew with niqqud).
+const UTF8_MOJIBAKE=/[\u0250-\u02ff\u0370-\u0385\u03e0-\u03ff\u0460-\u048f]|(?:^|[^A-Za-z\u00c0-\u024f\u0386-\u03ce\u0400-\u045f])[\u0300-\u036f]|(?:^|[^\u05d0-\u05ea])[\u0591-\u05c7]/;
+function isUtf8Text(all){
  let t;try{t=new TextDecoder('utf-8',{fatal:true}).decode(all);}catch{return false;}
- if(!/[^\x00-\x7f]/.test(t))return true;
- if(/[\u0080-\u009f]/.test(t))return false;
  if(/[^\x00-\u07ff]/.test(t))return true;
+ if(/[\u0080-\u009f]/.test(t))return false;
  if(all.some(b=>b>=0x80&&b<=0xa0))return true;
- if(/[^\x00-\u00ff]/.test(t))return false;
- const s=sample.map(b=>clean(new TextDecoder('utf-8').decode(b)).text).join('\n');
- if(/[\u00a0-\u00bf][\u0080-\u00ff]|[\u0080-\u00ff][\u00a0-\u00bf]/.test(s))return false;
- return /[A-Za-z][\u00c0-\u00ff]|[\u00c0-\u00ff][A-Za-z]|[A-Za-z0-9] ?[\u00a0-\u00bf]|[\u00a0-\u00bf] ?[A-Za-z0-9]/.test(s);}
+ return !UTF8_MOJIBAKE.test(t);}
 function codepage(bufs){const sample=bufs.slice(0,4000),sep=Buffer.from([10]);
  const all=sample.length>1?Buffer.concat(sample.flatMap((b,i)=>i?[sep,b]:[b])):sample[0]||Buffer.alloc(0);
- if(isUtf8Text(sample,all))return 'utf-8';
+ if(isUtf8Text(all))return 'utf-8';
  /* E577 Shift-JIS vs GBK: kit.codepage */return kit.codepage(all);}
 function clean(text){const ruby=[];let t=String(text??'').replace(/\r/g,'');
  t=t.replace(/\\r\[([^,\]]+),([^\]]+)\]/g,(_,base,reading)=>{ruby.push([base,reading]);return base;});
