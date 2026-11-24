@@ -1,18 +1,26 @@
-﻿param([switch]$Check,[switch]$TestsOnly)
+﻿param([switch]$Check,[switch]$TestsOnly,[switch]$TestsChanged)
 $ErrorActionPreference = 'Stop'
 $taskRoot = $PSScriptRoot
 # Toolchain discovery (local offline tools folder, or a standard Windows setup); see tools/build-env.ps1.
 . (Join-Path $taskRoot 'tools/build-env.ps1')
 if ($taskProblems.Count) { $taskProblems | ForEach-Object { Write-Error "MISSING: $_" -ErrorAction Continue }; throw 'Build environment incomplete; run tools/check-env.ps1 for details' }
-function Invoke-TaskTests {
+function Invoke-TaskTests([switch]$Changed) {
  # Test resume (tools/test-resume.cjs): with the same code fingerprint only failed, new or edited test files run again;
  # a changed fingerprint runs the whole suite. MEGULIT_TEST_STATE names the state file (Release.ps1: one per tag).
+ # -TestsChanged (tools/changed-tests.cjs): only the test files that name a file changed since the merge-base with
+ # origin/main (MEGULIT_TEST_BASE: another base), or a source one require away from it; shared ground runs everything.
  $taskState = if ($env:MEGULIT_TEST_STATE) { $env:MEGULIT_TEST_STATE } else { Join-Path $env:TEMP 'megulit-build-tests.json' }
  $taskList = Join-Path $env:TEMP ('megulit-tests-run-' + $PID + '.txt')
- & $taskNode (Join-Path $taskRoot 'tools/test-resume.cjs') select $taskState $taskRoot $taskList
- if ($LASTEXITCODE -ne 0) { throw 'Test selection failed (tools/test-resume.cjs)' }
+ if ($Changed) {
+  $taskBase = @(); if ($env:MEGULIT_TEST_BASE) { $taskBase = @('--base', $env:MEGULIT_TEST_BASE) }
+  & $taskNode (Join-Path $taskRoot 'tools/changed-tests.cjs') @taskBase --out $taskList
+  if ($LASTEXITCODE -ne 0) { throw 'Test selection failed (tools/changed-tests.cjs)' }
+ } else {
+  & $taskNode (Join-Path $taskRoot 'tools/test-resume.cjs') select $taskState $taskRoot $taskList
+  if ($LASTEXITCODE -ne 0) { throw 'Test selection failed (tools/test-resume.cjs)' }
+ }
  $taskRun = @(Get-Content -LiteralPath $taskList | Where-Object { $_ })
- if (-not $taskRun.Count) { Write-Output 'tests: every test file passed with this code already; none run'; return }
+ if (-not $taskRun.Count) { Remove-Item -LiteralPath $taskList -Force -ErrorAction SilentlyContinue; Write-Output $(if ($Changed) { 'tests: no test file names the changed files; none run' } else { 'tests: every test file passed with this code already; none run' }); return }
  # Cap test parallelism: at full CPU concurrency the timing-sensitive tests (runtime-harvest, relay-race, topmost/altt window checks) flake under load, though each passes alone. 2 keeps the suite fast while not saturating the machine.
  # MEGULIT_TEST_CONCURRENCY (1-32) overrides the default 2 on a machine that keeps the timing-sensitive tests green at a higher value
  $taskConcurrency = 2; if ($env:MEGULIT_TEST_CONCURRENCY -match '^\d+$' -and [int]$env:MEGULIT_TEST_CONCURRENCY -ge 1 -and [int]$env:MEGULIT_TEST_CONCURRENCY -le 32) { $taskConcurrency = [int]$env:MEGULIT_TEST_CONCURRENCY }
@@ -31,6 +39,7 @@ function Invoke-TaskTests {
  if (-not ([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Success) -or [int]([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Groups[1].Value) -eq 0) { throw 'Test runner reported zero tests' }
 }
 if ($TestsOnly) { Invoke-TaskTests; exit 0 }
+if ($TestsChanged) { Invoke-TaskTests -Changed; exit 0 }
 & (Join-Path $taskRoot 'tools/build-tray-icon.ps1')
 & $taskNode (Join-Path $taskRoot 'tools/prepare-reader.cjs')
 if ($LASTEXITCODE -ne 0) { throw 'Original overlay source preparation failed' }
