@@ -35,46 +35,44 @@ test('reallive: quoted pieces are one line, so a patch\'s 【name】 stays on it
  assert.deepEqual(rl.parse(gb).lines,['【女孩】「你好」']);});
 test('reallive: a kana-less line in a Japanese scenario stays Shift-JIS',()=>{
  assert.deepEqual(rl.parse(code('「あい」','あいう','名名')).lines,['「あい」','あいう','名名']);});
-test('reallive: ASCII digits, spaces and words stay inside quoted and unquoted text tokens',()=>{
+test('reallive: quoted text keeps embedded ASCII, escapes and Shift-JIS 0x5c trail bytes',()=>{
  const {sjis,gbk}=require('./helpers/engine-fixtures.cjs');
  const nl=Buffer.from('\n\x10\x00','latin1'),cmd=Buffer.from('#\x01\x02\x03\x04\x05\x06\x07("BGM01",1,2)','latin1');
  const ja=Buffer.concat([cmd,
   sjis('"今日は2024年です"'),nl,
-  sjis('今日は 2024年 です'),nl,
-  sjis('"HP 100でOK! #1 (テスト)"'),nl,
-  sjis('2024年1月'),nl,
+  sjis('"今日は 2024年 です"'),nl,
+  sjis('"HP 100でOK!"'),nl,
+  sjis('"2024年1月"'),nl,
   sjis('"ソ"'),nl,
   sjis('"彼は\\"元気\\"です"'),nl,
-  sjis('今日は"2024"年です'),Buffer.from('!\x05\x00','latin1'),sjis('次の行'),nl,
+  sjis('"A\\\\Bの記録"'),nl,
+  sjis('今日は"2024"年です'),nl,
   Buffer.alloc(700,0x2c)]);
- assert.deepEqual(rl.parse(ja).lines,['今日は2024年です','今日は 2024年 です','HP 100でOK! #1 (テスト)','2024年1月','ソ','彼は"元気"です','今日は2024年です','次の行']);
+ assert.deepEqual(rl.parse(ja).lines,['今日は2024年です','今日は 2024年 です','HP 100でOK!','2024年1月','ソ','彼は"元気"です','A\\Bの記録','今日は2024年です']);
  const zh=Buffer.concat([cmd,
   gbk('"今天是 2024年 OK"'),nl,
-  gbk('今天是2024年'),nl,
   gbk('"【""樱""】""「2024年好」"'),nl,
   Buffer.alloc(700,0x2c)]);
- assert.deepEqual(rl.parse(zh).lines,['今天是 2024年 OK','今天是2024年','【樱】「2024年好」']);
+ assert.deepEqual(rl.parse(zh).lines,['今天是 2024年 OK','【樱】「2024年好」']);
 });
-test('reallive: single-character dialogue and choices are kept while bytecode payloads do not leak false positives',()=>{
+test('reallive: quoted single-character lines/choices are kept while unquoted runs stay at base behavior',()=>{
  const {sjis,gbk}=require('./helpers/engine-fixtures.cjs');
+ const nl=Buffer.from('\n\x10\x00','latin1');
  const ja=Buffer.concat([
-  /* command header containing 0x96 0xbc ('名'), line marker with 0x82 0xa0 ('あ'), kidoku with 'い'/'う', int literal with 'あ', store var $\xc8 + op */
-  Buffer.from('#\x00\x02\x96\xbc\x01\x00\x00("BGM01")','latin1'),
-  Buffer.from('\n\x82\xa0@\x82\xa2!\x82\xa4$\xff\x82\xa0\x00\x00$\xc8\\\x28','latin1'),
-  sjis('「おはよう」'),Buffer.from('\n\x01\x00','latin1'),
-  sjis('「どちらへ行く？」'),Buffer.from('\n\x02\x00','latin1'),
-  sjis('「決めた」'),Buffer.from('\n\x03\x00','latin1'),
-  sjis('「そうだね」'),Buffer.from('\n\x04\x00','latin1'),
-  /* unquoted single-char dialogue and select choices */
-  sjis('え'),Buffer.from('\n\x05\x00','latin1'),
-  Buffer.from('#\x00\x02\x00\x00\x02\x00\x00{\n\x06\x00','latin1'),sjis('右'),Buffer.from('\n\x07\x00','latin1'),sjis('左'),Buffer.from('}','latin1'),
-  /* quoted single-char choices */
-  Buffer.from('#\x00\x02\x00\x00\x02\x00\x00{','latin1'),sjis('"上"'),Buffer.from('\n\x08\x00','latin1'),sjis('"下"'),Buffer.from('}','latin1'),
+  Buffer.from('#\x01\x02\x03\x04\x05\x06\x07("BGM01")','latin1'),
+  sjis('「おはよう」'),nl,
+  sjis('「どちらへ行く？」'),nl,
+  sjis('「決めた」'),nl,
+  /* quoted single-char dialogue and choices */
+  sjis('"え"'),nl,
+  Buffer.from('{','latin1'),sjis('"右"'),nl,sjis('"左"'),Buffer.from('}','latin1'),
   /* stray unclosed quote before a real line must not swallow the line */
-  Buffer.from('"','latin1'),sjis('「あい」'),Buffer.from('\n\x09\x00','latin1'),
+  Buffer.from('"','latin1'),sjis('「あい」'),nl,
+  /* unquoted runs keep base behavior: split on ASCII and drop single-char */
+  sjis('今日は2024年です'),nl,
+  sjis('あ'),nl,
   Buffer.alloc(700,0x2c)]);
- assert.deepEqual(rl.parse(ja).lines,['「おはよう」','「どちらへ行く？」','「決めた」','「そうだね」','え','右','左','上','下','「あい」']);
- /* GBK patch single-character choices */
- const zh=Buffer.concat([Buffer.from('#\x00\x02\x00\x00\x02\x00\x00{','latin1'),gbk('"右"'),Buffer.from('\n\x01\x00','latin1'),gbk('"左"'),Buffer.from('}','latin1'),Buffer.alloc(700,0x2c)]);
+ assert.deepEqual(rl.parse(ja).lines,['「おはよう」','「どちらへ行く？」','「決めた」','え','右','左','「あい」','今日は','年です']);
+ const zh=Buffer.concat([Buffer.from('{','latin1'),gbk('"右"'),nl,gbk('"左"'),Buffer.from('}','latin1'),Buffer.alloc(700,0x2c)]);
  assert.deepEqual(rl.parse(zh).lines,['右','左']);
 });

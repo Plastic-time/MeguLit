@@ -48,48 +48,31 @@ function decompress(src,dlen,key){const dst=Buffer.alloc(dlen);let s=8,d=0,m=8,b
 function index(b){const out=[];if(b.length<80000)return out;for(let i=0;i<10000;i++){const o=b.readInt32LE(i*8),n=b.readInt32LE(i*8+4);if(o>0&&n>0&&o+n<=b.length)out.push({id:i,offset:o,length:n});}return out;}
 function header(d){if(d.length<0x1d0||d.readInt32LE(0)!==0x1d0)return null;const v=d.readInt32LE(4);if(v!==10002&&v!==110002&&v!==1110002)return null;
  return {version:v,xor2:v!==10002,at:d.readInt32LE(0x20),dlen:d.readInt32LE(0x24),clen:d.readInt32LE(0x28)};}
-// Text runs: Shift-JIS / GBK textout and selection tokens (quoted or unquoted), keeping embedded ASCII.
+// Text runs: double-byte Shift-JIS (or GBK) characters; quoted pieces ("…") also keep ASCII and single-char tokens.
 const lead=c=>(c>=0x81&&c<=0x9f)||(c>=0xe0&&c<=0xfc);
-const ch=(code,j)=>j+1<code.length&&(lead(code[j])||(code[j]>=0xa1&&code[j]<=0xfe))&&code[j+1]>=0x40&&code[j+1]!==0x7f;
-const UNQUOT_STOP=new Set([0x21,0x22,0x23,0x24,0x28,0x29,0x2c,0x40,0x5b,0x5c,0x5d,0x7b,0x7d]);
-const unquotAscii=c=>c>=0x20&&c<=0x7e&&!UNQUOT_STOP.has(c);
-const BOUND_AFTER=new Set([0x00,0x0a,0x21,0x23,0x24,0x29,0x2c,0x40,0x7d]);
-/* Quoted piece ("…"): quotes are not printed (rlvm/rldev); check double-byte first so SJIS 0x5c trail bytes never escape '"'. */
-function readQuoted(code,start){const raw=[],dbl=[];let i=start+1,count=0;
- while(i<code.length){
-  if(ch(code,i)){raw.push(code[i],code[i+1]);dbl.push(code[i],code[i+1]);count++;i+=2;continue;}
-  const c=code[i];if(c===0x22)return {next:i+1,raw,dbl,count};
-  if(c===0x5c&&i+1<code.length&&(code[i+1]===0x22||code[i+1]===0x5c)){raw.push(code[i+1]);i+=2;continue;}
-  if(c>=0x20&&c<=0x7e){raw.push(c);i++;continue;}
-  return null;}
- return null;}
-/* Quoted pieces ("…""【""名前""】""「…」") and adjacent unquoted text form one text token; skip fixed bytecode markers
-   (\n + u16 line, @/! + u16 kidoku, # + 7B command header, $\xff + i32 / $var) so single-character lines stay safe. */
-function runs(code){const out=[];let i=0,afterStruct=true;
- while(i<code.length){const c=code[i];
-  if(c===0x0a||c===0x40||c===0x21){i+=3;afterStruct=true;continue;}
-  if(c===0x23){i+=8;afterStruct=true;continue;}
-  if(c===0x24){i+=code[i+1]===0xff?6:2;afterStruct=false;continue;}
-  if(c===0x5c){i+=2;afterStruct=false;continue;}
-  if(c===0x5b){i++;afterStruct=false;continue;}
-  if(c===0x00||c===0x28||c===0x29||c===0x2c||c===0x5d||c===0x7b||c===0x7d){i++;afterStruct=true;continue;}
-  if(c!==0x22&&!ch(code,i)&&!unquotAscii(c)){i++;afterStruct=false;continue;}
-  const st=i,raw=[],dbl=[];let count=0,quoted=false;
-  for(;i<code.length;){
-   if(code[i]===0x22){const q=readQuoted(code,i);if(!q)break;raw.push(...q.raw);dbl.push(...q.dbl);count+=q.count;quoted=true;i=q.next;continue;}
-   if(ch(code,i)){raw.push(code[i],code[i+1]);dbl.push(code[i],code[i+1]);count++;i+=2;continue;}
-   if(unquotAscii(code[i])){raw.push(code[i]);i++;continue;}
-   break;}
-  const cleanAfter=i>=code.length||BOUND_AFTER.has(code[i]);
-  if(count>=2||(count===1&&(quoted||(afterStruct&&cleanAfter))))out.push({raw:Buffer.from(raw),dbl:Buffer.from(dbl),count,quoted});
-  afterStruct=false;if(i===st)i++;}
+/* Quoted pieces ("…""【""名前""】""「…」") are one text token (rlvm: the quotes are not printed). Check double-byte first
+   inside quotes so Shift-JIS 0x5c trail bytes never escape '"'; unquoted runs stay double-byte only as before. */
+function runs(code){const out=[];let i=0;
+ const ch=j=>j+1<code.length&&(lead(code[j])||(code[j]>=0xa1&&code[j]<=0xfe))&&code[j+1]>=0x40&&code[j+1]!==0x7f;
+ const readQuoted=at=>{const raw=[],dbl=[];let j=at+1,n=0;while(j<code.length){
+   if(ch(j)){raw.push(code[j],code[j+1]);dbl.push(code[j],code[j+1]);n++;j+=2;continue;}
+   const c=code[j];if(c===0x22)return {next:j+1,raw,dbl,n};
+   if(c===0x5c&&j+1<code.length&&(code[j+1]===0x22||code[j+1]===0x5c)){raw.push(code[j+1]);j+=2;continue;}
+   if(c>=0x20&&c<=0x7e){raw.push(c);j++;continue;}
+   return null;}return null;};
+ while(i<code.length){if(code[i]!==0x22&&!lead(code[i])&&!(code[i]>=0xa1&&code[i]<=0xfe)){i++;continue;}
+  const st=i,raw=[],dbl=[];let n=0,quoted=false;
+  for(;;){if(ch(i)){raw.push(code[i],code[i+1]);dbl.push(code[i],code[i+1]);n++;i+=2;continue;}
+   if(code[i]===0x22){const q=readQuoted(i);if(q){raw.push(...q.raw);dbl.push(...q.dbl);n+=q.n;quoted=true;i=q.next;continue;}}break;}
+  if(n>=2||(quoted&&n>=1)){const b=Buffer.from(raw);if(quoted&&raw.length!==dbl.length)b._dbl=Buffer.from(dbl);out.push(b);}
+  if(i===st)i++;}
  return out;}
 const KANA=/[ぁ-ゖァ-ヺ]/,HAN=/[一-鿿]/;
 // Japanese if Shift-JIS reads it with kana; else GBK when that is clean Chinese (a patched Seen.txt).
 // Bytes a wrong key leaves behind read as half-width katakana and stray Latin letters: not text.
 const JUNK=/[｡-ﾟ�]|[A-Za-z`^~|\\]/;
-function text(r){const da=sj.decode(r.dbl);if(KANA.test(da)&&!JUNK.test(da))return sj.decode(r.raw);const db=gbk.decode(r.dbl);if(HAN.test(db)&&!JUNK.test(db)&&!/[ぁ-ゖ]/.test(db))return gbk.decode(r.raw);return '';}
-const score=code=>{let n=0;for(const r of runs(code)){const t=text(r);if(t&&KANA.test(t))n++;else if(JUNK.test(sj.decode(r.dbl)))n--;}return n;};
+function text(raw){const d=raw._dbl||raw,a=sj.decode(d);if(KANA.test(a)&&!JUNK.test(a))return sj.decode(raw);const b=gbk.decode(d);if(HAN.test(b)&&!JUNK.test(b)&&!/[ぁ-ゖ]/.test(b))return gbk.decode(raw);return '';}
+const score=code=>{let n=0;for(const r of runs(code)){const t=text(r);if(t&&KANA.test(t))n++;else if(JUNK.test(sj.decode(r)))n--;}return n;};
 // One scenario's bytecode: the second key named by the archive (REGNAME), else the one that gives the most Japanese.
 function bytecode(raw,keyName){const h=header(raw);if(!h||h.at<=0||h.at+h.clen>raw.length||h.dlen<=0||h.dlen>64<<20)return null;const src=raw.subarray(h.at,h.at+h.clen);
  if(!h.xor2)return decompress(src,h.dlen,null);
@@ -103,7 +86,7 @@ const tidy=t=>t.replace(/^[\s　]+|[\s　]+$/g,'');
    Shift-JIS, not GBK (it came out as 「係寧侾俆擔」) */
 function parse(buf){const lines=[];const code=Buffer.isBuffer(buf)?buf:Buffer.from(buf),list=runs(code);
  let ja=0,zh=0;for(const r of list){const t=text(r);if(!t)continue;if(KANA.test(t))ja++;else zh++;}
- const sjis=r=>JUNK.test(sj.decode(r.dbl))?'':sj.decode(r.raw);
+ const sjis=r=>JUNK.test(sj.decode(r._dbl||r))?'':sj.decode(r);
  for(const r of list){const t=tidy(ja>zh?sjis(r):text(r));if(t&&(KANA.test(t)||HAN.test(t)))lines.push(t);}
  return {lines,anchors:[]};}
 // REGNAME in Gameexe.ini picks the second key (rlvm archive.cc), when the folder has one.
