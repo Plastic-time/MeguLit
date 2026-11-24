@@ -87,7 +87,7 @@ function scan(b,out,{blocksOnly=false,check=()=>{}}={}){let at=0;
   if(blocksOnly&&(start===min&&min>0||n>2<<20))continue;
   const text=b.toString('utf8',start,start+n),m=HEAD.exec(text.split('\n',1)[0]);if(!m)continue;
   const doc={name:path.basename(m[3])+'.nani',src:(m[1]||'ja').toLowerCase(),dst:(m[2]||'').toLowerCase(),script:!/managed text/i.test(m[4]),text};
-  if(!blocksOnly&&doc.script&&!/\n# /.test(text)){const next=b.indexOf(DOC,at),end=next<0?Math.min(b.length,start+n+4e6):next;doc.prints=printed(b,start+n,end);
+  if(!blocksOnly&&doc.script&&!/^;|[\r\n]/.test(text)){const next=b.indexOf(DOC,at),end=next<0?Math.min(b.length,start+n+4e6):next;doc.prints=printed(b,start+n,end);
    // E450 entries by document line (source comment at L, translation at L + 1), so pairing never shifts at a gap
    try{doc.entries=require('./naninovel-voice.cjs').docEntries(b,start+n,end);}catch{doc.entries=null;}}
   out.push(doc);}
@@ -106,16 +106,20 @@ const isJa=l=>/^ja/.test(l),isZh=l=>/^zh/.test(l);
 const ZH=['zh-cn','zh-hans','zh','zh-sg','zh-tw','zh-hant','zh-hk'];
 const zhRank=l=>{const i=ZH.indexOf(l);return i<0?(isZh(l)?50:99):i;};
 const cleanJaSrc=c=>String(c||'').replace(/^[^\s:：「『（\[、。！？]{1,24}: /,'').replace(/\\([\\\[\]{}":])|\[[^\]\n]*\]/g,(_,e)=>e||'');
+const fmtOne=s=>String(s||'').replace(/<br>\s*/gi,'<br>').replace(/\r?\n/g,'<br>');
+const fmtSrc=s=>{const o=fmtOne(s);return '; '+(o.startsWith('>')?' '+o:o);};
+const fmtDst=s=>{const o=fmtOne(s).trim();return !tidy(o)?'':/^[#;]/.test(o)?' '+o:o;};
+const fmtBlock=(id,src,z,meta)=>{const d=fmtDst(z);return '# '+id+'\n'+(meta?'; '+meta+'\n':'')+fmtSrc(src)+(d?'\n'+d:'');};
+const stripNonZhDst=text=>text.replace(/\r/g,'').split('\n').filter(l=>!l.trim()||l.startsWith('# ')||l.startsWith(';')).join('\n');
 function parsedJaSrc(doc){
  const hasZh=isZh(doc.dst);
- const fmt=(id,src,z,meta)=>'# '+id+'\n'+(meta?'; '+meta+'\n':'')+src.split('\n').map(l=>'; '+l).join('\n')+(z?'\n'+z.replace(/<br>\s*/gi,'<br>').replace(/\r?\n/g,'<br>'):'');
  if(doc.entries&&doc.entries.length){
   const parts=[];let meta='';
   doc.entries.forEach((e,i)=>{
    const raw=String(e.source||'').trimStart();
    if(raw.startsWith('>')){if(!tidy(e.text))meta=raw.trim();return;}
    const src=cleanJaSrc(raw);if(!tidy(src)){meta='';return;}
-   parts.push(fmt('e'+i,src,hasZh&&tidy(e.text)?e.text:'',meta));meta='';
+   parts.push(fmtBlock('e'+i,src,hasZh?e.text:'',meta));meta='';
   });
   if(parts.length)return parts.join('\n\n');
  }
@@ -125,11 +129,11 @@ function parsedJaSrc(doc){
   if(cl&&cl.length){
    cl.forEach((c,i)=>{
     const raw=String(c.text||'').trimStart();
-    if(raw.startsWith('>')){meta=raw.trim();return;}
-    const src=cleanJaSrc(raw);if(!tidy(src)){meta='';return;}
     const nextLine=bounds?bounds.find(x=>x>c.line)??Infinity:(i+1<cl.length?cl[i+1].line:Infinity);
-    const z=hasZh&&bl.length?bl.filter(x=>x.line>c.line&&x.line<nextLine).map(x=>x.text).filter(tidy).join('\n'):'';
-    parts.push(fmt('p'+i,src,z,meta));meta='';
+    const texts=bl.length?bl.filter(x=>x.line>c.line&&x.line<nextLine).map(x=>x.text).filter(tidy):[];
+    if(raw.startsWith('>')){if(!texts.length)meta=raw.trim();return;}
+    const src=cleanJaSrc(raw);if(!tidy(src)){meta='';return;}
+    parts.push(fmtBlock('p'+i,src,hasZh?texts.join('\n'):'',meta));meta='';
    });
   }else if(doc.prints.comments&&doc.prints.comments.length){
    const rows=[];
@@ -140,7 +144,7 @@ function parsedJaSrc(doc){
     rows.push({src,meta});meta='';
    }
    const zp=hasZh&&doc.prints.length===rows.length?doc.prints:null;
-   rows.forEach((r,i)=>parts.push(fmt('p'+i,r.src,zp&&tidy(zp[i]||'')?zp[i]:'',r.meta)));
+   rows.forEach((r,i)=>parts.push(fmtBlock('p'+i,r.src,zp?zp[i]:'',r.meta)));
   }
   if(parts.length)return parts.join('\n\n');
  }
@@ -151,7 +155,7 @@ function combine(docs){const byName=new Map();for(const d of docs){if(!d.script)
  const out=[];
  for(const list of byName.values()){
   const jaSrc=list.filter(d=>isJa(d.src)).sort((a,b)=>zhRank(a.dst)-zhRank(b.dst))[0];
-  if(jaSrc){out.push({name:jaSrc.name,text:parsedJaSrc(jaSrc)||jaSrc.text});continue;}
+  if(jaSrc){out.push({name:jaSrc.name,text:parsedJaSrc(jaSrc)||(isZh(jaSrc.dst)?jaSrc.text:stripNonZhDst(jaSrc.text))});continue;}
   const ja=list.find(d=>isJa(d.dst));if(!ja)continue;
   const zhDoc=list.filter(d=>isZh(d.dst)).sort((a,b)=>zhRank(a.dst)-zhRank(b.dst))[0];
   /* E450 Parsed-asset documents with their entries: each Japanese entry (its source line and the Japanese printed on the
@@ -160,7 +164,7 @@ function combine(docs){const byName=new Map();for(const d of docs){if(!d.script)
      the source is Chinese. Pairing by position (below) shifted every later line after an untranslated entry. */
   if(ja.entries&&ja.entries.length){const nv=require('./naninovel-voice.cjs'),je=ja.entries,ze=zhDoc&&zhDoc.entries||[],m=nv.lcs(je.map(e=>e.key),ze.map(e=>e.key));
    const strip=c=>String(c||'').replace(/^[^:：「『（]{1,24}[:：]\s*/,'');
-   const parts=je.map((e,i)=>{if(!tidy(e.text))return '';const z=m[i]>=0&&tidy(ze[m[i]].text)?ze[m[i]].text:isZh(ja.src)?strip(e.source):'';return '# e'+i+'\n'+e.text.split('\n').map(l=>'; '+l).join('\n')+(z?'\n'+z:'');}).filter(Boolean);
+   const parts=je.map((e,i)=>{if(!tidy(e.text))return '';const z=m[i]>=0&&tidy(ze[m[i]].text)?ze[m[i]].text:isZh(ja.src)?strip(e.source):'';return fmtBlock('e'+i,e.text,z);}).filter(Boolean);
    if(parts.length){out.push({name:ja.name,text:parts.join('\n\n')});continue;}}
   // Parsed-asset documents: the printed texts, paired with the Chinese document's when both have as many.
   if(ja.prints){const zp=zhDoc&&zhDoc.prints&&zhDoc.prints.length===ja.prints.length?zhDoc.prints:null;
@@ -174,7 +178,7 @@ function combine(docs){const byName=new Map();for(const d of docs){if(!d.script)
    const zhAt=i=>zp&&tidy(zp[i]||'')?zp[i]:'';
    const zhOf=i=>zhAt(i)||(src&&tidy(src[i]||'')?src[i]:'')||(zp?zhAt(i-1)||zhAt(i+1):'');
    // Prints that are only whitespace are not lines.
-   const parts=ja.prints.map((t,i)=>tidy(t)?'# p'+i+'\n'+t.split('\n').map(l=>'; '+l).join('\n')+(zhOf(i)?'\n'+zhOf(i):''):'').filter(Boolean);
+   const parts=ja.prints.map((t,i)=>tidy(t)?fmtBlock('p'+i,t,zhOf(i)):'').filter(Boolean);
    if(parts.length)out.push({name:ja.name,text:parts.join('\n\n')});continue;}
   const jb=blocks(ja.text),zb=zhDoc?blocks(zhDoc.text):null,useSrc=!zhDoc&&isZh(ja.src);const parts=[];
   for(const [id,b] of jb){if(!b.dst.length)continue;const z=zb?zb.get(id):null;const zh=z?z.dst:useSrc?b.src:[];

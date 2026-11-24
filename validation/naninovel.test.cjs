@@ -291,3 +291,135 @@ test('Naninovel: Addressables localization bundles keep Japanese alongside prefe
  assert.deepEqual(readJa[0].lines,['原文。']);
  assert.deepEqual(readJa[0].zh,['中文。']);
 });
+
+test('Naninovel: #947 review regressions (empty classic doc, multiline/special-prefix roundtrip, LabelScriptLine bounds, extra ja->ja classic doc, hashless translated >)',t=>{
+ const os=require('node:os'),path=require('node:path');
+ const scenes=require('../services/original-engines/scenes.cjs');
+ const {packBundle}=require('../services/original-engines/utage-embedded.cjs')._internal;
+ const {string}=require('./helpers/utage-embedded-fixture.cjs');
+ const u32=v=>{const b=Buffer.alloc(4);b.writeUInt32LE(v);return b;};
+ const i32=v=>{const b=Buffer.alloc(4);b.writeInt32LE(v);return b;};
+ const str=s=>{const b=Buffer.from(s,'utf8');return Buffer.concat([u32(b.length),b,Buffer.alloc((4-b.length%4)%4)]);};
+ const comment=(line,hash,text)=>Buffer.concat([str('CommentScriptLine'),str('Naninovel'),str('Elringus.Naninovel.Runtime'),i32(line),...(hash!==null?[str(hash)]:[]),str(text)]);
+ const label=(line,hash,text)=>Buffer.concat([str('LabelScriptLine'),str('Naninovel'),str('Elringus.Naninovel.Runtime'),i32(line),...(hash!==null?[str(hash)]:[]),str(text)]);
+ const generic=(line,hash,count)=>Buffer.concat([str('GenericTextScriptLine'),str('Naninovel'),str('Elringus.Naninovel.Runtime'),i32(line),str(hash),u32(count),Buffer.alloc(count*8)]);
+ const print=(script,line,inl,text)=>Buffer.concat([str('PrintText'),str('Naninovel.Commands'),str('Elringus.Naninovel.Runtime'),str(script),i32(line),i32(inl),str(text)]);
+
+ // 1. Empty classic ja->zh document followed by an unrelated compiled script must not scan 4MB ahead into it
+ const emptyClassic=Buffer.concat([
+  Buffer.alloc(8),
+  str('; Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `EmptyClassic` naninovel script\n'),
+  comment(2,'10000001','無関係なスクリプトの台詞。'),
+  print('Other',3,0,'无关剧本台词。'),
+ ]);
+ const docs1=nani._internal.scan(emptyClassic,[]);
+ assert.equal(docs1.length,1);
+ const c1=nani._internal.combine(docs1);
+ assert.deepEqual(nani.parse(Buffer.from(c1[0].text)).lines,[]);
+
+ // 2. Non-Japanese-source parsed entries escape multiline (\n) and leading #/; translations cleanly
+ const nonJaEnToJa=Buffer.concat([
+  Buffer.alloc(8),
+  str('English <en> to Japanese <ja-JP> localization document for `NonJa` naninovel script'),
+  comment(2,'20000001','Src one'),print('NonJa',3,0,'日本語一。'),
+  comment(5,'20000002','Src two'),print('NonJa',6,0,'日本語二。'),
+  comment(8,'20000003','Src three'),print('NonJa',9,0,'日本語三。'),
+  comment(11,'20000004','Src four'),print('NonJa',12,0,'>日本語四。'),
+ ]);
+ const nonJaEnToZh=Buffer.concat([
+  Buffer.alloc(8),
+  str('English <en> to Chinese (S) <zh-Hans> localization document for `NonJa` naninovel script'),
+  comment(2,'20000001','Src one'),print('NonJa',3,0,'第一行'),print('NonJa',4,0,'# 假块'),
+  comment(6,'20000002','Src two'),print('NonJa',7,0,'第二行'),print('NonJa',8,0,'; 假原文'),
+  comment(10,'20000003','Src three'),print('NonJa',11,0,'# 首行井号'),
+  comment(13,'20000004','Src four'),print('NonJa',14,0,'; 首行分号'),
+ ]);
+ const docs2=nani._internal.scan(Buffer.concat([nonJaEnToJa,nonJaEnToZh,Buffer.alloc(8)]),[]);
+ const p2=nani.parse(Buffer.from(nani._internal.combine(docs2)[0].text));
+ assert.deepEqual(p2.lines,['日本語一。','日本語二。','日本語三。','>日本語四。']);
+ assert.deepEqual(p2.zh,['第一行\n# 假块','第二行\n; 假原文','# 首行井号','; 首行分号']);
+
+ // 3. LabelScriptLine stops untranslated comments in docEntries (empty hash + 8-hex label, normal hash) and printed()
+ const lblEmptyHash=Buffer.concat([
+  Buffer.alloc(8),
+  str('Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `LblEmpty` naninovel script'),
+  comment(2,'30000001','未翻訳A。'),
+  label(4,'','deadbeef'),
+  print('LblEmpty',5,0,'别块译文A'),
+  comment(7,'30000002','已翻訳B。'),
+  print('LblEmpty',8,0,'B的翻译'),
+ ]);
+ const lblNormalHash=Buffer.concat([
+  Buffer.alloc(8),
+  str('Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `LblHash` naninovel script'),
+  comment(2,'30000003','未翻訳C。'),
+  label(4,'abcdef01','NextBlock'),
+  print('LblHash',5,0,'别块译文C'),
+  comment(7,'30000004','已翻訳D。'),
+  print('LblHash',8,0,'D的翻译'),
+ ]);
+ const lblHashless=Buffer.concat([
+  Buffer.alloc(8),
+  str('Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `LblPrint` naninovel script'),
+  comment(2,null,'未翻訳E。'),
+  label(4,null,'MidLabel'),
+  generic(5,'',1),
+  comment(8,null,'已翻訳F。'),
+  generic(9,'',1),
+  print('LblPrint',5,0,'误吞译文E'),
+  print('LblPrint',9,0,'F的翻译'),
+ ]);
+ const docs3=nani._internal.scan(Buffer.concat([lblEmptyHash,lblNormalHash,lblHashless,Buffer.alloc(8)]),[]);
+ const by3=new Map(nani._internal.combine(docs3).map(d=>[d.name,nani.parse(Buffer.from(d.text))]));
+ assert.deepEqual(by3.get('LblEmpty.nani').lines,['未翻訳A。','已翻訳B。']);
+ assert.deepEqual(by3.get('LblEmpty.nani').zh,['','B的翻译']);
+ assert.deepEqual(by3.get('LblHash.nani').lines,['未翻訳C。','已翻訳D。']);
+ assert.deepEqual(by3.get('LblHash.nani').zh,['','D的翻译']);
+ assert.deepEqual(by3.get('LblPrint.nani').lines,['未翻訳E。','已翻訳F。']);
+ assert.deepEqual(by3.get('LblPrint.nani').zh,['','F的翻译']);
+
+ // 4. Extra classic ja->ja script in a ja bundle keeps Japanese + voice but never becomes a Chinese patch
+ const rootExtra=fs.mkdtempSync(path.join(os.tmpdir(),'nani-ja-extra-'));
+ t.after(()=>fs.rmSync(rootExtra,{recursive:true,force:true}));
+ const aaExtra=path.join(rootExtra,'Game_Data','StreamingAssets','aa','StandaloneWindows64');
+ fs.mkdirSync(aaExtra,{recursive:true});
+ fs.writeFileSync(path.join(aaExtra,'game-localization-zhhans-scripts-01.bundle'),packBundle('CAB-z',string('; Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `Main` naninovel script\n\n# m1\n; 本編。\n正篇。\n'),'2020.3.7f1'));
+ fs.writeFileSync(path.join(aaExtra,'game-localization-ja-scripts-01.bundle'),packBundle('CAB-j',Buffer.concat([
+  string('; Japanese <ja-JP> to Japanese <ja-JP> localization document for `Main` naninovel script\n\n# m1\n; 本編。\n本編校正。\n'),
+  string('; Japanese <ja-JP> to Japanese <ja-JP> localization document for `Extra` naninovel script\n\n# e1\n; > Ema: |#Extra_01|\n; 原文。\n校正後。\n'),
+ ]),'2020.3.7f1'));
+ const readExtra=new Map(scenes.read('naninovel',rootExtra).map(s=>[s.name,s]));
+ assert.deepEqual(readExtra.get('Main.nani').zh,['正篇。']);
+ const extraScene=readExtra.get('Extra.nani');
+ assert.deepEqual(extraScene.lines,['原文。']);
+ assert.deepEqual(extraScene.voices,['Extra_01']);
+ assert.deepEqual(extraScene.zh,['']);
+ assert.equal(nani.patchLines([extraScene]),null);
+
+ // 5. parsedJaSrc roundtrip: leading #/; translations, pure \n translations, >-prefixed source after author strip, and hashless translated > not poisoning voices
+ const edgeEntries=Buffer.concat([
+  Buffer.alloc(8),
+  str('Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `EdgeE` naninovel script'),
+  comment(2,'50000001','Ema: >矢印原文。'),print('EdgeE',3,0,'# 标题译文'),
+  comment(5,'50000002','二行目。'),print('EdgeE',6,0,'; 分号译文'),
+  comment(8,'50000003','三行目。'),print('EdgeE',9,0,'纯换行上\n# 假块\n; 假源文'),
+ ]);
+ const edgeHashless=Buffer.concat([
+  Buffer.alloc(8),
+  str('Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `EdgeP` naninovel script'),
+  comment(1,null,'> Ema: |#EdgeP_Fake|'),generic(2,'',1),
+  comment(4,null,'Ema: >無ハッシュ原文。'),generic(5,'',1),
+  comment(7,null,'純改行テスト。'),generic(8,'',1),
+  print('EdgeP',2,0,'有译文非元注释'),
+  print('EdgeP',5,0,'# 无哈希井号'),
+  print('EdgeP',8,0,'纯换行甲\n; 假源文乙'),
+ ]);
+ const docs5=nani._internal.scan(Buffer.concat([edgeEntries,edgeHashless,Buffer.alloc(8)]),[]);
+ const by5=new Map(nani._internal.combine(docs5).map(d=>[d.name,nani.parse(Buffer.from(d.text))]));
+ assert.deepEqual(by5.get('EdgeE.nani').lines,['>矢印原文。','二行目。','三行目。']);
+ assert.deepEqual(by5.get('EdgeE.nani').zh,['# 标题译文','; 分号译文','纯换行上\n# 假块\n; 假源文']);
+ assert.equal(by5.get('EdgeE.nani').voices,undefined);
+ assert.deepEqual(by5.get('EdgeP.nani').lines,['>無ハッシュ原文。','純改行テスト。']);
+ assert.deepEqual(by5.get('EdgeP.nani').zh,['# 无哈希井号','纯换行甲\n; 假源文乙']);
+ assert.equal(by5.get('EdgeP.nani').voices,undefined);
+});
