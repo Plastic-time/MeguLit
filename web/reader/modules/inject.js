@@ -122,6 +122,7 @@
   function skip(reason, text = '') { const k = reason + '|' + text; if (k === skipKey) return; skipKey = k; bridge.lastSkip = { reason, text: String(text).slice(0, 40) };
     try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'layoutDiagnostic', kind: 'translateSkip', reason, text: String(text).slice(0, 40) })); } catch {} }
   function read() {
+    if (sourcePreview) return;
     if(bridge.pageTranslationActive?.()){skip('page translation active');return;}
     const sentence = document.querySelector('.sentence-text');
     if (!sentence) {
@@ -194,14 +195,24 @@
   /* 2026-11-21 translation guard: 600 ms, 1.5 s and 3 s after a line is shown, a line still without a translation is asked again by its
      text (services/reader.cjs translateGuard: cache, script, fallback chain), past the "already asked" check and the request serial; after 3 s
      a faint 「翻译中…」 stands where the translation will go, never an empty row */
-  let guardTimers = [], guardText = '';
+  let guardTimers = [], guardText = '', sourcePreview = false;
+  bridge.setHookSourcePreview = preview => {
+    if (preview === sourcePreview) return;
+    sourcePreview = preview;
+    if (preview) {
+      bridge.serial++;
+      bridge.current = '';
+    }
+    guardText = '';
+    schedule();
+  };
   const guardNote = (what, text) => { try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'layoutDiagnostic', kind: 'translationGuard', what, text: String(text).slice(0, 40) })); } catch {} };
   const hasTranslation = () => output?.isConnected && output.dataset.state === 'ready' && !!output.textContent.trim() && output.textContent !== '翻译中…' && !bridge.lastTranslationError;
   function guard(text) {
     if (text === guardText) return; guardText = text; for (const t of guardTimers) clearTimeout(t); guardTimers = [];
-    if (!text || !enabled || !translationVisible) return;
+    if (sourcePreview || !text || !enabled || !translationVisible) return;
     for (const [ms, last] of [[600, false], [1500, false], [3000, true]]) guardTimers.push(setTimeout(() => {
-      if (guardText !== text || !sameLine(bridge.sourceText, text) || hasTranslation()) return;
+      if (sourcePreview || guardText !== text || !sameLine(bridge.sourceText, text) || hasTranslation()) return;
       guardNote(last ? 'still-missing' : 'retry', text);
       try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'translateGuard', text })); } catch {}
       if (last && output?.isConnected && (!output.textContent.trim() || output.textContent === '翻译中…')) { output.textContent = '翻译中…'; output.style.opacity = '.45'; output.dataset.state = 'pending'; }
@@ -211,7 +222,7 @@
   /* the page's earlier lines (.tome-page-tr, hook-reader): each one still empty at 0.6 / 1.5 / 3 s after it was first seen is asked by its text */
   const pageSeen = new Map();
   function pageGuard() {
-    if (!enabled || !translationVisible) return; const now = performance.now();
+    if (sourcePreview || !enabled || !translationVisible) return; const now = performance.now();
     for (const tr of document.querySelectorAll('.tome-page-lines .tome-page-tr')) {
       const jp = [...(tr.parentElement?.querySelectorAll('.tome-page-char') || [])].map(c => c.textContent).join('').trim(); if (!jp) continue;
       if (tr.textContent.trim()) { pageSeen.delete(jp); continue; }
@@ -226,6 +237,7 @@
   bridge.translationTarget = () => /^(english|bilingual-en)$/.test(bridge.galPreferences?.().display || '') || bridge.options?.().learnerLanguage === 'en' ? 'en' : 'zh';
   bridge.acceptTranslationTarget = context => !context || context.target === bridge.translationTarget();
   bridge.deliverBackfill = (source, text, kind = '', context = null) => {
+    if (sourcePreview) return;
     if (!bridge.acceptTranslationTarget(context)) return;
     if (!enabled || !translationVisible || !String(text || '').trim()) return;
     const shown = bridge.sourceText || bridge.current;
