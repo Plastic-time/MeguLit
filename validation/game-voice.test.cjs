@@ -149,6 +149,33 @@ test('fsb5: every setup header in the table parses to a mode list; a Vorbis samp
  const pages=[];for(let i=0;i<ogg.length;){assert.equal(ogg.toString('latin1',i,i+4),'OggS');const segs=ogg[i+26];let len=27+segs;for(let k=0;k<segs;k++)len+=ogg[i+27+k];pages.push({flags:ogg[i+5],granule:Number(ogg.readBigInt64LE(i+6))});i+=len;}
  assert.equal(pages[0].flags,2);assert.equal(pages.at(-1).flags,4);const bs=flags[(pk(0)[0]>>1)&((1<<mb)-1)]?2048:256;assert.ok(pages.at(-1).granule>0);
  const wav=f.toWav({channels:1,rate:22050,data:Buffer.alloc(100)});assert.equal(wav.toString('latin1',0,4),'RIFF');assert.equal(wav.readUInt32LE(24),22050);});
+test('fsb5: a name without a terminating NUL stops at the name table boundary',()=>{
+ const {parse}=require('../services/original-engines/fsb5.cjs');
+ const first=Buffer.from('voice-1\0'),last=Buffer.from('台詞');
+ const bank=(pcm,terminated)=>{
+  const table=Buffer.concat([Buffer.alloc(8),first,last,Buffer.alloc(terminated?1:0)]);
+  table.writeUInt32LE(8,0);
+  table.writeUInt32LE(8+first.length,4);
+  const head=Buffer.alloc(0x3c+16);
+  head.write('FSB5');
+  head.writeUInt32LE(1,4);
+  head.writeUInt32LE(2,8);
+  head.writeUInt32LE(16,12);
+  head.writeUInt32LE(table.length,16);
+  head.writeUInt32LE(pcm.length,20);
+  head.writeUInt32LE(2,24);
+  // Two 44100 Hz mono PCM16 samples, with the second starting 16 bytes into the audio.
+  head.writeUInt32LE(8<<1,0x3c);
+  head.writeUInt32LE(8<<2,0x40);
+  head.writeUInt32LE((1<<6)|(8<<1),0x44);
+  head.writeUInt32LE(8<<2,0x48);
+  return Buffer.concat([Buffer.from('embed'),head,table,pcm]);
+ };
+ const pcm=Buffer.alloc(32,0x41),pcmWithNul=Buffer.concat([Buffer.from('audio\0'),Buffer.alloc(26,0x41)]);
+ const samples=[parse(bank(pcm,true),5),parse(bank(pcm,false),5),parse(bank(pcmWithNul,false),5)];
+ assert.deepEqual(samples.map(clips=>clips.map(c=>c.name)),Array.from({length:3},()=>['voice-1','台詞']));
+ for(const [i,clips] of samples.entries())assert.deepEqual(Buffer.concat(clips.map(c=>c.data)),i===2?pcmWithNul:pcm);
+});
 test('naninovel voices: clips align in order to lines with a speaker, never against the line-number order, and only when the length fits',()=>{const nv=require('../services/original-engines/naninovel-voice.cjs');
  const L=[{text:'地の文。',author:'',idx:0},{text:'「おはよう、今日はいい天気だね」',author:'Kasumi',idx:1},{text:'「うん」',author:'',idx:2},{text:'「行こうか、みんなで一緒に海まで」',author:'Ayano',idx:3}];
  const V=[{name:'S/10.0',n:10,d:5.0},{name:'S/14.0',n:14,d:5.6}];

@@ -7,17 +7,24 @@
    The identification header is rebuilt (channels, rate, block sizes 256 / 2048 as FMOD uses), the setup header is read
    far enough to know each mode's block flag, and every packet's granule position is counted from its block size. */
 const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
+const {cstr}=require('./kit.cjs');
 const FREQ={1:8000,2:11000,3:11025,4:16000,5:22050,6:24000,7:32000,8:44100,9:48000};
 let setups=null;
 function setupFor(crc){if(!setups){setups=new Map();const b=zlib.inflateRawSync(fs.readFileSync(path.join(__dirname,'fsb-vorbis-setups.bin')));for(let p=0;p+8<=b.length;){const c=b.readUInt32LE(p),n=b.readUInt32LE(p+4);setups.set(c,b.subarray(p+8,p+8+n));p+=8+n;}}return setups.get(crc>>>0)||null;}
 // FSB5 bank -> [{name, channels, rate, samples, codec, crc, data}]
 function parse(b,at=0){if(b.toString('latin1',at,at+4)!=='FSB5')return null;const ver=b.readUInt32LE(at+4),num=b.readUInt32LE(at+8),shs=b.readUInt32LE(at+12),nts=b.readUInt32LE(at+16),ds=b.readUInt32LE(at+20),codec=b.readUInt32LE(at+24);
- const head=at+(ver===0?0x40:0x3c),dataAt=head+shs+nts;let p=head;const out=[];
+ const head=at+(ver===0?0x40:0x3c),namesAt=head+shs,dataAt=namesAt+nts;let p=head;const out=[];
  for(let i=0;i<num;i++){const lo=b.readUInt32LE(p),hi=b.readUInt32LE(p+4);p+=8;let rate=FREQ[(lo>>>1)&15]||44100,channels=((lo>>>5)&1)+1;const offset=((lo>>>6)|((hi&3)<<26))*16,samples=hi>>>2;let crc=null,next=lo&1;
   while(next){const c=b.readUInt32LE(p);p+=4;next=c&1;const size=(c>>>1)&0xffffff,type=(c>>>25)&0x7f;if(type===1)channels=b[p];else if(type===2)rate=b.readUInt32LE(p);else if(type===11)crc=b.readUInt32LE(p);p+=size;}
   out.push({channels,rate,samples,codec,crc,offset});}
  for(let i=0;i<out.length;i++){const end=i+1<out.length?out[i+1].offset:ds;out[i].data=b.subarray(dataAt+out[i].offset,dataAt+end);}
- if(nts)for(let i=0;i<out.length;i++){const o=b.readUInt32LE(head+shs+i*4),z=b.indexOf(0,head+shs+o);out[i].name=b.toString('utf8',head+shs+o,z);}
+ if(nts){
+  const names=b.subarray(namesAt,dataAt);
+  for(let i=0;i<out.length;i++){
+   const offset=b.readUInt32LE(namesAt+i*4);
+   out[i].name=cstr(names,offset)?.toString('utf8')??'';
+  }
+ }
  return out;}
 // LSB-first bit reader over a Vorbis header packet.
 function bits(buf){let p=0;return {read(n){let v=0;for(let i=0;i<n;i++){const byte=buf[p>>3];v+=((byte>>(p&7))&1)*2**i;p++;}return v;},get pos(){return p;}};}
