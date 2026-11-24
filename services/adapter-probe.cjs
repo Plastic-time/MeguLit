@@ -8,9 +8,10 @@
    One worker process at idle priority probes one game at a time. A game that runs over perGameMs kills the worker and
    is recorded as step 'timeout'; the next worker carries on. The whole run stops (state 'paused') when budgetMs is
    used up and continues on the next start/resume. A result is kept per game with a stamp (exe size + mtime, folder
-   mtime, reader code); a game whose stamp has not changed is not probed again unless force.
+   mtime, reader code, and whether the selected executable can use the SIA reader); a game whose stamp has not changed is not probed again unless force.
    State: data/adapter-probe/state.json (written after every game). Nothing here uploads. */
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{fork}=require('node:child_process');
+const {isGameExecutable:isSiaExecutable}=require('./original-engines/sia.cjs');
 const DEFAULT_BUDGET=20*60000,PER_GAME=90000,FRESH_DAYS=14;
 const fileOf=root=>path.join(root,'data','adapter-probe','state.json');
 function readJSON(file){try{const v=JSON.parse(fs.readFileSync(file,'utf8'));return v&&typeof v==='object'?v:null;}catch{return null;}}
@@ -19,7 +20,7 @@ function load(root){const v=readJSON(fileOf(root))||{};return {version:1,run:v.r
 const save=(root,s)=>atomic(fileOf(root),s);
 const runs=new Map();/* root → live run {child,timer,cancelled,emit} */
 
-function stampOf(executable){try{const st=fs.statSync(executable),dir=fs.statSync(path.dirname(executable));return st.size+'-'+Math.floor(st.mtimeMs)+'-'+Math.floor(dir.mtimeMs)+'-'+require('./adapter-probe-core.cjs').reader();}catch{return '';}}
+function stampOf(executable){try{const st=fs.statSync(executable),dir=fs.statSync(path.dirname(executable));return st.size+'-'+Math.floor(st.mtimeMs)+'-'+Math.floor(dir.mtimeMs)+'-'+require('./adapter-probe-core.cjs').reader()+(isSiaExecutable(executable)?'-sia':'');}catch{return '';}}
 /* the library games to probe: [{id,title,executable}] */
 function libraryRows(db){try{
  const rows=db.prepare("SELECT id,title,executable FROM games WHERE removed_at IS NULL AND executable<>''").all();

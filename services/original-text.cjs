@@ -120,15 +120,18 @@ const ADAPTERS={
   fingerprint:dir=>crypto.createHash('sha256').update('bgi-code-order\n'+bgi.arcFiles(dir).map(p=>{const st=fs.statSync(p);return path.basename(p)+'|'+st.size+'|'+st.mtimeMs;}).join('\n')).digest('hex')}};
 // E280: engines read as scene files (KiriKiri, Artemis, Ren'Py); their script is the game folder like BGI's.
 const scenes=require('./original-engines/scenes.cjs'),fillLines=require('./original-engines/fill.cjs');
+const {isGameExecutable:isSiaExecutable}=require('./original-engines/sia.cjs');
 for(const id of Object.keys(scenes.ENGINES))ADAPTERS[id]={folder:true,scene:true,locate:dir=>scenes.readable(id,dir)?{engine:id,target:dir}:null,
  read:dir=>{const list=scenes.read(id,dir),lines=list.flatMap(x=>x.lines),ruby=list.some(x=>x.ruby)?list.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined;const roles=list.some(scene=>scene.roles||scene.scope==='interface')?list.map(scene=>scene.roles||(scene.scope==='interface'?'i':'?').repeat(scene.lines.length)).join(''):undefined;
   return {engine:id,version:0,codepage:'text',lines,ruby,roles,sizes:list.map(x=>x.lines.length),structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
  fingerprint:dir=>scenes.fingerprint(id,dir)};
 const runningDirOf=runtime=>ADAPTERS[runtime.engine||'system4']?.folder?runtime.file:path.dirname(runtime.file);
+// Switching to or from 1055.exe can change the reader without changing files in the folder.
+const runtimeMatchesExecutable=(runtime,executable)=>(runtime.siaExecutable??(runtime.engine==='sia'))===isSiaExecutable(executable);
 /* 2026-11-21 (DDLC Plus pairing self-test: the generic Unity reader took the folder before vgprompter, so the runtime became its 53 poem lines and the
    group's 16177-line table no longer belonged to it): scene engines are chosen the way scenes.detect chooses them, the readers the engine registry
    names first; the plain registration order (generic readers among the dedicated ones) is no longer used for them */
-function locate(dir,base){for(const adapter of Object.values(ADAPTERS)){if(adapter.scene)continue;const found=adapter.locate(dir,base);if(found)return found;}let id=null;try{id=scenes.detect(dir);}catch{}return id&&ADAPTERS[id]?{engine:id,target:dir}:null;}
+function locate(dir,base,executable){for(const adapter of Object.values(ADAPTERS)){if(adapter.scene)continue;const found=adapter.locate(dir,base);if(found)return found;}let id=null;try{id=scenes.detect(dir,executable);}catch{}return id&&ADAPTERS[id]?{engine:id,target:dir}:null;}
 const ARCHIVE_BAK_ENGINES=new Set(['silky']);
 function readSceneArchive(id,file){
  if(!ARCHIVE_BAK_ENGINES.has(id))return null;
@@ -158,13 +161,14 @@ function gameRow(db,id){const row=db.prepare('SELECT * FROM games WHERE id=? AND
 
 // ---- Running build: what the installed (patched) game still contains ---------------------------
 function scanRunning(root,id,executable,opts={}){
- const dir=path.dirname(executable),loc=locate(dir,path.parse(executable).name);if(!loc){const waiting=scenes.preparing(dir);return writeState(root,id,waiting?{status:'preparing',error:'SCRIPT_PREPARING',preparing:waiting,runtime:null,gameDir:dir}:(()=>{const why=scenes.unsupportedReason(dir);return why?{status:'unsupported',error:why.code,detail:why.detail,engine:why.engine,preparing:null,runtime:null,gameDir:dir}:{status:'unsupported',error:'NO_SUPPORTED_SCRIPT',detail:'',preparing:null,runtime:null,gameDir:dir};})());}const file=loc.target;
- const hash=fingerprint(loc),current=readState(root)[id];if(current?.runtime?.sha256===hash&&(current.runtime.reader||'')===READER&&current.runtime.index&&fs.existsSync(current.runtime.index))return current;
+ const dir=path.dirname(executable),loc=locate(dir,path.parse(executable).name,executable);if(!loc){const waiting=scenes.preparing(dir);return writeState(root,id,waiting?{status:'preparing',error:'SCRIPT_PREPARING',preparing:waiting,runtime:null,gameDir:dir}:(()=>{const why=scenes.unsupportedReason(dir);return why?{status:'unsupported',error:why.code,detail:why.detail,engine:why.engine,preparing:null,runtime:null,gameDir:dir}:{status:'unsupported',error:'NO_SUPPORTED_SCRIPT',detail:'',preparing:null,runtime:null,gameDir:dir};})());}const file=loc.target;
+ const hash=fingerprint(loc),current=readState(root)[id];if(current?.runtime?.sha256===hash&&(current.runtime.reader||'')===READER&&runtimeMatchesExecutable(current.runtime,executable)&&current.runtime.index&&fs.existsSync(current.runtime.index))return current;
  const ain=readScript(loc),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length,nonEmpty=ain.lines.filter(prose).length,zhOnly=chineseOnly(ain.lines);
  // An English (or other) original read by a scene engine is neither the Japanese game nor a Chinese build: nothing to do.
  if(ADAPTERS[loc.engine].scene&&!zhOnly){const chinese=ain.lines.filter(t=>prose(t)&&!japaneseLine(t)&&/[一-鿿]{2}/.test(t)).length,latin=ain.lines.filter(latinDialogue).length;if(!nonEmpty||(japanese<nonEmpty*.5||latin>=Math.max(100,japanese*2,chinese*2))&&chinese<nonEmpty*.3)return writeState(root,id,{status:'unsupported',error:'SCRIPT_NOT_JAPANESE',runtime:null,gameDir:dir});}
  const index=writeIndex(root,id,'runtime-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'runtime',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash},structure:ain.structure,lines:ain.lines,...(ain.roles?{roles:ain.roles}:{}),...(ain.ruby?{ruby:ain.ruby}:{}),...(ain.sizes?{sizes:ain.sizes}:{})});
  const original=current?.original;const runtime={file,engine:loc.engine,sha256:hash,reader:READER,index,codepage:ain.codepage,version:ain.version,structure:ain.structure,lines:nonEmpty,japaneseLines:japanese};
+ if(isSiaExecutable(executable))runtime.siaExecutable=true;
  // A changed game build invalidates the earlier alignment; the original index itself stays.
  const state=writeState(root,id,{engine:loc.engine,runtime,status:zhOnly&&!original?.index?'chinese-only':!zhOnly&&japanese>=nonEmpty*.5?'native-japanese':original?.index&&current?.runtime?.sha256===hash?current.status:original?.index?'needs-recheck':'awaiting-original'});
  /* A scene engine that reads the Japanese lines behind the running ones from this same folder (CMVS official Chinese:
@@ -614,7 +618,8 @@ function brief(root,id){const s=readState(root)[String(id)];if(!s)return 'unknow
  if(s.status==='preparing')return 'preparing';return 'none';}
 function status(root,db,id){
  const row=gameRow(db,id),saved=readState(root)[id];let state=saved;
- try{if(!saved?.runtime||!sameDir(runningDirOf(saved.runtime),path.dirname(row.executable))||!fs.existsSync(saved.runtime.file)||saved.runtime.sha256!==fingerprint({engine:saved.runtime.engine||'system4',target:saved.runtime.file}))state=scanRunning(root,id,row.executable);}catch(error){state={...saved,status:'failed',error:String(error.message||error)};}
+ const runtimeMatches=saved?.runtime&&runtimeMatchesExecutable(saved.runtime,row.executable);
+ try{if(!runtimeMatches||!sameDir(runningDirOf(saved.runtime),path.dirname(row.executable))||!fs.existsSync(saved.runtime.file)||saved.runtime.sha256!==fingerprint({engine:saved.runtime.engine||'system4',target:saved.runtime.file}))state=scanRunning(root,id,row.executable);}catch(error){state={...saved,runtime:runtimeMatches?saved.runtime:null,status:'failed',error:String(error.message||error)};}
  try{state=refreshCachedPatchReport(root,id,state);}catch{}
  /* Live test 2026-11-13 (Summer Pockets, 魔法少女ノ魔女裁判, DDLC Plus): patches aligned before E496 had no pairing report, so the
     game page could not say total/paired/unpaired. Sample it once from the saved indexes; the verdict is reported, the state kept. */
@@ -624,7 +629,8 @@ function status(root,db,id){
  /* E288 (user: the dialog stayed on 正在查找 for good after removing a patch): every status poll starts autoPatchLater, so
     an entry in autoRuns says nothing; only a search that really scans (it records running) counts, for two minutes at most. */
  const searching=!!state?.patchSearch?.running&&Date.now()-(state.patchSearch.at||0)<120000,patchSearch=state?.patchSearch||searching?{running:searching,found:!!state?.patchSearch?.found,at:state?.patchSearch?.at||0,declined:!!state?.patchSearch?.declined}:null;
- return {preparing:state?.status==='preparing'?state.preparing||null:null,patchSearch,patchHint:patchHint(state?.runtime),patchLauncher:state?.patchLauncher?.file&&fs.existsSync(state.patchLauncher.file)?{file:state.patchLauncher.file}:null,gameDir:path.dirname(row.executable),patch:patchInfo,patchStatus:patchInfo?state.patchStatus||'none':'none',patchAlignment:patchInfo?state.patchAlignment||null:null,engine:state?.engine||'',status:state?.status||'unsupported',mode:state?.mode||'off',error:state?.error||'',lastSearch:state?.lastSearch?{at:state.lastSearch.at,found:state.lastSearch.found,searched:state.lastSearch.searched,complete:state.lastSearch.complete}:null,runtime:state?.runtime?runtime:null,original:state?.original?original:null,alignment:state?.alignment||null};
+ const engine=scenes.acceptsExecutable(state?.engine,row.executable)?state?.engine||'':'';
+ return {preparing:state?.status==='preparing'?state.preparing||null:null,patchSearch,patchHint:patchHint(state?.runtime),patchLauncher:state?.patchLauncher?.file&&fs.existsSync(state.patchLauncher.file)?{file:state.patchLauncher.file}:null,gameDir:path.dirname(row.executable),patch:patchInfo,patchStatus:patchInfo?state.patchStatus||'none':'none',patchAlignment:patchInfo?state.patchAlignment||null:null,engine,status:state?.status||'unsupported',mode:state?.mode||'off',error:state?.error||'',lastSearch:state?.lastSearch?{at:state.lastSearch.at,found:state.lastSearch.found,searched:state.lastSearch.searched,complete:state.lastSearch.complete}:null,runtime:state?.runtime?runtime:null,original:state?.original?original:null,alignment:state?.alignment||null};
 }
 function setMode(root,id,mode){if(!['off','original'].includes(mode))throw Error('INVALID_TEXT_MODE');const s=readState(root)[id];if(mode==='original'&&s?.status!=='ready')throw Error('ORIGINAL_NOT_READY');return writeState(root,id,{mode});}
 
@@ -834,9 +840,10 @@ function adoptOriginal(root,id,state,dir){
  return writeState(root,id,{original:{dir,file:dir,sha256:hash,index,codepage:'text',lines:lines.length,executable:'',auto:true},alignment,status:alignment.reliable?'ready':'unreliable',mode:state.mode||(alignment.reliable?'original':'off'),error:''});
 }
 /* E545 what the provider for this program is built from: the reader keeps a provider whose key has not changed (its reading position too) and rebuilds one whose script, patch or mode changed while the game runs */
-function providerEntry(root,dir,id,{runtimeOnly=false}={}){
+function providerEntry(root,executable,id,{runtimeOnly=false}={}){
+ const program=String(executable||''),dir=path.dirname(program).toLowerCase();
  return Object.entries(readState(root)).find(([key,s])=>(id===undefined||id===key)&&
-  (s?.runtime?.file?runningDirOf(s.runtime).toLowerCase()===dir:!runtimeOnly&&String(s?.gameDir||'').toLowerCase()===dir));
+  (s?.runtime?.file?runningDirOf(s.runtime).toLowerCase()===dir&&runtimeMatchesExecutable(s.runtime,program):!runtimeOnly&&String(s?.gameDir||'').toLowerCase()===dir));
 }
 const indexDigests=new Map();
 function scriptDigest(file){
@@ -853,7 +860,7 @@ function contributionScript(root,exe,id){
  if(manifest)return archive.localArchive(exe,manifest)?.valid()?manifest.indexSha256:'';
  const embedded=require('./embedded-japanese.cjs'),em=embedded.manifest(dir);
  if(em)return embedded._internal.valid(dir,em)?em.indexSha256:'';
- const entry=providerEntry(root,dir.toLowerCase(),id==null?undefined:String(id)),state=entry?.[1];
+ const entry=providerEntry(root,exe,id==null?undefined:String(id)),state=entry?.[1];
  if(!state?.runtime?.sha256){
   // A loose compiled Ren'Py entry script can identify the installed variant before any original-text index exists.
   try{
@@ -876,7 +883,7 @@ function contributionScript(root,exe,id){
 function providerKey(root,executable,id){const folder=path.dirname(String(executable||'')),dir=folder.toLowerCase();if(!dir||dir==='.')return '';
  const imported=require('../core/japanese-import-original.cjs'),archive=imported.archiveManifest(folder);
  if(archive)return 'archive|'+imported.archiveStamp(executable,archive);
- const embedded=require('./embedded-japanese.cjs').stamp(folder);if(embedded)return 'embedded|'+embedded;const entry=providerEntry(root,dir,id);if(!entry)return 'none|'+dir;const [entryId,s]=entry;return JSON.stringify([entryId,s.status||'',s.mode||'',s.runtime?.sha256||'',s.runtime?.index||'',s.patchStatus||'',s.patch?.index||'',s.patch?.version??'',s.patch?.runtimeSha||'',s.original?.index||'']);}
+ const embedded=require('./embedded-japanese.cjs').stamp(folder);if(embedded)return 'embedded|'+embedded;const entry=providerEntry(root,executable,id);if(!entry)return 'none|'+dir;const [entryId,s]=entry;return JSON.stringify([entryId,s.status||'',s.mode||'',s.runtime?.sha256||'',s.runtime?.index||'',s.patchStatus||'',s.patch?.index||'',s.patch?.version??'',s.patch?.runtimeSha||'',s.original?.index||'']);}
 function archiveProvider(imported,executable,manifest){
  const index=imported.localArchive(executable,manifest);
  if(!index)return null;
@@ -896,7 +903,7 @@ function provider(root,executable,opts={}){
  const imported=require('../core/japanese-import-original.cjs'),archive=imported.archiveManifest(embeddedDir);
  if(archive)return archiveProvider(imported,executable,archive);
  if(embedded.manifest(embeddedDir))return embedded.provider(embeddedDir);
- const dir=path.dirname(String(executable)).toLowerCase(),entry=providerEntry(root,dir,opts.id);
+ const entry=providerEntry(root,executable,opts.id);
  /* 2026-11-13 no imported script: the script harvested at run time (services/script-harvest.cjs), when there is one */
  if(!entry){try{const h=require('./script-harvest.cjs');return h.report(path.dirname(String(executable)))?.total?h.provider(path.dirname(String(executable))):null;}catch{return null;}}
  const gameDir=path.dirname(String(executable));
@@ -907,8 +914,7 @@ function provider(root,executable,opts={}){
    rebuild). ja[i] is the Japanese line, tr[i] its human translation or '' (a patch line left in Japanese is none);
    source is 'official' for a Chinese release with its Japanese original, 'group' for a translation group's patch. */
 function scriptPairs(root,executable){
- const dir=path.dirname(String(executable||'')).toLowerCase();if(!dir)return null;
- const entry=Object.entries(readState(root)).find(([,s])=>s?.runtime?.file&&runningDirOf(s.runtime).toLowerCase()===dir);if(!entry)return null;const state=entry[1];
+ const entry=providerEntry(root,executable,undefined,{runtimeOnly:true});if(!entry)return null;const state=entry[1];
  try{
   if(state.status==='ready'&&state.original?.index){const tr=readIndex(state.runtime.index).lines,ja=readIndex(state.original.index).lines;return {source:'official',ja,tr:ja.map((_,i)=>typeof tr[i]==='string'&&!japaneseLine(tr[i])?tr[i]:'')};}
   if(state.status!=='native-japanese'||!state.runtime.index)return null;const ja=readIndex(state.runtime.index).lines;
@@ -919,7 +925,7 @@ function scriptPairs(root,executable){
 }
 function staticProvider(root,executable,opts={}){
  // BGI's and scene engines' script is the whole game folder, AIN is a file in it.
- const entry=providerEntry(root,path.dirname(String(executable)).toLowerCase(),opts.id,{runtimeOnly:true});
+ const entry=providerEntry(root,executable,opts.id,{runtimeOnly:true});
  if(!entry?.[1]?.runtime?.file)return null;const [id,state]=entry;
  try{if(!opts.indexOnly&&fingerprint({engine:state.runtime.engine||'system4',target:state.runtime.file})!==state.runtime.sha256)return null;
   if(state.mode==='original'&&state.status==='ready'&&state.original?.index){const og=readIndex(state.original.index),m=new Matcher(readIndex(state.runtime.index).lines,og.lines);

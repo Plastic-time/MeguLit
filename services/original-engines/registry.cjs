@@ -192,12 +192,14 @@ const ENGINES=[
  // A Unity build keeps <Name>_Data beside <Name>.exe. A folder that only holds something named *_Data (a library
  // folder, or the folder a game was unpacked into) is not a Unity game by itself.
  {name:'Unity',hook:null,generic:true,test:f=>f.has(/^unityplayer\.dll$/i)||f.names.some(n=>/_Data$/i.test(n)&&f.names.some(e=>e.toLowerCase()===n.slice(0,-5).toLowerCase()+'.exe'))},
- /* E610 generic web bundles last: named engines of the family with no signature of their own read through the generic HTML5 reader */
+ /* E610 generic web bundles: named engines of the family with no signature of their own read through the generic HTML5 reader */
  {name:'O2 Engine / Novelsphere',hook:null,generic:true,test:f=>f.names.some(n=>/novelsphere/i.test(n))},
  {name:'NVLMaker',hook:null,generic:true,test:f=>f.names.some(n=>/nvlmaker/i.test(n))},
  {name:'CloudNovel',hook:null,generic:true,test:f=>f.names.some(n=>/cloudnovel/i.test(n))},
  {name:'HTMLVN',hook:null,generic:true,test:f=>f.names.some(n=>/htmlvn/i.test(n))},
  {name:'HTML5 / Electron / NW.js',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'html5'))},
+ // Keep SIA last so any existing folder match, including SoftPal, NeXAS and Tmr-Hiro PACs, takes priority.
+ {name:'SIA-Soft',hook:null,test:f=>f.has(/^1055\.exe$/i)&&f.inspect(require('./sia.cjs').probe)},
 ];
 /* the readers of each engine */
 const READERS={"BGI / Ethornell":["bgi"],
@@ -212,6 +214,7 @@ const READERS={"BGI / Ethornell":["bgi"],
  "Majiro":["majiro"],
  "QLIE":["qlie"],
  "SoftPal":["softpal"],
+ "SIA-Soft":["sia"],
  "NeXAS":["nexas"],
  "System 3.x (AliceSoft)":["alicesoft"],
  "System4 (AliceSoft)":["system4","alicesoft"],

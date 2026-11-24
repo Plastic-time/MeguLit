@@ -57,7 +57,7 @@ test('BGI lines follow code order; patch scenes are checked on shared identifier
  assert.match(src,/refs\.push\(off\)/);
  assert.match(ot,/skipped:'operands'/);
  assert.match(ot,/'bgi-code-order\\n'/,'old BGI indexes are rebuilt');
- assert.match(ot,/providerEntry\(root,path\.dirname\(String\(executable\)\)\.toLowerCase\(\),opts\.id/,'the runtime provider is looked up by game folder');
+ assert.match(ot,/function providerEntry\(root,executable,id,[^\n]*\n[^\n]*dir=path\.dirname\(program\)\.toLowerCase\(\)/,'the runtime provider takes the executable and looks up its game folder');
  assert.match(ot,/runningDirOf\(s\.runtime\)\.toLowerCase\(\)===dir/);assert.match(ot,/bgi:\{folder:true,/);
 });
 
