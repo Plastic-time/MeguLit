@@ -8,6 +8,7 @@
 // Japanese lines with a generic text scan (Shift-JIS, UTF-8, UTF-16). Results, and failures, are cached per archive
 // size + mtime + GARbro version, so a game is unpacked once and an archive GARbro cannot open is not retried.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{spawn}=require('node:child_process');
+const kit=require('./kit.cjs');
 const ROOT=()=>process.env.MEGULIT_GARBRO_ROOT||path.join(__dirname,'..','..');
 const HOST=path.join(__dirname,'..','garbro-host.ps1');
 const PACK='archives',DIR=()=>path.join(ROOT(),'runtime','garbro'),CACHE=()=>process.env.MEGULIT_GARBRO_CACHE||path.join(ROOT(),'cache','garbro');
@@ -23,6 +24,19 @@ const SCRIPTY=/script|scenario|scene|scn|story|text|txt|data|system|sys|main|gam
 const MEDIA='png|bmp|jpe?g|gif|tga|dds|webp|psd|tlg\\d?|pna|bmx|g00|pic|ani|eri|mio|cps|hg[23]|ogg|wav|mp3|m4a|opus|flac|ahx|hca|at3|wma|mp4|wmv|avi|mpe?g|webm|ogv|mov|ttf|otf|ttc|fnt|pmx|x|fbx';
 const MATCH='^(?!.*\\.('+MEDIA+')$).+';
 const LIMIT_BYTES=512*1048576,LIMIT_FILES=20000,MAX_ARCHIVES=12,MIN_SIZE=16384;
+const SCRIPT_PACKS={
+ '.pbz':{magic:'PBZ1',entries:/\.scr$/i,comment:/^;/},
+ '.pk':{magic:'fPK ',entries:/\.(?:txt|hpb)$/i,comment:/^#/,paired:true}
+};
+const SCRIPT_COMMAND=/^(?:[:@*]|[a-z][a-z0-9_]*(?:\s|$))/i;
+
+// GARbro's PBZ and PK/IVORY readers open these formats. Only the script pack belongs in the text scan.
+function scriptPack(file){
+ const {name,ext}=path.parse(file);
+ if(name.toLowerCase()!=='script')return null;
+ const pack=SCRIPT_PACKS[ext.toLowerCase()];
+ return pack&&kit.head(file,4).toString('latin1')===pack.magic?pack:null;
+}
 
 const jobs=new Map();/* archive path → {state,startedAt,error} for archives being unpacked in this process */
 let packsRef=null;
@@ -38,8 +52,8 @@ function archives(dir){
  /* E583 a System4 folder (its script is the .ain) keeps only CG / sound in .afa / .ald: never worth unpacking */
  const sys4=(()=>{try{return require('./alicesoft.cjs').system4(dir);}catch{return false;}})();
  const out=[];const scan=(d,depth)=>{let list;try{list=fs.readdirSync(d,{withFileTypes:true});}catch{return;}
-  for(const e of list){const p=path.join(d,e.name);if(e.isDirectory()){if(depth<1&&!/^(save|savedata|movie|movies|video|bgm|sound|voice|se|cg|image|images|logs?)$/i.test(e.name))scan(p,depth+1);continue;}
-   if(!ARCHIVE.test(e.name))continue;if(sys4&&/\.(afa|ald)$/i.test(e.name))continue;if(/^(unins\d*|setup|config|savedata|save\d*|global|sysdata)\./i.test(e.name))continue;
+  for(const e of list){const p=path.join(d,e.name);if(e.isDirectory()){if(depth<1&&!/^(save|savedata|movie|movies|video|bgm|sound|voice|se|cg|image|images|logs?|directx\d*)$/i.test(e.name))scan(p,depth+1);continue;}
+   if(!ARCHIVE.test(e.name)&&(!e.isFile()||!scriptPack(p)))continue;if(sys4&&/\.(afa|ald)$/i.test(e.name))continue;if(/^(unins\d*|setup|config|savedata|save\d*|global|sysdata)\./i.test(e.name))continue;
    let size=0;try{size=fs.statSync(p).size;}catch{}if(size>=MIN_SIZE)out.push({file:p,size,scripty:SCRIPTY.test(e.name)});}};
  scan(dir,0);
  return out.sort((a,b)=>b.scripty-a.scripty||a.size-b.size).slice(0,MAX_ARCHIVES).map(a=>a.file);
@@ -64,7 +78,7 @@ async function unpack(file,{download=true}={}){
  const v=version(),bad=readJson(failed);if(bad&&bad.version===v)throw Error(bad.error||'GARBRO_FAILED');
  const tmp=out+'.part';fs.rmSync(tmp,{recursive:true,force:true});
  try{
-  const r=await run(['-Mode','extract','-Archive',file,'-Out',tmp,'-Match',MATCH,'-Limit',String(LIMIT_FILES),'-MaxBytes',String(LIMIT_BYTES)]);
+  const r=await run(['-Mode','extract','-Archive',file,'-Out',tmp,'-Match',scriptPack(file)?.entries.source||MATCH,'-Limit',String(LIMIT_FILES),'-MaxBytes',String(LIMIT_BYTES)]);
   if(!r.files?.length)throw Error('GARBRO_NO_SCRIPTS');
   fs.rmSync(out,{recursive:true,force:true});fs.renameSync(tmp,out);
   const info={archive:file,format:r.format,files:r.files,bytes:r.bytes,version:v,at:Date.now()};fs.writeFileSync(done,JSON.stringify(info));return info;
@@ -80,7 +94,7 @@ function unpackSync(file,{timeout=60000}={}){
  const v=version(),bad=readJson(failed);if(bad&&bad.version===v)throw Error(bad.error||'GARBRO_FAILED');
  const tmp=out+'.part';fs.rmSync(tmp,{recursive:true,force:true});
  try{const ps=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
-  const r=require('node:child_process').spawnSync(ps,['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',HOST,'-GarbroDir',DIR(),'-Mode','extract','-Archive',file,'-Out',tmp,'-Match',MATCH,'-Limit',String(LIMIT_FILES),'-MaxBytes',String(LIMIT_BYTES)],{windowsHide:true,encoding:'utf8',timeout,maxBuffer:16<<20});
+  const r=require('node:child_process').spawnSync(ps,['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',HOST,'-GarbroDir',DIR(),'-Mode','extract','-Archive',file,'-Out',tmp,'-Match',scriptPack(file)?.entries.source||MATCH,'-Limit',String(LIMIT_FILES),'-MaxBytes',String(LIMIT_BYTES)],{windowsHide:true,encoding:'utf8',timeout,maxBuffer:16<<20});
   if(r.error&&/ETIMEDOUT/.test(String(r.error.code||r.error.message)))throw Error('GARBRO_TIMEOUT');
   let json=null;try{json=JSON.parse(String(r.stdout||'').trim().split(/\r?\n/).pop()||'');}catch{}
   if(!json)throw Error('GARBRO_BAD_OUTPUT '+String(r.stderr||r.stdout||'').slice(0,300));if(json.error)throw Error(json.error);
@@ -106,14 +120,26 @@ async function pump(){if(busy)return;busy=true;try{while(queue.length){const fil
   try{await unpack(file);job.state='done';}catch(error){job.state='error';job.error=error.message;}}}finally{busy=false;}}
 
 /* E573 the generic kana scan is shared with every reader whose grammar is unknown (kit.cjs) */
-const decodeRuns=require('./kit.cjs').decodeRuns;
+const {decodeRuns}=kit;
 // Engine interface used by scenes.cjs.
 const engine={id:'garbro',
  sources:dir=>archives(dir),
  scenes(dir){
   const out=[];
   for(const file of archives(dir)){let c;try{c=cacheDir(file);}catch{continue;}const info=readJson(path.join(c,'done.json'));
-   if(info){for(const rel of info.files)out.push({name:path.basename(file)+'/'+rel.replace(/\\/g,'/'),read:()=>fs.readFileSync(path.join(c,rel))});continue;}
+   if(info){
+    const pack=scriptPack(file),names=pack?.paired?new Set(info.files.map(name=>name.toLowerCase())):null;
+    for(const rel of info.files){
+     if(pack&&!pack.entries.test(rel))continue;
+     // The compiled Ivory entry and its text source are two versions of the same scene.
+     if(names&&(!/\.txt$/i.test(rel)||!names.has(rel.slice(0,-4).toLowerCase()+'.hpb')))continue;
+     const read=()=>fs.readFileSync(path.join(c,rel));
+     const scene={name:path.basename(file)+'/'+rel.replace(/\\/g,'/'),read};
+     if(pack)scene.parse=()=>kit.lineGrammar(kit.SJIS.decode(read()),{comment:pack.comment,anchor:SCRIPT_COMMAND,strip:[]});
+     out.push(scene);
+    }
+    continue;
+   }
    if(readJson(path.join(c,'failed.json'))?.version===version())continue;
    if(!cacheOnly.getStore())schedule(file);
   }

@@ -201,5 +201,9 @@ function probeInScope({dir,executable,title},{budgetMs=60000,progress=null}={}){
   engines:engines.map(({sizes,...e})=>e),detected:c.detected,lines:best?.lines||0,japaneseLines:best?.japaneseLines||0,dialogueLines:best?.dialogueLines||0,chineseLines:best?.chineseLines||0,sizes:best?.sizes||[],
   tried:engines.filter(e=>e.routed||e.scenes!==0).map(e=>e.id).slice(0,24),budgetMs,...garbroNeed&&c.step!=='not-japanese'?{needs:'garbro'}:{},step:c.step,detail:c.detail,original,restore,unsupported:unsupported?{engine:unsupported.engine,code:unsupported.code}:null,preparing,_archives:inv.archives.map(a=>a._path)};
 }
-function probeGame(game,options){return require('./original-engines/scenes.cjs').withCxProbe(()=>probeInScope(game,options));}
+function probeGame(game,options){
+ const scenes=require('./original-engines/scenes.cjs'),garbro=require('./original-engines/garbro.cjs');
+ // The synchronous fallback owns cold GARbro extraction during a probe.
+ return scenes.withCxProbe(()=>garbro.withCached(()=>probeInScope(game,options)));
+}
 module.exports={probeGame,isWindowsDirectory,routedReaders,scaledBudget,classify,judgeLanguage,countLines,inventory,reader,MAGICS};
