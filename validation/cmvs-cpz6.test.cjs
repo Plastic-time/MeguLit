@@ -53,38 +53,59 @@ test('CMVS: a damaged text section (no NUL) gives empty pushes, not the rest of 
  assert.equal(one[0].toString('latin1'),'abc');
 });
 
-test('CMVS: RESOURCE matches only standalone resource filenames, not dialogue mentioning a filename',()=>{
+test('CMVS: RESOURCE keeps path forms as anchors while excluding Japanese dialogue with sentence punctuation or quotes',()=>{
  const long121='あ'.repeat(121)+'.png';
  const ps=F.ps2a([
   {push:'bgm01.ogg'},
-  {push:'voice\\k01_001.ogg'},
-  {push:'cg/ev01.pb3'},
-  {push:'Title.OGG'},
-  {push:'立ち絵.pb3'},
-  {push:'cg/学園.png'},
+  {push:'voice\\n01_001.ogg'},
+  {push:'bg\\night_01.pb3'},
+  {push:'bg\\Night.png'},
+  {push:'script\\next.ps3'},
+  '立ち絵\\normal.pb3',
+  {push:'se01.ogg,1'},
+  {push:'bgm01.ogg 100'},
+  'cg/学園・夜.png',
+  '立ち絵/主人公（私服）.pb3',
+  'bg/テスト～1.bmp',
+  {push:'C:\\data\\bgm01.ogg'},
+  {push:'a.ogg,b.ogg'},
+  {push:'ev01.pb3|ev02.pb3'},
+  {push:'  cg/space.png  '},
+  long121,
   '「photo.pngを見せて」',
   '音声はse01.oggに入っている。',
+  'お姉ちゃんの写真、photo.png',
   'これ見て！写真.png',
-  'あの写真\\n思い出.bmp',
-  '――曲名.ogg',
-  '「bgm01.ogg」',
-  long121,
-  {push:'Open bgm01.ogg now.'},
-  {push:'Look at cg_01.png!'},
-  {push:'Line1\\nfile.ogg'},
+  '本当に？bg01.png',
+  '……BGMはtrack01.ogg',
+  '『bgm01.ogg』',
  ]);
  const r=cmvs.parse(ps);
- assert.deepEqual(r.anchors,['bgm01.ogg','voice\\k01_001.ogg','cg/ev01.pb3','Title.OGG','立ち絵.pb3','cg/学園.png']);
+ assert.deepEqual(r.anchors,[
+  'bgm01.ogg',
+  'voice\\n01_001.ogg',
+  'bg\\night_01.pb3',
+  'bg\\Night.png',
+  'script\\next.ps3',
+  '立ち絵\normal.pb3',
+  'se01.ogg,1',
+  'bgm01.ogg 100',
+  'cg/学園・夜.png',
+  '立ち絵/主人公（私服）.pb3',
+  'bg/テスト～1.bmp',
+  'C:\\data\\bgm01.ogg',
+  'a.ogg,b.ogg',
+  'ev01.pb3|ev02.pb3',
+  '  cg/space.png  ',
+  long121,
+ ]);
  assert.deepEqual(r.lines,[
   '「photo.pngを見せて」',
   '音声はse01.oggに入っている。',
+  'お姉ちゃんの写真、photo.png',
   'これ見て！写真.png',
-  'あの写真\n思い出.bmp',
-  '――曲名.ogg',
-  '「bgm01.ogg」',
-  long121,
-  'Open bgm01.ogg now.',
-  'Look at cg_01.png!',
-  'Line1\nfile.ogg',
+  '本当に？bg01.png',
+  '……BGMはtrack01.ogg',
+  '『bgm01.ogg』',
  ]);
 });
