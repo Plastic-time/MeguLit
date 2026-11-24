@@ -24,11 +24,16 @@
  const NODES='.sentence-text:not(.megulit-art-row) .char-token,.tome-page-lines>div,.tome-inline-wait,.tomoyo-cn-output,.tome-translation-char,.tomoyo-learning-notice,.tome-first-run,.lookup-tooltip,.tomoyo-selection-card,.tomoyo-cn-dialog[open],.tomoyo-cn-dialog[data-leaving],.tome-backlog[data-open],.tome-backlog[data-leaving],.tome-box-deco,.tome-subtitle-drag-guide,.sentence-placeholder,.mg-select-pop,.tome-color-panel,body.tomoyo-ui-translation:not(.tomoyo-gal-bound) .sentence-window';/* 2026-11-13 the choice overlay (E407.2) paints only inside the window region: without its boxes here it was drawn but never seen */
  // The lookup card and its dropdowns need the native pointer gate even when the game polls mouse buttons.
  const MENUS='.tomoyo-cn-dialog,.tome-backlog,.mg-select-pop,.tome-color-panel,.tome-subtitle-drag-guide,.tomoyo-selection-card';
+ function movedTranslationScroll(node) {
+  const row=node?.closest('.megulit-anchor-window .tomoyo-cn-row');
+  return row?.style.translate&&row.style.overflowY==='auto'?row:null;
+ }
  window.__megulitResolveWheel=(id,x,y)=>{
   const lookup=document.querySelector('.tomoyo-selection-card');
   const box=lookup&&getComputedStyle(lookup).visibility==='visible'?lookup.getBoundingClientRect():null;
   const inLookup=box&&x>=box.left&&x<box.right&&y>=box.top&&y<box.bottom;
-  const panel=!!(inLookup||document.elementFromPoint(x,y)?.closest(MENUS));
+  const at=document.elementFromPoint(x,y),scroll=movedTranslationScroll(at);
+  const panel=!!(inLookup||at?.closest(MENUS)||scroll&&scroll.scrollHeight>scroll.clientHeight);
   window.__tomoyoTranslateRequest(JSON.stringify({type:'galWheelDecision',id,panel}));
  };
  function schedule(){if(queued)return;queued=true;queueMicrotask(report);}
@@ -81,10 +86,12 @@
   const lookupDrag=Number(document.querySelector('.tomoyo-selection-card[data-lookup-drag]')?.dataset.lookupDrag)||0;
   const dragKey=lookupDrag?`lookup:${lookupDrag}:${menuOpen}:${innerWidth}:${innerHeight}:${scale}`:'';
   if(dragKey&&last===dragKey)return;
-  const bandRects=new Map();
+  const clipRects=new Map();
   if(bound)for(const node of document.querySelectorAll(NODES)){if(node.closest('body.megulit-choice-covers-line .sentence-window:not(.tome-island-page),body.megulit-choice-only .sentence-window:not(.tome-island-page)'))continue;if(!watched.has(node)){resize.observe(node);watched.add(node);}const style=getComputedStyle(node),isMenu=node.matches(MENUS);
    if(node.matches('.tomoyo-cn-output')&&node.querySelector('.tome-translation-char'))continue;
-   const band=node.closest('.megulit-dialogue-band');if(band&&!bandRects.has(band))bandRects.set(band,band.getBoundingClientRect());const clip=bandRects.get(band);
+   // Text Ranges include fragments scrolled out of sight. Those pixels must stay clickable in the game.
+   const container=movedTranslationScroll(node)||node.closest('.megulit-dialogue-band');
+   if(container&&!clipRects.has(container))clipRects.set(container,container.getBoundingClientRect());const clip=clipRects.get(container);
    const followsPaintedBox=node.matches('.tomoyo-selection-card,.tomoyo-menu-resizing,.tome-dragging');
    const boxes=isMenu?[followsPaintedBox?node.getBoundingClientRect():menuBox(node)]:textBoxes(node);for(const r of boxes){if(style.display==='none'||style.visibility==='hidden'||(!isMenu&&Number(style.opacity)===0&&!node.classList.contains('tome-typewriter-pending')&&!fadingIn(node))||!r.width||!r.height)continue;if(node.closest('[hidden]')||!node.getClientRects().length)continue;
    // The Windows region clips painting as well as clicks: include the furigana (a ::before above each token, outside its box) and the text outline.

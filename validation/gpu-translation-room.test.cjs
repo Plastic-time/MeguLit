@@ -13,13 +13,15 @@ test('a GPU-placed translation stays inside the game client without moving the J
       .sentence-text{font-size:23px;line-height:58px;padding-top:12px}
       .tomoyo-cn-row{margin-top:12px;font-size:20px;line-height:32px}
       .tomoyo-cn-output{display:block}
-    </style><body><div class="sentence-window tomoyo-hook-reader">
+    </style><body class="tomoyo-gal-bound"><div class="sentence-window tomoyo-hook-reader">
       <div class="sentence-text"></div><div class="tomoyo-cn-row"><span class="tomoyo-cn-output"></span></div>
     </div><script>
       window.__tomoyoChinese={galLayoutInfo:()=>({clientX:300,clientY:377,clientWidth:1280,clientHeight:720,workBottom:1350})};
       window.MeguLitProfile={get:k=>k==='placement.translationGrowsDown'};
+      window.packets=[];window.__tomoyoTranslateRequest=s=>packets.push(JSON.parse(s));
     </script></body>`);
     await page.addScriptTag({ path: path.join(__dirname, '..', 'web', 'reader', 'modules', 'text-place.js') });
+    await page.addScriptTag({ path: path.join(__dirname, '..', 'web', 'reader', 'modules', 'interaction.js') });
     await page.evaluate(() => window.__tomoyoChinese.textPlaceMode({ on: true }));
     const setLine = (text, y) => page.evaluate(([text, y]) => {
       document.querySelector('.sentence-text').replaceChildren(...[...text].map(c =>
@@ -68,5 +70,18 @@ test('a GPU-placed translation stays inside the game client without moving the J
     const longBelow = await layout();
     assert.ok(longBelow.row.top > longBelow.jp.bottom && longBelow.row.bottom <= clientBottom + .05, JSON.stringify(longBelow));
     assert.equal(longBelow.overflow, 'auto');
+
+    await setLine('もう一度、話してくれませんか。', 370);
+    await translate('我没有抛弃你。'.repeat(65));
+    const scroll = await layout();
+    const hits = await page.evaluate(({ row, jp }) => {
+      const x = row.left + 20, inside = row.top + 20, outside = jp.bottom + 60;
+      const { regions } = window.packets.findLast(p => p.type === 'galHitRegions');
+      const occupied = y => regions.some(r => !r.pass && x * devicePixelRatio >= r.x && x * devicePixelRatio < r.x + r.width &&
+        y * devicePixelRatio >= r.y && y * devicePixelRatio < r.y + r.height);
+      const wheel = y => { window.__megulitResolveWheel(1, x, y); return window.packets.at(-1).panel; };
+      return { visible: occupied(inside), clipped: occupied(outside), wheelInside: wheel(inside), wheelOutside: wheel(outside) };
+    }, scroll);
+    assert.deepEqual(hits, { visible: true, clipped: false, wheelInside: true, wheelOutside: false });
   } finally { await browser.close(); }
 });

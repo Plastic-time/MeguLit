@@ -387,7 +387,7 @@ struct GlyphLearner {
    if (learned && (g.rtW != areaW || g.rtH != areaH)) continue;
    // A partial line or older page row may still occupy the band. Compare positions only on its own target.
    Rect screen{};
-   const bool moved = learned && !reported && !hitSent && currentFrame && g.rt == areaRt &&
+   const bool moved = learned && !readOnly && !reported && !hitSent && currentFrame && g.rt == areaRt &&
     ToScreen(g.rt, g.rtW, g.rtH, screen) && Relocated(a, b);
    if (learned && !atlases.count(AtlasKey(NULL, g.tex))) {
     if (moved && movedGroup) ambiguousMove = true;

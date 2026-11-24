@@ -47,7 +47,7 @@ static void MovingBox() {
 
 static void KeepOccupiedBand() {
  void *dialogue = (void *)1, *label = (void *)2, *icon = (void *)3;
- {
+ for (bool read : { false, true }) {
   GlyphLearner g;
   auto draw = [&](void *tex, const std::vector<Quad> &q, unsigned now) {
    return g.Draw(tex, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now).size();
@@ -58,10 +58,12 @@ static void KeepOccupiedBand() {
 
   g.Line(L"IJKLMNOP", 11000);
   const auto menu = Row(8, 100, 130, 24, 0.2f);
-  assert(draw(dialogue, Row(3, 400, 550, 24, 0.3f), 11001) == 3);
+  g.readOnly = read;
+  assert(draw(dialogue, Row(3, 400, 550, 24, 0.3f), 11001) == (read ? 0 : 3));
   assert(draw(label, menu, 11001) == 0);
   draw(icon, Row(1, 335, 130, 24, 0.4f), 11001);
   g.Frame(11002, 1280, 720);
+  g.readOnly = false;
   assert(draw(dialogue, Row(8, 400, 550, 24, 0.3f), 11003) == 8);
   assert(draw(label, menu, 11003) == 0);
  }
