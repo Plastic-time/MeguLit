@@ -79,13 +79,13 @@ const MSG=0x2f|0x21<<8,AIN_MSG=0x2f|0x7c<<8,AIN_H=0x2f|0x7d<<8,AIN_HH=0x2f|0x7e<
 /* the message run at p: [bytes (expanded Shift-JIS) or string (utf8), next] */
 function messageRun(c,p,utf8){const out=[];const s=p;
  while(p<c.length&&(c[p]===0x20||c[p]>0x80)){const x=c[p];
-  if(utf8){const len=x<0x80?1:x<0xe0?2:x<0xf0?3:4;for(let k=0;k<len;k++)out.push(c[p+k]);p+=len;continue;}
+  if(utf8){const len=x<0x80?1:x<0xe0?2:x<0xf0?3:4,stop=Math.min(p+len,c.length);while(p<stop)out.push(c[p++]);continue;}
   if(lead(x)&&p+1<c.length){out.push(x,c[p+1]);p+=2;continue;}
   if(x===0x20||x>=0xa1&&x<=0xdd){const w=x===0x20?0x8140:KANA[x-0xa0];out.push(w>>8,w&255);p++;continue;}
   out.push(x);p++;}
- return [Buffer.from(out),p,p-s];}
+ const buf=Buffer.from(out);return [utf8?buf.toString('utf8'):buf,p,p-s];}
 /* walk one SCO page: events {text:Buffer|string, kind:'text'|'choice'} and {br} / {page} markers, in code order */
-function walk(sco,{ain=null,utf8=false}={}){const c=sco,hdr=c.readUInt32LE(4),end=Math.min(c.length,c.readUInt32LE(8)||c.length),ev=[];let p=hdr,menu=false,bad=0;
+function walk(sco,{ain=null,utf8=null}={}){const c=sco,hdr=c.readUInt32LE(4),end=Math.min(c.length,c.readUInt32LE(8)||c.length),ev=[];let p=hdr,menu=false,bad=0;
  if(utf8===null)utf8=c.toString('latin1',hdr,hdr+4)==='ZU\x41\x7f';if(c.toString('latin1',hdr,hdr+4)==='ZU\x41\x7f')p+=4;
  const say=(t,kind)=>ev.push({text:t,kind:menu?'choice':kind});
  while(p<end){const top=p,b=c[p];

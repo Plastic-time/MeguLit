@@ -102,6 +102,16 @@ test('AliceSoft: SCO walk — messages per page, R breaks, compacted kana, menu 
  assert.deepEqual(alice.parse(F.sco([Buffer.from([0x01,0x02]),...page1])).lines,AL);
  assert.deepEqual(alice.parse(Buffer.from('S351 too short')).lines,[]);
 });
+test('AliceSoft: ZU-marked UTF-8 SCO decodes message runs, inline choices, and /! strings as UTF-8',t=>{
+ const U=s=>Buffer.from(s,'utf8');
+ const utf8Page=F.sco([B('ZU\x41\x7f'),U('ランス'),F.R,U('「よう、冒険だ」'),F.A,
+  B('{'),F.expr(1),F.u32(0),B('$'),F.u32(0x100),U('戦う'),B('$'),B('$'),F.u32(0x120),U('逃げる'),B('$'),B(']'),
+  B('/!'),U('メッセージ命令'),Buffer.from([0]),F.A]);
+ const want=['ランス\n「よう、冒険だ」','戦う','逃げる','メッセージ命令'];
+ assert.deepEqual(alice.parse(utf8Page).lines,want);
+ const game=tmp(t);F.writeTree(game,{'RanceSA.ALD':F.ald([{name:'01.SCO',volume:1,data:utf8Page}]),'System3.exe':'MZ'});
+ assert.deepEqual(scenes.read('alicesoft',game)[0].lines,want);
+});
 test('AliceSoft: System 3.9 messages by id from System39.ain (rotated AINI)',()=>{
  const ain=F.ain39(['最初の台詞','二番目の台詞']),a=alice.readAin39(ain);assert.equal(a.messages.length,2);
  const pg=F.sco([B('/'),Buffer.from([0x7c]),F.u32(1),F.A,B('/'),Buffer.from([0x7c]),F.u32(0),F.A],{version:'S380'});
