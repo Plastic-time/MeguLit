@@ -13,6 +13,7 @@ const kit=require('./kit.cjs');/* E577 shared engine kit */
    [ruby text="よみ"] puts a reading over the next character; [r] [l] [p] are breaks and waits. */
 const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
 const voiceRef=require('./voice-ref.cjs');
+const {attributes}=require('../story-structure.cjs');
 const decode=buf=>require('./scenes.cjs').decode(buf);
 const KS=n=>/(?:^|\/)data\/scenario\/.*\.ks$/i.test(n.replace(/\\/g,'/'));
 
@@ -21,7 +22,15 @@ const RUBY_TEXT=/^\s*ruby\b[\s\S]*?\btext\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s\]]+
 const OPEN_CODE=/^\s*(iscript|html)\b/i;
 const END_SCRIPT=/\[\s*endscript\s*\]/i,END_HTML=/\[\s*endhtml\s*\]/i;
 const AT_END_SCRIPT=/^@\s*endscript\b/i,AT_END_HTML=/^@\s*endhtml\b/i;
-function parse(buf){const lines=[],anchors=[],ruby=[],voices=[],vt=voiceRef.tracker();let code=null,block=false;
+function parse(buf,{speakerNames,onCharacter}={}){const lines=[],anchors=[],ruby=[],voices=[],vt=voiceRef.tracker();let code=null,block=false;
+ const characters=new Map();
+ const declare=body=>{
+  if(!/^\s*chara_new(?:\s|$)/i.test(body))return;
+  const {name,jname}=attributes(body);
+  if(!name||/^[&%]/.test(name))return;
+  const display=jname&&!/^[&%]/.test(jname)?jname:'';
+  characters.set(name,display);onCharacter?.(name,display);
+ };
  for(const raw of decode(buf).split(/\r?\n/)){let t=raw.trim();
   if(block){const e=t.indexOf('*/');if(e<0)continue;block=false;t=t.slice(e+2).trim();}
   while(t.startsWith('/*')){const e=t.indexOf('*/',2);if(e<0){block=true;t='';break;}t=t.slice(e+2).trim();}
@@ -35,8 +44,11 @@ function parse(buf){const lines=[],anchors=[],ruby=[],voices=[],vt=voiceRef.trac
   }
   const atOpen=/^@\s*(iscript|html)\b/i.exec(t);
   if(atOpen){code=atOpen[1].toLowerCase()==='iscript'?'endscript':'endhtml';continue;}
-  if(t[0]==='*'||t[0]==='@'){vt.see(t);anchors.push(t);continue;}
-  if(t[0]==='#'){const who=t.slice(1).split(':')[0].trim();if(who){lines.push(who);ruby.push(null);voices.push(null);}continue;}
+  if(t[0]==='*'||t[0]==='@'){if(t[0]==='@')declare(t.slice(1));vt.see(t);anchors.push(t);continue;}
+  if(t[0]==='#'){const who=t.slice(1).split(':')[0].trim();if(who){
+   const display=characters.get(who)??(/^[\w-]+$/.test(who)?speakerNames?.().get(who):undefined);
+   lines.push(display||who);ruby.push(null);voices.push(null);
+  }continue;}
   /* [ruby text="よみ"] reads the next character; [[ escapes a literal '['; quoted attribute values may contain ']' */
   const pairs=[];let text='',pending=null,sawCode=false,sawTag=false,noClose=false;
   let lastDQ=t.lastIndexOf('"'),lastSQ=t.lastIndexOf("'");
@@ -63,7 +75,7 @@ function parse(buf){const lines=[],anchors=[],ruby=[],voices=[],vt=voiceRef.trac
     const em=endRe.exec(t.slice(end+1));
     if(em){i=end+1+em.index+em[0].length;continue;}
     code=kind;break;}
-   sawTag=true;vt.see(t.slice(i,end+1));
+   sawTag=true;vt.see(t.slice(i,end+1));declare(body);
    const rm=RUBY_TEXT.exec(body);if(rm){const v=rm[1]??rm[2]??rm[3];if(v)pending=v;}
    i=end+1;}
   text=text.trim();if(!text){if(!sawCode&&sawTag)anchors.push(t);continue;}
@@ -99,13 +111,33 @@ function containers(dir){const out=[];
   else if(nw&&gameExe(n))out.push({kind:'zip',file:f,exe:true});}
  return out.concat(legacyExeBundles(dir,files));}
 function archiveList(c){try{return c.entries||(c.kind==='asar'?asarList(c.file):zipList(c.file));}catch{return null;}}
-function scenes(dir){const out=new Map();
+function isTyranoAsar(dir){return tyranoArchive(archiveList({kind:'asar',file:path.join(dir,'resources','app.asar')}));}
+const scenarioName=n=>n.replace(/\\/g,'/').replace(/^.*?data\/scenario\//i,'');
+function sharedSpeakerNames(entries){
+ const names=new Map();
+ const onCharacter=(name,display)=>names.set(name,names.has(name)&&names.get(name)!==display?'':display);
+ for(const entry of entries)try{parse(entry.read(),{onCharacter});}catch{}
+ return names;
+}
+function scenes(dir,{original=false}={}){const out=new Map();let separated=false;
  for(const c of containers(dir)){
   if(c.kind==='loose'){const sc=path.join(c.root,'data','scenario');for(const f of walk(sc,4)){const rel=path.relative(sc,f).replace(/\\/g,'/');out.set(rel.toLowerCase(),{name:rel,read:()=>fs.readFileSync(f)});}continue;}
   const list=archiveList(c);if(!list)continue;
-  for(const e of list){if(!KS(e.name)||e.encrypted)continue;const rel=e.name.replace(/\\/g,'/').replace(/^.*?data\/scenario\//i,'');if(out.has(rel.toLowerCase()))continue;
-   out.set(rel.toLowerCase(),{name:rel,read:c.kind==='asar'?()=>readAt(c.file,e.offset,e.size):()=>zipRead(c.file,e)});}}
- return [...out.values()].sort((a,b)=>a.name.localeCompare(b.name));}
+  const scripts=list.filter(e=>!e.encrypted&&KS(e.name));
+  // A declared Chinese locale with its own entry script may keep translated versions in ch/.
+  const names=original&&c.kind==='asar'&&list.some(e=>/(?:^|\/)data\/others\/lang\/ch\.json$/i.test(e.name))?
+   new Set(scripts.map(e=>scenarioName(e.name).toLowerCase())):null;
+  const mirror=names?.has('first.ks')&&names.has('ch/first.ks');
+  for(const e of scripts){const rel=scenarioName(e.name),key=rel.toLowerCase();
+   if(mirror&&key.startsWith('ch/')&&names.has(key.slice(3))){separated=true;continue;}
+   if(out.has(key))continue;
+   out.set(key,{name:rel,read:c.kind==='asar'?()=>readAt(c.file,e.offset,e.size):()=>zipRead(c.file,e)});}}
+ const entries=[...out.values()].sort((a,b)=>a.name.localeCompare(b.name));
+ if(!separated)return entries;
+ let shared;
+ const speakerNames=()=>shared??=sharedSpeakerNames(entries);
+ return entries.map(s=>({...s,parse:()=>parse(s.read(),{speakerNames})}));
+}
 /* a Tyrano game: its scenario sits next to the engine (tyrano/ folder, or tyrano/*.js inside the container) */
 function isTyrano(dir){for(const c of containers(dir)){
   if(c.kind==='loose'){if(fs.existsSync(path.join(c.root,'tyrano','tyrano.base.js'))||fs.existsSync(path.join(c.root,'tyrano','libs')))return true;continue;}
@@ -113,9 +145,9 @@ function isTyrano(dir){for(const c of containers(dir)){
  return false;}
 const engine={
  id:'tyrano',hint:'data\\scenario\\*.ks（或 app.asar / package.nw）',
- scenes:dir=>isTyrano(dir)?scenes(dir):[],
+ scenes:dir=>isTyrano(dir)?scenes(dir,{original:true}):[],
  archives:dir=>scenes(dir),
  sources:dir=>containers(dir).map(c=>c.file||path.join(c.root,'data','scenario')),
  parse,test:n=>/\.ks$/i.test(n),
 };
-module.exports={engine,parse,asarList,zipList,zipRead,containers,isTyrano,scenes,legacyExeBundles};
+module.exports={engine,parse,asarList,zipList,zipRead,containers,isTyrano,isTyranoAsar,scenes,legacyExeBundles};
