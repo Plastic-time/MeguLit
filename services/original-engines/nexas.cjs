@@ -35,7 +35,7 @@ const listed=new Map();
 function list(file){const key=file+'|'+kit.size(file);if(!listed.has(key))listed.set(key,index(file));return listed.get(key);}
 function read(file,e){const b=kit.readAt(file,e.offset,e.size);if(!e.type||(e.type===4||e.type===7)&&e.size===e.unpacked)return b;
  switch(e.type){case 1:return kit.lzss(b,e.unpacked);case 2:return kit.huffman(b,e.unpacked,{order:'msb'});case 3:case 4:return kit.inflate(b);
-  default:try{return kit.unpackAny(b,Math.max(e.unpacked,1))||b;}catch{return b;}}}
+  default:try{const r=kit.unpackAny(b,Math.max(e.unpacked,1));return r&&r.length?r:b;}catch{return b;}}}
 
 /* ---- .bin --------------------------------------------------------------------------------------------------------- */
 const u32=(b,p)=>p+4<=b.length?b.readUInt32LE(p):-1;
