@@ -195,6 +195,22 @@ test('TyranoScript: a ch/ chapter stays readable without a declared Chinese lang
  assert.deepEqual(scenes.read('tyrano',dir).flatMap(s=>s.lines),['それから長い旅が始まります。','おはようございます。']);
 });
 
+const firstScripts={'first.ks':'おはようございます。','ch/first.ks':'それから長い旅が始まります。'};
+for(const [label,file,pack,entries] of [
+ ['an NW.js package','package.nw',F.zip,firstScripts],
+ ['an ASAR with only ch/first.ks','resources/app.asar',F.asar,{'ch/first.ks':firstScripts['ch/first.ks']}],
+ ['an ASAR with only first.ks','resources/app.asar',F.asar,{'first.ks':firstScripts['first.ks']}],
+]){
+ test('TyranoScript: '+label+' keeps ch/ scenarios',t=>{
+  const dir=tmp(t),dialogue={...entries,'route.ks':'次の場面に進みましょう。','ch/route.ks':'別の道を歩いていきます。'};
+  const files={'tyrano/tyrano.base.js':'//','data/others/lang/ch.json':'{"scenes":{},"charas":{},"tags":{}}'};
+  for(const [name,line] of Object.entries(dialogue))files['data/scenario/'+name]=line+'[p]';
+  F.writeTree(dir,{[file]:pack(files)});
+  assert.deepEqual(Object.fromEntries(scenes.read('tyrano',dir).map(s=>[s.name,s.lines])),
+   Object.fromEntries(Object.entries(dialogue).map(([name,line])=>[name,[line]])));
+ });
+}
+
 test('TyranoScript: the existing ASAR scenario signature still identifies a release',t=>{
  const dir=tmp(t);
  F.writeTree(dir,{'resources/app.asar':F.asar({'data/scenario/first.ks':KS_JA})});
