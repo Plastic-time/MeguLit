@@ -50,7 +50,7 @@ const codepageOf=(bufs,{min=0,max=4000}={})=>codepage(Buffer.concat(bufs.filter(
 /* KiriKiri's own scrambled text (header FE FE <mode> FF FE): mode 0 XORs each UTF-16 unit >= 0x20 with ((c&0xFE)<<8)^1, mode 1
    swaps the odd and even bits of every unit (no 0x20 threshold: krkrz base/TextStream.cpp, and the mode KiriKiri itself
    writes; a line break is stored as 0x05), mode 2 is zlib after the header; null when the bytes do not decode */
-function krkrScrambled(buf){if(!(buf[0]===0xfe&&buf[1]===0xfe&&buf[2]<=2))return null;const mode=buf[2];
+function krkrScrambled(buf){if(!buf||buf.length<5||!(buf[0]===0xfe&&buf[1]===0xfe&&buf[2]<=2&&buf[3]===0xff&&buf[4]===0xfe))return null;const mode=buf[2];
  if(mode===2){const zlib=require('node:zlib');for(let i=5;i<Math.min(buf.length,64);i++)if(buf[i]===0x78){try{const o=zlib.inflateSync(buf.subarray(i));return (o[0]===0xff&&o[1]===0xfe?o.subarray(2):o).toString('utf16le');}catch{}}return null;}
  const n=(buf.length-5)>>1,out=Buffer.alloc(n*2);
  for(let i=0;i<n;i++){let c=buf.readUInt16LE(5+i*2);if(mode===1)c=((c&0xaaaa)>>1)|((c&0x5555)<<1);else if(c>=0x20)c^=((c&0xfe)<<8)^1;out.writeUInt16LE(c&0xffff,i*2);}
@@ -155,18 +155,19 @@ const widthOf=type=>type==='u64le'?8:INT[type][0];
 function table(file,spec,{maxIndex=64<<20}={}){const fsz=size(file);if(fsz<8)return null;
  const idx=readAt(file,0,Math.min(fsz,maxIndex));if(spec.magic&&idx.toString('latin1',0,spec.magic.length)!==spec.magic)return null;
  try{const count=spec.count?rdInt(idx,spec.count.type,spec.count.at):Infinity;if(spec.count&&(count<0||count>500000))return null;
-  let p=typeof spec.entries==='number'?spec.entries:rdInt(idx,spec.entries.type,spec.entries.at);const raw=[];
+  let p=typeof spec.entries==='number'?spec.entries:rdInt(idx,spec.entries.type,spec.entries.at);if(p<0)return null;const raw=[];
   for(let n=0;n<count&&p<idx.length&&n<500000;n++){const e={};
-   for(const f of spec.fields){if(f.type==='skip'){p+=f.size;continue;}
-    if(f.type==='cstr'||f.type==='pstr8'){let nb;if(f.type==='cstr'){nb=idx.subarray(p,p+f.size);p+=f.size;const z=nb.indexOf(0);if(z>=0&&!spec.nameCipher)nb=nb.subarray(0,z);}else{const len=idx[p];nb=idx.subarray(p+1,p+1+len);p+=1+len;}
+   for(const f of spec.fields){if(f.type==='skip'){if(p+f.size>idx.length)return null;p+=f.size;continue;}
+    if(f.type==='cstr'||f.type==='pstr8'){let nb;if(f.type==='cstr'){if(p+f.size>idx.length)return null;nb=idx.subarray(p,p+f.size);p+=f.size;const z=nb.indexOf(0);if(z>=0&&!spec.nameCipher)nb=nb.subarray(0,z);}else{if(p>=idx.length)return null;const len=idx[p];if(p+1+len>idx.length)return null;nb=idx.subarray(p+1,p+1+len);p+=1+len;}
      nb=Buffer.from(nb);if(spec.nameCipher==='not')for(let i=0;i<nb.length;i++)nb[i]=~nb[i]&255;else if(spec.nameCipher?.xor!==undefined)for(let i=0;i<nb.length;i++)nb[i]^=spec.nameCipher.xor;
      const z=nb.indexOf(0);e.name=new TextDecoder(spec.encoding||'shift_jis').decode(z>=0?nb.subarray(0,z):nb);continue;}
-    const v=rdInt(idx,f.type,p);p+=widthOf(f.type);if(f.name)e[f.name]=v;}
+    if(p+widthOf(f.type)>idx.length)return null;const v=rdInt(idx,f.type,p);p+=widthOf(f.type);if(f.name)e[f.name]=v;}
    raw.push(e);}
+  if(spec.count&&raw.length!==count)return null;
   const base=spec.base==='after-index'?p:typeof spec.base==='number'?spec.base:spec.base?rdInt(idx,spec.base.type,spec.base.at):0;
   const out=[];for(let i=0;i<raw.length;i++){const e=raw[i];let offset=base+e.offset,sz=e.size;
    if(spec.sizeFrom==='next'){const next=i+1<raw.length?base+raw[i+1].offset:fsz;sz=next-offset;}
-   if(!Number.isSafeInteger(offset)||!Number.isSafeInteger(sz)||sz<0||offset+sz>fsz||!e.name)return null;
+   if(!Number.isSafeInteger(offset)||!Number.isSafeInteger(sz)||offset<0||sz<0||offset+sz>fsz||!e.name)return null;
    const entry={name:e.name.replace(/\\/g,'/'),offset,size:sz,unpacked:e.unpacked??sz,flags:e.flags};if(spec.validate&&!spec.validate(entry,fsz))return null;out.push(entry);}
   return out;}catch{return null;}}
 const entryRead=(file,e)=>readAt(file,e.offset,e.size);
@@ -253,8 +254,10 @@ function xorKeyByColumns(buf,{maxPeriod=64,weights=sjisWeights(),sample=48<<10,m
 function asarList(file){let head;try{head=readAt(file,0,16);}catch{return null;}if(head.length<16||head.readUInt32LE(0)!==4)return null;
  const size=head.readUInt32LE(4);if(size<8||size>64<<20)return null;const h=readAt(file,8,size);if(h.length<8)return null;
  const len=h.readUInt32LE(4);let tree;try{tree=JSON.parse(h.toString('utf8',8,8+len));}catch{return null;}
- const base=8+size,out=[];const walkTree=(node,pre)=>{for(const [name,v] of Object.entries(node.files||{})){const rel=pre?pre+'/'+name:name;if(v.files)walkTree(v,rel);else if(!v.unpacked&&v.offset!==undefined)out.push({name:rel,offset:base+Number(v.offset),size:Number(v.size)});}};
- walkTree(tree,'');return out;}
+ if(!tree||typeof tree!=='object'||Array.isArray(tree)||!tree.files||typeof tree.files!=='object'||Array.isArray(tree.files))return null;
+ const base=8+size,out=[];const walkTree=(node,pre,depth=0)=>{if(depth>64||!node||typeof node!=='object'||!node.files||typeof node.files!=='object'||Array.isArray(node.files))return;
+  for(const [name,v] of Object.entries(node.files)){if(!v||typeof v!=='object')continue;const rel=pre?pre+'/'+name:name;if(v.files&&typeof v.files==='object'&&!Array.isArray(v.files))walkTree(v,rel,depth+1);else if(!v.unpacked&&v.offset!==undefined)out.push({name:rel,offset:base+Number(v.offset),size:Number(v.size)});}};
+ try{walkTree(tree,'',0);}catch{return null;}return out;}
 function zipList(file,maxDirectory=Infinity){const sz=size(file);if(sz<22)return null;
  const tailLen=Math.min(sz,65557),t=readAt(file,sz-tailLen,tailLen);let e=-1;for(let i=t.length-22;i>=0;i--)if(t.readUInt32LE(i)===0x06054b50){e=i;break;}if(e<0)return null;
  const count=t.readUInt16LE(e+10),cdSize=t.readUInt32LE(e+12),cdOff=t.readUInt32LE(e+16),cdAt=sz-tailLen+e-cdSize,shift=cdAt-cdOff;if(cdAt<0||cdSize>maxDirectory)return null;
@@ -262,8 +265,13 @@ function zipList(file,maxDirectory=Infinity){const sz=size(file);if(sz<22)return
  for(let i=0;i<count&&p+46<=cd.length;i++){if(cd.readUInt32LE(p)!==0x02014b50)break;const flags=cd.readUInt16LE(p+8),method=cd.readUInt16LE(p+10),comp=cd.readUInt32LE(p+20),raw=cd.readUInt32LE(p+24),nl=cd.readUInt16LE(p+28),xl=cd.readUInt16LE(p+30),cl=cd.readUInt16LE(p+32),local=cd.readUInt32LE(p+42);
   const nameBuf=cd.subarray(p+46,p+46+nl),name=flags&0x800?nameBuf.toString('utf8'):decodeText(nameBuf);out.push({name:name.replace(/\\/g,'/'),method,comp,raw,local:local+shift,encrypted:!!(flags&1)});p+=46+nl+xl+cl;}
  return Number.isFinite(maxDirectory)&&(p!==cdSize||out.length!==count)?null:out;}
-function zipRead(file,e){const h=readAt(file,e.local,30);if(h.readUInt32LE(0)!==0x04034b50)throw Error('ZIP_LOCAL');const at=e.local+30+h.readUInt16LE(26)+h.readUInt16LE(28),data=readAt(file,at,e.comp);
- if(e.method===0)return data;if(e.method===8)return zlib.inflateRawSync(data,{maxOutputLength:256<<20});throw Error('ZIP_METHOD_'+e.method);}
+function zipRead(file,e){if(e.encrypted)throw Error('ZIP_ENCRYPTED');const fsz=size(file);if(!Number.isSafeInteger(e.local)||e.local<0||e.local+30>fsz)throw Error('ZIP_LOCAL');
+ const h=readAt(file,e.local,30);if(h.length<30||h.readUInt32LE(0)!==0x04034b50)throw Error('ZIP_LOCAL');if(h.readUInt16LE(6)&1)throw Error('ZIP_ENCRYPTED');
+ const at=e.local+30+h.readUInt16LE(26)+h.readUInt16LE(28);if(!Number.isSafeInteger(e.comp)||e.comp<0||at+e.comp>fsz)throw Error('ZIP_TRUNCATED');
+ const data=readAt(file,at,e.comp);if(data.length!==e.comp)throw Error('ZIP_TRUNCATED');
+ if(e.method===0){if(e.raw!==undefined&&data.length!==e.raw)throw Error('ZIP_SIZE');return data;}
+ if(e.method===8){const out=zlib.inflateRawSync(data,{maxOutputLength:256<<20});if(e.raw!==undefined&&out.length!==e.raw)throw Error('ZIP_SIZE');return out;}
+ throw Error('ZIP_METHOD_'+e.method);}
 
 /* ---- names (E605: every reader built its own TextDecoder('shift_jis') and cut fixed-size archive names at NUL by hand)
    SJIS            one shared Shift-JIS decoder (decode() without stream is stateless, so sharing is safe)

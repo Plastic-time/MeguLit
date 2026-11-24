@@ -72,3 +72,60 @@ test('names: one shared Shift-JIS decoder, fixed-width archive names cut at NUL 
  const b=Buffer.concat([Buffer.from([0x82,0xa0,0x82,0xa2]),Buffer.from('.txt\0junk','latin1'),Buffer.from('ab','latin1')]);
  assert.equal(kit.cname(b,0,13),'あい.txt');assert.equal(kit.cname(b,13),'ab');assert.equal(kit.cname(Buffer.from('noz','latin1')),'noz');
  assert.equal(kit.SJIS.decode(Buffer.from([0x82,0xa0])),'あ');});
+test('kit malformed guard #43: krkrScrambled requires a complete 5-byte FE FE <mode> FF FE header',()=>{
+ for(const b of [Buffer.from([0xfe,0xfe,0]),Buffer.from([0xfe,0xfe,1,0xff]),Buffer.from([0xfe,0xfe,0,0,0])]){
+  assert.equal(kit.krkrScrambled(b),null);
+  assert.equal(typeof kit.decodeText(b),'string');
+ }
+ const u16=Buffer.from('あ','utf16le');const m1=Buffer.alloc(2);const c=u16.readUInt16LE(0);m1.writeUInt16LE(((c&0xaaaa)>>1)|((c&0x5555)<<1),0);
+ assert.equal(kit.decodeText(Buffer.concat([Buffer.from([0xfe,0xfe,1,0xff,0xfe]),m1])),'あ');
+});
+test('kit malformed guard #35: table() rejects negative offsets, truncated fields and incomplete counts',t=>{
+ const d=tmp(t);
+ const neg=Buffer.alloc(16+16+8);neg.write('PACK',0,'latin1');neg.writeUInt32LE(1,8);neg.write('a.txt',16,'latin1');neg.writeUInt32LE(8,24);neg.writeInt32LE(-4,28);
+ const negFile=path.join(d,'neg.pak');fs.writeFileSync(negFile,neg);
+ assert.equal(kit.table(negFile,{magic:'PACK',count:{at:8,type:'u32le'},entries:16,fields:[{name:'name',type:'cstr',size:8},{name:'size',type:'u32le'},{name:'offset',type:'i32le'}]}),null);
+ const truncPstr=Buffer.concat([Buffer.from('ARCX','latin1'),Buffer.from([2,0,0,0]),Buffer.from([20,0,0,0,4]),Buffer.from('ab')]);
+ const truncPstrFile=path.join(d,'trunc-pstr.pak');fs.writeFileSync(truncPstrFile,truncPstr);
+ assert.equal(kit.table(truncPstrFile,{magic:'ARCX',count:{at:4,type:'u32le'},entries:8,fields:[{name:'offset',type:'u32le'},{name:'name',type:'pstr8'}],sizeFrom:'next'}),null);
+ const shortCnt=Buffer.alloc(16+16);shortCnt.write('PACK',0,'latin1');shortCnt.writeUInt32LE(3,8);shortCnt.write('a.txt',16,'latin1');shortCnt.writeUInt32LE(0,24);shortCnt.writeUInt32LE(32,28);
+ const shortCntFile=path.join(d,'short-cnt.pak');fs.writeFileSync(shortCntFile,shortCnt);
+ assert.equal(kit.table(shortCntFile,{magic:'PACK',count:{at:8,type:'u32le'},entries:16,fields:[{name:'name',type:'cstr',size:8},{name:'size',type:'u32le'},{name:'offset',type:'u32le'}]}),null);
+});
+test('kit malformed guard #42: asarList() handles malformed JSON roots, null child nodes and deep nesting',t=>{
+ const d=tmp(t);
+ const mkAsar=(json,payload=Buffer.alloc(16))=>{const jb=Buffer.from(json,'utf8'),pad=(4-(jb.length%4))%4,pLen=4+4+jb.length+pad;
+  const h=Buffer.alloc(16+jb.length+pad);h.writeUInt32LE(4,0);h.writeUInt32LE(pLen+4,4);h.writeUInt32LE(pLen,8);h.writeUInt32LE(jb.length,12);jb.copy(h,16);return Buffer.concat([h,payload]);};
+ for(const bad of ['null','123','{"files":123}']){const f=path.join(d,'bad-'+bad.length+'.asar');fs.writeFileSync(f,mkAsar(bad));assert.equal(kit.asarList(f),null);}
+ const mixed=path.join(d,'mixed.asar');fs.writeFileSync(mixed,mkAsar('{"files":{"bad":null,"good.ks":{"offset":"0","size":5}}}',Buffer.from('hello')));
+ assert.deepEqual(kit.asarList(mixed).map(e=>[e.name,e.size]),[['good.ks',5]]);
+ let deep='{"files":{"leaf.ks":{"offset":"0","size":1}}}';for(let i=0;i<120;i++)deep='{"files":{"d":'+deep+'}}';
+ const deepFile=path.join(d,'deep.asar');fs.writeFileSync(deepFile,mkAsar(deep));assert.ok(Array.isArray(kit.asarList(deepFile)));
+});
+test('kit malformed guard #40: zipRead() rejects encrypted, truncated and size-mismatched entries while reading valid ones',t=>{
+ const zlib=require('node:zlib'),d=tmp(t);
+ const mkZip=(name,rawBuf,{method=0,flags=0,badRaw=null,truncate=0}={})=>{
+  const nb=Buffer.from(name,'utf8'),compBuf=method===8?zlib.deflateRawSync(rawBuf):rawBuf;
+  const lh=Buffer.alloc(30+nb.length);lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(flags,6);lh.writeUInt16LE(method,8);
+  lh.writeUInt32LE(compBuf.length,18);lh.writeUInt32LE(badRaw??rawBuf.length,22);lh.writeUInt16LE(nb.length,26);nb.copy(lh,30);
+  const cd=Buffer.alloc(46+nb.length);cd.writeUInt32LE(0x02014b50,0);cd.writeUInt16LE(flags,8);cd.writeUInt16LE(method,10);
+  cd.writeUInt32LE(compBuf.length,20);cd.writeUInt32LE(badRaw??rawBuf.length,24);cd.writeUInt16LE(nb.length,28);cd.writeUInt32LE(0,42);nb.copy(cd,46);
+  const payload=truncate?compBuf.subarray(0,compBuf.length-truncate):compBuf;
+  const cdOff=lh.length+payload.length;
+  const eocd=Buffer.alloc(22);eocd.writeUInt32LE(0x06054b50,0);eocd.writeUInt16LE(1,8);eocd.writeUInt16LE(1,10);eocd.writeUInt32LE(cd.length,12);eocd.writeUInt32LE(cdOff,16);
+  return Buffer.concat([lh,payload,cd,eocd]);};
+ const zOk0=path.join(d,'ok0.zip'),zOk8=path.join(d,'ok8.zip');
+ fs.writeFileSync(zOk0,mkZip('a.txt',Buffer.from('hello world'),{method:0}));
+ fs.writeFileSync(zOk8,mkZip('a.txt',Buffer.from('hello world'),{method:8}));
+ assert.equal(kit.zipRead(zOk0,kit.zipList(zOk0)[0]).toString(),'hello world');
+ assert.equal(kit.zipRead(zOk8,kit.zipList(zOk8)[0]).toString(),'hello world');
+ const zEnc=path.join(d,'enc.zip');fs.writeFileSync(zEnc,mkZip('a.txt',Buffer.from('secret'),{method:0,flags:1}));
+ assert.throws(()=>kit.zipRead(zEnc,kit.zipList(zEnc)[0]),/ZIP_ENCRYPTED/);
+ const zTrunc=path.join(d,'trunc.zip');fs.writeFileSync(zTrunc,mkZip('a.txt',Buffer.from('hello world'),{method:0}).subarray(0,38));
+ assert.throws(()=>kit.zipRead(zTrunc,{name:'a.txt',method:0,comp:11,raw:11,local:0,encrypted:false}),/ZIP_TRUNCATED/);
+ const zSz0=path.join(d,'sz0.zip'),zSz8=path.join(d,'sz8.zip');
+ fs.writeFileSync(zSz0,mkZip('a.txt',Buffer.from('hello world'),{method:0,badRaw:99}));
+ fs.writeFileSync(zSz8,mkZip('a.txt',Buffer.from('hello world'),{method:8,badRaw:99}));
+ assert.throws(()=>kit.zipRead(zSz0,kit.zipList(zSz0)[0]),/ZIP_SIZE/);
+ assert.throws(()=>kit.zipRead(zSz8,kit.zipList(zSz8)[0]),/ZIP_SIZE/);
+});
