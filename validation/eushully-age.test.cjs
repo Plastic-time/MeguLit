@@ -33,3 +33,16 @@ test('Eushully AGE: an unknown opcode falls back to the string pool',()=>{
  const r=eu.parse(Buffer.concat([head,code2,pool]));
  assert.deepStrictEqual(r.lines,['こんにちは','世界']);
 });
+test('Eushully AGE: half-width kana (0xA1-0xDF) does not swallow following F040-F043 escapes while real SJIS pairs stay intact',()=>{
+ const notPad=raw=>{const e=Buffer.concat([raw,Buffer.from([0])]);return Buffer.from(Buffer.concat([e,Buffer.alloc((4-e.length%4)%4)]).map(c=>c^0xff));};
+ /* 0xA6 = ｦ followed by F040 (…), 0xB1/0xB2/0xB3 = ｱ/ｲ/ｳ followed by F041-F043 (―);
+    and genuine 2-byte SJIS ending in 0xF0 (0x82 0xF0 = を, 0xE0 0xF0 = 瑩) followed by 0x40 (@) must not trigger F040 */
+ const s1=notPad(Buffer.from([0xa6,0xf0,0x40,0xb1,0xf0,0x41,0xb2,0xf0,0x42,0xb3,0xf0,0x43]));
+ const s2=notPad(Buffer.from([0x82,0xf0,0x40,0xe0,0xf0,0x40]));
+ const ops=[[0x6e,[[0,0],[2,0]]],[0x2,[]],[0x6e,[[0,0],[2,s1.length/4]]],[0x2,[]]];
+ const codeLen=ops.reduce((n,[,a])=>n+4+a.length*8,0),poolAddr=codeLen/4,parts=[];
+ for(const [op,args] of ops){parts.push(u32(op));for(const [t,v] of args)parts.push(u32(t),u32(t===2?poolAddr+v:v));}
+ const head=Buffer.alloc(0x3c);head.write('SYS4',0,'latin1');head.writeUInt32LE(0x1c,0x20);head.writeInt32LE(poolAddr+(s1.length+s2.length)/4,0x28);
+ const r=eu.parse(Buffer.concat([head,...parts,s1,s2]));
+ assert.deepStrictEqual(r.lines,['ｦ…ｱ―ｲ―ｳ―','を@瑩@']);
+});
