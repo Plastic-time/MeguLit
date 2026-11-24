@@ -2,6 +2,7 @@
 
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),test=require('node:test');
 const kit=require('../services/original-engines/kit.cjs');
+const registry=require('../services/original-engines/registry.cjs');
 const {probeGame}=require('../services/adapter-probe-core.cjs');
 const original=require('../services/original-text.cjs');
 
@@ -32,6 +33,8 @@ test('SIA retail layout supplies the probe and Original Text entry',t=>{
  fs.writeFileSync(path.join(data,'start.pac'),packed);
  fs.writeFileSync(path.join(data,'title.pac'),kit.encodeSjis('TEXT\r\nもう一度読みます。\r\n'));
  fs.writeFileSync(path.join(dir,'outside.pac'),kit.encodeSjis('TEXT\r\n対象外です。\r\n'));
+ assert.equal(registry.engineOf(dir)?.name,'SIA-Soft');
+ assert.deepEqual(registry.readersFor(dir),['sia']);
  const result=probeGame({dir,executable});
  assert.equal(result.step,'ok');
  assert.equal(result.detected,'sia');
@@ -49,8 +52,10 @@ test('a PAC beside an unrelated or truncated executable does not claim the SIA r
  fs.writeFileSync(path.join(data,'start.pac'),kit.encodeSjis('TEXT\r\n今日は晴れています。\r\n'));
  exe.write('Different',0x58d20);
  fs.writeFileSync(executable,exe);
+ assert.notEqual(registry.engineOf(dir)?.name,'SIA-Soft');
  assert.notEqual(probeGame({dir,executable}).detected,'sia');
  exe.write('SIA-Soft\0',0x58d20);
  fs.writeFileSync(executable,exe.subarray(0,exe.length-1));
+ assert.notEqual(registry.engineOf(dir)?.name,'SIA-Soft');
  assert.notEqual(probeGame({dir,executable}).detected,'sia');
 });

@@ -48,4 +48,4 @@ const engine={id:'sia',
  scenes(dir){const game=installation(dir);return game?game.files.map(file=>({name:path.basename(file),read:()=>read(file,game.key)})):[];},
  parse,
 };
-module.exports={engine};
+module.exports={engine,probe:dir=>!!installation(dir)?.files.length};
