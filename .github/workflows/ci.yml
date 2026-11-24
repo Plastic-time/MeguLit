@@ -184,6 +184,19 @@ jobs:
           name: native-binaries
           path: native
 
+      # validation/reader-bootstrap.test.cjs reads tauri's core.js from the locked crate in the Cargo registry.
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+          cache-targets: false
+          save-if: ${{ matrix.shard == 1 }}
+
+      - name: cargo fetch
+        shell: pwsh
+        run: cargo fetch --locked --manifest-path desktop/Cargo.toml
+
       - name: Unit and integration tests
         shell: pwsh
         run: |
