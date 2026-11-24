@@ -18,6 +18,7 @@ function pushes(b){const out=[];if(b.length<8)return out;const end=Math.min(b.re
   const raw=b.subarray(i+2,i+1+n);if(raw.includes(0))continue;out.push({at:i,n});i+=1+n;}
  return out;}
 const tidy=s=>s.replace(/\r?\n/g,'\n').replace(/^[\s　]+|[\s　]+$/g,'');
+function trimRaw(b){let s=-1,e=0;for(let i=0;i<b.length;){const c=b[i];if(c===0x20||c>=0x09&&c<=0x0d){i++;continue;}if(c===0x81&&i+1<b.length&&b[i+1]===0x40){i+=2;continue;}const step=(c>=0x81&&c<=0x9f||c>=0xe0&&c<=0xfc)&&i+1<b.length?2:1;if(s<0)s=i;i+=step;e=i;}return s<0?b.subarray(0,0):b.subarray(s,e);}
 // The translated string at the same place in the patched file (up to its first NUL), or ''.
 // A string too long for its place is moved: the push is replaced by a jump (0x06, u32 target) into code the patch
 // appends after the original, which pushes the translation and jumps back.
@@ -26,7 +27,7 @@ function twin(z,p,origRaw){if(!z||p.at+6>z.length)return '';let at=p.at;
  else if(z[at]!==0x0E||z[at+1]!==p.n)return '';
  const n=z[at+1],raw=z.subarray(at+2,at+1+n),cut=raw.indexOf(0),slice=cut>=0?raw.subarray(0,cut):raw;
  // Unchanged bytes in a Chinese twin are still Shift-JIS, not GBK; leave empty so patchLines keeps the Japanese original.
- if(origRaw&&slice.equals(origRaw))return '';
+ if(origRaw&&trimRaw(slice).equals(trimRaw(origRaw)))return '';
  const s=tidy(gbk.decode(slice));return s&&!s.includes('�')?s:'';}
 /* E449 Chinese patches that leave the .hcb alone and serve the text from a "cnpack" next to it (五彩斑斓的曙光,
    loaded by its chn.dll): u32 count, then records {u32 key, u16 size, bytes}. A record is AES-128-ECB (zero padded);
@@ -35,7 +36,7 @@ function twin(z,p,origRaw){if(!z||p.at+6>z.length)return '';let at=p.at;
    The record key is the address the game hands the patch, byte-swapped: the length byte of a 0x0E push, or the operand
    of the call before one (the push follows within a few bytes). */
 // Image and sprite names pushed for the engine ("_エプロン_吹出L", "graph_bs/CHR_あ", one-letter ids), not text.
-const ASSET_PATH=s=>s[0]==='_'||s.includes('/');
+const ASSET_PATH=s=>s[0]==='_'||/[\\/]/.test(s)||/^[A-Za-z0-9]+_/.test(s)||/\.(?:png|tga|bmp|jpg|jpeg|ogg|wav|wmv|mpg|mp3|ani|psd|bin|dat|hcb)$/i.test(s);
 const ASSET=s=>/^[_A-Za-z0-9]/.test(s)||s.includes('/')||[...s].length===1;
 // The script call (0x02 u32) consuming a pushed string after up to 5 stack-push opcodes (0x08..0x10).
 function callAfter(b,end,p){let i=p.at+2+p.n;
@@ -54,17 +55,18 @@ function cnpack(pack,b){const crypto=require('node:crypto'),out=new Map();if(pac
  for(let i=0;i<cnt&&p+6<=pack.length;i++){const k=pack.readUInt32LE(p),size=pack.readUInt16LE(p+4),data=pack.subarray(p+6,p+6+size);p+=6+size;
   const at=pushAt(swap(k));if(at<0||out.has(at))continue;
   try{const d=crypto.createDecipheriv('aes-128-ecb',keyOf(k),null);d.setAutoPadding(false);const n=data.length&~15;const plain=Buffer.concat([d.update(data.subarray(0,n)),d.final()]);
-   let e=plain.length;while(e>4&&plain[e-1]===0)e--;const cut=plain.indexOf(0,4),slice=plain.subarray(4,cut>=4&&cut<e?cut:e),orig=b.subarray(at+2,at+1+b[at+1]);if(slice.equals(orig))continue;const s=tidy(gbk.decode(slice));if(s&&!s.includes('�'))out.set(at,s);}catch{}}
+   let e=plain.length;while(e>4&&plain[e-1]===0)e--;const cut=plain.indexOf(0,4),slice=plain.subarray(4,cut>=4&&cut<e?cut:e),orig=b.subarray(at+2,at+1+b[at+1]);if(trimRaw(slice).equals(trimRaw(orig)))continue;const s=tidy(gbk.decode(slice));if(s&&!s.includes('�'))out.set(at,s);}catch{}}
  return out;}
 function parse(buf){let b=Buffer.isBuffer(buf)?buf:Buffer.from(buf),z=null,cn=null;
  if(b.subarray(0,8).equals(MAGIC)){const n=b.readUInt32LE(8);z=b.subarray(12+n);b=b.subarray(12,12+n);}
  else if(b.subarray(0,8).equals(CN)){const n=b.readUInt32LE(8);const pack=b.subarray(12+n);b=b.subarray(12,12+n);cn=cnpack(pack,b);}
- const end=b.length>=4?Math.min(b.readUInt32LE(0),b.length):0,items=[],counts=new Map();let prevEnd=0,totalProse=0,textCall=-1,best=0;
+ const end=b.length>=4?Math.min(b.readUInt32LE(0),b.length):0,items=[],counts=new Map();let prevEnd=0,totalProse=0,textCall=-1,best=0,second=0;
  for(const p of pushes(b)){const orig=b.subarray(p.at+2,p.at+1+p.n),s=tidy(sj.decode(orig));const from=prevEnd;prevEnd=p.at+2+p.n;
   if(!s||!PROSE.test(s)||s.includes('�'))continue;
   const call=callAfter(b,end,p);items.push({p,orig,s,from,call});
-  if(!ASSET(s)){totalProse++;if(call>=0){const c=(counts.get(call)||0)+1;counts.set(call,c);if(c>best){best=c;textCall=call;}}}}
- if(best<2||best*2<totalProse)textCall=-1;
+  if(!ASSET(s)){totalProse++;if(call>=0)counts.set(call,(counts.get(call)||0)+1);}}
+ for(const [call,c] of counts){if(c>best){second=best;best=c;textCall=call;}else if(c>second)second=c;}
+ if(best<3||best===second||best*2<=totalProse)textCall=-1;
  const lines=[],zh=[],voices=[];
  for(const x of items){if(ASSET(x.s)&&(textCall<0||x.call!==textCall||ASSET_PATH(x.s)))continue;
   lines.push(x.s);zh.push(cn?cn.get(x.p.at)||'':twin(z,x.p,x.orig));voices.push(voiceAt(b,x.p.at,x.from));}

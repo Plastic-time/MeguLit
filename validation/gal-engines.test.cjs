@@ -149,52 +149,84 @@ test('fvp: unchanged Shift-JIS bytes in a Chinese twin or cnpack are left empty 
  const {parse,engine}=require('../services/original-engines/fvp.cjs'),{encodeSjis}=require('../services/original-engines/kit.cjs'),crypto=require('node:crypto');
  const head=n=>{const h=Buffer.alloc(4);h.writeUInt32LE(n,0);return h;};
  const mkPush=raw=>Buffer.concat([Buffer.from([0x0E,raw.length+1]),raw,Buffer.from([0])]);
- const u1=encodeSjis('「おはよう」'),u2=encodeSjis('「あい」'),u3=encodeSjis('「ありがとう」');
- const p1=mkPush(u1),p2=mkPush(u2),p3=mkPush(u3);
- const jpCode=Buffer.concat([p1,p2,p3]),jp=Buffer.concat([head(4+jpCode.length),jpCode]);
- /* Twin .hcb: p1 unchanged in-place, p2 translated to GBK '你好', p3 moved via 0x06 jump with unchanged Shift-JIS bytes */
+ const u1=encodeSjis('「おはよう」'),u2=encodeSjis('「あい」'),u3=encodeSjis('「ありがとう」'),u4=encodeSjis('「こんにちは」 \u3000'),u4Trim=encodeSjis('「こんにちは」');
+ const p1=mkPush(u1),p2=mkPush(u2),p3=mkPush(u3),p4=mkPush(u4);
+ const jpCode=Buffer.concat([p1,p2,p3,p4]),jp=Buffer.concat([head(4+jpCode.length),jpCode]);
+ /* Twin .hcb: p1 unchanged in-place, p2 translated to GBK '你好', p3 moved via 0x06 jump with unchanged Shift-JIS bytes, p4 unchanged Shift-JIS with trailing spaces trimmed */
  const zh2=Buffer.from([0xc4,0xe3,0xba,0xc3]);
  const z2=Buffer.concat([Buffer.from([0x0E,u2.length+1]),zh2,Buffer.alloc(u2.length+1-zh2.length)]);
+ const z4=Buffer.concat([Buffer.from([0x0E,u4.length+1]),u4Trim,Buffer.alloc(u4.length+1-u4Trim.length)]);
  const jump=Buffer.alloc(p3.length);jump[0]=0x06;jump.writeUInt32LE(4+jpCode.length,1);
- const zh=Buffer.concat([head(4+jpCode.length),p1,z2,jump,p3]);
+ const zh=Buffer.concat([head(4+jpCode.length),p1,z2,jump,z4,p3]);
  const n=Buffer.alloc(4);n.writeUInt32LE(jp.length);
  const r=parse(Buffer.concat([Buffer.from('FVP+ZH\0\0','latin1'),n,jp,zh]));
- assert.deepEqual(r.lines,['「おはよう」','「あい」','「ありがとう」']);
- assert.deepEqual(r.zh,['','你好','']);
+ assert.deepEqual(r.lines,['「おはよう」','「あい」','「ありがとう」','「こんにちは」']);
+ assert.deepEqual(r.zh,['','你好','','']);
  const patched=engine.patchLines([{name:'game.hcb',...r}]);
- assert.deepEqual(patched[0].lines,['「おはよう」','你好','「ありがとう」']);
- /* cnpack: an unchanged Shift-JIS record is also skipped instead of decoded as GBK mojibake */
- const at1=4+1,k1=(((at1&255)<<24)|((at1>>>8&255)<<16)|((at1>>>16&255)<<8)|(at1>>>24))>>>0;
- const key1=crypto.createHash('md5').update(String(k1)).digest();
- const plain1=Buffer.alloc(32);Buffer.from([1,2,3,4]).copy(plain1,0);u1.copy(plain1,4);
- const c1=crypto.createCipheriv('aes-128-ecb',key1,null);c1.setAutoPadding(false);const data1=Buffer.concat([c1.update(plain1),c1.final()]);
- const rec1=Buffer.alloc(6);rec1.writeUInt32LE(k1,0);rec1.writeUInt16LE(data1.length,4);
- const cnt=Buffer.alloc(4);cnt.writeUInt32LE(1);
- const rc=parse(Buffer.concat([Buffer.from('FVP+CN\0\0','latin1'),n,jp,cnt,rec1,data1]));
- assert.deepEqual(rc.zh,['','','']);});
-test('fvp: single-kana and alphanumeric-leading dialogue lines passed to the main text call are kept while assets are still dropped',()=>{
+ assert.deepEqual(patched[0].lines,['「おはよう」','你好','「ありがとう」','「こんにちは」']);
+ /* cnpack: an unchanged Shift-JIS record (even with trailing spaces trimmed) is also skipped instead of decoded as GBK mojibake */
+ const mkCnRec=(at,raw)=>{const k=(((at&255)<<24)|((at>>>8&255)<<16)|((at>>>16&255)<<8)|(at>>>24))>>>0;
+  const key=crypto.createHash('md5').update(String(k)).digest();
+  const plain=Buffer.alloc(32);Buffer.from([1,2,3,4]).copy(plain,0);raw.copy(plain,4);
+  const c=crypto.createCipheriv('aes-128-ecb',key,null);c.setAutoPadding(false);const data=Buffer.concat([c.update(plain),c.final()]);
+  const rec=Buffer.alloc(6);rec.writeUInt32LE(k,0);rec.writeUInt16LE(data.length,4);return Buffer.concat([rec,data]);};
+ const cnt=Buffer.alloc(4);cnt.writeUInt32LE(2);
+ const rc=parse(Buffer.concat([Buffer.from('FVP+CN\0\0','latin1'),n,jp,cnt,mkCnRec(4+1,u1),mkCnRec(4+p1.length+p2.length+p3.length+1,u4Trim)]));
+ assert.deepEqual(rc.zh,['','','','']);});
+test('fvp: single-kana and alphanumeric-leading dialogue lines passed to the main text call are kept while assets and ambiguous calls are dropped',()=>{
  const {parse}=require('../services/original-engines/fvp.cjs'),{encodeSjis}=require('../services/original-engines/kit.cjs');
  const mkPush=s=>{const raw=encodeSjis(s);return Buffer.concat([Buffer.from([0x0E,raw.length+1]),raw,Buffer.from([0])]);};
  const call=addr=>{const b=Buffer.alloc(5);b[0]=0x02;b.writeUInt32LE(addr,1);return b;};
+ const mkHcb=parts=>{const code=Buffer.concat(parts),head=Buffer.alloc(4);head.writeUInt32LE(4+code.length,0);return Buffer.concat([head,code]);};
  const show=Buffer.concat([Buffer.from([0x08,0x08,0x08]),call(0x366d0)]);
- const showOpt=Buffer.concat([Buffer.from([0x08,0x08,0x0C,0x01]),call(0x366d0)]);
  const voice=id=>{const b=Buffer.alloc(6);b[0]=0x0A;b.writeUInt32LE(id,1);b[5]=0x08;return b;};
- const code=Buffer.concat([
+ /* 1. Dominant main text call (>=3 and strict majority) covering all stack-push opcodes (0x08..0x10) and ASSET_PATH rejections */
+ const r=parse(mkHcb([
   mkPush('「おはよう」'),show,
-  voice(12001630),mkPush('え'),show,
-  mkPush('100%本当だ'),showOpt,
-  mkPush('A組のみんな'),show,
+  mkPush('「おやすみ」'),show,
+  voice(12001630),mkPush('え'),Buffer.from([0x09]),call(0x366d0),
+  mkPush('ん'),Buffer.from([0x0A,1,2,3,4]),call(0x366d0),
+  mkPush('っ'),Buffer.from([0x0D,0,0,0x80,0x3f]),call(0x366d0),
+  mkPush('あ'),Buffer.from([0x0B,1,0]),call(0x366d0),
+  mkPush('う'),Buffer.from([0x0F,2,0]),call(0x366d0),
+  mkPush('100%本当だ'),Buffer.from([0x08,0x0C,0x01]),call(0x366d0),
+  mkPush('A組のみんな'),Buffer.from([0x10,0x02]),call(0x366d0),
   mkPush('ハ'),mkPush('graph/gaiji_heart'),
   mkPush('_メイド服_吹出L'),Buffer.from([0x1A,0x16]),
   mkPush('graph_bs/CHR_つかさ'),Buffer.from([0x16,0x00]),
   mkPush('_内部_あ'),show,
   mkPush('dir/あ'),show,
+  mkPush('graph\\CHR_あ'),show,
+  mkPush('bg_あ.tga'),show,
+  mkPush('se_ドスン.ogg'),show,
+  mkPush('01_立ち絵.tga'),show,
+  mkPush('cg_あ'),show,
+  mkPush('100あ.png'),show,
   mkPush('「ありがとう」'),show,
- ]);
- const head=Buffer.alloc(4);head.writeUInt32LE(4+code.length,0);
- const r=parse(Buffer.concat([head,code]));
- assert.deepEqual(r.lines,['「おはよう」','え','100%本当だ','A組のみんな','「ありがとう」']);
- assert.deepEqual(r.voices,[null,'012001630',null,null,null]);});
+ ]));
+ assert.deepEqual(r.lines,['「おはよう」','「おやすみ」','え','ん','っ','あ','う','100%本当だ','A組のみんな','「ありがとう」']);
+ assert.deepEqual(r.voices,[null,null,'012001630',null,null,null,null,null,null,null]);
+ /* 2. Tie between two calls (2 vs 2) must not pick either call */
+ const tie=parse(mkHcb([
+  mkPush('セーブ画面'),call(0x1000),mkPush('ロード画面'),call(0x1000),mkPush('bg_あ.png'),call(0x1000),mkPush('ハ'),call(0x1000),
+  mkPush('「おはよう」'),call(0x2000),mkPush('「おやすみ」'),call(0x2000),mkPush('え'),call(0x2000),
+ ]));
+ assert.deepEqual(tie.lines,['セーブ画面','ロード画面','「おはよう」','「おやすみ」']);
+ /* 3. Few UI labels (best=2 < 3 and best=1 < 3) must not release assets or single-kana strings */
+ const small2=parse(mkHcb([
+  mkPush('セーブ画面'),call(0x1000),mkPush('ロード画面'),call(0x1000),
+  mkPush('bg\\あ.png'),call(0x1000),mkPush('se_ドスン.ogg'),call(0x1000),mkPush('01_立ち絵.tga'),call(0x1000),mkPush('cg_あ'),call(0x1000),mkPush('え'),call(0x1000),
+ ]));
+ assert.deepEqual(small2.lines,['セーブ画面','ロード画面']);
+ const small1=parse(mkHcb([mkPush('セーブ画面'),call(0x1000),mkPush('え'),call(0x1000)]));
+ assert.deepEqual(small1.lines,['セーブ画面']);
+ /* 4. Unique max of 3 out of 6 prose lines (exactly 50%, not strict majority) must not release single-kana */
+ const half=parse(mkHcb([
+  mkPush('「いち」'),call(0x1000),mkPush('「にぃ」'),call(0x1000),mkPush('「さん」'),call(0x1000),mkPush('え'),call(0x1000),
+  mkPush('「よん」'),call(0x2000),mkPush('「ごぉ」'),call(0x2000),
+  mkPush('「ろく」'),Buffer.from([0x1A,0x16]),
+ ]));
+ assert.deepEqual(half.lines,['「いち」','「にぃ」','「さん」','「よん」','「ごぉ」','「ろく」']);});
 test('kirikiri: KAG scenarios kept as .txt under a scenario folder count as scripts, list files do not',()=>{
  const src=require('node:fs').readFileSync(require.resolve('../services/original-engines/scenes.cjs'),'utf8');
  const m=/const KS=(n=>[^\n]+);/.exec(src);const KS=eval(m[1]);
