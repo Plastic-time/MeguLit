@@ -198,7 +198,7 @@ const ENGINES=[
  {name:'CloudNovel',hook:null,generic:true,test:f=>f.names.some(n=>/cloudnovel/i.test(n))},
  {name:'HTMLVN',hook:null,generic:true,test:f=>f.names.some(n=>/htmlvn/i.test(n))},
  {name:'HTML5 / Electron / NW.js',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'html5'))},
- // The SIA layout check is a fallback so a second executable cannot take another engine's registration.
+ // Keep SIA last so any existing folder match, including SoftPal, NeXAS and Tmr-Hiro PACs, takes priority.
  {name:'SIA-Soft',hook:null,test:f=>f.has(/^1055\.exe$/i)&&f.inspect(require('./sia.cjs').probe)},
 ];
 /* the readers of each engine */

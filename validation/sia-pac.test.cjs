@@ -44,6 +44,7 @@ test('SIA retail layout supplies the probe and Original Text entry',t=>{
  assert.equal(result.detected,'sia');
  assert.equal(result.engines.find(e=>e.id==='sia').scenes,2);
  assert.equal(result.japaneseLines,4);
+ assert.equal(probeGame({dir}).detected,'sia');
  const state=original.scanRunning(root,'1',executable);
  assert.equal(state.status,'native-japanese');
  assert.deepEqual(JSON.parse(fs.readFileSync(state.runtime.index,'utf8')).lines,[
@@ -84,8 +85,7 @@ for(const [name,engine,filename,payload] of [
  ['NeXAS','nexas','script.pac',nexas.nexasPac({'scene.bin':nexas.nexasBin(['',originalLine])})],
  ['Tmr-Hiro ADV','tmrhiro','srp.pac',tmr.tmrPac({'scene':tmr.srp([tmr.HEADER,tmr.tmrMsg(originalLine)])})],
 ])test('SIA PAC files leave the existing '+name+' reader selected',t=>{
- const {root,dir,data}=setup(t),executable=path.join(dir,'Game.exe');
- fs.writeFileSync(executable,'MZ');
+ const {root,dir,data,executable}=setup(t);
  fs.writeFileSync(path.join(dir,filename),payload);
  fs.writeFileSync(path.join(data,'start.pac'),kit.encodeSjis('TEXT\r\n別の台詞です。\r\n'.repeat(5)));
  assert.equal(registry.engineOf(dir)?.name,name);
@@ -93,6 +93,56 @@ for(const [name,engine,filename,payload] of [
  const state=original.scanRunning(root,'1',executable);
  assert.equal(state.runtime?.engine,engine);
  assert.deepEqual(JSON.parse(fs.readFileSync(state.runtime.index,'utf8')).lines,[originalLine]);
+});
+
+for(const [name,files] of [
+ ['loose SoftPal scripts',{'SCRIPT.SRC':softpal.src,'TEXT.DAT':softpal.text}],
+ ['publisher-named SoftPal PAC',{'named-by-publisher.pac':fixtures.softpalPac({'SCRIPT.SRC':softpal.src,'TEXT.DAT':softpal.text})}],
+])test('selecting Game.exe reads '+name+' alongside SIA PAC files',t=>{
+ const {root,dir,data}=setup(t),executable=path.join(dir,'Game.exe');
+ fs.writeFileSync(executable,'MZ');
+ for(const [file,payload] of Object.entries(files))fs.writeFileSync(path.join(dir,file),payload);
+ fs.writeFileSync(path.join(data,'dialogue.pac'),kit.encodeSjis('TEXT\r\n別の台詞です。\r\n'.repeat(5)));
+ // This installation can only find SoftPal through the fallback scan.
+ assert.deepEqual(registry.readersFor(dir),['sia']);
+ const stages=[];
+ const result=probeGame({dir,executable},{progress:stage=>stages.push(stage)});
+ assert.equal(result.detected,'softpal');
+ assert.ok(!result.engines.some(engine=>engine.id==='sia'));
+ assert.ok(stages.every(stage=>!stage.routed.includes('sia')&&stage.stage!=='engine:sia'));
+ const state=original.scanRunning(root,'1',executable);
+ assert.equal(state.runtime?.engine,'softpal');
+ assert.deepEqual(JSON.parse(fs.readFileSync(state.runtime.index,'utf8')).lines,[originalLine]);
+});
+
+test('selecting a different program suppresses SIA routing even with an old index and probe result',async t=>{
+ const {root,dir,data,exe,executable}=setup(t);
+ const other=path.join(dir,'1055.com');
+ fs.writeFileSync(other,exe);
+ const mtime=new Date('2020-01-01T00:00:00Z');
+ for(const file of [executable,other])fs.utimesSync(file,mtime,mtime);
+ fs.writeFileSync(path.join(data,'dialogue.pac'),kit.encodeSjis('TEXT\r\n今日は晴れています。\r\n'));
+ const {DatabaseSync}=require('node:sqlite'),db=new DatabaseSync(':memory:');
+ t.after(()=>db.close());
+ db.exec('CREATE TABLE games (id TEXT,title TEXT,executable TEXT,removed_at TEXT)');
+ db.prepare('INSERT INTO games (id,title,executable) VALUES (?,?,?)').run('1','SIA fixture',executable);
+ const probe=require('../services/adapter-probe.cjs');
+ const {setTimeout:delay}=require('node:timers/promises');
+ const runProbe=async()=>{
+  probe.start(root,db);
+  const deadline=Date.now()+5000;
+  while(probe.status(root).state==='running'&&Date.now()<deadline)await delay(10);
+  assert.equal(probe.status(root).state,'done');
+  return probe.results(root)['1'];
+ };
+ t.after(()=>probe.cancel(root));
+ assert.equal((await runProbe()).detected,'sia');
+ assert.equal(original.status(root,db,'1').runtime?.engine,'sia');
+ db.prepare('UPDATE games SET executable=? WHERE id=?').run(other,'1');
+ assert.notEqual((await runProbe()).detected,'sia');
+ const state=original.status(root,db,'1');
+ assert.equal(state.runtime,null);
+ assert.equal(state.engine,'');
 });
 
 test('a SIA translation PAC is refused through the normal patch entries',async t=>{

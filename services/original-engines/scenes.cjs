@@ -782,7 +782,8 @@ const adapterPack=(()=>{try{return require('../adapter-packs.cjs').engine;}catch
 /* E565 Majiro scenario.arc (.mjo bytecode), E567 TyranoScript (loose / app.asar / NW.js zip; before kirikiri, which would
    otherwise read its data/scenario/*.ks as plain KAG and keep the #name lines as text): majiro.cjs, tyrano.cjs. */
 /* E568 Softpal ADV (data.pac: SCRIPT.SRC + TEXT.DAT): softpal.cjs. */
-const majiro=require('./majiro.cjs').engine,tyrano=require('./tyrano.cjs').engine,softpal=require('./softpal.cjs').engine,sia=require('./sia.cjs').engine;
+const majiro=require('./majiro.cjs').engine,tyrano=require('./tyrano.cjs').engine,softpal=require('./softpal.cjs').engine;
+const {engine:sia,isGameExecutable:isSiaExecutable}=require('./sia.cjs');
 /* E570 System-NNN (spt\*.spt), E571 codeX RScript / Liar-soft (scr.xfl .gsc), E572 AST (ARC1/ARC2, generic text scan:
    last before GARbro): systemnnn.cjs, liar.cjs, ast.cjs. */
 const cmvs=require('./cmvs.cjs').engine,lucifen=require('./lucifen.cjs').engine,kaguya=require('./kaguya.cjs').engine,lcse=require('./lcse.cjs').engine,yuka=require('./yuka.cjs').engine;
@@ -811,6 +812,7 @@ const F4A_SCAN=require('./archive-scan.cjs').ENGINES;
 const siglusPck=require('./siglus-pck.cjs').engine;
 const ENGINES={'adapter-pack':adapterPack,'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,tyrano,kirikiri,artemis,renpy,siglus,'siglus-pck':siglusPck,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,fpd,yuris,aquaplus,'aquaplus-pck':aquaplusPck,'leaf-pak':leafPak,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,'spike-wad':spikeWad,pwaat,naninovel,yarnspinner,utage,'mages-cpk':magesCpk,aokana,'unity-assets':unityAssets,drv3,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,'nitro-npa':nitroNpa,iga,paz,bruns,'re-pak':rePak,fvp,advhd,kogado,reallive,vgprompter,majiro,softpal,sia,systemnnn,liar,rgss,silky,tmrhiro,nekosdk,ikura,exhibit,eagls,ast,seraph,interheart,nexas,malie,shiinario,cmvs,lucifen,kaguya,lcse,yuka,qlie,entis,alicesoft,marble,rugp,...webbundle,plaintext:require('./plaintext.cjs').engine,circus,whale,ddsystem,aoi,kid,...makers,escude,eushully,pjadv,luca,stuff,stcm2,slg:F4A_SCAN.slg,cpk:F4A_SCAN.cpk,evbox:F4A_SCAN.evbox,ism:F4A_SCAN.ism,glib2:F4A_SCAN.glib2,tanuki:F4A_SCAN.tanuki,yaneurao:F4A_SCAN.yaneurao,rits:F4A_SCAN.rits,bluegale:F4A_SCAN.bluegale,cyberworks:F4A_SCAN.cyberworks,dxlib:F4A_SCAN.dxlib,garbro};
 // The engine whose running scripts this folder holds, if any can be read.
+const acceptsExecutable=(id,executable)=>id!=='sia'||!executable||isSiaExecutable(executable);
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  // SIA script order is by filename, with control-only PACs mixed among the dialogue scenes.
  for(const s of id==='sia'?scenes:scenes.slice(0,64)){try{if((s.parse?s.parse():ENGINES[id].parse(s.read())).lines.length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */
@@ -819,10 +821,10 @@ function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{r
 function ownCx(dir){return cxArchives(dir).some(f=>{try{return xp3.list(f)?.files.some(e=>e.encrypted);}catch{return false;}});}
 /* E601 the readers of the engine the registry's fingerprints name are tried first (after an adapter pack), then every
    reader in order as before, so a folder the fingerprints miss reads exactly as it did */
-function detect(dir){if(readable('adapter-pack',dir))return 'adapter-pack';
- let hint=[];try{hint=require('./registry.cjs').readersFor(dir).filter(id=>ENGINES[id]&&id!=='garbro');}catch{}
+function detect(dir,executable){if(readable('adapter-pack',dir))return 'adapter-pack';
+ let hint=[];try{hint=require('./registry.cjs').readersFor(dir).filter(id=>ENGINES[id]&&id!=='garbro'&&acceptsExecutable(id,executable));}catch{}
  for(const id of hint)if(readable(id,dir))return id;
- for(const id of Object.keys(ENGINES)){if(id==='adapter-pack'||hint.includes(id))continue;if(id==='garbro'&&ownCx(dir))continue;if(readable(id,dir))return id;}return null;}
+ for(const id of Object.keys(ENGINES)){if(id==='adapter-pack'||hint.includes(id)||!acceptsExecutable(id,executable))continue;if(id==='garbro'&&ownCx(dir))continue;if(readable(id,dir))return id;}return null;}
 function read(id,dir,overlay){const engine=ENGINES[id];
  // E449 a release's Chinese column gets the filled translations of the lines it leaves empty (fill.cjs).
  const list=engine.scenes(dir).map(s=>{const replaced=overlay?.get(s.name.toLowerCase());let parsed={lines:[],anchors:[]};try{parsed=replaced?engine.parse(replaced):(s.parse?s.parse():engine.parse(s.read()));}catch{}return fill.scene({name:s.name,...parsed,patched:!!replaced});});
@@ -847,4 +849,4 @@ function preparing(dir){
 }
 /* E375 why a recognised game cannot be read (an engine's own check, e.g. encrypted WOLF archives), or null. */
 function unsupportedReason(dir){for(const e of Object.values(ENGINES)){if(typeof e.unsupported!=='function')continue;let code='';try{code=e.unsupported(dir);}catch{}if(code)return {engine:e.id,code,detail:e.REASONS?.[code]||''};}return null;}
-module.exports={layerOriginal,sceneLanguage,cxChineseOnly,cxPrepareSync,withCxProbe,ownCx,unquoteSlot,unsupportedReason,preparing,cxBuilds,chineseColumn,ENGINES,detect,readable,read,fingerprint,parseKs,parseAst,parseRpy,pfsList,pfsRead,tlPairs,decode};
+module.exports={layerOriginal,sceneLanguage,cxChineseOnly,cxPrepareSync,withCxProbe,ownCx,unquoteSlot,unsupportedReason,preparing,cxBuilds,chineseColumn,ENGINES,acceptsExecutable,detect,readable,read,fingerprint,parseKs,parseAst,parseRpy,pfsList,pfsRead,tlPairs,decode};

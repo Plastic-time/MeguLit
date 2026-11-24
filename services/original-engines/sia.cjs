@@ -7,6 +7,7 @@ const path=require('node:path'),kit=require('./kit.cjs');
 const BRAND=Buffer.from('SIA-Soft\0'),BRAND_OFFSET=0x58d20,KEY_OFFSET=0x59010,KEY_LENGTH=400;
 const MAX_SCRIPT_BYTES=1<<20;
 const TEXT_COMMANDS=new Set(['TEXT','TEXT_NO_INP','ADD_TEXT']);
+const isGameExecutable=executable=>path.basename(executable).toLowerCase()==='1055.exe';
 
 function installation(dir){
  const executable=path.join(dir,'1055.exe');
@@ -58,4 +59,4 @@ const engine={id:'sia',hint:'data\\*.pac',
  test:()=>false,
  archives:()=>[],
 };
-module.exports={engine,probe:dir=>!!installation(dir)?.files.length};
+module.exports={engine,isGameExecutable,probe:dir=>!!installation(dir)?.files.length};

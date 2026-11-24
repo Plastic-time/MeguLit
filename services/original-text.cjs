@@ -128,7 +128,7 @@ const runningDirOf=runtime=>ADAPTERS[runtime.engine||'system4']?.folder?runtime.
 /* 2026-11-21 (DDLC Plus pairing self-test: the generic Unity reader took the folder before vgprompter, so the runtime became its 53 poem lines and the
    group's 16177-line table no longer belonged to it): scene engines are chosen the way scenes.detect chooses them, the readers the engine registry
    names first; the plain registration order (generic readers among the dedicated ones) is no longer used for them */
-function locate(dir,base){for(const adapter of Object.values(ADAPTERS)){if(adapter.scene)continue;const found=adapter.locate(dir,base);if(found)return found;}let id=null;try{id=scenes.detect(dir);}catch{}return id&&ADAPTERS[id]?{engine:id,target:dir}:null;}
+function locate(dir,base,executable){for(const adapter of Object.values(ADAPTERS)){if(adapter.scene)continue;const found=adapter.locate(dir,base);if(found)return found;}let id=null;try{id=scenes.detect(dir,executable);}catch{}return id&&ADAPTERS[id]?{engine:id,target:dir}:null;}
 const ARCHIVE_BAK_ENGINES=new Set(['silky']);
 function readSceneArchive(id,file){
  if(!ARCHIVE_BAK_ENGINES.has(id))return null;
@@ -158,7 +158,7 @@ function gameRow(db,id){const row=db.prepare('SELECT * FROM games WHERE id=? AND
 
 // ---- Running build: what the installed (patched) game still contains ---------------------------
 function scanRunning(root,id,executable,opts={}){
- const dir=path.dirname(executable),loc=locate(dir,path.parse(executable).name);if(!loc){const waiting=scenes.preparing(dir);return writeState(root,id,waiting?{status:'preparing',error:'SCRIPT_PREPARING',preparing:waiting,runtime:null,gameDir:dir}:(()=>{const why=scenes.unsupportedReason(dir);return why?{status:'unsupported',error:why.code,detail:why.detail,engine:why.engine,preparing:null,runtime:null,gameDir:dir}:{status:'unsupported',error:'NO_SUPPORTED_SCRIPT',detail:'',preparing:null,runtime:null,gameDir:dir};})());}const file=loc.target;
+ const dir=path.dirname(executable),loc=locate(dir,path.parse(executable).name,executable);if(!loc){const waiting=scenes.preparing(dir);return writeState(root,id,waiting?{status:'preparing',error:'SCRIPT_PREPARING',preparing:waiting,runtime:null,gameDir:dir}:(()=>{const why=scenes.unsupportedReason(dir);return why?{status:'unsupported',error:why.code,detail:why.detail,engine:why.engine,preparing:null,runtime:null,gameDir:dir}:{status:'unsupported',error:'NO_SUPPORTED_SCRIPT',detail:'',preparing:null,runtime:null,gameDir:dir};})());}const file=loc.target;
  const hash=fingerprint(loc),current=readState(root)[id];if(current?.runtime?.sha256===hash&&(current.runtime.reader||'')===READER&&current.runtime.index&&fs.existsSync(current.runtime.index))return current;
  const ain=readScript(loc),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length,nonEmpty=ain.lines.filter(prose).length,zhOnly=chineseOnly(ain.lines);
  // An English (or other) original read by a scene engine is neither the Japanese game nor a Chinese build: nothing to do.
@@ -614,7 +614,7 @@ function brief(root,id){const s=readState(root)[String(id)];if(!s)return 'unknow
  if(s.status==='preparing')return 'preparing';return 'none';}
 function status(root,db,id){
  const row=gameRow(db,id),saved=readState(root)[id];let state=saved;
- try{if(!saved?.runtime||!sameDir(runningDirOf(saved.runtime),path.dirname(row.executable))||!fs.existsSync(saved.runtime.file)||saved.runtime.sha256!==fingerprint({engine:saved.runtime.engine||'system4',target:saved.runtime.file}))state=scanRunning(root,id,row.executable);}catch(error){state={...saved,status:'failed',error:String(error.message||error)};}
+ try{if(!saved?.runtime||!scenes.acceptsExecutable(saved.runtime.engine,row.executable)||!sameDir(runningDirOf(saved.runtime),path.dirname(row.executable))||!fs.existsSync(saved.runtime.file)||saved.runtime.sha256!==fingerprint({engine:saved.runtime.engine||'system4',target:saved.runtime.file}))state=scanRunning(root,id,row.executable);}catch(error){state={...saved,status:'failed',error:String(error.message||error)};}
  try{state=refreshCachedPatchReport(root,id,state);}catch{}
  /* Live test 2026-11-13 (Summer Pockets, 魔法少女ノ魔女裁判, DDLC Plus): patches aligned before E496 had no pairing report, so the
     game page could not say total/paired/unpaired. Sample it once from the saved indexes; the verdict is reported, the state kept. */
@@ -624,7 +624,8 @@ function status(root,db,id){
  /* E288 (user: the dialog stayed on 正在查找 for good after removing a patch): every status poll starts autoPatchLater, so
     an entry in autoRuns says nothing; only a search that really scans (it records running) counts, for two minutes at most. */
  const searching=!!state?.patchSearch?.running&&Date.now()-(state.patchSearch.at||0)<120000,patchSearch=state?.patchSearch||searching?{running:searching,found:!!state?.patchSearch?.found,at:state?.patchSearch?.at||0,declined:!!state?.patchSearch?.declined}:null;
- return {preparing:state?.status==='preparing'?state.preparing||null:null,patchSearch,patchHint:patchHint(state?.runtime),patchLauncher:state?.patchLauncher?.file&&fs.existsSync(state.patchLauncher.file)?{file:state.patchLauncher.file}:null,gameDir:path.dirname(row.executable),patch:patchInfo,patchStatus:patchInfo?state.patchStatus||'none':'none',patchAlignment:patchInfo?state.patchAlignment||null:null,engine:state?.engine||'',status:state?.status||'unsupported',mode:state?.mode||'off',error:state?.error||'',lastSearch:state?.lastSearch?{at:state.lastSearch.at,found:state.lastSearch.found,searched:state.lastSearch.searched,complete:state.lastSearch.complete}:null,runtime:state?.runtime?runtime:null,original:state?.original?original:null,alignment:state?.alignment||null};
+ const engine=scenes.acceptsExecutable(state?.engine,row.executable)?state?.engine||'':'';
+ return {preparing:state?.status==='preparing'?state.preparing||null:null,patchSearch,patchHint:patchHint(state?.runtime),patchLauncher:state?.patchLauncher?.file&&fs.existsSync(state.patchLauncher.file)?{file:state.patchLauncher.file}:null,gameDir:path.dirname(row.executable),patch:patchInfo,patchStatus:patchInfo?state.patchStatus||'none':'none',patchAlignment:patchInfo?state.patchAlignment||null:null,engine,status:state?.status||'unsupported',mode:state?.mode||'off',error:state?.error||'',lastSearch:state?.lastSearch?{at:state.lastSearch.at,found:state.lastSearch.found,searched:state.lastSearch.searched,complete:state.lastSearch.complete}:null,runtime:state?.runtime?runtime:null,original:state?.original?original:null,alignment:state?.alignment||null};
 }
 function setMode(root,id,mode){if(!['off','original'].includes(mode))throw Error('INVALID_TEXT_MODE');const s=readState(root)[id];if(mode==='original'&&s?.status!=='ready')throw Error('ORIGINAL_NOT_READY');return writeState(root,id,{mode});}
 

@@ -63,12 +63,12 @@ function lineKind(l){const t=String(l).trim();if(!t||PATHISH.test(t)||SCRIPTISH_
 /* → {dialogue,japanese,chinese} over a list of lines; japanese keeps the old meaning (any kana, whole list) */
 function countLines(lines){let dialogue=0,japanese=0,chinese=0;for(const l of lines||[]){if(KANA.test(l))japanese++;const k=lineKind(l);if(k)dialogue++;if(k===2)chinese++;}return {dialogue,japanese,chinese};}
 /* every engine of scenes.cjs, plus System4 / BGI from original-text.cjs, with a per-engine time cap */
-function runEngines(dir,{deadline,routed=[],progress=()=>{},only=null}){
+function runEngines(dir,{deadline,routed=[],progress=()=>{},only=null,executable}){
  const scenes=require('./original-engines/scenes.cjs'),out=[];
  /* the GARbro last resort never runs over a folder whose KiriKiri cx archives MeguLit decrypts itself (detect() skips it the same way): on a cold cache it spent 20-80 s unpacking them for nothing and the probe timed out (ATRI) */
  let skipGarbro=false;try{skipGarbro=scenes.ownCx(dir);}catch{}
  /* E610 dedicated readers first, in scenes.detect order; the generic scans (HTML5, garbro, unity-assets, cpk) only when no dedicated reader read a sizeable amount of Japanese, and each with its own time cap */
- const ids=Object.keys(scenes.ENGINES),first=routed.filter(i=>ids.includes(i)),rest=ids.filter(i=>!first.includes(i)),order=[...first.filter(i=>!GENERIC.has(i)),...rest.filter(i=>!GENERIC.has(i)),...first.filter(i=>GENERIC.has(i)),...rest.filter(i=>GENERIC.has(i))];let dedicatedJp=0;
+ const ids=Object.keys(scenes.ENGINES).filter(id=>scenes.acceptsExecutable(id,executable)),first=routed.filter(i=>ids.includes(i)),rest=ids.filter(i=>!first.includes(i)),order=[...first.filter(i=>!GENERIC.has(i)),...rest.filter(i=>!GENERIC.has(i)),...first.filter(i=>GENERIC.has(i)),...rest.filter(i=>GENERIC.has(i))];let dedicatedJp=0;
  /* S5 routing: the readers the fingerprint / registry name run first (never starved by the budget) and are always listed, a reader that found nothing as NO_SCENES */
  const isRouted=new Set(first);
  for(const id of only?order.filter(i=>only.includes(i)):order){const generic=GENERIC.has(id);if(generic&&dedicatedJp>=DEDICATED_JP)continue;progress({stage:'engine:'+id,engines:out});if(id==='garbro'&&skipGarbro)continue;if(Date.now()>deadline){out.push({id,scenes:-1,lines:0,error:'BUDGET',ms:0});continue;}
@@ -138,12 +138,13 @@ function classify({engines,inventory:inv,unsupported,preparing,title,garbroNeed=
 function scaledBudget(budgetMs,inv){const gb=(inv?.bytes||0)/2**30,n=(inv?.archives||[]).length;return Math.round(Math.min(budgetMs*4,budgetMs+gb*8000+n*1500));}
 /* S5 the readers the evidence names: registry folder tests plus the inventory fingerprint, as scenes.cjs reader ids */
 const norm=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
-function routedReaders(dir,inv){const out=[],add=ids=>{for(const i of ids||[])if(!out.includes(i))out.push(i);};let reg;try{reg=require('./original-engines/registry.cjs');}catch{}
+function routedReaders(dir,inv,executable){const out=[],add=ids=>{for(const i of ids||[])if(!out.includes(i))out.push(i);};let reg;try{reg=require('./original-engines/registry.cjs');}catch{}
  const known=fp.fingerprint(inv)?.engine;
  if(known&&reg){const k=norm(known);for(const [name,ids] of Object.entries(reg.READERS)){const n=norm(name),tokens=String(name).toLowerCase().split(/[^a-z0-9'-]+/).map(norm);if(n.startsWith(k)||tokens.includes(k))add(ids);}}
  if(known)try{add(Object.keys(require('./original-engines/scenes.cjs').ENGINES).filter(i=>norm(i)===norm(known)||i.startsWith(known+'-')));}catch{}
  try{add(reg?.readersFor(dir));}catch{}
- return {engine:known||null,readers:out};}
+ const {acceptsExecutable}=require('./original-engines/scenes.cjs');
+ return {engine:known||null,readers:out.filter(id=>acceptsExecutable(id,executable))};}
 /* the Japanese lines under a Chinese build: {kind:'layer'|'backup',lines} or null (S9) */
 function underlay(dir,id,executable){const scenes=require('./original-engines/scenes.cjs'),eng=scenes.ENGINES[id];
  if(eng?.originalLines){const lines=eng.originalLines(dir);if(Array.isArray(lines)&&lines.some(Boolean))return {kind:'layer',lines:lines.filter(Boolean)};}
@@ -169,13 +170,13 @@ function probeInScope({dir,executable,title},{budgetMs=60000,progress=null}={}){
  inv=inventory(dir,{deadline:t+budgetMs/2});let unsupported=null,preparing=null;
  budgetMs=scaledBudget(budgetMs,inv);deadline=t+budgetMs;
  report({stage:'route'});
- route=routedReaders(dir,inv);
+ route=routedReaders(dir,inv,executable);
  report({stage:'cx-prepare'});
  /* cx archives are decrypted here, not by a background worker the probe would not wait for */
  try{require('./original-engines/scenes.cjs').cxPrepareSync(dir,{deadline:t+budgetMs/2});}catch{}
  try{const scenes=require('./original-engines/scenes.cjs');unsupported=scenes.unsupportedReason(dir);preparing=scenes.preparing(dir)?.kind||null;}catch{}
  report({stage:'native'});
- const native=nativeEngines(dir,executable),engines=[...native,...runEngines(dir,{deadline,routed:route.readers,progress:p=>report({...p,engines:[...native,...p.engines]})})];
+ const native=nativeEngines(dir,executable),engines=[...native,...runEngines(dir,{deadline,routed:route.readers,executable,progress:p=>report({...p,engines:[...native,...p.engines]})})];
  if(!unsupported&&engines.some(e=>e.id==='kogado'&&!e.lines&&e.error==='HYPACK_COCOTTE'))unsupported={engine:'kogado',code:'HYPACK_COCOTTE'};
  /* the engine that named the unsupported code is a reader that tried: list it (issue showed 'engines tried: -' next to cmvs:CMVS_CPZ7) */
  /* S5 GARbro fallback: no native reader found lines, and the GARbro pack supports the archives.
