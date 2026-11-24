@@ -34,8 +34,8 @@ function readNpk(buf,key=KEYS.saya){
  const entries=npkIndex(idx,count,buf.length);
  return {buf,key,iv,version:buf.readUInt32LE(4),major:npkMajor(buf),entries};}
 /* Key trial: a wrong key still passes the PKCS7 padding about once in 256 tries and leaves a garbage index, so when no
-   key yields sane entries the archive's key is unknown (NPK_KEY), whichever key happened to be tried last. A bad header
-   does not depend on the key and is reported as it is. */
+   key yields sane entries no known key opens the archive (NPK_KEY: an unknown key, or a damaged index under a known
+   one), whichever key happened to be tried last. A bad header does not depend on the key and is reported as it is. */
 function readNpkAny(buf){
  for(const k of ALL_KEYS){try{return readNpk(buf,k);}catch(e){if(e.message==='NPK_NOT_NPK2'||e.message==='NPK_HEADER')throw e;}}
  throw Error('NPK_KEY');}
