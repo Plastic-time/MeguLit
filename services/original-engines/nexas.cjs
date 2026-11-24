@@ -7,7 +7,7 @@
      NeXAs/extTxtFromBin.py (the .bin string table), SakuraSymphonyReTranslation DC3PS-NeXAS-Script-Tool (the "VER"
      header of newer builds, length-prefixed UTF-8 strings, the (0,name)(5,1)(0,message) speaker pattern, @ codes).
    *.pac   "PAC" + a byte that is not ' ' (Softpal) or 'K'; u32 count; u32 pack type (0 none, 1 LZSS, 2 Huffman, 3 zlib,
-           4 zlib unless size = unpacked, 7 zstd: newer titles). Index: old builds at 0xC, count × {name[0x20|0x40],
+           4 zlib unless size = unpacked, 5 none, 6 zstd, 7 zstd unless size = unpacked). Index: old builds at 0xC, count × {name[0x20|0x40],
            u32 offset, u32 unpacked, u32 size}; newer ones at the end: the last u32 is its size, the bytes before it
            are NOT'ed, then static-Huffman coded (count × 0x4C, names 0x40, cp932).
    *.bin   compiled scenario: [u32 version, only in newer builds] u32 code count, count × {u32 op, u32 arg}, u32 string
@@ -33,9 +33,9 @@ function index(file){const size=kit.size(file);if(size<16)return null;const h=ki
  try{const raw=kit.not(kit.readAt(file,size-4-isz,isz)),idx=kit.huffman(raw,count*0x4c,{order:'msb'});return entries(idx,0,0x40);}catch{return null;}}
 const listed=new Map();
 function list(file){const key=file+'|'+kit.size(file);if(!listed.has(key))listed.set(key,index(file));return listed.get(key);}
-function read(file,e){const b=kit.readAt(file,e.offset,e.size);if(!e.type||e.size===e.unpacked&&e.type!==1&&e.type!==2)return b;
+function read(file,e){const b=kit.readAt(file,e.offset,e.size);if(!e.type||(e.type===4||e.type===7)&&e.size===e.unpacked)return b;
  switch(e.type){case 1:return kit.lzss(b,e.unpacked);case 2:return kit.huffman(b,e.unpacked,{order:'msb'});case 3:case 4:return kit.inflate(b);
-  default:return kit.unpackAny(b,Math.max(e.unpacked,1))||b;}}
+  default:try{const r=kit.unpackAny(b,Math.max(e.unpacked,1));return r&&r.length?r:b;}catch{return b;}}}
 
 /* ---- .bin --------------------------------------------------------------------------------------------------------- */
 const u32=(b,p)=>p+4<=b.length?b.readUInt32LE(p):-1;

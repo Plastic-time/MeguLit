@@ -39,6 +39,36 @@ test('NeXAS: script.pac (Huffman index, zlib / zstd / plain entries; old index) 
  /* Softpal's "PAC " archives are not NeXAS */
  const sp=path.join(game,'data.pac');fs.writeFileSync(sp,Buffer.concat([Buffer.from('PAC '),Buffer.alloc(64)]));assert.equal(nexas.list(sp),null);
 });
+test('NeXAS: equal packed and unpacked length skips decompression for pack types 4 and 7, not type 3 (zlib) or type 6 (zstd)',t=>{
+ const zlib=require('node:zlib');
+ const base=F.nexasBin(['朝の光が差し込む。'],{layout:'v1'});
+ let s=1;const noise=Buffer.alloc(600);for(let i=0;i<noise.length;i++){s=(Math.imul(s,1664525)+1013904223)>>>0;noise[i]=s>>>24;}
+ const eqOf=compress=>{for(let p=0;p<30;p++){const head=Buffer.concat([base.subarray(0,base.length-8),Buffer.alloc(p,0x41)]);
+  for(let k=0;k<noise.length;k++){const raw=Buffer.concat([head,noise.subarray(0,k)]);if(compress(raw).length===raw.length)return raw;}}
+  throw Error('no equal-length sample');};
+ const rawPac=(dir,type,payload,unpacked=payload.length)=>{const pac=path.join(dir,'script.pac');
+  const nm=Buffer.alloc(0x40);nm.write('s01.bin','latin1');
+  const hdr=Buffer.alloc(12);hdr.write('PAC\x32','latin1');hdr.writeUInt32LE(1,4);hdr.writeUInt32LE(type,8);
+  const idx=Buffer.alloc(0x4c);nm.copy(idx,0);idx.writeUInt32LE(12+0x4c,0x40);idx.writeUInt32LE(unpacked,0x44);idx.writeUInt32LE(payload.length,0x48);
+  fs.writeFileSync(pac,Buffer.concat([hdr,idx,payload]));return pac;};
+ /* type 3 (zlib): packed size === unpacked size is still a zlib stream and must be inflated */
+ const raw3=eqOf(b=>zlib.deflateSync(b));
+ assert.equal(zlib.deflateSync(raw3).length,raw3.length);
+ const g3=tmp(t);F.writeTree(g3,{'script.pac':F.nexasPac({'s01.bin':raw3},{type:3,index:'old'})});
+ assert.deepEqual(scenes.read('nexas',g3)[0].lines,['朝の光が差し込む。']);
+ /* type 6 (always zstd): packed size === unpacked size is still a zstd frame and must be decompressed */
+ if(typeof zlib.zstdCompressSync==='function'){
+  const raw6=eqOf(b=>zlib.zstdCompressSync(b)),packed6=zlib.zstdCompressSync(raw6);
+  assert.equal(packed6.length,raw6.length);
+  const g6=tmp(t);rawPac(g6,6,packed6,raw6.length);
+  assert.deepEqual(scenes.read('nexas',g6)[0].lines,['朝の光が差し込む。']);
+ }
+ /* type 4 (DeflateOrNone) and type 7 (ZstdOrNone): equal size returns raw bytes without decompressing */
+ for(const type of [4,7]){const g=tmp(t);rawPac(g,type,base);assert.deepEqual(scenes.read('nexas',g)[0].lines,['朝の光が差し込む。']);}
+ /* default branch: a corrupt zstd-magic payload falls back to raw bytes instead of throwing */
+ const gBad=tmp(t),badZstd=Buffer.from([0x28,0xb5,0x2f,0xfd,0xff,0xff,0xff,0xff]),pacBad=rawPac(gBad,7,badZstd,badZstd.length+10);
+ assert.deepEqual(nexas.read(pacBad,nexas.list(pacBad)[0]),badZstd);
+});
 
 /* ---- Malie ------------------------------------------------------------------------------------------------------ */
 test('Malie: Camellia and CFI blocks match GARbro ArcFormats.dll; every exported scheme loads',()=>{
