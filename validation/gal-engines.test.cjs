@@ -227,6 +227,60 @@ test('fvp: single-kana and alphanumeric-leading dialogue lines passed to the mai
   mkPush('「ろく」'),Buffer.from([0x1A,0x16]),
  ]));
  assert.deepEqual(half.lines,['「いち」','「にぃ」','「さん」','「よん」','「ごぉ」','「ろく」']);});
+test('fvp: non-kana Japanese lines passed to the main text call are kept while ASCII, assets and non-text calls are dropped',()=>{
+ const {parse,engine}=require('../services/original-engines/fvp.cjs'),{encodeSjis}=require('../services/original-engines/kit.cjs');
+ const mkPush=raw=>{const b=Buffer.isBuffer(raw)?raw:encodeSjis(raw);return Buffer.concat([Buffer.from([0x0E,b.length+1]),b,Buffer.from([0])]);};
+ const call=addr=>{const b=Buffer.alloc(5);b[0]=0x02;b.writeUInt32LE(addr,1);return b;};
+ const mkHcb=parts=>{const code=Buffer.concat(parts),head=Buffer.alloc(4);head.writeUInt32LE(4+code.length,0);return Buffer.concat([head,code]);};
+ const show=Buffer.concat([Buffer.from([0x08,0x08,0x08]),call(0x366d0)]);
+ const voice=id=>{const b=Buffer.alloc(6);b[0]=0x0A;b.writeUInt32LE(id,1);b[5]=0x08;return b;};
+ const jp=mkHcb([
+  mkPush('「おはよう」'),show,
+  mkPush('「おやすみ」'),show,
+  mkPush('「ありがとう」'),show,
+  voice(2005710),mkPush('…………'),show,
+  mkPush('……。'),show,
+  voice(3002500),mkPush('大丈夫'),show,
+  mkPush('悠馬……'),show,
+  mkPush('１０……'),show,
+  mkPush('！？'),show,
+  /* Pure ASCII or asset paths passed to main text call must still be dropped */
+  mkPush('0'),show,
+  mkPush('bg01'),show,
+  mkPush('...'),show,
+  mkPush('漢字.png'),show,
+  mkPush('bg_漢字'),show,
+  mkPush('dir/漢字'),show,
+  mkPush('_漢字'),show,
+  /* Non-kana strings passed to other calls must stay dropped */
+  mkPush('大丈夫'),call(0x23abf),
+  mkPush('汁'),mkPush('graph/gaiji_shiru'),
+ ]);
+ const r=parse(jp);
+ assert.deepEqual(r.lines,['「おはよう」','「おやすみ」','「ありがとう」','…………','……。','大丈夫','悠馬……','１０……','！？']);
+ assert.deepEqual(r.voices,[null,null,null,'002005710',null,'003002500',null,null,null]);
+ /* Twin .hcb: translated non-kana line pairs cleanly, unchanged Shift-JIS '…………' is skipped (no GBK mojibake) */
+ const origEllip=encodeSjis('…………'),origOk=encodeSjis('大丈夫'),zhOk=Buffer.from([0xc3,0xbb,0xca,0xc2]);
+ const mkTwinPush=(orig,zhBytes)=>Buffer.concat([Buffer.from([0x0E,orig.length+1]),zhBytes,Buffer.alloc(orig.length+1-zhBytes.length)]);
+ const jpPair=mkHcb([
+  mkPush('「おはよう」'),show,mkPush('「おやすみ」'),show,mkPush('「ありがとう」'),show,
+  mkPush(origEllip),show,mkPush(origOk),show,
+ ]);
+ const zhPair=mkHcb([
+  mkPush('「おはよう」'),show,mkPush('「おやすみ」'),show,mkPush('「ありがとう」'),show,
+  mkPush(origEllip),show,mkTwinPush(origOk,zhOk),show,
+ ]);
+ const n=Buffer.alloc(4);n.writeUInt32LE(jpPair.length);
+ const pr=parse(Buffer.concat([Buffer.from('FVP+ZH\0\0','latin1'),n,jpPair,zhPair]));
+ assert.deepEqual(pr.lines,['「おはよう」','「おやすみ」','「ありがとう」','…………','大丈夫']);
+ assert.deepEqual(pr.zh,['','','','','没事']);
+ assert.deepEqual(engine.patchLines([{name:'World.hcb',...pr}])[0].lines,['「おはよう」','「おやすみ」','「ありがとう」','…………','没事']);
+ /* Non-kana strings must NOT vote for textCall (even 5 non-kana pushes on 0x1000 cannot elect it over 2 kana pushes on 0x1000) */
+ const noVote=parse(mkHcb([
+  mkPush('「おはよう」'),call(0x1000),mkPush('「おやすみ」'),call(0x1000),
+  mkPush('…………'),call(0x1000),mkPush('……。'),call(0x1000),mkPush('大丈夫'),call(0x1000),mkPush('悠馬……'),call(0x1000),
+ ]));
+ assert.deepEqual(noVote.lines,['「おはよう」','「おやすみ」']);});
 test('kirikiri: KAG scenarios kept as .txt under a scenario folder count as scripts, list files do not',()=>{
  const src=require('node:fs').readFileSync(require.resolve('../services/original-engines/scenes.cjs'),'utf8');
  const m=/const KS=(n=>[^\n]+);/.exec(src);const KS=eval(m[1]);

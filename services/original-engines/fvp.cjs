@@ -62,13 +62,14 @@ function parse(buf){let b=Buffer.isBuffer(buf)?buf:Buffer.from(buf),z=null,cn=nu
  else if(b.subarray(0,8).equals(CN)){const n=b.readUInt32LE(8);const pack=b.subarray(12+n);b=b.subarray(12,12+n);cn=cnpack(pack,b);}
  const end=b.length>=4?Math.min(b.readUInt32LE(0),b.length):0,items=[],counts=new Map();let prevEnd=0,totalProse=0,textCall=-1,best=0,second=0;
  for(const p of pushes(b)){const orig=b.subarray(p.at+2,p.at+1+p.n),s=tidy(sj.decode(orig));const from=prevEnd;prevEnd=p.at+2+p.n;
-  if(!s||!PROSE.test(s)||s.includes('�'))continue;
-  const call=callAfter(b,end,p);items.push({p,orig,s,from,call});
-  if(!ASSET(s)){totalProse++;if(call>=0)counts.set(call,(counts.get(call)||0)+1);}}
+  if(!s||s.includes('�'))continue;
+  const hasKana=PROSE.test(s);if(!hasKana&&/^[\x00-\x7f]+$/.test(s))continue;
+  const call=callAfter(b,end,p);if(hasKana||call>=0)items.push({p,orig,s,from,call,hasKana});
+  if(hasKana&&!ASSET(s)){totalProse++;if(call>=0)counts.set(call,(counts.get(call)||0)+1);}}
  for(const [call,c] of counts){if(c>best){second=best;best=c;textCall=call;}else if(c>second)second=c;}
  if(best<3||best===second||best*2<=totalProse)textCall=-1;
  const lines=[],zh=[],voices=[];
- for(const x of items){if(ASSET(x.s)&&(textCall<0||x.call!==textCall||ASSET_PATH(x.s)))continue;
+ for(const x of items){if((!x.hasKana||ASSET(x.s))&&(textCall<0||x.call!==textCall||ASSET_PATH(x.s)))continue;
   lines.push(x.s);zh.push(cn?cn.get(x.p.at)||'':twin(z,x.p,x.orig));voices.push(voiceAt(b,x.p.at,x.from));}
  const v=require('./voice-ref.cjs').keep(voices),out=z||cn?{lines,anchors:[],zh}:{lines,anchors:[]};if(v)out.voices=v;return out;}
 /* E450 a spoken line's voice: the int the script pushes (0x0A, u32) just before the text, then the voice call's
