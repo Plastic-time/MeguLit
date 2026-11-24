@@ -169,3 +169,151 @@ test('QLIE: single Chinese pack, Chinese-over-Chinese packs, and plain Japanese 
  const r3=probeGame({dir:plainJa.dir,executable:plainJa.exe,title:'t'},{budgetMs:30000});
  assert.equal(r3.step,'ok');assert.equal(r3.original,null);assert.equal(r3.japaneseLines,ja.length);
 });
+
+function makeAi6Arc(files,sjis){
+ const F=require('./helpers/engine-fixtures-a.cjs');
+ const names=Object.keys(files),idx=[],datas=[];let off=4+names.length*0x110;
+ const u32be=v=>{const b=Buffer.alloc(4);b.writeUInt32BE(v>>>0);return b;};
+ for(const n of names){
+  const nb=Buffer.alloc(0x104),raw=sjis(n);let key=(raw.length+1)&255;
+  for(let j=0;j<raw.length;j++){nb[j]=(raw[j]+key)&255;key=(key-1)&255;}
+  const packed=F.lzssLiterals(files[n]);
+  idx.push(nb,u32be(packed.length),u32be(files[n].length),u32be(off));datas.push(packed);off+=packed.length;
+ }
+ return Buffer.concat([u32(names.length),...idx,...datas]);
+}
+function makeAi6Mes(lines,enc){
+ const parts=[];
+ for(const l of lines){parts.push(Buffer.from([0x0a]),enc(l),Buffer.from([0]));}
+ parts.push(Buffer.from([0x01]));
+ return Buffer.concat([u32(1),u32(0),...parts]);
+}
+function makeSys4Ain(lines,enc,{functions=['main','scene_a','scene_b'],mt=false}={}){
+ const zlib=require('node:zlib');
+ const tbl=(tag,items)=>Buffer.concat([Buffer.from(tag,'latin1'),u32(items.length),...items.flatMap(b=>[b,Buffer.from([0])])]);
+ const body=Buffer.concat([Buffer.from('VERS','latin1'),u32(6),tbl('MSG0',lines.map(enc)),tbl('FNAM',functions.map(f=>Buffer.from(f,'latin1')))]);
+ if(mt)return ot._ain.mtXor(body,0x5D3E3);
+ const packed=zlib.deflateSync(body),head=Buffer.alloc(16);
+ head.write('AI2\0',0,'latin1');head.writeUInt32LE(body.length,8);head.writeUInt32LE(packed.length,12);
+ return Buffer.concat([head,packed]);
+}
+
+test('Silky backup .bak: bakup/mes.arc.bak and sibling mes.arc.bak are adopted without entering normal scenes()',()=>{
+ const F=require('./helpers/engine-fixtures.cjs'),{probeGame}=require('../services/adapter-probe-core.cjs');
+ const ja=[],zh=[];for(let i=0;i<12;i++){ja.push(...JA);zh.push(...ZH);}
+ const jaArc=makeAi6Arc({'a01.mes':makeAi6Mes(ja,F.sjis)},F.sjis);
+ const zhArc=makeAi6Arc({'a01.mes':makeAi6Mes(zh,F.gbk)},F.sjis);
+ // #869 layout: root mes.arc (zh) + bakup/mes.arc (zh) + bakup/mes.arc.bak (ja)
+ const gSub=game(dir=>{
+  fs.writeFileSync(path.join(dir,'mes.arc'),zhArc);
+  fs.mkdirSync(path.join(dir,'bakup'),{recursive:true});
+  fs.writeFileSync(path.join(dir,'bakup','mes.arc'),zhArc);
+  fs.writeFileSync(path.join(dir,'bakup','mes.arc.bak'),jaArc);
+ });
+ assert.deepEqual(scenes.read('silky',gSub.dir).flatMap(s=>s.lines),zh,'normal scenes() must not read .bak');
+ assert.equal(ot.backupOriginal(gSub.dir,'silky','game'),path.join(gSub.dir,'bakup','mes.arc.bak'));
+ const rSub=probeGame({dir:gSub.dir,executable:gSub.exe,title:'t'},{budgetMs:30000});
+ assert.equal(rSub.step,'ok',JSON.stringify(rSub.engines));
+ assert.equal(rSub.detail,'silky');
+ assert.equal(rSub.original,'backup');
+ assert.equal(rSub.japaneseLines,ja.length);
+ const sSub=ot.scanRunning(gSub.root,'s1',gSub.exe);
+ assert.equal(sSub.status,'ready',JSON.stringify(sSub));
+ assert.equal(sSub.original?.backup,true);
+ assert.equal(sSub.original?.file,path.join(gSub.dir,'bakup','mes.arc.bak'));
+ // Same-folder mes.arc.bak layout
+ const gSib=game(dir=>{
+  fs.writeFileSync(path.join(dir,'mes.arc'),zhArc);
+  fs.writeFileSync(path.join(dir,'mes.arc.bak'),jaArc);
+ });
+ assert.deepEqual(scenes.read('silky',gSib.dir).flatMap(s=>s.lines),zh,'sibling .bak must not enter normal scenes()');
+ assert.equal(ot.backupOriginal(gSib.dir,'silky','game'),path.join(gSib.dir,'mes.arc.bak'));
+ const rSib=probeGame({dir:gSib.dir,executable:gSib.exe,title:'t'},{budgetMs:30000});
+ assert.equal(rSib.step,'ok',JSON.stringify(rSib.engines));
+ assert.equal(rSib.original,'backup');
+ assert.equal(rSib.japaneseLines,ja.length);
+});
+
+test('System4 backup .bak (#901 layout): sibling <stem>.bak with AI2 header is adopted while non-AIN .bak files are ignored',()=>{
+ const F=require('./helpers/engine-fixtures.cjs'),{probeGame}=require('../services/adapter-probe-core.cjs');
+ const ja=[],zh=[];for(let i=0;i<12;i++){ja.push(...JA);zh.push(...ZH);}
+ const g=game(dir=>{
+  fs.writeFileSync(path.join(dir,'アアア００.ain'),makeSys4Ain(zh,F.gbk));
+  fs.writeFileSync(path.join(dir,'アアア００.bak'),makeSys4Ain(ja,F.sjis));
+  fs.writeFileSync(path.join(dir,'Rance02.bak'),Buffer.from('MZ\x90\x00\x03\x00\x00\x00not-an-ain'));
+  fs.writeFileSync(path.join(dir,'アアア００GA.bak'),Buffer.from([0x15,0,0,0xca,1,0,0x89,6,0,0,0,0]));
+  fs.writeFileSync(path.join(dir,'Rance02.exe'),'MZ');
+ });
+ const exe=path.join(g.dir,'Rance02.exe');
+ assert.equal(ot.ADAPTERS.system4.locate(g.dir,'Rance02')?.target,path.join(g.dir,'アアア００.ain'));
+ assert.equal(ot.backupOriginal(g.dir,'system4','Rance02'),path.join(g.dir,'アアア００.bak'));
+ const r=probeGame({dir:g.dir,executable:exe,title:'t'},{budgetMs:30000});
+ assert.equal(r.step,'ok',JSON.stringify(r.engines));
+ assert.equal(r.detail,'system4');
+ assert.equal(r.original,'backup');
+ assert.equal(r.japaneseLines,ja.length);
+ const s=ot.scanRunning(g.root,'s4bak',exe);
+ assert.equal(s.status,'ready',JSON.stringify(s));
+ assert.equal(s.original?.backup,true);
+ assert.equal(s.original?.file,path.join(g.dir,'アアア００.bak'));
+});
+
+test('System4 sibling .ain (#904 layout): another valid Japanese .ain in the same folder is adopted over a larger Chinese .ain',()=>{
+ const F=require('./helpers/engine-fixtures.cjs'),{probeGame}=require('../services/adapter-probe-core.cjs');
+ const ja=[],zh=[];for(let i=0;i<12;i++){ja.push(...JA);zh.push(...ZH);}
+ // Pad Chinese lines so AliceCN.ain is strictly larger than SengokuRance.ain (like #904)
+ const zhBig=zh.map(l=>l+'，补充说明文字确保中文脚本文件大于日文原版。');
+ const g=game(dir=>{
+  fs.writeFileSync(path.join(dir,'AliceCN.ain'),makeSys4Ain(zhBig,F.gbk,{mt:true}));
+  fs.writeFileSync(path.join(dir,'SengokuRance.ain'),makeSys4Ain(ja,F.sjis,{mt:true}));
+  fs.writeFileSync(path.join(dir,'AltCN.ain'),makeSys4Ain(zh,F.gbk,{mt:true}));
+  fs.writeFileSync(path.join(dir,'System39.ain'),Buffer.from('AINI\x00\x00\x00\x00dummy'));
+ });
+ assert.equal(ot.ADAPTERS.system4.locate(g.dir,'game')?.target,path.join(g.dir,'AliceCN.ain'));
+ assert.equal(ot.backupOriginal(g.dir,'system4','game'),path.join(g.dir,'SengokuRance.ain'));
+ const r=probeGame({dir:g.dir,executable:g.exe,title:'t'},{budgetMs:30000});
+ assert.equal(r.step,'ok',JSON.stringify(r.engines));
+ assert.equal(r.detail,'system4');
+ assert.equal(r.original,'backup');
+ assert.equal(r.japaneseLines,ja.length);
+ const s=ot.scanRunning(g.root,'s4sib',g.exe);
+ assert.equal(s.status,'ready',JSON.stringify(s));
+ assert.equal(s.original?.backup,true);
+ assert.equal(s.original?.file,path.join(g.dir,'SengokuRance.ain'));
+});
+
+test('backupOriginal rejects Chinese backups, unrelated-game backups, and leaves plain single-archive games unchanged',()=>{
+ const F=require('./helpers/engine-fixtures.cjs'),{probeGame}=require('../services/adapter-probe-core.cjs');
+ const ja=[],zh=[];for(let i=0;i<12;i++){ja.push(...JA);zh.push(...ZH);}
+ // Silky: Chinese .bak and unrelated-game Japanese .bak (different scene names)
+ const zhArc=makeAi6Arc({'a01.mes':makeAi6Mes(zh,F.gbk)},F.sjis);
+ const otherJaArc=makeAi6Arc({'unrelated_game_99.mes':makeAi6Mes(ja,F.sjis)},F.sjis);
+ const gSilkyBad=game(dir=>{
+  fs.writeFileSync(path.join(dir,'mes.arc'),zhArc);
+  fs.mkdirSync(path.join(dir,'bakup'),{recursive:true});
+  fs.writeFileSync(path.join(dir,'bakup','mes.arc.bak'),zhArc);
+  fs.writeFileSync(path.join(dir,'mes.arc.bak'),otherJaArc);
+ });
+ assert.equal(ot.backupOriginal(gSilkyBad.dir,'silky','game'),null);
+ const rSilkyBad=probeGame({dir:gSilkyBad.dir,executable:gSilkyBad.exe,title:'t'},{budgetMs:30000});
+ assert.equal(rSilkyBad.step,'chinese-build');assert.equal(rSilkyBad.original,null);
+ // System4: single Chinese .ain (#906 layout), unrelated-game Japanese .ain (different FNAM), and mismatched-size .ain (3x lines)
+ const gS4Bad=game(dir=>{
+  fs.writeFileSync(path.join(dir,'Rance03.exe'),'MZ');
+  fs.writeFileSync(path.join(dir,'Rance03.ain'),makeSys4Ain(zh,F.gbk,{functions:['r03_main','r03_battle']}));
+  fs.writeFileSync(path.join(dir,'OtherCN.ain'),makeSys4Ain(zh,F.gbk,{functions:['r03_main','r03_battle']}));
+  fs.writeFileSync(path.join(dir,'OtherGame.ain'),makeSys4Ain(ja,F.sjis,{functions:['totally_other_fn1','totally_other_fn2']}));
+  fs.writeFileSync(path.join(dir,'WrongSize.ain'),makeSys4Ain([...ja,...ja,...ja],F.sjis,{functions:['r03_main','r03_battle']}));
+ });
+ const r03Exe=path.join(gS4Bad.dir,'Rance03.exe');
+ assert.equal(ot.backupOriginal(gS4Bad.dir,'system4','Rance03'),null);
+ const rS4Bad=probeGame({dir:gS4Bad.dir,executable:r03Exe,title:'t'},{budgetMs:30000});
+ assert.equal(rS4Bad.step,'chinese-build');assert.equal(rS4Bad.original,null);
+ // Plain single-archive Japanese games stay unchanged
+ const gSilkyJa=game(dir=>{fs.writeFileSync(path.join(dir,'mes.arc'),makeAi6Arc({'a01.mes':makeAi6Mes(ja,F.sjis)},F.sjis));});
+ const rSilkyJa=probeGame({dir:gSilkyJa.dir,executable:gSilkyJa.exe,title:'t'},{budgetMs:30000});
+ assert.equal(rSilkyJa.step,'ok');assert.equal(rSilkyJa.original,null);assert.equal(rSilkyJa.japaneseLines,ja.length);
+ const gS4Ja=game(dir=>{fs.writeFileSync(path.join(dir,'Rance03.ain'),makeSys4Ain(ja,F.sjis));});
+ const rS4Ja=probeGame({dir:gS4Ja.dir,executable:gS4Ja.exe,title:'t'},{budgetMs:30000});
+ assert.equal(rS4Ja.step,'ok');assert.equal(rS4Ja.original,null);assert.equal(rS4Ja.japaneseLines,ja.length);
+});
