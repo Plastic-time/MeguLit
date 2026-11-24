@@ -83,3 +83,7 @@ html:not(#u):not(#v):not(#a):not(#b):not(#c) body dialog.game-dialog.dev-notice.
 .dev-notice.guide-panel>.dev-notice-actions{flex:none;margin-top:0;padding-top:16px}
 .dev-notice.guide-panel>.dev-notice-scroll:not([hidden]){padding-bottom:12px!important}
 html:not(#u):not(#v):not(#a):not(#b) body dialog.guide-panel[open]>.dev-notice-actions{margin-bottom:30px!important}
+/* the The Seed dialog behind the home pill has no page wrapper either: on a small window the body scrolls and the title and button row stay inside */
+.dev-notice.seed-panel>.dev-notice-scroll{flex:1 1 0;min-height:0;overflow-y:auto}
+.dev-notice.seed-panel>h2,.dev-notice.seed-panel>.dev-notice-actions{flex:none}
+.dev-notice.seed-panel>.dev-notice-actions{margin-top:0;padding:16px 0 18px}
