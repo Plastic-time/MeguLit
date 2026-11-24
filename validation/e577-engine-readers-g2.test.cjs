@@ -55,6 +55,13 @@ const MZH=['\x07\x08v_rin0001\0“走吧，\x07\x01哥\nにい\0哥”\x07\x04',
 test('Malie: EXEC message table in order, voice / ruby / name codes; header walk and tail search',()=>{
  const want=['「行こう、兄さん」','朝の光が差し込む。\n静かな朝だ。','、目を覚ませ。'];
  assert.deepEqual(malie.parse(F.malieExec(MJA)).lines,want);
+ /* header walk must skip both data and code section lengths when trailing padding (< 16 bytes) prevents the EOF tail search */
+ assert.deepEqual(malie.parse(Buffer.concat([F.malieExec(MJA),Buffer.alloc(8)])).lines,want);
+ assert.deepEqual(malie.parse(Buffer.concat([F.malieExec(MJA),Buffer.alloc(15)])).lines,want);
+ /* an empty table (n=0) at the header-walk landing point must fall through to the EOF tail search */
+ const base=F.malieExec(MJA),emptyPrefix=F.malieExec([]),hdr=emptyPrefix.subarray(0,emptyPrefix.length-8),realTable=base.subarray(hdr.length);
+ const fakeHead=Buffer.alloc(8);fakeHead.writeUInt32LE(realTable.length,4);
+ assert.deepEqual(malie.parse(Buffer.concat([hdr,fakeHead,realTable])).lines,want);
  /* a build whose header this reader does not know: the table that ends the file is found anyway */
  assert.deepEqual(malie.parse(Buffer.concat([Buffer.from([9,9,9,9,0,0,0,0x80]),F.malieExec(MJA).subarray(4)])).lines,want);
  assert.deepEqual(malie.parse(Buffer.alloc(100,1)).lines,[]);

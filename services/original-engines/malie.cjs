@@ -84,7 +84,7 @@ function messages(b){if(!b||b.length<32)return null;let p=0;const u=()=>{if(p+4>
  try{const nv=u();if(nv>1000000)throw 0;for(let i=0;i<nv;i++){name();for(let g=0;u()!==0&&g<10000;g++)u();p+=16;}
   u();const nf=u();if(nf>1000000)throw 0;for(let i=0;i<nf;i++){name();p+=12;}
   const nl=u();if(nl>1000000)throw 0;for(let i=0;i<nl;i++){name();p+=4;}
-  p+=u();p+=u();const t=table(p);if(t&&t.end<=b.length&&b.length-t.end<16)return t;}catch{}
+  const dl=u();p+=dl;const cl=u();p+=cl;const t=table(p);if(t&&t.strings.length&&t.end<=b.length&&b.length-t.end<16)return t;}catch{}
  /* other builds: the table whose text runs to the end of the file */
  for(let at=b.length-12;at>=0;at-=2){const n=b.readUInt32LE(at);if(!n||n>2000000)continue;const tail=at+4+n*8;if(tail+4>b.length)continue;if(tail+4+b.readUInt32LE(tail)!==b.length)continue;const t=table(at);if(t&&t.strings.length)return t;}
  return null;}
