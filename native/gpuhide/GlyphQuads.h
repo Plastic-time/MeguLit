@@ -356,6 +356,18 @@ struct GlyphLearner {
  bool Earlier(const Rect &r) const { for (auto &e : earlierRects) { float w = (std::min)(e.x1 - e.x0, r.x1 - r.x0), h = e.y1 - e.y0; if (std::fabs(e.x0 - r.x0) < 0.4f * w && std::fabs(e.y0 - r.y0) < 0.4f * h) return true; } return false; }
  /* a glyph of an earlier line of the page (the same glyph on the same place) is never the new line's */
  bool EarlierGlyph(long long gk, long long k) const { return earlierKeys.count({ gk, k }) > 0; }
+ // A relocated dialogue line can use a different atlas. Both the current frame and the new glyphs must agree before moving the band.
+ bool Relocated(const std::vector<Rect> &live, const std::vector<Rect> &fresh) const {
+  if (n < 3 || live.size() != n || fresh.size() != n) return false;
+  bool above = true, below = true;
+  for (size_t i = 0; i < live.size(); i++) {
+   const Rect &a = live[i], &b = fresh[i];
+   if (std::fabs(a.x0 - b.x0) > (a.x1 - a.x0) * 0.4f || std::fabs(a.y0 - b.y0) > (a.y1 - a.y0) * 0.4f) return false;
+   above = above && a.y1 <= area.y0 - glyphH;
+   below = below && a.y0 >= area.y1 + glyphH;
+  }
+  return above || below;
+ }
  void Frame(unsigned now, unsigned backW, unsigned backH) {
   bbW = backW; bbH = backH; frameNow = now; PageFrame(now); frameNo++; if (pageOn) return; if (!Armed(now)) return;
   /* the earlier lines are on screen while most of their glyphs are still drawn: a text box that replaces its line (most ADV
@@ -363,17 +375,30 @@ struct GlyphLearner {
   if (!earlierKeys.empty()) { size_t on = 0; for (auto &e : earlierKeys) { auto g = groups.find(e.first); if (g == groups.end()) continue; auto it = g->second.keys.find(e.second); if (it != g->second.keys.end() && frameNo - it->second.lastFrame <= 2) on++; } if (on * 2 < earlierKeys.size()) { earlierKeys.clear(); earlierRects.clear(); } }
   if (reported && hiddenSent == (hitSent && !readOnly)) return;
   unsigned since = prevLineAt && now - prevLineAt < 120000 ? (std::max)(prevLineAt + 200, lineAt - 3000) : lineAt - 3000;
+  Group *movedGroup = nullptr; std::vector<Rect> movedRects; bool ambiguousMove = false;
   for (auto &kv : groups) {
    Group &g = kv.second; std::vector<Rect> fresh, live;
    for (auto &s : g.keys) if ((int)(s.second.firstAt - since) >= 0 && !EarlierGlyph(kv.first, s.first)) fresh.push_back(s.second.r);
-   const std::vector<Rect> &last = g.prevFrame == frameNo - 1 ? g.frame : g.prev; for (auto &r : last) if (earlierRects.empty() || !Earlier(r)) live.push_back(r);
+   const bool currentFrame = g.prevFrame == frameNo - 1;
+   const std::vector<Rect> &last = currentFrame ? g.frame : g.prev; for (auto &r : last) if (earlierRects.empty() || !Earlier(r)) live.push_back(r);
    std::vector<Rect> a = Chars(Cluster(Chars(live))), b = Chars(Cluster(Chars(fresh)));
    if (log && (now / 500) != ((now - 17) / 500)) log("frame %u group rt=%p %ux%u live=%u fresh=%u n=%u", frameNo, g.rt, g.tw, g.th, (unsigned)a.size(), (unsigned)b.size(), n);
    std::vector<Rect> keep; const std::vector<Rect> *hit = Match(a, b, keep); if (!hit) continue;
-   if (learned && (g.rtW != areaW || g.rtH != areaH || !atlases.count(AtlasKey(NULL, g.tex)))) continue;
-   Report(g, *hit);
+   if (learned && (g.rtW != areaW || g.rtH != areaH)) continue;
+   // A partial line or older page row may still occupy the band. Compare positions only on its own target.
+   Rect screen{};
+   const bool moved = learned && !readOnly && !reported && !hitSent && currentFrame && g.rt == areaRt &&
+    ToScreen(g.rt, g.rtW, g.rtH, screen) && Relocated(a, b);
+   if (learned && !atlases.count(AtlasKey(NULL, g.tex))) {
+    if (moved && movedGroup) ambiguousMove = true;
+    else if (moved) { movedGroup = &g; movedRects.swap(a); }
+    continue;
+   }
+   Report(g, *hit, moved);
    return;
   }
+  // Try a confirmed new atlas only after checking all previously learned atlases.
+  if (movedGroup && !ambiguousMove) { Report(*movedGroup, movedRects, true); return; }
   // The glyphs of one line can come from several atlas pages: count them together per render target.
   std::map<void *, std::vector<Group *>> byRt; for (auto &kv : groups) byRt[kv.second.rt].push_back(&kv.second);
   for (auto &kv : byRt) {
@@ -388,7 +413,8 @@ struct GlyphLearner {
    return;
   }
  }
- void Report(Group &g, const std::vector<Rect> &cs) {
+ void Report(Group &g, const std::vector<Rect> &cs, bool moved = false) {
+  if (moved) { learned = false; atlases.clear(); hitSent = false; }
   float h = 0; Rect box{ 1e30f, 1e30f, -1e30f, -1e30f }; for (auto &r : cs) { h += r.y1 - r.y0; box.x0 = (std::min)(box.x0, r.x0); box.y0 = (std::min)(box.y0, r.y0); box.x1 = (std::max)(box.x1, r.x1); box.y1 = (std::max)(box.y1, r.y1); } h /= cs.size();
   char b[256];
   if (!learned) {

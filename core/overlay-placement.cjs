@@ -226,6 +226,8 @@ class OverlayPlacement {
     const id = 'glyph:' + (Number(table.seq) || 0);
     // A glyph fragment from the same draw can otherwise replace the native page's source.
     if (this.ownsEngineRows() || this.nativeEmbed?.text === table.text) return;
+    // A glyph table can arrive after the GPU has placed the same line, with fragments from the previous box.
+    if (this.current?.engine === 'gpu' && this.current.rects && this.current.text === table.text) return;
     if (this.current?.sourceToken != null && this.current.rects && this.current.text === table.text) return;
     /* 2026-11-16 (死に逝く君、館に芽吹く憎悪, KiriKiri: 「間　側　法律　当　　ば　ほとんど　犯罪行」): an engine with a glyph
        cache rasterises a character once and reuses the bitmap, so a character an earlier line used has no record in
