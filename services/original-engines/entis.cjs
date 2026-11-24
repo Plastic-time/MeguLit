@@ -96,12 +96,20 @@ function exePasswords(dir){if(passMemo.has(dir))return passMemo.get(dir);const o
   for(const m of xml.matchAll(/<archive\b[^>]*>/gi)){const p=/\bpath\s*=\s*"([^"]*)"/i.exec(m[0]),k=/\bkey\s*=\s*"([^"]*)"/i.exec(m[0]);if(p&&k)out.set(path.basename(p[1].replace(/\\/g,'/')).toLowerCase(),k[1]);}}
  passMemo.set(dir,out);return out;}
 /* per-title passwords: entis-schemes.json, then an adapter pack's "entis-key" params */
-const SCHEMES=require('./entis-schemes.json');
-function packPasswords(){let extra=[];try{extra=require('../adapter-packs.cjs').params('entis-key').map(p=>p.value);}catch{}return [...extra,...Object.entries(SCHEMES).filter(([k])=>k[0]!=='_').map(([,v])=>v)].filter(v=>v&&typeof v.password==='string');}
+const SCHEMES=require('./entis-schemes.json'),KNOWN_PASSWORDS=Object.entries(SCHEMES).filter(([k])=>k[0]!=='_').map(([,v])=>v).filter(v=>v&&typeof v.password==='string');
+let passPackMemo={raw:null,list:[],fp:''};
+function extraPasswords(){
+ let raw=[];try{raw=require('../adapter-packs.cjs').params('entis-key');}catch{}
+ if(passPackMemo.raw===raw)return passPackMemo;
+ const list=raw.map(p=>p.value).filter(v=>v&&typeof v.password==='string');
+ passPackMemo={raw,list,fp:list.map(v=>JSON.stringify([v.archive?String(v.archive).toLowerCase():'',v.password])).join(',')};
+ return passPackMemo;
+}
+function packPasswords(extra=extraPasswords().list){return [...extra,...KNOWN_PASSWORDS];}
 /* the password an archive's BSHF entries open with: try an encrypted .csx's Cotopha header first, then fall back to the first encrypted entry */
-function passwordFor(file,entries){const first=entries.find(e=>e.code===BSHF);if(!first)return null;
+function passwordFor(file,entries,passwords=packPasswords()){const first=entries.find(e=>e.code===BSHF);if(!first)return null;
  const csx=entries.find(e=>e.code===BSHF&&/\.csx$/i.test(e.name)&&e.size>=0x40),name=path.basename(file).toLowerCase(),cands=[];
- const own=exePasswords(path.dirname(file)).get(name);if(own!==undefined)cands.push(own);for(const v of packPasswords())if(!v.archive||String(v.archive).toLowerCase()===name)cands.push(v.password);
+ const own=exePasswords(path.dirname(file)).get(name);if(own!==undefined)cands.push(own);for(const v of passwords)if(!v.archive||String(v.archive).toLowerCase()===name)cands.push(v.password);
  if(csx){let head=null;try{const len=Number(kit.readAt(file,csx.offset+8,8).readBigUInt64LE(0));if(len>=0x44){const h=kit.readAt(file,csx.offset+0x10,0x40);if(h.length===0x40)head=h;}}catch{}
   if(head)for(const pw of cands)if(isCsx(bshf(head,pw)))return pw;}
  for(const pw of cands){try{const b=readNoa(file,first,pw);if(b.toString('latin1',0,6)==='Entis\x1a'||plausible(b))return pw;}catch{}}return undefined;}
@@ -138,8 +146,10 @@ function parse(buf){if(isCsx(buf))return csxLines(buf);return {lines:[],anchors:
 
 /* ---- engine ----------------------------------------------------------------------------------------------------------- */
 const noaMemo=new Map();
-function noaList(file){const st=kit.size(file)+':'+(fs.statSync(file).mtimeMs|0),m=noaMemo.get(file);if(m&&m.st===st)return m.list;let l=null;try{l=listNoa(file);}catch{l=null;}
- if(l){const pw=passwordFor(file,l);for(const e of l)e.password=pw;}noaMemo.set(file,{st,list:l});return l;}
+function noaList(file){let stat;try{stat=fs.statSync(file);}catch{noaMemo.delete(file);return null;}
+ const extra=extraPasswords(),st=stat.size+':'+stat.mtimeMs+':'+extra.fp,m=noaMemo.get(file);
+ if(m&&m.st===st)return m.list;let l=null;try{l=listNoa(file);}catch{l=null;}
+ if(l){const pw=passwordFor(file,l,packPasswords(extra.list));for(const e of l)e.password=pw;}noaMemo.set(file,{st,list:l});return l;}
 const engine=kit.engine({id:'entis',hint:'*.noa / *.csx',
  archives:{name:/\.(noa|dat|arc)$/i,subs:['','data','Data'],entry:/\.csx$/i,list:noaList,read:(file,e)=>readNoa(file,e,e.password)},
  /* the game's one script image can sit in system\ next to the exe (ヨスガノソラ system\yosuga.csx, ハルカナソラ system\Haruka.csx) */

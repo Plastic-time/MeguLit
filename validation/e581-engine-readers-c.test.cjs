@@ -219,3 +219,70 @@ test('Marble: mg_data.mbl folder is recognised and read; a GBK patch (mg_data2) 
  const ja=scenes.read('marble',game)[0],tr=marble.parse(scenes.ENGINES.marble.archives(patch)[0].read());
  assert.equal(ja.lines.length,90);assert.equal(tr.lines.length,ja.lines.length);assert.equal(tr.lines[1],'窗外正在下雨。');
 });
+test('Marble: opened() cache invalidates when adapter-pack marble-key is added, replaced, or removed without changing the .mbl file',t=>{
+ const packs=require('../services/adapter-packs.cjs'),orig=packs.params;t.after(()=>{packs.params=orig;});
+ const dir=tmp(t),script=Array.from({length:30},()=>MS).flat(),plain=F.marbleScript(script);
+ const keyHex=Buffer.from(Array.from({length:73},(_,i)=>(i*37+19)&255)),wrongHex=Buffer.from(Array.from({length:73},(_,i)=>(i*13+7)&255));
+ const mblFile=path.join(dir,'mg_data.mbl');
+ F.writeTree(dir,{'mg_data.mbl':F.mbl({'s001.s':kit.xor(plain,keyHex)}),'marble.exe':'MZ'});
+ const entries=marble.list(mblFile);
+ /* 1. No pack key yet: >64-byte key cannot be cracked by column analysis, so cache records cipher:null */
+ packs.params=()=>[];
+ assert.equal(scenes.read('marble',dir).length,0);
+ /* 2. Wrong pack key (count 1) still fails */
+ const wrong=[{value:{title:'Wrong',hex:wrongHex.toString('hex')},pack:'p@1'}];
+ packs.params=target=>target==='marble-key'?wrong:[];
+ assert.equal(scenes.read('marble',dir).length,0);
+ /* 3. Replacing with the right key (same count 1, same file size & mtime) must invalidate cache and decrypt */
+ const right=[{value:{title:'Right',hex:keyHex.toString('hex')},pack:'p@2'}];
+ packs.params=target=>target==='marble-key'?right:[];
+ const got=scenes.read('marble',dir);
+ assert.equal(got.length,1);assert.deepEqual(got[0].lines.slice(0,3),ML);
+ assert.deepEqual(marble.parse(marble.decode(mblFile,entries[0])).lines.slice(0,3),ML);
+ /* 4. Removing the pack key must also invalidate the cached cipher */
+ packs.params=()=>[];
+ assert.equal(scenes.read('marble',dir).length,0);
+ /* 5. Same check with a cp932 text key ({key}) */
+ const dir2=tmp(t),textKey='長い合言葉テスト零壱弐参四五六七八九十甲乙丙丁戊己庚辛壬癸春夏秋冬東西南北青龍白虎朱雀玄武';
+ F.writeTree(dir2,{'mg_data.mbl':F.mbl({'s001.s':kit.xor(plain,kit.encodeSjis(textKey))}),'marble.exe':'MZ'});
+ assert.equal(scenes.read('marble',dir2).length,0);
+ const byText=[{value:{title:'TextKey',key:textKey},pack:'p@3'}];
+ packs.params=target=>target==='marble-key'?byText:[];
+ assert.deepEqual(scenes.read('marble',dir2)[0].lines.slice(0,3),ML);
+ /* 6. decode() reuses cached cipher so reading a 100-entry archive calls params() O(1) times, not per entry */
+ const dir3=tmp(t),many={};for(let i=0;i<100;i++)many['s'+String(i).padStart(3,'0')+'.s']=plain;
+ F.writeTree(dir3,{'mg_data.mbl':F.mbl(many),'marble.exe':'MZ'});
+ let calls=0;const empty=[];
+ packs.params=target=>{if(target==='marble-key')calls++;return empty;};
+ assert.equal(scenes.read('marble',dir3).length,100);
+ assert.ok(calls<=2,'first read should check marble-key once, got '+calls);
+ calls=0;
+ assert.equal(scenes.read('marble',dir3).length,100);
+ assert.ok(calls<=2,'cached read should check marble-key once, got '+calls);
+});
+test('Entis: noaList() cache invalidates when adapter-pack entis-key is added, replaced, narrowed by archive, or removed without changing the .noa file',t=>{
+ const packs=require('../services/adapter-packs.cjs'),orig=packs.params;t.after(()=>{packs.params=orig;});
+ const dir=tmp(t),enc=F.noa({'main.csx':F.csx(CJ)},{password:'cotopha',encrypt:new Set(['main.csx'])});
+ F.writeTree(dir,{'enc.noa':enc,'game.exe':'MZ'});
+ /* 1. No pack password yet: cache records undefined password, main.csx reads 0 lines */
+ packs.params=()=>[];
+ assert.deepEqual(scenes.read('entis',dir).map(s=>[s.name,s.lines]),[['main.csx',[]]]);
+ /* 2. Wrong pack password (count 1) still reads 0 lines */
+ const wrong=[{value:{password:'wrong-pw'},pack:'e@1'}];
+ packs.params=target=>target==='entis-key'?wrong:[];
+ assert.deepEqual(scenes.read('entis',dir).map(s=>[s.name,s.lines]),[['main.csx',[]]]);
+ /* 3. Replacing with the right password (same count 1, same file size & mtime) must invalidate cache and decrypt */
+ const right=[{value:{password:'cotopha'},pack:'e@2'}];
+ packs.params=target=>target==='entis-key'?right:[];
+ assert.deepEqual(scenes.read('entis',dir).map(s=>[s.name,s.lines]),[['main.csx',EL]]);
+ /* 4. Narrowing archive to another filename (same password, same count 1) must invalidate cache */
+ const otherArc=[{value:{archive:'other.noa',password:'cotopha'},pack:'e@3'}];
+ packs.params=target=>target==='entis-key'?otherArc:[];
+ assert.deepEqual(scenes.read('entis',dir).map(s=>[s.name,s.lines]),[['main.csx',[]]]);
+ /* 5. Matching archive restores reading; removing the pack invalidates again */
+ const matchArc=[{value:{archive:'ENC.NOA',password:'cotopha'},pack:'e@4'}];
+ packs.params=target=>target==='entis-key'?matchArc:[];
+ assert.deepEqual(scenes.read('entis',dir).map(s=>[s.name,s.lines]),[['main.csx',EL]]);
+ packs.params=()=>[];
+ assert.deepEqual(scenes.read('entis',dir).map(s=>[s.name,s.lines]),[['main.csx',[]]]);
+});
