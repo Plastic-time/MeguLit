@@ -44,7 +44,7 @@ const u32=(b,p)=>p+4<=b.length?b.readUInt32LE(p):-1;
 function table(b){if(!b||b.length<12)return null;
  const cstrs=(at)=>{const n=u32(b,at);if(n<1||n>200000)return null;const out=[];let p=at+4;for(let i=0;i<n;i++){const z=b.indexOf(0,p);if(z<0)return null;out.push(b.subarray(p,z));p=z+1;}return {strings:out,end:p};};
  const pstrs=(at)=>{const n=u32(b,at);if(n<1||n>200000)return null;const out=[];let p=at+4;for(let i=0;i<n;i++){const l=u32(b,p);if(l<1||p+4+l>b.length)return null;out.push(b.subarray(p+4,p+4+l-1));p+=4+l;}return {strings:out,end:p};};
- const codes=(at)=>{const n=u32(b,at);if(n<0||n>(b.length-at)/8)return null;const out=[];for(let i=0;i<n;i++)out.push([b.readUInt32LE(at+4+i*8),b.readUInt32LE(at+8+i*8)]);return {codes:out,end:at+4+n*8};};
+ const codes=(at)=>{const n=u32(b,at);if(n<0||at+4+n*8>b.length)return null;const out=[];for(let i=0;i<n;i++)out.push([b.readUInt32LE(at+4+i*8),b.readUInt32LE(at+8+i*8)]);return {codes:out,end:at+4+n*8};};
  const sane=t=>t&&t.strings.length&&t.strings.some(s=>s.some(c=>c>=0x80));
  let ver=-1;if(b.toString('latin1',0,3)==='VER')ver=9;else if(b[0]===9&&b.toString('latin1',4,7)==='VER')ver=13;
  if(ver>0){const unk=u32(b,ver);if(unk<0||unk>100000)return null;const a=codes(ver+4+unk*4);if(!a)return null;const c=codes(a.end);if(!c)return null;

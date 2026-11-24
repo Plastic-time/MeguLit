@@ -69,6 +69,21 @@ test('NeXAS: equal packed and unpacked length skips decompression for pack types
  const gBad=tmp(t),badZstd=Buffer.from([0x28,0xb5,0x2f,0xfd,0xff,0xff,0xff,0xff]),pacBad=rawPac(gBad,7,badZstd,badZstd.length+10);
  assert.deepEqual(nexas.read(pacBad,nexas.list(pacBad)[0]),badZstd);
 });
+test('NeXAS: codes() counts the 4-byte length prefix so boundary scripts fall back to v1 and short buffers return empty',t=>{
+ const u32=v=>{const b=Buffer.alloc(4);b.writeUInt32LE(v>>>0);return b;};
+ /* valid v1 bare-codes script (36 bytes): codeCount=2 (<0x100) and op0=4 (>2), so table() probes at=4 first;
+    4 + 4*8 === 36 would pass the old (len - at) / 8 check and throw instead of falling back to at=0 */
+ const v1=Buffer.concat([u32(2),u32(4),u32(0),u32(0),u32(1),u32(2),Buffer.from([0]),F.sjis('朝の光だ。'),Buffer.from([0])]);
+ assert.equal(v1.length,36);
+ assert.deepEqual(nexas.parse(v1).lines,['朝の光だ。']);
+ const g=tmp(t);F.writeTree(g,{'script.pac':F.nexasPac({'s01.bin':v1},{type:0,index:'old'})});
+ assert.deepEqual(scenes.read('nexas',g)[0].lines,['朝の光だ。']);
+ /* malformed boundary buffers across at=0, at=4, and VER layouts must return null / empty without throwing */
+ const bad0=Buffer.alloc(16);bad0.writeUInt32LE(2,0);
+ const bad4=Buffer.alloc(28);bad4.writeUInt32LE(1,0);bad4.writeUInt32LE(3,4);
+ const badVer=Buffer.concat([Buffer.from('VER\0\0\0\0\0\0','latin1'),u32(0),u32(1),u32(0)]);
+ for(const buf of [bad0,bad4,badVer]){assert.equal(nexas.table(buf),null);assert.deepEqual(nexas.parse(buf).lines,[]);}
+});
 
 /* ---- Malie ------------------------------------------------------------------------------------------------------ */
 test('Malie: Camellia and CFI blocks match GARbro ArcFormats.dll; every exported scheme loads',()=>{
