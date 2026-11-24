@@ -51,6 +51,19 @@ test('Escude: ESCR1_00 half-width kana, punctuation, voiced marks, and 0xA0 full
  assert.deepEqual(escude.parse(F.escr1([mixed,dangling],b=>b)).lines,['あ泛燿黑　をぁあ゛゜','真\ufffd']);
  assert.equal(escude.restring('!?｡｢｣､･ｦｧｱﾝﾞﾟ'),'！？。「」、…をぁあん゛゜');
 });
+test('Escude: ESCR1_00 ASCII-only !/? lines map to full-width dialogue and pair 1:1 with GBK patches while anchors stay anchors',()=>{
+ const ja=F.escr1(['bg01','ev_!01','  \\n ','！？','！','？','！？\\n！！','「おはよう」','se_02'],escr1Bytes);
+ const r=escude.parse(ja);
+ assert.deepEqual(r.lines,['！？','！','？','！？\n！！','「おはよう」']);
+ assert.deepEqual(r.anchors,['bg01','ev_!01','  \\n ','se_02']);
+ /* standalone 0x21 0x3F script (no bytes >= 0x80 at all) still parses as full-width dialogue */
+ assert.deepEqual(escude.parse(F.escr1([Buffer.from([0x21,0x3f])],b=>b)).lines,['！？']);
+ /* GBK patch encodes full-width punctuation as non-ASCII and pairs 1:1; ASCII-only !? in GBK or ESCR_NEW stays an anchor */
+ const zh=escude.parse(F.escr1(['bg01','ev_!01','！？','！','？','！？\\n！！','“早上好”','se_02'],gbk));
+ assert.equal(zh.lines.length,r.lines.length);
+ assert.deepEqual(escude.parse(F.escr1(['今天天气真好。','!?'],gbk)).anchors,['!?']);
+ assert.deepEqual(escude.parse(F.escrMess(['こんにちは','!?'])).anchors,['!?']);
+});
 
 /* ---- PJADV ---------------------------------------------------------------------------------------------------------- */
 const PJ=(L,N)=>[{name:N,say:L[0]},{say:L[1]},{prompt:L[2]},{choice:L[0].slice(0,3)},{choice:L[1].slice(0,3)}];

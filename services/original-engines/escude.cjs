@@ -68,7 +68,8 @@ function parse(buf){const b=Buffer.isBuffer(buf)?buf:Buffer.from(buf);if(b.lengt
  const all=Buffer.concat(s.list.filter(x=>x.some(c=>c>=0x80)).slice(0,4000)),score=t=>({bad:(t.match(/�/g)||[]).length,kana:(t.match(kit.KANA_G)||[]).length});
  const sj=score(restring(decodeV1(all))),gb=score(new TextDecoder('gbk').decode(all));
  const enc=s.kind==='v1'?(sj.bad<gb.bad||sj.bad===gb.bad&&sj.kana>=gb.kana?'shift_jis':'gbk'):kit.codepage(all),dec=new TextDecoder(enc),lines=[],anchors=[];
- for(const x of s.list){if(!x.length)continue;if(!x.some(c=>c>=0x80)){anchors.push(x.toString('latin1'));continue;}let t=s.kind==='v1'&&enc==='shift_jis'?restring(decodeV1(x)):dec.decode(x);t=kit.trimBoth(t.replace(/\\n/g,'\n'));if(t)lines.push(t);}
+ const isBang=a=>/[!?]/.test(a)&&/^(?:[!?]|\s|\\n)+$/.test(a);
+ for(const x of s.list){if(!x.length)continue;if(!x.some(c=>c>=0x80)){const a=x.toString('latin1');if(s.kind==='v1'&&enc==='shift_jis'&&isBang(a))lines.push(kit.trimBoth(restring(a).replace(/\\n/g,'\n')));else anchors.push(a);continue;}let t=s.kind==='v1'&&enc==='shift_jis'?restring(decodeV1(x)):dec.decode(x);t=kit.trimBoth(t.replace(/\\n/g,'\n'));if(t)lines.push(t);}
  return {lines,anchors};}
 const SCRIPT=/\.(bin|001)$/i;
 const isScript=b=>{const t=b.toString('latin1',0,8);return t==='ESCR1_00'||t==='@mess:__';};
