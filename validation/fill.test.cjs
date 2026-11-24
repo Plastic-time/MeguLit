@@ -14,7 +14,7 @@ test('fill: the shipped table holds only hashes and Chinese',()=>{
 test('fill: scenes without a Chinese column are left alone',()=>{
  const s={name:'b',lines:['あ']};assert.equal(fill.scene(s),s);});
 test('fill: ASSET matches standalone resource names only and never swallows dialogue mentioning filenames',()=>{
- for(const ok of ['ギター.tga','ライブシーン.ani','bg/cg_01.png','se\\click-1.ogg','a'.repeat(40)+'.bmp','OP.WMV','layer.psd']){
+ for(const ok of ['ギター.tga','ライブシーン.ani','bg/cg_01.png','se\\click-1.ogg','bg\\night_01.png','bg\\Night.bmp','voice\\n01_001.ogg','a'.repeat(40)+'.bmp','OP.WMV','layer.psd']){
   assert.deepEqual(fill.lookup(ok),{zh:'',source:'asset'},ok);
  }
  const dialogue=[
@@ -40,7 +40,7 @@ test('fill: ASSET matches standalone resource names only and never swallows dial
   'a|b.png',
   'a:b.png',
   'a\x07b.png',
-  '再生中\\nintro.wmv',
+  '再生中\nintro.wmv',
   '※cg01.png',
   '♪opening.ogg',
   '→next.bmp',
