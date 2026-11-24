@@ -249,7 +249,7 @@ test('Naninovel: Addressables localization bundles keep Japanese alongside prefe
  assert.deepEqual(read[0].lines,['こんにちは、世界。','さようなら。']);
  assert.deepEqual(read[0].zh,['你好，世界。','再见。']);
  const picked=nani.sources(root).map(f=>path.basename(f));
- assert.deepEqual(picked,['game-localization-ja-scripts-01.bundle','game-localization-zhhans-scripts-01.bundle']);
+ assert.deepEqual(picked,['game-localization-zhhans-scripts-01.bundle','game-localization-ja-scripts-01.bundle']);
  // Mixed-case and region-suffixed tags (zhHans + JA-JP / jajp) are also kept
  const rootCase=fs.mkdtempSync(path.join(os.tmpdir(),'nani-case-'));
  t.after(()=>fs.rmSync(rootCase,{recursive:true,force:true}));
@@ -533,5 +533,86 @@ test('Naninovel: #947 r3 regressions (empty/cn/chs/unknown classic dst, prefixed
   assert.deepEqual(by3.get('StaleP.nani').lines,['無ハッシュ次行。']);
   assert.deepEqual(by3.get('StaleP.nani').zh,['无哈希下一句。']);
   assert.equal(by3.get('StaleP.nani').voices,undefined);
+ });
+});
+
+test('Naninovel: #947 r4 regressions (primary bundle beats extra ja, ja->ja ranked below headerless/underscore zh, Sub/Name.nani sameScript, bare zh/jp bundles)',async t=>{
+ const os=require('node:os'),path=require('node:path');
+ const scenes=require('../services/original-engines/scenes.cjs');
+ const {packBundle}=require('../services/original-engines/utage-embedded.cjs')._internal;
+ const {string}=require('./helpers/utage-embedded-fixture.cjs');
+ const u32=v=>{const b=Buffer.alloc(4);b.writeUInt32LE(v);return b;};
+ const i32=v=>{const b=Buffer.alloc(4);b.writeInt32LE(v);return b;};
+ const str=s=>{const b=Buffer.from(s,'utf8');return Buffer.concat([u32(b.length),b,Buffer.alloc((4-b.length%4)%4)]);};
+ const comment=(line,hash,text)=>Buffer.concat([str('CommentScriptLine'),str('Naninovel'),str('Elringus.Naninovel.Runtime'),i32(line),...(hash!==null?[str(hash)]:[]),str(text)]);
+ const print=(script,line,inl,text)=>Buffer.concat([str('PrintText'),str('Naninovel.Commands'),str('Elringus.Naninovel.Runtime'),str(script),i32(line),i32(inl),str(text)]);
+
+ await t.test('CE-r3-1/2/3: extra ja bundle never overrides headerless or underscore-locale zhhans bundle',st=>{
+  const runPair=(zhDoc,jaDoc)=>{
+   const root=fs.mkdtempSync(path.join(os.tmpdir(),'nani-r4-'));
+   st.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+   const aa=path.join(root,'Game_Data','StreamingAssets','aa','StandaloneWindows64');
+   fs.mkdirSync(aa,{recursive:true});
+   fs.writeFileSync(path.join(aa,'game-localization-zhhans-scripts-01.bundle'),packBundle('CAB-z',string(zhDoc),'2020.3.7f1'));
+   fs.writeFileSync(path.join(aa,'game-localization-ja-scripts-01.bundle'),packBundle('CAB-j',string(jaDoc),'2020.3.7f1'));
+   assert.deepEqual(nani.sources(root).map(f=>path.basename(f)),['game-localization-zhhans-scripts-01.bundle','game-localization-ja-scripts-01.bundle']);
+   return scenes.read('naninovel',root);
+  };
+  // CE-r3-1: headerless zhhans + ja->ja
+  const r1=runPair(
+   '; localization document for `S` naninovel script\n\n# a\n; おはよう。\n早上好。\n',
+   '; Japanese <ja-JP> to Japanese <ja-JP> localization document for `S` naninovel script\n\n# a\n; おはよう。\nおはよう（校正）。\n'
+  );
+  assert.deepEqual(r1[0].zh,['早上好。']);
+  assert.ok(nani.patchLines(r1)?.[0]?.patched);
+
+  // CE-r3-2: headerless zhhans + headerless ja
+  const r2=runPair(
+   '; localization document for `S` naninovel script\n\n# a\n; おはよう。\n早上好。\n',
+   '; localization document for `S` naninovel script\n\n# a\n; おはよう。\nおはよう。\n'
+  );
+  assert.deepEqual(r2[0].zh,['早上好。']);
+  assert.ok(nani.patchLines(r2)?.[0]?.patched);
+
+  // CE-r3-3: underscore locale <ja_JP> to <zh_CN> + ja->ja
+  const r3=runPair(
+   '; Japanese <ja_JP> to Chinese <zh_CN> localization document for `S` naninovel script\n\n# a\n; おはよう。\n早上好。\n',
+   '; Japanese <ja-JP> to Japanese <ja-JP> localization document for `S` naninovel script\n\n# a\n; おはよう。\nおはよう（校正）。\n'
+  );
+  assert.deepEqual(r3[0].zh,['早上好。']);
+  assert.ok(nani.patchLines(r3)?.[0]?.patched);
+
+  // Even when ja->ja precedes a headerless or unknown-tag classic doc in the same buffer, zhRank ranks ja->ja below them
+  const sameBuf=nani._internal.combine([
+   {script:true,name:'Same.nani',src:'ja-jp',dst:'ja-jp',text:'; Japanese <ja-JP> to Japanese <ja-JP> localization document for `Same` naninovel script\n\n# a\n; おはよう。\n校正。\n'},
+   {script:true,name:'Same.nani',src:'ja',dst:'',text:'; localization document for `Same` naninovel script\n\n# a\n; おはよう。\n早上好。\n'},
+  ]);
+  assert.deepEqual(nani.parse(Buffer.from(sameBuf[0].text)).zh,['早上好。']);
+
+  // Underscore locale <ja_JP> to <zh_CN> is normalized to ja-jp / zh-cn (ranks Simplified ahead of zh-TW, and works in parsed assets)
+  const underBuf=Buffer.concat([
+   Buffer.alloc(8),str('; Japanese <ja-JP> to Chinese (T) <zh-TW> localization document for `U1` naninovel script\n\n# a\n; おはよう。\n早安繁體。\n'),
+   Buffer.alloc(8),str('; Japanese <ja_JP> to Chinese (S) <zh_CN> localization document for `U1` naninovel script\n\n# a\n; おはよう。\n早上好简体。\n'),
+  ]);
+  assert.deepEqual(nani.parse(Buffer.from(nani._internal.combine(nani._internal.scan(underBuf,[]))[0].text)).zh,['早上好简体。']);
+ });
+
+ await t.test('Sub/S02.nani header matches PrintText short name S02, and bare zh / jp bundles are recognized in order',st=>{
+  const subNani=Buffer.concat([
+   Buffer.alloc(8),
+   str('; Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `Sub/S02.nani` naninovel script\n'),
+   comment(2,'90000001','サブ拡張子付き。'),
+   print('S02',3,0,'子目录带后缀。'),
+  ]);
+  const parsed=nani.parse(Buffer.from(nani._internal.combine(nani._internal.scan(subNani,[]))[0].text));
+  assert.deepEqual(parsed.lines,['サブ拡張子付き。']);
+  assert.deepEqual(parsed.zh,['子目录带后缀。']);
+
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'nani-r4-ord-'));
+  st.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const aa=path.join(root,'Game_Data','StreamingAssets','aa','StandaloneWindows64');
+  fs.mkdirSync(aa,{recursive:true});
+  for(const l of ['en','zh','jp','jav'])fs.writeFileSync(path.join(aa,`game-localization-${l}-scripts-01.bundle`),'x');
+  assert.deepEqual(nani.sources(root).map(f=>path.basename(f)),['game-localization-zh-scripts-01.bundle','game-localization-jp-scripts-01.bundle']);
  });
 });

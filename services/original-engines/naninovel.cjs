@@ -39,19 +39,20 @@ function dataDirs(dir){
  return result;
 }
 function bundleDir(dir){for(const d of dataDirs(dir)){const b=path.join(d,'StreamingAssets','aa','StandaloneWindows64');if(fs.existsSync(b))return b;}return '';}
+const isJa=l=>/^(?:ja(?:$|-|jp$|panese$)|jpn?$)/.test(l),isZh=l=>/^(?:zh|(?:cn|chs|cht)(?:$|-))/.test(l);
 const isLocalizationBundle=f=>/-localization-[a-z-]+-scripts-.*\.bundle$/i.test(f)&&!/-scripts-debug/i.test(f);
 function localizationBundles(dir){const d=bundleDir(dir);if(!d)return [];let files;try{files=fs.readdirSync(d);}catch{return [];}
  const loc=files.filter(isLocalizationBundle);if(!loc.length)return [];
  const lang=f=>((/-localization-([a-z-]+?)-scripts-/i.exec(f)||[])[1]||'').toLowerCase();
- const order=['zhhans','zh-hans','zhcn','zh-cn','chs','cn','zhhant','zh-hant','zhtw','zh-tw','cht'];const langs=[...new Set(loc.map(lang))].sort((a,b)=>((order.indexOf(a)+1)||99)-((order.indexOf(b)+1)||99));
- const keep=new Set([langs[0],...langs.filter(l=>/^ja(?:$|-|jp$)/.test(l))]);
- return loc.filter(f=>keep.has(lang(f))).sort().map(f=>path.join(d,f));}
+ const order=['zhhans','zh-hans','zhcn','zh-cn','zh','chs','cn','zhhant','zh-hant','zhtw','zh-tw','cht'];const langs=[...new Set(loc.map(lang))].sort((a,b)=>((order.indexOf(a)+1)||99)-((order.indexOf(b)+1)||99));
+ const primary=loc.filter(f=>lang(f)===langs[0]).sort(),extraJa=isJa(langs[0])?[]:loc.filter(f=>lang(f)!==langs[0]&&isJa(lang(f))).sort();
+ return [...primary,...extraJa].map(f=>path.join(d,f));}
 const DOC=Buffer.from('localization document for');
 // Serialized files of the player that hold localization documents as TextAssets (resources.assets, sharedassets*).
 function assetFiles(dir){const out=[];for(const d of dataDirs(dir)){let names;try{names=fs.readdirSync(d);}catch{continue;}
  for(const n of names)if(/^(?:resources|sharedassets\d+)\.assets$/i.test(n)){const f=path.join(d,n);if(docsIn(f).length)out.push(f);}}
  return out;}
-const HEAD=/^(?:; )?(?:.*?<([A-Za-z-]+)>\s+to\s+.*?<([A-Za-z-]+)>\s+)?.*?localization document for [`']([^`']+)[`']\s*([^\r\n]*)/;
+const HEAD=/^(?:; )?(?:.*?<([A-Za-z_-]+)>\s+to\s+.*?<([A-Za-z_-]+)>\s+)?.*?localization document for [`']([^`']+)[`']\s*([^\r\n]*)/;
 // The documents in one buffer: { name, src, dst, script, text }. A document is a length-prefixed UTF-8 string starting
 // with its "; ... localization document for" line.
 // Newer Naninovel keeps a document as a parsed script asset: the header is a string of its own, the lines follow as
@@ -86,7 +87,7 @@ function scan(b,out,{blocksOnly=false,check=()=>{}}={}){let at=0;
   if(start<4)continue;const n=b.readUInt32LE(start-4);if(n<DOC.length||start+n>b.length)continue;
   if(blocksOnly&&(start===min&&min>0||n>2<<20))continue;
   const text=b.toString('utf8',start,start+n),m=HEAD.exec(text.split('\n',1)[0]);if(!m)continue;
-  const doc={name:path.basename(m[3])+'.nani',rawName:m[3],src:(m[1]||'ja').toLowerCase(),dst:(m[2]||'').toLowerCase(),script:!/managed text/i.test(m[4]),text};
+  const doc={name:path.basename(m[3])+'.nani',rawName:m[3],src:(m[1]||'ja').toLowerCase().replace(/_/g,'-'),dst:(m[2]||'').toLowerCase().replace(/_/g,'-'),script:!/managed text/i.test(m[4]),text};
   if(!blocksOnly&&doc.script&&!/\n# /.test(text)){const next=b.indexOf(DOC,at),end=next<0?Math.min(b.length,start+n+4e6):next;doc.prints=printed(b,start+n,end);
    // E450 entries by document line (source comment at L, translation at L + 1), so pairing never shifts at a gap
    try{doc.entries=require('./naninovel-voice.cjs').docEntries(b,start+n,end);}catch{doc.entries=null;}}
@@ -102,11 +103,10 @@ function blocks(text){const out=new Map();
   let voice=null;for(const l of block.split('\n').slice(1)){if(!l.trim())continue;if(l.startsWith('; >')){const v=/^; >\s*[^@\s:][^:]*:\s*\|#([\w.\-]+)\|/.exec(l); /* "> Name: |#id|" only, not "> @choice |#id|" */if(v)voice=v[1];continue;}if(l.startsWith('; '))src.push(l.slice(2));else if(!l.startsWith(';'))dst.push(l);}
   out.set(m[1],{src,dst,voice});}
  return out;}
-const isJa=l=>/^(?:ja(?:$|-|jp$|panese$)|jpn?$)/.test(l),isZh=l=>/^(?:zh|(?:cn|chs|cht)(?:$|-))/.test(l);
 const ZH=['zh-cn','zh-hans','zh','zh-sg','chs','cn','zh-tw','zh-hant','zh-hk','cht'];
-const zhRank=l=>{const i=ZH.indexOf(l);return i<0?(isZh(l)?50:99):i;};
+const zhRank=l=>{const i=ZH.indexOf(l);return i<0?(isZh(l)?50:isJa(l)?100:99):i;};
 const scriptKey=s=>String(s||'').replace(/\.nani$/i,'').toLowerCase();
-const sameScript=(doc,s)=>{const k=scriptKey(s),bn=scriptKey(doc.name),rn=scriptKey(doc.rawName||doc.name);return !!k&&(k===bn||k===rn||path.basename(k)===bn);};
+const sameScript=(doc,s)=>{const k=scriptKey(s),rn=scriptKey(doc.rawName||doc.name),bn=path.basename(rn);return !!k&&(k===rn||k===bn||path.basename(k)===bn);};
 const cleanJaSrc=c=>String(c||'').replace(/^[^\s:：「『（\[、。！？]{1,24}: /,'').replace(/\\([\\\[\]{}":])|\[[^\]\n]*\]/g,(_,e)=>e||'');
 const fmtOne=s=>String(s||'').replace(/<br>\s*/gi,'<br>').replace(/\r?\n/g,'<br>');
 const fmtSrc=s=>{const o=fmtOne(s);return '; '+(o.startsWith('>')?' '+o:o);};
