@@ -90,6 +90,51 @@ test('TyranoScript: names, ruby, code and comments',()=>{
  assert.deepEqual(r.ruby[2],[['晴','はれ']]);
  assert.ok(r.anchors.includes('@jump target=*next'));
 });
+test('TyranoScript: [[ escapes, quoted attribute brackets and single-line iscript/html blocks',t=>{
+ const script=[
+  '記号[[を押す。[p]',
+  '[eval exp="f.flag[0]=1"]おはよう。[p]',
+  "[eval exp='f.list[1]=2']こんばんは。[p]",
+  '[eval exp="f.flag[0]=2"]',
+  '[iscript]f.x=1;[endscript]',
+  '[html]<span>ignored</span>[endhtml]HTML後の台詞。[p]',
+  '前半[iscript]f.y=2;[endscript]後半[p]',
+  '[iscript]',
+  'f.s = "[endhtml]";',
+  '[endscript]閉じた直後の台詞。[p]',
+  'その後の台詞が全部消える。[p]',
+  "[tag a=don't]It's fine[p]",
+  '[tag a="unclosed]未閉鎖引用符の後の台詞。[p]',
+  '[eval exp="f.q=\\"a]b\\""]エスケープ引用符。[p]',
+  '[ruby text="か[1]"]漢[p]',
+  'テスト[未閉鎖ブラケット',
+ ].join('\n');
+ const dir=tmp(t);
+ F.writeTree(dir,{'data/scenario/first.ks':script,'tyrano/tyrano.base.js':'//','index.html':'<html>'});
+ const sc=scenes.read('tyrano',dir);
+ assert.deepEqual(sc[0].lines,[
+  '記号[を押す。',
+  'おはよう。',
+  'こんばんは。',
+  'HTML後の台詞。',
+  '前半後半',
+  '閉じた直後の台詞。',
+  'その後の台詞が全部消える。',
+  "It's fine",
+  '未閉鎖引用符の後の台詞。',
+  'エスケープ引用符。',
+  '漢',
+  'テスト[未閉鎖ブラケット',
+ ]);
+ assert.deepEqual(sc[0].ruby[10],[['漢','か[1]']]);
+ assert.ok(sc[0].anchors.includes('[eval exp="f.flag[0]=2"]'));
+ assert.ok(!sc[0].anchors.some(a=>a.includes('[iscript]')));
+ /* Linear time on adversarial unclosed brackets and quotes */
+ const t0=Date.now();
+ const evil=tyrano.parse(Buffer.from('['.repeat(50000)+'\n'+'[a="\\"'.repeat(20000)+']後続[p]\n'));
+ assert.ok(Date.now()-t0<2000,'parse should stay linear');
+ assert.equal(evil.lines[1],'後続');
+});
 test('TyranoScript: loose, app.asar, package.nw and exe-appended NW.js builds read the same lines',t=>{
  const files=ks=>({'data/scenario/first.ks':ks,'data/scenario/sub/route.ks':'#\nルートの行。[p]\n','tyrano/tyrano.base.js':'//','tyrano/libs/jquery.js':'//','index.html':'<html>'});
  const loose=tmp(t);F.writeTree(loose,files(KS_JA));

@@ -17,21 +17,56 @@ const decode=buf=>require('./scenes.cjs').decode(buf);
 const KS=n=>/(?:^|\/)data\/scenario\/.*\.ks$/i.test(n.replace(/\\/g,'/'));
 
 /* ---- parse ----------------------------------------------------------------------------------------------------- */
-function parse(buf){const lines=[],anchors=[],ruby=[],voices=[],vt=voiceRef.tracker();let code=false,block=false;
+const RUBY_TEXT=/^\s*ruby\b[\s\S]*?\btext\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s\]]+))/i;
+const OPEN_CODE=/^\s*(iscript|html)\b/i;
+const END_SCRIPT=/\[\s*endscript\s*\]/i,END_HTML=/\[\s*endhtml\s*\]/i;
+const AT_END_SCRIPT=/^@\s*endscript\b/i,AT_END_HTML=/^@\s*endhtml\b/i;
+function parse(buf){const lines=[],anchors=[],ruby=[],voices=[],vt=voiceRef.tracker();let code=null,block=false;
  for(const raw of decode(buf).split(/\r?\n/)){let t=raw.trim();
   if(block){const e=t.indexOf('*/');if(e<0)continue;block=false;t=t.slice(e+2).trim();}
-  if(t.startsWith('/*')){const e=t.indexOf('*/',2);if(e<0){block=true;continue;}t=t.slice(e+2).trim();}
+  while(t.startsWith('/*')){const e=t.indexOf('*/',2);if(e<0){block=true;t='';break;}t=t.slice(e+2).trim();}
   if(!t||t[0]===';')continue;
-  if(/^[@[]\s*(?:iscript|html)\b/i.test(t)){code=true;continue;}if(code){if(/^[@[]\s*(?:endscript|endhtml)\b/i.test(t))code=false;continue;}
+  if(code){
+   const atEnd=code==='endscript'?AT_END_SCRIPT:AT_END_HTML;
+   if(atEnd.test(t)){code=null;continue;}
+   const endRe=code==='endscript'?END_SCRIPT:END_HTML;
+   const em=endRe.exec(t);if(!em)continue;
+   code=null;t=t.slice(em.index+em[0].length).trim();if(!t||t[0]===';')continue;
+  }
+  const atOpen=/^@\s*(iscript|html)\b/i.exec(t);
+  if(atOpen){code=atOpen[1].toLowerCase()==='iscript'?'endscript':'endhtml';continue;}
   if(t[0]==='*'||t[0]==='@'){vt.see(t);anchors.push(t);continue;}
   if(t[0]==='#'){const who=t.slice(1).split(':')[0].trim();if(who){lines.push(who);ruby.push(null);voices.push(null);}continue;}
-  vt.see(t);
-  /* [ruby text="よみ"] reads the next character */
-  const pairs=[];let text='';const re=/\[([^\]]*)\]/g;let last=0,m,pending=null;
-  while((m=re.exec(t))){text+=take(t.slice(last,m.index));last=re.lastIndex;const r=/^\s*ruby\b[^\]]*\btext\s*=\s*["']?([^"'\s\]]+)/i.exec(m[1]);if(r)pending=r[1];}
-  text+=take(t.slice(last));
-  function take(seg){if(pending&&seg){const ch=[...seg][0];pairs.push([ch,pending]);pending=null;}return seg;}
-  text=text.trim();if(!text){anchors.push(t);continue;}
+  /* [ruby text="よみ"] reads the next character; [[ escapes a literal '['; quoted attribute values may contain ']' */
+  const pairs=[];let text='',pending=null,sawCode=false,sawTag=false,noClose=false;
+  let lastDQ=t.lastIndexOf('"'),lastSQ=t.lastIndexOf("'");
+  const take=seg=>{if(pending&&seg){const ch=[...seg][0];pairs.push([ch,pending]);pending=null;}return seg;};
+  for(let i=0;i<t.length;){
+   if(t[i]!=='['){const nxt=t.indexOf('[',i);const end=nxt<0?t.length:nxt;text+=take(t.slice(i,end));i=end;continue;}
+   if(t[i+1]==='['){text+=take('[');i+=2;continue;}
+   if(noClose){text+=take('[');i++;continue;}
+   let end=-1,q='',afterEq=false;
+   for(let j=i+1;j<t.length;j++){
+    const c=t[j];
+    if(q){if(c==='\\'&&(t[j+1]===q||t[j+1]==='\\')){j++;continue;}if(c===q)q='';continue;}
+    if(c===']'){end=j;break;}
+    if(afterEq&&(c==='"'||c==="'")){
+     if((c==='"'?lastDQ:lastSQ)<=j){end=t.indexOf(']',i+1);break;}
+     q=c;afterEq=false;continue;}
+    if(c==='=')afterEq=true;
+    else if(c!==' '&&c!=='\t')afterEq=false;}
+   if(end<0&&q){if(q==='"')lastDQ=-1;else lastSQ=-1;end=t.indexOf(']',i+1);}
+   if(end<0){noClose=true;text+=take('[');i++;continue;}
+   const body=t.slice(i+1,end),om=OPEN_CODE.exec(body);
+   if(om){sawCode=true;const kind=om[1].toLowerCase()==='iscript'?'endscript':'endhtml';
+    const endRe=kind==='endscript'?END_SCRIPT:END_HTML;
+    const em=endRe.exec(t.slice(end+1));
+    if(em){i=end+1+em.index+em[0].length;continue;}
+    code=kind;break;}
+   sawTag=true;vt.see(t.slice(i,end+1));
+   const rm=RUBY_TEXT.exec(body);if(rm){const v=rm[1]??rm[2]??rm[3];if(v)pending=v;}
+   i=end+1;}
+  text=text.trim();if(!text){if(!sawCode&&sawTag)anchors.push(t);continue;}
   lines.push(text);ruby.push(pairs.length?pairs:null);voices.push(vt.take());}
  const out={lines,anchors};if(ruby.some(Boolean))out.ruby=ruby;const v=voiceRef.keep(voices);if(v)out.voices=v;return out;}
 
