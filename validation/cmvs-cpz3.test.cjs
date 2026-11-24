@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { ps2a } = require('./helpers/engine-fixtures-d.cjs');
+const { cpz, ps2a } = require('./helpers/engine-fixtures-d.cjs');
 const { probeGame } = require('../services/adapter-probe-core.cjs');
 const { locate, readScript } = require('../services/original-text.cjs');
 const cmvs = require('../services/original-engines/cmvs.cjs');
@@ -150,4 +150,43 @@ test('CMVS bounds CPZ3 script reads while allowing the maximum packed size', t =
   atLimit.read();
   overLimit.read();
   assert.deepEqual(largeReads, [limit]);
+});
+
+test('a damaged same-name CPZ3 scene cannot hide a readable CPZ6 scene', t => {
+  const { root, pack, executable } = game(t);
+  const lines = ['明日も同じ時間に会おう。'];
+  fs.writeFileSync(path.join(pack, 'a-readme.cpz'), cpz({ 'scene.ps2': ps2a(lines) }, { version: 6 }));
+  const damaged = cpz3({ 'scene.ps2': ps2a(['駅まで迎えに行こう。']) });
+  damaged[damaged.length - 1] ^= 1;
+  fs.writeFileSync(path.join(pack, 'script.cpz'), damaged);
+
+  const probe = probeGame({ dir: root, executable });
+  assert.equal(probe.step, 'ok');
+  assert.equal(probe.engines.find(engine => engine.id === 'cmvs').scenes, 1);
+  assert.equal(probe.japaneseLines, 1);
+  assert.deepEqual(readScript(locate(root, 'cmvs')).lines, lines);
+
+  const patch = path.join(root, 'FileHook');
+  fs.mkdirSync(patch);
+  fs.writeFileSync(path.join(patch, 'scene.ps2'), ps2a(['予定が変わった。']));
+  assert.deepEqual(readScript(locate(root, 'cmvs')).lines, ['予定が変わった。']);
+  assert.deepEqual(cmvs.engine.originalLines(root), lines);
+});
+
+test('CPZ3 code-only scenes cannot exhaust CMVS original detection ahead of existing scenes', t => {
+  const { root, pack, executable } = game(t);
+  const lines = ['まだ蝉の声が聞こえるね。'];
+  fs.writeFileSync(path.join(pack, 'a-readme.cpz'), cpz({ 'zz-scene.ps2': ps2a(lines) }, { version: 6 }));
+  const codeOnly = Buffer.alloc(0x30);
+  codeOnly.write('PS2A');
+  const entries = Object.fromEntries(Array.from({ length: 64 }, (_, i) => [
+    'a' + String(i).padStart(3, '0') + '.ps2', codeOnly
+  ]));
+  entries['z-new.ps2'] = ps2a(['帰り道で夕日が見えた。']);
+  fs.writeFileSync(path.join(pack, 'script.cpz'), cpz3(entries));
+
+  const probe = probeGame({ dir: root, executable });
+  assert.equal(probe.step, 'ok');
+  assert.equal(probe.japaneseLines, 2);
+  assert.deepEqual(readScript(locate(root, 'cmvs')).lines, [...lines, '帰り道で夕日が見えた。']);
 });

@@ -317,10 +317,32 @@ const failCode=dir=>{
  if(version<5)return 'CMVS_CPZ'+version+'_ARCHIVE';
  return version===7?'CMVS_CPZ7':'CMVS_CPZ'+version+'_KEY';
 };
+function cmvsArchives(dir){return kit.files(dir,{name:/\.cpz$/i,magic:'CPZ',subs:SUBS});}
+function archiveScenes(dir){
+ const existing=new Map(),cpz3=new Map();
+ for(const file of cmvsArchives(dir)){
+  const entries=engine.archiveEntries(file);
+  if(!entries)continue;
+  const group=open(file)?.version===3?cpz3:existing;
+  for(const scene of entries)group.set(scene.name.toLowerCase(),scene);
+ }
+ return {existing,cpz3};
+}
+const bySceneName=(a,b)=>a.name.localeCompare(b.name);
+/* Keep existing CMVS scenes ahead of newly supported CPZ3 scenes. The original reader samples the first 64. */
+function cmvsScenes(dir){
+ const {existing,cpz3}=archiveScenes(dir);
+ for(const file of kit.files(dir,{name:PS,subs:PS_SUBS,max:20000})){
+  const name=path.basename(file);
+  existing.set(name.toLowerCase(),{name,read:()=>fs.readFileSync(file)});
+ }
+ for(const name of existing.keys())cpz3.delete(name);
+ return [...[...existing.values()].sort(bySceneName),...[...cpz3.values()].sort(bySceneName)];
+}
 const engine=kit.engine({id:'cmvs',hint:'*.cpz（*.pss / *.ps2 / *.ps3）',
- archives:{name:/\.cpz$/i,magic:'CPZ',subs:SUBS,list:listScripts,read},
+ archives:{find:cmvsArchives,list:listScripts,read},
  loose:{name:PS,subs:PS_SUBS},parse,
- extra:{unsupported:failCode,REASONS:{
+ extra:{scenes:cmvsScenes,archives:cmvsScenes,unsupported:failCode,REASONS:{
   CMVS_CPZ1_ARCHIVE:'这部 CVNS 作品的 CPZ1 封包索引读不了，请检查安装文件是否完整',
   CMVS_CPZ2_ARCHIVE:'这部 CVNS 作品的 CPZ2 封包索引读不了，请检查安装文件是否完整',
   CMVS_CPZ3_ARCHIVE:'这部 CMVS 作品的 CPZ3 封包索引读不了，请检查安装文件是否完整',
@@ -330,8 +352,7 @@ const engine=kit.engine({id:'cmvs',hint:'*.cpz（*.pss / *.ps2 / *.ps3）',
    FileHook\ (its loader reads those first), so the running script is Chinese and the archives hold its original. Both
    builds push the same strings in the same order: the running line at push n has the Japanese line at push n. One line
    per running line, '' where a scene has no archived copy or its pushes differ. */
-function originalLines(dir){const arch=new Map();
- for(const f of kit.files(dir,{name:/\.cpz$/i,magic:'CPZ',subs:SUBS}))for(const e of engine.archiveEntries(f)||[])arch.set(e.name.toLowerCase(),e);
- return engine.scenes(dir).flatMap(s=>{let own=[];try{own=texts(s.read());}catch{}const a=arch.get(s.name.toLowerCase());let ja=null;try{ja=a&&texts(a.read());}catch{}
+function originalLines(dir){const {existing,cpz3}=archiveScenes(dir);
+ return engine.scenes(dir).flatMap(s=>{let own=[];try{own=texts(s.read());}catch{}const key=s.name.toLowerCase(),a=existing.get(key)||cpz3.get(key);let ja=null;try{ja=a&&texts(a.read());}catch{}
   return own.flatMap((x,i)=>x.kind!=='line'?[]:[ja&&ja.length===own.length&&ja[i].kind==='line'?ja[i].t:'']);});}
 module.exports={engine,packed,parse,texts,originalLines,header,open,list,read,unpackPs2,unpackPss0,pushed,md5Words,table,stage1,dirCipher,entryCipher,scheme,DEFAULT,DEFAULT7,DEFAULTS,indexKey,startValues,rotl,rotr};
