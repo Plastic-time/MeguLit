@@ -31,8 +31,8 @@ function encEntries(d,at,len,key4,seed,tail=5){let i=0;for(;i<len>>>2;i++){const
  for(let q=at+i*4;q<at+len;q++,i++)d[q]=(((d[q]-tail)&255)^(key4[i&3]>>>4))&255;}
 /* files: {'dir/name.ps3': Buffer} ("root" for files without a folder) -> CPZ5/CPZ6, encrypted with the given md5 variant and
    constant set (cmvs-schemes.json 'cpz5', or 'cpz6' for a CMVS 3.x CPZ6 such as アマツツミ) */
-function cpz(files,{version=6,variant='Mirai',set='cpz5',encrypted=true,master=0x1234ABCD,raw=[0x11111111,0x22222222,0x33333333,0x44444444],entryRaw=0x5555AAAA}={}){
- const sc=cmvs.scheme(null,set),v=sc.md5.find(x=>x.name===variant),md5=cmvs.md5Words(raw,v),dirs=new Map();
+function cpz(files,{version=6,variant='Mirai',set='cpz5',params=null,encrypted=true,master=0x1234ABCD,raw=[0x11111111,0x22222222,0x33333333,0x44444444],entryRaw=0x5555AAAA}={}){
+ const sc=cmvs.scheme(params,set),v=sc.md5.find(x=>x.name===variant),md5=cmvs.md5Words(raw,v),dirs=new Map();
  for(const [n,b] of Object.entries(files)){const at=n.lastIndexOf('/'),d=at<0?'root':n.slice(0,at);if(!dirs.has(d))dirs.set(d,[]);dirs.get(d).push({name:n.slice(at+1),data:b});}
  const dirKeys=[...dirs.keys()].map((_,i)=>(0x01020304*(i+1))>>>0);let dataAt=0;const dirBufs=[],entBufs=[],datas=[];let entOff=0;
  [...dirs.entries()].forEach(([dn,list],di)=>{const ents=list.map((f,i)=>{const nb=pad4(z(f.name,s=>Buffer.from(s,'latin1'))),e=Buffer.alloc(0x18);e.writeInt32LE(0x18+nb.length,0);e.writeBigInt64LE(BigInt(dataAt),4);e.writeUInt32LE(f.data.length,12);e.writeUInt32LE(0,16);e.writeUInt32LE((0x100+i)>>>0,20);
