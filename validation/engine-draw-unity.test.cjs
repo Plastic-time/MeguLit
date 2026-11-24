@@ -5,7 +5,8 @@
    side of the control socket (DRAW / EMB out, ask in) is checked directly. Skipped without Roslyn csc. No Unity, no game. */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process');
 const root=path.join(__dirname,'..'),src=fs.readFileSync(path.join(root,'native/unitytext/MeguLitUnityText.cs'),'utf8');
-const CSC=[process.env.MEGULIT_ROSLYN_CSC,'E:/Apps/build-tools/vs2022/MSBuild/Current/Bin/Roslyn/csc.exe'].find(p=>p&&fs.existsSync(p));
+const {findRoslynCompiler}=require('./helpers/roslyn-compile.cjs');
+const CSC=findRoslynCompiler();
 function slice(start){const a=src.indexOf(start);assert.ok(a>=0,start);let i=src.indexOf('{',a),d=0;for(;i<src.length;i++){if(src[i]==='{')d++;else if(src[i]==='}'&&--d===0)break;}return src.slice(a,i+1);}
 
 test('Build: ruby over its base (TMP), the game\'s tags and breaks kept, Chinese as a smaller paragraph; uGUI gets the Chinese only',{skip:!CSC&&'no Roslyn csc'},()=>{

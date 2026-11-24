@@ -230,18 +230,43 @@ jobs:
           $env:TEMP = node -p "require('node:fs').realpathSync.native(require('node:os').tmpdir())"
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $env:TEMP -PathType Container)) { throw 'Could not resolve test temp directory' }
           $env:TMP = $env:TEMP
-          # Shards of similar duration from tools/test-timings.json; every test file lands in exactly one shard.
-          $tests = @(node tools/test-shards.cjs ${{ matrix.shard }} 3 | ForEach-Object { $_.Replace('/', '\') })
+          # Every runner needs the same parallelism to compute the same shard plan.
+          $parallelism = 3
+          $tests = @(node tools/test-shards.cjs ${{ matrix.shard }} 3 $parallelism | ForEach-Object { $_.Replace('/', '\') })
           if ($LASTEXITCODE -or -not $tests.Count) { throw 'No tests in this shard' }
-          # --test-force-exit: a test file that leaves a handle open (a browser, a server) still ends when its tests have finished
-          # test-file-times.json records each file's duration; refresh the timings with node tools/test-shards.cjs --update.
-          node --test --test-force-exit `
-            --test-reporter=tap --test-reporter-destination=stdout `
-            --test-reporter=./tools/test-file-times.mjs --test-reporter-destination=test-file-times.json `
-            @tests 2>&1 | Tee-Object -FilePath test-output.txt
-          if ($LASTEXITCODE) { throw 'Tests failed' }
-          $count = [regex]::Match((Get-Content test-output.txt -Raw), '(?m)^(?:#|ℹ) tests (\d+)').Groups[1].Value
-          if (-not $count -or [int]$count -eq 0) { throw 'Test runner reported zero tests' }
+
+          # The real-time reader replay needs regular browser samples even while the runner is busy.
+          $replay = 'validation\games-regression.test.cjs'
+          $batches = @()
+          if ($tests -contains $replay) {
+            $batches += ,@($replay)
+            $tests = @($tests | Where-Object { $_ -ne $replay })
+          }
+          if ($tests.Count) { $batches += ,$tests }
+
+          $failed = $false
+          $count = 0
+          $timings = @{}
+          $index = 0
+          Set-Content -LiteralPath test-output.txt -Value '' -NoNewline
+          foreach ($batch in $batches) {
+            $index++
+            $batchOutput = @()
+            $batchTimings = Join-Path $env:RUNNER_TEMP "test-file-times-$index.json"
+            # --test-force-exit lets completed tests finish even when they leave a browser or server handle open.
+            node --test --test-force-exit "--test-concurrency=$parallelism" `
+              --test-reporter=tap --test-reporter-destination=stdout `
+              --test-reporter=./tools/test-file-times.mjs "--test-reporter-destination=$batchTimings" `
+              @batch 2>&1 | Tee-Object -Variable batchOutput | Tee-Object -FilePath test-output.txt -Append
+            if ($LASTEXITCODE) { $failed = $true }
+            $batchCount = [regex]::Match(($batchOutput -join "`n"), '(?m)^(?:#|ℹ) tests (\d+)').Groups[1].Value
+            if (-not $batchCount -or [int]$batchCount -eq 0) { throw 'Test runner reported zero tests' }
+            $count += [int]$batchCount
+            $timings += (Get-Content -LiteralPath $batchTimings -Raw | ConvertFrom-Json -AsHashtable)
+          }
+          # Keep the same artifact format for tools/test-shards.cjs --update.
+          ConvertTo-Json -InputObject $timings | Set-Content -LiteralPath test-file-times.json
+          if ($failed) { throw 'Tests failed' }
           "Ran $count tests"
 
       - uses: actions/upload-artifact@v4

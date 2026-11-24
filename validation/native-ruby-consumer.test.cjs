@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs'),Module=require('node:module'),{spawnSync}=require('node:child_process');
+const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs'),Module=require('node:module');
+const {runRenpySelfTest}=require('./helpers/renpy-selftest.cjs');
 const TP=require('../core/text-paths.cjs'),ED=require('../core/engine-draw.cjs'),Profiles=require('../core/profiles/index.cjs'),{HookNative}=require('../core/hook-native.cjs'),{Reader}=require('../services/reader.cjs'),{exampleRuby}=require('../services/example-ruby.cjs');
-const root=path.join(__dirname,'..');
 function consumer(){
  const hook=Object.create(HookNative.prototype),reader=Object.create(Reader.prototype),tasks=[],writes=[];
  const p=Profiles.profileFor({}),profile={...p,draw:{...p.draw,embed:true}};
@@ -27,8 +27,7 @@ test('actual KAG track/serializer through parser, HookNative, EngineDraw and Rea
 });
 
 test('actual RenPy glyph producer records all parse and feed native ruby to actual Reader',async()=>{
- const produced=spawnSync('python',['-I',path.join(root,'native/renpytext/selftest/producer.py'),path.join(root,'native/MeguLitRenpy.py')],{windowsHide:true,encoding:'utf8',timeout:5000,maxBuffer:256*1024});
- assert.equal(produced.status,0,produced.stderr);const out=JSON.parse(produced.stdout);
+ const out=runRenpySelfTest('producer.py');
  for(const item of out.cases)assert.ok(TP.parseChars(item.wire),item.name);
  const repeated=out.cases.find(x=>x.name==='repeated base'),c=consumer();await c.feed(repeated.wire);
  const result=c.hook.engineDraw.entries.get('漢字漢字');assert.deepEqual(result.ruby.filter(r=>r[2]==='べつ'),[[2,4,'べつ']]);

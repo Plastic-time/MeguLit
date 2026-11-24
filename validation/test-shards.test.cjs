@@ -19,6 +19,17 @@ test('long files are spread out and files without a record count as the median',
   assert.deepEqual(s.map(x => x.total), [120, 180]);
 });
 
+test('the real-time replay consumes all test slots while it runs alone', () => {
+  const replay = 'validation/games-regression.test.cjs';
+  const files = [replay, 'a', 'b', 'c', 'd'];
+  const timings = { [replay]: 100, a: 90, b: 90, c: 90, d: 90 };
+  const assigned = shards(files, timings, 2, 3);
+  assert.deepEqual(assigned, [
+    { total: 300, files: [replay] },
+    { total: 360, files: ['a', 'b', 'c', 'd'] },
+  ]);
+});
+
 test('the split is the same on every runner', () => {
   const files = testFiles(), timings = readTimings();
   assert.deepEqual(shards(files, timings, 3), shards([...files].reverse(), timings, 3));

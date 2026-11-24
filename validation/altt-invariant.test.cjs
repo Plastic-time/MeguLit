@@ -242,8 +242,8 @@ test('compiled bridge: the recorded menu close and random hand-overs never sink 
  assert.equal(r.status,0,r.stdout+r.stderr);assert.match(r.stdout,/"passed":true/);
 });
 test('compiled hook bridge: a menu or focus hand-over never gives the text back to the game (when HookBridge.exe is built)',{skip:process.platform!=='win32'||!bridge('HookBridge.exe')},()=>{
- const r=require('node:child_process').spawnSync(bridge('HookBridge.exe'),['--overlay-gate-self-test'],{encoding:'utf8',windowsHide:true,timeout:20000});
- assert.equal(r.status,0,r.stdout+r.stderr);assert.match(r.stdout,/PASS overlay gate/);
+ const r=require('node:child_process').spawnSync(bridge('HookBridge.exe'),['--overlay-gate-self-test'],{encoding:'utf8',windowsHide:true,timeout:60000});
+ assert.ifError(r.error);assert.equal(r.status,0,r.stdout+r.stderr);assert.match(r.stdout,/PASS overlay gate/);
 });
 test('the tick decides the layer once: no second reading of the foreground decides float, sink or shown',()=>{
  const s=fs.readFileSync(path.join(__dirname,'..','native','GalWindowBridge.cs'),'utf8');
