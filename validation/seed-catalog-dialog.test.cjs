@@ -63,13 +63,13 @@ test('catalog dialog: normal mode, the NSFW question, search, R18 filter, closin
  }finally{await browser.close();}
 });
 
-test('the catalog opens one engine page at a time and follows the existing cover modes',{skip:!chromium&&'no playwright-core'},async()=>{
+test('the catalog tabs open one engine page at a time and follow the existing cover modes',{skip:!chromium&&'no playwright-core'},async()=>{
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
   const page=await pageFor(browser);
   const choice=[
-   {id:'kirikiri',name:'KiriKiri',count:101},
    {id:'rugp',name:'rUGP',count:2},
+   {id:'kirikiri',name:'KiriKiri',count:101},
   ];
   const engine=(vndb,title,cover)=>({vndb,title,cover,engine:'KiriKiri'});
   const sets={
@@ -80,42 +80,56 @@ test('the catalog opens one engine page at a time and follows the existing cover
   const open=(safeOnly=false)=>page.evaluate(({games,choice,sets,safeOnly})=>{
    calls.length=0;open_({games,offline:false,safeOnly},{engines:choice,pages:sets});
   },{games,choice,sets,safeOnly});
-  const panel=page.locator('[data-engine="kirikiri"]');
+  const view=page.locator('[data-engine-view]');
   const requests=()=>page.evaluate(()=>calls.filter(c=>c[0]==='seed_catalog_engine').map(c=>c[1]));
+  const openEngine=async id=>{await page.getByRole('tab',{name:/引擎已适配/}).click();await page.locator(`.sc-etile[data-engine="${id}"]`).click();};
   await open();
-  await page.getByRole('heading',{name:'已实测',exact:true}).waitFor({timeout:4000});
-  await page.getByRole('heading',{name:'引擎已适配（未逐部实测）',exact:true}).waitFor();
-  await panel.getByText('101 部').waitFor();
-  assert.deepEqual(await requests(),[]);
-  await panel.locator('summary').click();
-  await panel.getByText('First engine game').waitFor();
-  await panel.locator('.sc-cover img').first().waitFor();
+  const enginesTab=page.getByRole('tab',{name:/引擎已适配/});
+  await enginesTab.getByText('约 103 部').waitFor({timeout:4000});
+  assert.equal(await page.getByRole('tab',{name:/已实测/}).getAttribute('aria-selected'),'true');
+  assert.ok(await page.locator('[data-search]').isVisible(),'the seeded games tab keeps the search bar');
+  assert.ok(await page.locator('[data-pane="engines"]').isHidden());
+  await enginesTab.click();
+  assert.ok(await page.locator('[data-search]').isHidden(),'the engine tab has no search bar');
+  await page.getByText('引擎已适配（未逐部实测）',{exact:true}).waitFor();
+  assert.deepEqual(await page.locator('.sc-etile .sc-etile-name').allTextContents(),['KiriKiri','rUGP'],'the biggest engine first');
+  await page.locator('.sc-etile[data-engine="kirikiri"]').getByText('101').waitFor();
+  assert.deepEqual(await requests(),[],'counts come without a VNDB page');
+  await page.locator('.sc-etile[data-engine="kirikiri"]').click();
+  await view.getByText('First engine game').waitFor();
+  await view.locator('.sc-cover img').first().waitFor();
+  assert.ok(await page.locator('[data-engine-list]').isHidden(),'one engine replaces the tiles');
   assert.deepEqual(await requests(),[{engine:'kirikiri',page:1}]);
-  assert.equal(await panel.locator('.sc-veil').count(),1);
-  assert.equal(await panel.locator('.sc-st').count(),0);
+  assert.equal(await view.locator('.sc-veil').count(),1);
+  assert.equal(await view.locator('.sc-st').count(),0);
   assert.ok(!(await page.evaluate(()=>calls.some(c=>c[0]==='seed_cover'&&c[1].vndb==='v102'))));
-  await panel.getByRole('button',{name:'下一页'}).click();
-  await panel.getByText('Second page').waitFor();
+  await view.getByText('第 1 / 2 页',{exact:true}).waitFor();
+  await view.getByRole('button',{name:'下一页'}).click();
+  await view.getByText('Second page').waitFor();
   assert.deepEqual(await requests(),[{engine:'kirikiri',page:1},{engine:'kirikiri',page:2}]);
-  assert.ok(await panel.getByRole('button',{name:'下一页'}).isDisabled());
-  await panel.getByRole('button',{name:'上一页'}).click();
-  await panel.getByText('First engine game').waitFor();
-  await page.locator('[data-engine="rugp"] summary').click();
-  await page.getByText('Small engine').waitFor();
+  assert.ok(await view.getByRole('button',{name:'下一页'}).isDisabled());
+  await view.getByRole('button',{name:'上一页'}).click();
+  await view.getByText('First engine game').waitFor();
+  await view.getByRole('button',{name:/全部引擎/}).click();
+  await page.locator('.sc-etile[data-engine="rugp"]').click();
+  await view.getByText('Small engine').waitFor();
   assert.deepEqual((await requests()).at(-1),{engine:'rugp',page:1});
+  assert.equal(await view.locator('.sc-pager').count(),0,'a single page has no pager');
+  await page.getByRole('tab',{name:/已实测/}).click();
+  assert.ok(await page.locator('[data-search]').isVisible());
   await page.locator('[data-close]').click();
   await page.evaluate(()=>{setNsfw(true);return startNsfw();});
   await open();
-  await panel.locator('summary').click();
-  await panel.getByText('Mature engine game').waitFor();
+  await openEngine('kirikiri');
+  await view.getByText('Mature engine game').waitFor();
   await page.waitForFunction(()=>calls.some(c=>c[0]==='seed_cover'&&c[1].vndb==='v102'&&c[1].nsfw));
-  assert.equal(await panel.locator('.sc-veil').count(),0);
+  assert.equal(await view.locator('.sc-veil').count(),0);
   await page.locator('[data-close]').click();
   await open(true);
-  await panel.locator('summary').click();
-  await panel.locator('.sc-veil').waitFor();
+  await openEngine('kirikiri');
+  await view.locator('.sc-veil').waitFor();
   assert.equal(await page.locator('dialog.seed-catalog').getAttribute('data-mode'),'normal');
-  await panel.locator('.sc-veil').click();
+  await view.locator('.sc-veil').click();
   assert.ok(!(await page.evaluate(()=>calls.some(c=>c[0]==='seed_cover'&&c[1].nsfw))));
  }finally{await browser.close();}
 });

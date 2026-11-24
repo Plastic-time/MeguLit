@@ -6,20 +6,23 @@ import {nsfwOn} from './nsfw.js';
 const W={
  zh:{title:'已种下的游戏',sub:(g,s,b)=>`${g} 部游戏 · ${s} 颗种子 · ${b} 个游戏社`,seeds:n=>`${n} 颗种子`,partly:(a,b)=>`${a}/${b} 已确认`,locked:'设置里开着「卡背过滤 R18 图片」，成人封面不能显示',search:'搜索已实测游戏或游戏社',
   count:n=>`${n} 部`,other:'其他',tested:'已实测',engineAdapted:'引擎已适配（未逐部实测）',
-  engineHint:'同引擎的游戏大多能用，个别版本更换密钥或封包后可能读不出，欢迎反馈。',engineCountMissing:'部数暂缺',engineCached:'缓存部数，展开后更新',
-  previous:'上一页',next:'下一页',page:n=>`第 ${n} 页`,retry:'重试',
+  engineHint:'同引擎的游戏大多能用，个别版本更换密钥或封包后可能读不出，欢迎反馈。',engineCountMissing:'部数暂缺',engineCached:'缓存部数，打开后更新',
+  tabEngines:'引擎已适配',about:n=>`约 ${n} 部`,unit:'部',allEngines:'全部引擎',tabs:'目录分类',
+  previous:'上一页',next:'下一页',page:(n,m)=>m?`第 ${n} / ${m} 页`:`第 ${n} 页`,retry:'重试',
   status:{verified:'已确认','owner-ok':'已确认',read:'只读模式',skeleton:'等传火'},hidden:'成人内容 · 在设置里开启后显示',reveal:'点击只临时查看这一张',devNone:'暂时读不到这个游戏社的介绍',devSource:'简介来自 VNDB',devOpen:'在浏览器中打开',links:{vndb:'VNDB 游戏社页',site:'官网',moegirl:'萌娘百科',jawiki:'日文维基'},
   offline:'连不上 VNDB，部分游戏名和封面暂时显示不了',empty:'没有找到',close:'关闭',loading:'正在读取…',failed:'读取失败，稍后再试',link:'看看都有哪些游戏'},
  en:{title:'Seeded games',sub:(g,s,b)=>`${g} games · ${s} seeds · ${b} developers`,seeds:n=>`${n} seeds`,partly:(a,b)=>`${a}/${b} confirmed`,locked:'"Keep R18 pictures off the card back" is on in Settings, so only normal mode is shown',search:'Search tested games or developers',
-  count:n=>`${n} ${n===1?'game':'games'}`,other:'Other',tested:'Tested',engineAdapted:'Supported engines (individual games untested)',
-  engineHint:'Most games on these engines should work. Some releases use different keys or archives. Please report any that cannot be read.',engineCountMissing:'Count unavailable',engineCached:'Cached count, refreshed when expanded',
-  previous:'Previous',next:'Next',page:n=>`Page ${n}`,retry:'Retry',
+  count:n=>`${n} ${+n===1?'game':'games'}`,other:'Other',tested:'Tested',engineAdapted:'Supported engines (individual games untested)',
+  engineHint:'Most games on these engines should work. Some releases use different keys or archives. Please report any that cannot be read.',engineCountMissing:'Count unavailable',engineCached:'Cached count, refreshed when opened',
+  tabEngines:'Supported engines',about:n=>`about ${n}`,unit:'games',allEngines:'All engines',tabs:'Catalog sections',
+  previous:'Previous',next:'Next',page:(n,m)=>m?`Page ${n} of ${m}`:`Page ${n}`,retry:'Retry',
   status:{verified:'Confirmed','owner-ok':'Confirmed',read:'Read mode',skeleton:'Waiting for a spark'},hidden:'Adult content · shown when enabled in Settings',reveal:'Click to see only this one for now',devNone:'No introduction could be loaded for this developer for now',devSource:'Introduction from VNDB',devOpen:'Open in the browser',links:{vndb:'VNDB developer page',site:'Official site',moegirl:'Moegirlpedia',jawiki:'Japanese Wikipedia'},
   offline:'VNDB cannot be reached, so some names and covers are missing for now',empty:'Nothing found',close:'Close',loading:'Loading…',failed:'Could not load the list, try again later',link:'See which games'},
  ja:{title:'種まき済みのゲーム',sub:(g,s,b)=>`${g} 本 · 種 ${s} 個 · ${b} ブランド`,seeds:n=>`種 ${n} 個`,partly:(a,b)=>`${a}/${b} 確認済み`,locked:'設定で「カード裏の R18 画像を除外」がオンのため、通常モードのみ表示します',search:'確認済みゲーム・ブランドで検索',
   count:n=>`${n} 本`,other:'その他',tested:'実機確認済み',engineAdapted:'対応エンジン（作品ごとの動作は未確認）',
   engineHint:'同じエンジンの多くの作品に対応していますが、鍵やアーカイブが異なる版は読み込めない場合があります。問題があればお知らせください。',engineCountMissing:'件数を取得できません',engineCached:'キャッシュされた件数。開くと更新されます',
-  previous:'前へ',next:'次へ',page:n=>`${n} ページ`,retry:'再試行',
+  tabEngines:'対応エンジン',about:n=>`約 ${n} 本`,unit:'本',allEngines:'すべてのエンジン',tabs:'カタログの区分',
+  previous:'前へ',next:'次へ',page:(n,m)=>m?`${n} / ${m} ページ`:`${n} ページ`,retry:'再試行',
   status:{verified:'確認済み','owner-ok':'確認済み',read:'読み取りモード',skeleton:'伝火待ち'},hidden:'成人向け · 設定でオンにすると表示',reveal:'クリックでこの 1 枚だけ一時的に表示',devNone:'このブランドの紹介は今は読み込めません',devSource:'紹介文の出典：VNDB',devOpen:'ブラウザで開く',links:{vndb:'VNDB のブランドページ',site:'公式サイト',moegirl:'萌娘百科（中国語）',jawiki:'日本語版ウィキペディア'},
   offline:'VNDB に接続できないため、一部の名前と表紙を表示できません',empty:'見つかりません',close:'閉じる',loading:'読み込み中…',failed:'読み込めませんでした。後でもう一度お試しください',link:'収録ゲームを見る'}
 };
@@ -69,7 +72,7 @@ function cardHTML(g,locale,mode,esc,seeded=true){
  const t=catalogWords(locale),title=gameTitle(g,locale),st=coverState(g,mode),dev=g.developers?.[0]?developerName(g.developers[0],locale):'';
  const ph=`<span class="sc-ph" aria-hidden="true">${esc(Array.from(dev||title)[0]||'?')}</span>${st==='hidden'?`<button type="button" class="sc-veil" data-reveal="${esc(g.vndb)}" title="${esc(t.reveal)}">${esc(t.hidden)}</button>`:''}`;
  return `<li class="sc-card"><div class="sc-cover" data-state="${st}"${st==='load'?` data-vndb="${esc(g.vndb)}"`:''}>${ph}</div>
-  <div class="sc-meta"><b title="${esc(title)}">${esc(title)}</b>${seeded?`<span class="sc-tags"><span class="sc-engine">${esc((g.engines||[g.engine]).join(' / '))}</span>${g.seeds>1?`<span class="sc-builds">${esc(t.seeds(g.seeds))}</span>`:''}<span class="sc-st sc-st-${g.seeds>1&&g.ok>0&&g.ok<g.seeds?'part':STATUS_CLASS[g.status]||'wait'}">${esc(statusText(g,locale))}</span></span>`:''}</div></li>`;
+  <div class="sc-meta"><b title="${esc(title)}">${esc(title)}</b>${seeded?`<span class="sc-tags"><span class="sc-engine">${esc((g.engines||[g.engine]).join(' / '))}</span>${g.seeds>1?`<span class="sc-builds">${esc(t.seeds(g.seeds))}</span>`:''}<span class="sc-st sc-st-${g.seeds>1&&g.ok>0&&g.ok<g.seeds?'part':STATUS_CLASS[g.status]||'wait'}">${esc(statusText(g,locale))}</span></span>`:dev?`<span class="sc-tags sc-by">${esc(dev)}</span>`:''}</div></li>`;
 }
 export function catalogHTML(games,locale,mode,esc,query=''){
  const t=catalogWords(locale),groups=groupGames(games,locale,query);
@@ -116,17 +119,25 @@ export function loadLogos(root,api,live=()=>root.isConnected,{cache=logos}={}){
 }
 export function openSeedCatalog({api,locale,esc,toast}){
  document.querySelector('dialog.seed-catalog')?.close();
- const t=catalogWords(locale),dialog=document.createElement('dialog');let mode=savedMode(),games=[],query='',safeOnly=false;
+ const t=catalogWords(locale),dialog=document.createElement('dialog');let mode=savedMode(),games=[],query='',safeOnly=false,seedOffline=false;
  dialog.className='game-dialog seed-catalog';
- /* the app's dialog parts: game-dialog head, a bar like the lines picker, the list, the action row */
+ /* the app's dialog parts: game-dialog head, two tabs (the seeded games; the engines MeguLit reads), a bar like the lines
+    picker for the seeded games, the list, the action row */
  dialog.innerHTML=`<div class="game-dialog-head"><h2>${esc(t.title)}</h2><p data-sub>${esc(t.loading)}</p></div>
-  <div class="sc-bar"><label class="sc-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><input type="search" data-search placeholder="${esc(t.search)}" aria-label="${esc(t.search)}" autocomplete="off" spellcheck="false"></label></div>
+  <div class="sc-tabs" role="tablist" aria-label="${esc(t.tabs)}">
+   <button type="button" role="tab" id="sc-tab-tested" aria-controls="sc-pane-tested" aria-selected="true" data-tab="tested">${esc(t.tested)}<small data-tab-count></small></button>
+   <button type="button" role="tab" id="sc-tab-engines" aria-controls="sc-pane-engines" aria-selected="false" tabindex="-1" data-tab="engines">${esc(t.tabEngines)}<small data-tab-count></small></button>
+  </div>
+  <div class="sc-bar" data-bar><label class="sc-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><input type="search" data-search autofocus placeholder="${esc(t.search)}" aria-label="${esc(t.search)}" autocomplete="off" spellcheck="false"></label></div>
   <p class="sc-offline" data-offline hidden>${esc(t.offline)}</p>
   <div class="sc-body" data-body>
-   <section class="sc-group"><h3>${esc(t.tested)}</h3><div data-seed-games></div></section>
-   <section class="sc-group" data-engine-section><h3>${esc(t.engineAdapted)}</h3><p>${esc(t.engineHint)}</p>
-    <p class="sc-offline" data-engines-offline hidden>${esc(t.offline)}</p><div data-engine-list>${esc(t.loading)}</div>
-   </section>
+   <div role="tabpanel" id="sc-pane-tested" aria-labelledby="sc-tab-tested" data-pane="tested"><div data-seed-games></div></div>
+   <div role="tabpanel" id="sc-pane-engines" aria-labelledby="sc-tab-engines" data-pane="engines" hidden>
+    <p class="sc-note"><b>${esc(t.engineAdapted)}</b><span>${esc(t.engineHint)}</span></p>
+    <p class="sc-offline sc-inline" data-engines-offline hidden>${esc(t.offline)}</p>
+    <div data-engine-list><p class="sc-empty">${esc(t.loading)}</p></div>
+    <div class="sc-edetail" data-engine-view hidden></div>
+   </div>
   </div>
   <div class="dialog-actions"><button type="button" class="text-button" data-close>${esc(t.close)}</button></div>`;
  document.body.append(dialog);
@@ -135,49 +146,75 @@ export function openSeedCatalog({api,locale,esc,toast}){
  let run=0;
  const render=()=>{const mine=++run;dialog.dataset.mode=mode;seedGames.innerHTML=catalogHTML(games,locale,mode,esc,query);loadCovers(seedGames,api,mode,()=>mine===run&&dialog.isConnected);loadLogos(seedGames,api,()=>mine===run&&dialog.isConnected);};
 
- const engineList=$('[data-engine-list]'),panels=new WeakMap();
- const countText=n=>Number.isSafeInteger(n)&&n>=0?t.count(n):t.engineCountMissing;
+ /* tabs: the seeded games first; the search bar belongs to them */
+ const tabs=[...dialog.querySelectorAll('[data-tab]')];
+ const showTab=name=>{
+  for(const b of tabs){const on=b.dataset.tab===name;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;$(`[data-pane="${b.dataset.tab}"]`).hidden=!on;}
+  $('[data-bar]').hidden=name!=='tested';$('[data-offline]').hidden=name!=='tested'||!seedOffline;dialog.dataset.tab=name;body.scrollTop=0;
+ };
+ $('.sc-tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b)showTab(b.dataset.tab);});
+ $('.sc-tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;const i=tabs.indexOf(document.activeElement);if(i<0)return;
+  const b=tabs[(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length];b.focus();showTab(b.dataset.tab);e.preventDefault();});
+ const tabCount=(name,text)=>{$(`[data-tab="${name}"] [data-tab-count]`).textContent=text;};
+
+ /* engines: a tile per engine, the biggest first; a click opens that engine's games one VNDB page at a time */
+ const engineList=$('[data-engine-list]'),engineView=$('[data-engine-view]');
+ const known=n=>Number.isSafeInteger(n)&&n>=0;
+ const num=n=>n.toLocaleString('en-US');
+ const countText=n=>known(n)?t.count(num(n)):t.engineCountMissing;
+ let engineInfo=new Map(),current=null,enginesOffline=false;
  const showEngines=r=>{
   if(!dialog.isConnected)return;
-  $('[data-engines-offline]').hidden=!r?.offline;
-  const engines=Array.isArray(r?.engines)?r.engines:[];
-  engineList.innerHTML=engines.length?engines.map(g=>`<details class="sc-engine-entry" data-engine="${esc(g.id)}">
-   <summary>${esc(g.name)} <small data-engine-count${g.stale?` title="${esc(t.engineCached)}"`:''}>${esc(countText(g.count))}</small></summary>
-   <p class="sc-offline" data-engine-notice hidden></p><div data-engine-games></div></details>`).join(''):`<p class="sc-empty">${esc(r?.offline?t.offline:t.failed)}</p>`;
+  enginesOffline=!!r?.offline;$('[data-engines-offline]').hidden=!enginesOffline||!engineView.hidden;
+  const engines=(Array.isArray(r?.engines)?r.engines:[]).slice().sort((a,b)=>(known(b.count)?b.count:-1)-(known(a.count)?a.count:-1));
+  engineInfo=new Map(engines.map(g=>[g.id,g]));
+  const total=engines.reduce((n,g)=>n+(known(g.count)?g.count:0),0),top=Math.max(1,...engines.map(g=>known(g.count)?g.count:0));
+  if(total)tabCount('engines',t.about(num(total)));
+  engineList.innerHTML=engines.length?`<ul class="sc-engines">${engines.map(g=>`<li><button type="button" class="sc-etile" data-engine="${esc(g.id)}"${g.stale?` title="${esc(t.engineCached)}"`:''}>
+   <span class="sc-etile-name">${esc(g.name)}</span><span class="sc-etile-n">${known(g.count)?`<b>${esc(num(g.count))}</b> ${esc(t.unit)}`:esc(t.engineCountMissing)}</span>
+   <i aria-hidden="true" style="--share:${known(g.count)?(Math.log10(g.count+1)/Math.log10(top+1)).toFixed(3):0}"></i></button></li>`).join('')}</ul>`:`<p class="sc-empty">${esc(r?.offline?t.offline:t.failed)}</p>`;
  };
- const engineCovers=(entry,view)=>loadCovers(view,api,mode,()=>entry.open&&view.isConnected);
- async function showEnginePage(entry,page){
-  let state=panels.get(entry);if(!state){state={page:0,busy:false};panels.set(entry,state);}
-  if(state.busy)return;state.busy=true;
-  const view=entry.querySelector('[data-engine-games]'),notice=entry.querySelector('[data-engine-notice]');
-  notice.hidden=false;notice.textContent=t.loading;entry.setAttribute('aria-busy','true');
+ const closeEngine=()=>{current=null;engineView.hidden=true;engineView.innerHTML='';delete engineView.dataset.engine;engineList.hidden=false;$('[data-engines-offline]').hidden=!enginesOffline;body.scrollTop=0;};
+ async function showEnginePage(id,page){
+  const info=engineInfo.get(id);if(!info)return;
+  if(current?.busy)return;
+  const mine={id,page,busy:true};current=mine;
+  engineList.hidden=true;engineView.hidden=false;$('[data-engines-offline]').hidden=true;
+  if(engineView.dataset.engine!==id){
+   engineView.dataset.engine=id;
+   engineView.innerHTML=`<div class="sc-ehead"><button type="button" class="sc-back" data-engine-back><span aria-hidden="true">←</span> ${esc(t.allEngines)}</button>
+    <h3>${esc(info.name)}<small data-engine-count${info.stale?` title="${esc(t.engineCached)}"`:''}>${esc(countText(info.count))}</small></h3></div>
+    <p class="sc-offline sc-inline" data-engine-notice hidden></p><div data-engine-games></div>`;
+  }
+  const view=engineView.querySelector('[data-engine-games]'),notice=engineView.querySelector('[data-engine-notice]');
+  notice.hidden=false;notice.textContent=t.loading;engineView.setAttribute('aria-busy','true');
   try{
-   const result=await api('seed_catalog_engine',{engine:entry.dataset.engine,page});
-   if(!entry.isConnected)return;
+   const result=await api('seed_catalog_engine',{engine:id,page});
+   if(current!==mine||!dialog.isConnected)return;
    if(!result||!Array.isArray(result.games)||result.page!==page||result.offline&&!result.games.length)throw Error('catalog page');
-   if(!result.offline&&Number.isSafeInteger(result.count)&&result.count>=0){
-    const count=entry.querySelector('[data-engine-count]');count.textContent=countText(result.count);count.removeAttribute('title');
+   let count=info.count;
+   if(!result.offline&&known(result.count)){
+    count=result.count;info.count=count;info.stale=false;
+    const c=engineView.querySelector('[data-engine-count]');c.textContent=countText(count);c.removeAttribute('title');
    }
-   const turned=state.page&&state.page!==page;state.page=page;
+   const pages=known(count)&&count>0?Math.ceil(count/100):0;
    const games=result.games.length?`<ul class="sc-grid">${result.games.map(g=>cardHTML(g,locale,mode,esc,false)).join('')}</ul>`:`<p class="sc-empty">${esc(t.empty)}</p>`;
-   const button=(label,n,disabled)=>`<button type="button" class="text-button" data-engine-page="${n}"${disabled?' disabled':''}>${esc(label)}</button>`;
-   view.innerHTML=games+`<div class="sc-engine-pages">${button(t.previous,page-1,page<=1)}<span>${esc(t.page(page))}</span>${button(t.next,page+1,!result.more)}</div>`;
+   const button=(label,n,disabled,cls)=>`<button type="button" class="text-button ${cls}" data-engine-page="${n}"${disabled?' disabled':''}>${esc(label)}</button>`;
+   const pager=page>1||result.more?`<nav class="sc-pager">${button(t.previous,page-1,page<=1,'sc-prev')}<span>${esc(t.page(page,pages&&Math.max(pages,page)))}</span>${button(t.next,page+1,!result.more,'sc-next')}</nav>`:'';
+   view.innerHTML=games+pager;
    notice.hidden=!result.offline;notice.textContent=t.offline;
-   if(turned&&entry.open)entry.querySelector('summary').scrollIntoView({block:'start'});
-   engineCovers(entry,view);
+   body.scrollTop=0;
+   loadCovers(view,api,mode,()=>current?.id===id&&current.page===page&&view.isConnected);
   }catch{
-   if(!entry.isConnected)return;
-   notice.textContent=t.offline;
-   const retry=document.createElement('button');retry.type='button';retry.className='text-button';retry.dataset.enginePage=String(page);retry.textContent=t.retry;notice.append(' ',retry);
-  }finally{state.busy=false;entry.removeAttribute('aria-busy');}
+   if(current!==mine||!dialog.isConnected)return;
+   notice.hidden=true;
+   view.innerHTML=`<div class="sc-empty sc-fail"><span>${esc(t.offline)}</span><button type="button" class="sc-back" data-engine-page="${page}">${esc(t.retry)}</button></div>`;
+  }finally{mine.busy=false;engineView.removeAttribute('aria-busy');}
  }
- engineList.addEventListener('toggle',e=>{
-  const entry=e.target;if(!entry.matches('details[data-engine]')||!entry.open)return;
-  if(!panels.get(entry)?.page)showEnginePage(entry,1);
-  else engineCovers(entry,entry.querySelector('[data-engine-games]'));
- },true);
- engineList.addEventListener('click',e=>{
-  const button=e.target.closest('[data-engine-page]');if(button&&!button.disabled)showEnginePage(button.closest('[data-engine]'),Number(button.dataset.enginePage));
+ engineList.addEventListener('click',e=>{const b=e.target.closest('[data-engine]');if(b)showEnginePage(b.dataset.engine,1);});
+ engineView.addEventListener('click',e=>{
+  if(e.target.closest('[data-engine-back]'))return closeEngine();
+  const button=e.target.closest('[data-engine-page]');if(button&&!button.disabled)showEnginePage(engineView.dataset.engine,Number(button.dataset.enginePage));
  });
  /* a veil card: a click shows that one cover for now (the setting stays off; the app's R18 filter still refuses it) */
  body.addEventListener('click',async e=>{const b=e.target.closest('[data-reveal]');if(!b||b.disabled)return;if(safeOnly){b.title=t.locked;return;}const el=b.closest('.sc-cover');b.disabled=true;let u=null;try{u=await api('seed_cover',{vndb:b.dataset.reveal,nsfw:true});}catch{}
@@ -192,8 +229,9 @@ export function openSeedCatalog({api,locale,esc,toast}){
   if(!dialog.isConnected)return;games=Array.isArray(r?.games)?r.games:[];
   /* the app's R18 filter (卡背过滤 R18 图片) is on: normal mode only, the NSFW button off with a hint */
   if(r?.safeOnly===true){safeOnly=true;mode='normal';render();}
-  $('[data-sub]').textContent=t.sub(mergeGames(games).length,games.length,new Set(games.map(g=>g.developers?.[0]?.id).filter(Boolean)).size);
-  $('[data-offline]').hidden=!r?.offline;render();
+  const merged=mergeGames(games).length;tabCount('tested',t.count(merged));
+  $('[data-sub]').textContent=t.sub(merged,games.length,new Set(games.map(g=>g.developers?.[0]?.id).filter(Boolean)).size);
+  seedOffline=!!r?.offline;$('[data-offline]').hidden=!seedOffline||dialog.dataset.tab==='engines';render();
   Promise.resolve().then(()=>api('seed_catalog_engines',{})).then(showEngines).catch(()=>showEngines({offline:true}));
  }).catch(()=>{if(dialog.isConnected){$('[data-sub]').textContent=t.failed;toast&&toast(t.failed);}});
  return dialog;
