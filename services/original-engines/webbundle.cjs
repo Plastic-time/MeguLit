@@ -92,14 +92,16 @@ function twine(t){const lines=[],anchors=[];const passages=[];
  return res(lines,anchors);}
 /* WebGAL scene/*.txt: "speaker:text -args;", commands "changeBg:x;", intro:a|b; choose:text:scene|text:scene; */
 const WG_CMD=new Set('changebg changefigure bgm playeffect playvideo unlockcg unlockbgm label jumplabel callscene changescene setvar end pixiinit pixiperform setanimation settransform miniavatar getuserinput settextbox settempanimation applystyle wait filmmode showvars setcomplexanimation settransition setfilter'.split(' '));
+function wgColon(s){for(let i=0;i<s.length;i++){if(s[i]==='\\'){i++;continue;}if(s[i]===':')return i;}return -1;}
+const wgUnesc=s=>s.replace(/\\:/g,':');
 function webgal(t){const lines=[],anchors=[],speakers=[];
  for(let raw of t.split(/\r?\n/)){raw=raw.trim();if(!raw||raw[0]===';')continue;raw=raw.replace(/;\s*$/,'');
   const cut=/\s-[A-Za-z0-9_]+(?:[=.]\S*)?(?=\s|$)/.exec(raw);let body=cut?raw.slice(0,cut.index):raw;
-  const colon=body.search(/[:：]/);const cmd=colon>=0?body.slice(0,colon).trim():'';
+  const colon=wgColon(body);const cmd=colon>=0?body.slice(0,colon).trim():'';
   if(WG_CMD.has(cmd.toLowerCase())){anchors.push(raw);continue;}
-  if(cmd.toLowerCase()==='intro'){for(const x of body.slice(colon+1).split('|').map(clean))if(keep(x)){lines.push(x);speakers.push('');}continue;}
-  if(cmd.toLowerCase()==='choose'){for(const o of body.slice(colon+1).split('|')){const k=o.lastIndexOf(':'),x=clean(k>=0?o.slice(0,k):o);if(keep(x)){lines.push(x);speakers.push('');}}continue;}
-  const text=clean(colon>=0?body.slice(colon+1):body);if(!keep(text))continue;
+  if(cmd.toLowerCase()==='intro'){for(const x of body.slice(colon+1).split('|').map(s=>clean(wgUnesc(s))))if(keep(x)){lines.push(x);speakers.push('');}continue;}
+  if(cmd.toLowerCase()==='choose'){for(const o of body.slice(colon+1).split('|')){const k=o.lastIndexOf(':'),x=clean(wgUnesc(k>=0?o.slice(0,k):o));if(keep(x)){lines.push(x);speakers.push('');}}continue;}
+  const text=clean(wgUnesc(colon>=0?body.slice(colon+1):body));if(!keep(text))continue;
   if(colon>=0&&cmd&&keep(cmd)&&!keep(text.slice(0,1)))speakers.push(cmd);else speakers.push(colon>=0?cmd:'');
   lines.push(text.replace(/\\n/g,'\n'));}
  return res(lines,anchors,speakers.some(Boolean)?{speakers}:{});}
