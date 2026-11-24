@@ -203,9 +203,14 @@ function cleanText(s) {
 function splitSlot(raw) {
   let s = String(raw || '');
   let speaker = '';
-  const close = s.indexOf('】');
-  if (s.startsWith('【') && close > 1) speaker = s.slice(1, close);
-  let idx = close >= 0 ? close + 1 : 0;
+  let idx = 0;
+  if (s.startsWith('【')) {
+    const close = s.indexOf('】');
+    if (close >= 1) {
+      speaker = s.slice(1, close);
+      idx = close + 1;
+    }
+  }
   if (s[idx] === '：') idx++;
   while (s[idx] === '\t') idx++;
   let body = s.slice(idx);
@@ -219,7 +224,7 @@ function parseSelectSlot(slot) {
   const s = stripComment(String(slot || ''));
   for (const m of s.matchAll(/\b(\d+|OUTLINE):"((?:[^"\\]|\\.)*)"/g)) {
     let val = m[2];
-    if (m[1] === 'OUTLINE') {
+    if (m[1] === 'OUTLINE' && val.startsWith('【')) {
       const end = val.indexOf('】');
       if (end >= 0) val = val.slice(end + 1);
     }

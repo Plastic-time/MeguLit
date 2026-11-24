@@ -217,3 +217,53 @@ test('Aokana PRead: malformed archives return null and single-language scripts f
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('Aokana PRead: inline 【...】 brackets in dialogue or OUTLINE are not truncated as speaker prefixes', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aokana-brackets-'));
+  try {
+    const ep = [
+      '\u2402The [FC] match!\u2402「それがあの【FC】の試合だ」\u2402“那就是那场【FC】比赛”\u2402「那就是那場【FC】比賽」',
+      '\u2402Title [Prologue]\u2402　これは【序章】\u2402　这是【序章】\u2402　這是【序章】',
+      '\u2402【Misato】：Not a 【headline】!\u2402【実里】：「【悲報】記事にしません！」\u2402【实里】：「【悲报】不会写成报道！」\u2402【實里】：「【悲報】不會寫成報導！」',
+      '\u2402【】：Empty speaker\u2402【】：名無しの台詞。\u2402【】：无名台词。\u2402【】：無名台詞。',
+      '\u2402【Unclosed\u2402【閉じていない括弧\u2402【未闭合括号\u2402【未閉合括號',
+      '\u2405select 0:"Go" OUTLINE:"About 【FC】"\u2405select 0:"行く" OUTLINE:"あの【FC】について"\u2405select 0:"去" OUTLINE:"关于【FC】"\u2405select 0:"去" OUTLINE:"關於【FC】"',
+      '\u2405select 0:"Yes" OUTLINE:"【Choice】Ready?"\u2405select 0:"はい" OUTLINE:"【選択肢】準備はいい？"\u2405select 0:"是" OUTLINE:"【选项】准备好了吗？"\u2405select 0:"是" OUTLINE:"【選項】準備好了嗎？"',
+    ].join('\r\n');
+
+    put(dir, {
+      'SampleGame.exe': 'MZ',
+      'SampleGame_Data/system.dat': packPRead([
+        { name: 'scripts/merge/ep01.bs5', data: ep },
+      ]),
+    });
+
+    const list = scenes.read('aokana', dir);
+    assert.equal(list.length, 1);
+    assert.deepEqual(list[0].lines, [
+      '「それがあの【FC】の試合だ」',
+      'これは【序章】',
+      '「【悲報】記事にしません！」',
+      '名無しの台詞。',
+      '【閉じていない括弧',
+      'あの【FC】について',
+      '行く',
+      '準備はいい？',
+      'はい',
+    ]);
+    assert.deepEqual(list[0].zh, [
+      '“那就是那场【FC】比赛”',
+      '这是【序章】',
+      '「【悲报】不会写成报道！」',
+      '无名台词。',
+      '【未闭合括号',
+      '关于【FC】',
+      '去',
+      '准备好了吗？',
+      '是',
+    ]);
+    assert.deepEqual(list[0].speakers, ['', '', '実里', '', '', '', '', '', '']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
