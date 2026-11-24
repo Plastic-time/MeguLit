@@ -334,6 +334,30 @@ describe('rUGP (age) engine reader', () => {
   }
  });
 
+ it('pairs each translated choice with its own Japanese label', t => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rugp-choices-'));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const block = buildCrsaBlock([{ jp: '次はどうしよう。', tr: '接下来怎么办？' }], [
+   { jp: '廊下へ行く' },
+   { jp: '教室に残る', tr: '留在教室' },
+  ]);
+  const off = 0x100;
+  const toc = buildToc([{ off, sz: block.length }], { encrypted: false, shift: 0 });
+  const arc = Buffer.alloc(off + block.length);
+  toc.copy(arc);
+  block.copy(arc, off);
+  fs.writeFileSync(path.join(tmp, 'game.rio'), arc);
+
+  const base = rugp.scenes(tmp).map(s => rugp.parse(s.read()));
+  const patched = rugp.patchLines(base);
+  const foreign = rugp.foreign(tmp);
+  assert.deepEqual({ original: base[0].lines, translated: patched[0].lines, reverse: foreign.get(ot.foreignKey('留在教室')) }, {
+   original: ['次はどうしよう。', '廊下へ行く', '教室に残る'],
+   translated: ['接下来怎么办？', '廊下へ行く', '留在教室'],
+   reverse: '教室に残る',
+  });
+ });
+
  it('reads 3-volume trilingual .rio/.rio.002/.rio.003 (.rio.ici) builds like Muv-Luv Alternative', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rugp-3vol-'));
   try {

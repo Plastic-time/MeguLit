@@ -178,8 +178,9 @@ const cleanLine=text=>kit.trimBoth(String(text||'').replace(/[\x01-\x08\x0b-\x1f
 
 function extractChoices(dec,endAt){
  const out=[],head=dec.subarray(0,endAt);
- for(let pos=0;(pos=head.indexOf(CHOICE_FN,pos))>=0;pos+=CHOICE_FN.length){
-  const win=head.subarray(pos,Math.min(endAt,pos+512)),strs=[];
+ for(let pos=head.indexOf(CHOICE_FN),next;pos>=0;pos=next){
+  next=head.indexOf(CHOICE_FN,pos+CHOICE_FN.length);
+  const win=head.subarray(pos,Math.min(next<0?endAt:next,pos+512)),strs=[];
   for(let p=0;p+4<=win.length;){
    if(win[p]===0xff&&win[p+1]===0xfe&&win[p+2]===0xff){
     let chars=win[p+3],start=p+4;
