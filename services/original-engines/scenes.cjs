@@ -506,8 +506,16 @@ function cxCachedDocs(out){
  try{const st=fs.statSync(out),hit=cxMemo.get(out);if(hit&&hit.at===st.mtimeMs)return hit.docs;const docs=JSON.parse(fs.readFileSync(out,'utf8')).docs||[];cxMemo.set(out,{at:st.mtimeMs,docs});return docs;}catch{}
  return null;
 }
+function cxCachePath(file){
+ const out=cxCache(file);
+ // Retry an empty cache only when a newly supported filter opens this archive.
+ if(cxCachedDocs(out)?.length!==0)return out;
+ const cached=cxMemo.get(out);
+ cached.revision??=require('./cx-filter.cjs').hxCacheRevision(file);
+ return cached.revision?cxCache(file,'7-'+cached.revision):out;
+}
 function cxDocs(file){
- let out;try{out=cxCache(file);}catch{return null;}
+ let out;try{out=cxCachePath(file);}catch{return null;}
  const docs=cxCachedDocs(out);if(docs)return docs;
  // Keep the earlier scenes available while rebuilding caches that omitted Riddle PSB files.
  let legacy=null;try{legacy=cxCachedDocs(cxCache(file,6));}catch{}
@@ -525,7 +533,7 @@ function cxDocs(file){
    the missing caches in this thread, within a deadline; the probe calls it before reading. */
 function cxPrepareSync(dir,{deadline=Infinity}={}){let built=0;
  const size=f=>{try{return fs.statSync(f).size;}catch{return 0;}},order=cxArchives(dir).sort((a,b)=>(/^scn/i.test(path.basename(b))-/^scn/i.test(path.basename(a)))||size(a)-size(b));
- for(const file of order){let out;try{out=cxCache(file);}catch{continue;}if(fs.existsSync(out)||cxBuilds.has(out))continue;
+ for(const file of order){let out;try{out=cxCachePath(file);}catch{continue;}if(fs.existsSync(out)||cxBuilds.has(out))continue;
   if(Date.now()>=deadline){if(cxProbe)cxProbe.deferred=true;break;}
   const attempt=out+'.'+process.pid+'.'+crypto.randomUUID()+'.tmp';
   if(Number.isFinite(deadline)){
@@ -539,7 +547,7 @@ function cxPrepareSync(dir,{deadline=Infinity}={}){let built=0;
     if(Date.now()>=deadline||status===0){if(cxProbe)cxProbe.deferred=true;break;}
     // The worker has finished its attempt; only teardown is still pending.
     finishedCxWorkers.add(worker);
-    if(status===1){if(cxCache(file)!==out||Date.now()>=deadline){if(cxProbe)cxProbe.deferred=true;break;}fs.renameSync(attempt,out);built++;}
+    if(status===1){if(cxCachePath(file)!==out||Date.now()>=deadline){if(cxProbe)cxProbe.deferred=true;break;}fs.renameSync(attempt,out);built++;}
    }catch{}finally{if(worker)try{worker.terminate().then(cleanExited,()=>{});}catch{}}
   }else try{if(require('./cx-worker.cjs').prepare(file,attempt)){fs.renameSync(attempt,out);built++;}}catch{}finally{try{fs.rmSync(attempt,{force:true});}catch{}}
  }
@@ -570,7 +578,7 @@ const kirikiriCx={
   return [...byName.values()].map(x=>({name:x.name,read:()=>Buffer.from(JSON.stringify(x.d))})).sort((a,b)=>a.name.localeCompare(b.name));},
  archives:()=>[],
  // Keep the previous source fingerprint until the replacement cache is published.
- sources:dir=>cxArchives(dir).flatMap(f=>{let c='';try{c=cxCache(f);if(!fs.existsSync(c))c=cxCache(f,6);}catch{}return c?[f,c]:[f];}),
+ sources:dir=>cxArchives(dir).flatMap(f=>{let c='';try{c=cxCachePath(f);if(!fs.existsSync(c))c=cxCache(f,6);}catch{}return c?[f,c]:[f];}),
  // ruby: the game's own readings for each Japanese line ([base, reading] pairs), used before any dictionary reading.
  parse(buf){const doc=JSON.parse(buf.toString('utf8')),lines=[],zh=[],ruby=[],voices=[];
   /* the Chinese slot is found by its text (ATRI: ja/en/zh-Hans/zh-Hant; PureStation: ja/zh-Hans/zh-Hant; 9-nine-: ja/en/zh-Hant) */
@@ -843,7 +851,7 @@ function fingerprint(id,dir){
 function preparing(dir){
  if(cxProbe?.deferred)return {kind:'budget'};
  const viaGarbro=(()=>{try{return garbro.preparing(dir);}catch{return null;}})();if(viaGarbro)return viaGarbro;
- let started=0;for(const file of cxArchives(dir)){let out;try{out=cxCache(file);}catch{continue;}if(cxBuilds.has(out)&&!finishedCxWorkers.has(cxBuilds.get(out)))started=Math.min(started||Infinity,cxStarted.get(out)||Date.now());}
+ let started=0;for(const file of cxArchives(dir)){let out;try{out=cxCachePath(file);}catch{continue;}if(cxBuilds.has(out)&&!finishedCxWorkers.has(cxBuilds.get(out)))started=Math.min(started||Infinity,cxStarted.get(out)||Date.now());}
  if(started)return {kind:'unpack',startedAt:started};
  const archives=cxArchives(dir);if(!archives.length)return null;
  let encrypted=false;for(const file of archives){try{if(xp3.list(file)?.files.some(e=>e.encrypted)){encrypted=true;break;}}catch{}}

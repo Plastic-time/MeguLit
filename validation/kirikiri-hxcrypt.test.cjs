@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),zlib=require('node:zlib');
+const crypto=require('node:crypto');
 const xp3=require('../services/original-engines/xp3.cjs');
 const cx=require('../services/original-engines/cx-filter.cjs');
 const {buildPsb}=require('./helpers/psb-writer.cjs');
@@ -120,4 +121,64 @@ test('cold run skips Hxv4 games that cx-filter already decrypts statically',()=>
   const cold=require('../services/kirikiri-cold.cjs');
   assert.equal(cold.consider(root,{id:'g1',executable:path.join(game,'game.exe')}),false);
  }finally{fs.rmSync(tmp,{recursive:true,force:true});}
+});
+
+test('a new HxCrypt profile retries only its empty scene cache',t=>{
+ const profile=cx.schemes().find(s=>s.titles?.includes('lapla.exe (2025 Windows DL)'));
+ assert.ok(profile,'the 2025 Hxv4 profile is bundled');
+ const stella=cx.schemes().find(s=>s.type==='HxCrypt'&&s.titles?.some(title=>title.includes('Stella')));
+
+ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'hx-cache-'));
+ t.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
+ t.mock.method(os,'tmpdir',()=>tmp);
+ const cacheDir=path.join(tmp,'megulit-cx');
+ fs.mkdirSync(cacheDir);
+ const scenes=require('../services/original-engines/scenes.cjs');
+
+ function seedCache(name,scheme,docs){
+  const dir=path.join(tmp,name);
+  fs.mkdirSync(dir);
+  const file=path.join(dir,'data.xp3');
+  const entries=['「おはよう。」','「おかえりなさい。」'].map((ja,i)=>({
+   id:BigInt(i+1)|(i?0x100000000n:0n),key:BigInt(1234+i),adlr:i,
+   data:buildPsb({name:i+'.ks',scenes:[{texts:[[null,null,[[null,ja]]]]}]}),
+  }));
+  writeHxXp3(file,scheme,scheme.indexKeys[0],entries);
+  const {size,mtimeMs}=fs.statSync(file);
+  const hash=crypto.createHash('sha256').update(file.toLowerCase()+'|'+size+'|'+mtimeMs+'|7').digest('hex');
+  const cache=path.join(cacheDir,hash.slice(0,24)+'.json');
+  const previous=JSON.stringify({schema:1,file,docs});
+  fs.writeFileSync(cache,previous);
+  return {dir,cache,previous};
+ }
+
+ const empty=seedCache('empty',profile,[]);
+ assert.equal(scenes.cxPrepareSync(empty.dir,{deadline:Date.now()+10000}),1);
+ assert.deepEqual(scenes.read('kirikiri-cx',empty.dir).flatMap(s=>s.lines),['「おはよう。」','「おかえりなさい。」']);
+ assert.equal(scenes.cxPrepareSync(empty.dir),0);
+ assert.equal(fs.readFileSync(empty.cache,'utf8'),empty.previous);
+
+ const working=seedCache('working',profile,[{entry:'cached.ks',scenes:[{rows:[['「また明日。」']]}]}]);
+ assert.equal(scenes.cxPrepareSync(working.dir),0);
+ assert.deepEqual(scenes.read('kirikiri-cx',working.dir).flatMap(s=>s.lines),['「また明日。」']);
+ assert.equal(fs.readFileSync(working.cache,'utf8'),working.previous);
+
+ const unrelated=seedCache('unrelated',stella,[]);
+ assert.equal(scenes.cxPrepareSync(unrelated.dir),0);
+ assert.deepEqual(scenes.read('kirikiri-cx',unrelated.dir),[]);
+});
+
+test('the 2025 HxCrypt profile matches native entry streams with either open flag',()=>{
+ const profile=cx.schemes().find(s=>s.titles?.includes('lapla.exe (2025 Windows DL)'));
+ assert.ok(profile,'the 2025 Hxv4 profile is bundled');
+ // xp3-brute 0.3.7 native filter applied to synthetic bytes across the prefix, split and boundary offsets.
+ const vectors=[
+  [1n,0x123456789abcdef0n,'fd853a27ef6d93cc960dbc229c8763d914b7d8a505f8f22bb6152dd4b83166b8'],
+  [0x100000002n,0x0fedcba987654321n,'ff7d5ecfd5c7a4bc9002583abfa6fe23c7b0557c27a0b5ab4e8d45443706af4d'],
+ ];
+ for(const [id,key,expected] of vectors){
+  const bytes=Buffer.alloc(70000,0x5a);
+  cx.hxEntryDecryptor(profile,id,key)(0,bytes);
+  assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),expected);
+ }
 });
