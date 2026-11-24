@@ -91,6 +91,20 @@ test('SystemAoi: AOIB .box (version XOR), AOIMY offset key; generic scan',t=>{
  const patch=tmp(t);F.writeTree(patch,{'script.box':F.aoiBox({'s001':F.body(GZH,F.gbk),'s002':F.body(['第二个。'],F.gbk)})});
  const zh=scenes.ENGINES.aoi.archives(patch).map(s=>scenes.ENGINES.aoi.parse(s.read()));pairs(own[0].lines,zh[0].lines);
 });
+test('SystemAoi: truncated AOIB OX4/OX5 index returns null instead of throwing while exact-fit OX4 stays readable',t=>{
+ const dir=tmp(t);
+ const bad=Buffer.alloc(0x20);bad.write('AOIBOX4 ',0,'latin1');bad.writeInt32LE(100,8);
+ const badFile=path.join(dir,'a_bad.box');fs.writeFileSync(badFile,bad);
+ assert.equal(aoi.list(badFile),null);
+ /* exact-fit OX4: 5 empty entries whose offsets sit at 0xc..0x1f (idx.length === count*4, no +4 spare) */
+ const tight=Buffer.alloc(0x20);tight.write('AOIBOX4 ',0,'latin1');tight.writeInt32LE(5,8);
+ for(let i=0;i<5;i++)tight.writeUInt32LE(0x20,0xc+i*4);
+ const tightFile=path.join(dir,'b_tight.box');fs.writeFileSync(tightFile,tight);
+ assert.equal(aoi.list(tightFile).length,5);
+ fs.writeFileSync(path.join(dir,'z_good.box'),F.aoiBox({'s001':F.body(GJA)}));
+ assert.equal(library.engineOf(dir)?.name,'SystemAoi');
+ assert.deepEqual(scenes.read('aoi',dir).find(s=>s.name==='s001').lines,GJA);
+});
 test('KID: LNK script.dat, lnd-packed entries; generic scan',t=>{
  const plain=F.body(GJA);assert.deepEqual(kid.lnd(F.lndPack(plain),plain.length,0x10),plain);
  assert.equal(kid.lnd(Buffer.from([0xc0|3,0x41]),5).toString('latin1'),'AAAAA');

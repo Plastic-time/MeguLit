@@ -132,7 +132,7 @@ function yaneList(file){const h=kit.head(file,0x120);if(h.length<0x18)return nul
  if(tag==='yanepkDx'&&h.length>=0x110){const first=h.readUInt32LE(0x10c);if(first<0x118||first>=size)return null;const count=Math.floor((first-0xc)/0x10c);return rec(kit.readAt(file,0,first),count,0x100,0xc);}
  if(tag==='yanepkEx'){const count=h.readInt32LE(8);if(count<=0||count>100000)return null;return rec(kit.readAt(file,0,0xc+count*0x2c),count,0x20,0xc);}
  if(tag.startsWith('SQDARC')){const dirs=h.readInt32LE(0x10);if(dirs<=0||dirs>10000)return null;const top=kit.readAt(file,0x14,dirs*0x18);
-  for(let d=0;d<dirs;d++){const q=d*0x18;let at=top.readUInt32LE(q);const n=top.readInt32LE(q+4),ext=kit.cstr(top,q+0x12,q+0x16)?.toString('latin1')||'';if(n<0||n>100000)return null;const blk=kit.readAt(file,at,n*0x30);
+  for(let d=0;d<dirs;d++){const q=d*0x18;if(q+8>top.length)return null;let at=top.readUInt32LE(q);const n=top.readInt32LE(q+4),ext=kit.cstr(top,q+0x12,q+0x16)?.toString('latin1')||'';if(n<0||n>100000)return null;const blk=kit.readAt(file,at,n*0x30);if(blk.length<n*0x30)return null;
    for(let i=0;i<n;i++){const p=i*0x30,nb=kit.cstr(blk,p,p+0x28);if(!nb)return null;const base=sj.decode(nb).replace(/\.[^.]*$/,''),offset=blk.readUInt32LE(p+0x28),sz=blk.readUInt32LE(p+0x2c);if(offset+sz>size)return null;out.push({name:base+(ext?'.'+ext:''),offset,size:sz,unpacked:sz});}}
   return out;}
  return null;}
@@ -144,7 +144,7 @@ function safList(file){const h=kit.head(file,8);if(h.length<8)return null;const 
   for(let i=0;i<count;i++){const p=i*32;if(idx[p]>0x7f)continue;const nb=kit.cstr(idx,p,p+0x14);if(!nb||!nb.length)return null;const offset=idx.readUInt32LE(p+0x14)*2048,sz=idx.readUInt32LE(p+0x18),unpacked=idx.readUInt32LE(p+0x1c);if(offset+sz>size)return null;
    out.push({name:kit.SJIS.decode(nb).trimEnd(),offset,size:sz,unpacked,lzss:false});}
   return out;}
- if((id&0xff00)===0x600){const nlen=h.readInt32LE(4);if(nlen<=0||nlen>=size)return null;const idx=kit.readAt(file,8,count*16),names=kit.readAt(file,8+count*16,nlen);
+ if((id&0xff00)===0x600){const nlen=h.readInt32LE(4);if(nlen<=0||nlen>=size)return null;const idx=kit.readAt(file,8,count*16);if(idx.length<count*16)return null;const names=kit.readAt(file,8+count*16,nlen);
   if(id&1){for(let i=0;i<count;i++){let k=0xef;for(let j=0;j<16;j++)idx[i*16+j]^=(k++)&255;}let k=0xff;for(let i=0;i<names.length;i++){names[i]^=k;k=(k-1)&255;}}
   for(let i=0;i<count;i++){const p=i*16;if(idx[p+3]>0x7f)continue;const nb=kit.cstr(names,idx.readUInt32LE(p)&0x7fffffff);if(!nb||!nb.length)return null;const offset=idx.readUInt32LE(p+4)*2048,sz=idx.readUInt32LE(p+8),unpacked=idx.readUInt32LE(p+12);if(offset+sz>size)return null;
    out.push({name:kit.SJIS.decode(nb),offset,size:sz,unpacked,lzss:!!(id&2)});}

@@ -18,6 +18,23 @@ test('HyPack Script.pak: plain and XOR SR01 string tables read',()=>{
  for(const s of list)assert.deepStrictEqual(kogado.engine.parse(s.read()).lines,['「おはよう、トルタ」','雨が降っている。']);
  const fp=require('../services/engine-fingerprint.cjs');assert.strictEqual(fp.archiveInfo('Script.pak',Buffer.from('HyPack\0\x03').toString('hex')).engine,'kogado');
  fs.rmSync(dir,{recursive:true,force:true});});
+test('HyPack: truncated index or short index read returns null without aborting sibling archives',t=>{
+ const kit=require('../services/original-engines/kit.cjs'),origReadAt=kit.readAt;
+ t.after(()=>{kit.readAt=origReadAt;});
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hyp-trunc-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const sc=sr01(['「おはよう、トルタ」','雨が降っている。']);
+ const goodBuf=hypack([{name:'scr0001',ext:'kgo',type:0,unpacked:sc.length,stored:sc}]);
+ const badStatic=Buffer.alloc(32);badStatic.write('HyPack',0,'latin1');badStatic.writeUInt16LE(0x300,6);badStatic.writeUInt32LE(0,8);badStatic.writeInt32LE(10,12);
+ const badStaticFile=path.join(dir,'Script0_trunc.pak');fs.writeFileSync(badStaticFile,badStatic);
+ assert.strictEqual(kogado.list(badStaticFile),null);
+ /* Simulate concurrent short read on Script1_short.pak while Script2_good.pak stays valid */
+ const shortFile=path.join(dir,'Script1_short.pak'),goodFile=path.join(dir,'Script2_good.pak');
+ fs.writeFileSync(shortFile,goodBuf);fs.writeFileSync(goodFile,goodBuf);
+ kit.readAt=(f,at,len)=>f===shortFile&&at>0?origReadAt(f,at,Math.min(len,8)):origReadAt(f,at,len);
+ assert.strictEqual(kogado.list(shortFile),null);
+ assert.deepStrictEqual(kogado.engine.scenes(dir).map(s=>s.name),['scr0001.kgo']);
+});
 test('HyPack Cocotte reads consecutive range blocks, resets the model after a stored block, and reads the SKTR table',t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hyp-cocotte-'));
  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));

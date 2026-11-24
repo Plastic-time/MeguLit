@@ -12,7 +12,7 @@ const ENTRY={0x100:32,0x200:40,0x300:48,0x301:48};
 const COCOTTE_LIMIT=64*1024*1024;
 function list(file){let h;try{h=kit.readAt(file,0,16);}catch{return null;}if(h.length<16||h.toString('latin1',0,6)!=='HyPack')return null;
  const ver=h.readUInt16LE(6),es=ENTRY[ver],size=kit.size(file),at=0x10+h.readUInt32LE(8),n=h.readInt32LE(12);if(!es||n<=0||n>0xfffff||at+n*es>size)return null;
- const idx=kit.readAt(file,at,n*es),out=[];
+ let idx;try{idx=kit.readAt(file,at,n*es);}catch{return null;}if(idx.length<n*es)return null;const out=[];
  for(let i=0;i<n;i++){const o=i*es,cut=b=>b.toString('latin1').replace(/\0.*$/s,'');const base=cut(idx.subarray(o,o+0x15))||String(i).padStart(5,'0'),ext=cut(idx.subarray(o+0x15,o+0x18));
   const e={name:ext?base+'.'+ext:base,offset:0x10+idx.readUInt32LE(o+0x18)};
   if(ver>=0x200){e.unpacked=idx.readUInt32LE(o+0x1c);e.size=idx.readUInt32LE(o+0x20);e.type=idx[o+0x24];}else{e.size=idx.readUInt32LE(o+0x1c);e.unpacked=e.size;e.type=0;}
