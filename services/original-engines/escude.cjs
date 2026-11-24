@@ -63,20 +63,6 @@ function restring(t){let out='';for(let i=0;i<t.length;i++){const c=t[i],n=t[i+1
  if(n==='ﾞ'&&DAKU.has(c)){out+=DAKU.get(c);i++;continue;}
  if(n==='ﾟ'&&HANDAKU.has(c)){out+=HANDAKU.get(c);i++;continue;}
  out+=MAP.get(c)||c;}return out;}
-const GBK=new TextDecoder('gbk');
-function preferShortGbk(nonAscii){let gbCommon=0,gbTotal=0,sjGood=0,sjSusp=0;
- for(const x of nonAscii){
-  for(let i=0;i<x.length;i++){const c=x[i];if(c<0x80)continue;if(i+1>=x.length)return false;const d=x[++i];gbTotal++;
-   if((c>=0xb0&&c<=0xd7&&d>=0xa1&&d<=0xfe)||((c===0xa1||c===0xa3)&&d>=0xa1&&d<=0xfe))gbCommon++;}
-  let openQ=0;
-  for(let i=0;i<x.length;i++){const c=x[i];if(c<0x80)continue;
-   if(c>=0x81&&c<=0x9f||c>=0xe0&&c<=0xfc){if(i+1>=x.length){sjSusp+=2;break;}i++;if(c>=0xe0)sjSusp+=2;else sjGood+=2;}
-   else if(c===0xa0)return false;
-   else if(c>=0xa1&&c<=0xdf){
-    if(c===0xa2)openQ++;
-    else if(c===0xa3){if(openQ>0)openQ--;else if(i+1<x.length&&(x[i+1]===0xa1||x[i+1]===0xac||x[i+1]===0xba||x[i+1]===0xbf))sjSusp+=2;}
-    else if(c===0xa1&&i+1<x.length&&(x[i+1]===0xb0||x[i+1]===0xb1||(x[i+1]===0xa3&&openQ===0)))sjSusp+=2;}}}
- return gbTotal>0&&gbCommon*4>=gbTotal*3&&sjSusp>sjGood;}
 function decodeV1(b){if(!b.includes(0xa0))return kit.SJIS.decode(b);const out=Buffer.allocUnsafe(b.length*2);let o=0;
  for(let i=0;i<b.length;i++){const c=b[i];if((c>=0x81&&c<=0x9f||c>=0xe0&&c<=0xfc)&&i+1<b.length){out[o++]=c;out[o++]=b[++i];continue;}
   if(c===0xa0){out[o++]=0x81;out[o++]=0x40;continue;}out[o++]=c;}
@@ -91,9 +77,9 @@ function strings(b){const tag=b.toString('latin1',0,8);
  return null;}
 function parse(buf){const b=Buffer.isBuffer(buf)?buf:Buffer.from(buf);if(b.length<16)return {lines:[],anchors:[]};const s=strings(b);if(!s)return {lines:[],anchors:[]};
  /* the half-width forms count against Shift-JIS in kit.codepage, so ESCR1_00 text is judged after mapping them back */
- const nonAscii=s.list.filter(x=>x.some(c=>c>=0x80)).slice(0,4000),all=Buffer.concat(nonAscii),score=t=>({bad:(t.match(/�/g)||[]).length,kana:(t.match(kit.KANA_G)||[]).length});
- const sj=score(restring(decodeV1(all))),gb=score(GBK.decode(all));
- const enc=s.kind==='v1'?(sj.bad!==gb.bad?(sj.bad<gb.bad?'shift_jis':'gbk'):all.length<=256&&preferShortGbk(nonAscii)?'gbk':sj.kana>=gb.kana?'shift_jis':'gbk'):kit.codepage(all),dec=new TextDecoder(enc),lines=[],anchors=[];
+ const all=Buffer.concat(s.list.filter(x=>x.some(c=>c>=0x80)).slice(0,4000)),score=t=>({bad:(t.match(/�/g)||[]).length,kana:(t.match(kit.KANA_G)||[]).length});
+ const sj=score(restring(decodeV1(all))),gb=score(new TextDecoder('gbk').decode(all));
+ const enc=s.kind==='v1'?(sj.bad<gb.bad||sj.bad===gb.bad&&sj.kana>=gb.kana?'shift_jis':'gbk'):kit.codepage(all),dec=new TextDecoder(enc),lines=[],anchors=[];
  const isBang=a=>/[!?]/.test(a)&&/^(?:[!?]|\s|\\n)+$/.test(a);
  for(const x of s.list){if(!x.length)continue;if(!x.some(c=>c>=0x80)){const a=x.toString('latin1');if(s.kind==='v1'&&isBang(a))lines.push(kit.trimBoth((enc==='shift_jis'?restring(a):a).replace(/\\n/g,'\n')));else anchors.push(a);continue;}let t=s.kind==='v1'&&enc==='shift_jis'?restring(decodeV1(x)):dec.decode(x);t=kit.trimBoth(t.replace(/\\n/g,'\n'));if(t)lines.push(t);}
  return {lines,anchors};}
