@@ -57,13 +57,13 @@ function runs(code){const out=[];let i=0;
  const readQuoted=at=>{const raw=[],dbl=[];let j=at+1,n=0;while(j<code.length){
    if(ch(j)){raw.push(code[j],code[j+1]);dbl.push(code[j],code[j+1]);n++;j+=2;continue;}
    const c=code[j];if(c===0x22)return {next:j+1,raw,dbl,n};
-   if(c===0x5c&&j+1<code.length&&(code[j+1]===0x22||code[j+1]===0x5c)){raw.push(code[j+1]);j+=2;continue;}
+   if(c===0x5c&&j+1<code.length&&code[j+1]===0x22){raw.push(code[j+1]);j+=2;continue;}
    if(c>=0x20&&c<=0x7e){raw.push(c);j++;continue;}
    return null;}return null;};
  while(i<code.length){if(code[i]!==0x22&&!lead(code[i])&&!(code[i]>=0xa1&&code[i]<=0xfe)){i++;continue;}
   const st=i,raw=[],dbl=[];let n=0,quoted=false;
   for(;;){if(ch(i)){raw.push(code[i],code[i+1]);dbl.push(code[i],code[i+1]);n++;i+=2;continue;}
-   if(code[i]===0x22){const q=readQuoted(i);if(q){raw.push(...q.raw);dbl.push(...q.dbl);n+=q.n;quoted=true;i=q.next;continue;}}break;}
+   if(code[i]===0x22){const q=readQuoted(i);if(q&&(q.n>0||n>0)){for(const x of q.raw)raw.push(x);for(const x of q.dbl)dbl.push(x);n+=q.n;quoted=true;i=q.next;continue;}}break;}
   if(n>=2||(quoted&&n>=1)){const b=Buffer.from(raw);if(quoted&&raw.length!==dbl.length)b._dbl=Buffer.from(dbl);out.push(b);}
   if(i===st)i++;}
  return out;}
@@ -72,7 +72,7 @@ const KANA=/[ぁ-ゖァ-ヺ]/,HAN=/[一-鿿]/;
 // Bytes a wrong key leaves behind read as half-width katakana and stray Latin letters: not text.
 const JUNK=/[｡-ﾟ�]|[A-Za-z`^~|\\]/;
 function text(raw){const d=raw._dbl||raw,a=sj.decode(d);if(KANA.test(a)&&!JUNK.test(a))return sj.decode(raw);const b=gbk.decode(d);if(HAN.test(b)&&!JUNK.test(b)&&!/[ぁ-ゖ]/.test(b))return gbk.decode(raw);return '';}
-const score=code=>{let n=0;for(const r of runs(code)){const t=text(r);if(t&&KANA.test(t))n++;else if(JUNK.test(sj.decode(r)))n--;}return n;};
+const score=code=>{let n=0;for(const r of runs(code)){const t=text(r);if(t&&KANA.test(t))n++;else if(JUNK.test(sj.decode(r._dbl||r)))n--;}return n;};
 // One scenario's bytecode: the second key named by the archive (REGNAME), else the one that gives the most Japanese.
 function bytecode(raw,keyName){const h=header(raw);if(!h||h.at<=0||h.at+h.clen>raw.length||h.dlen<=0||h.dlen>64<<20)return null;const src=raw.subarray(h.at,h.at+h.clen);
  if(!h.xor2)return decompress(src,h.dlen,null);
@@ -85,7 +85,7 @@ const tidy=t=>t.replace(/^[\s　]+|[\s　]+$/g,'');
 /* The language is decided per scenario: in a Japanese one a line without kana (「４月１５日（火）」, 「声…」) is still
    Shift-JIS, not GBK (it came out as 「係寧侾俆擔」) */
 function parse(buf){const lines=[];const code=Buffer.isBuffer(buf)?buf:Buffer.from(buf),list=runs(code);
- let ja=0,zh=0;for(const r of list){const t=text(r);if(!t)continue;if(KANA.test(t))ja++;else zh++;}
+ let ja=0,zh=0;for(const r of list){if((r._dbl||r).length<=2)continue;const t=text(r);if(!t)continue;if(KANA.test(t))ja++;else zh++;}
  const sjis=r=>JUNK.test(sj.decode(r._dbl||r))?'':sj.decode(r);
  for(const r of list){const t=tidy(ja>zh?sjis(r):text(r));if(t&&(KANA.test(t)||HAN.test(t)))lines.push(t);}
  return {lines,anchors:[]};}

@@ -48,31 +48,55 @@ test('reallive: quoted text keeps embedded ASCII, escapes and Shift-JIS 0x5c tra
   sjis('"A\\\\Bの記録"'),nl,
   sjis('今日は"2024"年です'),nl,
   Buffer.alloc(700,0x2c)]);
- assert.deepEqual(rl.parse(ja).lines,['今日は2024年です','今日は 2024年 です','HP 100でOK!','2024年1月','ソ','彼は"元気"です','A\\Bの記録','今日は2024年です']);
+ assert.deepEqual(rl.parse(ja).lines,['今日は2024年です','今日は 2024年 です','HP 100でOK!','2024年1月','ソ','彼は"元気"です','A\\\\Bの記録','今日は2024年です']);
  const zh=Buffer.concat([cmd,
   gbk('"今天是 2024年 OK"'),nl,
   gbk('"【""樱""】""「2024年好」"'),nl,
   Buffer.alloc(700,0x2c)]);
  assert.deepEqual(rl.parse(zh).lines,['今天是 2024年 OK','【樱】「2024年好」']);
+ /* long quoted piece (>200 KB) must not throw RangeError on spread */
+ const big=Buffer.concat([Buffer.from('"','latin1'),sjis('あ'),Buffer.alloc(200000,0x30),Buffer.from('"','latin1'),nl]);
+ assert.equal(rl.parse(big).lines[0].length,200001);
 });
 test('reallive: quoted single-character lines/choices are kept while unquoted runs stay at base behavior',()=>{
  const {sjis,gbk}=require('./helpers/engine-fixtures.cjs');
  const nl=Buffer.from('\n\x10\x00','latin1');
  const ja=Buffer.concat([
   Buffer.from('#\x01\x02\x03\x04\x05\x06\x07("BGM01")','latin1'),
-  sjis('「おはよう」'),nl,
-  sjis('「どちらへ行く？」'),nl,
-  sjis('「決めた」'),nl,
-  /* quoted single-char dialogue and choices */
+  sjis('「どうする？」'),nl,
+  sjis('「４月１５日」'),nl,
+  sjis('「行こう」'),nl,
+  /* quoted single-char dialogue and choices must not flip ja/zh vote to Chinese */
   sjis('"え"'),nl,
-  Buffer.from('{','latin1'),sjis('"右"'),nl,sjis('"左"'),Buffer.from('}','latin1'),
+  Buffer.from('{','latin1'),sjis('"右"'),nl,sjis('"左"'),nl,sjis('"上"'),Buffer.from('}','latin1'),
+  /* stray 0x22 in line number (\n\x22\x2a) or int constant ($\xff\x22***) must not open a pure-ASCII quote before a real line */
+  Buffer.from('\n\x22\x2a','latin1'),sjis('"「行こう」"'),nl,
+  Buffer.from('#\x01\x0a\x00\x00\x00\x02\x00\x00($\xff\x22\x2a\x2a\x2a,','latin1'),sjis('"「行こう」"'),Buffer.from(')','latin1'),nl,
   /* stray unclosed quote before a real line must not swallow the line */
   Buffer.from('"','latin1'),sjis('「あい」'),nl,
   /* unquoted runs keep base behavior: split on ASCII and drop single-char */
   sjis('今日は2024年です'),nl,
   sjis('あ'),nl,
   Buffer.alloc(700,0x2c)]);
- assert.deepEqual(rl.parse(ja).lines,['「おはよう」','「どちらへ行く？」','「決めた」','え','右','左','「あい」','今日は','年です']);
+ assert.deepEqual(rl.parse(ja).lines,['「どうする？」','「４月１５日」','「行こう」','え','右','左','上','「行こう」','「行こう」','「あい」','今日は','年です']);
+ /* standalone small Japanese scene: 3 quoted single-kanji choices must not outvote 2 kana lines and flip the date line to GBK */
+ const smallJa=Buffer.concat([
+  Buffer.from('#\x00\x01\x0a\x00\x00\x00\x00\x00','latin1'),
+  sjis('「どうする？」'),nl,sjis('「４月１５日」'),nl,sjis('「行こう」'),nl,
+  Buffer.from('#\x00\x02\x01\x00\x03\x00\x00{','latin1'),nl,sjis('"右"'),nl,sjis('"左"'),nl,sjis('"上"'),Buffer.from('}','latin1'),
+  Buffer.alloc(700,0x2c)]);
+ assert.deepEqual(rl.parse(smallJa).lines,['「どうする？」','「４月１５日」','「行こう」','右','左','上']);
  const zh=Buffer.concat([Buffer.from('{','latin1'),gbk('"右"'),nl,gbk('"左"'),Buffer.from('}','latin1'),Buffer.alloc(700,0x2c)]);
  assert.deepEqual(rl.parse(zh).lines,['右','左']);
+});
+test('reallive: score() checks JUNK on double-byte bytes only so kana-less English quoted lines do not mispick the key',()=>{
+ const {sjis}=require('./helpers/engine-fixtures.cjs');
+ const nl=Buffer.from('\n\x10\x00','latin1'),line=s=>Buffer.concat([sjis(s),nl]);
+ const head=Buffer.concat([Buffer.from('#\x01\x02\x03\x04\x05\x06\x07(1,2)','latin1'),Buffer.alloc(245,0x2c)]);
+ const inReg=Buffer.concat([head,line('"「よし」"'),line('"理樹 VS 真人"'),line('"謙吾 VS 恭介"'),line('"Lv 5 鈴"'),line('"HP 100 最大"')]);
+ const reg=inReg.length<560?Buffer.concat([inReg,Buffer.alloc(560-inReg.length,0x2c)]):inReg;
+ const body=Buffer.concat([reg,line('「あい」'),line('「あいう」'),line('「いう」'),line('「あう」'),Buffer.alloc(200,0x2c)]);
+ const dec=rl.bytecode(scenario(body,110002,'little-busters'),null);
+ assert.ok(dec);
+ assert.deepEqual(rl.parse(dec).lines,['「よし」','理樹 VS 真人','謙吾 VS 恭介','Lv 5 鈴','HP 100 最大','「あい」','「あいう」','「いう」','「あう」']);
 });
