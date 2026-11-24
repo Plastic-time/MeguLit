@@ -61,6 +61,7 @@ test('RiddleCxCrypt PSB scene files reach the probe and reader after an empty ca
   const name=`00${i+1}.ks`,hash=0x12345678+i;
   const data=buildPsb({name,scenes:[{label:'start',texts:group.map(ja=>[null,[[null,ja]]])}]});
   signature.copy(data);
+  assert.strictEqual(psb.parse(data).version,3);
   return {name:name+'.scn',hash,data:filter(hash,0,data)};
  }));
  writeLegacyCxCache(file,{docs:[],files:0});
@@ -75,13 +76,14 @@ test('RiddleCxCrypt PSB scene files reach the probe and reader after an empty ca
  assert.throws(()=>psb.parse(malformed),/PSB_MAGIC/);
 });
 
-test('cx: earlier readable cache stays usable until the refreshed cache is ready',t=>{
+test('cx: earlier readable cache stays usable until the refreshed cache is ready',async t=>{
  const game=fs.mkdtempSync(path.join(os.tmpdir(),'cxlegacy-'));
  t.after(()=>fs.rmSync(game,{recursive:true,force:true}));
  const file=path.join(game,'scn.xp3'),uncached=path.join(game,'common.xp3');
  writeXp3(file,[{name:'001.ks.scn',data:buildPsb(scene)}]);
  writeXp3(uncached,[]);
- writeLegacyCxCache(file,worker.build(file));
+ const cached=worker.build(file);
+ writeLegacyCxCache(file,cached);
 
  const scenes=require('../services/original-engines/scenes.cjs');
  const read=()=>scenes.withCxProbe(()=>scenes.read('kirikiri-cx',game));
@@ -95,6 +97,17 @@ test('cx: earlier readable cache stays usable until the refreshed cache is ready
  assert.ok(!sources().includes(legacyCxCachePath(file)));
  assert.ok(sources().includes(legacyCxCachePath(uncached)));
  assert.strictEqual(scenes.cxPrepareSync(game),0);
+
+ const regularGame=path.join(game,'regular'),regularFile=path.join(regularGame,'scn.xp3');
+ fs.mkdirSync(regularGame);
+ fs.copyFileSync(file,regularFile);
+ writeLegacyCxCache(regularFile,cached);
+ const regular=scenes.read('kirikiri-cx',regularGame);
+ // Let the background refresh finish before the fixture is removed.
+ await Promise.all([...scenes.cxBuilds.values()].filter(Boolean).map(w=>{
+  w.ref();return new Promise(resolve=>w.once('exit',resolve));
+ }));
+ assert.deepStrictEqual(regular,before);
 });
 
 test('cx: two XOR bytes split at a boundary plus a stray byte are undone without a key',()=>{
