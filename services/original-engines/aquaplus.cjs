@@ -11,7 +11,7 @@ const kit=require('./kit.cjs');/* E577 shared engine kit */
    characters. GLYPHS is what those cells show, matched against 方正准圆 GBK (the font they were drawn with); other cells
    are the game's own and read as Shift-JIS. Only used when fon.pak is that exact build (its atlas entry sizes). */
 const fs=require('node:fs'),path=require('node:path');
-const {stat}=require('./file-key.cjs');
+const {stat}=require('./file-key.cjs'),fill=require('./fill.cjs');
 const listMemo=new Map();
 // Index: "KCAP", 2 words, count, then 44-byte entries (compressed flag, 24-byte name, crc, unpacked size, offset, size).
 /* E577 the KCAP index is a kit table: 44-byte entries {u32 compressed (1), name[24], 4, u32 size, u32 offset, u32 packed} */
@@ -30,8 +30,11 @@ const sjis=kit.SJIS;
 const RUBY=/<R([^|>]*)\|([^>]*)>/g;
 // E461 <F16…> and <W10…> wrap text (font size, wait): the tag and its closing > are dropped, the text kept
 function clean(t){return t.replace(RUBY,'$1').replace(/<[A-Za-z]+\d*>?/g,'').replace(/>/g,'').replace(/\\n/g,'\n');}
+const ASCII=/^[\x20-\x7e]*$/;
+const isAnchor=tok=>ASCII.test(tok)||fill.ASSET.test(tok);
+const sameAnchor=(a,b)=>a===b||(!ASCII.test(a)||!ASCII.test(b))&&fill.ASSET.test(a)&&fill.ASSET.test(b)&&path.extname(a).toLowerCase()===path.extname(b).toLowerCase();
 function parse(buf,decode=b=>sjis.decode(b)){const lines=[],anchors=[],ruby=[];
- for(const tok of decode(buf).split(',')){if(!tok)continue;if(/^[\x20-\x7e]*$/.test(tok)){anchors.push(tok);continue;}
+ for(const tok of decode(buf).split(',')){if(!tok)continue;if(isAnchor(tok)){anchors.push(tok);continue;}
   const pairs=[];for(const m of tok.matchAll(RUBY))if(m[1]&&m[2])pairs.push([m[1],m[2]]);
   lines.push(clean(tok));ruby.push(pairs.length?pairs:null);}
  return {lines,anchors,ruby};}
@@ -78,7 +81,7 @@ const aquaplus={
   const list=base.map(scene=>{const e=byName.get(scene.name.toLowerCase());if(!e)return scene;let w;try{w=parse(kcapRead(ck,e),patchDecode);}catch{return scene;
    }
    if(w.lines.length!==scene.lines.length)return {...scene,skipped:'count'};
-   const n=scene.anchors.length;let same=0;for(let k=0;k<Math.min(n,w.anchors.length);k++)if(w.anchors[k]===scene.anchors[k])same++;
+   const n=scene.anchors.length;let same=0;for(let k=0;k<Math.min(n,w.anchors.length);k++)if(sameAnchor(scene.anchors[k],w.anchors[k]))same++;
    if(n>=5&&(w.anchors.length!==n||same<n*.9))return {...scene,skipped:'anchors'};
    any=true;return {...scene,patched:true,lines:w.lines};});
   return any?list:null;},
@@ -103,14 +106,14 @@ function voiceFns(list){const by=new Map();for(const c of list){if(!c.args.lengt
   mostM=rows.length;}if(rows.length>most&&rows.every(r=>r.length===5)&&upward(rows,4)){voice=id;most=rows.length;}}
  return {message,voice};}
 const isName=(t,next)=>!!next&&/^[「『（]/.test(next)&&!/^[「『（]/.test(t)&&[...t].length<=12;
-function sceneVoices(stem,txt,bnr){const raw=sjis.decode(txt).split(','),toks=raw.filter(t=>t&&!/^[\x20-\x7e]*$/.test(t)),msgs=[];
+function sceneVoices(stem,txt,bnr){const raw=sjis.decode(txt).split(','),toks=raw.filter(t=>t&&!isAnchor(t)),msgs=[];
  for(let i=0;i<toks.length;i++)if(!isName(toks[i],toks[i+1]))msgs.push(clean(toks[i]));
  const list=calls(bnr),{message,voice}=voiceFns(list);if(message===null||voice===null)return [];const out=[];let pending=[];
  // several voices before one message (people talking at once) all go with it
  for(const c of list){if(c.id===voice&&c.args.length===5)pending.push(stem.split('_')[0]+'_'+String(c.args[4]).padStart(4,'0')+'_'+String(c.args[0]).padStart(2,
   '0'));
   else if(c.args.length===2&&(c.id===message||(c.str!==null&&c.args[1]===1&&pending.length))){
-   const t=c.str!==null&&raw[c.str]&&!/^[\x20-\x7e]*$/.test(raw[c.str])?clean(raw[c.str]):c.id===message?msgs[c.args[0]]:null;
+   const t=c.str!==null&&raw[c.str]&&!isAnchor(raw[c.str])?clean(raw[c.str]):c.id===message?msgs[c.args[0]]:null;
    if(t)for(const ref of pending)out.push({text:t.replace(/\\[a-z]/gi,''),ref});pending=[];}}
  return out;}
 aquaplus.voiceLines=dir=>{const f=scriptPak(dir);if(!f)return [];const l=kcapList(f),byName=new Map(l.map(e=>[e.name.toLowerCase(),e]));const out=[];
