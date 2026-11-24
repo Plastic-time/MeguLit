@@ -8,10 +8,11 @@
    4 KiB control block); it runs on the hash (>>7) and on its complement. Bytes before (hash & mask) + offset use the
    hash itself, later bytes use hash ^ (hash >> 16). Cabbage/Nana schemes swap the random generator, Riddle schemes also
    XOR the first 8 bytes with a key from the hash.
-   The parameters of every title GARbro knows are in cx-schemes.json (taken from GARbro's Formats.dat); a game folder
-   is matched to a scheme by trying them on one entry and keeping the one whose output is a known file header. */
+   GARbro's parameters are in cx-schemes.json. Additional HxCrypt profiles are in cx-hx-schemes.json.
+   The archive selects a scheme by checking the decrypted headers of sampled entries. */
 const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib'),crypto=require('node:crypto');
 const {isRiddlePsb}=require('./psb.cjs');
+const localHxSchemes=require('./cx-hx-schemes.json');
 const OP={NOP:0,RETN:1,MOV_EDI_ARG:2,PUSH_EBX:3,POP_EBX:4,PUSH_ECX:5,POP_ECX:6,MOV_EAX_EBX:7,MOV_EBX_EAX:8,MOV_ECX_EBX:9,MOV_EAX_EDI:11,MOV_EAX_INDIRECT:12,ADD_EAX_EBX:13,SUB_EAX_EBX:14,IMUL_EAX_EBX:15,AND_ECX_0F:16,SHR_EBX_1:17,SHL_EAX_1:18,SHR_EAX_CL:19,SHL_EAX_CL:20,OR_EAX_EBX:21,NOT_EAX:22,NEG_EAX:23,DEC_EAX:24,INC_EAX:25,IMMED:0x100,MOV_EAX_IMMED:0x101,AND_EBX_IMMED:0x102,AND_EAX_IMMED:0x103,XOR_EAX_IMMED:0x104,ADD_EAX_IMMED:0x105,SUB_EAX_IMMED:0x106};
 const LIMIT=0x80,M64=0xffffffffffffffffn,M32=0xffffffffn;
 function lcg(seed){let s=seed>>>0;return ()=>{const old=s;s=(Math.imul(1103515245,old)+12345)>>>0;return (s^(old<<16)^(old>>>16))>>>0;};}
@@ -107,7 +108,7 @@ function packCx(){try{return require('../adapter-packs.cjs').params('cx-scheme')
 const schemeOk=s=>s&&Number.isSafeInteger(s.mask)&&Number.isSafeInteger(s.offset)&&Array.isArray(s.prolog)&&Array.isArray(s.odd)&&Array.isArray(s.even)&&(s.cb===undefined||typeof s.cb==='string'&&s.cb.length<=8192);
 function extraFp(list){if(!list.length)return '';try{return crypto.createHash('sha256').update(JSON.stringify(list)).digest('hex');}catch{return String(Date.now())+':'+Math.random();}}
 function schemes(){const extra=packCx();if(known&&known.extra===extra)return known;
- if(!fileSchemes){let raw={};try{raw=JSON.parse(fs.readFileSync(path.join(__dirname,'cx-schemes.json'),'utf8'));}catch{}fileSchemes=raw.schemes||[];}
+ if(!fileSchemes){let raw={};try{raw=JSON.parse(fs.readFileSync(path.join(__dirname,'cx-schemes.json'),'utf8'));}catch{}fileSchemes=[...(raw.schemes||[]),...localHxSchemes];}
  const valid=extra.map(x=>x?.value).filter(schemeOk);
  known=[...valid,...fileSchemes].map(s=>({...s,cb:s.cb?(b=>new Uint32Array(b.buffer.slice(b.byteOffset,b.byteOffset+b.length)))(Buffer.from(s.cb,'base64')):null}));
  known.extra=extra;known.fp=extraFp(valid);return known;}
@@ -193,6 +194,12 @@ function decodeHxMap(hxRaw,k1,k2){
  if(head.length<6||!zlibHead(head.subarray(4)))return null;
  try{return hxIndexEntries(zlib.inflateSync(hxChacha(k1,k2,hxRaw.subarray(16)).subarray(4)));}catch{return null;}
 }
+// Only the new profiles can retire old empty caches. Check the index without reading entry payloads.
+function hxCacheRevision(file){
+ const raw=require('./xp3.cjs').hxChunk(file);if(!raw)return '';
+ const profile=localHxSchemes.find(s=>s.cacheRevision&&s.indexKeys.some(([k1,k2])=>decodeHxMap(raw,k1,k2)?.size));
+ return profile?.cacheRevision||'';
+}
 const TEXT_NAME=/\.(ks|tjs|txt|asd|csv|ini)$/i;
 const isJpg=b=>b.length>=10&&b[0]===0xff&&b[1]===0xd8&&b[2]===0xff&&(b[3]===0xe0&&b.toString('latin1',6,10)==='JFIF'||b[3]===0xe1&&b.toString('latin1',6,10)==='Exif');
 const looksHashXor=b=>HEAD.test(b.toString('latin1',0,4))||isJpg(b);
@@ -263,4 +270,4 @@ function forArchive(file){const id=path.resolve(file).toLowerCase();let st;
     if(cb)tryScheme(()=>filter({...s,cb}),s.titles);}
     if(!best)best=hashXorFilter(file,xp3,list,plainHits);}}catch{best=null;}
  memo.set(id,{st:stamp,v:best});return best;}
-module.exports={rot31,rot31Key,filter,generate,run,schemes,controlBlockIn,forArchive,looks,hxChacha,hxEntryDecryptor};
+module.exports={rot31,rot31Key,filter,generate,run,schemes,controlBlockIn,forArchive,hxCacheRevision,looks,hxChacha,hxEntryDecryptor};
