@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // node --test reporter: writes { "validation/x.test.cjs": milliseconds } for every test file that finished, so CI shards
-// can be balanced by duration (tools/test-shards.cjs, validation/test-timings.json).
+// can be balanced by duration (tools/test-shards.cjs, tools/test-timings.json).
 // Usage: node --test --test-reporter=./tools/test-file-times.mjs --test-reporter-destination=times.json ...
 import path from 'node:path';
 
