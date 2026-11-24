@@ -117,8 +117,8 @@ function list(file){const f=footer(file);if(!f||f.count<=0||f.count>500000||f.in
   :f.major===2?[{v:2,withHash:true,nameKeyV2:true}]:f.major===3?[{v:3,withHash:true,nameKeyV2:true,unicode:f.minor===1}]:[];
  let out=null,mode=null;for(const t of tries){out=parseIndex(idx,f,{...t,nameKey:t.v===3?arcKey:0xC4,arcKey});if(out&&out.length&&out.every(e=>e.name&&!/[\0-\x1f]/.test(e.name))){mode=t;break;}out=null;}
  if(!out){memo.delete(file);return null;}let keyFile=f.major===3?keyFileFor(file):null;const ctx={file,f,mode,arcKey,keyFile0:keyFile,gameKey:null,gameKeyFp:null};
- /* 3.x with a key file: entries after "pack_keyfile" use that entry's decrypted bytes as the key file */
- for(const e of out){e.keyFile=keyFile;e.ctx=ctx;if(f.major===3&&keyFile&&/pack_keyfile/i.test(e.name)){try{keyFile=decode(e,true);}catch{}}}
+ /* 3.x with a key file: entries after "pack_keyfile" use that entry's decrypted and unpacked bytes as the key file */
+ for(const e of out){e.keyFile=keyFile;e.ctx=ctx;if(f.major===3&&keyFile&&/pack_keyfile/i.test(e.name)){try{keyFile=decode(e);}catch{}}}
  memo.set(file,{st,list:out});return out;}
 /* the plain bytes of one entry */
 function decode(e,raw=false){const {f,mode}=e.ctx;const buf=kit.readAt(e.ctx.file,e.offset,e.size);
