@@ -11,11 +11,14 @@ function spcLz(src,size){const out=Buffer.alloc(size);let p=0,o=0;let flag=0,lef
   if(lit){out[o++]=src[p++];}
   else{const x=src[p]|src[p+1]<<8;p+=2;const n=(x>>10)+2,off=x&0x3ff;for(let i=0;i<n&&o<size;i++){const q=o-1024+off;out[o]=q>=0?out[q]:0;o++;}}}
  return out;}
-function spcList(buf){if(buf.toString('latin1',0,4)!=='CPS.')return null;const n=buf.readUInt32LE(0x28);let p=0x50;const out=[];
+function spcList(buf){if(buf.length<0x2c||buf.toString('latin1',0,4)!=='CPS.')return null;const n=buf.readUInt32LE(0x28);let p=0x50;const out=[];
  for(let i=0;i<n&&p+0x20<=buf.length;i++){const flag=buf.readUInt16LE(p),cs=buf.readUInt32LE(p+4),ds=buf.readUInt32LE(p+8),nl=buf.readUInt32LE(p+12);p+=0x20;
-  const name=buf.toString('utf8',p,p+nl);p+=(nl+1+15)&~15;const raw=buf.subarray(p,p+cs);p+=(cs+15)&~15;
+  if(nl>buf.length-p)break;
+  const name=buf.toString('utf8',p,p+nl);p+=Math.ceil((nl+1)/16)*16;
+  // The available bytes of a truncated payload may still contain readable STX text.
+  const raw=buf.subarray(p,p+cs);p+=Math.ceil(cs/16)*16;
   out.push({name,read:()=>flag===2?spcLz(raw,ds):raw,size:ds});}
- return out;}
+ return out.length||n===0?out:null;}
 /* STX text table: "STXT" + language tag, u32 1, u32 table offset (0x0c), u32 table type 8, u32 string count (0x14); (id, offset) pairs;
    UTF-16LE strings, NUL terminated. <CLT=..> / <CLT> colour tags and other <TAG> markup are dropped. */
 function stxStrings(b){if(b.length<0x20||b.toString('latin1',0,4)!=='STXT')return [];const tab=b.readUInt32LE(0x0c),n=b.readUInt32LE(0x14);if(n>200000||tab+n*8>b.length)return [];
