@@ -208,6 +208,28 @@ test('NVL without engine positions (魔法使いの夜): lines go down the page 
  assert.equal(shown[0][1],60,'the new page starts at the top again');
 });
 
+test('NVL fast-forward shows previews and translates only the final line',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const saved=global.MutationObserver;global.MutationObserver=class{observe(){}};t.after(()=>{global.MutationObserver=saved;});
+ const {w,b,sent}=fakeWindow({clientX:0,clientY:0,clientWidth:1280,clientHeight:720,readerX:100,readerY:60,readerWidth:1080,readerHeight:120});
+ require('../web/reader/modules/island-page.js').install(w);
+ const {HookNative}=require('../core/hook-native.cjs');
+ let now=1000;
+ const hook=new HookNative({native:__dirname,hook:__dirname,logs:__dirname},m=>b.islandPage.accept(m),()=>{},()=>now);
+ hook.flowPage=true;hook.trace=()=>{};t.after(()=>hook.stop());
+ const tick=ms=>{now+=ms;t.mock.timers.tick(ms);};
+ const text=i=>'物語の台詞その'+i+'。';
+ const line=i=>hook.source({text:text(i),sourceName:'EmbedTest',origin:'live'},'');
+ const requested=()=>sent.filter(m=>m.text).map(m=>m.text);
+ line(0);hook.skipHeld(true);
+ for(let i=1;i<=24;i++){tick(100);line(i);}
+ tick(100);
+ assert.equal(b.sourceText,text(24));
+ assert.deepEqual(requested(),[text(0)]);
+ hook.skipHeld(false);tick(400);
+ assert.deepEqual(requested(),[text(0),text(24)]);
+});
+
 test('hook-native marks lines of WITCH ON THE HOLY NIGHT (WoH.exe) as an NVL flow page; other games unchanged',t=>{
  const {FLOW_PAGE_EXES}=require('../core/hook-native.cjs');
  assert.ok(FLOW_PAGE_EXES.test('WoH.exe'));assert.ok(FLOW_PAGE_EXES.test('WoH'),'GalWindowBridge reports Process.ProcessName without .exe');assert.ok(!FLOW_PAGE_EXES.test('WoHelper'));assert.ok(!FLOW_PAGE_EXES.test('魔法使之夜.exe'));
