@@ -40,19 +40,20 @@ const textMemo=new Map();
 // The whole script as text, or '' when it is not an NScripter script (it must define *define and *start).
 function scriptText(dir){const files=scriptFiles(dir);if(!files.length)return '';const key=files.map(f=>f+'|'+stat(f)).join('\n');if(textMemo.has(key))return textMemo.get(key);
  let text='';try{text=files.map(f=>readScriptFile(f)).join('\n');}catch{text='';}
- if(!/^\*define\b/m.test(text)||!/^\*start\b/m.test(text))text='';
+ if(!/^[ \t]*\*define\b/im.test(text)||!/^[ \t]*\*start\b/im.test(text))text='';
  textMemo.set(key,text);if(textMemo.size>8)textMemo.delete(textMemo.keys().next().value);return text;}
 // Label blocks in file order; the text before the first label is "*_head". A label used twice keeps its first block.
 function blocks(text){const out=[],seen=new Set();let name='*_head',body=[];
  const push=()=>{const key=name.toLowerCase();if(!seen.has(key)){seen.add(key);out.push({name,body:body.join('\n')});}};
  for(const raw of text.split(/\r?\n/)){const m=raw.match(/^\s*(\*[A-Za-z0-9_]+)/);if(m){push();name=m[1];body=[raw];}else body.push(raw);}
  push();return out;}
-function clean(t){return t.replace(/!(?:w|d)\d+|!s(?:d|\d+)?|#[0-9A-Fa-f]{6}/g,'').replace(/[\/`]$/,'').trim();}
+function clean(t){let s=t.replace(/!(?:w|d)\d+|!s(?:d|\d+)?|#[0-9A-Fa-f]{6}/g,'').trim();if(s[0]==='`')s=s.replace(/`/g,'');return s.replace(/[\/`]$/,'').trim();}
+const isText=s=>!!s&&(s.charCodeAt(0)>=0x80||s[0]==='`');
 function parse(buf){const lines=[],anchors=[];
  for(const raw of buf.toString('utf8').split('\n')){let t=raw.trim();if(!t||t[0]===';')continue;
-  // A text line may open with inline commands (!w500「…」, #ffffff…).
-  const lead=t.replace(/^(?:!(?:w|d)\d+|!s(?:d|\d+)?|#[0-9A-Fa-f]{6})+/,'');if(lead!==t&&lead&&!/^[\x00-\x7f]/.test(lead))t=lead;
-  if(/^[\x00-\x7f]/.test(t)){if(t[0]==='*')anchors.push(t.split(/\s/)[0]);continue;}
+  // A text line may open with inline commands (!w500「…」, #ffffff…) or ONScripter's backtick text prefix (`…).
+  const lead=t.replace(/^(?:!(?:w|d)\d+|!s(?:d|\d+)?|#[0-9A-Fa-f]{6})+/,'');if(lead!==t&&isText(lead))t=lead;
+  if(!isText(t)){if(t[0]==='*')anchors.push(t.split(/\s/)[0]);continue;}
   for(const part of t.split(/[@\\]/)){const s=clean(part);if(s)lines.push(s);}}
  return {lines,anchors};}
 const nscripter={

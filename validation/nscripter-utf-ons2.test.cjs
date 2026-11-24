@@ -22,3 +22,58 @@ test('ONS2 *.file (onscripter-ru) is decoded; default.file wins over ru.file',()
 test('a Chinese NScripter build is reported chinese-build, not not-japanese',()=>{const {classify}=require('../services/adapter-probe-core.cjs');
  const r=classify({engines:[{id:'nscripter',lines:1000,japaneseLines:29,chineseLines:900}],inventory:{archives:[]}});assert.strictEqual(r.step,'chinese-build');
  assert.strictEqual(classify({engines:[{id:'x',lines:1000,japaneseLines:29,chineseLines:0}],inventory:{archives:[]}}).step,'not-japanese');});
+
+test('ONScripter backtick-prefixed text lines and case-insensitive/indented *define/*start labels are read',t=>{
+ const scenes=require('../services/original-engines/scenes.cjs');
+ const dir=tmp();
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const script=[
+  '  *DEFINE',
+  '  game',
+  '\t*START',
+  '*s1',
+  'bg black,1',
+  '; ; comment',
+  '!w500',
+  '#ffffffbg black,1',
+  '``',
+  '`@',
+  '`/',
+  '`2000年10月4日。@',
+  '`Hello world!@',
+  '`2000`年`10`月`4`日。@',
+  '!w500`待って！`@',
+  '#ffffff`Color text`\\',
+  '`Part 1`@`Part 2`\\',
+  '`No newline`/',
+  'おはよう。@`Hello!`\\',
+  '「`」だよ。@',
+  '普通の台詞。\\',
+ ].join('\r\n');
+ fs.writeFileSync(path.join(dir,'0.utf'),Buffer.from(script,'utf8'));
+ const list=scenes.read('nscripter',dir);
+ const s1=list.find(s=>s.name==='*s1');
+ assert.ok(s1,'*s1 block should be read despite uppercase/indented *DEFINE/*START');
+ assert.deepStrictEqual(s1.lines,[
+  '2000年10月4日。',
+  'Hello world!',
+  '2000年10月4日。',
+  '待って！',
+  'Color text',
+  'Part 1',
+  'Part 2',
+  'No newline',
+  'おはよう。',
+  'Hello!',
+  '「`」だよ。',
+  '普通の台詞。',
+ ]);
+ assert.deepStrictEqual(s1.anchors,['*s1']);
+
+ // Commented or prefix-only *defined/*started must still be rejected
+ for(const bad of ['; *define\n; *start\n普通の台詞。\\\n','*defined\n*start\n普通の台詞。\\\n','*define\n*started\n普通の台詞。\\\n']){
+  const d2=tmp();t.after(()=>fs.rmSync(d2,{recursive:true,force:true}));
+  fs.writeFileSync(path.join(d2,'0.txt'),Buffer.from(bad,'utf8'));
+  assert.deepStrictEqual(scenes.read('nscripter',d2),[]);
+ }
+});
