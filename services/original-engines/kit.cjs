@@ -50,8 +50,9 @@ const codepageOf=(bufs,{min=0,max=4000}={})=>codepage(Buffer.concat(bufs.filter(
 /* KiriKiri's own scrambled text (header FE FE <mode> FF FE): mode 0 XORs each UTF-16 unit >= 0x20 with ((c&0xFE)<<8)^1, mode 1
    swaps the odd and even bits of every unit (no 0x20 threshold: krkrz base/TextStream.cpp, and the mode KiriKiri itself
    writes; a line break is stored as 0x05), mode 2 is zlib after the header; null when the bytes do not decode */
-function krkrScrambled(buf){if(!buf||buf.length<5||!(buf[0]===0xfe&&buf[1]===0xfe&&buf[2]<=2&&buf[3]===0xff&&buf[4]===0xfe))return null;const mode=buf[2];
+function krkrScrambled(buf){if(!buf||buf.length<5||buf[0]!==0xfe||buf[1]!==0xfe||buf[2]>2)return null;const mode=buf[2];
  if(mode===2){const zlib=require('node:zlib');for(let i=5;i<Math.min(buf.length,64);i++)if(buf[i]===0x78){try{const o=zlib.inflateSync(buf.subarray(i));return (o[0]===0xff&&o[1]===0xfe?o.subarray(2):o).toString('utf16le');}catch{}}return null;}
+ if(buf[3]!==0xff||buf[4]!==0xfe)return null;
  const n=(buf.length-5)>>1,out=Buffer.alloc(n*2);
  for(let i=0;i<n;i++){let c=buf.readUInt16LE(5+i*2);if(mode===1)c=((c&0xaaaa)>>1)|((c&0x5555)<<1);else if(c>=0x20)c^=((c&0xfe)<<8)^1;out.writeUInt16LE(c&0xffff,i*2);}
  return out.toString('utf16le');}
@@ -158,7 +159,7 @@ function table(file,spec,{maxIndex=64<<20}={}){const fsz=size(file);if(fsz<8)ret
   let p=typeof spec.entries==='number'?spec.entries:rdInt(idx,spec.entries.type,spec.entries.at);if(p<0)return null;const raw=[];let cut=false;
   for(let n=0;n<count&&p<idx.length&&n<500000;n++){const e={};let bad=false;
    for(const f of spec.fields){if(f.type==='skip'){if(p+f.size>idx.length){bad=true;break;}p+=f.size;continue;}
-    if(f.type==='cstr'||f.type==='pstr8'){let nb;if(f.type==='cstr'){if(p+f.size>idx.length){bad=true;break;}nb=idx.subarray(p,p+f.size);p+=f.size;const z=nb.indexOf(0);if(z>=0&&!spec.nameCipher)nb=nb.subarray(0,z);}else{if(p>=idx.length){bad=true;break;}const len=idx[p];if(p+1+len>idx.length){bad=true;break;}nb=idx.subarray(p+1,p+1+len);p+=1+len;}
+    if(f.type==='cstr'||f.type==='pstr8'){let nb;if(f.type==='cstr'){nb=idx.subarray(p,p+f.size);p+=f.size;const z=nb.indexOf(0);if(z>=0&&!spec.nameCipher)nb=nb.subarray(0,z);}else{if(p>=idx.length){bad=true;break;}const len=idx[p];if(p+1+len>idx.length){bad=true;break;}nb=idx.subarray(p+1,p+1+len);p+=1+len;}
      nb=Buffer.from(nb);if(spec.nameCipher==='not')for(let i=0;i<nb.length;i++)nb[i]=~nb[i]&255;else if(spec.nameCipher?.xor!==undefined)for(let i=0;i<nb.length;i++)nb[i]^=spec.nameCipher.xor;
      const z=nb.indexOf(0);e.name=new TextDecoder(spec.encoding||'shift_jis').decode(z>=0?nb.subarray(0,z):nb);continue;}
     if(p+widthOf(f.type)>idx.length){bad=true;break;}const v=rdInt(idx,f.type,p);p+=widthOf(f.type);if(f.name)e[f.name]=v;}
@@ -269,8 +270,8 @@ function zipRead(file,e){if(e.encrypted)throw Error('ZIP_ENCRYPTED');const fsz=s
  const h=readAt(file,e.local,30);if(h.length<30||h.readUInt32LE(0)!==0x04034b50)throw Error('ZIP_LOCAL');if(h.readUInt16LE(6)&1)throw Error('ZIP_ENCRYPTED');
  const at=e.local+30+h.readUInt16LE(26)+h.readUInt16LE(28);if(!Number.isSafeInteger(e.comp)||e.comp<0||at+e.comp>fsz)throw Error('ZIP_TRUNCATED');
  const data=readAt(file,at,e.comp);if(data.length!==e.comp)throw Error('ZIP_TRUNCATED');
- if(e.method===0){if(e.raw>0&&e.raw!==0xffffffff&&data.length!==e.raw)throw Error('ZIP_SIZE');return data;}
- if(e.method===8){const out=zlib.inflateRawSync(data,{maxOutputLength:256<<20});if(e.raw>0&&e.raw!==0xffffffff&&out.length!==e.raw)throw Error('ZIP_SIZE');return out;}
+ if(e.method===0)return data;
+ if(e.method===8)return zlib.inflateRawSync(data,{maxOutputLength:256<<20});
  throw Error('ZIP_METHOD_'+e.method);}
 
 /* ---- names (E605: every reader built its own TextDecoder('shift_jis') and cut fixed-size archive names at NUL by hand)
