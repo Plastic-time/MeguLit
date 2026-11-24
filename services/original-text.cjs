@@ -38,11 +38,28 @@ function chineseOnly(lines){let k=0,h=0;for(const t of lines){if(!prose(t)||NAME
 /* #136 older System4 games (戦国ランス, ランス・クエスト and others of that era) store the AIN without the "AI2" zlib
    wrapper: the whole file is XORed with the low byte of each MT19937 output (Knuth 69069 seeding, seed 0x5D3E3) and
    decrypts to "VERS" + version (as libsys4's ain_decrypt). */
-function mtXor(src,seed){const b=Buffer.from(src),N=624,M=397,st=new Uint32Array(N);st[0]=seed>>>0;for(let i=1;i<N;i++)st[i]=Math.imul(69069,st[i-1])>>>0;let k=N;
- for(let i=0;i<b.length;i++){if(k>=N){for(let j=0;j<N;j++){const y=(st[j]&0x80000000)|(st[(j+1)%N]&0x7fffffff);st[j]=st[(j+M)%N]^(y>>>1)^(y&1?0x9908b0df:0);}k=0;}
-  let y=st[k++];y^=y>>>11;y^=(y<<7)&0x9d2c5680;y^=(y<<15)&0xefc60000;y^=y>>>18;b[i]^=y&255;}
- return b;}
 const AIN_SEED=0x5D3E3;
+let ainKey=null,ainKeyTimer=null;
+function mtXorRaw(b,seed){const N=624,st=new Uint32Array(N);st[0]=seed>>>0;for(let i=1;i<N;i++)st[i]=Math.imul(69069,st[i-1])>>>0;
+ const len=b.length;let p=0;
+ while(p<len){
+  for(let j=0;j<227;j++){const y=(st[j]&0x80000000)|(st[j+1]&0x7fffffff);st[j]=st[j+397]^(y>>>1)^(y&1?0x9908b0df:0);}
+  for(let j=227;j<623;j++){const y=(st[j]&0x80000000)|(st[j+1]&0x7fffffff);st[j]=st[j-227]^(y>>>1)^(y&1?0x9908b0df:0);}
+  {const y=(st[623]&0x80000000)|(st[0]&0x7fffffff);st[623]=st[396]^(y>>>1)^(y&1?0x9908b0df:0);}
+  const end=p+624<len?p+624:len;
+  for(let k=0;p<end;p++,k++){let y=st[k];y^=y>>>11;y^=(y<<7)&0x9d2c5680;y^=(y<<15)&0xefc60000;y^=y>>>18;b[p]^=y&255;}
+ }
+ return b;}
+function mtXor(src,seed){const b=Buffer.from(src);
+ if(seed!==AIN_SEED||b.length<64||b.length>(64<<20))return mtXorRaw(b,seed);
+ if(!ainKey||ainKey.length<b.length)ainKey=mtXorRaw(Buffer.alloc(b.length),AIN_SEED);
+ if(ainKeyTimer)clearTimeout(ainKeyTimer);ainKeyTimer=setTimeout(()=>{ainKey=null;ainKeyTimer=null;},5000);ainKeyTimer.unref?.();
+ if(!(b.byteOffset&3)&&!(ainKey.byteOffset&3)){
+  const n4=b.length>>>2,u=new Uint32Array(b.buffer,b.byteOffset,n4),k=new Uint32Array(ainKey.buffer,ainKey.byteOffset,n4);
+  for(let i=0;i<n4;i++)u[i]^=k[i];
+  for(let i=n4<<2;i<b.length;i++)b[i]^=ainKey[i];
+ }else for(let i=0;i<b.length;i++)b[i]^=ainKey[i];
+ return b;}
 function plainAin(b){if(b.length<8)return null;const h=mtXor(b.subarray(0,8),AIN_SEED);if(h.toString('latin1',0,4)!=='VERS'||h[5]||h[6]||h[7])return null;return mtXor(b,AIN_SEED);}
 function inflateAin(file){const b=Buffer.isBuffer(file)?file:fs.readFileSync(file);if(b.subarray(0,4).toString('latin1')==='VERS')return b;if(b.subarray(0,4).toString('latin1')!=='AI2\0'){const p=plainAin(b);if(p)return p;throw Error('UNSUPPORTED_AIN_CONTAINER');}const size=b.readUInt32LE(8),packed=b.readUInt32LE(12),d=zlib.inflateSync(b.subarray(16,16+packed));if(d.length!==size)throw Error('AIN_SIZE_MISMATCH');return d;}
 /* A tag can also occur inside the code or another table: take the first occurrence whose table reads to its end. */
@@ -53,10 +70,36 @@ function codepage(buffers){const sample=buffers.filter(b=>b.length>3).slice(0,40
  if(u8.bad===0&&sample.some(b=>b.some(x=>x>0x7f))&&(u8.kana>sj.kana||sj.bad>0&&gbk.bad>0))return 'utf-8';
  return sj.bad<gbk.bad||sj.bad===gbk.bad&&sj.kana>=gbk.kana?'shift_jis':'gbk';}
 function msg1(d){return section(d,'MSG1',at=>{let p=at+4;const n=d.readUInt32LE(p);p+=8;if(n>4e6)return null;const out=[];for(let i=0;i<n;i++){if(p+4>d.length)throw Error('AIN_TRUNCATED_MSG1');const len=d.readUInt32LE(p);p+=4;if(p+len>d.length)throw Error('AIN_TRUNCATED_MSG1');const b=Buffer.from(d.subarray(p,p+len));for(let k=0;k<len;k++)b[k]=(b[k]-k-0x60)&255;out.push(b);p+=len;}return out;});}
-function readAin(file){
- const d=inflateAin(file),version=d.subarray(0,4).toString('latin1')==='VERS'?d.readUInt32LE(4):0,raw=strings(d,'MSG0')||msg1(d);if(!raw)throw Error('AIN_MESSAGES_MISSING');
- const enc=codepage(raw),dec=new TextDecoder(enc),lines=raw.map(b=>dec.decode(b)),names=(strings(d,'FNAM')||[]).map(b=>b.toString('latin1'));
- return {engine:'system4',version,codepage:enc,lines,structure:{messages:lines.length,functions:names.length,functionHash:crypto.createHash('sha256').update(names.join('\0')).digest('hex').slice(0,16)}};
+const ainCache=new Map();let ainCacheTimer=null;
+function ainStamp(file){const st=fs.statSync(file,{bigint:true});return [st.ino,st.size,st.mtimeNs,st.ctimeNs].join('|');}
+function readAin(file,expect){
+ let key='',stamp='';
+ if(typeof file==='string'){
+  key=path.resolve(file).toLowerCase();
+  try{stamp=ainStamp(file);}catch{}
+  const hit=stamp&&ainCache.get(key);
+  if(hit&&hit.stamp===stamp){
+   const v=hit.value;
+   if(expect&&(!v.structure.functions||v.structure.messages!==expect.messages||v.structure.functionHash!==expect.functionHash))return null;
+   return {...v,lines:v.lines.slice(),structure:{...v.structure}};
+  }
+ }
+ const d=inflateAin(file),version=d.subarray(0,4).toString('latin1')==='VERS'?d.readUInt32LE(4):0;
+ let names=null,functionHash='';
+ if(expect){
+  names=(strings(d,'FNAM')||[]).map(b=>b.toString('latin1'));
+  functionHash=crypto.createHash('sha256').update(names.join('\0')).digest('hex').slice(0,16);
+  if(!names.length||functionHash!==expect.functionHash)return null;
+ }
+ const raw=strings(d,'MSG0')||msg1(d);if(!raw)throw Error('AIN_MESSAGES_MISSING');
+ if(!names){names=(strings(d,'FNAM')||[]).map(b=>b.toString('latin1'));functionHash=crypto.createHash('sha256').update(names.join('\0')).digest('hex').slice(0,16);}
+ const structure={messages:raw.length,functions:names.length,functionHash};
+ if(expect&&structure.messages!==expect.messages)return null;
+ const enc=codepage(raw),dec=new TextDecoder(enc),lines=raw.map(b=>dec.decode(b));
+ const value={engine:'system4',version,codepage:enc,lines,structure};
+ if(key&&stamp){if(ainCache.size>=8)ainCache.delete(ainCache.keys().next().value);ainCache.set(key,{stamp,value});
+  if(ainCacheTimer)clearTimeout(ainCacheTimer);ainCacheTimer=setTimeout(()=>{ainCache.clear();ainCacheTimer=null;},5000);ainCacheTimer.unref?.();}
+ return {...value,lines:value.lines.slice(),structure:{...value.structure}};
 }
 // ---- Paths and state --------------------------------------------------------------------------
 const stateFile=root=>path.join(root,'data/config/original-text.json');
@@ -86,11 +129,13 @@ const runningDirOf=runtime=>ADAPTERS[runtime.engine||'system4']?.folder?runtime.
    group's 16177-line table no longer belonged to it): scene engines are chosen the way scenes.detect chooses them, the readers the engine registry
    names first; the plain registration order (generic readers among the dedicated ones) is no longer used for them */
 function locate(dir,base){for(const adapter of Object.values(ADAPTERS)){if(adapter.scene)continue;const found=adapter.locate(dir,base);if(found)return found;}let id=null;try{id=scenes.detect(dir);}catch{}return id&&ADAPTERS[id]?{engine:id,target:dir}:null;}
+const ARCHIVE_BAK_ENGINES=new Set(['silky']);
 function readSceneArchive(id,file){
+ if(!ARCHIVE_BAK_ENGINES.has(id))return null;
  const eng=scenes.ENGINES[id];if(!eng?.archiveEntries)return null;
  const entries=eng.archiveEntries(file);if(!entries?.length)return null;
  const byName=new Map();for(const s of entries)byName.set(s.name.toLowerCase(),s);
- const ordered=eng.archiveSort===false?[...byName.values()]:[...byName.values()].sort((a,b)=>a.name.localeCompare(b.name));
+ const ordered=[...byName.values()].sort((a,b)=>a.name.localeCompare(b.name));
  const list=ordered.map(s=>{let parsed={lines:[],anchors:[]};try{parsed=s.parse?s.parse():eng.parse(s.read());}catch{}return fillLines.scene({name:s.name,...parsed,patched:false});});
  const lines=list.flatMap(x=>x.lines),ruby=list.some(x=>x.ruby)?list.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined;
  const roles=list.some(scene=>scene.roles||scene.scope==='interface')?list.map(scene=>scene.roles||(scene.scope==='interface'?'i':'?').repeat(scene.lines.length)).join(''):undefined;
@@ -102,7 +147,7 @@ function locateBackup(engine,target,base){
  if(st.isDirectory())return ADAPTERS[engine]?.locate(target,base)||null;
  if(!st.isFile())return null;
  if(engine==='system4')return isSystem4Ain(target)?{engine:'system4',target}:null;
- if(ADAPTERS[engine]?.scene&&scenes.ENGINES[engine]?.archiveEntries){
+ if(ARCHIVE_BAK_ENGINES.has(engine)&&ADAPTERS[engine]?.scene&&scenes.ENGINES[engine]?.archiveEntries){
   try{return scenes.ENGINES[engine].archiveEntries(target)?.length?{engine,target,archiveFile:true}:null;}catch{return null;}
  }
  return null;
@@ -199,6 +244,7 @@ function importInto(root,id,state,dir,exeBase,auto){
   const pc=pairCheck(runtime.lines,ain.lines,{zhSizes:runtime.sizes,jaSizes:ain.sizes,ruby:ain.ruby,structureOk:alignment.sameStructure});
   if(pc.verdict.lines){ain={...ain,lines:pc.verdict.lines,ruby:pc.verdict.ruby?.some(Boolean)?pc.verdict.ruby:undefined,structure:runtime.structure,sizes:runtime.sizes};alignment=align(runtime,ain);}
   alignment={...alignment,reliable:alignment.reliable&&pc.verdict.ok,pairing:pc.report};
+  if(isFile&&!alignment.reliable)return state;
   const index=writeIndex(root,id,'original-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'original',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash,dir:origDir},structure:ain.structure,lines:ain.lines,...(Array.isArray(ain.ruby)?{ruby:ain.ruby}:{})});
   const exe=isFile?null:fs.readdirSync(origDir).find(f=>/\.exe$/i.test(f)&&path.parse(f).name.toLowerCase()===String(exeBase).toLowerCase());
   return writeState(root,id,{original:{dir:origDir,file,sha256:hash,index,codepage:ain.codepage,lines:ain.lines.length,executable:exe?path.join(origDir,exe):'',...(auto?{auto:true,backup:true}:{})},alignment,status:alignment.reliable?'ready':'unreliable',mode:readState(root)[id]?.mode||(alignment.reliable?'original':'off'),error:''});
@@ -211,36 +257,22 @@ function importInto(root,id,state,dir,exeBase,auto){
    (same folder and backup subfolders) via single-file reading and System4 sibling .ain / <stem>.bak files. → folder/file or null */
 function sourceNames(engine,dir){if(engine==='bgi')return bgi.arcFiles(dir).map(f=>path.basename(f));const e=scenes.ENGINES[engine];if(!e?.sources)return [];return e.sources(dir).filter(f=>path.dirname(path.resolve(f)).toLowerCase()===path.resolve(dir).toLowerCase()).map(f=>path.basename(f));}
 function japaneseBackupCount(lines){const prose_=lines.filter(prose),ja=prose_.filter(japaneseLine).length;return ja>=prose_.length*.5&&ja>=50?ja:0;}
-function ainFnSet(file){try{const d=inflateAin(file),raw=strings(d,'FNAM');return raw?new Set(raw.map(b=>b.toString('latin1'))):null;}catch{return null;}}
 function backupSystem4(dir,base){
  const running=ainOf(dir,base);if(!running)return null;
  let runAin;try{runAin=readAin(running);}catch{return null;}
+ if(!runAin.structure.functions)return null;
  const runKey=path.resolve(running).toLowerCase(),runName=path.basename(running).toLowerCase(),runStem=path.parse(running).name.toLowerCase();
- let runFns=undefined;
  let best=null,seen=0;
- const check=(full,sameName)=>{
+ const check=full=>{
   if(path.resolve(full).toLowerCase()===runKey||!isSystem4Ain(full))return;
-  let r;try{r=readAin(full);}catch{return;}
+  let r;try{r=readAin(full,runAin.structure);}catch{return;}
+  if(!r||!align(runAin,r).sameStructure)return;
   const ja=japaneseBackupCount(r.lines);if(!ja)return;
-  const same=align(runAin,r).sameStructure;
-  if(!same){
-   const lo=Math.min(runAin.lines.length,r.lines.length),hi=Math.max(runAin.lines.length,r.lines.length);
-   if(!lo||lo<hi*.5)return;
-   if(!runAin.structure.functions||!r.structure.functions||r.structure.functionHash!==runAin.structure.functionHash){
-    if(runFns===undefined)runFns=ainFnSet(running);
-    const candFns=ainFnSet(full);
-    if(runFns&&candFns&&runFns.size&&candFns.size){
-     let overlap=0;for(const fn of candFns)if(runFns.has(fn))overlap++;
-     if(overlap<Math.min(runFns.size,candFns.size)*.5)return;
-    }else if(!sameName)return;
-   }
-  }
-  if(!best||Number(same)>Number(best.same)||same===best.same&&ja>best.ja)best={target:full,ja,same};
+  if(!best||ja>best.ja)best={target:full,ja};
  };
  const visit=(d,level)=>{let list;try{list=fs.readdirSync(d,{withFileTypes:true});}catch{return;}
   for(const e of list){if(!e.isFile())continue;const lower=e.name.toLowerCase(),full=path.join(d,e.name);
-   const sameName=lower===runName||lower===runName+'.bak'||lower===runStem+'.bak';
-   if(sameName||/\.ain$/i.test(lower))check(full,sameName);}
+   if(lower===runName||lower===runName+'.bak'||lower===runStem+'.bak'||/\.ain$/i.test(lower))check(full);}
   if(level<3)for(const e of list)if(e.isDirectory()&&!/^\.megulit/i.test(e.name)&&++seen<400)visit(path.join(d,e.name),level+1);};
  visit(dir,0);return best?best.target:null;
 }
@@ -249,13 +281,13 @@ function backupOriginal(dir,engine,base){
  if(engine!=='bgi'&&!ADAPTERS[engine]?.scene)return null;
  const names=new Set(sourceNames(engine,dir).map(n=>n.toLowerCase()));if(!names.size)return null;
  const bakNames=new Set([...names].map(n=>n+'.bak'));
- const canArchiveBak=!!(ADAPTERS[engine]?.scene&&scenes.ENGINES[engine]?.archiveEntries);
+ const canArchiveBak=ARCHIVE_BAK_ENGINES.has(engine)&&!!(ADAPTERS[engine]?.scene&&scenes.ENGINES[engine]?.archiveEntries);
  let runScenes=null;
  const scenesMatch=candNames=>{
   if(!runScenes){try{runScenes=new Set(scenes.ENGINES[engine].scenes(dir).map(s=>s.name.toLowerCase()));}catch{runScenes=new Set();}}
   if(!runScenes.size||!candNames?.length)return false;
   let overlap=0;for(const n of candNames)if(runScenes.has(n))overlap++;
-  return overlap>=Math.max(1,Math.ceil(Math.min(runScenes.size,candNames.length)*.5));
+  return overlap>=Math.max(1,Math.ceil(runScenes.size*.5));
  };
  /* the running archives' own folder (Archive) is not a backup of them */
  const own=engine==='bgi'?path.resolve(path.dirname(bgi.arcFiles(dir)[0]||dir)).toLowerCase():'';
