@@ -147,7 +147,7 @@ function routedReaders(dir,inv){const out=[],add=ids=>{for(const i of ids||[])if
 function underlay(dir,id,executable){const scenes=require('./original-engines/scenes.cjs'),eng=scenes.ENGINES[id];
  if(eng?.originalLines){const lines=eng.originalLines(dir);if(Array.isArray(lines)&&lines.some(Boolean))return {kind:'layer',lines:lines.filter(Boolean)};}
  const ot=require('./original-text.cjs'),base=path.parse(String(executable||'')).name,b=ot.backupOriginal(dir,id,base);if(!b)return null;
- const loc=ot.ADAPTERS[id].locate(b,base);return loc?{kind:'backup',lines:ot.readScript(loc).lines.filter(Boolean)}:null;}
+ const loc=ot.locateBackup(id,b,base),r=loc?ot.readScript(loc):null;return r?.lines?{kind:'backup',lines:r.lines.filter(Boolean)}:null;}
 function isWindowsDirectory(dir){
  const system=process.env.SystemRoot||process.env.windir;
  return !!(system&&dir&&path.isAbsolute(system)&&path.relative(path.toNamespacedPath(system),path.toNamespacedPath(dir))==='');
