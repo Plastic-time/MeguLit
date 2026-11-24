@@ -19,8 +19,9 @@ const hasEdge = [process.env.MEGULIT_EDGE, 'C:/Program Files (x86)/Microsoft/Edg
 const white = {home:[255,255,255], backdrop:'#fff'};
 
 function readerStub(fixture) {
- return `<script>(${function ({ state, home, game, themeMode }) {
+ return `<script>(${function ({ state, home, game, themeMode, accent }) {
   localStorage.clear();
+  const pictures = window.panelFixturePictures = {home,game};
   function image(value) {
    if (!Array.isArray(value)) return value || '';
    const canvas = document.createElement('canvas');
@@ -33,12 +34,12 @@ function readerStub(fixture) {
   window.__TAURI_INTERNALS__ = {transformCallback: () => 1, invoke: async (cmd, args) => {
    if (cmd !== 'service') return null;
    const { action, message } = args.request;
-   if (action === 'home') return {preferences:{language:'zh',themeMode}, games:[]};
+   if (action === 'home') return {preferences:{language:'zh',themeMode,accent}, games:[]};
    if (action === 'ui_state') return state;
    if (action === 'reader_bootstrap') return {engines:[],native:{}};
    if (action === 'reader_message') {
     if (message.type === 'v4') {
-     const result = message.action === 'backgroundGet' ? {image:image(message.args.slot === 'game' ? game : home)} : {};
+     const result = message.action === 'backgroundGet' ? {image:image(pictures[message.args.slot === 'game' ? 'game' : 'home'])} : {};
      return {replies:[{method:'v4Deliver',args:[message.id,result,'']}]};
     }
     return {replies:[]};
@@ -74,8 +75,8 @@ async function withReader(run) {
  try {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   cdp = await startEdge(path.join(temp, 'edge'));
-  async function load({home, game, backdrop, state = {}, themeMode = 'dark', width = 1280, height = 720}) {
-   fixture = {home, game, state, themeMode};
+  async function load({home, game, backdrop, state = {}, themeMode = 'dark', accent, width = 1280, height = 720}) {
+   fixture = {home, game, state, themeMode, accent};
    await cdp.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor:1, mobile:false});
    await cdp.send('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'reduce'}]});
    const url = `http://127.0.0.1:${server.address().port}/reader/index.html?fixture=${++page}`;
@@ -120,6 +121,14 @@ const menuText = [`${textTab} label:has([name=galTypewriter])`, `${textTab} .tom
 const logText = ['.tome-log-src','.tome-log-tr:not([hidden])'];
 const cardText = ['.tomoyo-sense > div','.tomoyo-word-reading','.tomoyo-word-pos'];
 const logState = () => ({'tomoyo-backlog-session':JSON.stringify([{src:'窓を開ける。',tr:'打开窗户。',at:Date.now()}])});
+const phraseText = ['.tomoyo-word-row:not(.tomoyo-word-minor)>summary>strong','.tomoyo-chunk-role','.tomoyo-row-meaning','.tomoyo-row-pos'];
+const speakerState = () => ({'tomoyo-backlog-session':JSON.stringify([
+ {src:'窓を開ける。',tr:'打开窗户。',at:Date.now()-5000},
+ {src:'司\n「明日は晴れる。」',tr:'明天会放晴。',at:Date.now()}
+])});
+const opaquePictures = {'tome-menu-background':JSON.stringify({
+ panels:Object.fromEntries(['menu','log','card'].map(panel => [panel,{alpha:100,dim:0,blur:0,saturate:100}]))
+})};
 
 function luminance(rgb) {
  return rgb.slice(0,3).map(value => {
@@ -129,23 +138,33 @@ function luminance(rgb) {
 }
 
 // Remove the glyphs after taking their positions and colors, leaving the composited background in the screenshot.
-async function contrast(cdp, selectors) {
- const probes = await cdp.evaluate(`(${function (selectors) {
+async function contrastDetails(cdp, selectors, directText = false) {
+ const probes = await cdp.evaluate(`(${function (selectors,directText) {
   const text = new Set();
+  const palette = new OffscreenCanvas(1,1).getContext('2d',{willReadFrequently:true});
   const probes = selectors.map(selector => {
    const target = document.querySelector(selector);
    if (!target) throw Error('Missing text: ' + selector);
    const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
    const areas = [];
    for (let node; (node = walker.nextNode());) {
-    if (!node.textContent.trim()) continue;
+    if (!node.textContent.trim() || directText && node.parentElement !== target) continue;
     const range = document.createRange();
     range.selectNodeContents(node);
     const parent = node.parentElement;
-    const fg = getComputedStyle(parent).color.match(/[\d.]+/g).map(Number);
+    const style = getComputedStyle(parent);
+    if (style.visibility !== 'visible' || style.display === 'none') continue;
+    const color = style.color;
+    palette.clearRect(0,0,1,1);
+    palette.fillStyle = color;
+    palette.fillRect(0,0,1,1);
+    const fg = Array.from(palette.getImageData(0,0,1,1).data);
+    let alpha = fg[3]/255;
+    for (let ancestor=parent; ancestor; ancestor=ancestor.parentElement) alpha *= Number(getComputedStyle(ancestor).opacity);
+    if (!alpha) continue;
     for (const {left,top,right,bottom} of range.getClientRects()) {
      if (left >= 0 && top >= 0 && right <= innerWidth && bottom <= innerHeight && right-left > 2 && bottom-top > 2)
-      areas.push({fg, box:[Math.ceil(left),Math.ceil(top),Math.floor(right)-Math.ceil(left),Math.floor(bottom)-Math.ceil(top)]});
+      areas.push({fg,alpha,color,text:node.textContent.trim(),box:[Math.ceil(left),Math.ceil(top),Math.floor(right)-Math.ceil(left),Math.floor(bottom)-Math.ceil(top)]});
     }
     text.add(parent);
    }
@@ -165,23 +184,27 @@ async function contrast(cdp, selectors) {
    }
   };
   return probes;
- }})(${JSON.stringify(selectors)})`);
+ }})(${JSON.stringify(selectors)},${directText})`);
  try {
   const result = await screenshotPixels(cdp,probes.flat().map(area => area.box));
-  const ratios = probes.map(areas => Math.min(...areas.map(({fg}) => {
-   const front = luminance(fg);
+  const readings = probes.map(areas => areas.map(({fg,alpha,color,text}) => {
    const pixels = result.shift();
    let min = Infinity;
    for (let i=0; i<pixels.length; i+=4) {
-    const back = luminance(pixels.slice(i,i+3));
+    const rgb = pixels.slice(i,i+3);
+    const back = luminance(rgb);
+    const front = luminance(rgb.map((channel,k) => channel*(1-alpha)+fg[k]*alpha));
     min = Math.min(min,(Math.max(front,back)+.05)/(Math.min(front,back)+.05));
    }
-   return min;
-  })));
-  return Object.fromEntries(selectors.map((selector,i) => [selector,ratios[i]]));
+   return {ratio:min,color,rgb:fg.slice(0,3),alpha,text};
+  }).reduce((worst,reading) => reading.ratio < worst.ratio ? reading : worst));
+  return Object.fromEntries(selectors.map((selector,i) => [selector,readings[i]]));
  } finally {
   await cdp.evaluate('window.restoreContrastProbe(); delete window.restoreContrastProbe;');
  }
+}
+async function contrast(cdp,selectors) {
+ return Object.fromEntries(Object.entries(await contrastDetails(cdp,selectors)).map(([selector,reading]) => [selector,reading.ratio]));
 }
 
 async function screenshotPixels(cdp, boxes) {
@@ -200,7 +223,10 @@ async function screenshotPixels(cdp, boxes) {
 async function openLog(cdp) {
  await cdp.evaluate(`window.__tomoyoChinese.openBacklog();
   dispatchEvent(new CustomEvent('tome-region-applied',{detail:{surfaceWidth:innerWidth,surfaceHeight:innerHeight}}));`);
- await waitFor(cdp, `document.querySelector('.tome-backlog[data-shown]')?.getAnimations().every(a => a.playState !== 'running')`);
+ await waitFor(cdp, `(() => {
+  const panel = document.querySelector('.tome-backlog[data-shown]');
+  return panel && getComputedStyle(panel).opacity === '1' && getComputedStyle(panel.querySelector('.tome-log-list')).opacity === '1';
+ })()`);
 }
 
 async function openCard(cdp) {
@@ -210,6 +236,17 @@ async function openCard(cdp) {
   b.openLocalSelection({text:'窓を開ける',start:0,end:1},{left:500,right:526,top:480,bottom:510,width:26,height:30});
  })()`);
  await waitFor(cdp, `!!document.querySelector('.tomoyo-selection-card .tomoyo-sense')`);
+}
+
+async function openPhrase(cdp) {
+ await cdp.evaluate(`(${async function () {
+  const b = window.__tomoyoChinese,phrase = '明日は晴れる';
+  const part = (surface,reading,pos,definition) => ({surface,entries:[{spellings:[surface],readings:[reading],pos:[pos],definitions:[definition]}]});
+  const parts = [part('明日','あした','名詞','明天'),part('は','は','助詞','主题助词'),part('晴れる','はれる','動詞','放晴')];
+  b.localLookup = async () => ({selection_analysis:{surface:phrase,exact:false,parts}});
+  await b.openLocalSelection({text:phrase,start:0,end:phrase.length},{left:500,right:560,top:480,bottom:510,width:60,height:30});
+ }})()`);
+ await waitFor(cdp, `!!document.querySelector('.tomoyo-selection-card .tomoyo-chunk-role')`);
 }
 
 async function menuPixel(cdp) {
@@ -244,17 +281,65 @@ if (require.main === module) {
   await openCard(cdp);
   assertAA(await contrast(cdp,cardText));
  }));
- test('a dark picture retains its original composite over a dark game',options,() => withReader(async (cdp,load) => {
-  await load({home:[30,30,30],backdrop:'#0a090a'});
+ test('both themes keep lookup accents and speaker names readable over white',options,() => withReader(async (cdp,load) => {
+  for (const themeMode of ['dark','light']) {
+   await load({...white,themeMode,state:opaquePictures});
+   await openPhrase(cdp);
+   const lookup = await contrast(cdp,phraseText);
+   await load({...white,themeMode,state:{...opaquePictures,...speakerState()}});
+   await openLog(cdp);
+   assertAA({...lookup,...await contrast(cdp,['.tome-log-name b',...logText])});
+  }
+  await load({...white,themeMode:'light',accent:'#ffffff',state:{...opaquePictures,...speakerState()}});
+  await openLog(cdp);
+  await cdp.evaluate(`(() => {
+   const search = document.querySelector('.tome-backlog input[type=search]');
+   search.value = '晴';
+   search.dispatchEvent(new Event('input',{bubbles:true}));
+  })()`);
+  await waitFor(cdp, `!!document.querySelector('.tome-backlog .tome-log-hit')`);
+  assertAA(await contrast(cdp,['.tome-backlog .tome-log-hit']));
+ }));
+ test('dark grey and dark blue pictures stay within a few RGB levels of the original',options,() => withReader(async (cdp,load) => {
+  for (const [home,alpha,expected] of [
+   [[48,48,48],30,[48,48,48]],
+   [[10,21,80],30,[37,40,58]],
+   [[10,21,80],100,[10,20,79]],
+  ]) {
+   const state = {[backgroundKey]:JSON.stringify({panels:{menu:{alpha,dim:0,blur:0,saturate:100}}})};
+   await load({home,backdrop:'#303030',state});
+   await openMenu(cdp);
+   const pixel = await menuPixel(cdp);
+   assert.ok(pixel.every((channel,i) => Math.abs(channel-expected[i]) <= 4), `at ${alpha}% with ${home}, got ${pixel}; expected ${expected}`);
+  }
+ }));
+ test('clearing a picture restores the saved opacity and plain composite',options,() => withReader(async (cdp,load) => {
+  const saved = JSON.stringify({panels:{menu:{alpha:30}}});
+  await load({home:[255,255,255],backdrop:'#3c405e',state:{[backgroundKey]:saved}});
   await openMenu(cdp);
-  // The existing 40% dim and 62% opacity give 18 * .62 + 10 * .38, within one RGB step of 15.
+  await cdp.evaluate(`window.panelFixturePictures.home = ''; window.__tomoyoChinese.hostRefreshAppearance()`);
+  await waitFor(cdp,`getComputedStyle(document.querySelector('${menu} .tome-menu-bg>i')).backgroundImage === 'none'`);
+  const result = await cdp.evaluate(`(() => {
+   const layer = document.querySelector('${menu} .tome-menu-bg');
+   return {alpha:getComputedStyle(layer).opacity,saved:localStorage.getItem('${backgroundKey}')};
+  })()`);
+  assert.deepEqual(result,{alpha:'0.3',saved});
   const pixel = await menuPixel(cdp);
-  assert.ok(pixel.every(channel => Math.abs(channel-15) <= 1), JSON.stringify(pixel));
+  assert.ok(pixel.every((channel,i) => Math.abs(channel-[45,48,69][i]) <= 1), JSON.stringify(pixel));
+ }));
+ test('other panel modes keep their original opacity even when a picture is loaded',options,() => withReader(async (cdp,load) => {
+  for (const [surface,expected] of [['plain','0.3'],['glass','1'],['both','1']]) {
+   const state = {[backgroundKey]:JSON.stringify({surfaces:{menu:surface},panels:{menu:{alpha:30}}})};
+   await load({...white,state});
+   await openMenu(cdp);
+   const alpha = await cdp.evaluate(`getComputedStyle(document.querySelector('${menu} .tome-menu-bg')).opacity`);
+   assert.equal(alpha,expected,surface);
+  }
  }));
  test('picture contrast respects saved values and keeps the full range of the opacity control',options,() => withReader(async (cdp,load) => {
   const saved = {custom:true,panels:{menu:{alpha:20,dim:0,saturate:172},log:{alpha:71,dim:42},card:{alpha:93,dim:60}}};
   const stored = JSON.stringify(saved);
-  await load({home:[12,12,12],game:[235,235,235],backdrop:'#fff',state:{[backgroundKey]:stored}});
+  await load({home:[12,12,12],game:[235,235,235],backdrop:'#ddd',state:{[backgroundKey]:stored}});
   await openMenu(cdp);
   const low = await menuPixel(cdp);
   const lowRatios = await contrast(cdp,menuText);
@@ -279,4 +364,4 @@ if (require.main === module) {
  }));
 }
 
-module.exports = {contrast,menuPixel,menuText,logText,cardText,logState,openMenu,openLog,openCard,withReader};
+module.exports = {contrast,contrastDetails,menuPixel,menuText,logText,cardText,logState,phraseText,speakerState,opaquePictures,openMenu,openLog,openCard,openPhrase,waitFor,withReader};

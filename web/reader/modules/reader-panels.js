@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* 2026-11-13 reader panels「推镜 Push-cut」(option D, judges 8.5 / 8.7): 点读卡, 对话记录 and Alt+T share one quiet ink
-   surface. Opacity, radius and border stay the user's own (--tome-p-*). Alt+T gets a one-line header, its hotkeys move to
+   surface. The saved opacity sets the picture weight, and the tint can raise the total opacity. Alt+T gets a one-line header, its hotkeys move to
    the footer; no ordinal numbers, corner marks or stripes. Motion: the panel cuts in at 97% and pushes to 100% (220 ms),
    one red line runs under the header, the word card's headword slides 10 px. GSAP is loaded on idle from ../vendor; until
    it is there (or with reduced motion) panels simply appear. Timelines are killed on completion: nothing keeps running. */
@@ -10,8 +10,9 @@
  const R='html:not(#mgp1):not(#mgp2):not(#mgp3):not(#mgp4):not(#mgp5):not(#mgp6):not(#mgp7):not(#mgp8):not(#mgp9) body';
  const P=':is(.tomoyo-cn-dialog,.tomoyo-selection-card,.tome-backlog)';
  const G=R.replace('html','html:is([data-tome-card-surface=glass],[data-tome-card-surface=both])');
- const picturePanels=':is([data-tome-menu-surface=image] .tomoyo-cn-dialog,[data-tome-log-surface=image] .tome-backlog,[data-tome-card-surface=image] .tomoyo-selection-card)';
- const pictureLayer=`${R}.tomoyo-ui-translation ${picturePanels}>.tome-menu-bg`;
+ const pictureSurfaces=':is([data-tome-menu-surface=image][data-tome-menu-picture] .tomoyo-cn-dialog,[data-tome-log-surface=image][data-tome-log-picture] .tome-backlog,[data-tome-card-surface=image][data-tome-card-picture] .tomoyo-selection-card)';
+ const picturePanels=`${R}.tomoyo-ui-translation ${pictureSurfaces}`;
+ const pictureLayer=`${picturePanels}>.tome-menu-bg`;
  const css=String.raw`
 ${R} ${P}{--ink:#f3efe8;--ink2:#cfc8bd;--ink3:#b0aaa0;--line:rgba(243,239,232,.13);--red:#d8343e;--redi:#ff7880;
  color:var(--ink)!important;border:1px solid rgba(243,239,232,var(--tome-p-border,.08))!important;border-radius:var(--tome-p-radius,18px)!important;
@@ -143,16 +144,24 @@ ${R} .tomoyo-selection-card>.tome-menu-bg{--tome-p-layer-alpha:max(var(--tome-p-
 ${R} .tome-backlog>.tome-menu-bg{--tome-p-layer-alpha:max(var(--tome-p-alpha,.62),.9);opacity:var(--tome-p-layer-alpha)!important}
 ${G} .tomoyo-selection-card>.tome-menu-bg{opacity:1!important}
 ${G} .tomoyo-selection-card>.tome-menu-bg::after{opacity:max(calc(var(--tome-p-alpha,.62) * .6),.8)!important;background:#0a090a!important}
-/* Picture panels use light ink over a dark backing, including when the home theme is light. */
-${R.replace('html','html[data-theme=light]')}.tomoyo-ui-translation ${picturePanels}{color-scheme:dark;--theme-text:var(--ink);--theme-textSecondary:var(--ink3);
- --theme-background:#14161b;--theme-surface:#24272e;--theme-border:#393e49;--mgc-ink:var(--ink);--mgc-ink-2:var(--ink2);--mgc-ink-3:var(--ink3);--mgc-well:var(--theme-background)}
-/* The 92% darken blend preserves channels up to 25 and rolls highlights off to at most 44.
-   Keep the picture's weight A. The ink backing raises the total alpha to B so that even over a white game,
-   A * 44 + (B - A) * 10 + (1 - B) * 255 is at most 47, leaving room for the translucent control fills. */
+/* A loaded picture uses the same readable ink in both themes. Accent text is lighter than the red button fills. */
+${picturePanels}{color-scheme:dark;--ink3:#c9c2b8;--redi:#ffb5ba;--theme-text:var(--ink);--theme-textSecondary:var(--ink3);
+ --theme-background:#14161b;--theme-surface:#24272e;--theme-border:#393e49;--mgc-ink:var(--ink);--mgc-ink-2:var(--ink2);--mgc-ink-3:var(--ink3);
+ --mgc-well:var(--theme-background);--mgc-red-ink:var(--redi);--mgc-red-hi:#c43b48}
+${picturePanels} :is(.tomoyo-word-row:not(.tomoyo-word-minor)>summary>strong,.tomoyo-chunk-role,.tomoyo-ai-result strong,.tome-voice-rec,
+ [data-calibration-current][data-preview=true],.tome-cm-link,.tomoyo-about-card b,.tome-credit-links button,.tome-pick-list li[aria-selected=true]){color:var(--redi)!important}
+${picturePanels} .tome-log-name b{color:var(--ink)!important}
+${picturePanels} .tome-log-hit{background:color-mix(in srgb,var(--mgc-red) 35%,transparent)!important}
+${picturePanels} :is(.tome-log-time,.tome-log-name i,.tomoyo-row-pos,.tomoyo-word-form){color:var(--ink3)!important}
+${picturePanels} :is(button:disabled,.megulit-autospeak-hint,.tome-hook-time,.tome-trouble>summary small){opacity:1!important}
+${picturePanels} .tomoyo-anki-button:disabled:not([data-state]){background:#443436!important}
+/* Keep the picture's weight A and raise the total opacity to B. In the worst case, the equivalent grey is
+   A * peak + (B - A) * tint + (1 - B) * 255. Solving for B bounds it at 48 before the controls' fills. */
 ${pictureLayer}{--tome-p-picture-alpha:clamp(0,var(--tome-p-layer-alpha,var(--tome-p-alpha,.62)),1);
- --tome-p-composite-alpha:max(var(--tome-p-picture-alpha),calc(.85 + .14 * var(--tome-p-picture-alpha)));opacity:var(--tome-p-composite-alpha)!important}
-${pictureLayer}>i{background-color:#0a090a;isolation:isolate;opacity:calc(var(--tome-p-picture-alpha) / var(--tome-p-composite-alpha))}
-${pictureLayer}>i::after{content:"";position:absolute;inset:0;background:#191919;mix-blend-mode:darken;opacity:.92}
+ --tome-p-tint:var(--tome-p-picture-tint,10);
+ --tome-p-composite-alpha:max(var(--tome-p-picture-alpha),calc((255 - var(--tome-p-picture-limit) + var(--tome-p-picture-alpha) * (var(--tome-p-picture-peak) - var(--tome-p-tint))) / (255 - var(--tome-p-tint))));
+ opacity:var(--tome-p-composite-alpha)!important;background-color:rgb(var(--tome-p-tint) var(--tome-p-tint) var(--tome-p-tint))!important}
+${pictureLayer}>i{background-image:var(--tome-p-readable-image,var(--tome-p-image,none));opacity:calc(var(--tome-p-picture-alpha) / var(--tome-p-composite-alpha))}
 ${R} .tomoyo-selection-card .tomoyo-sense{grid-template-columns:minmax(0,1fr)!important}
 ${R} .tomoyo-selection-card>header button:not(.tomoyo-anki-button),${R} .tomoyo-selection-card>footer button{color:var(--ink2)!important;border-color:rgba(243,239,232,.24)!important}
 ${R} .tomoyo-selection-card>header button:not(.tomoyo-anki-button):hover,${R} .tomoyo-selection-card>footer button:hover{color:var(--ink)!important;background:rgba(243,239,232,.08)!important}
