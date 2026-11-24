@@ -135,12 +135,12 @@ const wars=dir=>kit.files(dir,{name:/\.war$/i,magic:'WARC'}).filter(f=>header(f)
    GARbro's runtime pack when no scheme here opens them */
 const SCENARIO=/(_t|scenario|script|scr|txt|text)\.war$/i;
 function scenes(dir){const out=new Map(),all=wars(dir),keyed=[];
- const add=(a,e)=>{if(/\.txt$/i.test(e.name))out.set(e.name.toLowerCase(),{name:path.basename(a)+'/'+e.name,read:()=>read(a,e)});};
+ const add=(a,e)=>{if(/\.txt$/i.test(e.name)){const name=path.basename(a)+'/'+e.name;out.set(name.toLowerCase(),{name,read:()=>read(a,e)});}};
  for(const a of all){const l=list(a);if(l){for(const e of l)add(a,e);}else keyed.push(a);}
  const targets=keyed.filter(f=>SCENARIO.test(path.basename(f))),viaGarbro=[];
  for(const a of targets.length?targets:keyed){let arc=null;try{arc=open(a);}catch{}if(arc){for(const e of arc.entries)add(a,e);}else viaGarbro.push(a);}
  for(const a of viaGarbro){let c;try{c=garbro.cacheDir(a);}catch{continue;}const info=garbro.readJson(path.join(c,'done.json'));
-  if(info){for(const rel of info.files)if(/\.txt$/i.test(rel))out.set(rel.toLowerCase(),{name:path.basename(a)+'/'+rel.replace(/\\/g,'/'),read:()=>fs.readFileSync(path.join(c,rel))});continue;}
+  if(info){for(const rel of info.files)if(/\.txt$/i.test(rel)){const name=path.basename(a)+'/'+rel.replace(/\\/g,'/');out.set(name.toLowerCase(),{name,read:()=>fs.readFileSync(path.join(c,rel))});}continue;}
   if(garbro.readJson(path.join(c,'failed.json'))?.version===garbro.version())continue;
   try{garbro.schedule(a);}catch{}}
  return [...out.values()].sort((a,b)=>a.name.localeCompare(b.name));}
