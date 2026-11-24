@@ -182,7 +182,7 @@ function probeInScope({dir,executable,title},{budgetMs=60000,progress=null}={}){
     unpack them now when the pack is installed (a probe never downloads it), else say the pack is what is missing */
  let garbroNeed=0;
  if(!engines.some(e=>e.lines>0))try{const g=require('./original-engines/garbro.cjs'),scenes=require('./original-engines/scenes.cjs');
-  const files=scenes.ownCx(dir)?[]:g.archives(dir).filter(f=>{const c=g.cacheDir(f);return !g.readJson(path.join(c,'done.json'))&&g.readJson(path.join(c,'failed.json'))?.version!==g.version();});
+  const files=scenes.ownCx(dir)?[]:g.archives(dir).filter(f=>{const c=g.cacheDir(f);return !g.readJson(path.join(c,'done.json'))&&!g.cachedFailure(c);});
   if(files.length&&g.installed()){report({stage:'garbro-unpack',engines});for(const f of files){const left=deadline-Date.now()-3000;if(left<5000)break;try{g.unpackSync(f,{timeout:left});}catch{}}
    const again=runEngines(dir,{deadline:Math.max(deadline,Date.now()+GENERIC_MS),only:['garbro']}).find(e=>e.id==='garbro');if(again){const i=engines.findIndex(e=>e.id==='garbro');if(i>=0)engines[i]=again;else engines.push(again);}}
   else if(files.length)garbroNeed=files.length;}catch{}
@@ -201,5 +201,9 @@ function probeInScope({dir,executable,title},{budgetMs=60000,progress=null}={}){
   engines:engines.map(({sizes,...e})=>e),detected:c.detected,lines:best?.lines||0,japaneseLines:best?.japaneseLines||0,dialogueLines:best?.dialogueLines||0,chineseLines:best?.chineseLines||0,sizes:best?.sizes||[],
   tried:engines.filter(e=>e.routed||e.scenes!==0).map(e=>e.id).slice(0,24),budgetMs,...garbroNeed&&c.step!=='not-japanese'?{needs:'garbro'}:{},step:c.step,detail:c.detail,original,restore,unsupported:unsupported?{engine:unsupported.engine,code:unsupported.code}:null,preparing,_archives:inv.archives.map(a=>a._path)};
 }
-function probeGame(game,options){return require('./original-engines/scenes.cjs').withCxProbe(()=>probeInScope(game,options));}
+function probeGame(game,options){
+ const scenes=require('./original-engines/scenes.cjs'),garbro=require('./original-engines/garbro.cjs');
+ // The synchronous fallback owns cold GARbro extraction during a probe.
+ return scenes.withCxProbe(()=>garbro.withCached(()=>probeInScope(game,options)));
+}
 module.exports={probeGame,isWindowsDirectory,routedReaders,scaledBudget,classify,judgeLanguage,countLines,inventory,reader,MAGICS};
