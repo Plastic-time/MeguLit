@@ -27,9 +27,9 @@ function extraSchemes(){
  const list=[],fps=[];
  for(const p of raw){try{const s=p?.value;if(!s||typeof s.title!=='string')continue;
   const o={title:s.title,version:s.version|0,sc:s.type?.sc||'',ogg:s.type?.ogg||''},arcs=[];
-  for(const [a,k] of Object.entries(s.arc||{}))if(Array.isArray(k)&&typeof k[0]==='string'&&typeof k[1]==='string'){o[a]={index:k[0],data:k[1]};arcs.push(a+':'+k[0].toLowerCase()+':'+k[1].toLowerCase());}
-  arcs.sort();list.push(o);fps.push(o.title+':'+o.version+':'+o.sc+':'+o.ogg+':'+arcs.join(';'));}catch{}}
- extraMemo={raw,list,fp:fps.join('|')};
+  for(const [a,k] of Object.entries(s.arc||{}))if(Array.isArray(k)&&typeof k[0]==='string'&&typeof k[1]==='string'){o[a]={index:k[0],data:k[1]};arcs.push([a,k[0].toLowerCase(),k[1].toLowerCase()]);}
+  arcs.sort((x,y)=>x[0]<y[0]?-1:x[0]>y[0]?1:0);list.push(o);fps.push([o.title,o.version,o.sc,o.ogg,arcs]);}catch{}}
+ extraMemo={raw,list,fp:JSON.stringify(fps)};
  return extraMemo;
 }
 function schemes(extra=extraSchemes().list){return [...Object.values(SCHEMES),...extra,...KNOWN_SCHEMES];}
@@ -43,9 +43,10 @@ function opens(file,scheme,arc,total){if(!scheme[arc])return false;const start=s
  const raw=readAt(file,start+4,16);if(xor)for(let i=0;i<16;i++)raw[i]^=xor;const d=new Blowfish(Buffer.from(scheme[arc].index,'hex')).decryptBuffer(raw),count=d.readUInt32LE(0);
  if(!count||count>100000)return false;for(let i=4;i<16;i++){const c=d[i];if(c===0)return i>4;if(c<0x20||c===0x7f)return false;}return true;}
 const chosen=new Map();
-function schemeOf(file){let st,head;try{st=fs.statSync(file);head=readAt(file,0,32);}catch{chosen.delete(file);return null;}
+function schemeOf(file){let st;try{st=fs.statSync(file);}catch{chosen.delete(file);return null;}
  const total=st.size,extra=extraSchemes(),key=total+':'+st.mtimeMs+':'+extra.fp,m=chosen.get(file);
  if(m&&m.key===key)return m.val;
+ let head;try{head=readAt(file,0,32);}catch{chosen.delete(file);return null;}
  const arc=path.parse(file).name.toLowerCase();
  const name=head.toString('latin1',0,head.indexOf(0)>0?head.indexOf(0):0);let found=SCHEMES[name]&&SCHEMES[name][arc]?SCHEMES[name]:null;
  if(!found&&/\.(?:paz|dat)$/i.test(file))found=schemes(extra.list).find(s=>{try{return opens(file,s,arc,total);}catch{return false;}})||null;

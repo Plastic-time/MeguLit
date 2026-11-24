@@ -47,9 +47,10 @@ function extraSchemes(){
  const list=[],fps=[];
  for(const p of raw){const s=p?.value||{};const dec=decryptorOf(s);if(!dec)continue;
   const align=s.align>>>0||0x1000,title=String(s.title||'adapter pack');
+  const rot=Array.isArray(s.rotate)?s.rotate.map(x=>x>>>0):null;
   list.push({title,align,dec});
-  fps.push(s.cipher+':'+String(s.key).toLowerCase()+':'+align+':'+(Array.isArray(s.rotate)?s.rotate.map(x=>x>>>0).join('.'):'')+':'+title);}
- extraMemo={raw,list,fp:fps.join('|')};
+  fps.push([s.cipher,String(s.key).toLowerCase(),align,rot,title]);}
+ extraMemo={raw,list,fp:JSON.stringify(fps)};
  return extraMemo;
 }
 function schemes(extra=extraSchemes().list){return [...extra,...KNOWN_SCHEMES];}

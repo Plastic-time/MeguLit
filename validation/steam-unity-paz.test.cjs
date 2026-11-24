@@ -125,6 +125,50 @@ test('PAZ: schemeOf() cache invalidates when paz-scheme adapter packs or file mt
  /* 6. Removing pack invalidates cached scheme */
  packs.params=()=>[];
  assert.strictEqual(paz.list(pFile),null);
+ /* 7. Warmed schemeOf() cache returns without re-reading header or calling opens() (kills P8) */
+ packs.params=target=>target==='paz-scheme'?right:[];
+ assert.ok(paz.list(pFile));
+ const origOpen=fs.openSync;let opensCnt=0;fs.openSync=(...a)=>{opensCnt++;return origOpen(...a);};
+ try{assert.ok(paz.list(pFile));assert.strictEqual(opensCnt,2,'cached paz.list() should only read index size and index body, not header/opens');}finally{fs.openSync=origOpen;}
+ /* 8. Changing only type.ogg (and delimiter-collision sc/ogg pairs) invalidates cache (kills P5 & collision) */
+ const oggData=Buffer.from('OggS\x00\x02dummy-ogg-payload-123456','latin1');
+ const pazFileWith=(hdr,sc,arc,files,pw)=>{
+  const keys=sc.arc[arc],names=Object.keys(files),zlib=require('node:zlib');
+  let idxLen=4;for(const n of names)idxLen+=Buffer.byteLength(n,'latin1')+1+24;idxLen=(idxLen+7)&~7;
+  let at=0x24+idxLen;const parts=[],idx=Buffer.alloc(idxLen);idx.writeUInt32LE(names.length,0);let p=4;
+  for(const n of names){const plain=files[n],k=Buffer.from(n.toLowerCase()+' '+plain.length.toString(16).toUpperCase().padStart(8,'0')+' '+pw,'latin1');
+   const skip=sc.version>=2?(zlib.crc32(k)>>>12)&255:0;
+   const S=[...Array(256).keys()];let j=0;for(let i=0;i<256;i++){j=(j+S[i]+k[i%k.length])&255;[S[i],S[j]]=[S[j],S[i]];}
+   let a=0,b=0;for(let q=0;q<skip;q++){a=(a+1)&255;b=(b+S[a])&255;[S[a],S[b]]=[S[b],S[a]];}
+   const x=Buffer.from(plain);for(let i=0;i<x.length;i++){a=(a+1)&255;b=(b+S[a])&255;[S[a],S[b]]=[S[b],S[a]];x[i]^=S[(S[a]+S[b])&255];}
+   const body=enc(keys[1],pad8(x));p+=idx.write(n,p,'latin1');idx[p++]=0;idx.writeBigInt64LE(BigInt(at),p);idx.writeUInt32LE(plain.length,p+8);idx.writeUInt32LE(plain.length,p+12);idx.writeUInt32LE(body.length,p+16);idx.writeInt32LE(0,p+20);p+=24;parts.push(body);at+=body.length;}
+  const head=Buffer.alloc(0x24);head.write(hdr,0,'latin1');head.writeUInt32LE(idxLen,0x20);
+  return Buffer.concat([head,enc(keys[0],idx),...parts]);
+ };
+ const vSchemeGood={title:'Custom:Voice',version:1,type:{sc:'a',ogg:'b:c'},arc:{voice:[idxKeyA,dataKeyA]}};
+ const vSchemeCollide={title:'Custom:Voice',version:1,type:{sc:'a:b',ogg:'c'},arc:{voice:[idxKeyA,dataKeyA]}};
+ const vSchemeBadOgg={title:'Custom:Voice',version:1,type:{sc:'a',ogg:'wrong'},arc:{voice:[idxKeyA,dataKeyA]}};
+ const vFile=path.join(dir,'voice.paz');
+ fs.writeFileSync(vFile,pazFileWith('custom_v',vSchemeGood,'voice',{'v001.ogg':oggData},'b:c'));
+ const pBadOgg=[{value:vSchemeBadOgg,pack:'v@1'}],pCollide=[{value:vSchemeCollide,pack:'v@2'}],pGoodOgg=[{value:vSchemeGood,pack:'v@3'}];
+ packs.params=target=>target==='paz-scheme'?pBadOgg:[];
+ assert.notStrictEqual(paz.audio(vFile)[0].read().toString('latin1',0,4),'OggS');
+ packs.params=target=>target==='paz-scheme'?pGoodOgg:[];
+ assert.strictEqual(paz.audio(vFile)[0].read().toString('latin1',0,4),'OggS');
+ packs.params=target=>target==='paz-scheme'?pCollide:[];
+ assert.notStrictEqual(paz.audio(vFile)[0].read().toString('latin1',0,4),'OggS');
+ packs.params=target=>target==='paz-scheme'?pGoodOgg:[];
+ assert.strictEqual(paz.audio(vFile)[0].read().toString('latin1',0,4),'OggS');
+ /* 9. Changing only version (1 -> 2, same keys & passwords) invalidates cache (kills P6) */
+ const v2Good={title:'Custom V2',version:2,type:{sc:'pw123456'},arc:{scr:[idxKeyA,dataKeyA]}};
+ const v2AsV1={title:'Custom V2',version:1,type:{sc:'pw123456'},arc:{scr:[idxKeyA,dataKeyA]}};
+ const v2File=path.join(dir,'scr.dat');
+ fs.writeFileSync(v2File,pazFileWith('custom_v2',v2Good,'scr',{'A001.sc':ja},'pw123456'));
+ const pV1=[{value:v2AsV1,pack:'v2@1'}],pV2=[{value:v2Good,pack:'v2@2'}];
+ packs.params=target=>target==='paz-scheme'?pV1:[];
+ assert.notDeepStrictEqual(paz.parse(paz.list(v2File)[0].read()).lines,['「ひと」']);
+ packs.params=target=>target==='paz-scheme'?pV2:[];
+ assert.deepStrictEqual(paz.parse(paz.list(v2File)[0].read()).lines,['「ひと」']);
 });
 
 test('Naninovel: "> Name: |#id|" gives the line its voice by text id; @choice and narration take none',()=>{
