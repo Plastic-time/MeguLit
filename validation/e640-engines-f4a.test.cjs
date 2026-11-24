@@ -70,6 +70,55 @@ test('Escude: ESCR1_00 ASCII-only !/? lines map to full-width dialogue and pair 
  /* ESCR_NEW keeps ASCII !? as an anchor */
  assert.deepEqual(escude.parse(F.escrMess(['こんにちは','!?'])).anchors,['!?']);
 });
+test('Escude: ESCR1_00 half-width kana + voiced/semi-voiced marks compose into precomposed hiragana',t=>{
+ const dakuBytes=Buffer.from([
+  0xb3,0xde,
+  0xb6,0xde,0xb7,0xde,0xb8,0xde,0xb9,0xde,0xba,0xde,
+  0xbb,0xde,0xbc,0xde,0xbd,0xde,0xbe,0xde,0xbf,0xde,
+  0xc0,0xde,0xc1,0xde,0xc2,0xde,0xc3,0xde,0xc4,0xde,
+  0xca,0xde,0xcb,0xde,0xcc,0xde,0xcd,0xde,0xce,0xde,
+  0xca,0xdf,0xcb,0xdf,0xcc,0xdf,0xcd,0xdf,0xce,0xdf,
+ ]);
+ assert.deepEqual(escude.parse(F.escr1([dakuBytes],b=>b)).lines,['ゔがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽ']);
+ /* non-voicable kana, invalid handakuten base, double marks, and full-width kana/marks stay separate */
+ assert.equal(escude.restring('ｱﾞﾝﾞｶﾟｶﾞﾞかﾞｶ゛か゛'),'あ゛ん゛か゜が゛か゛か゛か゛');
+ /* end-to-end scenes.read on ESCR1_00 lines with decomposed voiced/semi-voiced half-width kana */
+ const encodeDecomposed=s=>{
+  const d={'が':'ｶﾞ','ぎ':'ｷﾞ','ぐ':'ｸﾞ','げ':'ｹﾞ','ご':'ｺﾞ','ざ':'ｻﾞ','じ':'ｼﾞ','ず':'ｽﾞ','ぜ':'ｾﾞ','ぞ':'ｿﾞ',
+   'だ':'ﾀﾞ','ぢ':'ﾁﾞ','づ':'ﾂﾞ','で':'ﾃﾞ','ど':'ﾄﾞ','ば':'ﾊﾞ','び':'ﾋﾞ','ぶ':'ﾌﾞ','べ':'ﾍﾞ','ぼ':'ﾎﾞ',
+   'ぱ':'ﾊﾟ','ぴ':'ﾋﾟ','ぷ':'ﾌﾟ','ぺ':'ﾍﾟ','ぽ':'ﾎﾟ','ゔ':'ｳﾞ'};
+  return Buffer.concat([...s].map(c=>d[c]?kit.encodeSjis(d[c]):escr1Bytes(c)));
+ };
+ const lines=['ありがとう、また明日。','今日はいい天気ですね。','がんばろう！ぱちぱち！'];
+ const game=tmp(t);put(game,'script.bin',F.escArc({'scr/0001.bin':F.escr1(lines,encodeDecomposed)}));
+ assert.deepEqual(scenes.read('escude',game)[0].lines,lines);
+});
+test('Escude: short ESCR1_00 GBK patches decode as GBK while short Japanese scripts stay Shift-JIS',t=>{
+ /* single-line and few-line GBK patches that previously tied at bad=0 and misdecoded as Shift-JIS */
+ for(const line of ['“早上好”','“回家”','谢谢你。','对不起。','你好。','晚安。','再见。','什么？','没关系。','太好了！','你好，世界！']){
+  assert.deepEqual(escude.parse(F.escr1([line],gbk)).lines,[line],line);
+ }
+ /* multi-line short GBK where a trailing 0xE0..0xFC byte would otherwise eat across concatenated rows */
+ assert.deepEqual(escude.parse(F.escr1(['你','好'],gbk)).lines,['你','好']);
+ /* scenes.read overlay pairs a short GBK patch cleanly */
+ const game=tmp(t);put(game,'script.bin',F.escArc({'scr/0001.bin':F.escr1(['「おはよう」','ありがとう。'],escr1Bytes)}));
+ const over=scenes.read('escude',game,new Map([['0001.bin',F.escr1(['“早上好”','谢谢你。'],gbk)]]));
+ assert.equal(over[0].patched,true);assert.deepEqual(over[0].lines,['“早上好”','谢谢你。']);
+ /* short Japanese scripts (quoted 。」, JIS level-2 kanji, level-1 kanji, 0xA0 space, pure hiragana, odd-length pair) stay Shift-JIS */
+ const encJa=s=>Buffer.concat([...s].map(c=>{const d={'が':'ｶﾞ','だ':'ﾀﾞ','で':'ﾃﾞ','ご':'ｺﾞ'};return d[c]?kit.encodeSjis(d[c]):escr1Bytes(c);}));
+ for(const line of ['「こんにちは。」','「ほんとう。」','こんにちは。','ごめんなさい。','はい','真琴','東京','第一章　出会い','薔薇が咲いた。','綺麗だね。','鬱']){
+  assert.deepEqual(escude.parse(F.escr1([line],encJa)).lines,[line],line);
+ }
+ /* boundary guards for preferShortGbk: per-row GBK FFFD, gbCommon ratio (<75%), 0x81-0x9F sjGood, 0xA0 space, balanced 「...。」, and >256B long-script cutoff */
+ assert.deepEqual(escude.parse(F.escr1([Buffer.from([0xb5,0xc4,0xb5,0xc4,0xb5,0xc4,0xe1,0x8a,0xb1]),Buffer.from([0xb2,0xb5,0xc4])],b=>b)).lines,['おとおとおと瘧あ','いおと']);
+ assert.deepEqual(escude.parse(F.escr1([Buffer.from([0xe1,0x8a,0xe1,0x8a])],b=>b)).lines,['瘧瘧']);
+ assert.deepEqual(escude.parse(F.escr1([Buffer.from([0x90,0x5e,0xb5,0xc4,0xb5,0xc4,0xa1,0xa3])],b=>b)).lines,['真おとおと。」']);
+ assert.deepEqual(escude.parse(F.escr1([Buffer.from([0xb5,0xc4,0xa0,0xb1,0xb5,0xc4,0xa1,0xa3])],b=>b)).lines,['おと　あおと。」']);
+ assert.deepEqual(escude.parse(F.escr1([Buffer.from([0xa2,0xb1,0xb5,0xc4,0xb5,0xc4,0xb5,0xc4,0xa1,0xa3])],b=>b)).lines,['「あおとおとおと。」']);
+ /* long script (>256B) tying at bad=0 keeps base Shift-JIS/kana decision unchanged */
+ const longTie=Array.from({length:35},()=>Buffer.from([0xa1,0xb0,0xbb,0xd8,0xbc,0xd2,0xa1,0xb1]));
+ assert.equal(escude.parse(F.escr1(longTie,b=>b)).lines[0],'。ーさりしめ。あ');
+});
 
 /* ---- PJADV ---------------------------------------------------------------------------------------------------------- */
 const PJ=(L,N)=>[{name:N,say:L[0]},{say:L[1]},{prompt:L[2]},{choice:L[0].slice(0,3)},{choice:L[1].slice(0,3)}];
