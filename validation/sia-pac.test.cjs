@@ -86,12 +86,16 @@ for(const [name,engine,filename,payload] of [
  ['Tmr-Hiro ADV','tmrhiro','srp.pac',tmr.tmrPac({'scene':tmr.srp([tmr.HEADER,tmr.tmrMsg(originalLine)])})],
 ])test('SIA PAC files leave the existing '+name+' reader selected',t=>{
  const {root,dir,data,executable}=setup(t);
+ const other=path.join(dir,'Game.exe');
+ fs.writeFileSync(other,'MZ');
  fs.writeFileSync(path.join(dir,filename),payload);
  fs.writeFileSync(path.join(data,'start.pac'),kit.encodeSjis('TEXT\r\n別の台詞です。\r\n'.repeat(5)));
  assert.equal(registry.engineOf(dir)?.name,name);
  assert.equal(probeGame({dir,executable}).detected,engine);
+ assert.equal(original.scanRunning(root,'1',other).runtime?.engine,engine);
  const state=original.scanRunning(root,'1',executable);
  assert.equal(state.runtime?.engine,engine);
+ assert.ok(original.provider(root,executable,{id:'1'}));
  assert.deepEqual(JSON.parse(fs.readFileSync(state.runtime.index,'utf8')).lines,[originalLine]);
 });
 
@@ -99,7 +103,7 @@ for(const [name,files] of [
  ['loose SoftPal scripts',{'SCRIPT.SRC':softpal.src,'TEXT.DAT':softpal.text}],
  ['publisher-named SoftPal PAC',{'named-by-publisher.pac':fixtures.softpalPac({'SCRIPT.SRC':softpal.src,'TEXT.DAT':softpal.text})}],
 ])test('selecting Game.exe reads '+name+' alongside SIA PAC files',t=>{
- const {root,dir,data}=setup(t),executable=path.join(dir,'Game.exe');
+ const {root,dir,data,executable:siaExecutable}=setup(t),executable=path.join(dir,'Game.exe');
  fs.writeFileSync(executable,'MZ');
  for(const [file,payload] of Object.entries(files))fs.writeFileSync(path.join(dir,file),payload);
  fs.writeFileSync(path.join(data,'dialogue.pac'),kit.encodeSjis('TEXT\r\n別の台詞です。\r\n'.repeat(5)));
@@ -113,6 +117,28 @@ for(const [name,files] of [
  const state=original.scanRunning(root,'1',executable);
  assert.equal(state.runtime?.engine,'softpal');
  assert.deepEqual(JSON.parse(fs.readFileSync(state.runtime.index,'utf8')).lines,[originalLine]);
+ const db=gameDb(t,siaExecutable);
+ assert.equal(original.status(root,db,'1').runtime?.engine,'sia');
+ assert.equal(original.scriptPairs(root,siaExecutable).ja[0],'別の台詞です。');
+});
+
+function gameDb(t,executable){
+ const {DatabaseSync}=require('node:sqlite'),db=new DatabaseSync(':memory:');
+ t.after(()=>db.close());
+ db.exec('CREATE TABLE games (id TEXT,title TEXT,executable TEXT,removed_at TEXT)');
+ db.prepare('INSERT INTO games (id,title,executable) VALUES (?,?,?)').run('1','SIA fixture',executable);
+ return db;
+}
+
+test('a newly recognized SoftPal install invalidates the previously saved SIA index',t=>{
+ const {root,dir,data,executable}=setup(t),db=gameDb(t,executable);
+ fs.writeFileSync(path.join(data,'dialogue.pac'),kit.encodeSjis('TEXT\r\n別の台詞です。\r\n'));
+ fs.writeFileSync(path.join(dir,'SCRIPT.SRC'),softpal.src);
+ fs.writeFileSync(path.join(dir,'TEXT.DAT'),softpal.text);
+ assert.equal(original.status(root,db,'1').runtime?.engine,'sia');
+ fs.writeFileSync(path.join(dir,'PAL.dll'),'MZ');
+ assert.equal(original.status(root,db,'1').runtime?.engine,'softpal');
+ assert.deepEqual(original.scriptPairs(root,executable).ja,[originalLine]);
 });
 
 test('selecting a different program suppresses SIA routing even with an old index and probe result',async t=>{
@@ -122,15 +148,12 @@ test('selecting a different program suppresses SIA routing even with an old inde
  const mtime=new Date('2020-01-01T00:00:00Z');
  for(const file of [executable,other])fs.utimesSync(file,mtime,mtime);
  fs.writeFileSync(path.join(data,'dialogue.pac'),kit.encodeSjis('TEXT\r\n今日は晴れています。\r\n'));
- const {DatabaseSync}=require('node:sqlite'),db=new DatabaseSync(':memory:');
- t.after(()=>db.close());
- db.exec('CREATE TABLE games (id TEXT,title TEXT,executable TEXT,removed_at TEXT)');
- db.prepare('INSERT INTO games (id,title,executable) VALUES (?,?,?)').run('1','SIA fixture',executable);
+ const db=gameDb(t,executable);
  const probe=require('../services/adapter-probe.cjs');
  const {setTimeout:delay}=require('node:timers/promises');
  const runProbe=async()=>{
   probe.start(root,db);
-  const deadline=Date.now()+5000;
+  const deadline=Date.now()+10000;
   while(probe.status(root).state==='running'&&Date.now()<deadline)await delay(10);
   assert.equal(probe.status(root).state,'done');
   return probe.results(root)['1'];
@@ -138,7 +161,13 @@ test('selecting a different program suppresses SIA routing even with an old inde
  t.after(()=>probe.cancel(root));
  assert.equal((await runProbe()).detected,'sia');
  assert.equal(original.status(root,db,'1').runtime?.engine,'sia');
+ assert.ok(original.provider(root,executable,{id:'1'}));
+ assert.match(original.contributionScript(root,executable,'1'),/^[a-f0-9]{64}$/);
  db.prepare('UPDATE games SET executable=? WHERE id=?').run(other,'1');
+ assert.equal(original.provider(root,other,{id:'1'}),null);
+ assert.match(original.providerKey(root,other,'1'),/^none\|/);
+ assert.equal(original.contributionScript(root,other,'1'),'');
+ assert.equal(original.scriptPairs(root,other),null);
  assert.notEqual((await runProbe()).detected,'sia');
  const state=original.status(root,db,'1');
  assert.equal(state.runtime,null);
@@ -150,10 +179,7 @@ test('a SIA translation PAC is refused through the normal patch entries',async t
  fs.writeFileSync(path.join(data,'start.pac'),kit.encodeSjis('TEXT\r\n今日は晴れています。\r\n'));
  const patch=path.join(root,'patch');fs.mkdirSync(patch);
  const source=path.join(patch,'start.pac');fs.writeFileSync(source,'TEXT\r\nTranslation.\r\n');
- const {DatabaseSync}=require('node:sqlite'),db=new DatabaseSync(':memory:');
- t.after(()=>db.close());
- db.exec('CREATE TABLE games (id TEXT,title TEXT,executable TEXT,removed_at TEXT)');
- db.prepare('INSERT INTO games (id,title,executable) VALUES (?,?,?)').run('1','SIA fixture',executable);
+ const db=gameDb(t,executable);
  assert.throws(()=>original.importPatch(root,db,'1',patch),{message:'PATCH_SCRIPT_NOT_FOUND'});
  await assert.rejects(original.importPatchSource(root,db,'1',source),{message:'PATCH_SCRIPT_NOT_FOUND'});
 });

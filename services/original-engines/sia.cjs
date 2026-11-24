@@ -7,7 +7,7 @@ const path=require('node:path'),kit=require('./kit.cjs');
 const BRAND=Buffer.from('SIA-Soft\0'),BRAND_OFFSET=0x58d20,KEY_OFFSET=0x59010,KEY_LENGTH=400;
 const MAX_SCRIPT_BYTES=1<<20;
 const TEXT_COMMANDS=new Set(['TEXT','TEXT_NO_INP','ADD_TEXT']);
-const isGameExecutable=executable=>path.basename(executable).toLowerCase()==='1055.exe';
+const isGameExecutable=executable=>path.basename(String(executable||'')).toLowerCase()==='1055.exe';
 
 function installation(dir){
  const executable=path.join(dir,'1055.exe');
@@ -18,6 +18,11 @@ function installation(dir){
   const files=kit.files(dir,{name:/\.pac$/i,subs:['data'],max:20000});
   return {executable,key:kit.not(key.subarray(0,KEY_LENGTH)),files};
  }catch{return null;}
+}
+
+function claimedInstallation(dir){
+ const game=installation(dir);
+ return game&&require('./registry.cjs').readersFor(dir).includes('sia')?game:null;
 }
 
 function read(file,key){
@@ -48,10 +53,10 @@ function parse(data){
 }
 
 const engine={id:'sia',hint:'data\\*.pac',
- sources(dir){const game=installation(dir);return game?[game.executable,...game.files]:[];},
+ sources(dir){const game=claimedInstallation(dir);return game?[game.executable,...game.files]:[];},
  scenes(dir){
-  const game=installation(dir);
-  if(!game||!require('./registry.cjs').readersFor(dir).includes('sia'))return [];
+  const game=claimedInstallation(dir);
+  if(!game)return [];
   return game.files.map(file=>({name:path.basename(file),read:()=>read(file,game.key)}));
  },
  parse,
