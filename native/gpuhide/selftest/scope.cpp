@@ -1,6 +1,50 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../GlyphQuads.h"
 #include <assert.h>
+
+static std::vector<Quad> Row(unsigned count, float left, float top, float height, float v) {
+ std::vector<Quad> row;
+ for (unsigned i = 0; i < count; i++) {
+  float x = left + 28 * i, u = i / 32.0f;
+  row.push_back({ x, top, x + height, top + height, u, v, u + height / 1024, v + height / 2048, i * 4 });
+ }
+ return row;
+}
+
+static void MovingBox() {
+ GlyphLearner g;
+ std::vector<std::string> reports;
+ g.emit = [&](const std::string &r) { reports.push_back(r); };
+ void *settings = (void *)1, *dialogue = (void *)2;
+ auto draw = [&](void *tex, const std::vector<Quad> &q, unsigned now) {
+  return g.Draw(tex, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now);
+ };
+ const auto preview = Row(6, 30, 88, 22, 0.0f);
+ g.Line(L"文字表示設定", 10000);
+ assert(draw(settings, preview, 10001).empty());
+ g.Frame(10002, 1280, 720);
+ assert(g.area.y0 == 66 && g.area.y1 == 154);
+
+ g.Line(L"お話しする時間ですよ。", 11000);
+ const auto bottom = Row(11, 470, 656, 32, 0.1f);
+ assert(draw(dialogue, bottom, 11001).empty());
+ g.Frame(11002, 1280, 720);
+ assert(g.area.y0 == 624 && g.glyphH == 32);
+ assert(reports.back().find("line=2 hidden=0") != std::string::npos);
+ assert(reports.back().find("rects=470,656,32,32") != std::string::npos);
+ assert(draw(dialogue, bottom, 11003).size() == bottom.size());
+ assert(draw(settings, preview, 11003).empty());
+ g.Frame(11004, 1280, 720);
+ assert(reports.back().find("line=2 hidden=1") != std::string::npos);
+
+ g.Line(L"水を持って行きますね。", 12000);
+ const auto next = Row(11, 470, 656, 32, 0.2f);
+ assert(draw(settings, Row(11, 50, 90, 22, 0.3f), 12001).empty());
+ assert(draw(dialogue, next, 12001).size() == next.size());
+ g.Frame(12002, 1280, 720);
+ assert(g.learnedSeq == 2); // The next line in a fixed box keeps the existing band.
+}
+
 int main() {
  GlyphLearner g;
  g.Line(L"これは会話です。", 100);
@@ -25,5 +69,6 @@ int main() {
  auto drop=g.Draw((void*)1,128,128,nullptr,640,480,640,480,{q,button},210);
  assert(drop.size()==1&&drop[0]==0);
  g.readOnly=true;assert(g.Draw((void*)1,128,128,nullptr,640,480,640,480,{q},211).empty());
+ MovingBox();
  puts("PASS dialogue scope: unclaimed title/menu, foreign target, unmatched ruby kept; confirmed dialogue hides; read/OFF restore");
 }

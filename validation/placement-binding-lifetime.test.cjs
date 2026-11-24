@@ -92,3 +92,25 @@ test('the same GPU line is submitted again when frame ownership returns to the R
   r.gal.hookEvent({ ...frame, hidden: true });
   assert.deepEqual(r.output, []);
 });
+
+test('a late glyph table cannot replace confirmed GPU coordinates for a moved line', () => {
+  const r = rig();
+  r.bind(10, '100');
+  const rects = [[300, 540, 28, 28], [328, 540, 28, 28]];
+  r.gal.hookEvent({ type: 'hookCharRects', engine: 'gpu', line: 5, hidden: true,
+    sw: 800, sh: 600, text: '青空', rects });
+  assert.deepEqual(r.output.at(-1).rects, rects);
+  const glyph = (seq, text) => {
+    r.gal.hooks.state.hookGlyphDots = { seq, text, dots: [...text].map((ch, i) => ({
+      i, ch, k: 'd', h: 28, a: 28, at: { x: 180 + i * 28, y: 230, space: 'c' }
+    })) };
+    r.gal.hookEvent({ type: 'hookGlyphDots' });
+  };
+  r.output.length = 0;
+  glyph(5, '青空');
+  assert.deepEqual(r.output, []);
+  assert.deepEqual(r.gal.placement.current.rects, rects);
+  glyph(6, '翌朝');
+  assert.equal(r.output.at(-1).text, '翌朝');
+  assert.equal(r.output.at(-1).rects[0][1], 230);
+});
