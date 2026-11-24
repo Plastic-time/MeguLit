@@ -236,6 +236,10 @@ test('CVNS PSS0 rejects a mismatched packed length and the reader rejects other 
   assert.deepEqual(cmvs.parse(invalidSize).lines, []);
   assert.deepEqual(cmvs.parse(invalidTextSize).lines, []);
   assert.deepEqual(cmvs.parse(invalidMagic).lines, []);
+  const foreignHeader = pss0(lines);
+  foreignHeader.write('BAD0');
+  assert.equal(cmvs.unpackPss0(foreignHeader), null);
+  assert.equal(cmvs.unpackPss0(Buffer.from('PSS0')), null);
   assert.deepEqual(cmvs.parse(pss0([...lines, { push: 'scene.pss' }])).anchors, ['scene.pss']);
   const sentence = 'Please load scene.pss.';
   assert.deepEqual(cmvs.parse(ps2a([sentence])).lines, [sentence]);
@@ -302,4 +306,35 @@ test('a PSS0 file named start.ps3 cannot hide the original PS2A registration for
 
   assert.equal(probeGame({ dir: root, executable }).step, 'ok');
   assert.deepEqual(readScript(locate(root, 'cvns')).lines.slice(0, lines.length), lines);
+});
+
+test('CVNS refuses short header and index reads from an otherwise well-formed archive', t => {
+  const { pack } = game(t);
+  const archive = cvnsPack({ 'main.pss': pss0(['そろそろ出かけよう。']) });
+  const shortHeader = path.join(pack, 'short-header.cpz');
+  const shortIndex = path.join(pack, 'short-index.cpz');
+  fs.writeFileSync(shortHeader, archive);
+  fs.writeFileSync(shortIndex, archive);
+  const head = kit.head;
+  const readAt = kit.readAt;
+  t.mock.method(kit, 'head', (file, size) => {
+    const bytes = head(file, size);
+    return file === shortHeader ? bytes.subarray(0, 12) : bytes;
+  });
+  t.mock.method(kit, 'readAt', (file, offset, size) => {
+    const bytes = readAt(file, offset, size);
+    return file === shortIndex && offset === 0x10 ? bytes.subarray(0, -1) : bytes;
+  });
+
+  assert.equal(cmvs.list(shortHeader), null);
+  assert.equal(cmvs.list(shortIndex), null);
+});
+
+test('CMVS continues to read unencrypted CPZ5 script entries', t => {
+  const { root, pack, executable } = game(t);
+  const lines = ['「そこに何か書いてあるよ。」', 'その紙を静かに広げて読んだ。'];
+  fs.writeFileSync(path.join(pack, 'script.cpz'), cpz({ 'main.ps3': ps2a(lines) }, { version: 5, encrypted: false }));
+
+  assert.equal(probeGame({ dir: root, executable }).step, 'ok');
+  assert.deepEqual(readScript(locate(root, 'cvns')).lines, lines);
 });
