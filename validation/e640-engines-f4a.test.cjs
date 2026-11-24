@@ -271,3 +271,40 @@ test('Cyberworks: legacy Arc05.dat falls back to Arc04.dat text TOC when Arc02.d
  const fb=scenes.read('cyberworks',badBin).filter(s=>s.lines.length);
  assert.equal(fb.length,1);assert.equal(fb[0].name,'s001.s');assert.deepEqual(fb[0].lines,JA);
 });
+test('archive-scan: truncated SQDARC and SAF 0x600 indexes return null without throwing while valid and tight archives stay readable',t=>{
+ const dir=tmp(t);
+ /* 1. SQDARC truncated top directory table and truncated file block */
+ const badTop=Buffer.alloc(0x20);badTop.write('SQDARC\0\0',0,'latin1');badTop.writeInt32LE(10,0x10);
+ const badTopFile=path.join(dir,'a_bad_top.sda');fs.writeFileSync(badTopFile,badTop);
+ assert.equal(scan.yaneList(badTopFile),null);
+ const badBlk=Buffer.alloc(0x30);badBlk.write('SQDARC\0\0',0,'latin1');badBlk.writeInt32LE(1,0x10);
+ badBlk.writeUInt32LE(0x2c,0x14);badBlk.writeInt32LE(5,0x18);
+ const badBlkFile=path.join(dir,'b_bad_blk.sda');fs.writeFileSync(badBlkFile,badBlk);
+ assert.equal(scan.yaneList(badBlkFile),null);
+ /* Valid SQDARC archive stays readable */
+ const sqdBody=TXT(sjis),sqdBlkAt=0x14+0x18,sqdDataAt=sqdBlkAt+0x30;
+ const goodSqd=Buffer.alloc(sqdDataAt+sqdBody.length);
+ goodSqd.write('SQDARC\0\0',0,'latin1');goodSqd.writeInt32LE(1,0x10);
+ goodSqd.writeUInt32LE(sqdBlkAt,0x14);goodSqd.writeInt32LE(1,0x18);goodSqd.write('txt',0x14+0x12,'latin1');
+ goodSqd.write('s01',sqdBlkAt,'latin1');goodSqd.writeUInt32LE(sqdDataAt,sqdBlkAt+0x28);goodSqd.writeUInt32LE(sqdBody.length,sqdBlkAt+0x2c);
+ sqdBody.copy(goodSqd,sqdDataAt);
+ const goodSqdFile=path.join(dir,'z_good.sda');fs.writeFileSync(goodSqdFile,goodSqd);
+ assert.deepEqual(scan.yaneList(goodSqdFile).map(e=>e.name),['s01.txt']);
+ assert.deepEqual(scenes.read('yaneurao',dir).filter(s=>s.lines.length)[0].lines,JA);
+
+ /* 2. SAF 0x600 truncated 10-byte index returns null without throwing */
+ const safDir=tmp(t);
+ const badSaf=Buffer.alloc(10);badSaf.writeUInt16LE(0x600,0);badSaf.writeInt16LE(1,2);badSaf.writeInt32LE(1,4);
+ const badSafFile=path.join(safDir,'a_bad.saf');fs.writeFileSync(badSafFile,badSaf);
+ assert.equal(scan.safList(badSafFile),null);
+ /* Valid SAF 0x600 (including slightly over-declared trailing nlen) stays readable alongside bad sibling */
+ const safBody=TXT(sjis),safName=Buffer.from('s01.str\0','latin1');
+ const goodSaf=Buffer.alloc(2048+safBody.length);
+ goodSaf.writeUInt16LE(0x600,0);goodSaf.writeInt16LE(1,2);goodSaf.writeInt32LE(200,4);
+ goodSaf.writeUInt32LE(0,8);goodSaf.writeUInt32LE(1,12);goodSaf.writeUInt32LE(safBody.length,16);goodSaf.writeUInt32LE(0,20);
+ safName.copy(goodSaf,24);safBody.copy(goodSaf,2048);
+ const goodSafFile=path.join(safDir,'z_good.saf');fs.writeFileSync(goodSafFile,goodSaf);
+ assert.deepEqual(scan.safList(goodSafFile).map(e=>e.name),['s01.str']);
+ assert.equal(library.engineOf(safDir)?.name,'Rits');
+ assert.deepEqual(scenes.read('rits',safDir).filter(s=>s.lines.length)[0].lines,JA);
+});
