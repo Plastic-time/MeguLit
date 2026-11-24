@@ -80,7 +80,7 @@ test('fallback reader: text scan, archive pick, media skipped, registered last',
 
 const dialogue=['今日は晴れています。','「ここで待とう。」'];
 for(const fixture of [
- {name:'PVNS',dir:'pack',archive:'SCRIPT.PBZ',magic:'PBZ1',file:'start.SCR',format:'PBZ',script:[';file:001 ver1.00',';ここはコメントです。','title 表示用の章名',...dialogue]},
+ {name:'PVNS',dir:'pack',archive:'SCRIPT.PBZ',magic:'PBZ1',file:'start.SCR',format:'PBZ',script:[';file:001 ver1.00',';ここはコメントです。',':開始ラベル','title 表示用の章名',...dialogue],extra:{'README.TXT':'内部エラーがありました。'}},
  {name:'Ivory',dir:'misc',archive:'script.pk',magic:'fPK ',file:'a01.TXT',format:'PK/IVORY',script:['unique 1','#ここはコメントです。','savetext "表示用の章名"',...dialogue],extra:{'A01.HPB':'fAGS','ERR.TXT':'内部エラーがありました。','PACKFILEW.EXE':'配布用のプログラムです。'}}
 ])test(`${fixture.name} archive supplies the probe and original entry with dialogue`,t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'garbro-legacy-')),game=path.join(root,'game');
@@ -111,11 +111,34 @@ test('GARbro keeps its existing archive types and avoids media and redistributab
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'garbro-select-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  fs.mkdirSync(path.join(root,'DirectX9'));
- for(const [file,magic] of Object.entries({'script.npk':'NPK2','script.pbz':'PBZ0','script.pk':'none','bg.pbz':'PBZ1','voice.pk':'fPK ','DirectX9/dxnt.cab':'MSCF'})){
+ for(const [file,magic] of Object.entries({'script.npk':'NPK2','script.pbz':'PBZ0','script.pk':'none','bg.pbz':'PBZ1','voice.pk':'fPK ','DirectX9/dxnt.cab':'MSCF','DirectX9/script.pak':'PACK'})){
   const data=Buffer.alloc(20000);data.write(magic);fs.writeFileSync(path.join(root,file),data);
  }
  const g=require('../services/original-engines/garbro.cjs');
- assert.deepEqual(g.archives(root).map(f=>path.basename(f)),['script.npk']);
+ assert.deepEqual(g.archives(root).map(f=>path.relative(root,f)).sort(),[path.join('DirectX9','script.pak'),'script.npk']);
+});
+
+test('a legacy script pack does not displace a readable generic archive from the probe',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'garbro-archive-limit-')),game=path.join(root,'game');
+ const previous=process.env.MEGULIT_GARBRO_CACHE;
+ process.env.MEGULIT_GARBRO_CACHE=path.join(root,'cache');
+ t.after(()=>{if(previous==null)delete process.env.MEGULIT_GARBRO_CACHE;else process.env.MEGULIT_GARBRO_CACHE=previous;fs.rmSync(root,{recursive:true,force:true});});
+ const g=require('../services/original-engines/garbro.cjs'),kit=require('../services/original-engines/kit.cjs');
+ fs.mkdirSync(game);
+ for(let i=1;i<=11;i++)fs.writeFileSync(path.join(game,`script${i}.pak`),Buffer.alloc(20000));
+ const existing=path.join(game,'script.pak');fs.writeFileSync(existing,Buffer.alloc(50000));
+ const cached=g.cacheDir(existing);fs.mkdirSync(cached,{recursive:true});
+ fs.writeFileSync(path.join(cached,'start.txt'),kit.encodeSjis(dialogue.join('\r\n')));
+ fs.writeFileSync(path.join(cached,'done.json'),JSON.stringify({format:'ZIP',files:['start.txt']}));
+ const header=Buffer.alloc(20000);header.write('PBZ1');
+ const legacy=path.join(game,'script.pbz');fs.writeFileSync(legacy,header);
+ const empty=g.cacheDir(legacy);fs.mkdirSync(empty,{recursive:true});
+ fs.writeFileSync(path.join(empty,'start.scr'),'; comment only');
+ fs.writeFileSync(path.join(empty,'done.json'),JSON.stringify({format:'PBZ',files:['start.scr']}));
+ const result=require('../services/adapter-probe-core.cjs').probeGame({dir:game});
+ assert.equal(result.step,'ok');
+ assert.equal(result.detected,'garbro');
+ assert.equal(result.japaneseLines,2);
 });
 
 test('cold adapter probe leaves GARbro extraction to the synchronous fallback',t=>{

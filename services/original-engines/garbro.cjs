@@ -23,7 +23,7 @@ const SCRIPTY=/script|scenario|scene|scn|story|text|txt|data|system|sys|main|gam
 /* media entries never hold dialogue: skip them so a 4 GB CG archive is not written to disk */
 const MEDIA='png|bmp|jpe?g|gif|tga|dds|webp|psd|tlg\\d?|pna|bmx|g00|pic|ani|eri|mio|cps|hg[23]|ogg|wav|mp3|m4a|opus|flac|ahx|hca|at3|wma|mp4|wmv|avi|mpe?g|webm|ogv|mov|ttf|otf|ttc|fnt|pmx|x|fbx';
 const MATCH='^(?!.*\\.('+MEDIA+')$).+';
-const LIMIT_BYTES=512*1048576,LIMIT_FILES=20000,MAX_ARCHIVES=12,MIN_SIZE=16384;
+const LIMIT_BYTES=512*1048576,LIMIT_FILES=20000,MAX_ARCHIVES=12,MAX_LEGACY_SCRIPT_PACKS=2,MIN_SIZE=16384;
 const SCRIPT_PACKS={
  '.pbz':{magic:'PBZ1',entries:/\.scr$/i,comment:/^;/},
  '.pk':{magic:'fPK ',entries:/\.(?:txt|hpb)$/i,comment:/^#/,paired:true}
@@ -52,11 +52,17 @@ function archives(dir){
  /* E583 a System4 folder (its script is the .ain) keeps only CG / sound in .afa / .ald: never worth unpacking */
  const sys4=(()=>{try{return require('./alicesoft.cjs').system4(dir);}catch{return false;}})();
  const out=[];const scan=(d,depth)=>{let list;try{list=fs.readdirSync(d,{withFileTypes:true});}catch{return;}
-  for(const e of list){const p=path.join(d,e.name);if(e.isDirectory()){if(depth<1&&!/^(save|savedata|movie|movies|video|bgm|sound|voice|se|cg|image|images|logs?|directx\d*)$/i.test(e.name))scan(p,depth+1);continue;}
-   if(!ARCHIVE.test(e.name)&&(!e.isFile()||!scriptPack(p)))continue;if(sys4&&/\.(afa|ald)$/i.test(e.name))continue;if(/^(unins\d*|setup|config|savedata|save\d*|global|sysdata)\./i.test(e.name))continue;
-   let size=0;try{size=fs.statSync(p).size;}catch{}if(size>=MIN_SIZE)out.push({file:p,size,scripty:SCRIPTY.test(e.name)});}};
+  const directx=depth>0&&/^directx\d*$/i.test(path.basename(d));
+  for(const e of list){const p=path.join(d,e.name);if(e.isDirectory()){if(depth<1&&!/^(save|savedata|movie|movies|video|bgm|sound|voice|se|cg|image|images|logs?)$/i.test(e.name))scan(p,depth+1);continue;}
+   if(directx&&/\.cab$/i.test(e.name))continue;
+   const legacyScript=!ARCHIVE.test(e.name);
+   if(legacyScript&&(!e.isFile()||!scriptPack(p)))continue;if(sys4&&/\.(afa|ald)$/i.test(e.name))continue;if(/^(unins\d*|setup|config|savedata|save\d*|global|sysdata)\./i.test(e.name))continue;
+   let size=0;try{size=fs.statSync(p).size;}catch{}if(size>=MIN_SIZE)out.push({file:p,size,scripty:SCRIPTY.test(e.name),legacyScript});}};
  scan(dir,0);
- return out.sort((a,b)=>b.scripty-a.scripty||a.size-b.size).slice(0,MAX_ARCHIVES).map(a=>a.file);
+ // Keep the existing candidate limit for generic formats and bound the named script packs separately.
+ let generic=0,legacy=0;
+ return out.sort((a,b)=>b.scripty-a.scripty||a.size-b.size)
+  .filter(a=>a.legacyScript?legacy++<MAX_LEGACY_SCRIPT_PACKS:generic++<MAX_ARCHIVES).map(a=>a.file);
 }
 
 function run(args,{timeout=10*60000}={}){
