@@ -70,6 +70,73 @@ test('QLIE: a game folder is recognised and read, and a GBK patch pairs 1:1',t=>
  const ja=scenes.read('qlie',game)[0],zh=qlie.parse(scenes.ENGINES.qlie.archives(patch)[0].read());
  assert.equal(zh.lines.length,ja.lines.length);assert.equal(zh.lines[0],'“早上好，哥哥”');assert.equal(zh.lines[4],'回家');
 });
+test('QLIE: 3.0 resolveGameKey re-evaluates when qlie-key adapter packs or key.fkey change in the same process',t=>{
+ const packs=require('../services/adapter-packs.cjs'),origParams=packs.params;
+ t.after(()=>{packs.params=origParams;});
+ const keyFile=Buffer.from(Array.from({length:256},(_,i)=>(i*29+7)&255));
+ const badKeyFile=Buffer.from(Array.from({length:256},(_,i)=>(i*31+3)&255));
+ const keyA=Buffer.from(Array.from({length:256},(_,i)=>(i*17+43)&255));
+ const keyB=Buffer.from(Array.from({length:256},(_,i)=>(i*23+89)&255));
+ const badExeKey=Buffer.from(Array.from({length:256},(_,i)=>(i*7+19)&255));
+ const dir=tmp(t);
+ F.writeTree(dir,{
+  'GameData/data0.pack':F.qliePack({'s001.s':F.sjis(QS)},{version:'3.0',keyFile,gameKey:keyA}),
+  'GameData/key.fkey':keyFile,
+  'game.exe':F.pe([{type:10,name:'TFORM1',data:F.tform(badExeKey)}]),
+ });
+ /* 1. Wrong adapter pack key + wrong exe key fails to decode Japanese */
+ packs.params=target=>target==='qlie-key'?[{value:{gameKey:keyB.toString('hex')}}]:[];
+ assert.notDeepEqual(scenes.read('qlie',dir)[0].lines,QL);
+ /* 2. Replacing the pack (same count = 1) with the right gameKey immediately decodes QL */
+ packs.params=target=>target==='qlie-key'?[{value:{gameKey:keyA.toString('hex')}}]:[];
+ assert.deepEqual(scenes.read('qlie',dir)[0].lines,QL);
+ /* 3. Removing the adapter pack must invalidate the previously adopted ctx.gameKey */
+ packs.params=()=>[];
+ assert.notDeepEqual(scenes.read('qlie',dir)[0].lines,QL);
+ /* 4. Re-adding the right pack decodes QL again */
+ packs.params=target=>target==='qlie-key'?[{value:{gameKey:keyA.toString('hex')}}]:[];
+ assert.deepEqual(scenes.read('qlie',dir)[0].lines,QL);
+ /* 5. Replacing external key.fkey with same-size bytes at a different millisecond within the same second invalidates list() cache */
+ const kfPath=path.join(dir,'GameData','key.fkey');
+ const tSec=1700000000000;
+ fs.utimesSync(kfPath,new Date(tSec+100),new Date(tSec+100));
+ assert.deepEqual(scenes.read('qlie',dir)[0].lines,QL);
+ fs.writeFileSync(kfPath,badKeyFile);
+ fs.utimesSync(kfPath,new Date(tSec+600),new Date(tSec+600));
+ assert.notDeepEqual(scenes.read('qlie',dir)[0].lines,QL);
+ fs.writeFileSync(kfPath,keyFile);
+ fs.utimesSync(kfPath,new Date(tSec+900),new Date(tSec+900));
+ assert.deepEqual(scenes.read('qlie',dir)[0].lines,QL);
+ /* 6. When adapter-pack fingerprint is unchanged, repeated reads reuse ctx.gameKey without re-scanning exe via kit.peResource */
+ const origPe=kit.peResource;
+ let peCalls=0;
+ kit.peResource=(...a)=>{peCalls++;return origPe(...a);};
+ try{
+  const samePack=[{value:{gameKey:keyA.toString('hex')}}];
+  packs.params=target=>target==='qlie-key'?samePack:[];
+  assert.deepEqual(scenes.read('qlie',dir)[0].lines,QL);
+  peCalls=0;
+  assert.deepEqual(scenes.read('qlie',dir)[0].lines,QL);
+  assert.equal(peCalls,0,'cached resolveGameKey should not re-scan exe resources');
+ }finally{kit.peResource=origPe;}
+ /* 7. Replacing ../DLL/key.fkey relative to GameData/*.pack also invalidates list() cache */
+ const dir2=tmp(t);
+ F.writeTree(dir2,{
+  'GameData/data0.pack':F.qliePack({'s001.s':F.sjis(QS)},{version:'3.0',keyFile,gameKey:keyA}),
+  'DLL/key.fkey':keyFile,
+  'game.exe':'MZ',
+ });
+ const dllKf=path.join(dir2,'DLL','key.fkey');
+ packs.params=target=>target==='qlie-key'?[{value:{gameKey:keyA.toString('hex')}}]:[];
+ fs.utimesSync(dllKf,new Date(tSec+100),new Date(tSec+100));
+ assert.deepEqual(scenes.read('qlie',dir2)[0].lines,QL);
+ fs.writeFileSync(dllKf,badKeyFile);
+ fs.utimesSync(dllKf,new Date(tSec+600),new Date(tSec+600));
+ assert.notDeepEqual(scenes.read('qlie',dir2)[0].lines,QL);
+ fs.writeFileSync(dllKf,keyFile);
+ fs.utimesSync(dllKf,new Date(tSec+900),new Date(tSec+900));
+ assert.deepEqual(scenes.read('qlie',dir2)[0].lines,QL);
+});
 
 /* ---- Entis -------------------------------------------------------------------------------------------------------------- */
 const talk=(name,parts)=>[['s',name],['s','v001'],['call','Talk',2],...parts.flatMap(p=>[['s',p],['call','Mess',1]])];

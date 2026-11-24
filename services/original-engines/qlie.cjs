@@ -92,16 +92,31 @@ function gameKeyFromExe(file){const d=path.dirname(file);for(const ed of [path.j
  const ic=f.indexOf(Buffer.from('\x05TIcon','latin1'),at);if(ic>=0&&ic+0x106<=f.length)return Buffer.from(f.subarray(ic+6,ic+0x106));}return null;}
 /* per-title game keys: qlie-schemes.json, then an adapter pack's "qlie-key" params */
 const SCHEMES=require('./qlie-schemes.json');
-function packKeys(){let extra=[];try{extra=require('../adapter-packs.cjs').params('qlie-key').map(p=>p.value);}catch{}return [...extra,...Object.entries(SCHEMES).filter(([k])=>k[0]!=='_').map(([,v])=>v)].filter(v=>v&&/^[0-9a-f]{512}$/i.test(String(v.gameKey||'')));}
+const KNOWN_KEYS=Object.entries(SCHEMES).filter(([k])=>k[0]!=='_').map(([,v])=>v?.gameKey).filter(g=>typeof g==='string'&&/^[0-9a-f]{512}$/i.test(g)).map(g=>Buffer.from(g,'hex'));
+let extraMemo={raw:null,keys:[],fp:''};
+function extraKeys(){
+ let raw=[];try{raw=require('../adapter-packs.cjs').params('qlie-key');}catch{}
+ if(extraMemo.raw===raw)return extraMemo;
+ const keys=[];
+ for(const p of raw){const g=p?.value?.gameKey;if(typeof g==='string'&&/^[0-9a-f]{512}$/i.test(g))keys.push(Buffer.from(g,'hex'));}
+ extraMemo={raw,keys,fp:keys.map(k=>k.toString('hex')).join(',')};
+ return extraMemo;
+}
+function packKeys(extra=extraKeys().keys){return [...extra,...KNOWN_KEYS];}
+function keyFileStamp(file){const d=path.dirname(file),parts=[];
+ for(const rel of ['.','..','../DLL','DLL']){const f=path.join(d,rel,'key.fkey');try{const s=fs.statSync(f);if(s.isFile())parts.push(rel+':'+s.size+':'+s.mtimeMs);}catch{}}
+ return parts.join('|');}
 
 const memo=new Map();
 /* list(file) -> entries (each knows how to read itself) or null */
-function list(file){const f=footer(file);if(!f||f.count<=0||f.count>500000||f.index<0||f.index>=f.size)return null;const st=kit.size(file)+':'+(fs.statSync(file).mtimeMs|0);
- const m=memo.get(file);if(m&&m.st===st)return m.list;let idx;try{idx=kit.readAt(file,f.index,f.size-0x1C-f.index);}catch{return null;}
+function list(file){const f=footer(file);if(!f||f.count<=0||f.count>500000||f.index<0||f.index>=f.size){memo.delete(file);return null;}
+ let stat;try{stat=fs.statSync(file);}catch{memo.delete(file);return null;}
+ const st=stat.size+':'+stat.mtimeMs+(f.major===3?':'+keyFileStamp(file):'');
+ const m=memo.get(file);if(m&&m.st===st)return m.list;let idx;try{idx=kit.readAt(file,f.index,f.size-0x1C-f.index);}catch{memo.delete(file);return null;}
  const arcKey=arcKeyOf(file,f),tries=f.major===1?[{v:1,withHash:false,nameKeyV2:false},{v:2,withHash:false,nameKeyV2:true},{v:2,withHash:true,nameKeyV2:true}]
   :f.major===2?[{v:2,withHash:true,nameKeyV2:true}]:f.major===3?[{v:3,withHash:true,nameKeyV2:true,unicode:f.minor===1}]:[];
  let out=null,mode=null;for(const t of tries){out=parseIndex(idx,f,{...t,nameKey:t.v===3?arcKey:0xC4,arcKey});if(out&&out.length&&out.every(e=>e.name&&!/[\0-\x1f]/.test(e.name))){mode=t;break;}out=null;}
- if(!out)return null;let keyFile=f.major===3?keyFileFor(file):null;const ctx={file,f,mode,arcKey,keyFile0:keyFile,gameKey:null,gameKeys:null};
+ if(!out){memo.delete(file);return null;}let keyFile=f.major===3?keyFileFor(file):null;const ctx={file,f,mode,arcKey,keyFile0:keyFile,gameKey:null,gameKeyFp:null};
  /* 3.x with a key file: entries after "pack_keyfile" use that entry's decrypted bytes as the key file */
  for(const e of out){e.keyFile=keyFile;e.ctx=ctx;if(f.major===3&&keyFile&&/pack_keyfile/i.test(e.name)){try{keyFile=decode(e,true);}catch{}}}
  memo.set(file,{st,list:out});return out;}
@@ -120,10 +135,11 @@ function unpack(input){if(input.length<12||input.readUInt32LE(0)!==0xFF435031)re
  return dst===outLen?out:null;}
 
 /* ---- 3.0 game key: from the exe, else probe-supplied candidates, kept when the scripts read as Japanese ------------- */
-function resolveGameKey(entries){const ctx=entries[0]?.ctx;if(!ctx||ctx.f.major!==3||ctx.f.minor!==0||!ctx.keyFile0||ctx.gameKey!==null)return;
+function resolveGameKey(entries){const ctx=entries[0]?.ctx;if(!ctx||ctx.f.major!==3||ctx.f.minor!==0||!ctx.keyFile0)return;
+ const extra=extraKeys();if(ctx.gameKeyFp===extra.fp)return;ctx.gameKeyFp=extra.fp;
  const probe=entries.filter(e=>/\.s$/i.test(e.name)&&e.method).slice(0,3);if(!probe.length){ctx.gameKey=false;return;}
  const ok=key=>{ctx.gameKey=key;let kana=0;for(const e of probe){try{kana+=(text(decode(e)).match(kit.KANA_G)||[]).length;}catch{}}return kana>=4;};
- const exe=gameKeyFromExe(ctx.file);if(exe&&ok(exe))return;for(const v of packKeys()){if(ok(Buffer.from(v.gameKey,'hex')))return;}
+ const exe=gameKeyFromExe(ctx.file);if(exe&&ok(exe))return;for(const k of packKeys(extra.keys)){if(ok(k))return;}
  if(ok(null))return;ctx.gameKey=exe||null;}
 
 /* ---- script grammar (VNTextPatch's reading of .s) ----------------------------------------------------------------- */
