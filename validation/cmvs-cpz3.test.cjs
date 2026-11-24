@@ -64,7 +64,7 @@ function cpz3(entries, editIndex = () => {}) {
     offset += encrypted.length;
   }
   const indexKey = 0x89abcdef;
-  const plainIndex = Buffer.concat([...index, Buffer.alloc(3)]);
+  const plainIndex = index.length ? Buffer.concat([...index, Buffer.alloc(3)]) : Buffer.alloc(0);
   editIndex(plainIndex);
   const packed = encrypt(plainIndex, indexKey);
   const head = Buffer.alloc(0x14);
@@ -189,4 +189,31 @@ test('CPZ3 code-only scenes cannot exhaust CMVS original detection ahead of exis
   assert.equal(probe.step, 'ok');
   assert.equal(probe.japaneseLines, 2);
   assert.deepEqual(readScript(locate(root, 'cmvs')).lines, [...lines, '帰り道で夕日が見えた。']);
+});
+
+test('CMVS accepts an empty, checksummed CPZ3 archive without a damage diagnostic', t => {
+  const { root, pack, executable } = game(t);
+  const file = path.join(pack, 'resources.cpz');
+  fs.writeFileSync(file, cpz3({}));
+
+  assert.deepEqual(cmvs.list(file), []);
+  const probe = probeGame({ dir: root, executable });
+  assert.equal(probe.step, 'no-script');
+});
+
+test('CMVS rejects a short CPZ3 entry read even when its checksum matches', t => {
+  const { pack } = game(t);
+  const script = ps2a(['雨が降る前に帰ろう。']);
+  const archive = cpz3({ 'main.ps2': script }, index => index.writeUInt32LE(script.length + 1, 4));
+  const file = path.join(pack, 'script.cpz');
+  fs.writeFileSync(file, Buffer.concat([archive, Buffer.alloc(1)]));
+
+  const [scene] = cmvs.engine.archiveEntries(file);
+  const readAt = kit.readAt;
+  t.mock.method(kit, 'readAt', (filename, offset, length) => {
+    const bytes = readAt(filename, offset, length);
+    return filename === file && length === script.length + 1 ? bytes.subarray(0, -1) : bytes;
+  });
+
+  assert.equal(scene.read().length, 0);
 });

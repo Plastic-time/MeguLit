@@ -186,7 +186,7 @@ function openFlat(file,header,fsz,version){
  const count=(header.readUInt32LE(4)^(format?.countMask??0))>>>0;
  const indexSize=(header.readUInt32LE(8)^(format?.indexSizeMask??0))>>>0;
  const base=indexAt+indexSize,minRecord=0x1a;
- if(!count||count>1e6||count>Math.floor(indexSize/minRecord)||indexSize>(64<<20)||base>fsz)return null;
+ if((version!==3&&!count)||count>1e6||count>Math.floor(indexSize/minRecord)||indexSize>(64<<20)||base>fsz)return null;
  const index=kit.readAt(file,indexAt,indexSize),entries=[];
  if(index.length!==indexSize)return null;
  if(format){
