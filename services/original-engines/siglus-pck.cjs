@@ -176,7 +176,7 @@ function parseSs(buf){
   }
   let rest=t;
   for(;;){
-   const next=rest.replace(/^(?:(?:KOE|exkoe|\$lsv2_koe|\$lsv2_name)\s*\([^)]*\)|【([^】]+)】|\s)+/i,(_,bk)=>{if(bk&&!sp)sp=bk;return '';});
+   const next=rest.replace(/^(?:(?:KOE|exkoe|\$lsv2_koe|\$lsv2_name)\s*\([^)]*\)|【([^】]+)】|\s+)/i,(_,bk)=>{if(bk&&!sp)sp=bk;return '';});
    if(next===rest)break;rest=next;
   }
   if(!rest||NON_DIALOGUE_STMT.test(rest))continue;
