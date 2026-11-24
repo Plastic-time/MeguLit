@@ -9,6 +9,7 @@ const { ps2a } = require('./helpers/engine-fixtures-d.cjs');
 const { probeGame } = require('../services/adapter-probe-core.cjs');
 const { locate, readScript } = require('../services/original-text.cjs');
 const cmvs = require('../services/original-engines/cmvs.cjs');
+const kit = require('../services/original-engines/kit.cjs');
 
 // Synthetic index and entries. The CPZ3 constants and inverse cipher follow the cmvs-rs format notes.
 const cipherWords = [
@@ -44,7 +45,7 @@ function checksum(data) {
   return result;
 }
 
-function cpz3(entries) {
+function cpz3(entries, editIndex = () => {}) {
   const index = [];
   const payload = [];
   let offset = 0;
@@ -63,7 +64,9 @@ function cpz3(entries) {
     offset += encrypted.length;
   }
   const indexKey = 0x89abcdef;
-  const packed = encrypt(Buffer.concat([...index, Buffer.alloc(3)]), indexKey);
+  const plainIndex = Buffer.concat([...index, Buffer.alloc(3)]);
+  editIndex(plainIndex);
+  const packed = encrypt(plainIndex, indexKey);
   const head = Buffer.alloc(0x14);
   head.write('CPZ3');
   head.writeUInt32LE((index.length ^ 0x5e9c4f37) >>> 0, 4);
@@ -116,4 +119,35 @@ test('CMVS rejects a CPZ3 index or script entry with the wrong checksum', t => {
   fs.writeFileSync(other, wrongEntry);
   const [scene] = cmvs.engine.archiveEntries(other);
   assert.deepEqual(cmvs.engine.parse(scene.read()).lines, []);
+});
+
+test('CMVS bounds CPZ3 script reads while allowing the maximum packed size', t => {
+  const { pack } = game(t);
+  const limit = (72 << 20) + 0x30;
+  const script = ps2a(['夕方になったらまた来よう。']);
+  const archive = cpz3({ 'at-limit.ps2': script, 'over-limit.ps2': script }, index => {
+    const next = index.readUInt32LE(0);
+    index.writeUInt32LE(limit, 4);
+    index.writeUInt32LE(limit + 1, next + 4);
+    index.writeUInt32LE(0, next + 8);
+  });
+  const file = path.join(pack, 'script.cpz');
+  fs.writeFileSync(file, archive);
+  const indexSize = (archive.readUInt32LE(8) ^ 0xf32aed17) >>> 0;
+  fs.truncateSync(file, 0x14 + indexSize + limit + 1);
+
+  const [atLimit, overLimit] = cmvs.engine.archiveEntries(file);
+  const readAt = kit.readAt;
+  const largeReads = [];
+  t.mock.method(kit, 'readAt', (filename, offset, length) => {
+    if (filename === file && length >= limit) {
+      largeReads.push(length);
+      return Buffer.alloc(0);
+    }
+    return readAt(filename, offset, length);
+  });
+
+  atLimit.read();
+  overLimit.read();
+  assert.deepEqual(largeReads, [limit]);
 });
