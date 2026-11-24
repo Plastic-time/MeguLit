@@ -64,7 +64,7 @@ test('Unity TextAssets: chineseSlot ignores English/pure-kana/tag columns, keeps
   ['この問題を見て。','請看這個問題。','请看这个问题。'],
  ]),2);
 
- // 4. Chinese column keeping Japanese kana speaker names (e.g. 【りそな】早上好) or kana particles still resolves slot 1 (matching main)
+ // 4. Chinese column keeping Japanese kana speaker names (e.g. 【りそな】早上好) still resolves slot 1 (matching main)
  assert.strictEqual(cs([
   ['【りそな】おはよう、学校へ行こう。','【りそな】早上好，我们一起去学校吧。'],
   ['【りそな】大変です。','【りそな】不好了。'],
@@ -73,19 +73,38 @@ test('Unity TextAssets: chineseSlot ignores English/pure-kana/tag columns, keeps
   ['【りそな】おはよう、学校へ行こう。','【りそな】早上好，我们一起去学校吧。','【里想奈】早安，我們一起去學校吧。'],
   ['【りそな】この話を聞いて。','【りそな】请听我说这件事。','【里想奈】請聽我說這件事。'],
  ]),1);
- // Pure-kana column without Han is skipped; partially-Han English column must not beat full Traditional Chinese
+ // 5. Punctuation/number-heavy short Chinese scenes (C1/C2/C13) and SC with OK + no marker chars vs TC (C5) match main
+ const c1=[
+  ['あ……※「……」','えっ！？※「！？」','うう……※「……」','大変だ！※「糟了！」'],
+ ].flat().map(l=>l.split('※'));
+ assert.strictEqual(cs(c1),1);
+ const c2=[
+  ['あ……※「……」','えっ！？※「！？」','１００％だよ※「100%」','うう……※「……」','助けて！※「救命！」'],
+ ].flat().map(l=>l.split('※'));
+ assert.strictEqual(cs(c2),1);
+ const c5=[
+  ['はい。','OK','好的'],
+  ['ありがとう。','多谢。','謝謝你聽我說話。'],
+  ['大変です。','不好了。','不好了。'],
+ ];
+ assert.strictEqual(cs(c5),1);
+ // English column with punctuation rows (>30% non-Latin punctuation, 0 Han) or 1 Han loanword among English lines must not beat Traditional Chinese
+ assert.strictEqual(cs([
+  ['おはよう。','Hello.','早安，我們走吧。'],
+  ['えっ！？','!?','！？'],
+  ['……','...','……'],
+ ]),2);
+ assert.strictEqual(cs([
+  ['東京へ行く。','Go to 東京.','前往東京。'],
+  ['おはよう。','Good morning.','早安，這件事交給我們吧。'],
+  ['ありがとう。','Thank you.','謝謝你聽我說話。'],
+  ['また明日。','See you tomorrow.','明天見。'],
+ ]),2);
+ // Pure-kana column without Han is skipped; tag-only column is skipped; 1-line and 2-line valid Chinese scenes still resolve slot 1
  assert.strictEqual(cs([
   ['おはようございます。','おはようございます。'],
   ['ありがとう。','ありがとう。'],
  ]),-1);
- assert.strictEqual(cs([
-  ['東京へ行く。','Go to 東京.','前往東京。'],
-  ['大阪へ行く。','Go to 大阪.','前往大阪。'],
-  ['おはようございます。','Good morning.','早安，這件事交給我們吧。'],
-  ['ありがとう。','Thank you.','謝謝你聽我說話。'],
- ]),2);
-
- // 5. Tag-only column is ignored; 1-line and 2-line valid Chinese scenes still resolve slot 1
  assert.strictEqual(cs([['おはようございます。','[背景]'],['ありがとう。','[演出]']]),-1);
  assert.strictEqual(cs([['「大変です」','「不好了」']]),1);
  assert.strictEqual(cs([['「……」','「……」'],['「大変です」','「不好了」']]),1);

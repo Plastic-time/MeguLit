@@ -9,7 +9,7 @@ const kit=require('./kit.cjs');/* E577 shared engine kit */
    The release's Simplified (else Traditional) Chinese part is the translation of each Japanese line. */
 const fs=require('node:fs'),path=require('node:path');
 const SEP='※',MARK=Buffer.from(SEP);
-const KANA=/[ぁ-ゖァ-ヺ]/,HAN=/[一-鿿]/;
+const KANA=/[ぁ-ゖァ-ヺ]/,HAN=/[一-鿿]/,LATIN=/[A-Za-z]/;
 const HANS=/[们这说话时个来对没还让门见问题电车为样边过东华爱头间学认长听写书钱后于]/g,HANT=/[們這說話時個來對沒還讓門見問題電車為樣邊過東華愛頭間學認長聽寫書錢後於]/g;
 const {stat}=require('./file-key.cjs');
 // <name>_Data folders beside the program that hold a resources.assets.
@@ -36,12 +36,11 @@ const RB=/\[rb,([^,\]]*),([^\]]*)\]/g;
 function clean(t){return t.replace(RB,'$1').replace(/\[n\]/g,'\n').replace(/\[[^\]]*\]/g,'').trim();}
 // Which part after the Japanese is Simplified Chinese (else Traditional), found by its characters.
 function chineseSlot(rows){if(!rows.length)return -1;let width=0;for(const r of rows)if(r.length>width)width=r.length;
- let best=-1,bestSimp=false,bestDiff=-Infinity,bestN=-1;
- for(let i=1;i<width;i++){let n=0,hans=0,hant=0;
-  for(const r of rows){const t=clean(r[i]||'');if(!t||!HAN.test(t))continue;n++;hans+=(t.match(HANS)||[]).length;hant+=(t.match(HANT)||[]).length;}
-  if(n<rows.length*.3)continue;
-  const simp=hans>hant,diff=hans-hant;
-  if(best<0||simp&&!bestSimp||(simp===bestSimp&&(simp?diff>bestDiff:n>bestN||n===bestN&&diff>bestDiff))){best=i;bestSimp=simp;bestDiff=diff;bestN=n;}}
+ let best=-1,bestHans=-Infinity;
+ for(let i=1;i<width;i++){let n=0,han=0,hans=0,hant=0;
+  for(const r of rows){const t=clean(r[i]||'');if(!t)continue;const hasHan=HAN.test(t);if(!hasHan&&(KANA.test(t)||LATIN.test(t)))continue;n++;if(hasHan)han++;hans+=(t.match(HANS)||[]).length;hant+=(t.match(HANT)||[]).length;}
+  if(n<rows.length*.3||!han)continue;
+  if(best<0||hans-hant>bestHans){best=i;bestHans=hans-hant;}}
  return best;}
 function parse(buf){const rows=[];for(const line of buf.toString('utf8').split(/\r?\n/))if(isText(line))rows.push(line.trim().split(SEP));
  const slot=chineseSlot(rows),lines=[],zh=[],ruby=[];
