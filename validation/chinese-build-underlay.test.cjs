@@ -232,6 +232,12 @@ test('Silky backup .bak: bakup/mes.arc.bak and sibling mes.arc.bak are adopted w
  assert.equal(rSib.step,'ok',JSON.stringify(rSib.engines));
  assert.equal(rSib.original,'backup');
  assert.equal(rSib.japaneseLines,ja.length);
+ const sSib=ot.scanRunning(gSib.root,'s2',gSib.exe);
+ assert.equal(sSib.status,'ready',JSON.stringify(sSib));
+ assert.equal(sSib.original?.executable,'','single-file backup must not record the Chinese build exe as original.executable');
+ // Empty/corrupt .bak is rejected by locateBackup instead of crashing downstream
+ const emptyBak=path.join(gSib.dir,'empty.arc.bak');fs.writeFileSync(emptyBak,Buffer.alloc(0));
+ assert.equal(ot.locateBackup('silky',emptyBak,'game'),null);
 });
 
 test('System4 backup .bak (#901 layout): sibling <stem>.bak with AI2 header is adopted while non-AIN .bak files are ignored',()=>{
@@ -309,6 +315,35 @@ test('backupOriginal rejects Chinese backups, unrelated-game backups, and leaves
  assert.equal(ot.backupOriginal(gS4Bad.dir,'system4','Rance03'),null);
  const rS4Bad=probeGame({dir:gS4Bad.dir,executable:r03Exe,title:'t'},{budgetMs:30000});
  assert.equal(rS4Bad.step,'chinese-build');assert.equal(rS4Bad.original,null);
+ // System4: empty FNAM tables must not bypass unrelated-game check when message counts differ
+ const gS4NoFn=game(dir=>{
+  fs.writeFileSync(path.join(dir,'GameA.exe'),'MZ');
+  fs.writeFileSync(path.join(dir,'GameA.ain'),makeSys4Ain(zh,F.gbk,{functions:[]}));
+  fs.writeFileSync(path.join(dir,'UnrelatedB.ain'),makeSys4Ain(ja.slice(0,60),F.sjis,{functions:[]}));
+ });
+ assert.equal(ot.backupOriginal(gS4NoFn.dir,'system4','GameA'),null);
+ // sort:false archive engine (iga) preserves archive entry order in locateBackup/readScript
+ const igaScene=lines=>Buffer.concat(lines.map(t=>{const b=Buffer.concat([F.sjis(t),Buffer.from([0])]);return Buffer.concat([Buffer.from([4,0,b.length]),b]);}));
+ const makePackdat=entries=>{
+  const hdr=Buffer.alloc(16);hdr.write('PACKDAT.',0,'latin1');hdr.writeUInt32LE(entries.length,8);hdr.writeUInt32LE(entries.length,12);
+  let off=16+entries.length*48;const idx=[],datas=[];
+  for(const [name,raw] of entries){
+   const e=Buffer.alloc(48);e.write(name,0,'latin1');e.writeUInt32LE(off,32);e.writeUInt32LE(raw.length,40);e.writeUInt32LE(raw.length,44);
+   const enc=Buffer.from(raw);for(let i=0;i<enc.length;i++)enc[i]^=0xff;
+   idx.push(e);datas.push(enc);off+=enc.length;
+  }
+  return Buffer.concat([hdr,...idx,...datas]);
+ };
+ const gIga=game(dir=>{
+  const arc=makePackdat([['z_scene.s',igaScene(['「一つ目」','「二つ目」','「三つ目」'])],['a_scene.s',igaScene(['「四つ目」'])]]);
+  fs.writeFileSync(path.join(dir,'script.dat'),arc);
+  fs.writeFileSync(path.join(dir,'script.dat.bak'),arc);
+ });
+ const igaRun=ot.ADAPTERS.iga.read(gIga.dir);
+ const igaBak=ot.readScript(ot.locateBackup('iga',path.join(gIga.dir,'script.dat.bak'),'game'));
+ assert.deepEqual(igaRun.sizes,[3,1]);
+ assert.deepEqual(igaBak.sizes,igaRun.sizes);
+ assert.equal(igaBak.structure.functionHash,igaRun.structure.functionHash);
  // Plain single-archive Japanese games stay unchanged
  const gSilkyJa=game(dir=>{fs.writeFileSync(path.join(dir,'mes.arc'),makeAi6Arc({'a01.mes':makeAi6Mes(ja,F.sjis)},F.sjis));});
  const rSilkyJa=probeGame({dir:gSilkyJa.dir,executable:gSilkyJa.exe,title:'t'},{budgetMs:30000});

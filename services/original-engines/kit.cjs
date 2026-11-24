@@ -299,7 +299,7 @@ function engine(def){const A=def.archives;
  /* E594 a patch's own archive of this engine under another name (a translation keeps patch.npk inside its EVB package):
     the scene entries of any one archive file this engine can list */
  const archiveEntries=file=>{if(!A)return null;let l;try{l=A.list(file);}catch{return null;}if(!l)return null;return l.filter(e=>!A.entry||A.entry.test(e.name)).map(e=>{const n=A.keepPath?e.name:path.posix.basename(String(e.name).replace(/\\/g,'/'));return {name:n,read:typeof e.read==='function'?e.read:()=>A.read?A.read(file,e):entryRead(file,e)};});};
- return {id:def.id,hint:def.hint,scenes,archiveEntries,archives:def.overlay===false?()=>[]:scenes,sources:dir=>[...arcFiles(dir),...looseFiles(dir)],parse:buf=>{try{return def.parse(Buffer.isBuffer(buf)?buf:Buffer.from(buf));}catch{return {lines:[],anchors:[]};}},test:def.test||(n=>!!def.loose&&def.loose.name.test(n)),...(def.extra||{})};}
+ return {id:def.id,hint:def.hint,scenes,archiveEntries,archiveSort:A?.sort!==false,archives:def.overlay===false?()=>[]:scenes,sources:dir=>[...arcFiles(dir),...looseFiles(dir)],parse:buf=>{try{return def.parse(Buffer.isBuffer(buf)?buf:Buffer.from(buf));}catch{return {lines:[],anchors:[]};}},test:def.test||(n=>!!def.loose&&def.loose.name.test(n)),...(def.extra||{})};}
 
 module.exports={SJIS,cname,asarList,zipList,zipRead,peInfo,readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,krkrScrambled,decoder,cstr,trimBoth,ascii,decodeRuns,encodeSjis,
  xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,lzDistance,SIGLUS_TOKEN,inflate,inflateRaw,zstd,unpackAny,huffman,table,entryRead,peResource,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine,
