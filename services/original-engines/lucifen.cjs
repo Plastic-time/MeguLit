@@ -41,18 +41,21 @@ function readIndex(idx,info){const count=idx.readInt32LE(0);if(count<=0||count>5
     const e={name:kit.SJIS.decode(Buffer.from(name.slice(0,depth))),offset:info.aligned?o*2048:o,size:idx.readUInt32LE(ep+4)};
     e.unpacked=info.packed?idx.readUInt32LE(ep+8):0;out.push(e);}}};
  walk(p,0);return out.length===count?out:null;}
-const memo=new Map();
+const memo=new Map(),opened=new WeakMap();
+const paramsKey=p=>{if(!p)return '';try{return JSON.stringify(p);}catch{return null;}};
 /* {entries, info, scheme} or null */
-function open(file,params){const fsz=kit.size(file),stamp=file+'|'+fsz+'|'+(kit.isFile(file)?fs.statSync(file).mtimeMs:0);if(memo.has(stamp))return memo.get(stamp);let r=null;
+function open(file,params){const fsz=kit.size(file),pk=paramsKey(params),stamp=pk===null?null:file+'|'+fsz+'|'+(kit.isFile(file)?fs.statSync(file).mtimeMs:0)+'|'+pk;
+ if(stamp!==null&&memo.has(stamp))return memo.get(stamp);let r=null;
  try{const h=kit.head(file,8);if(h.length===8&&h.toString('latin1',0,4)==='LPK1'){const base=path.basename(file).replace(/\.[^.]*$/,'').toUpperCase();
   for(const s of params?schemes(params):DEFAULT){const [k1,k2]=fileKeys(base,s),code=(h.readUInt32LE(4)^k2)>>>0,flags=code>>>24;let size=code&0xffffff;if(flags&1)size=size*2048-8;
    if(!(flags&2)||size<5||size+8>fsz)continue;const idx=kit.readAt(file,8,size);cryptIndex(idx,size,k2,s.pattern);
    const info={aligned:!!(flags&1),encrypted:!!(flags&4),packed:!!(flags&8),whole:!!(flags&0x10)&&base!=='PATCH',key:k1,prefix:null};
    let entries=null;try{entries=readIndex(idx,info);}catch{entries=null;}
    if(entries&&entries.every(e=>e.offset+e.size<=fsz)){r={entries,info,scheme:s};break;}}}}catch{r=null;}
- if(memo.size>64)memo.clear();memo.set(stamp,r);return r;}
+ if(r)for(const e of r.entries)opened.set(e,r);
+ if(stamp!==null){if(memo.size>64)memo.clear();memo.set(stamp,r);}return r;}
 const list=file=>open(file)?.entries||null;
-function read(file,e){const a=open(file);let d=kit.readAt(file,e.offset,e.size);if(!a)return d;const {info,scheme:s}=a;
+function read(file,e){const a=opened.get(e)||open(file);let d=kit.readAt(file,e.offset,e.size);if(!a)return d;const {info,scheme:s}=a;
  if(e.unpacked)d=Buffer.from(kit.lzss(d,e.unpacked));else d=Buffer.from(d);
  if(info.whole)for(let i=0;i<d.length;i++)d[i]=kit.ror(d[i]^s.xor,4);
  if(info.encrypted)cryptEntry(d,Math.min(d.length,0x100),info.key,s.pattern);
