@@ -254,6 +254,31 @@ test('siglus-pck falls back to OS .ss sources when exe_angou_mod!=0, supporting 
  assert.deepEqual(parsed[2].speakers, ['小鳥', '']);
 }));
 
+test('siglus-pck keeps bracketed speaker when followed by whitespace or KOE prefix while keeping existing forms and skipping non-dialogue', () => withDir(dir => {
+ const ssText = Buffer.from([
+  '\ufeff【小鳥】 "「こんにちは」"R',
+  '【小鳥】KOE(1003,003)"「元気？」"R',
+  'KOE(1004,004)  【朱音】  「本当？」R',
+  'KOE(1005,005)【ちはや】"「そのまま」"R',
+  '$lsv2_name("静流") 【予備】 "「優先」"R',
+  '【空行】   ',
+  'KOE(1006,006) $flag = 1',
+ ].join('\n') + '\n', 'utf8');
+ fs.writeFileSync(path.join(dir, 'Scene.pck'), buildScenePck({
+  scenes: [{ name: 's1', blob: Buffer.alloc(64, 0xaa) }],
+  exeAngouMod: 1,
+  osFiles: [{ name: 'seen_prefix.ss', raw: ssText }],
+ }));
+ fs.writeFileSync(path.join(dir, 'SiglusEngine.exe'), 'MZ');
+
+ const e = scenes.ENGINES['siglus-pck'];
+ const sc = e.scenes(dir);
+ assert.equal(sc.length, 1);
+ const p = e.parse(sc[0].read());
+ assert.deepEqual(p.lines, ['「こんにちは」', '「元気？」', '「本当？」', '「そのまま」', '「優先」']);
+ assert.deepEqual(p.speakers, ['小鳥', '小鳥', '朱音', 'ちはや', '静流']);
+}));
+
 test('siglus-pck reports decrypt-failed when exe_angou_mod!=0 and no OS section exists', () => withDir(dir => {
  fs.writeFileSync(path.join(dir, 'Scene.pck'), buildScenePck({
   scenes: [{ name: 'seen01', blob: Buffer.alloc(64, 0xaa) }],
