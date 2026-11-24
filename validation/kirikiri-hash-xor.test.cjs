@@ -145,3 +145,42 @@ test('the probe reads unflagged XP3 scripts masked with their own Adler-32 low b
  const p=probeGame({dir,title:'テスト'});
  assert.deepEqual([p.step,p.detected,p.lines,p.japaneseLines],['ok','kirikiri',5,5]);
 });
+
+test('cx-filter forArchive() invalidates cache when cx-scheme adapter pack changes with the same scheme count',t=>{
+ const packs=require('../services/adapter-packs.cjs'),origParams=packs.params;
+ t.after(()=>{packs.params=origParams;});
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-cx-fp-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const cbBuf=Buffer.alloc(0x1000);for(let i=0;i<0x400;i++)cbBuf.writeUInt32LE((Math.imul(i+1,0x9e3779b1)^0x5a5a5a5a)>>>0,i*4);
+ const cbArr=new Uint32Array(cbBuf.buffer,cbBuf.byteOffset,0x400),cbB64=cbBuf.toString('base64');
+ const schemeA={titles:['pack-A'],mask:0x1f,offset:7,prolog:[0,1,2],odd:[0,1,2,3,4,5],even:[0,1,2,3,4,5,6,7],cb:cbB64};
+ const schemeB={titles:['pack-B'],mask:0x3f,offset:19,prolog:[2,0,1],odd:[5,4,3,2,1,0],even:[7,6,5,4,3,2,1,0],cb:cbB64};
+ const enc=cx.filter({...schemeB,cb:cbArr});
+ const ks1=Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from('*s01\r\n[cm]\r\n「おはようございます」[p]\r\n','utf16le')]);
+ const ks2=Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from('*s02\r\n[cm]\r\n「こんにちは」[p]\r\n','utf16le')]);
+ const h1=0x13572468,h2=0x24681357;
+ const xp3File=path.join(dir,'data.xp3');
+ writeXp3(xp3File,[['s01.ks',enc(h1,0,Buffer.from(ks1)),h1],['s02.ks',enc(h2,0,Buffer.from(ks2)),h2]]);
+ /* 1) start with 1 wrong pack scheme -> cached as null */
+ const pA=[{value:schemeA}];
+ packs.params=target=>target==='cx-scheme'?pA:[];
+ assert.equal(cx.forArchive(xp3File),null);
+ assert.deepEqual(scenes.read('kirikiri',dir),[]);
+ /* 2) swap in 1 right pack scheme (same count!) without touching data.xp3 -> must invalidate cache and decrypt */
+ const pB=[{value:schemeB}];
+ packs.params=target=>target==='cx-scheme'?pB:[];
+ const f=cx.forArchive(xp3File);
+ assert.ok(f,'filter found after same-count scheme swap');
+ assert.deepEqual(f.titles,['pack-B']);
+ assert.deepEqual(scenes.read('kirikiri',dir).map(s=>s.lines),[['「おはようございます」'],['「こんにちは」']]);
+ /* 3) uninstall pack -> cache invalidates back to null */
+ const pNone=[];
+ packs.params=target=>target==='cx-scheme'?pNone:[];
+ assert.equal(cx.forArchive(xp3File),null);
+ /* 4) reinstall pack alongside an invalid entry -> still matches schemeB */
+ const pBInvalid=[{value:{mask:'bad'}},{value:schemeB}];
+ packs.params=target=>target==='cx-scheme'?pBInvalid:[];
+ assert.deepEqual(cx.forArchive(xp3File)?.titles,['pack-B']);
+ /* 5) removing the archive clears cache and returns null */
+ fs.rmSync(xp3File);
+ assert.equal(cx.forArchive(xp3File),null);
+});

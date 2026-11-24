@@ -10,7 +10,7 @@
    XOR the first 8 bytes with a key from the hash.
    The parameters of every title GARbro knows are in cx-schemes.json (taken from GARbro's Formats.dat); a game folder
    is matched to a scheme by trying them on one entry and keeping the one whose output is a known file header. */
-const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
+const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib'),crypto=require('node:crypto');
 const OP={NOP:0,RETN:1,MOV_EDI_ARG:2,PUSH_EBX:3,POP_EBX:4,PUSH_ECX:5,POP_ECX:6,MOV_EAX_EBX:7,MOV_EBX_EAX:8,MOV_ECX_EBX:9,MOV_EAX_EDI:11,MOV_EAX_INDIRECT:12,ADD_EAX_EBX:13,SUB_EAX_EBX:14,IMUL_EAX_EBX:15,AND_ECX_0F:16,SHR_EBX_1:17,SHL_EAX_1:18,SHR_EAX_CL:19,SHL_EAX_CL:20,OR_EAX_EBX:21,NOT_EAX:22,NEG_EAX:23,DEC_EAX:24,INC_EAX:25,IMMED:0x100,MOV_EAX_IMMED:0x101,AND_EBX_IMMED:0x102,AND_EAX_IMMED:0x103,XOR_EAX_IMMED:0x104,ADD_EAX_IMMED:0x105,SUB_EAX_IMMED:0x106};
 const LIMIT=0x80,M64=0xffffffffffffffffn,M32=0xffffffffn;
 function lcg(seed){let s=seed>>>0;return ()=>{const old=s;s=(Math.imul(1103515245,old)+12345)>>>0;return (s^(old<<16)^(old>>>16))>>>0;};}
@@ -103,10 +103,13 @@ let known=null;
 /* E561 schemes an adapter pack adds (params target "cx-scheme") are tried first; a malformed one is left out */
 let fileSchemes=null;
 function packCx(){try{return require('../adapter-packs.cjs').params('cx-scheme');}catch{return [];}}
+const schemeOk=s=>s&&Number.isSafeInteger(s.mask)&&Number.isSafeInteger(s.offset)&&Array.isArray(s.prolog)&&Array.isArray(s.odd)&&Array.isArray(s.even)&&(s.cb===undefined||typeof s.cb==='string'&&s.cb.length<=8192);
+function extraFp(list){if(!list.length)return '';try{return crypto.createHash('sha256').update(JSON.stringify(list)).digest('hex');}catch{return String(Date.now())+':'+Math.random();}}
 function schemes(){const extra=packCx();if(known&&known.extra===extra)return known;
  if(!fileSchemes){let raw={};try{raw=JSON.parse(fs.readFileSync(path.join(__dirname,'cx-schemes.json'),'utf8'));}catch{}fileSchemes=raw.schemes||[];}
- const ok=s=>s&&Number.isSafeInteger(s.mask)&&Number.isSafeInteger(s.offset)&&Array.isArray(s.prolog)&&Array.isArray(s.odd)&&Array.isArray(s.even)&&(s.cb===undefined||typeof s.cb==='string'&&s.cb.length<=8192);
- known=[...extra.map(x=>x.value).filter(ok),...fileSchemes].map(s=>({...s,cb:s.cb?(b=>new Uint32Array(b.buffer.slice(b.byteOffset,b.byteOffset+b.length)))(Buffer.from(s.cb,'base64')):null}));known.extra=extra;return known;}
+ const valid=extra.map(x=>x?.value).filter(schemeOk);
+ known=[...valid,...fileSchemes].map(s=>({...s,cb:s.cb?(b=>new Uint32Array(b.buffer.slice(b.byteOffset,b.byteOffset+b.length)))(Buffer.from(s.cb,'base64')):null}));
+ known.extra=extra;known.fp=extraFp(valid);return known;}
 // The control block of a scheme that keeps it in a plug-in (TPM / DLL): " Encryption control block", inverted.
 const SIG=Buffer.from(' Encryption control block','latin1');
 function controlBlockIn(file){let b;try{b=fs.readFileSync(file);}catch{return null;}let at=b.indexOf(SIG);
@@ -236,8 +239,10 @@ function hashXorFilter(file,xp3,list,plainHits){
 const memo=new Map();
 // The filter of one archive: the known scheme that turns most of its encrypted entries into known heads (at least
 // two and more than reading them as they are), or null.
-function forArchive(file){let key;try{const st=fs.statSync(file);key=path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+'|'+schemes().length;}catch{return null;}
- if(memo.has(key))return memo.get(key);let best=null;
+function forArchive(file){const id=path.resolve(file).toLowerCase();let st;
+ try{st=fs.statSync(file);}catch{memo.delete(id);return null;}
+ const all=schemes(),stamp=st.size+':'+st.mtimeMs+':'+all.fp,hit=memo.get(id);
+ if(hit&&hit.st===stamp)return hit.v;let best=null;
  try{const xp3=require('./xp3.cjs'),list=xp3.list(file),hxRaw=xp3.hxChunk(file),dir=path.dirname(file);
   const enc=(list?list.files:[]).filter(e=>e.encrypted&&e.size>=16);
   const picked=hxRaw&&enc.length>32?Array.from({length:32},(_,i)=>enc[Math.floor(i*enc.length/32)]):enc.slice(0,hxRaw?32:16);
@@ -248,13 +253,13 @@ function forArchive(file){let key;try{const st=fs.statSync(file);key=path.resolv
    if(hits>top){top=hits;best=dec;best.titles=titles;}};
   if(hxRaw){
    const idxCache=new Map();
-   for(const s of schemes()){if(s.type!=='HxCrypt'||!s.cb||!s.filterKey||!Array.isArray(s.indexKeys))continue;
+   for(const s of all){if(s.type!=='HxCrypt'||!s.cb||!s.filterKey||!Array.isArray(s.indexKeys))continue;
     let hxMap=null;
     for(const [k1,k2] of s.indexKeys){const ck=k1+':'+k2;if(!idxCache.has(ck))idxCache.set(ck,decodeHxMap(hxRaw,k1,k2));hxMap=idxCache.get(ck);if(hxMap)break;}
     if(hxMap?.size)tryScheme(()=>hxFilter(s,hxMap),s.titles);}
   }else{
-   for(const s of schemes()){if(s.type==='HxCrypt')continue;let cb=s.cb;if(!cb&&s.tpm)cb=controlBlockIn(path.join(dir,s.tpm))||controlBlockIn(path.join(dir,'plugin',s.tpm));
+   for(const s of all){if(s.type==='HxCrypt')continue;let cb=s.cb;if(!cb&&s.tpm)cb=controlBlockIn(path.join(dir,s.tpm))||controlBlockIn(path.join(dir,'plugin',s.tpm));
     if(cb)tryScheme(()=>filter({...s,cb}),s.titles);}
     if(!best)best=hashXorFilter(file,xp3,list,plainHits);}}catch{best=null;}
- memo.set(key,best);return best;}
+ memo.set(id,{st:stamp,v:best});return best;}
 module.exports={rot31,rot31Key,filter,generate,run,schemes,controlBlockIn,forArchive,looks,hxChacha,hxEntryDecryptor};
