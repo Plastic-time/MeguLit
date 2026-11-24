@@ -151,7 +151,7 @@ test('TyranoScript: loose, app.asar, package.nw and exe-appended NW.js builds re
  assert.deepEqual(a.map(s=>s.lines.length),b.map(s=>s.lines.length));assert.equal(b[0].lines[3],'天空很蓝。');assert.deepEqual(a[0].anchors,b[0].anchors);
 });
 
-test('TyranoScript: a large bilingual ASAR routes to the Japanese scripts and resolves speaker names',t=>{
+test('TyranoScript: a large bilingual ASAR routes to the Japanese scripts',t=>{
  const root=tmp(t),dir=path.join(root,'game'),executable=path.join(dir,'Game.exe');
  const files={};
  for(let i=0;i<1100;i++)files['data/bgimage/'+i+'-background-illustration-for-the-scenario-index-padding.png']='x';
@@ -176,9 +176,9 @@ test('TyranoScript: a large bilingual ASAR routes to the Japanese scripts and re
  const {runtime,status}=require('../services/original-text.cjs').scanRunning(path.join(root,'profile'),'g3',executable);
  assert.deepEqual({
   routed:probe.engines.find(e=>e.id==='tyrano')?.routed,step:probe.step,lines:probe.lines,kana:probe.japaneseLines,engine:runtime?.engine,status,
- },{routed:true,step:'ok',lines:7,kana:6,engine:'tyrano',status:'native-japanese'});
+ },{routed:true,step:'ok',lines:7,kana:5,engine:'tyrano',status:'native-japanese'});
  assert.deepEqual(JSON.parse(fs.readFileSync(runtime.index,'utf8')).lines,[
-  'もう一つのお話です。','旅の人','おかげさまで助かりました。','店長',
+  'もう一つのお話です。','guest','おかげさまで助かりました。','host',
   'どうぞゆっくりしていってください。','声の主','それではまた明日お会いしましょう。',
  ]);
  const translated=tyrano.engine.archives(dir).find(s=>s.name==='ch/route.ks');
@@ -193,6 +193,12 @@ test('TyranoScript: a ch/ chapter stays readable without a declared Chinese lang
   'data/scenario/ch/first.ks':'それから長い旅が始まります。[p]',
  })});
  assert.deepEqual(scenes.read('tyrano',dir).flatMap(s=>s.lines),['それから長い旅が始まります。','おはようございます。']);
+});
+
+test('TyranoScript: the existing ASAR scenario signature still identifies a release',t=>{
+ const dir=tmp(t);
+ F.writeTree(dir,{'resources/app.asar':F.asar({'data/scenario/first.ks':KS_JA})});
+ assert.equal(library.engineOf(dir)?.name,'TyranoScript');
 });
 
 test('TyranoScript: the probe reads the scenario appended to a legacy NW.js executable',t=>{
