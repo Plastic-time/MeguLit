@@ -13,7 +13,7 @@ const PROSE=/[ぁ-ゖァ-ヺ一-龯]/;
 function list(b,fileSize=b.length){if(b.length<16)return null;const n=b.readInt32LE(0);if(n<=0||n>0xff||4+n*12>b.length)return null;const exts=[];
  for(let i=0;i<n;i++){const p=4+i*12,ext=b.toString('latin1',p,p+4).replace(/\0.*$/s,'');if(!/^[A-Za-z0-9]{1,4}$/.test(ext))return null;exts.push({ext,count:b.readUInt32LE(p+4),dir:b.readUInt32LE(p+8)});}
  const read=(size,strict)=>{const rec=size+8,out=[];let dirEnd=0,minOff=Infinity,maxEnd=0,bytes=0;
-  if(strict){for(const e of exts)if(e.count>0){const end=e.dir+e.count*rec;if(end>b.length||end>fileSize)return null;if(end>dirEnd)dirEnd=end;}}
+  if(strict)for(const e of exts)if(e.count>0)dirEnd=Math.max(dirEnd,e.dir+e.count*rec);
   for(const e of exts){let d=e.dir;for(let i=0;i<e.count;i++){if(d+rec>b.length)return null;const name=b.toString('latin1',d,d+size).replace(/\0.*$/s,'');
    const s=b.readUInt32LE(d+size),o=b.readUInt32LE(d+size+4);if(!name||o+s>fileSize||strict&&o<dirEnd)return null;
    if(o<minOff)minOff=o;if(o+s>maxEnd)maxEnd=o+s;bytes+=s;out.push({name:name+'.'+e.ext.toLowerCase(),size:s,offset:o});d+=rec;}}

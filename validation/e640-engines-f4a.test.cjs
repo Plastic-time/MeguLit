@@ -116,11 +116,14 @@ test('Willadv: 13-byte name Will ARC with short (<=9 byte) names is not misread 
  assert.deepEqual(advhd.list(mkSingle(13,'s00001',5000,53,5069)),[{name:'s00001.wsc',size:5000,offset:53}]);
  /* pins maxEnd === fileSize: 13-byte 10-byte name (non-zero byte 9), 5000B payload, pre-gap, exact EOF */
  assert.deepEqual(advhd.list(mkSingle(13,'abcdefghij',5000,165,5165)),[{name:'abcdefghij.wsc',size:5000,offset:165}]);
- /* loose fallback preserves legacy shapes base could read: (1) 9-byte size=0 offset=0, (2) directory placed after data */
+ /* pins minOff === dirEnd: 13-byte 11-byte name, 200B payload starting right at dirEnd, large fileSize so maxEnd !== fileSize */
+ const minOffPin=mkSingle(13,'R22GKQ9OZ22',200,37,237);
+ assert.deepEqual(advhd.list(minOffPin,minOffPin.length+1.5e9),[{name:'R22GKQ9OZ22.wsc',size:200,offset:37}]);
+ /* loose fallback preserves legacy shapes base could read: (1) 9-byte size=0 offset=0, (2) directory placed after data (+16B tail pins 9-before-13 order) */
  assert.deepEqual(advhd.list(mkSingle(9,'s01',0,0,33)),[{name:'s01.wsc',size:0,offset:0}]);
- const dirAfter=Buffer.alloc(16+20+17);dirAfter.writeInt32LE(1,0);dirAfter.write('WSC',4,'latin1');dirAfter.writeUInt32LE(1,8);dirAfter.writeUInt32LE(36,12);
- fixed('s01',9).copy(dirAfter,36);dirAfter.writeUInt32LE(20,45);dirAfter.writeUInt32LE(16,49);
- assert.deepEqual(advhd.list(dirAfter),[{name:'s01.wsc',size:20,offset:16}]);
+ const dirAfter=Buffer.alloc(16+16+17+16);dirAfter.writeInt32LE(1,0);dirAfter.write('WSC',4,'latin1');dirAfter.writeUInt32LE(1,8);dirAfter.writeUInt32LE(32,12);
+ fixed('s01',9).copy(dirAfter,32);dirAfter.writeUInt32LE(16,41);dirAfter.writeUInt32LE(16,45);
+ assert.deepEqual(advhd.list(dirAfter),[{name:'s01.wsc',size:16,offset:16}]);
 });
 
 /* ---- archive + generic scan ----------------------------------------------------------------------------------------- */
