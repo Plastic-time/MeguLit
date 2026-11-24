@@ -102,6 +102,24 @@ test('AliceSoft: SCO walk — messages per page, R breaks, compacted kana, menu 
  assert.deepEqual(alice.parse(F.sco([Buffer.from([0x01,0x02]),...page1])).lines,AL);
  assert.deepEqual(alice.parse(Buffer.from('S351 too short')).lines,[]);
 });
+test('AliceSoft: ZU-marked UTF-8 SCO decodes message runs, inline choices, and /! strings as UTF-8',t=>{
+ const U=s=>Buffer.from(s,'utf8');
+ const utf8Page=F.sco([B('ZU\x41\x7f'),U('ランス'),F.R,U('「よう、冒険だ」'),F.A,
+  B('{'),F.expr(1),F.u32(0),B('$'),F.u32(0x100),U('戦う'),B('$'),B('$'),F.u32(0x120),U('逃げる'),B('$'),B(']'),
+  B('/!'),U('メッセージ命令'),Buffer.from([0]),F.A]);
+ const want=['ランス\n「よう、冒険だ」','戦う','逃げる','メッセージ命令'];
+ /* call scoLines directly (not via module-level lastOpts) to verify walk()'s default ZU auto-detection */
+ assert.deepEqual(alice.scoLines(utf8Page),want);
+ /* invalid UTF-8 lead byte must stop before a non-continuation command byte (A = page break) instead of swallowing it */
+ const badLead=F.sco([B('ZU\x41\x7f'),U('あい'),Buffer.from([0xe3]),F.A,U('次'),F.A]);
+ assert.deepEqual(alice.scoLines(badLead),['あい\ufffd','次']);
+ /* truncated UTF-8 sequence at EOF must stop at buffer end without reading past length */
+ const truncRun=Buffer.concat([U('あい'),Buffer.from([0xe3,0x81])]);
+ assert.deepEqual(alice.messageRun(truncRun,0,true),['あい\ufffd',8,8]);
+ assert.deepEqual(alice.scoLines(F.sco([B('ZU\x41\x7f'),truncRun])),['あい\ufffd']);
+ const game=tmp(t);F.writeTree(game,{'RanceSA.ALD':F.ald([{name:'01.SCO',volume:1,data:utf8Page}]),'System3.exe':'MZ'});
+ assert.deepEqual(scenes.read('alicesoft',game)[0].lines,want);
+});
 test('AliceSoft: System 3.9 messages by id from System39.ain (rotated AINI)',()=>{
  const ain=F.ain39(['最初の台詞','二番目の台詞']),a=alice.readAin39(ain);assert.equal(a.messages.length,2);
  const pg=F.sco([B('/'),Buffer.from([0x7c]),F.u32(1),F.A,B('/'),Buffer.from([0x7c]),F.u32(0),F.A],{version:'S380'});
