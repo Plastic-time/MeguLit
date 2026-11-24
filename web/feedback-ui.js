@@ -178,7 +178,7 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
 <ul class="dev-notice-updates" tabindex="0" aria-label="${esc(t.tabUpdates)}" hidden></ul><p class="dev-notice-updates-note" hidden></p>
 <p class="startup-updates-empty" role="status">${esc(loadingUpdates[locale] || loadingUpdates.zh)}</p>
 <p class="dev-notice-more">${esc(t.noticeMore)}</p>
-<label class="dev-notice-off" title="${esc(t.noticeOffTip)}"><input type="checkbox" data-notice-off${noticeOff() ? ' checked' : ''}><span>${esc(t.noticeOff)}</span></label>
+<div class="dev-notice-offbar"><label class="dev-notice-off" title="${esc(t.noticeOffTip)}"><input type="checkbox" data-notice-off${noticeOff() ? ' checked' : ''}><span>${esc(t.noticeOff)}</span></label></div>
 <div class="dev-notice-actions"><button type="button" class="text-button" data-report>${esc(t.report)}</button><button type="button" class="primary" data-next>${esc(seedWords(locale).next)}</button></div></div>
 <div class="dev-notice-page" data-page="seed" hidden>${seedPageHTML(locale, esc, { left: `<button type="button" class="text-button" data-back>${esc(t.back)}</button>`, right: `<button type="button" class="primary" data-next-guide>${esc(t.next)}</button>` })}</div>
 <div class="dev-notice-page" data-page="2" hidden><div class="dev-notice-top"><span>${esc(t.guideKicker)}</span><span data-page-no>3 / 3</span></div>

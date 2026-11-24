@@ -934,8 +934,9 @@ html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-up
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-updates-note{grid-area:note;margin:10px 0 0!important;font-size:12px!important}
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-more{grid-area:more;margin:14px 0 0!important;font-size:12.5px!important;display:block!important}
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-actions{grid-area:act;margin-top:22px!important}
-/* 以后不再提示: bottom left, level with the button row (sticky like it, so a small window still shows it), lit in the accent so it is found */
-html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-off{grid-area:off;align-self:end;justify-self:start;margin:0 0 18px;min-height:46px;position:sticky;bottom:18px;z-index:2}
+/* 以后不再提示: a band across the bottom left, level with the button row and sticky like it, so on a small window the text scrolls
+   away under a fade instead of under the box; the box itself is lit in the accent so it is found */
+html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-offbar{grid-area:off;align-self:end;justify-self:stretch;display:flex;align-items:center;min-height:auto;margin:0;padding:16px 0 18px;position:sticky;bottom:0;z-index:2;background:linear-gradient(to bottom,transparent,var(--t-panel-base) 16px)}
 html:not(#u):not(#v):not(#w) body .dev-notice-off{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:0 18px;border:1px solid color-mix(in srgb,var(--g-gold,#edb56e) 60%,transparent);background:color-mix(in srgb,var(--g-gold,#edb56e) 12%,var(--t-panel-base,#1b1416));color:var(--g-gold,#edb56e);font-size:14px;letter-spacing:.04em;cursor:pointer;user-select:none;transition:background .2s,border-color .2s}
 html:not(#u):not(#v):not(#w) body .dev-notice-off:hover{background:color-mix(in srgb,var(--g-gold,#edb56e) 20%,var(--t-panel-base,#1b1416));border-color:var(--g-gold,#edb56e)}
 html:not(#u):not(#v):not(#w) body .dev-notice-off:has(input:checked){background:color-mix(in srgb,var(--g-gold,#edb56e) 24%,var(--t-panel-base,#1b1416));border-color:var(--g-gold,#edb56e)}
@@ -1899,6 +1900,7 @@ html:not(#u):not(#v):not(#w):not(#x) body dialog.game-dialog.dev-notice .dev-not
 html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.guide-success li::before{content:"";width:7px;height:7px;top:calc(12px + .7em);left:15px;background:var(--g-gold);transform:rotate(45deg);font:0 serif}
 html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.guide-success li{padding-left:44px!important}
 @media (max-width:1000px){html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]:not([hidden]){grid-template-columns:1fr;grid-template-areas:"top" "title" "sub" "text" "form" "rule" "status" "succ" "upd" "note" "more" "off" "act"}}
+@media (max-width:1000px){html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-notice-offbar{position:static;padding:18px 0 0;background:none}} /* one column: the button row alone stays pinned; the box sits just above it */
 @media (max-height:700px),(max-width:1000px){
  html:not(#u):not(#v):not(#w):not(#x) body dialog.game-dialog.dev-notice[open]{padding:20px 26px 0!important}
  html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>h2:not(.dev-notice-title2){font-size:clamp(26px,5vw,40px)!important}

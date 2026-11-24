@@ -8,7 +8,7 @@ test('the start notice has a 以后不再提示 box that stops it opening by its
  for(const word of ["noticeOff: '以后不再提示'","noticeOff: '次回から表示しない'","noticeOff: \"Don't show this again\""])assert.ok(js.includes(word),word);
  assert.match(js,/const noticeOffKey = 'megulit\.startupNoticeOff';/);
  assert.match(js,/if \(\(\(shownThisLaunch \|\| noticeOff\(\)\) && !force\) \|\| document\.querySelector\('\.dev-notice'\) \|\| !canShow\(\)\) return;/,'ticked: no start-up notice, an explicit open still works');
- assert.match(js,/<label class="dev-notice-off" title="\$\{esc\(t\.noticeOffTip\)\}"><input type="checkbox" data-notice-off\$\{noticeOff\(\) \? ' checked' : ''\}>/);
+ assert.match(js,/<div class="dev-notice-offbar"><label class="dev-notice-off" title="\$\{esc\(t\.noticeOffTip\)\}"><input type="checkbox" data-notice-off\$\{noticeOff\(\) \? ' checked' : ''\}>/);
  assert.match(js,/\[data-notice-off\]'\)\.onchange = event => setNoticeOff\(event\.target\.checked\);/,'unticking turns the notice back on');
 });
 
@@ -16,7 +16,8 @@ test('the box sits bottom left, level with the button row, in every page-1 layou
  const css=web('unify.css');
  assert.match(css,/"succ upd" "more upd" "\. note" "off act";align-items:start\}/);
  assert.equal((css.match(/"more" "off" "act"\}\}/g)||[]).length,2,'both one-column layouts keep the box above the buttons');
- assert.match(css,/>\.dev-notice-off\{grid-area:off;align-self:end;justify-self:start;margin:0 0 18px;min-height:46px;position:sticky;bottom:18px;z-index:2\}/);
+ assert.match(css,/>\.dev-notice-offbar\{grid-area:off;align-self:end;justify-self:stretch;[^}]*padding:16px 0 18px;position:sticky;bottom:0;z-index:2;background:linear-gradient\(to bottom,transparent,var\(--t-panel-base\) 16px\)\}/,'a band like the button row: text scrolls away under a fade, not under the box');
+ assert.match(css,/@media \(max-width:1000px\)\{[^{]*>\.dev-notice-offbar\{position:static;/,'one column: only the button row stays pinned');
  assert.match(css,/body \.dev-notice-off\{display:inline-flex;[^}]*color:var\(--g-gold,#edb56e\)/,'lit in the theme gold');
 });
 
