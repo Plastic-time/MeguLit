@@ -47,7 +47,7 @@ function parseRow(line){
   at=match.index+tag.length;
   if(tag==='[[')text+='[';
   else if(/^\[l\]$/i.test(tag)){parts.push(text);text='';}
-  else if(/^\[(?:cm|er|ct)\]$/i.test(tag))clear=true;
+  else if(/^\[(?:cm|er|ct)(?:\s|\])/i.test(tag))clear=true;
   else text+=doubleQuoted??singleQuoted??'';
  }
  parts.push(text+line.slice(at));

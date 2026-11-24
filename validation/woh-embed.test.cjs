@@ -278,7 +278,7 @@ test('multilingual KiriKiri keeps KAG escaped [[ brackets as literal [ without s
  assert.deepEqual(esc.cont,[]);
 });
 
-test('multilingual KiriKiri splits pages on @cm/@ct/@er line commands without matching prefix-similar commands',()=>{
+test('multilingual KiriKiri splits pages on @cm/@ct/@er and [cm]/[ct]/[er] (with optional attributes) without matching prefix-similar commands',()=>{
  const {parse}=require('../services/original-engines/krkr-lang.cjs');
  const run=(ja,zh)=>parse(Buffer.from(JSON.stringify(zh===undefined?{ja}:{ja,zh})));
  const clears=run([
@@ -290,10 +290,18 @@ test('multilingual KiriKiri splits pages on @cm/@ct/@er line commands without ma
   '三頁目。[p]',
   '@er',
   '四頁目。[p]',
+  '@cm cond=1',
+  '五頁目。[p]',
+  '[cm ]',
+  '六頁目。[p]',
+  '[cm cond="1"]',
+  '七頁目。[p]',
+  '[er page=fore]',
+  '八頁目。[p]',
  ].join('\n'));
- assert.deepEqual(clears.lines,['一頁目。','二頁目。','三頁目。','四頁目。']);
- assert.deepEqual(clears.starts,[0,1,2,3]);
- assert.ok(clears.anchors.includes('@cm')&&clears.anchors.includes('@CT')&&clears.anchors.includes('@er'));
+ assert.deepEqual(clears.lines,['一頁目。','二頁目。','三頁目。','四頁目。','五頁目。','六頁目。','七頁目。','八頁目。']);
+ assert.deepEqual(clears.starts,[0,1,2,3,4,5,6,7]);
+ assert.ok(clears.anchors.includes('@cm')&&clears.anchors.includes('@CT')&&clears.anchors.includes('@er')&&clears.anchors.includes('@cm cond=1'));
 
  const nonClears=run([
   '*start',
@@ -302,10 +310,25 @@ test('multilingual KiriKiri splits pages on @cm/@ct/@er line commands without ma
   '@ctx',
   '@erase',
   '@cm_custom',
+  '@cm-x',
+  '@cm.x',
+  '[cmd]',
+  '[ctx]',
+  '[erase]',
+  '[cm-x]',
+  '[cm.x]',
   '同じ頁二。[p]',
  ].join('\n'));
  assert.deepEqual(nonClears.lines,['同じ頁一。\n同じ頁二。']);
  assert.deepEqual(nonClears.starts,[0]);
+
+ const paired=run(
+  '一頁目。[p]\n*scenario_A|\n@cm\n二頁目。[p]\n@cm\n三頁目。[p]\n*scenario_B|\n@cm cond=1\n四頁目。[p]\n[cm ]\n五頁目。[p]\n',
+  '第一页。[p]\n*scenario_A|\n@cm\n第二页。[p]\n@cm\n第三页。[p]\n*scenario_B|\n@cm cond=1\n第四页。[p]\n[cm ]\n第五页。[p]\n',
+ );
+ assert.deepEqual(paired.lines,['一頁目。','二頁目。','三頁目。','四頁目。','五頁目。']);
+ assert.deepEqual(paired.zh,['第一页。','第二页。','第三页。','第四页。','第五页。']);
+ assert.deepEqual(paired.starts,[0,1,2,3,4]);
 });
 
 test('E414: a page game by its own script turns on every page rule; a game whose pages hold one line does not',t=>{
