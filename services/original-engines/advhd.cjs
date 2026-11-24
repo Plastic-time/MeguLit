@@ -39,10 +39,13 @@ function parse(buf){const d=Buffer.isBuffer(buf)?buf:Buffer.from(buf),lines=[],a
   const p=at(i,5);if(p<0)continue;const name=cstr(d,p);if(!name||name.s.length<2)continue;const t=cstr(d,name.next);if(!t||t.s.length<2||t.s[0]<0x80)continue;
   const who=text(name.s),s=text(t.s);if(!s||!PROSE.test(s)||s.includes('�')||who.length>24)continue;lines.push(who);voices.push(null);lines.push(s);voices.push(voiceBefore(i));i=t.next-1;}
  const v=require('./voice-ref.cjs').keep(voices);return v?{lines,anchors,voices:v}:{lines,anchors};}
+/* E654 Willadv (Will's engine before AdvHD) keeps scripts beside images in one ARC, so WSC need not be the first extension */
+function oldHasScripts(file){const h=kit.head(file,4+0xff*12);if(h.length<16)return false;const n=h.readInt32LE(0);
+ if(n<=0||n>0xff||4+n*12>h.length)return false;let found=false;
+ for(let i=0;i<n;i++){const p=4+i*12,ext=h.toString('latin1',p,p+4).replace(/\0.*$/s,'');if(!/^[A-Za-z0-9]{1,4}$/.test(ext))return false;if(/^(WSC|SCR)$/i.test(ext))found=true;}
+ return found;}
 function archives(dir){let names;try{names=fs.readdirSync(dir);}catch{return [];}
- return names.filter(f=>/\.arc$/i.test(f)).map(f=>path.join(dir,f)).filter(f=>{try{const fd=fs.openSync(f,'r');try{const h=Buffer.alloc(4+16*12);fs.readSync(fd,h,0,h.length,0);const n=h.readInt32LE(0);
- /* E654 Willadv (Will's engine before AdvHD) keeps scripts beside images in one ARC, so WSC need not be the first extension */
- if(n>0&&n<16)for(let i=0;i<n;i++)if(/^(WSC|SCR)\0?$/i.test(h.toString('latin1',4+i*12,8+i*12).replace(/\0+$/,'')))return true;return !!v2Index(f)?.some(e=>WS2.test(e.name));}finally{fs.closeSync(fd);}}catch{return false;}});}
+ return names.filter(f=>/\.arc$/i.test(f)).map(f=>path.join(dir,f)).filter(f=>oldHasScripts(f)||!!v2Index(f)?.some(e=>WS2.test(e.name)));}
 /* S5 AdvHD's later ARC (リビドー・アバンちゅ～る Rio.arc / Chip*.arc; GARbro ArcPulltop.cs "ARC/WillV2", MIT): u32 count, u32 index size,
    then per file u32 size, u32 offset (from the end of the index), UTF-16LE name + NUL; the index ends exactly at its size.
    .ws2 entries are rotated like .wsc. Read from the head only (Chip6.arc is 1 GB). → [{name,size,offset}] | null */

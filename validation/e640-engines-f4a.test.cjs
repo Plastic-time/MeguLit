@@ -135,6 +135,26 @@ test('Willadv: a Will ARC whose scripts are not the first extension is recognise
  assert.equal(library.engineOf(game)?.name,'Willadv');assert.equal(scenes.detect(game),'advhd');
  const own=scenes.read('advhd',game);assert.deepEqual(own[0].lines,['ひなた',JA[0],JA[1]]);
 });
+test('Willadv: legacy Will ARC discovery supports 16..255 extension records matching list()',t=>{
+ const script=F.wsc('ひなた',JA[0],JA[1]);
+ const makeArc=(total,extName)=>{const groups={};for(let i=0;i<total-1;i++)groups['E'+String(i).padStart(2,'0')]={a:Buffer.alloc(4,1)};
+  groups[extName]={s01:script};return F.willArc(groups);};
+ /* exactly 16 extension records (previously rejected by n < 16) */
+ const g16=tmp(t);put(g16,'data.arc',makeArc(16,'WSC'));
+ assert.equal(library.engineOf(g16)?.name,'Willadv');assert.equal(scenes.detect(g16),'advhd');
+ assert.deepEqual(scenes.read('advhd',g16)[0].lines,['ひなた',JA[0],JA[1]]);
+ /* upper bound 255 extension records (matching list()'s 0xff cap) with SCR */
+ const g255=tmp(t),groups255={};
+ for(let i=0;i<254;i++)groups255['A'+i.toString(36).toUpperCase().padStart(2,'0')]={a:Buffer.alloc(4,1)};
+ groups255.SCR={s01:Buffer.from(script.map(c=>((c<<2)|(c>>>6))&255))};
+ put(g255,'data.arc',F.willArc(groups255));
+ assert.deepEqual(scenes.read('advhd',g255)[0].lines,['ひなた',JA[0],JA[1]]);
+ /* invalid extension name before WSC or n = 256 must not be accepted as a legacy Will ARC */
+ const bad=tmp(t),raw=makeArc(16,'WSC');raw.write('\x01\x02\x03\x04',4,'latin1');put(bad,'bad.arc',raw);
+ assert.deepEqual(scenes.ENGINES.advhd.sources(bad),[]);
+ const over=tmp(t),rawOver=Buffer.alloc(4+256*12+32);rawOver.writeInt32LE(256,0);rawOver.write('WSC\0',4,'latin1');put(over,'over.arc',rawOver);
+ assert.deepEqual(scenes.ENGINES.advhd.sources(over),[]);
+});
 test('Willadv: 13-byte name Will ARC with short (<=9 byte) names is not misread as 9-byte layout',t=>{
  const advhd=E('advhd'),u32=F.u32,fixed=(s,n)=>{const b=Buffer.alloc(n);Buffer.from(s,'latin1').copy(b);return b;};
  const script=F.wsc('ひなた',JA[0],JA[1]);
