@@ -124,8 +124,9 @@ test('archive + scan helpers: GLib2 schemes invert, SLG keys, media skipped, unk
  assert.deepEqual(scan.parse(Buffer.alloc(64,7)).lines,[]);
 });
 test('Cyberworks: legacy Arc05.dat falls back to Arc04.dat text TOC when Arc02.dat is a data archive, while modern Arc02.dat binary TOC still wins',t=>{
- const num4=v=>Buffer.from(String(v).padStart(4,'0').split('').map(d=>(+d)^0x7f));
- const legacyToc=text=>{const raw=Buffer.from(text,'latin1'),packed=F.lzLit(raw);return Buffer.concat([num4(raw.length),num4(packed.length),packed]);};
+ const num=(v,d)=>Buffer.from(String(v).padStart(d,'0').split('').map(c=>(+c)^0x7f));
+ const packToc=(raw,d)=>{const packed=F.lzLit(raw);return Buffer.concat([num(raw.length,d),num(packed.length,d),packed]);};
+ const legacyToc=text=>packToc(Buffer.from(text,'latin1'),4);
  const script=TXT(sjis),packedScript=F.lzLit(script);
  /* legacy layout: Arc02.dat is a data archive (indexed by Arc00.dat), Arc05.dat holds scripts (indexed by Arc04.dat) */
  const legacy=tmp(t);
@@ -134,10 +135,19 @@ test('Cyberworks: legacy Arc05.dat falls back to Arc04.dat text TOC when Arc02.d
  put(legacy,'Arc04.dat',legacyToc(`s001,${script.length},${packedScript.length},0,s\r\n`));
  put(legacy,'Arc05.dat',packedScript);
  const own=scenes.read('cyberworks',legacy).filter(s=>s.lines.length);
- assert.equal(own.length,1);assert.deepEqual(own[0].lines,JA);
- /* modern layout: Arc02.dat is a valid binary TOC for Arc05.dat even when Arc04.dat also exists */
+ assert.equal(own.length,1);assert.equal(own[0].name,'s001.s');assert.deepEqual(own[0].lines,JA);
+ /* modern layout: Arc02.dat binary TOC wins even when Arc04.dat is also a valid 4-digit text TOC */
  const modern=tmp(t),cw=F.cyberworks({a:script});
- put(modern,'Arc02.dat',cw.index);put(modern,'Arc04.dat',Buffer.alloc(32,0x33));put(modern,'Arc05.dat',cw.body);
+ put(modern,'Arc02.dat',cw.index);
+ put(modern,'Arc04.dat',legacyToc(`legacy01,${script.length},${cw.body.length},0,s\r\n`));
+ put(modern,'Arc05.dat',cw.body);
  const mod=scenes.read('cyberworks',modern).filter(s=>s.lines.length);
- assert.equal(mod.length,1);assert.deepEqual(mod[0].lines,JA);
+ assert.equal(mod.length,1);assert.equal(mod[0].name,'000001.s0');assert.deepEqual(mod[0].lines,JA);
+ /* fallback when Arc02.dat unpacks as 8-digit LZSS but first entry size es < 0x11 */
+ const badBin=tmp(t),shortEntry=Buffer.alloc(16);shortEntry.writeInt32LE(0x10,0);
+ put(badBin,'Arc02.dat',packToc(shortEntry,8));
+ put(badBin,'Arc04.dat',legacyToc(`s001,${script.length},${packedScript.length},0,s\r\n`));
+ put(badBin,'Arc05.dat',packedScript);
+ const fb=scenes.read('cyberworks',badBin).filter(s=>s.lines.length);
+ assert.equal(fb.length,1);assert.equal(fb[0].name,'s001.s');assert.deepEqual(fb[0].lines,JA);
 });

@@ -97,21 +97,20 @@ function tocUnpack(file,digits){const b=kit.head(file,1<<26);if(b.length<=digits
  const out=kit.lzss(b.subarray(digits*2,digits*2+packed),unpacked);return out.length===unpacked?out:null;}
 function cwTocsOf(file){const dir=path.dirname(file),n=path.basename(file),out=[];let m=/^(.+)(\d)([a-z])?(\.[^.]*)?$/i.exec(n);
  if(m){const num=m[2],idx=num>='4'&&num<='6'?num-3:num==='8'?7:null;if(idx!==null){const toc=path.join(dir,m[1]+idx+(m[4]||'')),arc=m[3]?m[3].toUpperCase().charCodeAt(0)-64:0;if(kit.isFile(toc))out.push({toc,arc,binary:true});}}
- m=/^(Arc0)(\d)\.(.*)$/i.exec(n);if(m){const map={2:0,3:1,5:4}[m[2]];if(map!==undefined){const toc=path.join(dir,m[1]+map+'.'+m[3]);if(kit.isFile(toc))out.push({toc,arc:0,binary:false});}}
+ m=/^Arc0(\d)\.(.*)$/i.exec(n);if(m){const map={2:0,3:1,5:4}[m[1]];if(map!==undefined){const toc=path.join(dir,'Arc0'+map+'.'+m[2]);if(kit.isFile(toc))out.push({toc,arc:0,binary:false});}}
  return out;}
 const cwTocOf=file=>cwTocsOf(file)[0]||null;
-function cwList(file){const size=kit.size(file);
- for(const t of cwTocsOf(file)){const out=[];
-  if(t.binary){const toc=tocUnpack(t.toc,8);if(!toc||toc.length<4)continue;let p=0,seen=0;
-   while(p+4<=toc.length){const es=toc.readInt32LE(p);if(es<0x11||p+4+es>toc.length){if(!out.length)seen=0;break;}const q=p+4,id=toc.readUInt32LE(q),unpacked=toc.readUInt32LE(q+4),sz=toc.readUInt32LE(q+8),offset=toc.readUInt32LE(q+12);
-    const t0=toc[q+16],t1=toc[q+17];let arc=0;if(es>=0x17)arc=toc[q+22];p=q+es;seen++;if(arc!==t.arc||offset+sz>size)continue;
-    let ext=t0>0x20&&t0<0x7f?String.fromCharCode(t0)+(t1>0x20&&t1<0x7f?String.fromCharCode(t1):''):'';if(/^(b0?|n0|o0|0b|j0?|k0?|u0)$/.test(ext))continue;
-    out.push({name:String(id).padStart(6,'0')+(ext?'.'+ext:''),offset,size:sz,unpacked});}
-   if(seen)return out;continue;}
-  const toc=tocUnpack(t.toc,4);if(!toc)continue;let ok=true;for(const line of toc.toString('latin1').split(/\r?\n/)){const f=line.split(',');if(f.length!==5)continue;if(/^[bjk]$/.test(f[4]))continue;
-   const unpacked=+f[1],sz=+f[2],offset=+f[3];if(!(offset+sz<=size)){ok=false;break;}out.push({name:f[0]+'.'+f[4],offset,size:sz,unpacked});}
-  if(ok)return out;}
- return null;}
+function cwBin(t,size){const toc=tocUnpack(t.toc,8);if(!toc||toc.length<4)return null;let p=0;const out=[];
+ while(p+4<=toc.length){const es=toc.readInt32LE(p);if(es<0x11||p+4+es>toc.length)return out.length?out:null;const q=p+4,id=toc.readUInt32LE(q),unpacked=toc.readUInt32LE(q+4),sz=toc.readUInt32LE(q+8),offset=toc.readUInt32LE(q+12);
+  const t0=toc[q+16],t1=toc[q+17];let arc=0;if(es>=0x17)arc=toc[q+22];p=q+es;if(arc!==t.arc||offset+sz>size)continue;
+  let ext=t0>0x20&&t0<0x7f?String.fromCharCode(t0)+(t1>0x20&&t1<0x7f?String.fromCharCode(t1):''):'';if(/^(b0?|n0|o0|0b|j0?|k0?|u0)$/.test(ext))continue;
+  out.push({name:String(id).padStart(6,'0')+(ext?'.'+ext:''),offset,size:sz,unpacked});}
+ return out;}
+function cwText(t,size){const toc=tocUnpack(t.toc,4);if(!toc)return null;const out=[];for(const line of toc.toString('latin1').split(/\r?\n/)){const f=line.split(',');if(f.length!==5)continue;if(/^[bjk]$/.test(f[4]))continue;
+  const unpacked=+f[1],sz=+f[2],offset=+f[3];if(!(offset+sz<=size))return null;out.push({name:f[0]+'.'+f[4],offset,size:sz,unpacked});}
+ return out;}
+/* the first candidate TOC that lists the archive wins */
+function cwList(file){const size=kit.size(file);for(const t of cwTocsOf(file)){const l=(t.binary?cwBin:cwText)(t,size);if(l)return l;}return null;}
 const cwRead=(file,e)=>{const b=kit.readAt(file,e.offset,e.size);return e.unpacked!==e.size?kit.lzss(b,e.unpacked):b;};
 const cwFind=dir=>kit.names(dir).filter(n=>/\.(dat|app)$/i.test(n)).map(n=>path.join(dir,n)).filter(f=>!!cwTocOf(f));
 
