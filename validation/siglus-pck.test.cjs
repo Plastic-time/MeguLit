@@ -252,6 +252,11 @@ test('siglus-pck falls back to OS .ss sources when exe_angou_mod!=0, supporting 
  assert.deepEqual(parsed[1].speakers, ['朱音', '']);
  assert.deepEqual(parsed[2].lines, ['「こんにちは」', '「次の行」']);
  assert.deepEqual(parsed[2].speakers, ['小鳥', '']);
+ assert.deepEqual(e.voiceLines(dir), [
+  { text: '「おはよう」', ref: 'koe:1001' },
+  { text: '「本当？」', ref: 'koe:1002' },
+  { text: '「こんにちは」', ref: 'koe:1003' },
+ ]);
 }));
 
 test('siglus-pck keeps bracketed speaker when followed by whitespace or KOE prefix while keeping existing forms and skipping non-dialogue', () => withDir(dir => {

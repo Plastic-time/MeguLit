@@ -107,82 +107,11 @@ function parseCompiledDat(buf){
  return speakers.some(Boolean)?{lines,anchors:[],speakers}:{lines,anchors:[]};
 }
 
-/* Strip // and ; comments only outside double-quoted strings */
-function stripLineComment(raw){
- let inQ=false;
- for(let i=0;i<raw.length;i++){
-  const c=raw[i];
-  if(inQ){if(c==='\\'&&i+1<raw.length){i++;continue;}if(c==='"')inQ=false;continue;}
-  if(c==='"'){inQ=true;continue;}
-  if(c===';'||c==='/'&&raw[i+1]==='/')return raw.slice(0,i);
- }
- return raw;
-}
-function unquote(s){
- s=String(s||'').trim();
- if(s.length>=2&&s[0]==='"'&&s[s.length-1]==='"')return s.slice(1,-1).replace(/\\(.)/g,'$1');
- return s;
-}
-function callArgs(t,cmdRe){
- const at=t.search(cmdRe);if(at<0)return null;
- let i=t.indexOf('(',at)+1,depth=1,inQ=false,start=i;const args=[];
- for(;i<t.length;i++){
-  const c=t[i];
-  if(inQ){if(c==='\\'&&i+1<t.length){i++;continue;}if(c==='"')inQ=false;continue;}
-  if(c==='"'){inQ=true;continue;}
-  if(c==='(')depth++;
-  else if(c===')'){if(--depth===0){args.push(t.slice(start,i).trim());break;}}
-  else if(c===','&&depth===1){args.push(t.slice(start,i).trim());start=i+1;}
- }
- return depth===0?args:null;
-}
-function extractQuotedRuns(s){
- const out=[];
- for(let i=0;i<s.length;i++){
-  if(s[i]!=='"')continue;
-  let j=i+1,val='';
-  while(j<s.length&&s[j]!=='"'){if(s[j]==='\\'&&j+1<s.length){val+=s[j+1];j+=2;continue;}val+=s[j++];}
-  if(j<s.length){if(val)out.push(val);i=j;}
- }
- return out;
-}
-const NON_DIALOGUE_STMT=/^(?:[@$]|(?:if|else|switch|case|default|while|for|goto|gosub|jump|farcall|return|owari)\b|[A-Za-z_][\w.]*(?:\[[^\]]*\])?\s*=)/i;
 function parseSs(buf){
- const text=kit.decodeText(buf).replace(/\/\*[\s\S]*?\*\//g,m=>m.replace(/[^\n]/g,''));
  const lines=[],speakers=[];
- let inInc=false;
- for(const raw of text.split(/\r?\n/)){
-  const t=stripLineComment(raw).trim();
-  if(!t)continue;
-  if(/^#inc_start\b/i.test(t)){inInc=true;continue;}
-  if(/^#inc_end\b/i.test(t)){inInc=false;continue;}
-  if(inInc||t[0]==='#')continue;
-  let sp='';
-  const lsvName=t.match(/\$lsv2_name\s*\(\s*"((?:[^"\\]|\\.)*)"\s*\)/i);
-  if(lsvName)sp=lsvName[1].replace(/\\(.)/g,'$1');
-  const mes=callArgs(t,/@mes\s*\(/i);
-  if(mes){
-   const bracket=t.match(/^[^@]*【([^】]+)】/);
-   if(!sp&&bracket)sp=bracket[1];
-   if(mes.length>=3){const msp=unquote(mes[1]).replace(/^【|】$/g,'');if(!sp&&msp)sp=msp;const txt=unquote(mes[2]);if(txt){lines.push(txt);speakers.push(sp);}}
-   else if(mes.length===2){const txt=unquote(mes[1]);if(txt){lines.push(txt);speakers.push(sp);}}
-   continue;
-  }
-  const lsv=callArgs(t,/@lsv2_line\s*\(/i);
-  if(lsv&&lsv.length>=2){
-   const txt=unquote(lsv.slice(1).join(',')).trim();
-   if(txt){lines.push(txt);speakers.push(sp);}
-   continue;
-  }
-  let rest=t;
-  for(;;){
-   const next=rest.replace(/^(?:(?:KOE|exkoe|\$lsv2_koe|\$lsv2_name)\s*\([^)]*\)|【([^】]+)】|\s+)/i,(_,bk)=>{if(bk&&!sp)sp=bk;return '';});
-   if(next===rest)break;rest=next;
-  }
-  if(!rest||NON_DIALOGUE_STMT.test(rest))continue;
-  if(rest[0]==='"'){for(const q of extractQuotedRuns(rest)){lines.push(q);speakers.push(sp);}continue;}
-  if(/^[「『（]/.test(rest)){const txt=rest.replace(/(?:R|NL|NLI)$/,'').trim();if(txt){lines.push(txt);speakers.push(sp);}}
- }
+ siglusSource._internal.walkSs(kit.decodeText(buf),(_,items)=>{
+  for(const {text,speaker} of items){lines.push(text);speakers.push(speaker);}
+ });
  return speakers.some(Boolean)?{lines,anchors:[],speakers}:{lines,anchors:[]};
 }
 
@@ -230,4 +159,4 @@ const engine={
  REASONS:{SIGLUS_EXE_KEY:'这个 SiglusEngine 游戏的 Scene.pck 用了按作品的 exe 密钥加密，从 exe 和剧本本身都没能取到密钥（或 Scene.pck 不完整），暂时读不了'},
  gameexe(dir){const pck=siglusSource.scenePck(dir),f=siglusKey.gameexeFile(pck?path.dirname(pck):dir);if(!f)return '';try{const b=fs.readFileSync(f);if(b.readInt32LE(4)===0)return siglusKey.gameexeText(b,null);return siglusKey.gameexeText(b,loadPck(dir)?.key?.key||null);}catch{return '';}},
 };
-module.exports={engine,parseHeader,isSiglusDat,compiledScenes,sceneKey,parseCompiledDat,parseSs,_internal:{EASY_ANGOU_CODE,stripLineComment}};
+module.exports={engine,parseHeader,isSiglusDat,compiledScenes,sceneKey,parseCompiledDat,parseSs,_internal:{EASY_ANGOU_CODE,stripLineComment:siglusSource._internal.stripLineComment}};
