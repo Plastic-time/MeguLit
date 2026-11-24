@@ -43,7 +43,7 @@ const isLocalizationBundle=f=>/-localization-[a-z-]+-scripts-.*\.bundle$/i.test(
 function localizationBundles(dir){const d=bundleDir(dir);if(!d)return [];let files;try{files=fs.readdirSync(d);}catch{return [];}
  const loc=files.filter(isLocalizationBundle);if(!loc.length)return [];
  const lang=f=>((/-localization-([a-z-]+?)-scripts-/i.exec(f)||[])[1]||'').toLowerCase();
- const order=['zhhans','zh-hans','zhcn','zh-cn','zhhant','zh-hant','zhtw','zh-tw'];const langs=[...new Set(loc.map(lang))].sort((a,b)=>((order.indexOf(a)+1)||99)-((order.indexOf(b)+1)||99));
+ const order=['zhhans','zh-hans','zhcn','zh-cn','chs','cn','zhhant','zh-hant','zhtw','zh-tw','cht'];const langs=[...new Set(loc.map(lang))].sort((a,b)=>((order.indexOf(a)+1)||99)-((order.indexOf(b)+1)||99));
  const keep=new Set([langs[0],...langs.filter(l=>/^ja(?:$|-|jp$)/.test(l))]);
  return loc.filter(f=>keep.has(lang(f))).sort().map(f=>path.join(d,f));}
 const DOC=Buffer.from('localization document for');
@@ -60,10 +60,10 @@ const HEAD=/^(?:; )?(?:.*?<([A-Za-z-]+)>\s+to\s+.*?<([A-Za-z-]+)>\s+)?.*?localiz
 const U8=new TextDecoder('utf-8',{fatal:true});
 function printed(b,from,to){const out=[];let p=from&~3;const str=q=>{if(q+4>to)return null;const n=b.readUInt32LE(q);if(n<1||n>20000||q+4+n>to)return null;const raw=b.subarray(q+4,q+4+n);for(const c of raw)if(c<9||(c>13&&c<32))return null;try{return {s:U8.decode(raw),next:(q+4+n+3)&~3};}catch{return null;}};
  const toks=[],at=[],ends=[];while(p<to){const r=str(p);if(r){toks.push(r.s);at.push(p);ends.push(r.next);p=r.next;}else p+=4;}
- const comments=[],lines=new Map(),texts=[],registry=[],bounds=[];let firstRid=-1;
+ const comments=[],lines=new Map(),texts=[],registry=[],bounds=[],scripts=[];let firstRid=-1;
  const u32=q=>q+4<=to?b.readUInt32LE(q):-1;
  for(let i=0;i+3<toks.length;i++){
-  if(toks[i+1]==='Naninovel.Commands'&&toks[i+2]==='Elringus.Naninovel.Runtime'){if(i+4>=toks.length)break;if(firstRid<0&&at[i]>=8)firstRid=u32(at[i]-8);registry.push(toks[i]==='PrintText'?toks[i+4]:null);if(toks[i]==='PrintText')out.push(toks[i+4]);continue;}
+  if(toks[i+1]==='Naninovel.Commands'&&toks[i+2]==='Elringus.Naninovel.Runtime'){if(i+4>=toks.length)break;if(firstRid<0&&at[i]>=8)firstRid=u32(at[i]-8);registry.push(toks[i]==='PrintText'?toks[i+4]:null);if(toks[i]==='PrintText'){out.push(toks[i+4]);scripts.push(toks[i+3]);}continue;}
   if(toks[i+1]!=='Naninovel'||toks[i+2]!=='Elringus.Naninovel.Runtime')continue;
   const line=u32(ends[i+2]);
   // The source line of each block ("Author: text"), after the CommentScriptLine type, its line number and its hash.
@@ -76,7 +76,7 @@ function printed(b,from,to){const out=[];let p=from&~3;const str=q=>{if(q+4>to)r
  // The commands are stored in the order of the lines that play them, so each text line takes its count in turn.
  const byLine=[];let next=0;for(const x of texts.sort((a,c)=>a.line-c.line)){const t=registry.slice(next,next+x.count).filter(s=>typeof s==='string');next+=x.count;const c=lines.get(x.line-1);byLine.push({line:x.line,text:t.join(''),comment:c&&c.comment!=null?c.comment:null});}
  if(next!==registry.length)byLine.length=0;
- out.comments=comments;out.byLine=byLine.sort((a,c)=>a.line-c.line);out.commentLines=[...lines].sort((a,c)=>a[0]-c[0]).map(([line,v])=>({line,text:v.comment}));out.bounds=bounds.sort((a,c)=>a-c);return out;}
+ out.comments=comments;out.byLine=byLine.sort((a,c)=>a.line-c.line);out.commentLines=[...lines].sort((a,c)=>a[0]-c[0]).map(([line,v])=>({line,text:v.comment}));out.bounds=bounds.sort((a,c)=>a-c);out.scripts=scripts;return out;}
 function scan(b,out,{blocksOnly=false,check=()=>{}}={}){let at=0;
  while((at=b.indexOf(DOC,at))>=0){
   check();
@@ -86,8 +86,8 @@ function scan(b,out,{blocksOnly=false,check=()=>{}}={}){let at=0;
   if(start<4)continue;const n=b.readUInt32LE(start-4);if(n<DOC.length||start+n>b.length)continue;
   if(blocksOnly&&(start===min&&min>0||n>2<<20))continue;
   const text=b.toString('utf8',start,start+n),m=HEAD.exec(text.split('\n',1)[0]);if(!m)continue;
-  const doc={name:path.basename(m[3])+'.nani',src:(m[1]||'ja').toLowerCase(),dst:(m[2]||'').toLowerCase(),script:!/managed text/i.test(m[4]),text};
-  if(!blocksOnly&&doc.script&&!/^;|[\r\n]/.test(text)){const next=b.indexOf(DOC,at),end=next<0?Math.min(b.length,start+n+4e6):next;doc.prints=printed(b,start+n,end);
+  const doc={name:path.basename(m[3])+'.nani',rawName:m[3],src:(m[1]||'ja').toLowerCase(),dst:(m[2]||'').toLowerCase(),script:!/managed text/i.test(m[4]),text};
+  if(!blocksOnly&&doc.script&&!/\n# /.test(text)){const next=b.indexOf(DOC,at),end=next<0?Math.min(b.length,start+n+4e6):next;doc.prints=printed(b,start+n,end);
    // E450 entries by document line (source comment at L, translation at L + 1), so pairing never shifts at a gap
    try{doc.entries=require('./naninovel-voice.cjs').docEntries(b,start+n,end);}catch{doc.entries=null;}}
   out.push(doc);}
@@ -102,9 +102,11 @@ function blocks(text){const out=new Map();
   let voice=null;for(const l of block.split('\n').slice(1)){if(!l.trim())continue;if(l.startsWith('; >')){const v=/^; >\s*[^@\s:][^:]*:\s*\|#([\w.\-]+)\|/.exec(l); /* "> Name: |#id|" only, not "> @choice |#id|" */if(v)voice=v[1];continue;}if(l.startsWith('; '))src.push(l.slice(2));else if(!l.startsWith(';'))dst.push(l);}
   out.set(m[1],{src,dst,voice});}
  return out;}
-const isJa=l=>/^ja/.test(l),isZh=l=>/^zh/.test(l);
-const ZH=['zh-cn','zh-hans','zh','zh-sg','zh-tw','zh-hant','zh-hk'];
+const isJa=l=>/^(?:ja(?:$|-|jp$|panese$)|jpn?$)/.test(l),isZh=l=>/^(?:zh|(?:cn|chs|cht)(?:$|-))/.test(l);
+const ZH=['zh-cn','zh-hans','zh','zh-sg','chs','cn','zh-tw','zh-hant','zh-hk','cht'];
 const zhRank=l=>{const i=ZH.indexOf(l);return i<0?(isZh(l)?50:99):i;};
+const scriptKey=s=>String(s||'').replace(/\.nani$/i,'').toLowerCase();
+const sameScript=(doc,s)=>{const k=scriptKey(s),bn=scriptKey(doc.name),rn=scriptKey(doc.rawName||doc.name);return !!k&&(k===bn||k===rn||path.basename(k)===bn);};
 const cleanJaSrc=c=>String(c||'').replace(/^[^\s:：「『（\[、。！？]{1,24}: /,'').replace(/\\([\\\[\]{}":])|\[[^\]\n]*\]/g,(_,e)=>e||'');
 const fmtOne=s=>String(s||'').replace(/<br>\s*/gi,'<br>').replace(/\r?\n/g,'<br>');
 const fmtSrc=s=>{const o=fmtOne(s);return '; '+(o.startsWith('>')?' '+o:o);};
@@ -112,12 +114,14 @@ const fmtDst=s=>{const o=fmtOne(s).trim();return !tidy(o)?'':/^[#;]/.test(o)?' '
 const fmtBlock=(id,src,z,meta)=>{const d=fmtDst(z);return '# '+id+'\n'+(meta?'; '+meta+'\n':'')+fmtSrc(src)+(d?'\n'+d:'');};
 const stripNonZhDst=text=>text.replace(/\r/g,'').split('\n').filter(l=>!l.trim()||l.startsWith('# ')||l.startsWith(';')).join('\n');
 function parsedJaSrc(doc){
+ const scripts=doc.prints&&doc.prints.scripts||[];
+ if(scripts.length?!scripts.some(s=>sameScript(doc,s)):/^;|[\r\n]/.test(doc.text))return null;
  const hasZh=isZh(doc.dst);
  if(doc.entries&&doc.entries.length){
   const parts=[];let meta='';
   doc.entries.forEach((e,i)=>{
    const raw=String(e.source||'').trimStart();
-   if(raw.startsWith('>')){if(!tidy(e.text))meta=raw.trim();return;}
+   if(raw.startsWith('>')){meta=tidy(e.text)?'':raw.trim();return;}
    const src=cleanJaSrc(raw);if(!tidy(src)){meta='';return;}
    parts.push(fmtBlock('e'+i,src,hasZh?e.text:'',meta));meta='';
   });
@@ -131,7 +135,7 @@ function parsedJaSrc(doc){
     const raw=String(c.text||'').trimStart();
     const nextLine=bounds?bounds.find(x=>x>c.line)??Infinity:(i+1<cl.length?cl[i+1].line:Infinity);
     const texts=bl.length?bl.filter(x=>x.line>c.line&&x.line<nextLine).map(x=>x.text).filter(tidy):[];
-    if(raw.startsWith('>')){if(!texts.length)meta=raw.trim();return;}
+    if(raw.startsWith('>')){meta=texts.length?'':raw.trim();return;}
     const src=cleanJaSrc(raw);if(!tidy(src)){meta='';return;}
     parts.push(fmtBlock('p'+i,src,hasZh?texts.join('\n'):'',meta));meta='';
    });
@@ -155,7 +159,7 @@ function combine(docs){const byName=new Map();for(const d of docs){if(!d.script)
  const out=[];
  for(const list of byName.values()){
   const jaSrc=list.filter(d=>isJa(d.src)).sort((a,b)=>zhRank(a.dst)-zhRank(b.dst))[0];
-  if(jaSrc){out.push({name:jaSrc.name,text:parsedJaSrc(jaSrc)||(isZh(jaSrc.dst)?jaSrc.text:stripNonZhDst(jaSrc.text))});continue;}
+  if(jaSrc){out.push({name:jaSrc.name,text:parsedJaSrc(jaSrc)||(isJa(jaSrc.dst)?stripNonZhDst(jaSrc.text):jaSrc.text)});continue;}
   const ja=list.find(d=>isJa(d.dst));if(!ja)continue;
   const zhDoc=list.filter(d=>isZh(d.dst)).sort((a,b)=>zhRank(a.dst)-zhRank(b.dst))[0];
   /* E450 Parsed-asset documents with their entries: each Japanese entry (its source line and the Japanese printed on the

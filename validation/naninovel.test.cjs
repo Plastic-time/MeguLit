@@ -423,3 +423,115 @@ test('Naninovel: #947 review regressions (empty classic doc, multiline/special-p
  assert.deepEqual(by5.get('EdgeP.nani').zh,['# 无哈希井号','纯换行甲\n; 假源文乙']);
  assert.equal(by5.get('EdgeP.nani').voices,undefined);
 });
+
+test('Naninovel: #947 r3 regressions (empty/cn/chs/unknown classic dst, prefixed parsed assets, stale meta cleared on translated >)',async t=>{
+ const os=require('node:os'),path=require('node:path');
+ const scenes=require('../services/original-engines/scenes.cjs');
+ const {packBundle}=require('../services/original-engines/utage-embedded.cjs')._internal;
+ const {string}=require('./helpers/utage-embedded-fixture.cjs');
+ const u32=v=>{const b=Buffer.alloc(4);b.writeUInt32LE(v);return b;};
+ const i32=v=>{const b=Buffer.alloc(4);b.writeInt32LE(v);return b;};
+ const str=s=>{const b=Buffer.from(s,'utf8');return Buffer.concat([u32(b.length),b,Buffer.alloc((4-b.length%4)%4)]);};
+ const comment=(line,hash,text)=>Buffer.concat([str('CommentScriptLine'),str('Naninovel'),str('Elringus.Naninovel.Runtime'),i32(line),...(hash!==null?[str(hash)]:[]),str(text)]);
+ const generic=(line,hash,count)=>Buffer.concat([str('GenericTextScriptLine'),str('Naninovel'),str('Elringus.Naninovel.Runtime'),i32(line),str(hash),u32(count),Buffer.alloc(count*8)]);
+ const print=(script,line,inl,text)=>Buffer.concat([str('PrintText'),str('Naninovel.Commands'),str('Elringus.Naninovel.Runtime'),str(script),i32(line),i32(inl),str(text)]);
+
+ await t.test('classic empty/cn/chs/unknown dst keeps translations and patchLines',st=>{
+  const classicCases=[
+   ['Legacy.nani','; localization document for `Legacy` naninovel script\n\n# l1\n; おはよう。\n早上好。\n\n# l2\n; 今日はいい天気ですね。\n今天天气真好啊。\n',['早上好。','今天天气真好啊。']],
+   ['CnTag.nani','; Japanese <ja-JP> to Chinese <cn> localization document for `CnTag` naninovel script\n\n# c1\n; おはよう。\n早上好。\n\n# c2\n; 今日はいい天気ですね。\n今天天气真好啊。\n',['早上好。','今天天气真好啊。']],
+   ['ChsTag.nani','; Japanese <ja-JP> to Chinese <chs> localization document for `ChsTag` naninovel script\n\n# s1\n; おはよう。\n早上好。\n\n# s2\n; 今日はいい天気ですね。\n今天天气真好啊。\n',['早上好。','今天天气真好啊。']],
+   ['CustomTag.nani','; Japanese <ja-JP> to Fan <custom> localization document for `CustomTag` naninovel script\n\n# u1\n; おはよう。\n早上好。\n',['早上好。']],
+  ];
+  const root1=fs.mkdtempSync(path.join(os.tmpdir(),'nani-r3-classic-'));
+  st.after(()=>fs.rmSync(root1,{recursive:true,force:true}));
+  const aa1=path.join(root1,'Game_Data','StreamingAssets','aa','StandaloneWindows64');
+  fs.mkdirSync(aa1,{recursive:true});
+  fs.writeFileSync(path.join(aa1,'game-localization-zhhans-scripts-01.bundle'),packBundle('CAB-c',Buffer.concat(classicCases.map(([,doc])=>string(doc))),'2020.3.7f1'));
+  const by1=new Map(scenes.read('naninovel',root1).map(s=>[s.name,s]));
+  for(const [name,,wantZh] of classicCases){
+   const sc=by1.get(name);assert.ok(sc,name);
+   assert.deepEqual(sc.zh,wantZh,name);
+   const patched=nani.patchLines([sc]);
+   assert.ok(patched&&patched[0].patched,name+' should patch');
+   assert.deepEqual(patched[0].lines,wantZh,name);
+  }
+  const parsedCn=Buffer.concat([
+   Buffer.alloc(8),
+   str('Japanese <ja-JP> to Chinese <cn> localization document for `ParsedCn` naninovel script'),
+   comment(2,'80000001','おはよう。'),print('ParsedCn',3,0,'早上好。'),
+  ]);
+  const pCn=nani.parse(Buffer.from(nani._internal.combine(nani._internal.scan(parsedCn,[]))[0].text));
+  assert.deepEqual(pCn.lines,['おはよう。']);
+  assert.deepEqual(pCn.zh,['早上好。']);
+ });
+
+ await t.test('parsed assets with leading "; " or trailing "\\n" still read while empty classic docs stay empty',()=>{
+  const prefNonJa=Buffer.concat([
+   Buffer.alloc(8),
+   str('; Chinese (T) <zh-TW> to Japanese <ja-JP> localization document for `PrefNonJa` naninovel script\n'),
+   str('LabelScriptLine'),Buffer.alloc(8),
+   str('PrintText'),str('Naninovel.Commands'),str('Elringus.Naninovel.Runtime'),str('PrefNonJa'),str('「あい」'),Buffer.alloc(4),
+   str('PrintText'),str('Naninovel.Commands'),str('Elringus.Naninovel.Runtime'),str('PrefNonJa'),str('うう'),Buffer.alloc(4),
+   Buffer.alloc(8),
+   str('; Chinese (T) <zh-TW> to Chinese (S) <zh-CN> localization document for `PrefNonJa` naninovel script\n'),
+   str('LabelScriptLine'),Buffer.alloc(8),
+   str('PrintText'),str('Naninovel.Commands'),str('Elringus.Naninovel.Runtime'),str('PrefNonJa'),str('你好'),Buffer.alloc(4),
+   str('PrintText'),str('Naninovel.Commands'),str('Elringus.Naninovel.Runtime'),str('PrefNonJa'),str('好'),Buffer.alloc(4),
+  ]);
+  const pNonJa=nani.parse(Buffer.from(nani._internal.combine(nani._internal.scan(prefNonJa,[]))[0].text));
+  assert.deepEqual(pNonJa.lines,['「あい」','うう']);
+  assert.deepEqual(pNonJa.zh,['你好','好']);
+
+  const prefJa=Buffer.concat([
+   Buffer.alloc(8),
+   str('; Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `PrefJa` naninovel script\n'),
+   comment(2,'81000001','おはよう。'),
+   print('PrefJa',3,0,'早上好。'),
+   Buffer.alloc(8),
+   str('; Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `Sub/PrefSub` naninovel script\n'),
+   comment(2,'81000002','サブ。'),
+   print('PrefSub',3,0,'子目录。'),
+   Buffer.alloc(8),
+   str('; Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `EmptyNoPrint` naninovel script\n'),
+   comment(2,'81000003','無関係なコメント。'),
+   Buffer.alloc(8),
+   str('Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `AllUntrans` naninovel script'),
+   comment(2,'81000004','未翻訳のみ。'),
+  ]);
+  const by2=new Map(nani._internal.combine(nani._internal.scan(prefJa,[])).map(d=>[d.name,nani.parse(Buffer.from(d.text))]));
+  assert.deepEqual(by2.get('PrefJa.nani').lines,['おはよう。']);
+  assert.deepEqual(by2.get('PrefJa.nani').zh,['早上好。']);
+  assert.deepEqual(by2.get('PrefSub.nani').lines,['サブ。']);
+  assert.deepEqual(by2.get('PrefSub.nani').zh,['子目录。']);
+  assert.deepEqual(by2.get('EmptyNoPrint.nani').lines,[]);
+  assert.deepEqual(by2.get('AllUntrans.nani').lines,['未翻訳のみ。']);
+  assert.deepEqual(by2.get('AllUntrans.nani').zh,['']);
+ });
+
+ await t.test('N3: translated "> " line clears stale voice meta in both entries and hashless paths',()=>{
+  const staleEntries=Buffer.concat([
+   Buffer.alloc(8),
+   str('Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `StaleE` naninovel script'),
+   comment(1,'82000001','> Ema: |#StaleE_Voice|'),
+   comment(3,'82000002','> Ema: |#StaleE_Fake|'),print('StaleE',4,0,'带译文行'),
+   comment(6,'82000003','次の台詞。'),print('StaleE',7,0,'下一句。'),
+  ]);
+  const staleHashless=Buffer.concat([
+   Buffer.alloc(8),
+   str('Japanese <ja-JP> to Chinese (S) <zh-Hans> localization document for `StaleP` naninovel script'),
+   comment(1,null,'> Ema: |#StaleP_Voice|'),
+   comment(3,null,'> Ema: |#StaleP_Fake|'),generic(4,'',1),
+   comment(6,null,'無ハッシュ次行。'),generic(7,'',1),
+   print('StaleP',4,0,'无哈希带译文行'),
+   print('StaleP',7,0,'无哈希下一句。'),
+  ]);
+  const by3=new Map(nani._internal.combine(nani._internal.scan(Buffer.concat([staleEntries,staleHashless,Buffer.alloc(8)]),[])).map(d=>[d.name,nani.parse(Buffer.from(d.text))]));
+  assert.deepEqual(by3.get('StaleE.nani').lines,['次の台詞。']);
+  assert.deepEqual(by3.get('StaleE.nani').zh,['下一句。']);
+  assert.equal(by3.get('StaleE.nani').voices,undefined);
+  assert.deepEqual(by3.get('StaleP.nani').lines,['無ハッシュ次行。']);
+  assert.deepEqual(by3.get('StaleP.nani').zh,['无哈希下一句。']);
+  assert.equal(by3.get('StaleP.nani').voices,undefined);
+ });
+});
