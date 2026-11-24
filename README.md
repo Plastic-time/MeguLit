@@ -365,6 +365,8 @@ KiriKiri、YU-RIS、Artemis、BGI、Siglus、Ren'Py、Unity 等主流引擎都�
 
 需要 Rust（Tauri）、Node.js 和 .NET Framework 的 C# 编译器
 
+只跑测试：`.\Build.ps1 -TestsOnly` 跑全部；`.\Build.ps1 -TestsChanged` 只跑和 origin/main 相比改动涉及的测试，改到测试运行器、CI 配置这类公共部分时自动跑全部
+
 ## 致谢
 
 [LunaHook](https://github.com/HIllya51/LunaHook)（文本 Hook）· [JMdict / EDRDG](https://www.edrdg.org/jmdict/j_jmdict.html)（词典）· [SudachiDict](https://github.com/WorksApplications/SudachiDict)（分词）· [KanjiVG](https://kanjivg.tagaini.net/)（© Ulrich Apel，CC BY-SA 3.0，笔顺）· [AivisSpeech](https://aivis-project.com/)（语音）· [Tauri](https://tauri.app/) · [Anki](https://apps.ankiweb.net/) & AnkiConnect · [Tomoyo](https://github.com/46daishi/tomoyo)（最早的灵感）
