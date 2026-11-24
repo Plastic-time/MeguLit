@@ -54,13 +54,37 @@ const ESC={n:'\n',t:'\t',r:'',b:'',f:'',v:'',0:''};
 function unesc(s,i,out){const d=s[i+1];if(d==='u'){if(s[i+2]==='{'){const e=s.indexOf('}',i);out.s+=String.fromCodePoint(parseInt(s.slice(i+3,e),16));return e+1;}out.s+=String.fromCharCode(parseInt(s.slice(i+2,i+6),16));return i+6;}
  if(d==='x'){out.s+=String.fromCharCode(parseInt(s.slice(i+2,i+4),16));return i+4;}if(d==='\n'){return i+2;}if(d==='\r'){return s[i+2]==='\n'?i+3:i+2;}
  out.s+=d in ESC?ESC[d]:d;return i+2;}
-/* JavaScript string literals in order (comments skipped; template literals taken whole) */
-function jsStrings(t){const out=[],n=t.length;let i=0;
+const JS_RE_KW=new Set('return case throw delete void typeof in instanceof new of await yield do else default'.split(' '));
+const JS_PAREN_KW=new Set(['if','while','for','with']);
+/* JavaScript string literals in order (comments and regex literals skipped; template literals taken whole) */
+function jsStrings(t){const out=[],n=t.length,pStack=[];
+ let i=0,allowRe=true,kwParen=false,afterDot=false,noSlashUntil=0,noBracketFrom=0,noBracketTo=0;
  while(i<n){const c=t[i];
+  if(/\s/.test(c)){i++;continue;}
   if(c==='/'&&t[i+1]==='/'){i=t.indexOf('\n',i);if(i<0)break;continue;}
   if(c==='/'&&t[i+1]==='*'){i=t.indexOf('*/',i+2);if(i<0)break;i+=2;continue;}
-  if(c==='"'||c==="'"||c==='`'){const o={s:''};let j=i+1;while(j<n&&t[j]!==c){if(t[j]==='\\'){j=unesc(t,j,o);}else if(t[j]==='\n'&&c!=='`')break;else o.s+=t[j++];}out.push(o.s);i=j+1;continue;}
-  i++;}
+  if(c==='"'||c==="'"||c==='`'){const o={s:''};let j=i+1;while(j<n&&t[j]!==c){if(t[j]==='\\'){j=unesc(t,j,o);}else if(t[j]==='\n'&&c!=='`')break;else o.s+=t[j++];}out.push(o.s);allowRe=t[j]==='\n';kwParen=false;afterDot=false;i=j+1;continue;}
+  if(c==='/'&&allowRe&&i>=noSlashUntil&&t[i-1]!=='<'){
+   let j=i+1,inClass=false,closed=false,aborted=false,classStart=-1;
+   while(j<n){const d=t[j];
+    if(d==='\n'||d==='\r')break;
+    if(d==='\\'){if(j+1>=n||t[j+1]==='\n'||t[j+1]==='\r')break;j+=2;continue;}
+    if(d==='['&&!inClass){if(j>=noBracketFrom&&j<noBracketTo){aborted=true;break;}inClass=true;classStart=j;j++;continue;}
+    if(d===']'&&inClass){inClass=false;j++;continue;}
+    if(d==='/'&&!inClass){closed=true;j++;break;}
+    j++;}
+   if(closed){i=j;allowRe=false;kwParen=false;afterDot=false;continue;}
+   if(!aborted){if(inClass){noBracketFrom=classStart;noBracketTo=j;}else noSlashUntil=j;}}
+  if((c==='+'&&t[i+1]==='+')||(c==='-'&&t[i+1]==='-')){kwParen=false;afterDot=false;i+=2;continue;}
+  if((c>='A'&&c<='Z')||(c>='a'&&c<='z')||c==='_'||c==='$'||c.charCodeAt(0)>=0x80){
+   let j=i+1;while(j<n){const k=t.charCodeAt(j);if((k>=65&&k<=90)||(k>=97&&k<=122)||(k>=48&&k<=57)||k===95||k===36||(k>=0x80&&!/\s/.test(t[j])))j++;else break;}
+   const w=t.slice(i,j);allowRe=!afterDot&&JS_RE_KW.has(w);kwParen=!afterDot&&JS_PAREN_KW.has(w);afterDot=false;i=j;continue;}
+  if(c>='0'&&c<='9'){let j=i+1;while(j<n&&t[j]>='0'&&t[j]<='9')j++;allowRe=false;kwParen=false;afterDot=false;i=j;continue;}
+  if(c==='('){pStack.push(kwParen);allowRe=true;kwParen=false;afterDot=false;i++;continue;}
+  if(c===')'){allowRe=pStack.length?pStack.pop():false;kwParen=false;afterDot=false;i++;continue;}
+  if(c===']'){allowRe=false;kwParen=false;afterDot=false;i++;continue;}
+  if(c==='.'&&t[i+1]==='.'&&t[i+2]==='.'){allowRe=true;kwParen=false;afterDot=false;i+=3;continue;}
+  afterDot=c==='.';allowRe=!afterDot;kwParen=false;i++;}
  return out;}
 /* Lua string literals: "..", '..', [[..]] / [=[..]=]; -- and --[[ ]] comments */
 function luaStrings(t){const out=[],n=t.length;let i=0;
