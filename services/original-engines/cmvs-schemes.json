@@ -1,5 +1,5 @@
 {
-  "_comment": "E592 CMVS (Purple Software) CPZ1/CPZ2/CPZ5/CPZ6/CPZ7 schemes; cpz5 from GARbro ArcFormats/Cmvs (morkt, MIT): ArcCPZ.cs CreateCpz5Scheme / DefaultCpz5Secret and CmvsMD5.cs. Numbers are hex strings. The reader tries every md5 variant in this order and keeps the first that gives a sane directory. A new title's variant or secret can be added here or sent as an adapter pack's params (same shape). out: [state index, op (^ + -), constant] per result word.",
+  "_comment": "E592 CMVS (Purple Software) CPZ1/CPZ2/CPZ3/CPZ5/CPZ6/CPZ7 schemes; cpz5 from GARbro ArcFormats/Cmvs (morkt, MIT): ArcCPZ.cs CreateCpz5Scheme / DefaultCpz5Secret and CmvsMD5.cs. Numbers are hex strings. The reader tries every md5 variant in this order and keeps the first that gives a sane directory. A new title's variant or secret can be added here or sent as an adapter pack's params (same shape). out: [state index, op (^ + -), constant] per result word.",
   "cpz1": {
     "_comment": "CVNS fixed key from GARbro ArcFormats/Cmvs/ArcCPZ1.cs (morkt, MIT).",
     "key": "92cd97908cd78cd58b4b93fa9ad78cbf8cc98ceb8d698d8b8cd28cd68b6d8ce38cfb8cd08cc88cf08bfe8caa8cf48b4b9c588cd396c88ccb8cce8cf38cd68b52"
@@ -8,6 +8,11 @@
     "_comment": "CVNS word table from GARbro ArcFormats/Cmvs/ArcCPZ2.cs (morkt, MIT).",
     "words": ["3a68cdbf", "d3c3a711", "8414876e", "657befdb", "cdd7c125", "09328580", "288ffedd", "99ebf13a",
               "5a471f95", "1ea3f4f1", "f4ff524e", "d358e8a9", "c5b71015", "a913046f", "2d6fd2bd", "68c8be19"]
+  },
+  "cpz3": {
+    "_comment": "Early CMVS word table from Shizuku-in/cmvs-rs crates/cmvs-core/src/cpz/cpz3.rs (Apache-2.0).",
+    "words": ["4d0d4a5e", "b3abf3e1", "3c37336d", "86c3f5f3", "7d4f9b89", "58d7de11", "6367778d", "a5f34629",
+              "067fa4b5", "ed0ae742", "b19450cc", "e7204a5a", "d9af04f5", "5d3b687f", "c1c7a6fd", "fc502289"]
   },
   "md5": {
     "Mirai":   {"init": ["67452301", "EFCDAB89", "98BADCFE", "10325476"], "out": [[0, "^", "0"], [1, "^", "0"], [2, "^", "0"], [3, "^", "0"]]},
