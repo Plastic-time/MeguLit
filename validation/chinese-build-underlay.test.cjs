@@ -128,6 +128,22 @@ test('QLIE: GameData/data7.pack over data0.pack, loose scenario/*.s over data0.p
  });
  assert.deepEqual(scenes.read('qlie',gLoose.dir).flatMap(s=>s.lines),zh);
  assert.deepEqual(scenes.ENGINES.qlie.originalLines(gLoose.dir),ja);
+ const gScript=game(dir=>{
+  writeTree(dir,{
+   'GameData/data0.pack':F.qliePack({'s01.s':F.sjis(sFile(ja))},{version:'3.1'}),
+   'GameData/script/s01.s':F.gbk(sFile(zh)),
+  });
+ });
+ assert.deepEqual(scenes.read('qlie',gScript.dir).flatMap(s=>s.lines),zh);
+ assert.deepEqual(scenes.ENGINES.qlie.originalLines(gScript.dir),ja);
+ const gCase=game(dir=>{
+  writeTree(dir,{
+   'GameData/data0.pack':F.qliePack({'S01.S':F.sjis(sFile(ja))},{version:'3.1'}),
+   'GameData/data7.pack':F.qliePack({'s01.s':F.gbk(sFile(zh))},{version:'3.1'}),
+  });
+ });
+ assert.deepEqual(scenes.read('qlie',gCase.dir).flatMap(s=>s.lines),zh);
+ assert.deepEqual(scenes.ENGINES.qlie.originalLines(gCase.dir),ja);
 });
 
 test('QLIE: single Chinese pack, Chinese-over-Chinese packs, and plain Japanese pack do not mis-adopt originals',()=>{
