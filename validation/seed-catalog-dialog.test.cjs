@@ -20,7 +20,7 @@ window.__on=false;
 window.startNsfw=()=>initNsfw({locale:'zh',api:async a=>a==='nsfw_state'?{on:window.__on,flagged:[]}:null});
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 window.calls=[];
-window.open_=(answer,engine={})=>openSeedCatalog({locale:'zh',esc,api:async(a,p={})=>{calls.push([a,p]);if(a==='seed_catalog')return answer;if(a==='seed_catalog_engines')return {engines:engine.engines||[]};if(a==='seed_catalog_engine')return engine.pages?.[p.engine+'|'+p.page];if(a==='seed_cover')return ${JSON.stringify(PIXEL)};return null;}});
+window.open_=(answer,engine={})=>openSeedCatalog({locale:'zh',esc,api:async(a,p={})=>{calls.push([a,p]);if(a==='seed_catalog'){if(engine.failCatalog)throw Error('offline');return answer;}if(a==='seed_catalog_engines')return {engines:engine.engines||[]};if(a==='seed_catalog_engine'){const k=p.engine+'|'+p.page;if(engine.delay?.[k])await new Promise(r=>setTimeout(r,engine.delay[k]));return engine.pages?.[k];}if(a==='seed_cover')return ${JSON.stringify(PIXEL)};return null;}});
 window.ready=true;
 </script></body></html>`;
 
@@ -136,4 +136,34 @@ test('the catalog tabs open one engine page at a time and follow the existing co
   await view.locator('.sc-veil').click();
   assert.ok(!(await page.evaluate(()=>calls.some(c=>c[0]==='seed_cover'&&c[1].nsfw))));
  }finally{await browser.close();}
+});
+
+test('engine tiles load without the tested games, a late page never lands on another engine, and back shows new counts',{skip:!chromium&&'no playwright-core'},async()=>{
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try{
+  const page=await pageFor(browser);
+  const choice=[{id:'kirikiri',name:'KiriKiri',count:101},{id:'rugp',name:'rUGP',count:2}];
+  const sets={
+   'kirikiri|1':{page:1,count:101,more:true,games:[{vndb:'v101',title:'Late page',cover:'none'}]},
+   'rugp|1':{page:1,count:5,more:false,games:[{vndb:'v104',title:'Small engine',cover:'none'}]},
+  };
+  await page.evaluate(({choice,sets})=>{open_(null,{failCatalog:true,engines:choice,pages:sets,delay:{'kirikiri|1':300,'rugp|1':1200}});},{choice,sets});
+  const enginesTab=page.getByRole('tab',{name:/引擎已适配/});
+  await enginesTab.getByText('约 103 部').waitFor({timeout:4000});
+  assert.equal(await page.textContent('[data-sub]'),'读取失败，稍后再试');
+  await enginesTab.click();
+  const view=page.locator('[data-engine-view]');
+  await page.locator('.sc-etile[data-engine="kirikiri"]').click();
+  await view.getByRole('button',{name:/全部引擎/}).click();
+  await page.locator('.sc-etile[data-engine="rugp"]').click();
+  await page.waitForTimeout(600);
+  assert.equal(await view.getByText('Late page').count(),0,'the first engine answered late and stays out');
+  assert.equal(await view.getAttribute('aria-busy'),'true','the open engine is still loading');
+  await view.getByText('Small engine').waitFor();
+  assert.equal(await view.getAttribute('aria-busy'),null);
+  assert.equal(await view.locator('[data-engine-count]').textContent(),'5 部');
+  await view.getByRole('button',{name:/全部引擎/}).click();
+  await page.locator('.sc-etile[data-engine="rugp"]').getByText('5').waitFor();
+  await enginesTab.getByText('约 106 部').waitFor();
+  assert.equal(await page.getByRole('tab',{name:/已实测/}).locator('[data-tab-count]').textContent(),'','the tested tab keeps its own count'); }finally{await browser.close();}
 });

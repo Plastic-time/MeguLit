@@ -88,11 +88,13 @@ html:not(#u):not(#v):not(#w) body .seed-catalog .sc-tabs>button[aria-selected=tr
 .sc-bar[hidden],[data-pane][hidden],[data-engine-list][hidden],.sc-edetail[hidden]{display:none!important}
 /* the search: the library's capsule, centred */
 html:not(#u):not(#v):not(#w) body .seed-catalog .sc-bar{justify-content:center;padding:16px 28px 4px;border-bottom:0}
-html:not(#u):not(#v):not(#w) body .seed-catalog .sc-search{flex:0 1 440px}
+html:not(#u):not(#v):not(#w) body .seed-catalog .sc-search{flex:0 1 440px;border-radius:26px;box-shadow:0 18px 40px -16px rgba(0,0,0,.7);transition:box-shadow .26s}
+/* the ring sits on the capsule, as on the card maker search: controls-b clears the input's own focus shadow */
+html:not(#u):not(#v):not(#w) body .seed-catalog .sc-search:focus-within{box-shadow:0 24px 60px -18px rgba(0,0,0,.85),0 0 0 1.5px color-mix(in srgb,var(--g-gold,#edb56e) 80%,transparent),0 0 0 5px color-mix(in srgb,var(--g-gold,#edb56e) 22%,transparent)}
 html:not(#u):not(#v):not(#w) body .seed-catalog .sc-search svg{left:16px;stroke:var(--g-t3,#8a746b)}
 html:not(#u):not(#v):not(#w) body .seed-catalog .sc-search input{height:40px!important;padding:0 18px 0 42px!important;border:1px solid var(--g-rule-strong,rgba(237,181,110,.24))!important;border-radius:26px!important;
- background:color-mix(in srgb,var(--g-raise,#1d1513) 82%,transparent)!important;box-shadow:0 18px 40px -16px rgba(0,0,0,.7)!important;font-size:13.5px!important;color:var(--g-t1,#f1e0d2)!important;transition:border-color .26s,box-shadow .26s}
-html:not(#u):not(#v):not(#w) body .seed-catalog .sc-search input:focus{border-color:color-mix(in srgb,var(--g-gold,#edb56e) 55%,transparent)!important;box-shadow:0 24px 60px -18px rgba(0,0,0,.85),0 0 0 5px color-mix(in srgb,var(--g-gold,#edb56e) 6%,transparent)!important;outline:0!important}
+ background:color-mix(in srgb,var(--g-raise,#1d1513) 82%,transparent)!important;box-shadow:none!important;font-size:13.5px!important;color:var(--g-t1,#f1e0d2)!important;transition:border-color .26s}
+html:not(#u):not(#v):not(#w) body .seed-catalog .sc-search input:focus{border-color:color-mix(in srgb,var(--g-gold,#edb56e) 55%,transparent)!important;outline:0!important}
 html:not(#u):not(#v):not(#w) body .seed-catalog .sc-offline{border-bottom:0;text-align:center;color:var(--g-t2,#c3ab9c)}
 /* the developer blocks */
 .sc-group{padding-top:30px}

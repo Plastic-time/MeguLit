@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* The Seed catalog: every game that has a seed, grouped by developer, with its cover (services/seed-catalog.cjs).
-   Covers follow the global NSFW setting (Settings, off by default; web/nsfw.js): off, a cover VNDB rates adult is a veil card
-   (one line of text) and a click shows that one cover; on, every cover. Opened from The Seed dialog and the About section (web/the-seed.js). */
+   Tested games show every cover unless the app's R18 filter is on. The engine pages follow the global NSFW setting (Settings,
+   off by default; web/nsfw.js): off, a cover VNDB rates adult is a veil card (one line of text) and a click shows that one
+   cover; on, every cover. Opened from The Seed dialog and the About section (web/the-seed.js). */
 import {nsfwOn} from './nsfw.js';
 import {fxPref} from './fx-prefs.js';
 const W={
@@ -82,10 +83,10 @@ export function catalogHTML(games,locale,mode,esc,query=''){
   <ul class="sc-grid">${gr.games.map(g=>cardHTML(g,locale,mode,esc)).join('')}</ul></section>`).join('');
 }
 
-/* covers: four at a time. A cover that arrived is kept per mode for as long as the app runs; a miss or an error is asked
-   again next time. live() is false once the list was drawn again (search, mode switch) or closed: that run stops before its
+/* covers: four at a time. The last 300 covers that arrived are kept per mode for as long as the app runs (an engine has
+   thousands of games); a miss or an error is asked again next time. live() is false once the list was drawn again (search, mode switch) or closed: that run stops before its
    next request, so leaving NSFW mode stops the downloads of covers normal mode does not show. */
-const covers=new Map();
+const covers=new Map(),KEEP_COVERS=300;
 const isCover=u=>typeof u==='string'&&u.startsWith('data:image/');
 export function resolveSeedCover(api,vid,mode='safe',cache=covers){
  const key=vid+'|'+mode;
@@ -96,7 +97,8 @@ export function resolveSeedCover(api,vid,mode='safe',cache=covers){
    return isCover(url)?url:null;
   });
   cache.set(key,pending);
- }
+  while(cache.size>KEEP_COVERS)cache.delete(cache.keys().next().value);
+ }else{cache.delete(key);cache.set(key,pending);}
  return pending;
 }
 export function loadCovers(root,api,mode,live=()=>root.isConnected,{cache=covers,show=showCover}={}){
@@ -168,7 +170,7 @@ export function openSeedCatalog({api,locale,esc,toast}){
  const tabs=[...dialog.querySelectorAll('[data-tab]')];
  const showTab=name=>{
   for(const b of tabs){const on=b.dataset.tab===name;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;$(`[data-pane="${b.dataset.tab}"]`).hidden=!on;}
-  $('[data-bar]').hidden=name!=='tested';$('[data-offline]').hidden=name!=='tested'||!seedOffline;dialog.dataset.tab=name;body.scrollTop=0;
+  $('[data-bar]').hidden=name!=='tested';$('[data-offline]').hidden=name!=='tested'||!seedOffline;dialog.dataset.section=name;body.scrollTop=0;
  };
  $('.sc-tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b)showTab(b.dataset.tab);});
  $('.sc-tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;const i=tabs.indexOf(document.activeElement);if(i<0)return;
@@ -192,7 +194,9 @@ export function openSeedCatalog({api,locale,esc,toast}){
    <span class="sc-etile-name">${esc(g.name)}</span><span class="sc-etile-n">${known(g.count)?`<b>${esc(num(g.count))}</b> ${esc(t.unit)}`:esc(t.engineCountMissing)}</span>
    <i aria-hidden="true" style="--share:${known(g.count)?(Math.log10(g.count+1)/Math.log10(top+1)).toFixed(3):0}"></i></button></li>`).join('')}</ul>`:`<p class="sc-empty">${esc(r?.offline?t.offline:t.failed)}</p>`;
  };
- const closeEngine=()=>{current=null;engineView.hidden=true;engineView.innerHTML='';delete engineView.dataset.engine;engineList.hidden=false;$('[data-engines-offline]').hidden=!enginesOffline;body.scrollTop=0;};
+ /* back to the tiles, drawn again so a count an opened page refreshed shows on its tile and in the total */
+ const closeEngine=()=>{current=null;engineView.hidden=true;engineView.innerHTML='';engineView.removeAttribute('aria-busy');delete engineView.dataset.engine;engineList.hidden=false;
+  showEngines({engines:[...engineInfo.values()],offline:enginesOffline});body.scrollTop=0;};
  async function showEnginePage(id,page){
   const info=engineInfo.get(id);if(!info)return;
   if(current?.busy)return;
@@ -227,7 +231,7 @@ export function openSeedCatalog({api,locale,esc,toast}){
    if(current!==mine||!dialog.isConnected)return;
    notice.hidden=true;
    view.innerHTML=`<div class="sc-empty sc-fail"><span>${esc(t.offline)}</span><button type="button" class="sc-back" data-engine-page="${page}">${esc(t.retry)}</button></div>`;
-  }finally{mine.busy=false;engineView.removeAttribute('aria-busy');}
+  }finally{mine.busy=false;if(current===mine)engineView.removeAttribute('aria-busy');}
  }
  engineList.addEventListener('click',e=>{const b=e.target.closest('[data-engine]');if(b)showEnginePage(b.dataset.engine,1);});
  engineView.addEventListener('click',e=>{
@@ -249,9 +253,10 @@ export function openSeedCatalog({api,locale,esc,toast}){
   if(r?.safeOnly===true){safeOnly=true;mode='normal';render();}
   const merged=mergeGames(games).length;tabCount('tested',t.count(merged));
   $('[data-sub]').textContent=t.sub(merged,games.length,new Set(games.map(g=>g.developers?.[0]?.id).filter(Boolean)).size);
-  seedOffline=!!r?.offline;$('[data-offline]').hidden=!seedOffline||dialog.dataset.tab==='engines';render();
-  Promise.resolve().then(()=>api('seed_catalog_engines',{})).then(showEngines).catch(()=>showEngines({offline:true}));
+  seedOffline=!!r?.offline;$('[data-offline]').hidden=!seedOffline||dialog.dataset.section==='engines';render();
  }).catch(()=>{if(dialog.isConnected){$('[data-sub]').textContent=t.failed;toast&&toast(t.failed);}});
+ /* the engine counts are local (a snapshot plus pages opened before), so they do not wait on the seeded games' VNDB lookup */
+ Promise.resolve().then(()=>api('seed_catalog_engines',{})).then(showEngines).catch(()=>showEngines({offline:true}));
  return dialog;
 }
 /* the entry button for The Seed dialog and the About section */

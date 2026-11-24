@@ -106,3 +106,30 @@ test('new built-in VNDB ids invalidate an engine count and page together',async 
  assert.equal(calls,2);
  assert.deepEqual(page.games,[]);
 });
+
+test('a failed engine page pauses only the engine pages, not the tested games',async t=>{
+ const root=tmp(t);
+ const failed=await catalog.enginePage(root,'kirikiri',1,{seeds,now:NOW,fetch:async()=>({ok:false,status:429})});
+ assert.equal(failed.offline,true);
+ assert.equal(catalog.engineCounts(root,{seeds,now:NOW+MIN}).offline,true);
+ let asked=0;
+ const r=await catalog.catalog(root,{seeds,now:NOW+MIN,fetch:async()=>{asked++;return json({results:[vn('v1','Seeded')]});}});
+ assert.equal(asked,1,'the tested games still ask VNDB for a missing name');
+ assert.equal(r.offline,false);
+ assert.equal(r.games[0].title,'Seeded');
+});
+
+test('a hand-edited engine cache keeps only canonical pages and a valid scope',async t=>{
+ const root=tmp(t),scope={seeds,now:NOW};
+ await catalog.enginePage(root,'kirikiri',1,{...scope,fetch:async()=>json({count:3,more:true,results:[vn('v2','Kept')]})});
+ const file=path.join(root,'data','config','seed-catalog.json'),data=JSON.parse(fs.readFileSync(file,'utf8'));
+ const row={at:NOW,ids:['v2'],more:false};
+ Object.assign(data.engines.kirikiri.entries,{'01':{...row,ids:['v9']},'1001':row,'2':{...row,at:-1},'3':{...row,ids:Array.from({length:150},(_,i)=>'v'+(i+10))}});
+ data.engines.tyrano={scope:'not-a-digest',entries:{0:{at:NOW,count:9},1:row}};
+ fs.writeFileSync(file,JSON.stringify(data));
+ const cache=catalog.readCache(root);
+ assert.deepEqual(Object.keys(cache.engines.kirikiri.entries),['0','1','3']);
+ assert.deepEqual(cache.engines.kirikiri.entries[1].ids,['v2'],'page "01" is not page 1');
+ assert.equal(cache.engines.kirikiri.entries[3].ids.length,100);
+ assert.equal(cache.engines.tyrano,undefined);
+});
