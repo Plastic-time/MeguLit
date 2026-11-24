@@ -48,23 +48,23 @@ function readDec(file,dec,offset,length){if(!Number.isSafeInteger(offset)||!Numb
 
 /* ---- containers --------------------------------------------------------------------------------------------------- */
 const sj=kit.SJIS;
-function libList(file,base,size,root,out,depth=0){const h=kit.readAt(file,base,16);if(h.length<16||h.toString('latin1',0,4)!=='LIB\0')return false;const count=h.readInt16LE(8);if(count<=0||0x30*count>size)return false;
- const idx=kit.readAt(file,base+16,0x30*count),data=base+16+0x30*count;
+function libList(file,base,size,root,out,depth=0){const h=kit.readAt(file,base,16);if(h.length<16||h.toString('latin1',0,4)!=='LIB\0')return false;const count=h.readInt16LE(8);if(count<=0||16+0x30*count>size)return false;
+ const idx=kit.readAt(file,base+16,0x30*count),data=base+16+0x30*count;if(idx.length<0x30*count)return false;
  for(let i=0;i<count;i++){const p=i*0x30,z=idx.indexOf(0,p),name=root+sj.decode(idx.subarray(p,z<0||z>p+0x24?p+0x24:z)),esz=idx.readUInt32LE(p+0x24),off=base+idx.readUInt32LE(p+0x28);
   if(!/\./.test(path.posix.basename(name))&&depth<8&&libList(file,off,esz,name+'/',out,depth+1))continue;if(off<data||off+esz>base+size)return false;out.push({name,offset:off,size:esz});}
  return true;}
-function libuList(file,dec,base,root,out,depth=0){const h=readDec(file,dec,base,16);if(h.toString('latin1',0,4)!=='LIBU')return false;const count=h.readInt32LE(8),fsz=kit.size(file);if(count<=0||count>100000)return false;
- const idx=readDec(file,dec,base+16,count*0x50);
+function libuList(file,dec,base,root,out,depth=0){const h=readDec(file,dec,base,16);if(h.length<16||h.toString('latin1',0,4)!=='LIBU')return false;const count=h.readInt32LE(8),fsz=kit.size(file);if(count<=0||count>100000||base+16+count*0x50>fsz)return false;
+ const idx=readDec(file,dec,base+16,count*0x50);if(idx.length<count*0x50)return false;
  for(let i=0;i<count;i++){const p=i*0x50;let name=idx.toString('utf16le',p,p+0x44);const z=name.indexOf('\0');if(z>=0)name=name.slice(0,z);const esz=idx.readUInt32LE(p+0x44),off=base+Number(idx.readBigInt64LE(p+0x48));
   if(!name.includes('.')&&depth<8&&off>=0&&off+16<=fsz&&libuList(file,dec,off,root+name+'/',out,depth+1))continue;if(off<0||off+esz>fsz)return false;out.push({name:root+name,offset:off,size:esz,dec});}
  return true;}
-function libpList(file,scheme){const h=readDec(file,scheme.dec,0,16),count=h.readInt32LE(4),noff=h.readInt32LE(8),fsz=kit.size(file);if(count<=0||count>200000||noff<0||noff>200000)return null;
- const idx=readDec(file,scheme.dec,16,count*0x20),table=readDec(file,scheme.dec,16+count*0x20,noff*4),align=scheme.align>0?scheme.align:0x1000,base=Math.ceil((16+count*0x20+noff*4)/align)*align,out=[],seen=new Set();
+function libpList(file,scheme){const h=readDec(file,scheme.dec,0,16);if(h.length<16)return null;const count=h.readInt32LE(4),noff=h.readInt32LE(8),fsz=kit.size(file);if(count<=0||count>200000||noff<0||noff>200000||16+count*0x20+noff*4>fsz)return null;
+ const idx=readDec(file,scheme.dec,16,count*0x20),table=readDec(file,scheme.dec,16+count*0x20,noff*4),align=scheme.align>0?scheme.align:0x1000,base=Math.ceil((16+count*0x20+noff*4)/align)*align,out=[],seen=new Set();if(idx.length<count*0x20||table.length<noff*4)return null;
  const dir=(root,first,n,depth)=>{for(let i=0;i<n;i++){const k=first+i;if(k>=count||seen.has(k))return;seen.add(k);const p=k*0x20,z=idx.indexOf(0,p),name=root+sj.decode(idx.subarray(p,z<0||z>p+0x14?p+0x14:z)),flags=idx.readInt32LE(p+0x14),off=idx.readInt32LE(p+0x18),esz=idx.readUInt32LE(p+0x1c);
   if(!(flags&0x30000)){if(off>k&&depth<16)dir(name?name+'/':'',off,esz,depth+1);continue;}if(off<0||off>=noff)continue;const at=base+table.readUInt32LE(off*4)*1024;if(at+esz<=fsz)out.push({name,offset:at,size:esz,dec:scheme.dec});}};
  dir('',0,1,0);return out.length?out:null;}
 /* the entries of a Malie archive (names with "/"), or null; tried: plain LIB, plain LIBU, each known key */
-function index(file){const fsz=kit.size(file);if(fsz<32)return null;const head=kit.readAt(file,0,16),sig=head.toString('latin1',0,4);
+function index(file){const fsz=kit.size(file);if(fsz<32)return null;const head=kit.readAt(file,0,16);if(head.length<16)return null;const sig=head.toString('latin1',0,4);
  if(sig==='LIB\0'){const out=[];return libList(file,0,fsz,'',out)&&out.length?out:null;}
  if(sig==='LIBU'){const out=[];return libuList(file,null,0,'',out)&&out.length?out:null;}
  for(const s of schemes()){const b=Buffer.from(head);s.dec(b,0);const t=b.toString('latin1',0,4);

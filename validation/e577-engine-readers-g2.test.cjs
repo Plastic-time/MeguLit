@@ -223,6 +223,28 @@ test('Malie: readDec, LIBU and LIBP decrypt entries across 2 GiB and past 4 GiB 
  assert.equal(malie.readDec(vCfi,cfiDec,Number.MAX_SAFE_INTEGER-8,8).length,0);
  assert.equal(virtuals.get(vCfi).reads.length,before);
 });
+test('Malie: truncated LIB / LIBU / LIBP headers and indexes return null instead of throwing and do not abort discovery',t=>{
+ const schemes=require('../services/original-engines/malie-schemes.json').schemes,[,cam]=Object.entries(schemes).find(([,v])=>v.cipher==='camellia');
+ const d=tmp(t);
+ /* truncated LIB\0 (48 bytes with count=1): 0x30*1 <= 48 passed the old check, leaving idx 16 bytes short */
+ const badLib=Buffer.alloc(48);badLib.write('LIB\0',0,'latin1');badLib.writeInt16LE(1,8);
+ const badLibFile=path.join(d,'bad.lib');fs.writeFileSync(badLibFile,badLib);
+ assert.equal(malie.index(badLibFile),null);
+ /* truncated LIBU (48 bytes with count=2): idx needs 16 + 2*0x50 = 176 bytes */
+ const badLibu=Buffer.alloc(48);badLibu.write('LIBU',0,'latin1');badLibu.writeInt32LE(2,8);
+ const badLibuFile=path.join(d,'badu.lib');fs.writeFileSync(badLibuFile,badLibu);
+ assert.equal(malie.index(badLibuFile),null);
+ /* truncated encrypted LIBP (32 bytes, header declares count=4, noff=2) */
+ const fullLibp=F.malieLibp({'system/exec.dat':F.malieExec(MJA)},{key:cam.key,align:cam.align});
+ const badLibpFile=path.join(d,'badp.dat');fs.writeFileSync(badLibpFile,fullLibp.subarray(0,32));
+ assert.equal(malie.index(badLibpFile),null);
+ /* end-to-end: a truncated archive sorting before a valid archive must not abort probe() or scenes.read('malie') */
+ const game=tmp(t);
+ F.writeTree(game,{'data/data0.lib':badLibu,'data/data1.lib':F.malieLib({'exec.dat':F.malieExec(MJA)}),'game.exe':'MZ'});
+ assert.equal(malie.probe(game),true);
+ assert.equal(library.engineOf(game)?.name,'Malie');
+ assert.deepEqual(scenes.read('malie',game)[0].lines,['「行こう、兄さん」','朝の光が差し込む。\n静かな朝だ。','、目を覚ませ。']);
+});
 
 /* ---- ShiinaRio -------------------------------------------------------------------------------------------------- */
 const SJA=';【第一話】\r\n$L_BG,b\\bg01,0\r\n$VOICE,v\\kir0001,0,0,0\r\n【霧子】\r\n「おはよう」\r\n朝の光が差し込む。\r\n\r\n①ありがとう①\r\n';
