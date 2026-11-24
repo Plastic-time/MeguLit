@@ -3,6 +3,7 @@
    Covers follow the global NSFW setting (Settings, off by default; web/nsfw.js): off, a cover VNDB rates adult is a veil card
    (one line of text) and a click shows that one cover; on, every cover. Opened from The Seed dialog and the About section (web/the-seed.js). */
 import {nsfwOn} from './nsfw.js';
+import {fxPref} from './fx-prefs.js';
 const W={
  zh:{title:'已种下的游戏',sub:(g,s,b)=>`${g} 部游戏 · ${s} 颗种子 · ${b} 个游戏社`,seeds:n=>`${n} 颗种子`,partly:(a,b)=>`${a}/${b} 已确认`,locked:'设置里开着「卡背过滤 R18 图片」，成人封面不能显示',search:'搜索已实测游戏或游戏社',
   count:n=>`${n} 部`,other:'其他',tested:'已实测',engineAdapted:'引擎已适配（未逐部实测）',
@@ -144,7 +145,24 @@ export function openSeedCatalog({api,locale,esc,toast}){
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
  const $=s=>dialog.querySelector(s),body=$('[data-body]'),seedGames=$('[data-seed-games]');
  let run=0;
- const render=()=>{const mine=++run;dialog.dataset.mode=mode;seedGames.innerHTML=catalogHTML(games,locale,mode,esc,query);loadCovers(seedGames,api,mode,()=>mine===run&&dialog.isConnected);loadLogos(seedGames,api,()=>mine===run&&dialog.isConnected);};
+ /* 2026-11-24 (user): the tested games always show their covers, adult ones too; only the app's R18 filter keeps them veiled */
+ const testedMode=()=>safeOnly?'normal':'nsfw';
+ const render=()=>{const mine=++run,shown=testedMode();dialog.dataset.mode=mode;seedGames.innerHTML=catalogHTML(games,locale,shown,esc,query);loadCovers(seedGames,api,shown,()=>mine===run&&dialog.isConnected);loadLogos(seedGames,api,()=>mine===run&&dialog.isConnected);};
+
+ /* covers answer the pointer like the library wall (card-tilt.js): a small turn toward it with a moving sheen */
+ const calm=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+ let tilted=null;
+ const untilt=el=>{if(!el)return;el.classList.remove('is-tilting');for(const k of ['--rx','--ry','--mx','--my'])el.style.removeProperty(k);};
+ body.addEventListener('pointermove',e=>{
+  const el=calm||e.buttons||!fxPref('cardTilt').on?null:e.target.closest?.('.sc-cover')||null;
+  if(el!==tilted){untilt(tilted);tilted=el;}
+  if(!el)return;
+  const r=el.getBoundingClientRect();if(!r.width)return;
+  const x=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),y=Math.min(1,Math.max(0,(e.clientY-r.top)/r.height));
+  el.style.setProperty('--ry',((x-.5)*16).toFixed(2)+'deg');el.style.setProperty('--rx',((.5-y)*14).toFixed(2)+'deg');
+  el.style.setProperty('--mx',(x*100).toFixed(1)+'%');el.style.setProperty('--my',(y*100).toFixed(1)+'%');el.classList.add('is-tilting');
+ },{passive:true});
+ body.addEventListener('pointerleave',()=>{untilt(tilted);tilted=null;},{passive:true});
 
  /* tabs: the seeded games first; the search bar belongs to them */
  const tabs=[...dialog.querySelectorAll('[data-tab]')];

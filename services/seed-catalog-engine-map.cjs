@@ -35,10 +35,10 @@ const engines={
  wolf:{name:'Wolf RPG Editor',vndb:['Wolf RPG Editor']},
 };
 
-// Distinct Japanese works with 48abbb68 built-in VNDB ids excluded, measured 2026-11-24.
+// Distinct Japanese works with the built-in VNDB ids excluded, measured 2026-11-24.
 const snapshot={
- at:1795526075720,
- seedIds:'0a176c4d51f3a290998a40e629262cbbd344d9b64b1e00d8d819504b8bd99f5a',
+ at:1795527481686,
+ seedIds:'a7c6c2fe309bed13dfa262b2a4807b83fc12d861b0ddafda4387bab425d1d30d',
  counts:{
   kirikiri:4492,
   tyrano:3669,
@@ -52,7 +52,7 @@ const snapshot={
   majiro:157,
   siglus:95,
   reallive:128,
-  avg32:87,
+  avg32:86,
   malie:62,
   qlie:86,
   liar:77,

@@ -45,13 +45,12 @@ test('catalog dialog: normal mode, the NSFW question, search, R18 filter, closin
   await page.evaluate(g=>{localStorage.clear();open_({games:g,offline:false,safeOnly:false});},games);await settle();
   let s=await state();
   assert.equal(s.open,true);assert.equal(s.sub,'3 部游戏 · 3 颗种子 · 2 个游戏社');assert.equal(s.cards,3);
-  assert.equal(s.hidden,1);assert.equal(s.veils,1);assert.equal(s.imgs,2);assert.deepEqual(s.covers.sort(),['v1|false','v3|false'],'normal mode never asks for the NSFW cover');
-  assert.match(await page.textContent('.sc-veil'),/成人内容/);
-  await page.click('.sc-veil');await settle();s=await state();assert.equal(s.imgs,3,'a click shows that one cover');assert.equal(s.veils,0);assert.ok(s.covers.includes('v2|true'));assert.equal(s.mode,'normal','the setting stays off');
+  assert.equal(s.mode,'normal','the global setting is off');
+  assert.equal(s.hidden,0);assert.equal(s.veils,0);assert.equal(s.imgs,3,'the tested games show every cover, the adult one too');assert.ok(s.covers.includes('v2|true'));
   await page.click('[data-close]');await settle();
   await page.evaluate(()=>{setNsfw(true);return startNsfw();});await settle();
   await page.evaluate(g=>{calls.length=0;open_({games:g,offline:false,safeOnly:false});},games);await settle();s=await state();
-  assert.equal(s.mode,'nsfw','the global setting is on');assert.equal(s.veils,0);assert.equal(s.imgs,3);assert.ok(s.covers.includes('v2|true'));
+  assert.equal(s.mode,'nsfw','the global setting is on');assert.equal(s.veils,0);assert.equal(s.imgs,3);
   await page.fill('[data-search]','gamma');await settle();s=await state();assert.equal(s.cards,1);
   await page.click('[data-close]');await settle();s=await state();assert.equal(s,null,'Close removes the dialog');
   await page.evaluate(g=>{open_({games:g,offline:true,safeOnly:false});},games);await settle();
@@ -59,6 +58,7 @@ test('catalog dialog: normal mode, the NSFW question, search, R18 filter, closin
   await page.evaluate(g=>{calls.length=0;open_({games:g,offline:false,safeOnly:true});},games);await settle();s=await state();
   assert.equal(await page.evaluate(()=>document.querySelectorAll('dialog.seed-catalog').length),1,'opening again replaces the open one');
   assert.equal(s.mode,'normal');assert.equal(s.veils,1);assert.ok(!s.covers.some(c=>c.endsWith('|true')),'the R18 filter: no NSFW cover is asked for');
+  assert.match(await page.textContent('.sc-veil'),/成人内容/);
   await page.mouse.click(5,5);await settle();s=await state();assert.equal(s,null,'a click on the backdrop closes it');
  }finally{await browser.close();}
 });
@@ -102,7 +102,11 @@ test('the catalog tabs open one engine page at a time and follow the existing co
   assert.deepEqual(await requests(),[{engine:'kirikiri',page:1}]);
   assert.equal(await view.locator('.sc-veil').count(),1);
   assert.equal(await view.locator('.sc-st').count(),0);
-  assert.ok(!(await page.evaluate(()=>calls.some(c=>c[0]==='seed_cover'&&c[1].vndb==='v102'))));
+  assert.ok(!(await page.evaluate(()=>calls.some(c=>c[0]==='seed_cover'&&c[1].vndb==='v102'))),'normal mode never asks for the NSFW cover of an engine game');
+  await view.locator('.sc-veil').click();
+  await page.waitForFunction(()=>calls.some(c=>c[0]==='seed_cover'&&c[1].vndb==='v102'&&c[1].nsfw));
+  await view.locator('.sc-veil').waitFor({state:'detached'});
+  assert.equal(await page.locator('dialog.seed-catalog').getAttribute('data-mode'),'normal','a click shows that one cover; the setting stays off');
   await view.getByText('第 1 / 2 页',{exact:true}).waitFor();
   await view.getByRole('button',{name:'下一页'}).click();
   await view.getByText('Second page').waitFor();
