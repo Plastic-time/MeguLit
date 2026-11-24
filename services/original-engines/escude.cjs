@@ -51,7 +51,18 @@ const PAIRS=[
  ['ﾗ','ら'],['ﾘ','り'],['ﾙ','る'],['ﾚ','れ'],['ﾛ','ろ'],['ﾜ','わ'],['ﾝ','ん'],['ﾞ','゛'],['ﾟ','゜'],
 ];
 const MAP=new Map(PAIRS);
-const restring=t=>[...t].map(c=>MAP.get(c)||c).join('');
+const DAKU=new Map([
+ ['ｳ','ゔ'],
+ ['ｶ','が'],['ｷ','ぎ'],['ｸ','ぐ'],['ｹ','げ'],['ｺ','ご'],
+ ['ｻ','ざ'],['ｼ','じ'],['ｽ','ず'],['ｾ','ぜ'],['ｿ','ぞ'],
+ ['ﾀ','だ'],['ﾁ','ぢ'],['ﾂ','づ'],['ﾃ','で'],['ﾄ','ど'],
+ ['ﾊ','ば'],['ﾋ','び'],['ﾌ','ぶ'],['ﾍ','べ'],['ﾎ','ぼ'],
+]);
+const HANDAKU=new Map([['ﾊ','ぱ'],['ﾋ','ぴ'],['ﾌ','ぷ'],['ﾍ','ぺ'],['ﾎ','ぽ']]);
+function restring(t){let out='';for(let i=0;i<t.length;i++){const c=t[i],n=t[i+1];
+ if(n==='ﾞ'&&DAKU.has(c)){out+=DAKU.get(c);i++;continue;}
+ if(n==='ﾟ'&&HANDAKU.has(c)){out+=HANDAKU.get(c);i++;continue;}
+ out+=MAP.get(c)||c;}return out;}
 function decodeV1(b){if(!b.includes(0xa0))return kit.SJIS.decode(b);const out=Buffer.allocUnsafe(b.length*2);let o=0;
  for(let i=0;i<b.length;i++){const c=b[i];if((c>=0x81&&c<=0x9f||c>=0xe0&&c<=0xfc)&&i+1<b.length){out[o++]=c;out[o++]=b[++i];continue;}
   if(c===0xa0){out[o++]=0x81;out[o++]=0x40;continue;}out[o++]=c;}

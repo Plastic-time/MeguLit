@@ -70,6 +70,38 @@ test('Escude: ESCR1_00 ASCII-only !/? lines map to full-width dialogue and pair 
  /* ESCR_NEW keeps ASCII !? as an anchor */
  assert.deepEqual(escude.parse(F.escrMess(['こんにちは','!?'])).anchors,['!?']);
 });
+test('Escude: ESCR1_00 half-width kana + voiced/semi-voiced marks compose into precomposed hiragana',t=>{
+ const dakuBytes=Buffer.from([
+  0xb3,0xde,
+  0xb6,0xde,0xb7,0xde,0xb8,0xde,0xb9,0xde,0xba,0xde,
+  0xbb,0xde,0xbc,0xde,0xbd,0xde,0xbe,0xde,0xbf,0xde,
+  0xc0,0xde,0xc1,0xde,0xc2,0xde,0xc3,0xde,0xc4,0xde,
+  0xca,0xde,0xcb,0xde,0xcc,0xde,0xcd,0xde,0xce,0xde,
+  0xca,0xdf,0xcb,0xdf,0xcc,0xdf,0xcd,0xdf,0xce,0xdf,
+ ]);
+ assert.deepEqual(escude.parse(F.escr1([dakuBytes],b=>b)).lines,['ゔがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽ']);
+ /* non-voicable kana, invalid handakuten base, double marks, and full-width kana/marks stay separate */
+ assert.equal(escude.restring('ｱﾞﾝﾞｶﾟｶﾞﾞかﾞｶ゛か゛'),'あ゛ん゛か゜が゛か゛か゛か゛');
+ /* end-to-end scenes.read on ESCR1_00 lines with decomposed voiced/semi-voiced half-width kana */
+ const encodeDecomposed=s=>{
+  const d={'が':'ｶﾞ','ぎ':'ｷﾞ','ぐ':'ｸﾞ','げ':'ｹﾞ','ご':'ｺﾞ','ざ':'ｻﾞ','じ':'ｼﾞ','ず':'ｽﾞ','ぜ':'ｾﾞ','ぞ':'ｿﾞ',
+   'だ':'ﾀﾞ','ぢ':'ﾁﾞ','づ':'ﾂﾞ','で':'ﾃﾞ','ど':'ﾄﾞ','ば':'ﾊﾞ','び':'ﾋﾞ','ぶ':'ﾌﾞ','べ':'ﾍﾞ','ぼ':'ﾎﾞ',
+   'ぱ':'ﾊﾟ','ぴ':'ﾋﾟ','ぷ':'ﾌﾟ','ぺ':'ﾍﾟ','ぽ':'ﾎﾟ','ゔ':'ｳﾞ'};
+  return Buffer.concat([...s].map(c=>d[c]?kit.encodeSjis(d[c]):escr1Bytes(c)));
+ };
+ const lines=['ありがとう、また明日。','今日はいい天気ですね。','がんばろう！ぱちぱち！'];
+ const game=tmp(t);put(game,'script.bin',F.escArc({'scr/0001.bin':F.escr1(lines,encodeDecomposed)}));
+ assert.deepEqual(scenes.read('escude',game)[0].lines,lines);
+ /* short natural Japanese scripts with half-width kana, punctuation, voiced kana and JIS level-2 kanji stay Shift-JIS */
+ for(const sample of [
+  ['「おはよう。あしたまたね。」','「うん。ありがとう。」'],
+  ['すごい。あついね。'],
+  ['またあしたね。」'],
+  ['頷いてくれたのさ。'],
+ ]){
+  assert.deepEqual(escude.parse(F.escr1(sample,encodeDecomposed)).lines,sample);
+ }
+});
 
 /* ---- PJADV ---------------------------------------------------------------------------------------------------------- */
 const PJ=(L,N)=>[{name:N,say:L[0]},{say:L[1]},{prompt:L[2]},{choice:L[0].slice(0,3)},{choice:L[1].slice(0,3)}];
