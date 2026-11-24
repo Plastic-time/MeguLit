@@ -10,6 +10,8 @@
  const R='html:not(#mgp1):not(#mgp2):not(#mgp3):not(#mgp4):not(#mgp5):not(#mgp6):not(#mgp7):not(#mgp8):not(#mgp9) body';
  const P=':is(.tomoyo-cn-dialog,.tomoyo-selection-card,.tome-backlog)';
  const G=R.replace('html','html:is([data-tome-card-surface=glass],[data-tome-card-surface=both])');
+ const picturePanels=':is([data-tome-menu-surface=image] .tomoyo-cn-dialog,[data-tome-log-surface=image] .tome-backlog,[data-tome-card-surface=image] .tomoyo-selection-card)';
+ const pictureLayer=`${R}.tomoyo-ui-translation ${picturePanels}>.tome-menu-bg`;
  const css=String.raw`
 ${R} ${P}{--ink:#f3efe8;--ink2:#cfc8bd;--ink3:#b0aaa0;--line:rgba(243,239,232,.13);--red:#d8343e;--redi:#ff7880;
  color:var(--ink)!important;border:1px solid rgba(243,239,232,var(--tome-p-border,.08))!important;border-radius:var(--tome-p-radius,18px)!important;
@@ -136,11 +138,21 @@ ${R} .tomoyo-cn-dialog .tome-reset-zone [data-reset-open]:hover{background:rgba(
 /* ---------- 点读卡 over a bright frame (user, 2026-11-14, ダストマニア): with 纯色 at the saved opacity the ink tint let a
    white game through, the card turned pale grey and the light chips / × / reading vanished. The tint behind the card never
    drops below 88% (glass: the tint over the blurred frame below 80%), whatever the background type or saved opacity. ---------- */
-${R} .tomoyo-selection-card>.tome-menu-bg{opacity:max(var(--tome-p-alpha,.62),.88)!important}
+${R} .tomoyo-selection-card>.tome-menu-bg{--tome-p-layer-alpha:max(var(--tome-p-alpha,.62),.88);opacity:var(--tome-p-layer-alpha)!important}
 /* 对话记录 the same (user's beta38 shot: at 81% the game's own line read straight through the log rows) */
-${R} .tome-backlog>.tome-menu-bg{opacity:max(var(--tome-p-alpha,.62),.9)!important}
+${R} .tome-backlog>.tome-menu-bg{--tome-p-layer-alpha:max(var(--tome-p-alpha,.62),.9);opacity:var(--tome-p-layer-alpha)!important}
 ${G} .tomoyo-selection-card>.tome-menu-bg{opacity:1!important}
 ${G} .tomoyo-selection-card>.tome-menu-bg::after{opacity:max(calc(var(--tome-p-alpha,.62) * .6),.8)!important;background:#0a090a!important}
+/* Picture panels use light ink over a dark backing, including when the home theme is light. */
+${R.replace('html','html[data-theme=light]')}.tomoyo-ui-translation ${picturePanels}{color-scheme:dark;--theme-text:var(--ink);--theme-textSecondary:var(--ink3);
+ --theme-background:#14161b;--theme-surface:#24272e;--theme-border:#393e49;--mgc-ink:var(--ink);--mgc-ink-2:var(--ink2);--mgc-ink-3:var(--ink3);--mgc-well:var(--theme-background)}
+/* The 92% darken blend preserves channels up to 25 and rolls highlights off to at most 44.
+   Keep the picture's weight A. The ink backing raises the total alpha to B so that even over a white game,
+   A * 44 + (B - A) * 10 + (1 - B) * 255 is at most 47, leaving room for the translucent control fills. */
+${pictureLayer}{--tome-p-picture-alpha:clamp(0,var(--tome-p-layer-alpha,var(--tome-p-alpha,.62)),1);
+ --tome-p-composite-alpha:max(var(--tome-p-picture-alpha),calc(.85 + .14 * var(--tome-p-picture-alpha)));opacity:var(--tome-p-composite-alpha)!important}
+${pictureLayer}>i{background-color:#0a090a;isolation:isolate;opacity:calc(var(--tome-p-picture-alpha) / var(--tome-p-composite-alpha))}
+${pictureLayer}>i::after{content:"";position:absolute;inset:0;background:#191919;mix-blend-mode:darken;opacity:.92}
 ${R} .tomoyo-selection-card .tomoyo-sense{grid-template-columns:minmax(0,1fr)!important}
 ${R} .tomoyo-selection-card>header button:not(.tomoyo-anki-button),${R} .tomoyo-selection-card>footer button{color:var(--ink2)!important;border-color:rgba(243,239,232,.24)!important}
 ${R} .tomoyo-selection-card>header button:not(.tomoyo-anki-button):hover,${R} .tomoyo-selection-card>footer button:hover{color:var(--ink)!important;background:rgba(243,239,232,.08)!important}
