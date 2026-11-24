@@ -120,6 +120,18 @@ test('QLIE: 3.0 with key.fkey (Mersenne Twister cipher) and the exe game key fro
  const c=tmp(t);F.writeTree(c,{'GameData/data0.pack':F.qliePack({'s001.s':F.sjis(QS)},{version:'3.1',keyFile,method:2,packKeyfile:Buffer.from(Array.from({length:200},(_,i)=>(i*7+3)&255))}),'GameData/key.fkey':keyFile,'game.exe':'MZ'});
  assert.deepEqual(scenes.read('qlie',c).find(s=>s.name==='s001.s').lines,QL);
 });
+for(const version of ['3.0','3.1'])test(`QLIE: pack ${version} decompresses the embedded key before reading scripts`,t=>{
+ const dir=tmp(t);
+ const keyFile=Buffer.from(Array.from({length:256},(_,i)=>(i*29+7)&255));
+ const packKeyfile=Buffer.from(Array.from({length:256},(_,i)=>(i*11+3)&254));
+ const packed=new Set(['pack_keyfile.dat','s001.s']);
+ F.writeTree(dir,{
+  'GameData/data0.pack':F.qliePack({'s001.s':F.sjis(QS)},{version,keyFile,packKeyfile,packed,method:2}),
+  'DLL/key.fkey':keyFile,
+  'game.exe':'MZ',
+ });
+ assert.deepEqual(scenes.read('qlie',dir).flatMap(s=>s.lines),QL);
+});
 test('QLIE: a game folder is recognised and read, and a GBK patch pairs 1:1',t=>{
  const game=tmp(t),patch=tmp(t);
  F.writeTree(game,{'GameData/data0.pack':F.qliePack({'s001.s':F.sjis(QS)},{version:'3.1'}),'GameData/data1.pack':F.qliePack({'bg.png':Buffer.alloc(64)},{version:'3.1'}),'game.exe':'MZ'});
