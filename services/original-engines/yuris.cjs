@@ -79,8 +79,10 @@ function ystbKey(seg,resLen){const key=[0,0,0,0];for(let j=0;j<4;j++){const c=ne
  if(top<n*.5)for(let v=0;v<256;v++){const s=score(v);if(s>top){top=s;best=v;}}
  key[0]=best;return key;}
 function ystb(buf){
- if(buf.length<32||buf.toString('latin1',0,4)!=='YSTB')return null;const sizes=[12,16,20,24].map(k=>buf.readUInt32LE(k));
- if(32+sizes.reduce((a,b)=>a+b,0)>buf.length||sizes[0]%4||sizes[1]%12)return null;
+ if(!buf||buf.length<32||buf.toString('latin1',0,4)!=='YSTB')return null;const sizes=[12,16,20,24].map(k=>buf.readUInt32LE(k));
+ const total=32+sizes.reduce((a,b)=>a+b,0);
+ if(total>buf.length||sizes[0]%4||sizes[1]%12)return null;
+ if(sizes[1]===0)return sizes[2]===0&&total===buf.length?[]:null;
  const key=ystbKey(buf.subarray(32+sizes[0],32+sizes[0]+sizes[1]),sizes[2]);let p=32;
  const [code,args,res]=sizes.slice(0,3).map(n=>{const s=Buffer.from(buf.subarray(p,p+n));for(let i=0;i<s.length;i++)s[i]^=key[i&3];p+=n;return s;});
  const insts=[];let a=0;
@@ -274,15 +276,12 @@ const updates=dir=>[...ypfsIn(dir,UPDATE),...ypfsIn(path.join(dir,'pac'),UPDATE)
 const ysbinOf=dir=>{const named=[path.join(dir,'pac','ysbin.ypf'),path.join(dir,'ysbin.ypf')].find(f=>fs.existsSync(f));if(named)return named;
  return [...ypfsIn(path.join(dir,'pac'),f=>!UPDATE(f)),...ypfsIn(dir,f=>!UPDATE(f))].find(f=>ypfScenes(f).length)||null;};
 // Scenes with text only (the system scripts have none), so the first ones read already show the game is readable.
+// Conservative trade-off: a parsed script with textOp < 0 that still carries a single non-empty type-0 arg
+// (e.g. pure-ASCII dialogue or op=79 'H') is treated as 'unreadable' so an update never drops a readable base scene.
 const textMemo=new Map();
 function sceneState(file,s){return memo(textMemo,file+'|'+stat(file)+'|'+s.name,()=>{
  try{
-  const buf=s.read();
-  if(!buf||buf.length<32||buf.toString('latin1',0,4)!=='YSTB')return 'unreadable';
-  const sizes=[12,16,20,24].map(k=>buf.readUInt32LE(k));
-  if(32+sizes.reduce((a,b)=>a+b,0)>buf.length||sizes[0]%4||sizes[1]%12)return 'unreadable';
-  if(sizes[1]===0)return 'empty';
-  const insts=ystb(buf);if(!insts)return 'unreadable';
+  const insts=ystb(s.read());if(!insts)return 'unreadable';
   if(textOp(insts)>=0)return 'text';
   if(insts.some(x=>x.args.length===1&&x.args[0].type===0&&x.args[0].data.length))return 'unreadable';
   return 'empty';
