@@ -38,17 +38,19 @@ test('KiriKiri: plain XP3 and .ks text, tags removed',()=>{
  assert.ok(p.anchors.includes('@se storage="door"'));
 });
 
-test('KiriKiri: parseKs keeps KAG escaped [[ brackets as literal [ without swallowing text or corrupting ruby',()=>{
+test('KiriKiri: parseKs keeps KAG escaped [[ brackets as literal [ without changing nested macro/tag stripping',()=>{
  const ks=[
   '記号[[を押す。[p]',
   'YOSUKE [[TRAP][r][font size=25]',
   '[[[p]',
   "[輝夜]と[漢字'よみ]と[[漢字'よみ][p]",
-  '[tag attr="a[[b"]本文[p]',
+  `[eval exp="f.n='[輝夜]'"]本文`,
+  '[foo [輝夜]]本文',
+  "[foo [漢字'よみ]です",
  ].join('\r\n');
  const p=scenes.parseKs(Buffer.from(ks));
- assert.deepStrictEqual(p.lines,['記号[を押す。','YOSUKE [TRAP]','[',"輝夜と漢字と[漢字'よみ]",'本文']);
- assert.deepStrictEqual(p.ruby,[null,null,null,[['漢字','よみ']],null]);
+ assert.deepStrictEqual(p.lines,['記号[を押す。','YOSUKE [TRAP]','[',"輝夜と漢字と[漢字'よみ]",'本文','本文','[foo 漢字です']);
+ assert.deepStrictEqual(p.ruby,[null,null,null,[['漢字','よみ']],null,null,[['漢字','よみ']]]);
 });
 
 test('KiriKiri: Japanese game reads its .ks, a Chinese patch.xp3 next to it is found by itself',async()=>{
