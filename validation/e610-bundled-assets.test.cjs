@@ -59,3 +59,43 @@ test('a plain game folder is not mistaken for a web bundle',t=>{
  const d=tmp(t);F.writeTree(d,{'Game.exe':'MZ','readme.txt':'日本語のテキスト','data.dat':'x'});
  assert.equal(wb.probe(d,'html5'),false);assert.equal(scenes.ENGINES.html5.scenes(d).length,0);
 });
+
+test('WebGAL: full-width colons and escaped \\: stay in dialogue text while unescaped ASCII : splits speaker/command',t=>{
+ const d=tmp(t);
+ F.writeTree(d,{
+  'game/config.txt':'Game_name:x;',
+  'game/scene/start.txt':[
+   'changeBg:bg.jpg -next;',
+   '時刻：午後三時、雨が降り始めた。;',
+   '掲示板：本日休館;',
+   'そして表示された文字は：;',
+   '時刻\\:午後三時、雨が降り始めた。;',
+   'そして表示された文字は\\:;',
+   '主人公:「おはよう」 -v1.ogg;',
+   '主人公:時刻\\:12\\:30だよ。;',
+   ':朝の光が差し込む。;',
+   '名前\\\\:台詞。;',
+   'intro:時刻\\:12\\:00|教室へ行く;',
+   'choose:時刻\\:12\\:00:a.txt|行く:b.txt;',
+  ].join('\n'),
+ });
+ const read=scenes.read('webgal',d);
+ assert.equal(read.length,1);
+ assert.deepEqual(read[0].lines,[
+  '時刻：午後三時、雨が降り始めた。',
+  '掲示板：本日休館',
+  'そして表示された文字は：',
+  '時刻:午後三時、雨が降り始めた。',
+  'そして表示された文字は:',
+  '「おはよう」',
+  '時刻:12:30だよ。',
+  '朝の光が差し込む。',
+  '台詞。',
+  '時刻:12:00',
+  '教室へ行く',
+  '時刻:12:00',
+  '行く',
+ ]);
+ assert.deepEqual(read[0].speakers,['','','','','','主人公','主人公','','名前\\\\','','','','']);
+ assert.deepEqual(read[0].anchors,['changeBg:bg.jpg -next']);
+});
