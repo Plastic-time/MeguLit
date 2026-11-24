@@ -9,6 +9,7 @@
 // size + mtime + GARbro version, so a game is unpacked once and an archive GARbro cannot open is not retried.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{spawn}=require('node:child_process');
 const kit=require('./kit.cjs');
+const ivoryNtk=require('./ivory-ntk.cjs');
 const ROOT=()=>process.env.MEGULIT_GARBRO_ROOT||path.join(__dirname,'..','..');
 const HOST=path.join(__dirname,'..','garbro-host.ps1');
 const PACK='archives',DIR=()=>path.join(ROOT(),'runtime','garbro'),CACHE=()=>process.env.MEGULIT_GARBRO_CACHE||path.join(ROOT(),'cache','garbro');
@@ -28,7 +29,7 @@ const LIMIT_BYTES=512*1048576,LIMIT_FILES=20000,MAX_ARCHIVES=12,MAX_LEGACY_SCRIP
 const TRANSIENT_FAILURE=/GARBRO_TIMEOUT|PACK_|^ENOENT: .*?, rename /;
 const SCRIPT_PACKS={
  '.pbz':{magic:'PBZ1',entries:/\.scr$/i,comment:/^;/},
- '.pk':{magic:'fPK ',entries:/\.(?:txt|hpb)$/i,comment:/^#/,paired:true}
+ '.pk':{magic:'fPK ',entries:/\.(?:txt|hpb|ntk)$/i,comment:/^#/,paired:true,cacheKey:'|ivory-ntk'}
 };
 const SCRIPT_COMMAND=/^(?:[:@*]|[a-z][a-z0-9_]*(?:\s|$))/i;
 
@@ -45,12 +46,40 @@ let packsRef=null;
 function packs(){if(!packsRef){const {RuntimePacks}=require('../../core/runtime-packs.cjs');packsRef=RuntimePacks.shared(ROOT());}return packsRef;}
 function installed(){try{return packs().installed(PACK);}catch{return false;}}
 function version(){try{return String(fs.statSync(path.join(DIR(),'ArcFormats.dll')).size);}catch{return '0';}}
-function key(file){const st=fs.statSync(file);return crypto.createHash('sha256').update(path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs).digest('hex').slice(0,24);}
-function cacheDir(file){return path.join(CACHE(),key(file));}
+function key(file,format=''){const st=fs.statSync(file);return crypto.createHash('sha256').update(path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+format).digest('hex').slice(0,24);}
+function cacheDir(file){return archiveCache(file,scriptPack(file)).dir;}
 function readJson(file){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}}
 function cachedFailure(cache,v=version()){
  const bad=readJson(path.join(cache,'failed.json'));
  return bad?.version===v&&!TRANSIENT_FAILURE.test(bad.error||'')?bad:null;
+}
+
+const ivoryName=rel=>rel.replace(/\\/g,'/').toLowerCase();
+function pairedIvory(names,rel){
+ const stem=ivoryName(rel).slice(0,-4);
+ return names.has(stem+'.txt')&&names.has(stem+'.hpb');
+}
+
+function parseScriptText(data,pack){
+ return kit.lineGrammar(kit.SJIS.decode(data),{comment:pack.comment,anchor:SCRIPT_COMMAND,strip:[]});
+}
+
+function readableLegacyIvory(dir,pack){
+ const info=readJson(path.join(dir,'done.json'));
+ if(!Array.isArray(info?.files)||info.files.some(rel=>typeof rel!=='string'))return false;
+ const names=new Set(info.files.map(ivoryName));
+ for(const rel of info.files){
+  if(!/\.txt$/i.test(rel)||!pairedIvory(names,rel))continue;
+  try{if(parseScriptText(fs.readFileSync(path.join(dir,rel)),pack).lines.length)return true;}catch{}
+ }
+ return false;
+}
+
+function archiveCache(file,pack){
+ const legacy=path.join(CACHE(),key(file));
+ // Keep usable source scenes in their existing cache. Only unreadable caches need the NTK pass.
+ if(!pack?.cacheKey||readableLegacyIvory(legacy,pack))return {dir:legacy,includeNtk:false};
+ return {dir:path.join(CACHE(),key(file,pack.cacheKey)),includeNtk:true};
 }
 
 // Archives in the game folder (and one level down) worth handing to GARbro, script-looking names first.
@@ -138,16 +167,24 @@ const engine={id:'garbro',
  sources:dir=>archives(dir),
  scenes(dir){
   const out=[];
-  for(const file of archives(dir)){let c;try{c=cacheDir(file);}catch{continue;}const info=readJson(path.join(c,'done.json'));
+  for(const file of archives(dir)){
+   const pack=scriptPack(file);
+   let cache;try{cache=archiveCache(file,pack);}catch{continue;}
+   const {dir:c,includeNtk}=cache,info=readJson(path.join(c,'done.json'));
    if(info){
-    const pack=scriptPack(file),names=pack?.paired?new Set(info.files.map(name=>name.toLowerCase())):null;
+    const names=pack?.paired?new Set(info.files.map(ivoryName)):null;
     for(const rel of info.files){
      if(pack&&!pack.entries.test(rel))continue;
-     // The compiled Ivory entry and its text source are two versions of the same scene.
-     if(names&&(!/\.txt$/i.test(rel)||!names.has(rel.slice(0,-4).toLowerCase()+'.hpb')))continue;
-     const read=()=>fs.readFileSync(path.join(c,rel));
+     const compiled=includeNtk&&/\.ntk$/i.test(rel);
+     if(names){
+      const paired=pairedIvory(names,rel);
+      if(compiled?paired:(!paired||!/\.txt$/i.test(rel)))continue;
+     }
+     const entry=path.join(c,rel);
+     const read=compiled?()=>kit.readAt(entry,0,Math.min(fs.statSync(entry).size,ivoryNtk.MAX_SCENE_BYTES+1)):()=>fs.readFileSync(entry);
      const scene={name:path.basename(file)+'/'+rel.replace(/\\/g,'/'),read};
-     if(pack)scene.parse=()=>kit.lineGrammar(kit.SJIS.decode(read()),{comment:pack.comment,anchor:SCRIPT_COMMAND,strip:[]});
+     if(compiled){scene.parse=()=>ivoryNtk.parse(read());scene.compiledIvory=true;}
+     else if(pack)scene.parse=()=>parseScriptText(read(),pack);
      out.push(scene);
     }
     continue;
