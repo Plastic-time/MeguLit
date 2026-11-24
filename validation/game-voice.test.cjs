@@ -83,6 +83,18 @@ test('siglus: voiced reuses parseSs prefixes, quoted R lines, @lsv2_line, and $l
  assert.deepEqual(s.voiced('@KOE(5,0)\n@mes(1, 【名】, 「1, 000円」)\n@mes(1,【名】,「あ,い」,「う」)\n@mes(1,【名】,「あ」,9)\n@KOE(7,0)\n@mes(1,【名】,「あ(い」)'),
   [{text:'「1, 000円」',koe:5},{text:'「あ,い」',koe:null},{text:'「あ」',koe:null},{text:'「あ(い」',koe:7}]);
  assert.deepEqual(s.voiced('@KOE(5,0)\n「あ;い」\n@KOE(6,0)\n@mes(1,【名】,「あ;い」)'),[{text:'「あ;い」',koe:5},{text:'「あ;い」',koe:6}]);
+ assert.deepEqual(s.voiced('@mes(1,【名】,「あ「い」う,え」)\n@mes(1,【名】,『あ,い;う』)'),[{text:'「あ「い」う,え」',koe:null},{text:'『あ,い;う』',koe:null}]);
+ /* Unmatched/mismatched Japanese quotes (e.g. multi-line letter 『… spanning lines) must not swallow ) or ; comments */
+ assert.deepEqual(s.voiced('@KOE(5,0)\n【名】@mes(1,「『拝啓、お元気ですか」)\n@KOE(6,0)\n【名】@mes(1,「お返事待ってます』」)'),
+  [{text:'「『拝啓、お元気ですか」',koe:5},{text:'「お返事待ってます』」',koe:6}]);
+ assert.deepEqual(s.voiced('$lsv2_koe(5,0)@lsv2_line(1, 「『拝啓」)R'),[{text:'「『拝啓」',koe:5}]);
+ assert.deepEqual(s.voiced('@KOE(5,0)\n【名】「『拝啓、お元気ですか」R ;手紙'),[{text:'「『拝啓、お元気ですか」',koe:5}]);
+ assert.deepEqual(s.voiced('@mes(1,【名】,「あ『い」)\n@mes(1,【名】,『あ」)\n@mes(1,【名】,「あ) ; memo'),
+  [{text:'「あ『い」',koe:null},{text:'『あ」',koe:null},{text:'「あ',koe:null}]);
+ assert.deepEqual(pck.parseSs(Buffer.from('KOE(「a)b」,0)【名】「あ」R','utf8')),{lines:['「あ」'],anchors:[],speakers:['名']});
+ const t0=Date.now(),huge='「'.repeat(50000)+' ; memo';
+ assert.equal(s.voiced(huge)[0].text,'「'.repeat(50000));
+ assert.ok(Date.now()-t0<1000,'50k unmatched openers must run in linear time');
  assert.deepEqual(pck.parseSs(Buffer.from('@mes(1, 【名】, 「1, 000円」)\n@mes(1,【名】,「あ」,9)\n@lsv2_line(1, 「あ」, 「い」)R','utf8')).lines,['「1, 000円」','「あ」','「あ」,「い」']);
  /* Unparsed dialogue-shaped lines clear pending, while ordinary commands with quotes or 「…」 and #define keep pending */
  assert.deepEqual(s.voiced('@KOE(5,0)\n@mes(1,【名】,)\n@KOE(6,0)\n「次」'),[{text:'「次」',koe:6}]);

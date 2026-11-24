@@ -58,16 +58,27 @@ function sources(file){const b=fs.readFileSync(file);if(b.length<96)return [];co
  return out;}
 const decode=raw=>{if(raw[0]===0xff&&raw[1]===0xfe)return raw.toString('utf16le',2);if(raw[0]===0xef&&raw[1]===0xbb)return raw.toString('utf8',3);
  try{return new TextDecoder('utf-8',{fatal:true}).decode(raw);}catch{return kit.SJIS.decode(raw);}};
-/* Strip // and ; comments outside "...", 「...」 and 『...』 */
+/* Linear-time matching table for same-type Japanese quote spans (「…」 and 『…』); unmatched openers are omitted */
+function quoteSpans(s){
+ if(!s.includes('「')&&!s.includes('『'))return null;
+ const spans=new Map(),s1=[],s2=[];
+ for(let i=0;i<s.length;i++){
+  const c=s[i];
+  if(c==='「')s1.push(i);
+  else if(c==='」'){if(s1.length)spans.set(s1.pop(),i);}
+  else if(c==='『')s2.push(i);
+  else if(c==='』'){if(s2.length)spans.set(s2.pop(),i);}
+ }
+ return spans.size?spans:null;
+}
+/* Strip // and ; comments outside "..." and balanced 「...」 / 『...』 spans */
 function stripLineComment(raw){
- let inQ=false,k1=0,k2=0;
+ const spans=quoteSpans(raw);let inQ=false;
  for(let i=0;i<raw.length;i++){
   const c=raw[i];
   if(inQ){if(c==='\\'&&i+1<raw.length){i++;continue;}if(c==='"')inQ=false;continue;}
-  if(k1||k2){if(c==='「')k1++;else if(c==='」'&&k1)k1--;else if(c==='『')k2++;else if(c==='』'&&k2)k2--;continue;}
   if(c==='"'){inQ=true;continue;}
-  if(c==='「'){k1++;continue;}
-  if(c==='『'){k2++;continue;}
+  if(spans&&(c==='「'||c==='『')){const e=spans.get(i);if(e!==undefined){i=e;continue;}}
   if(c===';'||c==='/'&&raw[i+1]==='/')return raw.slice(0,i);
  }
  return raw;
@@ -87,30 +98,26 @@ function unquote(s){
  if(s.length>=2&&s[0]==='"'&&s[s.length-1]==='"')return s.slice(1,-1).replace(/\\(.)/g,'$1');
  return s;
 }
-function callEnd(s,openPos){
- let depth=1,inQ=false,k1=0,k2=0;
+function callEnd(s,openPos,spans=quoteSpans(s)){
+ let depth=1,inQ=false;
  for(let i=openPos+1;i<s.length;i++){
   const c=s[i];
   if(inQ){if(c==='\\'&&i+1<s.length){i++;continue;}if(c==='"')inQ=false;continue;}
-  if(k1||k2){if(c==='「')k1++;else if(c==='」'&&k1)k1--;else if(c==='『')k2++;else if(c==='』'&&k2)k2--;continue;}
   if(c==='"'){inQ=true;continue;}
-  if(c==='「'){k1++;continue;}
-  if(c==='『'){k2++;continue;}
+  if(spans&&(c==='「'||c==='『')){const e=spans.get(i);if(e!==undefined){i=e;continue;}}
   if(c==='(')depth++;
   else if(c===')'&&--depth===0)return i+1;
  }
  return -1;
 }
-function callArgs(t,cmdRe){
+function callArgs(t,cmdRe,spans=quoteSpans(t)){
  const at=t.search(cmdRe);if(at<0)return null;
- let i=t.indexOf('(',at)+1,depth=1,inQ=false,k1=0,k2=0,start=i;const args=[];
+ let i=t.indexOf('(',at)+1,depth=1,inQ=false,start=i;const args=[];
  for(;i<t.length;i++){
   const c=t[i];
   if(inQ){if(c==='\\'&&i+1<t.length){i++;continue;}if(c==='"')inQ=false;continue;}
-  if(k1||k2){if(c==='「')k1++;else if(c==='」'&&k1)k1--;else if(c==='『')k2++;else if(c==='』'&&k2)k2--;continue;}
   if(c==='"'){inQ=true;continue;}
-  if(c==='「'){k1++;continue;}
-  if(c==='『'){k2++;continue;}
+  if(spans&&(c==='「'||c==='『')){const e=spans.get(i);if(e!==undefined){i=e;continue;}}
   if(c==='(')depth++;
   else if(c===')'){if(--depth===0){args.push(t.slice(start,i).trim());break;}}
   else if(c===','&&depth===1){args.push(t.slice(start,i).trim());start=i+1;}
@@ -128,21 +135,22 @@ function extractQuotedRuns(s){
  return out;
 }
 const NON_DIALOGUE_STMT=/^(?:[@$]|(?:if|else|switch|case|default|while|for|goto|gosub|jump|farcall|return|owari)\b|[A-Za-z_][\w.]*(?:\[[^\]]*\])?\s*=)/i;
-function stripPrefixes(t){
- let rest=t,sp='';
+function stripPrefixes(t,spans=quoteSpans(t)){
+ let pos=0,sp='';
  for(;;){
-  const m=rest.match(/^(?:(?:@?(?:KOE|exkoe)|\$lsv2_koe|\$lsv2_name)\s*\(|【([^】]+)】|\s+)/i);
+  const m=t.slice(pos).match(/^(?:(?:@?(?:KOE|exkoe)|\$lsv2_koe|\$lsv2_name)\s*\(|【([^】]+)】|\s+)/i);
   if(!m)break;
-  if(m[0].endsWith('(')){const end=callEnd(rest,m[0].length-1);if(end<0)break;rest=rest.slice(end);}
-  else{if(m[1]&&!sp)sp=m[1];rest=rest.slice(m[0].length);}
+  if(m[0].endsWith('(')){const end=callEnd(t,pos+m[0].length-1,spans);if(end<0)break;pos=end;}
+  else{if(m[1]&&!sp)sp=m[1];pos+=m[0].length;}
  }
- return {rest,sp};
+ return {rest:t.slice(pos),sp};
 }
 function parseSsLine(t){
  let sp='';
+ const spans=quoteSpans(t);
  const lsvName=t.match(/\$lsv2_name\s*\(\s*"((?:[^"\\]|\\.)*)"\s*\)/i);
  if(lsvName)sp=lsvName[1].replace(/\\(.)/g,'$1');
- const mes=callArgs(t,/@mes\s*\(/i);
+ const mes=callArgs(t,/@mes\s*\(/i,spans);
  if(mes){
   const bracket=t.match(/^[^@]*【([^】]+)】/);
   if(!sp&&bracket)sp=bracket[1];
@@ -150,12 +158,12 @@ function parseSsLine(t){
   if(mes.length===2){const txt=unquote(mes[1]);return txt?[{text:txt,speaker:sp}]:[];}
   return [];
  }
- const lsv=callArgs(t,/@lsv2_line\s*\(/i);
+ const lsv=callArgs(t,/@lsv2_line\s*\(/i,spans);
  if(lsv&&lsv.length>=2){
   const txt=unquote(lsv.slice(1).join(',')).trim();
   return txt?[{text:txt,speaker:sp}]:[];
  }
- const {rest,sp:bkSp}=stripPrefixes(t);
+ const {rest,sp:bkSp}=stripPrefixes(t,spans);
  if(!sp&&bkSp)sp=bkSp;
  if(!rest||NON_DIALOGUE_STMT.test(rest))return [];
  if(rest[0]==='"')return extractQuotedRuns(rest).map(q=>({text:q,speaker:sp}));
@@ -179,10 +187,10 @@ function walkSs(text,onLine){
    (@KOE(…060) in one branch, @KOE(…080) in the other, one shared @mes after).
    When one source line splits into multiple quoted runs (e.g. "「一」" "「二」"R), the preceding KOE attaches
    to the first run only and later runs on that line get koe:null, matching one voice clip per KOE call without
-   duplicating the clip across segments. If a line looks like dialogue (@mes/@lsv2_line or leading 「『（")
+   duplicating the clip across segments. If a line looks like dialogue (@mes/@lsv2_line or leading ")
    but yields 0 parsed items, clear pending so the voice does not leak onto a later unrelated line. */
 // E461 a /* … */ block is a comment (Summer Pockets keeps staff notes with 「…」 lines in them): no line, no voice.
-const UNPARSED_DIALOGUE=/@mes\s*\(|@lsv2_line\s*\(|^[「『（"]/i;
+const UNPARSED_DIALOGUE=/@mes\s*\(|@lsv2_line\s*\(|^"/i;
 const HASH_DIALOGUE=/@mes\s*\(|@lsv2_line\s*\(/i;
 function voiced(text){const out=[];let pending=[];
  walkSs(text,(t,items,skipped)=>{
