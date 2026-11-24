@@ -60,18 +60,18 @@ function header(b){if(b.length<12)return null;const h0=b.readInt32LE(0),h1=b.rea
 const isMes=b=>!!header(b);
 /* the instructions: [{op, at, len}] (stops at an unknown opcode, as msg-tool fails there) */
 function tokens(b,h){const {info}=h,out=[];let p=h.code;
- const cs=at=>{if(at>=b.length)return -1;const z=b.indexOf(0,at);return z<0?-1:z+1;};
+ const cs=at=>{const z=b.indexOf(0,at);return z<0?b.length:z+1;};
  while(p<b.length){const op=b[p];let end;
-  if(info.u8x2(op))end=p+3;else if(info.u8str(op))end=cs(p+2);else if(info.string(op)||info.encstr(op))end=cs(p+1);else if(info.u16x4(op))end=p+9;else break;
-  if(end<0||end>b.length)break;out.push({op,at:p,end});p=end;}
+  if(info.u8x2(op))end=p+3;else if(info.u8str(op)){if(p+2>=b.length)break;end=cs(p+2);}else if(info.string(op)||info.encstr(op)){if(p+1>=b.length)break;end=cs(p+1);}else if(info.u16x4(op))end=p+9;else break;
+  if(end>b.length)break;out.push({op,at:p,end});p=end;}
  return out;}
 /* ｛漢字／よみ｝ -> 漢字, with the reading kept */
 const RUBY=/｛([^／｝]+)／([^｝]*)｝/g;
 function parse(b){const h=header(b);if(!h)return {lines:[],anchors:[]};const {info}=h,raw=[],anchors=[];
- for(const t of tokens(b,h)){
-  if(info.encstr(t.op)){const s=Buffer.from(b.subarray(t.at+1,t.end-1));for(let i=0;i<s.length;i++)s[i]=(s[i]+info.key)&255;raw.push({s,name:t.op===info.nameOp});continue;}
-  if(t.op===info.plain){raw.push({s:b.subarray(t.at+1,t.end-1),name:false});continue;}
-  if(info.string(t.op)||info.u8str(t.op)){const s=b.subarray(info.string(t.op)?t.at+1:t.at+2,t.end-1).toString('latin1');if(s&&kit.ascii(s))anchors.push(s);}}
+ for(const t of tokens(b,h)){const pe=b[t.end-1]===0?t.end-1:t.end;
+  if(info.encstr(t.op)){const s=Buffer.from(b.subarray(t.at+1,pe));for(let i=0;i<s.length;i++)s[i]=(s[i]+info.key)&255;raw.push({s,name:t.op===info.nameOp});continue;}
+  if(t.op===info.plain){raw.push({s:b.subarray(t.at+1,pe),name:false});continue;}
+  if(info.string(t.op)||info.u8str(t.op)){const s=b.subarray(info.string(t.op)?t.at+1:t.at+2,pe).toString('latin1');if(s&&kit.ascii(s))anchors.push(s);}}
  const dec=kit.decoder(raw.map(r=>r.s)),lines=[],ruby={};
  for(const r of raw){let s=dec.decode(r.s);const pairs=[...s.matchAll(RUBY)].map(m=>[m[1],m[2]]);s=kit.trimBoth(s.replace(RUBY,'$1').replace(/\\n/g,'\n'));if(!s)continue;
   if(pairs.length)ruby[lines.length]=pairs;lines.push(s);}

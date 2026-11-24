@@ -28,21 +28,26 @@ test('Circus: MES opcode tables (old and head1 == 3 layouts), encrypted text, sp
  const patch=tmp(t);F.writeTree(patch,{'AdvData/MES/s001.mes':F.mes(CZH,{enc:F.gbk})});
  const zh=scenes.ENGINES.circus.archives(patch).map(s=>circus.parse(s.read()));pairs(own[0].lines,zh[0].lines);assert.equal(zh[0].lines[0],'小鸟');assert.equal(zh[0].lines[3],'去教室');
 });
-test('Circus: tokens() drops unterminated strings and truncated fixed-width instructions without corrupting the prefix',t=>{
+test('Circus: parse() keeps unterminated tail strings intact and tokens() drops truncated fixed-width / operand-less instructions',t=>{
  const prefix=F.mes([{cmd:'BG01',name:'ことり',say:'「おはよう」'}]),h=circus.header(prefix),baseToks=circus.tokens(prefix,h).length;
  const wantLines=['ことり','「おはよう」'],wantAnchors=['BG01','se01'];
  const encNoNul=Buffer.concat([prefix,Buffer.from([F.DC3DD.text]),Buffer.from(F.sjis('朝の光').map(c=>(c-F.DC3DD.key)&255))]);
- assert.deepEqual(circus.parse(encNoNul).lines,wantLines);
- assert.equal(circus.tokens(encNoNul,circus.header(encNoNul)).length,baseToks);
+ assert.deepEqual(circus.parse(encNoNul).lines,[...wantLines,'朝の光']);
  const g=tmp(t);F.writeTree(g,{'AdvData/MES/s001.mes':encNoNul,'game.exe':'MZ'});
- assert.deepEqual(scenes.read('circus',g)[0].lines,wantLines);
+ assert.deepEqual(scenes.read('circus',g)[0].lines,[...wantLines,'朝の光']);
+ /* single-line plain / encstr missing trailing NUL (including trailing newline) must still decode completely */
+ const headOnly=F.mes([]),plainSolo=Buffer.concat([headOnly,Buffer.from([F.DC3DD.plain]),F.sjis('教室へ行く\n')]);
+ const encSolo=Buffer.concat([headOnly,Buffer.from([F.DC3DD.text]),Buffer.from(F.sjis('朝の光\n').map(c=>(c-F.DC3DD.key)&255))]);
+ assert.deepEqual(circus.parse(plainSolo).lines,['教室へ行く']);
+ assert.deepEqual(circus.parse(encSolo).lines,['朝の光']);
  const plainNoNul=Buffer.concat([prefix,Buffer.from([F.DC3DD.plain]),F.sjis('教室へ行く')]);
- assert.deepEqual(circus.parse(plainNoNul).lines,wantLines);
+ assert.deepEqual(circus.parse(plainNoNul).lines,[...wantLines,'教室へ行く']);
  const strNoNul=Buffer.concat([prefix,Buffer.from([F.DC3DD.string]),Buffer.from('BG99','latin1')]);
- assert.deepEqual(circus.parse(strNoNul).anchors,wantAnchors);
+ assert.deepEqual(circus.parse(strNoNul).anchors,[...wantAnchors,'BG99']);
  const u8strNoNul=Buffer.concat([prefix,Buffer.from([F.DC3DD.u8str,5]),Buffer.from('se99','latin1')]);
- assert.deepEqual(circus.parse(u8strNoNul).anchors,wantAnchors);
- for(const tail of [Buffer.from([F.DC3DD.u8str]),Buffer.from([F.DC3DD.u8x2,1]),Buffer.from([F.DC3DD.u16x4,1,2,3,4])]){
+ assert.deepEqual(circus.parse(u8strNoNul).anchors,[...wantAnchors,'se99']);
+ /* truncated fixed-width instructions and operand-less string ops must stop without adding incomplete tokens */
+ for(const tail of [Buffer.from([F.DC3DD.string]),Buffer.from([F.DC3DD.text]),Buffer.from([F.DC3DD.u8str]),Buffer.from([F.DC3DD.u8str,5]),Buffer.from([F.DC3DD.u8x2,1]),Buffer.from([F.DC3DD.u16x4,1,2,3,4])]){
   const cut=Buffer.concat([prefix,tail]);
   assert.equal(circus.tokens(cut,circus.header(cut)).length,baseToks);
   assert.deepEqual(circus.parse(cut).lines,wantLines);
