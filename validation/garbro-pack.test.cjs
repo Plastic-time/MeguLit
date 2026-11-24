@@ -81,7 +81,7 @@ test('fallback reader: text scan, archive pick, media skipped, registered last',
 const dialogue=['今日は晴れています。','「ここで待とう。」'];
 for(const fixture of [
  {name:'PVNS',dir:'pack',archive:'SCRIPT.PBZ',magic:'PBZ1',file:'start.SCR',format:'PBZ',script:[';file:001 ver1.00',';ここはコメントです。',':開始ラベル','title 表示用の章名',...dialogue],extra:{'README.TXT':'内部エラーがありました。'}},
- {name:'Ivory',dir:'misc',archive:'script.pk',magic:'fPK ',file:'a01.TXT',format:'PK/IVORY',script:['unique 1','#ここはコメントです。','savetext "表示用の章名"',...dialogue],extra:{'A01.HPB':'fAGS','ERR.TXT':'内部エラーがありました。','PACKFILEW.EXE':'配布用のプログラムです。'}}
+ {name:'Ivory',dir:'misc',archive:'script.pk',magic:'fPK ',file:'a01.TXT',format:'PK/IVORY',script:['unique 1','#ここはコメントです。','savetext "表示用の章名"',...dialogue],extra:{'A01.HPB':'fAGS','A01.NTK':'fAGS','ERR.TXT':'内部エラーがありました。','PACKFILEW.EXE':'配布用のプログラムです。'}}
 ])test(`${fixture.name} archive supplies the probe and original entry with dialogue`,t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'garbro-legacy-')),game=path.join(root,'game');
  const previous=process.env.MEGULIT_GARBRO_CACHE;
