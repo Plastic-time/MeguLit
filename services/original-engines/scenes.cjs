@@ -211,7 +211,7 @@ const artemis={
   for(const file of artemisLoose(dir,pfs))out.set(path.basename(file).toLowerCase(),{name:path.basename(file),read:()=>fs.readFileSync(file)});
   return [...out.values()].sort((a,b)=>a.name.localeCompare(b.name));},
  archives:dir=>fs.readdirSync(dir).filter(isPfs).flatMap(a=>pfsScenes(path.join(dir,a))),
- sources:dir=>[...fs.readdirSync(dir).filter(isPfs).map(f=>path.join(dir,f)),...walk(dir,3,AST)],
+ sources(dir){const pfs=fs.readdirSync(dir).filter(isPfs);return [...pfs.map(f=>path.join(dir,f)),...artemisLoose(dir,pfs)];},
  parse:parseArtemis,test:AST,
  // E352: a multilingual release carries its own Chinese; other games fall back to the usual patch overlay.
  patchLines(base){let any=false;const list=base.map(scene=>{const zh=scene.zh||[];if(!zh.some(Boolean))return scene;any=true;return {...scene,patched:true,lines:scene.lines.map((t,k)=>zh[k]||t)};});return any?list:null;},

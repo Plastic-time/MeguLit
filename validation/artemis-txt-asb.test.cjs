@@ -159,3 +159,37 @@ test('Artemis single-layer Chinese/Japanese .txt/.asb and Chinese-over-Chinese p
   assert.strictEqual(r.step,'ok');assert.strictEqual(r.original,null);assert.strictEqual(r.japaneseLines,ja.length*2);
  }finally{gJaOnly.clean();}
 });
+
+test('Artemis sources() and fingerprint track loose scenario/*.txt and .asb while keeping .pfs/.ast-only games identical',()=>{
+ const ot=require('../services/original-text.cjs');
+ const ja=[],zh=[];for(let i=0;i<10;i++){ja.push(...JA_LINES);zh.push(...ZH_LINES);}
+ // Adding loose scenario/s01.txt next to root.pfs changes sources() and invalidates scanRunning cache
+ const g=mkGame(dir=>{
+  fs.writeFileSync(path.join(dir,'root.pfs'),pf8({['scenario\\s01.txt']:Buffer.from(txtScene(ja),'utf8')}));
+ });
+ try{
+  const srcBefore=scenes.ENGINES.artemis.sources(g.dir);
+  assert.deepStrictEqual(srcBefore,[path.join(g.dir,'root.pfs')]);
+  const fpBefore=scenes.fingerprint('artemis',g.dir);
+  const sBefore=ot.scanRunning(g.root,'art-fp',g.exe);
+  assert.strictEqual(sBefore.status,'native-japanese');
+  fs.mkdirSync(path.join(g.dir,'scenario'),{recursive:true});
+  const looseTxt=path.join(g.dir,'scenario','s01.txt');
+  fs.writeFileSync(looseTxt,Buffer.from(txtScene(zh),'utf8'));
+  const srcAfter=scenes.ENGINES.artemis.sources(g.dir);
+  assert.deepStrictEqual(srcAfter,[path.join(g.dir,'root.pfs'),looseTxt]);
+  assert.notStrictEqual(scenes.fingerprint('artemis',g.dir),fpBefore);
+  const sAfter=ot.scanRunning(g.root,'art-fp',g.exe);
+  assert.strictEqual(sAfter.status,'ready',JSON.stringify(sAfter));
+  assert.strictEqual(sAfter.original?.auto,true);
+ }finally{g.clean();}
+ // Games with only .pfs or only .ast keep the exact same sources() as before; bare scenario/*.txt without Artemis evidence is still ignored
+ const gAstOnly=mkGame(dir=>{
+  fs.mkdirSync(path.join(dir,'scenario'),{recursive:true});
+  fs.writeFileSync(path.join(dir,'scenario','s01.ast'),'astver = 2.0\nast = { text = { "こんにちは" } }\n');
+  fs.writeFileSync(path.join(dir,'scenario','notes.txt'),'plain text without pfs or iet');
+ });
+ try{
+  assert.deepStrictEqual(scenes.ENGINES.artemis.sources(gAstOnly.dir),[path.join(gAstOnly.dir,'scenario','s01.ast')]);
+ }finally{gAstOnly.clean();}
+});
