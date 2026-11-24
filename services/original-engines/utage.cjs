@@ -69,23 +69,38 @@ function parseBook(raw,version=22){
  return null;
 }
 
+function readGridList(raw,listAt,tailInts){
+ if(listAt+4>raw.length)return null;
+ const count=raw.readUInt32LE(listAt);
+ if(count>200)return null;
+ let p=listAt+4;const grids=[];
+ for(let g=0;g<count;g++){
+  try{const s=readGrid(raw,p,tailInts);grids.push({name:s.name,rows:s.rows});p=s.next;}
+  catch{return null;}
+ }
+ return {grids,next:p};
+}
+
 function parseChapter(raw,version=22){
  const h=monoHeader(raw,version);
  if(!h||!/\.chapter$/i.test(h.name))return null;
  for(const listAt of [h.next+12+h.pidBytes,h.next+8+h.pidBytes]){
-  if(listAt+4>raw.length)continue;
-  const count=raw.readInt32LE(listAt);
-  if(count<1||count>200)continue;
   for(const tailInts of [3,5,4]){
-   let p=listAt+4,ok=true;const grids=[];
-   for(let g=0;g<count;g++){
-    try{const s=readGrid(raw,p,tailInts);grids.push({name:s.name,rows:s.rows});p=s.next;}
-    catch{ok=false;break;}
-   }
-   if(ok&&p===raw.length)return grids;
+   const list=readGridList(raw,listAt,tailInts);
+   if(list?.grids.length&&list.next===raw.length)return {grids:list.grids,settingsOnly:false};
   }
  }
- return null;
+
+ // Compiled AdvChapterData: chapterName, dataList (PPtrs), settingList, customDataList.
+ if(h.next+4>raw.length)return null;
+ const nameEnd=h.next+4+raw.readUInt32LE(h.next);
+ const refsAt=Math.ceil(nameEnd/4)*4;
+ if(refsAt+4>raw.length)return null;
+ const settingsAt=refsAt+4+raw.readUInt32LE(refsAt)*(4+h.pidBytes);
+ const settings=readGridList(raw,settingsAt,3);
+ if(!settings?.grids.length)return null;
+ const custom=readGridList(raw,settings.next,3);
+ return custom?.next===raw.length?{grids:settings.grids,settingsOnly:true}:null;
 }
 
 function gridsFromTree(v){
@@ -153,7 +168,7 @@ function pickColumns(rows){
  return {hi,cCmd,cArg1,srcCol,zhCol,otherCols};
 }
 
-function collectObjects(buf,books,chapters,source){
+function collectObjects(buf,books,chapters,source,usedSources){
  const r=ser.parse(buf);if(!r)return;
  for(const o of r.objects){
   if(o.type!==114||o.size<64)continue;
@@ -161,10 +176,14 @@ function collectObjects(buf,books,chapters,source){
   if(!h)continue;
   if(/\.book$/i.test(h.name)){
    const sheets=o.tree?gridsFromTree(ser.readValue(buf,o)):parseBook(buf.subarray(o.offset,o.offset+o.size),r.version);
-   if(sheets?.length)books.push({name:h.name,sheets,source});
+   if(sheets?.length){books.push({name:h.name,sheets,source});usedSources.add(source);}
   }else if(/\.chapter$/i.test(h.name)){
-   const grids=o.tree?gridsFromTree(ser.readValue(buf,o)):parseChapter(buf.subarray(o.offset,o.offset+o.size),r.version);
-   if(grids?.length)chapters.push(grids);
+   const chapter=o.tree?{grids:gridsFromTree(ser.readValue(buf,o)),settingsOnly:false}:parseChapter(buf.subarray(o.offset,o.offset+o.size),r.version);
+   if(chapter?.grids?.length){
+    chapters.push(chapter.grids);
+    // Standalone compiled settings change speakers only. Keep the existing translation-pair fingerprint.
+    if(!chapter.settingsOnly)usedSources.add(source);
+   }
   }
  }
 }
@@ -207,7 +226,7 @@ function selectBooks(books){
 }
 
 function speakerResolver(chapters){
- const charToName=new Map(),locJa=new Map();
+ const charToName=new Map(),locJa=new Map(),defaults=new Map();
  for(const grids of chapters){
   for(const g of grids){
    const tag=String(g.name||'').split(':').pop().toLowerCase();
@@ -219,13 +238,19 @@ function speakerResolver(chapters){
    }else if(tag==='localize'){
     const ki=findCol(h,['key']),ji=findCol(h,['japanese','jp','ja','日本語','日文']);
     if(ki>=0&&ji>=0)for(const r of rows.slice(1))if(r[ki]&&r[ji]&&!locJa.has(r[ki]))locJa.set(r[ki],r[ji]);
+   }else if(tag==='param'){
+    const li=findCol(h,['label']),ti=findCol(h,['type']),vi=findCol(h,['value']);
+    if(li>=0&&ti>=0&&vi>=0)for(const r of rows.slice(1)){
+     if(r[li]&&r[vi]&&String(r[ti]).trim().toLowerCase()==='string'&&!defaults.has(r[li]))defaults.set(r[li],r[vi]);
+    }
    }
   }
  }
  return raw=>{
   const k=String(raw||'').trim();if(!k)return '';
   const nt=charToName.get(k)||k;
-  return locJa.get(nt)||nt;
+  const name=locJa.get(nt)||nt,param=/^<param=([^<>]+)>$/i.exec(name);
+  return param?defaults.get(param[1])||k:name;
  };
 }
 
@@ -241,26 +266,22 @@ function loadDir(dir){
  const hit=memo.get(dir);
  if(hit&&hit.sig===sig)return hit.data;
 
- const books=[],chapters=[],usedSources=[];
+ const books=[],chapters=[],usedSources=new Set();
  for(const f of src.players){
   let sz=0;try{sz=fs.statSync(f).size;}catch{}
   if(!sz||sz>MAX_ASSET)continue;
   let buf;try{buf=fs.readFileSync(f);}catch{continue;}
-  const before=books.length+chapters.length;
-  try{collectObjects(buf,books,chapters,f);}catch{}
-  if(books.length+chapters.length>before)usedSources.push(f);
+  try{collectObjects(buf,books,chapters,f,usedSources);}catch{}
  }
  for(const f of bundles){
   let nodes;try{nodes=ufs.list(f);}catch{nodes=null;}
   if(!nodes)continue;
-  const before=books.length+chapters.length;
   for(const n of nodes){
    if(/\.(resS|resource|ress)$/i.test(n.name)||n.size>MAX_NODE||n.size<64)continue;
    let node;try{node=ufs.readNode(f,n.index,MAX_NODE);}catch{continue;}
    if(!node)continue;
-   try{collectObjects(node.data,books,chapters,f);}catch{}
+   try{collectObjects(node.data,books,chapters,f,usedSources);}catch{}
   }
-  if(books.length+chapters.length>before)usedSources.push(f);
  }
 
  const resolveSpeaker=speakerResolver(chapters);
@@ -290,7 +311,7 @@ function loadDir(dir){
    sceneMap.set(key,{name:rawName,read:()=>payload});
   }
  }
- const data={scenes:[...sceneMap.values()],sources:usedSources,foreignRows};
+ const data={scenes:[...sceneMap.values()],sources:[...usedSources],foreignRows};
  memo.set(dir,{sig,data});
  if(memo.size>6)memo.delete(memo.keys().next().value);
  return data;

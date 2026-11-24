@@ -139,6 +139,97 @@ test('Utage AdvImportScenarioBook: Chinese-only book classifies as chinese-build
  fs.rmSync(dir,{recursive:true,force:true});
 });
 
+function compiledChapter(settings,custom){
+ const refs=Buffer.alloc(24);
+ refs.writeBigUInt64LE(91n,4);refs.writeBigUInt64LE(92n,16);
+ return Buffer.concat([
+  Buffer.alloc(12),i32(1),i32(1),Buffer.alloc(8),str('Start.chapter'),
+  str('Start'),i32(2),refs,
+  i32(settings.length),...settings.map(([n,rows])=>gridBytes(n,rows,3)),
+  i32(custom.length),...custom.map(([n,rows])=>gridBytes(n,rows,3)),
+ ]);
+}
+
+test('Utage chapter reference arrays preserve display names and string parameter defaults',t=>{
+ const dir=tmp('utage-compiled-chapter-');t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const rows=[
+  ['Command','Arg1','Text'],
+  ['','ACTOR','準備はできました。'],
+  ['','PLAYER','こちらも大丈夫です。'],
+  ['','UNKNOWN','先に行きましょう。'],
+  ['','NUMBER','少しだけ待ってください。'],
+  ['','客','それではまた明日。'],
+  ...Array.from({length:30},(_,i)=>['','','テストの台詞その'+i+'です。']),
+ ];
+ const character=['Character',[
+  ['CharacterName','NameText'],
+  ['ACTOR','actor_name'],
+  ['PLAYER','<param=player_name>'],
+  ['UNKNOWN','<param=missing>'],
+  ['NUMBER','<param=counter>'],
+ ]];
+ const settings=[
+  character,
+  ['Localize',[['Key','Japanese'],['actor_name','旅人']]],
+  ['Param',[['Label','Type','Value','FileType'],['player_name','String','遥','Default'],['counter','Int','5','Default']]],
+ ];
+ const custom=[['Character',[['CharacterName','NameText'],['客','別人']]]];
+ const chapter=compiledChapter(settings,custom);
+ const book=monoBook('story.book',[['Start',rows]]);
+ const executable=path.join(dir,'Demo.exe');
+ put(dir,{'Demo.exe':'MZ','UnityPlayer.dll':'x','Demo_Data/sharedassets0.assets':serializedFile([book,chapter])});
+
+ const probe=probeGame({dir,executable,title:'Demo'});
+ assert.equal(probe.step,'ok');
+ assert.equal(probe.detected,'utage');
+ assert.equal(probe.japaneseLines,35);
+ const list=scenes.read('utage',dir);
+ assert.deepEqual(list.map(scene=>scene.name),['Start']);
+ assert.deepEqual(list[0].lines,rows.slice(1).map(row=>row[2]));
+ assert.deepEqual(list[0].speakers.slice(0,5),['旅人','遥','UNKNOWN','NUMBER','客']);
+});
+
+test('Utage chapter settings reject truncated reference arrays and custom grids',()=>{
+ const parseChapter=scenes.ENGINES.utage._internal.parseChapter;
+ const settings=[['Character',[['CharacterName','NameText'],['ACTOR','旅人']]]];
+ const chapter=compiledChapter(settings,[['Custom',[['Label','Value'],['test','value']]]]);
+ const chapterHeaderBytes=28+str('Start.chapter').length;
+ assert.deepEqual(parseChapter(chapter)?.grids,settings.map(([name,rows])=>({name,rows})));
+ assert.equal(parseChapter(chapter.subarray(0,chapterHeaderBytes)),null);
+ assert.equal(parseChapter(chapter.subarray(0,60)),null);
+ assert.equal(parseChapter(chapter.subarray(0,-4)),null);
+ assert.equal(parseChapter(Buffer.concat([chapter,Buffer.alloc(4)])),null);
+ assert.equal(parseChapter(compiledChapter([],[])),null);
+ assert.equal(parseChapter(compiledChapter(Array(200).fill(settings[0]),[])).grids.length,200);
+ assert.equal(parseChapter(compiledChapter(Array(201).fill(settings[0]),[])),null);
+});
+
+test('Utage chapter settings keep existing translation pairs when stored apart from dialogue',t=>{
+ const root=tmp('utage-chapter-pairs-');t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const dir=path.join(root,'game'),executable=path.join(dir,'Demo.exe'),patchDir=path.join(root,'patch');
+ const rows=[['Command','Arg1','Text','SC']];
+ for(let i=0;i<50;i++)rows.push(['','ACTOR','これはテストの台詞'+i+'です。','这是第'+i+'句测试台词。']);
+ const book=monoBook('story.book',[['Opening',rows]]);
+ put(dir,{'Demo.exe':'MZ','UnityPlayer.dll':'x','Demo_Data/resources.assets':serializedFile([book])});
+ fs.mkdirSync(patchDir);
+ const original=require('../services/original-text.cjs');
+ const imported=original.importPatch(root,null,'demo',patchDir,{executable});
+ assert.equal(imported.patchStatus,'ready');
+ assert.equal(original.provider(root,executable,{id:'demo'}).hasLocalPairs(),true);
+
+ const settings=[['Character',[['CharacterName','NameText'],['ACTOR','旅人']]]];
+ put(dir,{'Demo_Data/sharedassets0.assets':serializedFile([compiledChapter(settings,[])])});
+ assert.equal(scenes.fingerprint('utage',dir),imported.runtime.sha256);
+ assert.equal(original.scanRunning(root,'demo',executable).patchStatus,'ready');
+ assert.equal(original.provider(root,executable,{id:'demo'}).hasLocalPairs(),true);
+ assert.equal(scenes.read('utage',dir)[0].speakers[0],'旅人');
+
+ put(dir,{'Demo_Data/sharedassets1.assets':serializedFile([monoChapter('Legacy.chapter',settings)])});
+ const sources=scenes.ENGINES.utage.sources(dir).map(file=>path.basename(file)).sort();
+ assert.deepEqual(sources,['resources.assets','sharedassets1.assets']);
+});
+
+
 function scenarioBundle(mono){
  const data=serializedFile([mono]),block=Buffer.alloc(10),entry=Buffer.alloc(20);
  block.writeUInt32BE(data.length,0);block.writeUInt32BE(data.length,4);
