@@ -31,7 +31,7 @@ const RUBY=/<R([^|>]*)\|([^>]*)>/g;
 // E461 <F16…> and <W10…> wrap text (font size, wait): the tag and its closing > are dropped, the text kept
 function clean(t){return t.replace(RUBY,'$1').replace(/<[A-Za-z]+\d*>?/g,'').replace(/>/g,'').replace(/\\n/g,'\n');}
 const ASCII=/^[\x20-\x7e]*$/;
-const ASSET=/^(?!.*\\n)[^\x00-\x1f\x7f\s<>|?*"':「」『』（）()【】［］\[\]！？!?。、，,．…・：；“”‘’]{1,40}\.(?:amp|tga|ani|png|bmp|jpg|ogg|wav|mpg|wmv|psd)$/i;
+const ASSET=/^(?!.*\\n)[^\x00-\x1f\x7f\s<>|?*"':「」『』（）()【】［］\[\]！？!?。、，,．…・：；“”‘’※♪→～―—]{1,40}\.(?:amp|tga|ani|png|bmp|jpg|ogg|wav|mpg|wmv|psd)$/i;
 const isAnchor=tok=>ASCII.test(tok)||ASSET.test(tok);
 function parse(buf,decode=b=>sjis.decode(b)){const lines=[],anchors=[],ruby=[];
  for(const tok of decode(buf).split(',')){if(!tok)continue;if(isAnchor(tok)){anchors.push(tok);continue;}

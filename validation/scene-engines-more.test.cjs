@@ -69,8 +69,11 @@ test('AQUAPLUS: Japanese asset filenames go to anchors without breaking patch pa
  /* 6. Dialogue with punctuation + filename stays a line in both base and patch so pairing keeps matching */
  const ja6=sjis(',mv01,a.tga,b.tga,c.tga,d.tga,これ見て！写真.jpg,「あ…」,');
  const cn6=Buffer.concat([sjis(',mv01,a.tga,b.tga,c.tga,d.tga,'),zh('快看这个！照片.jpg,「啊…」,')]);
+ /* 7. Decorative/symbol-prefixed lines (――, ※, ♪, →, ～) and >40-char names stay in lines */
+ const long41='あ'.repeat(41)+'.tga';
+ const ja7=sjis(',mv01,――写真.jpg,※写真.jpg,♪曲名.ogg,→写真.jpg,～曲名.ogg,'+long41+',');
  put(dir,{'WA2.exe':'x',
-  'script.pak':kcap([['1001.txt',ja1,true],['1002.txt',ja2,true],['1003.txt',ja3,true],['1004.txt',ja4,true],['1005.txt',ja5,true],['1006.txt',ja6,true]]),
+  'script.pak':kcap([['1001.txt',ja1,true],['1002.txt',ja2,true],['1003.txt',ja3,true],['1004.txt',ja4,true],['1005.txt',ja5,true],['1006.txt',ja6,true],['1007.txt',ja7,true]]),
   'ck-gal.pak':kcap([['1001.txt',cn1,true],['1002.txt',cn2,true],['1003.txt',cn3,true],['1004.txt',cn4,true],['1005.txt',cn5,true],['1006.txt',cn6,true]]),
   'fon.pak':fon});
  const base=scenes.read('aquaplus',dir);
@@ -79,6 +82,8 @@ test('AQUAPLUS: Japanese asset filenames go to anchors without breaking patch pa
  assert.deepStrictEqual(base[1].lines,['「あ…」']);
  assert.deepStrictEqual(base[1].anchors,['mv01','a.tga','b.tga','c.tga','学園.tga']);
  assert.deepStrictEqual(base[5].lines,['これ見て！写真.jpg','「あ…」']);
+ assert.deepStrictEqual(base[6].lines,['――写真.jpg','※写真.jpg','♪曲名.ogg','→写真.jpg','～曲名.ogg',long41]);
+ assert.deepStrictEqual(base[6].anchors,['mv01']);
  const found={files:new Map([['ck-gal.pak',{name:'ck-gal.pak',path:path.join(dir,'ck-gal.pak')}]]),dirs:[dir]};
  const list=aquaplus.patchLines(base,found);
  assert.ok(list[0].patched);assert.deepStrictEqual(list[0].lines,['「啊…」','「吉他.tga」','回忆.jpg','吉他.tga','那张照片\n回忆.jpg','快看这个！照片.jpg','１．回忆.jpg','【确认】照片.jpg','春希']);
