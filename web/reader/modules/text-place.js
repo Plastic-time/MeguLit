@@ -125,7 +125,8 @@
     for (const p of ['left', 'top']) win.style.removeProperty(p);
     /* 2026-11-21 (owner's recording: the translation jumped back and forth while a slider moved): the rows a previous frame closed
        up are opened before anything is measured, so every frame places the line from the same layout and decides once */
-    sentence.style.removeProperty('line-height'); win.querySelector('.tomoyo-cn-row')?.style.removeProperty('margin-top');
+    const row = win.querySelector('.tomoyo-cn-row');
+    sentence.style.removeProperty('line-height'); row?.style.removeProperty('margin-top'); row?.style.removeProperty('translate');
     const tok = sentence.querySelector('.char-token'), wr = win.getBoundingClientRect(), tr = tok?.getBoundingClientRect();
     /* 2026-11-19 (user: 「左右留白和边距现在都调整不了文本框位置了」): in anchored mode the box position fields are the line's offset
        from the game's own place, saved with the game's profile (anchorDX/anchorDY, client %, 0 = on the game's first character);
@@ -143,7 +144,7 @@
        does not fit only the translation scrolls where at least one row fits. The outline and shadow are always the user's own
        (appearance and this game's style profile): 2026-11-19 (user, windowed 千恋＊万花: 「为啥译文一直有投影，很重很烦还关不掉」) the
        automatic heavy shadow over the game's bottom bar is gone. */
-    const row = win.querySelector('.tomoyo-cn-row'), parts = row ? [...row.querySelectorAll('*')] : [];
+    const parts = row ? [...row.querySelectorAll('*')] : [];
     if (pr.translationInline && win.matches(inline)) {
       const limit = Math.min(innerWidth, cx0 + cwc);
       set(win, 'max-width', Math.max(40, limit - Math.max(cx0, win.getBoundingClientRect().left)) + 'px');
@@ -184,6 +185,20 @@
       sentence.style.removeProperty('line-height'); let sx = sentence.getBoundingClientRect();
       if (sx.bottom > uiLimit && sentence.querySelector('br.megulit-row-br')) { set(sentence, 'line-height', closeRows(sentence)); sx = sentence.getBoundingClientRect(); }
       if (sx.bottom > uiLimit) { const up = Math.min(sx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); }
+    }
+    // A GPU-placed dialogue can move to the client edge. Move only the translation so the Japanese keeps its anchor.
+    if (row && anchor.gpu && !page && tr?.height) {
+      const rb = rowRect(), top = Math.max(0, cy0), bottom = Math.min(cy0 + chc, workLimit());
+      const room = Math.floor(bottom - top);
+      if (rb.height > 0 && rb.bottom > bottom && room > 0) {
+        const height = Math.min(room, rb.height), lastTop = bottom - height;
+        const above = Math.min(lastTop, sentence.getBoundingClientRect().top - Math.max(4, tr.height * .2) - height);
+        if (rb.height > room) {
+          set(row, 'max-height', room + 'px'); set(row, 'overflow-y', 'auto'); set(row, 'overscroll-behavior', 'contain');
+        }
+        set(row, 'translate', '0 ' + ((above >= top ? above : lastTop) - rb.top) + 'px');
+        return;
+      }
     }
     if (row && roomBelow && !anchor.center && tr && tr.height) { const glyph = tr.height;
       /* 2026-11-21 (owner's third recording, 千恋＊万花, speaker row + one line: the translation left a box that had a free third row for below
@@ -232,7 +247,7 @@
     for (const br of document.querySelectorAll('br.megulit-row-br,br.megulit-cn-br')) br.remove();
     for (const w of document.querySelectorAll('.megulit-anchor-center,.megulit-page-fresh')) w.classList.remove('megulit-anchor-center', 'megulit-page-fresh');
     for (const w of document.querySelectorAll('.megulit-anchor-window')) w.style.removeProperty('max-width');
-    for (const w of document.querySelectorAll('.megulit-anchor-window')) { w.classList.remove('megulit-anchor-window', 'megulit-game-rows', 'megulit-rows-predicted'); w.style.removeProperty('--megulit-centre-width'); const cr = w.querySelector('.tomoyo-cn-row'); if (cr) for (const p of ['max-width', 'margin-left', 'margin-right', 'max-height', 'overflow-y', 'overscroll-behavior']) cr.style.removeProperty(p); for (const p of ['left', 'top', 'right', 'bottom', 'margin']) w.style.removeProperty(p); w.querySelector('.sentence-text')?.style.removeProperty('line-height'); }
+    for (const w of document.querySelectorAll('.megulit-anchor-window')) { w.classList.remove('megulit-anchor-window', 'megulit-game-rows', 'megulit-rows-predicted'); w.style.removeProperty('--megulit-centre-width'); const cr = w.querySelector('.tomoyo-cn-row'); if (cr) for (const p of ['max-width', 'margin-left', 'margin-right', 'max-height', 'overflow-y', 'overscroll-behavior', 'translate']) cr.style.removeProperty(p); for (const p of ['left', 'top', 'right', 'bottom', 'margin']) w.style.removeProperty(p); w.querySelector('.sentence-text')?.style.removeProperty('line-height'); }
     document.body.classList.toggle('megulit-place-fallback', fallback === true);
     for (const w of document.querySelectorAll('.megulit-place-window')) {
       w.classList.remove('megulit-place-window');
@@ -759,7 +774,7 @@
        margin gave two anchors one character apart, and the line jumped sideways at every change between them. On the same row a
        start up to about one and a half characters off is the same text box: the anchor keeps the leftmost (one move at most) */
     else if (anchor && Math.abs(a[1] - anchor[1]) <= Math.max(6, size * .6) && Math.abs(a[0] - anchor[0]) <= size * 1.6) a = [Math.min(a[0], anchor[0]), anchor[1]];
-    anchor = a; anchor.estimated = false; anchor.center = Number.isFinite(center); anchor.size = size; anchorLine = lineKey;
+    anchor = a; anchor.estimated = false; anchor.center = Number.isFinite(center); anchor.size = size; anchor.gpu = line?.engine === 'gpu' && !line.fallback; anchorLine = lineKey;
     anchorLimit = map.bounds[3] - (median(got.map(b => b[3])) || size) * 1.3;
   }
   function apply() {
@@ -1004,7 +1019,7 @@
     document.body.classList.remove('megulit-place-gone'); if (m?.clear) line = null; else if (m?.text && (m.fallback || Array.isArray(m.rects))) {
       const text = String(m.text);
       if (!m.fallback && line && !line.nativeCells && line.text !== text) noteReplaced(line);
-      line = { text, frameLayout: m.frameLayout, previousCells: Array.isArray(m.previousCells) ? m.previousCells : null, nativeCells: Array.isArray(m.nativeCells) && m.nativeCells.length === [...text].length ? m.nativeCells : null, fallback: m.fallback === true, approx: m.approx === true, rects: m.rects, client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] };
+      line = { text, engine: m.engine, frameLayout: m.frameLayout, previousCells: Array.isArray(m.previousCells) ? m.previousCells : null, nativeCells: Array.isArray(m.nativeCells) && m.nativeCells.length === [...text].length ? m.nativeCells : null, fallback: m.fallback === true, approx: m.approx === true, rects: m.rects, client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] };
     } schedule(); };
   const pageGone = () => { for (const n of document.querySelectorAll('.megulit-old-line')) n.remove(); clones.clear(); document.body.classList.remove('megulit-place-asleep'); };
   /* 2026-11-15 `elsewhere` (core/overlay-placement.cjs page()): the layer is not armed and another path hides the game's
