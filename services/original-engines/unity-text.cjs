@@ -9,7 +9,7 @@ const kit=require('./kit.cjs');/* E577 shared engine kit */
    The release's Simplified (else Traditional) Chinese part is the translation of each Japanese line. */
 const fs=require('node:fs'),path=require('node:path');
 const SEP='※',MARK=Buffer.from(SEP);
-const KANA=/[ぁ-ゖァ-ヺ]/;
+const KANA=/[ぁ-ゖァ-ヺ]/,HAN=/[一-鿿]/;
 const HANS=/[们这说话时个来对没还让门见问题电车为样边过东华爱头间学认长听写书钱后于]/g,HANT=/[們這說話時個來對沒還讓門見問題電車為樣邊過東華愛頭間學認長聽寫書錢後於]/g;
 const {stat}=require('./file-key.cjs');
 // <name>_Data folders beside the program that hold a resources.assets.
@@ -35,9 +35,13 @@ const readPart=(file,e)=>kit.readAt(file,e.offset,e.size);
 const RB=/\[rb,([^,\]]*),([^\]]*)\]/g;
 function clean(t){return t.replace(RB,'$1').replace(/\[n\]/g,'\n').replace(/\[[^\]]*\]/g,'').trim();}
 // Which part after the Japanese is Simplified Chinese (else Traditional), found by its characters.
-function chineseSlot(rows){let best=-1,bestHans=-1;const width=Math.max(0,...rows.map(r=>r.length));
- for(let i=1;i<width;i++){let n=0,hans=0,hant=0;for(const r of rows){const t=r[i]||'';if(!t||KANA.test(t)&&!/[一-鿿]/.test(t))continue;n++;hans+=(t.match(HANS)||[]).length;hant+=(t.match(HANT)||[]).length;}
-  if(n<rows.length*.3)continue;if(best<0||hans-hant>bestHans){best=i;bestHans=hans-hant;}}
+function chineseSlot(rows){if(!rows.length)return -1;let width=0;for(const r of rows)if(r.length>width)width=r.length;
+ let best=-1,bestSimp=false,bestDiff=-Infinity,bestN=-1;
+ for(let i=1;i<width;i++){let n=0,kana=0,hans=0,hant=0;
+  for(const r of rows){const t=clean(r[i]||'');if(!t)continue;if(KANA.test(t)){kana++;continue;}if(!HAN.test(t))continue;n++;hans+=(t.match(HANS)||[]).length;hant+=(t.match(HANT)||[]).length;}
+  if(n<rows.length*.3||kana>=n)continue;
+  const simp=hans>hant,diff=hans-hant;
+  if(best<0||simp&&!bestSimp||(simp===bestSimp&&(simp?diff>bestDiff:n>bestN||n===bestN&&diff>bestDiff))){best=i;bestSimp=simp;bestDiff=diff;bestN=n;}}
  return best;}
 function parse(buf){const rows=[];for(const line of buf.toString('utf8').split(/\r?\n/))if(isText(line))rows.push(line.trim().split(SEP));
  const slot=chineseSlot(rows),lines=[],zh=[],ruby=[];

@@ -26,6 +26,73 @@ test('Unity TextAssets: 日本語※简体※繁體 lines read as Japanese with 
  fs.rmSync(dir,{recursive:true,force:true});
 });
 
+test('Unity TextAssets: chineseSlot ignores English/kana/tag columns, prefers Simplified over Traditional, and keeps short Chinese scenes',()=>{
+ const ut=scenes.ENGINES['unity-text'],cs=ut._internal.chineseSlot;
+ // 1. 日本語※English※繁體中文: English (hans-hant=0) must not beat Traditional Chinese (hans-hant<0)
+ const dirTri=tmp('ut-en-hant-');
+ const tri=[
+  'おはよう、今日はいい天気ですね。※Good morning, nice weather today.※早安，今天天氣真好。',
+  'みんなと一緒に学校へ行きましょう。※Let us go to school together.※大家一起去學校吧。',
+  'この話を聞いてくれてありがとう。※Thank you for listening to this story.※謝謝你聽我說這件事。',
+ ].join('\r\n');
+ put(dirTri,{'Game.exe':'x','Game_Data/resources.assets':Buffer.concat([Buffer.alloc(32),textAsset('S01',tri),Buffer.alloc(16)])});
+ assert.strictEqual(scenes.detect(dirTri),'unity-text');
+ const triList=scenes.read('unity-text',dirTri);
+ assert.deepStrictEqual(triList[0].zh,['早安，今天天氣真好。','大家一起去學校吧。','謝謝你聽我說這件事。']);
+ const triPatched=ut.patchLines(triList,{dirs:[dirTri]});
+ assert.deepStrictEqual(triPatched[0].lines,['早安，今天天氣真好。','大家一起去學校吧。','謝謝你聽我說這件事。']);
+
+ // 2. 日本語※English (no Chinese): zh stays empty and patchLines returns null
+ const dirBi=tmp('ut-en-only-');
+ const bi=[
+  'おはよう、今日はいい天気ですね。※Good morning, nice weather today.',
+  'みんなと一緒に学校へ行きましょう。※Let us go to school together.',
+  'この話を聞いてくれてありがとう。※Thank you for listening to this story.',
+ ].join('\r\n');
+ put(dirBi,{'Game.exe':'x','Game_Data/resources.assets':Buffer.concat([Buffer.alloc(32),textAsset('S02',bi),Buffer.alloc(16)])});
+ const biList=scenes.read('unity-text',dirBi);
+ assert.deepStrictEqual(biList[0].zh,['','','']);
+ assert.strictEqual(ut.patchLines(biList,{dirs:[dirBi]}),null);
+
+ // 3. Four languages (JA/EN/Hans/Hant) & Traditional-before-Simplified both pick Simplified
+ assert.strictEqual(cs([
+  ['おはよう、今日はいい天気ですね。','Good morning.','今天天气真好，我们去学校吧。','今天天氣真好，我們去學校吧。'],
+  ['この話を聞いて。','Listen to this.','请听我说这件事。','請聽我說這件事。'],
+ ]),2);
+ assert.strictEqual(cs([
+  ['みんなと一緒に学校へ行こう。','我們一起去學校聽他說話。','我们一起去学校听他说话。'],
+  ['この問題を見て。','請看這個問題。','请看这个问题。'],
+ ]),2);
+
+ // 4. Kana-heavy backup column and partially-Han English column must not beat full Traditional Chinese
+ // Even as the sole second column, a kana-heavy Japanese backup (>=50% kana, >=30% kanji-only names) is not Chinese
+ assert.strictEqual(cs([
+  ['【大蔵】','【大蔵】'],
+  ['【りそな】','【里想奈】'],
+  ['おはようございます。','おはようございます。'],
+  ['みんなと学校へ行きましょう。','みんなと学校へ行きましょう。'],
+ ]),-1);
+ assert.strictEqual(cs([
+  ['【大蔵】','【大蔵】','【大藏】'],
+  ['【りそな】','【りそな】','【里想奈】'],
+  ['おはようございます。','おはようございます。','早安，今天天氣真好。'],
+  ['みんなと学校へ行きましょう。','みんなと学校へ行きましょう。','我們一起去學校吧。'],
+ ]),2);
+ assert.strictEqual(cs([
+  ['東京へ行く。','Go to 東京.','前往東京。'],
+  ['大阪へ行く。','Go to 大阪.','前往大阪。'],
+  ['おはようございます。','Good morning.','早安，這件事交給我們吧。'],
+  ['ありがとう。','Thank you.','謝謝你聽我說話。'],
+ ]),2);
+
+ // 5. Tag-only column is ignored; 1-line and 2-line valid Chinese scenes still resolve slot 1
+ assert.strictEqual(cs([['おはようございます。','[背景]'],['ありがとう。','[演出]']]),-1);
+ assert.strictEqual(cs([['「大変です」','「不好了」']]),1);
+ assert.strictEqual(cs([['「……」','「……」'],['「大変です」','「不好了」']]),1);
+
+ for(const d of [dirTri,dirBi])fs.rmSync(d,{recursive:true,force:true});
+});
+
 test('Higurashi: OutputLine Japanese strings are the lines; English is not a translation, a Chinese second slot is',()=>{
  const dir=tmp('hg-');
  const body='void main()\n{\n\tOutputLine(NULL, "　夏を迎えても、朝の空気は冷たい。",\n\t\t   NULL, "Even though we were approaching summer, the air was cold.", Line_WaitForInput);\n'+
