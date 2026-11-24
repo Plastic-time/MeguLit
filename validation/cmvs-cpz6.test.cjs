@@ -52,3 +52,39 @@ test('CMVS: a damaged text section (no NUL) gives empty pushes, not the rest of 
  const ok=Buffer.concat([Buffer.from('abc\0','latin1'),Buffer.alloc(0x3000,0x41)]),one=cmvs.pushed(cmvs.unpackPs2(F.ps2aRaw(push(0),ok)));
  assert.equal(one[0].toString('latin1'),'abc');
 });
+
+test('CMVS: RESOURCE matches only standalone resource filenames, not dialogue mentioning a filename',()=>{
+ const long121='あ'.repeat(121)+'.png';
+ const ps=F.ps2a([
+  {push:'bgm01.ogg'},
+  {push:'voice\\k01_001.ogg'},
+  {push:'cg/ev01.pb3'},
+  {push:'Title.OGG'},
+  {push:'立ち絵.pb3'},
+  {push:'cg/学園.png'},
+  '「photo.pngを見せて」',
+  '音声はse01.oggに入っている。',
+  'これ見て！写真.png',
+  'あの写真\\n思い出.bmp',
+  '――曲名.ogg',
+  '「bgm01.ogg」',
+  long121,
+  {push:'Open bgm01.ogg now.'},
+  {push:'Look at cg_01.png!'},
+  {push:'Line1\\nfile.ogg'},
+ ]);
+ const r=cmvs.parse(ps);
+ assert.deepEqual(r.anchors,['bgm01.ogg','voice\\k01_001.ogg','cg/ev01.pb3','Title.OGG','立ち絵.pb3','cg/学園.png']);
+ assert.deepEqual(r.lines,[
+  '「photo.pngを見せて」',
+  '音声はse01.oggに入っている。',
+  'これ見て！写真.png',
+  'あの写真\n思い出.bmp',
+  '――曲名.ogg',
+  '「bgm01.ogg」',
+  long121,
+  'Open bgm01.ogg now.',
+  'Look at cg_01.png!',
+  'Line1\nfile.ogg',
+ ]);
+});

@@ -166,7 +166,7 @@ function unpackPs2(buf){if(buf.length<0x30||buf.toString('latin1',0,4)!=='PS2A')
  const body=Buffer.from(buf.subarray(0x30).map(b=>kit.ror(k^((b-0x7C)&255),shift)));
  return Buffer.concat([buf.subarray(0,0x30),kit.lzss(body,buf.readUInt32LE(0x28),{window:0x800,start:0x7df,lenBits:5,minMatch:2})]);}
 const PUSH=Buffer.from([1,2,0x20,1]),PUSH_END=Buffer.from([0x0f,2,0x30,4]);
-const RESOURCE=/\.(ogg|wav|mv2|pb3|pb2|ps3|ps2|cur|cmv|mgv|png|bmp)\b/i;
+const RESOURCE=/^(?!.*\\n)[^\x00-\x1f\x7f\s<>|?*"':「」『』（）()【】［］\[\]！？!?。、，,．…・：；“”‘’※♪→～―—]{1,120}\.(?:ogg|wav|mv2|pb3|pb2|ps3|ps2|cur|cmv|mgv|png|bmp)$/i;
 /* the pushed strings in code order; an empty one stays as an empty buffer, so the n-th push of two builds of one script
    is the same line. A push with no NUL within MAX_PUSH bytes is a damaged text section (a wrong key, a cut file) and
    counts as empty: read to the section end, every push of such a script was the whole rest of it (300 MB for one scene) */
