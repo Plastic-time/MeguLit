@@ -41,6 +41,7 @@ function list(file){
    const objects=table.readUInt32LE(p+12);let q=p+16;const start=q;while(q+1<table.length&&(table[q]||table[q+1]))q+=2;
    const name=table.subarray(start,q).toString('utf16le'),type=table[q+2];q+=3;
    if(type!==2&&type!==3)break;
+   if(type===2&&q+53>table.length){if(!files.length)return null;break;}
    stack[stack.length-1].left--;
    const dir=stack.map(x=>x.name).filter(x=>x&&x!=='%DEFAULT FOLDER%');
    if(type===2){const original=table.readUInt32LE(q+2),stored=table.readUInt32LE(q+49);files.push({name,path:[...dir,name],offset:base,original,stored});base+=stored;q+=53;}

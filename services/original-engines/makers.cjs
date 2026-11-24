@@ -259,7 +259,12 @@ function userStrings(b){try{if(b.toString('latin1',0,2)!=='MZ')return null;const
  const secs=opt+b.readUInt16LE(pe+20),off=rva=>{for(let i=0;i<nsec;i++){const s=secs+i*40,va=b.readUInt32LE(s+12),vs=Math.max(b.readUInt32LE(s+8),b.readUInt32LE(s+16));if(rva>=va&&rva<va+vs)return rva-va+b.readUInt32LE(s+20);}return -1;};
  const cli=off(cliRva);if(cli<0)return null;const md=off(b.readUInt32LE(cli+8));if(md<0||b.toString('latin1',md,md+4)!=='BSJB')return null;
  const vl=b.readUInt32LE(md+12);let p=md+16+vl+2;const n=b.readUInt16LE(p);p+=2;let us=null;
- for(let i=0;i<n;i++){const o=b.readUInt32LE(p),sz=b.readUInt32LE(p+4);p+=8;const z=b.indexOf(0,p),name=b.toString('latin1',p,z);p=(z+4)&~3;if(name==='#US')us=b.subarray(md+o,md+o+sz);}
+ for(let i=0;i<n;i++){
+  if(p+8>b.length)break;
+  const o=b.readUInt32LE(p),sz=b.readUInt32LE(p+4);p+=8;
+  const z=b.indexOf(0,p);if(z<0)break;
+  const name=b.toString('latin1',p,z);p=(z+4)&~3;if(name==='#US')us=b.subarray(md+o,md+o+sz);
+ }
  if(!us)return null;const out=[];for(let i=1;i<us.length;){const c=us[i];let len,h;if(c<0x80){len=c;h=1;}else if((c&0xc0)===0x80){len=((c&0x3f)<<8)|us[i+1];h=2;}else{len=((c&0x1f)<<24)|(us[i+1]<<16)|(us[i+2]<<8)|us[i+3];h=4;}
   if(!len){i+=h;continue;}if(len>1)out.push(us.toString('utf16le',i+h,i+h+len-1));i+=h+len;}
  return out;}catch{return null;}}

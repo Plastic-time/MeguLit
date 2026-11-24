@@ -12,12 +12,44 @@ test('Fungus command list: Say lines with speaker',()=>{
 test('CSV script: text column and speaker column',()=>{
  const csv='Name,Text\n'+['真白,「おはよう、今日もいい天気だね」','悠,「そうだね、散歩に行こう」','真白,「うん、行こうよ」'].join('\n');
  assert.deepEqual(ua.parse(Buffer.from(csv)).lines,['真白：「おはよう、今日もいい天気だね」','悠：「そうだね、散歩に行こう」','真白：「うん、行こうよ」']);});
+function drv3Stx(text){
+ const b=Buffer.alloc(0x28);b.write('STXTJPLL',0,'latin1');b.writeUInt32LE(1,8);
+ b.writeUInt32LE(0x20,0x0c);b.writeUInt32LE(8,0x10);b.writeUInt32LE(1,0x14);b.writeUInt32LE(0x28,0x24);
+ return Buffer.concat([b,Buffer.from(text+'\0','utf16le')]);
+}
 test('DRV3 SPC compression and STX tags',()=>{
  /* flag 0xB0 = 1,0,1,1: literal 'a', ref (count 2, off 0x3ff = distance 1) , literals 'b' 'c' */
  const out=drv3.spcLz(Buffer.from([0xb0,0x61,0xff,0x03,0x62,0x63]),5);assert.equal(out.toString(),'aaabc');
- const s=['<CLT=cltMIND>やあ<CLT>'],hdr=Buffer.alloc(0x28);hdr.write('STXTJPLL',0,'latin1');hdr.writeUInt32LE(1,8);hdr.writeUInt32LE(0x20,12);hdr.writeUInt32LE(8,16);hdr.writeUInt32LE(1,20);
- const b=Buffer.alloc(0x20+8);b.write('STXTJPLL',0,'latin1');b.writeUInt32LE(1,8);b.writeUInt32LE(0x20,0x0c);b.writeUInt32LE(8,0x10);b.writeUInt32LE(1,0x14);b.writeUInt32LE(0,0x20);b.writeUInt32LE(0x28,0x24);
- assert.deepEqual(drv3.parse(Buffer.concat([b,Buffer.from(s[0]+'\0','utf16le')])).lines,['やあ']);});
+ assert.deepEqual(drv3.parse(drv3Stx('<CLT=cltMIND>やあ<CLT>')).lines,['やあ']);});
+test('DRV3 keeps readable SPC entries when an overcount reaches an incomplete tail',t=>{
+ const os=require('node:os'),path=require('node:path');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'drv3-prefix-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const fixtures=new Map();
+ t.mock.method(cpk,'list',file=>[{name:'wrd_script/chapter/text.spc',size:fixtures.get(file).length}]);
+ t.mock.method(cpk,'read',file=>fixtures.get(file));
+ const read=(count,...entries)=>{
+  const dir=path.join(root,String(fixtures.size));fs.mkdirSync(dir);
+  const file=path.join(dir,'partition_data_win.cpk');fs.writeFileSync(file,'CPK ');
+  const header=Buffer.alloc(0x50);header.write('CPS.');header.writeUInt32LE(count,0x28);
+  fixtures.set(file,Buffer.concat([header,...entries]));
+  return scenes.read('drv3',dir).flatMap(scene=>scene.lines);
+ };
+ const row=(name,line,declaredSize)=>{
+  const text=drv3Stx(line),header=Buffer.alloc(0x20),paddedName=Buffer.alloc(16);
+  paddedName.write(name);header.writeUInt16LE(1,0);
+  header.writeUInt32LE(declaredSize??text.length,4);
+  header.writeUInt32LE(text.length,8);header.writeUInt32LE(name.length,12);
+  return Buffer.concat([header,paddedName,text,Buffer.alloc((16-text.length%16)%16)]);
+ };
+ const first=row('first.stx','最初の台詞。');
+ const partial=row('tail.stx','末尾の台詞。',0x80000000);
+ const shortName=Buffer.alloc(0x20);shortName.writeUInt32LE(0x80000000,12);
+ const firstLine=['最初の台詞。'],bothLines=[...firstLine,'末尾の台詞。'];
+ assert.deepEqual(read(3,first),firstLine);
+ assert.deepEqual(read(2,first,partial),bothLines,'the physically present STX data is readable');
+ assert.deepEqual([read(3,first,partial),read(3,first,shortName),read(2,shortName)],[bothLines,firstLine,[]]);
+});
 test('CRI @UTF cipher round-trips',()=>{const t=Buffer.from('@UTF....');assert.equal(cpk.unmask(cpk.unmask(t)).toString(),t.toString());});
 const dr='e:/steam/steamapps/common/Danganronpa V3 Killing Harmony';
 

@@ -88,6 +88,16 @@ test('MonoGame / XNA: Content .xnb strings (plain and LZ4) and the game assembly
  assert.equal(M.xnbBody(Buffer.concat([Buffer.from('XNBw'),Buffer.from([5,0x80]),Buffer.alloc(8)])),null);
 });
 
+test('MonoGame / XNA keeps #US strings when the stream count runs past the metadata',t=>{
+ const text='明日',heap=F.usHeap([text]),img=F.pe(Buffer.alloc(0),{us:heap});
+ const md=img.indexOf('BSJB'),countAt=md+16+img.readUInt32LE(md+12)+2;
+ const stream=countAt+2,heapAt=md+img.readUInt32LE(stream);
+ const complete=img.subarray(0,heapAt+heap.length);
+ assert.deepEqual(M.ENGINES.xna.parse(complete).lines,[text]);
+ const overcount=Buffer.from(complete);overcount.writeUInt16LE(2,countAt);
+ const game=writeTree(tmp(t),{'Game.exe':overcount,'MonoGame.Framework.dll':F.pe()});
+ assert.deepEqual(scenes.read('xna',game).flatMap(scene=>scene.lines),[text]);
+});
 test('OHRRPGCE: .rpg lumps (PDP-endian sizes), .say text boxes of 8 lines',t=>{
  const rpg=(L,enc)=>F.rpgFile({'game.gen':Buffer.alloc(16,1),'game.say':F.sayLump([[L[0]],[L[2],L[1]]],enc)});
  const game=writeTree(tmp(t),{'game.rpg':rpg(JA,F.sjis),'game.exe':F.pe()}),patch=writeTree(tmp(t),{'game.rpg':rpg(ZH,F.gbk)});

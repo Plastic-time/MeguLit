@@ -31,6 +31,27 @@ test('Enigma Virtual Box table: folder, plain file and compressed file',()=>{
  assert.strictEqual(evb.read(file,t.files[1]).toString(),'ABC');
 });
 
+test('Enigma Virtual Box keeps a complete file before a truncated counted record',t=>{
+ const scenes=require('../services/original-engines/scenes.cjs');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'evb-prefix-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const text='ここに残る台詞です。',payload=Buffer.from(text);
+ const node=(name,fields)=>Buffer.concat([Buffer.alloc(16),Buffer.from(name+'\0','utf16le'),Buffer.from([2]),fields]);
+ const fields=Buffer.alloc(53);fields.writeUInt32LE(payload.length,2);fields.writeUInt32LE(payload.length,49);
+ const first=node('first.txt',fields),tail=node('tail.txt',Buffer.alloc(0));
+ const write=(name,count,table,data)=>{
+  const dir=path.join(root,name);fs.mkdirSync(dir);
+  const header=Buffer.alloc(80);header.write('EVB\0');
+  header.writeUInt32LE(table.length+11,64);header.writeUInt32LE(count,76);
+  const file=path.join(dir,'pack.cpk');fs.writeFileSync(file,Buffer.concat([header.subarray(0,79),table,data]));
+  return {file,lines:scenes.read('evbox',dir).flatMap(scene=>scene.lines)};
+ };
+ const table=Buffer.concat([first,tail]);
+ assert.deepEqual(write('control',1,table,payload).lines,[text]);
+ assert.deepEqual(write('overcount',2,table,payload).lines,[text]);
+ const empty=write('empty',1,tail,Buffer.alloc(0));
+ assert.deepEqual(empty.lines,[]);assert.equal(evb.list(empty.file),null);
+});
 test('BGI lines follow code order; patch scenes are checked on shared identifiers',()=>{
  const src=fs.readFileSync(path.join(root,'services/original-engines/bgi.cjs'),'utf8'),ot=fs.readFileSync(path.join(root,'services/original-text.cjs'),'utf8');
  assert.match(src,/refs\.push\(off\)/);
