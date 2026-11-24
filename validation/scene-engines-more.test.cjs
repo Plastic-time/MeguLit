@@ -48,6 +48,52 @@ test('AQUAPLUS: the WA2 Chinese patch (ck-gal.pak + its fon.pak) reads through t
  assert.strictEqual(aquaplus.patchLines(base,found),null);
  fs.rmSync(dir,{recursive:true,force:true});
 });
+test('AQUAPLUS: Japanese asset filenames go to anchors without breaking patch pairing or anchor guards',()=>{
+ const dir=tmp('aqua-asset-'),zh=patchEncoder();
+ const fon=fonPak([833652,724679,3302082,1918771]);
+ /* 1. Japanese asset names (ギター.tga, ライブシーン.ani, cg/学園.tga, 夕景.AMP) go to anchors; dialogue with tags/newlines/punctuation stays in lines */
+ const ja1=sjis(',mv01,ギター.tga,ライブシーン.ani,cg/学園.tga,夕景.AMP,「あ…」,「ギター.tga」,<W>思い出.jpg,<F16>ギター.tga,あの写真\\n思い出.jpg,これ見て！写真.jpg,１．思い出.jpg,【確認】写真.jpg,春希,');
+ const cn1=Buffer.concat([sjis(',mv01,ギター.tga,ライブシーン.ani,cg/学園.tga,夕景.AMP,'),zh('「啊…」,「吉他.tga」,<W>回忆.jpg,<F16>吉他.tga,那张照片\\n回忆.jpg,快看这个！照片.jpg,１．回忆.jpg,【确认】照片.jpg,春希,')]);
+ /* 2. Unchanged Kanji asset bytes in ck-gal.pak decode differently via patchDecode (学園.tga -> 剔侃.tga), exact raw Shift-JIS anchor comparison still pairs */
+ const ja2=sjis(',mv01,a.tga,b.tga,c.tga,学園.tga,「あ…」,');
+ const cn2=Buffer.concat([sjis(',mv01,a.tga,b.tga,c.tga,学園.tga,'),zh('「啊…」,')]);
+ /* 3. Negative: mismatched ASCII-vs-Japanese assets with same .tga extension must be rejected by the 90% anchor guard */
+ const ja3=sjis(',mv01,a1.tga,a2.tga,a3.tga,a4.tga,「あ…」,');
+ const cn3=Buffer.concat([sjis(',mv01,別1.tga,別2.tga,別3.tga,別4.tga,'),zh('「再见了」,')]);
+ /* 4. Negative: mismatched Japanese-vs-ASCII assets with same .tga extension must also be rejected */
+ const ja4=sjis(',学園.tga,教室.tga,廊下.tga,屋上.tga,夕景.tga,「あ…」,');
+ const cn4=Buffer.concat([sjis(',x1.tga,x2.tga,x3.tga,x4.tga,x5.tga,'),zh('「再见了」,')]);
+ /* 5. Negative: two distinct ASCII-only .tga anchor lists must still be rejected */
+ const ja5=sjis(',mv01,a1.tga,a2.tga,a3.tga,a4.tga,「あ…」,');
+ const cn5=Buffer.concat([sjis(',mv01,x1.tga,x2.tga,x3.tga,x4.tga,'),zh('「啊…」,')]);
+ /* 6. Dialogue with punctuation + filename stays a line in both base and patch so pairing keeps matching */
+ const ja6=sjis(',mv01,a.tga,b.tga,c.tga,d.tga,これ見て！写真.jpg,「あ…」,');
+ const cn6=Buffer.concat([sjis(',mv01,a.tga,b.tga,c.tga,d.tga,'),zh('快看这个！照片.jpg,「啊…」,')]);
+ /* 7. Decorative/symbol-prefixed lines (――, ※, ♪, →, ～) and >40-char names stay in lines */
+ const long41='あ'.repeat(41)+'.tga';
+ const ja7=sjis(',mv01,――写真.jpg,※写真.jpg,♪曲名.ogg,→写真.jpg,～曲名.ogg,'+long41+',');
+ put(dir,{'WA2.exe':'x',
+  'script.pak':kcap([['1001.txt',ja1,true],['1002.txt',ja2,true],['1003.txt',ja3,true],['1004.txt',ja4,true],['1005.txt',ja5,true],['1006.txt',ja6,true],['1007.txt',ja7,true]]),
+  'ck-gal.pak':kcap([['1001.txt',cn1,true],['1002.txt',cn2,true],['1003.txt',cn3,true],['1004.txt',cn4,true],['1005.txt',cn5,true],['1006.txt',cn6,true]]),
+  'fon.pak':fon});
+ const base=scenes.read('aquaplus',dir);
+ assert.deepStrictEqual(base[0].lines,['「あ…」','「ギター.tga」','思い出.jpg','ギター.tga','あの写真\n思い出.jpg','これ見て！写真.jpg','１．思い出.jpg','【確認】写真.jpg','春希']);
+ assert.deepStrictEqual(base[0].anchors,['mv01','ギター.tga','ライブシーン.ani','cg/学園.tga','夕景.AMP']);
+ assert.deepStrictEqual(base[1].lines,['「あ…」']);
+ assert.deepStrictEqual(base[1].anchors,['mv01','a.tga','b.tga','c.tga','学園.tga']);
+ assert.deepStrictEqual(base[5].lines,['これ見て！写真.jpg','「あ…」']);
+ assert.deepStrictEqual(base[6].lines,['――写真.jpg','※写真.jpg','♪曲名.ogg','→写真.jpg','～曲名.ogg',long41]);
+ assert.deepStrictEqual(base[6].anchors,['mv01']);
+ const found={files:new Map([['ck-gal.pak',{name:'ck-gal.pak',path:path.join(dir,'ck-gal.pak')}]]),dirs:[dir]};
+ const list=aquaplus.patchLines(base,found);
+ assert.ok(list[0].patched);assert.deepStrictEqual(list[0].lines,['「啊…」','「吉他.tga」','回忆.jpg','吉他.tga','那张照片\n回忆.jpg','快看这个！照片.jpg','１．回忆.jpg','【确认】照片.jpg','春希']);
+ assert.ok(list[1].patched);assert.deepStrictEqual(list[1].lines,['「啊…」']);
+ assert.strictEqual(list[2].skipped,'anchors');
+ assert.strictEqual(list[3].skipped,'anchors');
+ assert.strictEqual(list[4].skipped,'anchors');
+ assert.ok(list[5].patched);assert.deepStrictEqual(list[5].lines,['快看这个！照片.jpg','「啊…」']);
+ fs.rmSync(dir,{recursive:true,force:true});
+});
 
 const NS=body=>'*define\ncaption "test"\ngame\n*start\n'+body;
 test('NScripter: label blocks pair a Chinese 0.txt with the Japanese nscript.dat (zero-latency translation)',async()=>{
