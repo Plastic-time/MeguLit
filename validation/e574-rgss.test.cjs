@@ -35,3 +35,38 @@ test('XP game (Game.rgssad, Ruby 1.8 strings): 101 carries the first row',t=>{
  /* a loose Data folder (a developer build or an unpacked game) reads the same way */
  const loose=tmp(t);F.writeTree(loose,{'Data/Map002.rxdata':R.marshal(xpMap,{ace:false}),'Game.exe':'MZ'});assert.deepEqual(scenes.read('rgss',loose)[0].lines,['一行目\n二行目','東','西']);
 });
+test('bare Marshal parse() and scenes.read() overlay infer CommonEvents, Troops and Map shapes',t=>{
+ const troop=(say,choices)=>[null,new R.RObj('RPG::Troop',{id:1,name:'Slime',pages:[new R.RObj('RPG::Troop::Page',{list:[R.cmd(101,['',0,0,2]),R.cmd(401,[say]),R.cmd(102,[choices,1]),R.cmd(0,[])]})]})];
+ const ceWithChoice=[null,new R.RObj('RPG::CommonEvent',{id:1,name:'ce',list:[R.cmd(101,['',0,0,2]),R.cmd(401,['共通の台詞']),R.cmd(102,[['続ける','やめる'],1]),R.cmd(0,[])]})];
+ const mapBuf=R.marshal(vxMap(['マップ台詞','二行目'],['進む','戻る']));
+ const ceBuf=R.marshal(ceWithChoice);
+ const trBuf=R.marshal(troop('戦闘開始！',['戦う','逃げる']));
+ /* direct rgss.parse() on bare Marshal buffers */
+ assert.deepEqual(rgss.parse(mapBuf).lines,['マップ台詞\n二行目','進む','戻る','は笑った。']);
+ const ceParsed=rgss.parse(ceBuf);
+ assert.deepEqual(ceParsed.lines,['共通の台詞','続ける','やめる']);
+ assert.deepEqual(ceParsed.keys,['c1:m#1','c1:c#1','c1:c#2']);
+ const trParsed=rgss.parse(trBuf);
+ assert.deepEqual(trParsed.lines,['戦闘開始！','戦う','逃げる']);
+ assert.deepEqual(trParsed.keys,['t1.p0:m#1','t1.p0:c#1','t1.p0:c#2']);
+ /* XP bare Marshal CommonEvents / Troops (101 carries first row) */
+ const xpCe=[null,new R.RObj('RPG::CommonEvent',{id:2,name:'xp',list:[R.cmd(101,['XP共通']),R.cmd(401,['二行目']),R.cmd(0,[])]})];
+ const xpTr=[null,new R.RObj('RPG::Troop',{id:3,name:'xp',pages:[new R.RObj('RPG::Troop::Page',{list:[R.cmd(101,['XP戦闘']),R.cmd(0,[])]})]})];
+ assert.deepEqual(rgss.parse(R.marshal(xpCe,{ace:false})).lines,['XP共通\n二行目']);
+ assert.deepEqual(rgss.parse(R.marshal(xpTr,{ace:false})).lines,['XP戦闘']);
+ /* non-dialogue Marshal array (Actors) and corrupt Marshal return empty cleanly */
+ assert.deepEqual(rgss.parse(R.marshal(actors(['エリック']))).lines,[]);
+ assert.deepEqual(rgss.parse(Buffer.from([4,8,0xff])).lines,[]);
+ /* scenes.read() overlay path feeds raw Marshal buffers into rgss.parse() */
+ const game=tmp(t);
+ F.writeTree(game,{'Game.rgss3a':R.rgssadV3({'Data\\CommonEvents.rvdata2':ceBuf,'Data\\Troops.rvdata2':trBuf,'Data\\Map001.rvdata2':mapBuf}),'Game.exe':'MZ'});
+ const ceZh=R.marshal([null,new R.RObj('RPG::CommonEvent',{id:1,name:'ce',list:[R.cmd(101,['',0,0,2]),R.cmd(401,['通用台词']),R.cmd(102,[['继续','放弃'],1]),R.cmd(0,[])]})]);
+ const trZh=R.marshal(troop('战斗开始！',['战斗','逃跑']));
+ const overlay=new Map([['commonevents.rvdata2',ceZh],['troops.rvdata2',trZh]]);
+ const read=scenes.read('rgss',game,overlay);
+ assert.deepEqual(read.map(s=>[s.name,s.patched,s.lines]),[
+  ['CommonEvents.rvdata2',true,['通用台词','继续','放弃']],
+  ['Map001.rvdata2',false,['マップ台詞\n二行目','進む','戻る','は笑った。']],
+  ['Troops.rvdata2',true,['战斗开始！','战斗','逃跑']],
+ ]);
+});
