@@ -589,6 +589,8 @@ async function dispatch(request,runtime=null) {
       case 'game_developer':return await require('./nsfw.cjs').developerOf(db,root,String(request.id||''));
       case 'nsfw_state':return await require('./nsfw.cjs').state(db,root,{wait:request.wait===true});
       case 'seed_catalog':return await require('./seed-catalog.cjs').catalog(root); /* The Seed catalog page: the seeded games with VNDB names and developers */
+      case 'seed_catalog_engines':return await require('./seed-catalog.cjs').engineCounts(root);
+      case 'seed_catalog_engine':return await require('./seed-catalog.cjs').enginePage(root,request.engine,request.page);
       case 'seed_logo':return await require('./seed-logo.cjs').logo(root,String(request.pid||''));
       case 'seed_producer':return await require('./seed-producer.cjs').producer(root,String(request.pid||''),{moegirl:require('./info-source.cjs').forRoot(root,String(request.locale||''))});
       case 'seed_producer_open':return require('./seed-producer.cjs').open(root,String(request.pid||''),String(request.kind||''));

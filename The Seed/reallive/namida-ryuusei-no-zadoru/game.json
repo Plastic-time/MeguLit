@@ -41,7 +41,8 @@
  "issuedAt": "",
  "prints": {
   "script": "29582aac6837667dcabcd302db25654e6201a6067971d2f7847e662690c052f2",
-  "title": "fea33be33413cef427b4dbb69f6344fcc27aea318c9e3133c623ce13963a04c9"
+  "title": "fea33be33413cef427b4dbb69f6344fcc27aea318c9e3133c623ce13963a04c9",
+  "vndb": "v6641"
  },
  "seedFormat": 1,
  "status": "skeleton",

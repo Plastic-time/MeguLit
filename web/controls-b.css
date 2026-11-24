@@ -6,11 +6,11 @@
 html:not(#mgc1):not(#mgc2):not(#mgc3):not(#mgc4):not(#mgc5):not(#mgc6):not(#mgc7):not(#mgc8){
 
 /* ---------- keyboard focus: gilt ring + ground halo, the only use of gold ---------- */
-& body :is(button,summary,a,[role=button],[role=tab],[role=switch],input,select,textarea,.select-trigger):focus-visible:not(.titlebar *):not(:is(.cm-search,.esr-q,.gl-q,.sp-q,.lp-search) input){
+& body :is(button,summary,a,[role=button],[role=tab],[role=switch],input,select,textarea,.select-trigger):focus-visible:not(.titlebar *):not(:is(.cm-search,.esr-q,.gl-q,.sp-q,.lp-search,.sc-search) input){
  outline:var(--mgc-focus)!important;outline-offset:2px!important;box-shadow:var(--mgc-focus-halo)!important}
 
 /* search fields that draw their own focus on the wrapper (capsule or underline): the input never gets a second ring */
-& body :is(.cm-search,.esr-q,.gl-q,.sp-q,.lp-search) input:focus-visible{outline:none!important;box-shadow:none!important}
+& body :is(.cm-search,.esr-q,.gl-q,.sp-q,.lp-search,.sc-search) input:focus-visible{outline:none!important;box-shadow:none!important}
 
 /* ---------- buttons ---------- */
 & body :is(button.secondary,.g-btn:not(.primary),button.alt,.setting-link,.leaderboard-leave,.about-update,.about-link,.guide-chip,.reader-notice-actions>button,.lb-mychip,.rw-album-btn,.dev-notice-form>button,.lv-dialog footer button:not(.primary)):not(.icon-button):not(.switch):not(.select-trigger):not(.danger-outline):not(.danger):not(.titlebar *){
@@ -165,7 +165,7 @@ html:not(#mgc1):not(#mgc2):not(#mgc3):not(#mgc4):not(#mgc5):not(#mgc6):not(#mgc7
 }
 
 /* ---------- text fields, settings search, select trigger ---------- */
-& body :is(.settings-content,.lookup-form,.page-tools,.input-group,dialog,.dev-notice-form,.key-panel) :is(input:not([type=range]):not([type=color]):not([type=checkbox]):not([type=radio]):not(#game-search),textarea):not(.field-search *):not(.tv-search *),
+& body :is(.settings-content,.lookup-form,.page-tools,.input-group,dialog,.dev-notice-form,.key-panel) :is(input:not([type=range]):not([type=color]):not([type=checkbox]):not([type=radio]):not(#game-search),textarea):not(.field-search *):not(.tv-search *):not(.sc-search *),
 & body :is(.settings-search,.select-trigger){
  border:1px solid var(--mgc-line)!important;border-radius:var(--mgc-r)!important;background-color:var(--mgc-well)!important;color:var(--mgc-ink)!important;box-shadow:none!important;
  font-family:var(--mgc-ui)!important;transition:border-color var(--mgc-t),background-color var(--mgc-t)!important;
