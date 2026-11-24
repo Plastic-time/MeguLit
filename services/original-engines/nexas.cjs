@@ -33,7 +33,7 @@ function index(file){const size=kit.size(file);if(size<16)return null;const h=ki
  try{const raw=kit.not(kit.readAt(file,size-4-isz,isz)),idx=kit.huffman(raw,count*0x4c,{order:'msb'});return entries(idx,0,0x40);}catch{return null;}}
 const listed=new Map();
 function list(file){const key=file+'|'+kit.size(file);if(!listed.has(key))listed.set(key,index(file));return listed.get(key);}
-function read(file,e){const b=kit.readAt(file,e.offset,e.size);if(!e.type||e.size===e.unpacked&&e.type!==1&&e.type!==2)return b;
+function read(file,e){const b=kit.readAt(file,e.offset,e.size);if(!e.type||e.type===4&&e.size===e.unpacked)return b;
  switch(e.type){case 1:return kit.lzss(b,e.unpacked);case 2:return kit.huffman(b,e.unpacked,{order:'msb'});case 3:case 4:return kit.inflate(b);
   default:return kit.unpackAny(b,Math.max(e.unpacked,1))||b;}}
 
