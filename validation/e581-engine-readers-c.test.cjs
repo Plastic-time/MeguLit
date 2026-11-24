@@ -85,6 +85,21 @@ test('Entis: .noa (folder, BSHF entry, probe password) is recognised and read; a
  const enc=F.noa({'main.csx':F.csx(CJ)},{password:'cotopha',encrypt:new Set(['main.csx'])}),f=path.join(game,'enc.noa');fs.writeFileSync(f,enc);
  const e=entis.listNoa(f)[0];assert.equal(e.code,0x40000000);assert.throws(()=>entis.readNoa(f,e,null),/ENTIS_PASSWORD/);assert.deepEqual(entis.parse(entis.readNoa(f,e,'cotopha')).lines,EL);
 });
+test('Entis: password probe validates against an encrypted .csx Cotopha header instead of the first binary asset',t=>{
+ const packs=require('../services/adapter-packs.cjs'),orig=packs.params;
+ t.after(()=>{packs.params=orig;});
+ const fakeBin=Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]),Buffer.alloc(56,0)]);
+ const csxBuf=F.csx(CJ);
+ /* case 1: first encrypted entry is a binary image (not Entis\x1a and fails plausible); right password still opens main.csx */
+ packs.params=target=>target==='entis-key'?[{value:{archive:'data.noa',password:'cotopha'}}]:[];
+ const g1=tmp(t);F.writeTree(g1,{'data.noa':F.noa({'aaa.png':fakeBin,'script/main.csx':csxBuf},{password:'cotopha',encrypt:new Set(['aaa.png','script/main.csx'])}),'game.exe':'MZ'});
+ assert.deepEqual(scenes.read('entis',g1).map(s=>[s.name,s.lines]),[['main.csx',EL]]);
+ /* case 2: wrong password makes the first binary asset look like ASCII text (passing plausible), but csx validation rejects it and picks the real key */
+ const decoyPlain=entis.bshf(entis.bshf(Buffer.alloc(64,0x41),'wrong-pw',true),'cotopha',false);
+ packs.params=target=>target==='entis-key'?[{value:{archive:'data.noa',password:'wrong-pw'}},{value:{archive:'data.noa',password:'cotopha'}}]:[];
+ const g2=tmp(t);F.writeTree(g2,{'data.noa':F.noa({'aaa.dat':decoyPlain,'script/main.csx':csxBuf},{password:'cotopha',encrypt:new Set(['aaa.dat','script/main.csx'])}),'game.exe':'MZ'});
+ assert.deepEqual(scenes.read('entis',g2).map(s=>[s.name,s.lines]),[['main.csx',EL]]);
+});
 
 /* ---- AliceSoft System 3.x ----------------------------------------------------------------------------------------------- */
 const B=s=>Buffer.from(s,'latin1');
