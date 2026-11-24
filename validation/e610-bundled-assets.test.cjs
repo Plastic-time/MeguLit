@@ -99,3 +99,62 @@ test('WebGAL: full-width colons and escaped \\: stay in dialogue text while unes
  assert.deepEqual(read[0].speakers,['','','','','','主人公','主人公','','名前\\\\','','','','']);
  assert.deepEqual(read[0].anchors,['changeBg:bg.jpg -next']);
 });
+
+test('jsStrings skips regex literals containing quotes while keeping division expressions and strings intact',t=>{
+ // End-to-end Monogatari reader with regex literals containing " and `
+ const d=tmp(t);
+ F.writeTree(d,{
+  'js/monogatari.js':'//engine',
+  'js/options.js':'//',
+  'js/storage.js':'//',
+  'js/script.js':[
+   'const a = s.replace(/"/g, ""), line1 = "y 「同行の台詞が消える」";',
+   'const g = /`/;',
+   'monogatari.script({ Start: ["y 「次の台詞」"] });',
+  ].join('\n'),
+ });
+ const read=scenes.read('monogatari',d);
+ assert.equal(read.length,1);
+ assert.deepEqual(read[0].lines,['「同行の台詞が消える」','「次の台詞」']);
+ assert.deepEqual(read[0].speakers,['y','y']);
+
+ // Direct lexical cases: regex escapes, char classes, keywords, if(...), division, postfix ++/--, .return/.if,
+ // spread, Unicode identifiers, string division, unclosed regex/class/string, and nested HTML template </tag>
+ const src=[
+  'const r1 = /\\/"/g, s1 = "「エスケープ」";',
+  'const r2 = /[/"]/g, r2b = /[a]"/g, s2 = "「文字クラス」";',
+  'function f(x){ return /"/.test(x) ? "「戻り値」" : "「別」"; }',
+  'if (cond) /"/.test(x); const s3 = "「条件後」";',
+  'const d1 = a / 2; const s4 = "「変数除算」"; const d2 = b / 2;',
+  'const d3 = 10 / 2; const s5 = "「数値除算」"; const d4 = 20 / 2;',
+  'const d5 = (a + b) / 2; const s6 = "「括弧除算」"; const d6 = (c) / 2;',
+  'const d7 = arr[0] / 2; const s7 = "「添字除算」"; const d8 = arr[1] / 2;',
+  'const d9 = a++ / 2; const s8 = "「後置除算」"; const d10 = b-- / 2;',
+  'const d11 = obj.return / 2; const s9 = "「属性除算」"; const d12 = b / 2;',
+  'const d13 = a /* c */ / 2; const s10 = "「コメント後除算」"; const d14 = b / 2;',
+  'const d15 = obj.if(x) / 2; const s11 = "「属性条件除算」"; const d16 = b / 2;',
+  'const sp = [.../"/.exec(x)]; const s12 = "「展開正規表現」";',
+  'const u1 = 変数 / 2; const s13 = "「日本語変数除算」"; const u2 = 変数 / 2;',
+  'const st1 = "10" / 2; const s14 = "「文字列除算」"; const st2 = "20" / 2;',
+  'const bad = /unclosed "「未閉正規表現」";',
+  'const bad2 = /[unclosed "「未閉文字クラス」";',
+  'const u = "unclosed\n/"/g; const s15 = "「未閉文字列後」";',
+  'const html = `<div>${xs.map(x => `<p>${x}</p>`).join(\'\')}</div>`; const s16 = "「入れ子テンプレート後」";',
+ ].join('\n');
+ assert.deepEqual(wb.jsStrings(src),[
+  '「エスケープ」','「文字クラス」','「戻り値」','「別」','「条件後」',
+  '「変数除算」','「数値除算」','「括弧除算」','「添字除算」','「後置除算」',
+  '「属性除算」','「コメント後除算」','「属性条件除算」','「展開正規表現」',
+  '「日本語変数除算」','10','「文字列除算」','20','「未閉正規表現」','「未閉文字クラス」',
+  'unclosed','「未閉文字列後」',
+  '<div>${xs.map(x => ',').join(\'\')}</div>','「入れ子テンプレート後」',
+ ]);
+
+ // Linear-time guards: 50,000 unclosed /[ or (/\ on one line must stay O(N) and still read the trailing string
+ const t0=Date.now();
+ const hostileBracket='/['.repeat(50000)+' "「線形括弧」"';
+ assert.deepEqual(wb.jsStrings(hostileBracket),['「線形括弧」']);
+ const hostileSlash='/\\'.repeat(50000)+' "「線形斜線」"';
+ assert.deepEqual(wb.jsStrings(hostileSlash),['「線形斜線」']);
+ assert.ok(Date.now()-t0<500,'hostile unclosed regex patterns should stay linear');
+});
