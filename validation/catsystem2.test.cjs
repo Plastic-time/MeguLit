@@ -84,3 +84,47 @@ test('CatSystem2: empty or malformed .exe files in the folder do not abort gameK
  assert.equal(wmClips[0].name,'voice_002.ogg');
  assert.deepEqual(wmClips[0].read(),ogg);
 });
+
+test('CatSystem2: unchanged Shift-JIS bytes in bilingual cnscene.int are skipped instead of decoded as GBK mojibake',t=>{
+ const os=require('node:os'),path=require('node:path'),zlib=require('node:zlib');
+ const {encodeSjis}=require('../services/original-engines/kit.cjs');
+ const makeCatScene=msgs=>{
+  const chunks=msgs.map(b=>Buffer.concat([Buffer.from([1,0x20]),b,Buffer.from([0])]));
+  const body=Buffer.concat([Buffer.alloc(16),...chunks]);
+  const z=zlib.deflateSync(body),head=Buffer.alloc(16);
+  head.write('CatScene',0,'latin1');head.writeUInt32LE(z.length,8);head.writeUInt32LE(body.length,12);
+  return Buffer.concat([head,z]);
+ };
+ const makePlainKif=entries=>{
+  const head=Buffer.alloc(8);head.write('KIF\0',0,'latin1');head.writeUInt32LE(entries.length,4);
+  const dir=Buffer.alloc(entries.length*0x48);let off=8+dir.length;const payloads=[];
+  entries.forEach(([name,data],i)=>{
+   dir.write(name,i*0x48,'latin1');dir.writeUInt32LE(off,i*0x48+0x40);dir.writeUInt32LE(data.length,i*0x48+0x44);
+   off+=data.length;payloads.push(data);
+  });
+  return Buffer.concat([head,dir,...payloads]);
+ };
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'cs2-unchanged-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const ja1=encodeSjis('「おはよう」'),ja2=encodeSjis('「あい」'),ja3=encodeSjis('「こんにちは」 \u3000'),ja3Trim=encodeSjis('「こんにちは」'),ja4=Buffer.from('OK','latin1');
+ const zh2=Buffer.from([0xc4,0xe3,0xba,0xc3]); // GBK '你好'
+ const jpScene1=makeCatScene([ja1,ja2,ja3,ja4]);
+ const cnScene1=makeCatScene([ja1,ja2,ja3,ja4, ja1,zh2,ja3Trim,ja4]);
+ // Scene 2: every non-ASCII line left unchanged in Shift-JIS (no real translation)
+ const jpScene2=makeCatScene([ja1]);
+ const cnScene2=makeCatScene([ja1, ja1]);
+ fs.writeFileSync(path.join(dir,'scene.int'),makePlainKif([['s001.cst',jpScene1],['s002.cst',jpScene2]]));
+ fs.writeFileSync(path.join(dir,'cnscene.int'),makePlainKif([['s001.cst',cnScene1],['s002.cst',cnScene2]]));
+ const sc=cs2.scenes(dir);
+ assert.equal(sc.length,2);
+ const p0=cs2.parse(sc[0].read()),p1=cs2.parse(sc[1].read());
+ assert.deepEqual(p0.lines,['「おはよう」','「あい」','「こんにちは」','OK']);
+ assert.deepEqual(p0.zh,['','你好','','OK']);
+ assert.deepEqual(p1.zh,['']);
+ const patched=cs2.patchLines([{name:sc[0].name,...p0},{name:sc[1].name,...p1}]);
+ assert.equal(patched[0].patched,true);
+ assert.deepEqual(patched[0].lines,['「おはよう」','你好','「こんにちは」','OK']);
+ assert.equal(patched[1].patched,undefined);
+ assert.deepEqual(patched[1].lines,['「おはよう」']);
+ assert.equal(cs2.patchLines([{name:sc[1].name,...p1}]),null);
+});
