@@ -79,7 +79,7 @@ const catsystem2={
   return kif(jp).map((e,k)=>({name:'scene'+String(e.index).padStart(4,'0')+'.cst',read:()=>{
    const z=catScene(e.read());if(!z)return Buffer.from('{"ja":[],"zh":[]}');
    const mj=messages(z),ja=mj.map(m=>sjis.decode(m.text)),voices=mj.map(m=>m.voice||null);let zh=[];
-   const c=cn[k];if(c)try{const zc=catScene(c.read()),all=zc?messages(zc):[];if(all.length===2*ja.length&&all.slice(0,ja.length).every((m,j)=>sjis.decode(m.text)===ja[j]))zh=all.slice(ja.length).map(m=>gbk.decode(m.text));}catch{}
+   const c=cn[k];if(c)try{const zc=catScene(c.read()),all=zc?messages(zc):[];if(all.length===2*ja.length&&all.slice(0,ja.length).every((m,j)=>sjis.decode(m.text)===ja[j]))zh=all.slice(ja.length).map((m,j)=>m.text.some(x=>x>=0x80)&&m.text.equals(mj[j].text)?'':gbk.decode(m.text));}catch{}
    return Buffer.from(JSON.stringify({ja,zh,...(voices.some(Boolean)?{voices}:{})}));}}));},
  archives:()=>[],
  sources:dir=>[sceneFile(dir),patchFile(dir)].filter(Boolean),
