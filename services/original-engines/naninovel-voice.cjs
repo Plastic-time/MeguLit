@@ -70,11 +70,16 @@ function sourceSpots(dir){const c=catalogOf(dir),d=bundleDir(dir),out=[];if(!c||
 function docHeads(b){const H=/<([A-Za-z-]+)>\s+to\s+.*?<([A-Za-z-]+)>\s+localization document for [`']([^`']+)[`']/,heads=[];let i=b.indexOf('localization document for');
  while(i>=0){const m=H.exec(b.toString('utf8',Math.max(0,i-160),i+160));if(m)heads.push({at:i,src:m[1].toLowerCase(),lang:m[2].toLowerCase(),script:m[3].replace(/\.nani$/i,'')});i=b.indexOf('localization document for',i+1);}
  for(let k=0;k<heads.length;k++)heads[k].end=k+1<heads.length?heads[k+1].at:b.length;return heads;}
-function docEntries(b,from,to){const U8=new TextDecoder('utf-8',{fatal:true}),comments=new Map(),prints=new Map();
+function docEntries(b,from,to){const U8=new TextDecoder('utf-8',{fatal:true}),comments=new Map(),prints=new Map(),bounds=[];
  const str=q=>{if(q<0||q+4>b.length)return null;const n=b.readUInt32LE(q);if(n<1||n>4000||q+4+n>b.length)return null;try{return {s:U8.decode(b.subarray(q+4,q+4+n)),next:(q+4+n+3)&~3};}catch{return null;}};
- let p=b.indexOf('CommentScriptLine',from);while(p>=0&&p<to){for(let q=(p+20)&~3;q<p+200;q+=4){const n=b.readInt32LE(q);if(n>=0&&n<100000){const h=str(q+4);if(h&&/^[0-9a-f]{8}$/.test(h.s)){const t=str(h.next);if(t)comments.set(n,t.s);break;}}}p=b.indexOf('CommentScriptLine',p+17);}
+ let p=b.indexOf('CommentScriptLine',from);while(p>=0&&p<to){for(let q=(p+20)&~3;q<p+200&&q+4<=b.length;q+=4){const n=b.readInt32LE(q);if(n>=0&&n<100000){const h=str(q+4);if(h&&/^[0-9a-f]{8}$/.test(h.s)){const t=str(h.next);if(t){comments.set(n,t.s);bounds.push(n);}break;}}}p=b.indexOf('CommentScriptLine',p+17);}
+ p=b.indexOf('LabelScriptLine',from);while(p>=0&&p<to){const ns=p>=4&&b.readUInt32LE(p-4)===15?str((p+15+3)&~3):null,asm=ns&&ns.s==='Naninovel'?str(ns.next):null;
+  if(asm&&asm.s==='Elringus.Naninovel.Runtime'&&asm.next+8<=b.length&&asm.next+8<=to){const n=b.readInt32LE(asm.next),hl=b.readUInt32LE(asm.next+4);
+   if(n>=0&&n<100000&&(hl===0||hl<=64&&asm.next+8+((hl+3)&~3)<=b.length))bounds.push(n);}
+  p=b.indexOf('LabelScriptLine',p+15);}
  for(const s of spotsIn(b,[],from,to)){const a=prints.get(s.line)||[];a[s.inl]=s.text;prints.set(s.line,a);}
- return [...comments].sort((a,c)=>a[0]-c[0]).map(([L,z])=>({source:z,key:light(z),text:(prints.get(L+1)||[]).filter(Boolean).join('')}));}
+ bounds.sort((a,c)=>a-c);const pLines=[...prints].sort((a,c)=>a[0]-c[0]);
+ return [...comments].sort((a,c)=>a[0]-c[0]).map(([L,z])=>{const endL=bounds.find(x=>x>L)??Infinity;const lines=pLines.filter(([k])=>k>L&&k<endL).map(([,a])=>a.filter(Boolean).join('')).filter(Boolean);return {source:z,key:light(z),text:lines.join('\n')};});}
 // Japanese documents: script -> [{key, ja}] in order.
 function jaDocs(file){const b=fs.readFileSync(file),out=new Map();
  for(const h of docHeads(b)){if(!/^ja/.test(h.lang)||out.has(h.script))continue;out.set(h.script,docEntries(b,h.at,h.end).map(e=>({key:e.key,ja:e.text})));}
