@@ -102,3 +102,25 @@ test('ShiinaRio: WARC 1.1 read here; a keyed WARC goes through the GARbro cache;
  assert.equal(shiina.list(war),null);assert.equal(shiina.header(war).version,170);
  const viaGarbro=scenes.read('shiinario',keyed);assert.equal(viaGarbro.length,1);assert.deepEqual(viaGarbro[0].lines,['霧子','「おはよう」','朝の光が差し込む。','①ありがとう①']);
 });
+test('ShiinaRio: same-named TXT scripts across multiple WARC archives (direct and GARbro cache) do not overwrite each other',t=>{
+ const game=tmp(t),cache=tmp(t),prev=process.env.MEGULIT_GARBRO_CACHE;process.env.MEGULIT_GARBRO_CACHE=cache;t.after(()=>{if(prev===undefined)delete process.env.MEGULIT_GARBRO_CACHE;else process.env.MEGULIT_GARBRO_CACHE=prev;});
+ F.writeTree(game,{
+  'CH1_T.WAR':F.warc11({'S001.TXT':F.warcEntry(F.sjis('第一章の始まり。\r\n'),'YPK'),'DATA.BIN':F.warcEntry(Buffer.from('bin'),'YPK')}),
+  'CH2_T.WAR':F.warc11({'S001.TXT':F.warcEntry(F.sjis('第二章の始まり。\r\n'),'YPK')}),
+  'GAME.EXE':'MZ',
+ });
+ const own=scenes.read('shiinario',game);
+ assert.deepEqual(own.map(s=>s.name),['CH1_T.WAR/S001.TXT','CH2_T.WAR/S001.TXT']);
+ assert.deepEqual(own.map(s=>s.lines),[['第一章の始まり。'],['第二章の始まり。']]);
+
+ const keyed=tmp(t),w1=path.join(keyed,'P1_T.WAR'),w2=path.join(keyed,'P2_T.WAR');
+ fs.writeFileSync(w1,F.warcKeyed(7));fs.writeFileSync(w2,F.warcKeyed(7));fs.writeFileSync(path.join(keyed,'GAME.EXE'),'MZ');
+ const garbro=require('../services/original-engines/garbro.cjs');
+ for(const [war,line] of [[w1,'補完一話目。\r\n'],[w2,'補完二話目。\r\n']]){
+  const d=garbro.cacheDir(war);fs.mkdirSync(path.join(d,'scn'),{recursive:true});fs.writeFileSync(path.join(d,'scn','S001.TXT'),F.sjis(line));
+  fs.writeFileSync(path.join(d,'done.json'),JSON.stringify({archive:war,files:['scn\\S001.TXT','scn\\NOTE.BIN'],version:garbro.version()}));
+ }
+ const cached=scenes.read('shiinario',keyed);
+ assert.deepEqual(cached.map(s=>s.name),['P1_T.WAR/scn/S001.TXT','P2_T.WAR/scn/S001.TXT']);
+ assert.deepEqual(cached.map(s=>s.lines),[['補完一話目。'],['補完二話目。']]);
+});
