@@ -99,6 +99,33 @@ test('Entis: password probe validates against an encrypted .csx Cotopha header i
  packs.params=target=>target==='entis-key'?[{value:{archive:'data.noa',password:'wrong-pw'}},{value:{archive:'data.noa',password:'cotopha'}}]:[];
  const g2=tmp(t);F.writeTree(g2,{'data.noa':F.noa({'aaa.dat':decoyPlain,'script/main.csx':csxBuf},{password:'cotopha',encrypt:new Set(['aaa.dat','script/main.csx'])}),'game.exe':'MZ'});
  assert.deepEqual(scenes.read('entis',g2).map(s=>[s.name,s.lines]),[['main.csx',EL]]);
+ /* case 3: encrypted .csx that is not a Cotopha image falls back to the first encrypted entry; a wrong password that only decrypts an Entis\x1a magic is rejected */
+ const txtBuf=Buffer.from('script note line\r\n'.repeat(16),'utf8');
+ const nonCotopha=Buffer.concat([Buffer.from('Entis\x1a\0\0','latin1'),Buffer.alloc(8),Buffer.from('ERISA-Archive file'.padEnd(48,' '),'latin1')]);
+ const g3=tmp(t);
+ packs.params=target=>target==='entis-key'?[{value:{archive:'data.noa',password:'cotopha'}}]:[];
+ F.writeTree(g3,{'data.noa':F.noa({'script/a.csx':nonCotopha,'script/main.csx':csxBuf},{password:'cotopha',encrypt:new Set(['script/a.csx','script/main.csx'])}),'game.exe':'MZ'});
+ assert.deepEqual(scenes.read('entis',g3).map(s=>[s.name,s.lines]),[['a.csx',[]],['main.csx',EL]]);
+ const decoyEntis=entis.bshf(entis.bshf(nonCotopha,'wrong-entis',true),'cotopha',false);
+ packs.params=target=>target==='entis-key'?[{value:{archive:'data.noa',password:'wrong-entis'}},{value:{archive:'data.noa',password:'cotopha'}}]:[];
+ const g4=tmp(t);F.writeTree(g4,{'data.noa':F.noa({'a.txt':txtBuf,'script/a.csx':decoyEntis,'script/main.csx':csxBuf},{password:'cotopha',encrypt:new Set(['a.txt','script/a.csx','script/main.csx'])}),'game.exe':'MZ'});
+ assert.deepEqual(scenes.read('entis',g4).map(s=>[s.name,s.lines]),[['a.csx',[]],['main.csx',EL]]);
+ /* case 4: tiny (<0x40) .csx is skipped in favor of a full .csx; corrupt filehdr len (<0x44) and truncated .csx fall back cleanly */
+ packs.params=target=>target==='entis-key'?[{value:{archive:'data.noa',password:'cotopha'}}]:[];
+ const g5=tmp(t);F.writeTree(g5,{'data.noa':F.noa({'aaa.png':fakeBin,'script/tiny.csx':Buffer.alloc(32,0),'script/main.csx':csxBuf},{password:'cotopha',encrypt:new Set(['aaa.png','script/tiny.csx','script/main.csx'])}),'game.exe':'MZ'});
+ assert.deepEqual(scenes.read('entis',g5).map(s=>[s.name,s.lines]),[['main.csx',EL],['tiny.csx',[]]]);
+ const findHdr=(buf,nth)=>{let at=-1;for(let k=0;k<=nth;k++)at=buf.indexOf('filehdr\0',at+1,'latin1');return at;};
+ const fakeCsxHead=Buffer.concat([Buffer.from('Entis\x1a\0\0','latin1'),Buffer.alloc(8),Buffer.from('Cotopha Image file'.padEnd(48,' '),'latin1')]);
+ const decoyShort=entis.bshf(entis.bshf(fakeCsxHead,'wrong-len',true),'cotopha',false);
+ const g6=tmp(t),noaShort=F.noa({'a.txt':txtBuf,'script/bad.csx':decoyShort,'script/main.csx':csxBuf},{password:'cotopha',encrypt:new Set(['a.txt','script/bad.csx','script/main.csx'])});
+ noaShort.writeBigUInt64LE(0x20n,findHdr(noaShort,1)+8);
+ packs.params=target=>target==='entis-key'?[{value:{archive:'data.noa',password:'wrong-len'}},{value:{archive:'data.noa',password:'cotopha'}}]:[];
+ F.writeTree(g6,{'data.noa':noaShort,'game.exe':'MZ'});
+ assert.deepEqual(scenes.read('entis',g6).map(s=>[s.name,s.lines]),[['bad.csx',[]],['main.csx',EL]]);
+ const g7=tmp(t),noaTrunc=F.noa({'a.txt':txtBuf,'script/trunc.csx':csxBuf},{password:'cotopha',encrypt:new Set(['a.txt','script/trunc.csx'])});
+ packs.params=target=>target==='entis-key'?[{value:{archive:'data.noa',password:'cotopha'}}]:[];
+ F.writeTree(g7,{'data.noa':noaTrunc.subarray(0,findHdr(noaTrunc,1)+0x30),'game.exe':'MZ'});
+ assert.deepEqual(scenes.read('entis',g7).map(s=>[s.name,s.lines]),[['trunc.csx',[]]]);
 });
 
 /* ---- AliceSoft System 3.x ----------------------------------------------------------------------------------------------- */

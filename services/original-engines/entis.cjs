@@ -98,13 +98,13 @@ function exePasswords(dir){if(passMemo.has(dir))return passMemo.get(dir);const o
 /* per-title passwords: entis-schemes.json, then an adapter pack's "entis-key" params */
 const SCHEMES=require('./entis-schemes.json');
 function packPasswords(){let extra=[];try{extra=require('../adapter-packs.cjs').params('entis-key').map(p=>p.value);}catch{}return [...extra,...Object.entries(SCHEMES).filter(([k])=>k[0]!=='_').map(([,v])=>v)].filter(v=>v&&typeof v.password==='string');}
-/* the password an archive's BSHF entries open with: prefer an encrypted .csx (validated by its Cotopha header), else first encrypted entry */
-function passwordFor(file,entries){const csx=entries.find(e=>e.code===BSHF&&/\.csx$/i.test(e.name)&&e.size>=0x40),enc=csx||entries.find(e=>e.code===BSHF);
- if(!enc)return null;const name=path.basename(file).toLowerCase(),cands=[];
+/* the password an archive's BSHF entries open with: try an encrypted .csx's Cotopha header first, then fall back to the first encrypted entry */
+function passwordFor(file,entries){const first=entries.find(e=>e.code===BSHF);if(!first)return null;
+ const csx=entries.find(e=>e.code===BSHF&&/\.csx$/i.test(e.name)&&e.size>=0x40),name=path.basename(file).toLowerCase(),cands=[];
  const own=exePasswords(path.dirname(file)).get(name);if(own!==undefined)cands.push(own);for(const v of packPasswords())if(!v.archive||String(v.archive).toLowerCase()===name)cands.push(v.password);
- if(csx){try{const len=Number(kit.readAt(file,csx.offset+8,8).readBigUInt64LE(0));if(len>=0x44){const head=kit.readAt(file,csx.offset+0x10,0x40);
-  if(head.length===0x40)for(const pw of cands)if(isCsx(bshf(head,pw)))return pw;}}catch{}return undefined;}
- for(const pw of cands){try{const b=readNoa(file,enc,pw);if(b.toString('latin1',0,6)==='Entis\x1a'||plausible(b))return pw;}catch{}}return undefined;}
+ if(csx){let head=null;try{const len=Number(kit.readAt(file,csx.offset+8,8).readBigUInt64LE(0));if(len>=0x44){const h=kit.readAt(file,csx.offset+0x10,0x40);if(h.length===0x40)head=h;}}catch{}
+  if(head)for(const pw of cands)if(isCsx(bshf(head,pw)))return pw;}
+ for(const pw of cands){try{const b=readNoa(file,first,pw);if(b.toString('latin1',0,6)==='Entis\x1a'||plausible(b))return pw;}catch{}}return undefined;}
 const plausible=b=>{const t=b.subarray(0,4096);let ok=0;for(const x of t)if(x===9||x===10||x===13||x>=0x20)ok++;return t.length&&ok/t.length>0.9;};
 
 /* ---- Cotopha image (.csx) ------------------------------------------------------------------------------------------- */
