@@ -61,7 +61,7 @@ const offsetOf=a=>a<0?-1:0x3c+4*a;
 const REPL=[[0xf040,[0x81,0x63]],[0xf041,[0x81,0x5c]],[0xf042,[0x81,0x5c]],[0xf043,[0x81,0x5c]]];
 function stringAt(b,addr){const o=offsetOf(addr);if(o<0||o>=b.length)return '';const s=[];
  for(let q=o;q<b.length&&s.length<0x2000;q++){const c=b[q]^0xff;if(!c)break;s.push(c);}
- const out=[];for(let i=0;i<s.length;i++){const w=(s[i]<<8)|(s[i+1]??0),r=REPL.find(([k])=>k===w);if(r){out.push(...r[1]);i++;continue;}out.push(s[i]);if(s[i]>=0x81&&s[i]<=0xfc&&i+1<s.length)out.push(s[++i]);}
+ const out=[];for(let i=0;i<s.length;i++){const w=(s[i]<<8)|(s[i+1]??0),r=REPL.find(([k])=>k===w);if(r){out.push(...r[1]);i++;continue;}out.push(s[i]);if((s[i]>=0x81&&s[i]<=0x9f||s[i]>=0xe0&&s[i]<=0xfc)&&i+1<s.length)out.push(s[++i]);}
  return kit.SJIS.decode(Buffer.from(out));}
 function* instructions(b,state={}){if(b.length<0x3c||b.toString('latin1',0,4)!=='SYS4'||b.readUInt32LE(0x20)!==0x1c)return;
  let pool=offsetOf(b.readInt32LE(0x28));if(pool<0x3c||pool>b.length)pool=b.length;let p=0x3c;
