@@ -2,13 +2,15 @@
 'use strict';
 /* Changed-file test selection for Build.ps1 -TestsChanged: run only the validation/*.test.cjs files a change can reach.
    Most tests name the sources they exercise (require('../core/x.cjs'), path.join(ROOT,'web','app.js'), a regex over
-   'HookBridge.cs'), so a test is selected when its text names a changed file, or names a source that (transitively)
-   requires a changed file. Changes the names cannot follow fall back to the whole suite, with the reason printed.
-     node tools/changed-tests.cjs [--base <ref>] [--rev <commit>] [--out <file>] [--explain] [--json]
+   'HookBridge.cs'), so a test is selected when its text names a changed file or a source that requires it (DEPTH
+   hops), or when it lists a directory it names that holds a changed file. Changes on shared ground run the whole suite,
+   with the reason printed. A shadow run over 114 failing CI runs (2026-11-24) found no failure a change caused that
+   DEPTH 1 left out; DEPTH 0 left out three.
+     node tools/changed-tests.cjs [--base <ref>] [--rev <commit>] [--out <file>] [--explain] [--json] [--depth <n>]
    --base: compare against this ref (default: merge-base of origin/main and HEAD).
    --rev: read the tree of this commit instead of the working tree (shadow comparisons over past commits).
    Without --rev the working tree counts: committed, staged, unstaged and untracked changes. */
-const fs=require('node:fs'),path=require('node:path'),{execFileSync,spawnSync}=require('node:child_process');
+const fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process');
 
 /* How many require hops from a changed file to a source a test names (see the shadow comparison). */
 const DEPTH=1;
@@ -20,8 +22,7 @@ const FULL=[
  [/^tools\/(run-isolated\.cjs|RunOnTestDesktop\.cs|test-resume\.cjs|changed-tests\.cjs)$/,'test runner changed'],
  [/^Build\.ps1$/,'Build.ps1 runs the tests'],
  [/^\.github\//,'CI configuration changed'],
- [/^(package(-lock)?\.json|\.nvmrc)$/,'Node dependencies or version changed'],
- [/^validation\/helpers\/(cold-test|adapter-fixtures\.cjs)/,'shared test helper changed'],
+ [/(^|\/)package(-lock)?\.json$|^\.nvmrc$/,'Node dependencies or version changed'],
 ];
 
 function parseArgs(argv){
@@ -77,7 +78,7 @@ function requireGraph(tree){
 
 function select({root,base,rev,depth=DEPTH}){
  const git=gitRunner(root);
- if(!base)base=git(['merge-base','origin/main',rev||'HEAD']).trim();
+ if(!base){try{base=git(['merge-base','origin/main',rev||'HEAD']).trim();}catch{throw new Error('no merge-base with origin/main: fetch it, or pass --base (Build.ps1: MEGULIT_TEST_BASE)');}}
  const tree=treeSource(git,root,rev);
  const tests=tree.files.filter(f=>/^validation\/.*\.test\.cjs$/.test(f)).sort();
  const changed=changedFiles(git,base,rev);
@@ -95,7 +96,7 @@ function select({root,base,rev,depth=DEPTH}){
    const own=/^validation\/[^/]+$/.test(f)&&SELF_DIR.test(text);
    const d=own?['validation']:dirs.find(d=>[`'${d[d.length-1]}'`,`"${d[d.length-1]}"`,`'${d.join('/')}`,`"${d.join('/')}`].some(k=>text.includes(k)));
    if(d)note(t,`lists ${d.join('/')}/, which holds ${f}`);}
-  /* the changed file and every source that requires it, transitively */
+  /* the changed file and the sources that require it, up to depth hops away */
   const reach=new Map([[f,null]]);let ring=[f];
   for(let d=0;d<depth&&ring.length;d++){const next=[];for(const x of ring)for(const u of users.get(x)||[])if(!reach.has(u)){reach.set(u,x);next.push(u);}ring=next;}
   for(const [src,via] of reach){
