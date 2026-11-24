@@ -42,9 +42,10 @@ function bundleDir(dir){for(const d of dataDirs(dir)){const b=path.join(d,'Strea
 const isLocalizationBundle=f=>/-localization-[a-z-]+-scripts-.*\.bundle$/i.test(f)&&!/-scripts-debug/i.test(f);
 function localizationBundles(dir){const d=bundleDir(dir);if(!d)return [];let files;try{files=fs.readdirSync(d);}catch{return [];}
  const loc=files.filter(isLocalizationBundle);if(!loc.length)return [];
- const lang=f=>(/-localization-([a-z-]+?)-scripts-/i.exec(f)||[])[1]||'';
- const order=['zhhans','zh-hans','zhcn','zhhant','zh-hant','zhtw'];const langs=[...new Set(loc.map(lang))].sort((a,b)=>((order.indexOf(a)+1)||99)-((order.indexOf(b)+1)||99));
- return loc.filter(f=>lang(f)===langs[0]).sort().map(f=>path.join(d,f));}
+ const lang=f=>((/-localization-([a-z-]+?)-scripts-/i.exec(f)||[])[1]||'').toLowerCase();
+ const order=['zhhans','zh-hans','zhcn','zh-cn','zhhant','zh-hant','zhtw','zh-tw'];const langs=[...new Set(loc.map(lang))].sort((a,b)=>((order.indexOf(a)+1)||99)-((order.indexOf(b)+1)||99));
+ const keep=new Set([langs[0],...langs.filter(l=>/^ja(?:$|-|jp$)/.test(l))]);
+ return loc.filter(f=>keep.has(lang(f))).sort().map(f=>path.join(d,f));}
 const DOC=Buffer.from('localization document for');
 // Serialized files of the player that hold localization documents as TextAssets (resources.assets, sharedassets*).
 function assetFiles(dir){const out=[];for(const d of dataDirs(dir)){let names;try{names=fs.readdirSync(d);}catch{continue;}
@@ -103,12 +104,48 @@ function blocks(text){const out=new Map();
 const isJa=l=>/^ja/.test(l),isZh=l=>/^zh/.test(l);
 const ZH=['zh-cn','zh-hans','zh','zh-sg','zh-tw','zh-hant','zh-hk'];
 const zhRank=l=>{const i=ZH.indexOf(l);return i<0?(isZh(l)?50:99):i;};
+function parsedJaSrc(doc){
+ const hasZh=isZh(doc.dst),strip=c=>String(c||'').replace(/^[^:：「『（]{1,24}[:：]\s*/,'');
+ const fmt=(id,src,z,meta)=>'# '+id+'\n'+(meta?'; '+meta+'\n':'')+src.split('\n').map(l=>'; '+l).join('\n')+(z?'\n'+z:'');
+ if(doc.entries&&doc.entries.length){
+  const parts=[];let meta='';
+  doc.entries.forEach((e,i)=>{
+   const raw=String(e.source||'').trim();
+   if(raw.startsWith('>')){if(!tidy(e.text))meta=raw;return;}
+   const src=strip(raw);if(!tidy(src)){meta='';return;}
+   parts.push(fmt('e'+i,src,hasZh&&tidy(e.text)?e.text:'',meta));meta='';
+  });
+  if(parts.length)return parts.join('\n\n');
+ }
+ if(doc.prints){
+  const bl=doc.prints.byLine||[],rows=[];let meta='';
+  for(const c of doc.prints.comments||[]){
+   const raw=String(c||'').trim();
+   if(raw.startsWith('>')){meta=raw;continue;}
+   const src=strip(raw);if(!tidy(src)){meta='';continue;}
+   rows.push({src,meta});meta='';
+  }
+  const parts=[];
+  if(bl.length&&bl.every(x=>x.comment!=null)&&(!rows.length||bl.length===rows.length)){
+   bl.forEach((x,i)=>{
+    const raw=String(x.comment||'').trim();if(!raw||raw.startsWith('>'))return;
+    const src=strip(raw);if(!tidy(src))return;
+    parts.push(fmt('p'+i,src,hasZh&&tidy(x.text)?x.text:'',rows.length===bl.length?rows[i].meta:''));
+   });
+  }else if(rows.length){
+   const zp=hasZh&&doc.prints.length===rows.length?doc.prints:null;
+   rows.forEach((r,i)=>parts.push(fmt('p'+i,r.src,zp&&tidy(zp[i]||'')?zp[i]:'',r.meta)));
+  }
+  if(parts.length)return parts.join('\n\n');
+ }
+ return null;
+}
 // One document per script, written the classic way ("; " Japanese, then the Chinese) so parse() reads every release alike.
 function combine(docs){const byName=new Map();for(const d of docs){if(!d.script)continue;const k=d.name.toLowerCase();if(!byName.has(k))byName.set(k,[]);byName.get(k).push(d);}
  const out=[];
  for(const list of byName.values()){
   const jaSrc=list.filter(d=>isJa(d.src)).sort((a,b)=>zhRank(a.dst)-zhRank(b.dst))[0];
-  if(jaSrc){out.push({name:jaSrc.name,text:jaSrc.text});continue;}
+  if(jaSrc){const text=blocks(jaSrc.text).size?jaSrc.text:(parsedJaSrc(jaSrc)||jaSrc.text);out.push({name:jaSrc.name,text});continue;}
   const ja=list.find(d=>isJa(d.dst));if(!ja)continue;
   const zhDoc=list.filter(d=>isZh(d.dst)).sort((a,b)=>zhRank(a.dst)-zhRank(b.dst))[0];
   /* E450 Parsed-asset documents with their entries: each Japanese entry (its source line and the Japanese printed on the
