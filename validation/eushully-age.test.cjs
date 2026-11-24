@@ -45,4 +45,12 @@ test('Eushully AGE: half-width kana (0xA1-0xDF) does not swallow following F040-
  const head=Buffer.alloc(0x3c);head.write('SYS4',0,'latin1');head.writeUInt32LE(0x1c,0x20);head.writeInt32LE(poolAddr+(s1.length+s2.length)/4,0x28);
  const r=eu.parse(Buffer.concat([head,...parts,s1,s2]));
  assert.deepStrictEqual(r.lines,['ｦ…ｱ―ｲ―ｳ―','を@瑩@']);
+ /* exhaustive 0x80-0xFF lead-byte boundary table against eu.stringAt */
+ const dec=require('../services/original-engines/kit.cjs').SJIS;
+ for(let x=0x80;x<=0xff;x++){
+  const b=Buffer.alloc(0x40);b[0x3c]=x^0xff;b[0x3d]=0xf0^0xff;b[0x3e]=0x40^0xff;b[0x3f]=0xff;
+  const isLead=x>=0x81&&x<=0x9f||x>=0xe0&&x<=0xfc;
+  const want=isLead?dec.decode(Buffer.from([x,0xf0]))+'@':dec.decode(Buffer.from([x]))+'…';
+  assert.strictEqual(eu.stringAt(b,0),want,'byte 0x'+x.toString(16));
+ }
 });
