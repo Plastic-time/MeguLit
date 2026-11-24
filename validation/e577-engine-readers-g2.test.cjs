@@ -124,3 +124,25 @@ test('ShiinaRio: same-named TXT scripts across multiple WARC archives (direct an
  assert.deepEqual(cached.map(s=>s.name),['P1_T.WAR/scn/S001.TXT','P2_T.WAR/scn/S001.TXT']);
  assert.deepEqual(cached.map(s=>s.lines),[['補完一話目。'],['補完二話目。']]);
 });
+test('ShiinaRio: base and update WARC 1.1 archives keep both copies of same-named S001.TXT under their archive names',t=>{
+ const game=tmp(t);
+ F.writeTree(game,{
+  'GAME_T.WAR':F.warc11({'S001.TXT':F.warcEntry(F.sjis('旧い台詞。\r\n'),'YPK'),'S002.TXT':F.warcEntry(F.sjis('二話目の台詞。\r\n'),'YPK')}),
+  'GAME_U1.WAR':F.warc11({'S001.TXT':F.warcEntry(F.sjis('新しい台詞。\r\n'),'YPK')}),
+  'GAME.EXE':'MZ',
+ });
+ const own=scenes.read('shiinario',game);
+ assert.deepEqual(own.map(s=>s.name),['GAME_T.WAR/S001.TXT','GAME_T.WAR/S002.TXT','GAME_U1.WAR/S001.TXT']);
+ assert.deepEqual(own.map(s=>s.lines),[['旧い台詞。'],['二話目の台詞。'],['新しい台詞。']]);
+});
+test('ShiinaRio: identical S001.TXT across two WARC 1.1 archives are both kept under distinct archive-qualified names',t=>{
+ const game=tmp(t),same=F.sjis('同じ内容の台詞。\r\n');
+ F.writeTree(game,{
+  'CHIP_T.WAR':F.warc11({'S001.TXT':F.warcEntry(same,'YPK')}),
+  'CHIP_E3.WAR':F.warc11({'S001.TXT':F.warcEntry(same,'YPK')}),
+  'GAME.EXE':'MZ',
+ });
+ const own=scenes.read('shiinario',game);
+ assert.deepEqual(own.map(s=>s.name),['CHIP_E3.WAR/S001.TXT','CHIP_T.WAR/S001.TXT']);
+ assert.deepEqual(own.map(s=>s.lines),[['同じ内容の台詞。'],['同じ内容の台詞。']]);
+});
