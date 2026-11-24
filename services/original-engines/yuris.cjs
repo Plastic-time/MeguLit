@@ -275,13 +275,27 @@ const ysbinOf=dir=>{const named=[path.join(dir,'pac','ysbin.ypf'),path.join(dir,
  return [...ypfsIn(path.join(dir,'pac'),f=>!UPDATE(f)),...ypfsIn(dir,f=>!UPDATE(f))].find(f=>ypfScenes(f).length)||null;};
 // Scenes with text only (the system scripts have none), so the first ones read already show the game is readable.
 const textMemo=new Map();
-function hasText(file,s){return memo(textMemo,file+'|'+stat(file)+'|'+s.name,()=>{try{return words(s.read()).raw.length>0;}catch{return false;}});}
+function sceneState(file,s){return memo(textMemo,file+'|'+stat(file)+'|'+s.name,()=>{
+ try{
+  const buf=s.read();
+  if(!buf||buf.length<32||buf.toString('latin1',0,4)!=='YSTB')return 'unreadable';
+  const sizes=[12,16,20,24].map(k=>buf.readUInt32LE(k));
+  if(32+sizes.reduce((a,b)=>a+b,0)>buf.length||sizes[0]%4||sizes[1]%12)return 'unreadable';
+  if(sizes[1]===0)return 'empty';
+  const insts=ystb(buf);if(!insts)return 'unreadable';
+  if(textOp(insts)>=0)return 'text';
+  if(insts.some(x=>x.args.length===1&&x.args[0].type===0&&x.args[0].data.length))return 'unreadable';
+  return 'empty';
+ }catch{return 'unreadable';}
+});}
 const yuris={
  id:'yuris',hint:'update1.ypf（或 pac\\ysbin.ypf）',
- scenes(dir){const base=ysbinOf(dir);if(!base)return [];const latest=new Map();
-  for(const file of [base,...updates(dir)])for(const s of ypfScenes(file))latest.set(s.name.toLowerCase(),{file,s});
-  const out=[];for(const {file,s} of latest.values())if(hasText(file,s))out.push(s);
-  return out.sort((a,b)=>a.name.localeCompare(b.name));},
+ scenes(dir){const base=ysbinOf(dir);if(!base)return [];const out=new Map();
+  for(const file of [base,...updates(dir)])for(const s of ypfScenes(file)){
+   const key=s.name.toLowerCase(),st=sceneState(file,s);
+   if(st==='text')out.set(key,s);else if(st==='empty')out.delete(key);
+  }
+  return [...out.values()].sort((a,b)=>a.name.localeCompare(b.name));},
  archives:dir=>updates(dir).reverse().flatMap(ypfScenes),
  sources:dir=>{const base=ysbinOf(dir);return base?[base,...updates(dir)]:[];},
  parse,test:()=>false,

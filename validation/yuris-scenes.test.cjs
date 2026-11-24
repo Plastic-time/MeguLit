@@ -87,25 +87,52 @@ test('YU-RIS: a Chinese update*.ypf beside the program is the running script (no
 test('YU-RIS: update*.ypf overrides base scenes before filtering out textless scenes',t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yuris-upd-empty-'));
  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ /* Valid encrypted argless empty YSTB scripts (sizes=[8,0,0,8] and [4,0,0,4]) */
+ const emptyYstb=codeLen=>{
+  const code=Buffer.alloc(codeLen);for(let i=0;i<codeLen;i++)code[i]^=KEY[i&3];
+  const lin=Buffer.alloc(codeLen);for(let i=0;i<codeLen;i++)lin[i]^=KEY[i&3];
+  const head=Buffer.alloc(32);head.write('YSTB',0,'latin1');head.writeUInt32LE(0x1c2,4);head.writeUInt32LE(codeLen/4,8);
+  head.writeUInt32LE(codeLen,12);head.writeUInt32LE(0,16);head.writeUInt32LE(0,20);head.writeUInt32LE(codeLen,24);
+  return Buffer.concat([head,code,lin]);
+ };
+ /* Unreadable YSTB v0x200 with misaligned 10-byte args segment */
+ const badArgsV200=()=>{const head=Buffer.alloc(32);head.write('YSTB',0,'latin1');head.writeUInt32LE(0x200,4);head.writeUInt32LE(1,8);head.writeUInt32LE(4,12);head.writeUInt32LE(10,16);head.writeUInt32LE(0,20);head.writeUInt32LE(4,24);return Buffer.concat([head,Buffer.alloc(18)]);};
+ /* YPF builder allowing raw corrupt compressed bytes */
+ const ypfCorrupt=(name,badZlib)=>{
+  const n=Buffer.from(name,'latin1'),e=Buffer.alloc(4+1+n.length+18);
+  e[4]=n.length^0xff;n.forEach((c,i)=>{e[5+i]=c^0xff;});const p=5+n.length;e[p+1]=1;e.writeUInt32LE(64,p+2);e.writeUInt32LE(badZlib.length,p+6);e.writeUInt32LE(32+e.length,p+10);
+  const head=Buffer.alloc(32);head.write('YPF\0',0,'latin1');head.writeUInt32LE(450,4);head.writeUInt32LE(1,8);head.writeUInt32LE(e.length,12);
+  return Buffer.concat([head,e,badZlib]);
+ };
+ /* Out-of-order insertion + uppercase base filename; call scenes() before writing update1.ypf to exercise cache keying by file */
  put(dir,{
   'pac/ysbin.ypf':ypf([
-   ['ysbin\\yst00100.ybn',ystb(['ふるい。'].map(sjis))],
-   ['ysbin\\yst00101.ybn',ystb(['もと。'].map(sjis))],
+   ['ysbin\\yst00105.ybn',ystb(['あすきー。'].map(sjis))],
+   ['ysbin\\yst00104.ybn',ystb(['あーぐす。'].map(sjis))],
+   ['ysbin\\yst00103.ybn',ystb(['ずぃー。'].map(sjis))],
    ['ysbin\\yst00102.ybn',ystb([])],
+   ['ysbin\\yst00101.ybn',ystb(['もと。'].map(sjis))],
+   ['ysbin\\YST00100.YBN',ystb(['ふるい。'].map(sjis))],
   ]),
+ });
+ assert.deepStrictEqual(yuris.scenes(dir).map(s=>s.name),['YST00100.YBN','yst00101.ybn','yst00103.ybn','yst00104.ybn','yst00105.ybn']);
+ put(dir,{
   'pac/update1.ypf':ypf([
-   ['ysbin\\yst00100.ybn',ystb([])],
+   ['ysbin\\yst00100.ybn',emptyYstb(8)],
    ['ysbin\\yst00101.ybn',ystb(['こうしん。'].map(sjis))],
    ['ysbin\\yst00102.ybn',ystb(['ついか。'].map(sjis))],
+   ['ysbin\\yst00104.ybn',badArgsV200()],
+   ['ysbin\\yst00105.ybn',ystb([Buffer.from('"Hello world!"','latin1')])],
   ]),
-  'pac/update2.ypf':ypf([
-   ['ysbin\\yst00101.ybn',ystb([])],
-   ['ysbin\\yst00103.ybn',ystb(['しんき。'].map(sjis))],
+  'pac/update2.ypf':ypfCorrupt('ysbin\\yst00103.ybn',Buffer.from([0x78,0x9c,0xff,0xff,0x00,0x01])),
+  'pac/update3.ypf':ypf([
+   ['ysbin\\yst00101.ybn',emptyYstb(4)],
+   ['ysbin\\yst00106.ybn',ystb(['しんき。'].map(sjis))],
   ]),
  });
  const scenes=yuris.scenes(dir);
- assert.deepStrictEqual(scenes.map(s=>s.name),['yst00102.ybn','yst00103.ybn']);
- assert.deepStrictEqual(scenes.map(s=>yuris.parse(s.read()).lines),[['ついか。'],['しんき。']]);
+ assert.deepStrictEqual(scenes.map(s=>s.name),['yst00102.ybn','yst00103.ybn','yst00104.ybn','yst00105.ybn','yst00106.ybn']);
+ assert.deepStrictEqual(scenes.map(s=>yuris.parse(s.read()).lines),[['ついか。'],['ずぃー。'],['あーぐす。'],['あすきー。'],['しんき。']]);
 });
 
 // The user's own install (skipped elsewhere): 女装山脈 with the 萌空 1.1 patch, whose text is coded for the loader's font.
