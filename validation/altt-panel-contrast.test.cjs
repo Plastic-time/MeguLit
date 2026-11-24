@@ -356,7 +356,9 @@ async function menuPictureTextSamples(cdp,load,fixture) {
  await openMenu(cdp);
  await cdp.evaluate(`(() => {
   const style = document.createElement('style');
-  style.textContent = '.tomoyo-cn-dialog *, .tome-backlog *, .tomoyo-selection-card *{transition:none!important;animation:none!important;overflow-anchor:none!important}';
+  // Measure fully shown labels, including text that can scroll through the decorative edge fade.
+  style.textContent = '.tomoyo-cn-dialog *, .tome-backlog *, .tomoyo-selection-card *{transition:none!important;animation:none!important;overflow-anchor:none!important}'
+   + '.tomoyo-cn-dialog .tomoyo-menu-content{mask-image:none!important}';
   document.head.appendChild(style);
   return document.fonts.ready.then(() => true);
  })()`);
