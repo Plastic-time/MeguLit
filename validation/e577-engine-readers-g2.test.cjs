@@ -85,6 +85,99 @@ test('Malie: an adapter pack carries a new title key (params malie-scheme)',t=>{
  assert.equal(malie.index(path.join(game,'data.dat')).scheme,'New Title');assert.equal(scenes.read('malie',game)[0].lines.length,3);
  assert.ok(packs.CAPABILITIES.includes('params:malie-scheme'));
 });
+test('Malie: readDec, LIBU and LIBP decrypt entries across 2 GiB and past 4 GiB without 32-bit offset truncation',t=>{
+ const crypto=require('node:crypto'),kit=require('../services/original-engines/kit.cjs');
+ const schemes=require('../services/original-engines/malie-schemes.json').schemes;
+ const [,camScheme]=Object.entries(schemes).find(([,v])=>v.cipher==='camellia');
+ const [,cfiScheme]=Object.entries(schemes).find(([,v])=>v.cipher==='cfi');
+ const rotl=(x,n)=>{n&=31;return n?((x<<n)|(x>>>(32-n)))>>>0:x>>>0;},rotr=(x,n)=>{n&=31;return n?((x>>>n)|(x<<(32-n)))>>>0:x>>>0;};
+ const encCamAt=(buf,key,at)=>{
+  const pad=Math.ceil(buf.length/16)*16,plain=Buffer.alloc(pad);buf.copy(plain);
+  const c=crypto.createCipheriv('camellia-128-ecb',Buffer.from(key,'hex'),null);c.setAutoPadding(false);
+  const e=Buffer.concat([c.update(plain),c.final()]);
+  for(let i=0;i<e.length;i+=16){const r=(((at+i)>>>4)&15)+16;
+   e.writeUInt32LE(rotr(e.readUInt32LE(i),r),i);e.writeUInt32LE(rotl(e.readUInt32LE(i+4),r),i+4);
+   e.writeUInt32LE(rotr(e.readUInt32LE(i+8),r),i+8);e.writeUInt32LE(rotl(e.readUInt32LE(i+12),r),i+12);}
+  return e;};
+ const encCfiAt=(buf,key,rot,at)=>{
+  const pad=Math.ceil(buf.length/16)*16,e=Buffer.alloc(pad);buf.copy(e);
+  const k=Buffer.from(key,'hex'),K=i=>k[i&31]^0xa5,R=rot.map(x=>x>>>0);
+  for(let i=0;i<e.length;i+=16){const off=at+i,b=off>>>4;
+   e.writeUInt32LE((rotl(e.readUInt32LE(i),K(b+12))^rotr(R[0],K(b)))>>>0,i);
+   e.writeUInt32LE((rotr(e.readUInt32LE(i+4),K(b+15))^rotl(R[1],K(b+3)))>>>0,i+4);
+   e.writeUInt32LE((rotl(e.readUInt32LE(i+8),K(b-14))^rotr(R[2],K(b+6)))>>>0,i+8);
+   e.writeUInt32LE((rotr(e.readUInt32LE(i+12),K(b-11))^rotl(R[3],K(b+9)))>>>0,i+12);
+   const o=off&15,first=e[i+o];for(let j=0;j<16;j++)if(j!==o)e[i+j]^=first;}
+  return e;};
+ const exec=F.malieExec(MJA),want=['「行こう、兄さん」','朝の光が差し込む。\n静かな朝だ。','、目を覚ませ。'];
+ const origReadAt=kit.readAt,origSize=kit.size;
+ const virtuals=new Map();
+ t.after(()=>{kit.readAt=origReadAt;kit.size=origSize;});
+ kit.size=f=>virtuals.has(f)?virtuals.get(f).size:origSize(f);
+ kit.readAt=(f,off,len)=>{
+  if(!virtuals.has(f))return origReadAt(f,off,len);
+  const v=virtuals.get(f);
+  v.reads.push({off,len});
+  if(off<0||len<=0)throw new RangeError('bad virtual read: '+off+'/'+len);
+  const out=Buffer.alloc(len);
+  for(const seg of v.segs){
+   const s=Math.max(off,seg.at),e=Math.min(off+len,seg.at+seg.data.length);
+   if(e>s)seg.data.copy(out,s-off,s-seg.at,e-seg.at);}
+  return out;};
+ // 1. Encrypted LIBU with entries crossing 2 GiB, past 2 GiB, and past 4 GiB (all unaligned mod 16)
+ const libuOffsets=[0x7ffffff5,0x80001015,0x100002025];
+ const libuPlainHead=Buffer.alloc(16+libuOffsets.length*0x50);
+ libuPlainHead.write('LIBU',0,'latin1');libuPlainHead.writeInt32LE(libuOffsets.length,8);
+ const libuSegs=[];
+ libuOffsets.forEach((off,idx)=>{
+  const p=16+idx*0x50;Buffer.from(`e${idx}.bin`,'utf16le').copy(libuPlainHead,p,0,0x44);
+  libuPlainHead.writeUInt32LE(exec.length,p+0x44);libuPlainHead.writeBigInt64LE(BigInt(off),p+0x48);
+  const aligned=Math.floor(off/16)*16,lead=off-aligned;
+  const padded=Buffer.concat([Buffer.alloc(lead,0xaa),exec]);
+  libuSegs.push({at:aligned,data:encCamAt(padded,camScheme.key,aligned)});
+ });
+ libuSegs.unshift({at:0,data:encCamAt(libuPlainHead,camScheme.key,0)});
+ const vLibu='virtual:malie-large.libu';
+ virtuals.set(vLibu,{size:0x100010000,segs:libuSegs,reads:[]});
+ const libuEntries=malie.index(vLibu);
+ assert.ok(libuEntries&&libuEntries.length===3);
+ for(const e of libuEntries)assert.deepEqual(malie.parse(malie.read(vLibu,e)).lines,want,e.name);
+ // 2. Encrypted LIBP with an entry placed past 4 GiB (offset table entry = 0x400000 -> +4 GiB)
+ const align=camScheme.align||0x1000;
+ const libpIdx=Buffer.concat([
+  Buffer.concat([Buffer.alloc(0x14),Buffer.from([0,0,0,0]),Buffer.from([1,0,0,0]),Buffer.from([1,0,0,0])]),
+  (()=>{const b=Buffer.alloc(0x20);b.write('exec.dat',0,'latin1');b.writeInt32LE(0x10000,0x14);b.writeInt32LE(0,0x18);b.writeUInt32LE(exec.length,0x1c);return b;})()
+ ]);
+ const libpHead=Buffer.alloc(16);libpHead.write('LIBP',0,'latin1');libpHead.writeInt32LE(2,4);libpHead.writeInt32LE(1,8);
+ const offTab=Buffer.alloc(4);offTab.writeUInt32LE(0x400000,0);
+ const libpBase=Math.ceil((16+libpIdx.length+4)/align)*align;
+ const libpEntryAt=libpBase+0x400000*1024;
+ const vLibp='virtual:malie-large.libp';
+ virtuals.set(vLibp,{size:libpEntryAt+exec.length+64,reads:[],segs:[
+  {at:0,data:encCamAt(Buffer.concat([libpHead,libpIdx,offTab]),camScheme.key,0)},
+  {at:libpEntryAt,data:encCamAt(exec,camScheme.key,libpEntryAt)},
+ ]});
+ const libpEntries=malie.index(vLibp);
+ assert.ok(libpEntries&&libpEntries.length===1);
+ assert.equal(libpEntries[0].offset,libpEntryAt);
+ assert.deepEqual(malie.parse(malie.read(vLibp,libpEntries[0])).lines,want);
+ // 3. CFI cipher at >2 GiB and >4 GiB + invalid/empty readDec bounds
+ const cfiDec=malie.cfi(cfiScheme.key,cfiScheme.rotate);
+ const vCfi='virtual:malie-large.cfi';
+ const cfiSegs=[0x80000013,0x100000037].map(off=>{
+  const aligned=Math.floor(off/16)*16,lead=off-aligned;
+  return {off,at:aligned,data:encCfiAt(Buffer.concat([Buffer.alloc(lead,0x55),exec]),cfiScheme.key,cfiScheme.rotate,aligned)};
+ });
+ virtuals.set(vCfi,{size:0x100010000,reads:[],segs:cfiSegs});
+ for(const s of cfiSegs)assert.deepEqual(malie.parse(malie.readDec(vCfi,cfiDec,s.off,exec.length)).lines,want);
+ const before=virtuals.get(vCfi).reads.length;
+ assert.equal(malie.readDec(vCfi,cfiDec,-16,16).length,0);
+ assert.equal(malie.readDec(vCfi,cfiDec,0,0).length,0);
+ assert.equal(malie.readDec(vCfi,cfiDec,0,-4).length,0);
+ assert.equal(malie.readDec(vCfi,cfiDec,Number.MAX_SAFE_INTEGER,16).length,0);
+ assert.equal(malie.readDec(vCfi,cfiDec,Number.MAX_SAFE_INTEGER-8,8).length,0);
+ assert.equal(virtuals.get(vCfi).reads.length,before);
+});
 
 /* ---- ShiinaRio -------------------------------------------------------------------------------------------------- */
 const SJA=';【第一話】\r\n$L_BG,b\\bg01,0\r\n$VOICE,v\\kir0001,0,0,0\r\n【霧子】\r\n「おはよう」\r\n朝の光が差し込む。\r\n\r\n①ありがとう①\r\n';

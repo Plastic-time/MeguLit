@@ -44,7 +44,7 @@ function schemes(){const extra=packSchemes();if(catalog&&catalog.extra===extra)r
  let raw={};try{raw=require('./malie-schemes.json').schemes;}catch{}for(const [title,s] of Object.entries(raw)){const dec=decryptorOf(s);if(dec)list.push({title,align:s.align||0x1000,dec});}
  catalog={extra,list};return list;}
 /* read length bytes at offset through a decryptor (null = plain) */
-function readDec(file,dec,offset,length){if(!dec)return kit.readAt(file,offset,length);const a=offset&~15,end=(offset+length+15)&~15,b=kit.readAt(file,a,end-a);dec(b,a);return b.subarray(offset-a,offset-a+length);}
+function readDec(file,dec,offset,length){if(!Number.isSafeInteger(offset)||!Number.isSafeInteger(length)||offset<0||length<=0||!Number.isSafeInteger(offset+length))return Buffer.alloc(0);if(!dec)return kit.readAt(file,offset,length);const a=Math.floor(offset/16)*16,end=Math.ceil((offset+length)/16)*16;if(!Number.isSafeInteger(end))return Buffer.alloc(0);const b=kit.readAt(file,a,end-a);dec(b,a);return b.subarray(offset-a,offset-a+length);}
 
 /* ---- containers --------------------------------------------------------------------------------------------------- */
 const sj=kit.SJIS;
@@ -56,10 +56,10 @@ function libList(file,base,size,root,out,depth=0){const h=kit.readAt(file,base,1
 function libuList(file,dec,base,root,out,depth=0){const h=readDec(file,dec,base,16);if(h.toString('latin1',0,4)!=='LIBU')return false;const count=h.readInt32LE(8),fsz=kit.size(file);if(count<=0||count>100000)return false;
  const idx=readDec(file,dec,base+16,count*0x50);
  for(let i=0;i<count;i++){const p=i*0x50;let name=idx.toString('utf16le',p,p+0x44);const z=name.indexOf('\0');if(z>=0)name=name.slice(0,z);const esz=idx.readUInt32LE(p+0x44),off=base+Number(idx.readBigInt64LE(p+0x48));
-  if(!name.includes('.')&&depth<8&&off+16<=fsz&&libuList(file,dec,off,root+name+'/',out,depth+1))continue;if(off<0||off+esz>fsz)return false;out.push({name:root+name,offset:off,size:esz,dec});}
+  if(!name.includes('.')&&depth<8&&off>=0&&off+16<=fsz&&libuList(file,dec,off,root+name+'/',out,depth+1))continue;if(off<0||off+esz>fsz)return false;out.push({name:root+name,offset:off,size:esz,dec});}
  return true;}
 function libpList(file,scheme){const h=readDec(file,scheme.dec,0,16),count=h.readInt32LE(4),noff=h.readInt32LE(8),fsz=kit.size(file);if(count<=0||count>200000||noff<0||noff>200000)return null;
- const idx=readDec(file,scheme.dec,16,count*0x20),table=readDec(file,scheme.dec,16+count*0x20,noff*4),al=scheme.align-1,base=(16+count*0x20+noff*4+al)&~al,out=[],seen=new Set();
+ const idx=readDec(file,scheme.dec,16,count*0x20),table=readDec(file,scheme.dec,16+count*0x20,noff*4),align=scheme.align>0?scheme.align:0x1000,base=Math.ceil((16+count*0x20+noff*4)/align)*align,out=[],seen=new Set();
  const dir=(root,first,n,depth)=>{for(let i=0;i<n;i++){const k=first+i;if(k>=count||seen.has(k))return;seen.add(k);const p=k*0x20,z=idx.indexOf(0,p),name=root+sj.decode(idx.subarray(p,z<0||z>p+0x14?p+0x14:z)),flags=idx.readInt32LE(p+0x14),off=idx.readInt32LE(p+0x18),esz=idx.readUInt32LE(p+0x1c);
   if(!(flags&0x30000)){if(off>k&&depth<16)dir(name?name+'/':'',off,esz,depth+1);continue;}if(off<0||off>=noff)continue;const at=base+table.readUInt32LE(off*4)*1024;if(at+esz<=fsz)out.push({name,offset:at,size:esz,dec:scheme.dec});}};
  dir('',0,1,0);return out.length?out:null;}
