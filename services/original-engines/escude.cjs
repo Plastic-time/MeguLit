@@ -38,10 +38,23 @@ function lzw(src,unpacked){const out=Buffer.alloc(unpacked),dict=new Int32Array(
  return out.subarray(0,o);}
 const unpack=b=>b.length>8&&b.toString('latin1',0,4)==='acp\0'?lzw(b.subarray(8),b.readUInt32BE(4)):b;
 
-/* half-width forms the engine uses for hiragana / punctuation in ESCR1_00 strings (acpx_script.py _string_format) */
-const INNER='!?｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ',OUTER='！？　。「」、…をぁぃぅぇぉゃゅょっーあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわん゛゜';
-const MAP=new Map([...INNER].map((c,i)=>[c,[...OUTER][i]]));
+/* half-width forms the engine uses for hiragana / punctuation in ESCR1_00 strings (acpx_script.py _string_format;
+   single-byte 0xA0 -> full-width space is handled in decodeV1 because WHATWG shift_jis rejects 0xA0) */
+const PAIRS=[
+ ['!','！'],['?','？'],['｡','。'],['｢','「'],['｣','」'],['､','、'],['･','…'],
+ ['ｦ','を'],['ｧ','ぁ'],['ｨ','ぃ'],['ｩ','ぅ'],['ｪ','ぇ'],['ｫ','ぉ'],['ｬ','ゃ'],['ｭ','ゅ'],['ｮ','ょ'],['ｯ','っ'],['ｰ','ー'],
+ ['ｱ','あ'],['ｲ','い'],['ｳ','う'],['ｴ','え'],['ｵ','お'],['ｶ','か'],['ｷ','き'],['ｸ','く'],['ｹ','け'],['ｺ','こ'],
+ ['ｻ','さ'],['ｼ','し'],['ｽ','す'],['ｾ','せ'],['ｿ','そ'],['ﾀ','た'],['ﾁ','ち'],['ﾂ','つ'],['ﾃ','て'],['ﾄ','と'],
+ ['ﾅ','な'],['ﾆ','に'],['ﾇ','ぬ'],['ﾈ','ね'],['ﾉ','の'],['ﾊ','は'],['ﾋ','ひ'],['ﾌ','ふ'],['ﾍ','へ'],['ﾎ','ほ'],
+ ['ﾏ','ま'],['ﾐ','み'],['ﾑ','む'],['ﾒ','め'],['ﾓ','も'],['ﾔ','や'],['ﾕ','ゆ'],['ﾖ','よ'],
+ ['ﾗ','ら'],['ﾘ','り'],['ﾙ','る'],['ﾚ','れ'],['ﾛ','ろ'],['ﾜ','わ'],['ﾝ','ん'],['ﾞ','゛'],['ﾟ','゜'],
+];
+const MAP=new Map(PAIRS);
 const restring=t=>[...t].map(c=>MAP.get(c)||c).join('');
+function decodeV1(b){if(!b.includes(0xa0))return kit.SJIS.decode(b);const out=Buffer.allocUnsafe(b.length*2);let o=0;
+ for(let i=0;i<b.length;i++){const c=b[i];if((c>=0x81&&c<=0x9f||c>=0xe0&&c<=0xfc)&&i+1<b.length){out[o++]=c;out[o++]=b[++i];continue;}
+  if(c===0xa0){out[o++]=0x81;out[o++]=0x40;continue;}out[o++]=c;}
+ return kit.SJIS.decode(out.subarray(0,o));}
 /* the strings of a script in table order: ESCR1_00 (.bin) or the ESCR_NEW message file (.001) */
 function strings(b){const tag=b.toString('latin1',0,8);
  if(tag==='ESCR1_00'){const n=b.readUInt32LE(8);if(n>500000||12+n*4+4>b.length)return null;const codeLen=b.readUInt32LE(12+n*4),block=12+n*4+4+codeLen+4;if(block>b.length)return null;
@@ -53,9 +66,9 @@ function strings(b){const tag=b.toString('latin1',0,8);
 function parse(buf){const b=Buffer.isBuffer(buf)?buf:Buffer.from(buf);if(b.length<16)return {lines:[],anchors:[]};const s=strings(b);if(!s)return {lines:[],anchors:[]};
  /* the half-width forms count against Shift-JIS in kit.codepage, so ESCR1_00 text is judged after mapping them back */
  const all=Buffer.concat(s.list.filter(x=>x.some(c=>c>=0x80)).slice(0,4000)),score=t=>({bad:(t.match(/�/g)||[]).length,kana:(t.match(kit.KANA_G)||[]).length});
- const sj=score(restring(kit.SJIS.decode(all))),gb=score(new TextDecoder('gbk').decode(all));
+ const sj=score(restring(decodeV1(all))),gb=score(new TextDecoder('gbk').decode(all));
  const enc=s.kind==='v1'?(sj.bad<gb.bad||sj.bad===gb.bad&&sj.kana>=gb.kana?'shift_jis':'gbk'):kit.codepage(all),dec=new TextDecoder(enc),lines=[],anchors=[];
- for(const x of s.list){if(!x.length)continue;if(!x.some(c=>c>=0x80)){anchors.push(x.toString('latin1'));continue;}let t=dec.decode(x);if(s.kind==='v1'&&enc==='shift_jis')t=restring(t);t=kit.trimBoth(t.replace(/\\n/g,'\n'));if(t)lines.push(t);}
+ for(const x of s.list){if(!x.length)continue;if(!x.some(c=>c>=0x80)){anchors.push(x.toString('latin1'));continue;}let t=s.kind==='v1'&&enc==='shift_jis'?restring(decodeV1(x)):dec.decode(x);t=kit.trimBoth(t.replace(/\\n/g,'\n'));if(t)lines.push(t);}
  return {lines,anchors};}
 const SCRIPT=/\.(bin|001)$/i;
 const isScript=b=>{const t=b.toString('latin1',0,8);return t==='ESCR1_00'||t==='@mess:__';};
