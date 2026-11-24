@@ -26,6 +26,92 @@ test('Unity TextAssets: 日本語※简体※繁體 lines read as Japanese with 
  fs.rmSync(dir,{recursive:true,force:true});
 });
 
+test('Unity TextAssets: chineseSlot ignores English/pure-kana/tag columns, keeps Chinese with kana speakers, prefers Simplified over Traditional, and keeps short Chinese scenes',()=>{
+ const ut=scenes.ENGINES['unity-text'],cs=ut._internal.chineseSlot;
+ // 1. 日本語※English※繁體中文: English (hans-hant=0) must not beat Traditional Chinese (hans-hant<0)
+ const dirTri=tmp('ut-en-hant-');
+ const tri=[
+  'おはよう、今日はいい天気ですね。※Good morning, nice weather today.※早安，今天天氣真好。',
+  'みんなと一緒に学校へ行きましょう。※Let us go to school together.※大家一起去學校吧。',
+  'この話を聞いてくれてありがとう。※Thank you for listening to this story.※謝謝你聽我說這件事。',
+ ].join('\r\n');
+ put(dirTri,{'Game.exe':'x','Game_Data/resources.assets':Buffer.concat([Buffer.alloc(32),textAsset('S01',tri),Buffer.alloc(16)])});
+ assert.strictEqual(scenes.detect(dirTri),'unity-text');
+ const triList=scenes.read('unity-text',dirTri);
+ assert.deepStrictEqual(triList[0].zh,['早安，今天天氣真好。','大家一起去學校吧。','謝謝你聽我說這件事。']);
+ const triPatched=ut.patchLines(triList,{dirs:[dirTri]});
+ assert.deepStrictEqual(triPatched[0].lines,['早安，今天天氣真好。','大家一起去學校吧。','謝謝你聽我說這件事。']);
+
+ // 2. 日本語※English (no Chinese): zh stays empty and patchLines returns null
+ const dirBi=tmp('ut-en-only-');
+ const bi=[
+  'おはよう、今日はいい天気ですね。※Good morning, nice weather today.',
+  'みんなと一緒に学校へ行きましょう。※Let us go to school together.',
+  'この話を聞いてくれてありがとう。※Thank you for listening to this story.',
+ ].join('\r\n');
+ put(dirBi,{'Game.exe':'x','Game_Data/resources.assets':Buffer.concat([Buffer.alloc(32),textAsset('S02',bi),Buffer.alloc(16)])});
+ const biList=scenes.read('unity-text',dirBi);
+ assert.deepStrictEqual(biList[0].zh,['','','']);
+ assert.strictEqual(ut.patchLines(biList,{dirs:[dirBi]}),null);
+
+ // 3. Four languages (JA/EN/Hans/Hant) & Traditional-before-Simplified both pick Simplified
+ assert.strictEqual(cs([
+  ['おはよう、今日はいい天気ですね。','Good morning.','今天天气真好，我们去学校吧。','今天天氣真好，我們去學校吧。'],
+  ['この話を聞いて。','Listen to this.','请听我说这件事。','請聽我說這件事。'],
+ ]),2);
+ assert.strictEqual(cs([
+  ['みんなと一緒に学校へ行こう。','我們一起去學校聽他說話。','我们一起去学校听他说话。'],
+  ['この問題を見て。','請看這個問題。','请看这个问题。'],
+ ]),2);
+
+ // 4. Chinese column keeping Japanese kana speaker names (e.g. 【りそな】早上好) still resolves slot 1 (matching main)
+ assert.strictEqual(cs([
+  ['【りそな】おはよう、学校へ行こう。','【りそな】早上好，我们一起去学校吧。'],
+  ['【りそな】大変です。','【りそな】不好了。'],
+ ]),1);
+ assert.strictEqual(cs([
+  ['【りそな】おはよう、学校へ行こう。','【りそな】早上好，我们一起去学校吧。','【里想奈】早安，我們一起去學校吧。'],
+  ['【りそな】この話を聞いて。','【りそな】请听我说这件事。','【里想奈】請聽我說這件事。'],
+ ]),1);
+ // 5. Punctuation/number-heavy short Chinese scenes (C1/C2/C13) and SC with OK + no marker chars vs TC (C5) match main
+ const c1=[
+  ['あ……※「……」','えっ！？※「！？」','うう……※「……」','大変だ！※「糟了！」'],
+ ].flat().map(l=>l.split('※'));
+ assert.strictEqual(cs(c1),1);
+ const c2=[
+  ['あ……※「……」','えっ！？※「！？」','１００％だよ※「100%」','うう……※「……」','助けて！※「救命！」'],
+ ].flat().map(l=>l.split('※'));
+ assert.strictEqual(cs(c2),1);
+ const c5=[
+  ['はい。','OK','好的'],
+  ['ありがとう。','多谢。','謝謝你聽我說話。'],
+  ['大変です。','不好了。','不好了。'],
+ ];
+ assert.strictEqual(cs(c5),1);
+ // English column with punctuation rows (>30% non-Latin punctuation, 0 Han) or 1 Han loanword among English lines must not beat Traditional Chinese
+ assert.strictEqual(cs([
+  ['おはよう。','Hello.','早安，我們走吧。'],
+  ['えっ！？','!?','！？'],
+  ['……','...','……'],
+ ]),2);
+ assert.strictEqual(cs([
+  ['東京へ行く。','Go to 東京.','前往東京。'],
+  ['おはよう。','Good morning.','早安，這件事交給我們吧。'],
+  ['ありがとう。','Thank you.','謝謝你聽我說話。'],
+  ['また明日。','See you tomorrow.','明天見。'],
+ ]),2);
+ // Pure-kana column without Han is skipped; tag-only column is skipped; 1-line and 2-line valid Chinese scenes still resolve slot 1
+ assert.strictEqual(cs([
+  ['おはようございます。','おはようございます。'],
+  ['ありがとう。','ありがとう。'],
+ ]),-1);
+ assert.strictEqual(cs([['おはようございます。','[背景]'],['ありがとう。','[演出]']]),-1);
+ assert.strictEqual(cs([['「大変です」','「不好了」']]),1);
+ assert.strictEqual(cs([['「……」','「……」'],['「大変です」','「不好了」']]),1);
+
+ for(const d of [dirTri,dirBi])fs.rmSync(d,{recursive:true,force:true});
+});
+
 test('Higurashi: OutputLine Japanese strings are the lines; English is not a translation, a Chinese second slot is',()=>{
  const dir=tmp('hg-');
  const body='void main()\n{\n\tOutputLine(NULL, "　夏を迎えても、朝の空気は冷たい。",\n\t\t   NULL, "Even though we were approaching summer, the air was cold.", Line_WaitForInput);\n'+
