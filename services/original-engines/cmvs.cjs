@@ -5,6 +5,9 @@
    Format references (read, not copied): GARbro ArcFormats/Cmvs ArcCPZ.cs, CpzHeader.cs, CmvsMD5.cs (morkt, MIT) for the
    archive; ZQF-ReVN/RxCMVS PS3_Cryptor.cpp / PS3_TextEditor.cpp (no licence: format facts only) for the script; the
    per-title constants live in cmvs-schemes.json.
+     CVNS    "CPZ1" and "CPZ2" use a flat index. CPZ1 has a fixed byte key; CPZ2 has a masked header, a
+             checksum and separate keys for the index and entries. Their .pss scripts use PSS0,
+             with the PS2A section layout and LZSS stream but no script-level byte rotation.
      *.cpz   "CPZ5" / "CPZ6" / "CPZ7" (read). A 0x40-byte header
              of XOR-masked fields with an additive checksum and the index's MD5; the index is decrypted in four passes
              (stage 1 with the CPZ5 secret, a byte substitution table, the directory cipher, the per-directory entry
@@ -140,16 +143,76 @@ function startStamp(file){const out=[];let dir=path.dirname(file);
  for(let up=0;up<3;up++){const s=path.join(dir,'start.ps3');let st=null;try{st=fs.statSync(s,{throwIfNoEntry:false});}catch{}if(st&&st.isFile())out.push(s+':'+st.size+':'+st.mtimeMs);
   const upDir=path.dirname(dir);if(upDir===dir)break;dir=upDir;}
  return out.join(';');}
-/* {version, entries, md5, h, sc[, values]} for a CPZ5/CPZ6/CPZ7 archive; null for anything else */
+/* CVNS flat indexes (GARbro ArcCPZ1.cs / ArcCPZ2.cs and cmvs-rs cpz2.rs). */
+const CPZ1_KEY=Buffer.from(SCHEMES.cpz1.key,'hex'),CPZ2_WORDS=SCHEMES.cpz2.words.map(hex);
+function decryptCpz1(data){
+ for(let i=0;i<data.length;i++)data[i]=((data[i]^CPZ1_KEY[i%CPZ1_KEY.length])-0x6c)&255;
+ return data;
+}
+function decryptCpz2(data,key){
+ let shift=5;
+ for(let bit=0;bit<32;bit+=4)shift^=(key>>>bit)&15;
+ shift+=8;
+ const table=CPZ2_WORDS.map(word=>(word+key)>>>0);
+ let pos=0,word=0;
+ for(;pos+4<=data.length;pos+=4,word++){
+  data.writeUInt32LE(rotr((data.readUInt32LE(pos)^table[word&15])-0x15c3e7,shift),pos);
+ }
+ for(let bit=0;pos<data.length;pos++,word++,bit+=4)data[pos]=(data[pos]^(table[word&15]>>>bit))+55;
+ return data;
+}
+function flatChecksum(data){
+ let sum=0x78341256,pos=0;
+ for(;pos+4<=data.length;pos+=4)sum=(sum+data.readUInt32LE(pos))>>>0;
+ for(;pos<data.length;pos++)sum=(sum+data[pos])>>>0;
+ return sum;
+}
+function openCvns(file,header,fsz,version){
+ const keyed=version===2,indexAt=keyed?0x14:0x10;
+ if(header.length<indexAt)return null;
+ const count=(header.readUInt32LE(4)^(keyed?0xe47c59f3:0))>>>0;
+ const indexSize=(header.readUInt32LE(8)^(keyed?0x3f71de2a:0))>>>0;
+ const base=indexAt+indexSize,minRecord=0x1a;
+ if(!count||count>1e6||count>Math.floor(indexSize/minRecord)||indexSize>(64<<20)||base>fsz)return null;
+ const index=kit.readAt(file,indexAt,indexSize),entries=[];
+ if(index.length!==indexSize)return null;
+ if(keyed){
+  if(flatChecksum(index)!==header.readUInt32LE(0x0c))return null;
+  decryptCpz2(index,(header.readUInt32LE(0x10)^0x40de832c)>>>0);
+ }else decryptCpz1(index);
+ let pos=0;
+ for(let i=0;i<count;i++){
+  if(pos+minRecord>index.length)return null;
+  const recordSize=index.readUInt32LE(pos),end=pos+recordSize,nameAt=pos+0x18;
+  if(recordSize<minRecord||end>index.length)return null;
+  const nameEnd=index.indexOf(0,nameAt);
+  const size=index.readUInt32LE(pos+4),offset=base+index.readUInt32LE(pos+8);
+  if(nameEnd<=nameAt||nameEnd>=end||offset+size>fsz)return null;
+  const entry={name:kit.SJIS.decode(index.subarray(nameAt,nameEnd)),offset,size};
+  if(keyed){
+   entry.checksum=index.readUInt32LE(pos+0x10);
+   entry.key=(index.readUInt32LE(pos+0x14)^0x796c3afd)>>>0;
+  }
+  entries.push(entry);
+  pos=end;
+ }
+ return {version,h:{version,encrypted:true},entries};
+}
+
+/* Open a supported CPZ archive and retain the information needed to read its entries. */
 function open(file,params){const fsz=kit.size(file),pk=paramsKey(params),stamp=pk===null?null:file+'|'+fsz+'|'+(kit.isFile(file)?fs.statSync(file).mtimeMs:0)+'|'+startStamp(file)+'|'+pk;
  if(stamp!==null&&memo.has(stamp))return memo.get(stamp);
- let r=null;try{const h=header(kit.head(file,0x48));if(h&&h.version===7)r=open7(file,h,fsz,params);
+ let r=null;try{const bytes=kit.head(file,0x48),h=header(bytes),magic=bytes.toString('latin1',0,4);
+  if(magic==='CPZ1'||magic==='CPZ2')r=openCvns(file,bytes,fsz,bytes[3]-0x30);
+  else if(h&&h.version===7)r=open7(file,h,fsz,params);
   else if(h){const sets=params?ORDER.map(n=>scheme(params,n)):h.version===5?CPZ5_SETS:DEFAULTS,raw=kit.readAt(file,h.indexAt,h.dirSize+h.fileSize);
   if(raw.length===h.dirSize+h.fileSize&&md5sum(raw).equals(h.indexMd5))
    find:for(const sc of sets)for(const v of sc.md5){const x=readIndex(raw,h,v,sc,fsz);if(x&&x.entries.length){r={...x,h,sc};break find;}}}}catch{r=null;}
  if(stamp!==null){if(memo.size>64)memo.clear();memo.set(stamp,r);}return r;}
 const list=file=>open(file)?.entries||null;
 function read(file,e,params){const a=open(file,params),data=kit.readAt(file,e.offset,e.size);if(!a||!a.h.encrypted)return data;
+ if(a.version===1)return decryptCpz1(data);
+ if(a.version===2)return data.length===e.size&&flatChecksum(data)===e.checksum?decryptCpz2(data,e.key):Buffer.alloc(0);
  const {h,sc,md5}=a,v=a.values||ZERO7;let seed=(((((h.master^e.key)>>>0)+h.dirCount)>>>0)^v.resXor)>>>0;seed=(seed-sc.entrySub)>>>0;seed=(seed^((h.entryKey+v.seedAdd)>>>0))>>>0;
  const t=table(md5[3],h.master,sc.factor),kb=Buffer.alloc(64);for(let i=0;i<16;i++)kb.writeUInt32LE(sc.secret[i],i*4);
  const low=(md5[1]>>>2)&255,sk=Array.from({length:16},(_,i)=>{for(let q=0;q<4;q++)kb[i*4+q]=low^t[kb[i*4+q]];return (kb.readUInt32LE(i*4)^seed)>>>0;});
@@ -161,10 +224,23 @@ function read(file,e,params){const a=open(file,params),data=kit.readAt(file,e.of
 /* ---- PS2A script -------------------------------------------------------------------------------------------------- */
 /* a script whose header lengths (code, the 4-byte table, data, text) add up to the file is already plain: the official
    Chinese release of a CPZ7 title keeps its scripts unpacked in FileHook\ */
-const plainPs2=buf=>0x30+buf.readUInt32LE(0x14)+4*buf.readUInt32LE(0x10)+buf.readUInt32LE(0x18)+buf.readUInt32LE(0x1C)===buf.length;
-function unpackPs2(buf){if(buf.length<0x30||buf.toString('latin1',0,4)!=='PS2A')return null;if(plainPs2(buf))return buf;const key=buf.readUInt32LE(12),shift=((key>>>20)%5)+1,k=((key>>>24)+(key>>>3))&255;
+const scriptSize=buf=>buf.readUInt32LE(0x14)+4*buf.readUInt32LE(0x10)+buf.readUInt32LE(0x18)+buf.readUInt32LE(0x1c);
+const scriptLzss={window:0x800,start:0x7df,lenBits:5,minMatch:2};
+function unpackPs2(buf){
+ if(buf.length<0x30)return null;
+ const magic=buf.toString('latin1',0,4);
+ if(magic==='PSS0'){
+  const expected=buf.readUInt32LE(0x28);
+  if(expected!==scriptSize(buf)||expected>(64<<20)||buf.readUInt32LE(0x24)!==buf.length-0x30)return null;
+  const body=kit.lzss(buf.subarray(0x30),expected,scriptLzss);
+  return body.length===expected?Buffer.concat([buf.subarray(0,0x30),body]):null;
+ }
+ if(magic!=='PS2A')return null;
+ if(0x30+scriptSize(buf)===buf.length)return buf;
+ const key=buf.readUInt32LE(12),shift=((key>>>20)%5)+1,k=((key>>>24)+(key>>>3))&255;
  const body=Buffer.from(buf.subarray(0x30).map(b=>kit.ror(k^((b-0x7C)&255),shift)));
- return Buffer.concat([buf.subarray(0,0x30),kit.lzss(body,buf.readUInt32LE(0x28),{window:0x800,start:0x7df,lenBits:5,minMatch:2})]);}
+ return Buffer.concat([buf.subarray(0,0x30),kit.lzss(body,buf.readUInt32LE(0x28),scriptLzss)]);
+}
 const PUSH=Buffer.from([1,2,0x20,1]),PUSH_END=Buffer.from([0x0f,2,0x30,4]);
 const RESOURCE=/\.(ogg|wav|mv2|pb3|pb2|ps3|ps2|cur|cmv|mgv|png|bmp)\b/i;
 const DIALOGUE_PUNCT=/[「」『』。、！？…]/;
@@ -187,20 +263,20 @@ function texts(buf){const d=unpackPs2(buf);if(!d)return [];const list=pushed(d),
   if((RESOURCE.test(t)&&!DIALOGUE_PUNCT.test(t))||(kit.ascii(t)&&!prose(t)))return {kind:'anchor',t};return {kind:'line',t:kit.ascii(t)?clean(t):t};});}
 function parse(buf){const lines=[],anchors=[];for(const x of texts(buf)){if(x.kind==='line')lines.push(x.t);else if(x.kind==='anchor')anchors.push(x.t);}return {lines,anchors};}
 
-const PS=/\.ps[23]$/i;
+const PS=/\.ps[23]$/i,ARCHIVE_SCRIPT=/\.ps[23s]$/i;
 /* CMVS games keep their archives in data/pack (青い鳥, アマツツミ) */
 const SUBS=['','data/pack','pack'],PS_SUBS=['','script','patch','FileHook','data/code','data/update','data'];
-/* a CPZ5-7 archive in the usual pack folders (Steam / retail keep them in data/pack, not beside the exe): enough to name the engine */
-const packed=dir=>kit.files(dir,{name:/\.cpz$/i,subs:['data/pack','pack'],max:4}).some(f=>/^CPZ[567]/.test(kit.head(f,4).toString('latin1')));
+/* A supported CPZ archive in the usual pack folders is enough to identify the engine. */
+const packed=dir=>kit.files(dir,{name:/\.cpz$/i,subs:['data/pack','pack'],max:4}).some(f=>/^CPZ[12567]$/.test(kit.head(f,4).toString('latin1')));
 /* a CPZ the reader cannot open and no readable script anywhere (loose .ps3 in data/code count) */
 /* → the version (5/6/7) of the first CPZ that does not open, or 0 */
-const cpzFail=dir=>{const all=kit.files(dir,{name:/\.cpz$/i,subs:SUBS});if(all.some(f=>list(f)?.some(e=>PS.test(e.name)))||kit.files(dir,{name:PS,subs:PS_SUBS,max:1}).length)return 0;
+const cpzFail=dir=>{const all=kit.files(dir,{name:/\.cpz$/i,subs:SUBS});if(all.some(f=>list(f)?.some(e=>ARCHIVE_SCRIPT.test(e.name)))||kit.files(dir,{name:PS,subs:PS_SUBS,max:1}).length)return 0;
  for(const f of all){const m=/^CPZ([567])$/.exec(kit.head(f,4).toString('latin1'));if(m&&!open(f))return +m[1];}return 0;};
 const cpz7=dir=>cpzFail(dir)>0;
 /* CPZ7 keeps its old code; a CPZ5/6 whose index checks out but no known md5 variant decodes is a scheme (key) problem */
 const failCode=dir=>{const v=cpzFail(dir);return !v?'':v===7?'CMVS_CPZ7':'CMVS_CPZ'+v+'_KEY';};
-const engine=kit.engine({id:'cmvs',hint:'*.cpz（*.ps3）',
- archives:{name:/\.cpz$/i,magic:'CPZ',subs:SUBS,list:f=>{const l=list(f);return l&&l.some(e=>PS.test(e.name))?l:null;},read,entry:PS},
+const engine=kit.engine({id:'cmvs',hint:'*.cpz（*.pss / *.ps3）',
+ archives:{name:/\.cpz$/i,magic:'CPZ',subs:SUBS,list:f=>{const l=list(f);return l&&l.some(e=>ARCHIVE_SCRIPT.test(e.name))?l:null;},read,entry:ARCHIVE_SCRIPT},
  loose:{name:PS,subs:PS_SUBS},parse,
  extra:{unsupported:failCode,REASONS:{CMVS_CPZ5_KEY:'这部 CMVS 作品的 CPZ5 归档用了未知的密钥常数，暂时读不了剧本',CMVS_CPZ6_KEY:'这部 CMVS 作品的 CPZ6 归档用了未知的密钥常数，暂时读不了剧本',CMVS_CPZ7:'这部 CMVS 作品的 CPZ7 归档解不开（start.ps3 里没找到它的注册参数，或者常数和已知作品不同），暂时读不了剧本'},
   originalLines:dir=>originalLines(dir)}});
