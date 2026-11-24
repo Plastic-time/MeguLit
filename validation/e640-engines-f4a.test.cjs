@@ -123,3 +123,21 @@ test('archive + scan helpers: GLib2 schemes invert, SLG keys, media skipped, unk
  assert.deepEqual(scan.parse(Buffer.concat([Buffer.from('OggS'),sjis('おはようございます')])).lines,[]);
  assert.deepEqual(scan.parse(Buffer.alloc(64,7)).lines,[]);
 });
+test('Cyberworks: legacy Arc05.dat falls back to Arc04.dat text TOC when Arc02.dat is a data archive, while modern Arc02.dat binary TOC still wins',t=>{
+ const num4=v=>Buffer.from(String(v).padStart(4,'0').split('').map(d=>(+d)^0x7f));
+ const legacyToc=text=>{const raw=Buffer.from(text,'latin1'),packed=F.lzLit(raw);return Buffer.concat([num4(raw.length),num4(packed.length),packed]);};
+ const script=TXT(sjis),packedScript=F.lzLit(script);
+ /* legacy layout: Arc02.dat is a data archive (indexed by Arc00.dat), Arc05.dat holds scripts (indexed by Arc04.dat) */
+ const legacy=tmp(t);
+ put(legacy,'Arc00.dat',legacyToc('img01,16,16,0,b\r\n'));
+ put(legacy,'Arc02.dat',Buffer.alloc(16,0x22));
+ put(legacy,'Arc04.dat',legacyToc(`s001,${script.length},${packedScript.length},0,s\r\n`));
+ put(legacy,'Arc05.dat',packedScript);
+ const own=scenes.read('cyberworks',legacy).filter(s=>s.lines.length);
+ assert.equal(own.length,1);assert.deepEqual(own[0].lines,JA);
+ /* modern layout: Arc02.dat is a valid binary TOC for Arc05.dat even when Arc04.dat also exists */
+ const modern=tmp(t),cw=F.cyberworks({a:script});
+ put(modern,'Arc02.dat',cw.index);put(modern,'Arc04.dat',Buffer.alloc(32,0x33));put(modern,'Arc05.dat',cw.body);
+ const mod=scenes.read('cyberworks',modern).filter(s=>s.lines.length);
+ assert.equal(mod.length,1);assert.deepEqual(mod[0].lines,JA);
+});
