@@ -51,17 +51,23 @@ test('Escude: ESCR1_00 half-width kana, punctuation, voiced marks, and 0xA0 full
  assert.deepEqual(escude.parse(F.escr1([mixed,dangling],b=>b)).lines,['あ泛燿黑　をぁあ゛゜','真\ufffd']);
  assert.equal(escude.restring('!?｡｢｣､･ｦｧｱﾝﾞﾟ'),'！？。「」、…をぁあん゛゜');
 });
-test('Escude: ESCR1_00 ASCII-only !/? lines map to full-width dialogue and pair 1:1 with GBK patches while anchors stay anchors',()=>{
- const ja=F.escr1(['bg01','ev_!01','  \\n ','！？','！','？','！？\\n！！','「おはよう」','se_02'],escr1Bytes);
+test('Escude: ESCR1_00 ASCII-only !/? lines map to full-width dialogue and pair 1:1 with GBK patches while anchors stay anchors',t=>{
+ const ja=F.escr1(['bg01','ev_!01','x!','?param','!0','  \\n ','！？','！','？','！ ？','！\t','！？\\n！！','「おはよう」','se_02'],escr1Bytes);
  const r=escude.parse(ja);
- assert.deepEqual(r.lines,['！？','！','？','！？\n！！','「おはよう」']);
- assert.deepEqual(r.anchors,['bg01','ev_!01','  \\n ','se_02']);
+ assert.deepEqual(r.lines,['！？','！','？','！ ？','！','！？\n！！','「おはよう」']);
+ assert.deepEqual(r.anchors,['bg01','ev_!01','x!','?param','!0','  \\n ','se_02']);
  /* standalone 0x21 0x3F script (no bytes >= 0x80 at all) still parses as full-width dialogue */
  assert.deepEqual(escude.parse(F.escr1([Buffer.from([0x21,0x3f])],b=>b)).lines,['！？']);
- /* GBK patch encodes full-width punctuation as non-ASCII and pairs 1:1; ASCII-only !? in GBK or ESCR_NEW stays an anchor */
- const zh=escude.parse(F.escr1(['bg01','ev_!01','！？','！','？','！？\\n！！','“早上好”','se_02'],gbk));
- assert.equal(zh.lines.length,r.lines.length);
- assert.deepEqual(escude.parse(F.escr1(['今天天气真好。','!?'],gbk)).anchors,['!?']);
+ /* GBK patch: both full-width !? and ACPXScriptTool-assembled ASCII !? count as lines and pair 1:1 via scenes.read overlay */
+ const zhFull=escude.parse(F.escr1(['bg01','ev_!01','！？','！','？','！ ？','！\t','！？\\n！！','“早上好”','se_02'],gbk));
+ assert.equal(zhFull.lines.length,r.lines.length);
+ assert.deepEqual(escude.parse(F.escr1(['今天天气真好。','!?'],gbk)).lines,['今天天气真好。','!?']);
+ const game=tmp(t);put(game,'script.bin',F.escArc({'scr/0001.bin':F.escr1(['bg01','!?',...JA,'se_02'],escr1Bytes)}));
+ const zhAscii=F.escr1(['bg01','!?',...ZH,'se_02'],gbk);
+ const over=scenes.read('escude',game,new Map([['0001.bin',zhAscii]]));
+ assert.equal(over[0].patched,true);assert.deepEqual(over[0].lines,['!?',...ZH]);
+ assert.deepEqual(scenes.read('escude',game)[0].lines,['！？',...JA]);
+ /* ESCR_NEW keeps ASCII !? as an anchor */
  assert.deepEqual(escude.parse(F.escrMess(['こんにちは','!?'])).anchors,['!?']);
 });
 
