@@ -1,0 +1,33 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "0dd0b3bcc5dcdda257f50ef52f121f919a7453c2afa614f8f82124cb92351d50",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": false
+  },
+  "draw": {
+   "advhdInput": false,
+   "cmvsInput": false,
+   "fvpInput": false,
+   "minoriInput": false,
+   "spikechunsoftInput": false,
+   "kemcoSprites": false,
+   "embed": false,
+   "embedTranslation": true,
+   "viaRoles": []
+  }
+ },
+ "exe": "CafeStella.exe",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "0dd0b3bcc5dcdda257f50ef52f121f919a7453c2afa614f8f82124cb92351d50",
+  "head": "d3ea2f9209e3b92dc00873b1d90e24a91e6b5bb2e00c289e15f6d3e6f76ca941",
+  "pe": "1.2.0.3@5a1fee71"
+ },
+ "rev": 1
+}

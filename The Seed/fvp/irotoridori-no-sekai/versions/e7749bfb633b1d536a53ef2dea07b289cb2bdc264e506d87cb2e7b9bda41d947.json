@@ -1,0 +1,33 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "e7749bfb633b1d536a53ef2dea07b289cb2bdc264e506d87cb2e7b9bda41d947",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": false
+  },
+  "draw": {
+   "advhdInput": false,
+   "cmvsInput": false,
+   "fvpInput": false,
+   "minoriInput": false,
+   "spikechunsoftInput": false,
+   "kemcoSprites": false,
+   "embed": false,
+   "embedTranslation": true,
+   "viaRoles": []
+  }
+ },
+ "exe": "World.exe",
+ "engine": "fvp",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "e7749bfb633b1d536a53ef2dea07b289cb2bdc264e506d87cb2e7b9bda41d947",
+  "head": "12a786455e25a9a800d1bbdb5d8640d16dfbb84f00b118debc573ad70b9bb3bc",
+  "pe": "1.0.0.95@4e14bbd8"
+ },
+ "rev": 1
+}

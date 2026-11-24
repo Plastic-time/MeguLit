@@ -1,0 +1,33 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "ae48e22e19ce591036829a2085867f285cdfe2c63b13208ad71a3ab5275f9264",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": false
+  },
+  "draw": {
+   "advhdInput": false,
+   "cmvsInput": false,
+   "fvpInput": false,
+   "minoriInput": false,
+   "spikechunsoftInput": false,
+   "kemcoSprites": false,
+   "embed": false,
+   "embedTranslation": true,
+   "viaRoles": []
+  }
+ },
+ "exe": "irohanihoheto.exe",
+ "engine": "tyrano",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "ae48e22e19ce591036829a2085867f285cdfe2c63b13208ad71a3ab5275f9264",
+  "head": "3c23a76310ee68fbd5c2006b5a802acf0980ebe94b4f2580d436cd9088f021bc",
+  "pe": "0.0.0.0@6452884f"
+ },
+ "rev": 1
+}

@@ -1,0 +1,33 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "bebe297c4eb32d7a4e88f6eda0bdcc402c9fe5824bf652a4683f3e51640b527c",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": false
+  },
+  "draw": {
+   "advhdInput": false,
+   "cmvsInput": false,
+   "fvpInput": false,
+   "minoriInput": false,
+   "spikechunsoftInput": false,
+   "kemcoSprites": false,
+   "embed": false,
+   "embedTranslation": true,
+   "viaRoles": []
+  }
+ },
+ "exe": "Muv-Luv_Alternative16.exe",
+ "engine": "rugp",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "bebe297c4eb32d7a4e88f6eda0bdcc402c9fe5824bf652a4683f3e51640b527c",
+  "head": "15f2c9c5daf7f030ef4b4f55404ea7364e916fc815a47a7877966c37dd138ddf",
+  "pe": "1.0.0.1@59e5b4fb"
+ },
+ "rev": 1
+}

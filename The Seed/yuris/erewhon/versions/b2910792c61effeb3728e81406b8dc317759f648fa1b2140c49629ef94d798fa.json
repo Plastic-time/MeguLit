@@ -1,0 +1,33 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "b2910792c61effeb3728e81406b8dc317759f648fa1b2140c49629ef94d798fa",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": false
+  },
+  "draw": {
+   "advhdInput": false,
+   "cmvsInput": false,
+   "fvpInput": false,
+   "minoriInput": false,
+   "spikechunsoftInput": false,
+   "kemcoSprites": false,
+   "embed": false,
+   "embedTranslation": true,
+   "viaRoles": []
+  }
+ },
+ "exe": "erewhon.exe",
+ "engine": "yuris",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "b2910792c61effeb3728e81406b8dc317759f648fa1b2140c49629ef94d798fa",
+  "head": "e84ad71d2a68acc4c81b7133fbadeeaebdbe16fa9b34c9fb193b9d1d7cd95a66",
+  "pe": "1.0.0.0@5b3312bf"
+ },
+ "rev": 1
+}

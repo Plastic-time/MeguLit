@@ -1,0 +1,33 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "9c6a938189d4e18dfdbd1891204e35d7b3ed1f8325f24386d354b5838721eb91",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": false
+  },
+  "draw": {
+   "advhdInput": false,
+   "cmvsInput": false,
+   "fvpInput": false,
+   "minoriInput": false,
+   "spikechunsoftInput": false,
+   "kemcoSprites": false,
+   "embed": false,
+   "embedTranslation": true,
+   "viaRoles": []
+  }
+ },
+ "exe": "Aokana.exe",
+ "engine": "aokana",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "9c6a938189d4e18dfdbd1891204e35d7b3ed1f8325f24386d354b5838721eb91",
+  "head": "da0e68c7255568405a55cee1f8aaf204cfaeef62a5074b4cdfd1376db51997c1",
+  "pe": "2018.2.19.39183@5c000f68"
+ },
+ "rev": 1
+}

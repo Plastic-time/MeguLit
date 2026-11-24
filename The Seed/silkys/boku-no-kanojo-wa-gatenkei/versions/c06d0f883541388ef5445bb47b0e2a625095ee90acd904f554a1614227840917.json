@@ -1,0 +1,33 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "c06d0f883541388ef5445bb47b0e2a625095ee90acd904f554a1614227840917",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": false
+  },
+  "draw": {
+   "advhdInput": false,
+   "cmvsInput": false,
+   "fvpInput": false,
+   "minoriInput": false,
+   "spikechunsoftInput": false,
+   "kemcoSprites": false,
+   "embed": false,
+   "embedTranslation": true,
+   "viaRoles": []
+  }
+ },
+ "exe": "AI6WIN_CH.exe",
+ "engine": "silkys",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "c06d0f883541388ef5445bb47b0e2a625095ee90acd904f554a1614227840917",
+  "head": "00b36fd05e40ef689854d3d2254cc605a3f17ff72196ff97312397432a2aaf79",
+  "pe": "0.0.0.0@4eddb142"
+ },
+ "rev": 1
+}

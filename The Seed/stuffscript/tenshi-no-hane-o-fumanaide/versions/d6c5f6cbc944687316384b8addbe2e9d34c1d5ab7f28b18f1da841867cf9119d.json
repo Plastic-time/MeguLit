@@ -1,0 +1,33 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "d6c5f6cbc944687316384b8addbe2e9d34c1d5ab7f28b18f1da841867cf9119d",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": false
+  },
+  "draw": {
+   "advhdInput": false,
+   "cmvsInput": false,
+   "fvpInput": false,
+   "minoriInput": false,
+   "spikechunsoftInput": false,
+   "kemcoSprites": false,
+   "embed": false,
+   "embedTranslation": true,
+   "viaRoles": []
+  }
+ },
+ "exe": "AFeather_CN_V1.02.exe",
+ "engine": "stuffscript",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "d6c5f6cbc944687316384b8addbe2e9d34c1d5ab7f28b18f1da841867cf9119d",
+  "head": "bc1f4b03457e8be5f8056fc441f6e53f01e8b30247c53c3f0971dbe6d8e1c784",
+  "pe": "1.0.0.0@4dee3276"
+ },
+ "rev": 1
+}

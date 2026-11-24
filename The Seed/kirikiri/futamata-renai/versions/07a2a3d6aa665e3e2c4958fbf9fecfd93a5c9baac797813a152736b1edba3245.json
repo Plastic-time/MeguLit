@@ -1,0 +1,33 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "07a2a3d6aa665e3e2c4958fbf9fecfd93a5c9baac797813a152736b1edba3245",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": false
+  },
+  "draw": {
+   "advhdInput": false,
+   "cmvsInput": false,
+   "fvpInput": false,
+   "minoriInput": false,
+   "spikechunsoftInput": false,
+   "kemcoSprites": false,
+   "embed": false,
+   "embedTranslation": true,
+   "viaRoles": []
+  }
+ },
+ "exe": "フタマタ恋愛.exe",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "07a2a3d6aa665e3e2c4958fbf9fecfd93a5c9baac797813a152736b1edba3245",
+  "head": "cf729448e5ef3bab8faba6c8c119a81a6108dea5b4a215a7d88c41ffc5123d49",
+  "pe": "1.3.3.7@57aadc2a"
+ },
+ "rev": 1
+}
