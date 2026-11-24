@@ -28,6 +28,26 @@ test('Circus: MES opcode tables (old and head1 == 3 layouts), encrypted text, sp
  const patch=tmp(t);F.writeTree(patch,{'AdvData/MES/s001.mes':F.mes(CZH,{enc:F.gbk})});
  const zh=scenes.ENGINES.circus.archives(patch).map(s=>circus.parse(s.read()));pairs(own[0].lines,zh[0].lines);assert.equal(zh[0].lines[0],'小鸟');assert.equal(zh[0].lines[3],'去教室');
 });
+test('Circus: tokens() drops unterminated strings and truncated fixed-width instructions without corrupting the prefix',t=>{
+ const prefix=F.mes([{cmd:'BG01',name:'ことり',say:'「おはよう」'}]),h=circus.header(prefix),baseToks=circus.tokens(prefix,h).length;
+ const wantLines=['ことり','「おはよう」'],wantAnchors=['BG01','se01'];
+ const encNoNul=Buffer.concat([prefix,Buffer.from([F.DC3DD.text]),Buffer.from(F.sjis('朝の光').map(c=>(c-F.DC3DD.key)&255))]);
+ assert.deepEqual(circus.parse(encNoNul).lines,wantLines);
+ assert.equal(circus.tokens(encNoNul,circus.header(encNoNul)).length,baseToks);
+ const g=tmp(t);F.writeTree(g,{'AdvData/MES/s001.mes':encNoNul,'game.exe':'MZ'});
+ assert.deepEqual(scenes.read('circus',g)[0].lines,wantLines);
+ const plainNoNul=Buffer.concat([prefix,Buffer.from([F.DC3DD.plain]),F.sjis('教室へ行く')]);
+ assert.deepEqual(circus.parse(plainNoNul).lines,wantLines);
+ const strNoNul=Buffer.concat([prefix,Buffer.from([F.DC3DD.string]),Buffer.from('BG99','latin1')]);
+ assert.deepEqual(circus.parse(strNoNul).anchors,wantAnchors);
+ const u8strNoNul=Buffer.concat([prefix,Buffer.from([F.DC3DD.u8str,5]),Buffer.from('se99','latin1')]);
+ assert.deepEqual(circus.parse(u8strNoNul).anchors,wantAnchors);
+ for(const tail of [Buffer.from([F.DC3DD.u8str]),Buffer.from([F.DC3DD.u8x2,1]),Buffer.from([F.DC3DD.u16x4,1,2,3,4])]){
+  const cut=Buffer.concat([prefix,tail]);
+  assert.equal(circus.tokens(cut,circus.header(cut)).length,baseToks);
+  assert.deepEqual(circus.parse(cut).lines,wantLines);
+ }
+});
 
 /* ---- Whale -------------------------------------------------------------------------------------------------------- */
 const WJA=['ひなた','おはよう、朝だよ。','静かな午後だった。[n]風が吹く。','電話が鳴る。','教室へ行く','屋上へ行く','どうしよう'];

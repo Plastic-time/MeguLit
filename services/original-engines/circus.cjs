@@ -60,10 +60,10 @@ function header(b){if(b.length<12)return null;const h0=b.readInt32LE(0),h1=b.rea
 const isMes=b=>!!header(b);
 /* the instructions: [{op, at, len}] (stops at an unknown opcode, as msg-tool fails there) */
 function tokens(b,h){const {info}=h,out=[];let p=h.code;
- const cs=at=>{const z=b.indexOf(0,at);return z<0?b.length:z+1;};
+ const cs=at=>{if(at>=b.length)return -1;const z=b.indexOf(0,at);return z<0?-1:z+1;};
  while(p<b.length){const op=b[p];let end;
   if(info.u8x2(op))end=p+3;else if(info.u8str(op))end=cs(p+2);else if(info.string(op)||info.encstr(op))end=cs(p+1);else if(info.u16x4(op))end=p+9;else break;
-  out.push({op,at:p,end:Math.min(end,b.length)});p=end;}
+  if(end<0||end>b.length)break;out.push({op,at:p,end});p=end;}
  return out;}
 /* ｛漢字／よみ｝ -> 漢字, with the reading kept */
 const RUBY=/｛([^／｝]+)／([^｝]*)｝/g;
