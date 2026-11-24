@@ -172,6 +172,29 @@ test('fvp: unchanged Shift-JIS bytes in a Chinese twin or cnpack are left empty 
  const cnt=Buffer.alloc(4);cnt.writeUInt32LE(1);
  const rc=parse(Buffer.concat([Buffer.from('FVP+CN\0\0','latin1'),n,jp,cnt,rec1,data1]));
  assert.deepEqual(rc.zh,['','','']);});
+test('fvp: single-kana and alphanumeric-leading dialogue lines passed to the main text call are kept while assets are still dropped',()=>{
+ const {parse}=require('../services/original-engines/fvp.cjs'),{encodeSjis}=require('../services/original-engines/kit.cjs');
+ const mkPush=s=>{const raw=encodeSjis(s);return Buffer.concat([Buffer.from([0x0E,raw.length+1]),raw,Buffer.from([0])]);};
+ const call=addr=>{const b=Buffer.alloc(5);b[0]=0x02;b.writeUInt32LE(addr,1);return b;};
+ const show=Buffer.concat([Buffer.from([0x08,0x08,0x08]),call(0x366d0)]);
+ const showOpt=Buffer.concat([Buffer.from([0x08,0x08,0x0C,0x01]),call(0x366d0)]);
+ const voice=id=>{const b=Buffer.alloc(6);b[0]=0x0A;b.writeUInt32LE(id,1);b[5]=0x08;return b;};
+ const code=Buffer.concat([
+  mkPush('「おはよう」'),show,
+  voice(12001630),mkPush('え'),show,
+  mkPush('100%本当だ'),showOpt,
+  mkPush('A組のみんな'),show,
+  mkPush('ハ'),mkPush('graph/gaiji_heart'),
+  mkPush('_メイド服_吹出L'),Buffer.from([0x1A,0x16]),
+  mkPush('graph_bs/CHR_つかさ'),Buffer.from([0x16,0x00]),
+  mkPush('_内部_あ'),show,
+  mkPush('dir/あ'),show,
+  mkPush('「ありがとう」'),show,
+ ]);
+ const head=Buffer.alloc(4);head.writeUInt32LE(4+code.length,0);
+ const r=parse(Buffer.concat([head,code]));
+ assert.deepEqual(r.lines,['「おはよう」','え','100%本当だ','A組のみんな','「ありがとう」']);
+ assert.deepEqual(r.voices,[null,'012001630',null,null,null]);});
 test('kirikiri: KAG scenarios kept as .txt under a scenario folder count as scripts, list files do not',()=>{
  const src=require('node:fs').readFileSync(require.resolve('../services/original-engines/scenes.cjs'),'utf8');
  const m=/const KS=(n=>[^\n]+);/.exec(src);const KS=eval(m[1]);

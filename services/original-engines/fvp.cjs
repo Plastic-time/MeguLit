@@ -35,7 +35,14 @@ function twin(z,p,origRaw){if(!z||p.at+6>z.length)return '';let at=p.at;
    The record key is the address the game hands the patch, byte-swapped: the length byte of a 0x0E push, or the operand
    of the call before one (the push follows within a few bytes). */
 // Image and sprite names pushed for the engine ("_エプロン_吹出L", "graph_bs/CHR_あ", one-letter ids), not text.
+const ASSET_PATH=s=>s[0]==='_'||s.includes('/');
 const ASSET=s=>/^[_A-Za-z0-9]/.test(s)||s.includes('/')||[...s].length===1;
+// The script call (0x02 u32) consuming a pushed string after up to 5 stack-push opcodes (0x08..0x10).
+function callAfter(b,end,p){let i=p.at+2+p.n;
+ for(let step=0;step<6&&i<end;step++){const op=b[i];
+  if(op===0x02&&i+5<=end)return b.readUInt32LE(i+1);
+  if(op===0x08||op===0x09)i+=1;else if(op===0x0a||op===0x0d)i+=5;else if(op===0x0b||op===0x0f)i+=3;else if(op===0x0c||op===0x10)i+=2;else return -1;}
+ return -1;}
 const CN=Buffer.from('FVP+CN\0\0','latin1');
 function cnpack(pack,b){const crypto=require('node:crypto'),out=new Map();if(pack.length<4)return out;const cnt=pack.readUInt32LE(0);let p=4;
  const md5=s=>crypto.createHash('md5').update(s).digest();
@@ -52,8 +59,15 @@ function cnpack(pack,b){const crypto=require('node:crypto'),out=new Map();if(pac
 function parse(buf){let b=Buffer.isBuffer(buf)?buf:Buffer.from(buf),z=null,cn=null;
  if(b.subarray(0,8).equals(MAGIC)){const n=b.readUInt32LE(8);z=b.subarray(12+n);b=b.subarray(12,12+n);}
  else if(b.subarray(0,8).equals(CN)){const n=b.readUInt32LE(8);const pack=b.subarray(12+n);b=b.subarray(12,12+n);cn=cnpack(pack,b);}
- const lines=[],zh=[],voices=[];let prevEnd=0;
- for(const p of pushes(b)){const orig=b.subarray(p.at+2,p.at+1+p.n),s=tidy(sj.decode(orig));const from=prevEnd;prevEnd=p.at+2+p.n;if(!s||!PROSE.test(s)||s.includes('�')||ASSET(s))continue;lines.push(s);zh.push(cn?cn.get(p.at)||'':twin(z,p,orig));voices.push(voiceAt(b,p.at,from));}
+ const end=b.length>=4?Math.min(b.readUInt32LE(0),b.length):0,items=[],counts=new Map();let prevEnd=0,totalProse=0,textCall=-1,best=0;
+ for(const p of pushes(b)){const orig=b.subarray(p.at+2,p.at+1+p.n),s=tidy(sj.decode(orig));const from=prevEnd;prevEnd=p.at+2+p.n;
+  if(!s||!PROSE.test(s)||s.includes('�'))continue;
+  const call=callAfter(b,end,p);items.push({p,orig,s,from,call});
+  if(!ASSET(s)){totalProse++;if(call>=0){const c=(counts.get(call)||0)+1;counts.set(call,c);if(c>best){best=c;textCall=call;}}}}
+ if(best<2||best*2<totalProse)textCall=-1;
+ const lines=[],zh=[],voices=[];
+ for(const x of items){if(ASSET(x.s)&&(textCall<0||x.call!==textCall||ASSET_PATH(x.s)))continue;
+  lines.push(x.s);zh.push(cn?cn.get(x.p.at)||'':twin(z,x.p,x.orig));voices.push(voiceAt(b,x.p.at,x.from));}
  const v=require('./voice-ref.cjs').keep(voices),out=z||cn?{lines,anchors:[],zh}:{lines,anchors:[]};if(v)out.voices=v;return out;}
 /* E450 a spoken line's voice: the int the script pushes (0x0A, u32) just before the text, then the voice call's
    argument shuffles (0x08); voice.bin names the clip with that number in nine digits (10024540 -> 010024540). */
