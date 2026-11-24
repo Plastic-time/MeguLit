@@ -102,9 +102,9 @@ function writeCache(cache,files){
  fs.writeFileSync(path.join(cache,'done.json'),JSON.stringify({format:'PK/IVORY',files:Object.keys(files)}));
 }
 
-function previousCache(cacheRoot,archive){
+function previousCache(cacheRoot,archive,suffix=''){
  const st=fs.statSync(archive);
- const key=crypto.createHash('sha256').update(path.resolve(archive).toLowerCase()+'|'+st.size+'|'+st.mtimeMs).digest('hex').slice(0,24);
+ const key=crypto.createHash('sha256').update(path.resolve(archive).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+suffix).digest('hex').slice(0,24);
  return path.join(cacheRoot,key);
 }
 
@@ -127,29 +127,50 @@ test('a cached Ivory extraction from before compiled entries were supported is r
  assert.equal(probeGame({dir,executable}).needs,'garbro');
 });
 
-test('an older paired Ivory cache remains readable when re-extraction is unavailable',t=>{
+test('a readable legacy Ivory cache stays selected after partial extraction becomes available',t=>{
  const {root,dir,archive,executable,cacheRoot}=sample(t);
- const dialogue='これまでの原文です。';
- writeCache(previousCache(cacheRoot,archive),{'start.TXT':kit.encodeSjis(dialogue),'start.HPB':'fAGS'});
+ const dialogue=['これまでの原文です。','二行目も読めます。'];
+ const legacy=previousCache(cacheRoot,archive);
+ writeCache(legacy,{'start.TXT':kit.encodeSjis(dialogue.join('\r\n')),'start.HPB':'fAGS'});
  const {RuntimePacks}=require('../core/runtime-packs.cjs');
  let available=false;
  t.mock.method(RuntimePacks.prototype,'installed',()=>available);
- assert.equal(probeGame({dir,executable}).japaneseLines,1);
- const s=original.scanRunning(root,'1',executable);
- assert.equal(s.status,'native-japanese');
- assert.deepEqual(JSON.parse(fs.readFileSync(s.runtime.index,'utf8')).lines,[dialogue]);
- const files={'start.TXT':kit.encodeSjis(dialogue),'start.HPB':'fAGS','next.NTK':scene()};
+ assert.equal(probeGame({dir,executable}).japaneseLines,2);
+ const originalIndex=original.scanRunning(root,'1',executable).runtime.index;
+ const extract=t.mock.method(require('node:child_process'),'spawnSync',()=>{throw Error('readable old cache must not unpack');});
+ available=true;
+ assert.equal(probeGame({dir,executable}).japaneseLines,2);
+ assert.equal(original.scanRunning(root,'1',executable).runtime.index,originalIndex);
+ assert.equal(garbro.jobs.has(archive),false);
+ assert.equal(extract.mock.callCount(),0);
+ const modern=previousCache(cacheRoot,archive,'|ivory-ntk');
+ for(const partial of [{'next.NTK':scene()},{'error.TXT':kit.encodeSjis('無関係な文です。')}]){
+  writeCache(modern,partial);
+  assert.equal(garbro.cacheDir(archive),legacy);
+  assert.equal(probeGame({dir,executable}).japaneseLines,2);
+  const rerun=original.scanRunning(root,'1',executable);
+  assert.equal(rerun.runtime.index,originalIndex);
+  assert.deepEqual(JSON.parse(fs.readFileSync(rerun.runtime.index,'utf8')).lines,dialogue);
+ }
+});
+
+test('Ivory re-extracts when a legacy pair contains no readable scene',t=>{
+ const {root,dir,archive,executable,cacheRoot}=sample(t);
+ const old=previousCache(cacheRoot,archive);
+ writeCache(old,{'start.TXT':'# only a comment','start.HPB':'fAGS'});
+ const {RuntimePacks}=require('../core/runtime-packs.cjs');
+ t.mock.method(RuntimePacks.prototype,'installed',()=>true);
  const extract=t.mock.method(require('node:child_process'),'spawnSync',(_program,args)=>{
   assert.equal(args[args.indexOf('-Archive')+1],archive);
-  writeCache(args[args.indexOf('-Out')+1],files);
-  return {status:0,stdout:JSON.stringify({format:'PK/IVORY',files:Object.keys(files)})};
+  writeCache(args[args.indexOf('-Out')+1],{'start.NTK':scene()});
+  return {status:0,stdout:JSON.stringify({format:'PK/IVORY',files:['start.NTK']})};
  });
- available=true;
- assert.notEqual(require('../services/original-engines/scenes.cjs').fingerprint('garbro',dir),s.runtime.sha256);
- assert.equal(probeGame({dir,executable}).japaneseLines,1+expected.length);
+ assert.equal(garbro.cacheDir(archive),previousCache(cacheRoot,archive,'|ivory-ntk'));
+ assert.equal(probeGame({dir,executable}).japaneseLines,expected.length);
  assert.equal(extract.mock.callCount(),1);
- const refreshed=original.scanRunning(root,'1',executable);
- assert.deepEqual(JSON.parse(fs.readFileSync(refreshed.runtime.index,'utf8')).lines,[dialogue,...expected]);
+ const s=original.scanRunning(root,'1',executable);
+ assert.deepEqual(JSON.parse(fs.readFileSync(s.runtime.index,'utf8')).lines,expected);
+ assert.equal(fs.readFileSync(path.join(old,'start.TXT'),'utf8'),'# only a comment');
 });
 
 test('Ivory pairs names across slash styles without duplicating a compiled scene',t=>{
@@ -226,4 +247,50 @@ test('compiled Ivory bounds renderer text references',()=>{
  const clean=textRow('表示する行。'),long=textRow('長'.repeat(2049));
  const code=Buffer.concat([record(1,0,0),record(1,0,1),record(1,0,0xffffffff-1),record(1,0,clean.length)]);
  assert.deepEqual(parse(script(Buffer.concat([clean,long]),code)).lines,['表示する行。']);
+});
+
+test('Ivory reads only up to the compiled scene limit plus one byte',t=>{
+ const {dir,archive}=sample(t),cache=garbro.cacheDir(archive);
+ const {MAX_SCENE_BYTES}=require('../services/original-engines/ivory-ntk.cjs');
+ const entry=path.join(cache,'large.NTK');
+ writeCache(cache,{'large.NTK':scene()});
+ fs.truncateSync(entry,MAX_SCENE_BYTES+4096);
+ const read=t.mock.method(kit,'readAt');
+ const [compiled]=garbro.withCached(()=>garbro.engine.scenes(dir));
+ assert.deepEqual(compiled.parse().lines,[]);
+ const request=read.mock.calls.find(call=>call.arguments[0]===entry);
+ assert.equal(request?.arguments[2],MAX_SCENE_BYTES+1);
+});
+
+test('compiled Ivory rejects misaligned records and records that run past the code',()=>{
+ const {parse}=require('../services/original-engines/ivory-ntk.cjs');
+ const text=textRow('表示する行。'),show=record(1,0,0);
+ const invalidRecord=(bytes,size)=>{
+  const invalid=Buffer.alloc(bytes);
+  invalid.writeUInt16LE(47);
+  invalid.writeUInt16LE(size,2);
+  return invalid;
+ };
+ const misaligned=Buffer.concat([show,invalidRecord(5,5),invalidRecord(7,7)]);
+ const overrun=Buffer.concat([show,invalidRecord(4,8)]);
+ assert.deepEqual(parse(script(text,misaligned)).lines,[]);
+ assert.deepEqual(parse(script(text,overrun)).lines,[]);
+});
+
+test('compiled Ivory rejects zero-length records without stalling',()=>{
+ const invalid=record(47);invalid.writeUInt16LE(0,2);
+ const data=script(textRow('表示する行。'),Buffer.concat([record(1,0,0),invalid]));
+ const {spawnSync}=require('node:child_process');
+ const code="const {parse}=require(process.argv[1]);process.stdout.write(JSON.stringify(parse(Buffer.from(process.argv[2],'hex')).lines))";
+ const result=spawnSync(process.execPath,[...process.execArgv,'-e',code,require.resolve('../services/original-engines/ivory-ntk.cjs'),data.toString('hex')],{encoding:'utf8',timeout:3000,windowsHide:true});
+ assert.ifError(result.error);
+ assert.equal(result.status,0,result.stderr);
+ assert.equal(result.stdout,'[]');
+});
+
+test('compiled Ivory skips dialogue opcodes with extra fields',()=>{
+ const {parse}=require('../services/original-engines/ivory-ntk.cjs');
+ const invalid=textRow('画面に出ません。'),valid=textRow('次へ進みます。');
+ const code=Buffer.concat([record(1,0,0,0),record(2,0,0,0,0,0),record(1,0,invalid.length)]);
+ assert.deepEqual(parse(script(Buffer.concat([invalid,valid]),code)).lines,['次へ進みます。']);
 });

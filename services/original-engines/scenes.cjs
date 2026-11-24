@@ -833,9 +833,8 @@ function read(id,dir,overlay){const engine=ENGINES[id];
  return engine.annotate?engine.annotate(dir,list):list;}
 function fingerprint(id,dir){
  // Rebuild multilingual KiriKiri indexes that omitted captions in tag arguments.
- const files=ENGINES[id].sources(dir).sort();
- const format=id==='kirikiri-lang'?'caption-text-v1\n':id==='garbro'?garbro.cacheStamp(files):'';
- const sources=files.map(f=>path.basename(f)+'|'+stat(f)).join('\n');
+ const format=id==='kirikiri-lang'?'caption-text-v1\n':'';
+ const sources=ENGINES[id].sources(dir).sort().map(f=>path.basename(f)+'|'+stat(f)).join('\n');
  return crypto.createHash('sha256').update(id+'\n'+format+sources).digest('hex');
 }
 /* E294 (user: say that the first use needs 30-90 s of unpacking instead of "not supported"): what a game that cannot
