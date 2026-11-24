@@ -89,7 +89,7 @@ function readIndex(raw,h,variant,sc,fileSize,arc={}){const idx=Buffer.from(raw),
   let cur=h.dirSize+eo;const end=cur+len;for(let i=cur;i<end;i++)idx[i]=t[0x7E^idx[i]];
   entryCipher(idx,cur,len,md5.map((m,j)=>(m^((dirKey+sc.dirAddend[j])>>>0))>>>0),sc.indexSeed,arc.fileStep||0,sc.entryIndexTail);
   for(let e=0;e<count;e++){if(cur+h.nameAt>end)return null;const es=idx.readInt32LE(cur);if(es<=h.nameAt||cur+es>end)return null;
-   const nb=kit.cstr(idx,cur+h.nameAt,end);if(!nb||!nb.length||nb.some(c=>c<0x20))return null;const ko=cur+(h.version>6?0x14:0x10);
+   const nb=kit.cstr(idx,cur+h.nameAt,cur+es);if(!nb||!nb.length||nb.some(c=>c<0x20))return null;const ko=cur+(h.version>6?0x14:0x10);
    const entry={name:(name==='root'?'':name+'/')+kit.SJIS.decode(nb),offset:Number(idx.readBigInt64LE(cur+4))+base,size:idx.readUInt32LE(cur+12),key:(idx.readUInt32LE(ko+4)+dirKey)>>>0};
    if(entry.offset<base||entry.offset+entry.size>fileSize)return null;out.push(entry);cur+=es;}
   dp+=size;}
@@ -174,7 +174,7 @@ const MAX_PUSH=0x2000;
 function pushed(d){const count=d.readUInt32LE(0x10),code=0x30,codeLen=d.readUInt32LE(0x14)+4*count+d.readUInt32LE(0x18),text=code+codeLen,textLen=d.readUInt32LE(0x1C),out=[];
  if(text+textLen>d.length||codeLen<0)return out;const tend=text+textLen;
  for(let p=code;p+12<=text;p++){if(d[p]!==1||!d.subarray(p,p+4).equals(PUSH)||!d.subarray(p+8,p+12).equals(PUSH_END))continue;
-  const at=text+d.readUInt32LE(p+4),end=Math.min(tend,at+MAX_PUSH),s=kit.cstr(d.subarray(0,end),at,end);out.push(s&&!(end<tend&&s.length===end-at)?s:Buffer.alloc(0));p+=11;}
+  const at=text+d.readUInt32LE(p+4),end=Math.min(tend,at+MAX_PUSH),s=at<end?kit.cstr(d.subarray(at,end),0,end-at):null;out.push(s&&s.length<MAX_PUSH?s:Buffer.alloc(0));p+=11;}
  return out;}
 const clean=t=>kit.trimBoth(t.replace(/\\n/g,'\n'));
 /* an English (or other Latin-script) release keeps its dialogue as plain ASCII pushes: a string with letters and a space, sentence punctuation or a

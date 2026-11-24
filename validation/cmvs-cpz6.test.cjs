@@ -51,4 +51,55 @@ test('CMVS: a damaged text section (no NUL) gives empty pushes, not the rest of 
  assert.equal(list.length,200);assert.ok(list.every(s=>s.length===0));
  const ok=Buffer.concat([Buffer.from('abc\0','latin1'),Buffer.alloc(0x3000,0x41)]),one=cmvs.pushed(cmvs.unpackPs2(F.ps2aRaw(push(0),ok)));
  assert.equal(one[0].toString('latin1'),'abc');
+ /* #20: unterminated string reaching MAX_PUSH at tend must yield empty push, while short unterminated tail lines stay readable */
+ const shortText=F.sjis('朝の光');
+ const shortPs2=F.ps2aRaw(push(0),shortText);
+ assert.deepEqual(cmvs.parse(shortPs2).lines,['朝の光']);
+ const exactMax=F.ps2aRaw(push(0),Buffer.alloc(0x2000,0x41));
+ assert.deepEqual(cmvs.pushed(cmvs.unpackPs2(exactMax)),[Buffer.alloc(0)]);
+ const mixedText=Buffer.concat([F.sjis('正当な行。'),Buffer.from([0]),F.sjis('末尾の行')]);
+ const mixedPs2=F.ps2aRaw(Buffer.concat([push(0),push(F.sjis('正当な行。').length+1),push(mixedText.length+4)]),mixedText);
+ assert.deepEqual(cmvs.parse(mixedPs2).lines,['正当な行。','末尾の行']);
+ assert.deepEqual(cmvs.pushed(cmvs.unpackPs2(mixedPs2)).map(b=>b.length),[F.sjis('正当な行。').length,F.sjis('末尾の行').length,0]);
+});
+
+test('CMVS: readIndex bounds entry filenames to [cur + nameAt, cur + es) without bleeding into the next entry',t=>{
+ const crypto=require('node:crypto'),dir=tmp(t);
+ const inv=tb=>{const o=new Uint8Array(256);for(let i=0;i<256;i++)o[tb[i]]=i;return o;};
+ const noNulCpz=files=>{
+  const buf=Buffer.from(F.cpz(files,{version:6,variant:'Mirai',set:'cpz5'}));
+  const h=cmvs.header(buf),sc=cmvs.scheme(null,'cpz5'),v=sc.md5.find(x=>x.name==='Mirai'),md5=cmvs.md5Words(h.md5,v),mk=h.master;
+  const idx=Buffer.from(buf.subarray(h.indexAt,h.indexAt+h.dirSize+h.fileSize));
+  cmvs.stage1(idx,(mk^0x3795B39A)>>>0,sc);
+  const t1=cmvs.table(mk,md5[1],sc.factor),t2=cmvs.table(mk,md5[2],sc.factor),i1=inv(t1),i2=inv(t2);
+  for(let i=0;i<h.dirSize;i++)idx[i]=t1[0x3A^idx[i]];
+  cmvs.dirCipher(idx,h.dirSize,[(md5[0]^((mk+0x76A3BF29)>>>0))>>>0,(md5[1]^mk)>>>0,(md5[2]^((mk+0x10000000)>>>0))>>>0,(md5[3]^mk)>>>0],0);
+  const dirKey=idx.readUInt32LE(12),cur=h.dirSize+idx.readInt32LE(8),len=h.fileSize;
+  for(let i=cur;i<cur+len;i++)idx[i]=t2[0x7E^idx[i]];
+  cmvs.entryCipher(idx,cur,len,md5.map((m,j)=>(m^((dirKey+sc.dirAddend[j])>>>0))>>>0),sc.indexSeed,0,sc.entryIndexTail);
+  /* replace the NUL byte at the end of entry 0's 8-byte name ("a01.ps3\0") with 'x' so it fills [cur+0x18, cur+es) */
+  const es=idx.readInt32LE(cur);
+  for(let p=cur+h.nameAt;p<cur+es;p++)if(idx[p]===0)idx[p]=0x78;
+  /* re-encrypt entry block, dir block, stage1 and update header index MD5 + checksum */
+  const ek=md5.map((m,j)=>(m^((dirKey+sc.dirAddend[j])>>>0))>>>0);
+  let seed=sc.indexSeed,i=0;for(;i<len>>>2;i++){const o=cur+i*4;idx.writeUInt32LE(((cmvs.rotr((idx.readUInt32LE(o)-0x37A19E8B)>>>0,2)+seed)>>>0^ek[i&3])>>>0,o);seed=(seed-0x139FA9B)>>>0;}
+  for(let q=cur+i*4;q<cur+len;q++,i++)idx[q]=(((idx[q]-sc.entryIndexTail)&255)^(ek[i&3]>>>4))&255;
+  for(let q=cur;q<cur+len;q++)idx[q]=i2[idx[q]]^0x7E;
+  const dk=[(md5[0]^((mk+0x76A3BF29)>>>0))>>>0,(md5[1]^mk)>>>0,(md5[2]^((mk+0x10000000)>>>0))>>>0,(md5[3]^mk)>>>0];
+  seed=0x76548AEF;i=0;for(;i<h.dirSize>>>2;i++){idx.writeUInt32LE(((cmvs.rotr((idx.readUInt32LE(i*4)+seed)>>>0,3)+0x4A91C262)>>>0^dk[i&3])>>>0,i*4);seed=(seed+0x10FB562A)>>>0;}
+  for(let q=i*4;q<h.dirSize;q++,i++)idx[q]=(((idx[q]-0x37)&255)^(dk[i&3]>>>6))&255;
+  for(let q=0;q<h.dirSize;q++)idx[q]=i1[idx[q]]^0x3A;
+  const sk=sc.secret.map(s=>(s-((mk^0x3795B39A)>>>0))>>>0),k1=(mk^0x3795B39A)>>>0,sh=(((k1>>>24)^(k1>>>16)^(k1>>>8)^k1^0xB)&15)+7,n=idx.length>>>2;let j=5;
+  for(let p=0;p<n;p++){idx.writeUInt32LE(((cmvs.rotl((idx.readUInt32LE(p*4)-0x01010101)>>>0,sh)-sc.indexAddend)>>>0^sk[j])>>>0,p*4);j=(j+1)%24;}
+  for(let q=n*4,k=idx.length&3;k>0;k--,q++){idx[q]=(((idx[q]+sc.indexSub)&255)^(sk[j]>>>(k*4)))&255;j=(j+1)%24;}
+  idx.copy(buf,h.indexAt);crypto.createHash('md5').update(idx).digest().copy(buf,0x10);
+  let sum=0x923A564C;for(let o=0;o<0x3C;o+=4)sum=(sum+buf.readUInt32LE(o))>>>0;buf.writeUInt32LE(sum,0x3C);
+  return buf;
+ };
+ /* two entries: unterminated entry 0 stays "a01.ps3x" instead of bleeding into entry 1's 0x20 length byte ("a01.ps3x ") */
+ const f2=path.join(dir,'bleed.cpz');fs.writeFileSync(f2,noNulCpz({'a01.ps3':F.ps2a(JA),'b01.ps3':F.ps2a(['二本目。'])}));
+ assert.deepEqual(cmvs.list(f2).map(e=>e.name),['a01.ps3x','b01.ps3']);
+ /* single entry: unterminated entry 0 filling its slot stays readable as before */
+ const f1=path.join(dir,'nonul.cpz');fs.writeFileSync(f1,noNulCpz({'a01.ps3':F.ps2a(JA)}));
+ assert.deepEqual(cmvs.list(f1).map(e=>e.name),['a01.ps3x']);
 });
