@@ -106,10 +106,11 @@ test('CatSystem2: unchanged Shift-JIS bytes in bilingual cnscene.int are skipped
  };
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'cs2-unchanged-'));
  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
- const ja1=encodeSjis('「おはよう」'),ja2=encodeSjis('「あい」'),ja3=encodeSjis('「こんにちは」 \u3000'),ja3Trim=encodeSjis('「こんにちは」'),ja4=Buffer.from('OK','latin1');
+ const ja1=encodeSjis('「おはよう」'),ja2=encodeSjis('「あい」'),ja3=Buffer.from([0xb1]),ja4=Buffer.from('OK','latin1');
  const zh2=Buffer.from([0xc4,0xe3,0xba,0xc3]); // GBK '你好'
+ const zh3=Buffer.from([0xb1,0x81,0x40]); // GBK '眮@' (trailing 0x81 0x40 is NOT SJIS space to trim)
  const jpScene1=makeCatScene([ja1,ja2,ja3,ja4]);
- const cnScene1=makeCatScene([ja1,ja2,ja3,ja4, ja1,zh2,ja3Trim,ja4]);
+ const cnScene1=makeCatScene([ja1,ja2,ja3,ja4, ja1,zh2,zh3,ja4]);
  // Scene 2: every non-ASCII line left unchanged in Shift-JIS (no real translation)
  const jpScene2=makeCatScene([ja1]);
  const cnScene2=makeCatScene([ja1, ja1]);
@@ -118,12 +119,12 @@ test('CatSystem2: unchanged Shift-JIS bytes in bilingual cnscene.int are skipped
  const sc=cs2.scenes(dir);
  assert.equal(sc.length,2);
  const p0=cs2.parse(sc[0].read()),p1=cs2.parse(sc[1].read());
- assert.deepEqual(p0.lines,['「おはよう」','「あい」','「こんにちは」','OK']);
- assert.deepEqual(p0.zh,['','你好','','OK']);
+ assert.deepEqual(p0.lines,['「おはよう」','「あい」','ｱ','OK']);
+ assert.deepEqual(p0.zh,['','你好','眮@','OK']);
  assert.deepEqual(p1.zh,['']);
  const patched=cs2.patchLines([{name:sc[0].name,...p0},{name:sc[1].name,...p1}]);
  assert.equal(patched[0].patched,true);
- assert.deepEqual(patched[0].lines,['「おはよう」','你好','「こんにちは」','OK']);
+ assert.deepEqual(patched[0].lines,['「おはよう」','你好','眮@','OK']);
  assert.equal(patched[1].patched,undefined);
  assert.deepEqual(patched[1].lines,['「おはよう」']);
  assert.equal(cs2.patchLines([{name:sc[1].name,...p1}]),null);

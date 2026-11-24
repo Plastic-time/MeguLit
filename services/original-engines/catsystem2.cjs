@@ -66,7 +66,6 @@ function messages(z){const out=[];let name=null,voice=null;for(let i=16+z.readUI
   if(t===1&&c===0x21)name=z.subarray(i+2,e);else if(t===1&&c===0x20){out.push({text:z.subarray(i+2,e),name,voice});name=null;voice=null;}i=e+1;}
  return out;}
 const RUBY=/\[([^\[\]\/]+)\/([^\[\]]+)\]/g;
-function trimRaw(b){let s=-1,e=0;for(let i=0;i<b.length;){const c=b[i];if(c===0x20||c>=0x09&&c<=0x0d){i++;continue;}if(c===0x81&&i+1<b.length&&b[i+1]===0x40){i+=2;continue;}const step=(c>=0x81&&c<=0x9f||c>=0xe0&&c<=0xfc)&&i+1<b.length?2:1;if(s<0)s=i;i+=step;e=i;}return s<0?b.subarray(0,0):b.subarray(s,e);}
 function clean(s){return s.replace(RUBY,'$1').replace(/\\n/g,'\n').replace(/\\[a-zA-Z@]+/g,'').replace(/\\/g,'').trim();}
 function ruby(s){const pairs=[];for(const m of s.matchAll(RUBY))if(!/^・+$/.test(m[2]))pairs.push([m[1],m[2]]);return pairs.length?pairs:null;}
 
@@ -80,7 +79,7 @@ const catsystem2={
   return kif(jp).map((e,k)=>({name:'scene'+String(e.index).padStart(4,'0')+'.cst',read:()=>{
    const z=catScene(e.read());if(!z)return Buffer.from('{"ja":[],"zh":[]}');
    const mj=messages(z),ja=mj.map(m=>sjis.decode(m.text)),voices=mj.map(m=>m.voice||null);let zh=[];
-   const c=cn[k];if(c)try{const zc=catScene(c.read()),all=zc?messages(zc):[];if(all.length===2*ja.length&&all.slice(0,ja.length).every((m,j)=>sjis.decode(m.text)===ja[j]))zh=all.slice(ja.length).map((m,j)=>m.text.some(x=>x>=0x80)&&trimRaw(m.text).equals(trimRaw(mj[j].text))?'':gbk.decode(m.text));}catch{}
+   const c=cn[k];if(c)try{const zc=catScene(c.read()),all=zc?messages(zc):[];if(all.length===2*ja.length&&all.slice(0,ja.length).every((m,j)=>sjis.decode(m.text)===ja[j]))zh=all.slice(ja.length).map((m,j)=>m.text.some(x=>x>=0x80)&&m.text.equals(mj[j].text)?'':gbk.decode(m.text));}catch{}
    return Buffer.from(JSON.stringify({ja,zh,...(voices.some(Boolean)?{voices}:{})}));}}));},
  archives:()=>[],
  sources:dir=>[sceneFile(dir),patchFile(dir)].filter(Boolean),
