@@ -37,12 +37,22 @@ function cfi(key,rot){const k=Buffer.from(key,'hex'),K=i=>k[i&31]^0xa5;return (b
   buf.writeUInt32LE(rotr((buf.readUInt32LE(i+8)^rotr(rot[2],K(b+6)))>>>0,K(b-14)),i+8);
   buf.writeUInt32LE(rotl((buf.readUInt32LE(i+12)^rotl(rot[3],K(b+9)))>>>0,K(b-11)),i+12);}return buf;};}
 function decryptorOf(s){try{if(s.cipher==='camellia'&&/^[0-9a-f]{32}$/i.test(s.key))return camellia(s.key);if(s.cipher==='cfi'&&/^[0-9a-f]{64}$/i.test(s.key)&&Array.isArray(s.rotate)&&s.rotate.length===4)return cfi(s.key,s.rotate.map(x=>x>>>0));}catch{}return null;}
-let catalog=null;
-function packSchemes(){try{return require('../adapter-packs.cjs').params('malie-scheme');}catch{return [];}}
-function schemes(){const extra=packSchemes();if(catalog&&catalog.extra===extra)return catalog.list;const list=[];
- for(const {value:s} of extra){const dec=decryptorOf(s||{});if(dec)list.push({title:String(s.title||'adapter pack'),align:s.align>>>0||0x1000,dec});}
- let raw={};try{raw=require('./malie-schemes.json').schemes;}catch{}for(const [title,s] of Object.entries(raw)){const dec=decryptorOf(s);if(dec)list.push({title,align:s.align||0x1000,dec});}
- catalog={extra,list};return list;}
+const KNOWN_SCHEMES=(()=>{const list=[];let raw={};try{raw=require('./malie-schemes.json').schemes;}catch{}
+ for(const [title,s] of Object.entries(raw)){const dec=decryptorOf(s);if(dec)list.push({title,align:s.align||0x1000,dec});}
+ return list;})();
+let extraMemo={raw:null,list:[],fp:''};
+function extraSchemes(){
+ let raw=[];try{raw=require('../adapter-packs.cjs').params('malie-scheme');}catch{}
+ if(extraMemo.raw===raw)return extraMemo;
+ const list=[],fps=[];
+ for(const p of raw){const s=p?.value||{};const dec=decryptorOf(s);if(!dec)continue;
+  const align=s.align>>>0||0x1000,title=String(s.title||'adapter pack');
+  list.push({title,align,dec});
+  fps.push(s.cipher+':'+String(s.key).toLowerCase()+':'+align+':'+(Array.isArray(s.rotate)?s.rotate.map(x=>x>>>0).join('.'):'')+':'+title);}
+ extraMemo={raw,list,fp:fps.join('|')};
+ return extraMemo;
+}
+function schemes(extra=extraSchemes().list){return [...extra,...KNOWN_SCHEMES];}
 /* read length bytes at offset through a decryptor (null = plain) */
 function readDec(file,dec,offset,length){if(!Number.isSafeInteger(offset)||!Number.isSafeInteger(length)||offset<0||length<=0||!Number.isSafeInteger(offset+length))return Buffer.alloc(0);if(!dec)return kit.readAt(file,offset,length);const a=Math.floor(offset/16)*16,end=Math.ceil((offset+length)/16)*16;if(!Number.isSafeInteger(end))return Buffer.alloc(0);const b=kit.readAt(file,a,end-a);dec(b,a);return b.subarray(offset-a,offset-a+length);}
 
@@ -64,15 +74,18 @@ function libpList(file,scheme){const h=readDec(file,scheme.dec,0,16);if(h.length
   if(!(flags&0x30000)){if(off>k&&depth<16)dir(name?name+'/':'',off,esz,depth+1);continue;}if(off<0||off>=noff)continue;const at=base+table.readUInt32LE(off*4)*1024;if(at+esz<=fsz)out.push({name,offset:at,size:esz,dec:scheme.dec});}};
  dir('',0,1,0);return out.length?out:null;}
 /* the entries of a Malie archive (names with "/"), or null; tried: plain LIB, plain LIBU, each known key */
-function index(file){const fsz=kit.size(file);if(fsz<32)return null;const head=kit.readAt(file,0,16);if(head.length<16)return null;const sig=head.toString('latin1',0,4);
+function index(file,all=schemes()){const fsz=kit.size(file);if(fsz<32)return null;const head=kit.readAt(file,0,16);if(head.length<16)return null;const sig=head.toString('latin1',0,4);
  if(sig==='LIB\0'){const out=[];return libList(file,0,fsz,'',out)&&out.length?out:null;}
  if(sig==='LIBU'){const out=[];return libuList(file,null,0,'',out)&&out.length?out:null;}
- for(const s of schemes()){const b=Buffer.from(head);s.dec(b,0);const t=b.toString('latin1',0,4);
+ for(const s of all){const b=Buffer.from(head);s.dec(b,0);const t=b.toString('latin1',0,4);
   if(t==='LIBP'){const l=libpList(file,s);if(l)return Object.assign(l,{scheme:s.title});}
   if(t==='LIBU'){const out=[];if(libuList(file,s.dec,0,'',out)&&out.length)return Object.assign(out,{scheme:s.title});}}
  return null;}
 const listed=new Map();
-function list(file){const key=file+'|'+kit.size(file);if(!listed.has(key))listed.set(key,index(file));return listed.get(key);}
+function list(file){let st;try{st=fs.statSync(file);}catch{listed.delete(file);return null;}
+ const extra=extraSchemes(),key=st.size+':'+st.mtimeMs+':'+extra.fp,m=listed.get(file);
+ if(m&&m.key===key)return m.val;
+ const val=index(file,schemes(extra.list));listed.set(file,{key,val});return val;}
 function read(file,e){let b=readDec(file,e.dec||null,e.offset,e.size);if(/\.txtz$/i.test(e.name))b=kit.inflate(b);else if(/\.psbz$/i.test(e.name)&&b.toString('latin1',0,4)==='PSBZ')b=kit.inflate(b.subarray(8));return b;}
 
 /* ---- EXEC --------------------------------------------------------------------------------------------------------- */

@@ -71,6 +71,62 @@ test('PAZ: padding before the first tab keeps a tab-delimited message intact',()
  assert.deepStrictEqual(paz.parse(spaced).lines,['One\ttwo']);
 });
 
+test('PAZ: schemeOf() cache invalidates when paz-scheme adapter packs or file mtime change in the same process',t=>{
+ const packs=require('../services/adapter-packs.cjs'),orig=packs.params;
+ t.after(()=>{packs.params=orig;});
+ const dir=tmp('paz-pack-cache-');t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const idxKeyA='11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff';
+ const idxKeyB='22334455667788990011aabbccddeeff22334455667788990011aabbccddeeff';
+ const dataKeyA='ffeeddccbbaa00998877665544332211ffeeddccbbaa00998877665544332211';
+ const dataKeyB='00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
+ const schemeA={title:'Custom PAZ A',version:1,type:{sc:'pw123456'},arc:{scr:[idxKeyA,dataKeyA]}};
+ const schemeB={title:'Custom PAZ B',version:1,type:{sc:'pw123456'},arc:{scr:[idxKeyB,dataKeyB]}};
+ const schemeWrongData={title:'Custom PAZ A',version:1,type:{sc:'pw123456'},arc:{scr:[idxKeyA,dataKeyB]}};
+ const schemeWrongSc={title:'Custom PAZ A',version:1,type:{sc:'pw000000'},arc:{scr:[idxKeyA,dataKeyA]}};
+ const ja=Buffer.concat([Buffer.from('.message\t10\tryo-A001-0001\t\t','latin1'),Buffer.from([0x81,0x75,0x82,0xd0,0x82,0xc6,0x81,0x76]),Buffer.from('\r\n','latin1')]);
+ const blobA=pazFile('custom_paz',schemeA,'scr',{'A001.sc':ja});
+ const blobB=pazFile('custom_paz',schemeB,'scr',{'A001.sc':ja});
+ assert.strictEqual(blobA.length,blobB.length);
+ const pFile=path.join(dir,'scr.paz'),tSec=1700000000000;
+ fs.writeFileSync(pFile,blobA);
+ fs.utimesSync(pFile,new Date(tSec+100),new Date(tSec+100));
+ /* 1. No pack: schemeOf caches null */
+ packs.params=()=>[];
+ assert.strictEqual(paz.list(pFile),null);
+ /* 2. Wrong index key (count 1) still returns null */
+ const wrongIdx=[{value:schemeB,pack:'p@1'}];
+ packs.params=target=>target==='paz-scheme'?wrongIdx:[];
+ assert.strictEqual(paz.list(pFile),null);
+ /* 3. Right index key, wrong data key only -> updating data key (same count 1, same index key & sc) must invalidate */
+ const badData=[{value:schemeWrongData,pack:'p@2'}];
+ packs.params=target=>target==='paz-scheme'?badData:[];
+ const lBadData=paz.list(pFile);assert.ok(lBadData&&lBadData.length===1);
+ assert.notDeepStrictEqual(paz.parse(lBadData[0].read()).lines,['「ひと」']);
+ const right=[{value:schemeA,pack:'p@3'}];
+ packs.params=target=>target==='paz-scheme'?right:[];
+ assert.deepStrictEqual(paz.parse(paz.list(pFile)[0].read()).lines,['「ひと」']);
+ /* 4. Right index & data keys, wrong sc password only -> updating sc password must invalidate */
+ const badSc=[{value:schemeWrongSc,pack:'p@4'}];
+ packs.params=target=>target==='paz-scheme'?badSc:[];
+ assert.notDeepStrictEqual(paz.parse(paz.list(pFile)[0].read()).lines,['「ひと」']);
+ packs.params=target=>target==='paz-scheme'?right:[];
+ assert.deepStrictEqual(paz.parse(paz.list(pFile)[0].read()).lines,['「ひと」']);
+ /* 5. Same-size overwrite within the same second (different ms) switches between two active schemes */
+ const both=[{value:schemeA,pack:'p@5'},{value:schemeB,pack:'p@6'}];
+ packs.params=target=>target==='paz-scheme'?both:[];
+ assert.deepStrictEqual(paz.parse(paz.list(pFile)[0].read()).lines,['「ひと」']);
+ fs.writeFileSync(pFile,blobB);
+ fs.utimesSync(pFile,new Date(tSec+600),new Date(tSec+600));
+ const lSwitched=paz.list(pFile);assert.ok(lSwitched&&lSwitched.length===1);
+ assert.deepStrictEqual(paz.parse(lSwitched[0].read()).lines,['「ひと」']);
+ fs.writeFileSync(pFile,blobA);
+ fs.utimesSync(pFile,new Date(tSec+900),new Date(tSec+900));
+ assert.deepStrictEqual(paz.parse(paz.list(pFile)[0].read()).lines,['「ひと」']);
+ /* 6. Removing pack invalidates cached scheme */
+ packs.params=()=>[];
+ assert.strictEqual(paz.list(pFile),null);
+});
+
 test('Naninovel: "> Name: |#id|" gives the line its voice by text id; @choice and narration take none',()=>{
  const doc=['; 日本語 <ja> to 简体中文 <zh-Hans> localization document for \'A/B\' Naninovel scenario script','',
   '# 0101Adv31_Narrative001','; エマたちは食堂の調査にやってきた。','艾玛她们来到了食堂。','',

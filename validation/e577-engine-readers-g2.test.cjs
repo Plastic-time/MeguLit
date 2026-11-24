@@ -130,6 +130,43 @@ test('Malie: an adapter pack carries a new title key (params malie-scheme)',t=>{
  assert.equal(malie.index(path.join(game,'data.dat')).scheme,'New Title');assert.equal(scenes.read('malie',game)[0].lines.length,3);
  assert.ok(packs.CAPABILITIES.includes('params:malie-scheme'));
 });
+test('Malie: list() cache invalidates when malie-scheme adapter packs or file mtime change in the same process',t=>{
+ const packs=require('../services/adapter-packs.cjs'),kit=require('../services/original-engines/kit.cjs'),orig=packs.params;
+ t.after(()=>{packs.params=orig;});
+ const keyA='00112233445566778899aabbccddeeff',keyB='ffeeddccbbaa99887766554433221100';
+ const game=tmp(t),arc=path.join(game,'data.dat'),tSec=1700000000000;
+ const blobA=F.malieLibp({'exec.dat':F.malieExec(MJA)},{key:keyA,align:1024});
+ const blobB=F.malieLibp({'exec.dat':F.malieExec(MJA)},{key:keyB,align:1024});
+ assert.equal(blobA.length,blobB.length);
+ F.writeTree(game,{'data.dat':blobA,'game.exe':'MZ'});
+ fs.utimesSync(arc,new Date(tSec+100),new Date(tSec+100));
+ /* 1. No pack: list() caches null */
+ packs.params=()=>[];
+ assert.equal(malie.list(arc),null);
+ assert.equal(scenes.read('malie',game).length,0);
+ /* 2. Wrong pack (count 1) still returns null */
+ const wrong=[{value:{title:'Wrong',cipher:'camellia',key:keyB,align:1024},pack:'m@1'}];
+ packs.params=target=>target==='malie-scheme'?wrong:[];
+ assert.equal(malie.list(arc),null);
+ /* 3. Replacing with right pack (same count 1, archive untouched) immediately opens */
+ const right=[{value:{title:'Right',cipher:'camellia',key:keyA,align:1024},pack:'m@2'}];
+ packs.params=target=>target==='malie-scheme'?right:[];
+ assert.equal(malie.list(arc)?.scheme,'Right');
+ assert.equal(scenes.read('malie',game)[0].lines.length,3);
+ /* 4. Repeated list() with unchanged pack & file reuses cache without re-reading the archive */
+ const origRead=kit.readAt;let reads=0;kit.readAt=(...a)=>{reads++;return origRead(...a);};
+ try{assert.equal(malie.list(arc)?.scheme,'Right');assert.equal(reads,0);}finally{kit.readAt=origRead;}
+ /* 5. Same-size overwrite within the same second (different ms) invalidates list() */
+ fs.writeFileSync(arc,blobB);
+ fs.utimesSync(arc,new Date(tSec+600),new Date(tSec+600));
+ assert.equal(malie.list(arc),null);
+ fs.writeFileSync(arc,blobA);
+ fs.utimesSync(arc,new Date(tSec+900),new Date(tSec+900));
+ assert.equal(malie.list(arc)?.scheme,'Right');
+ /* 6. Removing pack invalidates cached list */
+ packs.params=()=>[];
+ assert.equal(malie.list(arc),null);
+});
 test('Malie: readDec, LIBU and LIBP decrypt entries across 2 GiB and past 4 GiB without 32-bit offset truncation',t=>{
  const crypto=require('node:crypto'),kit=require('../services/original-engines/kit.cjs');
  const schemes=require('../services/original-engines/malie-schemes.json').schemes;
