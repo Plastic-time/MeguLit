@@ -30,9 +30,16 @@ const negate=b=>{const o=Buffer.allocUnsafe(b.length);for(let i=0;i<b.length;i++
 const SCHEMES=require('./marble-schemes.json'),KNOWN=Object.entries(SCHEMES).filter(([k])=>k[0]!=='_').map(([,v])=>v);
 const sjisBytes=s=>kit.encodeSjis(s);
 const keyOf=v=>v?.hex&&/^([0-9a-f]{2})+$/i.test(v.hex)?Buffer.from(v.hex,'hex'):typeof v?.key==='string'?sjisBytes(v.key):null;
-const KNOWN_KEYS=KNOWN.map(keyOf).filter(k=>k&&k.length);
-function extraKeys(){let extra=[];try{extra=require('../adapter-packs.cjs').params('marble-key').map(p=>p&&p.value);}catch{}return extra.map(keyOf).filter(k=>k&&k.length);}
-function packKeys(extra=extraKeys()){return [...extra,...KNOWN_KEYS];}
+const KNOWN_KEYS=KNOWN.map(keyOf).filter(Boolean);
+let extraMemo={raw:null,keys:[],fp:''};
+function extraKeys(){
+ let raw=[];try{raw=require('../adapter-packs.cjs').params('marble-key');}catch{}
+ if(extraMemo.raw===raw)return extraMemo;
+ const keys=raw.map(p=>keyOf(p.value)).filter(Boolean);
+ extraMemo={raw,keys,fp:keys.map(k=>k.toString('hex')).join(',')};
+ return extraMemo;
+}
+function packKeys(extra=extraKeys().keys){return [...extra,...KNOWN_KEYS];}
 /* how much a decrypted script looks like Marble's: NUL-separated strings (one every ~100 bytes at least) that decode
    cleanly, with CJK text among them. GBK patches decode almost any byte pair, so the separators carry the check */
 function plausible(b){const t=b.subarray(0,32768),dec=new TextDecoder(kit.codepage(t)),parts=t.toString('latin1').split('\0').filter(Boolean);if(parts.length<t.length/120)return 0;
@@ -47,9 +54,9 @@ function cipherFor(file,entries,keys=packKeys()){const sample=entries.filter(e=>
  return null;}
 const memo=new Map();
 function opened(file){let stat;try{stat=fs.statSync(file);}catch{memo.delete(file);return null;}
- const extra=extraKeys(),st=stat.size+':'+stat.mtimeMs+':'+extra.map(k=>k.toString('hex')).join(','),m=memo.get(file);
- if(m&&m.st===st)return m.v;const l=list(file);const v=l?{list:l,cipher:cipherFor(file,l,packKeys(extra))}:null;memo.set(file,{st,v});return v;}
-function decode(file,e){const b=kit.readAt(file,e.offset,e.size),c=opened(file)?.cipher;if(!c)return negate(b);if(c.key)return kit.xor(b,c.key);if(c.negate)return negate(b);return b;}
+ const extra=extraKeys(),st=stat.size+':'+stat.mtimeMs+':'+extra.fp,m=memo.get(file);
+ if(m&&m.st===st)return m.v;const l=list(file);const v=l?{list:l,cipher:cipherFor(file,l,packKeys(extra.keys))}:null;memo.set(file,{st,v});return v;}
+function decode(file,e){const b=kit.readAt(file,e.offset,e.size),m=memo.get(file),c=(m?m.v:opened(file))?.cipher;if(!c)return negate(b);if(c.key)return kit.xor(b,c.key);if(c.negate)return negate(b);return b;}
 
 function parse(buf){const lines=[],anchors=[];const dec=kit.decoder([buf]);
  for(const part of buf.toString('latin1').split('\0')){if(!part)continue;const b=Buffer.from(part,'latin1');const t=kit.trimBoth(dec.decode(b));if(!t||t.includes('�'))continue;
