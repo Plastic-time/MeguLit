@@ -16,13 +16,23 @@ const SCHEMES={
 /* E452 every PazScheme GARbro knows (paz-schemes.json, from its Formats.dat: minori eden*, ef, Trinoline, Musica titles ...).
    A Steam build names itself in the header ("eden_en") but GARbro keys schemes by title, so an archive whose header has
    no built-in scheme takes the first scheme whose index key decrypts a sane index of that archive. */
-let catalog=null;
 /* E561 an adapter pack's paz schemes (params target "paz-scheme", same shape as a paz-schemes.json entry plus "title") come first */
-function packPaz(){try{return require('../adapter-packs.cjs').params('paz-scheme');}catch{return [];}}
-function schemes(){const extra=packPaz();if(catalog&&catalog.extra===extra)return catalog;catalog=Object.values(SCHEMES);
- for(const {value:s} of extra){try{if(typeof s.title!=='string')continue;const o={title:s.title,version:s.version|0,sc:s.type?.sc||'',ogg:s.type?.ogg||''};for(const [a,k] of Object.entries(s.arc||{}))if(Array.isArray(k)&&typeof k[0]==='string'&&typeof k[1]==='string')o[a]={index:k[0],data:k[1]};catalog.push(o);}catch{}}let raw={};try{raw=JSON.parse(fs.readFileSync(path.join(__dirname,'paz-schemes.json'),'utf8'));}catch{}
- for(const [title,s] of Object.entries(raw)){const o={title,version:s.version|0,sc:s.type?.sc||'',ogg:s.type?.ogg||''};for(const [a,k] of Object.entries(s.arc||{}))if(k&&k[0]&&k[1])o[a]={index:k[0],data:k[1]};catalog.push(o);}
- catalog.extra=extra;return catalog;}
+const KNOWN_SCHEMES=(()=>{const out=[];let raw={};try{raw=JSON.parse(fs.readFileSync(path.join(__dirname,'paz-schemes.json'),'utf8'));}catch{}
+ for(const [title,s] of Object.entries(raw)){const o={title,version:s.version|0,sc:s.type?.sc||'',ogg:s.type?.ogg||''};for(const [a,k] of Object.entries(s.arc||{}))if(k&&k[0]&&k[1])o[a]={index:k[0],data:k[1]};out.push(o);}
+ return out;})();
+let extraMemo={raw:null,list:[],fp:''};
+function extraSchemes(){
+ let raw=[];try{raw=require('../adapter-packs.cjs').params('paz-scheme');}catch{}
+ if(extraMemo.raw===raw)return extraMemo;
+ const list=[],fps=[];
+ for(const p of raw){try{const s=p?.value;if(!s||typeof s.title!=='string')continue;
+  const o={title:s.title,version:s.version|0,sc:s.type?.sc||'',ogg:s.type?.ogg||''},arcs=[];
+  for(const [a,k] of Object.entries(s.arc||{}))if(Array.isArray(k)&&typeof k[0]==='string'&&typeof k[1]==='string'){o[a]={index:k[0],data:k[1]};arcs.push([a,k[0].toLowerCase(),k[1].toLowerCase()]);}
+  arcs.sort((x,y)=>x[0]<y[0]?-1:x[0]>y[0]?1:0);list.push(o);fps.push([o.title,o.version,o.sc,o.ogg,arcs]);}catch{}}
+ extraMemo={raw,list,fp:JSON.stringify(fps)};
+ return extraMemo;
+}
+function schemes(extra=extraSchemes().list){return [...Object.values(SCHEMES),...extra,...KNOWN_SCHEMES];}
 function rc4(key,skip=0){const S=new Uint8Array(256);for(let i=0;i<256;i++)S[i]=i;let j=0;for(let i=0;i<256;i++){j=(j+S[i]+key[i%key.length])&255;const t=S[i];S[i]=S[j];S[j]=t;}let a=0,b=0;
  for(let k=0;k<skip;k++){a=(a+1)&255;b=(b+S[a])&255;const t=S[a];S[a]=S[b];S[b]=t;} /* version 2: GARbro skips (crc32(key)>>12)&255 bytes */
  return buf=>{for(let i=0;i<buf.length;i++){a=(a+1)&255;b=(b+S[a])&255;const t=S[a];S[a]=S[b];S[b]=t;buf[i]^=S[(S[a]+S[b])&255];}return buf;};}
@@ -33,11 +43,14 @@ function opens(file,scheme,arc,total){if(!scheme[arc])return false;const start=s
  const raw=readAt(file,start+4,16);if(xor)for(let i=0;i<16;i++)raw[i]^=xor;const d=new Blowfish(Buffer.from(scheme[arc].index,'hex')).decryptBuffer(raw),count=d.readUInt32LE(0);
  if(!count||count>100000)return false;for(let i=4;i<16;i++){const c=d[i];if(c===0)return i>4;if(c<0x20||c===0x7f)return false;}return true;}
 const chosen=new Map();
-function schemeOf(file){let head,total;try{total=fs.statSync(file).size;head=readAt(file,0,32);}catch{return null;}
- const arc=path.parse(file).name.toLowerCase(),key=file+'|'+total;if(chosen.has(key))return chosen.get(key);
+function schemeOf(file){let st;try{st=fs.statSync(file);}catch{chosen.delete(file);return null;}
+ const total=st.size,extra=extraSchemes(),key=total+':'+st.mtimeMs+':'+extra.fp,m=chosen.get(file);
+ if(m&&m.key===key)return m.val;
+ let head;try{head=readAt(file,0,32);}catch{chosen.delete(file);return null;}
+ const arc=path.parse(file).name.toLowerCase();
  const name=head.toString('latin1',0,head.indexOf(0)>0?head.indexOf(0):0);let found=SCHEMES[name]&&SCHEMES[name][arc]?SCHEMES[name]:null;
- if(!found&&/\.(?:paz|dat)$/i.test(file))found=schemes().find(s=>{try{return opens(file,s,arc,total);}catch{return false;}})||null;
- chosen.set(key,found);return found;}
+ if(!found&&/\.(?:paz|dat)$/i.test(file))found=schemes(extra.list).find(s=>{try{return opens(file,s,arc,total);}catch{return false;}})||null;
+ chosen.set(file,{key,val:found});return found;}
 function list(file){const scheme=schemeOf(file),arc=path.parse(file).name.toLowerCase();if(!scheme||!scheme[arc])return null;
  // E450 the index is read, entries are read from the file when asked for (voice.dat is two gigabytes)
  const total=fs.statSync(file).size,at=(o,n)=>readAt(file,o,n);
