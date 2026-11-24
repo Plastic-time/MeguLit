@@ -14,7 +14,7 @@ function installation(dir){
   if(kit.head(executable,2).toString('ascii')!=='MZ'||!kit.readAt(executable,BRAND_OFFSET,BRAND.length).equals(BRAND))return null;
   const key=kit.readAt(executable,KEY_OFFSET,KEY_LENGTH+1);
   if(key.indexOf(0)!==KEY_LENGTH)return null;
-  const files=kit.files(dir,{name:/\.pac$/i,subs:['data'],max:128});
+  const files=kit.files(dir,{name:/\.pac$/i,subs:['data'],max:20000});
   return {executable,key:kit.not(key.subarray(0,KEY_LENGTH)),files};
  }catch{return null;}
 }
@@ -37,15 +37,25 @@ function parse(data){
   if(command.startsWith('/*')){comment=!command.endsWith('*/');continue;}
   if(command.startsWith('#'))anchors.push(command);
   if(!TEXT_COMMANDS.has(command))continue;
-  const line=(rows[++i]||'').trim().replace(/@[\w.-]+\.wav$/i,'').replace(/\\n/g,'\n').trim();
+  const payload=(rows[i+1]||'').trim();
+  if(payload.startsWith('/*'))continue;
+  i++;
+  const line=payload.replace(/@[\w.-]+\.wav$/i,'').replace(/\\n/g,'\n').trim();
   if(line)lines.push(line);
  }
  return {lines,anchors};
 }
 
-const engine={id:'sia',
+const engine={id:'sia',hint:'data\\*.pac',
  sources(dir){const game=installation(dir);return game?[game.executable,...game.files]:[];},
- scenes(dir){const game=installation(dir);return game?game.files.map(file=>({name:path.basename(file),read:()=>read(file,game.key)})):[];},
+ scenes(dir){
+  const game=installation(dir);
+  if(!game||!require('./registry.cjs').readersFor(dir).includes('sia'))return [];
+  return game.files.map(file=>({name:path.basename(file),read:()=>read(file,game.key)}));
+ },
  parse,
+ // A replacement PAC cannot be read with the installed executable's key by assumption.
+ test:()=>false,
+ archives:()=>[],
 };
 module.exports={engine,probe:dir=>!!installation(dir)?.files.length};

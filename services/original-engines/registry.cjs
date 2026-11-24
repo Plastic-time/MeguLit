@@ -24,7 +24,6 @@ const ENGINES=[
  {name:'Kogado (HyPack)',hook:null,test:f=>f.magicAny(/\.pak$/i,'HyPack')},
  {name:'Majiro',hook:true,test:f=>f.has(/^scenario\.arc$/i)&&f.has(/\.arc$/i)},
  {name:'QLIE',hook:true,test:f=>f.sub('GameData',/\.pack$/i)},
- {name:'SIA-Soft',hook:null,test:f=>f.has(/^1055\.exe$/i)&&f.inspect(require('./sia.cjs').probe)},
  /* E568 Softpal keeps PAL.dll in dll\ (時計仕掛けのレイライン); its archives start "PAC " (NeXAS: "PAC" + a version byte) */
  {name:'SoftPal',hook:true,test:f=>f.has(/^pal\.dll$/i)||f.sub('dll',/^pal\.dll$/i)||f.magic(/^data\.pac$/i,'PAC ')||(f.has(/^data\.pac$/i)&&f.has(/^script\.src$/i))},
  {name:'NeXAS',hook:true,test:f=>f.has(/^thumbnail\.pac$/i)||f.has(/^update\.pac$/i)||f.has(/^script\.pac$/i)&&!f.magic(/^script\.pac$/i,'PAC ')},
@@ -193,12 +192,14 @@ const ENGINES=[
  // A Unity build keeps <Name>_Data beside <Name>.exe. A folder that only holds something named *_Data (a library
  // folder, or the folder a game was unpacked into) is not a Unity game by itself.
  {name:'Unity',hook:null,generic:true,test:f=>f.has(/^unityplayer\.dll$/i)||f.names.some(n=>/_Data$/i.test(n)&&f.names.some(e=>e.toLowerCase()===n.slice(0,-5).toLowerCase()+'.exe'))},
- /* E610 generic web bundles last: named engines of the family with no signature of their own read through the generic HTML5 reader */
+ /* E610 generic web bundles: named engines of the family with no signature of their own read through the generic HTML5 reader */
  {name:'O2 Engine / Novelsphere',hook:null,generic:true,test:f=>f.names.some(n=>/novelsphere/i.test(n))},
  {name:'NVLMaker',hook:null,generic:true,test:f=>f.names.some(n=>/nvlmaker/i.test(n))},
  {name:'CloudNovel',hook:null,generic:true,test:f=>f.names.some(n=>/cloudnovel/i.test(n))},
  {name:'HTMLVN',hook:null,generic:true,test:f=>f.names.some(n=>/htmlvn/i.test(n))},
  {name:'HTML5 / Electron / NW.js',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'html5'))},
+ // The SIA layout check is a fallback so a second executable cannot take another engine's registration.
+ {name:'SIA-Soft',hook:null,test:f=>f.has(/^1055\.exe$/i)&&f.inspect(require('./sia.cjs').probe)},
 ];
 /* the readers of each engine */
 const READERS={"BGI / Ethornell":["bgi"],
