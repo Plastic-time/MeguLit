@@ -90,7 +90,8 @@ function actorsOf(files){const a=[...files.values()].find(x=>/^actors\./i.test(x
 const wrap=(name,data,actors)=>Buffer.from(JSON.stringify({rpgmaker:1,name:mvName(name),actors,data:xpLists(data)}));
 function scenes(dir){const files=dataFiles(dir);let actors=null;
  return [...files.values()].filter(x=>SCENE.test(x.name)).sort((a,b)=>a.name.localeCompare(b.name)).map(x=>({name:x.name,read:()=>{actors=actors||actorsOf(files);const d=decode(x.read());return wrap(x.name,d,actors);}}));}
-const parse=buf=>{const b=Buffer.isBuffer(buf)?buf:Buffer.from(buf);if(b[0]===4&&b[1]===8){const d=decode(b);return d?rpgmaker.parse(wrap('Map000.rxdata',d,[])):{lines:[],anchors:[]};}return rpgmaker.parse(b);};
+const bareName=d=>Array.isArray(d)?(d.some(e=>e&&Array.isArray(e.pages))?'Troops.rxdata':'CommonEvents.rxdata'):'Map000.rxdata';
+const parse=buf=>{const b=Buffer.isBuffer(buf)?buf:Buffer.from(buf);if(b[0]===4&&b[1]===8){const d=decode(b);return d?rpgmaker.parse(wrap(bareName(d),d,[])):{lines:[],anchors:[]};}return rpgmaker.parse(b);};
 /* a translated copy: the same data files (loose or in the patch's own archive), paired by message key as for MV */
 function patchLines(base,found){const byName=new Map();
  for(const d of found.dirs){let files;try{files=dataFiles(d);}catch{continue;}if(!files.size)continue;let actors=null;
