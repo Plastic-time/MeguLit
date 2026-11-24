@@ -96,6 +96,20 @@ test('Willadv: a Will ARC whose scripts are not the first extension is recognise
  assert.equal(library.engineOf(game)?.name,'Willadv');assert.equal(scenes.detect(game),'advhd');
  const own=scenes.read('advhd',game);assert.deepEqual(own[0].lines,['ひなた',JA[0],JA[1]]);
 });
+test('Willadv: 13-byte name Will ARC with short (<=9 byte) names is not misread as 9-byte layout',t=>{
+ const u32=F.u32,fixed=(s,n)=>{const b=Buffer.alloc(n);Buffer.from(s,'latin1').copy(b);return b;};
+ const willArc13=groups=>{const exts=Object.keys(groups);let dir=4+exts.length*12;const head=[u32(exts.length)],idx=[],datas=[];
+  let dataAt=dir+exts.reduce((n,e)=>n+Object.keys(groups[e]).length*21,0);
+  for(const e of exts){head.push(fixed(e,4),u32(Object.keys(groups[e]).length),u32(dir));
+   for(const [n,b] of Object.entries(groups[e])){const enc=e==='WSC'?Buffer.from(b.map(c=>((c<<2)|(c>>>6))&255)):b;idx.push(fixed(n,13),u32(enc.length),u32(dataAt));datas.push(enc);dataAt+=enc.length;dir+=21;}}
+  return Buffer.concat([...head,...idx,...datas]);};
+ const script=F.wsc('ひなた',JA[0],JA[1]);
+ const single=tmp(t);put(single,'Rio.arc',willArc13({WSC:{s01:script}}));
+ assert.deepEqual(scenes.read('advhd',single)[0].lines,['ひなた',JA[0],JA[1]]);
+ const multi=tmp(t);put(multi,'data.arc',willArc13({OGG:{bgm01:Buffer.alloc(80,1)},WSC:{s01:script,s02:F.wsc('真琴',JA[1],JA[2])}}));
+ const own=scenes.read('advhd',multi);assert.equal(own.length,2);
+ assert.deepEqual(own[0].lines,['ひなた',JA[0],JA[1]]);assert.deepEqual(own[1].lines,['真琴',JA[1],JA[2]]);
+});
 
 /* ---- archive + generic scan ----------------------------------------------------------------------------------------- */
 const TXT=enc=>F.textScript(JA,enc),TXZ=()=>F.textScript(ZH,gbk);

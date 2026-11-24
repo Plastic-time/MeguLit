@@ -12,9 +12,21 @@ const sj=kit.SJIS;
 const PROSE=/[ぁ-ゖァ-ヺ一-龯]/;
 function list(b,fileSize=b.length){if(b.length<16)return null;const n=b.readInt32LE(0);if(n<=0||n>0xff||4+n*12>b.length)return null;const exts=[];
  for(let i=0;i<n;i++){const p=4+i*12,ext=b.toString('latin1',p,p+4).replace(/\0.*$/s,'');if(!/^[A-Za-z0-9]{1,4}$/.test(ext))return null;exts.push({ext,count:b.readUInt32LE(p+4),dir:b.readUInt32LE(p+8)});}
- const read=size=>{const out=[];for(const e of exts){let d=e.dir;for(let i=0;i<e.count;i++){if(d+size+8>b.length)return null;const name=b.toString('latin1',d,d+size).replace(/\0.*$/s,'');
-   const s=b.readUInt32LE(d+size),o=b.readUInt32LE(d+size+4);if(!name||o+s>fileSize)return null;out.push({name:name+'.'+e.ext.toLowerCase(),size:s,offset:o});d+=size+8;}}return out;};
- return read(9)||read(13);}
+ const headEnd=4+n*12,ordered=exts.filter(e=>e.count>0).sort((a,b)=>a.dir-b.dir);
+ const read=size=>{const rec=size+8,out=[];let tight=ordered.length>1;
+  for(let k=0;k<ordered.length;k++){const e=ordered[k],end=e.dir+e.count*rec;
+   if(e.dir<headEnd||end>b.length||end>fileSize)return null;
+   if(k+1<ordered.length){if(end>ordered[k+1].dir)return null;if(end!==ordered[k+1].dir)tight=false;}}
+  const dirEnd=ordered.length?ordered[ordered.length-1].dir+ordered[ordered.length-1].count*rec:headEnd;
+  let minOff=Infinity,maxEnd=0,bytes=0;
+  for(const e of exts){let d=e.dir;for(let i=0;i<e.count;i++){const name=b.toString('latin1',d,d+size).replace(/\0.*$/s,'');
+   const s=b.readUInt32LE(d+size),o=b.readUInt32LE(d+size+4);
+   if(!name||o<dirEnd||o+s>fileSize)return null;
+   if(o<minOff)minOff=o;if(o+s>maxEnd)maxEnd=o+s;bytes+=s;
+   out.push({name:name+'.'+e.ext.toLowerCase(),size:s,offset:o});d+=rec;}}
+  return {out,score:(tight?8:0)+(minOff===dirEnd?4:0)+(maxEnd===fileSize?2:0)+(bytes>0?1:0)};};
+ const a=read(9),c=read(13);
+ return a&&c?(c.score>a.score?c.out:a.out):(a||c)?.out||null;}
 function decode(raw){const d=Buffer.from(raw);for(let i=0;i<d.length;i++)d[i]=((d[i]>>>2)|(d[i]<<6))&255;return d;}
 function cstr(d,p){const e=d.indexOf(0,p);return e<0?null:{s:d.subarray(p,e),next:e+1};}
 // Inline codes (%K wait for a click, %P new page, %N new line ...) are dropped.
