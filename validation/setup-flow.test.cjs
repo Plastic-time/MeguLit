@@ -83,6 +83,8 @@ const tmp=p=>fs.mkdtempSync(path.join(tmpBase,p));
 test('Install pressed first: download keeps going, each pack is unpacked as soon as it arrives',{skip,timeout:120000},async()=>{
  const src=await server(512*1024),work=tmp('msf-first-'),root=fakeRoot(path.join(work,'from'),src),target=path.join(work,'to','MeguLit'),stage=path.join(work,'to',".megulit-download");
  try{
+  fs.mkdirSync(path.join(root,'Anki'));
+  fs.writeFileSync(path.join(root,'Anki','anki.exe'),'user Anki');
   const shots=process.env.MEGULIT_SETUP_SHOTS?{'download-start':path.join(process.env.MEGULIT_SETUP_SHOTS,'1-confirmed-downloading.png')}:{};
   const ev=await runWindow(root,{MEGULIT_SETUP_AUTOSTART:'now',MEGULIT_SETUP_TARGET:target,MEGULIT_SETUP_STAGING:stage},{shots});
   assert.equal(ev.at(-1).code,3,'moved to the chosen folder: '+JSON.stringify(ev));
@@ -90,6 +92,7 @@ test('Install pressed first: download keeps going, each pack is unpacked as soon
   assert.ok(at(ev,'unpack-start',e=>e.id==='base')<at(ev,'downloaded',e=>e.id==='voice'),'base unpacked while voice was still downloading');
   for(const id of ['base','reading','voice'])assert.ok(has(target,id),id+' installed in the target');
   assert.ok(fs.existsSync(path.join(target,'MeguLit.exe')),'program copied');
+  assert.equal(fs.readFileSync(path.join(target,'Anki','anki.exe'),'utf8'),'user Anki');
   assert.equal(fs.existsSync(stage),false,'staging folder removed');
   assert.equal(fs.existsSync(path.join(root,'runtime')),false,'nothing unpacked in the source folder');
  }finally{src.close();fs.rmSync(work,{recursive:true,force:true,maxRetries:30,retryDelay:300});}

@@ -15,6 +15,7 @@ build-manifest.json
 
 # Runtime, models and third-party binaries (fetched or built separately)
 runtime/*
+/Anki/
 !runtime/NODE-LICENSE.txt
 models/
 *.gguf

@@ -6,7 +6,7 @@
 #   1. copies itself to %TEMP%\megulit-uninstall-<pid> and runs from there, so the install folder can go;
 #   2. shows the plan and the 「保留本地账户数据」 choice (default on);
 #   3. stops every process started from the install folder (MeguLit, node, Python, HookBridge, GalWindowBridge, ...),
-#      runs the plan with node (--leave-root), then removes the install folder itself, keeping data\ and secrets\
+#      runs the plan with node (--leave-root), then removes the install folder itself, keeping data\, secrets\ and Anki\
 #      in place when asked, with a note saying what they are;
 #   4. leaves a hidden cmd that retries anything still locked and deletes the temp copy.
 # -DryRun prints the plan to the console and changes nothing.
@@ -93,7 +93,7 @@ function Root-Lists([bool]$keep) {
   foreach ($e in @(Get-ChildItem -LiteralPath $Root -Force -ErrorAction SilentlyContinue)) {
     $n = $e.Name.ToLower()
     if ($keep -and $n -eq 'data') { foreach ($d in @(Get-ChildItem -LiteralPath $e.FullName -Force -ErrorAction SilentlyContinue)) { if ($dataCaches -contains $d.Name.ToLower()) { $remove += $d.FullName } else { $kept += $d.FullName } } }
-    elseif ($keep -and ($n -eq 'secrets' -or $e.Name -eq $keepNote)) { $kept += $e.FullName }
+    elseif ($keep -and ($n -eq 'secrets' -or $n -eq 'anki' -or $e.Name -eq $keepNote)) { $kept += $e.FullName }
     else { $remove += $e.FullName }
   }
   @{ remove = $remove; kept = $kept }
@@ -150,23 +150,23 @@ $X = @{
   cardProgram='删除程序'; cardProgramSub='{0} 里的程序、运行组件、缓存和日志'
   cardGames='还原游戏'; cardGamesSub='只把 MeguLit 改过的文件改回去，存档和其他文件不动'; more='还有 {0} 个游戏…'
   cardTraces='清理痕迹'; tr_shortcuts='快捷方式 {0} 个'; tr_entry='「应用和功能」卸载项'; tr_paths='Windows 的程序路径记录 {0} 项'; tr_webview='WebView 用户数据'; tr_temp='临时文件 {0} 项'
-  keepShort='账户登录、游戏库与阅读记录、生词本、设置和自定义封面会留在 {0}，以后把 MeguLit 装回这里就能接着用'
+  keepShort='账户登录、游戏库与阅读记录、生词本、设置、自定义封面和 Anki 程序会留在 {0}，以后把 MeguLit 装回这里就能接着用'
   details='查看完整清单'; detailsTitle='完整清单'; close='关闭'
-  k_cfg='账户登录与设置'; k_db='游戏库、阅读记录、生词本'; k_assets='自定义封面'; k_secrets='中继密钥'; failCard='这些没能处理'; sep='、'; okShort='MeguLit 已卸载'; keptHead='你的数据保留在这里'; openFolder='打开文件夹' }
+  k_cfg='账户登录与设置'; k_db='游戏库、阅读记录、生词本'; k_assets='自定义封面'; k_secrets='中继密钥'; k_anki='Anki 程序'; ankiRunning='Anki 仍在运行。退出后可删除这个文件夹。'; failCard='这些没能处理'; sep='、'; okShort='MeguLit 已卸载'; keptHead='你的数据保留在这里'; openFolder='打开文件夹' }
  en = @{ chipFiles='program items'; chipGames='games to restore'; chipShortcuts='shortcuts'; chipReg='registry entries'
   cardProgram='Remove the program'; cardProgramSub='Program, runtime, caches and logs in {0}'
   cardGames='Restore games'; cardGamesSub='Only files MeguLit changed are put back; saves and other files stay'; more='{0} more…'
   cardTraces='Clean up traces'; tr_shortcuts='{0} shortcut(s)'; tr_entry='Apps & features entry'; tr_paths='{0} program path record(s)'; tr_webview='WebView user data'; tr_temp='{0} temp item(s)'
-  keepShort='Sign-in, library, reading history, vocabulary, settings and custom covers stay in {0}; install MeguLit here again to continue'
+  keepShort='Sign-in, library, reading history, vocabulary, settings, custom covers and the Anki program stay in {0}; install MeguLit here again to continue'
   details='Show full list'; detailsTitle='Full list'; close='Close'
-  k_cfg='Sign-in and settings'; k_db='Library, reading history, vocabulary'; k_assets='Custom covers'; k_secrets='Relay secrets'; failCard='Not handled'; sep=', '; okShort='MeguLit is uninstalled'; keptHead='Your data is kept here'; openFolder='Open folder' }
+  k_cfg='Sign-in and settings'; k_db='Library, reading history, vocabulary'; k_assets='Custom covers'; k_secrets='Relay secrets'; k_anki='Anki program'; ankiRunning='Anki is still running. Close it before deleting this folder.'; failCard='Not handled'; sep=', '; okShort='MeguLit is uninstalled'; keptHead='Your data is kept here'; openFolder='Open folder' }
  ja = @{ chipFiles='プログラム項目'; chipGames='戻すゲーム'; chipShortcuts='ショートカット'; chipReg='レジストリ項目'
   cardProgram='プログラムを削除'; cardProgramSub='{0} のプログラム・実行コンポーネント・キャッシュ・ログ'
   cardGames='ゲームを元に戻す'; cardGamesSub='MeguLit が変更したファイルだけを戻します。セーブなどはそのまま'; more='ほか {0} 件…'
   cardTraces='痕跡を整理'; tr_shortcuts='ショートカット {0} 個'; tr_entry='「アプリと機能」の項目'; tr_paths='プログラムパスの記録 {0} 件'; tr_webview='WebView ユーザーデータ'; tr_temp='一時ファイル {0} 件'
-  keepShort='ログイン情報・ライブラリ・読書履歴・単語帳・設定・カスタムカバーは {0} に残ります。ここに入れ直せば続きから使えます'
+  keepShort='ログイン情報・ライブラリ・読書履歴・単語帳・設定・カスタムカバー・Anki プログラムは {0} に残ります。ここに入れ直せば続きから使えます'
   details='すべての項目を表示'; detailsTitle='すべての項目'; close='閉じる'
-  k_cfg='ログイン情報と設定'; k_db='ライブラリ・読書履歴・単語帳'; k_assets='カスタムカバー'; k_secrets='リレーの鍵'; failCard='処理できなかった項目'; sep='・'; okShort='アンインストールしました'; keptHead='データはここに残っています'; openFolder='フォルダーを開く' }
+  k_cfg='ログイン情報と設定'; k_db='ライブラリ・読書履歴・単語帳'; k_assets='カスタムカバー'; k_secrets='リレーの鍵'; k_anki='Anki プログラム'; ankiRunning='Anki は実行中です。終了後にフォルダーを削除できます。'; failCard='処理できなかった項目'; sep='・'; okShort='アンインストールしました'; keptHead='データはここに残っています'; openFolder='フォルダーを開く' }
 }
 foreach ($k in $X[$lang].Keys) { $t[$k] = $X[$lang][$k] }
 
@@ -330,12 +330,25 @@ function Show-Details {
 
 # ---- doing it ----
 function Wait-UI($ms) { $until = [DateTime]::Now.AddMilliseconds($ms); while ([DateTime]::Now -lt $until) { Pump; Start-Sleep -Milliseconds 30 } }
-function Stop-MeguLit {
+function Install-Processes([switch]$Anki) {
   $prefix = $Root + '\'
-  $mine = { @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $PID -and $_.Path -and $_.Path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) }) }
-  foreach ($p in (& $mine | Where-Object { $_.ProcessName -eq 'MeguLit' })) { try { [void]$p.CloseMainWindow() } catch {} }
+  $ankiPrefix = (Join-Path $Root 'Anki') + '\'
+  Get-Process -ErrorAction SilentlyContinue | Where-Object {
+    $_.Id -ne $PID -and $_.Path -and $_.Path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -and
+      ($_.Path.StartsWith($ankiPrefix, [StringComparison]::OrdinalIgnoreCase) -eq $Anki.IsPresent)
+  }
+}
+function Stop-MeguLit {
+  foreach ($p in (Install-Processes | Where-Object { $_.ProcessName -eq 'MeguLit' })) { try { [void]$p.CloseMainWindow() } catch {} }
   Wait-UI 1500
-  for ($i = 0; $i -lt 3; $i++) { $left = & $mine; if (-not $left.Count) { break }; foreach ($p in $left) { try { $p.Kill() } catch {} }; Wait-UI 800 }
+  for ($i = 0; $i -lt 3; $i++) { $left = @(Install-Processes); if (-not $left.Count) { break }; foreach ($p in $left) { try { $p.Kill() } catch {} }; Wait-UI 800 }
+}
+# Let a local Anki finish saving its collection. A busy window can refuse to exit.
+function Close-LocalAnki {
+  $running = @(Install-Processes -Anki)
+  foreach ($p in $running) { try { [void]$p.CloseMainWindow() } catch {} }
+  for ($i = 0; $running.Count -and $i -lt 10; $i++) { Wait-UI 500; $running = @(Install-Processes -Anki) }
+  return -not $running.Count
 }
 function Remove-WithRetry($p) {
   for ($i = 0; $i -lt 6; $i++) {
@@ -364,12 +377,20 @@ function Run-Uninstall([bool]$noAsk) {
   } else {
     foreach ($f in @($plan.shortcuts) + @($plan.external | ForEach-Object { $_.path })) { if (-not (Remove-WithRetry $f)) { $failed.Add('  ' + $f) } }
     foreach ($r in @($plan.registry)) { try { Remove-Item -LiteralPath ('Registry::' + $r.key) -Recurse -Force -ErrorAction Stop } catch { $failed.Add('  ' + $r.key) } }
-    if ($keep) { try { [IO.File]::WriteAllText((Join-Path $Root $keepNote), "MeguLit 已卸载，这里保留了你的本地数据（data\ 与 secrets\）。把 MeguLit 装回这个文件夹就能接着用`r`nMeguLit was uninstalled. Your local data (data\ and secrets\) is kept here; install MeguLit into this folder again to continue.`r`n", (New-Object Text.UTF8Encoding $true)) } catch {} }
+    if ($keep) { try { [IO.File]::WriteAllText((Join-Path $Root $keepNote), "MeguLit 已卸载，这里保留了你的本地数据（data\、secrets\ 和 Anki\）。把 MeguLit 装回这个文件夹就能接着用`r`nMeguLit was uninstalled. Your local data (data\ and secrets\) and the Anki program folder are kept here; install MeguLit into this folder again to continue.`r`n", (New-Object Text.UTF8Encoding $true)) } catch {} }
   }
   $script:step = 2; Pump
   $r = Root-Lists $keep
-  foreach ($p in @($r.remove)) { if (-not (Remove-WithRetry $p)) { $script:leftovers.Add($p) } }
-  if (-not $keep) { try { Remove-Item -LiteralPath $Root -Force -ErrorAction Stop } catch { if (Test-Path -LiteralPath $Root) { $script:leftovers.Add($Root) } } }
+  $ankiFolder = Join-Path $Root 'Anki'
+  foreach ($p in @($r.remove)) {
+    if ($p -ieq $ankiFolder -and -not (Close-LocalAnki)) { $failed.Add('  ' + $p + '  ' + $t.ankiRunning); continue }
+    if (-not (Remove-WithRetry $p)) { $script:leftovers.Add($p) }
+  }
+  if (-not $keep) {
+    try { [IO.Directory]::Delete($Root, $false) } catch {
+      if ((Test-Path -LiteralPath $Root) -and -not (Get-ChildItem -LiteralPath $Root -Force -ErrorAction SilentlyContinue)) { $failed.Add('  ' + $Root + '  ' + $_.Exception.Message) }
+    }
+  }
   # ---- result ----
   $spinner.Stop()
   $L = New-Object Collections.Generic.List[string]
@@ -379,7 +400,7 @@ function Run-Uninstall([bool]$noAsk) {
   $script:detail = $L -join "`r`n"
   $rows = @()
   if ($keep) {
-    $names = @{ 'config' = $t.k_cfg; 'megulit.sqlite' = $t.k_db; 'assets' = $t.k_assets; 'secrets' = $t.k_secrets }
+    $names = @{ 'config' = $t.k_cfg; 'megulit.sqlite' = $t.k_db; 'assets' = $t.k_assets; 'secrets' = $t.k_secrets; 'anki' = $t.k_anki }
     foreach ($k in @((Root-Lists $true).kept)) { $leaf = (Split-Path $k -Leaf).ToLower(); if ($names.ContainsKey($leaf)) { $rows += @{ a = $names[$leaf]; b = (Rel $k) } } }
   }
   $cards = @(@{ accent = $C.gold; head = $(if ($keep) { $t.keptHead } else { $t.okAll }); sub = $(if ($keep) { $Root } else { '' }); rows = $rows })

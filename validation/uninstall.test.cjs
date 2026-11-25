@@ -18,6 +18,7 @@ function fakeRegistry(init={}){
 function fixture(){
  const base=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-uninstall-test-')),root=path.join(base,'MeguLit 安装'),env=path.join(base,'env');
  // install folder
+ w(path.join(root,'Anki','anki.exe'),'local Anki');
  w(path.join(root,'MeguLit.exe'),'exe');w(path.join(root,'web','index.html'),'ui');w(path.join(root,'runtime','node.exe'),'node');
  w(path.join(root,'cache','webview-profile','Local State'),'{}');w(path.join(root,'logs','a.log'),'log');w(path.join(root,'migration','update-rollback','MeguLit.exe'),'old');
  w(path.join(root,'data','megulit.sqlite'),'db');w(path.join(root,'data','config','secrets.dpapi'),'token');w(path.join(root,'data','config','preferences.json'),'{}');
@@ -43,6 +44,7 @@ function fixture(){
  const untouched=path.join(base,'Games','NotMine');w(path.join(untouched,'x.megulit-tmp'),'not in the library');
  // environment
  const e={localAppData:path.join(env,'Local'),appData:path.join(env,'Roaming'),temp:path.join(env,'Temp'),desktop:path.join(env,'Desktop'),programs:path.join(env,'Programs')};
+ w(path.join(e.appData,'Anki2','collection.anki2'),'cards');
  w(path.join(e.localAppData,'app.megulit','EBWebView','x'),'w');w(path.join(e.localAppData,'other.app','x'),'keep');
  w(path.join(e.temp,'megulit-cx','k'),'k');w(path.join(e.temp,'megulit-anki-hidden.txt'),'h');w(path.join(e.temp,'megulit-cg-test','k'),'test dir');w(path.join(e.temp,'someone-else','k'),'k');
  for(const f of [path.join(e.desktop,'MeguLit.lnk'),path.join(e.programs,'MeguLit.lnk'),path.join(e.programs,'Uninstall MeguLit.lnk')])w(f,'lnk');
@@ -57,12 +59,13 @@ function fixture(){
 }
 const opts=f=>({root:f.root,env:f.e,registry:f.reg,readShortcuts:f.readShortcuts,games:f.games});
 
-test('keep data: data\\ minus caches and secrets\\ stay; everything else in the install folder goes',()=>{
+test('keep data: Anki, data minus caches and secrets stay; everything else in the install folder goes',()=>{
  const f=fixture(),p=U.plan({...opts(f),keepData:true});
  const kept=p.root.kept.map(x=>path.relative(f.root,x)).sort(),removed=p.root.remove.map(x=>path.relative(f.root,x)).sort();
- assert.deepEqual(kept,['data\\assets','data\\config','data\\megulit.sqlite','data\\preferences.json','secrets'].map(x=>x.replace(/\\/g,path.sep)));
+ assert.deepEqual(kept,['Anki','data\\assets','data\\config','data\\megulit.sqlite','data\\preferences.json','secrets'].map(x=>x.replace(/\\/g,path.sep)));
  for(const x of ['MeguLit.exe','cache','logs','migration','runtime','web','data\\cache','data\\voice-cache','data\\update-installed.json'])assert.ok(removed.includes(x.replace(/\\/g,path.sep)),x);
  const all=U.plan({...opts(f),keepData:false});assert.equal(all.root.kept.length,0);assert.ok(all.root.remove.some(x=>path.basename(x)==='data')&&all.root.remove.some(x=>path.basename(x)==='secrets'));
+ assert.ok(all.root.remove.includes(path.join(f.root,'Anki')));
  fs.rmSync(f.base,{recursive:true,force:true});
 });
 
@@ -98,7 +101,9 @@ test('execute restores the games exactly, keeps user changes, and removes the re
  // report: only the changed import file failed
  assert.deepEqual(rep.failed.map(x=>x.kind+':'+(x.skipped||[]).join(',')),['jp-import:system.npa']);
  // install folder: kept data and the note remain
- assert.deepEqual(fs.readdirSync(f.root).sort(),['data','secrets',U.KEEP_NOTE].sort());
+ assert.deepEqual(fs.readdirSync(f.root).sort(),['Anki','data','secrets',U.KEEP_NOTE].sort());
+ assert.equal(r(path.join(f.root,'Anki','anki.exe')),'local Anki');
+ assert.equal(r(path.join(f.e.appData,'Anki2','collection.anki2')),'cards');
  assert.equal(r(path.join(f.root,'data','config','secrets.dpapi')),'token');assert.equal(has(path.join(f.root,'data','cache')),false);
  assert.match(r(path.join(f.root,U.KEEP_NOTE)),/secrets\.dpapi/);
  // outside: own shortcuts, app folders, app temp files and registry entries only
@@ -114,6 +119,7 @@ test('execute restores the games exactly, keeps user changes, and removes the re
 test('execute without keeping data removes the whole install folder',()=>{
  const f=fixture(),p=U.plan({...opts(f),keepData:false,games:[]});
  const rep=U.execute(p,{registry:f.reg});assert.equal(rep.failed.length,0);assert.equal(has(f.root),false);
+ assert.equal(r(path.join(f.e.appData,'Anki2','collection.anki2')),'cards');
  fs.rmSync(f.base,{recursive:true,force:true});
 });
 
@@ -146,6 +152,41 @@ test('dry run from the command line prints the plan and changes nothing',()=>{
  assert.match(out,/MeguLit uninstall plan/);assert.match(out,/keep local data: yes/);assert.match(out,/app\.megulit/);
  assert.deepEqual(fs.readdirSync(f.root).sort(),before);assert.equal(has(path.join(f.e.localAppData,'app.megulit')),true);
  fs.rmSync(f.base,{recursive:true,force:true});
+});
+
+test('the Windows uninstaller closes a local Anki normally and leaves a busy process alone',{skip:process.platform!=='win32'},()=>{
+ const {execFileSync}=require('node:child_process');
+ const script=path.join(__dirname,'..','setup','uninstall.ps1');
+ const probe=String.raw`
+$ErrorActionPreference='Stop'
+$tokens=$null; $errors=$null
+$ast=[System.Management.Automation.Language.Parser]::ParseFile($env:MEGULIT_UNINSTALL_FIX_SCRIPT,[ref]$tokens,[ref]$errors)
+if($errors.Count){throw ($errors|Out-String)}
+$Root=$env:MEGULIT_UNINSTALL_FIX_ROOT
+foreach($name in 'Install-Processes','Stop-MeguLit','Close-LocalAnki'){
+ $node=$ast.Find({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true)
+ if(!$node){throw "Missing function $name"}
+ . ([scriptblock]::Create($node.Extent.Text))
+}
+function Fixture-Process($id,$exe){
+ $item=[pscustomobject]@{Id=$id;Path=$exe;ProcessName='fixture';Alive=$true;CloseRequests=0;Closes=$false;Kills=0}
+ $item | Add-Member ScriptMethod CloseMainWindow { $this.CloseRequests++; if($this.Closes){$this.Alive=$false}; $this.Closes }
+ $item | Add-Member ScriptMethod Kill { $this.Kills++; $this.Alive=$false }
+ $item
+}
+$localAnki=Fixture-Process 1001 (Join-Path $Root 'Anki\anki.exe')
+$helper=Fixture-Process 1002 (Join-Path $Root 'runtime\node.exe')
+$external=Fixture-Process 1003 (Join-Path (Split-Path -Parent $Root) 'other\Anki.exe')
+function Get-Process { [CmdletBinding()]param(); $localAnki,$helper,$external | Where-Object Alive }
+function Wait-UI($ms){}
+Stop-MeguLit
+if($helper.Alive -or !$localAnki.Alive -or !$external.Alive -or $localAnki.CloseRequests){throw 'Wrong processes stopped'}
+if((Close-LocalAnki) -or !$localAnki.Alive -or $localAnki.Kills -or $external.CloseRequests -or $localAnki.CloseRequests -ne 1){throw 'A busy Anki was forced closed'}
+$localAnki.Closes=$true
+if(!(Close-LocalAnki) -or $localAnki.Alive -or $localAnki.Kills -or $external.CloseRequests){throw 'Graceful close failed'}
+`;
+ execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',probe],{windowsHide:true,
+  env:{...process.env,MEGULIT_UNINSTALL_FIX_SCRIPT:script,MEGULIT_UNINSTALL_FIX_ROOT:path.join(os.tmpdir(),'MeguLit-fixture')},timeout:10000});
 });
 
 test('the uninstaller ships: setup\\uninstall.ps1 (UTF-8 with BOM) and services\\uninstall.cjs are in the packaged folders',()=>{

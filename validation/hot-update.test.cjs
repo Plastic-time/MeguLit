@@ -26,7 +26,7 @@ test('hot update: only the exact previous install fits',()=>{
 });
 test('hot update: paths outside page and service files are refused',()=>{
  for(const p of ['web/app.js','services/update.cjs','core/x.cjs','setup/a.ps1'])assert.equal(hot.safe(p),true,p);
- for(const p of ['MeguLit.exe','native/HookBridge.exe','runtime/node.exe','data/x.json','web/index.html','web/../MeguLit.exe','web//a.js','web/a\\b.js','web/C:x'])assert.equal(hot.safe(p),false,p);
+ for(const p of ['MeguLit.exe','native/HookBridge.exe','runtime/node.exe','Anki/anki.exe','data/x.json','web/index.html','web/../MeguLit.exe','web//a.js','web/a\\b.js','web/C:x'])assert.equal(hot.safe(p),false,p);
 });
 
 function makeZip(dir,files,manifest){

@@ -25,7 +25,7 @@ class Runtime {
  prepareGame(executable,{enter=true}={}){if(this.libraryOnly())return;this.pendingGameEnter=enter;this.pendingGame=path.basename(executable,path.extname(executable));this.pendingExecutable=executable;this.reader?.selectGame(this.pendingGame,enter,executable);}
  // Point the hook at the Japanese original index for this executable, or clear it.
  learning(){return this.localLearning??=new(require('../core/learning-native.cjs').LocalLearning)(this.root,message=>this.emit('reader-event',message));}
- ankiProcess(){return this.ankiRunner??=new(require('../core/anki-process.cjs').AnkiProcess)({config:()=>this.config(),log:line=>{try{require('node:fs').appendFileSync(path.join(this.root,'logs','anki-process.log'),new Date().toISOString()+' '+line+'\n');}catch{}}});}
+ ankiProcess(){return this.ankiRunner??=new(require('../core/anki-process.cjs').AnkiProcess)({root:this.root,config:()=>this.config(),log:line=>{try{require('node:fs').appendFileSync(path.join(this.root,'logs','anki-process.log'),new Date().toISOString()+' '+line+'\n');}catch{}}});}
  services(){return this.serviceManager??=new(require('../core/services.cjs').Services)(this.root);}
  speech(){return this.speechEngine??=new(require('../core/speech.cjs').Speech)(path.join(this.root,'cache'));}
  models(){return this.modelStore??=new(require('../core/model-store.cjs').ModelStore)(this.root);}

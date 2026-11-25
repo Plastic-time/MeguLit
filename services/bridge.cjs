@@ -398,6 +398,9 @@ function restoreWord(db,id) {
 // E457 lookup_exact entries as dictionary-page rows: first spelling, all readings, one definition per line.
 function localEntries(result,query){return (result?.entries||[]).slice(0,20).map(e=>({spelling:e.spellings?.[0]||e.readings?.[0]||query,reading:(e.readings||[]).join(' · '),definition:(Array.isArray(e.definition_groups)&&e.definition_groups.length?e.definition_groups.map(g=>g.text):(e.definitions||[])).map(String).join('\n')})).filter(e=>e.definition);}
 async function lookupEntry(learning,base,key){for(const text of [...new Set([base,key].filter(Boolean))]){const result=await learning.request('lookup_exact',{text,start:0,end:[...text].length},'zh');const entry=result?.entries?.find(e=>require('./learning-insights.cjs').entryMatches(e,base,key));if(entry)return entry;}return null;}
+function findAnki(runtime){
+ return runtime?runtime.ankiProcess().find():require('../core/anki-process.cjs').find('',process.env,undefined,root);
+}
 async function dispatch(request,runtime=null) {
   if(request.action==='site_updates'){
     /* Return the freshest result this time, even when a faster mirror or the disk cache lags behind. */
@@ -661,12 +664,12 @@ async function dispatch(request,runtime=null) {
       case 'leaderboard_library':return require('./leaderboard.cjs').libraryTitles(db);
       case 'leaderboard_leave':return await require('./leaderboard.cjs').leave(root);
       case 'save_key':return new(require('./settings.cjs').Settings)(root).saveKey({provider:request.provider,baseUrl:request.baseUrl,apiKey:request.apiKey});
-      case 'anki_find':return {path:runtime.ankiProcess().find()};
+      case 'anki_find':return {path:findAnki(runtime)};
       /* 2026-11-12 one-click Anki: download the official installer, install it, add AnkiConnect, start and connect */
-      case 'anki_install':return require('../core/anki-installer.cjs').start(root,{runtime,find:()=>runtime?runtime.ankiProcess().find():require('../core/anki-process.cjs').find('',process.env)});
+      case 'anki_install':return require('../core/anki-installer.cjs').start(root,{runtime});
       case 'windows_feature_install':{const feature=neededFeature.get(String(request.id||''))||'DirectPlay';const r=await require('../core/windows-features.cjs').install(feature);neededFeature.delete(String(request.id||''));return r;}
       case 'anki_install_status':return require('../core/anki-installer.cjs').status();
-      case 'anki_install_connect':return await require('../core/anki-process.cjs').installAnkiConnect(process.env,runtime?{locate:()=>runtime.ankiProcess().find()}:{});
+      case 'anki_install_connect':return await require('../core/anki-process.cjs').installAnkiConnect(process.env,{locate:()=>findAnki(runtime)});
       case 'anki_connect_status':return {installed:require('../core/anki-process.cjs').ankiConnectInstalled()};
       case 'anki_launch':{const runner=runtime.ankiProcess(),hide=!!runtime.config().ankiHidden;if(String(request.reason||'')==='ANKI_PORT_TAKEN')return await runner.repair({hide});return await runner.start({hide});}
       case 'anki_repair':return await runtime.ankiProcess().repair({hide:!!runtime.config().ankiHidden});

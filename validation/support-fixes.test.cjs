@@ -32,3 +32,36 @@ test('a reader that never started names quarantined native files',()=>{
   assert.match(status.error,/^READER_NATIVE_MISSING: HookBridge\.exe, HookInjector32\.exe, HookInjector64\.exe$/);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('a registered Anki takes precedence over a copy inside MeguLit',t=>{
+ const env={},root='R:\\Apps\\MeguLit';
+ const known='Q:\\Installed Anki\\anki.exe',local=path.join(root,'Anki','anki.exe');
+ const queries=t.mock.method(require('node:child_process'),'execFileSync',(_exe,args)=>
+  args[1].includes('App Paths')?'    (Default)    REG_SZ    '+known:'');
+ assert.equal(anki.find('',env,file=>file===known||file===local,root),known);
+ assert.ok(queries.mock.callCount()>0);
+});
+
+test('a manually placed Anki is found at either MeguLit location without a registry entry',t=>{
+ const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-local-anki-'));
+ t.after(()=>fs.rmSync(scratch,{recursive:true,force:true}));
+ const source=path.join(scratch,'original'),target=path.join(scratch,'moved');
+ const exe=path.join(source,'Anki','anki.exe'),movedExe=path.join(target,'Anki','ankiw.exe');
+ for(const file of [exe,movedExe]){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'MZ');}
+ const manual=[exe,movedExe];
+ const exists=file=>manual.includes(file)&&fs.statSync(file).isFile();
+ t.mock.method(require('node:child_process'),'execFileSync',()=>'');
+ assert.ok(anki.coldCandidates({},source).includes(exe));
+ assert.ok(anki.coldCandidates({},target).includes(movedExe));
+ assert.equal(anki.find('',{},exists,source),exe);
+ assert.equal(anki.find('',{},exists,target),movedExe,'the previous MeguLit location is not reused');
+ const stat=fs.statSync,read=fs.readFileSync;
+ t.mock.method(fs,'statSync',(file,...args)=>{
+  if(typeof file==='string' && /[\\/]anki(w)?\.exe$/i.test(file) && !manual.includes(file))return {isFile:()=>false};
+  return stat(file,...args);
+ });
+ t.mock.method(fs,'readFileSync',(file,...args)=>
+  typeof file==='string' && /[\\/]Anki\.lnk$/i.test(file)?Buffer.alloc(0):read(file,...args));
+ const {Runtime}=require('../services/runtime.cjs');
+ assert.equal(new Runtime(target).ankiProcess().find(),movedExe);
+});
