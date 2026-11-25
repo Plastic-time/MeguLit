@@ -307,7 +307,7 @@
  const style=document.createElement('style');style.textContent=`
  .tomoyo-menu-header h3{flex-wrap:wrap!important;align-items:center!important;gap:4px 10px!important}
  [data-calibration-current]{flex:1;min-width:160px;font-size:11px!important;font-weight:400!important;letter-spacing:0;line-height:1.55;color:var(--theme-textSecondary,#aaa);overflow-wrap:anywhere}
- [data-calibration-current][data-preview=true]{color:var(--theme-primary,#e0495a)}
+ [data-calibration-current][data-preview=true]{color:var(--tome-picture-accent,var(--theme-primary,#e0495a))}
  /* Window-sized containers never draw a focus ring (user, 2026-11-09): Alt+T is a keyboard action, so Chromium drew a
     light-blue focus-visible ring on a container as large as the reader window; the window only shows its hit regions,
     so the ring's top edge appeared as a blue line above the new-game tip, or above the menu dragged to the top. */
@@ -319,7 +319,7 @@
  .tome-game-style-sync>label,.tome-game-style-sync>small{flex-basis:100%;margin:0!important;line-height:1.65}
  .tome-game-style-sync>button{margin:0!important;padding:7px 9px!important;font-size:12px!important}
  .tome-game-style-sync>button[data-game-style-sync]{border-color:var(--menu-accent)!important}
- [data-game-style-state][data-error=true]{color:#e6a56f!important}
+ [data-game-style-state][data-error=true]{color:var(--tome-picture-accent,#e6a56f)!important}
  .tome-calibration-imports{display:flex;flex-direction:column;gap:10px;margin:0 0 16px;padding:12px;border:1px solid var(--menu-border,#444);border-radius:12px}
  .tome-import-row{display:grid;grid-template-columns:1fr auto;gap:6px 8px;align-items:center}
  .tome-import-row>span{grid-column:1/-1;font-size:12.5px;font-weight:600}

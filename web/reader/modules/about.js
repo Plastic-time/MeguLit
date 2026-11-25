@@ -32,7 +32,7 @@
  .tome-credit-based{display:block;margin:-3px 0 8px;font-size:11px;color:var(--theme-textSecondary,#888);opacity:.85}
  .tome-credit p{margin:5px 0 8px;font-size:12px;line-height:1.6;color:var(--theme-textSecondary,#aaa)}
  .tome-credit-links{display:flex;gap:14px;flex-wrap:wrap}
- .tome-credit-links button{all:unset;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--theme-primary,#e0495a)}
+ .tome-credit-links button{all:unset;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--tome-picture-accent,var(--theme-primary,#e0495a))}
  .tome-credit-links button:hover{text-decoration:underline}
  .tome-credit-note{font-size:11px;color:var(--theme-textSecondary,#888);margin-top:2px}`;
  (document.head||document.documentElement).appendChild(style);

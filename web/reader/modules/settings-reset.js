@@ -20,11 +20,11 @@
  const send=m=>{try{window.__tomoyoTranslateRequest(JSON.stringify(m));}catch{}};
  const style=document.createElement('style');style.textContent=`
  .tome-reset-zone{margin:22px 0 6px;padding:10px 12px;border:1px dashed color-mix(in srgb,#d64545 45%,transparent);border-radius:10px}
- .tome-reset-zone h4{margin:0 0 6px;font-size:12px;font-weight:600;color:color-mix(in srgb,#d64545 80%,currentColor);letter-spacing:.04em}
+ .tome-reset-zone h4{margin:0 0 6px;font-size:12px;font-weight:600;color:var(--tome-picture-accent,color-mix(in srgb,#d64545 80%,currentColor));letter-spacing:.04em}
  .tome-reset-zone .tome-reset-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
  .tome-reset-zone small{display:block;margin-top:2px;color:var(--theme-textSecondary,#aaa);font-size:11px}
  .tome-reset-zone button,.tome-reset-dialog button,.tome-reset-undo button{flex:none;padding:6px 12px;border-radius:8px;border:1px solid var(--theme-border,#44444a);background:transparent;color:inherit;font:inherit;cursor:pointer}
- .tome-reset-zone [data-reset-open]{color:#e06060;border-color:color-mix(in srgb,#d64545 50%,transparent)}
+ .tome-reset-zone [data-reset-open]{color:var(--tome-picture-accent,#e06060);border-color:color-mix(in srgb,#d64545 50%,transparent)}
  .tome-reset-zone [data-reset-open]:hover{background:color-mix(in srgb,#d64545 12%,transparent)}
  .tome-reset-dialog{max-width:440px;padding:18px 20px;border-radius:14px;border:1px solid var(--theme-border,#34343a);background:var(--theme-surface,#18181b);color:var(--theme-text,#e8e9ec);font:13px/1.6 'Microsoft YaHei',sans-serif}
  .tome-reset-dialog::backdrop{background:#0006}

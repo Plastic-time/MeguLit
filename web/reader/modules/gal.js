@@ -138,9 +138,9 @@
     .megulit-ruby-rows .megulit-ruby-row-chip { display:inline-flex!important; align-items:center; justify-content:center; text-align:center; min-width:24px; height:22px; padding:0 6px; border-radius:6px; border:1px solid #ffffff26; background:transparent; color:inherit; font:600 11px/1 ui-monospace,monospace; cursor:pointer; transition:background-color .15s,border-color .15s,transform .1s; }
     .megulit-ruby-rows .megulit-ruby-row-chip:active { transform:scale(.96); }
     .megulit-ruby-rows .megulit-ruby-row-chip.is-set { border-color:#c8303c99; }
-    .megulit-ruby-rows .megulit-ruby-row-chip.is-on { background:#c8303c; border-color:#c8303c; color:#fff; }
+    .megulit-ruby-rows .megulit-ruby-row-chip.is-on { background:#c8303c; border-color:#c8303c; color:var(--tome-picture-on-accent,#fff); }
     .megulit-ruby-rows .megulit-ruby-row-chip:focus-visible { outline:2px solid #c8303c; outline-offset:2px; }
-    .megulit-ruby-rows-value { font:11px ui-monospace,monospace; color:#c8303c; min-width:3ch; text-align:right; }
+    .megulit-ruby-rows-value { font:11px ui-monospace,monospace; color:var(--tome-picture-accent,#c8303c); min-width:3ch; text-align:right; }
     .megulit-ruby-rows-slider { grid-column:1/-1; width:100%; }
     body.tomoyo-game-style .sentence-window .sentence-text:not(.tomoyo-furigana) { margin-top:calc((1.95 - var(--tomoyo-gal-line-height,1.95)) * .5em)!important; margin-bottom:calc((1.95 - var(--tomoyo-gal-line-height,1.95)) * .5em)!important; } /* furigana needs room between wrapped rows even with a tight line height */
     .sentence-text .megulit-ruby-base { position:relative;display:inline-block;white-space:nowrap;vertical-align:baseline;padding-right:var(--megulit-ruby-trailing-space,0px);text-indent:0!important; } /* E259: the sentence's hanging indent (text-indent:-17px for 「) was inherited by every inline-block base and shifted its kanji left over the previous glyph: the real cause of kana/kanji overlap */ /* E257: an inline-block drops the letter-spacing after its last glyph, so the next glyph overlapped; give it back */
@@ -206,8 +206,8 @@
     body.tomoyo-gal-bound.megulit-readonly-hook .sentence-window:not(.tome-island-page) .sentence-text .char-token { -webkit-text-fill-color:transparent!important;background-image:none!important;filter:none!important;-webkit-text-stroke:0!important;text-shadow:none!important; }
     .tomoyo-gal-fields { border:1px solid #505465; border-radius:8px; padding:10px 12px; margin:14px 0; }
     .tomoyo-gal-fields legend { padding:0 5px; }
-    .tomoyo-gal-fields button { background:#343847; color:#eef1fa; border:1px solid #505465; border-radius:5px; padding:5px 8px; margin:6px 6px 0 0; cursor:pointer; }
-    .tomoyo-gal-state { margin-top:6px; color:#b5d8fc; }
+    .tomoyo-gal-fields button { background:#343847; color:var(--tome-picture-text,#eef1fa); border:1px solid #505465; border-radius:5px; padding:5px 8px; margin:6px 6px 0 0; cursor:pointer; }
+    .tomoyo-gal-state { margin-top:6px; color:var(--tome-picture-muted,#b5d8fc); }
     body.tomoyo-gal-bound .sentence-text, body.tomoyo-game-style .sentence-text { font-weight:var(--tomoyo-jp-weight,400)!important; }
     body.tomoyo-ui-translation .tomoyo-cn-output,body.tomoyo-ui-translation .tomoyo-cn-output *,body.tomoyo-game-style .tomoyo-cn-output,body.tomoyo-game-style .tomoyo-cn-output * { font-weight:var(--tomoyo-cn-weight,400)!important; font-synthesis:weight!important; font-synthesis-weight:auto!important; }
     .sentence-window.tomoyo-cn-active .sentence-text, .sentence-window.tomoyo-cn-active .tomoyo-cn-row { box-sizing:border-box!important; align-self:stretch!important; min-width:0!important; width:100%!important; margin-left:0!important; margin-right:0!important; padding-left:0!important; padding-right:0!important; border-left:0!important; border-right:0!important; text-indent:0!important; text-align:left!important; }
@@ -222,7 +222,7 @@
     body.tomoyo-game-style .sentence-text,body.tomoyo-gal-bound .sentence-text,body.tomoyo-game-style .sentence-text .char-token,body.tomoyo-gal-bound .sentence-text .char-token { -webkit-text-stroke:var(--tomoyo-gal-jp-stroke,var(--tomoyo-jp-stroke,0px)) var(--tomoyo-jp-stroke-color,#fff)!important; paint-order:stroke fill!important; text-shadow:none!important; -webkit-font-smoothing:antialiased; text-rendering:geometricPrecision; }
     body.tomoyo-game-style .tomoyo-cn-output,body.tomoyo-gal-bound .tomoyo-cn-output { -webkit-text-stroke:var(--tomoyo-gal-cn-stroke,var(--tomoyo-cn-stroke,0px)) var(--tomoyo-cn-stroke-color,#fff)!important; paint-order:stroke fill!important; text-shadow:none!important; -webkit-font-smoothing:antialiased; text-rendering:geometricPrecision; }
     .sentence-text .megulit-ruby-base[data-tomoyo-reading]::before { -webkit-text-stroke:var(--tomoyo-ruby-stroke,0px) var(--tomoyo-ruby-stroke-color,#fff)!important; paint-order:stroke fill!important; text-shadow:none!important; }
-    .tomoyo-slider-value { color:#dfc9a7; font-variant-numeric:tabular-nums; float:right; }
+    .tomoyo-slider-value { color:var(--tome-picture-reading,#dfc9a7); font-variant-numeric:tabular-nums; float:right; }
     body.tomoyo-game-style .sentence-text,body.tomoyo-gal-bound .sentence-text { font-family:var(--tomoyo-gal-jp-font)!important; }
     body.tomoyo-game-style .tomoyo-cn-output,body.tomoyo-gal-bound .tomoyo-cn-output { font-family:var(--tomoyo-gal-cn-font)!important; }
     .sentence-text .megulit-ruby-base[data-tomoyo-reading]::before { font-family:var(--tomoyo-ruby-font,"Meiryo",sans-serif)!important; font-synthesis:none; text-rendering:optimizeLegibility; -webkit-font-smoothing:antialiased; font-weight:400!important; }

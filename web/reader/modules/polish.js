@@ -45,11 +45,11 @@
  .tomoyo-menu-tabs button svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.85}
  .tomoyo-menu-tabs button{background:transparent!important;border:0!important}
  .tomoyo-menu-tabs button:hover{background:color-mix(in srgb,var(--mg-text) 5%,transparent)!important;color:var(--mg-text)!important}
- .tomoyo-menu-tabs button[aria-selected=true]{background:var(--mg-tint)!important;color:var(--mg-accent)!important;font-weight:700}
+ .tomoyo-menu-tabs button[aria-selected=true]{background:var(--mg-tint)!important;color:var(--tome-picture-accent,var(--mg-accent))!important;font-weight:700}
  .tomoyo-menu-tabs button[aria-selected=true]::before{content:"";position:absolute;left:-10px;top:22%;bottom:22%;width:3px;border-radius:0 3px 3px 0;background:var(--mg-accent)}
  .tomoyo-menu-content{padding:8px 24px 22px!important;scroll-behavior:smooth}
  .tomoyo-cn-dialog label{font-size:12.5px!important;color:var(--mg-text)!important;letter-spacing:.01em}
- .tomoyo-cn-dialog .tomoyo-slider-value{float:right;min-width:30px;text-align:center;padding:0 6px;border-radius:3px;background:var(--mg-tint);color:var(--mg-accent)!important;font:600 11.5px/1.6 Consolas,"Cascadia Mono",monospace!important}
+ .tomoyo-cn-dialog .tomoyo-slider-value{float:right;min-width:30px;text-align:center;padding:0 6px;border-radius:3px;background:var(--mg-tint);color:var(--tome-picture-accent,var(--mg-accent))!important;font:600 11.5px/1.6 Consolas,"Cascadia Mono",monospace!important}
  .tomoyo-cn-dialog input:not([type=range]):not([type=checkbox]):not([type=color]),.tomoyo-cn-dialog select{min-height:36px;border-radius:10px!important;border:1px solid var(--mg-line)!important;background-color:color-mix(in srgb,var(--mg-base) 75%,transparent)!important;transition:border-color .15s,box-shadow .15s}
  .tomoyo-cn-dialog input:not([type=range]):not([type=checkbox]):focus,.tomoyo-cn-dialog select:focus{outline:none;border-color:var(--mg-accent)!important;box-shadow:0 0 0 3px var(--mg-tint)}
  .tomoyo-cn-dialog select{-webkit-appearance:none;appearance:none;padding-right:32px!important;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 11px center!important}
@@ -77,9 +77,9 @@
  .tomoyo-cn-dialog .tomoyo-cn-grid{gap:4px 16px!important}
  .tomoyo-cn-dialog button:not(.tomoyo-menu-tabs button){border-radius:10px;transition:background .15s,border-color .15s,color .15s}
  .tomoyo-cn-dialog section button,.tomoyo-cn-dialog fieldset button,.tomoyo-v4-settings button{padding:7px 14px;margin:10px 8px 0 0;border:1px solid var(--mg-line);background:transparent;color:var(--mg-text);cursor:pointer}
- .tomoyo-cn-dialog section button:hover,.tomoyo-cn-dialog fieldset button:hover,.tomoyo-v4-settings button:hover{border-color:var(--mg-accent);color:var(--mg-accent)}
+ .tomoyo-cn-dialog section button:hover,.tomoyo-cn-dialog fieldset button:hover,.tomoyo-v4-settings button:hover{border-color:var(--mg-accent);color:var(--tome-picture-accent,var(--mg-accent))}
   /* Filled accent buttons (save) keep white text on hover/press: red text on the red fill made the label vanish. */
-  .tomoyo-v4-settings button.tome-voice-save:is(:hover,:active,:focus-visible),.tomoyo-cn-dialog button.tome-voice-save:is(:hover,:active,:focus-visible){color:#fff!important;border-color:transparent!important;filter:brightness(1.08)}
+  .tomoyo-v4-settings button.tome-voice-save:is(:hover,:active,:focus-visible),.tomoyo-cn-dialog button.tome-voice-save:is(:hover,:active,:focus-visible){color:var(--tome-picture-on-accent,#fff)!important;border-color:transparent!important;filter:brightness(1.08)}
  .tomoyo-cn-dialog footer{padding:14px 22px!important;gap:10px!important;background:color-mix(in srgb,var(--mg-surface) 92%,#000 8%)!important}
  .tomoyo-cn-dialog footer button{min-width:84px;border-radius:10px!important;font-weight:600}
  .tomoyo-cn-dialog footer button:hover{border-color:color-mix(in srgb,var(--mg-text) 30%,transparent)!important}
@@ -95,37 +95,37 @@
  /* ── Word cards ───────────────────────────────────────────────────────── */
  .mg-ai-lines{display:flex;flex-direction:column;gap:7px;white-space:normal}
  .mg-ai-row{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:baseline;line-height:1.65;font-size:13.5px}
- .mg-ai-tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:6px;color:var(--mg-accent);background:var(--mg-tint);white-space:nowrap}
+ .mg-ai-tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:6px;color:var(--tome-picture-accent,var(--mg-accent));background:var(--mg-tint);white-space:nowrap}
  .tomoyo-selection-card{border-radius:16px!important;border:1px solid color-mix(in srgb,var(--mg-text) 9%,transparent)!important;box-shadow:0 18px 50px rgba(0,0,0,.42)!important;animation:mg-in .16s var(--mg-ease)}
  .tomoyo-selection-card footer button,.tomoyo-v4-actions button{border-radius:10px!important;transition:border-color .15s,color .15s,background .15s}
- .tomoyo-selection-card footer button:hover,.tomoyo-anki-button:hover{border-color:var(--mg-accent)!important;color:var(--mg-accent)!important}
- .tomoyo-speak-button{border-radius:50%!important;background:var(--mg-tint)!important;border-color:transparent!important;color:var(--mg-accent)}
+ .tomoyo-selection-card footer button:hover,.tomoyo-anki-button:hover{border-color:var(--mg-accent)!important;color:var(--tome-picture-accent,var(--mg-accent))!important}
+ .tomoyo-speak-button{border-radius:50%!important;background:var(--mg-tint)!important;border-color:transparent!important;color:var(--tome-picture-accent,var(--mg-accent))}
  .tomoyo-speak-button:hover:not(:disabled){background:color-mix(in srgb,var(--mg-accent) 24%,transparent)!important}
  .tomoyo-card-bar{gap:7px!important}
  .tomoyo-card-bar .mg-ai-btn{display:inline-flex!important;align-items:center;gap:6px;padding:6px 12px 6px 10px!important;border-radius:999px!important;border:1px solid color-mix(in srgb,var(--mg-text) 16%,transparent)!important;background:color-mix(in srgb,var(--mg-text) 6%,transparent)!important;color:var(--mg-text)!important;font-weight:600!important;font-size:12.5px!important;line-height:1.2;cursor:pointer;box-shadow:0 1px 0 color-mix(in srgb,#fff 6%,transparent) inset,0 1px 2px rgba(0,0,0,.25);transition:background .15s,border-color .15s,color .15s,transform .08s}
- .tomoyo-card-bar .mg-ai-btn:hover{border-color:color-mix(in srgb,var(--mg-accent) 70%,transparent)!important;background:var(--mg-tint)!important;color:var(--mg-accent)!important}
+ .tomoyo-card-bar .mg-ai-btn:hover{border-color:color-mix(in srgb,var(--mg-accent) 70%,transparent)!important;background:var(--mg-tint)!important;color:var(--tome-picture-accent,var(--mg-accent))!important}
  .tomoyo-card-bar .mg-ai-btn:active{transform:translateY(1px)}
- .tomoyo-card-bar .mg-ai-btn[aria-pressed=true]{border-color:var(--mg-accent)!important;background:var(--mg-tint)!important;color:var(--mg-accent)!important}
+ .tomoyo-card-bar .mg-ai-btn[aria-pressed=true]{border-color:var(--mg-accent)!important;background:var(--mg-tint)!important;color:var(--tome-picture-accent,var(--mg-accent))!important}
  .tomoyo-card-bar .mg-ai-btn svg,.tomoyo-anki-button svg{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
  .tomoyo-card-bar .mg-ai-btn[data-loading] svg,.tomoyo-anki-button:disabled svg{animation:mg-spin .9s linear infinite}
  @keyframes mg-spin{to{transform:rotate(360deg)}}
- .tomoyo-selection-card .tomoyo-anki-button{display:inline-flex!important;align-items:center;gap:5px;padding:6px 14px 6px 11px!important;border-radius:999px!important;border:1px solid var(--mg-accent)!important;background:var(--mg-accent)!important;color:#fff!important;font-weight:700!important;font-size:12.5px!important;cursor:pointer;box-shadow:0 2px 8px color-mix(in srgb,var(--mg-accent) 35%,transparent);transition:filter .15s,transform .08s}
- .tomoyo-selection-card .tomoyo-anki-button:hover{filter:brightness(1.1);color:#fff!important}
+ .tomoyo-selection-card .tomoyo-anki-button{display:inline-flex!important;align-items:center;gap:5px;padding:6px 14px 6px 11px!important;border-radius:999px!important;border:1px solid var(--mg-accent)!important;background:var(--mg-accent)!important;color:var(--tome-picture-on-accent,#fff)!important;font-weight:700!important;font-size:12.5px!important;cursor:pointer;box-shadow:0 2px 8px color-mix(in srgb,var(--mg-accent) 35%,transparent);transition:filter .15s,transform .08s}
+ .tomoyo-selection-card .tomoyo-anki-button:hover{filter:brightness(1.1);color:var(--tome-picture-on-accent,#fff)!important}
  .tomoyo-selection-card .tomoyo-anki-button:active{transform:translateY(1px)}
  .tomoyo-selection-card .tomoyo-anki-button:disabled{opacity:.7;cursor:progress}
  .tomoyo-selection-card .tomoyo-ai-result{margin:12px 16px 14px!important;padding:12px 14px!important;border:1px solid color-mix(in srgb,var(--mg-accent) 26%,transparent)!important;border-left:1px solid color-mix(in srgb,var(--mg-accent) 26%,transparent)!important;border-radius:12px!important;background:color-mix(in srgb,var(--mg-accent) 6%,transparent)!important;white-space:normal!important}
- .tomoyo-selection-card .tomoyo-ai-result>strong{display:flex!important;align-items:center;gap:6px;font-size:11.5px!important;letter-spacing:.04em;margin:0 0 10px!important;color:var(--mg-accent)!important}
+ .tomoyo-selection-card .tomoyo-ai-result>strong{display:flex!important;align-items:center;gap:6px;font-size:11.5px!important;letter-spacing:.04em;margin:0 0 10px!important;color:var(--tome-picture-accent,var(--mg-accent))!important}
  .tomoyo-selection-card .tomoyo-ai-result>strong::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
  .mg-ai-row{grid-template-columns:44px 1fr!important}.mg-ai-tag{text-align:center}
  .mg-sum{display:flex;flex-direction:column;gap:6px}
  .mg-sum-row{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--mg-text) 4%,transparent);border:1px solid transparent}
  .mg-sum-row[data-match]{border-color:color-mix(in srgb,var(--mg-accent) 55%,transparent);background:var(--mg-tint)}
  .mg-sum-num{font-style:normal;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11.5px;font-weight:700;color:var(--mg-sub);background:color-mix(in srgb,var(--mg-text) 9%,transparent)}
- .mg-sum-row[data-match] .mg-sum-num{color:#fff;background:var(--mg-accent)}
+ .mg-sum-row[data-match] .mg-sum-num{color:var(--tome-picture-on-accent,#fff);background:var(--mg-accent)}
  .mg-sum-row b{display:block;font-size:13.5px;line-height:1.5;color:var(--mg-text)}
  .mg-sum-row span{display:block;font-size:12.5px;line-height:1.6;color:var(--mg-sub)}
  .mg-sum-note{margin-top:4px;padding:8px 10px;border-radius:10px;font-size:12.5px;line-height:1.65;color:var(--mg-text);background:color-mix(in srgb,var(--mg-accent) 10%,transparent)}
- .mg-sum-note em{font-style:normal;font-weight:700;color:var(--mg-accent);margin-right:6px}
+ .mg-sum-note em{font-style:normal;font-weight:700;color:var(--tome-picture-accent,var(--mg-accent));margin-right:6px}
  .mg-sum-extra{font-size:12.5px;line-height:1.65;color:var(--mg-sub)}
  .tomoyo-speak-button svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
  `;
@@ -201,7 +201,7 @@
   .mg-select-pop .mg-opt{position:relative;display:flex;align-items:baseline;gap:6px;padding:7px 30px 7px 12px;border-radius:6px;white-space:nowrap;cursor:pointer;transition:background .1s}
   .mg-select-pop .mg-opt small{color:var(--mg-sub);font-size:11.5px}
   .mg-select-pop .mg-opt[data-active]{background:color-mix(in srgb,var(--mg-text) 8%,transparent)}
-  .mg-select-pop .mg-opt[aria-selected=true]{color:var(--mg-accent);font-weight:650;background:var(--mg-tint)}
+  .mg-select-pop .mg-opt[aria-selected=true]{color:var(--tome-picture-accent,var(--mg-accent));font-weight:650;background:var(--mg-tint)}
   .mg-select-pop .mg-opt[aria-selected=true]::before{content:"";position:absolute;left:3px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--mg-accent)}
   .mg-select-pop .mg-opt[aria-selected=true]::after{content:"";position:absolute;right:11px;top:50%;width:9px;height:5px;margin-top:-4px;border:solid var(--mg-accent);border-width:0 0 2px 2px;transform:rotate(-45deg)}
   .mg-select-pop .mg-opt[aria-disabled=true]{opacity:.4;cursor:default}

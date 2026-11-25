@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* 2026-11-13 reader panels「推镜 Push-cut」(option D, judges 8.5 / 8.7): 点读卡, 对话记录 and Alt+T share one quiet ink
-   surface. Opacity, radius and border stay the user's own (--tome-p-*). Alt+T gets a one-line header, its hotkeys move to
+   surface. The saved opacity sets the picture weight, and the tint can raise the total opacity. Alt+T gets a one-line header, its hotkeys move to
    the footer; no ordinal numbers, corner marks or stripes. Motion: the panel cuts in at 97% and pushes to 100% (220 ms),
    one red line runs under the header, the word card's headword slides 10 px. GSAP is loaded on idle from ../vendor; until
    it is there (or with reduced motion) panels simply appear. Timelines are killed on completion: nothing keeps running. */
@@ -10,6 +10,9 @@
  const R='html:not(#mgp1):not(#mgp2):not(#mgp3):not(#mgp4):not(#mgp5):not(#mgp6):not(#mgp7):not(#mgp8):not(#mgp9) body';
  const P=':is(.tomoyo-cn-dialog,.tomoyo-selection-card,.tome-backlog)';
  const G=R.replace('html','html:is([data-tome-card-surface=glass],[data-tome-card-surface=both])');
+ const pictureSurfaces=':is([data-tome-menu-surface=image][data-tome-menu-picture] .tomoyo-cn-dialog,[data-tome-log-surface=image][data-tome-log-picture] .tome-backlog,[data-tome-card-surface=image][data-tome-card-picture] .tomoyo-selection-card)';
+ const picturePanels=`${R}.tomoyo-ui-translation ${pictureSurfaces}`;
+ const pictureLayer=`${picturePanels}>.tome-menu-bg`;
  const css=String.raw`
 ${R} ${P}{--ink:#f3efe8;--ink2:#cfc8bd;--ink3:#b0aaa0;--line:rgba(243,239,232,.13);--red:#d8343e;--redi:#ff7880;
  color:var(--ink)!important;border:1px solid rgba(243,239,232,var(--tome-p-border,.08))!important;border-radius:var(--tome-p-radius,18px)!important;
@@ -46,7 +49,7 @@ ${R} .tomoyo-cn-dialog form>footer{position:relative;min-height:0!important;bord
 /* ---------- 点读卡 ---------- */
 ${R} .tomoyo-selection-card>header{position:relative;padding:10px 14px!important;border-bottom:1px solid var(--line)!important;background:transparent!important}
 ${R} .tomoyo-selection-card .tomoyo-selection-body{padding:18px 22px 10px!important}
-${R} .tomoyo-selection-card .tomoyo-word-heading strong{position:relative;font:700 32px/1.1 "Noto Sans JP","Yu Gothic UI","Microsoft YaHei UI",sans-serif!important;color:#fff!important;letter-spacing:.01em!important}
+${R} .tomoyo-selection-card .tomoyo-word-heading strong{position:relative;font:700 32px/1.1 "Noto Sans JP","Yu Gothic UI","Microsoft YaHei UI",sans-serif!important;color:var(--tome-picture-text,#fff)!important;letter-spacing:.01em!important}
 ${R} .tomoyo-selection-card .tomoyo-word-heading strong::after{content:"";position:absolute;left:0;bottom:-7px;width:24px;height:3px;background:var(--red)}
 ${R} .tomoyo-selection-card .tomoyo-word-reading{margin-top:14px!important;font:500 14px/1.5 "Noto Sans JP","Yu Gothic UI",sans-serif!important;letter-spacing:.06em!important;color:var(--ink2)!important}
 ${R} .tomoyo-selection-card .tomoyo-word-pos{font:400 12px/1 "Microsoft YaHei UI",sans-serif!important;letter-spacing:0!important;color:var(--ink3)!important;border:0!important;padding:0!important}
@@ -64,7 +67,7 @@ ${R} .tome-backlog .tome-log-heading h3{margin:0!important;font:700 17px/1.2 "Mi
 ${R} .tome-backlog .tome-log-count{font:400 12px/1 "Microsoft YaHei UI",sans-serif!important;color:var(--ink3)!important}
 ${R} .tome-backlog .tome-log-break{font:400 12px/1 "Cascadia Mono",Consolas,monospace!important;letter-spacing:0!important;color:var(--ink3)!important}
 ${R} .tome-backlog .tome-log-item{background:transparent!important;border-radius:0!important;border-bottom:1px solid var(--line)!important;padding:14px 22px!important;box-shadow:none!important}
-${R} .tome-backlog .tome-log-item:last-of-type .tome-log-src{font-weight:700!important;color:#fff!important}
+${R} .tome-backlog .tome-log-item:last-of-type .tome-log-src{font-weight:700!important;color:var(--tome-picture-text,#fff)!important}
 ${R} .tome-backlog .tome-log-item:last-of-type .tome-log-name i{color:var(--redi)!important}
 ${R} .tome-backlog .tome-log-item:hover{background:rgba(243,239,232,.04)!important}
 ${R} .tome-backlog .tome-log-name i{font:500 12px/1.4 "Microsoft YaHei UI",sans-serif!important;font-style:normal!important;letter-spacing:0!important;color:var(--ink3)!important}
@@ -90,16 +93,16 @@ ${R} .tomoyo-cn-dialog .tomoyo-menu-tabs button{padding-block:7px!important}
 /* word card: reading in gilt (the one gold text), no underline under the headword, meta fully opaque */
 ${R} .tomoyo-selection-card .tomoyo-word-heading strong{font-weight:800!important}
 ${R} .tomoyo-selection-card .tomoyo-word-heading strong::after{display:none!important}
-${R} .tomoyo-selection-card .tomoyo-word-reading{margin-top:8px!important;color:#d9b46a!important}
+${R} .tomoyo-selection-card .tomoyo-word-reading{margin-top:8px!important;color:var(--tome-picture-reading,#d9b46a)!important}
 ${R} .tomoyo-selection-card .tomoyo-card-meta,${R} .tomoyo-selection-card .tomoyo-card-meta *{opacity:1!important;color:var(--ink3)!important}
 /* backlog: no stripes at all; current line = speaker in red + brighter text */
 ${R} .tome-backlog .tome-log-item,${R} .tome-backlog .tome-log-item:last-of-type{border-left:0!important;box-shadow:none!important;background-image:none!important;background-color:transparent!important;outline:0!important}
 ${R} .tome-backlog .tome-log-item::before,${R} .tome-backlog .tome-log-item::after{display:none!important;content:none!important}
-${R} .tome-backlog .tome-log-tr{border-left:0!important;padding-left:0!important;color:#c5beb3!important}
+${R} .tome-backlog .tome-log-tr{border-left:0!important;padding-left:0!important;color:var(--tome-picture-muted,#c5beb3)!important}
 ${R} .tome-backlog .tome-log-item:last-of-type .tome-log-src{font-weight:500!important}
 
 /* ---------- round 4 ---------- */
-${R} .tomoyo-cn-dialog .tomoyo-menu-content :is(legend,h4,h5,.megulit-ruby-rows-title,.tome-gamefont-head,.tome-voice-pack-head),${R} .tomoyo-cn-dialog .tomoyo-menu-content details>summary{font-size:15px!important;font-weight:600!important;color:#fff!important}
+${R} .tomoyo-cn-dialog .tomoyo-menu-content :is(legend,h4,h5,.megulit-ruby-rows-title,.tome-gamefont-head,.tome-voice-pack-head),${R} .tomoyo-cn-dialog .tomoyo-menu-content details>summary{font-size:15px!important;font-weight:600!important;color:var(--tome-picture-text,#fff)!important}
 ${R} .tomoyo-cn-dialog .tomoyo-menu-content label{font-weight:400!important;color:var(--ink)!important}
 ${R} .tomoyo-cn-dialog .tome-bg-surfaces .setting-row{display:grid!important;grid-template-columns:96px minmax(0,1fr)!important;align-items:center!important;gap:12px!important}
 ${R} .tomoyo-cn-dialog .tomoyo-dictionary-title span{display:inline-block;padding:3px 7px!important;border:1px solid var(--line)!important;border-radius:2px!important;background:rgba(243,239,232,.06)!important;color:var(--ink2)!important;font:400 12px/1 "Microsoft YaHei UI",sans-serif!important}
@@ -136,11 +139,33 @@ ${R} .tomoyo-cn-dialog .tome-reset-zone [data-reset-open]:hover{background:rgba(
 /* ---------- 点读卡 over a bright frame (user, 2026-11-14, ダストマニア): with 纯色 at the saved opacity the ink tint let a
    white game through, the card turned pale grey and the light chips / × / reading vanished. The tint behind the card never
    drops below 88% (glass: the tint over the blurred frame below 80%), whatever the background type or saved opacity. ---------- */
-${R} .tomoyo-selection-card>.tome-menu-bg{opacity:max(var(--tome-p-alpha,.62),.88)!important}
+${R} .tomoyo-selection-card>.tome-menu-bg{--tome-p-layer-alpha:max(var(--tome-p-alpha,.62),.88);opacity:var(--tome-p-layer-alpha)!important}
 /* 对话记录 the same (user's beta38 shot: at 81% the game's own line read straight through the log rows) */
-${R} .tome-backlog>.tome-menu-bg{opacity:max(var(--tome-p-alpha,.62),.9)!important}
+${R} .tome-backlog>.tome-menu-bg{--tome-p-layer-alpha:max(var(--tome-p-alpha,.62),.9);opacity:var(--tome-p-layer-alpha)!important}
 ${G} .tomoyo-selection-card>.tome-menu-bg{opacity:1!important}
 ${G} .tomoyo-selection-card>.tome-menu-bg::after{opacity:max(calc(var(--tome-p-alpha,.62) * .6),.8)!important;background:#0a090a!important}
+/* Bind the theme, control and polish text tokens at the panel, where the picture palette is in effect. */
+${picturePanels}{color-scheme:dark;--ink2:#e6ded3;--ink3:#ddd5cb;--redi:#ffd0d4;
+ --tome-picture-text:var(--ink);--tome-picture-muted:var(--ink3);--tome-picture-accent:var(--redi);
+ --tome-picture-on-accent:#fff;--tome-picture-reading:#efd49c;--tome-picture-text-opacity:1;--tome-picture-inactive-control-opacity:.35;
+ --theme-text:var(--ink);--theme-textSecondary:var(--ink3);--theme-primary:var(--mgc-red);
+ --theme-background:#14161b;--theme-surface:#24272e;--theme-border:#393e49;
+ --mg-text:var(--ink);--mg-sub:var(--ink3);--mg-accent:var(--theme-primary);--mg-tint:color-mix(in srgb,var(--mg-accent) 14%,transparent);
+ --mg-base:var(--theme-background);--mg-surface:var(--theme-surface);
+ --mgc-ink:var(--ink);--mgc-ink-2:var(--ink2);--mgc-ink-3:var(--ink3);--mgc-well:var(--theme-background);
+ --mgc-red-ink:var(--redi);--mgc-red-hi:#bd303a}
+${picturePanels} :is(button:disabled,.megulit-autospeak-hint,.tome-hook-time,.tome-trouble>summary small){opacity:1!important}
+${picturePanels} .tomoyo-anki-button:disabled:not([data-state]){background:#443436!important}
+/* Keep the picture's weight A. The requested opacity B solves A * peak + (B - A) * tint + (1 - B) * 255 = limit.
+   Cap B at the value for a bright picture on the ink tint so a lighter backing never hides more of the game.
+   The picture palette also covers the brighter result when that cap is reached. */
+${pictureLayer}{--tome-p-picture-alpha:clamp(0,var(--tome-p-layer-alpha,var(--tome-p-alpha,.62)),1);
+ --tome-p-tint:var(--tome-p-picture-tint,var(--tome-p-picture-ink-tint));
+ --tome-p-requested-alpha:calc((255 - var(--tome-p-picture-limit) + var(--tome-p-picture-alpha) * (var(--tome-p-picture-peak) - var(--tome-p-tint))) / (255 - var(--tome-p-tint)));
+ --tome-p-alpha-cap:calc(1 - (1 - var(--tome-p-picture-alpha)) * (var(--tome-p-picture-limit) - var(--tome-p-picture-ink-tint)) / (255 - var(--tome-p-picture-ink-tint)));
+ --tome-p-composite-alpha:clamp(var(--tome-p-picture-alpha),var(--tome-p-requested-alpha),var(--tome-p-alpha-cap));
+ opacity:var(--tome-p-composite-alpha)!important;background-color:rgb(var(--tome-p-tint) var(--tome-p-tint) var(--tome-p-tint))!important}
+${pictureLayer}>i{background-image:var(--tome-p-readable-image,var(--tome-p-image,none));opacity:calc(var(--tome-p-picture-alpha) / var(--tome-p-composite-alpha))}
 ${R} .tomoyo-selection-card .tomoyo-sense{grid-template-columns:minmax(0,1fr)!important}
 ${R} .tomoyo-selection-card>header button:not(.tomoyo-anki-button),${R} .tomoyo-selection-card>footer button{color:var(--ink2)!important;border-color:rgba(243,239,232,.24)!important}
 ${R} .tomoyo-selection-card>header button:not(.tomoyo-anki-button):hover,${R} .tomoyo-selection-card>footer button:hover{color:var(--ink)!important;background:rgba(243,239,232,.08)!important}

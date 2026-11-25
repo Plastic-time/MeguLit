@@ -19,6 +19,7 @@
  // The Alt+T menu, backlog and lookup card each have their own six values (user, 2026-11-03: the menu's opacity changed
  // the other two). Old saves held one shared set: each panel starts from it.
  const PANELS=['menu','log','card'],PANEL_KEYS=['blur','dim','saturate','alpha','radius','border','glassBlur','glassDim','glassSaturate'];
+ const pictureLimit=48,highlightStart=40,pictureInkTint=10;
  {const old=gcfg.panels||{},next={};for(const p of PANELS){next[p]={};for(const k of PANEL_KEYS){const v=Number(old[p]?.[k]??gcfg[k]??gameDefaults[k]);next[p][k]=Number.isFinite(v)?v:gameDefaults[k];
   }}gcfg.panels=next;}
  const T={
@@ -82,8 +83,10 @@
   .tomoyo-cn-dialog{--tome-p-glass-blur:var(--tome-menu-glass-blur,18px);--tome-p-glass-bright:var(--tome-menu-glass-bright,1);--tome-p-glass-sat:var(--tome-menu-glass-sat,1);--tome-p-alpha:var(--tome-menu-alpha,.62);--tome-p-image:var(--tome-menu-image,none);--tome-p-radius:var(--tome-menu-radius,18px);--tome-p-border:var(--tome-menu-border,.08)}
   .tome-backlog{--tome-p-glass-blur:var(--tome-log-glass-blur,18px);--tome-p-glass-bright:var(--tome-log-glass-bright,1);--tome-p-glass-sat:var(--tome-log-glass-sat,1);--tome-p-alpha:var(--tome-log-alpha,.62);--tome-p-image:var(--tome-log-image,none);--tome-p-radius:var(--tome-log-radius,18px);--tome-p-border:var(--tome-log-border,.08)}
   .tomoyo-selection-card{--tome-p-glass-blur:var(--tome-card-glass-blur,18px);--tome-p-glass-bright:var(--tome-card-glass-bright,1);--tome-p-glass-sat:var(--tome-card-glass-sat,1);--tome-p-alpha:var(--tome-card-alpha,.62);--tome-p-image:var(--tome-card-image,none);--tome-p-radius:var(--tome-card-radius,18px);--tome-p-border:var(--tome-card-border,.08)}
-  .tome-menu-bg{position:absolute;inset:0;z-index:-1;border-radius:inherit;overflow:hidden;pointer-events:none;background:var(--theme-surface,#121218);opacity:var(--tome-p-alpha,.62)}
+  .tome-menu-bg{--tome-p-picture-limit:${pictureLimit};--tome-p-picture-ink-tint:${pictureInkTint};position:absolute;inset:0;z-index:-1;border-radius:inherit;overflow:hidden;pointer-events:none;background:var(--theme-surface,#121218);opacity:var(--tome-p-alpha,.62)}
   .tome-menu-bg>i{position:absolute;inset:0;background-position:center;background-size:cover;background-image:var(--tome-p-image,none);will-change:transform}
+  ${[['menu','.tomoyo-cn-dialog'],['log','.tome-backlog'],['card','.tomoyo-selection-card']].map(([p,selector])=>
+   `${selector}{--tome-p-readable-image:var(--tome-${p}-readable-image);--tome-p-picture-peak:var(--tome-${p}-picture-peak);--tome-p-picture-tint:var(--tome-${p}-picture-tint)}`).join('\n')}
   body:not(.tomoyo-ui-translation) .tome-menu-bg{display:none}
   /* The backlog and the lookup card use the same layer as the Alt+T menu, each with its own values. */
   body.tomoyo-ui-translation .tome-backlog,body.tomoyo-ui-translation .tomoyo-selection-card{background:transparent!important;isolation:isolate}
@@ -203,23 +206,96 @@
  // and used as a plain image: opening the menu no longer decodes the full picture and runs a live blur, which made the
  // background appear only after the menu was already open.
  // Each panel has its own blur/dim/saturation; panels with equal values share one rendered picture.
- const panelImages=new Map(),panelKeys={};let menuTimer=0;
- function renderMenuImage(){const image=gcfg.custom&&gameImage?gameImage:imageHome(),root=document.documentElement;
-  const want={};for(const p of PANELS){const v=gcfg.panels[p];want[p]=image?image.length+'|'+image.slice(-64)+'|'+v.blur+'|'+v.dim+'|'+v.saturate:'';}
-  if(PANELS.every(p=>panelKeys[p]===want[p]))return;clearTimeout(menuTimer);
-  for(const p of PANELS)if(!want[p]){panelKeys[p]='';root.style.setProperty('--tome-'+p+'-image','none');}
-  const drop=()=>{const used=new Set(Object.values(panelKeys));for(const [k,url] of panelImages)if(!used.has(k)){URL.revokeObjectURL(url);panelImages.delete(k);
-   }};
-  if(!image){drop();return;}
-  menuTimer=setTimeout(async()=>{try{const img=new Image();img.src=image;await img.decode();
-   for(const p of PANELS){const key=want[p];let url=panelImages.get(key);
-    if(!url){const v=gcfg.panels[p],w=640,h=Math.max(1,Math.round(img.naturalHeight*w/img.naturalWidth)),blur=v.blur*.8,pad=Math.ceil(blur*2);
-     const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d');ctx.filter='blur('+blur+'px) saturate('+v.saturate+'%) brightness('+(100-v.dim)+'%)';
-      ctx.drawImage(img,-pad,-pad,w+pad*2,h+pad*2);
-     const blob=await new Promise(r=>canvas.toBlob(r,'image/jpeg',.9));if(!blob)continue;url=URL.createObjectURL(blob);const pre=new Image();pre.src=url;await pre.decode().catch(()=>{
-      });panelImages.set(key,url);}
-    panelKeys[p]=key;root.style.setProperty('--tome-'+p+'-image','url("'+url+'")');}
-   drop();}catch{}},120);}
+ const panelImages=new Map(),panelKeys={};let menuTimer=0,pictureRequest=0,pictureSource='',sourceVersion=0;
+ // The nonlinear sRGB branch bounds WCAG luminance even in the linear toe. Its weighted power mean
+ // gives an equivalent grey that also bounds mixes with a neutral tint and a white game pixel.
+ const gamma=Array.from({length:256},(_,i)=>((i+14.025)/269.025)**2.4);
+ function pictureBrightness(data,i){
+  const l=.2126*gamma[data[i]]+.7152*gamma[data[i+1]]+.0722*gamma[data[i+2]];
+  return Math.max(0,Math.ceil(269.025*l**(1/2.4)-14.025-1e-6));
+ }
+ function preparePicture(pixels){
+  const {data}=pixels,histogram=new Uint32Array(256),brightness=new Uint8Array(data.length/4);
+  let peak=0;
+  for(let i=0,j=0;i<data.length;i+=4,j++){const value=pictureBrightness(data,i);brightness[j]=value;histogram[value]++;peak=Math.max(peak,value);}
+  let median=0,seen=histogram[0];while(seen<brightness.length/2)seen+=histogram[++median];
+  // Near-black photos keep the ink tint. Darker midtones use a neutral grey backing nearer their own shade.
+  // Return to the ink tint for daylight photos to keep their usual translucency.
+  const tint=pictureInkTint+Math.round(35*Math.max(0,Math.min(1,(median-16)/12,(96-median)/48)));
+  if(peak<=pictureLimit)return {peak,tint};
+  const slope=(pictureLimit-highlightStart)/(peak-highlightStart);
+  for(let j=0,i=0;j<brightness.length;j++,i+=4){
+   const level=brightness[j];if(level<=highlightStart)continue;
+   const gain=(highlightStart+(level-highlightStart)*slope)/level;
+   for(let channel=i;channel<i+3;channel++)data[channel]=Math.floor(data[channel]*gain);
+  }
+  return {peak:pictureLimit,tint,compressed:true};
+ }
+ function revokePicture(picture){URL.revokeObjectURL(picture.url);if(picture.readable!==picture.url)URL.revokeObjectURL(picture.readable);}
+ async function renderPicture(img,v){
+  const w=640,h=Math.max(1,Math.round(img.naturalHeight*w/img.naturalWidth)),blur=v.blur*.8,pad=Math.ceil(blur*2);
+  const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  ctx.filter='blur('+blur+'px) saturate('+v.saturate+'%) brightness('+(100-v.dim)+'%)';
+  ctx.drawImage(img,-pad,-pad,w+pad*2,h+pad*2);
+  const blob=await new Promise(r=>canvas.toBlob(r,'image/jpeg',.9));
+  if(!blob)return;
+  const url=URL.createObjectURL(blob);let readable=url;
+  try{
+   const decoded=new Image();decoded.src=url;await decoded.decode();
+   // Measure the same JPEG pixels the pane displays, including encoding and the user's effects.
+   ctx.filter='none';ctx.drawImage(decoded,0,0);
+   const pixels=ctx.getImageData(0,0,w,h),{peak,tint,compressed}=preparePicture(pixels);
+   if(compressed){
+    ctx.putImageData(pixels,0,0);
+    const safe=await new Promise(r=>canvas.toBlob(r,'image/png'));
+    if(!safe)throw Error('Panel picture could not be encoded');
+    readable=URL.createObjectURL(safe);const prepared=new Image();prepared.src=readable;await prepared.decode();
+   }
+   return {url,readable,peak,tint};
+  }catch(error){revokePicture({url,readable});throw error;}
+ }
+ function dropPanelImages(){
+  const used=new Set(Object.values(panelKeys));
+  for(const [key,picture] of panelImages)if(!used.has(key)){revokePicture(picture);panelImages.delete(key);}
+ }
+ function showPanelPicture(p,key,picture){
+  const root=document.documentElement,prefix='--tome-'+p+'-';
+  panelKeys[p]=key;
+  if(picture){
+   root.style.setProperty(prefix+'image','url("'+picture.url+'")');
+   root.style.setProperty(prefix+'readable-image','url("'+picture.readable+'")');
+   root.style.setProperty(prefix+'picture-peak',String(picture.peak));
+   root.style.setProperty(prefix+'picture-tint',String(picture.tint));
+  }else{
+   for(const name of ['image','readable-image','picture-peak','picture-tint'])root.style.removeProperty(prefix+name);
+  }
+  root.toggleAttribute('data-tome-'+p+'-picture',!!picture);
+ }
+ function renderMenuImage(){
+  const source=gcfg.custom&&gameImage?gameImage:imageHome(),settings=gcfg.panels,request=++pictureRequest;
+  clearTimeout(menuTimer);
+  if(!source){pictureSource='';for(const p of PANELS)showPanelPicture(p,'');dropPanelImages();return;}
+  if(source!==pictureSource){pictureSource=source;sourceVersion++;}
+  const keys=PANELS.map(p=>{const {blur,dim,saturate}=settings[p];return [sourceVersion,blur,dim,saturate].join('|');});
+  if(PANELS.every((p,i)=>panelKeys[p]===keys[i])){dropPanelImages();return;}
+  menuTimer=setTimeout(async()=>{
+   try{
+    const img=new Image();img.src=source;await img.decode();
+    for(const [i,p] of PANELS.entries()){
+     if(request!==pictureRequest)return;
+     const key=keys[i];let picture=panelImages.get(key);
+     if(!picture){
+      picture=await renderPicture(img,settings[p]);
+      if(!picture)continue;
+      if(request!==pictureRequest){revokePicture(picture);return;}
+      panelImages.set(key,picture);
+     }
+     showPanelPicture(p,key,picture);
+    }
+   }catch{}finally{if(request===pictureRequest)dropPanelImages();}
+  },120);
+ }
  const imageHome=()=>image||homeDefault;
  function save(){try{localStorage.setItem(KEY,JSON.stringify(cfg));}catch{}paint();}
  async function load(){try{const r=await b.v4Request('backgroundGet',{});/* the built-in home picture is only for the panels, never the reader's own backdrop */homeDefault=r.builtIn?r.image||'':'';

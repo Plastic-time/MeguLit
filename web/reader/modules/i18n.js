@@ -381,7 +381,7 @@ Object.assign(ZH,{"隐藏点击等待图标（绘制 Hook，仅支持已适配�
  .tome-pick-list{position:absolute;top:calc(100% + 6px);right:0;left:0;z-index:2000;margin:0;padding:5px;list-style:none;border-radius:12px;border:1px solid var(--theme-border,#3a3a40);background:var(--theme-surface,#16161a);box-shadow:0 14px 34px rgba(0,0,0,.45)}
  .tome-pick-list li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:8px;font-size:14px;color:var(--theme-text,#eee);cursor:pointer;outline:none;white-space:nowrap}
  .tome-pick-list li:hover,.tome-pick-list li:focus{background:color-mix(in srgb,var(--theme-text,#eee) 8%,transparent)}
- .tome-pick-list li[aria-selected=true]{background:color-mix(in srgb,var(--theme-primary,#e0495a) 16%,transparent);color:var(--theme-primary,#e0495a);font-weight:700}
+ .tome-pick-list li[aria-selected=true]{background:color-mix(in srgb,var(--theme-primary,#e0495a) 16%,transparent);color:var(--tome-picture-accent,var(--theme-primary,#e0495a));font-weight:700}
  .tome-pick-list li svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;visibility:hidden}
  .tome-pick-list li[aria-selected=true] svg{visibility:visible}
  .tome-lang-misc{display:flex!important;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 14px!important}`;
