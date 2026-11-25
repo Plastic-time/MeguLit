@@ -285,6 +285,8 @@ function fitLeft(root){const left=root.querySelector('.tv-left'),title=root.quer
 
 export function cardify(card){
  const face=card.querySelector('.tv-face');if(!face)return ()=>{};
+ // Pages repaint and call this again on the same card: keep one controller per card.
+ if(card.__tiltStop)return card.__tiltStop;
  const host=card.closest('.tv-home')||card.parentElement;
  const initialTransition=face.style.transition;
  const state={rx:0,ry:0,scale:1,x:.5,y:.5,strength:0};
@@ -331,14 +333,17 @@ export function cardify(card){
   paint();if(!settled)frame=requestUiFrame(tick);
  }
  function wake(){if(!stopped&&!frame){lastAt=performance.now();frame=requestUiFrame(tick);}}
+ // Only the home page calls stop(). Elsewhere a card that left the page drops its listeners at its next event.
+ function alive(){if(card.isConnected)return true;stop();return false;}
  function move(event){
-  if(event.pointerType==='touch')return;
+  if(!alive()||event.pointerType==='touch')return;
   pointer={x:event.clientX,y:event.clientY};dirty=true;wake();
  }
- function leave(){pointer=null;pressed=false;dirty=true;wake();}
+ function leave(){if(!alive())return;pointer=null;pressed=false;dirty=true;wake();}
  function down(event){if(event.button!==0||event.pointerType==='touch')return;pressed=true;move(event);}
- function up(){if(!pressed)return;pressed=false;dirty=true;wake();}
- function geometry(){dirty=true;if(pointer)wake();}
+ function up(){if(!alive()||!pressed)return;pressed=false;dirty=true;wake();}
+ function geometry(){if(!alive())return;dirty=true;if(pointer)wake();}
+ function visibility(){if(alive())reset();}
  function reset(){
   if(frame)cancelUiFrame(frame);frame=0;pointer=null;pressed=false;
   target=neutral();Object.assign(state,target);paint();
@@ -353,16 +358,17 @@ export function cardify(card){
  window.addEventListener('blur',leave);
  window.addEventListener('resize',geometry);
  document.addEventListener('scroll',geometry,true);
- document.addEventListener('visibilitychange',reset);
+ document.addEventListener('visibilitychange',visibility);
  function stop(){
   if(stopped)return;stopped=true;reset();busy.disconnect();
   host.removeEventListener('pointermove',move);host.removeEventListener('pointerleave',leave);
   card.removeEventListener('pointerdown',down);
   window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);
   window.removeEventListener('blur',leave);window.removeEventListener('resize',geometry);
-  document.removeEventListener('scroll',geometry,true);document.removeEventListener('visibilitychange',reset);
-  face.style.transition=initialTransition;
+  document.removeEventListener('scroll',geometry,true);document.removeEventListener('visibilitychange',visibility);
+  face.style.transition=initialTransition;delete card.__tiltStop;
  }
+ card.__tiltStop=stop;
  return stop;
 }
 
