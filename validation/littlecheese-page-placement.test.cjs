@@ -62,6 +62,13 @@ test('retained GDI rows leave room for the current translation inside the client
       return getComputedStyle(tokens[0]).opacity === '1' && getComputedStyle(tokens[1]).opacity === '0' &&
         document.querySelector('.megulit-old-line')?.textContent === '明日';
     });
+    await page.evaluate(() => window.__tomoyoChinese.textPlacePage({ awake: true, armed: true, engineRows: true, retainedBitmap: true,
+      client: [800, 600], lines: [{ id: 1, text: '今日', rects: [[266, 468, 20, 20], [286, 468, 20, 20]], nativeCells: [true, true] }] }));
+    await page.waitForFunction(() => {
+      const original = document.querySelector('.sentence-text:not(.megulit-old-line)');
+      return getComputedStyle(original).visibility === 'hidden' &&
+        document.querySelector('.tomoyo-cn-row').checkVisibility({ visibilityProperty: true });
+    });
   } finally {
     await browser.close();
   }

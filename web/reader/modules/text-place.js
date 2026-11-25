@@ -617,7 +617,8 @@
     body.classList.remove('megulit-place-fallback'); body.classList.add('megulit-placed'); win.classList.add('megulit-place-window');
     for (const w of document.querySelectorAll('.megulit-place-window')) if (w !== win) w.classList.remove('megulit-place-window');
     /* the reader's line is not on the page (its places are not claimed yet, or the game shows another page): its Japanese is not drawn anywhere else */
-    const hideCur = !cur; if (body.classList.contains('megulit-place-game-drawn') !== hideCur) body.classList.toggle('megulit-place-game-drawn', hideCur);
+    const hideCur = !cur || cur.nativeCells?.every(Boolean) === true;
+    if (body.classList.contains('megulit-place-game-drawn') !== hideCur) body.classList.toggle('megulit-place-game-drawn', hideCur);
     if (cur) {
       const at = [...cur.text.slice(0, cur.text.indexOf(readerText))].length, n = [...readerText].length;
       /* the places arrive from the game in uneven batches (several characters, then nothing for 0.1 s): the line's
@@ -695,7 +696,7 @@
     const ids = new Set(page.lines.map(l => l.id));
     for (const id of [...clones.keys()]) if (!ids.has(id)) clones.delete(id);
     for (const l of page.lines) {
-      if (l === cur || !l.rects.length) continue;
+      if (l === cur || !l.rects.length || l.nativeCells?.every(Boolean)) continue;
       let src = clones.get(l.id);
       if (!src) { src = plain(l.text); src.__megulitText = l.text; src.__megulitAt = 0; clones.set(l.id, src); }
       /* the kept copy stays out of the document; what is shown is a copy of it, made again when the reader's own passes
