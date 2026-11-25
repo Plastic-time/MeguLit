@@ -117,13 +117,13 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
  // to the offline view, and the deck view re-checks the connection every few seconds.
  /* 2026-11-12 (user: must be a foolproof one-click install) no Anki on this computer: download, install, AnkiConnect, connect */
  const INST={zh:{ask:'还没装 Anki？一键安装',title:'还没有安装 Anki',text:'点一下就好：MeguLit 会下载 Anki 官方安装包（约 190 MB）并装好，再自动装上 AnkiConnect 插件、启动并连接，全程不用自己找路径。',tips:['Windows 弹窗问「是否允许更改」时，点「是」',
-  'Anki 第一次启动会出现一个黑色窗口，直接按回车，等它下载完','装好后这里会自动连上，就可以开始复习了'],go:'一键安装 Anki',downloading:'正在下载 Anki',installing:'正在安装（稍等一下，Windows 可能会询问权限）',connecting:'正在启动 Anki 并连接…',
+  'Anki 首次启动时如提示选择语言，请在 Anki 窗口中确认','装好后这里会自动连上，就可以开始复习了'],go:'一键安装 Anki',downloading:'正在下载 Anki',installing:'正在安装（稍等一下，Windows 可能会询问权限）',connecting:'正在启动 Anki 并连接…',
   done:'装好了，正在连接',failed:'没有装成功',retry:'重试',cancelled:'安装被取消了：Windows 询问权限时请点「是」'},
   ja:{ask:'Anki がまだ？ワンクリックで導入',title:'Anki がインストールされていません',text:'押すだけ：MeguLit が Anki 公式インストーラー（約 190 MB）をダウンロードしてインストールし、AnkiConnect も入れて起動・接続します。パスを探す必要はありません。',
-   tips:['Windows が「変更を許可しますか」と聞いたら「はい」','Anki の初回起動で黒いウィンドウが出たら Enter を押して、ダウンロードが終わるまで待つ','終わるとここで自動的に接続され、復習を始められます'],go:'Anki をワンクリックで導入',downloading:'Anki をダウンロード中',
+   tips:['Windows が「変更を許可しますか」と聞いたら「はい」','初回起動で言語を聞かれたら、Anki の画面で選択して確定します','終わるとここで自動的に接続され、復習を始められます'],go:'Anki をワンクリックで導入',downloading:'Anki をダウンロード中',
    installing:'インストール中（Windows が許可を求めることがあります）',connecting:'Anki を起動して接続しています…',done:'完了。接続しています',failed:'インストールできませんでした',retry:'再試行',cancelled:'キャンセルされました：Windows の確認では「はい」を押してください'},
   en:{ask:'No Anki yet? Install it in one click',title:'Anki is not installed',text:'One click: MeguLit downloads the official Anki installer (about 190 MB), installs it, adds AnkiConnect, starts Anki and connects. No paths to look for.',
-   tips:['When Windows asks to allow changes, choose Yes','On Anki’s first start a black window appears: press Enter and wait for it to finish downloading','When it is done this page connects by itself and you can start reviewing'],
+   tips:['When Windows asks to allow changes, choose Yes','If Anki asks you to choose a language on first launch, confirm it in the Anki window','When it is done this page connects by itself and you can start reviewing'],
    go:'Install Anki',downloading:'Downloading Anki',installing:'Installing (Windows may ask for permission)',connecting:'Starting Anki and connecting…',done:'Installed, connecting',
    failed:'The installation did not complete',retry:'Try again',cancelled:'Cancelled: choose Yes when Windows asks for permission'}}[locale]||null;
  const inst=()=>INST||{ask:'',title:'',text:'',tips:[],go:'',downloading:'',installing:'',connecting:'',done:'',failed:'',retry:'',cancelled:''};

@@ -4,9 +4,9 @@
    be a foolproof one-click install). Downloads the official Anki installer (ankitects/anki GitHub release; the same file
    on MeguLit's mirror first, it is the faster one in China), checks its size and SHA-256 against the release digest,
    runs it with a progress bar (msiexec /passive; Windows may ask for permission once), then installs AnkiConnect and
-   starts Anki and connects. Anki 25+ is a launcher that fetches Anki itself on its first start: in China its package
-   index is pointed at the Tsinghua PyPI mirror. One job at a time; status() reports where it is. */
+   starts Anki and connects. The MSI includes Anki and its runtime. One job at a time; status() reports where it is. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{spawn}=require('node:child_process');
+const ankiProcess=require('./anki-process.cjs');
 const PACKAGE={version:'26.09.4',name:'anki-26.09.4-win-x64.msi',size:201621504,sha256:'c35e7b90acf2929a71d70ac755a3dd0685f9fbe1a89d2f9edabb6fe7c0d91cba'};
 const SOURCES=['https://dl.megulit.com/files/anki/'+PACKAGE.name,'https://cn-dl.megulit.com/files/anki/'+PACKAGE.name,'https://github.com/ankitects/anki/releases/download/'+PACKAGE.version+'/'+PACKAGE.name];
 const inChina=()=>{try{const o=Intl.DateTimeFormat().resolvedOptions();return o.timeZone==='Asia/Shanghai'||o.timeZone==='Asia/Urumqi'||/^zh-CN/i.test(o.locale||'');}catch{return false;}};
@@ -23,17 +23,23 @@ async function download(root,fetcher){
  catch(e){throw Error('ANKI_DOWNLOAD_FAILED '+String((e.last&&e.last.message)||e.message||''));}
 }
 /* msiexec with its own progress bar; 0 and 3010 (restart later) are success, 1602 is "cancelled" (the permission prompt) */
-function runInstaller(root,file){return new Promise((resolve,reject)=>{const child=spawn(path.join(process.env.SystemRoot||'C:\\Windows','System32','msiexec.exe'),['/i',file,'/passive','/norestart'],{windowsHide:false,stdio:'ignore'});
+function runInstaller(root,file){return new Promise((resolve,reject)=>{
+ const args=['/i',file,'/passive','/norestart'];
+ const folder=ankiProcess.installFolder(root);
+ if(folder)args.push('INSTALLFOLDER='+folder);
+ const child=spawn(path.join(process.env.SystemRoot||'C:\\Windows','System32','msiexec.exe'),args,{windowsHide:false,stdio:'ignore'});
  child.on('error',reject);child.on('exit',code=>{log(root,'msiexec exit '+code);if(code===0||code===3010)resolve();else reject(Error(code===1602||code===1223?'ANKI_INSTALL_CANCELLED':'ANKI_INSTALL_FAILED '+code));});});}
 /* start(root,{runtime,fetcher}) begins (or joins) the job: download, install, AnkiConnect, start and connect */
-function start(root,{runtime=null,fetcher=fetch,find=()=>require('./anki-process.cjs').find('',process.env),install=runInstaller,china=inChina()}={}){
+function start(root,{runtime=null,fetcher=fetch,install=runInstaller,china=inChina(),
+ find=()=>runtime?runtime.ankiProcess().find():ankiProcess.find('',process.env,undefined,root)}={}){
  if(job)return status();
  state={phase:'downloading',received:0,total:PACKAGE.size,error:''};
  job=(async()=>{try{
    if(!find()){const file=await download(root,fetcher);state.phase='installing';await install(root,file);}
    state.phase='connecting';
    if(!find())throw Error('ANKI_EXECUTABLE_MISSING');
-   await require('./anki-process.cjs').installAnkiConnect(process.env,{locate:find,fresh:true}).then(r=>log(root,'ankiconnect '+(r.already?'already there':'installed'))).catch(e=>log(root,'ankiconnect '+e.message));
+   await ankiProcess.installAnkiConnect(process.env,{locate:find,fresh:true}).then(r=>log(root,'ankiconnect '+(r.already?'already there':'installed'))).catch(e=>log(root,'ankiconnect '+e.message));
+   // An existing Anki 25.x launcher can still need packages on first start.
    if(china){process.env.UV_DEFAULT_INDEX??='https://pypi.tuna.tsinghua.edu.cn/simple';process.env.UV_INDEX_URL??='https://pypi.tuna.tsinghua.edu.cn/simple';}
    if(runtime?.ankiProcess)await runtime.ankiProcess().start({hide:false});
    state.phase='done';log(root,'done');

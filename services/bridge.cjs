@@ -663,7 +663,7 @@ async function dispatch(request,runtime=null) {
       case 'save_key':return new(require('./settings.cjs').Settings)(root).saveKey({provider:request.provider,baseUrl:request.baseUrl,apiKey:request.apiKey});
       case 'anki_find':return {path:runtime.ankiProcess().find()};
       /* 2026-11-12 one-click Anki: download the official installer, install it, add AnkiConnect, start and connect */
-      case 'anki_install':return require('../core/anki-installer.cjs').start(root,{runtime,find:()=>runtime?runtime.ankiProcess().find():require('../core/anki-process.cjs').find('',process.env)});
+      case 'anki_install':return require('../core/anki-installer.cjs').start(root,{runtime});
       case 'windows_feature_install':{const feature=neededFeature.get(String(request.id||''))||'DirectPlay';const r=await require('../core/windows-features.cjs').install(feature);neededFeature.delete(String(request.id||''));return r;}
       case 'anki_install_status':return require('../core/anki-installer.cjs').status();
       case 'anki_install_connect':return await require('../core/anki-process.cjs').installAnkiConnect(process.env,runtime?{locate:()=>runtime.ankiProcess().find()}:{});

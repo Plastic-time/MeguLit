@@ -6,11 +6,18 @@
 const fs=require('node:fs'),path=require('node:path'),{spawn,execFile}=require('node:child_process');
 const {Anki}=require('./anki.cjs');
 
-function candidates(configured,env=process.env){
+function installFolder(root,env=process.env){
+ const drive=path.win32.parse(root).root;
+ if(!/^[a-z]:[\\/]$/i.test(drive))return '';
+ const systemDrive=env.SystemDrive||'C:';
+ return drive.slice(0,2).toUpperCase()===systemDrive.toUpperCase()?'':path.win32.join(drive,'Anki');
+}
+function candidates(configured,env=process.env,root=''){
  const roots=[env.LOCALAPPDATA&&path.join(env.LOCALAPPDATA,'Programs'),env.ProgramFiles,env['ProgramFiles(x86)'],env.ProgramW6432].filter(Boolean);
  // Anki 25.x installs the program itself under %LOCALAPPDATA%\AnkiProgramFiles\.venv (ankiw.exe has no console).
  const venv=env.LOCALAPPDATA?['ankiw.exe','anki.exe'].map(name=>path.join(env.LOCALAPPDATA,'AnkiProgramFiles','.venv','Scripts',name)):[];
- return [configured,...roots.map(folder=>path.join(folder,'Anki','anki.exe')),...venv].filter(Boolean);
+ const sameDrive=installFolder(root,env);
+ return [configured,...roots.map(folder=>path.join(folder,'Anki','anki.exe')),...venv,sameDrive&&path.win32.join(sameDrive,'anki.exe')].filter(Boolean);
 }
 // Target of a Windows shortcut (.lnk, MS-SHLLINK): the local base path stored in its LinkInfo. '' when unreadable.
 // That path is often stored only in the ANSI code page; a non-ASCII one is read back through the Shell as UTF-8.
@@ -52,8 +59,8 @@ function coldCandidates(env=process.env){
  if(env.USERPROFILE)out.push(path.join(env.USERPROFILE,'scoop','apps','anki','current','anki.exe'));
  return out;
 }
-function find(configured,env=process.env,exists=file=>{try{return fs.statSync(file).isFile();}catch{return false;}}){
- for(const file of candidates(configured,env))if(exists(file))return file;
+function find(configured,env=process.env,exists=file=>{try{return fs.statSync(file).isFile();}catch{return false;}},root=''){
+ for(const file of candidates(configured,env,root))if(exists(file))return file;
  if(coldHit&&exists(coldHit))return coldHit;
  for(const file of coldCandidates(env))if(exists(file))return coldHit=file;
  return '';
@@ -120,9 +127,9 @@ function windows(mode){
  return new Promise(resolve=>{execFile('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-Command','& {'+WINDOWS+'} '+"'"+String(mode).replace(/'/g,"''")+"'"],{windowsHide:true,timeout:20000},(error,stdout)=>resolve(error?0:Number(String(stdout).trim())||0));});
 }
 class AnkiProcess{
- constructor({config,log=()=>{},anki=new Anki(),windowControl=windows,portOwners=listeners,killer=kill,running=ankiRunning,ankiPids=ankiProcesses,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){this.portOwners=portOwners;this.killer=killer;this.running=running;this.ankiPids=ankiPids;this.wait=wait;this.windows=windowControl;this.config=config;this.log=log;this.anki=anki;this.started=false;this.hidden=false;}
+ constructor({root='',config,log=()=>{},anki=new Anki(),windowControl=windows,portOwners=listeners,killer=kill,running=ankiRunning,ankiPids=ankiProcesses,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){this.portOwners=portOwners;this.killer=killer;this.running=running;this.ankiPids=ankiPids;this.wait=wait;this.windows=windowControl;this.root=root;this.config=config;this.log=log;this.anki=anki;this.started=false;this.hidden=false;}
  async online(){try{await this.anki.call(this.config(),'version');return true;}catch{return false;}}
- find(){return find(this.config().ankiPath);}
+ find(){return find(this.config().ankiPath,process.env,undefined,this.root);}
  async start({hide=false}={}){
   if(await this.online()){if(hide)await this.hide();return {running:true,started:false};}
   const exe=this.find();if(!exe)throw Error('ANKI_EXECUTABLE_MISSING');
@@ -215,4 +222,4 @@ async function installAnkiConnect(env=process.env,{locate=()=>find('',env),fresh
   return {installed:true,path:target};
  }finally{fs.rmSync(work,{recursive:true,force:true});}
 }
-module.exports={AnkiProcess,find,candidates,coldCandidates,shortcutTarget,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows,listeners,isAnki,portOf};
+module.exports={AnkiProcess,find,candidates,installFolder,coldCandidates,shortcutTarget,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows,listeners,isAnki,portOf};

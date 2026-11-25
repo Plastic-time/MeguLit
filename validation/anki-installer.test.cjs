@@ -44,3 +44,34 @@ test('one-click Anki reports a connection failure and lets the installed app con
  assert.deepEqual(actions,['version','version']);
  assert.equal(downloads,0);
 });
+
+for(const scenario of [
+ {name:'picks the MeguLit drive off the system drive',sameDrive:false,code:0},
+ {name:'keeps the MSI default on the system drive',sameDrive:true,code:0},
+ {name:'reports an MSI failure without falling back to the system drive',sameDrive:false,code:1603},
+]){
+ test('one-click Anki '+scenario.name,{skip:process.platform!=='win32'},async t=>{
+  const {EventEmitter}=require('node:events'),calls=[];
+  let installed=false;
+  t.mock.method(require('node:child_process'),'spawn',(exe,args)=>{
+   calls.push({exe,args});
+   const child=new EventEmitter();
+   queueMicrotask(()=>{installed=scenario.code===0;child.emit('exit',scenario.code);});
+   return child;
+  });
+  t.mock.method(require('../core/fast-download.cjs'),'download',async()=>{});
+  const {root,m}=fixture(t),drive=path.parse(root).root.slice(0,2);
+  const systemDrive=process.env.SystemDrive;
+  t.after(()=>{if(systemDrive===undefined)delete process.env.SystemDrive;else process.env.SystemDrive=systemDrive;});
+  process.env.SystemDrive=scenario.sameDrive?drive.toLowerCase():(drive.toUpperCase()==='C:'?'D:':'C:');
+  m.start(root,{find:()=>installed?path.join(drive+'\\','Anki','anki.exe'):'',china:false});
+  await wait(m,scenario.code?'error':'done');
+  const expected=['/i',path.join(root,'data','cache','anki-installer',m.PACKAGE.name),'/passive','/norestart'];
+  if(!scenario.sameDrive)expected.push('INSTALLFOLDER='+path.win32.join(drive+'\\','Anki'));
+  assert.equal(m.status().phase,scenario.code?'error':'done');
+  assert.equal(m.status().error,scenario.code?'ANKI_INSTALL_FAILED 1603':'');
+  assert.equal(calls.length,1);
+  assert.equal(path.basename(calls[0].exe),'msiexec.exe');
+  assert.deepEqual(calls[0].args,expected);
+ });
+}

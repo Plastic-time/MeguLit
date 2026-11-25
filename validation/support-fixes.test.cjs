@@ -32,3 +32,17 @@ test('a reader that never started names quarantined native files',()=>{
   assert.match(status.error,/^READER_NATIVE_MISSING: HookBridge\.exe, HookInjector32\.exe, HookInjector64\.exe$/);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('the runtime finds Anki on a MeguLit drive outside C through H without a Start menu shortcut',t=>{
+ const {Runtime}=require('../services/runtime.cjs');
+ const runtime=Object.create(Runtime.prototype);
+ runtime.root='R:\\Apps\\MeguLit';
+ const exe='R:\\Anki\\anki.exe',configured='U:\\Custom\\anki.exe';
+ runtime.config=()=>({ankiPath:''});
+ const registry=t.mock.method(require('node:child_process'),'execFileSync',()=>'');
+ t.mock.method(fs,'statSync',file=>({isFile:()=>file===exe||file===configured}));
+ assert.equal(runtime.ankiProcess().find(),exe);
+ assert.equal(registry.mock.callCount(),0);
+ runtime.config=()=>({ankiPath:configured});
+ assert.equal(runtime.ankiProcess().find(),configured);
+});
