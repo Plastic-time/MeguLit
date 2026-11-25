@@ -77,3 +77,10 @@ test('a sparse unchanged speaker column needs no repair even when it has the mos
  const changedName=table([['明日。','明日。','明日。',10],rows[1]],ids);
  assert.throws(()=>R.repairCells(changedName,original,50,codec),/JAPANESE_REPAIR_BLOCKED/);
 });
+
+test('a matching but unproven Japanese column cannot authorize a name repair',()=>{
+ const ids=[50,0,500],rows=[['甲','おはよう。',10],['乙','明日',20],['丙','帰宅',30],['丁','教室',40]];
+ const original=table(rows,ids);
+ const changedName=table([['おはよう。','おはよう。',10],...rows.slice(1)],ids);
+ assert.throws(()=>R.repairCells(changedName,original,50,codec),{message:'JAPANESE_REPAIR_BLOCKED',detail:'original Japanese column unproven'});
+});

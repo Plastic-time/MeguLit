@@ -60,15 +60,19 @@ test('a mixed story column is backed up and its unambiguous script rows are rest
 });
 
 test('a sparse speaker column cannot leave verified dialogue and choices in Chinese',t=>{
- const f=fixture(t,true,['@mes(41, ,まだ明るい。)','@mes_sel(42, ,帰ろう)','@mes(43, ,場面にある台詞。)']);
+ // Serial 43 must stay unchanged even though its Japanese text occurs at serial 44.
+ const f=fixture(t,true,['@mes(41, ,まだ明るい。)','@mes_sel(42, ,帰ろう)','@mes(43, ,場面にある台詞。)','@mes(44, ,別の台詞だ。)']);
  const file=path.join(f.dat,'text01.dbs');
- const rows=[['','まだ明るい。','天还亮着。',41],['','帰ろう','回家吧',42],
-  ['','別の台詞だ。','其他台词。',43],['ナレーター','','',0]];
- const original=dbs(rows,[50,0,2,500]);fs.writeFileSync(file,original);
+ const rows=[['','まだ明るい。',41,'天还亮着。'],['','帰ろう',42,'回家吧'],
+  ['','別の台詞だ。',43,'其他台词。'],['ナレーター','',0,'']];
+ const original=dbs(rows,[50,0,500,2]);fs.writeFileSync(file,original);
  const options={siglusDbsNameColumn:50};
- assert.equal(jr.detect(f.dir,options).state,'restorable');
+ const detected=jr.detect(f.dir,options);
+ assert.equal(detected.state,'restorable');
+ assert.equal(detected.japaneseColumn,0);
+ assert.ok(detected.targetColumns.includes(3));
  jr.apply(f.dir,options);
- assert.deepEqual(readCells(file),[['','まだ明るい。','まだ明るい。',41],['','帰ろう','帰ろう',42],...rows.slice(2)]);
+ assert.deepEqual(readCells(file),[['','まだ明るい。',41,'まだ明るい。'],['','帰ろう',42,'帰ろう'],...rows.slice(2)]);
  assert.deepEqual(jr.restore(f.dir,options).skipped,[]);
  assert.deepEqual(fs.readFileSync(file),original);
 });
@@ -80,4 +84,76 @@ test('a verified dialogue row keeps its full-width slash and the following text'
  fs.writeFileSync(file,dbs([[line,'又说了一遍。',81]],[0,2,500]));
  jr.apply(f.dir);
  assert.deepEqual(readCells(file),[[line,line,81]]);
+});
+
+test('a Shift-JIS story table is backed up without blocking the Unicode tables',t=>{
+ const f=fixture(t,true,['@mes(41, ,もう帰ろう。)','@mes(42, ,知りません。)']);
+ const file=path.join(f.dat,'text01.dbs');
+ const rows=[['もう帰ろう。','回家。',41],['知りません。','知りません。',42]];
+ const sjis=new Map([
+  ['もう帰ろう。','82e082a48b4182eb82a48142'],['回家。','89f189c68142'],['知りません。','926d82e882dc82b982f18142'],
+ ]);
+ const original=dbs(rows,[0,2,500],{marker:0,encode:v=>Buffer.from(sjis.get(v)+'00','hex')});
+ fs.writeFileSync(file,original);
+ assert.deepEqual(readCells(file),rows);
+ jr.apply(f.dir);
+ assert.deepEqual(readCells(f.file)[0],[body,body,body,20]);
+ assert.deepEqual(fs.readFileSync(file),original);
+ assert.deepEqual(fs.readFileSync(path.join(f.backup,'text01.dbs')),original);
+});
+
+test('other language targets still restore when a mirrored Japanese column wins the heuristic',t=>{
+ const f=fixture(t,true);
+ fs.writeFileSync(f.file,dbs([
+  [body,body,bodyZh,'I dislike this place.',20],
+  [choice,choice,choiceZh,'Talk to her.',24],
+ ],[3,0,2,1,500]));
+ jr.apply(f.dir);
+ assert.deepEqual(readCells(f.file),[[body,body,body,body,20],[choice,choice,choice,choice,24]]);
+});
+
+test('a quoted script example is not evidence that its serial is displayed',t=>{
+ const line='これはサンプルです。';
+ const f=fixture(t,true,['@mes(81, ,"用例は @mes(71, ,'+line+') と書きます。")','@mes(72, ,知りません。)']);
+ const file=path.join(f.dat,'text07.dbs');
+ const original=dbs([[line,'这是样例。',71],['知りません。','知りません。',72]],[0,2,500]);
+ fs.writeFileSync(file,original);
+ jr.apply(f.dir);
+ assert.deepEqual(fs.readFileSync(file),original);
+});
+
+test('ambiguous language column IDs cannot authorize copying a story cell',t=>{
+ const f=fixture(t,true,['@mes(41, ,もう帰ろう。)','@mes(42, ,知りません。)']);
+ const file=path.join(f.dat,'text01.dbs');
+ const original=dbs([['もう帰ろう。','回家吧。','走吧。',41],['知りません。','知りません。','知りません。',42]],[0,2,2,500]);
+ fs.writeFileSync(file,original);
+ jr.apply(f.dir);
+ assert.deepEqual(fs.readFileSync(file),original);
+});
+
+test('only numbered story tables can use a declared story slot',t=>{
+ const f=fixture(t,true,['@mes(41, ,もう帰ろう。)','@mes(42, ,知りません。)','@mes(43, ,また来ます。)']);
+ const tables=[
+  ['other.dbs',dbs([['もう帰ろう。','回家吧。',41],['知りません。','知りません。',42]],[0,2,500])],
+  ['text01.dbs',dbs([['もう帰ろう。','回家吧。',41,'カナ語(JP)'],
+   ['知りません。','知りません。',42,'English(EN)'],['また来ます。','また来ます。',43,'简体中文(CN)']],[0,2,500,55])],
+  ['numbers.dbs',dbs([[41]], [500])],
+ ];
+ for(const [name,bytes] of tables)fs.writeFileSync(path.join(f.dat,name),bytes);
+ jr.apply(f.dir);
+ for(const [name,bytes] of tables)assert.deepEqual(fs.readFileSync(path.join(f.dat,name)),bytes,name);
+});
+
+test('the declared story path requires the active Chinese pack and valid language IDs',t=>{
+ const f=fixture(t,true,['@mes(41, ,もう帰ろう。)','@mes(42, ,知りません。)']);
+ const file=path.join(f.dat,'text01.dbs'),ini=path.join(f.dir,'ds.ini');
+ const original=dbs([['もう帰ろう。','回家吧。',41],['知りません。','知りません。',42]],[0,2,500]);
+ fs.writeFileSync(file,original);
+ fs.writeFileSync(path.join(f.dir,'SceneEN.pck'),'other language');
+ fs.writeFileSync(ini,'Language=english');
+ const plan=options=>jr._internal.siglusPlan(f.dir,options).changes.some(c=>c.name==='text01.dbs');
+ assert.equal(plan(),false);
+ fs.writeFileSync(ini,'Language=schinese');
+ assert.equal(plan({siglusDbsNameColumn:2}),false);
+ assert.equal(plan(),true);
 });
