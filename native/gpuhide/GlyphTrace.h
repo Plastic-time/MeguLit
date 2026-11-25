@@ -37,7 +37,7 @@ struct GtCell { int x, y, w, h; uint32_t u; unsigned ord; uint32_t tint = 0; };
 
 struct GlyphTrace {
  // col: the quad's vertex colour 0xAARRGGBB when the draw has one (hasCol)
- struct Q { float x0, y0, x1, y1, u0, v0, u1, v1; uint32_t col = 0xffffffffu; bool hasCol = false; };
+ struct Q { float x0, y0, x1, y1, u0, v0, u1, v1; uint32_t col = 0xffffffffu; bool hasCol = false; unsigned glyph = 0; };
  struct Pos { uint32_t u; float x, y, w, h; unsigned order; uint32_t col = 0; bool hasCol = false; };
  std::function<void(const std::string &)> emit; void (*log)(const char *, ...) = nullptr;
  std::deque<GtGlyph> pending; unsigned ord = 0, traced = 0;
@@ -125,11 +125,12 @@ struct GlyphTrace {
  }
  void Off() { seq = 0; drawn.clear(); }
  // 3. One draw of quads from texture tex (tw x th); toBack maps a render-target rect to back-buffer pixels (false = not yet).
- template <class M> void Draw(void *tex, unsigned tw, unsigned th, const std::vector<Q> &q, const M &toBack, unsigned now) {
+ template <class M> void Draw(void *tex, unsigned tw, unsigned th, std::vector<Q> &q, const M &toBack, unsigned now) {
   if (!seq || !tw || !th) return; auto it = cells.find(tex); if (it == cells.end()) return; const auto &cv = it->second;
-  for (const Q &d : q) {
+  for (Q &d : q) {
    float cx = (d.u0 + d.u1) * 0.5f * tw, cy = (d.v0 + d.v1) * 0.5f * th, uw = std::fabs(d.u1 - d.u0) * tw, vh = std::fabs(d.v1 - d.v0) * th;
    const GtCell *hit = nullptr; for (const GtCell &c : cv) if (cx >= c.x - 1 && cx <= c.x + c.w + 1 && cy >= c.y - 1 && cy <= c.y + c.h + 1 && uw <= c.w * 2 + 4 && vh <= c.h * 2 + 4) { hit = &c; break; }
+   d.glyph = hit ? hit->ord : 0;
    if (!hit) continue;
    float r[4] = { (std::min)(d.x0, d.x1), (std::min)(d.y0, d.y1), (std::max)(d.x0, d.x1), (std::max)(d.y0, d.y1) }; if (!toBack(r)) continue;
    float w = r[2] - r[0], h = r[3] - r[1]; if (w < 1 || h < 1) continue;

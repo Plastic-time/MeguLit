@@ -24,7 +24,7 @@
 #include <cmath>
 #include <stdio.h>
 
-struct Quad { float x0, y0, x1, y1, u0, v0, u1, v1; unsigned first; unsigned col = 0xffffffffu; bool hasCol = false; }; // col: vertex colour 0xAARRGGBB of the quad's first vertex
+struct Quad { float x0, y0, x1, y1, u0, v0, u1, v1; unsigned first; unsigned col = 0xffffffffu; bool hasCol = false; unsigned glyph = 0; }; // col: vertex colour 0xAARRGGBB of the quad's first vertex
 
 static inline bool GlyphLike(const Quad &q, unsigned tw, unsigned th) {
  if (tw < 32 || th < 32) return false;
@@ -38,8 +38,8 @@ static inline bool GlyphLike(const Quad &q, unsigned tw, unsigned th) {
 static inline bool Blank(wchar_t c) { return c <= 0x20 || c == 0x3000 || c == 0x200B || c == 0xFEFF || c == 0x1F; }
 
 struct GlyphLearner {
- struct Rect { float x0, y0, x1, y1; };
- struct Seen { Rect r; unsigned firstAt, lastFrame; };
+ struct Rect { float x0, y0, x1, y1; bool traced = false; };
+ struct Seen { Rect r; unsigned firstAt, lastFrame, glyph, tracedAt; };
  struct Group { void *rt, *tex; unsigned tw, th, rtW, rtH; std::map<long long, Seen> keys; std::vector<Rect> frame, prev; unsigned prevFrame; };
  std::function<void(const std::string &)> emit; void (*log)(const char *, ...) = nullptr;
  bool readOnly = false;
@@ -51,7 +51,8 @@ struct GlyphLearner {
  std::vector<Rect> lastRects, earlierRects; std::set<std::pair<long long, long long>> lastKeys, earlierKeys; unsigned frameNow = 0;
  unsigned nameN = 0; std::wstring text; unsigned n = 0, seq = 0, lineAt = 0, prevLineAt = 0, armedUntil = 0; bool reported = false, hitSent = false, hiddenSent = false; unsigned hiddenQuads = 0;
  // learned
- bool learned = false; void *areaRt = nullptr; unsigned areaW = 0, areaH = 0; Rect area{}; std::set<long long> atlases; unsigned learnedSeq = 0; float glyphH = 0;
+ bool learned = false, areaTraced = false; void *areaRt = nullptr; unsigned areaW = 0, areaH = 0; Rect area{}; std::set<long long> atlases; unsigned learnedSeq = 0; float glyphH = 0;
+ size_t learnedGlyphs = 0;
  std::map<void *, unsigned> texFirst; // texture -> first time a glyph quad used it
  std::map<long long, Group> groups; unsigned frameNo = 0, bbW = 0, bbH = 0;
  std::map<void *, std::pair<Rect, Rect>> rtMap; // rt texture -> (uv rect, screen rect)
@@ -290,11 +291,20 @@ struct GlyphLearner {
    const Quad &x = q[i]; if (!GlyphLike(x, tw, th)) continue;
    { bool leave = false; if (PageQuad(x, tex, tw, th, rt, rtW, rtH, now, &leave)) { if (leave) { drop.push_back((int)i); hiddenQuads++; if (log && hiddenQuads < 60) log("drop page tex=%p %ux%u [%.0f,%.0f %.0fx%.0f]", tex, tw, th, x.x0, x.y0, x.x1 - x.x0, x.y1 - x.y0); } continue; } }
    if (!g) { g = &groups[gk]; g->rt = rt; g->tex = tex; g->tw = tw; g->th = th; g->rtW = rtW; g->rtH = rtH; if (groups.size() > 64) { groups.clear(); g = &groups[gk]; g->rt = rt; g->tex = tex; g->tw = tw; g->th = th; g->rtW = rtW; g->rtH = rtH; } }
-   Rect r{ x.x0, x.y0, x.x1, x.y1 };
+   Rect r{ x.x0, x.y0, x.x1, x.y1, x.glyph != 0 };
    if (g->prevFrame != frameNo) { g->prev.swap(g->frame); g->frame.clear(); g->prevFrame = frameNo; }
    if (g->frame.size() < 4096) g->frame.push_back(r);
    long long k = ((long long)(int)(x.x0 * 0.5f) << 44) ^ ((long long)(int)(x.y0 * 0.5f) << 30) ^ ((long long)(int)(x.u0 * 4096) << 15) ^ (long long)(int)(x.v0 * 4096);
-   auto it = g->keys.find(k); if (it == g->keys.end()) { if (g->keys.size() > 20000) g->keys.clear(); g->keys[k] = Seen{ r, now, frameNo }; } else it->second.lastFrame = frameNo;
+   auto it = g->keys.find(k);
+   if (it == g->keys.end()) {
+    if (g->keys.size() > 20000) g->keys.clear();
+    g->keys[k] = Seen{ r, now, frameNo, x.glyph, now };
+   } else {
+    Seen &seen = it->second;
+    seen.lastFrame = frameNo; seen.r.traced = r.traced;
+    // A texture cell can be rewritten at the same UV, on the same screen position.
+    if (x.glyph && x.glyph != seen.glyph) { seen.glyph = x.glyph; seen.tracedAt = now; }
+   }
    // learned atlas on the learned target; or, for engines that build a small glyph sheet per line (a new texture every
    // line), any glyph quad of the learned glyph height on a target of the learned size (effect buffers drawn twice)
    bool sameAtlas = rtW == areaW && rtH == areaH && atlases.count(AtlasKey(NULL, tex)), sheet = freshTex && LineSized(tw, th) && rtW == areaW && rtH == areaH && std::fabs((x.y1 - x.y0) - glyphH) <= glyphH * 0.25f;
@@ -304,7 +314,7 @@ struct GlyphLearner {
    bool redraw = (int)(redrawUntil - now) > 0 && rtW == areaW && rtH == areaH;
    if (learned && armed && !readOnly && glyphSize && (sameAtlas || sheet || redraw)) {
     float cx = (x.x0 + x.x1) / 2, cy = (x.y0 + x.y1) / 2;
-    if (cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1) { drop.push_back((int)i); hiddenQuads++; if (log && hiddenQuads < 60) log("drop %s tex=%p %ux%u [%.0f,%.0f %.0fx%.0f uv %.3f,%.3f %.3fx%.3f]", sameAtlas ? "atlas" : sheet ? "sheet" : "redraw", tex, tw, th, x.x0, x.y0, x.x1 - x.x0, x.y1 - x.y0, x.u0, x.v0, x.u1 - x.u0, x.v1 - x.v0); }
+    if (cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1) { drop.push_back((int)i); if (sameAtlas && rt == areaRt && r.traced) areaTraced = true; hiddenQuads++; if (log && hiddenQuads < 60) log("drop %s tex=%p %ux%u [%.0f,%.0f %.0fx%.0f uv %.3f,%.3f %.3fx%.3f]", sameAtlas ? "atlas" : sheet ? "sheet" : "redraw", tex, tw, th, x.x0, x.y0, x.x1 - x.x0, x.y1 - x.y0, x.u0, x.v0, x.u1 - x.u0, x.v1 - x.v0); }
    }
   }
   if (!drop.empty() && !hitSent) { hitSent = true; char b[128]; snprintf(b, sizeof b, "ToMe_GPUHIDE hit seq=%u quads=%u chars=%u", seq, (unsigned)drop.size(), n); if (emit) emit(b); }
@@ -352,10 +362,30 @@ struct GlyphLearner {
    if (k >= r.size()) return false; keep.push_back(r[k++]); }
   return k == r.size() && keep.size() == n;
  }
- /* the same place as an earlier glyph, offset copies (shadow, outline) included: the tolerance Chars() merges them with */
- bool Earlier(const Rect &r) const { for (auto &e : earlierRects) { float w = (std::min)(e.x1 - e.x0, r.x1 - r.x0), h = e.y1 - e.y0; if (std::fabs(e.x0 - r.x0) < 0.4f * w && std::fabs(e.y0 - r.y0) < 0.4f * h) return true; } return false; }
+ static bool SamePlace(const Rect &a, const Rect &b) {
+  const float w = (std::min)(a.x1 - a.x0, b.x1 - b.x0), h = (std::min)(a.y1 - a.y0, b.y1 - b.y0);
+  return std::fabs(a.x0 - b.x0) < 0.4f * w && std::fabs(a.y0 - b.y0) < 0.4f * h;
+ }
+ // Use the earlier glyph's height so a smaller late shadow or outline still counts as its copy.
+ bool Earlier(const Rect &r) const {
+  for (const auto &e : earlierRects) {
+   const float w = (std::min)(e.x1 - e.x0, r.x1 - r.x0), h = e.y1 - e.y0;
+   if (std::fabs(e.x0 - r.x0) < 0.4f * w && std::fabs(e.y0 - r.y0) < 0.4f * h) return true;
+  }
+  return false;
+ }
  /* a glyph of an earlier line of the page (the same glyph on the same place) is never the new line's */
  bool EarlierGlyph(long long gk, long long k) const { return earlierKeys.count({ gk, k }) > 0; }
+ bool BodyInBand(const Rect &r) const {
+  const float cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;
+  return cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1 &&
+         std::fabs((r.y1 - r.y0) - glyphH) <= glyphH * 0.2f;
+ }
+ // Same-atlas spacers and decorations have no traced glyph cell.
+ static std::vector<Rect> TracedChars(std::vector<Rect> rects) {
+  rects.erase(std::remove_if(rects.begin(), rects.end(), [](const Rect &r) { return !r.traced; }), rects.end());
+  return Chars(Cluster(Chars(std::move(rects))));
+ }
  // A relocated dialogue line can use a different atlas. Both the current frame and the new glyphs must agree before moving the band.
  bool Relocated(const std::vector<Rect> &live, const std::vector<Rect> &fresh) const {
   if (n < 3 || live.size() != n || fresh.size() != n) return false;
@@ -375,21 +405,50 @@ struct GlyphLearner {
   if (!earlierKeys.empty()) { size_t on = 0; for (auto &e : earlierKeys) { auto g = groups.find(e.first); if (g == groups.end()) continue; auto it = g->second.keys.find(e.second); if (it != g->second.keys.end() && frameNo - it->second.lastFrame <= 2) on++; } if (on * 2 < earlierKeys.size()) { earlierKeys.clear(); earlierRects.clear(); } }
   if (reported && hiddenSent == (hitSent && !readOnly)) return;
   unsigned since = prevLineAt && now - prevLineAt < 120000 ? (std::max)(prevLineAt + 200, lineAt - 3000) : lineAt - 3000;
-  Group *movedGroup = nullptr; std::vector<Rect> movedRects; bool ambiguousMove = false;
+  Group *movedGroup = nullptr; std::vector<Rect> movedRects, bandDrawn; bool ambiguousMove = false, freshBand = false;
+  const bool recoverBand = learned && hitSent && !areaTraced && !readOnly && !reported;
   for (auto &kv : groups) {
-   Group &g = kv.second; std::vector<Rect> fresh, live;
-   for (auto &s : g.keys) if ((int)(s.second.firstAt - since) >= 0 && !EarlierGlyph(kv.first, s.first)) fresh.push_back(s.second.r);
-   const bool currentFrame = g.prevFrame == frameNo - 1;
+   Group &g = kv.second; std::vector<Rect> fresh, live, freshTraced;
+   if (learned && (g.rtW != areaW || g.rtH != areaH)) continue;
+   const bool currentFrame = g.prevFrame == frameNo - 1, fromAtlas = atlases.count(AtlasKey(NULL, g.tex)) > 0;
+   Rect screen{};
+   const bool canMove = learned && !readOnly && !reported && currentFrame && g.rt == areaRt &&
+    (!hitSent || (recoverBand && !fromAtlas)) && ToScreen(g.rt, g.rtW, g.rtH, screen);
+   const bool recover = canMove && recoverBand;
+   const bool checkBand = recoverBand && currentFrame && fromAtlas && g.rt == areaRt;
+   for (auto &s : g.keys) {
+    const Seen &seen = s.second;
+    const bool isFresh = (int)(seen.firstAt - since) >= 0;
+    const bool isFreshTrace = recover && seen.lastFrame == frameNo - 1 && seen.r.traced && (int)(seen.tracedAt - since) >= 0;
+    if (!isFresh && !isFreshTrace) continue;
+    if (!EarlierGlyph(kv.first, s.first)) {
+     if (isFresh) fresh.push_back(seen.r);
+     if (isFreshTrace) freshTraced.push_back(seen.r);
+    }
+    if (checkBand && isFresh && seen.lastFrame == frameNo - 1 && BodyInBand(seen.r)) freshBand = true;
+   }
+   if (checkBand && !freshBand) for (const Rect &r : g.frame) if (BodyInBand(r)) bandDrawn.push_back(r);
    const std::vector<Rect> &last = currentFrame ? g.frame : g.prev; for (auto &r : last) if (earlierRects.empty() || !Earlier(r)) live.push_back(r);
    std::vector<Rect> a = Chars(Cluster(Chars(live))), b = Chars(Cluster(Chars(fresh)));
    if (log && (now / 500) != ((now - 17) / 500)) log("frame %u group rt=%p %ux%u live=%u fresh=%u n=%u", frameNo, g.rt, g.tw, g.th, (unsigned)a.size(), (unsigned)b.size(), n);
-   std::vector<Rect> keep; const std::vector<Rect> *hit = Match(a, b, keep); if (!hit) continue;
-   if (learned && (g.rtW != areaW || g.rtH != areaH)) continue;
-   // A partial line or older page row may still occupy the band. Compare positions only on its own target.
-   Rect screen{};
-   const bool moved = learned && !readOnly && !reported && !hitSent && currentFrame && g.rt == areaRt &&
-    ToScreen(g.rt, g.rtW, g.rtH, screen) && Relocated(a, b);
-   if (learned && !atlases.count(AtlasKey(NULL, g.tex))) {
+   std::vector<Rect> keep; const std::vector<Rect> *hit = Match(a, b, keep);
+   bool moved = canMove && !hitSent && Relocated(a, b);
+   if (recover) {
+    // A stale atlas can drop toolbar art. Move only when live and recently written glyph cells agree.
+    a = TracedChars(std::move(live)); b = TracedChars(std::move(freshTraced));
+    hit = Match(a, b, keep);
+    moved = Relocated(a, b);
+   } else if (!hit && reported && currentFrame && fromAtlas && areaTraced && g.rt == areaRt) {
+    // A traced menu in the same atlas must never replace the positions already reported for this line.
+    live.erase(std::remove_if(live.begin(), live.end(), [&](const Rect &r) {
+     return !r.traced || !BodyInBand(r) || std::none_of(lastRects.begin(), lastRects.end(), [&](const Rect &p) { return SamePlace(p, r); });
+    }), live.end());
+    const auto confirmed = Chars(std::move(live));
+    if (confirmed.size() == lastRects.size() && !confirmed.empty() &&
+        std::equal(confirmed.begin(), confirmed.end(), lastRects.begin(), SamePlace)) hit = &lastRects;
+   }
+   if (!hit) continue;
+   if (learned && !fromAtlas) {
     if (moved && movedGroup) ambiguousMove = true;
     else if (moved) { movedGroup = &g; movedRects.swap(a); }
     continue;
@@ -398,7 +457,17 @@ struct GlyphLearner {
    return;
   }
   // Try a confirmed new atlas only after checking all previously learned atlases.
-  if (movedGroup && !ambiguousMove) { Report(*movedGroup, movedRects, true); return; }
+  if (movedGroup && !ambiguousMove && !freshBand) {
+   const auto occupied = Chars(Cluster(Chars(std::move(bandDrawn))));
+   std::vector<Rect> keep;
+   // A centred box may draw only part of a line from cached cells. Require more positions than
+   // the old band learned before treating its hit as stale, even if no complete line matches there.
+   const bool retained = !occupied.empty() && std::all_of(occupied.begin(), occupied.end(), [&](const Rect &r) { return Earlier(r); });
+   if (!recoverBand || (occupied.size() > learnedGlyphs && !retained && !Match(occupied, {}, keep))) {
+    Report(*movedGroup, movedRects, true);
+    return;
+   }
+  }
   // The glyphs of one line can come from several atlas pages: count them together per render target.
   std::map<void *, std::vector<Group *>> byRt; for (auto &kv : groups) byRt[kv.second.rt].push_back(&kv.second);
   for (auto &kv : byRt) {
@@ -419,6 +488,8 @@ struct GlyphLearner {
   char b[256];
   if (!learned) {
    learned = true; areaRt = g.rt; areaW = g.rtW; areaH = g.rtH; glyphH = h; learnedSeq = seq; area = Rect{ 0, box.y0 - h, (std::max)(box.x1 + h * 8, (float)g.rtW), box.y1 + h * 2 };
+   learnedGlyphs = cs.size();
+   areaTraced = std::any_of(cs.begin(), cs.end(), [](const Rect &r) { return r.traced; });
    // atlases whose quads line up with the matched glyphs (other pages, outline / shadow sheets: top-left within 3 px of a
    // glyph for at least 60 % of their quads in the area); a UI sheet drawing the box frame or body under the text is not
    auto aligned = [&](const Rect &r) { for (auto &c : cs) if (std::fabs(r.x0 - c.x0) <= 3 && std::fabs(r.y0 - c.y0) <= 3) return true; return false; };

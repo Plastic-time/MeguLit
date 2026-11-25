@@ -190,10 +190,11 @@ static void DiagDraw(Dev &v, const char *kind, D3DPRIMITIVETYPE pt, UINT prims, 
 }
 // Decides per quad; returns the quads to leave out (indices into q). Empty = draw as is.
 // Glyph trace (GlyphTrace.h): quads from a texture that holds traced GetGlyphOutline cells give those characters' places.
-static void TraceDraw(void *tex, unsigned tw, unsigned th, void *rt, unsigned rtW, unsigned rtH, const std::vector<Quad> &q) {
+static void TraceDraw(void *tex, unsigned tw, unsigned th, void *rt, unsigned rtW, unsigned rtH, std::vector<Quad> &q) {
  if (!Trace.seq || !Trace.Known(tex)) return; std::vector<GlyphTrace::Q> t; t.reserve(q.size());
  for (auto &x : q) { GlyphTrace::Q g{ x.x0, x.y0, x.x1, x.y1, x.u0, x.v0, x.u1, x.v1 }; g.col = x.col; g.hasCol = x.hasCol; t.push_back(g); }
  Trace.Draw(tex, tw, th, t, [&](float *r) { GlyphLearner::Rect rr{ r[0], r[1], r[2], r[3] }; if (!Learner.ToScreen(rt, rtW, rtH, rr)) return false; r[0] = rr.x0; r[1] = rr.y0; r[2] = rr.x1; r[3] = rr.y1; return true; }, GetTickCount());
+ for (size_t i = 0; i < q.size(); i++) q[i].glyph = t[i].glyph;
 }
 static std::vector<int> Decide(Dev &v, std::vector<Quad> &q) {
  TexInfo ti = TexOf(v.tex0); std::vector<int> drop;
