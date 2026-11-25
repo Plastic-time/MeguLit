@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../GlyphQuads.h"
+#include "../LittlecheeseRows.h"
 #include <assert.h>
 
 static std::vector<Quad> Row(unsigned count, float left, float top, float height, float v) {
@@ -305,6 +306,44 @@ static void KeepCenteredBandWhileTyping() {
  assert(draw(label, menu, 15017) == 0);
 }
 
+static void RetainedDialogueRows() {
+ Littlecheese::Rows rows;
+ unsigned now = 1000;
+ auto draw = [&](const std::wstring &text, int y, int x, bool hide) {
+  for (wchar_t ch : text) {
+   assert(rows.Draw(1, ch, x, y, 20, 20, now, hide) == hide);
+   x += 20; now += 94;
+  }
+ };
+ draw(L"社会からの脱落。", 468, 266, true);
+ draw(L"それを", 494, 266, true);
+ assert(rows.Claim(L"違う文章", now).cells.empty());
+ auto first = rows.Claim(L"社会からの脱落。", now);
+ assert(first.hidden && first.cells.size() == 8);
+ for (const auto &c : first.cells) assert(c.y == 468);
+ draw(L"皮肉っぽく嘲笑うみたいな言葉。", 494, 326, true);
+ auto second = rows.Claim(L"それを皮肉っぽく嘲笑うみたいな言葉。", now);
+ assert(second.hidden && second.cells.size() == 18);
+ for (const auto &c : second.cells) assert(c.y == 494);
+ assert(rows.Claim(L"社会からの脱落。", now).cells.empty());
+ draw(L"はい。", 468, 266, true);
+ draw(L"はい。", 494, 266, true);
+ assert(rows.Claim(L"はい。", now).cells.front().y == 468);
+ assert(rows.Claim(L"はい。", now).cells.front().y == 494);
+
+ // A mid-row enable cannot turn a partially visible row into a hidden one.
+ draw(L"新", 468, 266, false);
+ assert(!rows.Draw(1, L'文', 286, 468, 20, 20, ++now, true));
+ assert(!rows.Claim(L"新文", now).hidden);
+ draw(L"次", 494, 266, true);
+ assert(!rows.Draw(1, L'へ', 286, 494, 20, 20, ++now, false));
+ assert(!rows.Claim(L"次へ", now).hidden);
+ draw(L"旧", 468, 266, true);
+ draw(L"新", 468, 266, true);
+ assert(rows.Claim(L"旧", now + 12001).cells.empty());
+ assert(rows.Claim(L"新", now + 12001).cells.empty());
+}
+
 int main() {
  GlyphLearner g;
  g.Line(L"これは会話です。", 100);
@@ -339,5 +378,6 @@ int main() {
  IgnoreTraceFromOldFrame();
  ReportNewLineWithLateScaledCopy();
  KeepCenteredBandWhileTyping();
+ RetainedDialogueRows();
  puts("PASS dialogue scope: unclaimed title/menu, foreign target, unmatched ruby kept; confirmed dialogue hides; read/OFF restore");
 }

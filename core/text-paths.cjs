@@ -12,7 +12,7 @@
 const fs=require('node:fs'),path=require('node:path');
 
 /* gpu: layer 4 (native/gpuhide, feat/hide-gpu-proxy) speaks the same record, rects in back-buffer px */
-const ENGINES=new Set(['krkr','renpy','web','unity','gpu','rpgm','rgss',/* engine-draw MAGES (core/mages-draw.cjs) */'mages']);
+const ENGINES=new Set(['krkr','renpy','web','unity','gpu','littlecheese','rpgm','rgss',/* engine-draw MAGES (core/mages-draw.cjs) */'mages']);
 /* engine-draw (docs/engine-draw-protocol.md): what a drawn run is in the game. Only `line` may be hidden or replaced; the
    others are annotated beside their box and their click area stays the game's */
 const ROLES=new Set(['line','name','choice','button','menu','system']);

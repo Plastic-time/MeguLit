@@ -591,7 +591,7 @@
     if (document.querySelector('.megulit-anchor-window')) { const p0 = page; page = null; release(false, false); page = p0; }
     const map = pageMap(), readerText = readerLine(), geom = [];
     let cur = null; if (readerText) for (let i = page.lines.length - 1; i >= 0; i--) if (page.lines[i].text.includes(readerText)) { cur = page.lines[i]; break; }
-    if (cur && anchorMode && document.body.classList.contains('megulit-inline-translation')) {
+    if (cur && !page.retainedBitmap && anchorMode && document.body.classList.contains('megulit-inline-translation')) {
       const canvas = mapper(page.client);
       const at = [...cur.text.slice(0, cur.text.indexOf(readerText))].length;
       const boxes = cur.rects.slice(at, at + [...readerText].length).map(canvas).filter(Boolean);
@@ -645,7 +645,18 @@
            and otherwise runs on below the game (the layer spans the work area), never over the page's other lines */
         const userCn = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tomoyo-gal-cn-size')), base = only ? size : (Number.isFinite(userCn) && userCn >= 10 ? userCn : Math.max(12, Math.round(size * .6)));
         set(row, 'font-size', base + 'px');
-        if (!only) { const info = b.galLayoutInfo?.(), dpr = devicePixelRatio || 1, limit = (Number.isFinite(info?.workBottom) && info.workBottom > 0 ? info.workBottom / dpr : innerHeight) - 8, rb = row.getBoundingClientRect();
+        if (page.retainedBitmap) {
+          // The bitmap keeps neighbouring rows. Give the translation a free band inside the game client.
+          const [, top, , bottom] = mapper(page.client).bounds, gap = Math.ceil(size * .25);
+          const others = page.lines.filter(l => l !== cur).flatMap(l => l.rects).map(map).filter(Boolean);
+          const height = row.offsetHeight || base * 1.25, below = y1 + gap;
+          const collision = others.some(r => r[1] < below + height && r[1] + r[3] > below);
+          const after = collision ? Math.max(...others.map(r => r[1] + r[3]), y1) + gap : below;
+          const above = Math.min(...others.map(r => r[1]), y0) - gap - height;
+          const y = only ? y0 : after + height <= bottom - size * 1.3 ? after : above;
+          set(row, 'top', y + 'px');
+          set(row, 'visibility', y >= top ? '' : 'hidden');
+        } else if (!only) { const info = b.galLayoutInfo?.(), dpr = devicePixelRatio || 1, limit = (Number.isFinite(info?.workBottom) && info.workBottom > 0 ? info.workBottom / dpr : innerHeight) - 8, rb = row.getBoundingClientRect();
           if (rb.height > 0 && rb.bottom > limit) set(row, 'font-size', Math.max(Math.ceil(base * .85), Math.floor(base * (limit - rb.top) / rb.height)) + 'px'); }
       }
       const copy = sentence.cloneNode(true); copy.__megulitText = readerText; copy.__megulitAt = at; clones.set(cur.id, copy);
@@ -1040,7 +1051,7 @@
       schedule(); return;
     }
     page = Array.isArray(m?.lines) ? {
-      awake: m.awake === true, armed: m.armed === true, engineRows: m.engineRows === true,
+      awake: m.awake === true, armed: m.armed === true, engineRows: m.engineRows === true, retainedBitmap: m.retainedBitmap === true,
       lines: m.lines.filter(l => l && typeof l.text === 'string' && Array.isArray(l.rects)),
       client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight]
     } : null;

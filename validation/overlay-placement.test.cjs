@@ -92,4 +92,26 @@ assert.strictEqual(gd.mode(require('node:os').tmpdir()), '', 'no glyph mode with
   assert.deepStrictEqual(o.rects.map(Boolean), [true, true, true, true, true, false, false, false], 'estimate: typed up to the last record');
   p2.stop(); q.stop();
 }
+{
+  // The littlecheese renderer reports the canvas in logical pixels, even in a DPI-scaled client.
+  const { formatChars, parseChars } = require('../core/text-paths.cjs');
+  const out = [], placed = new OverlayPlacement({ send: m => out.push(m) });
+  placed.wanted = () => true;
+  placed.configure({}, { bound: true, clientWidth: 1200, clientHeight: 900 });
+  const row = (line, text, y, hidden = true) => parseChars(formatChars({ engine: 'littlecheese', line, hidden, sw: 800, sh: 600,
+    rects: [...text].map((_, i) => [266 + i * 20, y, 20, 20]), text }));
+  const upper = '社会からの脱落。', lower = 'それを皮肉っぽく嘲笑うみたいな言葉。';
+  placed.hook(row(1, upper, 468));
+  placed.hook(row(2, lower, 494));
+  const page = out.filter(m => m.type === 'textPlacePage').pop();
+  assert.strictEqual(page.retainedBitmap, true);
+  assert.deepStrictEqual(page.lines.map(l => [l.text, l.rects.length, l.rects[0]]),
+    [[upper, 8, [399, 702, 30, 30]], [lower, 18, [399, 741, 30, 30]]]);
+  placed.hook(row(3, '次のページ。', 468));
+  assert.deepStrictEqual(out.at(-1).lines.map(l => l.text), ['次のページ。']);
+  placed.hook(row(4, '原文のまま。', 468, false));
+  assert.ok(out.some(m => m.type === 'textPlacePage' && m.lines === null), 'read-only draw clears the retained overlay page');
+  assert.strictEqual(out.at(-1).visible, true);
+  placed.stop();
+}
 console.log('PASS overlay placement');

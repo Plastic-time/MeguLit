@@ -126,20 +126,21 @@ class OverlayPlacement {
         const boxes = readerDraw && !this.profile.draw?.embed && OverlayPlacement.sane(rects, this.client);
         return this.emitLine({ id, engine: m.engine || 'engine', text, fallback: true, client: this.client.slice(), ...(boxes ? { rects: boxes } : {}), ...style });
       }
+      if (m.hidden !== true && m.engine === 'littlecheese') this.rowsCleared(id);
       if (m.hidden !== true) { this.why('shown:' + id, 'not placed: line ' + (Number(m.line) || 0) + ' is drawn by the game itself (hidden=0)'); if (this.current?.id === id) this.clear(); const vis = flat.join(''), vkey = vis + (m.emb ? '|emb' + m.emb : ''); if (vis && vkey !== this.visibleKey) { this.visibleKey = vkey; this.send({ type: 'textPlace', visible: true, text: vis, ...(this.hiding === true ? { hiding: true } : {}), ...(m.emb === 1 || m.emb === 2 ? { embedded: m.emb } : {}) }); } return; }
       if (m.engine === 'gpu') this.gpuHiding = Date.now();
       else this.engineHidden = true;
       this.visibleKey = ''; this.why('placed:' + id + ':' + rects.length, 'placed: line ' + (Number(m.line) || 0) + ', ' + rects.length + ' characters, first box ' + (rects[0] ? [].concat(rects[0]).map(v => Math.round(Number(v) || 0)).join(',') : '-') + ' in client ' + this.client.join('x'));
       this.emitLine({ id, engine: m.engine, text, rects, client: this.client.slice(), ...style });
-      if (m.engine !== 'gpu') this.rows({ id, text: flat.join(''), rects: this.current && !this.current.fallback && this.current.id === id ? this.current.rects : null });
+      if (m.engine !== 'gpu') this.rows({ id, text: flat.join(''), rects: this.current && !this.current.fallback && this.current.id === id ? this.current.rects : null }, m.engine === 'littlecheese');
     }
   }
   /* 2026-11-21 (owner, ファタモルガーナの館 two-row page: the line above went undrawn once the reader moved on, the new one sat on the first
      row): with page.engineRows the engine's lines make a page. A line joins it when the game has not cleared the page since (the
      engine's clear report, page.reportClear) and its top is below every row already on it; otherwise it starts a new page. The page
      goes to the reader as textPlacePage: every line on its own boxes, the earlier ones as old lines (ruby, lookups, the line colour) */
-  rows(l) {
-    const mode = require('./profiles/index.cjs').get(this.profile, 'page.engineRows', false);
+  rows(l, retainedBitmap = false) {
+    const mode = retainedBitmap || require('./profiles/index.cjs').get(this.profile, 'page.engineRows', false);
     if (mode === false || !l || !Array.isArray(l.rects) || !l.rects.length) return;
     const ok = r => Array.isArray(r) && r.length >= 4, rs = l.rects.filter(ok); if (!rs.length) return;
     const top = Math.min(...rs.map(r => r[1])), P = this.rowPage || (this.rowPage = []), at = P.findIndex(x => x.id === l.id);
@@ -148,7 +149,7 @@ class OverlayPlacement {
       if (P.length && top >= bottom - 2) this.why('rows:' + l.id, 'page: ' + l.id + ' goes on the page under ' + P[P.length - 1].id + ' (no clear since, starts below its rows)');
       else { if (P.length) this.why('rows:' + l.id, 'page: ' + l.id + ' starts a new page (' + (top < bottom - 2 ? 'not below the page' : 'cleared') + ')'); P.length = 0; }
       P.push({ id: l.id, text: l.text, rects: l.rects }); if (P.length > 12) P.shift(); }
-    if (mode === true || P.length >= 2) { this.rowsPaged = true; this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: P.map(x => ({ id: x.id, text: x.text, rects: x.rects })) }, { engineRows: mode === true }); }
+    if (mode === true || P.length >= 2) { this.rowsPaged = true; this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: P.map(x => ({ id: x.id, text: x.text, rects: x.rects })) }, { engineRows: mode === true, retainedBitmap }); }
     else this.rowsUnpage();
   }
   /* auto (null): back to the line model once the page holds one line again */
@@ -421,7 +422,7 @@ class OverlayPlacement {
     const elsewhere = !m.armed && !!m.awake && o.replaced === true;
     const lines = m.awake && m.armed ? m.lines.map(l => ({ id: l.id, text: l.text, rects: l.rects.slice(0, [...l.text].length).map(r => [Math.round(r[0] * kx), Math.round(r[1] * ky), Math.round(r[2] * kx), Math.round(r[3] * ky)]) })) : [];
     const out = elsewhere ? { type: 'textPlacePage', awake: true, armed: false, elsewhere: true, lines: [], client: this.client.slice() }
-      : { type: 'textPlacePage', awake: m.awake, armed: m.armed, ...(o.engineRows ? { engineRows: true } : {}), own: m.own, ownRects: m.ownRects, lines, client: this.client.slice() };
+      : { type: 'textPlacePage', awake: m.awake, armed: m.armed, ...(o.engineRows ? { engineRows: true } : {}), ...(o.retainedBitmap ? { retainedBitmap: true } : {}), own: m.own, ownRects: m.ownRects, lines, client: this.client.slice() };
     const key = JSON.stringify(out);
     if (key === this.pageKey) return; this.pageKey = key; this.paged = true;
     for (const l of lines) this.learn(l.rects);
