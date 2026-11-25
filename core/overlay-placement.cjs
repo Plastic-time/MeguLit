@@ -126,6 +126,16 @@ class OverlayPlacement {
         const boxes = readerDraw && !this.profile.draw?.embed && OverlayPlacement.sane(rects, this.client);
         return this.emitLine({ id, engine: m.engine || 'engine', text, fallback: true, client: this.client.slice(), ...(boxes ? { rects: boxes } : {}), ...style });
       }
+      if (m.engine === 'littlecheese') {
+        const cells = OverlayPlacement.sane(rects, this.client);
+        const nativeCells = m.hidden ? null : m.nativeCells || flat.map(() => true);
+        if (m.hidden || m.nativeCells) {
+          this.engineHidden = true;
+          this.emitLine({ id, engine: m.engine, text, rects, client: this.client.slice(), ...(nativeCells ? { nativeCells } : {}) });
+        }
+        this.rows({ id, text, rects: cells, nativeCells, bitmapPage: m.bitmapPage }, true);
+        return;
+      }
       if (m.hidden !== true) { this.why('shown:' + id, 'not placed: line ' + (Number(m.line) || 0) + ' is drawn by the game itself (hidden=0)'); if (this.current?.id === id) this.clear(); const vis = flat.join(''), vkey = vis + (m.emb ? '|emb' + m.emb : ''); if (vis && vkey !== this.visibleKey) { this.visibleKey = vkey; this.send({ type: 'textPlace', visible: true, text: vis, ...(this.hiding === true ? { hiding: true } : {}), ...(m.emb === 1 || m.emb === 2 ? { embedded: m.emb } : {}) }); } return; }
       if (m.engine === 'gpu') this.gpuHiding = Date.now();
       else this.engineHidden = true;
@@ -138,18 +148,25 @@ class OverlayPlacement {
      row): with page.engineRows the engine's lines make a page. A line joins it when the game has not cleared the page since (the
      engine's clear report, page.reportClear) and its top is below every row already on it; otherwise it starts a new page. The page
      goes to the reader as textPlacePage: every line on its own boxes, the earlier ones as old lines (ruby, lookups, the line colour) */
-  rows(l) {
-    const mode = require('./profiles/index.cjs').get(this.profile, 'page.engineRows', false);
+  rows(l, retainedBitmap = false) {
+    const mode = retainedBitmap || require('./profiles/index.cjs').get(this.profile, 'page.engineRows', false);
     if (mode === false || !l || !Array.isArray(l.rects) || !l.rects.length) return;
     const ok = r => Array.isArray(r) && r.length >= 4, rs = l.rects.filter(ok); if (!rs.length) return;
-    const top = Math.min(...rs.map(r => r[1])), P = this.rowPage || (this.rowPage = []), at = P.findIndex(x => x.id === l.id);
-    if (at >= 0) P[at] = { id: l.id, text: l.text, rects: l.rects };
+    const top = Math.min(...rs.map(r => r[1])), P = this.rowPage || (this.rowPage = []);
+    const bitmap = retainedBitmap && Number.isSafeInteger(l.bitmapPage);
+    if (bitmap && this.bitmapPage !== l.bitmapPage) { P.length = 0; this.bitmapPage = l.bitmapPage; }
+    const entry = { id: l.id, text: l.text, rects: l.rects, ...(l.nativeCells ? { nativeCells: l.nativeCells } : {}) };
+    const at = P.findIndex(x => x.id === l.id);
+    if (at >= 0) P[at] = entry;
     else { const bottom = P.length ? Math.max(...P.flatMap(x => x.rects.filter(ok).map(r => r[1] + r[3]))) : -Infinity;
-      if (P.length && top >= bottom - 2) this.why('rows:' + l.id, 'page: ' + l.id + ' goes on the page under ' + P[P.length - 1].id + ' (no clear since, starts below its rows)');
+      if (P.length && (bitmap || top >= bottom - 2)) this.why('rows:' + l.id, 'page: ' + l.id + ' goes on the page under ' + P[P.length - 1].id + ' (no clear since, starts below its rows)');
       else { if (P.length) this.why('rows:' + l.id, 'page: ' + l.id + ' starts a new page (' + (top < bottom - 2 ? 'not below the page' : 'cleared') + ')'); P.length = 0; }
-      P.push({ id: l.id, text: l.text, rects: l.rects }); if (P.length > 12) P.shift(); }
-    if (mode === true || P.length >= 2) { this.rowsPaged = true; this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: P.map(x => ({ id: x.id, text: x.text, rects: x.rects })) }, { engineRows: mode === true }); }
-    else this.rowsUnpage();
+      P.push(entry); if (P.length > 12) P.shift(); }
+    if (mode === true || P.length >= 2) {
+      this.rowsPaged = true;
+      const armed = !retainedBitmap || P.some(row => !row.nativeCells || row.nativeCells.some(cell => !cell));
+      this.page({ awake: true, armed, sw: this.client[0], sh: this.client[1], lines: P }, { engineRows: mode === true, retainedBitmap });
+    } else this.rowsUnpage();
   }
   /* auto (null): back to the line model once the page holds one line again */
   rowsUnpage() { if (!this.rowsPaged) return; this.rowsPaged = false; this.pageKey = ''; this.send({ type: 'textPlacePage', lines: null }); }
@@ -419,9 +436,9 @@ class OverlayPlacement {
     if (m.type === 'hookGpuPage' && !m.armed && this.ownsEngineRows()) return;
     const [cw, ch] = this.client, kx = m.sw > 0 && cw ? cw / m.sw : 1, ky = m.sh > 0 && ch ? ch / m.sh : kx;
     const elsewhere = !m.armed && !!m.awake && o.replaced === true;
-    const lines = m.awake && m.armed ? m.lines.map(l => ({ id: l.id, text: l.text, rects: l.rects.slice(0, [...l.text].length).map(r => [Math.round(r[0] * kx), Math.round(r[1] * ky), Math.round(r[2] * kx), Math.round(r[3] * ky)]) })) : [];
+    const lines = m.awake && (m.armed || o.retainedBitmap) ? m.lines.map(l => ({ id: l.id, text: l.text, rects: l.rects.slice(0, [...l.text].length).map(r => r ? [Math.round(r[0] * kx), Math.round(r[1] * ky), Math.round(r[2] * kx), Math.round(r[3] * ky)] : null), ...(l.nativeCells ? { nativeCells: l.nativeCells } : {}) })) : [];
     const out = elsewhere ? { type: 'textPlacePage', awake: true, armed: false, elsewhere: true, lines: [], client: this.client.slice() }
-      : { type: 'textPlacePage', awake: m.awake, armed: m.armed, ...(o.engineRows ? { engineRows: true } : {}), own: m.own, ownRects: m.ownRects, lines, client: this.client.slice() };
+      : { type: 'textPlacePage', awake: m.awake, armed: m.armed, ...(o.engineRows ? { engineRows: true } : {}), ...(o.retainedBitmap ? { retainedBitmap: true } : {}), own: m.own, ownRects: m.ownRects, lines, client: this.client.slice() };
     const key = JSON.stringify(out);
     if (key === this.pageKey) return; this.pageKey = key; this.paged = true;
     for (const l of lines) this.learn(l.rects);
@@ -455,6 +472,7 @@ class OverlayPlacement {
     if (this.extraKey && this.extraKey !== '[]') this.send({ type: 'textPlaceExtra', items: [] });
     if (this.choiceSent) this.send({ type: 'placeChoiceBoxes', items: [] });
     this.rowPage = [];
+    this.bitmapPage = null;
     this.rowsPaged = false;
     this.paged = false;
     this.choiceSent = false;

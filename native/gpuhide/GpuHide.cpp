@@ -440,6 +440,8 @@ static void Unlocked(void *buf, bool index) {
 static HRESULT WINAPI HVbUnlock(void *buf) { auto o = ORIG(HRESULT(WINAPI *)(void *), buf, 12); Unlocked(buf, false); return o(buf); }
 static HRESULT WINAPI HIbUnlock(void *buf) { auto o = ORIG(HRESULT(WINAPI *)(void *), buf, 12); Unlocked(buf, true); return o(buf); }
 
+#include "LittlecheeseGdi.h"
+
 // ------------------------------------------------------------------------------------------------------------- GDI blits
 // Software engines that keep their font sheet in a bitmap and copy one glyph cell per character into a back-buffer
 // bitmap (or straight into the window): BitBlt / StretchBlt / TransparentBlt / AlphaBlend from a memory DC, or
@@ -465,6 +467,9 @@ static bool GdiBlit(HDC dst, int x, int y, int w, int h, void *src, unsigned sw,
  if (!rt) { auto it = Textures.find(src); if (it != Textures.end() && it->second.rt) { Learner.Composite(src, q); return false; } }
  if (rt) { TexInfo ti = { tw, th, D3DFMT_UNKNOWN, true }; Textures[rt] = ti; }
  if (Diag && GlyphLike(x0, sw, sh)) Log("GDI blit dst=%p(%ux%u) src=%p(%ux%u) [%d,%d %dx%d from %d,%d %dx%d]", rt, tw, th, src, sw, sh, x, y, w, h, sx, sy, sW, sH);
+#ifdef _M_IX86
+ if (LittlecheeseMode) return false; // dialogue pixels are already handled before the bitmap is blitted
+#endif
  std::vector<int> drop = Learner.Draw(src, sw, sh, rt, tw, th, rt ? GdiW : tw, rt ? GdiH : th, q, GetTickCount());
  return !drop.empty();
 }
@@ -566,8 +571,27 @@ static DWORD WINAPI Sender(void *) {
 }
 static void Command(const std::string &line) {
  Log("CTL %s", line.c_str());
- if (line.compare(0, 5, "LINE ") == 0) { int n = MultiByteToWideChar(CP_UTF8, 0, line.c_str() + 5, -1, NULL, 0); std::wstring w(n > 0 ? n - 1 : 0, 0); if (n > 1) MultiByteToWideChar(CP_UTF8, 0, line.c_str() + 5, -1, &w[0], n); Guard g; Learner.Line(w, GetTickCount()); Trace.Line(Learner.seq, GetTickCount()); }
- else if (line == "OFF") { Guard g; Learner.Off(); Trace.Off(); }
+#ifdef _M_IX86
+ if (line.size() == 7 && line.compare(0, 6, "LCGDI ") == 0 && line[6] >= '0' && line[6] <= '2') { Guard g; LittlecheeseSetMode(line[6] - '0'); return; }
+#endif
+ if (line.compare(0, 5, "LINE ") == 0) {
+  int n = MultiByteToWideChar(CP_UTF8, 0, line.data() + 5, (int)line.size() - 5, NULL, 0);
+  if (n <= 0) return;
+  std::wstring w(n, 0);
+  MultiByteToWideChar(CP_UTF8, 0, line.data() + 5, (int)line.size() - 5, &w[0], n);
+  Guard g; unsigned now = GetTickCount();
+#ifdef _M_IX86
+  if (LittlecheeseLine(w, now)) return;
+#endif
+  Learner.Line(w, now); Trace.Line(Learner.seq, now);
+ }
+ else if (line == "OFF") {
+  Guard g;
+#ifdef _M_IX86
+  if (LittlecheeseMode == 2) { LittlecheeseSetMode(1); return; }
+#endif
+  Learner.Off(); Trace.Off();
+ }
  else if (line.compare(0, 7, "PRESET ") == 0) { float gh = 0; unsigned w = 0, h = 0; if (sscanf_s(line.c_str() + 7, "%f %u %u", &gh, &w, &h) == 3) { Guard g; Learner.Preset(gh, w, h); if (line.size() > 2 && line.compare(line.size() - 2, 2, " b") == 0) Learner.pageBlankQuads = true; } }
  else if (line == "MODE read") { Guard g; Learner.readOnly = true; } else if (line == "MODE hide") { Guard g; Learner.readOnly = false; }
 }
@@ -576,8 +600,13 @@ static DWORD WINAPI Control(void *) {
  while (!Quit) {
   HANDLE p = CreateFileW(name, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL); if (p == INVALID_HANDLE_VALUE) { Sleep(1000); continue; }
   std::string buf; char b[4096]; DWORD got;
-  while (ReadFile(p, b, sizeof b, &got, NULL) && got) { buf.append(b, got); size_t at; while ((at = buf.find('\n')) != std::string::npos) { std::string l = buf.substr(0, at); buf.erase(0, at + 1); if (!l.empty() && l.back() == '\r') l.pop_back(); if (l == "QUIT") { CloseHandle(p); return 0; } Command(l); } }
-  CloseHandle(p); { Guard g; Learner.Off(); Trace.Off(); } // MeguLit gone: stop hiding at once
+  while (ReadFile(p, b, sizeof b, &got, NULL) && got) { buf.append(b, got); size_t at; while ((at = buf.find('\n')) != std::string::npos) { std::string l = buf.substr(0, at); buf.erase(0, at + 1); if (!l.empty() && l.back() == '\r') l.pop_back(); if (l == "QUIT") { Command("LCGDI 0"); CloseHandle(p); return 0; } Command(l); } }
+  CloseHandle(p);
+  { Guard g; Learner.Off(); Trace.Off();
+#ifdef _M_IX86
+   LittlecheeseSetMode(0);
+#endif
+  } // MeguLit gone: stop hiding at once
  }
  return 0;
 }
@@ -598,7 +627,14 @@ static DWORD WINAPI Start(void *module) {
  // game's main thread runs; the launcher resumes the game once MeguLitFontReady-<pid> is set.
  { wchar_t v[8] = {}; if (GetEnvironmentVariableW(L"MEGULIT_FONT_DOTS", v, 8) && v[0] == L'1') { int n = InstallFontDots(); FontDotsOn = n == 8; Log("installed font dots hooks=%d", n); Send(FontDotsOn ? "ToMe_FONTDOTS ready version=1" : "ToMe_FONTDOTS status hooks failed"); }
    wchar_t ev[64]; swprintf_s(ev, L"MeguLitFontReady-%lu", GetCurrentProcessId()); HANDLE e = OpenEventW(EVENT_MODIFY_STATE, FALSE, ev); if (e) { SetEvent(e); CloseHandle(e); } }
- int gdi = InstallGdi(); CreateThread(NULL, 0, GdiTicker, NULL, 0, NULL); Log("installed gdi hooks=%d", gdi); Send("ToMe_GPUHIDE status gdi hooked=" + std::to_string(gdi));
+#ifdef _M_IX86
+ const bool littlecheese = InstallLittlecheeseDraw();
+#endif
+ int gdi = InstallGdi();
+#ifdef _M_IX86
+ if (littlecheese && gdi) Send("ToMe_GPUHIDE status littlecheese dialogue");
+#endif
+ CreateThread(NULL, 0, GdiTicker, NULL, 0, NULL); Log("installed gdi hooks=%d", gdi); Send("ToMe_GPUHIDE status gdi hooked=" + std::to_string(gdi));
  // Wait for the system's d3d9.dll / d3d11.dll (games often load them after their first window), then hook each once.
  bool d9 = false, d11 = false, ogl = false;
  for (int i = 0; i < 600 && !Quit && !(d9 && d11 && ogl); i++) {

@@ -2,7 +2,7 @@
 
 bool littlecheeseattach_function()
 {
-    // 黒と金の開かない鍵
+    // Littlecheese glyph hook
     /*if ( a3 == 33088 )
         cmp     edx, 8140h*/
     const BYTE bytes81[] = {

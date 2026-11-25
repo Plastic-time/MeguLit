@@ -92,7 +92,7 @@ test('nothing to find: no marks, or records without every character', () => {
   assert.equal(L.layout({text: '猫だ', dots: [{i: 0, ch: '猫', a: 28, h: 28, b: 24, x: 0, y: 0, k: 'd'}]}, {originX: 0, originY: 0, scale: 1, wrapMin: 0, wrapMax: Infinity}), null);
 });
 
-test('wiring: DLL marks GRAY8 only (first, second, last), bridge and front end switch them; read-only streams flush fast', () => {
+test('wiring: DLL marks GRAY8 only (first, second, last), bridge and front end switch them; bridge uses the stream flush policy', () => {
   const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
   const c = read('native/fontprobe/FontProbe.cpp');
   assert.ok(c.includes('if (markable && (f & 0x0f) == GGO_GRAY8_BITMAP && sv.kind == \'d\'') && c.includes('((BYTE *)b)[0] = 1; side = 1;'), 'one pixel, coverage 1/64, GRAY8 only');
@@ -105,7 +105,7 @@ test('wiring: DLL marks GRAY8 only (first, second, last), bridge and front end s
   assert.ok(read('native/fontprobe/selftest/dothost.cpp').includes('marks: stop by themselves after two lines'));
   const b = read('native/HookBridge.cs');
   assert.ok(b.includes('GlyphSend(GlyphMarks?"MARK on":"MARK off")') && b.includes('if(GlyphMarks)w.WriteLine("MARK on");'));
-  assert.ok(b.includes('int want=fast?30:180;') && b.includes('static void GlyphLine(string text){FlushFit();'), 'read-only stream under placement: 30 ms flush');
+  assert.ok(b.includes('want=ReaderFlushDelay(c,GlyphAll,GpuPageOn);') && b.includes('static void GlyphLine(string text){FlushFit();'), 'glyph placement uses the selected stream-level flush policy');
   const h = Object.create(require('../core/hook-native.cjs').HookNative.prototype), sent = []; h.send = m => sent.push(m);
   h.setGlyphMarks(true); h.setGlyphMarks(0); assert.deepEqual(sent, [{type: 'glyphMarks', on: true}, {type: 'glyphMarks', on: false}]);
   assert.ok(read('native/fontprobe/selftest/dothost.cpp').includes('"marks: none in GRAY4 (1/16 would be visible)"'));
