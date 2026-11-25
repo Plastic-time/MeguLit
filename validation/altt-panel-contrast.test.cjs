@@ -400,10 +400,37 @@ async function openAiResult(cdp, kind, text, selector) {
   document.querySelector('.tomoyo-selection-card [data-mg-ai="'+kind+'"]').click();
  }})(${JSON.stringify(kind)},${JSON.stringify(text)})`);
  await waitFor(cdp, `!!document.querySelector('${selector}')`);
- await cdp.evaluate(`document.querySelector('${selector}').scrollIntoView({block:'center'})`);
 }
 
 const frame = cdp => cdp.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+async function sampleLookupCardText(cdp, card) {
+ const view = top => cdp.evaluate(`(${function (selector,top) {
+  const panel = document.querySelector(selector);
+  if (top !== null) panel.scrollTop = top;
+  const {x,y,width,height} = panel.getBoundingClientRect();
+  const {scrollTop,clientHeight,scrollHeight} = panel;
+  return {layout:[innerWidth,innerHeight,x,y,width,height,clientHeight,scrollHeight].join(','),scrollTop,clientHeight,scrollHeight};
+ }})(${JSON.stringify(card)},${top})`);
+ await cdp.evaluate('document.fonts.ready.then(() => true)');
+ for (let attempt=0; attempt<3; attempt++) {
+  const readings = [];
+  let before = await view(0);
+  for (;;) {
+   await frame(cdp);
+   const samples = await scanPanelText(cdp,card);
+   const after = await view(null);
+   // A reflow can clip labels or leave a gap between the pages already sampled.
+   if (!samples || before.layout !== after.layout || before.scrollTop !== after.scrollTop) break;
+   readings.push(...samples);
+   if (after.scrollHeight-after.clientHeight-after.scrollTop <= 1) return readings;
+   // Overlap pages so labels that straddle a scrollport edge get a full sample.
+   before = await view(after.scrollTop+Math.max(1,Math.floor(after.clientHeight/2)));
+   if (before.layout !== after.layout || before.scrollTop <= after.scrollTop) break;
+  }
+ }
+ assert.fail(`Lookup card kept moving during contrast measurement: ${JSON.stringify(await view(null))}`);
+}
+
 async function sampleMenuPage(cdp,scene,readings) {
  await frame(cdp);
  await cdp.evaluate(`(() => {
@@ -492,20 +519,17 @@ async function pictureTextSamples(cdp,load,themeMode) {
  const search = await contrastDetails(cdp,[hit]);
  readings['对话记录/搜索'] = [{label:hit,...search[hit]}];
 
- await load(fixture);
+ // The role label is below the first full page of a short phrase card.
+ await load({...fixture,height:160});
  await openPhrase(cdp);
- await frame(cdp);
- readings['点读卡/多词'] = await visiblePanelText(cdp,card);
+ readings['点读卡/多词'] = await sampleLookupCardText(cdp,card);
  await load(fixture);
  await openCard(cdp);
- await frame(cdp);
- readings['点读卡/单词'] = await visiblePanelText(cdp,card);
+ readings['点读卡/单词'] = await sampleLookupCardText(cdp,card);
  await openAiResult(cdp,'summary','① 整理窗边｜把窗台上的东西排好\n② 打开窗户｜开窗通风\n本句：①，整理窗台。\n补充说明。','.mg-sum-row[data-match] b');
- await frame(cdp);
- readings['点读卡/归纳义项'] = await visiblePanelText(cdp,card);
+ readings['点读卡/归纳义项'] = await sampleLookupCardText(cdp,card);
  await openAiResult(cdp,'explain','意思：打开窗户。\n语气：普通。\n注意：对象是窗户。','.mg-ai-tag');
- await frame(cdp);
- readings['点读卡/上下文解释'] = await visiblePanelText(cdp,card);
+ readings['点读卡/上下文解释'] = await sampleLookupCardText(cdp,card);
  return readings;
 }
 
