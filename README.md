@@ -39,7 +39,7 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0--or--later-8b1e2d?style=flat-square)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/%E2%99%A1-Sponsor-c8323c?style=flat-square)](https://github.com/sponsors/ilynthn)
 
-**[下载 v1.4.24](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; **[官网 megulit.com](https://megulit.com)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [更新日志](https://github.com/ilynthn/MeguLit/releases) &nbsp;·&nbsp; [♡ 赞赏](#support)
+**[下载 v1.4.25](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; **[官网 megulit.com](https://megulit.com)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [更新日志](https://github.com/ilynthn/MeguLit/releases) &nbsp;·&nbsp; [♡ 赞赏](#support)
 
 <br>
 
@@ -263,7 +263,7 @@
 > [!IMPORTANT]
 > **游戏剧情必须是日文原文**。MeguLit 读的是游戏正在显示的台词，剧情被汉化后读到的就不是日文。只汉化了菜单、剧情仍是日文的游戏不受影响；汉化版可以先试试「工具 → 日文原版恢复」
 
-1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.4.24-win-x64.zip`，完整解压后双击 `Install MeguLit.cmd`。确认安装后，安装程序会按需安装包内的微软 Visual C++ x64 运行库
+1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.4.25-win-x64.zip`，完整解压后双击 `Install MeguLit.cmd`。确认安装后，安装程序会按需安装包内的微软 Visual C++ x64 运行库
 2. 第一次启动会弹出安装窗口，马上开始下载运行组件（约 565 MB，含注音词典和 AivisSpeech 语音引擎，需要约 1.8 GB 空间）。下载的同时选好安装位置和快捷方式，点「安装」，下完自动装好；中途关掉，下次打开会接着下
 3. 选好放游戏的文件夹，等游戏库扫描完
 4. 点一部作品 →「启动游戏」，**用窗口模式玩**
@@ -417,7 +417,7 @@ Supported engines and what works for each: [engine coverage](docs/engine-coverag
 
 ### Install
 
-1. Download `MeguLit-v1.4.24-win-x64.zip` from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), extract the entire archive, and run `Install MeguLit.cmd`. After you confirm, Setup installs the bundled Microsoft Visual C++ x64 Runtime if needed
+1. Download `MeguLit-v1.4.25-win-x64.zip` from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), extract the entire archive, and run `Install MeguLit.cmd`. After you confirm, Setup installs the bundled Microsoft Visual C++ x64 Runtime if needed
 2. The setup window starts downloading the runtime components at once (about 565 MB, with the furigana dictionaries and the AivisSpeech voice engine). Pick the install folder meanwhile and press *Install*
 3. Choose your game folder, pick a game and press *Launch*. Play in **windowed mode**. Press <kbd>Alt</kbd> + <kbd>T</kbd> for the menu
 
@@ -469,7 +469,7 @@ GPL-3.0-or-later · [LICENSE](LICENSE) · [THIRD-PARTY.md](THIRD-PARTY.md)
 
 ### インストール
 
-1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.4.24-win-x64.zip` をダウンロードしてすべて展開し、`Install MeguLit.cmd` を実行。インストールの確認後、必要に応じて同梱の Microsoft Visual C++ x64 ランタイムがインストールされます
+1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.4.25-win-x64.zip` をダウンロードしてすべて展開し、`Install MeguLit.cmd` を実行。インストールの確認後、必要に応じて同梱の Microsoft Visual C++ x64 ランタイムがインストールされます
 2. 初回セットアップを開くとすぐコンポーネント（約 565 MB）のダウンロードが始まるので、その間にインストール先を選んで「インストール」を押す
 3. ゲームフォルダを選び、作品を選んで「ゲーム起動」。**ウィンドウモード**で遊んでください。<kbd>Alt</kbd> + <kbd>T</kbd> でメニュー
 
