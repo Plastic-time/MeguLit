@@ -1,0 +1,16 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "790f3adb77f5b73706566f5bcba532c949aaed11af940315c252bbb3c92ab1bd",
+ "layer": "version",
+ "source": "official",
+ "settings": {},
+ "exe": "TenTama.exe",
+ "engine": "qlie",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "790f3adb77f5b73706566f5bcba532c949aaed11af940315c252bbb3c92ab1bd"
+ },
+ "rev": 1
+}

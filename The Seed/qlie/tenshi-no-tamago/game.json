@@ -1,0 +1,93 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "2bfa370e9314de3cf7ca662f504b7f3ffbaa5ae33b1019f59e2b0a73330567ca",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false,
+   "orphanDraw": true
+  },
+  "page": {
+   "reportClear": false,
+   "engineRows": false,
+   "filterHookRedraws": false,
+   "hookAnnotationPatterns": [],
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "pageFrames": [],
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "cardinal": {
+   "rev": 8,
+   "lines": 60,
+   "maxGapMs": 1500,
+   "sampleMs": 90,
+   "minIntervalMin": 30,
+   "maxLagMs": 80,
+   "weights": {
+    "row": 3,
+    "stable": 1,
+    "clean": 2,
+    "clear": 1,
+    "choice": 1,
+    "pair": 1,
+    "leak": 2
+   },
+   "thresholds": {
+    "settleMs": 300,
+    "shownRate": 0.9,
+    "stablePx": 0,
+    "cnOverlapPx": 2,
+    "lineMs": 700,
+    "burstMs": 300,
+    "calibGapMs": 1000,
+    "calibWatchMs": 2500,
+    "choiceMs": 3000,
+    "staleChars": 4,
+    "preflightMs": 1500
+   }
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "qlie",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "51adc6d3ea4e635bc3d8cf6cf8c788ae6e9cc8bfa484db9b526045d295616aed",
+  "title": "993fd8ac606f7e6977b343a3abda8ff09ac6f5f9c1fd0e6f7d497866648c80dc",
+  "vndb": "v3308"
+ },
+ "rev": 1,
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "tenshi-no-tamago",
+ "builds": [
+  "790f3adb77f5b73706566f5bcba532c949aaed11af940315c252bbb3c92ab1bd"
+ ],
+ "sourceLangs": [
+  "ja"
+ ]
+}

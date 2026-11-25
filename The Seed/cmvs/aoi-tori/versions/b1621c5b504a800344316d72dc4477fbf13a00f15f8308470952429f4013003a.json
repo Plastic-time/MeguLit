@@ -1,0 +1,33 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "b1621c5b504a800344316d72dc4477fbf13a00f15f8308470952429f4013003a",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": false
+  },
+  "draw": {
+   "advhdInput": false,
+   "cmvsInput": false,
+   "fvpInput": false,
+   "minoriInput": false,
+   "spikechunsoftInput": false,
+   "kemcoSprites": false,
+   "embed": false,
+   "embedTranslation": true,
+   "viaRoles": []
+  }
+ },
+ "exe": "cmvs32.exe",
+ "engine": "cmvs",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "b1621c5b504a800344316d72dc4477fbf13a00f15f8308470952429f4013003a",
+  "head": "bd930317beb96c118bb42ac853da4c8610c0fd8ac1618d5776bd42f8ca5a2bd5",
+  "pe": "3.42.3420.0@5a0ab312"
+ },
+ "rev": 1
+}

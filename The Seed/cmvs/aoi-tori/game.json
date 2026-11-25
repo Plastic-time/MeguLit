@@ -48,7 +48,8 @@
  "status": "skeleton",
  "slug": "aoi-tori",
  "builds": [
-  "3a2ec3af6a16a4f36d72faf9e7cb14e2bcc883fbf22fb31da5d69434cc53727e"
+  "3a2ec3af6a16a4f36d72faf9e7cb14e2bcc883fbf22fb31da5d69434cc53727e",
+  "b1621c5b504a800344316d72dc4477fbf13a00f15f8308470952429f4013003a"
  ],
  "match": {
   "exe": [
@@ -62,5 +63,5 @@
  "sourceLangs": [
   "ja"
  ],
- "rev": 1
+ "rev": 2
 }
