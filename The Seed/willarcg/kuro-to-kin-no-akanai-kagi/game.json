@@ -1,0 +1,103 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "fa97b9309417c0c1bfc7cfe4546312134d09fa1d2238d029738073c5cdcc214d",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false,
+   "orphanDraw": true
+  },
+  "page": {
+   "reportClear": false,
+   "engineRows": false,
+   "filterHookRedraws": false,
+   "hookAnnotationPatterns": [],
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "pageFrames": [],
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "cardinal": {
+   "rev": 8,
+   "lines": 60,
+   "maxGapMs": 1500,
+   "sampleMs": 90,
+   "minIntervalMin": 30,
+   "maxLagMs": 80,
+   "weights": {
+    "row": 3,
+    "stable": 1,
+    "clean": 2,
+    "clear": 1,
+    "choice": 1,
+    "pair": 1,
+    "leak": 2
+   },
+   "thresholds": {
+    "settleMs": 300,
+    "shownRate": 0.9,
+    "stablePx": 0,
+    "cnOverlapPx": 2,
+    "lineMs": 700,
+    "burstMs": 300,
+    "calibGapMs": 1000,
+    "calibWatchMs": 2500,
+    "choiceMs": 3000,
+    "staleChars": 4,
+    "preflightMs": 1500
+   }
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "willarcg",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "7600ceb8b1344d3c9234c393e449a4b511eb272f3c308c415ca3da56a6ab0edd",
+  "script": "1f224642e87f4647049b5356e8694b167ab3fcf46012cba4e788ea89355a7e41",
+  "title": "32eaab0d5b7f0206b44b6dea657084d563e1ab15ad5c0f3ed61f01fc269914d8",
+  "vndb": "v4106"
+ },
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "kuro-to-kin-no-akanai-kagi",
+ "builds": [
+  "5b7c3a183df0c4c4c271c5f8687a3980342fdafe1de9233125701db48585a496"
+ ],
+ "match": {
+  "exe": [
+   "blackgold.exe"
+  ],
+  "titles": [
+   "Kuro to Kin no Akanai Kagi.",
+   "黒と金の開かない鍵。"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
+}

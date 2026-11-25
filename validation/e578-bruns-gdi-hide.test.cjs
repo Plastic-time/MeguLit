@@ -96,7 +96,8 @@ test('host: the probe switches the probed stream on without replacement, keeps i
  assert.ok(b.includes('else if(type=="probe"){object pv;ProbeWanted=d.TryGetValue("on",out pv)&&Convert.ToBoolean(pv);Probe();}'));
  assert.ok(b.includes('!c.gdiProbe)return;on=(ReplacementEnabled||ProbeWanted)&&!DotsOwn(c);name=c.name;MarkEmbedDirty(Selected);}FlushEmbedSync();'),'only the stream the GDI hide probes');
  assert.ok(b.includes('if(key==Selected)return Armed(c)&&(ReplacementEnabled||ProbeWanted&&c.gdiProbe)&&!DotsOwn(c);'));
- assert.ok(b.includes('static void OnConnect(uint pid){if(pid!=Pid)return;Connected=true;ReattachHooks();ApplySettings();StartGuard();lock(Gate){if(Selected!="")MarkEmbedDirty(Selected);}FlushEmbedSync();'),'on connect too');
+ const onConnect=b.slice(b.indexOf('static void OnConnect('),b.indexOf('static void OnDisconnect('));
+ assert.match(onConnect,/if\(pid!=Pid\)return;Connected=true;ReattachHooks\(\);ApplySettings\(\);StartGuard\(\);\s*lock\(Gate\)\{[\s\S]*?if\(Selected!=""\)MarkEmbedDirty\(Selected\);\s*\}\s*FlushEmbedSync\(\);/,'on connect too');
  assert.match(b,/static bool GlyphWanted\(\)\{lock\(Gate\)\{Candidate c;return (?:!HookTarget\.ChineseText&&)?!GlyphCached&&Enabled&&\(ReplacementEnabled\|\|ProbeWanted\)&&Selected!=""/,'glyph hide lines are pushed while probing (a Chinese build keeps its text)');});
 test('reader: where the hook cannot hide the game text, MeguLit does not paint a second copy of the Japanese line over it',()=>{
  const g=read('web/reader/modules/gal.js');
