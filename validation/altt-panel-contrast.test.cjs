@@ -49,11 +49,12 @@ function readerStub(fixture) {
  }.toString()})(${JSON.stringify(fixture)});</script>`;
 }
 
-async function waitFor(cdp, condition) {
- for (let i = 0; i < 120; i++) {
+async function waitFor(cdp, condition, timeout = 6000) {
+ const deadline = performance.now() + timeout;
+ do {
   if (await cdp.evaluate(condition).catch(() => false)) return;
   await sleep(50);
- }
+ } while (performance.now() < deadline);
  const status = await cdp.evaluate('document.querySelector("#reader-status")?.textContent');
  assert.fail(`${condition} did not become true. Reader status: ${status}`);
 }
@@ -80,8 +81,10 @@ async function withReader(run) {
    await cdp.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor:1, mobile:false});
    await cdp.send('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'reduce'}]});
    const url = `http://127.0.0.1:${server.address().port}/reader/index.html?fixture=${++page}`;
-   await cdp.send('Page.navigate', {url});
-   await waitFor(cdp, `location.href === ${JSON.stringify(url)} && !!window.__TOME_READER_READY__`);
+   const navigation = await cdp.send('Page.navigate', {url});
+   assert.ok(!navigation.errorText, `Reader navigation failed: ${navigation.errorText}`);
+   // The reader loads its modules serially. Leave time for startup on a busy CI runner.
+   await waitFor(cdp, `location.href === ${JSON.stringify(url)} && !!window.__TOME_READER_READY__`, 20000);
    await cdp.evaluate(`(${function (backdrop) {
     const frame = document.createElement('div');
     frame.style.cssText = 'position:fixed;inset:0;z-index:-2147483647;pointer-events:none';
@@ -147,13 +150,19 @@ async function contrastDetails(cdp, selectors, directText = false) {
  assert.fail('Panel text moved between the contrast captures');
 }
 
-async function measureContrast(cdp,selectors,directText) {
- const probes = await cdp.evaluate(`(${function (selectors,directText) {
+async function measureContrast(cdp,selectors,directText,scan = false) {
+ const probes = await cdp.evaluate(`(${function (selectors,directText,scan) {
   const text = new Set(), positions = [];
   const palette = new OffscreenCanvas(1,1).getContext('2d',{willReadFrequently:true});
   const probes = selectors.map(selector => {
    const target = document.querySelector(selector);
-   if (!target) throw Error('Missing text: ' + selector);
+   if (!target) {
+    if (scan) return [];
+    throw Error('Missing text: ' + selector);
+   }
+   const card = target.closest('.tomoyo-selection-card')?.getBoundingClientRect();
+   const viewport = {left:Math.max(0,card?.left ?? 0),top:Math.max(0,card?.top ?? 0),
+    right:Math.min(innerWidth,card?.right ?? innerWidth),bottom:Math.min(innerHeight,card?.bottom ?? innerHeight)};
    const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
    const areas = [];
    for (let node; (node = walker.nextNode());) {
@@ -173,14 +182,15 @@ async function measureContrast(cdp,selectors,directText) {
     if (!alpha) continue;
     if (directText) positions.push([range,range.getBoundingClientRect()]);
     for (const {left,top,right,bottom} of range.getClientRects()) {
-     if (left >= 0 && top >= 0 && right <= innerWidth && bottom <= innerHeight && right-left > 2 && bottom-top > 2)
+     if (left >= viewport.left && top >= viewport.top && right <= viewport.right && bottom <= viewport.bottom && right-left > 2 && bottom-top > 2)
       areas.push({fg,alpha,color,text:node.textContent.trim(),box:[Math.ceil(left),Math.ceil(top),Math.floor(right)-Math.ceil(left),Math.floor(bottom)-Math.ceil(top)]});
     }
     text.add(parent);
    }
-   if (!areas.length) throw Error('No visible text: ' + selector);
+   if (!areas.length && !scan) throw Error('No visible text: ' + selector);
    return areas;
   });
+  if (probes.some(areas => !areas.length)) return null;
   const savedStyles = [...text].map(node => [node,node.getAttribute('style')]);
   window.maskContrastProbe = () => {
    for (const node of text) {
@@ -199,7 +209,8 @@ async function measureContrast(cdp,selectors,directText) {
    }
   };
   return probes;
- }})(${JSON.stringify(selectors)},${directText})`);
+ }})(${JSON.stringify(selectors)},${directText},${scan})`);
+ if (!probes) return null;
  try {
   const boxes = probes.flat().map(area => area.box);
   const before = directText ? await cdp.send('Page.captureScreenshot',{format:'png'}) : null;
@@ -231,6 +242,22 @@ async function contrast(cdp,selectors) {
  return Object.fromEntries(Object.entries(await contrastDetails(cdp,selectors)).map(([selector,reading]) => [selector,reading.ratio]));
 }
 
+async function scrollToText(cdp, selector) {
+ await cdp.evaluate(`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center',inline:'nearest',behavior:'instant'})`);
+ await frame(cdp);
+}
+
+// A short monitor work area can leave some lookup rows below the card scrollport.
+async function lookupContrast(cdp, selectors) {
+ await cdp.evaluate('document.fonts.ready.then(() => true)');
+ const ratios = {};
+ for (const selector of selectors) {
+  await scrollToText(cdp,selector);
+  Object.assign(ratios,await contrast(cdp,[selector]));
+ }
+ return ratios;
+}
+
 async function screenshotPixels(cdp, boxes, data) {
  if (!data) ({data} = await cdp.send('Page.captureScreenshot',{format:'png'}));
  return cdp.evaluate(`(${async function (data, boxes) {
@@ -254,10 +281,10 @@ async function openLog(cdp) {
 }
 
 async function openCard(cdp) {
- await cdp.evaluate(`(() => {
+ await cdp.evaluate(`(async () => {
   const b = window.__tomoyoChinese;
   b.localLookup = async () => ({entries:[{spellings:['窓'],readings:['まど'],pos:['名詞'],definitions:['窗户']}]});
-  b.openLocalSelection({text:'窓を開ける',start:0,end:1},{left:500,right:526,top:480,bottom:510,width:26,height:30});
+  await b.openLocalSelection({text:'窓を開ける',start:0,end:1},{left:500,right:526,top:480,bottom:510,width:26,height:30});
  })()`);
  await waitFor(cdp, `!!document.querySelector('.tomoyo-selection-card .tomoyo-sense')`);
 }
@@ -274,6 +301,16 @@ async function openPhrase(cdp) {
 }
 
 async function visiblePanelText(cdp, root) {
+ // Layout can move between tagging visible nodes and collecting their text rectangles.
+ for (let attempt=0; attempt<3; attempt++) {
+  const readings = await scanPanelText(cdp,root);
+  if (readings) return readings;
+  await frame(cdp);
+ }
+ assert.fail(`Panel text kept moving during contrast measurement: ${root}`);
+}
+
+async function scanPanelText(cdp, root) {
  const labels = await cdp.evaluate(`(${function (root) {
   const panel = document.querySelector(root);
   const surface = panel.querySelector(':scope > .tome-menu-bg').getBoundingClientRect();
@@ -308,8 +345,8 @@ async function visiblePanelText(cdp, root) {
  if (!labels.length) return [];
  const selectors = labels.map((_,index) => `[data-panel-text-probe="${index}"]`);
  try {
-  const readings = await contrastDetails(cdp,selectors,true);
-  return selectors.map((selector,index) => ({label:labels[index],...readings[selector]}));
+  const readings = await measureContrast(cdp,selectors,true,true);
+  return readings && selectors.map((selector,index) => ({label:labels[index],...readings[selector]}));
  } finally {
   await cdp.evaluate(`document.querySelectorAll('[data-panel-text-probe]').forEach(n=>delete n.dataset.panelTextProbe)`);
  }
@@ -366,6 +403,13 @@ async function menuPictureTextSamples(cdp,load,fixture) {
  for (const tab of tabs) {
   await cdp.evaluate(`document.querySelector('${menu} [data-menu-key="${tab}"]').click()`);
   await sampleMenuPage(cdp,`Alt+T/${tab}`,readings);
+  if (tab === 'voice') {
+   const note = `${menu} .tome-voice-pack-body > small`;
+   await waitFor(cdp, `!!document.querySelector(${JSON.stringify(note)})?.textContent`);
+   // Scroll directly to the deletion warning even if the normal pass lands either side of it.
+   await scrollToText(cdp,note);
+   readings['Alt+T/voice/pack-note'] = [{label:note,...(await contrastDetails(cdp,[note],true))[note]}];
+  }
   if (tab !== 'text') continue;
   const sub = `${textTab} .mg-subtabs > button`;
   const items = await cdp.evaluate(`[...document.querySelectorAll('${sub}')].map(b=>({text:b.textContent,selected:b.getAttribute('aria-selected')==='true'}))`);
@@ -458,13 +502,13 @@ if (require.main === module) {
  test('lookup definition and reading meet 4.5:1 over a white picture and game',options,() => withReader(async (cdp,load) => {
   await load(white);
   await openCard(cdp);
-  assertAA(await contrast(cdp,cardText));
+  assertAA(await lookupContrast(cdp,cardText));
  }));
  test('both themes keep lookup accents and speaker names readable over white',options,() => withReader(async (cdp,load) => {
   for (const themeMode of ['dark','light']) {
    await load({...white,themeMode,state:opaquePictures});
    await openPhrase(cdp);
-   const lookup = await contrast(cdp,phraseText);
+   const lookup = await lookupContrast(cdp,phraseText);
    await load({...white,themeMode,state:{...opaquePictures,...speakerState()}});
    await openLog(cdp);
    assertAA({...lookup,...await contrast(cdp,['.tome-log-name b',...logText])});
@@ -616,4 +660,4 @@ if (require.main === module) {
  }));
 }
 
-module.exports = {contrast,contrastDetails,menuPixel,menuText,logText,cardText,logState,phraseText,speakerState,opaquePictures,openMenu,openLog,openCard,openPhrase,pictureTextSamples,waitFor,withReader};
+module.exports = {contrast,contrastDetails,menuPixel,menuText,logText,cardText,logState,phraseText,speakerState,opaquePictures,openMenu,openLog,openCard,openPhrase,lookupContrast,pictureTextSamples,waitFor,withReader};

@@ -55,7 +55,7 @@
  .tome-voice-pack[open]>.tome-voice-pack-head{margin-bottom:8px}
  .tome-voice-rec{margin-left:8px;padding:1px 7px;border-radius:999px;font-style:normal;font-size:10.5px;font-weight:700;color:var(--tome-picture-accent,var(--theme-primary,#e0495a));background:color-mix(in srgb,var(--theme-primary,#e0495a) 14%,transparent);vertical-align:1px}
  .tome-voice-pack-body{display:flex;flex-direction:column;gap:6px}
- .tome-voice-pack-body>small{opacity:.75;line-height:1.55}
+ .tome-voice-pack-body>small{opacity:var(--tome-picture-text-opacity,.75);line-height:1.55}
  .tome-voice-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:4px 10px;padding:6px 0;border-top:1px solid color-mix(in srgb,var(--theme-text,#eee) 8%,transparent)}
  .tome-voice-row>span{font-size:12.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  .tome-voice-row>small{font-size:11.5px;opacity:.8;font-variant-numeric:tabular-nums}
