@@ -7,17 +7,27 @@ const fs=require('node:fs'),path=require('node:path'),{spawn,execFile}=require('
 const {Anki}=require('./anki.cjs');
 
 function driveInstallFolder(root,env=process.env){
- const drive=path.win32.parse(root).root;
+ const drive=path.win32.parse(root).root.replace(/^\\\\\?\\/,'');
  if(!/^[a-z]:[\\/]$/i.test(drive))return '';
  const systemDrive=env.SystemDrive||'C:';
  return drive.slice(0,2).toUpperCase()===systemDrive.toUpperCase()?'':path.win32.join(drive,'Anki');
 }
-function candidates(configured,env=process.env,root=''){
+const installerCache=root=>path.join(root,'data','cache','anki-installer');
+const installRecord=root=>path.join(installerCache(root),'installed-file.json');
+function installStamp(exe){
+ const file=fs.lstatSync(exe);
+ if (!file.isFile() || !file.size) return '';
+ return JSON.stringify([exe.toLowerCase(),file.dev,file.ino,file.size,file.mtimeMs]);
+}
+function rememberInstall(root,folder){
+ const stamp=installStamp(path.win32.join(folder,'anki.exe'));
+ if (stamp) fs.writeFileSync(installRecord(root),stamp,'utf8');
+}
+function candidates(configured,env=process.env){
  const roots=[env.LOCALAPPDATA&&path.join(env.LOCALAPPDATA,'Programs'),env.ProgramFiles,env['ProgramFiles(x86)'],env.ProgramW6432].filter(Boolean);
  // Anki 25.x installs the program itself under %LOCALAPPDATA%\AnkiProgramFiles\.venv (ankiw.exe has no console).
  const venv=env.LOCALAPPDATA?['ankiw.exe','anki.exe'].map(name=>path.join(env.LOCALAPPDATA,'AnkiProgramFiles','.venv','Scripts',name)):[];
- const sameDrive=driveInstallFolder(root,env);
- return [configured,...roots.map(folder=>path.join(folder,'Anki','anki.exe')),...venv,sameDrive&&path.win32.join(sameDrive,'anki.exe')].filter(Boolean);
+ return [configured,...roots.map(folder=>path.join(folder,'Anki','anki.exe')),...venv].filter(Boolean);
 }
 // Target of a Windows shortcut (.lnk, MS-SHLLINK): the local base path stored in its LinkInfo. '' when unreadable.
 // That path is often stored only in the ANSI code page; a non-ASCII one is read back through the Shell as UTF-8.
@@ -60,9 +70,17 @@ function coldCandidates(env=process.env){
  return out;
 }
 function find(configured,env=process.env,exists=file=>{try{return fs.statSync(file).isFile();}catch{return false;}},root=''){
- for(const file of candidates(configured,env,root))if(exists(file))return file;
+ for(const file of candidates(configured,env))if(exists(file))return file;
  if(coldHit&&exists(coldHit))return coldHit;
  for(const file of coldCandidates(env))if(exists(file))return coldHit=file;
+ const folder=driveInstallFolder(root,env);
+ if (!folder) return '';
+ // Keep the existing discovery order. A previously installed file can outlast its Windows shortcut.
+ try{
+  const stamp=fs.readFileSync(installRecord(root),'utf8');
+  const exe=path.win32.join(folder,'anki.exe');
+  if (stamp && stamp===installStamp(exe)) return exe;
+ }catch{}
  return '';
 }
 // AnkiConnect is an Anki add-on (code 2055492159). Without it MeguLit cannot add cards even when Anki is open.
@@ -222,4 +240,4 @@ async function installAnkiConnect(env=process.env,{locate=()=>find('',env),fresh
   return {installed:true,path:target};
  }finally{fs.rmSync(work,{recursive:true,force:true});}
 }
-module.exports={AnkiProcess,find,candidates,driveInstallFolder,coldCandidates,shortcutTarget,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows,listeners,isAnki,portOf};
+module.exports={AnkiProcess,find,candidates,driveInstallFolder,installerCache,rememberInstall,coldCandidates,shortcutTarget,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows,listeners,isAnki,portOf};

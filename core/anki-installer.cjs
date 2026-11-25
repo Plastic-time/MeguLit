@@ -14,7 +14,7 @@ let state={phase:'idle',received:0,total:PACKAGE.size,error:''},job=null;
 const status=()=>({...state,version:PACKAGE.version});
 function log(root,m){try{fs.appendFileSync(path.join(root,'logs','anki-process.log'),new Date().toISOString()+' installer '+m+'\n');}catch{}}
 async function download(root,fetcher){
- const dir=path.join(root,'data','cache','anki-installer'),file=path.join(dir,PACKAGE.name);fs.mkdirSync(dir,{recursive:true});
+ const dir=ankiProcess.installerCache(root),file=path.join(dir,PACKAGE.name);fs.mkdirSync(dir,{recursive:true});
  const ok=f=>{try{if(fs.statSync(f).size!==PACKAGE.size)return false;const h=crypto.createHash('sha256');h.update(fs.readFileSync(f));return h.digest('hex')===PACKAGE.sha256;}catch{return false;}};
  if(ok(file)){state.received=PACKAGE.size;return file;}
  /* 2026-11-19: core/fast-download.cjs measures every source at once and pulls the fast ones in parallel Range pieces;
@@ -63,7 +63,7 @@ async function runInstaller(root,file){
  const args=['/i',file,'/passive','/norestart'];
  const folder=await installFolder(root);
  if (folder) args.push('INSTALLFOLDER='+folder);
- return new Promise((resolve,reject)=>{
+ await new Promise((resolve,reject)=>{
   const child=spawn(path.join(process.env.SystemRoot||'C:\\Windows','System32','msiexec.exe'),args,{windowsHide:false,stdio:'ignore'});
   child.on('error',reject);
   child.on('exit',code=>{
@@ -73,6 +73,10 @@ async function runInstaller(root,file){
    reject(Error(folder?'ANKI_INSTALL_TARGET_FAILED '+folder+' ('+code+')':'ANKI_INSTALL_FAILED '+code));
   });
  });
+ if (folder) {
+  try{ankiProcess.rememberInstall(root,folder);}
+  catch(error){log(root,'could not record Anki installation '+error.message);}
+ }
 }
 /* start(root,{runtime,fetcher}) begins (or joins) the job: download, install, AnkiConnect, start and connect */
 function start(root,{runtime=null,fetcher=fetch,install=runInstaller,china=inChina(),

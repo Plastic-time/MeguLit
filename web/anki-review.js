@@ -131,6 +131,7 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
   landing.innerHTML='<h2>'+esc(t.title)+'</h2><p class="muted">'+esc(t.text)+'</p><ol class="anki-install-tips">'+t.tips.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol><div class="anki-install-bar" hidden><i></i></div><p class="muted u-status" data-install-state hidden></p><div class="review-controls"><button class="primary" data-install-go>'+esc(t.go)+'</button></div>';
   const go=landing.querySelector('[data-install-go]'),bar=landing.querySelector('.anki-install-bar'),fill=bar.querySelector('i'),line=landing.querySelector('[data-install-state]');
   const installError=error=>{
+   error=String(error??'');
    const prefix='ANKI_INSTALL_TARGET_FAILED ';
    if (error.startsWith(prefix)) return t.targetFailed.replace('{folder}',error.slice(prefix.length));
    return /CANCELLED/.test(error)?t.cancelled:error==='ANKI_OFFLINE'?reason(error):t.failed+'（'+error+'）';

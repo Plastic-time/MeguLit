@@ -47,18 +47,21 @@ test('one-click Anki reports a connection failure and lets the installed app con
 
 for(const scenario of [
  {name:'uses a non-system fixed drive',override:true},
+ {name:'also allows internal SATA',override:true,profile:{bus:'SATA'}},
  {name:'keeps the MSI default on the system drive',sameDrive:true},
  {name:'reports the chosen directory on an MSI write failure',override:true,code:1603,error:'ANKI_INSTALL_TARGET_FAILED {folder} (1603)'},
  {name:'does not retry a cancelled installation',override:true,code:1602,error:'ANKI_INSTALL_CANCELLED'},
  {name:'keeps the cancellation message when elevation is declined',override:true,code:1223,error:'ANKI_INSTALL_CANCELLED'},
  {name:'accepts a successful MSI installation that requests a reboot',override:true,code:3010},
+ {name:'reports success without an executable as an error',override:true,noExecutable:true,error:'ANKI_EXECUTABLE_MISSING'},
  {name:'reports a failure to start Windows Installer',override:true,spawnError:true,error:'MSI launch failed'},
  {name:'keeps the ordinary MSI error without a directory override',sameDrive:true,code:1603,error:'ANKI_INSTALL_FAILED 1603'},
  {name:'keeps the MSI default on removable media',profile:{type:'Removable'}},
  {name:'keeps the MSI default on a mapped network drive',profile:{type:'Remote'}},
  {name:'keeps the MSI default on USB media marked as fixed',profile:{bus:'USB'}},
  {name:'keeps the MSI default on a hot-pluggable disk',profile:{removal:3}},
- {name:'keeps the MSI default if the path resolves to another volume',profile:{drive:null}},
+ {name:'keeps the MSI default if the path resolves to another volume',profile:{drive:'Q'}},
+ {name:'keeps the MSI default if the removal policy has an invalid type',profile:{removal:'1'}},
  {name:'keeps the MSI default if Windows cannot query the volume',probeError:true},
  {name:'keeps the MSI default if the probe returns unreadable output',probeOutput:'not JSON'},
  {name:'allows an existing ordinary target directory',override:true,entry:'directory'},
@@ -77,7 +80,7 @@ for(const scenario of [
    const child=new EventEmitter();
    queueMicrotask(()=>{
     if(scenario.spawnError){child.emit('error',Error('MSI launch failed'));return;}
-    installed=!scenario.code||scenario.code===3010;
+    installed=(!scenario.code||scenario.code===3010)&&!scenario.noExecutable;
     child.emit('exit',scenario.code||0);
    });
    return child;
@@ -85,13 +88,18 @@ for(const scenario of [
   t.mock.method(require('../core/fast-download.cjs'),'download',async()=>{});
   const {root,m}=fixture(t),drive=path.win32.parse(root).root;
   const folder=path.win32.join(drive,'Anki');
+  const executable=path.win32.join(folder,'anki.exe');
+  const targetFixture=path.join(root,'target');
+  if(scenario.entry==='directory')fs.mkdirSync(targetFixture);
+  if(scenario.entry==='redirected')fs.writeFileSync(targetFixture,'occupied');
   volume={drive:drive[0].toUpperCase(),type:'Fixed',bus:'NVMe',removal:1,...scenario.profile};
   const lstat=fs.lstatSync;
   t.mock.method(fs,'lstatSync',(file,options)=>{
+   if(file===executable)return installed?{isFile:()=>true,dev:1,ino:2,size:4096,mtimeMs:10}:lstat(path.join(root,'missing-exe'),options);
    if(file!==folder)return lstat(file,options);
    checked.push(file);
    if(scenario.entry==='denied')throw Object.assign(Error('access denied'),{code:'EACCES'});
-   return scenario.entry?{isDirectory:()=>scenario.entry==='directory'}:undefined;
+   return lstat(targetFixture,options);
   });
   const systemDrive=process.env.SystemDrive;
   t.after(()=>{if(systemDrive===undefined)delete process.env.SystemDrive;else process.env.SystemDrive=systemDrive;});
@@ -117,6 +125,8 @@ for(const scenario of [
    assert.equal(queries[0].options.env.MEGULIT_ANKI_ROOT,root);
   }
   assert.deepEqual(checked,scenario.override||scenario.entry?[folder]:[]);
+  const record=path.join(root,'data','cache','anki-installer','installed-file.json');
+  assert.equal(fs.existsSync(record),!!scenario.override&&!scenario.error,'only successful same-drive installs are recorded');
  });
 }
 
@@ -126,6 +136,7 @@ test('the install dialog shows the failed Anki directory and a way forward',asyn
   en:/Could not install to E:\\Anki \(1603\)\. Check that the folder is writable/,
   ja:/E:\\Anki \(1603\) にインストールできませんでした。フォルダーと書き込み権限を確認/,
  };
+ const generic={zh:/没有装成功/,en:/The installation did not complete/,ja:/インストールできませんでした/};
  const noop=()=>{};
  const document={documentElement:{lang:''},addEventListener:noop,removeEventListener:noop};
  const globals={document,window:{addEventListener:noop,removeEventListener:noop},addEventListener:noop,
@@ -147,18 +158,25 @@ test('the install dialog shows the failed Anki directory and a way forward',asyn
   const landing={matches:()=>true,classList:{add:noop,remove:noop},removeAttribute:noop,querySelector};
   const target={firstElementChild:landing,querySelector};
   landing.parentElement=target;
+  let error;
   const api=async action=>{
    if(action==='anki_status')return {connected:false};
    if(action==='anki_install')return {phase:'installing'};
    assert.equal(action,'anki_install_status');
-   return {phase:'error',error:'ANKI_INSTALL_TARGET_FAILED E:\\Anki (1603)'};
+   return {phase:'error',error};
   };
   await renderAnkiReview({target,api,text:{},esc:String,isCurrent:()=>true,toast:assert.fail,quiet:true});
-  ask.onclick();
-  await go.onclick();
-  await ticks.at(-1)();
-  assert.match(line.textContent,message);
-  assert.equal(go.disabled,false);
+  for(const [value,expected] of [
+   ['ANKI_INSTALL_TARGET_FAILED E:\\Anki (1603)',message],['ANKI_INSTALL_FAILED 1603',generic[language]],
+   [1603,generic[language]],[undefined,generic[language]],
+  ]){
+   error=value;
+   ask.onclick();
+   await go.onclick();
+   await ticks.at(-1)();
+   assert.match(line.textContent,expected);
+   assert.equal(go.disabled,false);
+  }
  }
 });
 
@@ -184,4 +202,12 @@ test('the bridge connects an existing Anki using the runtime path',async t=>{
  await wait(m,'done');
  assert.equal(m.status().phase,'done');
  assert.equal(launched,true);
+ const cliFind=t.mock.method(anki,'find',(_configured,_env,_exists,appRoot)=>{
+  assert.equal(appRoot,root);
+  return exe;
+ });
+ await dispatch({action:'anki_install'});
+ await wait(m,'done');
+ assert.equal(m.status().phase,'done');
+ assert.ok(cliFind.mock.callCount()>0);
 });
