@@ -89,6 +89,64 @@ static void RecoverStaleToolbar() {
  }
 }
 
+static void ConfirmBodyBeforeMenu() {
+ for (bool readOnly : { false, true }) {
+  GlyphLearner g;
+  std::vector<std::string> reports;
+  g.emit = [&](const std::string &r) { reports.push_back(r); };
+  auto draw = [&](const std::vector<Quad> &q, unsigned now) {
+   return g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now).size();
+  };
+  auto body = Row(5, 400, 550, 32, 0.1f);
+  auto menu = Row(5, 100, 130, 32, 0.2f);
+  for (unsigned i = 0; i < 5; i++) { body[i].glyph = i + 1; menu[i].glyph = i + 6; }
+  g.Line(L"ABCDE", 10000);
+  draw(body, 10001);
+  g.Frame(10002, 1280, 720);
+  if (readOnly) {
+   draw(body, 10010);
+   g.Frame(10011, 1280, 720);
+   g.readOnly = true;
+  }
+
+  body.push_back({ 392, 558, 396, 562, 0, 0, 4.f / 1024, 4.f / 2048, 0 });
+  assert(draw(body, 10017) == (readOnly ? 0 : 5));
+  assert(draw(menu, 10017) == 0);
+  g.Frame(10018, 1280, 720);
+  assert(reports.back().find("rects=400,550,32,32") != std::string::npos);
+  assert(g.area.y0 == 518);
+  g.readOnly = false;
+  assert(draw(body, 10035) == 5 && draw(menu, 10035) == 0);
+ }
+}
+
+static void KeepCachedBand() {
+ for (unsigned count : { 5u, 8u }) {
+  GlyphLearner g;
+  void *dialogue = (void *)1, *label = (void *)2;
+  auto draw = [&](void *tex, const std::vector<Quad> &q, unsigned now) {
+   return g.Draw(tex, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now).size();
+  };
+  const auto body = Row(count, 400, 550, 32, 0.1f);
+  auto menu = Row(5, 100, 130, 32, 0.2f);
+  for (unsigned i = 0; i < menu.size(); i++) menu[i].glyph = i + 1;
+  menu.push_back({ 92, 138, 96, 142, 0, 0, 4.f / 1024, 4.f / 2048, 0 });
+
+  g.Line(count == 5 ? L"ABCDE" : L"ABCDEFGH", 10000);
+  draw(dialogue, body, 10001);
+  g.Frame(10002, 1280, 720);
+  assert(draw(dialogue, body, 10010) == count);
+  g.Frame(10011, 1280, 720);
+  g.Line(L"VWXYZ", 15000);
+  assert(draw(dialogue, body, 15001) == count);
+  assert(draw(label, menu, 15001) == 0);
+  g.Frame(15002, 1280, 720);
+  assert(g.learnedSeq == 1 && g.area.y0 == 518);
+  assert(draw(dialogue, body, 15017) == count);
+  assert(draw(label, menu, 15017) == 0);
+ }
+}
+
 static void KeepOccupiedBand() {
  void *dialogue = (void *)1, *label = (void *)2, *icon = (void *)3;
  for (bool read : { false, true }) {
@@ -194,6 +252,8 @@ int main() {
  g.readOnly=true;assert(g.Draw((void*)1,128,128,nullptr,640,480,640,480,{q},211).empty());
  MovingBox();
  RecoverStaleToolbar();
+ ConfirmBodyBeforeMenu();
+ KeepCachedBand();
  KeepOccupiedBand();
  IgnoreOldAtlasFrame();
  KeepBandOnItsTarget();

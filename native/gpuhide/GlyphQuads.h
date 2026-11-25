@@ -362,9 +362,18 @@ struct GlyphLearner {
   return k == r.size() && keep.size() == n;
  }
  /* the same place as an earlier glyph, offset copies (shadow, outline) included: the tolerance Chars() merges them with */
- bool Earlier(const Rect &r) const { for (auto &e : earlierRects) { float w = (std::min)(e.x1 - e.x0, r.x1 - r.x0), h = e.y1 - e.y0; if (std::fabs(e.x0 - r.x0) < 0.4f * w && std::fabs(e.y0 - r.y0) < 0.4f * h) return true; } return false; }
+ static bool SamePlace(const Rect &a, const Rect &b) {
+  const float w = (std::min)(a.x1 - a.x0, b.x1 - b.x0), h = (std::min)(a.y1 - a.y0, b.y1 - b.y0);
+  return std::fabs(a.x0 - b.x0) < 0.4f * w && std::fabs(a.y0 - b.y0) < 0.4f * h;
+ }
+ bool Earlier(const Rect &r) const { for (auto &e : earlierRects) if (SamePlace(r, e)) return true; return false; }
  /* a glyph of an earlier line of the page (the same glyph on the same place) is never the new line's */
  bool EarlierGlyph(long long gk, long long k) const { return earlierKeys.count({ gk, k }) > 0; }
+ bool BodyInBand(const Rect &r) const {
+  const float cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;
+  return cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1 &&
+         std::fabs((r.y1 - r.y0) - glyphH) <= glyphH * 0.2f;
+ }
  // Same-atlas spacers and decorations have no traced glyph cell.
  static std::vector<Rect> TracedChars(std::vector<Rect> rects) {
   rects.erase(std::remove_if(rects.begin(), rects.end(), [](const Rect &r) { return !r.traced; }), rects.end());
@@ -389,7 +398,7 @@ struct GlyphLearner {
   if (!earlierKeys.empty()) { size_t on = 0; for (auto &e : earlierKeys) { auto g = groups.find(e.first); if (g == groups.end()) continue; auto it = g->second.keys.find(e.second); if (it != g->second.keys.end() && frameNo - it->second.lastFrame <= 2) on++; } if (on * 2 < earlierKeys.size()) { earlierKeys.clear(); earlierRects.clear(); } }
   if (reported && hiddenSent == (hitSent && !readOnly)) return;
   unsigned since = prevLineAt && now - prevLineAt < 120000 ? (std::max)(prevLineAt + 200, lineAt - 3000) : lineAt - 3000;
-  Group *movedGroup = nullptr; std::vector<Rect> movedRects; bool ambiguousMove = false, freshBand = false;
+  Group *movedGroup = nullptr; std::vector<Rect> movedRects, bandDrawn; bool ambiguousMove = false, freshBand = false;
   const bool recoverBand = learned && hitSent && !areaTraced && !readOnly && !reported;
   for (auto &kv : groups) {
    Group &g = kv.second; std::vector<Rect> fresh, live, freshTraced;
@@ -409,25 +418,27 @@ struct GlyphLearner {
      if (isFresh) fresh.push_back(seen.r);
      if (isFreshTrace) freshTraced.push_back(seen.r);
     }
-    if (checkBand && isFresh && seen.lastFrame == frameNo - 1) {
-     const Rect &r = seen.r;
-     const float cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;
-     if (cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1 &&
-         std::fabs((r.y1 - r.y0) - glyphH) <= glyphH * 0.2f) freshBand = true;
-    }
+    if (checkBand && isFresh && seen.lastFrame == frameNo - 1 && BodyInBand(seen.r)) freshBand = true;
    }
+   if (checkBand && !freshBand) for (const Rect &r : g.frame) if (BodyInBand(r)) bandDrawn.push_back(r);
    const std::vector<Rect> &last = currentFrame ? g.frame : g.prev; for (auto &r : last) if (earlierRects.empty() || !Earlier(r)) live.push_back(r);
    std::vector<Rect> a = Chars(Cluster(Chars(live))), b = Chars(Cluster(Chars(fresh)));
    if (log && (now / 500) != ((now - 17) / 500)) log("frame %u group rt=%p %ux%u live=%u fresh=%u n=%u", frameNo, g.rt, g.tw, g.th, (unsigned)a.size(), (unsigned)b.size(), n);
    std::vector<Rect> keep; const std::vector<Rect> *hit = Match(a, b, keep);
-   // A stale atlas can drop toolbar art before any dialogue glyph has drawn. Require a complete traced line
-   // on the same target and no new body-sized draw in the old band before replacing it.
    bool moved = canMove && !hitSent && Relocated(a, b);
-   if (recover || (!hit && reported && currentFrame && fromAtlas && areaTraced)) {
-    a = TracedChars(std::move(live));
-    b = TracedChars(recover ? std::move(freshTraced) : std::move(fresh));
+   if (recover) {
+    // A stale atlas can drop toolbar art. Move only when live and recently written glyph cells agree.
+    a = TracedChars(std::move(live)); b = TracedChars(std::move(freshTraced));
     hit = Match(a, b, keep);
-    moved = recover && Relocated(a, b);
+    moved = Relocated(a, b);
+   } else if (!hit && reported && currentFrame && fromAtlas && areaTraced && g.rt == areaRt) {
+    // A traced menu in the same atlas must never replace the positions already reported for this line.
+    live.erase(std::remove_if(live.begin(), live.end(), [&](const Rect &r) {
+     return !r.traced || !BodyInBand(r) || std::none_of(lastRects.begin(), lastRects.end(), [&](const Rect &p) { return SamePlace(p, r); });
+    }), live.end());
+    const auto confirmed = Chars(std::move(live));
+    if (confirmed.size() == lastRects.size() && !confirmed.empty() &&
+        std::equal(confirmed.begin(), confirmed.end(), lastRects.begin(), SamePlace)) hit = &lastRects;
    }
    if (!hit) continue;
    if (learned && !fromAtlas) {
@@ -439,7 +450,13 @@ struct GlyphLearner {
    return;
   }
   // Try a confirmed new atlas only after checking all previously learned atlases.
-  if (movedGroup && !ambiguousMove && !freshBand) { Report(*movedGroup, movedRects, true); return; }
+  if (movedGroup && !ambiguousMove && !freshBand) {
+   const auto occupied = Chars(Cluster(Chars(std::move(bandDrawn))));
+   std::vector<Rect> keep;
+   // A fixed box can reuse the same texture slots. Keep it if it still draws a complete line or an earlier row.
+   const bool retained = !occupied.empty() && std::all_of(occupied.begin(), occupied.end(), [&](const Rect &r) { return Earlier(r); });
+   if (!retained && !Match(occupied, {}, keep)) { Report(*movedGroup, movedRects, true); return; }
+  }
   // The glyphs of one line can come from several atlas pages: count them together per render target.
   std::map<void *, std::vector<Group *>> byRt; for (auto &kv : groups) byRt[kv.second.rt].push_back(&kv.second);
   for (auto &kv : byRt) {
