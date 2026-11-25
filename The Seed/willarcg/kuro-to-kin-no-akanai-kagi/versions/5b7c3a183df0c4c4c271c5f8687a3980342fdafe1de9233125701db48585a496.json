@@ -1,0 +1,33 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "5b7c3a183df0c4c4c271c5f8687a3980342fdafe1de9233125701db48585a496",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": false
+  },
+  "draw": {
+   "advhdInput": false,
+   "cmvsInput": false,
+   "fvpInput": false,
+   "minoriInput": false,
+   "spikechunsoftInput": false,
+   "kemcoSprites": false,
+   "embed": false,
+   "embedTranslation": true,
+   "viaRoles": []
+  }
+ },
+ "exe": "blackgold.exe",
+ "engine": "willarcg",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "5b7c3a183df0c4c4c271c5f8687a3980342fdafe1de9233125701db48585a496",
+  "head": "7d4333104e7cdcd10c1a78e48e554164aac9a00ff5e52a5ae7ddc2efbd8cd0fe",
+  "pe": "1.0.0.0@4ce12607"
+ },
+ "rev": 1
+}

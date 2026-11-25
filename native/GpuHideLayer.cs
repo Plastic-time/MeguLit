@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Hide layer 4, the "fake GPU" (native/gpuhide, docs/hide-layers.md, owner 2026-11-14: MeguLit draws all game text).
 // MeguLitGpu<bit>.dll is loaded into the bound game next to MeguLitFont<bit>.dll. It hooks the game's Direct3D 9 draws and
 // GDI blits, learns which textured quads / blits are the glyphs of the dialogue line and where the text area is, and
@@ -42,13 +42,15 @@ public static partial class HookBridge {
  static void GpuCalibrationSaveNow(string v){try{string f=GpuCalibrationFile();if(f!=""&&File.Exists(f)&&File.ReadAllText(f).Trim()==v+" b")return;if(f!=""&&!(File.Exists(f)&&File.ReadAllText(f).Trim()==v)){File.WriteAllText(f,v);Diagnostic("gpu hide calibration saved "+v);}}catch{}}
  static string GpuCalibrationLoad(){try{string f=GpuCalibrationFile();if(f==""||!File.Exists(f))return "";string v=File.ReadAllText(f).Trim();return System.Text.RegularExpressions.Regex.IsMatch(v,@"^[0-9.]{1,6} \d{2,5} \d{2,5}( b)?$")?v:"";}catch{return "";}}
  // This renderer can leave only the verified dialogue call's pixels out before the line is flushed.
- static bool GpuLittlecheeseReady;
+ const string LittlecheeseTextHook="HAX-8@1DA3C:";
+ static bool GpuLittlecheeseReady,GpuLittlecheeseDisconnected;
+ static string GpuLittlecheeseSourceCode="";
  static int GpuLittlecheeseMode=-1;
  // These are the stock per-character hooks for the verified dialogue call.
  static bool LittlecheeseDialogue(Candidate c){
   if(c==null||c.tp.ctx2!=0)return false;
   string code=c.code??"";
-  return c.tp.ctx==0x31221&&c.name=="littlecheese"&&code.StartsWith("HAX-8@1DA3C:",StringComparison.OrdinalIgnoreCase)||
+  return c.tp.ctx==0x31221&&c.name=="littlecheese"&&code.StartsWith(LittlecheeseTextHook,StringComparison.OrdinalIgnoreCase)||
    c.tp.ctx==0x1db20&&c.name=="Ruf"&&code.StartsWith("HA-C@17C78:",StringComparison.OrdinalIgnoreCase);
  }
  static bool GpuLittlecheeseSelected(){
@@ -57,15 +59,39 @@ public static partial class HookBridge {
    return GpuLittlecheeseReady&&Enabled&&Candidates.TryGetValue(Selected,out c)&&LittlecheeseDialogue(c);
   }
  }
+ // The verified renderer draws into a retained bitmap before Luna flushes a source line.
+ // During a fresh attach, the installed stock hook can supply that first line even before a thread exists.
+ static bool GpuLittlecheeseStarting(){
+  return GpuLittlecheeseSourceCode!=""&&!Reattach&&!Quit&&!GpuLittlecheeseDisconnected&&!StreamProbePending&&Resume==null&&SelectGen==0;
+ }
+ static void GpuLittlecheeseHookInserted(string code){
+  string module=Path.GetFileName(HookTarget.ExePath);
+  if(String.IsNullOrEmpty(module)||!String.Equals(code,LittlecheeseTextHook+module,StringComparison.OrdinalIgnoreCase))return;
+  lock(Gate){GpuLittlecheeseSourceCode=code;SyncGpuLittlecheese();}
+ }
  static void SyncGpuLittlecheese(){
   lock(Gate){
    if(!GpuLittlecheeseReady)return;
-   int mode=!GpuLittlecheeseSelected()?0:!ReplacementEnabled||SkipHeld||HookTarget.ChineseText?1:2;
+   bool starting=GpuLittlecheeseStarting();
+   int mode=0;
+   if(!GpuLittlecheeseDisconnected&&!Quit&&(starting||GpuLittlecheeseSelected()))mode=ReplacementEnabled&&!SkipHeld?2:1;
+   // The thread may be registered before the renderer reports readiness.
+   if(starting&&mode==2){
+    foreach(var candidate in Candidates.Values){
+     if(candidate.created&&String.Equals(candidate.code,GpuLittlecheeseSourceCode,StringComparison.OrdinalIgnoreCase)&&LittlecheeseDialogue(candidate)){
+      Select(candidate.tp.Key(),false); // Select syncs the new mode after leaving startup.
+      return;
+     }
+    }
+   }
    if(mode!=0)GlyphFontOff();
    lock(GpuGate){
     if(GpuCtlPipe==null||mode==GpuLittlecheeseMode)return;
     GpuSend("LCGDI "+mode);
-    if(GpuCtlPipe!=null)GpuLittlecheeseMode=mode;
+    if(GpuCtlPipe!=null){
+     GpuLittlecheeseMode=mode;
+     Diagnostic("littlecheese GPU mode "+mode+(starting?" before stream selection":""));
+    }
    }
   }
  }
@@ -73,9 +99,153 @@ public static partial class HookBridge {
   if(!GpuLittlecheeseSelected())return false;
   GlyphFontOff();
   SyncGpuLittlecheese();
-  if(!SkipHeld&&!HookTarget.ChineseText)GpuLine(text);
+  if(!GpuLittlecheeseDisconnected&&!Quit&&!SkipHeld&&!HookTarget.ChineseText)GpuLine(text);
   else GpuDisarm();
   return true;
+ }
+ // Replay the control pipe at startup without loading or attaching to a game.
+ static bool LittlecheeseStartupSelfTest(){
+  using(var commands=new MemoryStream())
+  using(var writer=new StreamWriter(commands,new System.Text.UTF8Encoding(false)){AutoFlush=true,NewLine="\n"}){
+   Pid=42;Selected="";SelectGen=0;Enabled=false;Reattach=false;Quit=false;Resume=null;
+   ReplacementEnabled=true;SkipHeld=false;HookTarget.SetSourceLanguage("ja");
+   HookTarget.ExePath=Path.Combine(Path.GetTempPath(),"fixture.exe");
+   GpuCtlPipe=writer;GpuLittlecheeseReady=false;GpuLittlecheeseSourceCode="";GpuLittlecheeseMode=-1;
+   Func<string,string,bool> expect=(stage,want)=>{
+    string got=System.Text.Encoding.UTF8.GetString(commands.ToArray()).Trim();
+    commands.SetLength(0);commands.Position=0;
+    if(got==want)return true;
+    Console.Error.WriteLine("FAIL littlecheese startup ("+stage+"): expected "+want+", got "+got);
+    return false;
+   };
+   Action<object> input=command=>{
+    TextReader stdin=Console.In;bool wasQuit=Quit;var settings=_Luna_SettingsEx;
+    try{
+     _Luna_SettingsEx=(pid,wait,charset,setCharset,font,display,skip,clear,setSize,size,veh,unitydir)=>{};
+     Console.SetIn(new StringReader(Json.Serialize(command)));
+     Input();
+    }finally{Console.SetIn(stdin);Quit=wasQuit;_Luna_SettingsEx=settings;}
+   };
+   const string code="HAX-8@1DA3C:fixture.exe";
+   OnInsert(Pid+1,0x41da3c,code);
+   OnInsert(Pid,0x41da4c,"HAX-8@1DA4C:fixture.exe");
+   OnInsert(Pid,0x721da3c,"HAX-8@1DA3C:helper.dll");
+   GpuReport("ToMe_GPUHIDE status littlecheese dialogue");
+   if(!expect("no source hook in this process","LCGDI 0"))return false;
+   OnInsert(Pid,0x41da3c,code);
+   if(!expect("stock hook installed before its first text callback","LCGDI 2"))return false;
+   SetSkipHeld(true);
+   if(!expect("skip while waiting for the stream","LCGDI 1"))return false;
+   SetSkipHeld(false);
+   if(!expect("skip released","LCGDI 2"))return false;
+   ReplacementEnabled=false;SyncGpuLittlecheese();
+   if(!expect("read-only while waiting for the stream","LCGDI 1"))return false;
+   input(new{type="enable"});
+   if(!expect("replacement enabled","LCGDI 2"))return false;
+   input(new{type="sourceLanguage",value="zh!"});
+   if(!expect("Chinese text stays visible","OFF"))return false;
+   input(new{type="sourceLanguage",value="ja"});
+   if(!expect("Japanese source resumes","LCGDI 2"))return false;
+
+   var tp=new ThreadParam{processId=Pid,addr=0x41da3c,ctx=0x31221};
+   SessionFileFor=Path.GetTempFileName();
+   try{
+    GpuLittlecheeseReady=false;
+    OnCreate(code,"littlecheese",tp,false);
+    if(Selected!=""){Console.Error.WriteLine("FAIL littlecheese startup: selected before renderer was ready");return false;}
+    OnDestroy(code,"littlecheese",tp);
+    GpuReport("ToMe_GPUHIDE status littlecheese dialogue");
+    SetSkipHeld(true);
+    OnCreate(code,"littlecheese",tp,false);
+    if(Selected!=""||!expect("stream creation while skipping","LCGDI 1"))return false;
+    OnDestroy(code,"littlecheese",tp);
+    SetSkipHeld(false);
+    if(!expect("skip released before stream selection","LCGDI 2"))return false;
+    ReplacementEnabled=false;SyncGpuLittlecheese();
+    OnCreate(code,"littlecheese",tp,false);
+    if(Selected!=""||!expect("stream creation while read-only","LCGDI 1"))return false;
+    OnDestroy(code,"littlecheese",tp);
+    ReplacementEnabled=true;SyncGpuLittlecheese();
+    if(!expect("replacement restored before stream selection","LCGDI 2"))return false;
+    var wrongContext=tp;wrongContext.ctx++;
+    OnCreate(code,"littlecheese",wrongContext,false);
+    OnCreate("HAX-8@1DA3C:helper.dll","littlecheese",tp,false);
+    if(Selected!=""){Console.Error.WriteLine("FAIL littlecheese startup: selected an unverified thread");return false;}
+    OnCreate(code,"littlecheese",tp,false);
+    if(Selected!=tp.Key()){Console.Error.WriteLine("FAIL littlecheese startup: verified dialogue stream was not selected on creation");return false;}
+    if(!expect("confirmed stream inherits hiding",""))return false;
+    OnDestroy(code,"littlecheese",tp);
+    if(!expect("a destroyed stream does not re-arm startup","LCGDI 0"))return false;
+
+    SelectGen=0;GpuLittlecheeseReady=false;
+    OnCreate(code,"littlecheese",tp,false);
+    GpuReport("ToMe_GPUHIDE status littlecheese dialogue");
+    if(Selected!=tp.Key()){Console.Error.WriteLine("FAIL littlecheese startup: late renderer status did not select the stock thread");return false;}
+    if(!expect("late renderer status arms a selected stream","LCGDI 2"))return false;
+    OnDestroy(code,"littlecheese",tp);
+    if(!expect("the late-selected stream can also be removed","LCGDI 0"))return false;
+
+    SelectGen=0;SyncGpuLittlecheese();
+    if(!expect("startup armed before manual probing","LCGDI 2"))return false;
+    input(new{type="probeStreams",id=1});
+    if(!expect("manual probing restores the game text","LCGDI 0"))return false;
+    GpuLittlecheeseReady=false;
+    OnCreate(code,"littlecheese",tp,false);
+    GpuReport("ToMe_GPUHIDE status littlecheese dialogue");
+    if(Selected!=""){Console.Error.WriteLine("FAIL littlecheese startup: selected a stock thread while waiting for a fresh probe sample");return false;}
+    if(!expect("late renderer report while probing",""))return false;
+    if(!AcceptProbeFrame(1,tp,"「これは本文です」")||Selected!=tp.Key()){Console.Error.WriteLine("FAIL littlecheese startup: a fresh probe sample did not select its stream");return false;}
+    if(!expect("the fresh probe sample enables hiding","LCGDI 2"))return false;
+    OnDestroy(code,"littlecheese",tp);
+    if(!expect("the probe-selected stream can be removed","LCGDI 0"))return false;
+   }finally{File.Delete(SessionFileFor);SessionFileFor=null;}
+   SelectGen=0;Reattach=true;SyncGpuLittlecheese();
+   if(!expect("reattach is not a cold start",""))return false;
+   Reattach=false;SyncGpuLittlecheese();
+   if(!expect("startup arms before a stream is selected","LCGDI 2"))return false;
+   input(new{type="select",id=tp.Key(),replace=false});
+   if(!expect("a rejected selection disarms startup","LCGDI 0"))return false;
+
+   SelectGen=0;ReplacementEnabled=true;SyncGpuLittlecheese();
+   if(!expect("startup arms before disconnect","LCGDI 2"))return false;
+   // WaitForExit in OnDisconnect must wait on a live process while the notices arrive.
+   using(var live=Process.GetCurrentProcess()){
+    GameProcess=live;Connected=true;
+    var disconnect=new Thread(()=>OnDisconnect(Pid)){IsBackground=true};
+    disconnect.Start();
+    try{
+     if(!SpinWait.SpinUntil(()=>(disconnect.ThreadState&System.Threading.ThreadState.WaitSleepJoin)!=0,1000)){
+      Console.Error.WriteLine("FAIL littlecheese startup: disconnect did not reach its process wait");
+      return false;
+     }
+     lock(Gate){
+      if(Quit||!Connected){Console.Error.WriteLine("FAIL littlecheese startup: disconnect finished before the replay");return false;}
+      if(!expect("disconnect disarms startup before waiting","LCGDI 0"))return false;
+      GpuReport("ToMe_GPUHIDE status littlecheese dialogue");
+      OnInsert(Pid,tp.addr,code);
+      OnCreate(code,"littlecheese",tp,false);
+      if(Selected!=""){Console.Error.WriteLine("FAIL littlecheese startup: selected a thread during disconnect");return false;}
+      OnDestroy(code,"littlecheese",tp);
+      if(!expect("late renderer and hook notices during disconnect",""))return false;
+     }
+    }finally{disconnect.Join();GameProcess=null;}
+   }
+   GpuReport("ToMe_GPUHIDE status littlecheese dialogue");
+   if(!expect("late renderer report after disconnect",""))return false;
+
+   Quit=false;GpuLittlecheeseDisconnected=false;
+   const string savedCode="HA@22600:fixture.exe";
+   var saved=new ThreadParam{processId=Pid,addr=0x422600,ctx=0x40123};
+   Resume=new System.Collections.Generic.Dictionary<string,object>{{"code",savedCode},{"addr","422600"},{"ctx","40123"},{"ctx2","0"}};
+   SyncGpuLittlecheese();
+   if(!expect("saved selection takes priority",""))return false;
+   lock(Gate){
+    OnCreate(savedCode,"saved",saved,false);
+    GpuReport("ToMe_GPUHIDE status littlecheese dialogue");
+    OnDestroy(savedCode,"saved",saved);
+    return expect("queued restoration keeps startup off","");
+   }
+  }
  }
  static void GpuReport(string s){
   /* page model (GlyphQuads.h): the whole page, every line with its places; core/overlay-placement.cjs page() */
