@@ -11,11 +11,11 @@ function repairCells(current,original,column,I){
  const ids=old.columns.map((c,i)=>c.id===column&&c.type===0x53?i:-1).filter(i=>i>=0);
  if(!ids.length)return null;if(ids.length!==1)throw blocked('ambiguous name column');
  const col=ids[0],jp=I.languageColumns(old).filter(c=>c.filled).sort((a,b)=>b.kana-a.kana)[0];
- if(!jp||jp.kana<.3||jp.index===col)throw blocked('original Japanese column unproven');
  const cells=now.cells.map(row=>row.slice());let count=0;
  for(let r=0;r<old.rows;r++){
   for(let c=0;c<old.cols;c++)if(old.columns[c].type!==0x53&&old.cells[r][c]!==now.cells[r][c])throw blocked('numeric field changed');
   if(now.cells[r][col]===old.cells[r][col])continue;
+  if(!jp||jp.kana<.3||jp.index===col)throw blocked('original Japanese column unproven');
   const expected=old.cells[r][jp.index]?I.shownJapanese(old.cells[r][jp.index],old.cells[r][col]):old.cells[r][col];
   if(now.cells[r][col]!==expected)throw blocked('name field was not the prior Japanese copy');
   cells[r][col]=old.cells[r][col];count++;
