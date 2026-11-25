@@ -60,7 +60,7 @@ test('library views fade completely, wall strips alternate, and the elastic bar 
   await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:preference}]});
   for(const view of ['tracks','wall','list']){
    await evaluate("__motions=[];__cuts=[];__rowSnapshot=null;document.querySelector('.library-wall-toggle').click()");
-   await wait("__motions.some(x=>x.kind==='bar')");
+   await wait(preference==='reduce'?`document.querySelector('.library-wall-toggle').dataset.view===${JSON.stringify(view)}`:"__motions.some(x=>x.kind==='bar')");
    await wait(settled);
    const result=await evaluate(`(()=>{const bar=document.querySelector('.field-search'),root=document.querySelector('#library-results'),r=bar.getBoundingClientRect();
     return {motions:__motions,cuts:__cuts,rowSnapshot:__rowSnapshot,view:document.querySelector('.library-wall-toggle').dataset.view,stored:localStorage.getItem('megulit-library-view'),
@@ -69,6 +69,16 @@ test('library views fade completely, wall strips alternate, and the elastic bar 
      leader:root.querySelector('mg-cell[data-wall-row="0"][data-wall-col="0"] [data-member-id]')?.dataset.memberId,
      order:[...root.querySelectorAll('.library-grid .library-card')].map(n=>n.dataset.memberId)};})()`);
    assert.equal(result.view,view);assert.equal(result.stored,view);assert.ok(result.same&&result.focus,'input and focus survive the switch');
+   if(preference==='reduce'){
+    // Reduced motion swaps the view at once: no fade, strips or bar spring.
+    assert.deepEqual(result.motions,[],'reduced motion plays no switch animation');
+    assert.ok(result.cuts.every(n=>n===1),'reduced motion does not fade the old view');
+    assert.equal(result.opacity,'');assert.equal(result.pointerEvents,'');
+    if(view==='wall')leaders.push(result.leader);
+    if(view==='list')orders.push(result.order);
+    await sleep(400); // An instant swap leaves the view's deferred render pending; let it land before the next switch.
+    continue;
+   }
    assert.ok(result.cuts.length&&result.cuts.every(n=>n<.001),'old view is fully faded before DOM replacement: '+JSON.stringify({view,cuts:result.cuts}));
    const bar=result.motions.find(m=>m.kind==='bar');assert.ok(bar.options.duration>=1000,'bar settles at a readable pace');
    assert.equal(bar.keys.at(-1).scale,'1 1');assert.ok(bar.keys.some(k=>parseFloat(k.scale)>1),'bar stretches while moving');

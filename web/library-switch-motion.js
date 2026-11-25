@@ -4,6 +4,7 @@ import {syncMainKids} from './main-kids.js';
 const host=()=>document.querySelector('#library-results');
 const cover=el=>el.querySelector('.cover-frame img,.cover-frame .cover');
 const centre=root=>{const b=root.getBoundingClientRect();const top=Math.max(b.top,0),bottom=Math.min(b.bottom,innerHeight);return [b.left+b.width/2,(top+bottom)/2];};
+const reduce=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 const capsule=()=>document.querySelector('.field-search');
 const remeasure=()=>dispatchEvent(new Event('megulit-field-measure'));
 const EXPO_OUT='cubic-bezier(.16,1,.3,1)',ACCELERATE='cubic-bezier(.55,0,.85,.35)';
@@ -55,7 +56,7 @@ export async function switchLibrary(view,render,from=''){
   return {runs,duration:duration+4*step,start(){epoch=start(runs);},stop(){observer.disconnect();}};
  };
  try{
-  if(!root||document.hidden||typeof root.animate!=='function'){render();if(view!=='list')remeasure();return;}
+  if(!root||document.hidden||reduce()||typeof root.animate!=='function'){render();if(view!=='list')remeasure();return;}
   const before=bar?.getBoundingClientRect();style(root,'pointerEvents','none');
   const leaving=from==='wall'?strips(root,false):null;
   const outDuration=leaving?.duration||FADE_OUT;
