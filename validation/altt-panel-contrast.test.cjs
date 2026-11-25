@@ -150,17 +150,45 @@ async function contrastDetails(cdp, selectors, directText = false) {
  assert.fail('Panel text moved between the contrast captures');
 }
 
+function textVisibilityDetails(target, card, clip) {
+ const nodes = [];
+ const walker = target && document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+ for (let node = walker?.nextNode(); node; node = walker.nextNode()) {
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  const ancestors = [];
+  for (let element = node.parentElement; element; element = element.parentElement) {
+   const {opacity,visibility,display,overflowX,overflowY,contentVisibility} = getComputedStyle(element);
+   ancestors.push({tag:element.localName,id:element.id,className:element.className,opacity,visibility,display,
+    overflowX,overflowY,contentVisibility,open:element.localName === 'details' ? element.open : undefined,
+    rect:element.getBoundingClientRect().toJSON(),scrollTop:element.scrollTop,clientHeight:element.clientHeight,scrollHeight:element.scrollHeight});
+  }
+  const {fontFamily,fontStyle,fontWeight,fontSize,lineHeight} = getComputedStyle(node.parentElement);
+  nodes.push({text:node.textContent,rects:[...range.getClientRects()].map(rect => rect.toJSON()),ancestors,
+   fontFamily,fontSize,lineHeight,fontLoaded:document.fonts.check(`${fontStyle} ${fontWeight} ${fontSize} ${fontFamily}`,node.textContent)});
+ }
+ return JSON.stringify({
+  browser:navigator.userAgent,theme:document.documentElement.dataset.theme,card:card?.getBoundingClientRect().toJSON(),clip,
+  viewport:{width:innerWidth,height:innerHeight,scale:devicePixelRatio,scrollX,scrollY,
+   visualWidth:visualViewport.width,visualHeight:visualViewport.height,visualTop:visualViewport.offsetTop,visualLeft:visualViewport.offsetLeft},
+  workArea:{left:screen.availLeft,top:screen.availTop,width:screen.availWidth,height:screen.availHeight,screenX,screenY,outerWidth,outerHeight},
+  fonts:{status:document.fonts.status,faces:[...document.fonts].map(({family,status}) => ({family,status}))},nodes
+ });
+}
+
 async function measureContrast(cdp,selectors,directText,scan = false) {
- const probes = await cdp.evaluate(`(${function (selectors,directText,scan) {
+ const probes = await cdp.evaluate(`(${function (selectors,directText,scan,visibilityDetails) {
   const text = new Set(), positions = [];
   const palette = new OffscreenCanvas(1,1).getContext('2d',{willReadFrequently:true});
   const probes = selectors.map(selector => {
    const target = document.querySelector(selector);
    if (!target) {
     if (scan) return [];
-    throw Error('Missing text: ' + selector);
+    const card = document.querySelector('.tomoyo-selection-card');
+    throw Error(`Missing text: ${selector}\n${visibilityDetails(null,card)}`);
    }
-   const card = target.closest('.tomoyo-selection-card')?.getBoundingClientRect();
+   const panel = target.closest('.tomoyo-selection-card');
+   const card = panel?.getBoundingClientRect();
    const viewport = {left:Math.max(0,card?.left ?? 0),top:Math.max(0,card?.top ?? 0),
     right:Math.min(innerWidth,card?.right ?? innerWidth),bottom:Math.min(innerHeight,card?.bottom ?? innerHeight)};
    const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
@@ -187,7 +215,7 @@ async function measureContrast(cdp,selectors,directText,scan = false) {
     }
     text.add(parent);
    }
-   if (!areas.length && !scan) throw Error('No visible text: ' + selector);
+   if (!areas.length && !scan) throw Error(`No visible text: ${selector}\n${visibilityDetails(target,panel,viewport)}`);
    return areas;
   });
   if (probes.some(areas => !areas.length)) return null;
@@ -209,7 +237,7 @@ async function measureContrast(cdp,selectors,directText,scan = false) {
    }
   };
   return probes;
- }})(${JSON.stringify(selectors)},${directText},${scan})`);
+ }})(${JSON.stringify(selectors)},${directText},${scan},${textVisibilityDetails})`);
  if (!probes) return null;
  try {
   const boxes = probes.flat().map(area => area.box);
@@ -243,7 +271,7 @@ async function contrast(cdp,selectors) {
 }
 
 async function scrollToText(cdp, selector) {
- await cdp.evaluate(`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center',inline:'nearest',behavior:'instant'})`);
+ await cdp.evaluate(`document.querySelector(${JSON.stringify(selector)})?.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'})`);
  await frame(cdp);
 }
 
@@ -252,8 +280,17 @@ async function lookupContrast(cdp, selectors) {
  await cdp.evaluate('document.fonts.ready.then(() => true)');
  const ratios = {};
  for (const selector of selectors) {
-  await scrollToText(cdp,selector);
-  Object.assign(ratios,await contrast(cdp,[selector]));
+  const deadline = performance.now() + 2000;
+  // A resize can move a row below the scrollport after the initial scroll.
+  while (true) {
+   await scrollToText(cdp,selector);
+   try {
+    Object.assign(ratios,await contrast(cdp,[selector]));
+    break;
+   } catch (error) {
+    if (!error.message.includes(`No visible text: ${selector}\n`) || performance.now() >= deadline) throw error;
+   }
+  }
  }
  return ratios;
 }
@@ -486,7 +523,7 @@ function assertAA(ratios) {
 }
 
 if (require.main === module) {
- const options = {skip:!hasEdge && 'Edge not installed',timeout:60000};
+ const options = {skip:!hasEdge && !process.env.CI && 'Edge not installed',timeout:60000};
  test('Alt+T text and secondary controls meet 4.5:1 over a white game',options,() => withReader(async (cdp,load) => {
   for (const fixture of [white,{...white,themeMode:'light'},{...white,home:[30,30,30]}]) {
    await load(fixture);
