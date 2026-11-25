@@ -97,3 +97,60 @@ test('ARCG rejects out-of-range indexes and incomplete or malformed pages',t=>{
  fs.writeFileSync(pathToScript,outOfRange);
  assert.deepEqual(engine.scenes(dir),[]);
 });
+
+
+test('ARCG checks exact magic and finds the valid SCB after unrelated files',t=>{
+ const {root,dir,executable}=setup(t);
+ const bytes=scb([['story',scene(page('見つけた台詞です。'))]]);
+ const impostor=Buffer.from(bytes);
+ Buffer.from([0xc1,0xd2,0xc3,0xc7]).copy(impostor);
+ for(let i=0;i<64;i++)fs.writeFileSync(path.join(dir,'other-'+i+'.scb'),impostor);
+ assert.deepEqual(registry.readersFor(dir),[]);
+ assert.equal(probeGame({dir,executable}).detected,null);
+ assert.equal(original.scanRunning(root,'1',executable).status,'unsupported');
+
+ fs.writeFileSync(path.join(dir,'story.scb'),bytes);
+ assert.deepEqual(registry.readersFor(dir),['arcg']);
+ assert.equal(probeGame({dir,executable}).detected,'arcg');
+ assert.equal(original.scanRunning(root,'1',executable).runtime.engine,'arcg');
+});
+
+test('a script from the registered engine takes priority over an ARCG side archive',t=>{
+ const {root,dir,executable}=setup(t);
+ const {scnpac}=require('./helpers/engine-fixtures-e.cjs');
+ const seraphText=kit.encodeSjis('セラフの台詞です。\r\nこちらの台詞です。\r\n');
+ fs.writeFileSync(path.join(dir,'ScnPac.dat'),scnpac([Buffer.concat([Buffer.alloc(4),seraphText])]));
+ const bonus=scb([['bonus',scene(page('おまけの一行目。'),page('おまけの二行目。'),page('おまけの三行目。'))]]);
+ const broken=Buffer.from(bonus),index=bonus.readUInt32LE(8);
+ broken.writeUInt32LE(2,index+8);
+ for(const [game,archive] of [['1',broken],['2',bonus]]){
+  fs.writeFileSync(path.join(dir,'bonus.scb'),archive);
+  assert.deepEqual(registry.readersFor(dir),['seraph']);
+  const probe=probeGame({dir,executable});
+  assert.equal(probe.detected,'seraph');
+  assert.equal(probe.japaneseLines,2);
+  const state=original.scanRunning(root,game,executable);
+  assert.equal(state.runtime.engine,'seraph');
+  assert.equal(state.runtime.japaneseLines,2);
+ }
+});
+
+test('ARCG accepts an archive at the size limit and rejects one byte over it',t=>{
+ const {dir}=setup(t);
+ const file=path.join(dir,'story.scb');
+ fs.writeFileSync(file,scb([['story',scene(page('上限内の台詞です。'))]]));
+ fs.truncateSync(file,64<<20);
+ assert.deepEqual(registry.readersFor(dir),['arcg']);
+ assert.deepEqual(engine.scenes(dir).map(s=>s.name),['story']);
+ fs.truncateSync(file,(64<<20)+1);
+ assert.deepEqual(registry.readersFor(dir),[]);
+ assert.deepEqual(engine.scenes(dir),[]);
+});
+
+test('ARCG stops reading a scene when its budget expires in the padding',t=>{
+ const body=Buffer.concat([page('途中までの台詞です。'),end(),Buffer.alloc(192<<10,0xff)]);
+ assert.equal(engine.parse(body).lines.length,1);
+ let checks=0;
+ t.mock.method(Date,'now',()=>++checks<=2?0:2);
+ assert.deepEqual(engine.parse(body,{deadline:1}).lines,[]);
+});

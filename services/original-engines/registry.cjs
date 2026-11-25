@@ -128,7 +128,6 @@ const ENGINES=[
  /* E601 Capcom RE Engine (逆転裁判456 王泥喜セレクション): read by re-pak.cjs but had no fingerprint, so it showed as unknown */
  {name:'RE Engine (Capcom)',hook:null,generic:true,test:f=>f.has(/^re_chunk_000\.pak$/i)},
  {name:'Adobe AIR / Flash',hook:null,generic:true,test:f=>f.sub('META-INF',/^AIR$/i)||f.has(/\.swf$/i)&&f.names.some(n=>/\.exe$/i.test(n))},
- {name:'Will ARCG',hook:null,test:f=>f.probe(/\.scb$/i,p=>require('./arcg.cjs').probe(p),8)},
  {name:'Seraph',hook:null,test:f=>f.has(/^(archpac|scnpac)\.dat$/i)},
  {name:'ISM',hook:null,test:f=>f.magicAny(/\.isa$/i,'ISM ARCHIVED')},
  /* E610 a game shipped inside an Enigma Virtual Box container (an 'EVB ' header in a .cpk/.dat/.bin/.pak): only the evbox scan reads it */
@@ -199,8 +198,10 @@ const ENGINES=[
  {name:'CloudNovel',hook:null,generic:true,test:f=>f.names.some(n=>/cloudnovel/i.test(n))},
  {name:'HTMLVN',hook:null,generic:true,test:f=>f.names.some(n=>/htmlvn/i.test(n))},
  {name:'HTML5 / Electron / NW.js',hook:null,generic:true,test:f=>f.inspect(dir=>require('./webbundle.cjs').probe(dir,'html5'))},
- // Keep SIA last so any existing folder match, including SoftPal, NeXAS and Tmr-Hiro PACs, takes priority.
+ // Keep SIA after established folder matches so any existing PAC match, including SoftPal, NeXAS and Tmr-Hiro PACs, takes priority.
  {name:'SIA-Soft',hook:null,test:f=>f.has(/^1055\.exe$/i)&&f.inspect(require('./sia.cjs').probe)},
+ // Preserve established engine fingerprints when a folder also ships an ARCG side archive.
+ {name:'Will ARCG',hook:null,test:f=>f.inspect(require('./arcg.cjs').matches)},
 ];
 /* the readers of each engine */
 const READERS={"BGI / Ethornell":["bgi"],
