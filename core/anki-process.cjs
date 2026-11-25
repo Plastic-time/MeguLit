@@ -6,7 +6,7 @@
 const fs=require('node:fs'),path=require('node:path'),{spawn,execFile}=require('node:child_process');
 const {Anki}=require('./anki.cjs');
 
-function installFolder(root,env=process.env){
+function driveInstallFolder(root,env=process.env){
  const drive=path.win32.parse(root).root;
  if(!/^[a-z]:[\\/]$/i.test(drive))return '';
  const systemDrive=env.SystemDrive||'C:';
@@ -16,7 +16,7 @@ function candidates(configured,env=process.env,root=''){
  const roots=[env.LOCALAPPDATA&&path.join(env.LOCALAPPDATA,'Programs'),env.ProgramFiles,env['ProgramFiles(x86)'],env.ProgramW6432].filter(Boolean);
  // Anki 25.x installs the program itself under %LOCALAPPDATA%\AnkiProgramFiles\.venv (ankiw.exe has no console).
  const venv=env.LOCALAPPDATA?['ankiw.exe','anki.exe'].map(name=>path.join(env.LOCALAPPDATA,'AnkiProgramFiles','.venv','Scripts',name)):[];
- const sameDrive=installFolder(root,env);
+ const sameDrive=driveInstallFolder(root,env);
  return [configured,...roots.map(folder=>path.join(folder,'Anki','anki.exe')),...venv,sameDrive&&path.win32.join(sameDrive,'anki.exe')].filter(Boolean);
 }
 // Target of a Windows shortcut (.lnk, MS-SHLLINK): the local base path stored in its LinkInfo. '' when unreadable.
@@ -222,4 +222,4 @@ async function installAnkiConnect(env=process.env,{locate=()=>find('',env),fresh
   return {installed:true,path:target};
  }finally{fs.rmSync(work,{recursive:true,force:true});}
 }
-module.exports={AnkiProcess,find,candidates,installFolder,coldCandidates,shortcutTarget,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows,listeners,isAnki,portOf};
+module.exports={AnkiProcess,find,candidates,driveInstallFolder,coldCandidates,shortcutTarget,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows,listeners,isAnki,portOf};

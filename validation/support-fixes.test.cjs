@@ -46,3 +46,11 @@ test('the runtime finds Anki on a MeguLit drive outside C through H without a St
  runtime.config=()=>({ankiPath:configured});
  assert.equal(runtime.ankiProcess().find(),configured);
 });
+
+test('Anki only derives a local candidate from an absolute drive-letter path',()=>{
+ const env={SystemDrive:'C:'};
+ for(const root of ['','R:relative',String.raw`\\server\share\MeguLit`,String.raw`\\?\UNC\server\share\MeguLit`,'/opt/MeguLit']){
+  assert.deepEqual(anki.candidates('',env,root),[]);
+ }
+ assert.deepEqual(anki.candidates('',env,'r:/MeguLit'),[String.raw`r:\Anki\anki.exe`]);
+});
