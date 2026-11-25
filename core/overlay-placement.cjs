@@ -162,8 +162,11 @@ class OverlayPlacement {
       if (P.length && (bitmap || top >= bottom - 2)) this.why('rows:' + l.id, 'page: ' + l.id + ' goes on the page under ' + P[P.length - 1].id + ' (no clear since, starts below its rows)');
       else { if (P.length) this.why('rows:' + l.id, 'page: ' + l.id + ' starts a new page (' + (top < bottom - 2 ? 'not below the page' : 'cleared') + ')'); P.length = 0; }
       P.push(entry); if (P.length > 12) P.shift(); }
-    if (mode === true || P.length >= 2) { this.rowsPaged = true; this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: P }, { engineRows: mode === true, retainedBitmap }); }
-    else this.rowsUnpage();
+    if (mode === true || P.length >= 2) {
+      this.rowsPaged = true;
+      const armed = !retainedBitmap || P.some(row => !row.nativeCells || row.nativeCells.some(cell => !cell));
+      this.page({ awake: true, armed, sw: this.client[0], sh: this.client[1], lines: P }, { engineRows: mode === true, retainedBitmap });
+    } else this.rowsUnpage();
   }
   /* auto (null): back to the line model once the page holds one line again */
   rowsUnpage() { if (!this.rowsPaged) return; this.rowsPaged = false; this.pageKey = ''; this.send({ type: 'textPlacePage', lines: null }); }
@@ -433,7 +436,7 @@ class OverlayPlacement {
     if (m.type === 'hookGpuPage' && !m.armed && this.ownsEngineRows()) return;
     const [cw, ch] = this.client, kx = m.sw > 0 && cw ? cw / m.sw : 1, ky = m.sh > 0 && ch ? ch / m.sh : kx;
     const elsewhere = !m.armed && !!m.awake && o.replaced === true;
-    const lines = m.awake && m.armed ? m.lines.map(l => ({ id: l.id, text: l.text, rects: l.rects.slice(0, [...l.text].length).map(r => r ? [Math.round(r[0] * kx), Math.round(r[1] * ky), Math.round(r[2] * kx), Math.round(r[3] * ky)] : null), ...(l.nativeCells ? { nativeCells: l.nativeCells } : {}) })) : [];
+    const lines = m.awake && (m.armed || o.retainedBitmap) ? m.lines.map(l => ({ id: l.id, text: l.text, rects: l.rects.slice(0, [...l.text].length).map(r => r ? [Math.round(r[0] * kx), Math.round(r[1] * ky), Math.round(r[2] * kx), Math.round(r[3] * ky)] : null), ...(l.nativeCells ? { nativeCells: l.nativeCells } : {}) })) : [];
     const out = elsewhere ? { type: 'textPlacePage', awake: true, armed: false, elsewhere: true, lines: [], client: this.client.slice() }
       : { type: 'textPlacePage', awake: m.awake, armed: m.armed, ...(o.engineRows ? { engineRows: true } : {}), ...(o.retainedBitmap ? { retainedBitmap: true } : {}), own: m.own, ownRects: m.ownRects, lines, client: this.client.slice() };
     const key = JSON.stringify(out);

@@ -114,6 +114,7 @@ assert.strictEqual(gd.mode(require('node:os').tmpdir()), '', 'no glyph mode with
   placed.hook(row(4, '原文', 468, { hidden: false, bitmapPage: 2 }));
   assert.deepStrictEqual(out.at(-1).lines.map(l => l.text), ['原文'], 'the renderer advances the page');
   assert.deepStrictEqual(out.at(-1).lines[0].nativeCells, [true, true]);
+  assert.strictEqual(out.at(-1).armed, false, 'wholly visible pages use the game-drawn presentation');
   const mixed = record(3, '次へ', 520, { hidden: false, nativeCells: [false, true] });
   assert.strictEqual(parseChars(mixed.replace('painted=01', 'painted=1')), null);
   assert.strictEqual(parseChars(mixed.replace('engine=littlecheese', 'engine=gpu')), null);
