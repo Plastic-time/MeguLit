@@ -18,7 +18,7 @@ static bool __stdcall KurokinChar(unsigned glyph, int x, int y, int w, int h, ui
  char bytes[] = {(char)(glyph >> 8), (char)glyph};
  wchar_t ch;
  if (MultiByteToWideChar(932, MB_ERR_INVALID_CHARS, bytes + (glyph < 256), glyph < 256 ? 1 : 2, &ch, 1) != 1 ||
-     ch < L' ' || ch == 0x7f) return false;
+     ch <= L' ' || ch == 0x3000 || ch == 0x7f) return false;
  Guard g;
  return KurokinRows.Draw(layout, ch, x, y, w, h, GetTickCount(), KurokinMode == 2 && !Learner.readOnly);
 }
@@ -71,8 +71,6 @@ static bool InstallKurokinDraw() {
  KurokinAdvance = base + 0x1dd64;
  if (MH_CreateHook(target, (void *)&KurokinDraw, &KurokinDrawOriginal) != MH_OK) return false;
  if (MH_QueueEnableHook(target) == MH_OK) return true;
- MH_RemoveHook(target);
- KurokinDrawOriginal = nullptr;
  return false;
 }
 
@@ -83,13 +81,17 @@ static bool KurokinLine(const std::wstring &line, unsigned now) {
  auto matched = KurokinRows.Claim(key, now);
  if (matched.cells.empty()) return true;
  const unsigned seq = ++KurokinSequence;
- std::string rects;
+ std::string rects, painted;
+ bool anyHidden = false;
  for (const auto &c : matched.cells) {
   if (!rects.empty()) rects += ';';
+  painted += c.hidden ? '0' : '1';
+  anyHidden = anyHidden || c.hidden;
   rects += std::to_string(c.x) + "," + std::to_string(c.y) + "," + std::to_string(c.w) + "," + std::to_string(c.h);
  }
  Send("ToMe_CHARS engine=littlecheese line=" + std::to_string(seq) + " hidden=" + (matched.hidden ? "1" : "0") +
-      " sw=800 sh=600 vx=0 vy=0 vw=0 vh=0 n=" + std::to_string(matched.cells.size()) + " rects=" + rects + " text=" + Utf8(key));
+      " sw=800 sh=600 vx=0 vy=0 vw=0 vh=0 n=" + std::to_string(matched.cells.size()) + " rects=" + rects +
+      " bitmap=" + std::to_string(matched.page) + (anyHidden && !matched.hidden ? " painted=" + painted : "") + " text=" + Utf8(key));
  return true;
 }
 static void KurokinSetMode(int mode) {

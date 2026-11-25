@@ -31,7 +31,7 @@ function formatChars(r){
  const rects=(r.rects||[]).slice(0,MAX_RECTS).map(q=>q.map(num).join(',')).join(';');
  const v=r.viewport||[0,0,0,0];
  return 'ToMe_CHARS engine='+r.engine+' line='+(r.line|0)+' hidden='+(r.hidden?1:0)+' sw='+num(r.sw)+' sh='+num(r.sh)+
-  ' vx='+num(v[0])+' vy='+num(v[1])+' vw='+num(v[2])+' vh='+num(v[3])+' n='+(r.rects||[]).length+' rects='+rects+(/^#?[0-9a-f]{6}$/i.test(r.color||'')?' color='+String(r.color).replace('#','').toLowerCase():'')+(typeof r.read==='boolean'?' read='+(r.read?1:0):'')+drawFields(r)+formatRuby(r.ruby,r.text||'',(r.rects||[]).length)+' text='+String(r.text||'').replace(/\r?\n/g,'\x1f');
+  ' vx='+num(v[0])+' vy='+num(v[1])+' vw='+num(v[2])+' vh='+num(v[3])+' n='+(r.rects||[]).length+' rects='+rects+(/^#?[0-9a-f]{6}$/i.test(r.color||'')?' color='+String(r.color).replace('#','').toLowerCase():'')+(typeof r.read==='boolean'?' read='+(r.read?1:0):'')+drawFields(r)+formatRuby(r.ruby,r.text||'',(r.rects||[]).length)+bitmapFields(r)+' text='+String(r.text||'').replace(/\r?\n/g,'\x1f');
 }
 /* optional engine-draw fields, fixed order: role id box sel emb (each left out when it says nothing new) */
 function drawFields(r){let s='';
@@ -41,19 +41,26 @@ function drawFields(r){let s='';
  if(typeof r.sel==='boolean')s+=' sel='+(r.sel?1:0);
  if(r.emb===1||r.emb===2)s+=' emb='+r.emb;
  return s;}
-const RE=/^ToMe_CHARS engine=([a-z]+) line=(\d+) hidden=([01]) sw=([\d.]+) sh=([\d.]+) vx=(-?[\d.]+) vy=(-?[\d.]+) vw=([\d.]+) vh=([\d.]+) n=(\d+) rects=([-\d.,;]*)(?: color=([0-9a-f]{6}))?(?: read=([01]))?(?: role=([a-z]+))?(?: id=([A-Za-z0-9:._-]{1,32}))?(?: box=(-?[\d.]+,-?[\d.]+,[\d.]+,[\d.]+))?(?: sel=([01]))?(?: emb=([012]))?(?: ruby=([^ ]+))? text=(.*)$/;
+function bitmapFields(r){
+ if(r.engine!=='littlecheese'||!Number.isSafeInteger(r.bitmapPage)||r.bitmapPage<0)return '';
+ return ' bitmap='+r.bitmapPage+(Array.isArray(r.nativeCells)?' painted='+r.nativeCells.map(c=>c?'1':'0').join(''):'');
+}
+const RE=/^ToMe_CHARS engine=([a-z]+) line=(\d+) hidden=([01]) sw=([\d.]+) sh=([\d.]+) vx=(-?[\d.]+) vy=(-?[\d.]+) vw=([\d.]+) vh=([\d.]+) n=(\d+) rects=([-\d.,;]*)(?: color=([0-9a-f]{6}))?(?: read=([01]))?(?: role=([a-z]+))?(?: id=([A-Za-z0-9:._-]{1,32}))?(?: box=(-?[\d.]+,-?[\d.]+,[\d.]+,[\d.]+))?(?: sel=([01]))?(?: emb=([012]))?(?: ruby=([^ ]+))?(?: bitmap=(\d{1,10})(?: painted=([01]+))?)? text=(.*)$/;
 function parseChars(line){
  const m=RE.exec(String(line||''));if(!m||!ENGINES.has(m[1]))return null;
  const rects=m[11]?m[11].split(';').slice(0,MAX_RECTS).map(s=>s.split(',').map(Number)):[];
  if(rects.some(q=>q.length!==4||q.some(n=>!Number.isFinite(n))))return null;
- const text=m[20].replace(/\x1f/g,'\n').slice(0,4000),role=m[14]||'line';
+ const text=m[22].replace(/\x1f/g,'\n').slice(0,4000),role=m[14]||'line';
  if(!ROLES.has(role))return null;
  const box=m[16]?m[16].split(',').map(Number):null;
  /* a UI item may come as its box alone (the engine knows its text but did not lay it out glyph by glyph) */
  const boxOnly=role!=='line'&&box&&rects.length===0;
  if(rects.length!==Number(m[10])||!boxOnly&&rects.length!==[...text.replace(/\n/g,'')].length)return null;
  const ruby=m[19]===undefined?null:parseRuby(m[19],text,rects.length);if(m[19]!==undefined&&!ruby)return null;
+ if(m[20]!==undefined&&m[1]!=='littlecheese'||m[21]&&
+   (m[3]!=='0'||m[21].length!==rects.length||!m[21].includes('0')||!m[21].includes('1')))return null;
  return {type:'hookCharRects',engine:m[1],line:Number(m[2]),hidden:m[3]==='1',sw:Number(m[4]),sh:Number(m[5]),viewport:[m[6],m[7],m[8],m[9]].map(Number),rects,text,...(ruby?{ruby}:{}),...(m[12]?{color:'#'+m[12]}:{}),...(m[13]?{read:m[13]==='1'}:{}),
+  ...(m[20]!==undefined?{bitmapPage:Number(m[20])}:{}),...(m[21]?{nativeCells:[...m[21]].map(c=>c==='1')}:{}),
   ...(m[14]?{role}:{}),...(m[15]?{id:m[15]}:{}),...(box?{box}:{}),...(m[17]?{sel:m[17]==='1'}:{}),...(m[18]?{emb:Number(m[18])}:{})};
 }
 

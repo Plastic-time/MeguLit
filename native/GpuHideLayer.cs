@@ -18,7 +18,13 @@ public static partial class HookBridge {
  /// hides only after it found the line's glyphs; nothing is hidden when it is unsure.</summary>
  public static void GpuArm(string streamId,string line){if(HookTarget.ChineseText){GpuDisarm();return;}lock(GpuGate){GpuStream=streamId??"";GpuSent=true;}GpuSend("LINE "+System.Text.RegularExpressions.Regex.Replace(line??"",@"[\r\n  ]+"," "));}
  /// <summary>Stop hiding at once.</summary>
- public static void GpuDisarm(){bool was;lock(GpuGate){was=GpuSent;GpuSent=false;}if(was)GpuSend("OFF");}
+ public static void GpuDisarm(){
+  lock(GpuGate){
+   if(GpuSent||GpuLittlecheeseMode==2)GpuSend("OFF");
+   GpuSent=false;
+   if(GpuLittlecheeseMode==2)GpuLittlecheeseMode=1;
+  }
+ }
  /// <summary>Read-only: learn and report character rectangles, never hide.</summary>
  public static void GpuReadOnly(bool on){GpuSend(on?"MODE read":"MODE hide");}
  /// <summary>First hidden draw of a line: (stream, line number, glyph quads left out, characters of the line).</summary>
@@ -38,25 +44,36 @@ public static partial class HookBridge {
  // This renderer can leave only the verified dialogue call's pixels out before the line is flushed.
  static bool GpuLittlecheeseReady;
  static int GpuLittlecheeseMode=-1;
+ // These are the stock per-character hooks for the verified dialogue call.
+ static bool LittlecheeseDialogue(Candidate c){
+  if(c==null||c.tp.ctx2!=0)return false;
+  string code=c.code??"";
+  return c.tp.ctx==0x31221&&c.name=="littlecheese"&&code.StartsWith("HAX-8@1DA3C:",StringComparison.OrdinalIgnoreCase)||
+   c.tp.ctx==0x1db20&&c.name=="Ruf"&&code.StartsWith("HA-C@17C78:",StringComparison.OrdinalIgnoreCase);
+ }
  static bool GpuLittlecheeseSelected(){
   lock(Gate){
    Candidate c;
-   return GpuLittlecheeseReady&&Enabled&&Candidates.TryGetValue(Selected,out c)&&
-    (c.name=="littlecheese"&&c.tp.ctx==0x31221||c.name=="Ruf"&&c.tp.ctx==0x1db20);
+   return GpuLittlecheeseReady&&Enabled&&Candidates.TryGetValue(Selected,out c)&&LittlecheeseDialogue(c);
   }
  }
  static void SyncGpuLittlecheese(){
   lock(Gate){
    if(!GpuLittlecheeseReady)return;
    int mode=!GpuLittlecheeseSelected()?0:!ReplacementEnabled||SkipHeld||HookTarget.ChineseText?1:2;
-   if(mode==GpuLittlecheeseMode)return;
    if(mode!=0)GlyphFontOff();
    lock(GpuGate){
-    if(GpuCtlPipe==null)return;
+    if(GpuCtlPipe==null||mode==GpuLittlecheeseMode)return;
     GpuSend("KUROKIN "+mode);
     if(GpuCtlPipe!=null)GpuLittlecheeseMode=mode;
    }
   }
+ }
+ static bool GpuLittlecheeseLine(string text){
+  if(!GpuLittlecheeseSelected())return false;
+  GlyphFontOff();
+  if(!SkipHeld&&!HookTarget.ChineseText){SyncGpuLittlecheese();GpuLine(text);}
+  return true;
  }
  static void GpuReport(string s){
   /* page model (GlyphQuads.h): the whole page, every line with its places; core/overlay-placement.cjs page() */
@@ -232,6 +249,6 @@ public static partial class HookBridge {
  static void GpuHide(string bit,string loader,string[] args){try{if(Environment.GetEnvironmentVariable("MEGULIT_TEXT_MARKS")=="1")SetMarks(true); /* marks do not need layer 4 */string dll=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"MeguLitGpu"+bit+".dll");if(!File.Exists(dll)){Diagnostic("gpu hide unavailable: "+Path.GetFileName(dll)+" missing");return;}
   if(!GpuCanaryArm())return;
   new Thread(()=>{while(!Quit){try{using(var pipe=new System.IO.Pipes.NamedPipeServerStream("MeguLitGpu-"+Pid,System.IO.Pipes.PipeDirection.In,1)){pipe.WaitForConnection();using(var reader=new StreamReader(pipe,new System.Text.UTF8Encoding(false))){string line;while((line=reader.ReadLine())!=null)GpuReport(line);}}}catch(Exception e){Diagnostic("gpu pipe "+e.Message);Thread.Sleep(1000);}}}){IsBackground=true}.Start();
-  new Thread(()=>{while(!Quit){try{using(var pipe=new System.IO.Pipes.NamedPipeServerStream("MeguLitGpuCtl-"+Pid,System.IO.Pipes.PipeDirection.Out,1)){pipe.WaitForConnection();var w=new StreamWriter(pipe,new System.Text.UTF8Encoding(false)){AutoFlush=true,NewLine="\n"};lock(GpuGate){GpuCtlPipe=w;GpuSent=false;}lock(Gate){GpuLittlecheeseMode=-1;}SyncGpuLittlecheese();Diagnostic("gpu hide connected");{string cal=GpuCalibrationLoad();if(cal!=""){w.WriteLine("PRESET "+cal);Diagnostic("gpu hide preset "+cal+" (saved by an earlier run)");}}while(!Quit){lock(GpuGate){if(GpuCtlPipe!=w)break;}Thread.Sleep(500);}}}catch(Exception e){lock(GpuGate){GpuCtlPipe=null;}Diagnostic("gpu control "+e.Message);Thread.Sleep(1000);}}}){IsBackground=true}.Start();
+  new Thread(()=>{while(!Quit){try{using(var pipe=new System.IO.Pipes.NamedPipeServerStream("MeguLitGpuCtl-"+Pid,System.IO.Pipes.PipeDirection.Out,1)){pipe.WaitForConnection();var w=new StreamWriter(pipe,new System.Text.UTF8Encoding(false)){AutoFlush=true,NewLine="\n"};lock(GpuGate){GpuCtlPipe=w;GpuSent=false;GpuLittlecheeseMode=-1;}SyncGpuLittlecheese();Diagnostic("gpu hide connected");{string cal=GpuCalibrationLoad();if(cal!=""){w.WriteLine("PRESET "+cal);Diagnostic("gpu hide preset "+cal+" (saved by an earlier run)");}}while(!Quit){lock(GpuGate){if(GpuCtlPipe!=w)break;}Thread.Sleep(500);}}}catch(Exception e){lock(GpuGate){GpuCtlPipe=null;}Diagnostic("gpu control "+e.Message);Thread.Sleep(1000);}}}){IsBackground=true}.Start();
   var start=new ProcessStartInfo(loader,Pid+" "+args[1]+" \""+args[2]+"\" "+args[3]+" \""+dll+"\""){UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true};using(var child=Process.Start(start)){if(!child.WaitForExit(12000)){Diagnostic("gpu hide load timed out");return;}Diagnostic(child.ExitCode==0?"gpu hide loaded":"gpu hide failed: "+child.StandardError.ReadToEnd().Trim());}}catch(Exception e){Diagnostic("gpu hide skipped: "+e.Message);}}
 }

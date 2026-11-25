@@ -30,8 +30,8 @@ test('retained GDI rows leave room for the current translation inside the client
       }, [y, nextY]);
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       return page.locator('.tomoyo-cn-row').evaluate(row => {
-        const { top, bottom, left } = row.getBoundingClientRect();
-        return { top, bottom, left, visible: row.checkVisibility({ visibilityProperty: true }) };
+        const { top, bottom, left, right } = row.getBoundingClientRect();
+        return { top, bottom, left, right, visible: row.checkVisibility({ visibilityProperty: true }) };
       });
     };
     const normal = await draw(468, 494);
@@ -40,6 +40,28 @@ test('retained GDI rows leave room for the current translation inside the client
     const bottom = await draw(550, 576);
     assert.equal(bottom.left, 266);
     assert.ok(bottom.visible && bottom.top >= 0 && bottom.bottom <= 550, JSON.stringify(bottom));
+    await page.setViewportSize({ width: 800, height: 45 });
+    const packed = await draw(0, 270);
+    assert.ok(packed.visible && packed.top >= 0 && packed.bottom <= 45, JSON.stringify(packed));
+    await page.evaluate(() => window.__tomoyoChinese.textPlaceMode({ on: false }));
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(await page.locator('.tomoyo-cn-row').evaluate(row => row.style.visibility), '');
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    await page.evaluate(() => {
+      window.__tomoyoChinese.galLayoutInfo = () => ({ clientX: 200, clientY: 100, clientWidth: 800, clientHeight: 600 });
+      document.querySelector('.tomoyo-cn-row').textContent = '长'.repeat(60);
+    });
+    const offset = await draw(468, 494);
+    assert.equal(offset.left, 466);
+    assert.ok(offset.visible && offset.right <= 1000 && offset.bottom <= 700, JSON.stringify(offset));
+    await page.evaluate(() => window.__tomoyoChinese.textPlacePage({ awake: true, armed: true, engineRows: true, retainedBitmap: true,
+      client: [800, 600], lines: [{ id: 1, text: '今日', rects: [[266, 468, 20, 20], [286, 468, 20, 20]], nativeCells: [false, true] },
+        { id: 2, text: '明日', rects: [[266, 494, 20, 20], [286, 494, 20, 20]] }] }));
+    await page.waitForFunction(() => {
+      const tokens = document.querySelectorAll('.sentence-text:not(.megulit-old-line) .char-token');
+      return getComputedStyle(tokens[0]).opacity === '1' && getComputedStyle(tokens[1]).opacity === '0' &&
+        document.querySelector('.megulit-old-line')?.textContent === '明日';
+    });
   } finally {
     await browser.close();
   }

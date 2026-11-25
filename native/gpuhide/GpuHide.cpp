@@ -585,7 +585,13 @@ static void Command(const std::string &line) {
 #endif
   Learner.Line(w, now); Trace.Line(Learner.seq, now);
  }
- else if (line == "OFF") { Guard g; Learner.Off(); Trace.Off(); }
+ else if (line == "OFF") {
+  Guard g;
+#ifdef _M_IX86
+  if (KurokinMode == 2) { KurokinSetMode(1); return; }
+#endif
+  Learner.Off(); Trace.Off();
+ }
  else if (line.compare(0, 7, "PRESET ") == 0) { float gh = 0; unsigned w = 0, h = 0; if (sscanf_s(line.c_str() + 7, "%f %u %u", &gh, &w, &h) == 3) { Guard g; Learner.Preset(gh, w, h); if (line.size() > 2 && line.compare(line.size() - 2, 2, " b") == 0) Learner.pageBlankQuads = true; } }
  else if (line == "MODE read") { Guard g; Learner.readOnly = true; } else if (line == "MODE hide") { Guard g; Learner.readOnly = false; }
 }

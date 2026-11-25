@@ -323,7 +323,7 @@ static void RetainedDialogueRows() {
  for (const auto &c : first.cells) assert(c.y == 468);
  draw(L"皮肉っぽく嘲笑うみたいな言葉。", 494, 326, true);
  auto second = rows.Claim(L"それを皮肉っぽく嘲笑うみたいな言葉。", now);
- assert(second.hidden && second.cells.size() == 18);
+ assert(second.hidden && second.cells.size() == 18 && second.page == first.page);
  for (const auto &c : second.cells) assert(c.y == 494);
  assert(rows.Claim(L"社会からの脱落。", now).cells.empty());
  draw(L"はい。", 468, 266, true);
@@ -337,11 +337,17 @@ static void RetainedDialogueRows() {
  assert(!rows.Claim(L"新文", now).hidden);
  draw(L"次", 494, 266, true);
  assert(!rows.Draw(1, L'へ', 286, 494, 20, 20, ++now, false));
- assert(!rows.Claim(L"次へ", now).hidden);
+ auto mixed = rows.Claim(L"次へ", now);
+ assert(!mixed.hidden && mixed.cells[0].hidden && !mixed.cells[1].hidden);
+ assert(mixed.page > first.page);
  draw(L"旧", 468, 266, true);
  draw(L"新", 468, 266, true);
  assert(rows.Claim(L"旧", now + 12001).cells.empty());
  assert(rows.Claim(L"新", now + 12001).cells.empty());
+ draw(L"別", 468, 266, true);
+ auto prior = rows.Claim(L"別", now);
+ assert(rows.Draw(2, L'新', 286, 494, 20, 20, ++now, true));
+ assert(rows.Claim(L"新", now).page > prior.page);
 }
 
 int main() {

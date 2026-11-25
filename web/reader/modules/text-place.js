@@ -524,13 +524,14 @@
     if (rubyMoved) b.measurePlacedRuby?.(sentence);
   }
   /* put a sentence's character tokens on their boxes (boxes[j] for the j-th shown token; a missing box = not drawn yet) */
-  function layout(sentence, boxes, geom, visible = boxes.length) {
+  function layout(sentence, boxes, geom, visible = boxes.length, nativeCells = null) {
     const tokens = [...sentence.querySelectorAll('.char-token')].filter(t => !t.closest('.tome-page-lines'));
     const shown = tokens.filter(t => !t.hasAttribute('data-tomoyo-leading-space') && !blank(t.textContent));
     const size = glyphSize(shown, boxes);
     for (const t of tokens) if (!shown.includes(t)) t.classList.add('megulit-unplaced');
     const place = new Map(), reported = new Map();
     shown.forEach((t, j) => {
+      t.classList.toggle('megulit-native-cell', nativeCells?.[j] === true);
       const r = boxes[j]; if (r) reported.set(t, r);
       if (!r || j >= visible) { t.classList.add('megulit-unplaced'); return; }
       t.classList.remove('megulit-unplaced'); place.set(t, r);
@@ -590,6 +591,7 @@
        before the page places its lines on their own boxes, or every row sits that far off */
     if (document.querySelector('.megulit-anchor-window')) { const p0 = page; page = null; release(false, false); page = p0; }
     const map = pageMap(), readerText = readerLine(), geom = [];
+    body.classList.toggle('megulit-native-cells', page.lines.some(l => Array.isArray(l.nativeCells)));
     let cur = null; if (readerText) for (let i = page.lines.length - 1; i >= 0; i--) if (page.lines[i].text.includes(readerText)) { cur = page.lines[i]; break; }
     if (cur && !page.retainedBitmap && anchorMode && document.body.classList.contains('megulit-inline-translation')) {
       const canvas = mapper(page.client);
@@ -627,7 +629,7 @@
       if (reveal.n < have) schedule(); else reveal.t = nowT;
       const visible = Math.floor(reveal.n);
       const boxes = cur.rects.slice(at, at + (page.engineRows ? have : visible)).map(map);
-      const revealed = layout(sentence, boxes, geom, visible);
+      const revealed = layout(sentence, boxes, geom, visible, cur.nativeCells?.slice(at));
       const row = win.querySelector('.tomoyo-cn-row');
       // Anchor and size a native row's translation from its report, including the still-unrevealed glyphs.
       const all = page.engineRows ? boxes.filter(Boolean) : [...revealed.place.values()];
@@ -647,15 +649,16 @@
         set(row, 'font-size', base + 'px');
         if (page.retainedBitmap) {
           // The bitmap keeps neighbouring rows. Give the translation a free band inside the game client.
-          const [, top, , bottom] = mapper(page.client).bounds, gap = Math.ceil(size * .25);
-          const others = page.lines.filter(l => l !== cur).flatMap(l => l.rects).map(map).filter(Boolean);
-          const height = row.offsetHeight || base * 1.25, below = y1 + gap;
-          const collision = others.some(r => r[1] < below + height && r[1] + r[3] > below);
-          const after = collision ? Math.max(...others.map(r => r[1] + r[3]), y1) + gap : below;
-          const above = Math.min(...others.map(r => r[1]), y0) - gap - height;
-          const y = only ? y0 : after + height <= bottom - size * 1.3 ? after : above;
+          const [, top, right, bottom] = mapper(page.client).bounds, gap = Math.ceil(size * .25);
+          set(row, 'width', Math.max(1, right - x0 - 8) + 'px');
+          const others = page.lines.filter(l => l !== cur).flatMap(l => l.rects).map(map).filter(Boolean).sort((a, b) => a[1] - b[1]);
+          const height = row.offsetHeight || base * 1.25, limit = bottom - size * 1.3;
+          let after = y1 + gap, above = y0 - gap - height;
+          for (const r of others) if (r[1] < after + height && r[1] + r[3] > after) after = r[1] + r[3] + gap;
+          for (const r of others.reverse()) if (r[1] < above + height && r[1] + r[3] > above) above = r[1] - gap - height;
+          const y = only ? y0 : after + height <= limit ? after :
+            above >= top ? above : after + height <= bottom ? after : Math.max(top, bottom - height);
           set(row, 'top', y + 'px');
-          set(row, 'visibility', y >= top ? '' : 'hidden');
         } else if (!only) { const info = b.galLayoutInfo?.(), dpr = devicePixelRatio || 1, limit = (Number.isFinite(info?.workBottom) && info.workBottom > 0 ? info.workBottom / dpr : innerHeight) - 8, rb = row.getBoundingClientRect();
           if (rb.height > 0 && rb.bottom > limit) set(row, 'font-size', Math.max(Math.ceil(base * .85), Math.floor(base * (limit - rb.top) / rb.height)) + 'px'); }
       }
@@ -686,7 +689,7 @@
       let node = [...win.querySelectorAll(':scope>.megulit-line-rest')].find(x => x.__megulitLine === l.id);
       if (!idx.length) { node?.remove(); return; }
       if (!node || node.__megulitKey !== key) { node?.remove(); node = plain(idx.map(i => all[i]).join('')); node.classList.add('megulit-old-line', 'megulit-line-rest'); node.__megulitKey = key; node.__megulitLine = l.id; win.append(node); }
-      keep.add(node); layout(node, idx.map(i => map(l.rects[i])), geom);
+      keep.add(node); layout(node, idx.map(i => map(l.rects[i])), geom, undefined, idx.map(i => l.nativeCells?.[i]));
     };
     if (cur) rest(cur, [...cur.text.slice(0, cur.text.indexOf(readerText))].length, [...readerText].length);
     const ids = new Set(page.lines.map(l => l.id));
@@ -705,7 +708,8 @@
         win.append(node);
       }
       keep.add(node);
-      layout(node, l.rects.slice(node.__megulitAt, node.__megulitAt + [...node.__megulitText].length).map(map), geom);
+      const start = node.__megulitAt, end = start + [...node.__megulitText].length;
+      layout(node, l.rects.slice(start, end).map(map), geom, undefined, l.nativeCells?.slice(start, end));
       rest(l, node.__megulitAt, [...node.__megulitText].length);
     }
     dropOld(win, keep);
@@ -803,12 +807,12 @@
     const reader = cleared ? readerLine() : null;
     const hideTranslation = !!cleared && (!reader || reader === goneText || reader === page.retiredReader);
     document.body.classList.toggle('megulit-cleared-translation', hideTranslation);
-    if (b.textPlaceUsesDialogueArea()) {
+    if (!page?.retainedBitmap && b.textPlaceUsesDialogueArea()) {
       const win = target(), text = readerLine(), sentence = win?.querySelector('.sentence-text:not(.megulit-old-line)');
       if (sentence && text && placeBand(win, sentence, dialogueArea(), text)) return;
     }
     clearBand();
-    if (page) { document.body.classList.remove('megulit-native-cells'); return applyPage(); }
+    if (page) return applyPage();
     if (!on || !line) { document.body.classList.remove('megulit-place-garbled'); release(); gameDrawn(); return; }
     if (line.nativeCells && readerLine() !== line.text.replace(/\s/g, '')) { release(); return; }
     if (line.cleared) {
