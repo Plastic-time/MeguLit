@@ -1,0 +1,16 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "8b09e6b23e0eeaecccf6a584cb94720d239c00f177ed02036ab8845120d99197",
+ "layer": "version",
+ "source": "official",
+ "settings": {},
+ "exe": "cmvs32.exe",
+ "engine": "cmvs",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "8b09e6b23e0eeaecccf6a584cb94720d239c00f177ed02036ab8845120d99197"
+ },
+ "rev": 1
+}
