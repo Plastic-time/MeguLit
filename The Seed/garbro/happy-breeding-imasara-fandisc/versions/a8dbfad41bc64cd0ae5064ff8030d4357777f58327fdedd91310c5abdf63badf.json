@@ -1,0 +1,16 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "a8dbfad41bc64cd0ae5064ff8030d4357777f58327fdedd91310c5abdf63badf",
+ "layer": "version",
+ "source": "official",
+ "settings": {},
+ "exe": "hfd.exe",
+ "engine": "garbro",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "a8dbfad41bc64cd0ae5064ff8030d4357777f58327fdedd91310c5abdf63badf"
+ },
+ "rev": 1
+}

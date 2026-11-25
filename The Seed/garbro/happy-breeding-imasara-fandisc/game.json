@@ -1,0 +1,93 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "643efbeb45b62c0b5c3acca9b31e763a276fca71b481930eb124ca3b04a6ff42",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false,
+   "orphanDraw": true
+  },
+  "page": {
+   "reportClear": false,
+   "engineRows": false,
+   "filterHookRedraws": false,
+   "hookAnnotationPatterns": [],
+   "pairByDrawn": false,
+   "keepHeld": false
+  },
+  "choice": {
+   "pageFrames": [],
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "effectJudge": false
+  },
+  "cardinal": {
+   "rev": 8,
+   "lines": 60,
+   "maxGapMs": 1500,
+   "sampleMs": 90,
+   "minIntervalMin": 30,
+   "maxLagMs": 80,
+   "weights": {
+    "row": 3,
+    "stable": 1,
+    "clean": 2,
+    "clear": 1,
+    "choice": 1,
+    "pair": 1,
+    "leak": 2
+   },
+   "thresholds": {
+    "settleMs": 300,
+    "shownRate": 0.9,
+    "stablePx": 0,
+    "cnOverlapPx": 2,
+    "lineMs": 700,
+    "burstMs": 300,
+    "calibGapMs": 1000,
+    "calibWatchMs": 2500,
+    "choiceMs": 3000,
+    "staleChars": 4,
+    "preflightMs": 1500
+   }
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  }
+ },
+ "exe": "",
+ "engine": "garbro",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "26485022318011356957d7cfcb7b29ba36613ac83d633acb14ca019645b139d8",
+  "title": "080370aca7fc8f9a4991bbfbc75e1d0a5553b8b1294f173f1508ab2291ca836c",
+  "vndb": "v982"
+ },
+ "rev": 1,
+ "seedFormat": 1,
+ "status": "skeleton",
+ "slug": "happy-breeding-imasara-fandisc",
+ "builds": [
+  "a8dbfad41bc64cd0ae5064ff8030d4357777f58327fdedd91310c5abdf63badf"
+ ],
+ "sourceLangs": [
+  "ja"
+ ]
+}
