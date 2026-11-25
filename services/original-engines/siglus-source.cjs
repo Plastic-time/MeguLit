@@ -83,11 +83,13 @@ function stripLineComment(raw){
  }
  return raw;
 }
-function stripQuoted(s){
+function stripQuoted(s,spans){
  let out='',inQ=false;
  for(let i=0;i<s.length;i++){
   const c=s[i];
   if(inQ){if(c==='\\'&&i+1<s.length){out+='  ';i++;continue;}if(c==='"')inQ=false;out+=' ';continue;}
+  const end=spans?.get(i);
+  if(end!==undefined){out+=' '.repeat(end-i+1);i=end;continue;}
   if(c==='"'){inQ=true;out+=' ';continue;}
   out+=c;
  }
@@ -239,7 +241,7 @@ function messageSlots(list){
   const text=decode(raw).replace(/\/\*[\s\S]*?\*\//g,'');
   for(const line of text.split(/\r?\n/)){
    const code=line.split(/;|\/\//,1)[0];
-   const syntax=stripQuoted(code);
+   const syntax=stripQuoted(code,quoteSpans(code));
    for(const match of code.matchAll(/@mes(_sel|_par[0-3])?\s*\(\s*(\d+)\s*,[^,]*,\s*([^()\r\n]*?)\)/gi)){
     if(syntax[match.index]!=='@')continue;
     const id=Number(match[2]),role=match[1]?.toLowerCase()==='_sel'?'c':'b';

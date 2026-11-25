@@ -112,9 +112,41 @@ test('other language targets still restore when a mirrored Japanese column wins 
  assert.deepEqual(readCells(f.file),[[body,body,body,body,20],[choice,choice,choice,choice,24]]);
 });
 
-test('a quoted script example is not evidence that its serial is displayed',t=>{
- const line='これはサンプルです。';
- const f=fixture(t,true,['@mes(81, ,"用例は @mes(71, ,'+line+') と書きます。")','@mes(72, ,知りません。)']);
+test('a disagreement between Japanese columns preserves the declared source and unverified translation',t=>{
+ const f=fixture(t,true,['@mes(41, ,帰宅。)','@mes(42, ,別人。)']);
+ const file=path.join(f.dat,'text01.dbs');
+ const rows=[['おかえり。','帰宅。','回家了。','Welcome home.',41],['またね。','明日。','明天见。','See you.',42]];
+ fs.writeFileSync(file,dbs(rows,[3,0,2,1,500]));
+ jr.apply(f.dir);
+ assert.deepEqual(readCells(file),[
+  ['おかえり。','帰宅。','帰宅。','おかえり。',41],
+  ['またね。','明日。','明天见。','またね。',42],
+ ]);
+});
+
+const japaneseQuote='「記号は " です。」',followingLine='また会いましょう。';
+test('same-line dialogue following a Japanese-quoted double quote still restores',t=>{
+ const f=fixture(t,false,['@mes(10, ,'+japaneseQuote+')@mes(42, ,'+followingLine+')']);
+ fs.unlinkSync(path.join(f.dat,'config.dbs'));
+ fs.writeFileSync(f.file,dbs([[followingLine,'明天再见。',42]],[0,2,500]));
+ assert.equal(jr.detect(f.dir).state,'restorable');
+ assert.equal(jr.apply(f.dir).cells,1);
+ assert.deepEqual(readCells(f.file),[[followingLine,followingLine,42]]);
+});
+
+test('same-line choices following a Japanese-quoted double quote are still found',t=>{
+ const f=fixture(t,true,['@mes_sel(19, ,'+japaneseQuote+'), @mes_sel(42, ,'+followingLine+')']);
+ fs.writeFileSync(path.join(f.dat,'text01.dbs'),dbs([
+  [japaneseQuote,japaneseQuote,19],[followingLine,'明天再见。',42],['知らないよ。','知らないよ。',43],
+ ],[0,2,500]));
+ const {choice,choiceTotal}=jr.detect(f.dir).chinese;
+ assert.deepEqual([choice,choiceTotal],[2,3]);
+});
+
+test('quoted script examples are not evidence that a serial is displayed',t=>{
+ const line='これはサンプルです。',example='@mes(71, ,'+line+')';
+ const f=fixture(t,true,['@mes(81, ,"用例は '+example+' と書きます。")',
+  '@mes(82, ,「用例は '+example+' と書きます。」)','@mes(72, ,知りません。)']);
  const file=path.join(f.dat,'text07.dbs');
  const original=dbs([[line,'这是样例。',71],['知りません。','知りません。',72]],[0,2,500]);
  fs.writeFileSync(file,original);
@@ -127,6 +159,7 @@ test('ambiguous language column IDs cannot authorize copying a story cell',t=>{
  const file=path.join(f.dat,'text01.dbs');
  const original=dbs([['もう帰ろう。','回家吧。','走吧。',41],['知りません。','知りません。','知りません。',42]],[0,2,2,500]);
  fs.writeFileSync(file,original);
+ assert.deepEqual(jr.detect(f.dir).targetColumns,[1,2]);
  jr.apply(f.dir);
  assert.deepEqual(fs.readFileSync(file),original);
 });
