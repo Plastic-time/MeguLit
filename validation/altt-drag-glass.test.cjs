@@ -26,9 +26,12 @@ test('Fata keeps the latest sentence in the dialogue box during calibration drag
  try{
   server=await serve();cdp=await startEdge(path.join(temp,'edge'));
   await cdp.send('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
-  await cdp.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/reader/index.html`});
-  let ready=false;for(let i=0;i<100&&!ready;i++){await sleep(100);ready=await cdp.evaluate('!!window.__TOME_READER_READY__').catch(()=>false);}
-  assert.ok(ready);
+  const url=`http://127.0.0.1:${server.address().port}/reader/index.html`;
+  const navigation=await cdp.send('Page.navigate',{url});
+  assert.ok(!navigation.errorText,`Reader navigation failed (${navigation.errorText})`);
+  const ready=await waitFor(cdp,`location.href === ${JSON.stringify(url)} &&
+   (window.__TOME_READER_READY__ === true || document.querySelector('#reader-status')?.textContent)`,20000);
+  assert.equal(ready,true,ready ? `Reader bootstrap failed (${ready})` : 'Reader bootstrap did not finish');
   await cdp.evaluate(`(()=>{const b=__tomoyoChinese;window.__tomoyoMode.set('translation');
    const diff=${JSON.stringify(JSON.parse(fs.readFileSync(path.join(ROOT,'The Seed','kirikiri','fata-morgana','game.json'))).settings)};
    window.MeguLitProfile={get:(key,fallback)=>{let v=diff;for(const k of key.split('.'))v=v?.[k];return v??fallback;}};
@@ -36,30 +39,36 @@ test('Fata keeps the latest sentence in the dialogue box during calibration drag
    b.galLayout({clientX:80,clientY:80,clientWidth:800,clientHeight:600,readerX:290,readerY:530,readerWidth:720,readerHeight:130,surfaceWidth:1280,surfaceHeight:800});
    b.restoreGalSettings({display:'bilingual',furigana:false});
    const win=document.createElement('div');win.className='sentence-window tomoyo-hook-reader';win.innerHTML='<div class="sentence-text" data-sequence="1" data-megulit-native-breaks>'+[...${JSON.stringify('だって、わたくし、この時を待ちわびていたのですから……。\n'.repeat(2))}].map(c=>'<span class="char-token">'+c+'</span>').join('')+'</div><div class="tomoyo-cn-row"><span class="tomoyo-cn-output" data-state="ready">'+'我一直在等这一刻的到来。'.repeat(7)+'</span></div>';document.body.append(win);
-   b.textPlaceMode({on:true,game:'fata'});b.textPlacePage({engineRows:true,awake:true,armed:true,client:[800,600],lines:[{id:1,text:'前の台詞',rects:[[720,490,20,24]]}]});
-   b.toggleGalMenu();document.querySelector('[data-gal-drag]').click();})()`);
-  await sleep(300);
+   b.textPlaceMode({on:true,game:'fata'});b.textPlacePage({engineRows:true,awake:true,armed:true,client:[800,600],lines:[{id:1,text:'前の台詞',rects:[[720,490,20,24]]}]});})()`);
+  // The mode cover hides the guide from the region reporter even while its DOM rectangle exists.
+  assert.ok(await waitFor(cdp,`document.documentElement.matches('.tomoyo-ui-translation:not(.tome-mode-cover,.tome-mode-in-translation)')`),
+   'reader finished switching to translation mode');
+  await cdp.evaluate(`__tomoyoChinese.toggleGalMenu();document.querySelector('[data-gal-drag]').click()`);
   const get=()=>cdp.evaluate(`(()=>{const win=document.querySelector('.megulit-dialogue-band'),guide=document.querySelector('.tome-subtitle-drag-guide');
    const sentence=win.querySelector('.sentence-text');
    const first=sentence.querySelector('.char-token').getBoundingClientRect();
    const tokens=[...sentence.querySelectorAll('.char-token')].filter(n=>n.textContent.trim()).map(n=>n.getBoundingClientRect());
-   const r=guide.getBoundingClientRect(),cn=win.querySelector('.tomoyo-cn-output');
+   const r=guide.getBoundingClientRect(),box=win.getBoundingClientRect(),cn=win.querySelector('.tomoyo-cn-output');
+   const regions=__sent.findLast(m=>m.type==='galHitRegions')?.regions.filter(g=>g.menu)||[];
    return {x:first.left,y:first.top,rows:new Set(tokens.map(p=>Math.round(p.top))).size,
-    textRight:Math.max(...tokens.map(p=>p.right)),right:win.getBoundingClientRect().right,cnMax:Math.max(...[...cn.getClientRects()].map(p=>p.right)),
-    guide:[r.left,r.top,r.width,r.height],
-    region:__sent.findLast(m=>m.type==='galHitRegions')?.regions.some(g=>g.menu&&g.x<=r.left&&g.y<=r.top&&g.x+g.width>=r.right&&g.y+g.height>=r.bottom)};})()`);
+    textRight:Math.max(...tokens.map(p=>p.right)),right:box.right,cnMax:Math.max(...[...cn.getClientRects()].map(p=>p.right)),
+    guide:[r.left,r.top,r.width,r.height],dialogue:[box.left,box.top,box.right,box.bottom],
+    menuRegions:regions.map(g=>[g.x,g.y,g.x+g.width,g.y+g.height]),
+    region:regions.some(g=>g.x<=r.left&&g.y<=r.top&&g.x+g.width>=r.right&&g.y+g.height>=r.bottom)};})()`);
+  await nextFrame(cdp);
   const before=await get();assert.ok(before.x>=148&&before.x<=155&&before.textRight<=before.right+1&&before.right<880,JSON.stringify(before));
   assert.ok(before.cnMax<=before.right+1&&before.rows>=2,JSON.stringify(before));
-  assert.equal(before.region,true,'native region covers all four sides');
+  assert.equal(before.region,true,`native region covers all four sides ${JSON.stringify(before)}`);
   const [l,t,w,h]=before.guide,x=l+Math.min(w/2,18),y=t+Math.min(h/2,15);
   const mouse=(type,x,y,buttons)=>cdp.send('Input.dispatchMouseEvent',{type,x,y,button:type==='mouseMoved'?'none':'left',buttons,clickCount:1});
   await mouse('mouseMoved',x,y,0);await mouse('mousePressed',x,y,1);
   assert.ok(await cdp.evaluate("__sent.findLast(m=>m.type==='galHitRegions')?.regions.some(g=>g.width===1280&&g.height===800)"),'keep the Windows paint region open while the border is moving');
   await mouse('mouseMoved',x-30,y-35,1);await mouse('mouseReleased',x-30,y-35,0);
-  await sleep(180);
+  // Let the drag preview and the guide repaint run before comparing the released geometry.
+  await nextFrame(cdp);
   const after=await get();assert.ok(Math.abs(after.guide[0]-before.guide[0]+30)<2&&Math.abs(after.guide[1]-before.guide[1]+35)<2,JSON.stringify({before,after}));
   assert.ok(Math.abs(after.guide[2]-before.guide[2])<=1,'dragging translates the whole box at its current width');
-  assert.equal(after.region,true);
+  assert.equal(after.region,true,`native region covers all four sides after release ${JSON.stringify(after)}`);
   await cdp.evaluate('document.querySelector("[data-gal-drag]").click()');await sleep(100);
   assert.equal(await cdp.evaluate('!!document.querySelector(".tome-subtitle-drag-guide")'),false);
   await cdp.evaluate(`(()=>{const b=__tomoyoChinese;b.restoreGalSettings({anchorDX:0,anchorDY:0});
