@@ -27,7 +27,7 @@ test('DLL never writes game data: dropped quads are draws not made, buffers are 
  assert.match(c,/D3DCREATE_MULTITHREADED : 0/,'multithreaded device classes covered');
  assert.match(c,/SafeCopy\(&s\.data\[p\.off\], p\.ptr, size\)/,'vertex / index data copied into a shadow at Unlock');
  assert.doesNotMatch(c,/memcpy\(p\.ptr|WriteProcessMemory|VirtualProtect/,'nothing written into game buffers or code tables');
- assert.match(c,/CloseHandle\(p\);\s+\{ Guard g; Learner\.Off\(\); Trace\.Off\(\);[\s\S]*?KurokinSetMode\(0\);/,'HookBridge gone: disarm the generic and retained-bitmap paths');
+ assert.match(c,/CloseHandle\(p\);\s+\{ Guard g; Learner\.Off\(\); Trace\.Off\(\);[\s\S]*?LittlecheeseSetMode\(0\);/,'HookBridge gone: disarm the generic and retained-bitmap paths');
  assert.match(c,/MeguLitGpu version=1/,'version marker');
  assert.match(c,/ib == Buffers\.end\(\) && v\.vbStride && pt == D3DPT_TRIANGLELIST && prims == 2 && nv == 4/,'a 4-vertex quad is decoded without its index buffer (static buffer filled before injection: Danganronpa)');
  assert.match(c,/Hook<94>\(vt\[94\], HSetVSConstF\)/,'vertex-shader constants shadowed for diagnostics (pure devices cannot read them back)');

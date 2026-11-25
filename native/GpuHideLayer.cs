@@ -64,7 +64,7 @@ public static partial class HookBridge {
    if(mode!=0)GlyphFontOff();
    lock(GpuGate){
     if(GpuCtlPipe==null||mode==GpuLittlecheeseMode)return;
-    GpuSend("KUROKIN "+mode);
+    GpuSend("LCGDI "+mode);
     if(GpuCtlPipe!=null)GpuLittlecheeseMode=mode;
    }
   }

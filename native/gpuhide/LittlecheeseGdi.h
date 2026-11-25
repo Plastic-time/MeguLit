@@ -4,28 +4,28 @@
 // cannot hide the pixels already present in that bitmap.
 #include "LittlecheeseRows.h"
 #ifdef _M_IX86
-static constexpr uintptr_t KurokinDialogueReturn = 0x31221;
-static constexpr int KurokinW = 800, KurokinH = 600;
-static void *KurokinDrawOriginal, *KurokinAdvance;
-static const unsigned char *KurokinBase;
-static Littlecheese::Rows KurokinRows;
-static int KurokinMode = 0; // 0: other stream, 1: read only, 2: replace dialogue pixels
-static unsigned KurokinSequence;
+static constexpr uintptr_t LittlecheeseDialogueReturn = 0x31221;
+static constexpr int LittlecheeseW = 800, LittlecheeseH = 600;
+static void *LittlecheeseDrawOriginal, *LittlecheeseAdvance;
+static const unsigned char *LittlecheeseBase;
+static Littlecheese::Rows LittlecheeseRows;
+static int LittlecheeseMode = 0; // 0: other stream, 1: read only, 2: replace dialogue pixels
+static unsigned LittlecheeseSequence;
 
-static bool __stdcall KurokinChar(unsigned glyph, int x, int y, int w, int h, uintptr_t via, uintptr_t layout) {
- if (via != (uintptr_t)KurokinBase + KurokinDialogueReturn ||
-     x < 0 || y < 0 || w < 1 || h < 1 || w > 96 || h > 96 || x > KurokinW - w || y > KurokinH - h) return false;
+static bool __stdcall LittlecheeseChar(unsigned glyph, int x, int y, int w, int h, uintptr_t via, uintptr_t layout) {
+ if (via != (uintptr_t)LittlecheeseBase + LittlecheeseDialogueReturn ||
+     x < 0 || y < 0 || w < 1 || h < 1 || w > 96 || h > 96 || x > LittlecheeseW - w || y > LittlecheeseH - h) return false;
  char bytes[] = {(char)(glyph >> 8), (char)glyph};
  wchar_t ch;
  if (MultiByteToWideChar(932, MB_ERR_INVALID_CHARS, bytes + (glyph < 256), glyph < 256 ? 1 : 2, &ch, 1) != 1 ||
      ch <= L' ' || ch == 0x3000 || ch == 0x7f) return false;
  Guard g;
- return KurokinRows.Draw(layout, ch, x, y, w, h, GetTickCount(), KurokinMode == 2 && !Learner.readOnly);
+ return LittlecheeseRows.Draw(layout, ch, x, y, w, h, GetTickCount(), LittlecheeseMode == 2 && !Learner.readOnly);
 }
 
 // After the glyph metrics lookup (Ruf's text hook), before shadow and fill.
 // The game's own continuation still advances the cursor and returns its width.
-static __declspec(naked) void KurokinDraw() {
+static __declspec(naked) void LittlecheeseDraw() {
  __asm {
   pushfd
   pushad
@@ -38,20 +38,20 @@ static __declspec(naked) void KurokinDraw() {
   push dword ptr [eax + 8]
   movzx ecx, word ptr [eax]
   push ecx
-  call KurokinChar
+  call LittlecheeseChar
   test al, al
   jnz hidden
   popad
   popfd
-  jmp dword ptr [KurokinDrawOriginal]
+  jmp dword ptr [LittlecheeseDrawOriginal]
  hidden:
   popad
   popfd
-  jmp dword ptr [KurokinAdvance]
+  jmp dword ptr [LittlecheeseAdvance]
  }
 }
 
-static bool InstallKurokinDraw() {
+static bool InstallLittlecheeseDraw() {
  const auto base = reinterpret_cast<unsigned char *>(GetModuleHandleW(nullptr));
  if (!base) return false;
  auto dos = reinterpret_cast<const IMAGE_DOS_HEADER *>(base);
@@ -66,21 +66,21 @@ static bool InstallKurokinDraw() {
  auto target = base + 0x1db43;
  if (memcmp(base + 0x1da43, locals, sizeof locals) || memcmp(target, blend, sizeof blend) ||
      memcmp(base + 0x1dd64, advance, sizeof advance) ||
-     memcmp(base + KurokinDialogueReturn - 5, caller, sizeof caller)) return false;
- KurokinBase = base;
- KurokinAdvance = base + 0x1dd64;
- if (MH_CreateHook(target, (void *)&KurokinDraw, &KurokinDrawOriginal) != MH_OK) return false;
+     memcmp(base + LittlecheeseDialogueReturn - 5, caller, sizeof caller)) return false;
+ LittlecheeseBase = base;
+ LittlecheeseAdvance = base + 0x1dd64;
+ if (MH_CreateHook(target, (void *)&LittlecheeseDraw, &LittlecheeseDrawOriginal) != MH_OK) return false;
  if (MH_QueueEnableHook(target) == MH_OK) return true;
  return false;
 }
 
-static bool KurokinLine(const std::wstring &line, unsigned now) {
- if (!KurokinMode) return false;
+static bool LittlecheeseLine(const std::wstring &line, unsigned now) {
+ if (!LittlecheeseMode) return false;
  std::wstring key;
  for (wchar_t ch : line) if (ch != L' ' && ch != 0x3000 && ch != L'\t') key += ch;
- auto matched = KurokinRows.Claim(key, now);
+ auto matched = LittlecheeseRows.Claim(key, now);
  if (matched.cells.empty()) return true;
- const unsigned seq = ++KurokinSequence;
+ const unsigned seq = ++LittlecheeseSequence;
  std::string rects, painted;
  bool anyHidden = false;
  for (const auto &c : matched.cells) {
@@ -94,10 +94,10 @@ static bool KurokinLine(const std::wstring &line, unsigned now) {
       " bitmap=" + std::to_string(matched.page) + (anyHidden && !matched.hidden ? " painted=" + painted : "") + " text=" + Utf8(key));
  return true;
 }
-static void KurokinSetMode(int mode) {
- if (!KurokinDrawOriginal) return;
- KurokinMode = mode;
- if (mode == 0) KurokinRows.Clear();
+static void LittlecheeseSetMode(int mode) {
+ if (!LittlecheeseDrawOriginal) return;
+ LittlecheeseMode = mode;
+ if (mode == 0) LittlecheeseRows.Clear();
  Learner.Off();
  Trace.Off();
 }
