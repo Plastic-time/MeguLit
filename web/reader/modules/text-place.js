@@ -31,7 +31,7 @@
     'body.megulit-placed .sentence-window.megulit-place-window::before,body.megulit-placed .sentence-window.megulit-place-window::after{display:none!important}',
     'body.megulit-placed .tome-box-deco,body.megulit-placed .sentence-window:not(.megulit-place-window){display:none!important}',
     'body.megulit-placed .megulit-place-window .sentence-text{position:absolute!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;margin:0!important;padding:0!important;transform:none!important;overflow:visible!important}',
-    'body.megulit-native-cells .megulit-place-window .char-token.megulit-native-cell{opacity:0!important}',
+    'body.megulit-native-cells .megulit-place-window .char-token.megulit-native-cell,body.megulit-placed .megulit-place-window .sentence-text.megulit-native-sentence{opacity:0!important}',
     'body.megulit-placed .megulit-place-window .tome-page-lines{display:none!important}',
     /* 2026-11-21 (ファタ two-row page: every placed row 11 px under its box): the reader's line-height margin (gal.js, a more specific
        selector) moved the full-window sentence off the surface's top; a placed page's sentence sits exactly at 0,0 */
@@ -256,6 +256,7 @@
     document.body.classList.toggle('megulit-place-fallback', fallback === true);
     for (const w of document.querySelectorAll('.megulit-place-window')) {
       w.classList.remove('megulit-place-window');
+      w.querySelector('.megulit-native-sentence')?.classList.remove('megulit-native-sentence');
       for (const o of w.querySelectorAll('.tomoyo-cn-row *')) { o.style.removeProperty('font-size'); o.style.removeProperty('line-height'); }
       for (const n of w.querySelectorAll('.char-token,.megulit-ruby-base,.tomoyo-cn-row')) { n.classList.remove('megulit-unplaced'); for (const p of ['left', 'top', 'width', 'height', 'font-size', 'line-height','--megulit-cell-scale']) n.style.removeProperty(p); }
     }
@@ -617,7 +618,9 @@
     body.classList.remove('megulit-place-fallback'); body.classList.add('megulit-placed'); win.classList.add('megulit-place-window');
     for (const w of document.querySelectorAll('.megulit-place-window')) if (w !== win) w.classList.remove('megulit-place-window');
     /* the reader's line is not on the page (its places are not claimed yet, or the game shows another page): its Japanese is not drawn anywhere else */
-    const hideCur = !cur || cur.nativeCells?.every(Boolean) === true;
+    const nativeCur = cur?.nativeCells?.every(Boolean) === true;
+    sentence.classList.toggle('megulit-native-sentence', nativeCur);
+    const hideCur = !cur || nativeCur;
     if (body.classList.contains('megulit-place-game-drawn') !== hideCur) body.classList.toggle('megulit-place-game-drawn', hideCur);
     if (cur) {
       const at = [...cur.text.slice(0, cur.text.indexOf(readerText))].length, n = [...readerText].length;

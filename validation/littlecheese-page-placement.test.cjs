@@ -66,7 +66,7 @@ test('retained GDI rows leave room for the current translation inside the client
       client: [800, 600], lines: [{ id: 1, text: '今日', rects: [[266, 468, 20, 20], [286, 468, 20, 20]], nativeCells: [true, true] }] }));
     await page.waitForFunction(() => {
       const original = document.querySelector('.sentence-text:not(.megulit-old-line)');
-      return getComputedStyle(original).visibility === 'hidden' &&
+      return getComputedStyle(original).opacity === '0' &&
         document.querySelector('.tomoyo-cn-row').checkVisibility({ visibilityProperty: true });
     });
   } finally {
