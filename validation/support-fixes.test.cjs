@@ -48,20 +48,30 @@ test('cold detection finds only the executable recorded after an MSI install',t=
  const exists=file=>file===exe;
  t.mock.method(require('node:child_process'),'execFileSync',()=>'');
  const read=fs.readFileSync,lstat=fs.lstatSync,write=fs.writeFileSync;
- let saved='',info={isFile:()=>true,dev:1,ino:20,size:0,mtimeMs:10};
- t.mock.method(fs,'readFileSync',(file,...args)=>file===record?saved:read(file,...args));
+ let saved='',recordReads=0,info={isFile:()=>true,dev:1,ino:20,size:0,mtimeMs:10};
+ t.mock.method(fs,'readFileSync',(file,...args)=>{
+  if(file!==record)return read(file,...args);
+  recordReads++;
+  return saved;
+ });
  t.mock.method(fs,'writeFileSync',(file,data,...args)=>{if(file===record)saved=data;else write(file,data,...args);});
  t.mock.method(fs,'lstatSync',(file,...args)=>file===exe?info:lstat(file,...args));
  assert.equal(anki.find('',env,exists,root),'','an unrelated placeholder is ignored');
  anki.rememberInstall(root,folder);
  assert.equal(saved,'','an empty executable is never recorded');
- info={...info,size:4096};
+ info={...info,isFile:()=>false,size:4096};
+ anki.rememberInstall(root,folder);
+ assert.equal(saved,'','a non-regular executable is never recorded');
+ info={...info,isFile:()=>true};
  anki.rememberInstall(root,folder);
  assert.equal(anki.find('',env,exists,root),exe,'recorded install survives a cold lookup without its shortcut');
  const configured='U:\\Custom\\anki.exe';
  assert.equal(anki.find(configured,env,file=>file===configured||file===exe,root),configured);
  info={...info,ino:21};
  assert.equal(anki.find('',env,exists,root),'','a stale record does not bless a replacement');
+ const previousReads=recordReads;
+ assert.equal(anki.find('',{SystemDrive:'R:'},exists,root),'');
+ assert.equal(recordReads,previousReads,'system-drive discovery ignores redirected install records');
 });
 
 test('Anki only derives a target from an absolute drive-letter path',()=>{

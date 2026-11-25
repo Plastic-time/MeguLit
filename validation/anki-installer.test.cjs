@@ -95,6 +95,8 @@ for(const scenario of [
   volume={drive:drive[0].toUpperCase(),type:'Fixed',bus:'NVMe',removal:1,...scenario.profile};
   const lstat=fs.lstatSync;
   t.mock.method(fs,'lstatSync',(file,options)=>{
+   // A default install must ignore an unrelated executable in the working directory.
+   if(file==='anki.exe')return {isFile:()=>true,dev:1,ino:3,size:4096,mtimeMs:10};
    if(file===executable)return installed?{isFile:()=>true,dev:1,ino:2,size:4096,mtimeMs:10}:lstat(path.join(root,'missing-exe'),options);
    if(file!==folder)return lstat(file,options);
    checked.push(file);
