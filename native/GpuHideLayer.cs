@@ -72,7 +72,9 @@ public static partial class HookBridge {
  static bool GpuLittlecheeseLine(string text){
   if(!GpuLittlecheeseSelected())return false;
   GlyphFontOff();
-  if(!SkipHeld&&!HookTarget.ChineseText){SyncGpuLittlecheese();GpuLine(text);}
+  SyncGpuLittlecheese();
+  if(!SkipHeld&&!HookTarget.ChineseText)GpuLine(text);
+  else GpuDisarm();
   return true;
  }
  static void GpuReport(string s){
