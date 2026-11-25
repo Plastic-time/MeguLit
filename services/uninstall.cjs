@@ -2,7 +2,7 @@
 'use strict';
 /* Full uninstall (user 2026-11-12: "再加个全面清理的uninstall程序 删除的时候可以选要不要保留账户数据在本地").
    plan() lists everything MeguLit put on this PC and nothing else:
-   - the install folder (with "keep data": data\ minus caches, and secrets\, stay where they are, next to a note);
+   - the install folder (with "keep data": data\ minus caches, secrets\ and Anki\ stay where they are, next to a note);
    - what it changed in game folders, undone with the same code the app uses (patch swap back to the patch, Japanese
      restore / import backups put back, DirectPlay / .NET config files from .megulit-compat.json removed or restored);
    - its shortcuts (only .lnk files that point into this install), the Apps & features entry, registry values keyed by
@@ -24,7 +24,7 @@ const APP_ID='app.megulit';
 const KEEP_NOTE='MeguLit 保留的数据 - Kept data.txt';
 /* data\ entries that are caches (rebuilt on demand) or version stamps: removed even when data is kept */
 const DATA_CACHES=['cache','cg-cache','voice-cache','vocal-sep','diagnostics','hook-streams','update-installed.json','icon-refresh.json'];
-const KEEP_TOP=['data','secrets'];
+const KEEP_TOP=['data','secrets','anki'];
 /* temp names the app itself creates (anki-process, bluebook, CX key cache, Unity voice); megulit-* folders made by
    the test suite or release script are not the app's and stay */
 const TEMP_NAMES=/^megulit-(?:anki-|ankiconnect-|anki-hidden.txt$|cx|unity-voice)/i;
@@ -155,8 +155,9 @@ function keepNote(file,root){
  const text=['MeguLit 已卸载，这里保留了你的本地数据（账户登录、游戏库、阅读记录、生词本、设置）',
   '把新的 MeguLit 解压或安装到这个文件夹（'+root+'）就能接着用；不需要的话直接删除整个文件夹即可',
   '  data\\      游戏库与阅读记录（megulit.sqlite）、生词本、设置与账户（data\\config，含 secrets.dpapi 登录令牌）、自定义封面',
-  '  secrets\\   中继服务的本地密钥','',
-  'MeguLit was uninstalled. Your local data (account sign-in, library, reading history, vocabulary, settings) is kept here.',
+  '  secrets\\   中继服务的本地密钥',
+  '  Anki\\      Anki 程序','',
+  'MeguLit was uninstalled. Your local data (account sign-in, library, reading history, vocabulary, settings) and the Anki program folder are kept here.',
   'Install MeguLit into this folder again to continue, or delete the whole folder if you no longer need it.',''].join('\r\n');
  fs.writeFileSync(file,'\ufeff'+text);
 }

@@ -5,7 +5,7 @@
    on MeguLit's mirror first, it is the faster one in China), checks its size and SHA-256 against the release digest,
    runs it with a progress bar (msiexec /passive; Windows may ask for permission once), then installs AnkiConnect and
    starts Anki and connects. The MSI includes Anki and its runtime. One job at a time; status() reports where it is. */
-const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{execFile,spawn}=require('node:child_process');
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{spawn}=require('node:child_process');
 const ankiProcess=require('./anki-process.cjs');
 const PACKAGE={version:'26.09.4',name:'anki-26.09.4-win-x64.msi',size:201621504,sha256:'c35e7b90acf2929a71d70ac755a3dd0685f9fbe1a89d2f9edabb6fe7c0d91cba'};
 const SOURCES=['https://dl.megulit.com/files/anki/'+PACKAGE.name,'https://cn-dl.megulit.com/files/anki/'+PACKAGE.name,'https://github.com/ankitects/anki/releases/download/'+PACKAGE.version+'/'+PACKAGE.name];
@@ -14,7 +14,7 @@ let state={phase:'idle',received:0,total:PACKAGE.size,error:''},job=null;
 const status=()=>({...state,version:PACKAGE.version});
 function log(root,m){try{fs.appendFileSync(path.join(root,'logs','anki-process.log'),new Date().toISOString()+' installer '+m+'\n');}catch{}}
 async function download(root,fetcher){
- const dir=ankiProcess.installerCache(root),file=path.join(dir,PACKAGE.name);fs.mkdirSync(dir,{recursive:true});
+ const dir=path.join(root,'data','cache','anki-installer'),file=path.join(dir,PACKAGE.name);fs.mkdirSync(dir,{recursive:true});
  const ok=f=>{try{if(fs.statSync(f).size!==PACKAGE.size)return false;const h=crypto.createHash('sha256');h.update(fs.readFileSync(f));return h.digest('hex')===PACKAGE.sha256;}catch{return false;}};
  if(ok(file)){state.received=PACKAGE.size;return file;}
  /* 2026-11-19: core/fast-download.cjs measures every source at once and pulls the fast ones in parallel Range pieces;
@@ -22,47 +22,20 @@ async function download(root,fetcher){
  try{log(root,'download '+SOURCES.length+' sources');await require('./fast-download.cjs').download({urls:SOURCES,dest:file,size:PACKAGE.size,sha256:PACKAGE.sha256,fetch:fetcher,onProgress:p=>{state.received=p.received;},log:line=>log(root,line)});return file;}
  catch(e){throw Error('ANKI_DOWNLOAD_FAILED '+String((e.last&&e.last.message)||e.message||''));}
 }
-const VOLUME_INFO=`
-$ErrorActionPreference='Stop'
-$volume=Get-Volume -FilePath $env:MEGULIT_ANKI_ROOT
-$disk=Get-Partition -DriveLetter $volume.DriveLetter | Get-Disk
-$device=Get-CimInstance Win32_DiskDrive -Filter ('Index='+$disk.Number)
-$policy=Get-PnpDeviceProperty -InstanceId $device.PNPDeviceID -KeyName DEVPKEY_Device_RemovalPolicy
-@{drive=[string]$volume.DriveLetter;type=$volume.DriveType;bus=$disk.BusType;removal=$policy.Data} | ConvertTo-Json -Compress
-`;
-const FIXED_DISK_BUSES=new Set(['ATA','NVMe','RAID','SAS','SATA','SCSI','Spaces','SCM','UFS']);
-function volumeInfo(root){
- const powershell=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
- return new Promise(resolve=>{
-  execFile(powershell,['-NoProfile','-NonInteractive','-Command',VOLUME_INFO],{
-   windowsHide:true,timeout:10000,env:{...process.env,MEGULIT_ANKI_ROOT:path.win32.normalize(root)},
-  },(error,out)=>{
-   if (error) return resolve(null);
-   try{resolve(JSON.parse(out));}catch{resolve(null);}
-  });
- });
-}
-
-async function installFolder(root){
- const folder=ankiProcess.driveInstallFolder(root);
- if (!folder) return '';
- const volume=await volumeInfo(root);
- // A USB disk can be reported as Fixed. Removal policy 1 means Windows expects the device to stay attached.
- if (!volume || volume.drive!==folder[0].toUpperCase() || volume.type!=='Fixed') return '';
- if (!FIXED_DISK_BUSES.has(volume.bus) || volume.removal!==1) return '';
+function installFolder(root){
+ const folder=ankiProcess.ankiFolder(root);
  try{
   const entry=fs.lstatSync(folder,{throwIfNoEntry:false});
-  if (!entry || entry.isDirectory()) return folder;
+  if (!entry || (entry.isDirectory() && fs.readdirSync(folder).length===0)) return folder;
  }catch{}
- // A junction or an unreadable target cannot be handed to Windows Installer.
+ // Existing files and directory links may belong to a manually managed Anki.
  throw Error('ANKI_INSTALL_TARGET_FAILED '+folder);
 }
 
 /* msiexec with its own progress bar; 0 and 3010 (restart later) are success, 1602 is "cancelled" (the permission prompt) */
 async function runInstaller(root,file){
- const args=['/i',file,'/passive','/norestart'];
- const folder=await installFolder(root);
- if (folder) args.push('INSTALLFOLDER='+folder);
+ const folder=installFolder(root);
+ const args=['/i',file,'/passive','/norestart','INSTALLFOLDER='+folder];
  await new Promise((resolve,reject)=>{
   const child=spawn(path.join(process.env.SystemRoot||'C:\\Windows','System32','msiexec.exe'),args,{windowsHide:false,stdio:'ignore'});
   child.on('error',reject);
@@ -70,13 +43,9 @@ async function runInstaller(root,file){
    log(root,'msiexec exit '+code);
    if (code===0||code===3010) return resolve();
    if (code===1602||code===1223) return reject(Error('ANKI_INSTALL_CANCELLED'));
-   reject(Error(folder?'ANKI_INSTALL_TARGET_FAILED '+folder+' ('+code+')':'ANKI_INSTALL_FAILED '+code));
+   reject(Error('ANKI_INSTALL_TARGET_FAILED '+folder+' ('+code+')'));
   });
  });
- if (folder) {
-  try{ankiProcess.rememberInstall(root,folder);}
-  catch(error){log(root,'could not record Anki installation '+error.message);}
- }
 }
 /* start(root,{runtime,fetcher}) begins (or joins) the job: download, install, AnkiConnect, start and connect */
 function start(root,{runtime=null,fetcher=fetch,install=runInstaller,china=inChina(),
@@ -92,7 +61,7 @@ function start(root,{runtime=null,fetcher=fetch,install=runInstaller,china=inChi
    if(china){process.env.UV_DEFAULT_INDEX??='https://pypi.tuna.tsinghua.edu.cn/simple';process.env.UV_INDEX_URL??='https://pypi.tuna.tsinghua.edu.cn/simple';}
    if(runtime?.ankiProcess)await runtime.ankiProcess().start({hide:false});
    state.phase='done';log(root,'done');
-  }catch(e){state.phase='error';state.error=String(e.message||e).slice(0,120);log(root,'error '+state.error);}finally{job=null;}})();
+  }catch(e){state.phase='error';const message=String(e.message||e);state.error=message.startsWith('ANKI_INSTALL_TARGET_FAILED ')?message:message.slice(0,120);log(root,'error '+state.error);}finally{job=null;}})();
  return status();
 }
 module.exports={start,status,PACKAGE,SOURCES};

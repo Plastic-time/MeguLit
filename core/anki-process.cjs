@@ -6,23 +6,7 @@
 const fs=require('node:fs'),path=require('node:path'),{spawn,execFile}=require('node:child_process');
 const {Anki}=require('./anki.cjs');
 
-function driveInstallFolder(root,env=process.env){
- const drive=path.win32.parse(root).root.replace(/^\\\\\?\\/,'');
- if(!/^[a-z]:[\\/]$/i.test(drive))return '';
- const systemDrive=env.SystemDrive||'C:';
- return drive.slice(0,2).toUpperCase()===systemDrive.toUpperCase()?'':path.win32.join(drive,'Anki');
-}
-const installerCache=root=>path.join(root,'data','cache','anki-installer');
-const installRecord=root=>path.join(installerCache(root),'installed-file.json');
-function installStamp(exe){
- const file=fs.lstatSync(exe);
- if (!file.isFile() || !file.size) return '';
- return JSON.stringify([exe.toLowerCase(),file.dev,file.ino,file.size,file.mtimeMs]);
-}
-function rememberInstall(root,folder){
- const stamp=installStamp(path.win32.join(folder,'anki.exe'));
- if (stamp) fs.writeFileSync(installRecord(root),stamp,'utf8');
-}
+const ankiFolder=root=>path.join(root,'Anki');
 function candidates(configured,env=process.env){
  const roots=[env.LOCALAPPDATA&&path.join(env.LOCALAPPDATA,'Programs'),env.ProgramFiles,env['ProgramFiles(x86)'],env.ProgramW6432].filter(Boolean);
  // Anki 25.x installs the program itself under %LOCALAPPDATA%\AnkiProgramFiles\.venv (ankiw.exe has no console).
@@ -46,41 +30,42 @@ function shortcutTarget(file){
 }
 // Cold detection (user: Anki installed outside C: was never found): when no default location has Anki, read where
 // Windows says it was installed (uninstall entries and App Paths, per user and per machine), then the Start menu
-// shortcut the installer made, then other drives' usual folders. The official MSI leaves InstallLocation and
-// DisplayIcon empty, so a custom install folder is only on record in that shortcut. Read-only; a hit is remembered.
+// shortcut the installer made, then other drives' usual folders. Finally look in the current MeguLit folder.
+// Anki's MSI may leave InstallLocation empty, and a copied Anki will have neither a registry entry nor a shortcut.
 let coldHit;
-function coldCandidates(env=process.env){
+function coldCandidates(env=process.env,root=''){
  const B=String.fromCharCode(92);
  const out=[],reg=path.join(env.WINDIR||['C:','Windows'].join(B),'System32','reg.exe');
  const query=key=>{try{return require('node:child_process').execFileSync(reg,['query',key,'/s'],{encoding:'utf8',windowsHide:true,timeout:4000,maxBuffer:8<<20,stdio:['ignore','pipe','ignore']});}catch{return '';}};
- for(const root of [['HKCU','SOFTWARE'].join(B),['HKLM','SOFTWARE'].join(B),['HKLM','SOFTWARE','WOW6432Node'].join(B)]){
-  for(const block of query(root+['','Microsoft','Windows','CurrentVersion','Uninstall'].join(B)).split(/\r?\n\r?\n/)){
+ for(const key of [['HKCU','SOFTWARE'].join(B),['HKLM','SOFTWARE'].join(B),['HKLM','SOFTWARE','WOW6432Node'].join(B)]){
+  for(const block of query(key+['','Microsoft','Windows','CurrentVersion','Uninstall'].join(B)).split(/\r?\n\r?\n/)){
    if(!/DisplayName\s+REG_SZ\s+Anki\b/i.test(block))continue;
    // The official MSI leaves InstallLocation empty and its UninstallString is "MsiExec.exe /X{...}": an empty value
    // must not take the next line, and only absolute folders are used.
    for(const m of block.matchAll(/(InstallLocation|DisplayIcon|UninstallString)[ \t]+REG_(?:EXPAND_)?SZ[ \t]+(\S[^\r\n]*)/gi)){let v=m[2].trim().replace(/,\d+$/,'').replace(/"/g,'');if(/^msiexec/i.test(path.basename(v.split(/\s+\//)[0])))continue;if(/\.exe$/i.test(v))v=path.dirname(v);if(path.isAbsolute(v))out.push(path.join(v,'anki.exe'),path.join(v,'ankiw.exe'));}
   }
-  const app=query(root+['','Microsoft','Windows','CurrentVersion','App Paths','anki.exe'].join(B)).match(/\(Default\)\s+REG_SZ\s+(.+)/i);if(app)out.push(app[1].trim().replace(/"/g,''));
+  const app=query(key+['','Microsoft','Windows','CurrentVersion','App Paths','anki.exe'].join(B)).match(/\(Default\)\s+REG_SZ\s+(.+)/i);if(app)out.push(app[1].trim().replace(/"/g,''));
  }
  for(const menu of [env.APPDATA&&path.join(env.APPDATA,'Microsoft','Windows','Start Menu','Programs'),env.ProgramData&&path.join(env.ProgramData,'Microsoft','Windows','Start Menu','Programs')].filter(Boolean)){
   for(const link of [path.join(menu,'Anki','Anki.lnk'),path.join(menu,'Anki.lnk')]){const target=shortcutTarget(link);if(/\.exe$/i.test(target))out.push(target);}
  }
  for(const drive of 'CDEFGH')out.push(drive+[':','Anki','anki.exe'].join(B),drive+[':','Program Files','Anki','anki.exe'].join(B),drive+[':','Apps','Anki','anki.exe'].join(B));
  if(env.USERPROFILE)out.push(path.join(env.USERPROFILE,'scoop','apps','anki','current','anki.exe'));
+ if(root){
+  const folder=ankiFolder(root);
+  out.push(path.join(folder,'anki.exe'),path.join(folder,'ankiw.exe'));
+ }
  return out;
 }
 function find(configured,env=process.env,exists=file=>{try{return fs.statSync(file).isFile();}catch{return false;}},root=''){
  for(const file of candidates(configured,env))if(exists(file))return file;
  if(coldHit&&exists(coldHit))return coldHit;
- for(const file of coldCandidates(env))if(exists(file))return coldHit=file;
- const folder=driveInstallFolder(root,env);
- if (!folder) return '';
- // Keep the existing discovery order. A previously installed file can outlast its Windows shortcut.
- try{
-  const stamp=fs.readFileSync(installRecord(root),'utf8');
-  const exe=path.win32.join(folder,'anki.exe');
-  if (stamp && stamp===installStamp(exe)) return exe;
- }catch{}
+ const local=root?ankiFolder(root).toLowerCase():'';
+ for(const file of coldCandidates(env,root))if(exists(file)){
+  // A manually placed copy belongs to this root and should not be cached across relocations.
+  if(path.dirname(file).toLowerCase()!==local)coldHit=file;
+  return file;
+ }
  return '';
 }
 // AnkiConnect is an Anki add-on (code 2055492159). Without it MeguLit cannot add cards even when Anki is open.
@@ -240,4 +225,4 @@ async function installAnkiConnect(env=process.env,{locate=()=>find('',env),fresh
   return {installed:true,path:target};
  }finally{fs.rmSync(work,{recursive:true,force:true});}
 }
-module.exports={AnkiProcess,find,candidates,driveInstallFolder,installerCache,rememberInstall,coldCandidates,shortcutTarget,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows,listeners,isAnki,portOf};
+module.exports={AnkiProcess,find,candidates,ankiFolder,coldCandidates,shortcutTarget,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows,listeners,isAnki,portOf};

@@ -104,6 +104,49 @@ test('update: an old rollback exe moves out of the MeguLit folder; the script ba
  assert.match(src,/robocopy \$Root \$bak \/MIR/);assert.match(src,/ie4uinit\.exe'\) -show/);assert.match(src,/rolling back/);assert.doesNotMatch(src,/Copy-Item -LiteralPath \$exe -Destination \$backup/);
 });
 
+test('a full update and rollback leave the local Anki program in place',{skip:process.platform!=='win32'},async t=>{
+ const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto');
+ const {execFileSync}=require('node:child_process');
+ const work=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-update-anki-'));
+ const root=path.join(work,'app'),src=path.join(work,'package'),bak=path.join(work,'backup');
+ const put=(dir,file,contents)=>{
+  const dest=path.join(dir,file);
+  fs.mkdirSync(path.dirname(dest),{recursive:true});
+  fs.writeFileSync(dest,contents);
+ };
+ put(root,'MeguLit.exe','old app');
+ put(root,'Anki/anki.exe','user Anki');
+ put(src,'MeguLit.exe','new app contents');
+ put(src,'Anki/anki.exe','package Anki');
+ u.reset();
+ t.after(()=>{u.reset();fs.rmSync(work,{recursive:true,force:true});});
+ const zip=Buffer.from('PK fixture');
+ const rel={tag_name:'v9.9.9',assets:[{name:'MeguLit-v9.9.9-win-x64.zip',size:zip.length,
+  digest:'sha256:'+crypto.createHash('sha256').update(zip).digest('hex'),
+  browser_download_url:'https://github.com/ilynthn/MeguLit/releases/download/v9.9.9/MeguLit-v9.9.9-win-x64.zip'}]};
+ const state=await u.start(root,'1.0.0',async url=>url.endsWith('/latest')?
+  {ok:true,json:async()=>rel}:{ok:true,url,headers:{get:()=>String(zip.length)},arrayBuffer:async()=>zip});
+ assert.equal(state.phase,'ready');
+ const copies=fs.readFileSync(state.ps1,'utf8').match(/^ *& robocopy .+$/gm);
+ assert.equal(copies.length,3);
+ const copy=index=>execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',
+  '$Root=$env:MEGULIT_UPDATE_FIX_ROOT; $src=$env:MEGULIT_UPDATE_FIX_PACKAGE; $bak=$env:MEGULIT_UPDATE_FIX_BACKUP; '+copies[index]+
+  '; if($LASTEXITCODE -ge 8){exit $LASTEXITCODE}; exit 0'],{windowsHide:true,env:{...process.env,
+   MEGULIT_UPDATE_FIX_ROOT:root,MEGULIT_UPDATE_FIX_PACKAGE:src,MEGULIT_UPDATE_FIX_BACKUP:bak},timeout:10000});
+ const read=file=>fs.readFileSync(path.join(root,file),'utf8');
+ copy(0);
+ const backedUpAnki=fs.existsSync(path.join(bak,'Anki'));
+ put(bak,'Anki/anki.exe','stale Anki backup');
+ copy(1);
+ assert.equal(read('MeguLit.exe'),'new app contents');
+ const afterUpdate=read('Anki/anki.exe');
+ copy(2);
+ assert.equal(read('MeguLit.exe'),'old app');
+ assert.equal(afterUpdate,'user Anki');
+ assert.equal(read('Anki/anki.exe'),'user Anki');
+ assert.equal(backedUpAnki,false);
+});
+
 // E289 (Henan user: the download failed right at the end): a dropped connection resumes from the bytes it already has.
 test('update: a download cut off near the end resumes with a range request',async()=>{
  const fs=require('fs'),os=require('os'),path=require('path'),crypto=require('crypto');

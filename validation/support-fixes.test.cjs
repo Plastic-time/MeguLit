@@ -33,53 +33,35 @@ test('a reader that never started names quarantined native files',()=>{
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 
-test('a pre-existing Windows installation wins over an unrecorded file on the MeguLit drive',t=>{
- const env={SystemDrive:'C:'},root='R:\\Apps\\MeguLit';
- const known='Q:\\Installed Anki\\anki.exe',other='R:\\Anki\\anki.exe';
+test('a registered Anki takes precedence over a copy inside MeguLit',t=>{
+ const env={},root='R:\\Apps\\MeguLit';
+ const known='Q:\\Installed Anki\\anki.exe',local=path.join(root,'Anki','anki.exe');
  const queries=t.mock.method(require('node:child_process'),'execFileSync',(_exe,args)=>
   args[1].includes('App Paths')?'    (Default)    REG_SZ    '+known:'');
- assert.equal(anki.find('',env,file=>file===known||file===other,root),known);
+ assert.equal(anki.find('',env,file=>file===known||file===local,root),known);
  assert.ok(queries.mock.callCount()>0);
 });
 
-test('cold detection finds only the executable recorded after an MSI install',t=>{
- const env={SystemDrive:'C:'},root='R:\\Apps\\MeguLit';
- const folder='R:\\Anki',exe=path.join(folder,'anki.exe'),record=path.join(root,'data','cache','anki-installer','installed-file.json');
- const exists=file=>file===exe;
+test('a manually placed Anki is found at either MeguLit location without a registry entry',t=>{
+ const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-local-anki-'));
+ t.after(()=>fs.rmSync(scratch,{recursive:true,force:true}));
+ const source=path.join(scratch,'original'),target=path.join(scratch,'moved');
+ const exe=path.join(source,'Anki','anki.exe'),movedExe=path.join(target,'Anki','ankiw.exe');
+ for(const file of [exe,movedExe]){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'MZ');}
+ const manual=[exe,movedExe];
+ const exists=file=>manual.includes(file)&&fs.statSync(file).isFile();
  t.mock.method(require('node:child_process'),'execFileSync',()=>'');
- const read=fs.readFileSync,lstat=fs.lstatSync,write=fs.writeFileSync;
- let saved='',recordReads=0,info={isFile:()=>true,dev:1,ino:20,size:0,mtimeMs:10};
- t.mock.method(fs,'readFileSync',(file,...args)=>{
-  if(file!==record)return read(file,...args);
-  recordReads++;
-  return saved;
+ assert.ok(anki.coldCandidates({},source).includes(exe));
+ assert.ok(anki.coldCandidates({},target).includes(movedExe));
+ assert.equal(anki.find('',{},exists,source),exe);
+ assert.equal(anki.find('',{},exists,target),movedExe,'the previous MeguLit location is not reused');
+ const stat=fs.statSync,read=fs.readFileSync;
+ t.mock.method(fs,'statSync',(file,...args)=>{
+  if(typeof file==='string' && /[\\/]anki(w)?\.exe$/i.test(file) && !manual.includes(file))return {isFile:()=>false};
+  return stat(file,...args);
  });
- t.mock.method(fs,'writeFileSync',(file,data,...args)=>{if(file===record)saved=data;else write(file,data,...args);});
- t.mock.method(fs,'lstatSync',(file,...args)=>file===exe?info:lstat(file,...args));
- assert.equal(anki.find('',env,exists,root),'','an unrelated placeholder is ignored');
- anki.rememberInstall(root,folder);
- assert.equal(saved,'','an empty executable is never recorded');
- info={...info,isFile:()=>false,size:4096};
- anki.rememberInstall(root,folder);
- assert.equal(saved,'','a non-regular executable is never recorded');
- info={...info,isFile:()=>true};
- anki.rememberInstall(root,folder);
- assert.equal(anki.find('',env,exists,root),exe,'recorded install survives a cold lookup without its shortcut');
- const configured='U:\\Custom\\anki.exe';
- assert.equal(anki.find(configured,env,file=>file===configured||file===exe,root),configured);
- info={...info,ino:21};
- assert.equal(anki.find('',env,exists,root),'','a stale record does not bless a replacement');
- const previousReads=recordReads;
- assert.equal(anki.find('',{SystemDrive:'R:'},exists,root),'');
- assert.equal(recordReads,previousReads,'system-drive discovery ignores redirected install records');
-});
-
-test('Anki only derives a target from an absolute drive-letter path',()=>{
- const env={SystemDrive:'C:'};
- for(const root of ['','R:relative',String.raw`\\server\share\MeguLit`,String.raw`\\?\UNC\server\share\MeguLit`,'/opt/MeguLit']){
-  assert.equal(anki.driveInstallFolder(root,env),'');
- }
- assert.equal(anki.driveInstallFolder('r:/MeguLit',env),String.raw`r:\Anki`);
- assert.equal(anki.driveInstallFolder(String.raw`\\?\R:\MeguLit`,env),String.raw`R:\Anki`);
- assert.equal(anki.driveInstallFolder(String.raw`C:\MeguLit`,{}),'');
+ t.mock.method(fs,'readFileSync',(file,...args)=>
+  typeof file==='string' && /[\\/]Anki\.lnk$/i.test(file)?Buffer.alloc(0):read(file,...args));
+ const {Runtime}=require('../services/runtime.cjs');
+ assert.equal(new Runtime(target).ankiProcess().find(),movedExe);
 });

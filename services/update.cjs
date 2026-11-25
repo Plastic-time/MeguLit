@@ -3,7 +3,7 @@
    Updates from GitHub Releases. On every start MeguLit checks the latest release; a newer one is downloaded in the
    background with real progress, verified (size, zip header, GitHub's sha256 digest) and kept in cache/update until the
    user restarts. A detached PowerShell script then waits for MeguLit to exit, copies the program files over the old ones
-   and reopens it. data / logs / cache / runtime / models are never touched. */
+   and reopens it. data / logs / cache / runtime / models / Anki are never touched. */
 const fs=require('fs'),path=require('path'),crypto=require('crypto'),{spawn}=require('child_process');
 const REPO='https://api.github.com/repos/ilynthn/MeguLit/releases';
 const ASSET=/^MeguLit-v(\d+)\.(\d+)\.(\d+)([a-z]?)-win-x64\.zip$/i;
@@ -253,11 +253,11 @@ try{
  # confused people about which one to start). The whole program is kept, not only the exe, so a rollback is complete.
  $bak=Join-Path $Root 'migration\\update-rollback'
  New-Item -ItemType Directory -Force $bak | Out-Null
- & robocopy $Root $bak /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /XD data logs cache runtime models migration /XF MeguLit.rollback-update.exe | Out-Null
+ & robocopy $Root $bak /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /XD data logs cache runtime models migration Anki /XF MeguLit.rollback-update.exe | Out-Null
  if($LASTEXITCODE -ge 8){throw "backup failed $LASTEXITCODE"}
  Remove-Item -LiteralPath (Join-Path $Root 'MeguLit.rollback-update.exe') -Force -ErrorAction SilentlyContinue
  Log 'backed up previous version'
- & robocopy $src $Root /E /R:5 /W:1 /NFL /NDL /NJH /NJS /XD data logs cache runtime models | Out-Null
+ & robocopy $src $Root /E /R:5 /W:1 /NFL /NDL /NJH /NJS /XD data logs cache runtime models Anki | Out-Null
  if($LASTEXITCODE -ge 8){throw "robocopy failed $LASTEXITCODE"}
  Log 'copied'
  Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
@@ -273,7 +273,7 @@ try{
  $bak=Join-Path $Root 'migration\\update-rollback'
  if($started -and $started.HasExited -and $started.ExitCode -ne 0 -and (Test-Path (Join-Path $bak 'MeguLit.exe'))){
   Log ('new version exited with '+$started.ExitCode+'; rolling back')
-  & robocopy $bak $Root /E /R:5 /W:1 /NFL /NDL /NJH /NJS | Out-Null
+  & robocopy $bak $Root /E /R:5 /W:1 /NFL /NDL /NJH /NJS /XD Anki | Out-Null
   try{Remove-Item -LiteralPath (Join-Path $Root 'data\\update-installed.json') -Force -ErrorAction SilentlyContinue}catch{}
   Start-Process -FilePath (Join-Path $Root 'MeguLit.exe') -WorkingDirectory $Root
   Log 'rolled back'
