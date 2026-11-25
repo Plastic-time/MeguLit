@@ -113,6 +113,7 @@ function chineseStory(gameDir,manifest){
 function siglusPlan(gameDir,options={}){
  const nameId=nameColumn(options);
  const dir=datDir(gameDir);if(!dir)return null;
+ const storyEngine=fs.existsSync(path.join(gameDir,'SceneZH.pck'))?require('../services/original-engines/scenes.cjs').ENGINES.siglus:null;
  const files=fs.readdirSync(dir).filter(f=>/\.dbs$/i.test(f)),changes=[];let japanese=null,targets=new Set(),cells=0,japaneseTables=0;
  for(const name of files){
   const twin=name.match(/^(.*)_(en|eng|zh|cn|ch|chs|cht|sc|tc|tw|ko|kr|ru)\.dbs$/i); /* E373: Summer Pockets ships sfight_*_ch.dbs */
@@ -126,12 +127,20 @@ function siglusPlan(gameDir,options={}){
   {const stem=name.replace(/\.dbs$/i,'').toLowerCase();if(files.some(f=>f.toLowerCase().startsWith(stem+'_')&&/^(.*)_(en|eng|zh|cn|ch|chs|cht|sc|tc|tw|ko|kr|ru)\.dbs$/i.test(f)))continue;}
   const langs=languageColumns(table),jp=langs.filter(c=>c.filled).sort((a,b)=>b.kana-a.kana)[0];
   if(jp&&jp.kana>=.3)japaneseTables++;
-  if(!jp||jp.kana<.3||langs.filter(c=>c.filled).length<2)continue;
-  if(japanese==null)japanese=jp.index;
-  const tgt=translationColumns(table,langs,jp.index,nameId);tgt.forEach(c=>targets.add(c.index));
-  const next=table.cells.map(row=>row.map((v,c)=>tgt.some(t=>t.index===c)&&row[jp.index]?shownJapanese(row[jp.index],v):v));
+  const story=storyEngine?.restoreStory(gameDir,name,table,nameId);
+  const guess=jp?.kana>=.3&&langs.filter(c=>c.filled).length>=2&&(!story||jp.index===story.from);
+  if(!guess&&!story)continue;
+  const from=story?.from??jp.index;
+  if(japanese==null)japanese=from;
+  const tgt=guess?translationColumns(table,langs,from,nameId).map(c=>c.index):[];
+  const next=table.cells.map(row=>row.map((v,c)=>tgt.includes(c)&&row[from]?shownJapanese(row[from],v):v));
+  if(story){
+   for(const r of story.rows)next[r][story.to]=table.cells[r][from];
+   if(!tgt.includes(story.to))tgt.push(story.to);
+  }
+  tgt.forEach(c=>targets.add(c));
   let n=0;next.forEach((row,r)=>row.forEach((v,c)=>{if(v!==table.cells[r][c])n++;}));
-  if(n)changes.push({name,file,decoded,table,next,changed:n,kind:'column',from:jp.index,to:tgt.map(t=>t.index)});cells+=n;
+  if(n)changes.push({name,file,decoded,table,next,changed:n,kind:'column',from,to:tgt});cells+=n;
  }
  return {adapter:'siglus-dbs',dir,japaneseColumn:japanese,targetColumns:[...targets],changes,cells,japaneseTables};
 }

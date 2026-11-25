@@ -429,6 +429,26 @@ const siglus={
   });
  },
  parse:parseDbs,test:DBS,
+ // SceneZH declares the language column IDs and binds dialogue and choices to serials.
+ restoreStory(dir,name,table,nameId){
+  if(!/^text\d+\.dbs$/i.test(name)||dbsScope(table,name)!=='script')return null;
+  const file=dbsSceneFile(dir);
+  if(!file||path.basename(file).toLowerCase()!=='scenezh.pck')return null;
+  let info;try{info=slotLayout(file);}catch{return null;}
+  const {layout,slots}=info,ids=rowIds(table);
+  if(!layout||!slots.size||!ids)return null;
+  const col=id=>table.columns.findIndex(c=>c.id===id&&c.type===0x53);
+  const from=col(layout.ja),to=col(layout.zh);
+  if(from<0||to<0||speakerColumn(table,from)||speakerColumn(table,to)||layout.zh===nameId)return null;
+  const seen=new Set(),duplicates=new Set();
+  for(const id of ids){if(seen.has(id))duplicates.add(id);seen.add(id);}
+  const rows=[];
+  for(let r=0;r<ids.length;r++){
+   const text=table.cells[r][from];
+   if(text&&!duplicates.has(ids[r])&&slots.get(ids[r])?.text===text)rows.push(r);
+  }
+  return rows.length?{from,to,rows}:null;
+ },
  // E450 voices: the release's Scene.pck keeps its original sources, where a KOE call comes before each spoken line
  voiceLines:dir=>require('./siglus-source.cjs').voiceLines(dir),
  /* 2026-11-13 (Summer Pockets Steam, Chinese install: the opening poem is a picture of the Chinese column's text): every other

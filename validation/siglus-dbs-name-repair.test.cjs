@@ -69,3 +69,11 @@ test('a changed numeric field or unproven prior copy is never repaired',()=>fixt
  const original=fs.readFileSync(path.join(C.backup,'dat','a.dbs')),bad=table(C.rows.map(r=>[r[1],r[1],r[1],r[3]+1]),[50,7,8,500]);assert.throws(()=>R.repairCells(bad,original,50,codec),/JAPANESE_REPAIR_BLOCKED/);
  const wrong=table(C.rows.map(r=>['wrong name',r[1],r[1],r[3]]),[50,7,8,500]);assert.throws(()=>R.repairCells(wrong,original,50,codec),/JAPANESE_REPAIR_BLOCKED/);
 }));
+
+test('a sparse unchanged speaker column needs no repair even when it has the most kana',()=>{
+ const ids=[50,0,2,500],rows=[['ナレーター','明日。','明天。',10],['','もう帰ろう。','我们回家吧。',20]];
+ const original=table(rows,ids),restored=table(rows.map(r=>[r[0],r[1],r[1],r[3]]),ids);
+ assert.equal(R.repairCells(restored,original,50,codec),null);
+ const changedName=table([['明日。','明日。','明日。',10],rows[1]],ids);
+ assert.throws(()=>R.repairCells(changedName,original,50,codec),/JAPANESE_REPAIR_BLOCKED/);
+});

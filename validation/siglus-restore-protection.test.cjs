@@ -3,13 +3,13 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const jr=require('../core/japanese-restore.cjs'),dbs=require('./helpers/siglus-dbs-table.cjs');
 const body='この町は嫌いだ。',choice='話しかける',bodyZh='我讨厌这座小镇。',choiceZh='上前搭话';
-function fixture(t,translated){
+function fixture(t,translated,extra=[]){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'siglus-protect-')),dat=path.join(dir,'dat'),backup=path.join(dir,'.megulit-japanese','dat');
  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
  fs.mkdirSync(dat);fs.writeFileSync(path.join(dir,'SceneZH.pck'),'fixture');
  t.mock.method(require('../services/original-engines/siglus-source.cjs'),'sources',()=>[
   {name:'_system_language.inc',raw:Buffer.from('#define $lang_jp 0\n#define $lang_ch 2')},
-  {name:'seen0414.ss',raw:Buffer.from('@mes(20, ,'+body+')\n@mes_sel(24, ,'+choice+')')}]);
+  {name:'seen0414.ss',raw:Buffer.from(['@mes(20, ,'+body+')','@mes_sel(24, ,'+choice+')',...extra].join('\n'))}]);
  const file=path.join(dat,'text00.dbs');
  const bytes=dbs([[body,translated?bodyZh:body,'I hate this town.',20],[choice,translated?choiceZh:choice,'Talk to her.',24]],[0,2,1,500]);
  fs.writeFileSync(file,bytes);
@@ -43,13 +43,41 @@ test('conflicting or damaged backups cannot replace game data',t=>{
  fs.writeFileSync(f.keep,'damaged');assert.deepEqual(jr.restore(f.dir).skipped,['text00.dbs']);
  assert.deepEqual(fs.readFileSync(f.file),patched);assert.equal(fs.readFileSync(f.keep,'utf8'),'damaged');
 });
-test('a partially Chinese table which the writer does not change is also backed up',t=>{
- const f=fixture(t,false);
- const rows=[[body,bodyZh,20],[choice,choice,24],['そうです。','そうです。',31],['知りません。','知りません。',32]];
+function readCells(file){
+ const {raw,marker}=jr._internal.decrypt(fs.readFileSync(file));
+ return jr._internal.parse(raw,marker).cells;
+}
+
+test('a mixed story column is backed up and its unambiguous script rows are restored',t=>{
+ const f=fixture(t,false,['@mes(31, ,そうです。)']);
+ const rows=[[body,bodyZh,20],[choice,choice,24],['そうです。','确实是的。',31],['そうです。','重复的一行。',31],['知りません。','知りません。',32]];
  const original=dbs(rows,[0,2,500]);fs.writeFileSync(f.file,original);
  const result=jr.apply(f.dir);
  assert.equal(result.chinese.body,1);assert.equal(result.chinese.choice,0);
- assert.deepEqual(fs.readFileSync(f.file),original);assert.deepEqual(fs.readFileSync(f.keep),original);
- assert.equal(jr._internal.readManifest(f.dir).files.find(e=>e.file==='text00.dbs').kind,'chinese-source');
+ assert.deepEqual(readCells(f.file),[[body,body,20],...rows.slice(1)]);
+ assert.deepEqual(fs.readFileSync(f.keep),original);
  assert.deepEqual(jr.restore(f.dir).skipped,[]);assert.deepEqual(fs.readFileSync(f.file),original);
+});
+
+test('a sparse speaker column cannot leave verified dialogue and choices in Chinese',t=>{
+ const f=fixture(t,true,['@mes(41, ,まだ明るい。)','@mes_sel(42, ,帰ろう)','@mes(43, ,場面にある台詞。)']);
+ const file=path.join(f.dat,'text01.dbs');
+ const rows=[['','まだ明るい。','天还亮着。',41],['','帰ろう','回家吧',42],
+  ['','別の台詞だ。','其他台词。',43],['ナレーター','','',0]];
+ const original=dbs(rows,[50,0,2,500]);fs.writeFileSync(file,original);
+ const options={siglusDbsNameColumn:50};
+ assert.equal(jr.detect(f.dir,options).state,'restorable');
+ jr.apply(f.dir,options);
+ assert.deepEqual(readCells(file),[['','まだ明るい。','まだ明るい。',41],['','帰ろう','帰ろう',42],...rows.slice(2)]);
+ assert.deepEqual(jr.restore(f.dir,options).skipped,[]);
+ assert.deepEqual(fs.readFileSync(file),original);
+});
+
+test('a verified dialogue row keeps its full-width slash and the following text',t=>{
+ const line='言った／言い直した。';
+ const f=fixture(t,true,['@mes(81, ,'+line+')']);
+ const file=path.join(f.dat,'text19.dbs');
+ fs.writeFileSync(file,dbs([[line,'又说了一遍。',81]],[0,2,500]));
+ jr.apply(f.dir);
+ assert.deepEqual(readCells(file),[[line,line,81]]);
 });
