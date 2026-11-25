@@ -226,6 +226,85 @@ static void KeepBandOnItsTarget() {
  assert(draw(game, dialogue, Row(8, 100, 80, 24, 0.3f), 11003) == 8);
 }
 
+static void IgnoreTraceFromOldFrame() {
+ GlyphLearner g;
+ void *toolbar = (void *)1, *label = (void *)2;
+ auto draw = [&](void *tex, const std::vector<Quad> &q, unsigned now) {
+  return g.Draw(tex, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now).size();
+ };
+ const auto buttons = Row(12, 4, 0, 32, 0.0f);
+ auto menu = Row(7, 400, 220, 32, 0.1f);
+ auto prior = Row(7, 400, 220, 32, 0.2f);
+ for (unsigned i = 0; i < menu.size(); i++) { menu[i].glyph = i + 1; prior[i].glyph = i + 8; }
+
+ g.Line(L"ABCD", 10000);
+ draw(toolbar, {buttons.begin(), buttons.begin() + 4}, 10001);
+ g.Frame(10002, 1280, 720);
+ draw(label, menu, 10400);
+ draw(toolbar, buttons, 10400);
+ g.Frame(10401, 1280, 720);
+ draw(label, prior, 13000); // A different label uses the same positions and different texture cells.
+ g.Frame(13001, 1280, 720);
+
+ g.Line(L"ABCDEFG", 15000);
+ menu.push_back({ 392, 228, 396, 232, 0, 0, 4.f / 1024, 4.f / 2048, 0 });
+ assert(draw(toolbar, buttons, 15001) == buttons.size());
+ assert(draw(label, menu, 15001) == 0);
+ g.Frame(15002, 1280, 720);
+ assert(draw(label, menu, 15017) == 0);
+}
+
+static void ReportNewLineWithLateScaledCopy() {
+ GlyphLearner g;
+ std::vector<std::string> reports;
+ g.emit = [&](const std::string &r) { reports.push_back(r); };
+ auto draw = [&](const std::vector<Quad> &q, unsigned now) {
+  return g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now).size();
+ };
+ const auto previous = Row(6, 400, 550, 32, 0.0f), next = Row(3, 400, 590, 32, 0.1f);
+ g.Line(L"ABCDEF", 10000);
+ draw(previous, 10001);
+ g.Frame(10002, 1280, 720);
+ draw(previous, 10010);
+ g.Frame(10011, 1280, 720);
+
+ g.Line(L"GHI", 15000);
+ draw(previous, 15001);
+ draw(Row(1, 400, 562, 28, 0.2f), 15001);
+ assert(draw(next, 15001) == 3);
+ g.Frame(15002, 1280, 720);
+ assert(reports.back().find("line=2 hidden=1") != std::string::npos);
+ assert(reports.back().find(" n=3 rects=400,590,32,32;428,590,32,32;456,590,32,32 text=GHI") != std::string::npos);
+}
+
+static void KeepCenteredBandWhileTyping() {
+ GlyphLearner g;
+ void *dialogue = (void *)1, *label = (void *)2;
+ auto draw = [&](void *tex, const std::vector<Quad> &q, unsigned now) {
+  return g.Draw(tex, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now).size();
+ };
+ const auto prefix = Row(3, 356, 550, 32, 0.1f), next = Row(5, 356, 550, 32, 0.1f);
+ const auto previous = Row(5, 412, 550, 32, 0.0f);
+ auto menu = Row(5, 100, 130, 32, 0.2f);
+ for (unsigned i = 0; i < menu.size(); i++) menu[i].glyph = i + 1;
+ menu.push_back({ 92, 138, 96, 142, 0, 0, 4.f / 1024, 4.f / 2048, 0 });
+ draw(dialogue, prefix, 6500); // Cache the first cells before either line starts.
+ g.Frame(6501, 1280, 720);
+
+ g.Line(L"ABCDE", 10000);
+ draw(dialogue, previous, 10001);
+ g.Frame(10002, 1280, 720);
+ draw(dialogue, previous, 10010);
+ g.Frame(10011, 1280, 720);
+
+ g.Line(L"VWXYZ", 15000);
+ assert(draw(dialogue, prefix, 15001) == 3);
+ assert(draw(label, menu, 15001) == 0);
+ g.Frame(15002, 1280, 720);
+ assert(draw(dialogue, next, 15017) == 5);
+ assert(draw(label, menu, 15017) == 0);
+}
+
 int main() {
  GlyphLearner g;
  g.Line(L"これは会話です。", 100);
@@ -257,5 +336,8 @@ int main() {
  KeepOccupiedBand();
  IgnoreOldAtlasFrame();
  KeepBandOnItsTarget();
+ IgnoreTraceFromOldFrame();
+ ReportNewLineWithLateScaledCopy();
+ KeepCenteredBandWhileTyping();
  puts("PASS dialogue scope: unclaimed title/menu, foreign target, unmatched ruby kept; confirmed dialogue hides; read/OFF restore");
 }

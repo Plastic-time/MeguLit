@@ -52,6 +52,7 @@ struct GlyphLearner {
  unsigned nameN = 0; std::wstring text; unsigned n = 0, seq = 0, lineAt = 0, prevLineAt = 0, armedUntil = 0; bool reported = false, hitSent = false, hiddenSent = false; unsigned hiddenQuads = 0;
  // learned
  bool learned = false, areaTraced = false; void *areaRt = nullptr; unsigned areaW = 0, areaH = 0; Rect area{}; std::set<long long> atlases; unsigned learnedSeq = 0; float glyphH = 0;
+ size_t learnedGlyphs = 0;
  std::map<void *, unsigned> texFirst; // texture -> first time a glyph quad used it
  std::map<long long, Group> groups; unsigned frameNo = 0, bbW = 0, bbH = 0;
  std::map<void *, std::pair<Rect, Rect>> rtMap; // rt texture -> (uv rect, screen rect)
@@ -361,12 +362,18 @@ struct GlyphLearner {
    if (k >= r.size()) return false; keep.push_back(r[k++]); }
   return k == r.size() && keep.size() == n;
  }
- /* the same place as an earlier glyph, offset copies (shadow, outline) included: the tolerance Chars() merges them with */
  static bool SamePlace(const Rect &a, const Rect &b) {
   const float w = (std::min)(a.x1 - a.x0, b.x1 - b.x0), h = (std::min)(a.y1 - a.y0, b.y1 - b.y0);
   return std::fabs(a.x0 - b.x0) < 0.4f * w && std::fabs(a.y0 - b.y0) < 0.4f * h;
  }
- bool Earlier(const Rect &r) const { for (auto &e : earlierRects) if (SamePlace(r, e)) return true; return false; }
+ // Use the earlier glyph's height so a smaller late shadow or outline still counts as its copy.
+ bool Earlier(const Rect &r) const {
+  for (const auto &e : earlierRects) {
+   const float w = (std::min)(e.x1 - e.x0, r.x1 - r.x0), h = e.y1 - e.y0;
+   if (std::fabs(e.x0 - r.x0) < 0.4f * w && std::fabs(e.y0 - r.y0) < 0.4f * h) return true;
+  }
+  return false;
+ }
  /* a glyph of an earlier line of the page (the same glyph on the same place) is never the new line's */
  bool EarlierGlyph(long long gk, long long k) const { return earlierKeys.count({ gk, k }) > 0; }
  bool BodyInBand(const Rect &r) const {
@@ -412,7 +419,7 @@ struct GlyphLearner {
    for (auto &s : g.keys) {
     const Seen &seen = s.second;
     const bool isFresh = (int)(seen.firstAt - since) >= 0;
-    const bool isFreshTrace = recover && seen.r.traced && (int)(seen.tracedAt - since) >= 0;
+    const bool isFreshTrace = recover && seen.lastFrame == frameNo - 1 && seen.r.traced && (int)(seen.tracedAt - since) >= 0;
     if (!isFresh && !isFreshTrace) continue;
     if (!EarlierGlyph(kv.first, s.first)) {
      if (isFresh) fresh.push_back(seen.r);
@@ -453,9 +460,13 @@ struct GlyphLearner {
   if (movedGroup && !ambiguousMove && !freshBand) {
    const auto occupied = Chars(Cluster(Chars(std::move(bandDrawn))));
    std::vector<Rect> keep;
-   // A fixed box can reuse the same texture slots. Keep it if it still draws a complete line or an earlier row.
+   // A centred box may draw only part of a line from cached cells. Require more positions than
+   // the old band learned before treating its hit as stale, even if no complete line matches there.
    const bool retained = !occupied.empty() && std::all_of(occupied.begin(), occupied.end(), [&](const Rect &r) { return Earlier(r); });
-   if (!retained && !Match(occupied, {}, keep)) { Report(*movedGroup, movedRects, true); return; }
+   if (!recoverBand || (occupied.size() > learnedGlyphs && !retained && !Match(occupied, {}, keep))) {
+    Report(*movedGroup, movedRects, true);
+    return;
+   }
   }
   // The glyphs of one line can come from several atlas pages: count them together per render target.
   std::map<void *, std::vector<Group *>> byRt; for (auto &kv : groups) byRt[kv.second.rt].push_back(&kv.second);
@@ -477,6 +488,7 @@ struct GlyphLearner {
   char b[256];
   if (!learned) {
    learned = true; areaRt = g.rt; areaW = g.rtW; areaH = g.rtH; glyphH = h; learnedSeq = seq; area = Rect{ 0, box.y0 - h, (std::max)(box.x1 + h * 8, (float)g.rtW), box.y1 + h * 2 };
+   learnedGlyphs = cs.size();
    areaTraced = std::any_of(cs.begin(), cs.end(), [](const Rect &r) { return r.traced; });
    // atlases whose quads line up with the matched glyphs (other pages, outline / shadow sheets: top-left within 3 px of a
    // glyph for at least 60 % of their quads in the area); a UI sheet drawing the box frame or body under the text is not
