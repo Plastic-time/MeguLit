@@ -32,6 +32,17 @@ function pickDirect(list,w,r){
  const distinct=new Set(hits.flatMap(e=>Array.isArray(e.readings)?e.readings.map(hira).filter(Boolean):[]));
  return distinct.size===1?hits[0]:null;
 }
+function coversWholeWord(analysis,w,m){
+ if(m.surface&&String(m.surface).trim()!==w)return false;
+ const parts=analysis.selection_analysis?.parts;
+ if(!Array.isArray(parts)||parts.length<=1)return true;
+ const nonBlank=parts.filter(p=>p&&String(p.surface||'').trim());
+ if(nonBlank.length<=1)return true;
+ const flat=w.replace(/[\s　]+/gu,'');
+ if(flat===m.base||flat===m.normalized)return true;
+ const fullLemma=nonBlank.slice(0,-1).map(p=>p.surface).join('')+(nonBlank.at(-1).morphology?.base||nonBlank.at(-1).surface);
+ return fullLemma===m.base||fullLemma===m.normalized;
+}
 function pickEntry(entries,word,reading='',analysis=null){
  const list=Array.isArray(entries)?entries.filter(Boolean):[],w=String(word||'').trim(),r=hira(reading);
  if(!list.length||!w)return null;
@@ -40,7 +51,7 @@ function pickEntry(entries,word,reading='',analysis=null){
  if(!analysis||typeof analysis!=='object')return null;
  if(analysis.selection_analysis?.exact===false)return null;
  const m=analysis.morphology;
- if(!m||typeof m!=='object')return null;
+ if(!m||typeof m!=='object'||!coversWholeWord(analysis,w,m))return null;
  const mReading=hira(m.reading),mLookupReading=hira(m.lookupReading);
  if(r&&(mReading||mLookupReading)&&mReading!==r&&mLookupReading!==r)return null;
  const seen=new Set([w]),forms=[];

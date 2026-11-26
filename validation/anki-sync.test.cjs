@@ -241,6 +241,10 @@ test('AnkiSync, bridge anki_sync, and reader ankiStats resolve suru verbs, poten
    {surface:'汗',base_form:'汗',normalized:'汗',reading:'アセ',pos:'名詞',grammar:['名詞','普通名詞','一般','*','*','*'],start:0,end:1},
    {surface:'ばむ',base_form:'ばむ',normalized:'ばむ',reading:'バム',pos:'接尾辞',grammar:['接尾辞','動詞的','*','*','五段-マ行','終止形-一般'],start:1,end:3},
    {surface:'手',base_form:'手',normalized:'手',reading:'テ',pos:'名詞',grammar:['名詞','普通名詞','一般','*','*','*'],start:3,end:4}
+  ],
+  '汗ばん':[
+   {surface:'汗',base_form:'汗',normalized:'汗',reading:'アセ',pos:'名詞',grammar:['名詞','普通名詞','一般','*','*','*'],start:0,end:1},
+   {surface:'ばん',base_form:'ばむ',normalized:'ばむ',reading:'バン',pos:'接尾辞',grammar:['接尾辞','動詞的','*','*','五段-マ行','連用形-撥音便'],start:1,end:3}
   ]
  };
  ll.tokenizeWhole=async text=>tokensByWord[text]||[];
@@ -256,12 +260,12 @@ test('AnkiSync, bridge anki_sync, and reader ankiStats resolve suru verbs, poten
  const rPhrase=await lookup('10分');
  const rHomographSuru=await lookup('生する');
  const rPrefixPhrase=await lookup('汗ばむ手');
+ const rWholeCompound=await lookup('汗ばん');
 
  assert.equal(rSuru.morphology.lookup,'勉強');
  assert.equal(rSuru.morphology.lookupReading,'べんきょう');
  assert.equal(rPot.morphology.base,'泳ぐ');
  assert.equal(rOku.morphology.normalized,'お話');
- assert.equal(rPrefixPhrase.selection_analysis.exact,false,'prefix-only compound match must not be marked exact');
  // English morphology carries the same lookup/normalized fields
  assert.equal(conjugation(ll.groups(tokensByWord['勉強する'])[0],'en').lookup,'勉強');
 
@@ -274,6 +278,8 @@ test('AnkiSync, bridge anki_sync, and reader ankiStats resolve suru verbs, poten
  assert.equal(pickEntry(rPot.entries,'泳げる','',rPot)?.id,1174340);
  assert.equal(pickEntry(rOku.entries,'お話し','おはなし',rOku)?.id,1590000);
  assert.equal(pickEntry(rPast.entries,'食べた','たべた',rPast)?.id,1358280);
+ assert.equal(pickEntry(rWholeCompound.entries,'汗ばん','あせばむ',rWholeCompound),null);
+ assert.equal(pickEntry(rWholeCompound.entries,'汗ばん','あせばん',rWholeCompound)?.id,301);
  // Homograph suru stem: explicit reading resolves to matching entry, blank reading still refuses ambiguity even when Sudachi guesses a reading
  assert.equal(pickEntry(rHomographSuru.entries,'生する','せいする',rHomographSuru)?.id,101);
  assert.equal(pickEntry(rHomographSuru.entries,'生する','',rHomographSuru),null);
@@ -282,11 +288,12 @@ test('AnkiSync, bridge anki_sync, and reader ankiStats resolve suru verbs, poten
  assert.equal(pickEntry(rIreru.entries,'入れる','いれる',rIreru)?.id,1465610);
  assert.equal(pickEntry([dictEntries[4]],'入れる','いれる',rIreru),null);
 
- // Negative boundaries: phrase subtoken & prefix-only fallbacks (exact:false), mismatched reading, missing analysis, empty m.reading with wrong r
+ // Negative boundaries: phrase subtoken & prefix-only fallbacks, mismatched surface/reading, missing analysis, empty m.reading with wrong r
  assert.equal(pickEntry(rPhrase.entries,'10分','ぶん',rPhrase),null);
  assert.equal(pickEntry(rPhrase.entries,'10分','',rPhrase),null);
  assert.equal(pickEntry(rPrefixPhrase.entries,'汗ばむ手','あせばむて',rPrefixPhrase),null);
  assert.equal(pickEntry(rPrefixPhrase.entries,'汗ばむ手','',rPrefixPhrase),null);
+ assert.equal(pickEntry(rSuru.entries,'別の語','べんきょうする',rSuru),null);
  assert.equal(pickEntry(rPot.entries,'泳げる','たべる',rPot),null);
  assert.equal(pickEntry(rSuru.entries,'勉強する','べんきょうする'),null);
  assert.equal(pickEntry([dictEntries[0]],'勉強する','まったくちがう',{morphology:{base:'勉強する',lookup:'勉強',lookupReading:'べんきょう',reading:''}}),null);
