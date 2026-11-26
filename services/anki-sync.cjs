@@ -38,18 +38,18 @@ function pickEntry(entries,word,reading='',analysis=null){
  const direct=pickDirect(list,w,r);
  if(direct)return direct;
  if(!analysis||typeof analysis!=='object')return null;
- if(analysis.selection_analysis?.exact===false||analysis.exact===false)return null;
- const m=analysis.morphology||analysis;
+ if(analysis.selection_analysis?.exact===false)return null;
+ const m=analysis.morphology;
  if(!m||typeof m!=='object')return null;
  const mReading=hira(m.reading),mLookupReading=hira(m.lookupReading);
- if(r&&mReading&&mReading!==r&&!(mLookupReading&&mLookupReading===r))return null;
+ if(r&&(mReading||mLookupReading)&&mReading!==r&&mLookupReading!==r)return null;
  const seen=new Set([w]),forms=[];
  const push=(b,lr)=>{const s=String(b||'').trim();if(!s||seen.has(s))return;seen.add(s);forms.push([s,lr]);};
  push(m.lookup,mLookupReading);
  push(m.base,'');
  push(m.normalized,'');
  for(const [base,lr]of forms){
-  const wantR=lr||r;
+  const wantR=r?(lr||r):'';
   let hit=wantR?pickDirect(list,base,wantR):null;
   if(!hit&&(!r||(mReading&&mReading===r)))hit=pickDirect(list,base,'');
   if(hit){

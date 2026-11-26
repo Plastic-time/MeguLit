@@ -193,8 +193,9 @@ test('AnkiSync, bridge anki_sync, and reader ankiStats resolve suru verbs, poten
   {id:1590000,spellings:['お話'],readings:['おはなし'],pos:['Noun'],definitions:['talk']},
   {id:1358280,spellings:['食べる'],readings:['たべる'],pos:['Ichidan verb'],definitions:['eat']},
   {id:1502860,spellings:['分'],readings:['ぶん'],pos:['Noun'],definitions:['part']},
-  {id:101,spellings:['生'],readings:['せい'],pos:['Noun'],definitions:['life']},
-  {id:102,spellings:['生'],readings:['なま'],pos:['Noun'],definitions:['raw']}
+  {id:101,spellings:['生'],readings:['せい'],pos:['Noun','Noun or participle which takes the aux. verb suru'],definitions:['life']},
+  {id:102,spellings:['生'],readings:['なま'],pos:['Noun'],definitions:['raw']},
+  {id:301,spellings:['汗ばむ'],readings:['あせばむ'],pos:['Godan verb with mu ending'],definitions:['be sweaty']}
  ];
  const ll=new LocalLearning(root);
  const index=new Map(),byId=new Map(),english=new Map();
@@ -231,6 +232,15 @@ test('AnkiSync, bridge anki_sync, and reader ankiStats resolve suru verbs, poten
   '10分':[
    {surface:'10',base_form:'10',normalized:'10',reading:'',pos:'名詞',grammar:['名詞','数詞','*','*','*','*'],start:0,end:2},
    {surface:'分',base_form:'分',normalized:'分',reading:'ブン',pos:'名詞',grammar:['名詞','普通名詞','一般','*','*','*'],start:2,end:3}
+  ],
+  '生する':[
+   {surface:'生',base_form:'生',normalized:'生',reading:'セイ',pos:'名詞',grammar:['名詞','普通名詞','サ変可能','*','*','*'],start:0,end:1},
+   {surface:'する',base_form:'する',normalized:'為る',reading:'スル',pos:'動詞',grammar:['動詞','非自立可能','*','*','サ行変格','終止形-一般'],start:1,end:3}
+  ],
+  '汗ばむ手':[
+   {surface:'汗',base_form:'汗',normalized:'汗',reading:'アセ',pos:'名詞',grammar:['名詞','普通名詞','一般','*','*','*'],start:0,end:1},
+   {surface:'ばむ',base_form:'ばむ',normalized:'ばむ',reading:'バム',pos:'接尾辞',grammar:['接尾辞','動詞的','*','*','五段-マ行','終止形-一般'],start:1,end:3},
+   {surface:'手',base_form:'手',normalized:'手',reading:'テ',pos:'名詞',grammar:['名詞','普通名詞','一般','*','*','*'],start:3,end:4}
   ]
  };
  ll.tokenizeWhole=async text=>tokensByWord[text]||[];
@@ -244,15 +254,19 @@ test('AnkiSync, bridge anki_sync, and reader ankiStats resolve suru verbs, poten
  const rOku=await lookup('お話し');
  const rPast=await lookup('食べた');
  const rPhrase=await lookup('10分');
+ const rHomographSuru=await lookup('生する');
+ const rPrefixPhrase=await lookup('汗ばむ手');
 
  assert.equal(rSuru.morphology.lookup,'勉強');
  assert.equal(rSuru.morphology.lookupReading,'べんきょう');
  assert.equal(rPot.morphology.base,'泳ぐ');
  assert.equal(rOku.morphology.normalized,'お話');
+ assert.equal(rPrefixPhrase.selection_analysis.exact,false,'prefix-only compound match must not be marked exact');
  // English morphology carries the same lookup/normalized fields
  assert.equal(conjugation(ll.groups(tokensByWord['勉強する'])[0],'en').lookup,'勉強');
 
  assert.equal(pickEntry(rSuru.entries,'勉強する','べんきょうする',rSuru)?.id,1512670);
+ assert.equal(pickEntry(rSuru.entries,'勉強する','べんきょう',rSuru)?.id,1512670);
  assert.equal(pickEntry(rSuru.entries,'勉強する','',rSuru)?.id,1512670);
  assert.equal(pickEntry(rSuruPast.entries,'勉強した','べんきょうした',rSuruPast)?.id,1512670);
  assert.equal(pickEntry(rKanaSuru.entries,'アクセスする','あくせすする',rKanaSuru)?.id,1015230);
@@ -260,17 +274,24 @@ test('AnkiSync, bridge anki_sync, and reader ankiStats resolve suru verbs, poten
  assert.equal(pickEntry(rPot.entries,'泳げる','',rPot)?.id,1174340);
  assert.equal(pickEntry(rOku.entries,'お話し','おはなし',rOku)?.id,1590000);
  assert.equal(pickEntry(rPast.entries,'食べた','たべた',rPast)?.id,1358280);
+ // Homograph suru stem: explicit reading resolves to matching entry, blank reading still refuses ambiguity even when Sudachi guesses a reading
+ assert.equal(pickEntry(rHomographSuru.entries,'生する','せいする',rHomographSuru)?.id,101);
+ assert.equal(pickEntry(rHomographSuru.entries,'生する','',rHomographSuru),null);
 
  // 入れる keeps its own entry and never falls back to 入る even if 入れる were missing from candidates
  assert.equal(pickEntry(rIreru.entries,'入れる','いれる',rIreru)?.id,1465610);
  assert.equal(pickEntry([dictEntries[4]],'入れる','いれる',rIreru),null);
 
- // Negative boundaries: phrase subtoken fallback (exact:false), mismatched reading, missing analysis, ambiguous homograph stem
+ // Negative boundaries: phrase subtoken & prefix-only fallbacks (exact:false), mismatched reading, missing analysis, empty m.reading with wrong r
  assert.equal(pickEntry(rPhrase.entries,'10分','ぶん',rPhrase),null);
  assert.equal(pickEntry(rPhrase.entries,'10分','',rPhrase),null);
+ assert.equal(pickEntry(rPrefixPhrase.entries,'汗ばむ手','あせばむて',rPrefixPhrase),null);
+ assert.equal(pickEntry(rPrefixPhrase.entries,'汗ばむ手','',rPrefixPhrase),null);
  assert.equal(pickEntry(rPot.entries,'泳げる','たべる',rPot),null);
  assert.equal(pickEntry(rSuru.entries,'勉強する','べんきょうする'),null);
- assert.equal(pickEntry([dictEntries[8],dictEntries[9]],'生する','',{morphology:{base:'生する',lookup:'生',reading:''}}),null);
+ assert.equal(pickEntry([dictEntries[0]],'勉強する','まったくちがう',{morphology:{base:'勉強する',lookup:'勉強',lookupReading:'べんきょう',reading:''}}),null);
+ assert.equal(pickEntry([dictEntries[0]],'勉強する','べんきょうする',{morphology:{base:'勉強する',lookup:'勉強',lookupReading:'べんきょう',reading:'べんきょうする'},selection_analysis:{exact:false}}),null);
+ assert.equal(pickEntry([dictEntries[5]],'お話し','ちがう',{morphology:{base:'お話し',normalized:'お話',reading:''}}),null);
  // Resolved reading symbol only matches the reading verified by morphology
  const pickedPot=pickEntry(rPot.entries,'泳げる','およげる',rPot);
  assert.equal(matchesReading(pickedPot,'およげる'),true);
