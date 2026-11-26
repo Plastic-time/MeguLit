@@ -28,6 +28,7 @@ export async function playSentence(api,text,button,{id}={}){
   const r=await api('sentence_voice',{text:String(text||'').slice(0,400),...(id!==undefined&&id!==null?{id:Number(id)}:{})});
   if(request!==latest)return;
   const bytes=Uint8Array.from(atob(r.data),c=>c.charCodeAt(0)),audio=new Audio();
+  if(typeof r.volume==='number'&&Number.isFinite(r.volume))audio.volume=Math.max(0,Math.min(1,r.volume));
   const url=URL.createObjectURL(new Blob([bytes],{type:r.mime||'audio/wav'}));
   const release=()=>{if(current?.audio===audio){current=null;URL.revokeObjectURL(url);}};
   current={audio,release};
