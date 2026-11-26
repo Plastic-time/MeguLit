@@ -41,11 +41,17 @@ class AnkiReviewer{
   // A deck with nothing left today: Anki refuses or shows its congratulations screen. Report it as finished.
   const opened=await this.call('guiDeckReview',{name:deck});this.saveSession(null);
   const result=await this.snapshot(null,{recover:true}).catch(error=>{if(opened)throw error;return {done:true};});
-  if(result.done){let total=0;try{const stats=Object.values(await this.call('getDeckStats',{decks:[deck]}))[0];total=Number(stats?.total_in_deck)||0;}catch{}return {done:true,finished:true,deck,total,...await this.dayInfo(deck)};}
+  if(result.done)return this.finishedInfo(deck);
   return result;
+ }
+ async finishedInfo(deck){
+  const out={done:true,finished:true,deck};
+  if(deck){let total=0;try{const stats=Object.values(await this.call('getDeckStats',{decks:[deck]}))[0];total=Number(stats?.total_in_deck)||0;}catch{}out.total=total;}
+  return {...out,...await this.dayInfo(deck)};
  }
  // 2026-11-13: for the finished screen, cards reviewed today and when this deck has cards due again (first day with any, up to a month)
  async dayInfo(deck){const out={};try{out.reviewedToday=Number(await this.call('getNumCardsReviewedToday'))||0;}catch{}
+  if(!deck)return out;
   try{const q='"deck:'+String(deck).replace(/"/g,'')+'" -is:suspended prop:due=';for(const days of [1,2,3,4,5,6,7]){const ids=await this.call('findCards',{query:q+days});if(ids?.length){out.nextDue={days,count:ids.length};return out;}}
    const later=await this.call('findCards',{query:'"deck:'+String(deck).replace(/"/g,'')+'" -is:suspended prop:due>7 prop:due<=30'});out.nextDue=later?.length?{days:8,count:later.length}:null;}catch{}return out;}
  async showAnswer(id){
@@ -68,7 +74,7 @@ class AnkiReviewer{
    if(!await this.call('guiAnswerCard',{ease}))throw Error('ANKI_FAILED');
    this.db.prepare('INSERT INTO anki_review_events VALUES (?,?,?,?)').run(operationId,cardId,ease,Math.floor(Date.now()/1000));
    this.saveSession(null);
-   const result=await this.snapshot();if(result.done){result.finished=true;result.deck=card.deckName||'';}
+   let result=await this.snapshot();if(result.done)result=await this.finishedInfo(card.deckName||'');
    this.db.prepare("UPDATE anki_actions SET status='done',result=? WHERE operation_id=?").run(JSON.stringify(result),operationId);return result;
   }catch(error){throw Error(error.message==='ANKI_CARD_CHANGED'?error.message:'ANKI_RATING_UNCERTAIN');}
   finally{activeRatings.delete(operationId);}
