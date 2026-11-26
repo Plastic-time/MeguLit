@@ -1036,8 +1036,8 @@ async function learning(token){
   if(subtab==='readwords'){commit();try{const {mountReadingInsights}=await import('./reading-insights.js');if(token===pageToken)await mountReadingInsights(target,
    {api,locale,esc,number,toast,isCurrent:()=>token===pageToken,enhance:enhanceSelects});}catch(error){target.textContent=String(error?.message||error);}return;
    }
-  if(subtab==='kana'){commit();try{const {mountKana}=await import('./kana/kana.js');if(token===pageToken)await mountKana(target,{api,invoke,toast,start:'index',
-   focus:kanaFocus,openTab:tab=>navigate('learning',tab)});}catch(error){target.textContent=String(error?.message||error);}return;}
+  if(subtab==='kana'){commit();try{const {mountKana}=await import('./kana/kana.js');if(token===pageToken){const k=await mountKana(target,{api,invoke,toast,start:'index',
+   focus:kanaFocus,openTab:tab=>navigate('learning',tab)});if(token===pageToken)stopDetailPage=()=>k?.stop?.();else k?.stop?.();}}catch(error){target.textContent=String(error?.message||error);}return;}
   /* 2026-11-14 a failing review (Anki HUD) shows its own retry inside the tab; it never takes the whole learning page down */
   if(subtab==='review'){try{await review(token,target);}catch(error){console.error('learning review',error);learningFailed(target,error,token);}
    if(token===pageToken){try{enhanceSelects(target);}catch(error){console.error('learning review selects',error);}commit();}return;}
