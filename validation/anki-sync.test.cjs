@@ -178,85 +178,137 @@ test('kana-only Anki notes with blank WordReading match existing local vocabular
  assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=602').get().note_id,9002);
 });
 
-test('AnkiSync and pickEntry keep derived suru verbs, potential forms, and okurigana variants while still rejecting mismatched readings or kanji',async t=>{
- const {db}=fixture(t);
+test('AnkiSync, bridge anki_sync, and reader ankiStats resolve suru verbs, potential forms, conjugations, and normalized variants via LocalLearning/morphology analysis',async t=>{
+ const {db,root}=fixture(t);
  const {matchesReading}=require('../services/anki-sync.cjs');
- const suru={id:1511610,spellings:['勉強'],readings:['べんきょう'],definitions:['study']};
- const kanaSuru={id:1015380,spellings:[],readings:['アクセス'],definitions:['access']};
- const potential={id:1169870,spellings:['飲む'],readings:['のむ'],definitions:['drink']};
- const okurigana={id:1590000,spellings:['お話'],readings:['おはなし'],definitions:['talk']};
- const standalonePot={id:1383700,spellings:['切れる'],readings:['きれる'],definitions:['be sharp']};
- const godanCut={id:1383680,spellings:['切る'],readings:['きる'],definitions:['cut']};
- const wrongKanji={id:204,spellings:['精'],readings:['せい'],definitions:['spirit']};
+ const {LocalLearning}=require('../core/learning-native.cjs');
+ const {conjugation}=require('../core/morphology.cjs');
 
- assert.equal(pickEntry([suru],'勉強する','べんきょうする')?.id,1511610);
- assert.equal(pickEntry([suru],'勉強する','')?.id,1511610);
- assert.equal(pickEntry([kanaSuru],'アクセスする','あくせすする')?.id,1015380);
- assert.equal(pickEntry([potential],'飲める','のめる')?.id,1169870);
- assert.equal(pickEntry([potential],'飲める','')?.id,1169870);
- // MeguLit's own potential card stores root Word='飲む' with potential reading 'のめる'
- assert.equal(pickEntry([potential],'飲む','のめる')?.id,1169870);
- assert.equal(pickEntry([potential],'飲む','たべる'),null);
- assert.equal(pickEntry([okurigana],'お話し','おはなし')?.id,1590000);
- // Direct entry wins over derived root when both exist
- assert.equal(pickEntry([godanCut,standalonePot],'切れる','きれる')?.id,1383700);
-
- // Negative boundaries: blank-reading kanji-only mismatch, 1-kana suru stem, short words, wrong kanji/reading
- assert.equal(pickEntry([{id:1,spellings:['食べる'],readings:['たべる']}],'食う',''),null);
- assert.equal(pickEntry([{id:2,spellings:['出る'],readings:['でる']}],'出す',''),null);
- assert.equal(pickEntry([{id:3,spellings:['話'],readings:['はなし']}],'話をする',''),null);
- assert.equal(pickEntry([{id:4,spellings:['分'],readings:['ぶん']}],'10分',''),null);
- assert.equal(pickEntry([{id:4,spellings:['分'],readings:['ぶん']}],'10分','ぶん'),null);
- assert.equal(pickEntry([potential],'食べる','のめる'),null);
- assert.equal(pickEntry([okurigana],'お話しする','おはなしする'),null);
- assert.equal(pickEntry([{id:5,spellings:['お勉強'],readings:['おべんきょう']}],'勉強する',''),null);
- assert.equal(pickEntry([{id:6,spellings:['子'],readings:['こ']}],'こする','こする'),null);
- assert.equal(pickEntry([{id:7,spellings:[''],readings:['']}],'する','する'),null);
- assert.equal(pickEntry([{id:8,spellings:['う'],readings:['う']}],'える','える'),null);
- assert.equal(pickEntry([wrongKanji],'生','せい'),null);
- assert.equal(pickEntry([potential],'飲める','たべる'),null);
- assert.equal(pickEntry([{id:101,spellings:['生'],readings:['せい']},{id:102,spellings:['生'],readings:['なま']}],'生する',''),null);
-
- // matchesReading rejects derived reading mismatches or wrong-spelling candidates from custom resolvers
- assert.equal(matchesReading(suru,'べんきょうする','勉強する'),true);
- assert.equal(matchesReading(kanaSuru,'あくせすする','アクセスする'),true);
- assert.equal(matchesReading(potential,'のめる','飲む'),true);
- assert.equal(matchesReading(suru,'べんきょうする'),false);
- assert.equal(matchesReading({id:999,spellings:['勉教'],readings:['べんきょう']},'べんきょうする','勉強する'),false);
- assert.equal(matchesReading({id:998,spellings:['飲ます'],readings:['のむ']},'のめる','飲める'),false);
-
- const byWord={
-  '勉強する':[suru],
-  '飲める':[potential],
-  '飲む':[potential],
-  'お話し':[okurigana]
+ const dictEntries=[
+  {id:1512670,spellings:['勉強'],readings:['べんきょう'],pos:['Noun','Noun or participle which takes the aux. verb suru'],definitions:['study']},
+  {id:1015230,spellings:[],readings:['アクセス'],pos:['Noun','Noun or participle which takes the aux. verb suru'],definitions:['access']},
+  {id:1174340,spellings:['泳ぐ'],readings:['およぐ'],pos:['Godan verb with gu ending'],definitions:['swim']},
+  {id:1465610,spellings:['入れる'],readings:['いれる'],pos:['Ichidan verb'],definitions:['put in']},
+  {id:1465590,spellings:['入る'],readings:['はいる'],pos:['Godan verb with ru ending'],definitions:['enter']},
+  {id:1590000,spellings:['お話'],readings:['おはなし'],pos:['Noun'],definitions:['talk']},
+  {id:1358280,spellings:['食べる'],readings:['たべる'],pos:['Ichidan verb'],definitions:['eat']},
+  {id:1502860,spellings:['分'],readings:['ぶん'],pos:['Noun'],definitions:['part']},
+  {id:101,spellings:['生'],readings:['せい'],pos:['Noun'],definitions:['life']},
+  {id:102,spellings:['生'],readings:['なま'],pos:['Noun'],definitions:['raw']}
+ ];
+ const ll=new LocalLearning(root);
+ const index=new Map(),byId=new Map(),english=new Map();
+ for(const e of dictEntries){byId.set(e.id,e);for(const k of [...e.spellings,...e.readings]){const arr=index.get(k)||[];arr.push(e.id);index.set(k,arr);}}
+ Object.assign(ll,{index,byId,english});
+ ll.load=()=>{};
+ const tokensByWord={
+  '勉強する':[
+   {surface:'勉強',base_form:'勉強',normalized:'勉強',reading:'ベンキョウ',pos:'名詞',grammar:['名詞','普通名詞','サ変可能','*','*','*'],start:0,end:2},
+   {surface:'する',base_form:'する',normalized:'為る',reading:'スル',pos:'動詞',grammar:['動詞','非自立可能','*','*','サ行変格','終止形-一般'],start:2,end:4}
+  ],
+  '勉強した':[
+   {surface:'勉強',base_form:'勉強',normalized:'勉強',reading:'ベンキョウ',pos:'名詞',grammar:['名詞','普通名詞','サ変可能','*','*','*'],start:0,end:2},
+   {surface:'し',base_form:'する',normalized:'為る',reading:'シ',pos:'動詞',grammar:['動詞','非自立可能','*','*','サ行変格','連用形-一般'],start:2,end:3},
+   {surface:'た',base_form:'た',normalized:'た',reading:'タ',pos:'助動詞',grammar:['助動詞','*','*','*','助動詞-タ','終止形-一般'],start:3,end:4}
+  ],
+  'アクセスする':[
+   {surface:'アクセス',base_form:'アクセス',normalized:'アクセス',reading:'アクセス',pos:'名詞',grammar:['名詞','普通名詞','サ変可能','*','*','*'],start:0,end:4},
+   {surface:'する',base_form:'する',normalized:'為る',reading:'スル',pos:'動詞',grammar:['動詞','非自立可能','*','*','サ行変格','終止形-一般'],start:4,end:6}
+  ],
+  '泳げる':[
+   {surface:'泳げる',base_form:'泳げる',normalized:'泳げる',reading:'オヨゲル',pos:'動詞',grammar:['動詞','一般','*','*','下一段-ガ行','終止形-一般'],start:0,end:3}
+  ],
+  '入れる':[
+   {surface:'入れる',base_form:'入れる',normalized:'入れる',reading:'イレル',pos:'動詞',grammar:['動詞','一般','*','*','下一段-ラ行','終止形-一般'],start:0,end:3}
+  ],
+  'お話し':[
+   {surface:'お話し',base_form:'お話し',normalized:'お話',reading:'オハナシ',pos:'名詞',grammar:['名詞','普通名詞','一般','*','*','*'],start:0,end:3}
+  ],
+  '食べた':[
+   {surface:'食べ',base_form:'食べる',normalized:'食べる',reading:'タベ',pos:'動詞',grammar:['動詞','一般','*','*','下一段-バ行','連用形-一般'],start:0,end:2},
+   {surface:'た',base_form:'た',normalized:'た',reading:'タ',pos:'助動詞',grammar:['助動詞','*','*','*','助動詞-タ','終止形-一般'],start:2,end:3}
+  ],
+  '10分':[
+   {surface:'10',base_form:'10',normalized:'10',reading:'',pos:'名詞',grammar:['名詞','数詞','*','*','*','*'],start:0,end:2},
+   {surface:'分',base_form:'分',normalized:'分',reading:'ブン',pos:'名詞',grammar:['名詞','普通名詞','一般','*','*','*'],start:2,end:3}
+  ]
  };
- const sync=new AnkiSync({
-  db,config:{},
-  anki:{stats:async()=>[
-   {noteId:9101,word:'勉強する',reading:'べんきょうする',status:3,reviews:[10000]},
-   {noteId:9102,word:'飲める',reading:'のめる',status:2,reviews:[20000]},
-   {noteId:9103,word:'お話し',reading:'おはなし',status:4,reviews:[30000]},
-   {noteId:9104,word:'飲める',reading:'たべる',status:1,reviews:[40000]},
-   {noteId:9105,word:'食う',reading:'',status:2,reviews:[50000]}
-  ]},
-  resolveEntry:async(word,reading)=>pickEntry(byWord[word]||[{id:1,spellings:['食べる'],readings:['たべる']}],word,reading)
- });
- const res=await sync.run();
+ ll.tokenizeWhole=async text=>tokensByWord[text]||[];
+
+ const lookup=async w=>ll.request('lookup_exact',{text:w,start:0,end:[...w].length},'zh');
+ const rSuru=await lookup('勉強する');
+ const rSuruPast=await lookup('勉強した');
+ const rKanaSuru=await lookup('アクセスする');
+ const rPot=await lookup('泳げる');
+ const rIreru=await lookup('入れる');
+ const rOku=await lookup('お話し');
+ const rPast=await lookup('食べた');
+ const rPhrase=await lookup('10分');
+
+ assert.equal(rSuru.morphology.lookup,'勉強');
+ assert.equal(rSuru.morphology.lookupReading,'べんきょう');
+ assert.equal(rPot.morphology.base,'泳ぐ');
+ assert.equal(rOku.morphology.normalized,'お話');
+ // English morphology carries the same lookup/normalized fields
+ assert.equal(conjugation(ll.groups(tokensByWord['勉強する'])[0],'en').lookup,'勉強');
+
+ assert.equal(pickEntry(rSuru.entries,'勉強する','べんきょうする',rSuru)?.id,1512670);
+ assert.equal(pickEntry(rSuru.entries,'勉強する','',rSuru)?.id,1512670);
+ assert.equal(pickEntry(rSuruPast.entries,'勉強した','べんきょうした',rSuruPast)?.id,1512670);
+ assert.equal(pickEntry(rKanaSuru.entries,'アクセスする','あくせすする',rKanaSuru)?.id,1015230);
+ assert.equal(pickEntry(rPot.entries,'泳げる','およげる',rPot)?.id,1174340);
+ assert.equal(pickEntry(rPot.entries,'泳げる','',rPot)?.id,1174340);
+ assert.equal(pickEntry(rOku.entries,'お話し','おはなし',rOku)?.id,1590000);
+ assert.equal(pickEntry(rPast.entries,'食べた','たべた',rPast)?.id,1358280);
+
+ // 入れる keeps its own entry and never falls back to 入る even if 入れる were missing from candidates
+ assert.equal(pickEntry(rIreru.entries,'入れる','いれる',rIreru)?.id,1465610);
+ assert.equal(pickEntry([dictEntries[4]],'入れる','いれる',rIreru),null);
+
+ // Negative boundaries: phrase subtoken fallback (exact:false), mismatched reading, missing analysis, ambiguous homograph stem
+ assert.equal(pickEntry(rPhrase.entries,'10分','ぶん',rPhrase),null);
+ assert.equal(pickEntry(rPhrase.entries,'10分','',rPhrase),null);
+ assert.equal(pickEntry(rPot.entries,'泳げる','たべる',rPot),null);
+ assert.equal(pickEntry(rSuru.entries,'勉強する','べんきょうする'),null);
+ assert.equal(pickEntry([dictEntries[8],dictEntries[9]],'生する','',{morphology:{base:'生する',lookup:'生',reading:''}}),null);
+ // Resolved reading symbol only matches the reading verified by morphology
+ const pickedPot=pickEntry(rPot.entries,'泳げる','およげる',rPot);
+ assert.equal(matchesReading(pickedPot,'およげる'),true);
+ assert.equal(matchesReading(pickedPot,'たべる'),false);
+ assert.equal(matchesReading(dictEntries[2],'およげる'),false);
+
+ // End-to-end AnkiSync via bridge anki_sync and reader ankiStats
+ const prevRoot=process.env.MEGULIT_ROOT;
+ const bridgePath=require.resolve('../services/bridge.cjs');
+ delete require.cache[bridgePath];
+ process.env.MEGULIT_ROOT=root;
+ t.after(()=>{delete require.cache[bridgePath];if(prevRoot===undefined)delete process.env.MEGULIT_ROOT;else process.env.MEGULIT_ROOT=prevRoot;});
+ const {Anki}=require('../core/anki.cjs');
+ t.mock.method(Anki.prototype,'stats',async()=>[
+  {noteId:9101,word:'勉強する',reading:'べんきょうする',status:3,reviews:[10000]},
+  {noteId:9102,word:'泳げる',reading:'およげる',status:2,reviews:[20000]},
+  {noteId:9103,word:'お話し',reading:'おはなし',status:4,reviews:[30000]},
+  {noteId:9104,word:'泳げる',reading:'たべる',status:1,reviews:[40000]},
+  {noteId:9105,word:'10分',reading:'ぶん',status:2,reviews:[50000]}
+ ]);
+ const runtime={config:()=>({}),emit:()=>{},learning:()=>ll};
+ const {dispatch}=require('../services/bridge.cjs');
+ const res=await dispatch({action:'anki_sync'},runtime);
  assert.equal(res.imported,3);
  assert.equal(res.skipped,2);
- assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=1511610').get()?.note_id,9101);
- assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=1169870').get()?.note_id,9102);
- assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=1590000').get()?.note_id,9103);
-
- // Also verify MeguLit-mined potential card (Word='飲む', WordReading='のめる') imports when unlinked
- const {db:db2}=fixture(t);
- const sync2=new AnkiSync({
-  db:db2,config:{},
-  anki:{stats:async()=>[{noteId:9201,word:'飲む',reading:'のめる',status:3,reviews:[10000]}]},
-  resolveEntry:async(word,reading)=>pickEntry([potential],word,reading)
- });
- const res2=await sync2.run();
- assert.equal(res2.imported,1);
- assert.equal(db2.prepare('SELECT note_id FROM anki_links WHERE word_id=1169870').get()?.note_id,9201);
+ const checkDb=openStore(root);
+ try{
+  assert.equal(checkDb.prepare('SELECT note_id FROM anki_links WHERE word_id=1512670').get()?.note_id,9101);
+  assert.equal(checkDb.prepare('SELECT note_id FROM anki_links WHERE word_id=1174340').get()?.note_id,9102);
+  assert.equal(checkDb.prepare('SELECT note_id FROM anki_links WHERE word_id=1590000').get()?.note_id,9103);
+ }finally{checkDb.close();}
+ const {Reader}=require('../services/reader.cjs');
+ const reader=Object.create(Reader.prototype);
+ reader.root=root;reader.runtime=runtime;
+ const stats=await reader.v4('ankiStats',{linked:[]});
+ assert.equal(stats[0].entry?.id,1512670);
+ assert.equal(stats[1].entry?.id,1174340);
+ assert.equal(stats[2].entry?.id,1590000);
+ assert.equal(stats[3].entry,undefined);
+ assert.equal(stats[4].entry,undefined);
 });

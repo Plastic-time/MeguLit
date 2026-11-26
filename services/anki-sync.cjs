@@ -9,47 +9,18 @@ function schema(db){db.exec(`CREATE TABLE IF NOT EXISTS anki_links(word_id INTEG
 }
 function link(db,wordId,noteId){schema(db);if(Number.isSafeInteger(wordId)&&Number.isSafeInteger(noteId))db.prepare('INSERT OR REPLACE INTO anki_links VALUES(?,?)').run(wordId,noteId);}
 const KANJI=/[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff々〆ヶ]/;
-const WORD_CHARS=/^[\u3041-\u3096\u30a1-\u30f6ー\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff々〆ヶ]+$/;
 const hira=s=>String(s||'').trim().replace(/[\u30a1-\u30f4]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
-const kanjiOf=s=>[...String(s||'')].filter(c=>KANJI.test(c)).join('');
-const POT_MAP={'え':'う','け':'く','げ':'ぐ','せ':'す','て':'つ','ね':'ぬ','べ':'ぶ','め':'む','れ':'る'};
-function potentialRoot(s){
- const c=[...String(s||'')];
- if(c.length<3||c.at(-1)!=='る')return '';
- const u=POT_MAP[c.at(-2)];
- return u?c.slice(0,-2).join('')+u:'';
-}
-function derivedForms(word,reading=''){
- const w=String(word||'').trim(),r=hira(reading),out=[];
- if(w.length>2&&w.endsWith('する')&&(!r||(r.length>2&&r.endsWith('する')))){
-  const stem=w.slice(0,-2);
-  if(KANJI.test(stem)||[...stem].length>=2)out.push([stem,r?r.slice(0,-2):'']);
- }
- const pw=potentialRoot(w),pr=r?potentialRoot(r):'';
- if(pw&&(!r||pr))out.push([pw,pr]);
- else if(pr&&w.endsWith([...pr].at(-1)))out.push([w,pr]);
- return out;
-}
-function matchesReading(entry,reading,word=''){
+const RESOLVED_READING=Symbol('resolvedReading');
+function matchesReading(entry,reading){
  const want=hira(reading);if(!want)return true;
- const rs=Array.isArray(entry?.readings)?entry.readings.map(hira):[];
- if(rs.includes(want))return true;
- if(!word)return false;
- for(const [dw,dr]of derivedForms(word,want)){
-  if(!dr||!rs.includes(dr))continue;
-  if(Array.isArray(entry.spellings)&&entry.spellings.includes(dw))return true;
-  if(!KANJI.test(dw)&&rs.includes(hira(dw)))return true;
- }
- return false;
+ if(entry?.[RESOLVED_READING]===want)return true;
+ return Array.isArray(entry?.readings)&&entry.readings.some(r=>hira(r)===want);
 }
-function pickOne(list,w,r,allowKanji=true){
- const wk=kanjiOf(w);
+function pickDirect(list,w,r){
  if(r){
   const byReading=list.filter(e=>Array.isArray(e.readings)&&e.readings.some(x=>hira(x)===r));
   const bySpelling=byReading.filter(e=>Array.isArray(e.spellings)&&e.spellings.includes(w));
-  const byKana=byReading.filter(e=>e.readings.some(x=>hira(x)===hira(w)));
-  const byKanji=allowKanji&&wk&&WORD_CHARS.test(w)?byReading.filter(e=>Array.isArray(e.spellings)&&e.spellings.some(sp=>WORD_CHARS.test(sp)&&kanjiOf(sp)===wk)):[];
-  const hits=bySpelling.length?bySpelling:(byKana.length?byKana:byKanji);
+  const hits=bySpelling.length?bySpelling:byReading.filter(e=>e.readings.some(x=>hira(x)===hira(w)));
   return hits[0]||null;
  }
  const bySpelling=list.filter(e=>Array.isArray(e.spellings)&&e.spellings.includes(w));
@@ -61,14 +32,30 @@ function pickOne(list,w,r,allowKanji=true){
  const distinct=new Set(hits.flatMap(e=>Array.isArray(e.readings)?e.readings.map(hira).filter(Boolean):[]));
  return distinct.size===1?hits[0]:null;
 }
-function pickEntry(entries,word,reading=''){
+function pickEntry(entries,word,reading='',analysis=null){
  const list=Array.isArray(entries)?entries.filter(Boolean):[],w=String(word||'').trim(),r=hira(reading);
  if(!list.length||!w)return null;
- const direct=pickOne(list,w,r,true);
+ const direct=pickDirect(list,w,r);
  if(direct)return direct;
- for(const [dw,dr]of derivedForms(w,r)){
-  const hit=pickOne(list,dw,dr,false);
-  if(hit)return hit;
+ if(!analysis||typeof analysis!=='object')return null;
+ if(analysis.selection_analysis?.exact===false||analysis.exact===false)return null;
+ const m=analysis.morphology||analysis;
+ if(!m||typeof m!=='object')return null;
+ const mReading=hira(m.reading),mLookupReading=hira(m.lookupReading);
+ if(r&&mReading&&mReading!==r&&!(mLookupReading&&mLookupReading===r))return null;
+ const seen=new Set([w]),forms=[];
+ const push=(b,lr)=>{const s=String(b||'').trim();if(!s||seen.has(s))return;seen.add(s);forms.push([s,lr]);};
+ push(m.lookup,mLookupReading);
+ push(m.base,'');
+ push(m.normalized,'');
+ for(const [base,lr]of forms){
+  const wantR=lr||r;
+  let hit=wantR?pickDirect(list,base,wantR):null;
+  if(!hit&&(!r||(mReading&&mReading===r)))hit=pickDirect(list,base,'');
+  if(hit){
+   if(r&&!matchesReading(hit,r))return {...hit,[RESOLVED_READING]:r};
+   return hit;
+  }
  }
  return null;
 }
@@ -90,7 +77,7 @@ class AnkiSync{
     const existing=rows.find(row=>String(row.reading||'')===rawReading)||(wantReading?rows.find(row=>hira(row.reading)===wantReading):null);
     wordId=existing?.id;
     if(!wordId&&note.word){
-     if(attempts<300){attempts++;lastAttempt=note.noteId;try{const found=await this.resolve(note.word,rawReading);if(found&&matchesReading(found,rawReading,rawWord)){entry=found;wordId=entry.id;}}catch{}}
+     if(attempts<300){attempts++;lastAttempt=note.noteId;try{const found=await this.resolve(note.word,rawReading);if(found&&matchesReading(found,rawReading)){entry=found;wordId=entry.id;}}catch{}}
      else more=true;
     }
    }
