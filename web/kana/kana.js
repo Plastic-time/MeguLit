@@ -70,7 +70,7 @@ function createStore(api,data){
 }
 
 /* ---------- 发音：走 MeguLit 的 AivisSpeech（词典读音 + UniDic 音调），连不上退回系统语音 ---------- */
-function createSpeech(api,store,toast=()=>{}){
+function createSpeech(api,store,toast=()=>{},active=()=>true){
  const cache=new Map();let current=null,seq=0,offline=false;
  const volume=()=>{const p=store.get(KEY.p,{});return Number.isFinite(p.volume)?p.volume:0.4;};
  const readingOf=t=>{for(const w of Object.values(D.WORD_H))if(w[0]===t)return w[1];return '';};
@@ -92,10 +92,10 @@ function createSpeech(api,store,toast=()=>{}){
   if(my===seq)system(text);
  }
  function stop(){if(current){current.pause();current=null;}try{speechSynthesis.cancel();}catch{}}
- /* start the voice engine as soon as the kana module opens, so the first click already has a voice */
- setTimeout(()=>{synth('あ').catch(()=>{});},300);
+ /* start the voice engine when AI voice is chosen, so the first click already has a voice */
+ setTimeout(()=>{if(active()&&voice()==='ai')synth('あ').catch(()=>{});},300);
  let queue=Promise.resolve();
- function prefetch(list){queue=queue.then(async()=>{for(const t of [...new Set(list)].slice(0,120)){if(offline)return;if(recorded(t))continue;try{await synth(t);}catch{return;}}});return queue;}
+ function prefetch(list){queue=queue.then(async()=>{for(const t of [...new Set(list)].slice(0,120)){if(!active()||offline)return;if(recorded(t))continue;try{await synth(t);}catch{return;}}});return queue;}
  function setVolume(v){if(current)current.volume=v;}
  return {say,prefetch,stop,setVolume};
 }
@@ -111,7 +111,7 @@ export async function mountKana(target,{api,invoke,toast,start='index',openTab,f
  target.replaceChildren(host);
  const root=shadow.querySelector('.kana-root'),viewEl=shadow.querySelector('.kn-view');
  const data=await api('kana_progress').catch(()=>({mastery:{},boxes:{},runs:[],applied:[],lessons:{},prefs:{volume:0.4}}));
- const store=createStore(api,data),speech=createSpeech(api,store,(...a)=>(toast||(()=>{}))(...a));liveStore=store;
+ const store=createStore(api,data),speech=createSpeech(api,store,(...a)=>(toast||(()=>{}))(...a),()=>host.isConnected);liveStore=store;
  let gameWordsCache=null;
  const gameWords=()=>gameWordsCache??=api('kana_game_words',{words:D.GAME_WORDS}).then(r=>r.words||{}).catch(()=>({}));
  let keyHandlers=[],leaveHandlers=[],current={name:'index',params:{}};
