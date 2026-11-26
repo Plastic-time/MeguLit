@@ -482,11 +482,30 @@
     return drawn;
   }
   let reveal = { id: 0, n: 0, t: 0 };
-  /* tags a dash token (see the style rule); the stroke takes the colour the glyph was filled with */
+  /* tags a dash token (see the style rule); leave --megulit-dash-color unset when fill tracks currentColor (or gradient
+     transparent fill) so ::after inherits currentColor dynamically across read/unread line colour transitions. Only pin
+     --megulit-dash-color when a stylesheet sets an explicit non-transparent -webkit-text-fill-color different from color. */
+  function applyDashColor(t, fill, color) {
+    if (fill && fill !== 'rgba(0, 0, 0, 0)' && fill !== color) t.style.setProperty('--megulit-dash-color', fill);
+    else t.style.removeProperty('--megulit-dash-color');
+  }
+  function refreshDashColors() {
+    const list = [...document.querySelectorAll('.sentence-text .char-token.megulit-dash')];
+    if (!list.length) return;
+    // Two-phase read/write: lift inline/class overrides on all dashes first so the browser runs one style recalc.
+    for (const t of list) { t.classList.remove('megulit-dash'); t.style.removeProperty('-webkit-text-fill-color'); }
+    const measured = list.map(t => { const cs = getComputedStyle(t); return [t, cs.webkitTextFillColor, cs.color]; });
+    for (const [t, fill, color] of measured) {
+      applyDashColor(t, fill, color);
+      t.classList.add('megulit-dash');
+      t.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
+    }
+  }
   function markDash(t) {
     if (t.classList.contains('megulit-dash') || !DASH.test(t.textContent || '')) return;
-    const cs = getComputedStyle(t), fill = cs.webkitTextFillColor, color = fill && fill !== 'rgba(0, 0, 0, 0)' ? fill : cs.color;
-    t.style.setProperty('--megulit-dash-color', color); t.classList.add('megulit-dash');
+    const cs = getComputedStyle(t);
+    applyDashColor(t, cs.webkitTextFillColor, cs.color);
+    t.classList.add('megulit-dash');
     /* 2026-11-16 (user: 「──」 drawn as two lines of different widths): a game style's own fill / outline rules outranked
        the dash rule, so the glyph was painted under the drawn line. Inline !important wins over every stylesheet. */
     for (const [p, v] of [['-webkit-text-fill-color', 'transparent'], ['-webkit-text-stroke-width', '0px'], ['text-shadow', 'none'], ['paint-order', 'normal']]) t.style.setProperty(p, v, 'important');
@@ -1091,9 +1110,16 @@
   let busy = false;
   new MutationObserver(records => { if (on && (line || drawnByGame || page || bandWindow) && records.some(r => !(r.target.closest?.('.tomoyo-cn-dialog,#megulit-place-extras,#megulit-page-ahead,.megulit-old-line')) && !r.target.classList?.contains('megulit-old-line'))) { /* page mode: at once, before the next paint, so a line that just stopped being the reader's own never misses a frame */ if (page && !busy) { busy = true; try { apply(); } finally { busy = false; } } else schedule(); } }).observe(document.documentElement, { subtree: true, childList: true, characterData: true });
   const markAll = root => { for (const t of (root.querySelectorAll ? root.querySelectorAll('.sentence-text .char-token:not(.megulit-dash)') : [])) markDash(t); };
+  let dashRefreshQueued = false;
+  const scheduleDashRefresh = () => {
+    if (dashRefreshQueued || !document.querySelector('.sentence-text .char-token.megulit-dash')) return;
+    dashRefreshQueued = true;
+    requestAnimationFrame(() => { dashRefreshQueued = false; refreshDashColors(); });
+  };
   new MutationObserver(records => { for (const r of records) for (const n of r.addedNodes) if (n.nodeType === 1) { if (n.matches?.('.char-token') && n.closest('.sentence-text')) markDash(n); else markAll(n); } }).observe(document.documentElement, { subtree: true, childList: true });
+  if (document.body) new MutationObserver(scheduleDashRefresh).observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
   markAll(document);
   addEventListener('resize', schedule);
-  new MutationObserver(() => { if (on && (anchor || page || bandWindow)) schedule(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+  new MutationObserver(() => { scheduleDashRefresh(); if (on && (anchor || page || bandWindow)) schedule(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
   addEventListener('megulit-profile', schedule);
 })();
