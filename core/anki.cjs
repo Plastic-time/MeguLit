@@ -67,9 +67,8 @@ class Anki{
   const notes=await this.call(c,'notesInfo',{notes:ids}),cardIds=notes.flatMap(n=>n.cards||[]);
   const cards=cardIds.length?await this.call(c,'cardsInfo',{cards:cardIds}):[],byId=new Map(cards.map(x=>[x.cardId,x]));
   const reviews=cardIds.length?await this.call(c,'getReviewsOfCards',{cards:cardIds.map(String)}):{};
-  const text=v=>String(v?.value||'').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').trim();
   const level=x=>{if(!x)return 0;if(x.type===0||x.queue===0)return 0;if(x.type===1||x.type===3||x.queue===1||x.queue===3)return 1;const ivl=Number(x.interval)||0;return ivl>=21?4:ivl>=7?3:2;};
-  return notes.map(n=>{const cs=(n.cards||[]).map(id=>byId.get(id)).filter(Boolean);return {noteId:n.noteId,word:text(n.fields?.Word),reading:text(n.fields?.WordReading||n.fields?.Reading),sentence:text(n.fields?.Sentence),status:cs.length?Math.max(...cs.map(level)):0,reviews:(n.cards||[]).flatMap(id=>(reviews[String(id)]||[]).map(r=>Number(r.id)).filter(Number.isFinite))};});
+  return notes.map(n=>{const cs=(n.cards||[]).map(id=>byId.get(id)).filter(Boolean);return {noteId:n.noteId,word:plainText(n.fields?.Word),reading:plainText(n.fields?.WordReading)||plainText(n.fields?.Reading),sentence:plainText(n.fields?.Sentence),status:cs.length?Math.max(...cs.map(level)):0,reviews:(n.cards||[]).flatMap(id=>(reviews[String(id)]||[]).map(r=>Number(r.id)).filter(Number.isFinite))};});
  }
  async status(c){return {version:await this.call(c,'version'),decks:await this.call(c,'deckNames'),models:await this.call(c,'modelNames')};}
  async sync(word,config,audio,extra={}){const c=cleanV4(config);if(!word?.surface||!word?.reading)throw Error('当前词没有确定读音，无法制卡');const id=createHash('sha256').update(JSON.stringify(word.cardKey?[word.cardKey]:[word.base||word.surface,word.reading])).digest('hex'),lock=JSON.stringify([c.ankiUrl,c.ankiDeck,c.ankiModel,id]);if(this.pending.has(lock))return this.pending.get(lock);const job=this.save(word,c,audio,id,extra).finally(()=>this.pending.delete(lock));this.pending.set(lock,job);return job;}

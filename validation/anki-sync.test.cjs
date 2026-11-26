@@ -113,3 +113,40 @@ test('bridge anki_sync and reader ankiStats resolve homographs by reading instea
  assert.equal(stats[1].entry?.id,302);
  assert.equal(stats[2].entry,undefined);
 });
+
+test('Anki.stats falls back to Reading when WordReading is empty or nbsp so homograph sync does not drop readings',async t=>{
+ const {db}=fixture(t);
+ const {Anki}=require('../core/anki.cjs');
+ const anki=new Anki(async(_url,options)=>{
+  const {action}=JSON.parse(options.body);let result;
+  if(action==='findNotes')result=[8001,8002,8003];
+  else if(action==='notesInfo')result=[
+   {noteId:8001,cards:[9001],fields:{Word:{value:'生',order:0},WordReading:{value:'',order:1},Reading:{value:'なま',order:2},Sentence:{value:'生で食べる。',order:3}}},
+   {noteId:8002,cards:[9002],fields:{Word:{value:'<span>生</span>',order:0},WordReading:{value:'<div>&nbsp;</div>',order:1},Reading:{value:'せい&nbsp;',order:2},Sentence:{value:'生を受ける。',order:3}}},
+   {noteId:8003,cards:[9003],fields:{Word:{value:'言葉',order:0},WordReading:{value:'ことば',order:1},Reading:{value:'ふるい',order:2},Sentence:{value:'',order:3}}}
+  ];
+  else if(action==='cardsInfo')result=[
+   {cardId:9001,type:2,queue:2,interval:21},
+   {cardId:9002,type:2,queue:2,interval:10},
+   {cardId:9003,type:2,queue:2,interval:3}
+  ];
+  else if(action==='getReviewsOfCards')result={'9001':[{id:10000}],'9002':[{id:20000}],'9003':[]};
+  else throw Error('unexpected '+action);
+  return Response.json({result,error:null});
+ });
+ const notes=await anki.stats({});
+ assert.deepEqual(notes.map(n=>[n.noteId,n.word,n.reading]),[
+  [8001,'生','なま'],
+  [8002,'生','せい'],
+  [8003,'言葉','ことば']
+ ]);
+ const entries=[
+  {id:501,spellings:['生'],readings:['せい'],definitions:['life']},
+  {id:502,spellings:['生'],readings:['なま'],definitions:['raw']}
+ ];
+ const sync=new AnkiSync({db,config:{},anki,resolveEntry:async(word,reading)=>pickEntry(entries,word,reading)});
+ const res=await sync.run();
+ assert.equal(res.imported,2);assert.equal(res.linked,3);assert.equal(res.skipped,0);assert.equal(res.reviews,2);
+ assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=502').get().note_id,8001);
+ assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=501').get().note_id,8002);
+});
