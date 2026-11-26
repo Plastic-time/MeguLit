@@ -86,9 +86,9 @@ class AnkiReviewer{
   let card;try{card=await this.call('guiCurrentCard');}catch(error){throw Error(error.message==='ANKI_REVIEW_INACTIVE'?'ANKI_MEDIA_MISSING':error.message);}
   if(!card||Number(card.cardId)!==id)throw Error('ANKI_CARD_CHANGED');if(await this.call('guiPlayAudio')===false)throw Error('ANKI_FAILED');return {played:true};}
  /* the clips of one card in template order (answer side, which holds the question's too), as data: URLs */
- async cardClips(id){const [card]=await this.call('cardsInfo',{cards:[id]});if(!card)return [];const audio=require('./anki-media.cjs'),html=String(card.answer||'');
-  let names=[];if(/\[anki:play:a:\d+\]/.test(html)){try{const play=audio.playMap(card,await this.call('modelTemplates',{modelName:card.modelName}),html);names=[...html.matchAll(/\[anki:play:a:(\d+)\]/g)].map(m=>play.get('a:'+m[1]));}catch{}}
-  if(!names.length||names.some(n=>!n))names=[...audio.sounds(html),...Object.values(card.fields||{}).sort((a,b)=>(a?.order??0)-(b?.order??0)).flatMap(f=>audio.sounds(f?.value))];
+ async cardClips(id){const [card]=await this.call('cardsInfo',{cards:[id]});if(!card)return [];const audio=require('./anki-media.cjs'),state=this.session(),frontOnly=state?.cardId===id&&state.answerShown===false,html=String((frontOnly?card.question:card.answer)||'');
+  let names=[];if(/\[anki:play:[qa]:\d+\]/.test(html)){try{const play=audio.playMap(card,await this.call('modelTemplates',{modelName:card.modelName}),html);names=[...html.matchAll(/\[anki:play:([qa]):(\d+)\]/g)].map(m=>play.get(m[1]+':'+m[2]));}catch{}}
+  if(!names.length||names.some(n=>!n))names=frontOnly?audio.sounds(html):[...audio.sounds(html),...Object.values(card.fields||{}).sort((a,b)=>(a?.order??0)-(b?.order??0)).flatMap(f=>audio.sounds(f?.value))];
   const out=[];for(const name of [...new Set(names)].filter(n=>n&&!/[\\/]/.test(n)).slice(0,6)){const data=await this.mediaFile(name);if(!data)continue;const cache=require('../core/anki-media-cache.cjs'),clip={name,src:'data:'+cache.mimeOf(data,name)+';base64,'+data};if(cache.isSynth(this.mediaDir,name))clip.channel='sentence';out.push(clip);}return out;}
  /* one media file: MeguLit's own copy first, then Anki's media folder (copied here for next time) */
  async mediaFile(name){const cache=require('../core/anki-media-cache.cjs');const local=cache.read(this.mediaDir,name);if(local)return local;
