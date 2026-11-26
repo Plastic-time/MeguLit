@@ -1141,7 +1141,7 @@ function dictionary(target){
   /* 2026-11-15 results use the word page's layout (detail-collect.js mountEntries): headwords left, one row per entry, the current entry on
      the right with its MOJi detail; click / ↑ ↓ switches, rows never move, the wheel scrolls the list */
   let unmountEntries=()=>{},savedSet=null,wantedEntry='';
-  const loadSaved=()=>savedSet||(savedSet=api('vocabulary').then(rows=>new Set(rows.flatMap(r=>[r.spelling,r.reading]).filter(Boolean))).catch(()=>new Set()));
+  const loadSaved=()=>savedSet||(savedSet=api('vocabulary').then(rows=>new Set(rows.map(r=>r.spelling||r.reading).filter(Boolean))).catch(()=>new Set()));
   const renderList=async()=>{unmountEntries();unmountEntries=()=>{};
     if(!lastItems.length){results.innerHTML=empty(text.noDefinition,'word');return;}
     const request=ticket,[{mountEntries},saved]=await Promise.all([import('./detail-collect.js'),loadSaved()]);if(request!==ticket||!results.isConnected)return;
@@ -1157,7 +1157,7 @@ function dictionary(target){
       toast(`${{zh:'已加入 Anki',ja:'Anki に追加しました',en:'Added to Anki'}[locale]} · ${item.spelling||item.reading}`);
       savedSet=null;}catch(error){toast(errorMessage(error));throw error;}},
      onSave:async item=>{try{const r=await api('reading_save_word',{key:item.spelling||item.reading,base:item.spelling||item.reading});
-      toast(`${{zh:'已加入单词本',ja:'単語帳に追加しました',en:'Added to your words'}[locale]} · ${r?.spelling||item.spelling}`);}catch(error){toast(errorMessage(error));throw error;}}});
+      toast(`${{zh:'已加入单词本',ja:'単語帳に追加しました',en:'Added to your words'}[locale]} · ${r?.spelling||item.spelling||item.reading}`);savedSet=null;}catch(error){toast(errorMessage(error));throw error;}}});
   };
   if(onlineSource==='jisho')account.hidden=true;else api('moji_status').then(state=>{if(account.isConnected&&!account.querySelector('.moji-qr-panel'))showStatus(state);}).catch(()=>showStatus({}));
   target.querySelector('#lookup-form').addEventListener('submit',async event=>{
