@@ -1191,19 +1191,24 @@ function dictionary(target){
  async function review(token,target){
   target.innerHTML=`<div class="tabs review-sources"><button class="tab active" data-review-source="anki">${text.ankiReview}</button><button class="tab" data-review-source="local">${text.localReview}</button></div><div id="review-content"></div>`;
   const content=target.querySelector('#review-content');
-  target.querySelectorAll('[data-review-source]').forEach(button=>button.onclick=()=>{target.querySelectorAll('[data-review-source]').forEach(b=>b.classList.toggle('active',
-   b===button));if(button.dataset.reviewSource==='anki')renderAnkiReview({target:content,api,text,esc,isCurrent:()=>token===pageToken&&button.classList.contains('active'),
-   toast,cover:ankiCover,windowAction:ankiWindow}).catch(error=>toast(errorMessage(error)));else localReview(token,content);});
-  await renderAnkiReview({target:content,api,text,esc,isCurrent:()=>token===pageToken&&target.querySelector('[data-review-source="anki"]').classList.contains('active'),
+  let sourceTicket=0;
+  target.querySelectorAll('[data-review-source]').forEach(button=>button.onclick=()=>{const ticket=++sourceTicket;target.querySelectorAll('[data-review-source]').forEach(b=>b.classList.toggle('active',
+   b===button));const isCurrent=()=>token===pageToken&&ticket===sourceTicket&&button.classList.contains('active')&&content.isConnected;
+   if(button.dataset.reviewSource==='anki')renderAnkiReview({target:content,api,text,esc,isCurrent,
+   toast,cover:ankiCover,windowAction:ankiWindow}).catch(error=>toast(errorMessage(error)));else localReview(token,content,isCurrent);});
+  const ankiTicket=++sourceTicket;
+  await renderAnkiReview({target:content,api,text,esc,isCurrent:()=>token===pageToken&&ankiTicket===sourceTicket&&!!target.querySelector('[data-review-source="anki"]')?.classList.contains('active')&&content.isConnected,
    toast,quiet:true,cover:ankiCover,windowAction:ankiWindow});
 }
-async function localReview(token,target){
-  const words=await api('vocabulary');if(token!==pageToken)return;
+async function localReview(token,target,isCurrent=()=>token===pageToken&&target.isConnected){
+  let words;try{words=await api('vocabulary');}catch(error){if(isCurrent())toast(errorMessage(error));return;}
+  if(!isCurrent())return;
   if(!words.length){target.innerHTML=empty(text.emptyWords,'learning');return;}
-  let index=0,revealed=false;
-  function draw(){const word=words[index];if(!word){target.innerHTML=empty(text.reviewDone,'check',String(words.length));return;}
+  let index=0,revealed=false,busy=false;
+  function draw(){if(!isCurrent())return;const word=words[index];if(!word){target.innerHTML=empty(text.reviewDone,'check',String(words.length));return;}
     target.innerHTML=`<section class="panel review-card"><div class="muted">${index+1} / ${words.length}</div><h2>${esc(word.spelling)}</h2>${revealed?`<div class="word-reading">${esc(word.reading)}</div><div class="word-def">${esc(definitions(word.definitions))}</div>`:`<p class="muted">${text.reviewSub}</p>`}<div class="review-controls"><button class="primary" id="review-next">${revealed?text.next:text.showAnswer}</button></div></section>`;
-    target.querySelector('#review-next').addEventListener('click',async()=>{if(revealed){await api('record_review',{id:word.id});index++;revealed=false;}else revealed=true;
+    const nextButton=target.querySelector('#review-next');
+    nextButton.addEventListener('click',async()=>{if(busy)return;if(revealed){busy=true;nextButton.disabled=true;try{await api('record_review',{id:word.id});}catch(error){busy=false;if(isCurrent()&&nextButton.isConnected)nextButton.disabled=false;if(isCurrent())toast(errorMessage(error));return;}busy=false;if(!isCurrent())return;index++;revealed=false;}else revealed=true;
      draw();});
   }draw();
 }
