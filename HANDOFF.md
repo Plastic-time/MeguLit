@@ -69,7 +69,7 @@
 | RRFZ | 新增 AGENTS.md：贡献者与 AI 代理须遵守的仓库规范（分层修复、回归测试、PR 要求） | — | rrfz/agents-md | 11-26 | 完成：已合并 #1294 b4d89e6f |
 
 **@RRFZ：上表这些我们这边在做，请先别动；你在做的也请登记进来，我们看到就不碰。**
-| 魚魚棟 · Claude | 模拟器实验：Switch 模拟器（Eden/Ryubing）里读对话文本 + 换成等长空白隐藏原文、选项照常；样本 一部 Switch 乙游 + 海猫 Switch 版（DS 下载中） | — | exp/emulator-hook | 11-27 | 等 DS 下载 |
+| 魚魚棟 · Claude | 模拟器实验：Switch 模拟器（Eden/Ryubing）里读对话文本 + 换成等长空白隐藏原文、选项照常；样本 一部 Switch 乙游 + 海猫 Switch 版（DS 下载中） | — | exp/emulator-hook | 11-27 | 暂停：磁盘（E: 剩余空间不足；E:galadaptswitch-otome 先留着） |
 
 ## 已放弃
 
