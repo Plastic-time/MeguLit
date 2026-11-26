@@ -51,7 +51,7 @@
 | 魚魚棟 · Claude | 阅读层：源头不画时日文行由阅读层自己画；快进 4000 字长行导致页面卡死 | — | reader-nodraw | 11-26 | 已提交，待合并 |
 | 魚魚棟 · Claude | Cardinal 回放打分加强（实屏 OCR 证据、扣分说明、磁带版本化、快进段不计分、YU-RIS/BGI/通用回放模型）；Yui 启动阶段补漏、#1090 frontend-rejection | #1090 | yui-cardinal | 11-26 | 已提交，待合并 |
 | 魚魚棟 · Claude | 冷测试输入兜底（PostMessage → InputShim → SendInput）、自动回答改名弹窗、选项定位答复 | — | coldtest-inputshim | 11-26 | 已提交，待合并 |
-| 魚魚棟 · Claude | euphoria HD リマスター（YU-RIS）开头选项「オープニングを見る」「メインルームへ」没有翻译：查选项是否进翻译链，按四层修（seed 优先，缺能力补 YU-RIS 引擎层） | #1143 | fix/1143-yuris-choice-translate | 11-27 | 进行中 |
+| 魚魚棟 · Claude | euphoria HD リマスター（YU-RIS）开头选项「オープニングを見る」「メインルームへ」没有翻译：查选项是否进翻译链，按四层修（seed 优先，缺能力补 YU-RIS 引擎层） | #1143 | fix/1143-yuris-choice-translate | 11-27 | PR #1295 已开待合并：根因是开头选项被当成台词流 + OCR 把选项读成台词；改 YU-RIS 引擎层新键 source.autoSelectSkip + euphoria HD 版本 seed + 内核 OCR 拒收选项行，实机两处选项都有中文 |
 | 魚魚棟 · Claude | 适配 アイキス3 sexy（戯画，QQ 精华 #1109，光盘版+1.03）和 ハミダシクリエイティブ（まどそふと，QQ 精华 #1133）：adapt-auto 冷测试，seed 只写 `The Seed/<engine>/<slug>/` | — | adapt/aikiss3-hamidashi | 11-27 | 进行中 |
 | 魚魚棟 · Claude | **MeguLit-Adapter**（半自动适配器，合并画字钩子和引擎剧本读取，tools/adapt-auto.cjs 并进来只留一个入口 `tools/megulit-adapter.cjs`）：认游戏按 VNDB+发行版、原文优先用引擎剧本读取（复用 RRFZ 读取器）、画字钩子对齐兜底、引擎级隐藏优先、版本层按封包/剧本指纹、需要人看的地方停下给截图和一句话问题 | — | feat/megulit-adapter（基于 feat/auto-adapt） | 11-27 | 进行中 |
 | 魚魚棟 · Claude | YU-RIS 引擎层：正文 N 倍逐字重复去重、正文线程选择 | — | engine-yuris | 11-26 | 暂停（已提交） |
