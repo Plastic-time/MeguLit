@@ -69,7 +69,8 @@ function find(configured,env=process.env,exists=file=>{try{return fs.statSync(fi
  return '';
 }
 // AnkiConnect is an Anki add-on (code 2055492159). Without it MeguLit cannot add cards even when Anki is open.
-function ankiConnectInstalled(env=process.env){const base=env.APPDATA&&path.join(env.APPDATA,'Anki2','addons21');if(!base)return null;try{return fs.readdirSync(base).some(name=>name==='2055492159'||/anki-?connect/i.test(name));}catch{return null;}}
+function addonEntryExists(dir){try{return fs.statSync(path.join(dir,'__init__.py')).isFile();}catch{return false;}}
+function ankiConnectInstalled(env=process.env){const base=env.APPDATA&&path.join(env.APPDATA,'Anki2','addons21');if(!base)return null;try{return fs.readdirSync(base).some(name=>(name==='2055492159'||/anki-?connect/i.test(name))&&addonEntryExists(path.join(base,name)));}catch{return null;}}
 // Anki's main window is a Qt window titled "Anki" or "<profile> - Anki"; the 25.x launcher runs Anki in a child
 // process, so windows are matched by title and class rather than by the spawned PID.
 const WINDOWS=`
@@ -206,23 +207,44 @@ function ankiProcesses(){try{const out=require('node:child_process').execFileSyn
 // from "not installed", which needs a different hint.
 /* fresh: Anki was just installed and has not started yet (one-click install): the add-on goes in before its first start,
    which loads it, instead of failing with ANKI_NEVER_STARTED */
-async function installAnkiConnect(env=process.env,{locate=()=>find('',env),fresh=false}={}){
+async function installAnkiConnect(env=process.env,{locate=()=>find('',env),fresh=false,running=ankiRunning,fetcher=fetch,extract=(zip,out)=>require('node:child_process').execFileSync(path.join(env.WINDIR||'C:/Windows','System32/WindowsPowerShell/v1.0/powershell.exe'),['-NoProfile','-NonInteractive','-Command','Expand-Archive -LiteralPath $env:MEGULIT_ZIP -DestinationPath $env:MEGULIT_OUT -Force'],{windowsHide:true,timeout:60000,env:{...env,MEGULIT_ZIP:zip,MEGULIT_OUT:out}})}={}){
  if(!env.APPDATA)throw Error('ANKI_ADDON_FOLDER_MISSING');
  const base=path.join(env.APPDATA,'Anki2','addons21'),target=path.join(base,ANKICONNECT_CODE);
  if(ankiConnectInstalled(env))return {installed:true,already:true};
- let created=false;if(!fs.existsSync(path.join(env.APPDATA,'Anki2'))){if(!locate())throw Error('ANKI_NOT_INSTALLED');if(!fresh)throw Error('ANKI_NEVER_STARTED');fs.mkdirSync(base,{recursive:true});created=true;}
- /* a folder made just now is not in use by any running Anki */
- if(!created&&ankiRunning())throw Error('ANKI_RUNNING');
- const response=await fetch('https://ankiweb.net/shared/download/'+ANKICONNECT_CODE+'?v=2.1&p=250900',{redirect:'follow',signal:AbortSignal.timeout(60000),headers:{'User-Agent':'MeguLit'}});
- if(!response.ok)throw Error('ANKICONNECT_DOWNLOAD_FAILED: HTTP '+response.status);
- const bytes=Buffer.from(await response.arrayBuffer());if(bytes.length<4096||bytes.length>5<<20||bytes.readUInt32LE(0)!==0x04034b50)throw Error('ANKICONNECT_DOWNLOAD_FAILED: not an add-on package');
+ if(!fs.existsSync(path.join(env.APPDATA,'Anki2'))){if(!locate())throw Error('ANKI_NOT_INSTALLED');if(!fresh)throw Error('ANKI_NEVER_STARTED');}
+ if(running())throw Error('ANKI_RUNNING');
+ let response,bytes;
+ try{
+  response=await fetcher('https://ankiweb.net/shared/download/'+ANKICONNECT_CODE+'?v=2.1&p=250900',{redirect:'follow',signal:AbortSignal.timeout(60000),headers:{'User-Agent':'MeguLit'}});
+  if(!response.ok)throw Error('HTTP '+response.status);
+  bytes=Buffer.from(await response.arrayBuffer());
+ }catch(error){throw Error('ANKICONNECT_DOWNLOAD_FAILED: '+(error?.message||error));}
+ if(bytes.length<4096||bytes.length>5<<20||bytes.readUInt32LE(0)!==0x04034b50)throw Error('ANKICONNECT_DOWNLOAD_FAILED: not an add-on package');
  const work=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'megulit-ankiconnect-')),zip=path.join(work,'addon.zip'),out=path.join(work,'addon');
+ let staging='';
  try{
   fs.writeFileSync(zip,bytes);
-  require('node:child_process').execFileSync(path.join(env.WINDIR||'C:/Windows','System32/WindowsPowerShell/v1.0/powershell.exe'),['-NoProfile','-NonInteractive','-Command','Expand-Archive -LiteralPath $env:MEGULIT_ZIP -DestinationPath $env:MEGULIT_OUT -Force'],{windowsHide:true,timeout:60000,env:{...env,MEGULIT_ZIP:zip,MEGULIT_OUT:out}});
-  const init=path.join(out,'__init__.py');if(!fs.existsSync(init)||!/AnkiConnect|anki_connect|web\.WebServer|webBindAddress/i.test(fs.readFileSync(init,'utf8')+fs.readFileSync(path.join(out,'config.json'),'utf8')))throw Error('ANKICONNECT_DOWNLOAD_FAILED: unexpected package');
-  fs.mkdirSync(base,{recursive:true});fs.cpSync(out,target,{recursive:true,errorOnExist:true,force:false});
+  try{extract(zip,out);}catch(error){throw Error('ANKICONNECT_INSTALL_FAILED: '+(error?.message||error));}
+  const init=path.join(out,'__init__.py'),cfg=path.join(out,'config.json');if(!fs.existsSync(init)||!fs.existsSync(cfg)||!/AnkiConnect|anki_connect|web\.WebServer|webBindAddress/i.test(fs.readFileSync(init,'utf8')+fs.readFileSync(cfg,'utf8')))throw Error('ANKICONNECT_DOWNLOAD_FAILED: unexpected package');
+  fs.mkdirSync(base,{recursive:true});
+  staging=fs.mkdtempSync(path.join(base,'.megulit-addon-'));
+  fs.cpSync(out,staging,{recursive:true,force:true});
+  if(ankiConnectInstalled(env))return {installed:true,already:true};
+  if(running())throw Error('ANKI_RUNNING');
+  const existing=fs.lstatSync(target,{throwIfNoEntry:false});
+  if(existing){
+   if(addonEntryExists(target))return {installed:true,already:true};
+   if(existing.isDirectory()&&!existing.isSymbolicLink())fs.rmSync(target,{recursive:true,force:true});
+   else throw Error('ANKICONNECT_INSTALL_FAILED: target exists');
+  }
+  try{
+   fs.renameSync(staging,target);
+   staging='';
+  }catch(error){
+   if(ankiConnectInstalled(env))return {installed:true,already:true};
+   throw error;
+  }
   return {installed:true,path:target};
- }finally{fs.rmSync(work,{recursive:true,force:true});}
+ }finally{fs.rmSync(work,{recursive:true,force:true});if(staging)fs.rmSync(staging,{recursive:true,force:true});}
 }
 module.exports={AnkiProcess,find,candidates,ankiFolder,coldCandidates,shortcutTarget,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows,listeners,isAnki,portOf};
