@@ -11,24 +11,24 @@
 6. **代码不要直接 push 进 main**（包括 RRFZ、魚魚棟的 Claude 会话、其他 agent）：推自己的分支 → 开 PR → CI 通过、确认没问题 → **squash 合并**
 7. **HANDOFF.md 例外，可以直接 push 进 main**：认领、改状态、写「修了啥」都直接改直接推，第一时间让大家看到，不用等 PR。只改这一个文件，别夹带代码
 8. **撞车时 RRFZ 优先**：RRFZ 已经在做的，或者他想接手的，直接在那一行把「谁」改成他、状态写一句，Claude 会话看到就停手，不争、不覆盖他的改动
-9. **适配好一部游戏就登记**（所有人，包括 RRFZ、魚魚棟的 Claude 会话、其他 agent）：某部游戏的某个版本适配好了（验收过，seed 已合并或 PR 已开），马上在下面「已适配的游戏」表里加一行，写清游戏、引擎、版本（exe SHA-256 前 8 位，再加平台/版本号，比如 Steam 版、DL 版、汉化硬盘版）、状态、谁、PR。**开始适配前先查这张表：同一游戏同一版本已经在表里的，不要再花时间做**；版本不同（exe 哈希不同）才算新活，在那一行旁边加一行
+9. **适配好一部游戏就登记**（所有人，包括 RRFZ、魚魚棟的 Claude 会话、其他 agent）：某部游戏的某个发行版本适配好了（验收过，seed 已合并或 PR 已开），马上在下面「已适配的游戏」表里加一行。**用 VNDB 作品号（v 开头）认游戏，用发行版本认版本**（平台 / 版本名，例如 Steam 版、DL 版、DVD 版、HD リマスター、汉化硬盘版；查得到就附 VNDB 发行号 r 开头），不用 exe 哈希去重（打补丁、免 DVD、汉化都会改 exe）。**开始适配前先查这张表**：同作品同发行版已在表里的不要再做；同作品不同发行版也别从零做，先拿已有的 seed 跑，游戏层一般能直接用，只补版本层
 
 ## 已适配的游戏
 
-同一游戏同一版本（exe 哈希）已在表里的不要重复适配。状态：verified = 官方验收过；owner-ok = 店主确认能用；read = 能用但只能读模式、待修；进行中 = PR 已开未合并
+按「VNDB 作品号 + 发行版」去重，不按 exe 哈希。状态：verified = 官方验收过；owner-ok = 店主确认能用；read = 能用但只能读模式、待修；进行中 = PR 已开未合并
 
-| 游戏 | 引擎 | 版本（exe 前 8 位 · 说明） | 状态 | 谁 | PR / seed | 日期 |
+| 游戏 | VNDB | 发行版 | 引擎 | 状态 | 谁 | PR / seed |
 |---|---|---|---|---|---|---|
-| 千恋＊万花 | KiriKiri | fd37d708 | verified | 魚魚棟 | kirikiri/senren-banka | — |
-| ファタモルガーナの館 | KiriKiri | 17b5941a | owner-ok | 魚魚棟 | kirikiri/fata-morgana | — |
-| 死に逝く君、館に芽吹く憎悪 | KiriKiri | 0adf662a · 汉化硬盘版 | read | 魚魚棟 | kirikiri/shiniyuku-kimi | — |
-| CHAOS;CHILD | MAGES | 51aeae59 | verified | 魚魚棟 | mages/chaos-child | — |
-| STEINS;GATE | MAGES | cbbc5dab | read | 魚魚棟 | mages/steins-gate | — |
-| 素晴らしき日々 | BGI | f52f44c9 | verified | 魚魚棟 | bgi/subahibi | — |
-| 沙耶の唄 | Nitroplus | 7092242e · Steam 版 | verified | 魚魚棟 | nitroplus/saya-no-uta | — |
-| 女装山脈 | YU-RIS | 00f49985 | owner-ok | 魚魚棟 | yuris/josou-sanmyaku | — |
-| オルフレール | KiriKiri | 待补 | 进行中（冷测试连续 5 局通过） | 魚魚棟 · Claude | PR #1291 | 11-27 |
-| Monochrome Empire | YU-RIS2 | 待补 | 进行中（选项被隐藏，卡在原生 hook） | 魚魚棟 · Claude | PR #1291 | 11-27 |
+| 千恋＊万花 | v19073 | 待补 | KiriKiri | verified | 魚魚棟 | kirikiri/senren-banka |
+| ファタモルガーナの館 | v12402 | 待补 | KiriKiri | owner-ok | 魚魚棟 | kirikiri/fata-morgana |
+| 死に逝く君、館に芽吹く憎悪 | v19233 | 汉化硬盘版 | KiriKiri | read | 魚魚棟 | kirikiri/shiniyuku-kimi |
+| CHAOS;CHILD | v14018 | 待补 | MAGES | verified | 魚魚棟 | mages/chaos-child |
+| STEINS;GATE | v2002 | 待补 | MAGES | read | 魚魚棟 | mages/steins-gate |
+| 素晴らしき日々～不連続存在～ | v3144 | 待补 | BGI | verified | 魚魚棟 | bgi/subahibi |
+| 沙耶の唄 | v97 | Steam 版（待核实） | Nitroplus | verified | 魚魚棟 | nitroplus/saya-no-uta |
+| 女装山脈 | v6589 | 待补 | YU-RIS | owner-ok | 魚魚棟 | yuris/josou-sanmyaku |
+| オルフレール | v15563 | 待补 | KiriKiri | 进行中（冷测试连续 5 局通过） | 魚魚棟 · Claude | PR #1291 |
+| Monochrome Empire | v26413 | 待补 | YU-RIS2 | 进行中（选项被隐藏，卡在原生 hook） | 魚魚棟 · Claude | PR #1291 |
 
 ## 进行中
 
