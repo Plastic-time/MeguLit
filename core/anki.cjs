@@ -49,6 +49,7 @@ ruby rt{font-size:.5em;opacity:.85}
 .tm-hl rt{color:#f0883e}
 .replay-button{color:inherit}.replay-button svg{width:40px;height:40px}`;
 const html=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])).replace(/\n/g,'<br>');
+const plainText=v=>String(v?.value??v??'').replace(/<br\s*\/?>/gi,'\n').replace(/<[^<>]*>/g,'').replace(/&nbsp;|\u00a0/gi,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;|&apos;|&#x27;/gi,"'").replace(/&amp;/g,'&').trim();
 // Native Anki queues [sound:] tags automatically. MeguLit notes use a
 // manual player so showing or grading a card never starts the media.
 const audioField=(name,manual)=>manual?'<audio controls preload="none" src="'+name+'"></audio>':'[sound:'+name+']';
@@ -93,7 +94,30 @@ class Anki{
   return changed;
  }
  async save(word,c,audio,id,extra={}){const {available,owned}=await this.prepareModel(c);await this.call(c,'createDeck',{deck:c.ankiDeck});
-  const quote=s=>'"'+s.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"',tag='tomoyo::'+id,found=await this.call(c,'findNotes',{query:'tag:'+tag+' deck:'+quote(c.ankiDeck)+' note:'+quote(c.ankiModel)});if(found.length>1)throw Error('找到多个同步词条，请先在 Anki 中消除重复笔记');
+  const quote=s=>'"'+String(s||'').replace(/([\\"*_])/g,'\\$1')+'"',tag='tomoyo::'+id,found=await this.call(c,'findNotes',{query:'tag:'+tag+' deck:'+quote(c.ankiDeck)+' note:'+quote(c.ankiModel)});if(found.length>1)throw Error('找到多个同步词条，请先在 Anki 中消除重复笔记');
+  const rawWord=String(word.base||word.surface||'').trim();
+  let allowDuplicate=false;
+  if(!found.length){
+   if(word.cardKey)allowDuplicate=true;
+   else{
+    const htmlWord=html(rawWord),wordQuery=htmlWord!==rawWord?'(Word:'+quote(rawWord)+' OR Word:'+quote(htmlWord)+')':'Word:'+quote(rawWord);
+    const sameWordIds=await this.call(c,'findNotes',{query:'note:'+quote(c.ankiModel)+' '+wordQuery});
+    if(sameWordIds.length){
+     const exact=[];
+     for(let i=0;i<sameWordIds.length;i+=500){
+      const infos=await this.call(c,'notesInfo',{notes:sameWordIds.slice(i,i+500)});
+      for(const n of infos)if((!n.modelName||n.modelName===c.ankiModel)&&plainText(n.fields?.Word)===rawWord)exact.push(n);
+     }
+     if(exact.length){
+      const hasKanji=KANJI.test(rawWord),wantReading=hiragana(String(word.reading||'').trim());
+      const readingOf=n=>hiragana(plainText(n.fields?.WordReading)||plainText(n.fields?.Reading));
+      const same=exact.find(n=>{const r=readingOf(n);return hasKanji?(r!==''&&r===wantReading):(r===''||r===wantReading);});
+      if(same)return {id:same.noteId,updated:false,screenshotAttached:false};
+      if(hasKanji&&wantReading&&exact.every(n=>{const r=readingOf(n);return r!==''&&r!==wantReading;}))allowDuplicate=true;
+     }
+    }
+   }
+  }
   const values={Word:html(word.base||word.surface),Pitch:circled(word.pitch),PartOfSpeech:html(word.pos),Meaning:html(word.meaning)+(extra.aiNote?.text?'<div class="megulit-ai-note"><br><b>'+(extra.aiNote.kind==='summary'?'AI 归纳义项':'AI 上下文解释')+'</b><br>'+html(extra.aiNote.text)+'</div>':''),Sentence:html(word.sentence),Audio:''};
   if(available.includes('SentenceFurigana'))values.SentenceFurigana=extra.sentenceHtml||'';if(available.includes('SentenceTranslation'))values.SentenceTranslation=html(extra.translation||'');{/* sentence card: game title and where the translation came from (human first) */const f=require('../services/learning-insights.cjs').ankiSentenceFields({translation:extra.translation,translationSource:extra.translationSource,gameTitle:extra.gameTitle},available);if('Game' in f)values.Game=html(f.Game);if('TranslationSource' in f)values.TranslationSource=html(f.TranslationSource);}if(available.includes('SentenceAudio'))values.SentenceAudio='';
   if(available.includes('Screenshot'))values.Screenshot='';
@@ -110,7 +134,7 @@ class Anki{
    let same=true;try{const [info]=await this.call(c,'notesInfo',{notes:[found[0]]});const old=info?.fields?.Sentence?.value;if(typeof old==='string')same=old.trim()===values.Sentence.trim();}catch{}
    if(same){if(!extra.sentenceAudio)delete values.SentenceAudio;if(!extra.screenshot)delete values.Screenshot;if(!extra.translation){delete values.SentenceTranslation;delete values.TranslationSource;}if(!extra.gameTitle)delete values.Game;}
    else for(const k of ['SentenceAudio','Screenshot','SentenceTranslation','TranslationSource','Game'])if(available.includes(k)&&!(k in values))values[k]='';await this.call(c,'updateNoteFields',{note:{id:found[0],fields:values}});return {id:found[0],updated:true,screenshotAttached:!!extra.screenshot&&available.includes('Screenshot')};}
-  const note=await this.call(c,'addNote',{note:{deckName:c.ankiDeck,modelName:c.ankiModel,fields:values,options:{allowDuplicate:false},tags:['tomoyo_megumin',tag]}});if(!note)throw Error('Anki 未创建笔记');return {id:note,updated:false,screenshotAttached:!!extra.screenshot&&available.includes('Screenshot')};
+  const note=await this.call(c,'addNote',{note:{deckName:c.ankiDeck,modelName:c.ankiModel,fields:values,options:{allowDuplicate},tags:['tomoyo_megumin',tag]}});if(!note)throw Error('Anki 未创建笔记');return {id:note,updated:false,screenshotAttached:!!extra.screenshot&&available.includes('Screenshot')};
  }
 }
 module.exports={Anki,answerReading,hiragana,fields,extraFields,html,circled,FRONT,BACK,CSS};
