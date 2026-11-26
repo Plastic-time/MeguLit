@@ -299,6 +299,12 @@ test('AnkiSync, bridge anki_sync, and reader ankiStats resolve suru verbs, poten
  assert.equal(pickEntry([dictEntries[0]],'勉強する','まったくちがう',{morphology:{base:'勉強する',lookup:'勉強',lookupReading:'べんきょう',reading:''}}),null);
  assert.equal(pickEntry([dictEntries[0]],'勉強する','べんきょうする',{morphology:{base:'勉強する',lookup:'勉強',lookupReading:'べんきょう',reading:'べんきょうする'},selection_analysis:{exact:false}}),null);
  assert.equal(pickEntry([dictEntries[5]],'お話し','ちがう',{morphology:{base:'お話し',normalized:'お話',reading:''}}),null);
+ // Suru stem with explicit lookupReading and non-inflected normalized variants must never fall back to a reading-mismatched entry
+ assert.equal(pickEntry([dictEntries[9]],'生する','せいする',rHomographSuru),null);
+ assert.equal(pickEntry(rHomographSuru.entries,'生する','しょうする',rHomographSuru),null);
+ assert.equal(pickEntry([{id:2001,spellings:['確と'],readings:['しかと']}],'ちゃんと','ちゃんと',{morphology:{base:'ちゃんと',normalized:'確と',reading:'ちゃんと'}}),null);
+ assert.equal(pickEntry([{id:401,spellings:['入る'],readings:['はいる']},{id:402,spellings:['入る'],readings:['いる']}],'入った','はいった',{morphology:{base:'入る',reading:'はいった'}}),null);
+ assert.equal(pickEntry([dictEntries[10]],'汗 ばむ','あせばむ',{morphology:{base:'汗ばむ',surface:'汗 ばむ',reading:'あせばむ'},selection_analysis:{exact:true,parts:[{surface:'汗'},{surface:' '},{surface:'ばむ'}]}}),dictEntries[10]);
  // Resolved reading symbol only matches the reading verified by morphology
  const pickedPot=pickEntry(rPot.entries,'泳げる','およげる',rPot);
  assert.equal(matchesReading(pickedPot,'およげる'),true);
@@ -317,18 +323,20 @@ test('AnkiSync, bridge anki_sync, and reader ankiStats resolve suru verbs, poten
   {noteId:9102,word:'泳げる',reading:'およげる',status:2,reviews:[20000]},
   {noteId:9103,word:'お話し',reading:'おはなし',status:4,reviews:[30000]},
   {noteId:9104,word:'泳げる',reading:'たべる',status:1,reviews:[40000]},
-  {noteId:9105,word:'10分',reading:'ぶん',status:2,reviews:[50000]}
+  {noteId:9105,word:'10分',reading:'ぶん',status:2,reviews:[50000]},
+  {noteId:9106,word:'アクセスする',reading:'あくせすする',status:2,reviews:[60000]}
  ]);
  const runtime={config:()=>({}),emit:()=>{},learning:()=>ll};
  const {dispatch}=require('../services/bridge.cjs');
  const res=await dispatch({action:'anki_sync'},runtime);
- assert.equal(res.imported,3);
+ assert.equal(res.imported,4);
  assert.equal(res.skipped,2);
  const checkDb=openStore(root);
  try{
   assert.equal(checkDb.prepare('SELECT note_id FROM anki_links WHERE word_id=1512670').get()?.note_id,9101);
   assert.equal(checkDb.prepare('SELECT note_id FROM anki_links WHERE word_id=1174340').get()?.note_id,9102);
   assert.equal(checkDb.prepare('SELECT note_id FROM anki_links WHERE word_id=1590000').get()?.note_id,9103);
+  assert.equal(checkDb.prepare('SELECT spelling,reading FROM vocabulary WHERE id=1015230').get()?.spelling,'アクセス');
  }finally{checkDb.close();}
  const {Reader}=require('../services/reader.cjs');
  const reader=Object.create(Reader.prototype);

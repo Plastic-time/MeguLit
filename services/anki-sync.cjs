@@ -9,7 +9,7 @@ function schema(db){db.exec(`CREATE TABLE IF NOT EXISTS anki_links(word_id INTEG
 }
 function link(db,wordId,noteId){schema(db);if(Number.isSafeInteger(wordId)&&Number.isSafeInteger(noteId))db.prepare('INSERT OR REPLACE INTO anki_links VALUES(?,?)').run(wordId,noteId);}
 const KANJI=/[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff々〆ヶ]/;
-const hira=s=>String(s||'').trim().replace(/[\u30a1-\u30f4]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+const hira=s=>String(s||'').trim().replace(/[\u30a1-\u30f6]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
 const RESOLVED_READING=Symbol('resolvedReading');
 function matchesReading(entry,reading){
  const want=hira(reading);if(!want)return true;
@@ -55,14 +55,14 @@ function pickEntry(entries,word,reading='',analysis=null){
  const mReading=hira(m.reading),mLookupReading=hira(m.lookupReading);
  if(r&&(mReading||mLookupReading)&&mReading!==r&&mLookupReading!==r)return null;
  const seen=new Set([w]),forms=[];
- const push=(b,lr)=>{const s=String(b||'').trim();if(!s||seen.has(s))return;seen.add(s);forms.push([s,lr]);};
- push(m.lookup,mLookupReading);
- push(m.base,'');
- push(m.normalized,'');
- for(const [base,lr]of forms){
+ const push=(b,lr,allowInflected)=>{const s=String(b||'').trim();if(!s||seen.has(s))return;seen.add(s);forms.push([s,lr,allowInflected]);};
+ push(m.lookup,mLookupReading,!mLookupReading);
+ push(m.base,'',true);
+ push(m.normalized,'',false);
+ for(const [base,lr,allowInflected]of forms){
   const wantR=r?(lr||r):'';
   let hit=wantR?pickDirect(list,base,wantR):null;
-  if(!hit&&(!r||(mReading&&mReading===r)))hit=pickDirect(list,base,'');
+  if(!hit&&(!r||(allowInflected&&mReading&&mReading===r)))hit=pickDirect(list,base,'');
   if(hit){
    if(r&&!matchesReading(hit,r))return {...hit,[RESOLVED_READING]:r};
    return hit;
@@ -99,7 +99,7 @@ class AnkiSync{
   try{for(const{note,wordId,entry,linked}of resolved){let word=this.db.prepare('SELECT id FROM vocabulary WHERE id=?').get(wordId);
     // A user deletion has priority over importing an Anki note again.
     if(!word&&(linked||this.db.prepare('SELECT 1 FROM word_trash WHERE word_id=?').get(wordId))){result.skipped++;continue;}
-    if(!word&&entry){this.db.prepare('INSERT INTO vocabulary(id,spelling,reading,definitions,status,created_at,original) VALUES(?,?,?,?,0,?,?)').run(wordId,entry.spellings?.[0]||note.word,entry.readings?.[0]||note.reading||'',JSON.stringify(entry.definitions||[]),Math.floor(note.noteId/1000),JSON.stringify({entry,noteId:note.noteId,origin:'anki'}));result.imported++;word={id:wordId};}
+    if(!word&&entry){this.db.prepare('INSERT INTO vocabulary(id,spelling,reading,definitions,status,created_at,original) VALUES(?,?,?,?,0,?,?)').run(wordId,entry.spellings?.[0]||entry.readings?.[0]||note.word,entry.readings?.[0]||note.reading||'',JSON.stringify(entry.definitions||[]),Math.floor(note.noteId/1000),JSON.stringify({entry,noteId:note.noteId,origin:'anki'}));result.imported++;word={id:wordId};}
     if(!word)continue;link(this.db,wordId,note.noteId);result.linked++;
     const status=Number(note.status);if(Number.isInteger(status)&&status>=0&&status<=4)result.status+=Number(this.db.prepare('UPDATE vocabulary SET status=? WHERE id=? AND status!=?').run(status,wordId,status).changes);
     for(const id of note.reviews||[]){if(!Number.isSafeInteger(id)||id<0)continue;const inserted=this.db.prepare('INSERT OR IGNORE INTO anki_synced_reviews VALUES(?,?)').run(id,wordId);if(inserted.changes){this.db.prepare('INSERT INTO review_events(word_id,reviewed_at) VALUES(?,?)').run(wordId,Math.floor(id/1000));result.reviews++;}}
