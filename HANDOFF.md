@@ -42,18 +42,21 @@
 | 魚魚棟 · Claude | E 设置/排版：游戏锁死换行宽度/行距时允许自定义；隐藏鼠标的游戏里 Alt+T 改不了设置；日文原文只占一行选项；Alt+H 再按一次没文本；Alt+T 常驻胶囊（先出方案） | #1137 #1144 #1145 #1132 #1138 | fix/e-settings | 11-26 | 完成：已合并 #1177 555a876f（#1132 在 fix/display-leftovers 继续；胶囊在 feat/alt-t-capsule） |
 | 魚魚棟 · Claude | F The Seed：已适配游戏显示绿色「已适配·默认配置已导入」，不再写只读模式 | #1113 | fix/f-seed | 11-26 | 完成：已合并 #1178 89ef9ea5 |
 | 魚魚棟 · Claude | relay：探针 / 想玩 / 诊断 / Yui 故障登记到汇总 issue（#1199 #1200 #1203 #1204），不再一条条开 | — | relay/issue-trackers（PR #1209） | 11-26 | 完成：1d42a52e 已合并，迁移 0030/0031/0041 已上线，relay 已部署 |
-| 魚魚棟 · Claude | Alt+T 常驻胶囊：三种风格可自选（默认屏幕顶部居中灵动岛 / 侧边竖向胶囊 / 角落小圆点），可拖动、可开关常驻 | #1138 | feat/alt-t-capsule | 11-26 | 进行中 |
-| 魚魚棟 · Claude | 剩余问题：日志说话人显示成旁白；标题/读档画面盖着台词层；日志面板点击穿透 | #1136 | fix/reader-leftovers | 11-26 | 进行中 |
-| 魚魚棟 · Claude | 剩余问题：雾之城文字挤左；Alt+H 再按没文本；双重译文另一来源 | #1104 #1132 #1128 | fix/display-leftovers | 11-26 | 进行中 |
-| 魚魚棟 · Claude | #1248 汇总反馈：译文冒韩文（开源模型低温度 + 韩文译文判失败）；魔法使いの夜整页不再自动只显示中文；其余图片反馈核对 main 已修 | #1116 #1102 #1101 #1105 #1106 #1108 #1141 #1143 | fix/1248-reports | 11-27 | 已提交，待合并 |
-| 魚魚棟 · Claude | 自动适配命令行 `tools/adapt-auto.cjs`：游戏目录 → 探针 → 冷测试自动推进 → 差分 → Cardinal 验收 → result.json（目标每部 5–10 分钟） | — | krkr-drawtext | 11-26 | 进行中 |
-| 魚魚棟 · Claude | KiriKiri 非 KAG 引擎层：DrawText 逐字双发去重、正文线程选择、按句接；原生「源头不画」隐藏原文（MeguLitHook32 `MeguLitDrawSkip.h`） | — | krkr-drawtext / krkr-native-nodraw | 11-26 | 进行中 |
-| 魚魚棟 · Claude | 阅读层：源头不画时日文行由阅读层自己画；快进 4000 字长行导致页面卡死 | — | reader-nodraw | 11-26 | 已提交，待合并 |
-| 魚魚棟 · Claude | Cardinal 回放打分加强（实屏 OCR 证据、扣分说明、磁带版本化、快进段不计分、YU-RIS/BGI/通用回放模型）；Yui 启动阶段补漏、#1090 frontend-rejection | #1090 | yui-cardinal | 11-26 | 已提交，待合并 |
-| 魚魚棟 · Claude | 冷测试输入兜底（PostMessage → InputShim → SendInput）、自动回答改名弹窗、选项定位答复 | — | coldtest-inputshim | 11-26 | 已提交，待合并 |
-| 魚魚棟 · Claude | euphoria HD リマスター（YU-RIS）开头选项「オープニングを見る」「メインルームへ」没有翻译：查选项是否进翻译链，按四层修（seed 优先，缺能力补 YU-RIS 引擎层） | #1143 | fix/1143-yuris-choice-translate | 11-27 | PR #1295 已开待合并：根因是开头选项被当成台词流 + OCR 把选项读成台词；改 YU-RIS 引擎层新键 source.autoSelectSkip + euphoria HD 版本 seed + 内核 OCR 拒收选项行，实机两处选项都有中文 |
-| 魚魚棟 · Claude | 适配 アイキス3 sexy（戯画，QQ 精华 #1109，光盘版+1.03）和 ハミダシクリエイティブ（まどそふと，QQ 精华 #1133）：adapt-auto 冷测试，seed 只写 `The Seed/<engine>/<slug>/` | — | adapt/aikiss3-hamidashi | 11-27 | 进行中 |
-| 魚魚棟 · Claude | **MeguLit-Adapter**（半自动适配器，合并画字钩子和引擎剧本读取，tools/adapt-auto.cjs 并进来只留一个入口 `tools/megulit-adapter.cjs`）：认游戏按 VNDB+发行版、原文优先用引擎剧本读取（复用 RRFZ 读取器）、画字钩子对齐兜底、引擎级隐藏优先、版本层按封包/剧本指纹、需要人看的地方停下给截图和一句话问题 | — | feat/megulit-adapter（基于 feat/auto-adapt） | 11-27 | 进行中 |
+| 魚魚棟 · Claude | Alt+T 常驻胶囊：三种风格可自选（默认屏幕顶部居中灵动岛 / 侧边竖向胶囊 / 角落小圆点），可拖动、可开关常驻 | #1138 | feat/alt-t-capsule | 11-26 | 完成：已合并 #1263 |
+| 魚魚棟 · Claude | 剩余问题：日志说话人显示成旁白；标题/读档画面盖着台词层；日志面板点击穿透 | #1136 | fix/reader-leftovers | 11-26 | PR #1267 检查已过，实机测试中（隐藏桌面），测完合并 |
+| 魚魚棟 · Claude | 剩余问题：雾之城文字挤左；Alt+H 再按没文本；双重译文另一来源 | #1104 #1132 #1128 | fix/display-leftovers | 11-26 | PR #1268 检查已过，实机测试中（隐藏桌面），测完合并 |
+| 魚魚棟 · Claude | #1248 汇总反馈：译文冒韩文（开源模型低温度 + 韩文译文判失败）；魔法使いの夜整页不再自动只显示中文；其余图片反馈核对 main 已修 | #1116 #1102 #1101 #1105 #1106 #1108 #1141 #1143 | fix/1248-reports | 11-27 | 完成：已合并 #1284 |
+| 魚魚棟 · Claude | 自动适配命令行 `tools/adapt-auto.cjs`：游戏目录 → 探针 → 冷测试自动推进 → 差分 → Cardinal 验收 → result.json（目标每部 5–10 分钟） | — | krkr-drawtext | 11-26 | 完成：已合并 #1291，后续并进 MeguLit-Adapter（#1296） |
+| 魚魚棟 · Claude | KiriKiri 非 KAG 引擎层：DrawText 逐字双发去重、正文线程选择、按句接；原生「源头不画」隐藏原文（MeguLitHook32 `MeguLitDrawSkip.h`） | — | krkr-drawtext / krkr-native-nodraw | 11-26 | 完成：随 #1291 合并（源头不画 DLL 构建产物还只在本地，见 #1296） |
+| 魚魚棟 · Claude | 阅读层：源头不画时日文行由阅读层自己画；快进 4000 字长行导致页面卡死 | — | reader-nodraw | 11-26 | 完成：随 #1291 合并 |
+| 魚魚棟 · Claude | Cardinal 回放打分加强（实屏 OCR 证据、扣分说明、磁带版本化、快进段不计分、YU-RIS/BGI/通用回放模型）；Yui 启动阶段补漏、#1090 frontend-rejection | #1090 | yui-cardinal | 11-26 | 完成：随 #1291 合并 |
+| 魚魚棟 · Claude | 冷测试输入兜底（PostMessage → InputShim → SendInput）、自动回答改名弹窗、选项定位答复 | — | coldtest-inputshim | 11-26 | 完成：随 #1291 合并 |
+| 魚魚棟 · Claude | euphoria HD リマスター（YU-RIS）开头选项「オープニングを見る」「メインルームへ」没有翻译：查选项是否进翻译链，按四层修（seed 优先，缺能力补 YU-RIS 引擎层） | #1143 | fix/1143-yuris-choice-translate | 11-27 | PR #1295：修完开头选项；正在补两条附带问题（标题菜单被 OCR 读成台词、Ctrl 快进 500 字整段）并评估能否做成 YU-RIS / 全引擎通用修复 |
+| 魚魚棟 · Claude | **MeguLit-Adapter**（半自动适配器，合并画字钩子和引擎剧本读取，tools/adapt-auto.cjs 并进来只留一个入口 `tools/megulit-adapter.cjs`）：认游戏按 VNDB+发行版、原文优先用引擎剧本读取（复用 RRFZ 读取器）、画字钩子对齐兜底、引擎级隐藏优先、版本层按封包/剧本指纹、需要人看的地方停下给截图和一句话问题 | — | feat/megulit-adapter（基于 feat/auto-adapt） | 11-27 | PR #1296 已开，正在跑回归（千恋＊万花、ファタモルガーナの館、オルフレール 等），并接入调研出的外部工具；今晚最优先 |
+| 魚魚棟 · Claude | 勾选框：方框被撑成长方形、勾挤成角落白点、「当前版本不再提示」文字没和方框对齐；补真实无头 Edge 回归测试，查设置/Anki/学习页的兄弟勾选框 | — | fix/checkbox-mark | 11-27 | PR #1297 已开，正在按 AGENTS.md 补测试和截图 |
+| 魚魚棟 · Claude | 更新失败 UPDATE_LAUNCH_FAILED（玩家 1.4.19 → 1.4.25 点「重启并更新」没反应，重进才好）：查启动更新程序那步的残留锁 / 进程 / 占用 | — | fix/update-launch-failed | 11-27 | 进行中 |
+| 魚魚棟 · Claude | 调研网上现成工具接进 MeguLit-Adapter（LunaHook/LunaTranslator 特殊码库、Textractor、VNR 数据库、GARbro、KrkrExtract、SiglusExtract、VNTextPatch、AssetStudio 等）：只调研不改仓库，结论交给 #1296 接入 | — | — | 11-27 | 进行中 |
+| 魚魚棟 · Claude | たいせつなきみのために、ぼくにできるいちばんのこと（只要你不再悲伤）：开隐藏原文时译文颜色在设置色和原文色之间来回变；开「同步原文样式」后原文藏不干净（玩家きゅう 11-27 报）。作为 MeguLit-Adapter 的实验样本一起查 | — | — | 11-27 | 排队：等游戏下载完 |
 | 魚魚棟 · Claude | YU-RIS 引擎层：正文 N 倍逐字重复去重、正文线程选择 | — | engine-yuris | 11-26 | 暂停（已提交） |
 | RRFZ | 注音：日报送假名不进 ruby；例句超过 120 句仍有注音；JLPT 词表快速滚动后读音释义缺失；例句注音不给片假名加读音 | — | — | 11-26 | 已合，本轮收口 |
 | RRFZ | 查词/文字：未读长音符号用未读颜色；译文行尾不留孤字；Alt+T 保存设置后译文偶尔不出现；词典页同音词被误判为已收录；纯假名词收录后词头空白；MOJi 详情加载失败后可重试；英文界面本地词典返回英文释义；读过的词页切游戏被旧结果覆盖；跳转定位句子时清空残留搜索词；本地复习防连点跳卡；JLPT 词表批量操作防重入；作品详情补全资料不重建其他标签页；日报阅读器查纯假名词 | #1119 #1122 #1127 | — | 11-26 | 已合，本轮收口 |
@@ -72,7 +75,8 @@
 |---|---|---|---|
 | RRFZ | 上下文解释用已绑定的翻译 API；偶发双重译文 | #1117 #1128 | #1176 已修 |
 | RRFZ | 「生」按语境注音；游戏注音冲突与按词对齐；朗读读音和注音一致；切换声调；读音纠错；人名读音；异表记下拉（关 #1189） | #1123 #1131 #1134 #1135 #1114 #1111 | 和 #1192 重复，让给 #1192 |
-| 魚魚棟 · Claude | #1112 默认点读层点不了（点词/点句无反应），开外置 log 拖动后才能用：查初始鼠标穿透/命中区首次下发，和 #1267 的 #1136 穿透修法不冲突 | #1112 | fix/1112-reader-hit-test | 11-27 | 放置：店主 11-27 说可能是别的 bug 带出来的，先不管 |
+| 魚魚棟 · Claude | #1112 默认点读层点不了，开外置 log 拖动后才能用 | #1112 | 放置：店主 11-27 说可能是别的 bug 带出来的，先不管 |
+| 魚魚棟 · Claude | 适配 アイキス3 sexy、ハミダシクリエイティブ | #1109 #1133 | 暂停：店主 11-27 说今晚先做好 MeguLit-Adapter，这两部改作它的实验样本 |
 
 ## 完成（保留最近 30 条）
 
