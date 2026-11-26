@@ -12,6 +12,7 @@
 7. **HANDOFF.md 例外，可以直接 push 进 main**：认领、改状态、写「修了啥」都直接改直接推，第一时间让大家看到，不用等 PR。只改这一个文件，别夹带代码
 8. **撞车时 RRFZ 优先**：RRFZ 已经在做的，或者他想接手的，直接在那一行把「谁」改成他、状态写一句，Claude 会话看到就停手，不争、不覆盖他的改动
 9. **适配好一部游戏就登记**（所有人，包括 RRFZ、魚魚棟的 Claude 会话、其他 agent）：某部游戏的某个发行版本适配好了（验收过，seed 已合并或 PR 已开），马上在下面「已适配的游戏」表里加一行。**用 VNDB 作品号（v 开头）认游戏，用发行版本认版本**（平台 / 版本名，例如 Steam 版、DL 版、DVD 版、HD リマスター、汉化硬盘版；查得到就附 VNDB 发行号 r 开头），不用 exe 哈希去重（打补丁、免 DVD、汉化都会改 exe）。**开始适配前先查这张表**：同作品同发行版已在表里的不要再做；同作品不同发行版也别从零做，先拿已有的 seed 跑，游戏层一般能直接用，只补版本层
+10. **所有游戏适配都走 MeguLit-Adapter**（`node tools/megulit-adapter.cjs <游戏目录>`，PR 合并前在 `feat/megulit-adapter`）：不再写一次性的适配脚本。每适配一部学到的东西（新的引擎特征、隐藏方式、版本指纹、踩的坑）都写回适配器的引擎层或规则表（`tools/megulit-adapter/engines.cjs`、`plan.cjs`、`checkpoints.cjs`，剧本格式写回 `services/original-engines/`），这部游戏自己的设置只进 The Seed
 
 ## 已适配的游戏
 
