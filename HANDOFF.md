@@ -22,7 +22,7 @@
 | 魚魚棟 · Claude | D 翻译：偶发双重译文；上下文解析和翻译用同一个用户 API；外置 log 旁白不自动翻译 | #1128 #1117 #1129 | fix/d-translate | 11-26 | 已提交，待 PR |
 | 魚魚棟 · Claude | E 设置/排版：游戏锁死换行宽度/行距时允许自定义；隐藏鼠标的游戏里 Alt+T 改不了设置；日文原文只占一行选项；Alt+H 再按一次没文本；Alt+T 常驻胶囊（先出方案） | #1137 #1144 #1145 #1132 #1138 | fix/e-settings | 11-26 | 已提交，待 PR（#1132 没修；胶囊方案等选） |
 | 魚魚棟 · Claude | F The Seed：已适配游戏显示绿色「已适配·默认配置已导入」，不再写只读模式 | #1113 | fix/f-seed | 11-26 | 已提交，待 PR |
-| 魚魚棟 · Claude | relay：探针 / 想玩 / 诊断 / Yui 故障登记到汇总 issue（#1199 #1200 #1203 #1204），不再一条条开 | — | relay/issue-trackers（PR #1209） | 11-26 | 待合并后上线 |
+| 魚魚棟 · Claude | relay：探针 / 想玩 / 诊断 / Yui 故障登记到汇总 issue（#1199 #1200 #1203 #1204），不再一条条开 | — | relay/issue-trackers（PR #1209） | 11-26 | 完成：1d42a52e 已合并，迁移 0030/0031/0041 已上线，relay 已部署 |
 | 魚魚棟 · Claude | 自动适配命令行 `tools/adapt-auto.cjs`：游戏目录 → 探针 → 冷测试自动推进 → 差分 → Cardinal 验收 → result.json（目标每部 5–10 分钟） | — | krkr-drawtext | 11-26 | 进行中 |
 | 魚魚棟 · Claude | KiriKiri 非 KAG 引擎层：DrawText 逐字双发去重、正文线程选择、按句接；原生「源头不画」隐藏原文（MeguLitHook32 `MeguLitDrawSkip.h`） | — | krkr-drawtext / krkr-native-nodraw | 11-26 | 进行中 |
 | 魚魚棟 · Claude | 阅读层：源头不画时日文行由阅读层自己画；快进 4000 字长行导致页面卡死 | — | reader-nodraw | 11-26 | 已提交，待合并 |
