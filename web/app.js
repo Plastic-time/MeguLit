@@ -1167,16 +1167,16 @@ function dictionary(target){
   if(onlineSource==='jisho')account.hidden=true;else api('moji_status').then(state=>{if(account.isConnected&&!account.querySelector('.moji-qr-panel'))showStatus(state);}).catch(()=>showStatus({}));
   target.querySelector('#lookup-form').addEventListener('submit',async event=>{
     event.preventDefault();const query=target.querySelector('#lookup-input').value.trim();if(!query)return;
-    const request=++ticket,online=event.submitter?.value!=='local',wanted=openWanted===query;openWanted='';
+    const request=++ticket,online=event.submitter?.value!=='local',wanted=openWanted===query,language=locale==='en'?'en':'zh';openWanted='';
     /* one search = one look-up: the local fallback reuses the same operationId, so it can never be counted twice */
     const operationId=crypto.randomUUID();
     results.innerHTML=loading();
     try{
       let items,used=online;
-      try{items=await api('dictionary',{query,source:online?onlineSource:'local',operationId});}
-      catch(error){if(!online)throw error;if(request===ticket)toast(L.fail);used=false;items=await api('dictionary',{query,source:'local',operationId});
+      try{items=await api('dictionary',{query,source:online?onlineSource:'local',language,operationId});}
+      catch(error){if(!online)throw error;if(request===ticket)toast(L.fail);used=false;items=await api('dictionary',{query,source:'local',language,operationId});
        }
-      if(online&&used&&!items.length){const local=await api('dictionary',{query,source:'local',operationId}).catch(()=>[]);if(local.length){
+      if(online&&used&&!items.length){const local=await api('dictionary',{query,source:'local',language,operationId}).catch(()=>[]);if(local.length){
        items=local;used=false;}}
       if(request!==ticket||!results.isConnected)return;
       lastItems=items;lastOnline=used;wantedEntry=query;renderList();
