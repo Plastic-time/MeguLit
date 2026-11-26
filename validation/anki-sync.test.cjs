@@ -177,3 +177,86 @@ test('kana-only Anki notes with blank WordReading match existing local vocabular
  assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=601').get().note_id,9001);
  assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=602').get().note_id,9002);
 });
+
+test('AnkiSync and pickEntry keep derived suru verbs, potential forms, and okurigana variants while still rejecting mismatched readings or kanji',async t=>{
+ const {db}=fixture(t);
+ const {matchesReading}=require('../services/anki-sync.cjs');
+ const suru={id:1511610,spellings:['勉強'],readings:['べんきょう'],definitions:['study']};
+ const kanaSuru={id:1015380,spellings:[],readings:['アクセス'],definitions:['access']};
+ const potential={id:1169870,spellings:['飲む'],readings:['のむ'],definitions:['drink']};
+ const okurigana={id:1590000,spellings:['お話'],readings:['おはなし'],definitions:['talk']};
+ const standalonePot={id:1383700,spellings:['切れる'],readings:['きれる'],definitions:['be sharp']};
+ const godanCut={id:1383680,spellings:['切る'],readings:['きる'],definitions:['cut']};
+ const wrongKanji={id:204,spellings:['精'],readings:['せい'],definitions:['spirit']};
+
+ assert.equal(pickEntry([suru],'勉強する','べんきょうする')?.id,1511610);
+ assert.equal(pickEntry([suru],'勉強する','')?.id,1511610);
+ assert.equal(pickEntry([kanaSuru],'アクセスする','あくせすする')?.id,1015380);
+ assert.equal(pickEntry([potential],'飲める','のめる')?.id,1169870);
+ assert.equal(pickEntry([potential],'飲める','')?.id,1169870);
+ // MeguLit's own potential card stores root Word='飲む' with potential reading 'のめる'
+ assert.equal(pickEntry([potential],'飲む','のめる')?.id,1169870);
+ assert.equal(pickEntry([potential],'飲む','たべる'),null);
+ assert.equal(pickEntry([okurigana],'お話し','おはなし')?.id,1590000);
+ // Direct entry wins over derived root when both exist
+ assert.equal(pickEntry([godanCut,standalonePot],'切れる','きれる')?.id,1383700);
+
+ // Negative boundaries: blank-reading kanji-only mismatch, 1-kana suru stem, short words, wrong kanji/reading
+ assert.equal(pickEntry([{id:1,spellings:['食べる'],readings:['たべる']}],'食う',''),null);
+ assert.equal(pickEntry([{id:2,spellings:['出る'],readings:['でる']}],'出す',''),null);
+ assert.equal(pickEntry([{id:3,spellings:['話'],readings:['はなし']}],'話をする',''),null);
+ assert.equal(pickEntry([{id:4,spellings:['分'],readings:['ぶん']}],'10分',''),null);
+ assert.equal(pickEntry([{id:4,spellings:['分'],readings:['ぶん']}],'10分','ぶん'),null);
+ assert.equal(pickEntry([potential],'食べる','のめる'),null);
+ assert.equal(pickEntry([okurigana],'お話しする','おはなしする'),null);
+ assert.equal(pickEntry([{id:5,spellings:['お勉強'],readings:['おべんきょう']}],'勉強する',''),null);
+ assert.equal(pickEntry([{id:6,spellings:['子'],readings:['こ']}],'こする','こする'),null);
+ assert.equal(pickEntry([{id:7,spellings:[''],readings:['']}],'する','する'),null);
+ assert.equal(pickEntry([{id:8,spellings:['う'],readings:['う']}],'える','える'),null);
+ assert.equal(pickEntry([wrongKanji],'生','せい'),null);
+ assert.equal(pickEntry([potential],'飲める','たべる'),null);
+ assert.equal(pickEntry([{id:101,spellings:['生'],readings:['せい']},{id:102,spellings:['生'],readings:['なま']}],'生する',''),null);
+
+ // matchesReading rejects derived reading mismatches or wrong-spelling candidates from custom resolvers
+ assert.equal(matchesReading(suru,'べんきょうする','勉強する'),true);
+ assert.equal(matchesReading(kanaSuru,'あくせすする','アクセスする'),true);
+ assert.equal(matchesReading(potential,'のめる','飲む'),true);
+ assert.equal(matchesReading(suru,'べんきょうする'),false);
+ assert.equal(matchesReading({id:999,spellings:['勉教'],readings:['べんきょう']},'べんきょうする','勉強する'),false);
+ assert.equal(matchesReading({id:998,spellings:['飲ます'],readings:['のむ']},'のめる','飲める'),false);
+
+ const byWord={
+  '勉強する':[suru],
+  '飲める':[potential],
+  '飲む':[potential],
+  'お話し':[okurigana]
+ };
+ const sync=new AnkiSync({
+  db,config:{},
+  anki:{stats:async()=>[
+   {noteId:9101,word:'勉強する',reading:'べんきょうする',status:3,reviews:[10000]},
+   {noteId:9102,word:'飲める',reading:'のめる',status:2,reviews:[20000]},
+   {noteId:9103,word:'お話し',reading:'おはなし',status:4,reviews:[30000]},
+   {noteId:9104,word:'飲める',reading:'たべる',status:1,reviews:[40000]},
+   {noteId:9105,word:'食う',reading:'',status:2,reviews:[50000]}
+  ]},
+  resolveEntry:async(word,reading)=>pickEntry(byWord[word]||[{id:1,spellings:['食べる'],readings:['たべる']}],word,reading)
+ });
+ const res=await sync.run();
+ assert.equal(res.imported,3);
+ assert.equal(res.skipped,2);
+ assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=1511610').get()?.note_id,9101);
+ assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=1169870').get()?.note_id,9102);
+ assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=1590000').get()?.note_id,9103);
+
+ // Also verify MeguLit-mined potential card (Word='飲む', WordReading='のめる') imports when unlinked
+ const {db:db2}=fixture(t);
+ const sync2=new AnkiSync({
+  db:db2,config:{},
+  anki:{stats:async()=>[{noteId:9201,word:'飲む',reading:'のめる',status:3,reviews:[10000]}]},
+  resolveEntry:async(word,reading)=>pickEntry([potential],word,reading)
+ });
+ const res2=await sync2.run();
+ assert.equal(res2.imported,1);
+ assert.equal(db2.prepare('SELECT note_id FROM anki_links WHERE word_id=1169870').get()?.note_id,9201);
+});
