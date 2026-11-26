@@ -428,7 +428,7 @@ async function dispatch(request,runtime=null) {
     switch(request.action) {
       case 'anki_sync':{
         const {AnkiSync,pickEntry}=require('./anki-sync.cjs'),{Anki}=require('../core/anki.cjs');const config=store.readJSON(path.join(root,'data','config','v4-preferences.json'));
-        const result=await new AnkiSync({db,anki:new Anki(),config,resolveEntry:async(text,reading)=>{if(!runtime)return null;const result=await runtime.learning().request('lookup_exact',{text,start:0,end:[...text].length},'zh');return pickEntry(result.entries,text,reading);}}).run();runtime?.emit('reader-event',{type:'word-status-changed'});return result;
+        const result=await new AnkiSync({db,anki:new Anki(),config,resolveEntry:async(text,reading)=>{if(!runtime)return null;const result=await runtime.learning().request('lookup_exact',{text,start:0,end:[...text].length},'zh');return pickEntry(result.entries,text,reading,result);}}).run();runtime?.emit('reader-event',{type:'word-status-changed'});return result;
       }
       case 'set_word_status':{const id=Number(request.id),status=Number(request.status);if(!Number.isSafeInteger(id)||!Number.isInteger(status)||status<0||status>4)throw Error('INVALID_WORD_STATUS');if(!db.prepare('UPDATE vocabulary SET status=? WHERE id=?').run(status,id).changes)throw Error('WORD_NOT_FOUND');runtime?.emit('reader-event',{type:'word-status-changed'});return {id,status};}
       case 'library_scan':case 'library_find_steam':case 'reader_bootstrap':if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');return runtime.call(request);
