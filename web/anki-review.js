@@ -440,7 +440,7 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
   toolbar(s,(card.hasAudio?'<button class="text-button" data-replay>'+copy.play+'</button>':'')+'<button class="text-button" data-fit aria-pressed="'+fit+'">'+(fit?copy.fit:copy.original)+'</button><button class="text-button" data-reload>'+text.ankiRefresh+'</button><button class="text-button" data-stop>'+copy.stop+'</button>');
   progress(s,'<span class="anki-hud-deck">Anki · '+esc(card.deck)+'</span>'+(reviewed?'<b>'+esc(hc.reviewed.replace('{n}',reviewed))+'</b>':''));
   mountFrame(s,{...card,when:card.answerShown?'flip':'next'});s.querySelector('[data-reload]').onclick=reload;s.querySelector('[data-stop]').onclick=stopStudy;
-  const play=s.querySelector('[data-replay]');if(play)play.onclick=()=>card.manualAudio?playCardAudio(card):replay(card,play);
+  const play=s.querySelector('[data-replay]');if(play)play.onclick=()=>playCardAudio(card);
   s.querySelector('[data-fit]').onclick=event=>{fit=!fit;event.currentTarget.textContent=fit?copy.fit:copy.original;event.currentTarget.setAttribute('aria-pressed',
    String(fit));currentFrame.contentWindow.postMessage({type:'tome-anki-fit',nonce:currentFrame.dataset.nonce,fit},'*');};
   const controls=s.querySelector('[data-controls]');controls.replaceChildren();requestAnimationFrame(placeBlocks);
