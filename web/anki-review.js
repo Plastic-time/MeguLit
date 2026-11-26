@@ -292,7 +292,7 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
  function watchDock(){clearInterval(dockWatch);dockWatch=setInterval(()=>{if(!dockEl){clearInterval(dockWatch);return;}if(dockGone()){dockEl.hidden=true;const own=dockEl.__stage;if(!isCurrent()||!own?.isConnected||own!==stage()){dockEl.remove();clearInterval(dockWatch);}}else if(editing&&dockEl.hidden){dockEl.hidden=false;placeDock(stage());}},400);}
  document.addEventListener('fullscreenchange',dockHome);
  const dockResize=()=>{const s=stage();if(editing&&s&&dockEl&&!dockEl.hidden)placeDock(s);};
- /* a smaller window pulls a saved spot back inside it */addEventListener('resize',dockResize);
+ /* a smaller window pulls a saved spot back inside it */window.addEventListener('resize',dockResize);
  function shell(){
   /* only a stage this render built is reused: one left by an earlier render on the same target carries that render's handlers */
   let s=stage();if(s&&s.__owner===owner)return s;
@@ -432,7 +432,7 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
   else if(d.type==='tome-anki-key')key(String(d.key||''));
   else if(d.type==='tome-anki-lookup')lookup(String(d.word||'').slice(0,60));};
  window.addEventListener('message',messages);
- const stop=()=>{stopReplay();window.removeEventListener('message',messages);document.removeEventListener('keydown',keydown);document.removeEventListener('fullscreenchange',fullscreenSync);document.removeEventListener('fullscreenchange',dockHome);removeEventListener('resize',dockResize);clearInterval(poll);leaveHud();dockEl?.remove();clearInterval(dockWatch);};stopMessages=stop;
+ const stop=()=>{stopReplay();window.removeEventListener('message',messages);document.removeEventListener('keydown',keydown);document.removeEventListener('fullscreenchange',fullscreenSync);document.removeEventListener('fullscreenchange',dockHome);window.removeEventListener('resize',dockResize);clearInterval(poll);leaveHud();dockEl?.remove();clearInterval(dockWatch);};stopMessages=stop;
  function progress(s,html){s.querySelector('.anki-hud-progress').innerHTML=html;requestAnimationFrame(placeBlocks);}
  function mountFrame(s,card){stopReplay();currentFrame=frame(card);s.querySelector('.anki-hud-frame-slot').replaceChildren(currentFrame);}
  function drawCard(card){
