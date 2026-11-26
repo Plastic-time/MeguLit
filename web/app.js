@@ -42,7 +42,7 @@ let selectedGameId='',gameOrigin='library',selectedSeriesId='';
 let startupDialogsReady=false;
 /* 2026-11-13 the detail tab a page asked the game page to open on (学习 › 句子 书架 → 收录句子); used once */
 let gameTab='';
-import {renderSettings} from './settings.js';
+import {renderSettings,stopSettings} from './settings.js';
 import {openProfilePanel} from './profile-panel.js';
 import {avatarHTML} from './leaderboard-view.js';
 import {openBackgroundCrop,backgroundGeometry} from './background-crop.js';
@@ -1214,6 +1214,7 @@ function restoreSettingsScroll(section){const target=settingsScroll.get(section)
  if(c&&c.querySelector('form,section,.panel')){c.classList.remove('g-enter');void c.offsetWidth;c.classList.add('g-enter');if(target)c.scrollTo({top:target,behavior:'smooth'});
  return;}if(++tries<60)requestAnimationFrame(step);};requestAnimationFrame(step);}
 async function settings(token){
+  stopDetailPage=stopSettings;
   await renderSettings({main:document.querySelector('#main'),api,invoke,text,locale,esc,toast,heading,basicSettings,isCurrent:()=>token===pageToken,section:settingsSection,onProfileClose:paintTopProfile,
    setSection:value=>{rememberSettingsScroll();try{localStorage.setItem('megulit-settings-section',value||'');}catch{}settingsSection=value;restoreSettingsScroll(value);
    },profile:settingsProfile,setProfile:value=>settingsProfile=value,onSaved:async result=>{const next=await api('home'),reload=!result?.scope||result.scope==='background-toggle';
