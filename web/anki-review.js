@@ -34,11 +34,11 @@ const hudCopy={
 /* (user 2026-11-14) say why Anki could not do it, instead of the catch-all 「暂时无法完成此操作」 */
 const ankiReasons={
  zh:{ANKI_REVIEW_INACTIVE:'Anki 现在不在复习界面，这一步只能在 Anki 复习中进行',ANKI_MEDIA_MISSING:'这张卡没有找到音频文件（MeguLit 和 Anki 媒体库里都没有）',ANKI_TIMEOUT:'AnkiConnect 超时：Anki 可能卡在弹窗或同步中',
-  ANKI_UNAVAILABLE:'连接 AnkiConnect 失败，请确认 Anki 已打开',ANKI_INVALID_RESPONSE:'AnkiConnect 返回了无法识别的结果，请更新插件',ANKI_INVALID_CARD:'卡片编号无效，请刷新',ANKI_FAILED:'Anki 拒绝了这个操作（AnkiConnect 返回错误）'},
+  ANKI_UNAVAILABLE:'连接 AnkiConnect 失败，请确认 Anki 已打开',ANKI_INVALID_RESPONSE:'AnkiConnect 返回了无法识别的结果，请更新插件',ANKI_INVALID_CARD:'卡片编号无效，请刷新',ANKI_FAILED:'Anki 拒绝了这个操作（AnkiConnect 返回错误）',ANKI_CLOSE_REQUIRED:'Anki 尚未关闭（可能正在保存、同步或等待确认），已为你显示 Anki 窗口，请关闭后再重试'},
  ja:{ANKI_REVIEW_INACTIVE:'Anki が復習画面ではありません。この操作は Anki の復習中だけ使えます',ANKI_MEDIA_MISSING:'このカードの音声ファイルが見つかりません（MeguLit にも Anki のメディアにもありません）',ANKI_TIMEOUT:'AnkiConnect がタイムアウトしました。Anki がダイアログや同期で止まっている可能性があります',
-  ANKI_UNAVAILABLE:'AnkiConnect に接続できません。Anki が起動しているか確認してください',ANKI_INVALID_RESPONSE:'AnkiConnect の応答を読めません。プラグインを更新してください',ANKI_INVALID_CARD:'カード番号が無効です。再読み込みしてください',ANKI_FAILED:'Anki がこの操作を拒否しました（AnkiConnect のエラー）'},
+  ANKI_UNAVAILABLE:'AnkiConnect に接続できません。Anki が起動しているか確認してください',ANKI_INVALID_RESPONSE:'AnkiConnect の応答を読めません。プラグインを更新してください',ANKI_INVALID_CARD:'カード番号が無効です。再読み込みしてください',ANKI_FAILED:'Anki がこの操作を拒否しました（AnkiConnect のエラー）',ANKI_CLOSE_REQUIRED:'Anki を閉じられませんでした（保存・同期中または確認画面が表示中の可能性があります）。Anki を閉じてから再試行してください'},
  en:{ANKI_REVIEW_INACTIVE:'Anki is not in review, and this only works during an Anki review',ANKI_MEDIA_MISSING:'No audio file was found for this card (neither in MeguLit nor in Anki media)',ANKI_TIMEOUT:'AnkiConnect timed out; Anki may be stuck on a dialog or syncing',
-  ANKI_UNAVAILABLE:'Could not reach AnkiConnect; make sure Anki is open',ANKI_INVALID_RESPONSE:'AnkiConnect sent a reply MeguLit cannot read; update the add-on',ANKI_INVALID_CARD:'Invalid card id; refresh the page',ANKI_FAILED:'Anki refused this action (AnkiConnect error)'}};
+  ANKI_UNAVAILABLE:'Could not reach AnkiConnect; make sure Anki is open',ANKI_INVALID_RESPONSE:'AnkiConnect sent a reply MeguLit cannot read; update the add-on',ANKI_INVALID_CARD:'Invalid card id; refresh the page',ANKI_FAILED:'Anki refused this action (AnkiConnect error)',ANKI_CLOSE_REQUIRED:'Anki stayed open (it may be saving, syncing or waiting on a dialog). Close Anki and try again'}};
 const mixKey='tome-anki-audio-mix',mixChannels=['master','word','sentence','game'];
 const mixLabels={
  zh:['音量混音器','总音量','单词读音','合成例句','游戏原声','控制 MeguLit 卡片内播放的声音'],
