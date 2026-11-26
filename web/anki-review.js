@@ -413,7 +413,7 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
  function key(k){
   const s=stage();if(!s||!isCurrent())return;const controls=s.querySelector('[data-controls]'),ratings=[...controls.querySelectorAll('.anki-rating')].map(b=>Number(b.dataset.ease));
   const action=ankiKeyAction(k,{answerShown:ratings.length>0,ratings,editing,immersive});if(!action)return false;
-  if(action==='fullscreen')setImmersive(!immersive);else if(action==='layout')setEditing(!editing);else if(action==='replay')s.querySelector('[data-replay]')?.click();
+  if(action==='fullscreen')setImmersive(!immersive);else if(action==='layout')setEditing(!editing);else if(action==='replay'){const b=s.querySelector('[data-replay]');if(b&&!b.hidden)b.click();}
   else if(action==='primary')controls.querySelector('button.hud-primary:not(:disabled),button.primary:not(:disabled)')?.click();else controls.querySelector('.rating-'+action.slice(5)+':not(:disabled)')?.click();
   return true;
  }
@@ -493,15 +493,16 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
   target.querySelector('[data-custom]')?.addEventListener('click',event=>openAnki('custom',card.deck,event.currentTarget));
   target.querySelector('[data-limits]')?.addEventListener('click',()=>drawLimits(card.deck,()=>drawDone(card)));
  }
- async function practice(deck,advance){try{const card=await api('anki_practice',{deck,advance});if(isCurrent())card.done?drawDone(card):drawPractice(card);}catch(error){
-  failed(error);}}
+ async function practice(deck,advance){try{const card=await api('anki_practice',{deck,advance});if(isCurrent())card.done?drawDone(card):drawPractice(card);return true;}catch(error){
+  failed(error);return false;}}
  function drawPractice(card){
   if(!isCurrent())return;currentCard=card;let shown=false;
-  const s=shell();toolbar(s,'<button class="text-button" data-stop>'+copy.endPractice+'</button>');
+  const s=shell();toolbar(s,'<button class="text-button" data-replay hidden>'+copy.play+'</button><button class="text-button" data-stop>'+copy.endPractice+'</button>');
+  const play=s.querySelector('[data-replay]');play.onclick=()=>playCardAudio(card);
   progress(s,'<span class="anki-hud-deck">'+esc(copy.practiceTag)+' · '+esc(card.deck)+'</span><b class="anki-hud-count">'+esc(card.position)+' / '+esc(card.total)+'</b>');
-  const show=()=>{mountFrame(s,{html:shown?card.answer:card.question,when:shown?'flip':'next'});
+  const show=()=>{const html=shown?card.answer:card.question;play.hidden=!/<audio\b|data-anki-play|data-anki-replay/i.test(html);mountFrame(s,{html,when:shown?'flip':'next'});
    const controls=s.querySelector('[data-controls]');controls.replaceChildren();requestAnimationFrame(placeBlocks);const button=document.createElement('button');button.className='primary';button.textContent=shown?copy.next:text.showAnswer;
-   button.onclick=()=>{if(shown)practice(card.deck,true);else{shown=true;show();}};controls.append(button);};
+   button.onclick=async()=>{if(!shown){shown=true;show();return;}button.disabled=true;if(!await practice(card.deck,true)&&button.isConnected)button.disabled=false;};controls.append(button);};
   s.querySelector('[data-stop]').onclick=async()=>{try{await api('anki_practice',{end:true});}catch{}drawDecks();};show();
  }
  async function drawLimits(deck,back){
