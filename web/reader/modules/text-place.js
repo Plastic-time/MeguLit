@@ -743,16 +743,19 @@
   /* 2026-11-20 (user, CHAOS;CHILD: 「排版同步一下啊 对应一下每一行的日文」): the translation gets as many rows as the game gave the
      Japanese, each the part that matches one Japanese row: breaks after the translation's punctuation nearest to where each
      Japanese row ends (by share of the sentence), else at that share. One-row lines and unfinished translations are left alone. */
-  const CN_PUNCT = /[，、。；：！？…—,.;:!?」』）)]/;
+  const CN_PUNCT = /[，、。；：！？…—,.;:!?」』）)”’》】〕〗〉\]\}]/;
+  const CN_NONWORD = /[，、。；：！？…—,.;:!?」』）)”’》】〕〗〉\]\}“‘「『（(《【〔〖〈\s]/g;
   /* breaks for `shares` (where each Japanese row ends, as a share of the sentence): the set of break points after the
      translation's punctuation that lies nearest to the shares overall (least squares); a share no punctuation is left for
      breaks at its own place */
   function cnSplit(text, shares) {
     const n = text.length, k = shares.length; if (!n || !k) return [];
-    const cand = []; for (let i = 1; i < n; i++) if (CN_PUNCT.test(text[i - 1]) && !CN_PUNCT.test(text[i])) cand.push(i);
+    /* never split closing punctuation onto its own line or orphan a single trailing character */
+    const tailOk = i => text.slice(i).replace(CN_NONWORD, '').length >= 2;
+    const cand = []; for (let i = 1; i < n; i++) if (CN_PUNCT.test(text[i - 1]) && !CN_PUNCT.test(text[i]) && tailOk(i)) cand.push(i);
     /* not enough punctuation: a break goes where a Chinese clause can start (before 在/将/变…, after 的/了…), never inside a word; none near: no break */
     if (cand.length < k) { const soft = i => CN_PUNCT.test(text[i - 1]) || /[在将把被让使变是有和与而但却又也就都才从向对]/.test(text[i]) || /[的了着过地]/.test(text[i - 1]); const out = []; let last = 0;
-      for (const sh of shares) { const p = sh * n; let best = -1, c = Infinity; for (let i = last + 1; i < n; i++) if (soft(i) && !CN_PUNCT.test(text[i]) && Math.abs(i - p) < c) { c = Math.abs(i - p); best = i; } if (best > last && c <= n * .2) { out.push(best); last = best; } } return out; }
+      for (const sh of shares) { const p = sh * n; let best = -1, c = Infinity; for (let i = last + 1; i < n; i++) if (soft(i) && !CN_PUNCT.test(text[i]) && tailOk(i) && Math.abs(i - p) < c) { c = Math.abs(i - p); best = i; } if (best > last && c <= n * .2) { out.push(best); last = best; } } return out; }
     const m = cand.length, cost = (j, i) => (cand[i] / n - shares[j]) ** 2, INF = 1e9;
     const D = Array.from({ length: k }, () => new Array(m).fill(INF)), P = Array.from({ length: k }, () => new Array(m).fill(-1));
     for (let i = 0; i < m; i++) D[0][i] = cost(0, i);
