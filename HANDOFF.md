@@ -53,8 +53,6 @@
 | 魚魚棟 · Claude | 冷测试输入兜底（PostMessage → InputShim → SendInput）、自动回答改名弹窗、选项定位答复 | — | coldtest-inputshim | 11-26 | 完成：随 #1291 合并 |
 | 魚魚棟 · Claude | euphoria HD リマスター（YU-RIS）开头选项「オープニングを見る」「メインルームへ」没有翻译：查选项是否进翻译链，按四层修（seed 优先，缺能力补 YU-RIS 引擎层） | #1143 | fix/1143-yuris-choice-translate | 11-27 | PR #1295：修完开头选项；正在补两条附带问题（标题菜单被 OCR 读成台词、Ctrl 快进 500 字整段）并评估能否做成 YU-RIS / 全引擎通用修复 |
 | 魚魚棟 · Claude | **MeguLit-Adapter**（半自动适配器，合并画字钩子和引擎剧本读取，tools/adapt-auto.cjs 并进来只留一个入口 `tools/megulit-adapter.cjs`）：认游戏按 VNDB+发行版、原文优先用引擎剧本读取（复用 RRFZ 读取器）、画字钩子对齐兜底、引擎级隐藏优先、版本层按封包/剧本指纹、需要人看的地方停下给截图和一句话问题 | — | feat/megulit-adapter（基于 feat/auto-adapt） | 11-27 | PR #1296 已开，正在跑回归（千恋＊万花、ファタモルガーナの館、オルフレール 等），并接入调研出的外部工具；今晚最优先 |
-| 魚魚棟 · Claude | 勾选框：方框被撑成长方形、勾挤成角落白点、「当前版本不再提示」文字没和方框对齐；补真实无头 Edge 回归测试，查设置/Anki/学习页的兄弟勾选框 | — | fix/checkbox-mark | 11-27 | PR #1297 已开，正在按 AGENTS.md 补测试和截图 |
-| 魚魚棟 · Claude | 更新失败 UPDATE_LAUNCH_FAILED（玩家 1.4.19 → 1.4.25 点「重启并更新」没反应，重进才好）：查启动更新程序那步的残留锁 / 进程 / 占用 | — | fix/update-launch-failed | 11-27 | 进行中 |
 | 魚魚棟 · Claude | 调研网上现成工具接进 MeguLit-Adapter（LunaHook/LunaTranslator 特殊码库、Textractor、VNR 数据库、GARbro、KrkrExtract、SiglusExtract、VNTextPatch、AssetStudio 等）：只调研不改仓库，结论交给 #1296 接入 | — | — | 11-27 | 完成：结论交给 #1296 接入（VNDB 发行版查询、LunaHook 认引擎、GARbro-Mod 升级、GalTransl 读取器兜底；OpenSpeedy 冷测试加速待确认） |
 | 魚魚棟 · Claude | たいせつなきみのために、ぼくにできるいちばんのこと（只要你不再悲伤）：开隐藏原文时译文颜色在设置色和原文色之间来回变；开「同步原文样式」后原文藏不干净（玩家きゅう 11-27 报）。作为 MeguLit-Adapter 的实验样本一起查 | — | — | 11-27 | 排队：等游戏下载完 |
 | 魚魚棟 · Claude | YU-RIS 引擎层：正文 N 倍逐字重复去重、正文线程选择 | — | engine-yuris | 11-26 | 暂停（已提交） |
