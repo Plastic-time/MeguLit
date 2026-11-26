@@ -4,14 +4,48 @@
 #ifdef _M_IX86
 static void *Sact2DrawOriginal;
 static const unsigned char *Sact2Base;
-static volatile LONG Sact2Hide, Sact2Installed;
+static volatile LONG Sact2Mode, Sact2Epoch, Sact2Installed;
+
+static bool Sact2Report(int slot, const char *kind, const Sact2::Glyph *glyphs, size_t count) {
+ struct LastPaint { unsigned hash; DWORD tick; LONG epoch; };
+ static thread_local LastPaint last[10];
+ char bytes[Sact2::MaxGlyphs * 2];
+ size_t size = 0;
+ unsigned hash = 2166136261u;
+ for (size_t i = 0; i < count; ++i) {
+  const unsigned code = glyphs[i].code;
+  if ((code & 0xff) < 0x20) return false;
+  hash = (hash ^ code) * 16777619u;
+  bytes[size++] = (char)code;
+  if (code > 0xff) bytes[size++] = (char)(code >> 8);
+ }
+ const DWORD now = GetTickCount();
+ const LONG epoch = InterlockedCompareExchange(&Sact2Epoch, 0, 0);
+ auto &paint = last[slot];
+ // Repainting a blinking wait icon also repaints the line. A battle balloon
+ // can independently reappear with the same text on a later turn.
+ const bool changed = paint.epoch != epoch || paint.hash != hash || (slot && now - paint.tick > 1500);
+ if (!changed) {
+  paint.tick = now;
+  return true;
+ }
+ wchar_t text[Sact2::MaxGlyphs];
+ const int chars = MultiByteToWideChar(932, MB_ERR_INVALID_CHARS, bytes, (int)size, text, (int)count);
+ if (chars <= 0) return false;
+ paint = {hash, now, epoch};
+ Send(std::string("ToMe_GPUHIDE sact2 hidden ") + kind + " " + std::to_string(count) + "\t" + Utf8(std::wstring(text, chars)));
+ return true;
+}
 
 // This SACT renderer draws the sprite's retained list into the software surface.
 // Shorten only this call's range. The original list still supplies the backlog.
 static uintptr_t __stdcall Sact2DrawEnd(const uintptr_t *args) {
  const auto end = args[3];
- if (!InterlockedCompareExchange(&Sact2Hide, 0, 0) ||
-     args[0] != (uintptr_t)Sact2Base + 0x504d || args[6] != 3 || args[7] != 355 || args[2] >= end) return end;
+ const LONG mode = InterlockedCompareExchange(&Sact2Mode, 0, 0);
+ if (!mode || args[0] != (uintptr_t)Sact2Base + 0x504d || args[2] >= end) return end;
+ const int x = (int)args[6], y = (int)args[7];
+ const int slot = Sact2::BubbleSlot(x, y);
+ if ((x != 3 || y != 355) && (mode != 1 || !slot)) return end;
  const auto bytes = end - args[2];
  if (bytes % sizeof(void *) || bytes > Sact2::MaxGlyphs * sizeof(void *)) return end;
  const auto count = bytes / sizeof(void *);
@@ -23,15 +57,10 @@ static uintptr_t __stdcall Sact2DrawEnd(const uintptr_t *args) {
   if (!SafeCopy(node, nodes[i], sizeof node)) return end;
   glyphs[i] = {(int)node[1], (int)node[2], node[7] & 0xffff};
  }
- const auto keep = Sact2::DrawCount(true, (int)args[6], (int)args[7], glyphs, count);
+ const auto keep = Sact2::DrawCount(true, x, y, glyphs, count);
  if (keep == count) return end;
- if (Diag) {
-  // Repeat draws of the same retained list are common while the wait icon blinks.
-  static thread_local unsigned last;
-  unsigned hash = 2166136261u;
-  for (size_t i = keep; i < count; ++i) hash = (hash ^ glyphs[i].code) * 16777619u;
-  if (last != hash) { last = hash; Log("SACT2 dialogue paint omitted glyphs=%u", (unsigned)(count - keep)); }
- }
+ if (mode != 1 && (!keep || (glyphs[keep].code == 0x6981) != (mode == 3))) return end;
+ if (!Sact2Report(slot, slot ? "battle" : keep ? "story" : "narration", glyphs + keep, count - keep)) return end;
  return args[2] + keep * sizeof(void *);
 }
 

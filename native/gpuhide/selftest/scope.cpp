@@ -368,8 +368,25 @@ static void Sact2DialogueScope() {
  assert(Sact2::DrawCount(true, 3, 355, line, count) == count);
  line[3].code = 0x7781;
  assert(Sact2::DrawCount(true, 3, 355, line, count) == 3);
+ line[3].code = 0x6981; // （
+ assert(Sact2::DrawCount(true, 3, 355, line, count) == 3);
+ assert(Sact2::DrawCount(true, 3, 355, line + 4, count - 4) == count - 4);
+ line[3].code = 0x738a;
+ assert(Sact2::DrawCount(true, 3, 355, line + 3, count - 3) == 0); // nameless message
  line[6].y = 112;
  assert(Sact2::DrawCount(true, 3, 355, line, count) == count);
+
+ Sact2::Glyph bubble[] = {
+  {36,14,0x4383},{50,14,0x4a83},{64,14,0x5b81},{78,14,0x5b81},{92,14,0x5b81},{106,14,0x5b81},
+  {36,30,0x4383},{50,30,0x4a83},{64,30,0x4a83},{78,30,0x4a83},{92,30,0x5b81},{106,30,0x5b81}
+ };
+ assert(Sact2::DrawCount(true, 240, 2, bubble, 12) == 0);
+ assert(Sact2::DrawCount(true, 240, 143, bubble, 12) == 0);
+ assert(Sact2::DrawCount(false, 240, 143, bubble, 12) == 12);
+ assert(Sact2::DrawCount(true, 89, 462, bubble, 12) == 12); // action ticker
+ assert(Sact2::DrawCount(true, 380, 147, bubble, 12) == 12); // attack menu
+ bubble[1].x++;
+ assert(Sact2::DrawCount(true, 240, 143, bubble, 12) == 12);
 }
 
 int main() {

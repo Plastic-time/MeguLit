@@ -104,7 +104,7 @@ public static partial class HookBridge {
   return true;
  }
  static bool GpuSact2Ready,GpuSact2SourceHook;
- static bool? GpuSact2Mode;
+ static int? GpuSact2Mode;
  static void GpuSact2HookInserted(string code){
   if(!String.Equals(code,Sact2TextHook,StringComparison.OrdinalIgnoreCase))return;
   lock(Gate){GpuSact2SourceHook=true;}
@@ -138,11 +138,15 @@ public static partial class HookBridge {
    // The retained sprite can be painted before its text reaches the bridge.
    // Its renderer validates the live message layout, including on the first line.
    bool on=GpuSact2SourceHook&&Sact2DrawWanted(ReplacementEnabled&&!SafeMode,SkipHeld,Quit||GpuRendererDisconnected,StreamProbePending,ManualPick,selected);
+   int mode=!on?0:!ManualPick?1:selected.tp.ctx2==12?2:3;
    lock(GpuGate){
-    if(GpuCtlPipe==null||GpuSact2Mode==on)return;
-    GpuSend(on?"SACT2 1":"SACT2 0");
-    if(GpuCtlPipe!=null)GpuSact2Mode=on;
+    if(GpuCtlPipe==null||GpuSact2Mode==mode)return;
+    GpuSend("SACT2 "+mode);
+    if(GpuCtlPipe==null)return;
+    GpuSact2Mode=mode;
    }
+   Diagnostic("SACT2 draw mode="+mode+" selected="+Selected);
+   Emit(new{type="hookSact2Mode",active=on});
   }
  }
  // Replay the control pipe at startup without loading or attaching to a game.
@@ -297,7 +301,20 @@ public static partial class HookBridge {
   if(s.StartsWith("ToMe_GLYPHPOS ",StringComparison.Ordinal)){Emit(new{type="hookGlyphPos",line=s});return;}
   // glyph trace colour (GlyphTrace.h LineColor): what the line's glyphs are painted with, texel tint times vertex colour
   if(s.StartsWith("ToMe_GLYPHCOL ",StringComparison.Ordinal)){var gc=System.Text.RegularExpressions.Regex.Match(s,@"^ToMe_GLYPHCOL line=(\d{1,9}) rgb=([0-9a-f]{6}) a=([0-9a-f]{2}) n=(\d{1,4}) of=(\d{1,4})$");if(gc.Success)Emit(new{type="hookGlyphColor",seq=Int64.Parse(gc.Groups[1].Value),color="#"+gc.Groups[2].Value,alpha=Convert.ToInt32(gc.Groups[3].Value,16),src="gpu",n=Int32.Parse(gc.Groups[4].Value),of=Int32.Parse(gc.Groups[5].Value)});return;}
-  if(!s.StartsWith("ToMe_GPUHIDE ",StringComparison.Ordinal))return;s=s.Substring(13);Diagnostic("gpu hide "+s);
+  if(!s.StartsWith("ToMe_GPUHIDE ",StringComparison.Ordinal))return;s=s.Substring(13);
+  if(s.StartsWith("sact2 hidden ",StringComparison.Ordinal)){
+   var draw=System.Text.RegularExpressions.Regex.Match(s,@"\Asact2 hidden (story|narration|battle) (\d{1,3})\t([^\r\n]{1,128})\z");
+   int count;
+   if(!draw.Success||!Int32.TryParse(draw.Groups[2].Value,out count)||count<1||count>128)return;
+   string kind=draw.Groups[1].Value,text=draw.Groups[3].Value;
+   lock(Gate){
+    if(!GpuSact2Ready||!GpuSact2SourceHook||!ReplacementEnabled||SkipHeld||GpuRendererDisconnected)return;
+    Diagnostic("SACT2 draw hit "+kind+" glyphs="+count+" selected="+Selected);
+    Emit(new{type="hookSact2Paint",kind=kind,text=text});
+   }
+   return;
+  }
+  Diagnostic("gpu hide "+s);
   /* page model: this engine draws a glyph for every blank; kept with the calibration so the next run knows from its first line */
   if(s=="status littlecheese dialogue"){lock(Gate){GpuLittlecheeseReady=true;}SyncGpuLittlecheese();return;}
   if(s=="status sact2 dialogue"){

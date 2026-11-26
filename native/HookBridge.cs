@@ -502,14 +502,14 @@ static bool GdiProbeable(Candidate c){return c!=null&&!c.embed&&!ConversionHook(
  const string Sact2TextHook="HS-4:-10@B1E0:SACT2.dll";
  static bool Sact2DialogueStream(Candidate candidate){
   return candidate!=null&&candidate.role==0&&!candidate.embed&&
-   candidate.tp.ctx==0xf139&&candidate.tp.ctx2==12&&
+   candidate.tp.ctx==0xf139&&(candidate.tp.ctx2==12||candidate.tp.ctx2==14)&&
    String.Equals(candidate.code,Sact2TextHook,StringComparison.OrdinalIgnoreCase);
  }
  static bool Sact2Speech(Candidate candidate,string text){
   if(!Sact2DialogueStream(candidate))return false;
   string line=(text??"").Trim();
   if(PageDump(line))return false;
-  return Regex.IsMatch(line,@"\A【[^】\r\n]{1,40}】[ \t\u3000]*(?:「[^」]+」|『[^』]+』)\z");
+  return Regex.IsMatch(line,@"\A【[^】\r\n]{1,40}】[ \t\u3000]*(?:「[^」]+」|『[^』]+』|（[^【】\r\n]+）)\z");
  }
  static bool PreferSact2Speech(Candidate current,Candidate next,string text,bool manual){
   return !manual&&current!=null&&next!=null&&current.tp.addr==next.tp.addr&&current.tp.ctx==next.tp.ctx&&
@@ -522,6 +522,11 @@ static bool GdiProbeable(Candidate c){return c!=null&&!c.embed&&!ConversionHook(
   var next=new Candidate{name="System40",code=code,tp=new ThreadParam{addr=0x401000,ctx=0xf139,ctx2=12}};
   if(!PreferSact2Speech(current,next,dialogue,false)||PreferSact2Speech(current,next,dialogue,true)||
      PreferSact2Speech(current,next,place,false)||PreferSact2Speech(current,next,dialogue+"【案内】「戻る」",false))return false;
+  var aside=new Candidate{name="System40",code=code,tp=new ThreadParam{addr=0x401000,ctx=0xf139,ctx2=14}};
+  const string monologue="【勇者】（この暗い道の先に　何があるの（たぶん出口）だろう）";
+  if(!PreferSact2Speech(next,aside,monologue,false)||!PreferSact2Speech(aside,next,dialogue,false)||
+     PreferSact2Speech(next,aside,monologue,true)||PreferSact2Speech(next,aside,monologue+monologue,false)||
+     !Sact2DrawWanted(true,false,false,false,true,aside))return false;
   if(!Sact2DrawWanted(true,false,false,false,false,current)||!Sact2DrawWanted(true,false,false,false,true,next)||
      Sact2DrawWanted(false,false,false,false,false,next)||Sact2DrawWanted(true,true,false,false,false,next)||
      Sact2DrawWanted(true,false,true,false,false,next)||Sact2DrawWanted(true,false,false,true,false,next)||

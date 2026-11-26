@@ -581,10 +581,11 @@ static void Command(const std::string &line) {
  Log("CTL %s", line.c_str());
 #ifdef _M_IX86
  if (line.size() == 7 && line.compare(0, 6, "LCGDI ") == 0 && line[6] >= '0' && line[6] <= '2') { Guard g; LittlecheeseSetMode(line[6] - '0'); return; }
- if (line == "SACT2 0" || line == "SACT2 1") {
+ if (line.size() == 7 && line.compare(0, 6, "SACT2 ") == 0 && line[6] >= '0' && line[6] <= '3') {
   Guard g;
   if (!Sact2Installed) return;
-  InterlockedExchange(&Sact2Hide, line.back() == '1');
+  InterlockedIncrement(&Sact2Epoch);
+  InterlockedExchange(&Sact2Mode, line[6] - '0');
   Learner.Off(); Trace.Off();
   return;
  }
@@ -597,7 +598,7 @@ static void Command(const std::string &line) {
   Guard g; unsigned now = GetTickCount();
 #ifdef _M_IX86
   if (LittlecheeseLine(w, now)) return;
-  if (Sact2Hide) return;
+  if (Sact2Mode) return;
 #endif
   Learner.Line(w, now); Trace.Line(Learner.seq, now);
  }
@@ -621,7 +622,7 @@ static DWORD WINAPI Control(void *) {
   { Guard g; Learner.Off(); Trace.Off();
 #ifdef _M_IX86
    LittlecheeseSetMode(0);
-   InterlockedExchange(&Sact2Hide, 0);
+   InterlockedExchange(&Sact2Mode, 0);
 #endif
   } // MeguLit gone: stop hiding at once
  }
