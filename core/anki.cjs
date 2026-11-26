@@ -72,12 +72,12 @@ class Anki{
  }
  async status(c){return {version:await this.call(c,'version'),decks:await this.call(c,'deckNames'),models:await this.call(c,'modelNames')};}
  async sync(word,config,audio,extra={}){const c=cleanV4(config);if(!word?.surface||!word?.reading)throw Error('当前词没有确定读音，无法制卡');const id=createHash('sha256').update(JSON.stringify(word.cardKey?[word.cardKey]:[word.base||word.surface,word.reading])).digest('hex'),lock=JSON.stringify([c.ankiUrl,c.ankiDeck,c.ankiModel,id]);if(this.pending.has(lock))return this.pending.get(lock);const job=this.save(word,c,audio,id,extra).finally(()=>this.pending.delete(lock));this.pending.set(lock,job);return job;}
- async prepareModel(config){const c=cleanV4(config),models=await this.call(c,'modelNames'),own=['MeguLit','ToMe','tomoyo_megumin'].includes(c.ankiModel);
+ async prepareModel(config,{fixReadings=true}={}){const c=cleanV4(config),models=await this.call(c,'modelNames'),own=['MeguLit','ToMe','tomoyo_megumin'].includes(c.ankiModel);
   if(!models.includes(c.ankiModel)){if(!own)throw Error('所选笔记类型不存在，请先在 Anki 中创建');await this.call(c,'createModel',{modelName:c.ankiModel,inOrderFields:[...fields,...extraFields],css:CSS,cardTemplates:[{Name:'日本語',Front:FRONT,Back:BACK}]});this.upgraded=true;}
   let available=await this.call(c,'modelFieldNames',{modelName:c.ankiModel});
   if(fields.some(f=>!available.includes(f)))throw Error('笔记类型缺少需要字段：'+fields.join(', '));
   if(own&&!this.upgraded){for(const f of extraFields)if(!available.includes(f)){await this.call(c,'modelFieldAdd',{modelName:c.ankiModel,fieldName:f,index:available.length});available=[...available,f];}const names=await this.call(c,'modelTemplates',{modelName:c.ankiModel}).catch(()=>({}));const tname=Object.keys(names||{})[0]||'日本語';await this.call(c,'updateModelTemplates',{model:{name:c.ankiModel,templates:{[tname]:{Front:FRONT,Back:BACK}}}});await this.call(c,'updateModelStyling',{model:{name:c.ankiModel,css:CSS}});this.upgraded=true;}
-  if(own&&available.includes('WordReading')&&!this.readingsFixed){this.readingsFixed=true;this.fixReadings(c).catch(()=>{});}
+  if(fixReadings&&own&&available.includes('WordReading')&&!this.readingsFixed){this.readingsFixed=true;this.fixReadings(c).catch(()=>{});}
   return {available,owned:own};
  }
  // Existing MeguLit notes follow the same reading rule: katakana readings become hiragana, kana-only words drop it.
