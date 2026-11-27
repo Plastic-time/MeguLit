@@ -371,17 +371,13 @@ static void CenteredDialogueWithSpacer(GlyphLearner &g, BodyRecheckCase test) {
   assert(line[0].find(mixed) != std::string::npos);
   return;
  }
- assert(line.size() == (test == BodyRecheckCase::Centered ? 1 : 2));
+ assert(line.size() == (test == BodyRecheckCase::Moved ? 2 : 1));
  const auto complete = [&](const std::string &r, const char *state) {
   assert(r.find(state) != std::string::npos);
   assert(r.find("n=14 rects=428," + std::to_string(top) + ",32,32") != std::string::npos);
   assert(r.find(";792," + std::to_string(top) + ",32,32 text=") != std::string::npos);
  };
  if (test == BodyRecheckCase::Moved) complete(line.front(), " line=2 hidden=0 ");
- if (test == BodyRecheckCase::Partial) {
-  assert(line.front().find(" line=2 hidden=1 ") != std::string::npos);
-  assert(line.front().find(mixed) != std::string::npos);
- }
  complete(line.back(), " line=2 hidden=1 ");
 
  if (test == BodyRecheckCase::Centered) {
@@ -395,6 +391,68 @@ static void CenteredDialogueWithSpacer(GlyphLearner &g, BodyRecheckCase test) {
   assert(std::none_of(reports.begin() + before, reports.end(), [](const std::string &r) {
    return r.find("ToMe_CHARS engine=gpu line=3 ") == 0;
   }));
+ }
+}
+
+enum class TailGeometry { OnPitch, OffPitch, InteriorGap };
+
+static void BottomDialogueWithUntracedTail(GlyphLearner &g, TailGeometry geometry, bool recheck, bool boxTiles = false) {
+ const std::string prefix = "ToMe_CHARS engine=gpu line=2 ";
+ std::vector<std::string> reports;
+ g.emit = [&](const std::string &r) { if (r.find(prefix) == 0) reports.push_back(r); };
+ auto draw = [&](const std::vector<Quad> &q, unsigned now) {
+  return g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now);
+ };
+
+ auto prior = Row(4, 960, 656, 32, 0.1f);
+ for (unsigned i = 0; i < prior.size(); i++) prior[i].glyph = i + 1;
+ g.Line(L"ABCD", 10000);
+ draw(prior, 10001);
+ g.Frame(10002, 1280, 720);
+
+ // A spacer or three tiles can bring a partial row up to the expected count.
+ auto row = Row(21, 330, 656, 32, 0.2f);
+ for (unsigned i = 0; i < 19; i++) row[i].glyph = i + 5;
+ if (geometry == TailGeometry::OffPitch) { row.back().x0 += 8; row.back().x1 += 8; }
+ if (geometry == TailGeometry::InteriorGap) std::swap(row[11].glyph, row[19].glyph);
+ const Quad spacer{ 304, 616, 308, 620, 0, 0, 4.f / 1024, 4.f / 2048, 0 };
+ g.Line(L"ABCDEFGHIJKLMNOPQRSTU", 15000);
+ std::vector<Quad> partial(row.begin(), row.begin() + (boxTiles ? 18 : 20));
+ if (boxTiles) {
+  const std::vector<Quad> tiles{
+   { 304, 616, 332, 644, 0, 0, 28.f / 1280, 28.f / 720, 0 },
+   { 304, 644, 332, 686, 0, 0, 28.f / 1280, 42.f / 720, 0 },
+   { 304, 686, 332, 714, 0, 0, 28.f / 1280, 28.f / 720, 0 },
+  };
+  assert(g.Draw((void *)2, 1280, 720, nullptr, 1280, 720, 1280, 720, tiles, 15001).empty());
+ } else {
+  partial.push_back(spacer);
+  row.push_back(spacer);
+ }
+ draw(partial, 15001);
+ g.Frame(15002, 1280, 720);
+ const bool legacy = !recheck || geometry == TailGeometry::InteriorGap;
+ assert(reports.size() == (legacy ? 1 : 0));
+ if (legacy) {
+  assert(reports.front().find(prefix + "hidden=1 ") == 0);
+  assert(reports.front().find(boxTiles ? "n=21 rects=304,616,28,28;304,644,28,42;330,656,32,32;" :
+                                       "n=21 rects=304,616,4,4;330,656,32,32;") != std::string::npos);
+ }
+
+ const auto hidden = draw(row, 15017);
+ g.Frame(15018, 1280, 720);
+ draw(row, 15034);
+ g.Frame(15035, 1280, 720);
+ assert(hidden.size() == 21 && hidden.back() == 20);
+ assert(reports.size() == (legacy || geometry == TailGeometry::OnPitch ? 1 : 0));
+ if (recheck && geometry == TailGeometry::OnPitch) {
+  assert(reports.back().find(prefix + "hidden=1 ") == 0);
+  std::string rects = "n=21 rects=";
+  for (int x = 330; x <= 890; x += 28) {
+   if (x != 330) rects += ';';
+   rects += std::to_string(x) + ",656,32,32";
+  }
+  assert(reports.back().find(rects + " text=") != std::string::npos);
  }
 }
 
@@ -520,6 +578,18 @@ int main() {
   if (test != BodyRecheckCase::Disabled) learner.bodyRecheck = true;
   CenteredDialogueWithSpacer(learner, test);
  }
+ for (auto geometry : { TailGeometry::OnPitch, TailGeometry::OffPitch, TailGeometry::InteriorGap }) {
+  GlyphLearner learner;
+  learner.bodyRecheck = true;
+  BottomDialogueWithUntracedTail(learner, geometry, true);
+ }
+ GlyphLearner disabled;
+ BottomDialogueWithUntracedTail(disabled, TailGeometry::OnPitch, false);
+ GlyphLearner combinedAtlas;
+ combinedAtlas.bodyRecheck = true;
+ BottomDialogueWithUntracedTail(combinedAtlas, TailGeometry::OnPitch, true, true);
+ GlyphLearner combinedAtlasDisabled;
+ BottomDialogueWithUntracedTail(combinedAtlasDisabled, TailGeometry::OnPitch, false, true);
  RetainedDialogueRows();
  Sact2DialogueScope();
  puts("PASS dialogue scope: unclaimed title/menu, foreign target, unmatched ruby kept; confirmed dialogue hides; read/OFF restore");

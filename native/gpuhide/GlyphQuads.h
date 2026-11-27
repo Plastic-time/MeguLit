@@ -382,14 +382,45 @@ struct GlyphLearner {
   const float cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;
   return cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1 && BodyHeight(r);
  }
- std::vector<Rect> TracedBody(std::vector<Rect> rects, const std::vector<Rect> &retained) const {
+ bool FixedPitchBody(const std::vector<Rect> &body) const {
+  // CMVS can finish a fixed-pitch row with up to two quads whose atlas cells were not traced.
+  if (body.size() < 5 || !body[0].traced || !body[1].traced) return false;
+  const float pitch = body[1].x0 - body[0].x0;
+  if (pitch <= 0 || pitch > glyphH) return false;
+  unsigned untraced = 0;
+  for (size_t i = 0; i < body.size(); i++) {
+   const auto &r = body[i];
+   if (!BodyInBand(r) || std::fabs(r.y0 - body[0].y0) > 1 ||
+       (i > 0 && std::fabs(r.x0 - body[i - 1].x0 - pitch) > 1)) return false;
+   if (!r.traced) untraced++;
+   else if (untraced) return false;
+  }
+  return untraced <= 2;
+ }
+ // A spacer or a column of box tiles to the left can make a partial row count as complete.
+ bool PartialBodyWithBoxTrim(const std::vector<Rect> &rects) const {
+  const auto &trim = rects.front();
+  if (trim.traced) return false;
+  const auto first = std::find_if(rects.begin() + 1, rects.end(), [](const Rect &r) { return r.traced; });
+  if (first == rects.end() || trim.x0 >= first->x0 || trim.y1 >= first->y0) return false;
+  std::vector<Rect> row;
+  for (const auto &r : rects) {
+   if (!r.traced && std::fabs(r.x0 - trim.x0) <= 1 && std::fabs(r.y0 - first->y0) > 1) continue;
+   row.push_back(r);
+  }
+  return rects.size() - row.size() <= 3 && FixedPitchBody(row);
+ }
+ std::vector<Rect> BodyRects(std::vector<Rect> rects, const std::vector<Rect> &retained, bool allowUntracedTail = false) const {
   rects.erase(std::remove_if(rects.begin(), rects.end(), [&](const Rect &r) {
    // Bubble tiles can keep an earlier rectangle alive after its glyph has gone.
-   return !r.traced || !BodyHeight(r) || (Earlier(r) && std::any_of(retained.begin(), retained.end(),
+   const bool outsideBody = allowUntracedTail ? !BodyInBand(r) : !r.traced || !BodyHeight(r);
+   return outsideBody || (Earlier(r) && std::any_of(retained.begin(), retained.end(),
     [&](const Rect &e) { return SamePlace(e, r); }));
   }), rects.end());
   if (rects.size() < n) return {};
-  return Chars(Cluster(Chars(std::move(rects))));
+  auto body = Chars(Cluster(Chars(std::move(rects))));
+  if (allowUntracedTail && (body.size() != n || !FixedPitchBody(body))) return {};
+  return body;
  }
  // Same-atlas spacers and decorations have no traced glyph cell.
  static std::vector<Rect> TracedChars(std::vector<Rect> rects) {
@@ -448,7 +479,11 @@ struct GlyphLearner {
    if (checkBody) {
     // A centred line can overlap the previous line and share its atlas with a spacer.
     // Confirm the whole row against fresh keys before counting those positions again.
-    const auto body = TracedBody(g.frame, retainedBody), newBody = TracedBody(fresh, retainedBody);
+    auto body = BodyRects(g.frame, retainedBody), newBody = BodyRects(fresh, retainedBody);
+    if (hitSent && areaTraced && (body.size() != n || newBody.size() != n)) {
+     body = BodyRects(g.frame, retainedBody, true);
+     newBody = BodyRects(fresh, retainedBody, true);
+    }
     const bool moved = canMove && !hitSent && Relocated(body, newBody);
     if ((hitSent || moved) && body.size() == n && newBody.size() == n &&
         std::equal(body.begin(), body.end(), newBody.begin(), SamePlace)) {
@@ -517,6 +552,9 @@ struct GlyphLearner {
   }
  }
  void Report(Group &g, const std::vector<Rect> &cs, bool moved = false) {
+  // Wait for the row: even a later correction can leave the reader pinned to its first position.
+  if (bodyRecheck && !readOnly && hitSent && areaTraced && !reported && cs.size() == n && cs.size() >= 6 &&
+      g.rt == areaRt && PartialBodyWithBoxTrim(cs)) return;
   if (moved) { learned = false; atlases.clear(); hitSent = false; }
   float h = 0; Rect box{ 1e30f, 1e30f, -1e30f, -1e30f }; for (auto &r : cs) { h += r.y1 - r.y0; box.x0 = (std::min)(box.x0, r.x0); box.y0 = (std::min)(box.y0, r.y0); box.x1 = (std::max)(box.x1, r.x1); box.y1 = (std::max)(box.y1, r.y1); } h /= cs.size();
   char b[256];
