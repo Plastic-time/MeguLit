@@ -231,6 +231,37 @@ and the scene unchanged, `hit` and `ToMe_CHARS hidden=1` with the same rectangle
 line is drawn again. Built and run by `Build.ps1` and CI through `native/native-builds.json` (marker
 `MeguLitGpu version=1`, checked by `tools/native-stale.cjs` and `Release.ps1`).
 
+### GPU learner replay
+
+Set `MEGULIT_GPU_REPLAY` in the target process environment before loading the GPU DLL. Its value is a new
+absolute file path on a local fixed drive, with an existing parent directory. An unset variable leaves
+recording off. Recording starts with the fresh learner and uses one bounded in-memory buffer. It hands
+the buffer to a writer thread after `QUIT`, a control-pipe disconnect, or the capture limit. A completed
+file ends with `END complete` or `END prefix`. The latter is the valid prefix before a limit or an event
+that could not be captured. A hard process exit can leave no completed file. An existing file is kept.
+
+D3D9, D3D11, OpenGL and GDI feed the same capture boundary. The file records draw batches, target and texture
+dimensions, screen and UV rectangles, compositing, line and frame ticks, and the learner's mode, preset and off
+transitions. Glyph trace contributes only its per-glyph ordinal. The file uses local numeric ranks in place of
+native handles and group keys, preserving the order used to pick among candidates. The tape preserves call order and the tick values supplied to the learner.
+
+Each captured line becomes per-capture synthetic code units. They keep length, repeated-character equality,
+blanks, line separators and the two structural speaker delimiters. The file contains only their numeric tokens.
+Texture pixels, glyph bitmaps, original text, paths and native addresses stay out of the file. Take fixtures from
+short synthetic layouts whenever possible. Review geometry and timing before sharing a capture.
+
+The native GPU self-test builds `replay.exe` into its test output folder. Run `replay.exe input.replay [expected]`
+to write the learner's `ToMe_GPUHIDE`, `ToMe_CHARS` and `ToMe_PAGE` messages and the draw masks. A `MASK` row
+starts with the zero-based frame and batch numbers followed by the indices of the omitted quads. The optional
+expected file compares the output byte for byte. This boundary uses the already-correlated glyph ordinals.
+Hook installation, texture scanning, glyph colours and the retained-bitmap adapters have their own self-tests.
+
+`replay.exe --check replay-fixtures` compares the checked-in samples to direct learner calls and replays each
+sample twice. The six samples cover the three nearby-nameplate layouts and the centred, moved and partially
+painted Aoitori bubbles. `--generate <directory>` exports the same synthetic cases and their direct output for
+review. The checked-in output records the shared learner's current behaviour, including the early Aoitori
+placement that the CMVS change addresses.
+
 ### Live checks (2026-11-14)
 
 - **STEINS;GATE 0 (MAGES, D3D9, Steam): works** (8- and 18-character lines, rectangles, `hidden=1`). The ring-shaped wait

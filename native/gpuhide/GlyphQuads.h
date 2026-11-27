@@ -21,6 +21,7 @@
 #include <set>
 #include <algorithm>
 #include <functional>
+#include <utility>
 #include <cmath>
 #include <stdio.h>
 
@@ -37,7 +38,14 @@ static inline bool GlyphLike(const Quad &q, unsigned tw, unsigned th) {
 }
 static inline bool Blank(wchar_t c) { return c <= 0x20 || c == 0x3000 || c == 0x200B || c == 0xFEFF || c == 0x1F; }
 
-struct GlyphLearner {
+struct NativeGroupOrder {
+ long long operator()(void *rt, void *tex) const {
+  return ((long long)(size_t)rt * 1315423911LL) ^ (long long)(size_t)tex;
+ }
+};
+
+template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
+ explicit OrderedGlyphLearner(GroupOrder order = {}) : GroupOrder(std::move(order)) {}
  struct Rect { float x0, y0, x1, y1; bool traced = false; };
  struct Seen { Rect r; unsigned firstAt, lastFrame, glyph, tracedAt; };
  struct Group { void *rt, *tex; unsigned tw, th, rtW, rtH; std::map<long long, Seen> keys; std::vector<Rect> frame, prev; unsigned prevFrame; };
@@ -58,7 +66,7 @@ struct GlyphLearner {
  std::map<void *, std::pair<Rect, Rect>> rtMap; // rt texture -> (uv rect, screen rect)
 
  // one group per (render target, texture): two atlases of the same size (glyph sheet and UI sheet) never mix
- static long long GroupKey(void *rt, void *tex) { return ((long long)(size_t)rt * 1315423911LL) ^ (long long)(size_t)tex; }
+ static long long GroupKey(void *rt, void *tex) { return NativeGroupOrder{}(rt, tex); }
  static long long AtlasKey(void *rt, void *tex) { return GroupKey(rt, tex); }
  // a glyph sheet made for one line is sized to that line (e.g. 76 x 88), unlike UI / font atlases (powers of two)
  static bool LineSized(unsigned w, unsigned h) { auto p2 = [](unsigned v) { return v && !(v & (v - 1)); }; return !(p2(w) && p2(h)) && w * h <= 1024u * 256u; }
@@ -284,7 +292,7 @@ struct GlyphLearner {
  // One draw call: returns the indices of the quads to leave out.
  std::vector<int> Draw(void *tex, unsigned tw, unsigned th, void *rt, unsigned rtW, unsigned rtH, unsigned backW, unsigned backH, const std::vector<Quad> &q, unsigned now) {
   std::vector<int> drop; bbW = backW; bbH = backH;
-  long long gk = GroupKey(rt, tex); Group *g = nullptr; bool armed = Armed(now);
+  long long gk = GroupOrder::operator()(rt, tex); Group *g = nullptr; bool armed = Armed(now);
   // a texture first used for this line (per-line glyph sheets); UI sheets in use before the line never count as sheets
   bool freshTex = false; { auto ft = texFirst.find(tex); if (ft == texFirst.end()) { if (texFirst.size() > 8192) texFirst.clear(); texFirst[tex] = now; ft = texFirst.find(tex); } freshTex = (int)(ft->second - (lineAt - 3000)) >= 0; }
   for (size_t i = 0; i < q.size(); i++) {
@@ -474,7 +482,7 @@ struct GlyphLearner {
    if (kv.second.size() < 2 || (learned && (kv.second[0]->rtW != areaW || kv.second[0]->rtH != areaH))) continue;
    std::vector<Rect> fresh, live; Group *big = kv.second[0]; size_t most = 0;
    for (Group *g : kv.second) { const std::vector<Rect> &last = g->prevFrame == frameNo - 1 ? g->frame : g->prev; for (auto &r : last) if (earlierRects.empty() || !Earlier(r)) live.push_back(r); if (last.size() > most) { most = last.size(); big = g; }
-    for (auto &s : g->keys) if ((int)(s.second.firstAt - since) >= 0 && !EarlierGlyph(GroupKey(g->rt, g->tex), s.first)) fresh.push_back(s.second.r); }
+    for (auto &s : g->keys) if ((int)(s.second.firstAt - since) >= 0 && !EarlierGlyph(GroupOrder::operator()(g->rt, g->tex), s.first)) fresh.push_back(s.second.r); }
    std::vector<Rect> a = Chars(Cluster(Chars(live))), b = Chars(Cluster(Chars(fresh)));
    if (log && (now / 500) != ((now - 17) / 500)) log("frame %u target rt=%p pages=%u live=%u fresh=%u n=%u", frameNo, kv.first, (unsigned)kv.second.size(), (unsigned)a.size(), (unsigned)b.size(), n);
    std::vector<Rect> keep; const std::vector<Rect> *hit = Match(a, b, keep); if (!hit) continue;
@@ -513,3 +521,5 @@ struct GlyphLearner {
   if (emit) emit(line);
  }
 };
+
+using GlyphLearner = OrderedGlyphLearner<NativeGroupOrder>;

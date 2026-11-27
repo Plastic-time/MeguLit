@@ -36,7 +36,8 @@
 #include <set>
 #include <algorithm>
 #include <cmath>
-#include "GlyphQuads.h"
+#include <sstream>
+#include "GlyphReplay.h"
 #include "GlyphTrace.h"
 #include "../shared/minhook/include/MinHook.h"
 
@@ -105,9 +106,86 @@ static Dev *DevOf(IDirect3DDevice9 *d) {
 static GlyphLearner Learner;
 static GlyphTrace Trace; // GetGlyphOutline glyphs followed into textures and onto the screen (GlyphTrace.h)
 static unsigned Frame, LastPresent;
+struct ReplayRecording {
+ std::wstring path;
+ GpuReplay::Tape tape;
+ bool limited = false;
+};
+
+// The graphics/control paths append under Guard. The writer takes ownership after the last event.
+static HANDLE ReplayReady;
+static std::unique_ptr<ReplayRecording> ReplayActive, ReplayFinished;
+
+static DWORD WINAPI SaveGpuReplay(void *) {
+ HANDLE ready = ReplayReady;
+ if (WaitForSingleObject(ready, INFINITE) != WAIT_OBJECT_0) { CloseHandle(ready); return 0; }
+ std::unique_ptr<ReplayRecording> recording;
+ { Guard g; recording = std::move(ReplayFinished); }
+ CloseHandle(ready);
+ try {
+  std::ostringstream out;
+  if (!GpuReplay::WriteTape(out, recording->tape, recording->limited)) return 0;
+  const std::string bytes = out.str();
+  if (bytes.size() > GpuReplay::MaxFileBytes) return 0;
+  HANDLE file = CreateFileW(recording->path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (file == INVALID_HANDLE_VALUE) return 0;
+  DWORD written = 0;
+  WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr);
+  CloseHandle(file);
+ } catch (...) { /* A diagnostic must never stop the game. */ }
+ return 0;
+}
+
+static void StartGpuReplay() {
+ wchar_t path[MAX_PATH];
+ const DWORD n = GetEnvironmentVariableW(L"MEGULIT_GPU_REPLAY", path, MAX_PATH);
+ if (n < 4 || n >= MAX_PATH || path[1] != L':' || path[2] != L'\\' || wcschr(path + 3, L':')) return;
+ const wchar_t drive[] = {path[0], L':', L'\\', 0};
+ if (GetDriveTypeW(drive) != DRIVE_FIXED) return;
+ try {
+  auto recording = std::make_unique<ReplayRecording>();
+  recording->path = path;
+  ReplayReady = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+  if (!ReplayReady) return;
+  HANDLE writer = CreateThread(nullptr, 0, SaveGpuReplay, nullptr, 0, nullptr);
+  if (!writer) { CloseHandle(ReplayReady); return; }
+  ReplayActive = std::move(recording);
+  CloseHandle(writer);
+ } catch (...) { /* An unavailable recorder leaves the learner alone. */ }
+}
+
+static void FinishGpuReplay(bool limited) {
+ if (!ReplayActive) return;
+ ReplayActive->limited = limited;
+ ReplayFinished = std::move(ReplayActive);
+ SetEvent(ReplayReady);
+}
+
+template <class Record> static void RecordGpu(Record record) {
+ if (!ReplayActive) return;
+ try {
+  if (record(ReplayActive->tape)) return;
+ } catch (...) { /* Save the valid prefix even if capture could not allocate the next event. */ }
+ FinishGpuReplay(true);
+}
+
+static std::vector<int> LearnDraw(void *tex, unsigned tw, unsigned th, void *rt, unsigned rw, unsigned rh,
+                                  unsigned bw, unsigned bh, const std::vector<Quad> &q, unsigned now) {
+ RecordGpu([&](GpuReplay::Tape &t) { return t.Draw(tex, tw, th, rt, rw, rh, bw, bh, Learner.texRt, q, now); });
+ return Learner.Draw(tex, tw, th, rt, rw, rh, bw, bh, q, now);
+}
+
+static void LearnComposite(void *tex, const std::vector<Quad> &q) {
+ RecordGpu([&](GpuReplay::Tape &t) { return t.Composite(tex, q); });
+ Learner.Composite(tex, q);
+}
+
 /* Test rigs only: MEGULIT_GPU_FPS_CAP=<fps> sleeps before each present so a background test game does not take the GPU from
    the player's own game. Unset in MeguLit (no cap). */
-static void FramesTick(unsigned now, unsigned w, unsigned h) { Learner.Frame(now, w, h); Trace.Frame(now, w, h); }
+static void FramesTick(unsigned now, unsigned w, unsigned h) {
+ RecordGpu([&](GpuReplay::Tape &t) { return t.Frame(now, w, h); });
+ Learner.Frame(now, w, h); Trace.Frame(now, w, h);
+}
 static void FpsCap() {
  static int cap = -1; static LARGE_INTEGER f, last; if (cap < 0) { wchar_t v[8] = {}; cap = GetEnvironmentVariableW(L"MEGULIT_GPU_FPS_CAP", v, 8) ? _wtoi(v) : 0; QueryPerformanceFrequency(&f); }
  if (cap <= 0) return; LARGE_INTEGER now; QueryPerformanceCounter(&now); double want = 1.0 / cap, got = last.QuadPart ? (double)(now.QuadPart - last.QuadPart) / f.QuadPart : want;
@@ -199,10 +277,10 @@ static void TraceDraw(void *tex, unsigned tw, unsigned th, void *rt, unsigned rt
 static std::vector<int> Decide(Dev &v, std::vector<Quad> &q) {
  TexInfo ti = TexOf(v.tex0); std::vector<int> drop;
  if (!v.tex0 || ti.w == 0) return drop;
- if (v.rtIsBack && ti.rt) { Learner.Composite(v.tex0, q); return drop; }
+ if (v.rtIsBack && ti.rt) { LearnComposite(v.tex0, q); return drop; }
  TraceDraw(v.tex0, ti.w, ti.h, v.rtIsBack ? NULL : v.rtTex, v.rtW, v.rtH, q);
  Learner.texRt = ti.rt;
- return Learner.Draw(v.tex0, ti.w, ti.h, v.rtIsBack ? NULL : v.rtTex, v.rtW, v.rtH, v.bbW, v.bbH, q, GetTickCount());
+ return LearnDraw(v.tex0, ti.w, ti.h, v.rtIsBack ? NULL : v.rtTex, v.rtW, v.rtH, v.bbW, v.bbH, q, GetTickCount());
 }
 // The device's own getters at every draw: state the game set before the DLL arrived (a declaration set once at start,
 // DR1) counts too. A pure device refuses Get* calls; then the hooked setters' view stays.
@@ -465,13 +543,13 @@ static bool GdiBlit(HDC dst, int x, int y, int w, int h, void *src, unsigned sw,
  std::vector<Quad> q(1); Quad &x0 = q[0]; x0.x0 = (float)x + o.x; x0.y0 = (float)y + o.y; x0.x1 = x0.x0 + w; x0.y1 = x0.y0 + h; x0.u0 = (float)sx / sw; x0.v0 = (float)sy / sh; x0.u1 = (float)(sx + sW) / sw; x0.v1 = (float)(sy + sH) / sh; x0.first = 0;
  InterlockedExchange(&GdiSeen, 1);
  Guard g;
- if (!rt) { auto it = Textures.find(src); if (it != Textures.end() && it->second.rt) { Learner.Composite(src, q); return false; } }
+ if (!rt) { auto it = Textures.find(src); if (it != Textures.end() && it->second.rt) { LearnComposite(src, q); return false; } }
  if (rt) { TexInfo ti = { tw, th, D3DFMT_UNKNOWN, true }; Textures[rt] = ti; }
  if (Diag && GlyphLike(x0, sw, sh)) Log("GDI blit dst=%p(%ux%u) src=%p(%ux%u) [%d,%d %dx%d from %d,%d %dx%d]", rt, tw, th, src, sw, sh, x, y, w, h, sx, sy, sW, sH);
 #ifdef _M_IX86
  if (LittlecheeseMode) return false; // dialogue pixels are already handled before the bitmap is blitted
 #endif
- std::vector<int> drop = Learner.Draw(src, sw, sh, rt, tw, th, rt ? GdiW : tw, rt ? GdiH : th, q, GetTickCount());
+ std::vector<int> drop = LearnDraw(src, sw, sh, rt, tw, th, rt ? GdiW : tw, rt ? GdiH : th, q, GetTickCount());
  return !drop.empty();
 }
 typedef BOOL(WINAPI *BitBltF)(HDC, int, int, int, int, HDC, int, int, DWORD);
@@ -587,6 +665,7 @@ static void Command(const std::string &line) {
   InterlockedIncrement(&Sact2Epoch);
   InterlockedExchange(&Sact2Mode, line[6] - '0');
   Learner.Off(); Trace.Off();
+  RecordGpu([](GpuReplay::Tape &t) { return t.Off(); });
   return;
  }
 #endif
@@ -600,6 +679,7 @@ static void Command(const std::string &line) {
   if (LittlecheeseLine(w, now)) return;
   if (Sact2Mode) return;
 #endif
+  RecordGpu([&](GpuReplay::Tape &t) { return t.Line(w, now); });
   Learner.Line(w, now); Trace.Line(Learner.seq, now);
  }
  else if (line == "OFF") {
@@ -608,18 +688,34 @@ static void Command(const std::string &line) {
   if (LittlecheeseMode == 2) { LittlecheeseSetMode(1); return; }
 #endif
   Learner.Off(); Trace.Off();
+  RecordGpu([](GpuReplay::Tape &t) { return t.Off(); });
  }
- else if (line.compare(0, 7, "PRESET ") == 0) { float gh = 0; unsigned w = 0, h = 0; if (sscanf_s(line.c_str() + 7, "%f %u %u", &gh, &w, &h) == 3) { Guard g; Learner.Preset(gh, w, h); if (line.size() > 2 && line.compare(line.size() - 2, 2, " b") == 0) Learner.pageBlankQuads = true; } }
- else if (line == "MODE read") { Guard g; Learner.readOnly = true; } else if (line == "MODE hide") { Guard g; Learner.readOnly = false; }
+ else if (line.compare(0, 7, "PRESET ") == 0) {
+  float gh = 0; unsigned w = 0, h = 0;
+  if (sscanf_s(line.c_str() + 7, "%f %u %u", &gh, &w, &h) == 3) {
+   Guard g;
+   const bool blanks = line.size() > 2 && line.compare(line.size() - 2, 2, " b") == 0;
+   Learner.Preset(gh, w, h);
+   if (blanks) Learner.pageBlankQuads = true;
+   RecordGpu([&](GpuReplay::Tape &t) { return t.Preset(gh, w, h, blanks); });
+  }
+ }
+ else if (line == "MODE read" || line == "MODE hide") {
+  Guard g;
+  Learner.readOnly = line == "MODE read";
+  RecordGpu([](GpuReplay::Tape &t) { return t.Mode(Learner.readOnly); });
+ }
 }
 static DWORD WINAPI Control(void *) {
  wchar_t name[64]; swprintf_s(name, L"\\\\.\\pipe\\MeguLitGpuCtl-%lu", GetCurrentProcessId());
  while (!Quit) {
   HANDLE p = CreateFileW(name, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL); if (p == INVALID_HANDLE_VALUE) { Sleep(1000); continue; }
   std::string buf; char b[4096]; DWORD got;
-  while (ReadFile(p, b, sizeof b, &got, NULL) && got) { buf.append(b, got); size_t at; while ((at = buf.find('\n')) != std::string::npos) { std::string l = buf.substr(0, at); buf.erase(0, at + 1); if (!l.empty() && l.back() == '\r') l.pop_back(); if (l == "QUIT") { Command("LCGDI 0"); Command("SACT2 0"); CloseHandle(p); return 0; } Command(l); } }
+  while (ReadFile(p, b, sizeof b, &got, NULL) && got) { buf.append(b, got); size_t at; while ((at = buf.find('\n')) != std::string::npos) { std::string l = buf.substr(0, at); buf.erase(0, at + 1); if (!l.empty() && l.back() == '\r') l.pop_back(); if (l == "QUIT") { Command("LCGDI 0"); Command("SACT2 0"); { Guard g; FinishGpuReplay(false); } CloseHandle(p); return 0; } Command(l); } }
   CloseHandle(p);
   { Guard g; Learner.Off(); Trace.Off();
+   RecordGpu([](GpuReplay::Tape &t) { return t.Off(); });
+   FinishGpuReplay(false);
 #ifdef _M_IX86
    LittlecheeseSetMode(0);
    InterlockedExchange(&Sact2Mode, 0);
@@ -639,6 +735,7 @@ static DWORD WINAPI Start(void *module) {
  wchar_t path[MAX_PATH]; GetModuleFileNameW((HMODULE)module, path, MAX_PATH); wchar_t *slash = wcsrchr(path, L'\\'); if (slash) wcscpy_s(slash + 1, MAX_PATH - (slash + 1 - path), L"MeguLitGpu.diag");
  FILE *f = NULL; if (_wfopen_s(&f, path, L"r, ccs=UTF-8") == 0 && f) { wchar_t log[MAX_PATH] = {}; if (fgetws(log, MAX_PATH, f)) { size_t n = wcslen(log); while (n && (log[n - 1] == L'\n' || log[n - 1] == L'\r' || log[n - 1] == L' ')) log[--n] = 0; wchar_t full[MAX_PATH]; swprintf_s(full, L"%s.%lu.log", log, GetCurrentProcessId()); Diag = _wfsopen(full, L"w", _SH_DENYNO); } fclose(f); }
  Learner.emit = Emit; Learner.log = Diag ? Log : NULL; Trace.emit = Emit; Trace.log = Diag ? Log : NULL;
+ StartGpuReplay();
  CreateThread(NULL, 0, Sender, NULL, 0, NULL); CreateThread(NULL, 0, Control, NULL, 0, NULL);
  MH_Initialize();
  // Font dots at the source (FontDots.h): only with MEGULIT_FONT_DOTS=1 from the launcher that injects this DLL before the
