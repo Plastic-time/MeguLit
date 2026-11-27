@@ -41,6 +41,7 @@
 
 | 谁 | 做什么 | issue | 分支 | 开始 | 状态 |
 |---|---|---|---|---|---|
+| 魚魚棟 · Claude | megulit-engine：Rust 直读引擎剧本，同引擎游戏零适配（设计文档 docs/megulit-engine.md + KiriKiri 原型：xp3 解包、cx/HxCrypt 解密、scn/ks 解析） | — | claude/megulit-engine | 11-28 | 在做 |
 | 魚魚棟 · Claude | 台词按说话人上色：取游戏原色不再发灰（アイキス3 sexy アヤメ），颜色页新增「分角色」按作品改色 | — | feat/speaker-colors | 11-28 | 等合并（PR #1359，CI 全绿） |
 | 魚魚棟 · Claude | 注音字体默认 Noto Sans JP，随 MeguLit 自带、优先用自带文件；下拉框标「自带」；旧默认 Meiryo 的老用户迁移过去 | — | claude/bundled-noto-ruby | 11-28 | 在做 |
 | 魚魚棟 · Claude | 修 main：统一提示接管 title 后 el.title 仍能读写提示（#1344 合并后校准按钮测试失败） | — | claude/fix-main-tip-title | 11-28 | 等合并（PR #1350，CI 全绿） |
