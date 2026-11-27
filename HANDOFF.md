@@ -21,7 +21,8 @@
 按「VNDB 作品号 + 发行版」去重，不按 exe 哈希。状态：verified = 官方验收过；owner-ok = 店主确认能用；read = 能用但只能读模式、待修；进行中 = PR 已开未合并
 
 | 游戏 | VNDB | 发行版 | 引擎 | 状态 | 谁 | PR / seed |
-|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|
+| 魚魚棟 · Claude | 适配贡献默认开启：11-22 起更新卡片不再问，新玩家一直是关的；改成所有版本启动提示一次后即开启，设置 → 游戏库可关，关过的不再打开 | — | fix/contrib-default-on | 11-28 | 等 CI（PR #1356） |---|
 | 千恋＊万花 | v19073 | 待补 | KiriKiri | verified | 魚魚棟 | kirikiri/senren-banka |
 | ファタモルガーナの館 | v12402 | 待补 | KiriKiri | owner-ok | 魚魚棟 | kirikiri/fata-morgana |
 | 死に逝く君、館に芽吹く憎悪 | v19233 | 汉化硬盘版 | KiriKiri | read | 魚魚棟 | kirikiri/shiniyuku-kimi |
