@@ -6,11 +6,13 @@
 // draw call that is not made. The stream becomes hide-only only after the DLL reports a hit (like E578 / E667).
 // C# 5 (the .NET Framework csc), compiled with HookBridge.cs (partial class).
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
 public static partial class HookBridge {
  static readonly object GpuGate=new object();static StreamWriter GpuCtlPipe;static bool GpuSent,GpuLoaded;static string GpuApis="";static string GpuStream="";
+ static bool GpuBodyRecheck;
  /* Interface for the hide orchestrator (feat/hide-orchestrator). */
  /// <summary>APIs the layer hooked in this game ("d3d9", "gdi"); empty until the DLL reported in.</summary>
  public static string[] GpuCapabilities(){lock(GpuGate){return GpuLoaded&&GpuApis.Length>0?GpuApis.Split(','):new string[0];}}
@@ -30,6 +32,44 @@ public static partial class HookBridge {
  /// <summary>First hidden draw of a line: (stream, line number, glyph quads left out, characters of the line).</summary>
  public static event Action<string,int,int,int> GpuHit;
  static void GpuSend(string line){lock(GpuGate){if(GpuCtlPipe==null)return;try{GpuCtlPipe.WriteLine(line);}catch{GpuCtlPipe=null;}}}
+ static void SetGpuBodyRecheck(bool on){
+  lock(GpuGate){
+   if(GpuBodyRecheck==on)return;
+   GpuBodyRecheck=on;
+   GpuSend(on?"OPT bodyRecheck 1":"OPT bodyRecheck 0");
+  }
+ }
+ static void GpuControlConnected(StreamWriter writer){
+  lock(GpuGate){
+   GpuCtlPipe=writer;GpuSent=false;GpuLittlecheeseMode=-1;GpuSact2Mode=null;
+   if(GpuBodyRecheck)GpuSend("OPT bodyRecheck 1");
+  }
+ }
+ static bool GpuBodyRecheckSelfTest(){
+  using(var commands=new MemoryStream())
+  using(var writer=new StreamWriter(commands,new System.Text.UTF8Encoding(false)){AutoFlush=true,NewLine="\n"}){
+   const string key="MEGULIT_PROFILE";
+   const string enabled="{\"type\":\"profile\",\"gpuBodyRecheck\":true}";
+   string saved=Environment.GetEnvironmentVariable(key);
+   try{
+    Environment.SetEnvironmentVariable(key,enabled);
+    ProfileFromEnv();
+    GpuControlConnected(writer);
+    GpuControlConnected(writer);
+    ApplyProfile(Json.Deserialize<Dictionary<string,object>>(enabled));
+    ApplyProfile(Json.Deserialize<Dictionary<string,object>>("{\"type\":\"profile\"}"));
+    GpuControlConnected(writer);
+    ApplyProfile(Json.Deserialize<Dictionary<string,object>>(enabled));
+    ApplyProfile(Json.Deserialize<Dictionary<string,object>>("{\"gpuBodyRecheck\":\"true\"}"));
+    return System.Text.Encoding.UTF8.GetString(commands.ToArray())==
+     "OPT bodyRecheck 1\nOPT bodyRecheck 1\nOPT bodyRecheck 0\nOPT bodyRecheck 1\nOPT bodyRecheck 0\n";
+   }finally{
+    lock(GpuGate){GpuCtlPipe=null;}
+    ApplyProfile(null);
+    Environment.SetEnvironmentVariable(key,saved);
+   }
+  }
+ }
  // The same streams the glyph hide (E667) serves: the selected stream without write-back, with replacement on or probing.
  static bool GpuWanted(){lock(Gate){Candidate c;bool blank=GlyphMode=="blank";return !GpuSact2Ready&&!HookTarget.ChineseText&&Enabled&&(ReplacementEnabled||ProbeWanted||blank)&&Selected!=""&&Candidates.TryGetValue(Selected,out c)&&(c.gdiProbe||RememberedHide(c)||blank&&GdiProbeable(c)||GlyphMode=="dot"&&GlyphAll);}} /* 2026-11-15 (沙耶の唄 with in-place drawing on: nothing was hidden): 文字显示 in place sends glyph mode blank, which means the line must vanish;
     a game whose glyphs the font layer cannot blank (rasterised once and reused) is hidden here instead, also without replacement or probe. */ /* text-arch: in ①'s dot mode (compositor) the GDI probe is never switched on, the stream is still the dialogue */
@@ -493,6 +533,6 @@ public static partial class HookBridge {
  static void GpuHide(string bit,string loader,string[] args){try{if(Environment.GetEnvironmentVariable("MEGULIT_TEXT_MARKS")=="1")SetMarks(true); /* marks do not need layer 4 */string dll=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"MeguLitGpu"+bit+".dll");if(!File.Exists(dll)){Diagnostic("gpu hide unavailable: "+Path.GetFileName(dll)+" missing");return;}
   if(!GpuCanaryArm())return;
   new Thread(()=>{while(!Quit){try{using(var pipe=new System.IO.Pipes.NamedPipeServerStream("MeguLitGpu-"+Pid,System.IO.Pipes.PipeDirection.In,1)){pipe.WaitForConnection();using(var reader=new StreamReader(pipe,new System.Text.UTF8Encoding(false))){string line;while((line=reader.ReadLine())!=null)GpuReport(line);}}}catch(Exception e){Diagnostic("gpu pipe "+e.Message);Thread.Sleep(1000);}}}){IsBackground=true}.Start();
-  new Thread(()=>{while(!Quit){try{using(var pipe=new System.IO.Pipes.NamedPipeServerStream("MeguLitGpuCtl-"+Pid,System.IO.Pipes.PipeDirection.Out,1)){pipe.WaitForConnection();var w=new StreamWriter(pipe,new System.Text.UTF8Encoding(false)){AutoFlush=true,NewLine="\n"};lock(GpuGate){GpuCtlPipe=w;GpuSent=false;GpuLittlecheeseMode=-1;GpuSact2Mode=null;}SyncGpuRenderers();Diagnostic("gpu hide connected");{string cal=GpuCalibrationLoad();if(cal!=""){w.WriteLine("PRESET "+cal);Diagnostic("gpu hide preset "+cal+" (saved by an earlier run)");}}while(!Quit){lock(GpuGate){if(GpuCtlPipe!=w)break;}Thread.Sleep(500);}}}catch(Exception e){lock(GpuGate){GpuCtlPipe=null;}Diagnostic("gpu control "+e.Message);Thread.Sleep(1000);}}}){IsBackground=true}.Start();
+  new Thread(()=>{while(!Quit){try{using(var pipe=new System.IO.Pipes.NamedPipeServerStream("MeguLitGpuCtl-"+Pid,System.IO.Pipes.PipeDirection.Out,1)){pipe.WaitForConnection();var w=new StreamWriter(pipe,new System.Text.UTF8Encoding(false)){AutoFlush=true,NewLine="\n"};GpuControlConnected(w);SyncGpuRenderers();Diagnostic("gpu hide connected");{string cal=GpuCalibrationLoad();if(cal!=""){lock(GpuGate){if(GpuCtlPipe==w)w.WriteLine("PRESET "+cal);}Diagnostic("gpu hide preset "+cal+" (saved by an earlier run)");}}while(!Quit){lock(GpuGate){if(GpuCtlPipe!=w)break;}Thread.Sleep(500);}}}catch(Exception e){lock(GpuGate){GpuCtlPipe=null;}Diagnostic("gpu control "+e.Message);Thread.Sleep(1000);}}}){IsBackground=true}.Start();
   var start=new ProcessStartInfo(loader,Pid+" "+args[1]+" \""+args[2]+"\" "+args[3]+" \""+dll+"\""){UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true};using(var child=Process.Start(start)){if(!child.WaitForExit(12000)){Diagnostic("gpu hide load timed out");return;}Diagnostic(child.ExitCode==0?"gpu hide loaded":"gpu hide failed: "+child.StandardError.ReadToEnd().Trim());}}catch(Exception e){Diagnostic("gpu hide skipped: "+e.Message);}}
 }

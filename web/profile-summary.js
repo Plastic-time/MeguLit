@@ -45,6 +45,7 @@ const settingNames = {
  'hide.engineTrial.clickMs':'同一次点击的文本时间窗（毫秒）',
  'hide.engineTrial.skipAside':'隐藏试验跳过场景标签和姓名牌',
  'hide.glyphAfterLine':'整句画完后成批画的字（选项、名牌）不再顺带隐藏',
+ 'hide.gpuBodyRecheck':'出字完成后复核 GPU 台词坐标',
  'selfCheck.window':'自检取样行数',
  'selfCheck.minLines':'自检最少行数',
  'selfCheck.hideVisible':'自检原文漏出比例阈值',

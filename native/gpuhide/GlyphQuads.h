@@ -43,6 +43,7 @@ struct GlyphLearner {
  struct Group { void *rt, *tex; unsigned tw, th, rtW, rtH; std::map<long long, Seen> keys; std::vector<Rect> frame, prev; unsigned prevFrame; };
  std::function<void(const std::string &)> emit; void (*log)(const char *, ...) = nullptr;
  bool readOnly = false;
+ bool bodyRecheck = false;
  // line
  std::vector<bool> blankAt; unsigned nb = 0; // the line with its interior blanks (engines that draw a blank glyph for a space)
  /* 2026-11-20 (CHAOS;CHILD: a page keeps its earlier lines while the next one types out): the places the earlier lines of the page
@@ -381,10 +382,14 @@ struct GlyphLearner {
   const float cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;
   return cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1 && BodyHeight(r);
  }
- std::vector<Rect> TracedBody(std::vector<Rect> rects) const {
-  rects.erase(std::remove_if(rects.begin(), rects.end(), [&](const Rect &r) { return !r.traced || !BodyHeight(r); }), rects.end());
+ std::vector<Rect> TracedBody(std::vector<Rect> rects, const std::vector<Rect> &retained) const {
+  rects.erase(std::remove_if(rects.begin(), rects.end(), [&](const Rect &r) {
+   // Bubble tiles can keep an earlier rectangle alive after its glyph has gone.
+   return !r.traced || !BodyHeight(r) || (Earlier(r) && std::any_of(retained.begin(), retained.end(),
+    [&](const Rect &e) { return SamePlace(e, r); }));
+  }), rects.end());
   if (rects.size() < n) return {};
-  return Chars(std::move(rects));
+  return Chars(Cluster(Chars(std::move(rects))));
  }
  // Same-atlas spacers and decorations have no traced glyph cell.
  static std::vector<Rect> TracedChars(std::vector<Rect> rects) {
@@ -409,17 +414,18 @@ struct GlyphLearner {
      games) drops them at once, and its new glyphs on the old places are the new line's again */
   if (!earlierKeys.empty()) { size_t on = 0; for (auto &e : earlierKeys) { auto g = groups.find(e.first); if (g == groups.end()) continue; auto it = g->second.keys.find(e.second); if (it != g->second.keys.end() && frameNo - it->second.lastFrame <= 2) on++; } if (on * 2 < earlierKeys.size()) { earlierKeys.clear(); earlierRects.clear(); } }
   const bool settled = reported && hiddenSent == (hitSent && !readOnly);
-  const bool mixed = reported && !readOnly && std::any_of(lastRects.begin(), lastRects.end(),
+  const bool recheck = bodyRecheck && !readOnly;
+  const bool mixed = recheck && reported && areaTraced && std::any_of(lastRects.begin(), lastRects.end(),
    [&](const Rect &r) { return !r.traced && !BodyHeight(r); });
   if (settled && !mixed) return;
   unsigned since = prevLineAt && now - prevLineAt < 120000 ? (std::max)(prevLineAt + 200, lineAt - 3000) : lineAt - 3000;
   Group *movedGroup = nullptr; std::vector<Rect> movedRects, bandDrawn; bool ambiguousMove = false, freshBand = false;
   const bool recoverBand = learned && hitSent && !areaTraced && !readOnly && !reported;
   for (auto &kv : groups) {
-   Group &g = kv.second; std::vector<Rect> fresh, live, freshTraced;
+   Group &g = kv.second; std::vector<Rect> fresh, live, freshTraced, retainedBody;
    if (learned && (g.rtW != areaW || g.rtH != areaH)) continue;
    const bool currentFrame = g.prevFrame == frameNo - 1, fromAtlas = atlases.count(AtlasKey(NULL, g.tex)) > 0;
-   const bool checkBody = !readOnly && (!reported || mixed) && currentFrame && fromAtlas && g.rt == areaRt;
+   const bool checkBody = recheck && (!reported || mixed) && currentFrame && fromAtlas && g.rt == areaRt;
    if (settled && !checkBody) continue;
    Rect screen{};
    const bool canMove = learned && !readOnly && !reported && currentFrame && g.rt == areaRt &&
@@ -428,6 +434,8 @@ struct GlyphLearner {
    const bool checkBand = recoverBand && currentFrame && fromAtlas && g.rt == areaRt;
    for (auto &s : g.keys) {
     const Seen &seen = s.second;
+    if (checkBody && seen.lastFrame == frameNo - 1 && seen.r.traced && EarlierGlyph(kv.first, s.first))
+     retainedBody.push_back(seen.r);
     const bool isFresh = (int)(seen.firstAt - since) >= 0;
     const bool isFreshTrace = recover && seen.lastFrame == frameNo - 1 && seen.r.traced && (int)(seen.tracedAt - since) >= 0;
     if (!isFresh && !isFreshTrace) continue;
@@ -440,7 +448,7 @@ struct GlyphLearner {
    if (checkBody) {
     // A centred line can overlap the previous line and share its atlas with a spacer.
     // Confirm the whole row against fresh keys before counting those positions again.
-    const auto body = TracedBody(g.frame), newBody = TracedBody(fresh);
+    const auto body = TracedBody(g.frame, retainedBody), newBody = TracedBody(fresh, retainedBody);
     const bool moved = canMove && !hitSent && Relocated(body, newBody);
     if ((hitSent || moved) && body.size() == n && newBody.size() == n &&
         std::equal(body.begin(), body.end(), newBody.begin(), SamePlace)) {

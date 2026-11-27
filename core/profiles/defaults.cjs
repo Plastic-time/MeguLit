@@ -116,6 +116,8 @@ module.exports={
      again (native/fontprobe/GlyphMatch.h AfterLineNew); false = the kernel: a character hidden in the line stays hidden until
      the next line */
   glyphAfterLine:false,
+  /* Recheck GPU dialogue coordinates against traced glyphs after the row finishes drawing (CMVS). */
+  gpuBodyRecheck:false,
  },
  /* self-check thresholds of the auto-profile layer (feat/auto-profile): a window of lines whose hide/drop/repeat/pairing
     rates decide a fallback */

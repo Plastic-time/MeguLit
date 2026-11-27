@@ -307,11 +307,19 @@ static void KeepCenteredBandWhileTyping() {
  assert(draw(label, menu, 15017) == 0);
 }
 
-static void CenteredDialogueWithSpacer(int top, bool partial = false) {
- GlyphLearner g;
+enum class BodyRecheckCase { Centered, Moved, Partial, Disabled, ReadOnly };
+
+static void CenteredDialogueWithSpacer(GlyphLearner &g, BodyRecheckCase test) {
+ const int top = test == BodyRecheckCase::Moved ? 656 : 334;
+ const bool partial = test == BodyRecheckCase::Partial || test == BodyRecheckCase::Disabled || test == BodyRecheckCase::ReadOnly;
+ const bool readOnly = test == BodyRecheckCase::ReadOnly;
  std::vector<std::string> reports;
  g.emit = [&](const std::string &r) { reports.push_back(r); };
+ const auto tilesAtOldPlaces = Row(4, 568, 334, 4, 0.6f);
  auto draw = [&](const std::vector<Quad> &q, unsigned now) {
+  // These untraced tiles outlive the previous line and keep its rectangle records around.
+  if (test == BodyRecheckCase::Centered)
+   assert(g.Draw((void *)3, 1024, 2048, nullptr, 1280, 720, 1280, 720, tilesAtOldPlaces, now).empty());
   return g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now);
  };
  auto prior = Row(4, partial ? 900 : 568, 334, 32, 0.1f);
@@ -321,10 +329,15 @@ static void CenteredDialogueWithSpacer(int top, bool partial = false) {
  g.Frame(10002, 1280, 720);
  assert(draw(prior, 10003).size() == prior.size());
  g.Frame(10004, 1280, 720);
+ g.readOnly = readOnly;
 
  auto next = Row(14, 428, (float)top, 32, 0.2f);
  for (unsigned i = 0; i < next.size(); i++) next[i].glyph = i + 5;
- next.push_back({ 402, (float)top - 40, 406, (float)top - 36, 0, 0, 4.f / 1024, 4.f / 2048, 0 });
+ const float spacerTop = (float)top - (partial ? 40 : 20);
+ next.push_back({ 402, spacerTop, 406, spacerTop + 4, 0, 0, 4.f / 1024, 4.f / 2048, 0 });
+ auto nameplate = Row(4, 84, 160, 32, 0.4f);
+ for (unsigned i = 0; i < nameplate.size(); i++) nameplate[i].glyph = i + 20;
+ next.insert(next.end(), nameplate.begin(), nameplate.end());
  g.Line(L"EFGHIJKLMNOPQR", 15000);
  if (partial) {
   // A partial row plus three bubble tiles can reach the expected count.
@@ -334,27 +347,55 @@ static void CenteredDialogueWithSpacer(int top, bool partial = false) {
    { 402, 364, 430, 392, 0, 0, 28.f / 1280, 28.f / 720, 0 },
   };
   std::vector<Quad> prefix(next.begin(), next.begin() + 11);
-  prefix.push_back(next.back());
+  prefix.push_back(next[14]);
   assert(g.Draw((void *)2, 1280, 720, nullptr, 1280, 720, 1280, 720, tiles, 15001).empty());
   draw(prefix, 15001);
   g.Frame(15002, 1280, 720);
  }
  draw(next, 15005);
  g.Frame(15006, 1280, 720);
- const auto hidden = draw(next, 15017);
+ draw(next, 15017);
  g.Frame(15018, 1280, 720);
- assert(hidden.size() == 14 && hidden.back() == 13); // The spacer stays in the game.
- assert(reports.back().find("line=2 hidden=1") != std::string::npos);
- assert(reports.back().find("n=14 rects=428," + std::to_string(top) + ",32,32") != std::string::npos);
- assert(reports.back().find(";792," + std::to_string(top) + ",32,32 text=") != std::string::npos);
+ const auto hidden = draw(next, 15034);
+ g.Frame(15035, 1280, 720);
+ if (test == BodyRecheckCase::Centered) assert(g.earlierRects.size() == prior.size());
+ if (readOnly) assert(hidden.empty());
+ else assert(hidden.size() == 14 && hidden.back() == 13); // The spacer and nameplate stay in the game.
 
- const auto before = reports.size();
- g.Line(L"STUVWXYZABCDEF", 20000);
- draw(next, 20001); // The previous row stays while the new row has yet to draw.
- g.Frame(20002, 1280, 720);
- assert(std::none_of(reports.begin() + before, reports.end(), [](const std::string &r) {
-  return r.find("ToMe_CHARS engine=gpu line=3 ") == 0;
- }));
+ std::vector<std::string> line;
+ for (const auto &r : reports) if (r.find("ToMe_CHARS engine=gpu line=2 ") == 0) line.push_back(r);
+ const std::string mixed = "n=14 rects=402,294,28,28;402,322,28,42;";
+ if (test == BodyRecheckCase::Disabled || readOnly) {
+  assert(line.size() == 1);
+  assert(line[0].find(readOnly ? " line=2 hidden=0 " : " line=2 hidden=1 ") != std::string::npos);
+  assert(line[0].find(mixed) != std::string::npos);
+  return;
+ }
+ assert(line.size() == (test == BodyRecheckCase::Centered ? 1 : 2));
+ const auto complete = [&](const std::string &r, const char *state) {
+  assert(r.find(state) != std::string::npos);
+  assert(r.find("n=14 rects=428," + std::to_string(top) + ",32,32") != std::string::npos);
+  assert(r.find(";792," + std::to_string(top) + ",32,32 text=") != std::string::npos);
+ };
+ if (test == BodyRecheckCase::Moved) complete(line.front(), " line=2 hidden=0 ");
+ if (test == BodyRecheckCase::Partial) {
+  assert(line.front().find(" line=2 hidden=1 ") != std::string::npos);
+  assert(line.front().find(mixed) != std::string::npos);
+ }
+ complete(line.back(), " line=2 hidden=1 ");
+
+ if (test == BodyRecheckCase::Centered) {
+  const auto before = reports.size();
+  g.Line(L"STUVWXYZABCDEF", 20000);
+  draw(next, 20001);
+  auto redraw = next; // The previous row is also redrawn from different cells before the new row arrives.
+  for (auto &q : redraw) { q.v0 += 0.1f; q.v1 += 0.1f; }
+  draw(redraw, 20001);
+  g.Frame(20002, 1280, 720);
+  assert(std::none_of(reports.begin() + before, reports.end(), [](const std::string &r) {
+   return r.find("ToMe_CHARS engine=gpu line=3 ") == 0;
+  }));
+ }
 }
 
 static void RetainedDialogueRows() {
@@ -473,9 +514,12 @@ int main() {
  IgnoreTraceFromOldFrame();
  ReportNewLineWithLateScaledCopy();
  KeepCenteredBandWhileTyping();
- CenteredDialogueWithSpacer(334);
- CenteredDialogueWithSpacer(656);
- CenteredDialogueWithSpacer(334, true);
+ for (auto test : { BodyRecheckCase::Centered, BodyRecheckCase::Moved, BodyRecheckCase::Partial,
+                     BodyRecheckCase::Disabled, BodyRecheckCase::ReadOnly }) {
+  GlyphLearner learner;
+  if (test != BodyRecheckCase::Disabled) learner.bodyRecheck = true;
+  CenteredDialogueWithSpacer(learner, test);
+ }
  RetainedDialogueRows();
  Sact2DialogueScope();
  puts("PASS dialogue scope: unclaimed title/menu, foreign target, unmatched ruby kept; confirmed dialogue hides; read/OFF restore");

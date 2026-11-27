@@ -611,6 +611,7 @@ static void Command(const std::string &line) {
  }
  else if (line.compare(0, 7, "PRESET ") == 0) { float gh = 0; unsigned w = 0, h = 0; if (sscanf_s(line.c_str() + 7, "%f %u %u", &gh, &w, &h) == 3) { Guard g; Learner.Preset(gh, w, h); if (line.size() > 2 && line.compare(line.size() - 2, 2, " b") == 0) Learner.pageBlankQuads = true; } }
  else if (line == "MODE read") { Guard g; Learner.readOnly = true; } else if (line == "MODE hide") { Guard g; Learner.readOnly = false; }
+ else if (line == "OPT bodyRecheck 1" || line == "OPT bodyRecheck 0") { Guard g; Learner.bodyRecheck = line.back() == '1'; }
 }
 static DWORD WINAPI Control(void *) {
  wchar_t name[64]; swprintf_s(name, L"\\\\.\\pipe\\MeguLitGpuCtl-%lu", GetCurrentProcessId());
@@ -619,7 +620,7 @@ static DWORD WINAPI Control(void *) {
   std::string buf; char b[4096]; DWORD got;
   while (ReadFile(p, b, sizeof b, &got, NULL) && got) { buf.append(b, got); size_t at; while ((at = buf.find('\n')) != std::string::npos) { std::string l = buf.substr(0, at); buf.erase(0, at + 1); if (!l.empty() && l.back() == '\r') l.pop_back(); if (l == "QUIT") { Command("LCGDI 0"); Command("SACT2 0"); CloseHandle(p); return 0; } Command(l); } }
   CloseHandle(p);
-  { Guard g; Learner.Off(); Trace.Off();
+  { Guard g; Learner.Off(); Trace.Off(); Learner.bodyRecheck = false;
 #ifdef _M_IX86
    LittlecheeseSetMode(0);
    InterlockedExchange(&Sact2Mode, 0);
