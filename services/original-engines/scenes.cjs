@@ -880,7 +880,7 @@ function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{r
  // Compiled Ivory scenes have their own scan and leave the original GARbro sample limit intact.
  const sampled=id==='garbro'?scenes.filter(s=>!s.compiledIvory).slice(0,64).concat(scenes.filter(s=>s.compiledIvory)):scenes.slice(0,64);
  // SIA script order is by filename, with control-only PACs mixed among the dialogue scenes.
- for(const s of id==='sia'?scenes:sampled){try{if((s.parse?s.parse():ENGINES[id].parse(s.read())).lines.length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */
+ for(const s of id==='sia'?scenes:sampled){try{const parsed=s.parse?s.parse():ENGINES[id].parse(s.read());if((parsed.identityProjection?.lines||parsed.lines).length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */
 /* GARbro is the last resort: a folder MeguLit's own cx reader owns (encrypted KiriKiri Z xp3, cache still decrypting)
    stays unread until that cache is ready instead of going to GARbro (9-nine- Ep4 / ATRI read as garbro). */
 function ownCx(dir){return cxArchives(dir).some(f=>{try{return xp3.list(f)?.files.some(e=>e.encrypted);}catch{return false;}});}

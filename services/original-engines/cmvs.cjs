@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const {classify}=require('./cmvs-bytecode.cjs'),voiceRef=require('./voice-ref.cjs');
 /* E592 CMVS — Purple Software's engine (Purple software, Chronoclock, Amatarasu Riddle Star, 青空の見える丘, ハピメア …;
    ~44 company releases, 26 since 2016). Family A (string pool, docs/engine-families.md).
    Format references (read, not copied): GARbro ArcFormats/Cmvs ArcCPZ.cs, CpzHeader.cs, CmvsMD5.cs (morkt, MIT) for the
@@ -265,24 +266,79 @@ const PUSH=Buffer.from([1,2,0x20,1]),PUSH_END=Buffer.from([0x0f,2,0x30,4]);
 const RESOURCE=/\.(ogg|wav|mv2|pb3|pb2|ps3|ps2|cur|cmv|mgv|png|bmp)\b/i;
 const CVNS_RESOURCE=/^\S+\.pss$/i;
 const DIALOGUE_PUNCT=/[「」『』。、！？…]/;
-/* the pushed strings in code order; an empty one stays as an empty buffer, so the n-th push of two builds of one script
-   is the same line. A push with no NUL within MAX_PUSH bytes is a damaged text section (a wrong key, a cut file) and
-   counts as empty: read to the section end, every push of such a script was the whole rest of it (300 MB for one scene) */
+const CPZ_PATH=/^(?:[\w.-]+[/\\])*[\w.-]+\.cpz$/i;
+/* The original offset scan defines push ordinals, even when a slot is empty or decoding falls back.
+   MAX_PUSH bounds a damaged string with no terminator. */
 const MAX_PUSH=0x2000;
-function pushed(d){const count=d.readUInt32LE(0x10),code=0x30,codeLen=d.readUInt32LE(0x14)+4*count+d.readUInt32LE(0x18),text=code+codeLen,textLen=d.readUInt32LE(0x1C),out=[];
- if(text+textLen>d.length||codeLen<0)return out;const tend=text+textLen;
- for(let p=code;p+12<=text;p++){if(d[p]!==1||!d.subarray(p,p+4).equals(PUSH)||!d.subarray(p+8,p+12).equals(PUSH_END))continue;
-  const at=text+d.readUInt32LE(p+4),end=Math.min(tend,at+MAX_PUSH),s=at<end?kit.cstr(d.subarray(at,end),0,end-at):null;out.push(s&&s.length<MAX_PUSH?s:Buffer.alloc(0));p+=11;}
- return out;}
+function pushSlots(d){
+ const count=d.readUInt32LE(0x10),code=0x30,codeLen=d.readUInt32LE(0x14)+4*count+d.readUInt32LE(0x18),text=code+codeLen,textLen=d.readUInt32LE(0x1C),out=[];
+ if(text+textLen>d.length||codeLen<0)return out;
+ const tend=text+textLen;
+ for(let p=code;p+12<=text;p++){
+  if(d[p]!==1||!d.subarray(p,p+4).equals(PUSH)||!d.subarray(p+8,p+12).equals(PUSH_END))continue;
+  const at=text+d.readUInt32LE(p+4),end=Math.min(tend,at+MAX_PUSH),s=at<end?kit.cstr(d.subarray(at,end),0,end-at):null;
+  out.push({pc:p,bytes:s&&s.length<MAX_PUSH?s:Buffer.alloc(0),valid:!!s&&at+s.length<end});
+  p+=11;
+ }
+ return out;
+}
+const pushed=d=>pushSlots(d).map(slot=>slot.bytes);
 const clean=t=>kit.trimBoth(t.replace(/\\n/g,'\n'));
-/* an English (or other Latin-script) release keeps its dialogue as plain ASCII pushes: a string with letters and a space, sentence punctuation or a
-   Capitalised word is text; resource ids, control codes (\wc) and lower-case identifiers stay anchors */
+const displayText=t=>clean(t.replace(/\\t/g,'\t'));
+/* Keep the original classification and string normalization for Seed and patch identity. */
 const prose=t=>/[A-Za-z]/.test(t)&&(/\s/.test(t)||/[,.!?"'\u2026]/.test(t)||/^[A-Z][a-z]+$/.test(t));
-/* every push as {kind, t}: 'line' (text the game shows), 'anchor' (a file name or command) or '' (empty) */
-function texts(buf){const cvns=buf.toString('latin1',0,4)==='PSS0',d=cvns?unpackPss0(buf):unpackPs2(buf);if(!d)return [];const list=pushed(d),dec=kit.decoder(list.filter(s=>s.length));
- return list.map(s=>{const t=!s.length?'':s.some(c=>c>=0x80)?clean(dec.decode(s)):s.toString('latin1');if(!t)return {kind:'',t};
-  if(((RESOURCE.test(t)||(cvns&&CVNS_RESOURCE.test(t)))&&!DIALOGUE_PUNCT.test(t))||(kit.ascii(t)&&!prose(t)))return {kind:'anchor',t};return {kind:'line',t:kit.ascii(t)?clean(t):t};});}
-function parse(buf){const lines=[],anchors=[];for(const x of texts(buf)){if(x.kind==='line')lines.push(x.t);else if(x.kind==='anchor')anchors.push(x.t);}return {lines,anchors};}
+function identitySlots(pushes,cvns){
+ const dec=kit.decoder(pushes.map(s=>s.bytes).filter(s=>s.length));
+ return pushes.map(({bytes:s})=>{
+  const t=!s.length?'':s.some(c=>c>=0x80)?clean(dec.decode(s)):s.toString('latin1');
+  if(!t)return {kind:'',t};
+  if(((RESOURCE.test(t)||(cvns&&CVNS_RESOURCE.test(t)))&&!DIALOGUE_PUNCT.test(t))||(kit.ascii(t)&&!prose(t)))return {kind:'anchor',t};
+  return {kind:'line',t:kit.ascii(t)?clean(t):t};
+ });
+}
+function scriptSlots(buf,withDisplay){
+ const cvns=buf.toString('latin1',0,4)==='PSS0',d=cvns?unpackPss0(buf):unpackPs2(buf);
+ if(!d)return {identity:[],display:[]};
+ const pushes=pushSlots(d),identity=identitySlots(pushes,cvns);
+ if(!withDisplay)return {identity};
+ const bytecode=pushes.length?classify(d,cvns):null;
+ const byPc=new Map(pushes.map((slot,i)=>[slot.pc,i])),messages=new Map(),parameters=new Set();
+ for(const [pc,message] of bytecode?.messages||[]){
+  const text=byPc.get(pc),voice=byPc.get(message.voice),speaker=byPc.get(message.speaker);
+  if(!pushes[text]?.valid||!pushes[voice]?.valid||!pushes[speaker]?.valid)continue;
+  messages.set(text,{speaker:displayText(identity[speaker].t),voice:displayText(identity[voice].t),lineId:message.lineId});
+  parameters.add(voice);
+  parameters.add(speaker);
+ }
+ const display=identity.map((slot,i)=>{
+  const message=messages.get(i);
+  if(message){const t=displayText(slot.t);return {kind:t?'line':'',t,message};}
+  if(parameters.has(i)||bytecode?.anchors.has(pushes[i].pc)||CPZ_PATH.test(slot.t))return {kind:slot.t?'anchor':'',t:slot.t};
+  if(slot.kind!=='line')return slot;
+  const t=displayText(slot.t);
+  return {kind:t?'line':'',t};
+ });
+ return {identity,display};
+}
+/* The full push sequence remains available for alignment and the legacy oracle. */
+const texts=buf=>scriptSlots(buf,false).identity;
+function parse(buf){
+ const {identity,display}=scriptSlots(buf,true),lines=[],anchors=[],records=[],identityIndices=[];
+ const identityProjection={lines:[],anchors:[]};
+ for(let i=0;i<identity.length;i++){
+  const before=identity[i],after=display[i];
+  const identityIndex=before.kind==='line'?identityProjection.lines.length:-1;
+  if(before.kind==='line')identityProjection.lines.push(before.t);
+  else if(before.kind==='anchor')identityProjection.anchors.push(before.t);
+  if(after.kind==='line'){
+   lines.push(after.t);
+   records.push({text:after.t,...(after.message||{speaker:'',voice:'',lineId:null})});
+   identityIndices.push(identityIndex);
+  }else if(after.kind==='anchor')anchors.push(after.t);
+ }
+ const voices=voiceRef.keep(records.map(record=>voiceRef.clean(record.voice)));
+ return {lines,anchors,records,identityIndices,identityProjection,...(voices?{voices}:{})};
+}
 
 const PS=/\.ps[23]$/i,PSS=/\.pss$/i;
 function listScripts(file){
@@ -347,12 +403,24 @@ const engine=kit.engine({id:'cmvs',hint:'*.cpz（*.pss / *.ps2 / *.ps3）',
   CMVS_CPZ2_ARCHIVE:'这部 CVNS 作品的 CPZ2 封包索引读不了，请检查安装文件是否完整',
   CMVS_CPZ3_ARCHIVE:'这部 CMVS 作品的 CPZ3 封包索引读不了，请检查安装文件是否完整',
   CMVS_CPZ5_KEY:'这部 CMVS 作品的 CPZ5 归档用了未知的密钥常数，暂时读不了剧本',CMVS_CPZ6_KEY:'这部 CMVS 作品的 CPZ6 归档用了未知的密钥常数，暂时读不了剧本',CMVS_CPZ7:'这部 CMVS 作品的 CPZ7 归档解不开（start.ps3 里没找到它的注册参数，或者常数和已知作品不同），暂时读不了剧本'},
-  originalLines:dir=>originalLines(dir)}});
+  originalLines:dir=>originalLines(dir),originalProjection:dir=>pairedOriginal(dir,true)}});
 /* An official Chinese release keeps the Japanese scripts in data/pack and lays plain Chinese ones over them in
    FileHook\ (its loader reads those first), so the running script is Chinese and the archives hold its original. Both
    builds push the same strings in the same order: the running line at push n has the Japanese line at push n. One line
    per running line, '' where a scene has no archived copy or its pushes differ. */
-function originalLines(dir){const {existing,cpz3}=archiveScenes(dir);
- return engine.scenes(dir).flatMap(s=>{let own=[];try{own=texts(s.read());}catch{}const key=s.name.toLowerCase(),a=existing.get(key)||cpz3.get(key);let ja=null;try{ja=a&&texts(a.read());}catch{}
-  return own.flatMap((x,i)=>x.kind!=='line'?[]:[ja&&ja.length===own.length&&ja[i].kind==='line'?ja[i].t:'']);});}
+function pairedOriginal(dir,withDisplay){
+ const {existing,cpz3}=archiveScenes(dir),lines=[],displayLines=[];
+ for(const scene of engine.scenes(dir)){
+  let own;try{own=scriptSlots(scene.read(),withDisplay);}catch{continue;}
+  const key=scene.name.toLowerCase(),archive=existing.get(key)||cpz3.get(key);
+  let ja;try{if(archive)ja=scriptSlots(archive.read(),withDisplay);}catch{}
+  const matched=ja&&ja.identity.length===own.identity.length;
+  for(let i=0;i<own.identity.length;i++){
+   if(own.identity[i].kind==='line')lines.push(matched&&ja.identity[i].kind==='line'?ja.identity[i].t:'');
+   if(withDisplay&&own.display[i].kind==='line')displayLines.push(matched&&ja.display[i].kind==='line'?ja.display[i].t:'');
+  }
+ }
+ return {lines,displayLines};
+}
+const originalLines=dir=>pairedOriginal(dir,false).lines;
 module.exports={engine,packed,parse,texts,originalLines,header,open,list,read,unpackPs2,unpackPss0,pushed,md5Words,table,stage1,dirCipher,entryCipher,scheme,DEFAULT,DEFAULT7,DEFAULTS,indexKey,startValues,rotl,rotr};

@@ -24,7 +24,7 @@ const SCAN_VERSION=2;
 /* 2026-11-15 saved-line voice (user: a CV line of 沙耶の唄 played an AI voice): an engine reader that learned to pair
    voices after its games were scanned raises its revision here; only those games are scanned again (on their next
    start, or when one of their saved lines is played). Hits of an older revision stay valid. */
-const ENGINE_REV={'nitroplus-n4':1};
+const ENGINE_REV={'nitroplus-n4':1,cmvs:1};
 /* 2026-11-15 (user: 有的例句和原配音不一致) quiet keys: the lines a game's script plays no voice for, and the pieces of a
    voiced line that the game shows one at a time (沙耶の唄 sy010: 「俺だって解らない。…思う。<k>お前だって…わけないよ」 is one
    clip, 3/003002; the second piece arrived as its own line and a card cut the game sound after it, music and no voice).
