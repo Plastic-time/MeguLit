@@ -307,6 +307,56 @@ static void KeepCenteredBandWhileTyping() {
  assert(draw(label, menu, 15017) == 0);
 }
 
+static void CenteredDialogueWithSpacer(int top, bool partial = false) {
+ GlyphLearner g;
+ std::vector<std::string> reports;
+ g.emit = [&](const std::string &r) { reports.push_back(r); };
+ auto draw = [&](const std::vector<Quad> &q, unsigned now) {
+  return g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now);
+ };
+ auto prior = Row(4, partial ? 900 : 568, 334, 32, 0.1f);
+ for (unsigned i = 0; i < prior.size(); i++) prior[i].glyph = i + 1;
+ g.Line(L"ABCD", 10000);
+ draw(prior, 10001);
+ g.Frame(10002, 1280, 720);
+ assert(draw(prior, 10003).size() == prior.size());
+ g.Frame(10004, 1280, 720);
+
+ auto next = Row(14, 428, (float)top, 32, 0.2f);
+ for (unsigned i = 0; i < next.size(); i++) next[i].glyph = i + 5;
+ next.push_back({ 402, (float)top - 40, 406, (float)top - 36, 0, 0, 4.f / 1024, 4.f / 2048, 0 });
+ g.Line(L"EFGHIJKLMNOPQR", 15000);
+ if (partial) {
+  // A partial row plus three bubble tiles can reach the expected count.
+  const std::vector<Quad> tiles{
+   { 402, 294, 430, 322, 0, 0, 28.f / 1280, 28.f / 720, 0 },
+   { 402, 322, 430, 364, 0, 0, 28.f / 1280, 42.f / 720, 0 },
+   { 402, 364, 430, 392, 0, 0, 28.f / 1280, 28.f / 720, 0 },
+  };
+  std::vector<Quad> prefix(next.begin(), next.begin() + 11);
+  prefix.push_back(next.back());
+  assert(g.Draw((void *)2, 1280, 720, nullptr, 1280, 720, 1280, 720, tiles, 15001).empty());
+  draw(prefix, 15001);
+  g.Frame(15002, 1280, 720);
+ }
+ draw(next, 15005);
+ g.Frame(15006, 1280, 720);
+ const auto hidden = draw(next, 15017);
+ g.Frame(15018, 1280, 720);
+ assert(hidden.size() == 14 && hidden.back() == 13); // The spacer stays in the game.
+ assert(reports.back().find("line=2 hidden=1") != std::string::npos);
+ assert(reports.back().find("n=14 rects=428," + std::to_string(top) + ",32,32") != std::string::npos);
+ assert(reports.back().find(";792," + std::to_string(top) + ",32,32 text=") != std::string::npos);
+
+ const auto before = reports.size();
+ g.Line(L"STUVWXYZABCDEF", 20000);
+ draw(next, 20001); // The previous row stays while the new row has yet to draw.
+ g.Frame(20002, 1280, 720);
+ assert(std::none_of(reports.begin() + before, reports.end(), [](const std::string &r) {
+  return r.find("ToMe_CHARS engine=gpu line=3 ") == 0;
+ }));
+}
+
 static void RetainedDialogueRows() {
  Littlecheese::Rows rows;
  unsigned now = 1000;
@@ -423,6 +473,9 @@ int main() {
  IgnoreTraceFromOldFrame();
  ReportNewLineWithLateScaledCopy();
  KeepCenteredBandWhileTyping();
+ CenteredDialogueWithSpacer(334);
+ CenteredDialogueWithSpacer(656);
+ CenteredDialogueWithSpacer(334, true);
  RetainedDialogueRows();
  Sact2DialogueScope();
  puts("PASS dialogue scope: unclaimed title/menu, foreign target, unmatched ruby kept; confirmed dialogue hides; read/OFF restore");

@@ -309,7 +309,7 @@ struct GlyphLearner {
    // line), any glyph quad of the learned glyph height on a target of the learned size (effect buffers drawn twice)
    bool sameAtlas = rtW == areaW && rtH == areaH && atlases.count(AtlasKey(NULL, tex)), sheet = freshTex && LineSized(tw, th) && rtW == areaW && rtH == areaH && std::fabs((x.y1 - x.y0) - glyphH) <= glyphH * 0.25f;
    // glyph height only: a wait cursor or icon drawn from the same sheet inside the area stays
-   bool glyphSize = std::fabs((x.y1 - x.y0) - glyphH) <= glyphH * 0.2f;
+   bool glyphSize = BodyHeight(r);
    if (!glyphSize && RubySized(x.y1 - x.y0) && RubyOver(Rect{ x.x0, x.y0, x.x1, x.y1 })) glyphSize = true; /* the line's ruby goes with it */
    bool redraw = (int)(redrawUntil - now) > 0 && rtW == areaW && rtH == areaH;
    if (learned && armed && !readOnly && glyphSize && (sameAtlas || sheet || redraw)) {
@@ -376,10 +376,15 @@ struct GlyphLearner {
  }
  /* a glyph of an earlier line of the page (the same glyph on the same place) is never the new line's */
  bool EarlierGlyph(long long gk, long long k) const { return earlierKeys.count({ gk, k }) > 0; }
+ bool BodyHeight(const Rect &r) const { return std::fabs((r.y1 - r.y0) - glyphH) <= glyphH * 0.2f; }
  bool BodyInBand(const Rect &r) const {
   const float cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;
-  return cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1 &&
-         std::fabs((r.y1 - r.y0) - glyphH) <= glyphH * 0.2f;
+  return cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1 && BodyHeight(r);
+ }
+ std::vector<Rect> TracedBody(std::vector<Rect> rects) const {
+  rects.erase(std::remove_if(rects.begin(), rects.end(), [&](const Rect &r) { return !r.traced || !BodyHeight(r); }), rects.end());
+  if (rects.size() < n) return {};
+  return Chars(std::move(rects));
  }
  // Same-atlas spacers and decorations have no traced glyph cell.
  static std::vector<Rect> TracedChars(std::vector<Rect> rects) {
@@ -403,7 +408,10 @@ struct GlyphLearner {
   /* the earlier lines are on screen while most of their glyphs are still drawn: a text box that replaces its line (most ADV
      games) drops them at once, and its new glyphs on the old places are the new line's again */
   if (!earlierKeys.empty()) { size_t on = 0; for (auto &e : earlierKeys) { auto g = groups.find(e.first); if (g == groups.end()) continue; auto it = g->second.keys.find(e.second); if (it != g->second.keys.end() && frameNo - it->second.lastFrame <= 2) on++; } if (on * 2 < earlierKeys.size()) { earlierKeys.clear(); earlierRects.clear(); } }
-  if (reported && hiddenSent == (hitSent && !readOnly)) return;
+  const bool settled = reported && hiddenSent == (hitSent && !readOnly);
+  const bool mixed = reported && !readOnly && std::any_of(lastRects.begin(), lastRects.end(),
+   [&](const Rect &r) { return !r.traced && !BodyHeight(r); });
+  if (settled && !mixed) return;
   unsigned since = prevLineAt && now - prevLineAt < 120000 ? (std::max)(prevLineAt + 200, lineAt - 3000) : lineAt - 3000;
   Group *movedGroup = nullptr; std::vector<Rect> movedRects, bandDrawn; bool ambiguousMove = false, freshBand = false;
   const bool recoverBand = learned && hitSent && !areaTraced && !readOnly && !reported;
@@ -411,6 +419,8 @@ struct GlyphLearner {
    Group &g = kv.second; std::vector<Rect> fresh, live, freshTraced;
    if (learned && (g.rtW != areaW || g.rtH != areaH)) continue;
    const bool currentFrame = g.prevFrame == frameNo - 1, fromAtlas = atlases.count(AtlasKey(NULL, g.tex)) > 0;
+   const bool checkBody = !readOnly && (!reported || mixed) && currentFrame && fromAtlas && g.rt == areaRt;
+   if (settled && !checkBody) continue;
    Rect screen{};
    const bool canMove = learned && !readOnly && !reported && currentFrame && g.rt == areaRt &&
     (!hitSent || (recoverBand && !fromAtlas)) && ToScreen(g.rt, g.rtW, g.rtH, screen);
@@ -427,6 +437,21 @@ struct GlyphLearner {
     }
     if (checkBand && isFresh && seen.lastFrame == frameNo - 1 && BodyInBand(seen.r)) freshBand = true;
    }
+   if (checkBody) {
+    // A centred line can overlap the previous line and share its atlas with a spacer.
+    // Confirm the whole row against fresh keys before counting those positions again.
+    const auto body = TracedBody(g.frame), newBody = TracedBody(fresh);
+    const bool moved = canMove && !hitSent && Relocated(body, newBody);
+    if ((hitSent || moved) && body.size() == n && newBody.size() == n &&
+        std::equal(body.begin(), body.end(), newBody.begin(), SamePlace)) {
+     // A partial row can already have been reported with decorations in its count.
+     const size_t shared = std::count_if(lastRects.begin(), lastRects.end(), [&](const Rect &r) {
+      return std::any_of(body.begin(), body.end(), [&](const Rect &b) { return SamePlace(r, b); });
+     });
+     if (!reported || shared > n / 2) { Report(g, body, moved); return; }
+    }
+   }
+   if (settled) continue;
    if (checkBand && !freshBand) for (const Rect &r : g.frame) if (BodyInBand(r)) bandDrawn.push_back(r);
    const std::vector<Rect> &last = currentFrame ? g.frame : g.prev; for (auto &r : last) if (earlierRects.empty() || !Earlier(r)) live.push_back(r);
    std::vector<Rect> a = Chars(Cluster(Chars(live))), b = Chars(Cluster(Chars(fresh)));
@@ -456,6 +481,7 @@ struct GlyphLearner {
    Report(g, *hit, moved);
    return;
   }
+  if (settled) return;
   // Try a confirmed new atlas only after checking all previously learned atlases.
   if (movedGroup && !ambiguousMove && !freshBand) {
    const auto occupied = Chars(Cluster(Chars(std::move(bandDrawn))));
