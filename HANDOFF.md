@@ -44,6 +44,7 @@
 | 魚魚棟 · Claude | The Seed「已种下的游戏」太乱、滚动条隐藏：游戏社默认折叠成一行（社名、部数、小封面），只展开第一个；全部展开/收起，搜索自动展开，细滚动条 | — | fix/seed-planted-collapse | 11-27 | CI 绿，待测试员实测（PR #1323） |
 | 魚魚棟 · Claude | 点过按钮后按 Shift 等键冒出黄色焦点框：只在键盘导航时显示，焦点框统一重做 | — | fix/focus-ring | 11-27 | 在做 |
 | 魚魚棟 · Claude | 游戏内新手引导：前 5 次进游戏分步高亮胶囊、Alt+T 菜单、个性化文本、点读、校准，可跳过；顶栏「教程」和 Alt+T 可重看，教程页配图 | — | feat/onboarding-tour | 11-27 | 等 CI，待测试员实测（PR #1324） |
+| 魚魚棟 · Claude | 游戏库标题停在文件夹名（Ozmafia-ozmafia-joki）：改成显示作品名（seed/VNDB），用户改过的名字不覆盖，老数据迁移，原名留作别名 | — | fix/library-title-from-work | 11-27 | 等 CI，待测试员实测（PR #1326） |
 | 魚魚棟 · Claude | 启动画面只留进度条，结尾不再变圆出小脸，改成进度条变形成半透明 MeguLit logo | — | feat/splash-logo | 11-27 | CI 全绿，待测试员实测（PR #1319） |
 | 魚魚棟 · Claude | 首页大卡牌按住往下压时，单击/双击提示框压在卡牌上：提示框挪到卡牌下方，按住、拖动、抽卡时不出现 | — | fix/home-card-press | 11-27 | 等 CI，待测试员实测（PR #1320） |
 | 魚魚棟 · Claude | 关于页感谢太少：除 MeguLit 外改成片尾致谢名单，名单数据在 web/credits.json | — | feat/credits-roll | 11-27 | CI 绿，待测试员实测（PR #1321） |
