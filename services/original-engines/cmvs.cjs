@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
-const {classify}=require('./cmvs-bytecode.cjs'),voiceRef=require('./voice-ref.cjs');
+const {classify}=require('./cmvs-bytecode.cjs');
 /* E592 CMVS — Purple Software's engine (Purple software, Chronoclock, Amatarasu Riddle Star, 青空の見える丘, ハピメア …;
    ~44 company releases, 26 since 2016). Family A (string pool, docs/engine-families.md).
    Format references (read, not copied): GARbro ArcFormats/Cmvs ArcCPZ.cs, CpzHeader.cs, CmvsMD5.cs (morkt, MIT) for the
@@ -266,7 +266,6 @@ const PUSH=Buffer.from([1,2,0x20,1]),PUSH_END=Buffer.from([0x0f,2,0x30,4]);
 const RESOURCE=/\.(ogg|wav|mv2|pb3|pb2|ps3|ps2|cur|cmv|mgv|png|bmp)\b/i;
 const CVNS_RESOURCE=/^\S+\.pss$/i;
 const DIALOGUE_PUNCT=/[「」『』。、！？…]/;
-const CPZ_PATH=/^(?:[\w.-]+[/\\])*[\w.-]+\.cpz$/i;
 /* The original offset scan defines push ordinals, even when a slot is empty or decoding falls back.
    MAX_PUSH bounds a damaged string with no terminator. */
 const MAX_PUSH=0x2000;
@@ -284,11 +283,11 @@ function pushSlots(d){
 }
 const pushed=d=>pushSlots(d).map(slot=>slot.bytes);
 const clean=t=>kit.trimBoth(t.replace(/\\n/g,'\n'));
-const displayText=t=>clean(t.replace(/\\t/g,'\t'));
+const expandTabs=t=>String(t||'').replace(/\\t/g,'\t');
+const displayText=t=>clean(expandTabs(t));
 /* Keep the original classification and string normalization for Seed and patch identity. */
 const prose=t=>/[A-Za-z]/.test(t)&&(/\s/.test(t)||/[,.!?"'\u2026]/.test(t)||/^[A-Z][a-z]+$/.test(t));
-function identitySlots(pushes,cvns){
- const dec=kit.decoder(pushes.map(s=>s.bytes).filter(s=>s.length));
+function identitySlots(pushes,cvns,dec){
  return pushes.map(({bytes:s})=>{
   const t=!s.length?'':s.some(c=>c>=0x80)?clean(dec.decode(s)):s.toString('latin1');
   if(!t)return {kind:'',t};
@@ -299,21 +298,24 @@ function identitySlots(pushes,cvns){
 function scriptSlots(buf,withDisplay){
  const cvns=buf.toString('latin1',0,4)==='PSS0',d=cvns?unpackPss0(buf):unpackPs2(buf);
  if(!d)return {identity:[],display:[]};
- const pushes=pushSlots(d),identity=identitySlots(pushes,cvns);
+ const pushes=pushSlots(d),dec=kit.decoder(pushes.map(s=>s.bytes).filter(s=>s.length));
+ const identity=identitySlots(pushes,cvns,dec);
  if(!withDisplay)return {identity};
  const bytecode=pushes.length?classify(d,cvns):null;
  const byPc=new Map(pushes.map((slot,i)=>[slot.pc,i])),messages=new Map(),parameters=new Set();
  for(const [pc,message] of bytecode?.messages||[]){
   const text=byPc.get(pc),voice=byPc.get(message.voice),speaker=byPc.get(message.speaker);
   if(!pushes[text]?.valid||!pushes[voice]?.valid||!pushes[speaker]?.valid)continue;
-  messages.set(text,{speaker:displayText(identity[speaker].t),voice:displayText(identity[voice].t),lineId:message.lineId});
+  const ref=pushes[voice].bytes;
+  messages.set(text,{speaker:displayText(identity[speaker].t),
+   voice:ref.some(c=>c>=0x80)?dec.decode(ref):ref.toString('latin1'),lineId:message.lineId});
   parameters.add(voice);
   parameters.add(speaker);
  }
  const display=identity.map((slot,i)=>{
   const message=messages.get(i);
   if(message){const t=displayText(slot.t);return {kind:t?'line':'',t,message};}
-  if(parameters.has(i)||bytecode?.anchors.has(pushes[i].pc)||CPZ_PATH.test(slot.t))return {kind:slot.t?'anchor':'',t:slot.t};
+  if(parameters.has(i)||bytecode?.anchors.has(pushes[i].pc))return {kind:slot.t?'anchor':'',t:slot.t};
   if(slot.kind!=='line')return slot;
   const t=displayText(slot.t);
   return {kind:t?'line':'',t};
@@ -336,8 +338,7 @@ function parse(buf){
    identityIndices.push(identityIndex);
   }else if(after.kind==='anchor')anchors.push(after.t);
  }
- const voices=voiceRef.keep(records.map(record=>voiceRef.clean(record.voice)));
- return {lines,anchors,records,identityIndices,identityProjection,...(voices?{voices}:{})};
+ return {lines,anchors,records,identityIndices,identityProjection};
 }
 
 const PS=/\.ps[23]$/i,PSS=/\.pss$/i;
@@ -403,6 +404,7 @@ const engine=kit.engine({id:'cmvs',hint:'*.cpz（*.pss / *.ps2 / *.ps3）',
   CMVS_CPZ2_ARCHIVE:'这部 CVNS 作品的 CPZ2 封包索引读不了，请检查安装文件是否完整',
   CMVS_CPZ3_ARCHIVE:'这部 CMVS 作品的 CPZ3 封包索引读不了，请检查安装文件是否完整',
   CMVS_CPZ5_KEY:'这部 CMVS 作品的 CPZ5 归档用了未知的密钥常数，暂时读不了剧本',CMVS_CPZ6_KEY:'这部 CMVS 作品的 CPZ6 归档用了未知的密钥常数，暂时读不了剧本',CMVS_CPZ7:'这部 CMVS 作品的 CPZ7 归档解不开（start.ps3 里没找到它的注册参数，或者常数和已知作品不同），暂时读不了剧本'},
+  displayProjection:true,normalizeDisplayText:expandTabs,
   originalLines:dir=>originalLines(dir),originalProjection:dir=>pairedOriginal(dir,true)}});
 /* An official Chinese release keeps the Japanese scripts in data/pack and lays plain Chinese ones over them in
    FileHook\ (its loader reads those first), so the running script is Chinese and the archives hold its original. Both
