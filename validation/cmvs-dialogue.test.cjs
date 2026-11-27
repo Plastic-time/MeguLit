@@ -234,6 +234,24 @@ test('CMVS resolves conditional paths, loops and alternate returns inside a mess
   }
 });
 
+test('CMVS does not follow a dynamic or script return into another message function', () => {
+  for (const opcode of [0x0413, 0x0414]) {
+    const bytes = script(F.sjis, ({message}) => {
+      message([ja[2], 'known.ogg', ja[0]], 31, 1);
+      message([ja[1], 'other.ogg', ja[0]], 32);
+    }, 4, undefined, undefined, ({emit, setLabel}) => {
+      emit(0x2152, 0x2153, opcode, 0);
+      // Place a fixed-arity return beyond either opcode's value as a would-be jump target.
+      emit(...Array(0x0414 / 2).fill(0x0416));
+      setLabel(1);
+      emit(0x2152, 0x2153, 0x0411, 28);
+    });
+    const parsed = cmvs.parse(bytes);
+    assert.deepEqual(parsed.lines, [ja[2], ja[1], ja[0]], opcode.toString(16));
+    assert.deepEqual(parsed.records.map(row => row.lineId), [31, null, null], opcode.toString(16));
+  }
+});
+
 test('CMVS skips valid complex expressions and falls back on malformed expressions and instructions', () => {
   const int = [0x0200, 0x0100, 0, 0, 0x020f];
   const nested = depth => [...Array.from({length:depth}, () => [0x0200, 0x0101]).flat(), ...int,
@@ -559,6 +577,43 @@ test('CMVS status and the static provider rebuild a stale runtime and adopted or
     assert.equal(original.contributionScript(root, exe, id), print);
     assert.equal(original.providerKey(root, exe, id), key);
   }
+});
+
+test('an unprojected engine keeps its usable runtime index with an older reader stamp', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'megulit-unprojected-index-'));
+  t.after(() => fs.rmSync(root, {recursive:true, force:true}));
+  const game = path.join(root, 'game'), exe = path.join(game, 'game.exe'), id = 'kirikiri-test';
+  F.writeTree(game, {
+    'game.exe': 'MZ',
+    'scenario/first.ks': Buffer.from('\ufeff' + ja[1] + '[p]\r\n' + ja[2] + '[p]\r\n', 'utf16le')
+  });
+  const state = original.scanRunning(root, id, exe);
+  assert.equal(state.runtime.engine, 'kirikiri');
+  assert.equal(state.status, 'native-japanese');
+  assert.equal(read(state.runtime.index).display, undefined);
+
+  const stateFile = path.join(root, 'data/config/original-text.json');
+  const saved = read(stateFile), olderReader = 'older-reader';
+  saved[id].runtime.reader = olderReader;
+  const inspect = {
+    provider() {
+      const provider = original.provider(root, exe);
+      assert.equal(provider?.kind, 'patch');
+      provider.resolve(ja[1]);
+      assert.equal(provider.position(), 0);
+    },
+    status() {
+      const db = {prepare: () => ({get: () => ({executable: exe})})};
+      assert.equal(original.status(root, db, id).status, 'native-japanese');
+    }
+  };
+  const observed = {};
+  for (const [entry, check] of Object.entries(inspect)) {
+    fs.writeFileSync(stateFile, JSON.stringify(saved));
+    check();
+    observed[entry] = read(stateFile)[id].runtime.reader;
+  }
+  assert.deepEqual(observed, {provider:olderReader, status:olderReader});
 });
 
 /* Replay private, previously collected indexes or scan the matching Japanese retail copy.
