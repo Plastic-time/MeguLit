@@ -30,6 +30,7 @@
 | 女装山脈 | v6589 | 待补 | YU-RIS | owner-ok | 魚魚棟 | yuris/josou-sanmyaku |
 | オルフレール | v15563 | 待补 | KiriKiri | 进行中（冷测试连续 5 局通过） | 魚魚棟 · Claude | PR #1291 |
 | Monochrome Empire | v26413 | 待补 | YU-RIS2 | 进行中（选项被隐藏，卡在原生 hook） | 魚魚棟 · Claude | PR #1291 |
+| ハミダシクリエイティブ | v27449 | パッケージ版 | Artemis | 进行中 | 魚魚棟 · Claude | artemis/hamidashi-creative（MeguLit-Adapter） PR #1303 |
 
 ## 进行中
 
