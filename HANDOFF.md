@@ -36,6 +36,7 @@
 
 | 谁 | 做什么 | issue | 分支 | 开始 | 状态 |
 |---|---|---|---|---|---|
+| 魚魚棟 · Claude | 实机验证 ファタモルガーナの館、千恋＊万花、ISLAND 的第一个选项在阅读层上有中文，出不来的修；PostMessage 推进 + WGC 截图做成适配器实机验证步骤 | — | fix/choice-live | 11-27 | 进行中 |
 | 魚魚棟 · Claude | 适配 OZMAFIA!!（YU-RIS）、ハミダシクリエイティブ（常轨脱离Creative，Artemis）：走 MeguLit-Adapter 实机验证，每部一个 seed PR | #1107 #1133 | claude/ozmafia-joki | 11-27 | 常轨脱离 PR #1303 已开待 CI（skeleton：换句过、原文隐藏没过、选项未验证）；OZMAFIA 卡在下载：允许的站没有 PC 日文生肉、touchgal/qingju 被 Cloudflare 拦，第二轮下载单已排，E 盘 11 GB 低于 20 GB 不派单 |
 | 魚魚棟 · Claude | 偶发双重译文（同一句出两条不同译文），#1176/#1268 之后仍有 | #1128 | fix/1128-double-translation | 11-27 | 进行中 |
 | 魚魚棟 · Claude | 制服カノジョ（制服女友，Unity/TMP）：原文漏出 <space=> 等 TMP 标签且同句重复；回 log 后原文没藏干净、台词消失 | #1248 | fix/unity-tmp-space-backlog | 11-27 | 进行中：TMP 标签通用剥离已写好；游戏下载被卡（站点 403），实机待做 |
