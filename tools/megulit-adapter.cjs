@@ -27,6 +27,9 @@
      node tools/megulit-adapter.cjs inventory [--json]                what every engine has (from the code)
      node tools/megulit-adapter.cjs testbuild <target> [--app <MeguLit>] the tester's side-by-side MeguLit with this checkout's code
      node tools/megulit-adapter.cjs cold <game folder> ...            the cold stage alone (the old adapt-auto command line)
+     node tools/megulit-adapter.cjs choice <game pid> --megulit <MeguLit root> --out <dir> [--megulit-pid N] [--advance "x,y;enter"]
+                                    the live check's choice step: the game (started by a side-by-side MeguLit) advanced by window
+                                    messages to its first choice, the game and the reader shot by WGC (tools/megulit-adapter/live.cjs)
 
    Exit codes: 0 done, 1 fail, 2 inconclusive, 3 waiting for a person (<out>/review.html shows each question with its pictures).
    State: <out>/adapter.json (everything decided, every answer); nothing is written into the game folder. */
@@ -253,6 +256,7 @@ async function main(argv){const cmd=argv[2];
  const runsGame=cmd!=='answer'&&cmd!=='publish'&&cmd!=='craft';
  if(runsGame){let app=Cold.APP_DEFAULT;const i=argv.indexOf('--app');if(i>0&&argv[i+1])app=argv[i+1];const r=Cold.reexecIfOldNode(__filename,argv,app);if(r!==null)return r;/* the game folder: the first argument that is not a flag or a flag's value (cold: after the word) */const rest=argv.slice(cmd==='cold'?3:2),VAL=/^--(exe|vndb|release|cn|out|budget-min|app|answer|lock-wait-min|steam-appid|seed-out)$/;let gd='';for(let k=0;k<rest.length;k++){if(VAL.test(rest[k])){k++;continue;}if(!rest[k].startsWith('--')){gd=rest[k];break;}}Cold.prepareRuntime(gd);}
  try{
+  if(cmd==='choice')return await require('./megulit-adapter/live.cjs').choiceMain(argv.slice(3));
   if(cmd==='cold')return await Cold.main([argv[0],argv[1],...argv.slice(3)]);
   if(cmd==='answer'){if(!argv[3])throw Error('usage: answer <out dir> id=value ...');return answer(argv[3],argv.slice(4));}
   if(cmd==='publish'){const a=argv.slice(4);const r=a.indexOf('--repo');return publish(argv[3],{repo:r>=0?a[r+1]:'',go:a.includes('--go')});}
