@@ -12,7 +12,7 @@
 7. **HANDOFF.md 例外，可以直接 push 进 main**：认领、改状态、写「修了啥」都直接改直接推，第一时间让大家看到，不用等 PR。只改这一个文件，别夹带代码
 8. **撞车时 RRFZ 优先**：RRFZ 已经在做的，或者他想接手的，直接在那一行把「谁」改成他、状态写一句，Claude 会话看到就停手，不争、不覆盖他的改动
 9. **适配好一部游戏就登记**（所有人，包括 RRFZ、魚魚棟的 Claude 会话、其他 agent）：某部游戏的某个发行版本适配好了（验收过，seed 已合并或 PR 已开），马上在下面「已适配的游戏」表里加一行。**用 VNDB 作品号（v 开头）认游戏，用发行版本认版本**（平台 / 版本名，例如 Steam 版、DL 版、DVD 版、HD リマスター、汉化硬盘版；查得到就附 VNDB 发行号 r 开头），不用 exe 哈希去重（打补丁、免 DVD、汉化都会改 exe）。**开始适配前先查这张表**：同作品同发行版已在表里的不要再做；同作品不同发行版也别从零做，先拿已有的 seed 跑，游戏层一般能直接用，只补版本层
-10. **所有游戏适配都走 MeguLit-Adapter**（`node tools/megulit-adapter.cjs <游戏目录>`，PR 合并前在 `feat/megulit-adapter`）：不再写一次性的适配脚本。每适配一部学到的东西（新的引擎特征、隐藏方式、版本指纹、踩的坑）都写回适配器的引擎层或规则表（`tools/megulit-adapter/engines.cjs`、`plan.cjs`、`checkpoints.cjs`，剧本格式写回 `services/original-engines/`），这部游戏自己的设置只进 The Seed
+10. **所有游戏适配都走 MeguLit-Adapter**（`node tools/megulit-adapter.cjs <游戏目录>`）：不再写一次性的适配脚本。每适配一部学到的东西（新的引擎特征、隐藏方式、版本指纹、踩的坑）都写回适配器的引擎层或规则表（`tools/megulit-adapter/engines.cjs`、`plan.cjs`、`checkpoints.cjs`，剧本格式写回 `services/original-engines/`），这部游戏自己的设置只进 The Seed
 
 ## 已适配的游戏
 
@@ -52,7 +52,7 @@
 | 魚魚棟 · Claude | Cardinal 回放打分加强（实屏 OCR 证据、扣分说明、磁带版本化、快进段不计分、YU-RIS/BGI/通用回放模型）；Yui 启动阶段补漏、#1090 frontend-rejection | #1090 | yui-cardinal | 11-26 | 完成：随 #1291 合并 |
 | 魚魚棟 · Claude | 冷测试输入兜底（PostMessage → InputShim → SendInput）、自动回答改名弹窗、选项定位答复 | — | coldtest-inputshim | 11-26 | 完成：随 #1291 合并 |
 | 魚魚棟 · Claude | euphoria HD リマスター（YU-RIS）开头选项「オープニングを見る」「メインルームへ」没有翻译：查选项是否进翻译链，按四层修（seed 优先，缺能力补 YU-RIS 引擎层） | #1143 | fix/1143-yuris-choice-translate | 11-27 | PR #1295 CI 全绿、7d29cab5 实机复测通过（标题无残留、第一屏选项有中文、快进只留最后一句、OCR 台词随图片撤下），完成，PR #1295 已合（47a1d886）；YU-RIS2 跳过不普遍（Monochrome Empire 台词在 YU-RIS2），保留按版本 seed |
-| 魚魚棟 · Claude | **MeguLit-Adapter**（半自动适配器，合并画字钩子和引擎剧本读取，tools/adapt-auto.cjs 并进来只留一个入口 `tools/megulit-adapter.cjs`）：认游戏按 VNDB+发行版、原文优先用引擎剧本读取（复用 RRFZ 读取器）、画字钩子对齐兜底、引擎级隐藏优先、版本层按封包/剧本指纹、需要人看的地方停下给截图和一句话问题 | — | feat/megulit-adapter（PR #1296） | 11-27 | 待维护者合并：PR #1296；主流程改成实机验证（认游戏→剧本读取→开游戏看几句：换句/原文隐藏/选项→seed→登记），Cardinal 改为 --cold 后台补充；实机确认 ファタ 正文原文藏住、选项误报消失、ISLAND 原文藏住；选项译文画面未验证 |
+| 魚魚棟 · Claude | **MeguLit-Adapter**（半自动适配器，合并画字钩子和引擎剧本读取，tools/adapt-auto.cjs 并进来只留一个入口 `tools/megulit-adapter.cjs`）：认游戏按 VNDB+发行版、原文优先用引擎剧本读取（复用 RRFZ 读取器）、画字钩子对齐兜底、引擎级隐藏优先、版本层按封包/剧本指纹、需要人看的地方停下给截图和一句话问题 | — | feat/megulit-adapter（PR #1296） | 11-27 | 完成，PR #1296 已合（6e6885b2）；主流程改成实机验证，冷测试/Cardinal 降为可选后台补充 |
 | 魚魚棟 · Claude | 调研网上现成工具接进 MeguLit-Adapter（LunaHook/LunaTranslator 特殊码库、Textractor、VNR 数据库、GARbro、KrkrExtract、SiglusExtract、VNTextPatch、AssetStudio 等）：只调研不改仓库，结论交给 #1296 接入 | — | — | 11-27 | 完成：结论交给 #1296 接入（VNDB 发行版查询、LunaHook 认引擎、GARbro-Mod 升级、GalTransl 读取器兜底；OpenSpeedy 冷测试加速待确认） |
 | 魚魚棟 · Claude | たいせつなきみのために、ぼくにできるいちばんのこと（只要你不再悲伤）：开隐藏原文时译文颜色在设置色和原文色之间来回变；开「同步原文样式」后原文藏不干净（玩家きゅう 11-27 报）。作为 MeguLit-Adapter 的实验样本一起查 | — | fix/taisetsuna-color-hide | 11-27 | 进行中：认引擎、查根因 |
 | 魚魚棟 · Claude | YU-RIS 引擎层：正文 N 倍逐字重复去重、正文线程选择 | — | engine-yuris | 11-26 | 暂停（已提交） |
