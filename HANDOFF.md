@@ -44,5 +44,5 @@
 | 魚魚棟 · Claude | 制服カノジョ3（制服女友3，Unity/TMP）：原文漏出 <space=> 等 TMP 标签且同句重复；回 log 后原文没藏干净、台词消失 | #1248 | fix/unity-tmp-space-backlog | 11-27 | 等 CI + 测试员实测（PR #1309） |
 | 魚魚棟 · Claude | YU-RIS 引擎层：正文 N 倍逐字重复去重、正文线程选择 | — | engine-yuris | 11-26 | 暂停（已提交） |
 | 魚魚棟 · Claude | 模拟器实验：Switch 模拟器（Eden/Ryubing）里读对话文本 + 换成等长空白隐藏原文、选项照常；样本 一部 Switch 乙游 + 海猫 Switch 版（DS 下… | — | exp/emulator-hook | 11-27 | 暂停：磁盘（E 盘剩余空间不足；adapt 下的 swit… |
-| 魚魚棟 · Claude | 适配 アイキス3 sexy（NeXAS，包装版 + 1.03）：选项被字形隐藏吃掉（hide.glyphAfterLine）、钩子文本带 @ 控制码（source.stripCodes）、选项 OCR 定位（choice.ocrLoose）；写回适配器（光盘安装、GIGA 更新、testbuild、测试清单等） | #1109 | adapt/aikiss3-sexy | 11-27 | PR #1304 等 CI，待测试员实测（清单 E:\Apps\test-requests\1304-aikiss3.md） |
+| 魚魚棟 · Claude | 适配 アイキス3 sexy（NeXAS，包装版 + 1.03）：选项被字形隐藏吃掉（hide.glyphAfterLine）、钩子文本带 @ 控制码（source.stripCodes）、选项 OCR 定位（choice.ocrLoose）；写回适配器（光盘安装、GIGA 更新、testbuild、测试清单等） | #1109 | adapt/aikiss3-sexy | 11-27 | PR #1304 等 CI，待测试员实测（测试清单已交测试员） |
 
