@@ -40,6 +40,7 @@
 
 | 谁 | 做什么 | issue | 分支 | 开始 | 状态 |
 |---|---|---|---|---|---|
+| 魚魚棟 · Claude | 游戏内新手引导：前 5 次进游戏分步高亮胶囊、Alt+T 菜单、个性化文本、点读、校准，可跳过；顶栏「教程」和 Alt+T 可重看，教程页配图 | — | feat/onboarding-tour | 11-27 | 在做 |
 | 魚魚棟 · Claude | 启动画面只留进度条，结尾不再变圆出小脸，改成进度条变形成半透明 MeguLit logo | — | feat/splash-logo | 11-27 | 等 CI，待测试员实测（PR #1319） |
 | 魚魚棟 · Claude | 首页大卡牌按住往下压时，单击/双击提示框压在卡牌上：提示框挪到卡牌下方，按住、拖动、抽卡时不出现 | — | fix/home-card-press | 11-27 | 等 CI，待测试员实测（PR #1320） |
 | 魚魚棟 · Claude | MeguLit-Adapter auto：新游戏下载完自动装、适配、开 PR、做测试版和卡片（不花 LLM token），计划任务 watch | — | feat/adapter-auto-pipeline | 11-27 | 等 CI（PR #1318） |
