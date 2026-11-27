@@ -31,7 +31,7 @@
 | オルフレール | v15563 | 待补 | KiriKiri | 进行中（冷测试连续 5 局通过） | 魚魚棟 · Claude | PR #1291 |
 | Monochrome Empire | v26413 | 待补 | YU-RIS2 | 进行中（选项被隐藏，卡在原生 hook） | 魚魚棟 · Claude | PR #1291 |
 | ハミダシクリエイティブ | v27449 | パッケージ版 | Artemis | 进行中 | 魚魚棟 · Claude | artemis/hamidashi-creative（MeguLit-Adapter） PR #1303 |
-| アイキス3 sexy | v32132 | 豪華版 DVD（r84077）+ Ver.1.03 | NeXAS | 进行中 | 魚魚棟 · Claude | nexas/ai-kiss-3-sexy（MeguLit-Adapter） PR #1304 |
+| アイキス3 sexy | v32132 | 豪華版 DVD（r84077）+ Ver.1.03 | NeXAS | 进行中（skeleton：选项被字形隐藏吃掉、句首「漏出，未修） | 魚魚棟 · Claude | nexas/ai-kiss-3-sexy（MeguLit-Adapter） PR #1304 |
 
 ## 进行中
 
@@ -77,7 +77,7 @@
 
 **@RRFZ：上表这些我们这边在做，请先别动；你在做的也请登记进来，我们看到就不碰。**
 | 魚魚棟 · Claude | 模拟器实验：Switch 模拟器（Eden/Ryubing）里读对话文本 + 换成等长空白隐藏原文、选项照常；样本 一部 Switch 乙游 + 海猫 Switch 版（DS 下载中） | — | exp/emulator-hook | 11-27 | 暂停：磁盘（E 盘剩余空间不足；adapt 下的 switch-otome 先留着） |
-| 魚魚棟 · Claude | 适配 アイキス3 sexy（NeXAS，包装版 + 1.03），走 MeguLit-Adapter | #1109 | adapt/aikiss3-sexy | 11-27 | 进行中：游戏已装好，跑适配器 |
+| 魚魚棟 · Claude | 适配 アイキス3 sexy（NeXAS，包装版 + 1.03），走 MeguLit-Adapter；写回：光盘自动安装 + GIGA 更新、NeXAS 存档、截图只认本游戏、每游戏一份 app 副本、checkout 字形 DLL、seed 目录名 | #1109 | adapt/aikiss3-sexy | 11-27 | PR #1304 已开，等 CI；选项被通用字形隐藏吃掉没修（要内核按位置藏） |
 
 ## 已放弃
 
