@@ -39,6 +39,7 @@ for %%m in (d3d9-up d3d9-vb d3d9-ivb d3d9-quad4 d3d9-decl d3d11 gl gl-ff gdi) do
  "%OUT%\host64.exe" "%DLLS%\MeguLitGpu64.dll" %%m || set FAIL=1
 )
 call "%~dp0run-trace.cmd" "%DLLS%" || set FAIL=1
+call "%~dp0run-color.cmd" || set FAIL=1
 set "REPLAY_TAPE=%OUT%\capture-%RANDOM%-%RANDOM%.replay"
 set "REPLAY_OUT=%REPLAY_TAPE%.txt"
 if exist "%REPLAY_TAPE%" exit /b 1
