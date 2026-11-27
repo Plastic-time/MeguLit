@@ -38,7 +38,7 @@
 | 谁 | 做什么 | issue | 分支 | 开始 | 状态 |
 |---|---|---|---|---|---|
 | 魚魚棟 · Claude | 实机验证 ファタモルガーナの館、千恋＊万花、ISLAND 的第一个选项在阅读层上有中文，出不来的修；PostMessage 推进 + WGC 截图做成适配器实机验证步骤 | — | fix/choice-live | 11-27 | 进行中 |
-| 魚魚棟 · Claude | 适配 OZMAFIA!!（YU-RIS）、ハミダシクリエイティブ（常轨脱离Creative，Artemis）：走 MeguLit-Adapter 实机验证，每部一个 seed PR | #1107 #1133 | claude/ozmafia-joki | 11-27 | 常轨脱离 PR #1303 已开待 CI（skeleton：换句过、原文隐藏没过、选项未验证）；OZMAFIA 卡在下载：第二单 blocked，DeepSeek 沙箱给 H:\gal\adapt\ozmafia-r2 加写权限失败（SetNamedSecurityInfoW 5），shell 跑不了；otoame dbc140b2 页可能有生肉，待环境修好重跑 |
+| 魚魚棟 · Claude | 适配 OZMAFIA!!（YU-RIS）、ハミダシクリエイティブ（常轨脱离Creative，Artemis）：走 MeguLit-Adapter 实机验证，每部一个 seed PR | #1107 #1133 | claude/ozmafia-joki | 11-27 | 常轨脱离 PR #1303 待 CI（skeleton：换句过、原文隐藏没过、选项未验证）；OZMAFIA 卡在下载源：三轮都没找到日文 PC 原版（otoame 只有夜鸮汉化 PC 和 NS 生肉；touchgal 无条目；qingju Cloudflare 403；shinnku/ggbases/Sukebei/Nyaa/IA/kungal/shionlib 都没有），需要店主提供来源 |
 | 魚魚棟 · Claude | 偶发双重译文（同一句出两条不同译文），#1176/#1268 之后仍有 | #1128 | fix/1128-double-translation | 11-27 | 进行中 |
 | 魚魚棟 · Claude | 制服カノジョ（制服女友，Unity/TMP）：原文漏出 <space=> 等 TMP 标签且同句重复；回 log 后原文没藏干净、台词消失 | #1248 | fix/unity-tmp-space-backlog | 11-27 | 进行中：TMP 标签通用剥离已写好；游戏下载被卡（站点 403），实机待做 |
 | 魚魚棟 · Claude | A 读音/注音：多音字按语境消歧（生に縋ろう→せい）；人名读音优先级 游戏 ruby > 游戏全文 > VNDB > 词典；注音、小喇叭、点读查询三处读音统一；ruby 错位；音调切换失效；异表记下拉（Anki 同形异读不碰，RRFZ #1150–#1155 已做） | #1123 #1134 #1135 #1131 #1114 #1111 | fix/a-reading | 11-26 | 完成：已合并 #1192 f4276f94 |
