@@ -40,6 +40,7 @@
 
 | 谁 | 做什么 | issue | 分支 | 开始 | 状态 |
 |---|---|---|---|---|---|
+| 魚魚棟 · Claude | 启动画面只留进度条，结尾不再变圆出小脸，改成进度条变形成半透明 MeguLit logo | — | feat/splash-logo | 11-27 | 等 CI，待测试员实测（PR #1319） |
 | 魚魚棟 · Claude | 首页大卡牌按住往下压时，单击/双击提示框压在卡牌上：提示框挪到卡牌下方，按住、拖动、抽卡时不出现 | — | fix/home-card-press | 11-27 | 在做 |
 | 魚魚棟 · Claude | MeguLit-Adapter auto：新游戏下载完自动装、适配、开 PR、做测试版和卡片（不花 LLM token），计划任务 watch | — | feat/adapter-auto-pipeline | 11-27 | 等 CI（PR #1318） |
 | 魚魚棟 · Claude | 传火碑门外草地重做：蓝调夜色草地和萤火，西门前扩成圆形草地，删掉水面上的椅子 | — | feat/torch-meadow-c | 11-27 | 等 CI，待测试员实测（PR #1314） |
