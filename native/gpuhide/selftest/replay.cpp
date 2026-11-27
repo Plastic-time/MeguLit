@@ -21,7 +21,14 @@ unsigned Id(void *key) { return static_cast<unsigned>(reinterpret_cast<size_t>(k
 
 struct RecordedGroupOrder {
  const GroupRanks &groups;
- long long operator()(void *rt, void *tex) const { return groups.at({Id(rt), Id(tex)}); }
+ long long operator()(void *rt, void *tex) const {
+  const auto key = std::make_pair(Id(rt), Id(tex));
+  if (rt) return groups.at(key);
+  const auto drawn = groups.find(key);
+  // An atlas can be drawn only to offscreen targets. Give its atlas-only key
+  // a separate range from the recorded draw groups, which have positive ranks.
+  return drawn != groups.end() ? drawn->second : -1 - static_cast<long long>(Id(tex));
+ }
 };
 
 bool ReadQuads(std::istream &in, GpuReplay::Call &c, size_t &total) {
@@ -44,6 +51,7 @@ bool ReadTape(std::istream &in, ReplayInput &tape) {
  std::string tag;
  if (!(in >> tag) || tag != "MEGULIT_GPU_REPLAY" || !(in >> tag) || tag != "1") return false;
  size_t quads = 0, text = 0;
+ std::set<unsigned> backbufferRanks;
  while (in >> tag) {
   if (tag == "END") {
    if (!(in >> tag) || (tag != "prefix" && tag != "complete")) return false;
@@ -84,11 +92,20 @@ bool ReadTape(std::istream &in, ReplayInput &tape) {
   }
   if (flag > 1 || texture > 2 * MaxEvents || target > 2 * MaxEvents ||
       (std::max)({c.tw, c.th, c.rw, c.rh, c.bw, c.bh}) > MaxDimension) return false;
-  if (c.op == 'D' && tape.groups.emplace(std::make_pair(target, texture), group).first->second != group) return false;
+  if (c.op == 'D') {
+   const auto entry = tape.groups.emplace(std::make_pair(target, texture), group);
+   if (entry.first->second != group) return false;
+   if (entry.second && !target && !backbufferRanks.insert(group).second) return false;
+  }
   c.tex = Key(texture); c.rt = Key(target); c.flag = flag != 0;
   tape.calls.push_back(std::move(c));
  }
  return false; // A partial write never masquerades as the end of a capture.
+}
+
+bool ReadTapeFile(const std::filesystem::path &file, ReplayInput &tape) {
+ std::ifstream in(file, std::ios::binary);
+ return in.good() && ReadTape(in, tape);
 }
 
 std::string Run(const ReplayInput &tape) {
@@ -115,9 +132,16 @@ std::string Run(const ReplayInput &tape) {
 void Require(bool ok, const char *failure) { if (!ok) throw std::runtime_error(failure); }
 
 std::string Bytes(const std::filesystem::path &file) {
- std::ifstream in(file);
+ std::ifstream in(file, std::ios::binary);
  Require(in.good(), "could not open input");
- return std::string(std::istreambuf_iterator<char>(in), {});
+ std::string bytes(std::istreambuf_iterator<char>(in), {});
+ size_t written = 0;
+ for (size_t i = 0; i < bytes.size(); ++i) {
+  if (bytes[i] == '\r' && i + 1 < bytes.size() && bytes[i + 1] == '\n') continue;
+  bytes[written++] = bytes[i];
+ }
+ bytes.resize(written);
+ return bytes;
 }
 
 void WriteFile(const std::filesystem::path &file, const std::string &bytes) {
@@ -147,21 +171,56 @@ void Compare(const std::string &expected, const std::string &actual, const char 
  throw std::runtime_error(failure);
 }
 
+void CheckGroupKeys() {
+ const GroupRanks ranks{{{1, 2}, 1}, {{3, 2}, 3}, {{3, 4}, 2}, {{0, 4}, 7}};
+ const RecordedGroupOrder order{ranks};
+ OrderedGlyphLearner<RecordedGroupOrder> learner(order);
+ const auto row = Row(2, 50, 350, 24, 0.1f);
+ learner.Line(L"AB", 10000);
+ learner.Draw(Key(2), 1024, 2048, Key(1), 640, 480, 640, 480, row, 10001);
+ learner.Frame(10002, 640, 480);
+ Require(learner.groups.count(learner.GroupKey(Key(1), Key(2))) == 1, "draw group uses a different key");
+ Require(learner.atlases.count(order(nullptr, Key(2))) == 1, "learned atlas uses a different key");
+ Require(learner.GroupKey(nullptr, Key(4)) == 7, "backbuffer draw and atlas must use the same key");
+ const std::vector<int> hidden{0, 1};
+ Require(learner.Draw(Key(2), 1024, 2048, Key(3), 640, 480, 640, 480, row, 10003) == hidden,
+         "offscreen atlas was not recognized on another target");
+ Require(learner.Draw(Key(4), 1024, 2048, Key(3), 640, 480, 640, 480, row, 10003).empty(),
+         "a different atlas was hidden");
+}
+
 void CheckFormat() {
- for (const char *input : {
-       "MEGULIT_GPU_REPLAY 1\nO\n",                             // truncated
-       "MEGULIT_GPU_REPLAY 1\nL 10000 1 65\nEND complete\n",   // literal text
-       "MEGULIT_GPU_REPLAY 1\nL 10000 4097\nEND complete\n",   // too long
-       "MEGULIT_GPU_REPLAY 1\nC 1 65537\nEND complete\n",     // too many quads
-       "MEGULIT_GPU_REPLAY 1\nM 2\nEND complete\n",            // invalid flag
-       "MEGULIT_GPU_REPLAY 1\nC 1 1 0 0 1e9 1 0 0 1 1 0\nEND complete\n",
-       "MEGULIT_GPU_REPLAY 1\nD 1 1 0 1 32 32 32 32 32 32 0 0\nD 2 1 0 2 32 32 32 32 32 32 0 0\nEND complete\n",
-       "MEGULIT_GPU_REPLAY 1\nEND complete\nO\n",
-      }) {
+ const auto reject = [](const std::string &input) {
   std::istringstream in(input);
   ReplayInput bad;
   Require(!ReadTape(in, bad), "invalid replay accepted");
- }
+ };
+ for (const char *input : {
+       "MEGULIT_GPU_REPLAY 1\nO\n",                             // truncated
+       "MEGULIT_GPU_REPLAY 1\nL 10000 1 65\nEND complete\n",   // literal text
+       "MEGULIT_GPU_REPLAY 1\nM 2\nEND complete\n",            // invalid flag
+       "MEGULIT_GPU_REPLAY 1\nC 1 1 0 0 1e9 1 0 0 1 1 0\nEND complete\n",
+       "MEGULIT_GPU_REPLAY 1\nD 1 1 0 1 32 32 32 32 32 32 0 0\nD 2 1 0 2 32 32 32 32 32 32 0 0\nEND complete\n",
+       "MEGULIT_GPU_REPLAY 1\nD 1 1 0 1 32 32 32 32 32 32 0 0\nD 2 2 0 1 32 32 32 32 32 32 0 0\nEND complete\n",
+       "MEGULIT_GPU_REPLAY 1\nEND complete\nO\n",
+      }) reject(input);
+ const auto rejectOverLimit = [&](const char *header, unsigned count, const char *item) {
+  std::string input = std::string("MEGULIT_GPU_REPLAY 1\n") + header + std::to_string(count);
+  for (unsigned i = 0; i < count; ++i) input += item;
+  reject(input + "\nEND complete\n");
+ };
+ rejectOverLimit("L 10000 ", MaxLine + 1, " 57344");
+ rejectOverLimit("C 1 ", MaxQuads + 1, " 0 0 1 1 0 0 1 1 0");
+
+ Tape payloadLimit;
+ Require(payloadLimit.Line(std::wstring(MaxLine, L'A'), 10000), "capture refused a line at the limit");
+ Require(!payloadLimit.Line(std::wstring(MaxLine + 1, L'A'), 10001), "capture missed the line limit");
+ const Quad quad{0, 0, 1, 1, 0, 0, 1, 1, 0};
+ Require(payloadLimit.Composite(Key(1), std::vector<Quad>(MaxQuads, quad)), "capture refused quads at the limit");
+ Require(!payloadLimit.Composite(Key(1), {quad}), "capture missed the quad limit");
+ const auto payload = Parse(Serialized(payloadLimit, true));
+ Require(payload.calls.size() == 2 && payload.calls[0].text.size() == MaxLine &&
+         payload.calls[1].quads.size() == MaxQuads, "replay lost the longest permitted payloads");
 
  ReplayFixture test;
  test.Preset(24, 640, 480, true);
@@ -212,7 +271,14 @@ void Fixtures(const std::filesystem::path &dir, bool generate) {
   Compare(first, Run(Parse(saved)), "replay was not deterministic");
   std::printf("PASS replay %ls\n", fixture.name);
  }
+ CheckGroupKeys();
  CheckFormat();
+ const std::string trailingBytes = "MEGULIT_GPU_REPLAY 1\nEND complete\n\x1aO\n";
+ const auto badPath = dir / L"trailing-data.replay";
+ if (generate) WriteFile(badPath, trailingBytes);
+ Require(Bytes(badPath) == trailingBytes, "file reader ignored trailing bytes");
+ ReplayInput rejected;
+ Require(!ReadTapeFile(badPath, rejected), "trailing data accepted from file");
  puts("PASS replay input validation, anonymity, group order and capture limit");
 }
 
@@ -225,9 +291,8 @@ int wmain(int argc, wchar_t **argv) {
    return 0;
   }
   if (argc == 2 || argc == 3) {
-   std::ifstream in{std::filesystem::path(argv[1])};
    ReplayInput tape;
-   Require(in.good() && ReadTape(in, tape), "invalid or incomplete GPU replay");
+   Require(ReadTapeFile(argv[1], tape), "invalid or incomplete GPU replay");
    const std::string output = Run(tape);
    if (tape.limited) std::cerr << "GPU replay contains a bounded prefix\n";
    if (argc == 3) Compare(Bytes(argv[2]), output, "replay differs from the baseline");

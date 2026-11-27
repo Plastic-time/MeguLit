@@ -238,7 +238,8 @@ absolute file path on a local fixed drive, with an existing parent directory. An
 recording off. Recording starts with the fresh learner and uses one bounded in-memory buffer. It hands
 the buffer to a writer thread after `QUIT`, a control-pipe disconnect, or the capture limit. A completed
 file ends with `END complete` or `END prefix`. The latter is the valid prefix before a limit or an event
-that could not be captured. A hard process exit can leave no completed file. An existing file is kept.
+that could not be captured. Send `QUIT` or disconnect the control pipe before closing the game so the writer
+can save the file. An existing file is kept.
 
 D3D9, D3D11, OpenGL and GDI feed the same capture boundary. The file records draw batches, target and texture
 dimensions, screen and UV rectangles, compositing, line and frame ticks, and the learner's mode, preset and off
@@ -253,7 +254,7 @@ short synthetic layouts whenever possible. Review geometry and timing before sha
 The native GPU self-test builds `replay.exe` into its test output folder. Run `replay.exe input.replay [expected]`
 to write the learner's `ToMe_GPUHIDE`, `ToMe_CHARS` and `ToMe_PAGE` messages and the draw masks. A `MASK` row
 starts with the zero-based frame and batch numbers followed by the indices of the omitted quads. The optional
-expected file compares the output byte for byte. This boundary uses the already-correlated glyph ordinals.
+expected file compares the output byte for byte after normalizing CRLF line endings. This boundary uses the already-correlated glyph ordinals.
 Hook installation, texture scanning, glyph colours and the retained-bitmap adapters have their own self-tests.
 
 `replay.exe --check replay-fixtures` compares the checked-in samples to direct learner calls and replays each

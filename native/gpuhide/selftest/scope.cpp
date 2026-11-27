@@ -399,7 +399,7 @@ int main() {
  g.Off(); assert(!g.PageHidden(p));
  // Ordinary matched atlas dialogue is still hidden, while a button outside its box is kept.
  g.Line(L"これは会話です。",200);g.texRt=false;g.learned=true;g.areaW=640;g.areaH=480;
- g.area={40,380,400,450};g.glyphH=24;g.atlases.insert(GlyphLearner::AtlasKey(nullptr,(void*)1));
+ g.area={40,380,400,450};g.glyphH=24;g.atlases.insert(g.GroupKey(nullptr,(void*)1));
  q={60,400,84,424,0,0,.1f,.1f,0};Quad button=q;button.y0=20;button.y1=44;
  auto drop=g.Draw((void*)1,128,128,nullptr,640,480,640,480,{q,button},210);
  assert(drop.size()==1&&drop[0]==0);

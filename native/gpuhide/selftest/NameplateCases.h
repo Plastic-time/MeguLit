@@ -18,7 +18,7 @@ static std::vector<Quad> TracedRow(unsigned count, float left, float top, float 
  return row;
 }
 
-template <class Learner> static void KeepSharedAtlasNameplate(Learner &g) {
+template <class Learner> static void KeepSharedAtlasNameplate(Learner &g, const std::string &expectedText = "ABCDE") {
  std::vector<std::string> placements;
  const auto emit = g.emit;
  g.emit = [&](const std::string &r) {
@@ -32,8 +32,8 @@ template <class Learner> static void KeepSharedAtlasNameplate(Learner &g) {
  // The plate shares both the atlas and the row cluster, with its centres just above the learned band.
  const auto name = TracedRow(5, 400, 355, 24, 0.2f, 6);
  const std::vector<int> hiddenBody{0, 1, 2, 3, 4};
- const char *bodyRects =
-  " n=5 rects=400,400,24,24;428,400,24,24;456,400,24,24;484,400,24,24;512,400,24,24 text=";
+ const std::string bodyRects =
+  " n=5 rects=400,400,24,24;428,400,24,24;456,400,24,24;484,400,24,24;512,400,24,24 text=" + expectedText;
  g.Line(L"ABCDE", 10000);
  assert(draw(body, 10001).empty());
  g.Frame(10002, 1280, 720);
@@ -55,7 +55,7 @@ template <class Learner> static void KeepSharedAtlasNameplate(Learner &g) {
  puts("PASS Siglus shared-atlas nameplate");
 }
 
-template <class Learner> static void KeepSeparateAtlasNameplate(Learner &g, bool separateTarget) {
+template <class Learner> static void KeepSeparateAtlasNameplate(Learner &g, bool separateTarget, const std::string &expectedText = "FGHIJ") {
  std::vector<std::string> placements;
  const auto emit = g.emit;
  g.emit = [&](const std::string &r) {
@@ -100,8 +100,8 @@ template <class Learner> static void KeepSeparateAtlasNameplate(Learner &g, bool
  assert(draw(dialogueTarget, dialogueAtlas, next, 15017) == hiddenBody);
  g.Frame(15018, 1280, 720);
  assert(placements.size() == 3 && placements.back().find(" line=2 hidden=1 ") != std::string::npos);
- const char *bodyRects =
-  " n=5 rects=200,500,48,48;256,500,48,48;312,500,48,48;368,500,48,48;424,500,48,48 text=";
+ const std::string bodyRects =
+  " n=5 rects=200,500,48,48;256,500,48,48;312,500,48,48;368,500,48,48;424,500,48,48 text=" + expectedText;
  assert(placements.back().find(bodyRects) != std::string::npos);
  assert(draw(nameTarget, nameAtlas, name, 15035).empty());
  g.emit = emit;

@@ -121,11 +121,12 @@ inline bool WriteTape(std::ostream &out, const Tape &tape, bool limited = false)
  // Preserve both sort orders: the learner takes the first match in its group and per-target maps.
  std::map<void *, unsigned> ids{{nullptr, 0}};
  std::map<long long, unsigned> groups;
+ const NativeGroupOrder nativeKey;
  for (const Call &c : tape.calls) {
   if (c.op == 'D' || c.op == 'C') ids.emplace(c.tex, 0);
   if (c.op == 'D') {
    ids.emplace(c.rt, 0);
-   groups.emplace(GlyphLearner::GroupKey(c.rt, c.tex), 0);
+   groups.emplace(nativeKey(c.rt, c.tex), 0);
   }
  }
  unsigned rank = 0;
@@ -143,7 +144,7 @@ inline bool WriteTape(std::ostream &out, const Tape &tape, bool limited = false)
    break;
   case 'D':
    out << ' ' << c.tick << ' ' << ids.at(c.tex) << ' ' << ids.at(c.rt) << ' '
-       << groups.at(GlyphLearner::GroupKey(c.rt, c.tex)) << ' '
+       << groups.at(nativeKey(c.rt, c.tex)) << ' '
        << c.tw << ' ' << c.th << ' ' << c.rw << ' ' << c.rh << ' '
        << c.bw << ' ' << c.bh << ' ' << c.flag;
    break;

@@ -11,7 +11,7 @@ test('learner is API-independent, generic and hides only after learning, inside 
  assert.doesNotMatch(g,/#include <windows\.h>|d3d9/i,'no Windows / Direct3D in the decision core');
  assert.doesNotMatch(g,/kirikiri|krkr|siglus|bgi|yuris|bruns|unity|renpy|leaf|clannad|dustmania/i,'no engine or game names');
  assert.match(g,/armedUntil = now \+ 60000/,'a line stays armed 60 s after the last push');
- assert.match(g,/sameAtlas = rtW == areaW && rtH == areaH && atlases\.count\(AtlasKey\(NULL, tex\)\)/,'learned atlas (by texture) on every target of the learned size (pages drawn twice into a shadow buffer)');
+ assert.match(g,/sameAtlas = rtW == areaW && rtH == areaH && atlases\.count\(GroupKey\(nullptr, tex\)\)/,'learned atlas (by texture) on every target of the learned size (pages drawn twice into a shadow buffer)');
  assert.match(g,/sheet = freshTex && LineSized\(tw, th\)/,'line-sized glyph sheets: only textures first drawn with this line');
  assert.match(g,/if \(learned && armed && !readOnly && glyphSize && \(sameAtlas \|\| sheet \|\| redraw\)\)/,'hides only after learning, while armed; learned atlas at glyph height, the current line\'s own fresh sheet, or a page the game draws again');
  assert.match(g,/bool redraw = \(int\)\(redrawUntil - now\) > 0 && rtW == areaW && rtH == areaH;/,'a page redraw only on a target of the learned size, for RedrawMs');

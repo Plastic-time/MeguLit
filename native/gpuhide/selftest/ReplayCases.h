@@ -121,10 +121,12 @@ struct FixtureCase {
  const wchar_t *name;
  void (*run)(ReplayFixture &);
 };
+static const std::string FirstNameplateLine = GlyphLearner::Utf8(L"\ue000\ue001\ue002\ue003\ue004");
+static const std::string SecondNameplateLine = GlyphLearner::Utf8(L"\ue005\ue006\ue007\ue008\ue009");
 static const FixtureCase ReplayFixtures[] = {
- {L"siglus", [](ReplayFixture &g) { KeepSharedAtlasNameplate(g); }},
- {L"catsystem2", [](ReplayFixture &g) { KeepSeparateAtlasNameplate(g, true); }},
- {L"advhd", [](ReplayFixture &g) { KeepSeparateAtlasNameplate(g, false); }},
+ {L"siglus", [](ReplayFixture &g) { KeepSharedAtlasNameplate(g, FirstNameplateLine); }},
+ {L"catsystem2", [](ReplayFixture &g) { KeepSeparateAtlasNameplate(g, true, SecondNameplateLine); }},
+ {L"advhd", [](ReplayFixture &g) { KeepSeparateAtlasNameplate(g, false, SecondNameplateLine); }},
  {L"aoitori-centered", [](ReplayFixture &g) { AoitoriCase(g, AoitoriLayout::Centered); }},
  {L"aoitori-moved", [](ReplayFixture &g) { AoitoriCase(g, AoitoriLayout::Moved); }},
  {L"aoitori-partial", [](ReplayFixture &g) { AoitoriCase(g, AoitoriLayout::Partial); }},

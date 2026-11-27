@@ -44,7 +44,7 @@ set "REPLAY_TAPE=%OUT%\capture-%RANDOM%-%RANDOM%.replay"
 set "REPLAY_OUT=%REPLAY_TAPE%.txt"
 if exist "%REPLAY_TAPE%" exit /b 1
 if exist "%REPLAY_OUT%" exit /b 1
-"%OUT%\host64.exe" "%DLLS%\MeguLitGpu64.dll" gdi "%REPLAY_TAPE%" || set FAIL=1
+"%OUT%\host64.exe" "%DLLS%\MeguLitGpu64.dll" gdi "%REPLAY_TAPE:\=/%" || set FAIL=1
 "%OUT%\replay.exe" "%REPLAY_TAPE%" > "%REPLAY_OUT%" || set FAIL=1
 findstr /b /c:"ToMe_CHARS engine=gpu line=2 hidden=1" "%REPLAY_OUT%" >nul || set FAIL=1
 if exist "%REPLAY_TAPE%" del /q "%REPLAY_TAPE%"

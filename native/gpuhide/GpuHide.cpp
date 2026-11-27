@@ -139,7 +139,7 @@ static DWORD WINAPI SaveGpuReplay(void *) {
 static void StartGpuReplay() {
  wchar_t path[MAX_PATH];
  const DWORD n = GetEnvironmentVariableW(L"MEGULIT_GPU_REPLAY", path, MAX_PATH);
- if (n < 4 || n >= MAX_PATH || path[1] != L':' || path[2] != L'\\' || wcschr(path + 3, L':')) return;
+ if (n < 4 || n >= MAX_PATH || path[1] != L':' || (path[2] != L'\\' && path[2] != L'/') || wcschr(path + 3, L':')) return;
  const wchar_t drive[] = {path[0], L':', L'\\', 0};
  if (GetDriveTypeW(drive) != DRIVE_FIXED) return;
  try {
