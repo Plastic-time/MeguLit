@@ -54,7 +54,7 @@
 | 魚魚棟 · Claude | euphoria HD リマスター（YU-RIS）开头选项「オープニングを見る」「メインルームへ」没有翻译：查选项是否进翻译链，按四层修（seed 优先，缺能力补 YU-RIS 引擎层） | #1143 | fix/1143-yuris-choice-translate | 11-27 | PR #1295 CI 全绿、7d29cab5 实机复测通过（标题无残留、第一屏选项有中文、快进只留最后一句、OCR 台词随图片撤下），完成，PR #1295 已合（47a1d886）；YU-RIS2 跳过不普遍（Monochrome Empire 台词在 YU-RIS2），保留按版本 seed |
 | 魚魚棟 · Claude | **MeguLit-Adapter**（半自动适配器，合并画字钩子和引擎剧本读取，tools/adapt-auto.cjs 并进来只留一个入口 `tools/megulit-adapter.cjs`）：认游戏按 VNDB+发行版、原文优先用引擎剧本读取（复用 RRFZ 读取器）、画字钩子对齐兜底、引擎级隐藏优先、版本层按封包/剧本指纹、需要人看的地方停下给截图和一句话问题 | — | feat/megulit-adapter（PR #1296） | 11-27 | 进行中：PR #1296 收尾；第六轮：ファタ seed 固定 Krkr2wcs（source.keepStream）、选项只认画面上找到的；店主回来后只能隐藏桌面，ファタ 标题点不进、ISLAND(D3D) 起不来，两项实机未验证 |
 | 魚魚棟 · Claude | 调研网上现成工具接进 MeguLit-Adapter（LunaHook/LunaTranslator 特殊码库、Textractor、VNR 数据库、GARbro、KrkrExtract、SiglusExtract、VNTextPatch、AssetStudio 等）：只调研不改仓库，结论交给 #1296 接入 | — | — | 11-27 | 完成：结论交给 #1296 接入（VNDB 发行版查询、LunaHook 认引擎、GARbro-Mod 升级、GalTransl 读取器兜底；OpenSpeedy 冷测试加速待确认） |
-| 魚魚棟 · Claude | たいせつなきみのために、ぼくにできるいちばんのこと（只要你不再悲伤）：开隐藏原文时译文颜色在设置色和原文色之间来回变；开「同步原文样式」后原文藏不干净（玩家きゅう 11-27 报）。作为 MeguLit-Adapter 的实验样本一起查 | — | — | 11-27 | 排队：等游戏下载完 |
+| 魚魚棟 · Claude | たいせつなきみのために、ぼくにできるいちばんのこと（只要你不再悲伤）：开隐藏原文时译文颜色在设置色和原文色之间来回变；开「同步原文样式」后原文藏不干净（玩家きゅう 11-27 报）。作为 MeguLit-Adapter 的实验样本一起查 | — | fix/taisetsuna-color-hide | 11-27 | 进行中：认引擎、查根因 |
 | 魚魚棟 · Claude | YU-RIS 引擎层：正文 N 倍逐字重复去重、正文线程选择 | — | engine-yuris | 11-26 | 暂停（已提交） |
 | 魚魚棟 · Claude | 更新弹窗「下载失败 · UPDATE_LAUNCH_FAILED」，按「重启并更新」没反应，退出重进才好（v1.4.19→v1.4.25 玩家反馈）：查更新程序启动那步的超时/残留进程 | — | fix/update-launch-failed | 11-27 | 完成：已合并 #1298 |
 | 魚魚棟 · Claude | PR #1297 勾选框长方形、勾成白点、启动提示文字偏高：测试换成无头 Edge 实测，补 PR 正文和截图，查设置/Anki/学习页兄弟勾选框 | — | fix/checkbox-mark | 11-27 | 完成：已合并 #1297 |
