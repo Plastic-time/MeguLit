@@ -34,6 +34,7 @@
 | Monochrome Empire | v26413 | 待补 | YU-RIS2 | 进行中（选项被隐藏，卡在原生 hook） | 魚魚棟 · Claude | PR #1291 |
 | ハミダシクリエイティブ | v27449 | パッケージ版 | Artemis | 进行中 | 魚魚棟 · Claude | artemis/hamidashi-creative（MeguLit-Adapter） PR #1303 |
 | アイキス3 sexy | v32132 | 豪華版 DVD（r84077）+ Ver.1.03 | NeXAS | 进行中（skeleton，待测试员实测：选项修了未见中文选项上屏） | 魚魚棟 · Claude | nexas/ai-kiss-3-sexy（MeguLit-Adapter） PR #1304 |
+| OZMAFIA!! | v7833 | OZMAFIA!!（r15697） + 汉化外挂整包 | YU-RIS | 进行中 | 魚魚棟 · Claude | yuris/ozmafia（MeguLit-Adapter） PR #1312 |
 
 ## 进行中
 
