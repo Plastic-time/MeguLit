@@ -55,7 +55,7 @@
 | 魚魚棟 · Claude | 游戏内新手引导：前 5 次进游戏分步高亮胶囊、Alt+T 菜单、个性化文本、点读、校准，可跳过；顶栏「教程」和 Alt+T 可重看，教程页配图 | — | feat/onboarding-tour | 11-27 | 等 CI，待测试员实测（PR #1324） |
 | 魚魚棟 · Claude | 游戏库标题停在文件夹名（Ozmafia-ozmafia-joki）：改成显示作品名（seed/VNDB），用户改过的名字不覆盖，老数据迁移，原名留作别名 | — | fix/library-title-from-work | 11-27 | 等 CI，待测试员实测（PR #1326） |
 | 魚魚棟 · Claude | 启动画面只留进度条，结尾不再变圆出小脸，改成进度条变形成半透明 MeguLit logo | — | feat/splash-logo | 11-27 | CI 全绿，待测试员实测（PR #1319） |
-| 魚魚棟 · Claude | 启动画面 logo 发灰、卡顿：改实色、由暗到亮入场，绘制移到独立线程 | — | fix/splash-logo-solid | 11-28 | CI 中（PR #1357） |
+| 魚魚棟 · Claude | 启动画面 logo 发灰、卡顿：改实色、由暗到亮入场，绘制移到独立线程 | — | fix/splash-logo-solid | 11-28 | CI 全绿，待测试员实测（PR #1357） |
 | 魚魚棟 · Claude | 首页大卡牌按住往下压时，单击/双击提示框压在卡牌上：提示框挪到卡牌下方，按住、拖动、抽卡时不出现 | — | fix/home-card-press | 11-27 | 等 CI，待测试员实测（PR #1320） |
 | 魚魚棟 · Claude | 热键全部可自定义：Alt+M / Alt+T / Alt+H / Alt+L 可改组合键，也可绑鼠标侧键或中键加修饰键；冲突提示，Alt+T 菜单和设置里同一个「热键」面板，所有热键提示跟着设置变 | — | feat/custom-hotkeys | 11-27 | 在做 |
 | 魚魚棟 · Claude | 关于页感谢太少：除 MeguLit 外改成片尾致谢名单，名单数据在 web/credits.json | — | feat/credits-roll | 11-27 | CI 绿，待测试员实测（PR #1321） |
