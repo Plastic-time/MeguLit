@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# 2026-11-26 the cold test's input fallback (services/cold-test-run.cjs, tools/adapt-auto.cjs only): one line in, one JSON line out.
+# 2026-11-26 the cold test's input fallback (services/cold-test-run.cjs, tools/megulit-adapter (cold stage) only): one line in, one JSON line out.
 #   init <pid> <hwnd> <bits> <inputctl dir>   InputCtl<bits>.exe inject <pid> (the testbed's InputShim: fake foreground, cursor,
 #                                             GetAsyncKeyState and DirectInput inside the game), then its shared state is opened here
 #   shim click|move <x> <y> | shim key|down|up <vk hex>   what InputCtl.exe does, with the hwnd ColdDesk found (InputCtl looks the
 #                                             window up with EnumWindows, which never sees the hidden desktop)
 #   fg click|move <x> <y> | fg key|down|up <vk hex>       real input (SendInput) to the game made the foreground window; only for a
-#                                             visible run (adapt-auto --foreground, owner away): it moves the real cursor
+#                                             visible run (megulit-adapter --foreground, owner away): it moves the real cursor
 #   dialog <pid> [name]                     a standard dialog of the game asking for text (YU-RIS name entry): an empty Edit gets
 #                                             name, OK is pressed; any other dialog is only reported
 #   quit
@@ -87,8 +87,11 @@ public static class ColdInput{
    if(ok!=IntPtr.Zero&&edit!=IntPtr.Zero)SendMessage(ok,0xF5,IntPtr.Zero,IntPtr.Zero);
    o.Append((o.Length>0?" | ":"")+"\""+Txt(d)+"\" "+string.Join("/",labels)+(edit!=IntPtr.Zero?" edit=\""+(filled?name:had)+"\"":"")+(ok==IntPtr.Zero?" no-ok":edit!=IntPtr.Zero?" ok":" left"));}
   return o.ToString();}
- public static string Fg(long hwnd,string cmd,int a,int b){W=(IntPtr)hwnd;bool front=Front();
-  if(cmd=="move"||cmd=="click"){var p=new PT();p.X=a;p.Y=b;ClientToScreen(W,ref p);SetCursorPos(p.X,p.Y);Thread.Sleep(120);
+ /* 2026-11-27 (ファタモルガーナの館: the game stayed under another window and every SendInput click went to that window): no real input
+    at all unless the game is the foreground window and the point is on one of its windows */
+ [DllImport("user32.dll")]static extern IntPtr WindowFromPoint(PT p);
+ public static string Fg(long hwnd,string cmd,int a,int b){W=(IntPtr)hwnd;bool front=Front();if(!front)return "not foreground";
+  if(cmd=="move"||cmd=="click"){var p=new PT();p.X=a;p.Y=b;ClientToScreen(W,ref p);var at=WindowFromPoint(p);if(at==IntPtr.Zero||PidOf(at)!=PidOf(W))return "covered";SetCursorPos(p.X,p.Y);Thread.Sleep(120);
    if(cmd=="click"){Mouse(2);Thread.Sleep(90);Mouse(4);Thread.Sleep(60);}}
   else{int vk=a&255;if(cmd!="up")Key(vk,false);if(cmd=="key")Thread.Sleep(90);if(cmd!="down")Key(vk,true);}
   return front?"":"not foreground";}

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
-/* 2026-11-26 tools/adapt-auto.cjs without a game: arguments, folder triage (Switch / disc image / no exe), exe + engine lookup on a
+/* 2026-11-26 tools/megulit-adapter/cold.cjs (the cold stage of MeguLit-Adapter, formerly tools/adapt-auto.cjs) without a game: arguments, folder triage (Switch / disc image / no exe), exe + engine lookup on a
    temp KiriKiri-shaped folder, the one-run lock, and judge(): the cold self-check + Cardinal scores → pass / fail / inconclusive,
    where anything not measured stays inconclusive. */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
-const A=require('../tools/adapt-auto.cjs');
+const A=require('../tools/megulit-adapter/cold.cjs');
 /* the cold runner ticks on real timers: wait for what a test expects instead of a fixed time (a busy machine runs it late) */
 const until=async(cond,ms=10000)=>{const end=Date.now()+ms;while(!cond()&&Date.now()<end)await new Promise(r=>setTimeout(r,20));return cond();};
 const tmp=()=>fs.mkdtempSync(path.join(process.env.MEGULIT_TMP||os.tmpdir(),'adapt-auto-'));
@@ -154,7 +154,7 @@ test('hookDiagnostics: injected hooks, dropped dialogue, the selected stream, cu
  fs.writeFileSync(path.join(root,'logs','hook-diagnostics.log'),['2026-11-26T06:00:00.0000000Z info 0 注入钩子: KiriKiri1 005240D0','2026-11-26T06:23:43.5970284Z info 0 注入钩子: EmbedKrkr2 005E3389',
   '2026-11-26T06:23:45.0137487Z krkr wait kag','2026-11-26T06:24:10.0151891Z auto-select KiriKiri2 (first dialogue stream of 3)','2026-11-26T06:24:37.2574944Z aux noise tTVPNativeBaseBitmap::DrawText "私私もも"'].join('\n'));
  const d=A.hookDiagnostics(root,{startedAt:'2026-11-26T06:23:43Z',endedAt:'2026-11-26T06:24:56Z'},path.join(root,'cut.log'));
- assert.deepEqual(d,{injected:['EmbedKrkr2'],auxNoise:1,auxSample:'tTVPNativeBaseBitmap::DrawText: 私私もも',kagWait:true,selected:'KiriKiri2'});
+ assert.deepEqual(d,{injected:['EmbedKrkr2'],auxNoise:1,auxSample:'tTVPNativeBaseBitmap::DrawText: 私私もも',kagWait:true,selected:'KiriKiri2',lunaEngine:''});
  assert.equal(fs.readFileSync(path.join(root,'cut.log'),'utf8').split('\n').filter(Boolean).length,4,'only the run\'s lines');});
 
 test('writeSeed: a verified seed entry in The Seed layout, checked by core/profiles/seed.cjs',()=>{const DM=require('../tools/diff-maker/index.cjs');const d=tmp();
@@ -236,7 +236,7 @@ test('driver choiceQuietMs: the first try waits until fast-forward stopped drawi
 test('run: stage records (core/yui-run.cjs) say where a run stopped',async()=>{const d=tmp();
  const sw=path.join(d,'[GAME]Garden[01009DB022BC6000]');put(path.join(sw,'game.nsp'));const out=path.join(d,'out');
  const r=await A.run({dir:sw,out,budgetMin:1,app:''},{log:()=>{}});const y=require('../core/yui-run.cjs').read(out);
- assert.equal(r.artifacts.yui,path.join(out,'yui-run.log'));assert.equal(y.kind,'adapt-auto');assert.equal(y.state,'failed');assert.equal(y.failed.stage,'verdict-inconclusive');assert.match(y.failed.reason,/Switch/);
+ assert.equal(r.artifacts.yui,path.join(out,'yui-run.log'));assert.equal(y.kind,'megulit-adapter');assert.equal(y.state,'failed');assert.equal(y.failed.stage,'verdict-inconclusive');assert.match(y.failed.reason,/Switch/);
  assert.ok(y.events.some(e=>e.stage==='triage'));});
 
 test('locateAnswer: the options the kernel wants located get the OCR rows that are theirs; GalWindowBridge\'s answer shape',()=>{const R=require('../services/cold-test-run.cjs');
@@ -269,5 +269,34 @@ test('driver readPerCharMs: a long line that came whole gets 45 ms a character b
  const e=new Driver({skip:false,slowLines:100,readQuietMs:600,readMinMs:1000,stallMs:1e9,shotLines:[]});e.next({t:0,window:W});e.next({t:10,window:W,lines:1,quietMs:0});
  assert.equal(e.next({t:2000,window:W,lines:1,quietMs:1200,lineChars:54,lineAgeMs:1200}).length,1,'without readPerCharMs as before');});
 
-test('coldTest: the per-character wait is for engines that hand lines over whole (YU-RIS), not KiriKiri',()=>{const src=fs.readFileSync(path.join(__dirname,'..','tools','adapt-auto.cjs'),'utf8');
+test('coldTest: the per-character wait is for engines that hand lines over whole (YU-RIS), not KiriKiri',()=>{const src=fs.readFileSync(path.join(__dirname,'..','tools','megulit-adapter','cold.cjs'),'utf8');
  assert.match(src,/const WHOLE_LINE=new Set\(\['yuris'\]\);/);assert.match(src,/readPerCharMs:WHOLE_LINE\.has\(loc\.engine\)\?45:0/);});
+
+test('stuckOf: a black capture on the visible desktop is the capture, not a hidden-desktop render failure (ISLAND drew its title)',()=>{
+ const black={cold:{verdict:'inconclusive',lines:0,end:'black'},run:{end:'black'}};
+ assert.match(A.stuckOf({...black,visible:true}),/客户区截图截不到/);assert.match(A.stuckOf(black),/隐藏桌面画不出画面/);});
+
+test('cold test Steam check: a Steam emulator build runs without the Steam client (千恋＊万花 copy: SteamEmu folder, no Valve in steam_api.dll); a real one still needs it',()=>{
+ const C=require('../services/cold-test.cjs');const mk=(dll,extra)=>{const d=tmp();fs.writeFileSync(path.join(d,'game.exe'),'MZ');fs.writeFileSync(path.join(d,'steam_api.dll'),dll);if(extra)fs.mkdirSync(path.join(d,extra));return path.join(d,'game.exe');};
+ assert.equal(C.steamOf({exe:mk('MZ emu build')}),null,'no Valve name');
+ assert.equal(C.steamOf({exe:mk(Buffer.concat([Buffer.from('MZ'),Buffer.from('Valve Corporation','utf16le')]),'SteamEmu')}),null,'SteamEmu folder');
+ const real=C.steamOf({exe:mk(Buffer.concat([Buffer.from('MZ'),Buffer.from('Valve Corporation','utf16le')])),steamAppId:'1144400'});assert.equal(real.appid,'1144400','a genuine steam_api still goes through Steam');});
+
+test('ocrItems: a title menu with no start word gets its topmost row (ファタモルガーナの館); a menu that starts with continue or config, or loose text, does not',()=>{
+ const R=require('../services/cold-test-run.cjs');const row=(text,y,x=600)=>({text,x,y,w:180,h:30});
+ const fata=['館の扉を開く','記を辿る','調整を行う','情報頁','別メニュー'].map((t,i)=>row(t,400+i*50));
+ const got=R.ocrItems(fata);assert.equal(got.length,1);assert.equal(got[0].text,'はじめから');assert.equal(got[0].ocr,'館の扉を開く');assert.equal(got[0].guessed,true);
+ assert.deepEqual(R.ocrItems([row('続きから',400),row('環境設定',450),row('終了',500)]),[]);
+ assert.deepEqual(R.ocrItems([row('システム設定',400),row('おまけ',450),row('終了',500)]),[]);
+ assert.deepEqual(R.ocrItems([row('今日はいい天気',400,100),row('だね',400,900)]),[],'not a column');
+ assert.equal(R.ocrItems([row('はじめから',400),row('つづきから',450)])[0].ocr,'はじめから','a start word wins as before');});
+
+test('ocrItems / driver: a Chinese title menu starts (千恋＊万花 Steam copy in Simplified Chinese: 新游戏, read by Japanese OCR as *新游双)',()=>{
+ const R=require('../services/cold-test-run.cjs');const row=(text,y)=>({text,x:600,y,w:180,h:30});
+ assert.equal(R.ocrItems([row('*新游双',400),row('读取存档',450)])[0]?.text,'はじめから');assert.equal(R.ocrItems([row('新游戏',400)])[0]?.text,'はじめから');
+ assert.deepEqual(R.ocrItems([row('新游',400)]).filter(i=>!i.guessed),[],'two characters are not enough');});
+
+test('a visible run whose game lay under other windows says so (ISLAND / ファタ / 千恋＊万花 under the bottom guard); a hidden run is unchanged',()=>{
+ const st={cold:{verdict:'inconclusive',lines:0,end:'no-lines'},run:{end:'no-lines',covered:5}};
+ assert.match(A.stuckOf({...st,visible:true}),/被别的窗口挡住（5 张/);assert.doesNotMatch(A.stuckOf(st),/挡住/);
+ const src=fs.readFileSync(path.join(__dirname,'..','native','ColdDesk.cs'),'utf8');assert.match(src,/covered=OnUserDesktop&&!GameOnTop\(w,h\)/);});

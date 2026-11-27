@@ -10,8 +10,10 @@ const layerNames = {
 const settingNames = {
  'source.artemisQuoteSpans':'Artemis 跨片段引号台词合并',
  'source.autoSelectSkip':'不自动选为台词的文本流',
+ 'source.keepStream':'选中后不再换走的台词文本流',
  'page.skipMergedTail':'快进合并文本只留最后几句（字数）',
  'source.siglusDbsNameColumn':'Siglus DBS 人名列编号',
+ 'source.versionMatch':'版本层怎么认',
  'placement.firstLineAnchor':'首行定位基准',
  'placement.dialogueArea':'游戏对话区参考位置',
  'placement.lineOffsetY':'原文行垂直偏移（像素）',
@@ -95,6 +97,7 @@ const enums = {
  'placement.firstLineAnchor':{glyph:'字形位置',box:'文本框',page:'页面'},
  'page.presentation':{adv:'对话框式（ADV）',nvl:'整页式（NVL）',mixed:'混合排版'},
  'calibrate.positionSource':{engine:'引擎坐标',glyph:'字形位置',ocr:'屏幕文字识别（OCR）'},
+ 'source.versionMatch':{exe:'只认程序哈希',prints:'程序哈希认不出时按封包 / 剧本指纹认（候选）'},
  'calibrate.hideMethod':{hide:'隐藏原文并重绘',engine:'引擎隐藏',glyph:'字形隐藏',gpu:'GPU 隐藏',read:'保留原文的阅读模式'},
  annotation:{ruby:'假名注音',ipa:'国际音标',pinyin:'拼音',none:'无注音'},
  pairing:{script:'原始脚本配对',patch:'补丁文本配对',machine:'机器翻译',none:'无配对'},

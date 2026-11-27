@@ -13,7 +13,16 @@ module.exports={
   /* #1143 HookBridge streams (RegExp sources on the stream name, e.g. '^YU-RIS2?$') never auto-selected as the dialogue stream; their
      text stays auxiliary (choice candidates) even before a dialogue stream is chosen. [] = the kernel: any stream may be taken */
   autoSelectSkip:[],
+  /* 2026-11-27 (ファタモルガーナの館) HookBridge streams (RegExp sources on the stream name, e.g. '^Krkr2wcs$') that, once selected, are never
+     left for another stream with more dialogue lines (a fresh session left Krkr2wcs in the prologue and the page hide never ran).
+     [] = the kernel: the selected stream may be left */
+  keepStream:[],
   siglusDbsNameColumn:null,
+  /* 2026-11-27 MeguLit-Adapter: how this game's built-in version layer is found. 'exe' = the kernel as before: only the exe's
+     SHA-256 (The Seed versions/<sha>.json). 'prints' = when the exe hash misses (no-DVD, update, a Chinese patch's renamed exe), the
+     version whose recorded prints (game.json ext.versionPrints: exe head, PE version, script-source print, main pack print) match
+     this copy is taken as a candidate: applied low (under this PC's calibration, like a skeleton seed) so the self-check gate decides */
+  versionMatch:'exe',
  },
  placement:{
   /* where the first line of a page is anchored: null = kernel (glyph records, then the text box); 'glyph' | 'box' | 'page' */
