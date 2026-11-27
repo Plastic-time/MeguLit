@@ -447,7 +447,7 @@ async function dispatch(request,runtime=null) {
       case 'review_full':if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');return runtime.reviews().full(String(request.platform),String(request.url||''));
       case 'game_reviews':if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');return runtime.reviews().page(String(request.id),String(request.platform),request.page,request.size,String(request.lang||'all'));
       case 'reviews_translate':if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');return runtime.reviews().translate(request.texts,String(request.target),String(request.source||'auto'));
-      case 'open_source':{const url=new URL(String(request.url));if(url.protocol!=='https:'||!['vndb.org','store.steampowered.com','steamcommunity.com','bgm.tv','2dfan.com','erogamescape.dyndns.org','github.com','plicy.net','megulit.com','platform.deepseek.com','cloud.siliconflow.cn','bailian.console.aliyun.com','aistudio.google.com','apps.ankiweb.net','zh.moegirl.org.cn','ndlsearch.ndl.go.jp','openlibrary.org','data1.library.sh.cn','ankiweb.net'].includes(url.hostname)||url.username||url.password)throw Error('INVALID_SOURCE_URL');const child=spawn('explorer.exe',[url.href],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {opened:true};}
+      case 'open_source':{const url=new URL(String(request.url));if(url.protocol!=='https:'||!['vndb.org','store.steampowered.com','steamcommunity.com','bgm.tv','2dfan.com','erogamescape.dyndns.org','github.com','plicy.net','megulit.com','platform.deepseek.com','cloud.siliconflow.cn','bailian.console.aliyun.com','aistudio.google.com','apps.ankiweb.net','zh.moegirl.org.cn','ndlsearch.ndl.go.jp','openlibrary.org','data1.library.sh.cn','qm.qq.com','ankiweb.net'].includes(url.hostname)||url.username||url.password)throw Error('INVALID_SOURCE_URL');const child=spawn('explorer.exe',[url.href],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {opened:true};}
       case 'game_locale_mode':{
         const id=String(request.id),row=db.prepare('SELECT original FROM games WHERE id=? AND removed_at IS NULL').get(id);
         if(!row)throw Error('GAME_NOT_FOUND');
@@ -697,7 +697,26 @@ async function dispatch(request,runtime=null) {
         const values=cleanUiState(request.values),file=path.join(root,'data','ui-state.json');
         fs.writeFileSync(file,JSON.stringify(values,null,2));return {keys:Object.keys(values).length};
       }
+      /* 2026-11-27 新手引导 again (教程 in the top bar): the reader shows it now if a game is on, else ui-state.json keeps the wish for the next launch */
+      case 'onboarding_replay':{
+        /* the key and its shape belong to web/onboarding-steps.js (KEY, replay); web/ is inside the exe, so it is not required from here */
+        const KEY='tomoyo-onboarding',file=path.join(root,'data','ui-state.json'),values=cleanUiState(store.readJSON(file,{}));
+        let saved={};try{saved=JSON.parse(values[KEY]||'{}')||{};}catch{}if(!saved||typeof saved!=='object'||Array.isArray(saved))saved={};values[KEY]=JSON.stringify({...saved,replay:true});fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(values,null,2));
+        runtime?.emit('reader-event',{type:'onboarding',action:'replay'});return {replay:true};
+      }
+      /* 教程 opened in the main window: the red dot on the 教程 buttons is done with */
+      case 'onboarding_seen':{
+        const KEY='tomoyo-onboarding',file=path.join(root,'data','ui-state.json'),values=cleanUiState(store.readJSON(file,{}));
+        let saved={};try{saved=JSON.parse(values[KEY]||'{}')||{};}catch{}if(!saved||typeof saved!=='object'||Array.isArray(saved))saved={};
+        values[KEY]=JSON.stringify({...saved,seen:true});fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(values,null,2));return {seen:true};
+      }
       case 'save_preferences':{const preferences=savePreferences(request);runtime?.emit('reader-event',{type:'appearance',preferences});if(request.values?.language)runtime?.emit('reader-event',{type:'language',language:preferences.language});return preferences;}
+      /* 2026-11-27 Settings → 热键 (web/hotkeys-panel.js), also called by the Alt+T 热键 page */
+      case 'hotkeys_get':return require('../core/hotkeys.cjs').state(path.join(root,'data','config'));
+      case 'hotkeys_save':{const keys=require('../core/hotkeys.cjs'),folder=path.join(root,'data','config');keys.save(folder,request.changes);keys.publish(folder,runtime);return keys.state(folder);}
+      /* the log key chosen in the log page before 2026-11-27 (the reader's own storage) is taken over once */
+      case 'hotkeys_adopt_log':{const keys=require('../core/hotkeys.cjs'),folder=path.join(root,'data','config');if(keys.adoptLog(folder,request.value))keys.publish(folder,runtime);return keys.state(folder);}
+      case 'hotkeys_pause':runtime?.reader?.gal?.send?.({type:'hotkeysPause',paused:request.paused===true});return {paused:request.paused===true};
       case 'asset_get':return require('./assets.cjs').get(root,String(request.slot||'home'));
       case 'asset_preview':return require('./assets.cjs').preview(request.path);
       case 'asset_set':return require('./assets.cjs').set(root,String(request.slot||'home'),request.path);
@@ -806,6 +825,7 @@ async function dispatch(request,runtime=null) {
       case 'update_apply':return await require('./update.cjs').apply(root,String(request.current||''));
       case 'update_start':{const u=require('./update.cjs');u.start(root,String(request.current||''),fetch,{forceLatest:request.forceLatest===true});return u.status();}
       case 'update_status':return require('./update.cjs').status();
+      case 'test_build':return {label:String(process.env.MEGULIT_TEST_BUILD||'').trim()};
       case 'update_install':return await require('./update.cjs').install(root);
       /* 2026-11-15 adaptation contribution consent (services/adapter-contrib.cjs): the update card's 同意并下一步 / 不参与, the beta note */
       case 'contrib_consent':return require('./adapter-contrib.cjs').consentState(root);

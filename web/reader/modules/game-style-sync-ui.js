@@ -183,12 +183,16 @@
    message=t('importPreview',{source,part:t(importing.part==='text'?'partText':'partPosition')});last={...last,gameStyleState:'measured'};paint();return true;}
  b.gameStyleStatus=m=>{if(receiveImport(m))return;
   if(m.gameStyleKey&&session.key&&m.gameStyleKey!==session.key&&m.gameStyleState!=='profile')return;
+  /* 2026-11-28 the work's speaker colour table (core/game-style-sync.cjs speakerTable) rides on every status: 分角色 (speaker-colors.js) */
+  if(m.gameStyleSpeakers!==undefined)b.speakerColorsReceived?.(m.gameStyleSpeakers,m.gameStyleKey||'');
   if(typeof m.gameStylePreview==='boolean'){
    document.body.classList.toggle('tome-style-probing',m.gameStylePreview);window.__tomeGlassReport?.(); // drop or restore glass windows now, not on the next 120 ms tick
    if(m.gameStylePreview&&Number.isSafeInteger(m.gameStyleCaptureId)&&document.body.classList.contains('tomoyo-ui-translation'))requestAnimationFrame(()=>requestAnimationFrame(()=>send({
     type:'gameStyleCaptureReady',id:m.gameStyleCaptureId})));
   }
   if(m.gameStyleState==='profile')setTimeout(()=>firstRunTip(m),0);
+  /* 2026-11-27 one event per status that names a launch; the 新手引导 (onboarding.js) counts launches from it */
+  if(m.gameStyleState==='profile'&&m.gameStyleIdentity)window.dispatchEvent(new CustomEvent('megulit-game-launch',{detail:{identity:String(m.gameStyleIdentity),key:m.gameStyleKey||''}}));
   if(m.gameStyleState==='profile'){
    const changed=(m.gameStyleKey||'')!==session.key||!!m.gameStyleIdentity&&m.gameStyleIdentity!==gameIdentity;
    if(changed||!dirty()&&!saving){if(changed){itemUndo=storedUndo(m.gameStyleKey,m.gameStyleSavedAt);measurementSerial++;clearInterval(correctionTimer);saving=null;aligning=false;gameIdentity=m.gameStyleIdentity||'';

@@ -439,6 +439,8 @@ test('CMVS FileHook pairs both versions by the original push slots and keeps the
   assert.equal(captured.status, 'exact');
   assert.equal(captured.japanese, pairs.ja[0]);
   assert.equal(captured.captured, literalZh);
+  assert.equal(captured.speaker, zh[0]);
+  assert.equal(provider.resolve(zh[3]).speaker, undefined);
   assert.equal(provider.resolveJapanese(literalJa).translation, pairs.tr[0]);
   assert.equal(scenes.read('cmvs', game)[0].records[0].speaker, zh[0]);
 });
@@ -468,18 +470,26 @@ test('CMVS keeps a paired message even when neither side had a legacy identity r
   const jp = ja.slice(), cn = zh.slice();
   jp[2] = 'japanese.ogg';
   cn[2] = 'chinese.ogg';
-  F.writeTree(game, {'data/pack/script.cpz': F.cpz7({'s1.ps3': classified(F.sjis, jp, 2)})});
-  assert.equal(original.scanRunning(root, id, exe).status, 'native-japanese');
+  const named = (encode, [speaker, ...rows]) => script(encode, ({message}) => {
+    rows.forEach((text, i) => message([text, '', i === 1 ? speaker : ''], 42 + i));
+  });
+  F.writeTree(game, {'data/pack/script.cpz': F.cpz7({'s1.ps3': named(F.sjis, jp)})});
+  const initial = original.scanRunning(root, id, exe);
+  assert.equal(initial.status, 'native-japanese');
+  assert.equal(read(initial.runtime.index).display[1].identityIndex, -1);
   const native = original.provider(root, exe).resolve(jp[2]);
   assert.equal(native.method, 'untranslated');
   assert.deepEqual(native.indices, [1]);
-  F.writeTree(game, {'FileHook/s1.ps3': classified(F.gbk, cn, 7)});
+  assert.equal(native.speaker, jp[0]);
+  F.writeTree(game, {'FileHook/s1.ps3': named(F.gbk, cn)});
   assert.equal(original.scanRunning(root, id, exe).status, 'ready');
   assert.equal(original.scriptPairs(root, exe).ja[1], jp[2]);
-  assert.equal(original.provider(root, exe).resolve(cn[2]).japanese, jp[2]);
+  const restored = original.provider(root, exe).resolve(cn[2]);
+  assert.equal(restored.japanese, jp[2]);
+  assert.equal(restored.speaker, cn[0]);
 });
 
-test('display rows keep saved choice roles and ruby attached to their identity slots', t => {
+test('display rows keep saved choice roles, ruby and speakers attached to their identity slots', t => {
   for (const view of ['original', 'patch']) {
     const {root, exe, id} = makeGame(t, view === 'original' ? zh : null);
     const state = original.scanRunning(root, id, exe);
@@ -489,16 +499,19 @@ test('display rows keep saved choice roles and ruby attached to their identity s
       assert.equal(original.importPatch(root, null, id, patch, {executable:exe}).patchStatus, 'ready');
       assert.equal(original.provider(root, exe).resolve(ja[1] + '\\t' + ja[1]).translation, zh[1] + '\t' + zh[1]);
     }
-    // CMVS itself has no roles or ruby. Model the metadata of an index that does.
+    // Model an index with metadata stored by identity slot instead of beside the display text.
     const indexPath = view === 'original' ? state.original.index : state.runtime.index;
     const index = read(indexPath), body = ja[1] + '\\t' + ja[1], choices = ja.slice(2, 4), ruby = ['二', 'に'];
     index.roles = index.lines.map(text => text === body ? 'b' : choices.includes(text) ? 'c' : '?').join('');
     index.ruby = index.lines.map(text => text === choices[0] ? [ruby] : null);
+    index.who = index.lines.map(text => text === choices[0] ? '読子' : '');
     fs.writeFileSync(indexPath, JSON.stringify(index));
     const provider = original.provider(root, exe);
     assert.equal(provider.resolveChoice(body).status, 'none', view);
     assert.deepEqual(choices.map(text => provider.resolveChoice(text).translation), zh.slice(2, 4), view);
-    assert.deepEqual(provider.resolve(view === 'original' ? zh[2] : ja[2]).ruby, [ruby], view);
+    const resolved = provider.resolve(view === 'original' ? zh[2] : ja[2]);
+    assert.deepEqual(resolved.ruby, [ruby], view);
+    assert.equal(resolved.speaker, '読子', view);
     if (view === 'patch') {
       assert.deepEqual(provider.choiceGroupAfter(body, choices.slice().reverse()), choices);
       provider.resolve(body);

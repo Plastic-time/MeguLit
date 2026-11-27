@@ -3,7 +3,7 @@
  if(!document.documentElement||!window.__tomoyoChinese?.openSettings){document.addEventListener('DOMContentLoaded',installMenuLayout,{once:true});return;}
  const bridge=window.__tomoyoChinese;if(bridge.menuLayoutInstalled)return;bridge.menuLayoutInstalled=true;
  const ABOUT_HTML='';
- const categories=[['translate','翻译'],['text','文字'],['calibrate','校准'],['mask','内嵌'],['learn','学习'],['voice','语音'],['log','记录'],['misc','外观'],['about','关于']];
+ const categories=[['translate','翻译'],['text','文字'],['calibrate','校准'],['mask','内嵌'],['learn','学习'],['voice','语音'],['log','记录'],['misc','外观'],['hotkeys','热键'],['about','关于']];
  const style=document.createElement('style');style.textContent=`
  .tomoyo-cn-dialog { --menu-bg:var(--theme-surface,#18181b);--menu-border:var(--theme-border,#34343a);--menu-accent:var(--theme-primary,#e0495a); background:var(--menu-bg)!important;color:var(--theme-text,#e8e9ec)!important;border:1px solid var(--menu-border)!important;border-radius:16px!important;box-shadow:0 16px 60px #0005!important;padding:0!important;width:520px!important;max-width:calc(100vw - 24px)!important;max-height:calc(100vh - 24px)!important;overflow:hidden!important;font:14px/1.55 'Microsoft YaHei',sans-serif!important; }
  .tomoyo-cn-dialog form { display:flex;flex-direction:column;height:min(730px,calc(100vh - 26px));margin:0; }
@@ -156,9 +156,9 @@
   /* 颜色 page (user 2026-11-21: 「重灾区」): no folds; two flat sections, each one compact matrix. Columns are the two states,
      rows are 文字颜色 / 渐变 / 上色 / 下色 / 起点 %. The same inputs (same names, same handlers) are moved into the cells; a colour
      cell is a small swatch whose value is its tooltip; rows of a column whose gradient is off are dimmed. */
-  {const copy={zh:{dlg:'台词（已读 / 未读）',chc:'选项（已选 / 未选）',unread:'未读',read:'已读',unsel:'未选',sel:'已选',colour:'文字颜色',grad:'渐变',top:'上色',bottom:'下色',start:'起点 %'},
-    en:{dlg:'Lines (read / unread)',chc:'Choices (selected / unselected)',unread:'Unread',read:'Read',unsel:'Unselected',sel:'Selected',colour:'Text colour',grad:'Gradient',top:'Top',bottom:'Bottom',start:'Start %'},
-    ja:{dlg:'台詞（既読・未読）',chc:'選択肢（選択済み・未選択）',unread:'未読',read:'既読',unsel:'未選択',sel:'選択済み',colour:'文字色',grad:'グラデーション',top:'上の色',bottom:'下の色',start:'開始 %'}};
+  {const copy={zh:{dlg:'台词（已读 / 未读）',chc:'选项（已选 / 未选）',spk:'分角色',unread:'未读',read:'已读',unsel:'未选',sel:'已选',colour:'文字颜色',grad:'渐变',top:'上色',bottom:'下色',start:'起点 %'},
+    en:{dlg:'Lines (read / unread)',chc:'Choices (selected / unselected)',spk:'By character',unread:'Unread',read:'Read',unsel:'Unselected',sel:'Selected',colour:'Text colour',grad:'Gradient',top:'Top',bottom:'Bottom',start:'Start %'},
+    ja:{dlg:'台詞（既読・未読）',chc:'選択肢（選択済み・未選択）',spk:'キャラ別',unread:'未読',read:'既読',unsel:'未選択',sel:'選択済み',colour:'文字色',grad:'グラデーション',top:'上の色',bottom:'下の色',start:'開始 %'}};
    const C=copy[uiLang]||copy.zh;
    const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null){e.textContent=text;e.dataset.noI18n='';}return e;};
    /* the text panel is not inside the form yet when this runs: look the inputs up in the sections themselves */
@@ -189,7 +189,7 @@
     const reset=[...choiceBox.querySelectorAll(':scope>button')].pop();if(reset){reset.classList.add('tome-cm-link');c.head.append(reset);}
     if(font){font.classList.add('tome-cm-font');c.box.insertBefore(font,c.grid);}choiceBox.append(c.box);}
    /* flat: the two old folds go, their contents sit straight in the colour page */
-   palette.append(d.box,rest);palette.append(choiceBox||c.box);colours.remove();choiceColours.remove();palette.dataset.colourMatrix='';
+   palette.append(d.box,rest);palette.append(choiceBox||c.box);colours.remove();choiceColours.remove();/* 2026-11-28 分角色 (speaker-colors.js fills it): a third group of the colour page, after lines and choices (owner: 「把分角色放进颜色里」) */{const s=block(C.spk,[]);s.grid.remove();s.box.dataset.textSpeakerColors='';palette.append(s.box);}palette.dataset.colourMatrix='';
    const dim=()=>{for(const [i,name] of ['galTextGradient','galReadTextGradient'].entries()){const on=!!field(name)?.checked;for(const cell of d.grid.querySelectorAll('.tome-cm-cell[data-cm-row=g][data-cm-col="'+i+'"]'))cell.classList.toggle('tome-cm-off',!on);}
     for(const cell of palette.querySelectorAll('.tome-cm-cell')){const v=cell.querySelector('input[type=color]');if(v)cell.title=v.value;}};
    form.addEventListener('input',dim);form.addEventListener('change',dim);dim();const tick=setInterval(()=>{if(!document.contains(palette)){clearInterval(tick);return;}dim();},500);
@@ -221,6 +221,9 @@
   placeSize('galJapaneseSize',jp,'galJapaneseFont');placeSize('galChineseSize',cn,'galChineseFont');for(const n of sizes)if(!n.querySelector('[name]'))n.remove();
   const history=document.createElement('details');history.className='tome-calibration-history';history.dataset.noI18n='';history.innerHTML='<summary></summary><div data-calibration-history-list></div>';calibration.append(history);
   group.append(text,calibration,panels.mask);
+  /* 2026-11-27 热键: the same panel as Settings → 热键 (web/hotkeys-panel.js); a key being recorded is let go by the bridge meanwhile */
+  const service=(action,params)=>window.__tomoyoInvoke('service',{request:{action,...params}});
+  window.MeguHotkeys?.mountPanel?.(panels.hotkeys,{lang:()=>window.__tomeI18n?.get?.()||'zh',load:()=>service('hotkeys_get'),save:changes=>service('hotkeys_save',{changes}),pause:paused=>service('hotkeys_pause',{paused})?.catch?.(()=>{})});
   const about=panels.about;about.classList.add('tomoyo-about');about.replaceChildren(window.__tomeAboutPanel?.()||document.createTextNode('MeguLit'));
   for(const n of [...form.children]){
    if(n===footer||n===group)continue;
@@ -228,7 +231,7 @@
    if(n.classList.contains('tomoyo-learning-panel')||n.querySelector('.tomoyo-learning-panel'))panels.learn.append(n);
    else if(n.querySelector('[name=font]')){n.style.display='none';general.append(n);}else panels.translate.append(n);
   }
-  content.append(panels.translate,group,panels.learn,panels.voice,panels.log,panels.misc,panels.about);form.prepend(header,nav,content);if(footer)form.append(footer);
+  content.append(panels.translate,group,panels.learn,panels.voice,panels.log,panels.misc,panels.hotkeys,panels.about);form.prepend(header,nav,content);if(footer)form.append(footer);
   bridge.calibrationMenuOpened?.(dialog);
   // Resizable like a normal window: drag any edge or corner. Size is remembered; double-click an edge to reset.
   // Normal window and translation overlay have very different sizes, so each mode remembers its own menu size.
