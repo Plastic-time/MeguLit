@@ -33,7 +33,7 @@
 | オルフレール | v15563 | 待补 | KiriKiri | 进行中（冷测试连续 5 局通过） | 魚魚棟 · Claude | PR #1291 |
 | Monochrome Empire | v26413 | 待补 | YU-RIS2 | 进行中（选项被隐藏，卡在原生 hook） | 魚魚棟 · Claude | PR #1291 |
 | ハミダシクリエイティブ | v27449 | パッケージ版 | Artemis | 进行中 | 魚魚棟 · Claude | artemis/hamidashi-creative（MeguLit-Adapter） PR #1303 |
-| アイキス3 sexy | v32132 | 豪華版 DVD（r84077）+ Ver.1.03 | NeXAS | 进行中（skeleton：选项被字形隐藏吃掉、句首「漏出，未修） | 魚魚棟 · Claude | nexas/ai-kiss-3-sexy（MeguLit-Adapter） PR #1304 |
+| アイキス3 sexy | v32132 | 豪華版 DVD（r84077）+ Ver.1.03 | NeXAS | 进行中（skeleton，待测试员实测：选项修了未见中文选项上屏） | 魚魚棟 · Claude | nexas/ai-kiss-3-sexy（MeguLit-Adapter） PR #1304 |
 
 ## 进行中
 
@@ -44,5 +44,5 @@
 | 魚魚棟 · Claude | 制服カノジョ3（制服女友3，Unity/TMP）：原文漏出 <space=> 等 TMP 标签且同句重复；回 log 后原文没藏干净、台词消失 | #1248 | fix/unity-tmp-space-backlog | 11-27 | 等 CI + 测试员实测（PR #1309） |
 | 魚魚棟 · Claude | YU-RIS 引擎层：正文 N 倍逐字重复去重、正文线程选择 | — | engine-yuris | 11-26 | 暂停（已提交） |
 | 魚魚棟 · Claude | 模拟器实验：Switch 模拟器（Eden/Ryubing）里读对话文本 + 换成等长空白隐藏原文、选项照常；样本 一部 Switch 乙游 + 海猫 Switch 版（DS 下… | — | exp/emulator-hook | 11-27 | 暂停：磁盘（E 盘剩余空间不足；adapt 下的 swit… |
-| 魚魚棟 · Claude | 适配 アイキス3 sexy（NeXAS，包装版 + 1.03），走 MeguLit-Adapter；写回：光盘自动安装 + GIGA 更新、NeXAS 存档、截图只认本游戏、每游… | #1109 | adapt/aikiss3-sexy | 11-27 | #1304 修选项隐藏中 |
+| 魚魚棟 · Claude | 适配 アイキス3 sexy（NeXAS，包装版 + 1.03）：选项被字形隐藏吃掉（hide.glyphAfterLine）、钩子文本带 @ 控制码（source.stripCodes）、选项 OCR 定位（choice.ocrLoose）；写回适配器（光盘安装、GIGA 更新、testbuild、测试清单等） | #1109 | adapt/aikiss3-sexy | 11-27 | PR #1304 等 CI，待测试员实测（清单 E:\Apps\test-requests\1304-aikiss3.md） |
 
