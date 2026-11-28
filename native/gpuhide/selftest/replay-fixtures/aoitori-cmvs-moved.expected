@@ -1,0 +1,15 @@
+MASK 0.0
+ToMe_PAGE sw=1280 sh=720 awake=0 armed=1 gh=0 own=0 ownr= t=10002	1	4		
+ToMe_GPUHIDE learn seq=1 area=0,302,1280,128 atlas=1024x2048 glyphs=4 chars=4 atlases=1
+ToMe_CHARS engine=gpu line=1 hidden=0 sw=1280 sh=720 vx=0 vy=0 vw=1280 vh=720 n=4 rects=568,334,32,32;596,334,32,32;624,334,32,32;652,334,32,32 text=
+ToMe_GPUHIDE hit seq=1 quads=4 chars=4
+MASK 1.0 0 1 2 3
+ToMe_CHARS engine=gpu line=1 hidden=1 sw=1280 sh=720 vx=0 vy=0 vw=1280 vh=720 n=4 rects=568,334,32,32;596,334,32,32;624,334,32,32;652,334,32,32 text=
+MASK 2.0
+ToMe_PAGE sw=1280 sh=720 awake=0 armed=1 gh=0 own=0 ownr= t=15006	1	4			2	14		
+ToMe_GPUHIDE learn seq=2 area=0,624,1280,128 atlas=1024x2048 glyphs=14 chars=14 atlases=1
+ToMe_CHARS engine=gpu line=2 hidden=0 sw=1280 sh=720 vx=0 vy=0 vw=1280 vh=720 n=14 rects=428,656,32,32;456,656,32,32;484,656,32,32;512,656,32,32;540,656,32,32;568,656,32,32;596,656,32,32;624,656,32,32;652,656,32,32;680,656,32,32;708,656,32,32;736,656,32,32;764,656,32,32;792,656,32,32 text=
+ToMe_GPUHIDE hit seq=2 quads=14 chars=14
+MASK 3.0 0 1 2 3 4 5 6 7 8 9 10 11 12 13
+ToMe_CHARS engine=gpu line=2 hidden=1 sw=1280 sh=720 vx=0 vy=0 vw=1280 vh=720 n=14 rects=428,656,32,32;456,656,32,32;484,656,32,32;512,656,32,32;540,656,32,32;568,656,32,32;596,656,32,32;624,656,32,32;652,656,32,32;680,656,32,32;708,656,32,32;736,656,32,32;764,656,32,32;792,656,32,32 text=
+MASK 4.0 0 1 2 3 4 5 6 7 8 9 10 11 12 13

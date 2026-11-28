@@ -52,6 +52,10 @@ struct ReplayFixture : GlyphLearner {
   Recorded(tape.Mode(read));
   readOnly = read;
  }
+ void BodyRecheck(bool enabled) {
+  Recorded(tape.BodyRecheck(enabled));
+  bodyRecheck = enabled;
+ }
  void Preset(float gh, unsigned w, unsigned h, bool blanks) {
   Recorded(tape.Preset(gh, w, h, blanks));
   GlyphLearner::Preset(gh, w, h);
@@ -65,9 +69,9 @@ struct ReplayFixture : GlyphLearner {
 
 enum class AoitoriLayout { Centered, Moved, Partial };
 
-// Synthetic bubble draws from the Aoitori scope tests. The shared learner's current
-// outputs are captured here, including an early placement that the CMVS patch corrects.
-static void AoitoriCase(ReplayFixture &g, AoitoriLayout layout) {
+// Synthetic bubble draws from the Aoitori scope tests with and without the CMVS option.
+static void AoitoriCase(ReplayFixture &g, AoitoriLayout layout, bool recheck = false) {
+ if (recheck) g.BodyRecheck(true);
  const bool partial = layout == AoitoriLayout::Partial;
  const bool centered = layout == AoitoriLayout::Centered;
  const float top = layout == AoitoriLayout::Moved ? 656.0f : 334.0f;
@@ -130,4 +134,7 @@ static const FixtureCase ReplayFixtures[] = {
  {L"aoitori-centered", [](ReplayFixture &g) { AoitoriCase(g, AoitoriLayout::Centered); }},
  {L"aoitori-moved", [](ReplayFixture &g) { AoitoriCase(g, AoitoriLayout::Moved); }},
  {L"aoitori-partial", [](ReplayFixture &g) { AoitoriCase(g, AoitoriLayout::Partial); }},
+ {L"aoitori-cmvs-centered", [](ReplayFixture &g) { AoitoriCase(g, AoitoriLayout::Centered, true); }},
+ {L"aoitori-cmvs-moved", [](ReplayFixture &g) { AoitoriCase(g, AoitoriLayout::Moved, true); }},
+ {L"aoitori-cmvs-partial", [](ReplayFixture &g) { AoitoriCase(g, AoitoriLayout::Partial, true); }},
 };

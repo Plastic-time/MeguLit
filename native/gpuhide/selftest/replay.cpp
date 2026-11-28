@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ReplayCases.h"
+#include "CmvsUsertestCases.h"
 #include "EngineGpuCases.h"
 #include "EngineLayerCases.h"
 #include <filesystem>
@@ -88,7 +89,7 @@ bool ReadTape(std::istream &in, ReplayInput &tape) {
   case 'P':
    if (!(in >> c.height >> c.bw >> c.bh >> flag) || !Coordinate(c.height, 1000000)) return false;
    break;
-  case 'M': if (!(in >> flag)) return false; break;
+  case 'M': case 'B': if (!(in >> flag)) return false; break;
   case 'O': break;
   default: return false;
   }
@@ -125,6 +126,7 @@ std::string Run(const ReplayInput &tape) {
   case 'F': learner.Frame(c.tick, c.bw, c.bh); out.EndFrame(); break;
   case 'P': learner.Preset(c.height, c.bw, c.bh); if (c.flag) learner.pageBlankQuads = true; break;
   case 'M': learner.readOnly = c.flag; break;
+  case 'B': learner.bodyRecheck = c.flag; break;
   case 'O': learner.Off(); break;
   }
  }
@@ -201,6 +203,7 @@ void CheckFormat() {
        "MEGULIT_GPU_REPLAY 1\nO\n",                             // truncated
        "MEGULIT_GPU_REPLAY 1\nL 10000 1 65\nEND complete\n",   // literal text
        "MEGULIT_GPU_REPLAY 1\nM 2\nEND complete\n",            // invalid flag
+       "MEGULIT_GPU_REPLAY 1\nB 2\nEND complete\n",
        "MEGULIT_GPU_REPLAY 1\nC 1 1 0 0 1e9 1 0 0 1 1 0\nEND complete\n",
        "MEGULIT_GPU_REPLAY 1\nD 1 1 0 1 32 32 32 32 32 32 0 0\nD 2 1 0 2 32 32 32 32 32 32 0 0\nEND complete\n",
        "MEGULIT_GPU_REPLAY 1\nD 1 1 0 1 32 32 32 32 32 32 0 0\nD 2 2 0 1 32 32 32 32 32 32 0 0\nEND complete\n",
@@ -285,6 +288,11 @@ void Fixtures(const std::filesystem::path &dir, bool generate, const std::wstrin
  };
  bool matched = false;
  for (const auto &fixture : ReplayFixtures) {
+  if (!only.empty() && only != fixture.name) continue;
+  checkGpu(fixture);
+  matched = true;
+ }
+ for (const auto &fixture : CmvsUsertest::Cases) {
   if (!only.empty() && only != fixture.name) continue;
   checkGpu(fixture);
   matched = true;
