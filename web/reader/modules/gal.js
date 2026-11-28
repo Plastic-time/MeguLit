@@ -222,7 +222,6 @@
     body.tomoyo-gal-none :is(.sentence-text,.tomoyo-cn-row) { visibility:hidden!important; }
     body.megulit-composited :is(.sentence-window,.sentence-text,.tomoyo-cn-row) { visibility:hidden!important; } /* the compositor owns the game's text: no overlay dialogue at all */
     body.tomoyo-gal-zh-only .tomoyo-cn-row { margin-top:0!important; }
-    body.tomoyo-gal-mask .sentence-window { background:var(--tomoyo-gal-mask,#171923)!important; }
     body.tomoyo-game-style .sentence-text .char-token,body.tomoyo-game-style .tomoyo-cn-output,body.tomoyo-gal-bound .sentence-text .char-token,body.tomoyo-gal-bound .tomoyo-cn-output {
       background-image:var(--tomoyo-gal-gradient,none)!important;background-clip:text!important;-webkit-background-clip:text!important;
       -webkit-text-fill-color:var(--tomoyo-gal-fill,currentColor)!important;
@@ -627,7 +626,6 @@
     root.setProperty('--tomoyo-gal-gradient',unreadPaint.gradient);root.setProperty('--tomoyo-gal-fill',unreadPaint.fill);
     root.setProperty('--tomoyo-gal-read-gradient',readPaint.gradient);root.setProperty('--tomoyo-gal-read-fill',readPaint.fill);
     root.setProperty('--tomoyo-gal-shadow', appearance.shadowFor(preferences.textColor, preferences.shadow));
-    root.setProperty('--tomoyo-gal-mask', preferences.maskColor);
     if (preferences.style !== 'custom') {
       root.setProperty('--tomoyo-gal-jp-font', appearance.fonts[preferences.style].ja);
       root.setProperty('--tomoyo-gal-cn-font', appearance.fonts[preferences.style].zh);
@@ -644,7 +642,7 @@
     bridge.setTranslationVisible(preferences.display !== 'japanese' && preferences.display !== 'none');
     bridge.cardinalPair?.refresh();
     document.body.classList.toggle('tomoyo-gal-bound', bound);
-    document.body.classList.toggle('tomoyo-gal-mask', bound && preferences.maskMode === 'full');bridge.islandPage?.refresh();
+    bridge.islandPage?.refresh();
     markReader();
     alignText();
     bridge.applyTransparency?.();
@@ -677,9 +675,9 @@
   // Values applied from outside the menu (style sync, saved game style) also go into an open menu's fields and its
   // saved snapshot; otherwise the next preview would rebuild settings from the stale fields (the synced colour turned
   // back to black as soon as the outline was touched) and Cancel would undo the sync.
-  let syncingForm=false;
+  let syncingForm=false,colourTouched=false;
   const syncOpenForm = values => { const dialog = document.querySelector('.tomoyo-cn-dialog[open]'); if (!dialog) return;
-    syncingForm=true;try{for (const [key, value] of Object.entries(values)) {
+    if('colorSource' in values)colourTouched=false;syncingForm=true;try{for (const [key, value] of Object.entries(values)) {
      // The same two controls edit either the box position or the offset from the game glyph.
      // A calibration can update both pairs while the menu is open. Only display the pair the form will read.
      const name = key === 'translationSize' ? 'ChineseSize' : key[0].toUpperCase()+key.slice(1);
@@ -859,7 +857,6 @@
       <small class="tomoyo-hotkey-hint">开启后游戏文本框直接显示译文，位置和字体都由游戏自己处理；Alt+H 只开关 MeguLit 自己的显示，不影响游戏写回的译文</small>
       <small class="tomoyo-hotkey-hint" data-mask-hotkey><kbd>Alt+H</kbd> 随时一键关闭 / 恢复内嵌（连同全部 MeguLit 覆盖），用来对比游戏原文；开着「译文由游戏自己显示」时，游戏里的译文不受 Alt+H 影响，只由这个开关控制</small>
       <div data-gal-hook-options><label>对话文本流<select name="galHookThread"><option value="">先绑定游戏并推进一句</option></select></label><button type="button" data-gal-hook-select>使用这条对话流</button><div class="tomoyo-hook-state" role="status"></div><small>选择前请核对内容是完整对话。仅读取的流可以显示台词，不能清空游戏原文；可清空的流仅在覆盖模式启用替换。Alt+H 隐藏覆盖会关闭替换，台词读取继续。</small></div>
-      <label data-gal-full-color>整块底板颜色<input type="color" name="galMaskColor"></label>
       <label><input name="galRelocateWaitMarker" type="checkbox">将原等待符移到 MeguLit 句末</label>
       <label><input name="galHideWaitMarker" type="checkbox">隐藏点击等待图标</label>
       <details><summary>局部模糊与原文字扫描范围</summary>
@@ -977,7 +974,7 @@
      style:'galStyle', display:'galDisplay', translationInline:'galTranslationInline', japaneseOneLine:'galJapaneseOneLine', translationSize:'galChineseSize', textColor:'galTextColor', shadow:'galShadow', autoScale:'galAutoScale', lineHeight:'galLineHeight',
      translationLineHeight:'galTranslationLineHeight', japaneseSpacingPx:'galJapaneseSpacingPx', chineseSpacingPx:'galChineseSpacingPx', rubyScale:'galRubyScale',
      rubyOffsetX:'galRubyOffsetX',rubyOffsetY:'galRubyOffsetY',rubyRowOffsets:'galRubyRowOffsets',rubyRowOffsetsX:'galRubyRowOffsetsX',embedTranslation:'galEmbedTranslation',
-     gap:'galGap', translationWidth:'galTranslationWidth', paddingX:'galPaddingX', paddingY:'galPaddingY', autoGameStyle:'galAutoGameStyle', maskColor:'galMaskColor',
+     gap:'galGap', translationWidth:'galTranslationWidth', paddingX:'galPaddingX', paddingY:'galPaddingY', autoGameStyle:'galAutoGameStyle',
      maskMode:'galMaskMode', scanX:'galScanX', scanY:'galScanY', scanWidth:'galScanWidth', scanHeight:'galScanHeight', blurRadius:'galBlurRadius', maskPadding:'galMaskPadding',
      fastMask:'galFastMask', maskStyle:'galMaskStyle', japaneseBold:'galJapaneseBold', chineseBold:'galChineseBold', translationBlur:'galTranslationBlur' };
     for(const [key] of fields)additional['english'+key[0].toLowerCase()+key.slice(1)]='galEnglish'+key;
@@ -1085,7 +1082,14 @@
     bridge.galStatus({hookMessage:bridge.hookMessage||'选择 Hook 后会检查本地组件；尚未选择对话流时不会清空文字',hookThreads:bridge.hookThreads||[]});
     group.querySelector('[data-gal-hook-select]').onclick=()=>send({type:'hookSelect',id:f('galHookThread').value});
     dialogFields.maskState.textContent = bridge.maskMessage || '局部遮字会在绑定游戏并收到原文后启动';
-    const current = () => appearance.clean({ ...preferences, readTextColor: f('galReadTextColor').value.toLowerCase() === f('galTextColor').value.toLowerCase() ? '' : f('galReadTextColor').value,
+    /* a text colour picked in this menu (an input on one of the colour controls, not a value the menu was filled with) is the user's:
+       it paints every line from now on, over the game's (game-style.js colorSource). Picking counts, not comparing values: a calibrated
+       read colour equal to the unread one reads back as '' and is no change, and the same colour picked again still marks it. */
+    const colourFields = new Set(['galTextColor','galReadTextColor','galTextGradient','galTextGradientTop','galTextGradientBottom','galTextGradientStart','galReadTextGradient','galReadTextGradientTop','galReadTextGradientBottom','galReadTextGradientStart']);
+    const touchColour = e => { if (!syncingForm && colourFields.has(e.target?.name)) colourTouched = true; };
+    group.addEventListener('input', touchColour, true); group.addEventListener('change', touchColour, true);
+    const current = () => { const form = currentForm(); return colourTouched ? appearance.clean({ ...form, colorSource:'user' }) : form; };
+    const currentForm = () => appearance.clean({ ...preferences, readTextColor: f('galReadTextColor').value.toLowerCase() === f('galTextColor').value.toLowerCase() ? '' : f('galReadTextColor').value,
      furigana: f('galFurigana').checked, japaneseSize: Number(f('galJapaneseSize').value), sizeSource: Number(f('galJapaneseSize').value)!==preferences.japaneseSize||Number(f('galChineseSize')?.value??preferences.translationSize)!==preferences.translationSize?'user':preferences.sizeSource,
       ...(fieldsAreOffset ? { x: preferences.x, y: preferences.y, anchorDX: Number(f('galX').value) || 0, anchorDY: Number(f('galY').value) || 0 } : { x: Number(f('galX').value), y: Number(f('galY').value), anchorDX: Number(preferences.anchorDX) || 0, anchorDY: Number(preferences.anchorDY) || 0 }), width: Number(f('galWidth').value), height: Number(f('galHeight').value),
       ...Object.fromEntries(Object.entries(additional).map(([key,name]) => [key, typeof defaults[key] === 'boolean' ? f(name).checked : f(name).value])) });
@@ -1093,8 +1097,8 @@
      if(event?.type==='submit'&&dialog.dataset.menuTab==='calibrate'&&bridge.saveGameProfileFromMenu){event.preventDefault();event.stopImmediatePropagation();bridge.saveGameProfileFromMenu(preferences);
      return;} if(preferences.textColor.toLowerCase()!==committed.textColor.toLowerCase()){previousColor=committed.textColor;localStorage.setItem(colorHistoryKey,
      previousColor);colorUndo.disabled=false;} committed = { ...preferences }; localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...preferences,translationPrompt:undefined,anchorDX:undefined,anchorDY:undefined}));
-     send({ type: 'galConfigure', settings: preferences }); bridge.saveGameProfileFromMenu?.(preferences); apply(); };
-    const updateMaskForm = () => { group.querySelector('[data-gal-full-color]').hidden = f('galMaskMode').value !== 'full';group.querySelector('[data-gal-hook-options]').hidden=f('galMaskMode').value!=='hook';
+     send({ type: 'galConfigure', settings: preferences }); bridge.saveGameProfileFromMenu?.(preferences); colourTouched=false; apply(); };
+    const updateMaskForm = () => { group.querySelector('[data-gal-hook-options]').hidden=f('galMaskMode').value!=='hook';
      };
     updateMaskForm();
     let previewFrame=0;
@@ -1192,7 +1196,7 @@
      if (fieldsAreOffset) { const was = syncingForm; syncingForm = true; try { f('galX').value = 0; f('galY').value = 0; for (const update of sliderOutputs) update(); } finally { syncingForm = was; } }
      committed = { ...preferences }; send({ type: 'galConfigure', settings: preferences }); bridge.saveGameProfileFromMenu?.(preferences); apply(); };
     form.addEventListener('submit', save, true);
-    dialog.addEventListener('close', () => { if(previewFrame){cancelAnimationFrame(previewFrame);previewFrame=0;}/* issue 468 (寒蝉: Alt+T 里调小字号，一关设置又变大): a text size changed in the menu is the user's size, kept on close like the home settings' size (same value, sizeSource user); other unsaved edits are still dropped */{const size={japaneseSize:Number(f('galJapaneseSize')?.value),translationSize:Number(f('galChineseSize')?.value??committed.translationSize)};if(Number.isFinite(size.japaneseSize)&&Number.isFinite(size.translationSize)&&(size.japaneseSize!==committed.japaneseSize||size.translationSize!==committed.translationSize)){committed=appearance.clean({...committed,...size,sizeSource:'user'});localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...committed,translationPrompt:undefined,anchorDX:undefined,anchorDY:undefined}));send({ type: 'galConfigure', settings: committed });bridge.saveGameProfileFromMenu?.(committed);}}preferences = {...committed,interfaceMode:preferences.interfaceMode};
+    dialog.addEventListener('close', () => { if(previewFrame){cancelAnimationFrame(previewFrame);previewFrame=0;}colourTouched=false;/* issue 468 (寒蝉: Alt+T 里调小字号，一关设置又变大): a text size changed in the menu is the user's size, kept on close like the home settings' size (same value, sizeSource user); other unsaved edits are still dropped */{const size={japaneseSize:Number(f('galJapaneseSize')?.value),translationSize:Number(f('galChineseSize')?.value??committed.translationSize)};if(Number.isFinite(size.japaneseSize)&&Number.isFinite(size.translationSize)&&(size.japaneseSize!==committed.japaneseSize||size.translationSize!==committed.translationSize)){committed=appearance.clean({...committed,...size,sizeSource:'user'});localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...committed,translationPrompt:undefined,anchorDX:undefined,anchorDY:undefined}));send({ type: 'galConfigure', settings: committed });bridge.saveGameProfileFromMenu?.(committed);}}preferences = {...committed,interfaceMode:preferences.interfaceMode};
      dialogFields = null;commitSynchronizedStyle=null;/* 2026-11-16 Alt+T: closing only drops the menu's unsaved edits; re-sending the snapshot as a preview turned the embed off */if(bound)send({type:'galPreviewEnd'});setTimeout(()=>send({ type: 'galMenu', open: !!document.querySelector('.tomoyo-cn-dialog[open],.tome-backlog[data-open],.tomoyo-cn-dialog[data-leaving],.tome-backlog[data-leaving]') }),
      340);apply(); }, { once: true });
     send({ type: 'galWindows' }); send({ type: 'galMenu', open: true });

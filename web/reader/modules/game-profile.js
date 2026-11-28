@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.TomeGameProfile=api;})(typeof globalThis==='object'?globalThis:this,function(){
  'use strict';
- const textKeys=['choiceFont','choiceSelectedColor','choiceUnselectedColor','choiceCnColor','choiceCnScale','choiceCnFont','choiceCnX','choiceCnY','choiceRubyScale','choiceRubyFont','choiceRubyX','choiceRubyY','autoGameStyle','typewriter','typewriterSpeed','style','display','translationInline','japaneseOneLine','japaneseSize','translationSize','japaneseSpacingPx','chineseSpacingPx','lineHeight','lineHeightMode','translationLineHeight','gap','translationWidth','textColor','readTextColor','speechTextColor','narrationTextColor','textGradient','textGradientTop','textGradientBottom','textGradientStart','readTextGradientStart','readTextGradient','readTextGradientTop','readTextGradientBottom','shadow','japaneseFont','japaneseFontSource','chineseFont','rubyFont','englishFont','englishEnabled','englishSize','englishSpacingPx','englishBold','englishOutline','englishOutlineColor','englishOutlineWidth','japaneseBold','chineseBold','japaneseOutline','chineseOutline','japaneseOutlineColor','chineseOutlineColor','japaneseOutlineWidth','chineseOutlineWidth','rubyOutline','rubyOutlineColor','rubyOutlineWidth','rubyScale','rubyOffsetX','rubyOffsetY','rubyRowOffsets','rubyRowOffsetsX','furigana','autoScale','sizeSource'];
+ const textKeys=['choiceFont','choiceSelectedColor','choiceUnselectedColor','choiceCnColor','choiceCnScale','choiceCnFont','choiceCnX','choiceCnY','choiceRubyScale','choiceRubyFont','choiceRubyX','choiceRubyY','autoGameStyle','typewriter','typewriterSpeed','style','display','translationInline','japaneseOneLine','japaneseSize','translationSize','japaneseSpacingPx','chineseSpacingPx','lineHeight','lineHeightMode','translationLineHeight','gap','translationWidth','textColor','colorSource','readTextColor','speechTextColor','narrationTextColor','textGradient','textGradientTop','textGradientBottom','textGradientStart','readTextGradientStart','readTextGradient','readTextGradientTop','readTextGradientBottom','shadow','japaneseFont','japaneseFontSource','chineseFont','rubyFont','englishFont','englishEnabled','englishSize','englishSpacingPx','englishBold','englishOutline','englishOutlineColor','englishOutlineWidth','japaneseBold','chineseBold','japaneseOutline','chineseOutline','japaneseOutlineColor','chineseOutlineColor','japaneseOutlineWidth','chineseOutlineWidth','rubyOutline','rubyOutlineColor','rubyOutlineWidth','rubyScale','rubyOffsetX','rubyOffsetY','rubyRowOffsets','rubyRowOffsetsX','furigana','autoScale','sizeSource'];
  const positionKeys=['x','y','width','height','paddingX','paddingY','livePosition','anchorDX','anchorDY'];
  // 内嵌 panel: original-text hiding, mask/scan, Hook switches and the wait marker are per work too (user, 2026-11-02).
- const embedKeys=['maskMode','embedTranslation','maskModeSource','maskStyle','maskColor','maskPadding','blurRadius','fastMask','scanAuto','scanX','scanY','scanWidth','scanHeight','hideWaitMarker','relocateWaitMarker','waitCoverStyle','hookProfile','hookHide','hookAutoStart','hookFast'];
+ const embedKeys=['maskMode','embedTranslation','maskModeSource','maskStyle','maskPadding','blurRadius','fastMask','scanAuto','scanX','scanY','scanWidth','scanHeight','hideWaitMarker','relocateWaitMarker','waitCoverStyle','hookProfile','hookHide','hookAutoStart','hookFast'];
  // 'base' = text+position (they have defaults); 'all' adds embed, which falls back to the current value, not a default.
  const keysOf=kind=>kind==='text'?textKeys:kind==='position'?positionKeys:kind==='embed'?embedKeys:kind==='base'?[...textKeys,...positionKeys]:[...textKeys,...positionKeys,...embedKeys];
  function pick(p,kind='all'){const out={};for(const k of keysOf(kind))if(p&&p[k]!==undefined&&['number','boolean','string'].includes(typeof p[k]))out[k]=p[k];return out;}
@@ -17,6 +17,7 @@
     when it was chosen for it (Alt+T, a calibration, its own page in Settings): a size equal to the global one that the work did not
     already hold is left out, and the work follows Settings. sizes:1 marks entries written under this rule. */
  const sizeKeys=['japaneseSize','translationSize','englishSize'];
+ const colourKeys=['textColor','readTextColor','speechTextColor','narrationTextColor','textGradient','textGradientTop','textGradientBottom','readTextGradient','readTextGradientTop','readTextGradientBottom'];
  function ownSizes(prefs,base,owned){const out={...prefs},has=k=>!!owned&&Object.hasOwn(owned,k);let kept=false;
   for(const k of sizeKeys){if(!(k in out))continue;if(!has(k)&&Number(out[k])===Number(base?.[k]))delete out[k];else kept=true;}
   if(!kept&&'sizeSource' in out&&!has('sizeSource'))delete out.sizeSource;return out;}
@@ -30,6 +31,9 @@
   if(entry.sizes!==1){const held=sizeKeys.filter(k=>k in prefs);
    if(prefs.sizeSource!=='user'&&held.every(k=>Number(prefs[k])===legacySizes[k]))for(const k of held)delete prefs[k];
    if(!sizeKeys.some(k=>k in prefs))delete prefs.sizeSource;}
+  /* colours a work holds without the colorSource mark were measured or copied for it, not picked: they follow the game, and a mark
+     set in Settings for every work does not lock them (2026-11-29) */
+  if(!('colorSource' in prefs)&&colourKeys.some(k=>k in prefs))prefs.colorSource='';
   return {...entry,prefs,textSavedAt,positionSavedAt,history,sizes:1};}
  const copy=v=>v==null?null:JSON.parse(JSON.stringify(v));
  const canonical=v=>JSON.stringify(Object.fromEntries(Object.entries(v||{}).sort(([a],[b])=>a.localeCompare(b))));
