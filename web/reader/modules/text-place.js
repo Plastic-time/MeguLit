@@ -37,7 +37,7 @@
        selector) moved the full-window sentence off the surface's top; a placed page's sentence sits exactly at 0,0 */
     'html body.megulit-placed .sentence-window.megulit-place-window .sentence-text:not(#megulit-x){margin:0!important;top:0!important;left:0!important}',
     '.megulit-anchor-window.megulit-anchor-center .sentence-text,.megulit-anchor-window.megulit-anchor-center .tomoyo-cn-row,.megulit-anchor-window.megulit-anchor-center .tomoyo-cn-output,.megulit-anchor-window.megulit-anchor-center .tome-page-lines{text-align:center!important;text-align-last:center!important}',
-    '.megulit-anchor-window .sentence-text{position:relative}',
+    '.megulit-anchor-window .sentence-text{position:relative;scale:var(--megulit-anchor-scale,none)}',
     'body.megulit-place-gone .sentence-window.tomoyo-hook-reader,body.megulit-place-gone .sentence-window.tomoyo-hook-reader *{opacity:0!important;visibility:hidden!important}', /* 2026-11-20 (CHAOS;CHILD: the game cleared its text at a scene change, the old line stayed): gone with the game's line until the next one */
     '.megulit-anchor-window .tome-page-lines{opacity:.6;position:absolute;left:0;right:0;bottom:100%}',
     '.megulit-anchor-window.megulit-page-fresh .tome-page-lines{display:none!important}',
@@ -134,14 +134,15 @@
     return own && own.isConnected ? own : document.querySelector('.sentence-window');
   }
   /* the reader's own layout, its first character on the anchor */
-  function pin(win, sentence) {
+  function pin(win, sentence, fitRow = null) {
     if (!anchor || !win || !sentence) return;
     document.body.classList.add('megulit-anchored'); win.classList.add('megulit-anchor-window');
     for (const p of ['left', 'top']) win.style.removeProperty(p);
     /* 2026-11-21 (owner's recording: the translation jumped back and forth while a slider moved): the rows a previous frame closed
        up are opened before anything is measured, so every frame places the line from the same layout and decides once */
     const row = win.querySelector('.tomoyo-cn-row');
-    sentence.style.removeProperty('line-height'); row?.style.removeProperty('margin-top'); row?.style.removeProperty('translate');
+    sentence.style.removeProperty('line-height'); sentence.style.removeProperty('--megulit-anchor-scale');
+    row?.style.removeProperty('margin-top'); row?.style.removeProperty('translate');
     const tok = sentence.querySelector('.char-token'), wr = win.getBoundingClientRect(), tr = tok?.getBoundingClientRect();
     /* 2026-11-19 (user: 「左右留白和边距现在都调整不了文本框位置了」): in anchored mode the box position fields are the line's offset
        from the game's own place, saved with the game's profile (anchorDX/anchorDY, client %, 0 = on the game's first character);
@@ -151,7 +152,24 @@
     const cx0 = info0?.clientWidth ? (info0.clientX || 0) / dpr0 : 0, cy0 = info0?.clientHeight ? (info0.clientY || 0) / dpr0 : 0;
     const offX = Math.max(cx0 - anchor[0], Math.min(cx0 + cwc - 40 - anchor[0], (Number(pr.anchorDX) || 0) / 100 * cwc)), offY = Math.max(cy0 - anchor[1], Math.min(cy0 + chc - 40 - anchor[1], (Number(pr.anchorDY) || 0) / 100 * chc));
     appliedOffset = {x:offX / cwc * 100, y:offY / chc * 100};
-    if (tr && tr.width && anchor.center) { set(win, 'left', (anchor[0] + offX - wr.width / 2) + 'px'); set(win, 'top', (wr.top + anchor[1] + offY - tr.top) + 'px'); set(win, 'right', 'auto'); set(win, 'bottom', 'auto'); set(win, 'margin', '0'); }
+    const inlineTranslation = pr.translationInline && win.matches(inline);
+    const tokenBounds = () => {
+      const rects = [...sentence.querySelectorAll('.char-token')].filter(t => !t.closest('.tome-page-lines')).map(t => t.getBoundingClientRect()).filter(r => r.width > 0);
+      return rects.length ? [Math.min(...rects.map(r => r.left)), Math.max(...rects.map(r => r.right))] : null;
+    };
+    let left = anchor[0] - wr.width / 2;
+    if (tr?.width && fitRow && !inlineTranslation) {
+      const bounds = tokenBounds();
+      const width = bounds ? bounds[1] - bounds[0] : 0;
+      const fitWidth = fitRow.r - fitRow.l;
+      if (fitWidth > 0 && width > fitWidth) {
+        // Fit the bottom row horizontally while keeping the configured font height and wrapping.
+        sentence.style.setProperty('--megulit-anchor-scale', (fitWidth / width) + ' 1');
+        const [jpLeft, jpRight] = tokenBounds();
+        left = wr.left + (fitRow.l + fitRow.r - jpLeft - jpRight) / 2;
+      }
+    }
+    if (tr && tr.width && anchor.center) { set(win, 'left', (left + offX) + 'px'); set(win, 'top', (wr.top + anchor[1] + offY - tr.top) + 'px'); set(win, 'right', 'auto'); set(win, 'bottom', 'auto'); set(win, 'margin', '0'); }
     else if (tr && tr.width) { set(win, 'left', (wr.left + anchor[0] + offX - tr.left) + 'px'); set(win, 'top', (wr.top + anchor[1] + offY - tr.top) + 'px'); set(win, 'right', 'auto'); set(win, 'bottom', 'auto'); set(win, 'margin', '0'); }
     /* 2026-11-19 (user, windowed 千恋＊万花: 「不要再挤压我的汉字了 我窗口化呢 只要显示器上还有位置就不要这样」): the translation keeps the
        user's size and goes on below the game window as long as the monitor's work area has room (the overlay spans the desktop);
@@ -160,7 +178,7 @@
        (appearance and this game's style profile): 2026-11-19 (user, windowed 千恋＊万花: 「为啥译文一直有投影，很重很烦还关不掉」) the
        automatic heavy shadow over the game's bottom bar is gone. */
     const parts = row ? [...row.querySelectorAll('*')] : [];
-    if (pr.translationInline && win.matches(inline)) {
+    if (inlineTranslation) {
       const limit = Math.min(innerWidth, cx0 + cwc);
       set(win, 'max-width', Math.max(40, limit - Math.max(cx0, win.getBoundingClientRect().left)) + 'px');
       return;
@@ -170,8 +188,8 @@
        2026-11-26 (QQ essence 1137, integration live test on 死に逝く君: the anchored line ignored 译文换行宽度): a wrap width the user changed from its
        default is the translation's width here too (% of the game client, inside the room right of the line); the default keeps the Japanese width */
     if (row) { for (const p of ['max-width', 'margin-left', 'margin-right']) row.style.removeProperty(p);
-      const toks = [...sentence.querySelectorAll('.char-token')].filter(t => !t.closest('.tome-page-lines')).map(t => t.getBoundingClientRect()).filter(r => r.width > 0);
-      if (toks.length) { const l = Math.min(...toks.map(r => r.left)), r = Math.max(...toks.map(r => r.right)), rr = row.getBoundingClientRect(), own = userRowLayout(pr), w = own.width > 0 ? Math.max(80, Math.min(anchor.center ? cwc - 16 : cx0 + cwc - l - 8, cwc * own.width / 100)) : Math.max(r - l, wr.width * .5);
+      const bounds = tokenBounds();
+      if (bounds) { const [l, r] = bounds, rr = row.getBoundingClientRect(), own = userRowLayout(pr), w = own.width > 0 ? Math.max(80, Math.min(anchor.center ? cwc - 16 : cx0 + cwc - l - 8, cwc * own.width / 100)) : Math.max(r - l, wr.width * .5);
         set(row, 'max-width', Math.ceil(w) + 'px'); if (anchor.center) { set(row, 'margin-left', 'auto'); set(row, 'margin-right', 'auto'); } else set(row, 'margin-left', Math.max(0, Math.round(l - rr.left)) + 'px'); } }
     for (const o of row ? [row, ...parts] : []) o.style.removeProperty('font-size');
     const cnBase = row ? parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16 : 16; // All fit passes share the user's 85% floor
@@ -269,7 +287,7 @@
     for (const br of document.querySelectorAll('br.megulit-row-br,br.megulit-cn-br')) br.remove();
     for (const w of document.querySelectorAll('.megulit-anchor-center,.megulit-page-fresh')) w.classList.remove('megulit-anchor-center', 'megulit-page-fresh');
     for (const w of document.querySelectorAll('.megulit-anchor-window')) w.style.removeProperty('max-width');
-    for (const w of document.querySelectorAll('.megulit-anchor-window')) { w.classList.remove('megulit-anchor-window', 'megulit-game-rows', 'megulit-rows-predicted'); w.style.removeProperty('--megulit-centre-width'); const cr = w.querySelector('.tomoyo-cn-row'); if (cr) for (const p of ['max-width', 'margin-left', 'margin-right', 'max-height', 'overflow-y', 'overscroll-behavior', 'translate']) cr.style.removeProperty(p); for (const p of ['left', 'top', 'right', 'bottom', 'margin']) w.style.removeProperty(p); w.querySelector('.sentence-text')?.style.removeProperty('line-height'); }
+    for (const w of document.querySelectorAll('.megulit-anchor-window')) { w.classList.remove('megulit-anchor-window', 'megulit-game-rows', 'megulit-rows-predicted'); w.style.removeProperty('--megulit-centre-width'); const cr = w.querySelector('.tomoyo-cn-row'); if (cr) for (const p of ['max-width', 'margin-left', 'margin-right', 'max-height', 'overflow-y', 'overscroll-behavior', 'translate']) cr.style.removeProperty(p); for (const p of ['left', 'top', 'right', 'bottom', 'margin']) w.style.removeProperty(p); const s = w.querySelector('.sentence-text'); for (const p of ['line-height', '--megulit-anchor-scale']) s?.style.removeProperty(p); }
     document.body.classList.toggle('megulit-place-fallback', fallback === true);
     for (const w of document.querySelectorAll('.megulit-place-window')) {
       w.classList.remove('megulit-place-window');
@@ -987,7 +1005,11 @@
         const predict = centred && centreWidth > size * 4 && shown.some((t, j) => !(rows.rowOf[j] >= 0));
         win.classList.toggle('megulit-rows-predicted', predict); if (predict) win.style.setProperty('--megulit-centre-width', Math.round(centreWidth) + 'px'); else win.style.removeProperty('--megulit-centre-width'); }
       cnRows(win, shown, rows);
-      pin(win, sentence);
+      // Use the two-glyph bottom strip for stand-alone rows. Leave retained page lines at their own width.
+      const first = rows.rows[0];
+      const bottomRow = !line.fallback && rowsFresh && Number.isFinite(rows.center) && rows.rows.length === 1 &&
+        rows.rowOf.every(i => i === 0) && first.t + firstBox[3] * 2 >= map.bounds[3] - 1;
+      pin(win, sentence, bottomRow ? first : null);
       return;
     }
     document.body.classList.remove('megulit-place-fallback');
