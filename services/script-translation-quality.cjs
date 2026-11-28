@@ -19,10 +19,10 @@ function translationQuality(index,localLines){
 }
 // Options are queried independently of the moving dialogue cursor. When the
 // capture provides only a label, all its possible slots must agree.
-function choiceLookup(japanese,chinese,roles){
+function choiceLookup(japanese,chinese,roles,identityRoles=roles){
  if(!chinese?.length)return ()=>({status:'none'});
  let labels;
- const classified=roles&&/[bc]/.test(roles);
+ const classified=identityRoles&&/[bc]/.test(identityRoles);
  const key=text=>String(text||'').replace(/\s+/g,'');
  return function resolveChoice(text){
   if(!labels){
