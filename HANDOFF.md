@@ -41,6 +41,8 @@
 
 | 谁 | 做什么 | issue | 分支 | 开始 | 状态 |
 |---|---|---|---|---|---|
+| 魚魚棟 · Claude（服务器/官网/账号/CI） | api.megulit.com 撞 1027（免费 Workers 每天 10 万次用完）：测试不连线上、缩略图走 R2 公共域名 img.megulit.com、The Seed 少重连、额度用完提示「北京时间 8 点恢复」并停止重试 | — | fix/tests-offline、fix/relay-quota、fix/daily-thumbs、fix/seed-live-quiet | 11-29 | 等 CI（PR #1432 优先、#1431、#1433、#1434）；relay 北京时间 8 点后部署（0043、0044 迁移 + #1435） |
+| 魚魚棟 · Claude（服务器/官网/账号/CI） | 偶发失败的测试：learning-responsive 计时、五十音、SoftPal 文件锁、YU-RIS update.ypf、首页换卡、传火碑 200ms | — | fix/flaky-softpal-yuris、fix/flaky-kana-homecard、fix/flaky-learning-torch | 11-29 | 在做 |
 | 魚魚棟 · Claude | 剧本说话人接进索引（第一批）：CatSystem2、SoftPal、CMVS 读取器输出 who，名字不再当成正文行 | — | fix/script-who-batch1 | 11-29 | 在做 |
 | 魚魚棟 · Claude | 知识入口整理：新增 docs/README.md 总目录、精简 AGENTS.md（细则挪进 docs/dev-rules.md、docs/architecture.md） | — | docs/agents-slim、docs/readme-toc | 11-29 | 等合并（PR #1440 AGENTS 精简，需 RRFZ 过目；#1441 docs 目录） |
 | 魚魚棟 · Claude | 隐藏原文时原文第二行露出（たいせつなきみのために、ぼくにできるいちばんのこと（只要你不再悲伤），Ciel 逐字 TextOutA，GDI 隐藏的单字 3 秒窗口过后没藏）：Ciel 引擎在 hook DLL 里开「按台词顺序续藏」 | — | fix/taisetsuna-second-line | 11-29 | 等 CI（PR #1443） |
