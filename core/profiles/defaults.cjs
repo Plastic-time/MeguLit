@@ -27,9 +27,10 @@ module.exports={
      [] = the kernel: a short piece follows the label rule (kanji / katakana pieces go back unchanged) */
   embedGlyphPieces:[],
   /* 2026-11-28 (アオイトリ, CMVS: one context of the dialogue hook sends only the glyphs drawn for the first time, its sibling the whole
-     line 1-10 ms later) HookBridge watches same-hook siblings for a first-glyph context: an all-new early line of the selected stream
-     waits up to 60 ms for the sibling's line, and the whole-line sibling takes the selection (native/HookBridge.cs FirstGlyphSwitch).
-     false = the kernel: lines are handled at once and no sibling is preferred for it */
+     line 1-10 ms before or after it) HookBridge watches same-hook siblings for a first-glyph context: an all-new early line of the
+     selected stream waits up to 60 ms for the sibling's line, the whole-line sibling takes the selection in either order
+     (native/HookBridge.cs FirstGlyphLine), and a short quoted first line (『ねえ』) can be auto-selected.
+     false = the kernel: lines are handled at once, no sibling is preferred, the first line needs four kana or kanji */
   firstGlyphSiblings:false,
   siglusDbsNameColumn:null,
   /* 2026-11-27 MeguLit-Adapter: how this game's built-in version layer is found. 'exe' = the kernel as before: only the exe's
