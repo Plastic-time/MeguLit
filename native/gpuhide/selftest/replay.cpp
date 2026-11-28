@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ReplayCases.h"
+#include "EngineGpuCases.h"
+#include "EngineLayerCases.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -250,27 +252,58 @@ void CheckFormat() {
  Require(prefix.limited && prefix.calls.size() == MaxEvents, "bounded capture did not keep a replayable prefix");
 }
 
-void Fixtures(const std::filesystem::path &dir, bool generate) {
- if (generate) std::filesystem::create_directories(dir);
- for (const auto &fixture : ReplayFixtures) {
-  ReplayFixture direct;
-  fixture.run(direct);
-  const std::string tape = Serialized(direct.tape);
-  const std::string expected = direct.output.rows.str();
-  const auto inputFile = dir / (std::wstring(fixture.name) + L".replay");
-  const auto outputFile = dir / (std::wstring(fixture.name) + L".expected");
+template <class Play>
+void CheckFixture(const std::filesystem::path &dir, const wchar_t *name, const Tape &recording,
+                  const std::string &expected, bool generate, Play play) {
+ try {
+  const std::string tape = Serialized(recording);
+  const auto inputFile = dir / (std::wstring(name) + L".replay");
+  const auto outputFile = dir / (std::wstring(name) + L".expected");
   if (generate) {
    WriteFile(inputFile, tape);
    WriteFile(outputFile, expected);
   }
   const std::string saved = Bytes(inputFile);
   Compare(tape, saved, "fixture input changed");
-  const std::string first = Run(Parse(saved));
-  Compare(expected, first, "replay differs from the direct learner");
+  const std::string first = play(Parse(saved));
+  Compare(expected, first, "replay differs from the direct run");
   Compare(Bytes(outputFile), first, "replay differs from the baseline");
-  Compare(first, Run(Parse(saved)), "replay was not deterministic");
-  std::printf("PASS replay %ls\n", fixture.name);
+  Compare(first, play(Parse(saved)), "replay was not deterministic");
+  std::printf("PASS replay %ls\n", name);
+ } catch (const std::exception &) {
+  std::fprintf(stderr, "Fixture %ls failed\n", name);
+  throw;
  }
+}
+
+void Fixtures(const std::filesystem::path &dir, bool generate, const std::wstring &only) {
+ if (generate) std::filesystem::create_directories(dir);
+ const auto checkGpu = [&](const FixtureCase &fixture) {
+  ReplayFixture direct;
+  fixture.run(direct);
+  CheckFixture(dir, fixture.name, direct.tape, direct.output.rows.str(), generate, Run);
+ };
+ bool matched = false;
+ for (const auto &fixture : ReplayFixtures) {
+  if (!only.empty() && only != fixture.name) continue;
+  checkGpu(fixture);
+  matched = true;
+ }
+ for (const auto &fixture : EngineGpuFixtures) {
+  if (!only.empty() && only != fixture.name) continue;
+  checkGpu(fixture);
+  matched = true;
+ }
+ for (const auto &fixture : EngineLayerFixtures) {
+  if (!only.empty() && only != fixture.name) continue;
+  Tape direct;
+  fixture.record(direct);
+  CheckFixture(dir, fixture.name, direct, fixture.replay(direct.calls), generate,
+               [&](const ReplayInput &input) { return fixture.replay(input.calls); });
+  matched = true;
+ }
+ Require(matched, "unknown fixture name");
+ if (!only.empty()) return;
  CheckGroupKeys();
  CheckFormat();
  const std::string trailingBytes = "MEGULIT_GPU_REPLAY 1\nEND complete\n\x1aO\n";
@@ -286,8 +319,8 @@ void Fixtures(const std::filesystem::path &dir, bool generate) {
 
 int wmain(int argc, wchar_t **argv) {
  try {
-  if (argc == 3 && (std::wstring(argv[1]) == L"--check" || std::wstring(argv[1]) == L"--generate")) {
-   Fixtures(argv[2], std::wstring(argv[1]) == L"--generate");
+  if ((argc == 3 || argc == 4) && (std::wstring(argv[1]) == L"--check" || std::wstring(argv[1]) == L"--generate")) {
+   Fixtures(argv[2], std::wstring(argv[1]) == L"--generate", argc == 4 ? argv[3] : L"");
    return 0;
   }
   if (argc == 2 || argc == 3) {
@@ -299,7 +332,7 @@ int wmain(int argc, wchar_t **argv) {
    std::cout << output;
    return 0;
   }
-  std::cerr << "usage: replay <input.replay> [expected] | --check <fixtures> | --generate <fixtures>\n";
+  std::cerr << "usage: replay <input.replay> [expected] | --check <fixtures> [name] | --generate <fixtures> [name]\n";
  } catch (const std::exception &error) {
   std::cerr << error.what() << '\n';
  }

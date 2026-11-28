@@ -1,0 +1,9 @@
+ToMe_GLYPHHIDE hit path=ggo size=30 seq=1
+ToMe_GLYPHHIDE key size=30 face=Synthetic
+MASK 0.0 0 1 2 3 4 5 6 7
+ToMe_GLYPHHIDE afterline done seq=1 cursor=8/8
+ToMe_GLYPHHIDE afterline kept seq=1 ch=
+MASK 0.1 0
+MASK 0.2
+ToMe_GLYPHHIDE afterline text 
+MASK 1.0 0 1 2 3 4 5 6 7
