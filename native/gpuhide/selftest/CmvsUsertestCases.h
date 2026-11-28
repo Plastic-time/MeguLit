@@ -174,8 +174,19 @@ static std::vector<int> BodyMask(int count) {
  return mask;
 }
 
-// Synthesized from the startup log: 19 traced positions in a 23-cell draw,
-// then a partial redraw and the complete 20-cell second line after OFF.
+static std::string ColdPlacement() {
+ // The first cell starts at 302 and the last ends at 918 + 32.
+ std::vector<Quad> boxes;
+ for (int i = 0; i < 19; ++i) {
+  const float left = float(302 + (648 * i + 9) / 19);
+  const float right = float(302 + (648 * (i + 1) + 9) / 19);
+  boxes.push_back({left, 334, right, 366});
+ }
+ return Placement(1, true, boxes);
+}
+
+// Synthesized from the startup log: the hook sends 19 characters, but the
+// game draws 23 glyphs. After OFF, it draws the complete 20-cell second line.
 static void ColdStart(ReplayFixture &g) {
  const auto first = Cells(302, 334, 23, 19, 0);
  const auto second = Cells(344, 334, 20, 19, 40);
@@ -187,16 +198,17 @@ static void ColdStart(ReplayFixture &g) {
  PaintCold(g, 10001, first, 23);
  const auto firstHidden = PaintCold(g, 10018, first, 23);
  const auto firstStable = PaintCold(g, 10035, first, 23);
+ if (firstHidden != BodyMask(23) || firstStable != BodyMask(23))
+  throw std::runtime_error("CMVS cold-start mask must cover all 23 drawn glyphs");
+ if (g.lastRects.size() != 23) throw std::runtime_error("CMVS must remember all 23 original positions");
  g.Off();
  g.Line(Text(2, 20), 15000);
  PaintCold(g, 15001, second, 13);
  const auto secondHidden = PaintCold(g, 15018, second, 20);
  PaintCold(g, 15035, second, 20);
 
- const std::vector<Quad> firstText(first.begin(), first.begin() + 19);
- CheckPlacements(g, {Placement(1, true, firstText), Placement(2, true, second)});
- if (firstHidden != BodyMask(19) || firstStable != BodyMask(19) || secondHidden != BodyMask(20))
-  throw std::runtime_error("CMVS cold-start masks must cover just the source line");
+ CheckPlacements(g, {ColdPlacement(), Placement(2, true, second)});
+ if (secondHidden != BodyMask(20)) throw std::runtime_error("CMVS second line mask must cover all 20 glyphs");
 }
 
 static void CheckColdAtlasGuards() {
@@ -240,7 +252,7 @@ static void CheckColdAtlasGuards() {
  displacedTail.back().x1 += 4;
  rejects(displacedTail, 1024, 2048, true, false);
 
- // A redraw in hide mode cannot remove the cell already drawn in read mode.
+ // A redraw in hide mode cannot remove a trailing cell already drawn in read mode.
  ReplayFixture g;
  g.BodyRecheck(true);
  g.Line(Text(1, 19), 10000);
@@ -252,7 +264,7 @@ static void CheckColdAtlasGuards() {
                 {Box(int(first.x0), int(first.y0), 32, 32, 5, 8, 1024, 2048)}, tick);
  };
  g.Mode(true);
- const auto visible = g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, {row[1]}, 10018);
+ const auto visible = g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, {row.back()}, 10018);
  g.Mode(false);
  g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, row, 10018);
  storeDecoy(10018);
@@ -262,8 +274,7 @@ static void CheckColdAtlasGuards() {
 
  storeDecoy(10035);
  PaintCold(g, 10035, good, good.size());
- const std::vector<Quad> source(good.begin(), good.begin() + 19);
- CheckPlacements(g, {Placement(1, true, source)});
+ CheckPlacements(g, {ColdPlacement()});
  if (!storeDecoy(10052).empty()) throw std::runtime_error("cold-start learning claimed a different atlas");
 }
 

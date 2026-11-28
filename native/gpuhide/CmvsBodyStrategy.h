@@ -67,6 +67,21 @@ template <class Geometry> struct CmvsBodyStrategy {
   return true;
  }
 
+ static std::vector<Rect> StartupPlacement(const Rect &row, unsigned count) {
+  // There is no character mapping for glyphs the hook missed. Give the hook
+  // text contiguous boxes across the row, with shared rounded edges.
+  std::vector<Rect> boxes;
+  boxes.reserve(count);
+  const float width = row.x1 - row.x0, top = std::round(row.y0), bottom = std::round(row.y1);
+  float left = std::round(row.x0);
+  for (unsigned i = 0; i < count; ++i) {
+   const float right = std::round(row.x0 + width * (i + 1) / count);
+   boxes.push_back({left, top, right, bottom});
+   left = right;
+  }
+  return boxes;
+ }
+
  struct Selection {
   Group *group = nullptr;
   std::vector<Rect> body;
@@ -269,8 +284,8 @@ template <class Geometry> struct CmvsBodyStrategy {
    const Rect &last = cells.back()->r;
    const bool startup = tryStartup && hasSpacer && std::fabs(last.y0 - first.y0) <= 1 &&
     std::all_of(cells.begin(), cells.end(), [](const Seen *cell) { return cell->fixedCell && cell->r.traced; });
-   // A cold atlas can contain additional untraced cells at the trailing
-   // positions. They neither make up the source line nor get hidden by it.
+   // The hook can miss some of the glyphs drawn on this row. Keep the
+   // contiguous trailing cells in the body once their placement agrees.
    if (!tail.empty()) {
     if (!startup) return {};
     std::sort(tail.begin(), tail.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
@@ -279,6 +294,7 @@ template <class Geometry> struct CmvsBodyStrategy {
      if (tail[i].first != cells.size() + i + 1 || std::fabs(r.x0 - last.x0 - pitch * (i + 1)) > 1 ||
          std::fabs(r.y0 - last.y0) > 1 || std::fabs(r.x1 - r.x0 - width) > width * .2f ||
          std::fabs(r.y1 - r.y0 - height) > height * .2f) return {};
+     body.push_back(r);
     }
    }
    return {std::move(body), startup};

@@ -555,7 +555,7 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
    return;
   }
  }
- void Report(Group &g, const std::vector<Rect> &cs, bool moved = false, bool exactAtlas = false) {
+ void Report(Group &g, const std::vector<Rect> &cs, bool moved = false, bool startup = false) {
   if (bodyRecheck && CmvsFrame().WaitForBody(g, cs, [&](void *tex) { return LearnedAtlas(tex); })) return;
   if (moved) { learned = false; atlases.clear(); hitSent = false; }
   float h = 0; Rect box{ 1e30f, 1e30f, -1e30f, -1e30f }; for (auto &r : cs) { h += r.y1 - r.y0; box.x0 = (std::min)(box.x0, r.x0); box.y0 = (std::min)(box.y0, r.y0); box.x1 = (std::max)(box.x1, r.x1); box.y1 = (std::max)(box.y1, r.y1); } h /= cs.size();
@@ -570,7 +570,7 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
    auto inArea = [&](const Rect &r) { float cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2; return cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1; };
    // every target of the learned size counts: engines draw the same page into a shadow / effect buffer too (Saya)
    for (auto &kv : groups) {
-    if (exactAtlas && &kv.second != &g) continue;
+    if (startup && &kv.second != &g) continue;
     if (kv.second.rt != g.rt && (kv.second.rtW != g.rtW || kv.second.rtH != g.rtH)) continue;
     int in = 0, on = 0; for (const std::vector<Rect> *v : { &kv.second.frame, &kv.second.prev }) for (auto &r : *v) if (inArea(r)) { in++; if (aligned(r)) on++; }
     if (&kv.second == &g || (on >= 1 && on * 10 >= in * 6)) atlases.insert(GroupKey(nullptr, kv.second.tex)); }
@@ -580,14 +580,16 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
    area.x0 = 0; /* centred rows (CHAOS;CHILD) start further left than the learned line: the band spans the whole target so a new row's first glyphs never leak */ area.x1 = (std::max)(area.x1, (float)g.rtW); area.y0 = (std::min)(area.y0, box.y0 - h * 0.5f); area.x1 = (std::max)(area.x1, box.x1 + h * 0.5f); area.y1 = (std::max)(area.y1, box.y1 + h * 0.5f);
   }
   bool hidden = hitSent && !readOnly; std::string rects; bool mapped = true;
-  for (auto r : cs) { if (!ToScreen(g.rt, g.rtW, g.rtH, r)) { mapped = false; break; } char x[64]; snprintf(x, sizeof x, "%s%.0f,%.0f,%.0f,%.0f", rects.empty() ? "" : ";", r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0); rects += x; }
+  const auto projected = startup && cs.size() > n ? BodyStrategy::StartupPlacement(box, n) : std::vector<Rect>{};
+  const auto &placement = projected.empty() ? cs : projected;
+  for (auto r : placement) { if (!ToScreen(g.rt, g.rtW, g.rtH, r)) { mapped = false; break; } char x[64]; snprintf(x, sizeof x, "%s%.0f,%.0f,%.0f,%.0f", rects.empty() ? "" : ";", r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0); rects += x; }
   if (!mapped) { if (log && frameNo % 60 == 0) log("rects not mapped yet: render target %p not composited", g.rt); return; } // try again next frame
   reported = true; hiddenSent = hidden; lastRects = cs; lastKeys.clear();
   if (bodyRecheck && hidden) cmvs.bodyReportAt = frameNow;
   for (auto &kv : groups) { if (kv.second.rt != g.rt) continue; for (auto &s : kv.second.keys) { if (frameNo - s.second.lastFrame > 2) continue; for (auto &c : cs) { float w = (std::min)(c.x1 - c.x0, s.second.r.x1 - s.second.r.x0), h = c.y1 - c.y0; if (std::fabs(c.x0 - s.second.r.x0) < 0.4f * w && std::fabs(c.y0 - s.second.r.y0) < 0.4f * h) { lastKeys.insert({ kv.first, s.first }); break; } } } }
   std::string t;
   { std::string u; for (size_t i = 0; i < text.size(); i++) { unsigned c = text[i]; if (c >= 0xD800 && c < 0xDC00 && i + 1 < text.size()) { c = 0x10000 + ((c - 0xD800) << 10) + (text[++i] - 0xDC00); u += (char)(0xF0 | (c >> 18)); u += (char)(0x80 | ((c >> 12) & 63)); u += (char)(0x80 | ((c >> 6) & 63)); u += (char)(0x80 | (c & 63)); } else if (c < 0x80) u += (char)c; else if (c < 0x800) { u += (char)(0xC0 | (c >> 6)); u += (char)(0x80 | (c & 63)); } else { u += (char)(0xE0 | (c >> 12)); u += (char)(0x80 | ((c >> 6) & 63)); u += (char)(0x80 | (c & 63)); } } t = u; }
-  std::string line = "ToMe_CHARS engine=gpu line=" + std::to_string(seq) + " hidden=" + (hidden ? "1" : "0") + " sw=" + std::to_string(bbW) + " sh=" + std::to_string(bbH) + " vx=0 vy=0 vw=" + std::to_string(bbW) + " vh=" + std::to_string(bbH) + " n=" + std::to_string(cs.size()) + " rects=" + rects + " text=" + t;
+  std::string line = "ToMe_CHARS engine=gpu line=" + std::to_string(seq) + " hidden=" + (hidden ? "1" : "0") + " sw=" + std::to_string(bbW) + " sh=" + std::to_string(bbH) + " vx=0 vy=0 vw=" + std::to_string(bbW) + " vh=" + std::to_string(bbH) + " n=" + std::to_string(placement.size()) + " rects=" + rects + " text=" + t;
   if (emit) emit(line);
  }
 };
