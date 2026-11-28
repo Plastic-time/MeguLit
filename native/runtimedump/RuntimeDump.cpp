@@ -418,12 +418,18 @@ PVOID NTAPI HAlloc(PVOID heap, ULONG flags, SIZE_T n) {
  PVOID p = OAlloc(heap, flags, n);
  if (p && ArmedUntil && (LONG)n >= ArmMin && (LONG)n <= ArmMax && Ready && (LONG)(GetTickCount() - ArmedUntil) < 0 && !Inside()) {
   DWORD e = GetLastError();
-  try {
-   Guard g;
-   std::string source; { Lock l; source = LastSource; }
-   // The new buffer still holds whatever the heap left there; it is saved once it has changed and settled.
-   Watch(p, (DWORD)n, Crc32 ? Crc32(0, p, (ULONG)n) : 0, source, 0, "alloc");
-  } catch (...) {}
+  // The heap calls RtlAllocateHeap again while it holds its own locks (LFH user-block refill, loader TLS), and
+  // threads that hold Gate allocate. Waiting for Gate here closes that cycle and freezes the game at startup,
+  // so a busy Gate skips this allocation instead.
+  if (TryEnterCriticalSection(&Gate)) {
+   try {
+    Guard g;
+    std::string source = LastSource;
+    // The new buffer still holds whatever the heap left there; it is saved once it has changed and settled.
+    Watch(p, (DWORD)n, Crc32 ? Crc32(0, p, (ULONG)n) : 0, source, 0, "alloc");
+   } catch (...) {}
+   LeaveCriticalSection(&Gate);
+  }
   SetLastError(e);
  }
  return p;
