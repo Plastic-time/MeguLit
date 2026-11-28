@@ -44,7 +44,8 @@
 | 魚魚棟 · Claude | 排行榜加 Gal / 轻小说 / 乙游作品榜（VNDB、Bangumi、AniList，relay 每日拉取，需部署 relay） | — | feat/work-charts | 11-28 | 等 CI（PR #1408） |
 | 魚魚棟 · Claude | 1.4.26 设置「运行组件」中文残缺（注→汪、语缺顶）、简繁字体混排；disc-mount 补中文名和说明 | — | claude/runtime-list-cjk | 11-28 | 等 CI |
 | 魚魚棟 · Claude | 语音「已就绪」却读不出声音（1.4.26 群反馈）：引擎启动卡在连 huggingface.co，改离线启动；已就绪按引擎实际响应；读取失败写明原因和下一步 | — | fix/aivis-ready-voices | 11-28 | 在做 |
-| RRFZ · Claude | アオイトリ（青鸟）开场选流：只有两个假名的第一句没选流、先选到缺字的上下文 | — | rrfz/cmvs-startup-stream | 11-28 | 在做：等实测 |
+| RRFZ · Claude | アオイトリ（青鸟）开场选流：只有两个假名的第一句没选流、先选到缺字的上下文 | — | rrfz/cmvs-startup-stream | 11-28 | 在做：实测通过，按评审返工 |
+| RRFZ · Claude | アオイトリ（青鸟）长句一闪一闪：阅读器把游戏画成一行的长句按上一句宽度折成两行，打字中途整段跳出对话框（text-place.js） | — | rrfz/cmvs-one-row-wrap | 11-28 | 在做：评审中 |
 | 魚魚棟 · Claude | megulit-engine：Rust 直读引擎剧本（设计文档 + KiriKiri 原型） | — | claude/megulit-engine | 11-28 | 等 CI（PR #1365） |
 | 魚魚棟 · Claude | 批量骨架 seed 生成器：一批目录离线认引擎、算 key、写 skeleton seed，出可信度清单（基于 #1362） | — | claude/seed-skeleton-batch | 11-28 | 等 CI（PR #1366） |
 | 魚魚棟 · Claude | 台词按说话人上色：取游戏原色不再发灰（アイキス3 sexy アヤメ），颜色页新增「分角色」按作品改色 | — | feat/speaker-colors | 11-28 | 等合并（PR #1359，CI 全绿） |
