@@ -134,7 +134,7 @@
     return own && own.isConnected ? own : document.querySelector('.sentence-window');
   }
   /* the reader's own layout, its first character on the anchor */
-  function pin(win, sentence, fitRow = null) {
+  function pin(win, sentence, fitRow = null, gameRowsOnly = false) {
     if (!anchor || !win || !sentence) return;
     document.body.classList.add('megulit-anchored'); win.classList.add('megulit-anchor-window');
     for (const p of ['left', 'top']) win.style.removeProperty(p);
@@ -158,6 +158,8 @@
       return rects.length ? [Math.min(...rects.map(r => r.left)), Math.max(...rects.map(r => r.right))] : null;
     };
     let left = anchor[0] - wr.width / 2;
+    /* a centred line on the game's rows may be wider than the reader box (it is not broken there): its characters are centred, not the box */
+    if (!inlineTranslation && gameRowsOnly) { const bounds = tokenBounds(); if (bounds) left = wr.left + anchor[0] - (bounds[0] + bounds[1]) / 2; }
     if (tr?.width && fitRow && !inlineTranslation) {
       const bounds = tokenBounds();
       const width = bounds ? bounds[1] - bounds[0] : 0;
@@ -814,7 +816,11 @@
     if (rows.length >= 2) { const c = mid(rows[0]); if (rows.every(r => Math.abs(mid(r) - c) < size * .75) && Math.max(...rows.map(r => r.l)) - Math.min(...rows.map(r => r.l)) > size * 1.5) center = rows.reduce((t, r) => t + mid(r), 0) / rows.length; }
     /* 2026-11-21 (owner, 千恋＊万花: 「普通说话以为要居中，点一下又左对齐」): a text box that sits in the middle of the screen makes a full
        one-row line look centred; a row that starts at the left edge of the page's left-aligned lines is that box, not a centred line */
-    else if (rows.length === 1 && Math.abs(mid(rows[0]) - (L + R) / 2) < size * .75 && rows[0].l > L + (R - L) * .15 && !(Number.isFinite(leftEdge) && Math.abs(rows[0].l - leftEdge) <= size * .5)) center = mid(rows[0]);
+    /* 2026-11-28 (user, アオイトリ（青鸟）: 「一闪一闪」): a one-row line the game is still typing is measured at the width it will have.
+       A centred box puts its first glyph where the whole line starts, so the drawn part's own middle sits left of the box's: the
+       row goes on at the drawn glyphs' pitch for the characters after the last drawn one */
+    else if (rows.length === 1) { const known = rowOf.filter(r => r === 0).length, ahead = boxes.length - 1 - rowOf.lastIndexOf(0), row = { l: rows[0].l, r: rows[0].r + (rows[0].r - rows[0].l) / known * ahead };
+      if (Math.abs(mid(row) - (L + R) / 2) < size * .75 && row.l > L + (R - L) * .15 && !(Number.isFinite(leftEdge) && Math.abs(row.l - leftEdge) <= size * .5)) center = mid(row); }
     return { rows, rowOf, center };
   }
   /* a line break before each reader character the game put at the start of a new row */
@@ -865,7 +871,9 @@
     if (!document.body.classList.contains('megulit-jp-one-line')) shown.forEach((t, j) => { const r = rows.rowOf[j]; if (r < 0) return; if (prev >= 0 && r > prev) { const base = t.closest('.megulit-ruby-base'); const at = base && base.querySelector('.char-token') === t ? base : t; if (!base || at === base) want.add(at); } prev = r; });
     for (const br of win.querySelectorAll('br.megulit-row-br')) if (!want.has(br.nextSibling)) br.remove();
     for (const at of want) if (!(at.previousSibling && at.previousSibling.nodeName === 'BR' && at.previousSibling.classList.contains('megulit-row-br'))) { const br = document.createElement('br'); br.className = 'megulit-row-br'; at.parentNode.insertBefore(br, at); }
-    win.classList.toggle('megulit-game-rows', want.size > 0); /* 2026-11-20 (CHAOS;CHILD: a two-row line drawn as three) the game's row breaks only */
+    /* 2026-11-20 (CHAOS;CHILD: a two-row line drawn as three) the game's row breaks only. 2026-11-28 (アオイトリ（青鸟）: a 23-glyph line
+       the game drew on one row became two at the reader box's width): a line the game keeps on one row is not broken either */
+    win.classList.toggle('megulit-game-rows', !document.body.classList.contains('megulit-jp-one-line') && rows.rows.length > 0);
     win.classList.toggle('megulit-anchor-center', Number.isFinite(rows.center));
   }
   function anchorFrom(got, size, map, lineKey, center = null) {
@@ -997,7 +1005,9 @@
       win.classList.toggle('megulit-page-fresh', rowsFresh); if (rowsFresh) b.hookPageReset?.();
       rowBreaks(win, shown, rows);
       { const known = boxes.filter(Boolean).length, centred = Number.isFinite(rows.center);
-        if (centred && known >= shown.length && rows.rows.length) centreWidth = Math.max(...rows.rows.map(r => r.r - r.l)) + size;
+        /* only a line the game broke shows where its page wraps; a one-row line shows its own length (アオイトリ（青鸟）, 2026-11-28: a
+           23-glyph line typed after an 11-glyph one was wrapped at the short line's width) */
+        if (centred && known >= shown.length && rows.rows.length > 1) centreWidth = Math.max(...rows.rows.map(r => r.r - r.l)) + size;
         if (!centred && known >= shown.length && rows.rows.length) leftEdge = Math.min(...rows.rows.map(r => r.l));
         else if (!centred && !(anchor && anchor.center)) centreWidth = 0;
         /* while the game has not drawn every row of a centred line, the whole line already wraps at the page's row width and is
@@ -1009,7 +1019,7 @@
       const first = rows.rows[0];
       const bottomRow = !line.fallback && rowsFresh && Number.isFinite(rows.center) && rows.rows.length === 1 &&
         rows.rowOf.every(i => i === 0) && first.t + firstBox[3] * 2 >= map.bounds[3] - 1;
-      pin(win, sentence, bottomRow ? first : null);
+      pin(win, sentence, bottomRow ? first : null, win.classList.contains('megulit-game-rows'));
       return;
     }
     document.body.classList.remove('megulit-place-fallback');
