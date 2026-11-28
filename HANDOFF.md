@@ -41,6 +41,7 @@
 
 | 谁 | 做什么 | issue | 分支 | 开始 | 状态 |
 |---|---|---|---|---|---|
+| RRFZ · Claude | アオイトリ（青鸟）开场选流：只有两个假名的第一句没选流、先选到缺字的上下文 | — | rrfz/cmvs-startup-stream | 11-28 | 在做：等实测 |
 | 魚魚棟 · Claude | megulit-engine：Rust 直读引擎剧本（设计文档 + KiriKiri 原型） | — | claude/megulit-engine | 11-28 | 等 CI（PR #1365） |
 | 魚魚棟 · Claude | 批量骨架 seed 生成器：一批目录离线认引擎、算 key、写 skeleton seed，出可信度清单（基于 #1362） | — | claude/seed-skeleton-batch | 11-28 | 等 CI（PR #1366） |
 | 魚魚棟 · Claude | 台词按说话人上色：取游戏原色不再发灰（アイキス3 sexy アヤメ），颜色页新增「分角色」按作品改色 | — | feat/speaker-colors | 11-28 | 等合并（PR #1359，CI 全绿） |
