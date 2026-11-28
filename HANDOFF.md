@@ -41,6 +41,7 @@
 
 | 谁 | 做什么 | issue | 分支 | 开始 | 状态 |
 |---|---|---|---|---|---|
+| 魚魚棟 · Claude | 剧本说话人接进索引（第一批）：CatSystem2、SoftPal、CMVS 读取器输出 who，名字不再当成正文行 | — | fix/script-who-batch1 | 11-29 | 在做 |
 | 魚魚棟 · Claude | 知识入口整理：新增 docs/README.md 总目录、精简 AGENTS.md（细则挪进 docs/dev-rules.md、docs/architecture.md） | — | docs/agents-slim、docs/readme-toc | 11-29 | 等合并（PR #1440 AGENTS 精简，需 RRFZ 过目；#1441 docs 目录） |
 | 魚魚棟 · Claude | 隐藏原文时原文第二行露出（たいせつなきみのために、ぼくにできるいちばんのこと（只要你不再悲伤），Ciel 逐字 TextOutA，GDI 隐藏的单字 3 秒窗口过后没藏）：Ciel 引擎在 hook DLL 里开「按台词顺序续藏」 | — | fix/taisetsuna-second-line | 11-29 | 等 CI（PR #1443） |
 | 魚魚棟 · Claude | 隐藏原文时名字框的说话人名字也被藏（1.4.26 群反馈）：撤回 #1436 的通用字号规则；按引擎声明 hide.nameChannel（Ciel 首个：行首【】），没声明的引擎阅读层补画名牌 | — | fix/revert-1436、fix/speaker-name-channel | 11-29 | 等 CI（PR #1439 撤回、PR #1442 按引擎） |
