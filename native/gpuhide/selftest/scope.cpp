@@ -610,12 +610,13 @@ static void BodyWithUntracedCells(GlyphLearner &g, bool atlasRun, bool expectCle
   draw(partial, 15002);
  }
  g.Frame(15003, 1280, 720);
- assert(offsets.size() == (expectClean ? 0 : 1));
+ assert(offsets.size() == (g.bodyRecheck ? 0 : 1));
 
  row.push_back(spacer);
  draw(row, 15017);
  g.Frame(15018, 1280, 720);
- assert(offsets.size() == 1);
+ assert(offsets.size() == (expectClean || !g.bodyRecheck ? 1 : 0));
+ if (offsets.empty()) return;
  assert(offsets.front().find(prefix + "hidden=1 ") == 0);
  const char *legacyStart = start == BodyStart::BoxTiles ? "n=23 rects=276,616,28,28;" : "n=23 rects=276,616,4,4;";
  assert(offsets.front().find(expectClean ? "n=23 rects=302,656,32,32;" : legacyStart) != std::string::npos);

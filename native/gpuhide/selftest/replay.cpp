@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ReplayCases.h"
+#include "CmvsUsertestCases.h"
 #include "EngineGpuCases.h"
 #include "EngineLayerCases.h"
 #include <filesystem>
@@ -287,6 +288,11 @@ void Fixtures(const std::filesystem::path &dir, bool generate, const std::wstrin
  };
  bool matched = false;
  for (const auto &fixture : ReplayFixtures) {
+  if (!only.empty() && only != fixture.name) continue;
+  checkGpu(fixture);
+  matched = true;
+ }
+ for (const auto &fixture : CmvsUsertest::Cases) {
   if (!only.empty() && only != fixture.name) continue;
   checkGpu(fixture);
   matched = true;
