@@ -4,7 +4,8 @@
    centred, every line on one row. After a short centred line, a long line the game types on one row was wrapped at the short
    line's width while it typed, then at the reader box width, and half way through its rows jumped above the box. Replays: the
    target (one row on the game's row while it types and when complete, Japanese and translation centred together, with an
-   anchor offset, a scaled client and the bottom-row squeeze), and the layouts that must keep the reader's own wrapping: a
+   anchor offset, a scaled client and the bottom-row squeeze; a game glyph that never gets a box, a doubled dash, narrow
+   boxes; a centred two-row line wider than the box), and the layouts that must keep the reader's own wrapping: a
    left-aligned box, the first row of a line the game wraps, a row wider than the game client, one-line Japanese.
    Headless Edge through playwright-core; skipped when it is not installed (MEGULIT_PLAYWRIGHT). */
 const assert = require('node:assert'), fs = require('node:fs'), path = require('node:path'), test = require('node:test');
@@ -113,6 +114,51 @@ test('a centred line the game keeps on one row stays on it; other layouts keep t
       const twice = await p.place(SHORT, centred(11, 656), SHORT + SHORT);
       assert.strictEqual(twice.rows, 1); assert.strictEqual(twice.top, 656); near(twice.mid, 640, 'repeated copy centred', twice); near(twice.cnMid, 640, 'translation', twice);
       assert.strictEqual(twice.scale, '', 'a repeated copy is not squeezed into the game row (' + JSON.stringify(twice) + ')');
+      await p.page.close();
+    });
+
+    await t.test('a game glyph that never gets a box does not move the line sideways', async () => {
+      /* the game's text ends in 」 but it never gives the 」 a box: one glyph short of the projection, within the centring slack */
+      const g = 'ただ、一度でいいから普通になりたかった', q = g + '」';
+      for (const o of [{ y: 656, s: 32 }, { y: 690, s: 24, font: 40 }]) {
+        let p = await open({ font: o.font });
+        await p.place(SHORT, centred(11, o.y, o.s));
+        const all = centred([...g].length, o.y, o.s), steps = await typed(p, q, all, [3, 12, all.length]);
+        for (const s of steps) { assert.strictEqual(s.rows, 1, 'one row (' + JSON.stringify(s) + ')'); assert.strictEqual(s.first, steps[0].first, 'no sideways move (' + JSON.stringify(s) + ')'); near(s.mid, 640, 'Japanese', s); near(s.cnMid, 640, 'translation', s); }
+        await p.page.close();
+        p = await open({ font: o.font });
+        await p.place(SHORT, centred(11, o.y, o.s));
+        const twice = [await p.place(q, all), await p.place(q, all)];
+        for (const s of twice) { assert.strictEqual(s.rows, 1); near(s.mid, 640, 'delivered complete, every frame', s); }
+        await p.page.close();
+      }
+    });
+
+    await t.test('the projection counts game glyphs at their pitch: a doubled dash, narrow boxes', async () => {
+      /* the reader has 「――」 where the game draws one 「―」 (two reader characters on one game box) */
+      const game = 'ただ―一度でいいから普通になりたかったのです', reader = 'ただ――一度でいいから普通になりたかったのです';
+      let p, steps;
+      for (const after of [SHORT, null]) { /* after a short line, and as the first line (no place to keep) */
+        p = await open();
+        if (after) await p.place(after, centred(11, 656));
+        steps = await typed(p, game, centred([...game].length, 656), [2, 3, 4, 9, 14, [...game].length], reader);
+        for (const s of steps) { assert.strictEqual(s.rows, 1, 'one row (' + JSON.stringify(s) + ')'); assert.strictEqual(s.first, steps[0].first, 'no sideways move (' + JSON.stringify(s) + ')'); near(s.mid, 640, 'centred', s); }
+        await p.page.close();
+      }
+      /* 28 px glyph boxes at a 32 px pitch */
+      p = await open();
+      const narrow = (n, y) => centred(n, y).map(r => [r[0], r[1], 28, 32]);
+      await p.place(SHORT, narrow(11, 656));
+      steps = await typed(p, LONG, narrow(N, 656), [2, 3, 8, 16, N]);
+      for (const s of steps) { assert.strictEqual(s.rows, 1, 'one row (' + JSON.stringify(s) + ')'); assert.strictEqual(s.first, steps[0].first, 'no sideways move (' + JSON.stringify(s) + ')'); near(s.mid, 638, 'centred on the game row', s); }
+      await p.page.close();
+    });
+
+    await t.test('a centred two-row line wider than the reader box is centred with its translation', async () => {
+      /* CHAOS;CHILD-style narration: 18 + 8 glyph rows in a bigger reader font; the rows are the game's, the box takes the wider one */
+      const p = await open({ font: 40 }), text = '流行を創り出していた高層建造物はその役目を諦めたように倒壊';
+      const s = await p.place(text, [...centred(18, 300), ...centred([...text].length - 18, 340)]);
+      assert.strictEqual(s.rows, 2); onScreen(s, 'it'); near(s.mid, 640, 'Japanese', s); near(s.cnMid, 640, 'translation', s);
       await p.page.close();
     });
 

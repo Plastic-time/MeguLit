@@ -811,7 +811,7 @@
   /* 2026-11-21 (owner, CHAOS;CHILD centred narration: a new line typed out on one row and only wrapped and centred when it was
      complete): the widest row of the last fully drawn centred line; a centred line the game is still typing wraps at it */
   let centreWidth = 0, leftEdge = null; /* left edge of the last fully drawn left-aligned line */
-  function gameRows(boxes, size, map, leftEdge = null, pending = 0) {
+  function gameRows(boxes, size, map, leftEdge = null, pending = 0, glyph = j => j) {
     const rows = [], rowOf = new Array(boxes.length).fill(-1); let cur = null;
     boxes.forEach((r, j) => { if (!r || r[3] < size * .7 || r[2] > size * 1.6) return; /* a small glyph (the game's own ruby) or a wide one (a UI button the layer took for a glyph) is no row */ if (!cur || r[1] > cur.t + size * .6 || r[0] < cur.l - size * .5 && r[1] > cur.t + size * .3) { cur = { l: r[0], r: r[0] + r[2], t: r[1], first: j }; rows.push(cur); } else { cur.l = Math.min(cur.l, r[0]); cur.r = Math.max(cur.r, r[0] + r[2]); } rowOf[j] = rows.length - 1; });
     let center = null, single = null; const [L, , R] = map.bounds || [0, 0, innerWidth], mid = r => (r.l + r.r) / 2;
@@ -820,13 +820,15 @@
        one-row line look centred; a row that starts at the left edge of the page's left-aligned lines is that box, not a centred line */
     /* 2026-11-28 (user, アオイトリ（青鸟）: 「一闪一闪」): a one-row line the game is still typing is measured at the width it will have.
        A centred box puts its first glyph where the whole line starts, so the drawn part's own middle sits left of the box's: the
-       row goes on at the drawn glyphs' pitch for the reader characters the game has but did not draw yet (`pending`; never the
-       reader's own extras, which the game never draws). A line the game will wrap starts where its first row starts, so its
-       projection (past the client's edge or the page's row width) is never centred: the drawn row decides, as before.
-       `single`: a centred line the game keeps on one row (complete, or projected) */
+       row goes on at the drawn glyphs' pitch for the game glyphs it has not drawn yet (`pending`, counted in game glyphs like the
+       pitch: two reader dashes on one game dash are one; never the reader's own extras, which the game never draws). A line the
+       game will wrap starts where its first row starts, so its projection (past the client's edge or the page's row width) is
+       never centred: the drawn row decides, as before. `single`: a centred line the game keeps on one row (complete, or projected) */
     else if (rows.length === 1) {
       const centredRow = row => Math.abs(mid(row) - (L + R) / 2) < size * .75 && row.l > L + (R - L) * .15 && !(Number.isFinite(leftEdge) && Math.abs(row.l - leftEdge) <= size * .5);
-      const whole = { ...rows[0], r: rows[0].r + (rows[0].r - rows[0].l) / rowOf.filter(i => i === 0).length * pending };
+      const lefts = new Map(); boxes.forEach((r, j) => { if (rowOf[j] === 0) lefts.set(glyph(j), Math.min(r[0], lefts.get(glyph(j)) ?? Infinity)); });
+      const xs = [...lefts.values()].sort((a, b) => a - b), pitch = xs.length > 1 ? (xs.at(-1) - xs[0]) / (xs.length - 1) : rows[0].r - rows[0].l;
+      const whole = { ...rows[0], r: rows[0].r + pitch * pending };
       if (centredRow(whole)) { center = mid(whole); single = whole; }
       else if (centredRow(rows[0])) center = mid(rows[0]);
     }
@@ -891,14 +893,17 @@
     if (rects.length && Math.max(...rects.map(r => r.right)) - Math.min(...rects.map(r => r.left)) > clientWidth) { win.classList.remove('megulit-game-rows'); return false; }
     return true;
   }
-  function anchorFrom(got, size, map, lineKey, center = null) {
+  function anchorFrom(got, size, map, lineKey, center = null, projected = false) {
     const top = Math.min(...got.map(b => b[1]));
     let a = [Number.isFinite(center) ? center : Math.min(...got.filter(b => b[1] < top + size * .5).map(b => b[0])), top];
     /* a centred page and a left-aligned box are different places: switching between them moves the line at once */
     if (anchor && !!anchor.center !== Number.isFinite(center)) anchor = null;
     /* 2026-11-20 (CHAOS;CHILD acceptance: 「発生は、突然だった。」 sat right of the game's centre): a centred line's middle is measured
        again while it types (the first boxes give a middle too far left or right); only its top is kept */
-    if (anchor && anchor.center && Number.isFinite(center) && anchorLine === lineKey && Math.abs(a[1] - anchor[1]) < size * 2) a = [center, anchor[1]];
+    /* 2026-11-28 (review, アオイトリ（青鸟）: a game glyph that never gets a box, 「…なりたかった」」 without its 」): a middle projected
+       over glyphs still to come is an estimate; one within the same text box's slack of the line's place keeps that place, so the
+       line does not move sideways while it types (the drawn row is measured again when nothing is left to come) */
+    if (anchor && anchor.center && Number.isFinite(center) && anchorLine === lineKey && Math.abs(a[1] - anchor[1]) < size * 2) a = [projected && Math.abs(center - anchor[0]) <= Math.max(6, size * .6) ? anchor[0] : center, anchor[1]];
     else if (anchor && anchorLine === lineKey && Math.abs(a[0] - anchor[0]) < size * 2 && Math.abs(a[1] - anchor[1]) < size * 2) a = anchor;
     else if (anchor && Math.abs(a[0] - anchor[0]) <= Math.max(6, size * .6) && Math.abs(a[1] - anchor[1]) <= Math.max(6, size * .6)) a = anchor;
     /* 2026-11-19 (audit of 528a2bae): a game that indents narration by one full-width space and starts dialogue with 「 at the
@@ -1005,15 +1010,17 @@
        box). A box that really moved (another text box, a different scene layout) moves it. */
     if (anchorMode && !line.nativeCells) {
       /* 2026-11-20 (user, CHAOS;CHILD: 「排版要贴近游戏」 — narration centred mid-screen, a dialogue box left-aligned): the game's rows
-         decide where the reader breaks the line and whether the block is centred; size and wrap width stay the user's.
+         decide where the reader breaks the line and whether the block is centred; size stays the user's, and so does the wrap
+         width, except that a centred line the game keeps on one row is not wrapped (rowBreaks).
          A sentence whose first part the game drew earlier (core/page-text.cjs `continues`) keeps the place that part had. */
-      const later = j => idx[j] != null && !boxes[j]; /* a character of the game's line it has not drawn yet */
-      const rows = gameRows(boxes, size, map, leftEdge, shown.filter((_, j) => later(j)).length), lead = idx.findIndex(k => k != null), firstBox = boxes.find(Boolean), atLeft = !!firstBox && Number.isFinite(leftEdge) && Math.abs(firstBox[0] - leftEdge) <= size * .5;
+      const later = j => idx[j] != null && !boxes[j], glyph = j => Math.floor(idx[j]); /* a character of the game's line it has not drawn yet; its game glyph */
+      const pending = new Set(shown.map((_, j) => later(j) ? glyph(j) : null).filter(g => g != null)).size;
+      const rows = gameRows(boxes, size, map, leftEdge, pending, glyph), lead = idx.findIndex(k => k != null), firstBox = boxes.find(Boolean), atLeft = !!firstBox && Number.isFinite(leftEdge) && Math.abs(firstBox[0] - leftEdge) <= size * .5;
       /* 2026-11-20 (user: a centred line started at the left as 「流」 while the game typed it): with under half of the line's boxes known
          the centring cannot be measured yet; a page that was centred stays centred on the same middle until it can */
       /* a line whose first characters start at the left edge of the page's left-aligned lines is not centred, whatever came before */ if (!Number.isFinite(rows.center) && anchor && anchor.center && !atLeft && boxes.filter(Boolean).length < shown.length * .5) rows.center = anchor[0]; b.textPlaceRows = { text: readerText, rows: rows.rows.map(r => [Math.round(r.l), Math.round(r.r), Math.round(r.t), r.first]), center: rows.center, boxes: boxes.map(r => r && r.map(Math.round)), idx };
       fxCount('paired', line.text);
-      if (!(anchor && lead >= 3 && Number(b.hookSourceContinues) > 0)) anchorFrom(boxes.filter(Boolean), size, map, String(line.text || ''), rows.center);
+      if (!(anchor && lead >= 3 && Number(b.hookSourceContinues) > 0)) anchorFrom(boxes.filter(Boolean), size, map, String(line.text || ''), rows.center, !!rows.single && pending > 0);
       /* the page's earlier lines stay above only when the game drew this line under them; a line that starts at or above
          where the last one ended is a new page (a title card, a cleared box), whatever the text stream said */
       { const k = String(line.text || ''), first = rows.rows[0], seq = Number(sentence.dataset.sequence) || 0; if (k !== rowsLine) { /* only the line placed just before counts (lines skipped through were never placed) */ rowsFresh = !(rowsPrev && rowsSeq && seq - rowsSeq <= 1 && first && first.t >= rowsPrev - size * .3 && Number.isFinite(rows.center) === rowsCentred); /* a centred page and a text box are never one page */ rowsCentred = Number.isFinite(rows.center); rowsPrev = rows.rows.length ? rows.rows[rows.rows.length - 1].t + size : null; rowsLine = k; rowsSeq = seq; } }
@@ -1037,7 +1044,9 @@
          squeeze does not change when it completes; reader characters the game has no place for (a repeated copy) never fit */
       const bottomRow = !line.fallback && rowsFresh && Number.isFinite(rows.center) && rows.rows.length === 1 &&
         rows.rowOf.every((i, j) => i === 0 || oneRow && later(j)) && first.t + firstBox[3] * 2 >= map.bounds[3] - 1;
-      pin(win, sentence, bottomRow ? (oneRow ? rows.single : first) : null);
+      /* the projected row on the line's place (a projected middle is kept within the box's slack, anchorFrom) */
+      const fit = oneRow ? { l: anchor[0] - (rows.single.r - rows.single.l) / 2, r: anchor[0] + (rows.single.r - rows.single.l) / 2 } : first;
+      pin(win, sentence, bottomRow ? fit : null);
       return;
     }
     document.body.classList.remove('megulit-place-fallback');
