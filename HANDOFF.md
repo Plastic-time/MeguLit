@@ -22,7 +22,6 @@
 
 | 游戏 | VNDB | 发行版 | 引擎 | 状态 | 谁 | PR / seed |
 |---|---|---|---|---|---|
-| 魚魚棟 · Claude | 知识入口整理：新增 docs/README.md 总目录、精简 AGENTS.md（细则挪进 docs/dev-rules.md、docs/architecture.md） | — | docs/agents-slim、docs/readme-toc | 11-29 | 等合并（PR #1440 AGENTS 精简，需 RRFZ 过目；#1441 docs 目录） |
 | 魚魚棟 · Claude | 适配贡献默认开启：不提示，所有版本默认开，每次更新对所有人重新开启；设置 → 游戏库可关到下次更新 | — | fix/contrib-default-on | 11-28 | 完成（PR #1356） |
 | 千恋＊万花 | v19073 | 待补 | KiriKiri | verified | 魚魚棟 | kirikiri/senren-banka |
 | ファタモルガーナの館 | v12402 | 待补 | KiriKiri | owner-ok | 魚魚棟 | kirikiri/fata-morgana |
@@ -42,6 +41,7 @@
 
 | 谁 | 做什么 | issue | 分支 | 开始 | 状态 |
 |---|---|---|---|---|---|
+| 魚魚棟 · Claude | 知识入口整理：新增 docs/README.md 总目录、精简 AGENTS.md（细则挪进 docs/dev-rules.md、docs/architecture.md） | — | docs/agents-slim、docs/readme-toc | 11-29 | 等合并（PR #1440 AGENTS 精简，需 RRFZ 过目；#1441 docs 目录） |
 | 魚魚棟 · Claude | 隐藏原文时原文第二行露出（たいせつなきみのために、ぼくにできるいちばんのこと（只要你不再悲伤），Ciel 逐字 TextOutA，GDI 隐藏的单字 3 秒窗口过后没藏）：Ciel 引擎在 hook DLL 里开「按台词顺序续藏」 | — | fix/taisetsuna-second-line | 11-29 | 在做 |
 | 魚魚棟 · Claude | 隐藏原文时名字框的说话人名字也被藏（1.4.26 群反馈）：先撤回 #1436 的通用字号规则，再按引擎声明 hide.nameChannel（Ciel 首个），没声明的引擎阅读层补画名牌 | — | fix/revert-1436、fix/speaker-name-channel | 11-29 | 等 CI（撤回 PR #1439）；按引擎声明在做 |
 | 魚魚棟 · Claude | 1.4.26 游戏库刷新要等特别久：刷新先出列表，VNDB 查询放后台并缓存（54 部假库：刷新 35 s → 1.6 s） | — | fix/library-refresh-speed | 11-29 | 等 CI（PR #1423） |
