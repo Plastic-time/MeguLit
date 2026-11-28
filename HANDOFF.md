@@ -43,7 +43,7 @@
 |---|---|---|---|---|---|
 | 魚魚棟 · Claude | 点「原声」不发音：游戏删除或移动后仍标原声、点了读不到也不说原因；改为按能否读到标注，读不到时写明原因并改用合成朗读 | — | fix/game-voice-replay | 11-28 | 在做 |
 | 魚魚棟 · Claude | 文库内置书源：成为小说家吧（日文）+ 哩哩轻小说（中文）自动配对、日中逐段对照阅读，书源设置加说明和测试连接；relay 抓取代理只写方案等店主定 | — | claude/novel-bilingual | 11-28 | 等 CI（PR #1410） |
-| 魚魚棟 · Claude | 排行榜加 Gal / 轻小说 / 乙游作品榜（VNDB、Bangumi、AniList，relay 每日拉取，需部署 relay） | — | feat/work-charts | 11-28 | 等 CI（PR #1408） |
+| 魚魚棟 · Claude | 广场：作品榜、按游戏卡片、切换限流、交流适配请求、关于页统计 | — | feat/work-charts | 11-28 | 等合并（PR #1408，CI 绿；relay 需部署） |
 | 魚魚棟 · Claude | 1.4.26 设置「运行组件」中文残缺（注→汪、语缺顶）、简繁字体混排；disc-mount 补中文名和说明 | — | claude/runtime-list-cjk | 11-28 | 等 CI |
 | 魚魚棟 · Claude | 语音「已就绪」却读不出声音（1.4.26 群反馈）：引擎启动卡在连 huggingface.co，改离线启动；已就绪按引擎实际响应；读取失败写明原因和下一步 | — | fix/aivis-ready-voices | 11-28 | 在做 |
 | RRFZ · Claude | アオイトリ（青鸟）开场选流：只有两个假名的第一句没选流、先选到缺字的上下文 | — | rrfz/cmvs-startup-stream | 11-28 | 在做：实测通过，按评审返工 |
