@@ -456,6 +456,181 @@ static void BottomDialogueWithUntracedTail(GlyphLearner &g, TailGeometry geometr
  }
 }
 
+static void VisibleThenHiddenDialogue(GlyphLearner &g, bool expectClean) {
+ std::vector<std::string> offsets;
+ g.emit = [&](const std::string &r) { if (r.find("ToMe_CHARS engine=gpu line=2 ") == 0) offsets.push_back(r); };
+ auto draw = [&](const std::vector<Quad> &q, unsigned now) {
+  return g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now);
+ };
+ auto prior = Row(4, 940, 334, 32, 0.1f);
+ for (unsigned i = 0; i < prior.size(); i++) prior[i].glyph = i + 1;
+ g.Line(L"ABCD", 10000);
+ draw(prior, 10001);
+ g.Frame(10002, 1280, 720);
+
+ auto row = Row(15, 414, 334, 32, 0.2f);
+ for (unsigned i = 0; i < row.size(); i++) row[i].glyph = i + 5;
+ const Quad spacer{ 388, 294, 392, 298, 0, 0, 4.f / 1024, 4.f / 2048, 0 };
+ auto partial = row;
+ partial.back() = spacer;
+ row.push_back(spacer);
+
+ g.readOnly = true;
+ g.Line(L"EFGHIJKLMNOPQRS", 15000);
+ assert(draw(partial, 15001).empty());
+ g.Frame(15002, 1280, 720);
+ assert(offsets.size() == 1 && offsets.front().find("hidden=0 ") != std::string::npos);
+ g.readOnly = false;
+ assert(draw(partial, 15017).size() == 14);
+ g.Frame(15018, 1280, 720);
+ assert(offsets.size() == (expectClean ? 1 : 2));
+
+ assert(draw(row, 15034).size() == 15);
+ g.Frame(15035, 1280, 720);
+ assert(offsets.size() == 2 && offsets.back().find("hidden=1 ") != std::string::npos);
+ const char *start = expectClean ? "rects=414,334,32,32;" : "rects=388,294,4,4;";
+ assert(offsets.back().find(start) != std::string::npos);
+ if (expectClean) assert(offsets.back().find(";806,334,32,32 text=") != std::string::npos);
+}
+
+enum class RewriteTiming { AfterLine, BeforeLine, Stale };
+
+static void RewrittenBodyAtlas(GlyphLearner &g, RewriteTiming timing, bool expectPosition) {
+ std::vector<std::string> offsets;
+ g.emit = [&](const std::string &r) { if (r.find("ToMe_CHARS engine=gpu line=2 ") == 0) offsets.push_back(r); };
+ auto draw = [&](const std::vector<Quad> &q, unsigned now) {
+  return g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now);
+ };
+ auto row = Row(17, 386, 656, 32, 0.2f);
+ for (unsigned i = 0; i < row.size(); i++) row[i].glyph = i + 1;
+ g.Line(L"ABCDEFGHIJKLMNOPQ", 10000);
+ draw(row, 10001);
+ g.Frame(10002, 1280, 720);
+ if (timing == RewriteTiming::Stale) {
+  // These writes already belonged to the previous hidden report.
+  row[0].glyph = 19;
+  row[1].glyph = 18;
+ }
+ draw(row, 10017);
+ g.Frame(10018, 1280, 720);
+
+ if (timing == RewriteTiming::BeforeLine) {
+  // CMVS has drawn the first new cells before the hook delivers the line.
+  row[0].glyph = 19;
+  row[1].glyph = 18;
+  draw(std::vector<Quad>(row.begin(), row.begin() + 2), 10340);
+  g.Frame(10341, 1280, 720);
+ }
+ const unsigned lineAt = timing == RewriteTiming::Stale ? 10130 : 10500;
+ g.Line(L"QRSTUVWXYZABCDEFG", lineAt);
+ if (timing == RewriteTiming::AfterLine) {
+  assert(draw(row, lineAt + 1).size() == row.size()); // The old drawing can outlive LINE.
+  g.Frame(lineAt + 2, 1280, 720);
+  assert(offsets.empty());
+  row[1].glyph = 18;
+  draw(row, lineAt + 18);
+  g.Frame(lineAt + 19, 1280, 720);
+  assert(offsets.empty()); // A single change is not enough to claim the whole row.
+  row[0].glyph = 19;
+ }
+ const std::vector<Quad> partial(row.begin(), row.end() - 1);
+ draw(partial, lineAt + 35);
+ g.Frame(lineAt + 36, 1280, 720);
+ assert(offsets.empty());
+
+ assert(draw(row, lineAt + 52).size() == row.size());
+ g.Frame(lineAt + 53, 1280, 720);
+ draw(row, lineAt + 69);
+ g.Frame(lineAt + 70, 1280, 720);
+ assert(offsets.size() == (expectPosition ? 1 : 0));
+ if (expectPosition) {
+  assert(offsets.front().find("hidden=1 ") != std::string::npos);
+  assert(offsets.front().find("n=17 rects=386,656,32,32;") != std::string::npos);
+  assert(offsets.front().find(";834,656,32,32 text=") != std::string::npos);
+ }
+}
+
+enum class BodyStart { Learned, Initial, BoxTiles };
+
+static void BodyWithUntracedCells(GlyphLearner &g, bool atlasRun, bool expectClean, BodyStart start = BodyStart::Learned) {
+ const bool initial = start == BodyStart::Initial;
+ const std::string prefix = initial ? "ToMe_CHARS engine=gpu line=1 " : "ToMe_CHARS engine=gpu line=2 ";
+ std::vector<std::string> offsets;
+ g.emit = [&](const std::string &r) { if (r.find(prefix) == 0) offsets.push_back(r); };
+ auto draw = [&](const std::vector<Quad> &q, unsigned now) {
+  return g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, q, now);
+ };
+ if (!initial) {
+  auto prior = Row(11, 470, 656, 32, 0.15f);
+  for (unsigned i = 0; i < prior.size(); i++) prior[i].glyph = i + 1;
+  g.Line(L"ABCDEFGHIJK", 10000);
+  draw(prior, 10001);
+  g.Frame(10002, 1280, 720);
+ }
+
+ auto row = Row(23, 302, 656, 32, 0);
+ for (unsigned i = 0; i < row.size(); i++) {
+  auto &q = row[i];
+  q.u0 = ((i + 1) % 14) * 72.f / 1024;
+  q.v0 = ((i + 1) / 14) * 72.f / 2048;
+  q.u1 = q.u0 + 32.f / 1024;
+  q.v1 = q.v0 + 32.f / 2048;
+  q.glyph = i == 1 || i == 8 || i >= 19 ? 0 : i + 12;
+ }
+ if (!atlasRun) {
+  row[8].u0 += 4.f / 1024;
+  row[8].u1 += 4.f / 1024;
+ }
+ const Quad spacer{ 276, 616, 280, 620, 0, 0, 4.f / 1024, 4.f / 2048, 0 };
+ g.Line(L"ABCDEFGHIJKLMNOPQRSTUVW", 15000);
+ if (initial) {
+  // The very first complete frame has all the body glyphs and the same-atlas spacer.
+  row.push_back(spacer);
+  assert(draw(row, 15001).empty());
+  g.Frame(15002, 1280, 720);
+  assert(offsets.size() == (expectClean ? 1 : 0));
+  const auto dropped = draw(row, 15017);
+  g.Frame(15018, 1280, 720);
+  assert(dropped.size() == (expectClean ? 23 : 0));
+  assert(offsets.size() == (expectClean ? 2 : 0));
+  if (expectClean) {
+   assert(offsets.back().find(prefix + "hidden=1 ") == 0);
+   assert(offsets.back().find("n=23 rects=302,656,32,32;") != std::string::npos);
+   assert(offsets.back().find(";918,656,32,32 text=") != std::string::npos);
+  }
+  return;
+ }
+ if (start == BodyStart::BoxTiles) {
+  g.Frame(15000, 1280, 720);
+  g.Frame(15001, 1280, 720);
+  std::vector<Quad> tiles;
+  for (int i = 0; i < 7; i++) {
+   const float x = 276.f + 28 * i, u = i / 32.f;
+   tiles.push_back({ x, 616, x + 28, 644, u, 0, u + 28.f / 1280, 28.f / 720, 0 });
+   const float mid = i ? x - 2 : x;
+   tiles.push_back({ mid, 644, mid + 32, 688, u, 0.1f, u + 32.f / 1280, 0.1f + 44.f / 720, 0 });
+   tiles.push_back({ x, 686, x + 28, 714, u, 0.2f, u + 28.f / 1280, 0.2f + 28.f / 720, 0 });
+  }
+  assert(g.Draw((void *)2, 1280, 720, nullptr, 1280, 720, 1280, 720, tiles, 15002).empty());
+  draw({ row[6], row[7] }, 15002);
+ } else {
+  std::vector<Quad> partial(row.begin(), row.end() - 1);
+  partial.push_back(spacer);
+  draw(partial, 15002);
+ }
+ g.Frame(15003, 1280, 720);
+ assert(offsets.size() == (expectClean ? 0 : 1));
+
+ row.push_back(spacer);
+ draw(row, 15017);
+ g.Frame(15018, 1280, 720);
+ assert(offsets.size() == 1);
+ assert(offsets.front().find(prefix + "hidden=1 ") == 0);
+ const char *legacyStart = start == BodyStart::BoxTiles ? "n=23 rects=276,616,28,28;" : "n=23 rects=276,616,4,4;";
+ assert(offsets.front().find(expectClean ? "n=23 rects=302,656,32,32;" : legacyStart) != std::string::npos);
+ if (expectClean) assert(offsets.front().find(";918,656,32,32 text=") != std::string::npos);
+}
+
 static void RetainedDialogueRows() {
  Littlecheese::Rows rows;
  unsigned now = 1000;
@@ -590,6 +765,27 @@ int main() {
  BottomDialogueWithUntracedTail(combinedAtlas, TailGeometry::OnPitch, true, true);
  GlyphLearner combinedAtlasDisabled;
  BottomDialogueWithUntracedTail(combinedAtlasDisabled, TailGeometry::OnPitch, false, true);
+ for (bool enabled : {false, true}) {
+  GlyphLearner visible;
+  visible.bodyRecheck = enabled;
+  VisibleThenHiddenDialogue(visible, enabled);
+  for (auto timing : { RewriteTiming::AfterLine, RewriteTiming::BeforeLine, RewriteTiming::Stale }) {
+   GlyphLearner rewritten;
+   rewritten.bodyRecheck = enabled;
+   RewrittenBodyAtlas(rewritten, timing, enabled && timing != RewriteTiming::Stale);
+  }
+  for (bool atlasRun : {false, true}) {
+   GlyphLearner untraced;
+   untraced.bodyRecheck = enabled;
+   BodyWithUntracedCells(untraced, atlasRun, enabled && atlasRun);
+   GlyphLearner initial;
+   initial.bodyRecheck = enabled;
+   BodyWithUntracedCells(initial, atlasRun, enabled && atlasRun, BodyStart::Initial);
+  }
+  GlyphLearner tiled;
+  tiled.bodyRecheck = enabled;
+  BodyWithUntracedCells(tiled, true, enabled, BodyStart::BoxTiles);
+ }
  RetainedDialogueRows();
  Sact2DialogueScope();
  puts("PASS dialogue scope: unclaimed title/menu, foreign target, unmatched ruby kept; confirmed dialogue hides; read/OFF restore");

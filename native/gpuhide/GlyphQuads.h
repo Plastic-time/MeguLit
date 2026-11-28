@@ -44,6 +44,8 @@ struct GlyphLearner {
  std::function<void(const std::string &)> emit; void (*log)(const char *, ...) = nullptr;
  bool readOnly = false;
  bool bodyRecheck = false;
+ static const unsigned BodyHookGraceMs = 250;
+ unsigned bodyReportAt = 0;
  // line
  std::vector<bool> blankAt; unsigned nb = 0; // the line with its interior blanks (engines that draw a blank glyph for a space)
  /* 2026-11-20 (CHAOS;CHILD: a page keeps its earlier lines while the next one types out): the places the earlier lines of the page
@@ -382,45 +384,108 @@ struct GlyphLearner {
   const float cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;
   return cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1 && BodyHeight(r);
  }
- bool FixedPitchBody(const std::vector<Rect> &body) const {
-  // CMVS can finish a fixed-pitch row with up to two quads whose atlas cells were not traced.
-  if (body.size() < 5 || !body[0].traced || !body[1].traced) return false;
+ // This CMVS atlas packs the line in order in a 72-pixel grid, after the spacer at cell zero.
+ bool BodyAtlasRun(const Group &g, const std::vector<Rect> &body) const {
+  if (g.tw != 1024 || g.th != 2048 || (learned && !atlases.count(AtlasKey(NULL, g.tex)))) return false;
+  const unsigned cell = 72, columns = g.tw / cell;
+  const unsigned uStep = cell * 4096 / g.tw, vStep = cell * 4096 / g.th;
+  std::vector<bool> matched(body.size());
+  size_t count = 0;
+  for (const auto &key : g.keys) {
+   const auto &seen = key.second;
+   if (seen.lastFrame != frameNo - 1) continue;
+   if (!learned && ((int)(seen.firstAt - (lineAt - BodyHookGraceMs)) < 0 ||
+       (prevLineAt && (int)(seen.firstAt - prevLineAt) <= 0))) continue;
+   // Draw packs the quantized atlas coordinates into the low 30 bits of the key.
+   const unsigned long long uv = key.first;
+   const unsigned u = (uv >> 15) & 0x7fff, v = uv & 0x7fff;
+   if (u % uStep || v % vStep || u / uStep >= columns) continue;
+   const unsigned ordinal = (v / vStep) * columns + u / uStep;
+   if (ordinal == 0 || ordinal > body.size() || matched[ordinal - 1] ||
+       !SamePlace(body[ordinal - 1], seen.r)) continue;
+   matched[ordinal - 1] = true;
+   if (++count == body.size()) return true;
+  }
+  return false;
+ }
+ bool FixedPitchBody(const std::vector<Rect> &body, const Group *atlas = nullptr) const {
+  if (body.size() < 5 || !body[0].traced) return false;
+  const float height = learned ? glyphH : body[0].y1 - body[0].y0;
   const float pitch = body[1].x0 - body[0].x0;
-  if (pitch <= 0 || pitch > glyphH) return false;
+  if (pitch <= 0 || pitch > height) return false;
+  bool tracedPrefix = body[1].traced;
   unsigned untraced = 0;
   for (size_t i = 0; i < body.size(); i++) {
    const auto &r = body[i];
-   if (!BodyInBand(r) || std::fabs(r.y0 - body[0].y0) > 1 ||
+   const bool bodySize = learned ? BodyInBand(r) : std::fabs((r.y1 - r.y0) - height) <= height * 0.2f;
+   if (!bodySize || std::fabs(r.y0 - body[0].y0) > 1 ||
        (i > 0 && std::fabs(r.x0 - body[i - 1].x0 - pitch) > 1)) return false;
    if (!r.traced) untraced++;
-   else if (untraced) return false;
+   else if (untraced) tracedPrefix = false;
   }
-  return untraced <= 2;
+  // Initial calibration and missing interior traces both require a confirmed atlas run.
+  return (learned && tracedPrefix && untraced <= 2) ||
+   (atlas && untraced <= body.size() / 3 && BodyAtlasRun(*atlas, body));
+ }
+ // The bubble spacer can also keep the first complete row from matching during calibration.
+ std::vector<Rect> InitialBody(const Group &g) const {
+  if (n < 6 || g.rt || g.tw != 1024 || g.th != 2048 || g.frame.size() < n) return {};
+  const auto first = std::find_if(g.frame.begin(), g.frame.end(), [](const Rect &r) { return r.traced; });
+  if (first == g.frame.end()) return {};
+  std::vector<Rect> row;
+  for (const auto &r : g.frame) if (std::fabs(r.y0 - first->y0) <= 1) row.push_back(r);
+  auto body = Chars(std::move(row));
+  if (body.size() != n || !FixedPitchBody(body, &g)) return {};
+  return body;
  }
  // A spacer or a column of box tiles to the left can make a partial row count as complete.
- bool PartialBodyWithBoxTrim(const std::vector<Rect> &rects) const {
+ bool PartialBodyWithBoxTrim(const Group &g, const std::vector<Rect> &rects) const {
   const auto &trim = rects.front();
   if (trim.traced) return false;
   const auto first = std::find_if(rects.begin() + 1, rects.end(), [](const Rect &r) { return r.traced; });
   if (first == rects.end() || trim.x0 >= first->x0 || trim.y1 >= first->y0) return false;
+  // A cross-atlas match can be mostly box tiles. These tiles straddle the top of the glyph row.
+  const size_t tiles = std::count_if(rects.begin(), rects.end(), [&](const Rect &r) {
+   return !r.traced && !BodyHeight(r) && r.y0 < first->y0 && r.y1 > first->y0;
+  });
+  if (tiles >= 4 && tiles * 4 >= rects.size()) return true;
   std::vector<Rect> row;
   for (const auto &r : rects) {
    if (!r.traced && std::fabs(r.x0 - trim.x0) <= 1 && std::fabs(r.y0 - first->y0) > 1) continue;
    row.push_back(r);
   }
-  return rects.size() - row.size() <= 3 && FixedPitchBody(row);
+  return rects.size() - row.size() <= 3 && FixedPitchBody(row, &g);
  }
- std::vector<Rect> BodyRects(std::vector<Rect> rects, const std::vector<Rect> &retained, bool allowUntracedTail = false) const {
+ std::vector<Rect> BodyRects(std::vector<Rect> rects, const std::vector<Rect> &retained, const Group *atlas = nullptr) const {
   rects.erase(std::remove_if(rects.begin(), rects.end(), [&](const Rect &r) {
    // Bubble tiles can keep an earlier rectangle alive after its glyph has gone.
-   const bool outsideBody = allowUntracedTail ? !BodyInBand(r) : !r.traced || !BodyHeight(r);
+   const bool outsideBody = atlas ? !BodyInBand(r) : !r.traced || !BodyHeight(r);
    return outsideBody || (Earlier(r) && std::any_of(retained.begin(), retained.end(),
     [&](const Rect &e) { return SamePlace(e, r); }));
   }), rects.end());
   if (rects.size() < n) return {};
   auto body = Chars(Cluster(Chars(std::move(rects))));
-  if (allowUntracedTail && (body.size() != n || !FixedPitchBody(body))) return {};
+  if (atlas && (body.size() != n || !FixedPitchBody(body, atlas))) return {};
   return body;
+ }
+ // CMVS can reuse both the position and UV of an older glyph. Require changes at two
+ // distinct places in a complete row before accepting the reused keys as the new line.
+ bool RewrittenBody(const Group &g, const std::vector<Rect> &row) const {
+  if (row.size() != n || !FixedPitchBody(row)) return false;
+  // The game can draw the first updated cells before LINE reaches the GPU thread.
+  const Rect *first = nullptr;
+  for (const auto &key : g.keys) {
+   const auto &seen = key.second;
+   if (seen.lastFrame != frameNo - 1 || !seen.r.traced || (int)(seen.tracedAt - seen.firstAt) <= 0 ||
+       (int)(seen.tracedAt - (lineAt - BodyHookGraceMs)) < 0 ||
+       (prevLineAt && (int)(seen.tracedAt - prevLineAt) <= 0) ||
+       (bodyReportAt && (int)(seen.tracedAt - bodyReportAt) <= 0)) continue;
+   const auto place = std::find_if(row.begin(), row.end(), [&](const Rect &r) { return SamePlace(r, seen.r); });
+   if (place == row.end()) continue;
+   if (first && first != &*place) return true;
+   first = &*place;
+  }
+  return false;
  }
  // Same-atlas spacers and decorations have no traced glyph cell.
  static std::vector<Rect> TracedChars(std::vector<Rect> rects) {
@@ -446,6 +511,7 @@ struct GlyphLearner {
   if (!earlierKeys.empty()) { size_t on = 0; for (auto &e : earlierKeys) { auto g = groups.find(e.first); if (g == groups.end()) continue; auto it = g->second.keys.find(e.second); if (it != g->second.keys.end() && frameNo - it->second.lastFrame <= 2) on++; } if (on * 2 < earlierKeys.size()) { earlierKeys.clear(); earlierRects.clear(); } }
   const bool settled = reported && hiddenSent == (hitSent && !readOnly);
   const bool recheck = bodyRecheck && !readOnly;
+  const bool firstHidden = recheck && areaTraced && hitSent && !hiddenSent;
   const bool mixed = recheck && reported && areaTraced && std::any_of(lastRects.begin(), lastRects.end(),
    [&](const Rect &r) { return !r.traced && !BodyHeight(r); });
   if (settled && !mixed) return;
@@ -456,7 +522,11 @@ struct GlyphLearner {
    Group &g = kv.second; std::vector<Rect> fresh, live, freshTraced, retainedBody;
    if (learned && (g.rtW != areaW || g.rtH != areaH)) continue;
    const bool currentFrame = g.prevFrame == frameNo - 1, fromAtlas = atlases.count(AtlasKey(NULL, g.tex)) > 0;
-   const bool checkBody = recheck && (!reported || mixed) && currentFrame && fromAtlas && g.rt == areaRt;
+   if (recheck && !learned && currentFrame) {
+    const auto body = InitialBody(g);
+    if (!body.empty()) { Report(g, body); return; }
+   }
+   const bool checkBody = recheck && (!reported || mixed || firstHidden) && currentFrame && fromAtlas && g.rt == areaRt;
    if (settled && !checkBody) continue;
    Rect screen{};
    const bool canMove = learned && !readOnly && !reported && currentFrame && g.rt == areaRt &&
@@ -481,8 +551,8 @@ struct GlyphLearner {
     // Confirm the whole row against fresh keys before counting those positions again.
     auto body = BodyRects(g.frame, retainedBody), newBody = BodyRects(fresh, retainedBody);
     if (hitSent && areaTraced && (body.size() != n || newBody.size() != n)) {
-     body = BodyRects(g.frame, retainedBody, true);
-     newBody = BodyRects(fresh, retainedBody, true);
+     body = BodyRects(g.frame, retainedBody, &g);
+     newBody = BodyRects(fresh, retainedBody, &g);
     }
     const bool moved = canMove && !hitSent && Relocated(body, newBody);
     if ((hitSent || moved) && body.size() == n && newBody.size() == n &&
@@ -492,6 +562,10 @@ struct GlyphLearner {
       return std::any_of(body.begin(), body.end(), [&](const Rect &b) { return SamePlace(r, b); });
      });
      if (!reported || shared > n / 2) { Report(g, body, moved); return; }
+    }
+    if (firstHidden) {
+     const auto row = BodyRects(g.frame, {});
+     if (RewrittenBody(g, row)) { Report(g, row); return; }
     }
    }
    if (settled) continue;
@@ -553,8 +627,8 @@ struct GlyphLearner {
  }
  void Report(Group &g, const std::vector<Rect> &cs, bool moved = false) {
   // Wait for the row: even a later correction can leave the reader pinned to its first position.
-  if (bodyRecheck && !readOnly && hitSent && areaTraced && !reported && cs.size() == n && cs.size() >= 6 &&
-      g.rt == areaRt && PartialBodyWithBoxTrim(cs)) return;
+  if (bodyRecheck && !readOnly && hitSent && areaTraced && !hiddenSent && cs.size() == n && cs.size() >= 6 &&
+      g.rt == areaRt && PartialBodyWithBoxTrim(g, cs)) return;
   if (moved) { learned = false; atlases.clear(); hitSent = false; }
   float h = 0; Rect box{ 1e30f, 1e30f, -1e30f, -1e30f }; for (auto &r : cs) { h += r.y1 - r.y0; box.x0 = (std::min)(box.x0, r.x0); box.y0 = (std::min)(box.y0, r.y0); box.x1 = (std::max)(box.x1, r.x1); box.y1 = (std::max)(box.y1, r.y1); } h /= cs.size();
   char b[256];
@@ -578,6 +652,7 @@ struct GlyphLearner {
   for (auto r : cs) { if (!ToScreen(g.rt, g.rtW, g.rtH, r)) { mapped = false; break; } char x[64]; snprintf(x, sizeof x, "%s%.0f,%.0f,%.0f,%.0f", rects.empty() ? "" : ";", r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0); rects += x; }
   if (!mapped) { if (log && frameNo % 60 == 0) log("rects not mapped yet: render target %p not composited", g.rt); return; } // try again next frame
   reported = true; hiddenSent = hidden; lastRects = cs; lastKeys.clear();
+  if (bodyRecheck && hidden) bodyReportAt = frameNow;
   { long long gk = GroupKey(g.rt, g.tex); for (auto &kv : groups) { if (kv.second.rt != g.rt) continue; for (auto &s : kv.second.keys) { if (frameNo - s.second.lastFrame > 2) continue; for (auto &c : cs) { float w = (std::min)(c.x1 - c.x0, s.second.r.x1 - s.second.r.x0), h = c.y1 - c.y0; if (std::fabs(c.x0 - s.second.r.x0) < 0.4f * w && std::fabs(c.y0 - s.second.r.y0) < 0.4f * h) { lastKeys.insert({ kv.first, s.first }); break; } } } } (void)gk; }
   std::string t;
   { std::string u; for (size_t i = 0; i < text.size(); i++) { unsigned c = text[i]; if (c >= 0xD800 && c < 0xDC00 && i + 1 < text.size()) { c = 0x10000 + ((c - 0xD800) << 10) + (text[++i] - 0xDC00); u += (char)(0xF0 | (c >> 18)); u += (char)(0x80 | ((c >> 12) & 63)); u += (char)(0x80 | ((c >> 6) & 63)); u += (char)(0x80 | (c & 63)); } else if (c < 0x80) u += (char)c; else if (c < 0x800) { u += (char)(0xC0 | (c >> 6)); u += (char)(0x80 | (c & 63)); } else { u += (char)(0xE0 | (c >> 12)); u += (char)(0x80 | ((c >> 6) & 63)); u += (char)(0x80 | (c & 63)); } } t = u; }
