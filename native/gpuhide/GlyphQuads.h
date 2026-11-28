@@ -339,7 +339,7 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
    if (!glyphSize && RubySized(x.y1 - x.y0) && RubyOver(Rect{ x.x0, x.y0, x.x1, x.y1 })) glyphSize = true; /* the line's ruby goes with it */
    bool redraw = (int)(redrawUntil - now) > 0 && rtW == areaW && rtH == areaH;
    const float cx = (x.x0 + x.x1) / 2, cy = (x.y0 + x.y1) / 2;
-   const bool hide = startup ? fixedCell && BodyStrategy::MaskStartup(*g, frameNo, k, r, !readOnly) :
+   const bool hide = startup ? BodyStrategy::MaskStartup(*g, frameNo, k, r, fixedCell, !readOnly) :
     learned && armed && !readOnly && glyphSize && (sameAtlas || sheet || redraw) &&
     cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1;
    if (hide) {
@@ -456,6 +456,13 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
   const bool settled = reported && hiddenSent == (hitSent && !readOnly);
   const auto policy = CmvsFrame();
   const bool mixed = policy.NeedsCorrection();
+  if (bodyRecheck && reported && learnedSeq == seq) {
+   const auto repaint = policy.FollowStartup(groups, readOnly);
+   if (repaint.ownsFrame) {
+    if (repaint.group) Report(*repaint.group, repaint.body, false, true);
+    return;
+   }
+  }
   if (settled && !mixed) return;
   const auto grid = policy.SelectGrid(groups, [&](void *tex) { return LearnedAtlas(tex); });
   if (grid.ownsFrame) {
@@ -580,7 +587,9 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
    area.x0 = 0; /* centred rows (CHAOS;CHILD) start further left than the learned line: the band spans the whole target so a new row's first glyphs never leak */ area.x1 = (std::max)(area.x1, (float)g.rtW); area.y0 = (std::min)(area.y0, box.y0 - h * 0.5f); area.x1 = (std::max)(area.x1, box.x1 + h * 0.5f); area.y1 = (std::max)(area.y1, box.y1 + h * 0.5f);
   }
   bool hidden = hitSent && !readOnly; std::string rects; bool mapped = true;
-  const auto projected = startup && cs.size() > n ? BodyStrategy::StartupPlacement(box, n) : std::vector<Rect>{};
+  // The wire protocol counts Unicode code points, while LINE uses UTF-16.
+  const size_t count = startup ? std::count_if(text.begin(), text.end(), [](wchar_t c) { return c < 0xdc00 || c > 0xdfff; }) : cs.size();
+  const auto projected = cs.size() > count ? BodyStrategy::StartupPlacement(box, count) : std::vector<Rect>{};
   const auto &placement = projected.empty() ? cs : projected;
   for (auto r : placement) { if (!ToScreen(g.rt, g.rtW, g.rtH, r)) { mapped = false; break; } char x[64]; snprintf(x, sizeof x, "%s%.0f,%.0f,%.0f,%.0f", rects.empty() ? "" : ";", r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0); rects += x; }
   if (!mapped) { if (log && frameNo % 60 == 0) log("rects not mapped yet: render target %p not composited", g.rt); return; } // try again next frame

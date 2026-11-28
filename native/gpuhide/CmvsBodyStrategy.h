@@ -9,10 +9,10 @@
 
 template <class Rect> struct CmvsBodyAtlas {
  bool identified = false, startupConfirmed = false;
- unsigned startupSeq = 0, startupFrame = 0, maskedFrame = 0;
+ unsigned startupSeq = 0, startupFrame = 0, maskedFrame = 0, changedFrame = 0;
  std::vector<Rect> startupCells;
  std::vector<bool> masked;
- bool visibleCell = false;
+ bool visibleCell = false, refreshing = false;
 };
 
 // The strategy reads the current line and learned band, and returns a group's
@@ -52,29 +52,32 @@ template <class Geometry> struct CmvsBodyStrategy {
    !atlas.startupCells.empty() && g.rtW == bw && g.rtH == bh;
  }
 
- static bool MaskStartup(Group &g, unsigned frame, long long key, const Rect &rect, bool mayHide) {
+ static bool MaskStartup(Group &g, unsigned frame, long long key, const Rect &rect, bool fixedCell, bool mayHide) {
   auto &atlas = g.cmvs;
   const int slot = BodyAtlasCell(key);
-  if (slot <= 0 || size_t(slot) > atlas.startupCells.size() ||
-      !Geometry::SamePlace(atlas.startupCells[slot - 1], rect)) return false;
+  if (slot <= 0) return false;
+  if (size_t(slot) > atlas.startupCells.size() || !Geometry::SamePlace(atlas.startupCells[slot - 1], rect)) {
+   if (fixedCell) atlas.changedFrame = frame;
+   return false;
+  }
   if (atlas.maskedFrame != frame) {
    std::fill(atlas.masked.begin(), atlas.masked.end(), false);
    atlas.maskedFrame = frame;
    atlas.visibleCell = false;
   }
-  if (!mayHide) { atlas.visibleCell = true; return false; }
+  if (!mayHide || !fixedCell) { atlas.visibleCell = true; return false; }
   atlas.masked[slot - 1] = true;
   return true;
  }
 
- static std::vector<Rect> StartupPlacement(const Rect &row, unsigned count) {
+ static std::vector<Rect> StartupPlacement(const Rect &row, size_t count) {
   // There is no character mapping for glyphs the hook missed. Give the hook
   // text contiguous boxes across the row, with shared rounded edges.
   std::vector<Rect> boxes;
   boxes.reserve(count);
   const float width = row.x1 - row.x0, top = std::round(row.y0), bottom = std::round(row.y1);
   float left = std::round(row.x0);
-  for (unsigned i = 0; i < count; ++i) {
+  for (size_t i = 0; i < count; ++i) {
    const float right = std::round(row.x0 + width * (i + 1) / count);
    boxes.push_back({left, top, right, bottom});
    left = right;
@@ -130,15 +133,11 @@ template <class Geometry> struct CmvsBodyStrategy {
     // A complete observed row is the probe. Publish placement only after a
     // later draw has actually hidden every one of those same cells.
     if (selection.startup) {
-     const bool masked = atlas.startupSeq == seq && atlas.maskedFrame == frameNo - 1 && !atlas.visibleCell &&
-      std::equal(selection.body.begin(), selection.body.end(), atlas.startupCells.begin(), atlas.startupCells.end(), Geometry::SamePlace) &&
-      std::all_of(atlas.masked.begin(), atlas.masked.end(), [](bool value) { return value; });
-     if (!masked) {
+     if (!MaskedStartup(atlas, selection.body)) {
       atlas.startupSeq = seq;
       atlas.startupFrame = frameNo;
       atlas.startupConfirmed = false;
-      atlas.startupCells = std::move(selection.body);
-      atlas.masked.assign(atlas.startupCells.size(), false);
+      SetStartupCells(atlas, std::move(selection.body));
       return {nullptr, {}, false, true};
      }
      atlas.startupConfirmed = true;
@@ -150,6 +149,39 @@ template <class Geometry> struct CmvsBodyStrategy {
       [&](const Rect &r) { return !Geometry::BodyInBand(r, area, glyphH); }));
    }
    return selection;
+  }
+
+  // Keep following the confirmed startup row while the hook still owns it.
+  // A repaint may translate the whole row or reveal more of the same run.
+  Selection FollowStartup(std::map<long long, Group> &groups, bool readOnly) const {
+   for (auto &entry : groups) {
+    Group &g = entry.second;
+    auto &atlas = g.cmvs;
+    if (g.rt || !AtlasSize(g.tw, g.th) || !atlas.startupConfirmed || atlas.startupSeq != seq) continue;
+    const Selection hold{nullptr, {}, false, true};
+    if (readOnly) return hiddenSent ? Selection{&g, lastRects, false, true, true} : hold;
+    if (g.rtW != bbW || g.rtH != bbH) return hold;
+    if (atlas.changedFrame == frameNo - 1 || atlas.refreshing) {
+     auto next = CurrentBodyGrid(g, true);
+     if (next.startup && RepaintOfLastRow(next.body) &&
+         !std::equal(next.body.begin(), next.body.end(), lastRects.begin(), lastRects.end(), Geometry::SamePlace)) {
+      if (MaskedStartup(atlas, next.body)) {
+       atlas.refreshing = false;
+       return {&g, std::move(next.body), false, true, true};
+      }
+      SetStartupCells(atlas, std::move(next.body));
+      atlas.refreshing = true;
+      return hold;
+     }
+     if (atlas.refreshing) {
+      SetStartupCells(atlas, lastRects);
+      atlas.refreshing = false;
+     }
+    }
+    if (!hiddenSent && MaskedStartup(atlas, lastRects)) return {&g, lastRects, false, true, true};
+    return hold;
+   }
+   return {};
   }
 
   // The bubble spacer can also keep the first complete row from matching during calibration.
@@ -196,6 +228,29 @@ template <class Geometry> struct CmvsBodyStrategy {
   }
 
  private:
+  static void SetStartupCells(CmvsBodyAtlas<Rect> &atlas, std::vector<Rect> cells) {
+   atlas.startupCells = std::move(cells);
+   atlas.masked.assign(atlas.startupCells.size(), false);
+  }
+
+  bool MaskedStartup(const CmvsBodyAtlas<Rect> &atlas, const std::vector<Rect> &body) const {
+   return atlas.startupSeq == seq && atlas.maskedFrame == frameNo - 1 && !atlas.visibleCell &&
+    std::equal(body.begin(), body.end(), atlas.startupCells.begin(), atlas.startupCells.end(), Geometry::SamePlace) &&
+    std::all_of(atlas.masked.begin(), atlas.masked.end(), [](bool value) { return value; });
+  }
+
+  bool RepaintOfLastRow(const std::vector<Rect> &body) const {
+   if (lastRects.empty() || body.size() < lastRects.size() ||
+       !std::all_of(body.begin(), body.end(), [&](const Rect &r) { return Geometry::BodyInBand(r, area, glyphH); })) return false;
+   const float dx = body.front().x0 - lastRects.front().x0;
+   const float dy = body.front().y0 - lastRects.front().y0;
+   return std::equal(lastRects.begin(), lastRects.end(), body.begin(), [&](Rect previous, const Rect &current) {
+    previous.x0 += dx; previous.x1 += dx;
+    previous.y0 += dy; previous.y1 += dy;
+    return Geometry::SamePlace(previous, current);
+   });
+  }
+
   // CMVS packs the line in order in a 72-pixel grid, after the spacer at cell zero.
   bool BodyAtlasRun(const Group &g, const std::vector<Rect> &body, bool fromAtlas) const {
    if (!AtlasSize(g.tw, g.th) || (learned && !fromAtlas)) return false;
@@ -222,10 +277,10 @@ template <class Geometry> struct CmvsBodyStrategy {
 
   // Only this frame's ordered atlas cells can describe the line. Counting the
   // box and font atlases together can fill a partial line with pieces of its box.
-  Grid CurrentBodyGrid(Group &g) const {
+  Grid CurrentBodyGrid(Group &g, bool extending = false) const {
    if (g.prevFrame != frameNo - 1) return {};
    // A cold row must include the atlas wrap from column 13 to column 0.
-   const bool tryStartup = !learned && n >= Columns && n == blankAt.size();
+   const bool tryStartup = (!learned || extending) && n >= Columns && n == blankAt.size();
    std::vector<const Seen *> cells(blankAt.size());
    std::vector<std::pair<unsigned, const Rect *>> tail;
    const Rect *spacer = nullptr;
@@ -280,7 +335,7 @@ template <class Geometry> struct CmvsBodyStrategy {
    // The same coordinates and UVs can be reused. Old cells alone cannot claim
    // a new line, while a second report of an already matched line can reuse them.
    const bool repeat = reported && std::equal(body.begin(), body.end(), lastRects.begin(), lastRects.end(), Geometry::SamePlace);
-   if (!traced || body.size() != n || (!repeat && fresh < (std::min)(n, 2u))) return {};
+   if (!traced || body.size() != n || (!extending && !repeat && fresh < (std::min)(n, 2u))) return {};
    const Rect &last = cells.back()->r;
    const bool startup = tryStartup && hasSpacer && std::fabs(last.y0 - first.y0) <= 1 &&
     std::all_of(cells.begin(), cells.end(), [](const Seen *cell) { return cell->fixedCell && cell->r.traced; });

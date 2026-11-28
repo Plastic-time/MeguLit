@@ -154,7 +154,9 @@ static void TwoRows(ReplayFixture &g) {
 // order and rectangles, including the four untraced cells beyond the first line.
 static std::vector<int> PaintCold(ReplayFixture &g, unsigned tick, const std::vector<Quad> &body, size_t count,
                                   unsigned width = 1024, unsigned height = 2048) {
- const auto row = Reveal(body, count);
+ auto row = Reveal(body, count);
+ row.front().u1 = 4.f / width;
+ row.front().v1 = 4.f / height;
  const auto split = row.begin() + (std::min)(row.size(), size_t(14));
  auto mask = g.Draw((void *)1, width, height, nullptr, 1280, 720, 1280, 720, {row.begin(), split}, tick);
  if (split != row.end()) {
@@ -174,15 +176,15 @@ static std::vector<int> BodyMask(int count) {
  return mask;
 }
 
-static std::string ColdPlacement() {
+static std::string ColdPlacement(bool hidden = true, int count = 19) {
  // The first cell starts at 302 and the last ends at 918 + 32.
  std::vector<Quad> boxes;
- for (int i = 0; i < 19; ++i) {
-  const float left = float(302 + (648 * i + 9) / 19);
-  const float right = float(302 + (648 * (i + 1) + 9) / 19);
+ for (int i = 0; i < count; ++i) {
+  const float left = float(302 + (648 * i + count / 2) / count);
+  const float right = float(302 + (648 * (i + 1) + count / 2) / count);
   boxes.push_back({left, 334, right, 366});
  }
- return Placement(1, true, boxes);
+ return Placement(1, hidden, boxes);
 }
 
 // Synthesized from the startup log: the hook sends 19 characters, but the
@@ -233,6 +235,10 @@ static void CheckColdAtlasGuards() {
  offGrid[4].u0 += 1.f / 1024;
  offGrid[4].u1 += 1.f / 1024;
  rejects(offGrid, 1024, 2048, true, false);
+ offGrid = good;
+ offGrid[4].v0 += 1.f / 2048;
+ offGrid[4].v1 += 1.f / 2048;
+ rejects(offGrid, 1024, 2048, true, false);
 
  auto narrow = good;
  for (size_t i = 0; i < narrow.size(); ++i) {
@@ -246,10 +252,27 @@ static void CheckColdAtlasGuards() {
  auto wrongCrop = good;
  wrongCrop[6].v1 += 4.f / 2048;
  rejects(wrongCrop, 1024, 2048, true, false);
+ wrongCrop = good;
+ wrongCrop[6].u1 += 4.f / 1024;
+ rejects(wrongCrop, 1024, 2048, true, false);
 
  auto displacedTail = good;
  displacedTail.back().x0 += 4;
  displacedTail.back().x1 += 4;
+ rejects(displacedTail, 1024, 2048, true, false);
+ displacedTail = good;
+ displacedTail.back().y0 += 4;
+ displacedTail.back().y1 += 4;
+ rejects(displacedTail, 1024, 2048, true, false);
+ displacedTail = good;
+ displacedTail.back().u0 += 72.f / 1024;
+ displacedTail.back().u1 += 72.f / 1024;
+ rejects(displacedTail, 1024, 2048, true, false);
+ displacedTail = good;
+ displacedTail.back().x1 += 8;
+ rejects(displacedTail, 1024, 2048, true, false);
+ displacedTail = good;
+ displacedTail.back().y1 += 8;
  rejects(displacedTail, 1024, 2048, true, false);
 
  // A redraw in hide mode cannot remove a trailing cell already drawn in read mode.
@@ -276,6 +299,116 @@ static void CheckColdAtlasGuards() {
  PaintCold(g, 10035, good, good.size());
  CheckPlacements(g, {ColdPlacement()});
  if (!storeDecoy(10052).empty()) throw std::runtime_error("cold-start learning claimed a different atlas");
+}
+
+static void CheckLateColdTail() {
+ ReplayFixture g;
+ const auto row = Cells(302, 334, 23, 19, 0);
+ const std::vector<Quad> prefix(row.begin(), row.begin() + 19);
+ const auto prefixReport = Placement(1, true, prefix);
+ g.BodyRecheck(true);
+ g.Line(Text(1, 19), 10000);
+ PaintCold(g, 10001, row, 19);
+ PaintCold(g, 10018, row, 19);
+ CheckPlacements(g, {prefixReport});
+
+ PaintCold(g, 10035, row, row.size());
+ CheckPlacements(g, {prefixReport});
+ if (PaintCold(g, 10052, row, row.size()) != BodyMask(23))
+  throw std::runtime_error("late CMVS glyphs stayed visible after the next repaint");
+ CheckPlacements(g, {prefixReport, ColdPlacement()});
+ if (PaintCold(g, 10069, row, row.size()) != BodyMask(23))
+  throw std::runtime_error("CMVS lost the extended row when it redrew again");
+ CheckPlacements(g, {prefixReport, ColdPlacement()});
+
+ g.Mode(true);
+ if (!PaintCold(g, 10086, row, row.size()).empty()) throw std::runtime_error("CMVS hid the extended row in read mode");
+ CheckPlacements(g, {prefixReport, ColdPlacement(), ColdPlacement(false)});
+ g.Mode(false);
+ if (PaintCold(g, 10103, row, 19) != BodyMask(19)) throw std::runtime_error("CMVS failed to restore the prefix mask");
+ CheckPlacements(g, {prefixReport, ColdPlacement(), ColdPlacement(false)});
+ if (PaintCold(g, 10120, row, row.size()) != BodyMask(23)) throw std::runtime_error("CMVS failed to restore the full mask");
+ CheckPlacements(g, {prefixReport, ColdPlacement(), ColdPlacement(false), ColdPlacement()});
+}
+
+static void CheckUnconfirmedColdProbe() {
+ const auto body = Cells(302, 334, 23, 19, 0);
+ const auto draw = Reveal(body, body.size());
+ const auto arm = [](ReplayFixture &g) {
+  g.BodyRecheck(true);
+  g.Line(Text(1, 19), 10000);
+ };
+ {
+  ReplayFixture g;
+  arm(g);
+  PaintCold(g, 10001, body, body.size());
+  g.Frame(10019, 1280, 720);
+  if (!PaintCold(g, 10035, body, body.size()).empty()) throw std::runtime_error("CMVS used an expired startup probe");
+  CheckPlacements(g, {});
+ }
+ for (const auto size : {std::pair<unsigned, unsigned>{1296, 720}, std::pair<unsigned, unsigned>{1280, 736}}) {
+  ReplayFixture g;
+  arm(g);
+  PaintCold(g, 10001, body, body.size());
+  if (!g.Draw((void *)1, 1024, 2048, nullptr, size.first, size.second, 1280, 720, draw, 10018).empty())
+   throw std::runtime_error("CMVS used a startup probe on a different target size");
+ }
+ {
+  ReplayFixture g;
+  arm(g);
+  for (unsigned tick : {10001u, 10018u}) {
+   const auto first = g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, draw, tick);
+   const auto second = g.Draw((void *)2, 1024, 2048, nullptr, 1280, 720, 1280, 720, draw, tick);
+   if (!first.empty() || !second.empty()) throw std::runtime_error("CMVS masked an ambiguous startup atlas");
+   g.Frame(tick + 1, 1280, 720);
+  }
+  CheckPlacements(g, {});
+ }
+}
+
+static void CheckMovedColdRow() {
+ ReplayFixture g;
+ const auto first = Cells(302, 334, 19, 19, 0);
+ const auto shifted = Cells(326, 334, 19, 19, 0);
+ g.BodyRecheck(true);
+ g.Line(Text(1, 19), 10000);
+ PaintCold(g, 10001, first, first.size());
+ PaintCold(g, 10018, first, first.size());
+ PaintCold(g, 10035, shifted, shifted.size());
+ CheckPlacements(g, {Placement(1, true, first)});
+ if (PaintCold(g, 10052, shifted, shifted.size()) != BodyMask(19))
+  throw std::runtime_error("CMVS did not mask the confirmed repaint at its new position");
+ CheckPlacements(g, {Placement(1, true, first), Placement(1, true, shifted)});
+}
+
+static void CheckVisibleColdCrop() {
+ ReplayFixture g;
+ const auto row = Cells(302, 334, 19, 19, 0);
+ auto visible = row.front();
+ visible.v1 += 4.f / 2048;
+ g.BodyRecheck(true);
+ g.Line(Text(1, 19), 10000);
+ PaintCold(g, 10001, row, row.size());
+ const auto mask = g.Draw((void *)1, 1024, 2048, nullptr, 1280, 720, 1280, 720, {visible}, 10018);
+ PaintCold(g, 10018, row, row.size());
+ if (!mask.empty() || g.hitSent) throw std::runtime_error("CMVS confirmed a frame with a visible crop at a body cell");
+ CheckPlacements(g, {});
+ if (PaintCold(g, 10035, row, row.size()) != BodyMask(19))
+  throw std::runtime_error("CMVS did not recover on the next complete hidden repaint");
+ CheckPlacements(g, {Placement(1, true, row)});
+}
+
+static void CheckColdUnicode() {
+ ReplayFixture g;
+ const auto row = Cells(302, 334, 23, 19, 0);
+ g.BodyRecheck(true);
+ // Bypass the tape's one-code-unit aliases to exercise the native UTF-16 input.
+ g.GlyphLearner::Line(L"\U00020BB7" + Text(1, 17), 10000);
+ PaintCold(g, 10001, row, row.size());
+ if (PaintCold(g, 10018, row, row.size()) != BodyMask(23)) throw std::runtime_error("CMVS failed to mask the Unicode row");
+ CheckPlacements(g, {ColdPlacement(true, 18)});
+ if (g.output.rows.str().find(" text=\xf0\xa0\xae\xb7") == std::string::npos)
+  throw std::runtime_error("CMVS did not preserve the supplementary character");
 }
 
 static const FixtureCase Cases[] = {
