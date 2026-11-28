@@ -29,8 +29,9 @@ MeguLit 是一款运行在 Windows 10/11 x64 上的日语学习工具，面向�
 
 ## 协作与认领
 
-- 开工前必须阅读 [HANDOFF.md](HANDOFF.md)，按其中的规则认领、登记和更新状态。已被他人认领且未完成的事项不得重复处理。
-- 适配游戏前须查阅 HANDOFF.md 的「已适配的游戏」表。去重以 VNDB 作品号加发行版本为准，不以 exe 哈希为准。
+- 开工前运行 `node tools/claim-check.cjs <关键词> <要改的文件>` 查重，不必通读 [HANDOFF.md](HANDOFF.md)。它只列出撞车的条目：改同样文件的 open PR、HANDOFF.md「进行中」、HANDOFF-done.md 和已合并的 PR。已被他人认领且未完成的事项不得重复处理。
+- 按 HANDOFF.md 的规则认领、登记和更新状态，只改自己那一行。开工即登记，并推送分支或开 draft PR，别人的查重才看得到你改了哪些文件。
+- 适配游戏前须用 `node tools/claim-check.cjs v<VNDB 作品号>` 查 HANDOFF.md 的「已适配的游戏」表。去重以 VNDB 作品号加发行版本为准，不以 exe 哈希为准。
 - 代码不得直接推送到 `main`。须推送到独立分支并开 PR，CI 全部完成且通过后以 squash 方式合并。唯一例外是 HANDOFF.md，可直接推送到 `main`，且不得夹带其他文件。
 
 ## 分层与修复位置
