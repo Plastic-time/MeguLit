@@ -47,7 +47,7 @@
 | 魚魚棟 · Claude | 注音字体默认 Noto Sans JP，随 MeguLit 自带、优先用自带文件；下拉框标「自带」；旧默认 Meiryo 的老用户迁移过去 | — | claude/bundled-noto-ruby | 11-28 | 在做 |
 | 魚魚棟 · Claude | 修 main：统一提示接管 title 后 el.title 仍能读写提示（#1344 合并后校准按钮测试失败） | — | claude/fix-main-tip-title | 11-28 | 等合并（PR #1350，CI 全绿） |
 | 魚魚棟 · Claude | 选项译文与选项注音可调：译文放「翻译」页，注音放「文字 → 注音设置」，按作品保存 | — | claude/altt-choice-style | 11-28 | 等合并（PR #1363，CI 全绿） |
-| RRFZ · Codex | CMVS/CVNS 剧本按指令分类台词，提取说话人、语音和行号 | — | rrfz/cmvs-classify | 11-27 | 在做 |
+| RRFZ · Codex | CMVS/CVNS 剧本按指令分类台词，提取说话人、语音和行号 | — | rrfz/cmvs-classify | 11-27 | 等 CI（PR #1394） |
 | 魚魚棟 · Claude | 点读查词支持口语缩约和方言语尾（舐めんなし、わかんねえ、ええやん）：还原后再查、最长前缀兜底、可选 AI 释义 | — | feat/colloquial-lookup | 11-28 | 等 CI（PR #1339） |
 | 魚魚棟 · Claude | 官网换新图标（点读台词框）：favicon、apple-touch-icon、manifest、结构化数据 logo；启动器图标和字标不动 | — | feat/site-favicon | 11-27 | 等 CI（PR #1333） |
 | 魚魚棟 · Claude | megulit.com 用户中心：网页登录看学习看板、收藏句子（点读查词）、单词本、阅读进度，PWA 离线；桌面端自动同步、「同步到网页」开关和删除云端数据 | — | feat/web-dashboard-relay · feat/web-dashboard-sync · feat/web-dashboard | 11-27 | 三个 PR 已开：服务端 #1329、桌面端 #1330（叠在 #1329 上）、网页 #1332；等 CI 和测试员，部署要等店主批准 |
@@ -70,5 +70,6 @@
 | 魚魚棟 · Claude | 模拟器实验：Switch 模拟器（Eden/Ryubing）里读对话文本 + 换成等长空白隐藏原文、选项照常；样本 一部 Switch 乙游 + 海猫 Switch 版（DS 下… | — | exp/emulator-hook | 11-27 | 暂停：磁盘（E 盘剩余空间不足；adapt 下的 swit… |
 | 魚魚棟 · Claude | 适配 アイキス3 sexy（NeXAS，包装版 + 1.03）：选项被字形隐藏吃掉（hide.glyphAfterLine）、钩子文本带 @ 控制码（source.stripCodes）、选项 OCR 定位（choice.ocrLoose）；写回适配器（光盘安装、GIGA 更新、testbuild、测试清单等） | #1109 | adapt/aikiss3-sexy | 11-27 | PR #1304 等 CI，待测试员实测（测试清单已交测试员） |
 | 魚魚棟 · Claude | MeguLit-Adapter 加 craft 静态分析阶段（craft-anything：开游戏前核对引擎、画字 API、隐藏方式） | — | claude/amazing-aryabhata-a55dfa | 11-28 | 等 CI（PR #1362） |
-| RRFZ · Codex | アオイトリ（青鸟）中央气泡原文没藏住、字幕飘到气泡外（11-25 后 main 回归，二分中） | — | rrfz/aoitori-overlay-regress | 11-27 | 二分中 |
+| RRFZ · Codex | アオイトリ（青鸟）中央气泡原文没藏住、字幕飘到气泡外、译文上下跳 | — | rrfz/aoitori-overlay-regress | 11-27 | 等 CI（PR #1393） |
+| RRFZ · Codex | アオイトリ（青鸟）底框长句越出左框（阅读器布局） | — | rrfz/aoitori-long-line-layout | 11-27 | 等 CI（PR #1395） |
 
