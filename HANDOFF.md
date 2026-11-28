@@ -41,6 +41,7 @@
 
 | 谁 | 做什么 | issue | 分支 | 开始 | 状态 |
 |---|---|---|---|---|---|
+| 魚魚棟 · Claude | 点「原声」不发音：游戏删除或移动后仍标原声、点了读不到也不说原因；改为按能否读到标注，读不到时写明原因并改用合成朗读 | — | fix/game-voice-replay | 11-28 | 在做 |
 | 魚魚棟 · Claude | 文库内置书源：成为小说家吧（日文）+ 哩哩轻小说（中文）自动配对、日中逐段对照阅读，书源设置加说明和测试连接；relay 抓取代理只写方案等店主定 | — | claude/novel-bilingual | 11-28 | 等 CI（PR #1410） |
 | 魚魚棟 · Claude | 排行榜加 Gal / 轻小说 / 乙游作品榜（VNDB、Bangumi、AniList，relay 每日拉取，需部署 relay） | — | feat/work-charts | 11-28 | 等 CI（PR #1408） |
 | 魚魚棟 · Claude | 1.4.26 设置「运行组件」中文残缺（注→汪、语缺顶）、简繁字体混排；disc-mount 补中文名和说明 | — | claude/runtime-list-cjk | 11-28 | 等 CI |
