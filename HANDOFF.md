@@ -42,7 +42,7 @@
 | 谁 | 做什么 | issue | 分支 | 开始 | 状态 |
 |---|---|---|---|---|---|
 | 魚魚棟 · Claude | 知识入口整理：新增 docs/README.md 总目录、精简 AGENTS.md（细则挪进 docs/dev-rules.md、docs/architecture.md） | — | docs/agents-slim、docs/readme-toc | 11-29 | 等合并（PR #1440 AGENTS 精简，需 RRFZ 过目；#1441 docs 目录） |
-| 魚魚棟 · Claude | 隐藏原文时原文第二行露出（たいせつなきみのために、ぼくにできるいちばんのこと（只要你不再悲伤），Ciel 逐字 TextOutA，GDI 隐藏的单字 3 秒窗口过后没藏）：Ciel 引擎在 hook DLL 里开「按台词顺序续藏」 | — | fix/taisetsuna-second-line | 11-29 | 在做 |
+| 魚魚棟 · Claude | 隐藏原文时原文第二行露出（たいせつなきみのために、ぼくにできるいちばんのこと（只要你不再悲伤），Ciel 逐字 TextOutA，GDI 隐藏的单字 3 秒窗口过后没藏）：Ciel 引擎在 hook DLL 里开「按台词顺序续藏」 | — | fix/taisetsuna-second-line | 11-29 | 等 CI（PR #1443） |
 | 魚魚棟 · Claude | 隐藏原文时名字框的说话人名字也被藏（1.4.26 群反馈）：撤回 #1436 的通用字号规则；按引擎声明 hide.nameChannel（Ciel 首个：行首【】），没声明的引擎阅读层补画名牌 | — | fix/revert-1436、fix/speaker-name-channel | 11-29 | 等 CI（PR #1439 撤回、PR #1442 按引擎） |
 | 魚魚棟 · Claude | 1.4.26 游戏库刷新要等特别久：刷新先出列表，VNDB 查询放后台并缓存（54 部假库：刷新 35 s → 1.6 s） | — | fix/library-refresh-speed | 11-29 | 等 CI（PR #1423） |
 | 魚魚棟 · Claude | 点「原声」不发音：游戏删除或移动后仍标原声、点了读不到也不说原因；改为按能否读到标注，读不到时写明原因并改用合成朗读 | — | fix/game-voice-replay | 11-28 | 在做 |
