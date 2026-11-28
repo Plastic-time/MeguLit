@@ -215,8 +215,25 @@ static bool RectsOk(const std::string &r) {
  for (int i = 0; i < 8; i++) { float x, y, w, h; if (sscanf_s(r.c_str() + a, "%f,%f,%f,%f", &x, &y, &w, &h) != 4) return false; if (fabsf(x - TextX(i)) <= 2 && fabsf(y - GY) <= 2 && fabsf(w - GS) <= 2 && fabsf(h - GS) <= 2) ok++; a = r.find(';', a); if (i < 7 && a == std::string::npos) return false; a++; }
  return ok == 8;
 }
+static bool WaitForReplay(const wchar_t *path) {
+ for (int i = 0; i < 300; ++i) {
+  HANDLE f = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (f != INVALID_HANDLE_VALUE) { CloseHandle(f); return true; }
+  Sleep(10);
+ }
+ return false;
+}
+
 int wmain(int argc, wchar_t **argv) {
- if (argc < 3) { printf("usage: host <dll> <d3d9-up|d3d9-vb|d3d9-ivb|d3d9-quad4|d3d9-decl|d3d11|gl|gl-ff|gdi>\n"); return 2; }
+ if (argc < 3 || argc > 4) {
+  printf("usage: host <dll> <d3d9-up|d3d9-vb|d3d9-ivb|d3d9-quad4|d3d9-decl|d3d11|gl|gl-ff|gdi> [new replay file]\n");
+  return 2;
+ }
+ const wchar_t *replay = argc == 4 ? argv[3] : nullptr;
+ if (replay && (GetFileAttributesW(replay) != INVALID_FILE_ATTRIBUTES || !SetEnvironmentVariableW(L"MEGULIT_GPU_REPLAY", replay))) {
+  puts("FAIL could not reserve a new replay path");
+  return 1;
+ }
  char m[32]; WideCharToMultiByte(CP_UTF8, 0, argv[2], -1, m, sizeof m, NULL, NULL); Mode = m; printf("mode %s (%d-bit)\n", m, (int)sizeof(void *) * 8);
  WNDCLASSW wc = {}; wc.lpfnWndProc = DefWindowProcW; wc.hInstance = GetModuleHandleW(NULL); wc.lpszClassName = L"GpuHideTest"; RegisterClassW(&wc);
  Win = CreateWindowExW(WS_EX_TOOLWINDOW, wc.lpszClassName, L"gpu hide test", WS_POPUP, -32000, -32000, W, H, NULL, NULL, wc.hInstance, NULL); // never shown
@@ -253,5 +270,7 @@ int wmain(int argc, wchar_t **argv) {
  Pixels(8, false, "line 2 (hidden)");
  // 3. off
  SendCtl("OFF"); for (int i = 0; i < 3; i++) Frame(16, nullptr); Pixels(16, true, "after OFF");
- SendCtl("QUIT"); printf(Fails ? "RESULT FAIL %d\n" : "RESULT PASS\n", Fails); fflush(stdout); TerminateProcess(GetCurrentProcess(), Fails ? 1 : 0); return Fails ? 1 : 0;
+ SendCtl("QUIT");
+ if (replay) Check(WaitForReplay(replay), "capture saved after QUIT");
+ printf(Fails ? "RESULT FAIL %d\n" : "RESULT PASS\n", Fails); fflush(stdout); TerminateProcess(GetCurrentProcess(), Fails ? 1 : 0); return Fails ? 1 : 0;
 }
