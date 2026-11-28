@@ -128,9 +128,29 @@ const scenes=require('./original-engines/scenes.cjs'),fillLines=require('./origi
 const whoOf=list=>list.some(x=>Array.isArray(x.who)&&x.who.length===x.lines.length&&x.who.some(Boolean))?list.flatMap(x=>Array.isArray(x.who)&&x.who.length===x.lines.length?x.who.map(n=>String(n||'').slice(0,24)):x.lines.map(()=>'')):undefined;
 const whoFits=ain=>Array.isArray(ain?.who)&&Array.isArray(ain.lines)&&ain.who.length===ain.lines.length;
 const {isGameExecutable:isSiaExecutable}=require('./original-engines/sia.cjs');
+/* The index's lines, sizes and structure are also inputs to patch matching and Seed identity.
+   Readers with a display projection store it alongside those original values. */
+const hasDisplayProjection=id=>scenes.ENGINES[id]?.displayProjection===true;
+const unchanged=text=>text;
+function displayNormalizer(index){
+ return Array.isArray(index.display)?scenes.ENGINES[index.engine]?.normalizeDisplayText||unchanged:unchanged;
+}
+const identityScene=scene=>scene.identityProjection?{...scene,...scene.identityProjection}:scene;
+function indexDisplay(scenes){
+ let offset=0;
+ return scenes.flatMap(scene=>{
+  const identity=scene.identityProjection;
+  const rows=scene.lines.map((text,i)=>{
+   const index=identity?scene.identityIndices[i]:i;
+   return {...scene.records?.[i],text,identityIndex:index<0?-1:offset+index};
+  });
+  offset+=identity?.lines.length??scene.lines.length;
+  return rows;
+ });
+}
 for(const id of Object.keys(scenes.ENGINES))ADAPTERS[id]={folder:true,scene:true,locate:dir=>scenes.readable(id,dir)?{engine:id,target:dir}:null,
- read:dir=>{const list=scenes.read(id,dir),lines=list.flatMap(x=>x.lines),ruby=list.some(x=>x.ruby)?list.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined,who=whoOf(list);const roles=list.some(scene=>scene.roles||scene.scope==='interface')?list.map(scene=>scene.roles||(scene.scope==='interface'?'i':'?').repeat(scene.lines.length)).join(''):undefined;
-  return {engine:id,version:0,codepage:'text',lines,ruby,...(who?{who}:{}),roles,sizes:list.map(x=>x.lines.length),structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
+ read:dir=>{const parsed=scenes.read(id,dir),list=parsed.map(identityScene),lines=list.flatMap(x=>x.lines),ruby=list.some(x=>x.ruby)?list.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined,who=whoOf(list);const roles=list.some(scene=>scene.roles||scene.scope==='interface')?list.map(scene=>scene.roles||(scene.scope==='interface'?'i':'?').repeat(scene.lines.length)).join(''):undefined;
+  return {engine:id,version:0,codepage:'text',lines,ruby,...(who?{who}:{}),roles,sizes:list.map(x=>x.lines.length),structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)},...(hasDisplayProjection(id)?{display:indexDisplay(parsed)}:{})};},
  fingerprint:dir=>scenes.fingerprint(id,dir)};
 const runningDirOf=runtime=>ADAPTERS[runtime.engine||'system4']?.folder?runtime.file:path.dirname(runtime.file);
 // Switching to or from 1055.exe can change the reader without changing files in the folder.
@@ -169,11 +189,11 @@ function gameRow(db,id){const row=db.prepare('SELECT * FROM games WHERE id=? AND
 // ---- Running build: what the installed (patched) game still contains ---------------------------
 function scanRunning(root,id,executable,opts={}){
  const dir=path.dirname(executable),loc=locate(dir,path.parse(executable).name,executable);if(!loc){const waiting=scenes.preparing(dir);return writeState(root,id,waiting?{status:'preparing',error:'SCRIPT_PREPARING',preparing:waiting,runtime:null,gameDir:dir}:(()=>{const why=scenes.unsupportedReason(dir);return why?{status:'unsupported',error:why.code,detail:why.detail,engine:why.engine,preparing:null,runtime:null,gameDir:dir}:{status:'unsupported',error:'NO_SUPPORTED_SCRIPT',detail:'',preparing:null,runtime:null,gameDir:dir};})());}const file=loc.target;
- const hash=fingerprint(loc),current=readState(root)[id];if(current?.runtime?.sha256===hash&&(current.runtime.reader||'')===READER&&runtimeMatchesExecutable(current.runtime,executable)&&current.runtime.index&&fs.existsSync(current.runtime.index))return current;
+ const hash=fingerprint(loc),current=readState(root)[id];if(current?.runtime?.sha256===hash&&(current.runtime.reader||'')===READER&&!projectedIndexStale(current)&&runtimeMatchesExecutable(current.runtime,executable)&&current.runtime.index&&fs.existsSync(current.runtime.index))return current;
  const ain=readScript(loc),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length,nonEmpty=ain.lines.filter(prose).length,zhOnly=chineseOnly(ain.lines);
  // An English (or other) original read by a scene engine is neither the Japanese game nor a Chinese build: nothing to do.
  if(ADAPTERS[loc.engine].scene&&!zhOnly){const chinese=ain.lines.filter(t=>prose(t)&&!japaneseLine(t)&&/[一-鿿]{2}/.test(t)).length,latin=ain.lines.filter(latinDialogue).length;if(!nonEmpty||(japanese<nonEmpty*.5||latin>=Math.max(100,japanese*2,chinese*2))&&chinese<nonEmpty*.3)return writeState(root,id,{status:'unsupported',error:'SCRIPT_NOT_JAPANESE',runtime:null,gameDir:dir});}
- const index=writeIndex(root,id,'runtime-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'runtime',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash},structure:ain.structure,lines:ain.lines,...(ain.roles?{roles:ain.roles}:{}),...(ain.ruby?{ruby:ain.ruby}:{}),...(whoFits(ain)?{who:ain.who}:{}),...(ain.sizes?{sizes:ain.sizes}:{})});
+ const index=writeIndex(root,id,'runtime-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'runtime',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash},structure:ain.structure,lines:ain.lines,...(ain.roles?{roles:ain.roles}:{}),...(ain.ruby?{ruby:ain.ruby}:{}),...(whoFits(ain)?{who:ain.who}:{}),...(ain.sizes?{sizes:ain.sizes}:{}),...(ain.display?{display:ain.display}:{})});
  const original=current?.original;const runtime={file,engine:loc.engine,sha256:hash,reader:READER,index,codepage:ain.codepage,version:ain.version,structure:ain.structure,lines:nonEmpty,japaneseLines:japanese};
  if(isSiaExecutable(executable))runtime.siaExecutable=true;
  // A changed game build invalidates the earlier alignment; the original index itself stays.
@@ -380,7 +400,7 @@ function buildPatch(runningState,source){
   translated=scenes.filter(x=>x.patched).flatMap(x=>x.lines);
   script={engine:'bgi',version:0,codepage:'mixed',lines,sizes:scenes.map(x=>x.lines.length),structure:{messages:lines.length,functions:scenes.length,functionHash:crypto.createHash('sha256').update(scenes.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};
  }else if(scenes.ENGINES[engine]){
-  const eng=scenes.ENGINES[engine],base=scenes.read(engine,runningDir);let list;
+  const eng=scenes.ENGINES[engine],base=scenes.read(engine,runningDir).map(identityScene);let list;
   found.running=runningDir;if(eng.patchLines)list=eng.patchLines(base,found);
   if(!list&&eng.patchLines&&(!eng.archives||engine==='siglus'))throw Error('PATCH_SCRIPT_NOT_FOUND');
   if(!list){
@@ -400,7 +420,7 @@ function buildPatch(runningState,source){
       for(const e of eng.archiveEntries(file)||[]){const key=e.name.toLowerCase();if(names.has(key)&&!overlay.has(key))try{overlay.set(key,e.read());}catch{}}}catch{}finally{if(tmp)fs.rmSync(tmp,{recursive:true,force:true});}}}
    if(!overlay.size)throw Error('PATCH_SCRIPT_NOT_FOUND');
    // File by file: same number of text lines and the same anchors (commands, labels, file names), else the running text.
-   list=scenes.read(engine,runningDir,overlay).map((scene,i)=>{const own=base[i];if(!scene.patched||!own||own.name!==scene.name)return own||scene;
+   list=scenes.read(engine,runningDir,overlay).map(identityScene).map((scene,i)=>{const own=base[i];if(!scene.patched||!own||own.name!==scene.name)return own||scene;
     if(scene.lines.length!==own.lines.length)return {...own,patched:false,skipped:'count'};
     const n=Math.min(scene.anchors.length,own.anchors.length);let same=0;for(let k=0;k<n;k++)if(scene.anchors[k]===own.anchors[k])same++;
     if(own.anchors.length>=5&&(Math.abs(scene.anchors.length-own.anchors.length)>own.anchors.length*.1||same<own.anchors.length*.9))return {...own,patched:false,skipped:'anchors'};
@@ -554,6 +574,14 @@ const READER=(()=>{try{const h=require('node:crypto').createHash('sha256');const
  /* E561 the adapter-pack runtime reads scripts too: a fix to it reads the games it serves again */
  try{h.update('adapter-packs|').update(fs.readFileSync(path.join(__dirname,'adapter-packs.cjs')));}catch{}
  return h.digest('hex').slice(0,12);}catch{return '';}})();
+function projectedIndexStale(state){
+ // A legacy index has no display field yet. The reader declares whether it needs one.
+ if(!hasDisplayProjection(state?.runtime?.engine))return false;
+ const own=state.original;
+ const runtime=state.runtime;
+ if(runtime.reader!==READER||!runtime.index||!fs.existsSync(runtime.index))return true;
+ return state.status==='ready'&&!!own?.auto&&!own.backup&&(own.reader!==READER||!own.index||!fs.existsSync(own.index));
+}
 const autoRuns=new Map();
 // Fire and forget, with its own database handle (callers' handles close when their request ends).
 /* 2026-11-14 the search runs in a worker thread (services/text-source-worker.cjs): on the service thread it held every other
@@ -626,7 +654,7 @@ function brief(root,id){const s=readState(root)[String(id)];if(!s)return 'unknow
 function status(root,db,id){
  const row=gameRow(db,id),saved=readState(root)[id];let state=saved;
  const runtimeMatches=saved?.runtime&&runtimeMatchesExecutable(saved.runtime,row.executable);
- try{if(!runtimeMatches||!sameDir(runningDirOf(saved.runtime),path.dirname(row.executable))||!fs.existsSync(saved.runtime.file)||saved.runtime.sha256!==fingerprint({engine:saved.runtime.engine||'system4',target:saved.runtime.file}))state=scanRunning(root,id,row.executable);}catch(error){state={...saved,runtime:runtimeMatches?saved.runtime:null,status:'failed',error:String(error.message||error)};}
+ try{if(!runtimeMatches||projectedIndexStale(saved)||!sameDir(runningDirOf(saved.runtime),path.dirname(row.executable))||!fs.existsSync(saved.runtime.file)||saved.runtime.sha256!==fingerprint({engine:saved.runtime.engine||'system4',target:saved.runtime.file}))state=scanRunning(root,id,row.executable);}catch(error){state={...saved,runtime:runtimeMatches?saved.runtime:null,status:'failed',error:String(error.message||error)};}
  try{state=refreshCachedPatchReport(root,id,state);}catch{}
  /* Live test 2026-11-13 (Summer Pockets, 魔法少女ノ魔女裁判, DDLC Plus): patches aligned before E496 had no pairing report, so the
     game page could not say total/paired/unpaired. Sample it once from the saved indexes; the verdict is reported, the state kept. */
@@ -649,7 +677,7 @@ class Matcher{
     translation was a machine one): the script line an OCR row stands for. Bigram overlap (Dice) of the row against the same
     length of each line near the reading position (or anywhere before the first match); a row that is most of a line and
     agrees at 0.8 or more gives the whole script line. '' when nothing is that close. */
- near(text){const s=matchKey(text);if(s.length<6)return -1;const grams=t=>{const m=new Map();for(let i=0;i+1<t.length;i++){const g=t.slice(i,i+2);m.set(g,(m.get(g)||0)+1);}return m;};const a=grams(s);
+ near(text){const s=matchKey(this.prepare(text));if(s.length<6)return -1;const grams=t=>{const m=new Map();for(let i=0;i+1<t.length;i++){const g=t.slice(i,i+2);m.set(g,(m.get(g)||0)+1);}return m;};const a=grams(s);
   const dice=t=>{const b=grams(t);let both=0;for(const [g,n] of a)both+=Math.min(n,b.get(g)||0);return 2*both/Math.max(1,s.length-1+t.length-1);};
   const from=this.last>=0?Math.max(0,this.last-40):0,to=this.last>=0?Math.min(this.normalized.length,this.last+600):this.normalized.length;let best=-1,score=0;
   for(let i=from;i<to;i++){const t=this.normalized[i];if(!t||t.length<s.length*.6||s.length<t.length*.6&&t.length-s.length>12)continue;const d=dice(t.slice(0,s.length+2));if(d>score){score=d;best=i;}}
@@ -657,14 +685,16 @@ class Matcher{
  // A vanished OCR group can contain just the end of a line being replaced.
  // A complete short line anywhere in the script takes precedence. Keep the reading position intact.
  ocrSuffix(text){
-  const raw=matchKey(text),tail=raw.replace(/^[・…]+/u,'');
+  const raw=matchKey(this.prepare(text)),tail=raw.replace(/^[・…]+/u,'');
   if(!/^[ぁ-ヺ一-龯々ー]{3,10}[。！？]$/u.test(tail))return false;
   for(const key of [raw,tail]){
    if(this.heads.get(key.slice(0,4))?.some(i=>this.normalized[i]===key))return false;
   }
   return this.normalized.some(line=>line.length>=tail.length+2&&line.endsWith(tail));
  }
- constructor(runtimeLines,originalLines){this.isUntranslated=untranslatedJapanese(runtimeLines);this.rt=runtimeLines;this.og=originalLines;this.normalized=runtimeLines.map(matchKey);this.heads=new Map();this.normalized.forEach((t,i)=>{if(!t)return;const k=t.slice(0,4);if(!this.heads.has(k))this.heads.set(k,[]);this.heads.get(k).push(i);});this.last=-1;}
+ constructor(runtimeLines,originalLines,prepare=unchanged,identityLines=null){this.prepare=prepare;this.isUntranslated=untranslatedJapanese(runtimeLines);this.rt=runtimeLines;this.og=originalLines;this.normalized=runtimeLines.map(matchKey);
+  this.identityKeys=identityLines?.map((line,i)=>line===runtimeLines[i]?this.normalized[i]:matchKey(line));
+  this.heads=new Map();this.normalized.forEach((t,i)=>{if(!t)return;const k=t.slice(0,4);if(!this.heads.has(k))this.heads.set(k,[]);this.heads.get(k).push(i);});this.last=-1;}
  /* 2026-11-13 (涙 name screen: 「あなたの現在の名前は『春日　光一』、」 lost its head as if it were a speaker): a line after the
     first of a joined text is also tried whole, without the speaker cut */
  /* 2026-11-19 (素晴らしき日々, BGI: 「……そして」 and 「ヒラヒラ服だわね……」」 are two messages with the resource line ev0001_l between
@@ -698,7 +728,7 @@ class Matcher{
  save(){return [this.last,this.recent?this.recent.slice():null,this.maybe];}
  load(v){if(Array.isArray(v)){[this.last,this.recent,this.maybe]=v;}}
  // Identify the original script entries in a hook packet without advancing the translation lookup cursor.
- pageParts(text){const flat=plainKey(text),key=matchKey(text);if(!flat||!key)return [];
+ pageParts(text){const input=this.prepare(text),flat=plainKey(input),key=matchKey(input);if(!flat||!key)return [];
   // A whole authored row wins over a possible split, even if its translation is ambiguous at this position.
   const row=this.heads.get(key.slice(0,4))?.find(i=>plainKey(this.rt[i])===flat);
   if(row!==undefined)return [inlineTags(this.rt[row])];
@@ -709,7 +739,7 @@ class Matcher{
  }finally{this.load(before);}}
  // Recover a dialogue callback from a secondary stream only when it is the following authored row.
  pageNext(previous,text){
-  const tail=plainKey(text);if(!tail)return false;
+  const tail=plainKey(this.prepare(text));if(!tail)return false;
   const before=this.save();try{
    const r=this.match(previous);
    return ['exact','high'].includes(r.status)&&r.method!=='guess'&&r.method!=='same-text'&&r.indices?.length>0&&plainKey(this.rt[r.indices.at(-1)+1])===tail;
@@ -717,6 +747,7 @@ class Matcher{
  }
  // A packet bounded by two drawn rows proves that its entries took place between them.
  pageBetween(previous,packet,next){
+  previous=this.prepare(previous);packet=this.prepare(packet);next=this.prepare(next);
   const before=plainKey(previous),after=plainKey(next),key=matchKey(packet);
   if(!before||!key||!after)return [];
   const candidates=this.heads.get(matchKey(previous).slice(0,4))||[];
@@ -734,8 +765,13 @@ class Matcher{
  recentPick(found){for(const a of [...(this.recent||[])].reverse()){if(a===this.last)continue;const c=found.filter(c=>c[0]>a&&c[0]-a<=400).sort((x,y)=>x[0]-y[0]);if(c.length)return {c:c[0],method:'recent'};}
   const near=found.filter(c=>c[0]<this.last&&this.last-c.at(-1)<=60).sort((x,y)=>y[0]-x[0]);return near.length?{c:near[0],method:'near-back'}:null;}
  match(text){
-  const s=matchKey(text);if(!s)return {status:'none',method:'empty'};const starts=new Set();for(let k=Math.min(4,s.length);k>=1;k--)for(const i of this.heads.get(s.slice(0,k))||[])if(s.startsWith(this.normalized[i]))starts.add(i);
-  const found=[...starts].map(i=>this.cover(i,s,text)).filter(Boolean);if(!found.length)return {status:'none',method:'no-cover'};
+  const input=this.prepare(text),s=matchKey(input);if(!s)return {status:'none',method:'empty'};const starts=new Set();for(let k=Math.min(4,s.length);k>=1;k--)for(const i of this.heads.get(s.slice(0,k))||[])if(s.startsWith(this.normalized[i]))starts.add(i);
+  let found=[...starts].map(i=>this.cover(i,s,input)).filter(Boolean);if(!found.length)return {status:'none',method:'no-cover'};
+  // Two source rows can look the same after expanding the display escapes. Prefer the captured spelling.
+  if(found.length>1&&this.identityKeys){
+   const raw=matchKey(text),exact=found.filter(row=>row.map(i=>this.identityKeys[i]).join('')===raw);
+   if(exact.length)found=exact;
+  }
   let pick,method,status,alt,cont=[],open=false;
   if(found.length===1){pick=found[0];method='unique';status='exact';}
   else{/* a line that grew (core/sentence-pieces.cjs) starts before the reading position and ends on or past it: the piece's own
@@ -835,16 +871,23 @@ function pruneIndexes(root,id){const s=readState(root)[id],keep=new Set([s?.runt
 // The Japanese script the engine lines up with the running (translated) one, kept as the original: the same import as a
 // picked Japanese copy (importOriginal), from what the engine read. Original mode is chosen unless it was turned off.
 function adoptOriginal(root,id,state,dir){
- const eng=scenes.ENGINES[state.runtime.engine],runtime=readIndex(state.runtime.index);let lines=eng.originalLines(dir);
+ const eng=scenes.ENGINES[state.runtime.engine],runtime=readIndex(state.runtime.index);
+ const {lines:identity,displayLines}=eng.originalProjection?eng.originalProjection(dir):{lines:eng.originalLines(dir)};
+ let lines=identity;
  if(!Array.isArray(lines)||lines.length!==runtime.lines.length||!lines.some(t=>t&&japaneseLine(t)))return state;
  const hash=crypto.createHash('sha256').update('original\n'+state.runtime.sha256).digest('hex');
- if(state.original?.sha256===hash&&state.original.index&&fs.existsSync(state.original.index)&&state.status==='ready')return state;
+ if(state.original?.sha256===hash&&state.original.index&&fs.existsSync(state.original.index)&&state.status==='ready'&&
+    (!hasDisplayProjection(state.runtime.engine)||state.original.reader===READER))return state;
  let alignment=align(runtime,{lines,structure:runtime.structure});
  const pc=pairCheck(runtime.lines,lines,{zhSizes:runtime.sizes,jaSizes:runtime.sizes});
  if(pc.verdict.lines){lines=pc.verdict.lines;alignment=align(runtime,{lines,structure:runtime.structure});}
  alignment={...alignment,reliable:alignment.reliable&&pc.verdict.ok,pairing:pc.report};
- const index=writeIndex(root,id,'original-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'original',engine:runtime.engine,version:0,codepage:'text',source:{file:dir,sha256:hash,dir},structure:runtime.structure,lines});
- return writeState(root,id,{original:{dir,file:dir,sha256:hash,index,codepage:'text',lines:lines.length,executable:'',auto:true},alignment,status:alignment.reliable?'ready':'unreliable',mode:state.mode||(alignment.reliable?'original':'off'),error:''});
+ // A repair made by pairCheck also applies to its corresponding display row.
+ const normalize=displayNormalizer(runtime);
+ const display=displayLines&&runtime.display?.map((row,i)=>
+  lines[row.identityIndex]===identity[row.identityIndex]?displayLines[i]:normalize(lines[row.identityIndex]||''));
+ const index=writeIndex(root,id,'original-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'original',engine:runtime.engine,version:0,codepage:'text',source:{file:dir,sha256:hash,dir},structure:runtime.structure,lines,...(display?{displayLines:display}:{})});
+ return writeState(root,id,{original:{dir,file:dir,sha256:hash,index,codepage:'text',lines:lines.length,executable:'',auto:true,...(hasDisplayProjection(state.runtime.engine)?{reader:READER}:{})},alignment,status:alignment.reliable?'ready':'unreliable',mode:state.mode||(alignment.reliable?'original':'off'),error:''});
 }
 /* E545 what the provider for this program is built from: the reader keeps a provider whose key has not changed (its reading position too) and rebuilds one whose script, patch or mode changed while the game runs */
 function providerEntry(root,executable,id,{runtimeOnly=false}={}){
@@ -853,6 +896,7 @@ function providerEntry(root,executable,id,{runtimeOnly=false}={}){
   (s?.runtime?.file?runningDirOf(s.runtime).toLowerCase()===dir&&runtimeMatchesExecutable(s.runtime,program):!runtimeOnly&&String(s?.gameDir||'').toLowerCase()===dir));
 }
 const indexDigests=new Map();
+/* index.lines is the identity projection. Classified display rows have their own field. */
 function scriptDigest(file){
  const stat=fs.statSync(file,{bigint:true}),stamp=[stat.ino,stat.size,stat.mtimeNs,stat.ctimeNs].join('|');
  const prior=indexDigests.get(file);if(prior?.stamp===stamp)return prior.digest;
@@ -890,7 +934,7 @@ function contributionScript(root,exe,id){
 function providerKey(root,executable,id){const folder=path.dirname(String(executable||'')),dir=folder.toLowerCase();if(!dir||dir==='.')return '';
  const imported=require('../core/japanese-import-original.cjs'),archive=imported.archiveManifest(folder);
  if(archive)return 'archive|'+imported.archiveStamp(executable,archive);
- const embedded=require('./embedded-japanese.cjs').stamp(folder);if(embedded)return 'embedded|'+embedded;const entry=providerEntry(root,executable,id);if(!entry)return 'none|'+dir;const [entryId,s]=entry;return JSON.stringify([entryId,s.status||'',s.mode||'',s.runtime?.sha256||'',s.runtime?.index||'',s.patchStatus||'',s.patch?.index||'',s.patch?.version??'',s.patch?.runtimeSha||'',s.original?.index||'']);}
+ const embedded=require('./embedded-japanese.cjs').stamp(folder);if(embedded)return 'embedded|'+embedded;const entry=providerEntry(root,executable,id);if(!entry)return 'none|'+dir;const [entryId,s]=entry;return JSON.stringify([entryId,s.status||'',s.mode||'',s.runtime?.sha256||'',s.runtime?.index||'',s.patchStatus||'',s.patch?.index||'',s.patch?.version??'',s.patch?.runtimeSha||'',s.original?.index||'',...(hasDisplayProjection(s.runtime?.engine)?[s.runtime.reader,s.original?.reader]:[])]);}
 function archiveProvider(imported,executable,manifest){
  const index=imported.localArchive(executable,manifest);
  if(!index)return null;
@@ -917,16 +961,31 @@ function provider(root,executable,opts={}){
  if(!opts.indexOnly&&(scenes.ENGINES[entry[1].runtime?.engine]?.live||!entry[1].runtime&&liveEngines().some(e=>e.eligible(gameDir))))return liveProvider(root,entry[0],executable);
  return staticProvider(root,executable,opts);
 }
+function displayPair(runtime,other=runtime){
+ if(!Array.isArray(runtime.display))return [runtime.lines,other.lines];
+ const lines=runtime.display.map(row=>row.text);
+ if(other===runtime)return [lines,lines];
+ if(Array.isArray(other.displayLines)&&other.displayLines.length===lines.length)return [lines,other.displayLines];
+ const normalize=displayNormalizer(runtime);
+ return [lines,runtime.display.map(row=>normalize(other.lines[row.identityIndex]||''))];
+}
+function displayMetadata(runtime,values,missing){
+ if(!values||!Array.isArray(runtime.display))return values;
+ const rows=runtime.display.map(row=>values[row.identityIndex]??missing);
+ return typeof values==='string'?rows.join(''):rows;
+}
 /* Learning (grammar examples, 2026-11-11): the imported script as index-aligned pairs, read-only (no import, no
    rebuild). ja[i] is the Japanese line, tr[i] its human translation or '' (a patch line left in Japanese is none);
    source is 'official' for a Chinese release with its Japanese original, 'group' for a translation group's patch. */
 function scriptPairs(root,executable){
  const entry=providerEntry(root,executable,undefined,{runtimeOnly:true});if(!entry)return null;const state=entry[1];
  try{
-  if(state.status==='ready'&&state.original?.index){const tr=readIndex(state.runtime.index).lines,ja=readIndex(state.original.index).lines;return {source:'official',ja,tr:ja.map((_,i)=>typeof tr[i]==='string'&&!japaneseLine(tr[i])?tr[i]:'')};}
-  if(state.status!=='native-japanese'||!state.runtime.index)return null;const ja=readIndex(state.runtime.index).lines;
+  const runtime=readIndex(state.runtime.index);
+  if(state.status==='ready'&&state.original?.index){const [tr,ja]=displayPair(runtime,readIndex(state.original.index));return {source:'official',ja,tr:ja.map((_,i)=>typeof tr[i]==='string'&&!japaneseLine(tr[i])?tr[i]:'')};}
+  if(state.status!=='native-japanese')return null;
   const patched=state.patchStatus==='ready'&&state.patch?.index&&patchCurrent(state);
-  if(!patched)return {source:'',ja,tr:[]};const og=readIndex(state.patch.index).lines;
+  const [ja,og]=displayPair(runtime,patched?readIndex(state.patch.index):runtime);
+  if(!patched)return {source:'',ja,tr:[]};
   return {source:'group',ja,tr:ja.map((t,i)=>{const o=inlineTags(og[i]);return sampler.translated(o,inlineTags(t))?o:'';})};
  }catch{return null;}
 }
@@ -939,24 +998,54 @@ function scriptRuby(root,executable,id){
 }
 /* the script's speaker of a resolved line (index who, parallel to lines): speaker '' when the script names none */
 const withSpeaker=(r,who)=>{if(!r||!Array.isArray(who)||!Array.isArray(r.indices)||!r.indices.length)return r;const n=who[r.indices[0]];return typeof n==='string'&&n?{...r,speaker:n}:r;};
+// The Matcher uses display positions. A classified row can name a speaker even without an identity slot.
+function displaySpeakers(runtime,index=runtime){
+ if(!Array.isArray(runtime.display))return index.who;
+ const who=whoFits(index)?index.who:null;
+ return runtime.display.map(row=>who?.[row.identityIndex]??String(row.speaker||'').slice(0,24));
+}
 function staticProvider(root,executable,opts={}){
  // BGI's and scene engines' script is the whole game folder, AIN is a file in it.
  const entry=providerEntry(root,executable,opts.id,{runtimeOnly:true});
- if(!entry?.[1]?.runtime?.file)return null;const [id,state]=entry;
- try{if(!opts.indexOnly&&fingerprint({engine:state.runtime.engine||'system4',target:state.runtime.file})!==state.runtime.sha256)return null;
-  if(state.mode==='original'&&state.status==='ready'&&state.original?.index){const og=readIndex(state.original.index),m=new Matcher(readIndex(state.runtime.index).lines,og.lines);
+ if(!entry?.[1]?.runtime?.file)return null;let [id,state]=entry;
+ try{if(!opts.indexOnly){
+  if(fingerprint({engine:state.runtime.engine||'system4',target:state.runtime.file})!==state.runtime.sha256)return null;
+  if(projectedIndexStale(state))state=scanRunning(root,id,executable);
+  if(!state.runtime?.index||projectedIndexStale(state))return null;
+ }
+  const rtIndex=readIndex(state.runtime.index),prepare=displayNormalizer(rtIndex);
+  function identityAliases(index,display){
+   return prepare===unchanged?null:rtIndex.display.map((row,i)=>index.lines[row.identityIndex]??display[i]);
+  }
+  function choice(japanese,chinese,roles,identityRoles,aliases){
+   const {choiceLookup}=require('./script-translation-quality.cjs');
+   const lookup=choiceLookup(japanese,chinese,roles,identityRoles);
+   const raw=aliases&&choiceLookup(aliases,chinese,roles,identityRoles);
+   return text=>{
+    const hit=raw?.(text);
+    return hit?.status==='exact'?hit:lookup(prepare(text));
+   };
+  }
+  if(state.mode==='original'&&state.status==='ready'&&state.original?.index){
+   const og=readIndex(state.original.index),[rt,ja]=displayPair(rtIndex,og),aliases=identityAliases(og,ja);
+   const m=new Matcher(rt,ja,prepare,identityAliases(rtIndex,rt));
    // The original's own ruby (BGI <R よみ>漢字</R>) for the restored lines: game readings before dictionary ones.
-   const readings=Array.isArray(og.ruby)?og.ruby:null,withRuby=r=>{if(!r||!readings||!Array.isArray(r.indices))return r;const pairs=r.indices.flatMap(i=>Array.isArray(readings[i])?readings[i]:[]);return pairs.length?{...r,ruby:pairs}:r;};
+   const roles=displayMetadata(rtIndex,og.roles,'?');
+   const readings=Array.isArray(og.ruby)?displayMetadata(rtIndex,og.ruby,null):null,withRuby=r=>{if(!r||!readings||!Array.isArray(r.indices))return r;const pairs=r.indices.flatMap(i=>Array.isArray(readings[i])?readings[i]:[]);return pairs.length?{...r,ruby:pairs}:r;};
+   const who=displaySpeakers(rtIndex,og);
    // A patched game shown in Japanese: the patched line itself is the group's translation of the restored line.
-   return {kind:'original',resolveJapanese:require('./script-translation-quality.cjs').choiceLookup(og.lines,m.rt),resolveChoice:require('./script-translation-quality.cjs').choiceLookup(og.lines,m.rt,og.roles),hasLocalPairs:()=>og.lines.some((ja,i)=>japaneseLine(ja)&&localTranslation(m.rt[i])),position:()=>m.last,save:()=>m.save(),load:v=>m.load(v),resolve:text=>withSpeaker(withRuby(m.match(text)),og.who)};}
+   return {kind:'original',resolveJapanese:choice(ja,m.rt,undefined,undefined,aliases),resolveChoice:choice(ja,m.rt,roles,og.roles,aliases),hasLocalPairs:()=>ja.some((line,i)=>japaneseLine(line)&&localTranslation(m.rt[i])),position:()=>m.last,save:()=>m.save(),load:v=>m.load(v),resolve:text=>withSpeaker(withRuby(m.match(text)),who)};}
   const patched=state.patchStatus==='ready'&&state.patch?.index&&patchCurrent(state);
   if(!patched&&state.status!=='native-japanese')return null;
   // The Japanese game, with an imported patch or with none: the line stays Japanese; the patch's line at the same place is
   // its translation, and a line the patch leaves as it is (or every line, without a patch) takes the filled translation.
-  const rtIndex=readIndex(state.runtime.index),rt=rtIndex.lines,m=new Matcher(rt,patched?readIndex(state.patch.index).lines:rt),fill=fillStore(root,id,scenes.ENGINES[state.runtime.engine]?.live?'live':state.runtime.sha256);
+  const [rt,pair]=displayPair(rtIndex,patched?readIndex(state.patch.index):rtIndex),aliases=identityAliases(rtIndex,rt);
+  const m=new Matcher(rt,pair,prepare,aliases),fill=fillStore(root,id,scenes.ENGINES[state.runtime.engine]?.live?'live':state.runtime.sha256);
   // The script's own ruby for the matched lines (KiriKiri Z scene files): game readings come before dictionary ones.
-  const readings=Array.isArray(rtIndex.ruby)?rtIndex.ruby:null,withRuby=r=>{if(!readings||!Array.isArray(r.indices))return r;const pairs=r.indices.flatMap(i=>Array.isArray(readings[i])?readings[i]:[]);return pairs.length?{...r,ruby:pairs}:r;};
-  const untranslated=i=>!patched||rtIndex.roles?.[i]==='i'||!sampler.translated(inlineTags(m.og[i]),inlineTags(rt[i]));
+  const roles=displayMetadata(rtIndex,rtIndex.roles,'?');
+  const readings=Array.isArray(rtIndex.ruby)?displayMetadata(rtIndex,rtIndex.ruby,null):null,withRuby=r=>{if(!readings||!Array.isArray(r.indices))return r;const pairs=r.indices.flatMap(i=>Array.isArray(readings[i])?readings[i]:[]);return pairs.length?{...r,ruby:pairs}:r;};
+  const who=displaySpeakers(rtIndex);
+  const untranslated=i=>!patched||roles?.[i]==='i'||!sampler.translated(inlineTags(m.og[i]),inlineTags(rt[i]));
   /* E358: an engine that draws from a fixed glyph set (HuneX bitmap fonts) says which characters it has. drawable(text) is
      null when unknown; tableDrawable() is false when the game cannot draw its own translation table (WoH in Japanese draws
      4.9 % of the official Chinese lines in full), so the game is not asked to draw translations it would leave with holes. */
@@ -977,20 +1066,21 @@ function staticProvider(root,executable,opts={}){
    // A live hook burst can identify controls before OCR has measured the native glyphs.
    // Only an exact body anchor followed by the whole recorded choice group qualifies.
    choiceGroupAfter(body,options){
-    if(!rtIndex.roles||!body||!Array.isArray(options)||options.length<2)return null;
+    if(!roles||!body||!Array.isArray(options)||options.length<2)return null;
+    body=prepare(body);
     const key=matchKey(body);
-    const anchors=(m.heads.get(key.slice(0,4))||[]).filter(i=>rtIndex.roles[i]==='b'&&norm(rt[i])===norm(body));
+    const anchors=(m.heads.get(key.slice(0,4))||[]).filter(i=>roles[i]==='b'&&norm(rt[i])===norm(body));
     const anchor=anchors.includes(m.last)?m.last:anchors.length===1?anchors[0]:-1;
     if(anchor<0)return null;
     let i=anchor+1;
-    while(i<rt.length&&!rt[i]&&rtIndex.roles[i]==='?')i++;
+    while(i<rt.length&&!rt[i]&&roles[i]==='?')i++;
     const group=[];
-    while(rtIndex.roles[i]==='c')group.push(rt[i++]);
-    const live=new Set(options);
+    while(roles[i]==='c')group.push(rt[i++]);
+    const live=new Set(options.map(prepare));
     return group.length===options.length&&new Set(group).size===group.length&&group.every(text=>live.has(text))?group:null;
    },
-   matchedBody:text=>rtIndex.roles?.[m.last]==='b'&&norm(rt[m.last])===norm(text),
-   resolveChoice:require('./script-translation-quality.cjs').choiceLookup(rt,patched?m.og:[],rtIndex.roles),pageParts:text=>m.pageParts(text),pageNext:(previous,text)=>m.pageNext(previous,text),pageBetween:(previous,packet,next)=>m.pageBetween(previous,packet,next),resolve:text=>withSpeaker(withRuby(resolveLine(text)),rtIndex.who)};
+   matchedBody:text=>roles?.[m.last]==='b'&&norm(rt[m.last])===norm(prepare(text)),
+   resolveChoice:choice(rt,patched?m.og:[],roles,rtIndex.roles,aliases),pageParts:text=>m.pageParts(text),pageNext:(previous,text)=>m.pageNext(previous,text),pageBetween:(previous,packet,next)=>m.pageBetween(previous,packet,next),resolve:text=>withSpeaker(withRuby(resolveLine(text)),who)};
   if(state.runtime.engine==='nitro-pak'&&require('../core/saya-page-ocr.cjs').legacyExe(path.basename(executable))){
    let lookup;
    api.sayaPageLine=(text,mode)=>(lookup??=require('../core/saya-page-ocr.cjs').scriptLookup(rt))(text,mode);

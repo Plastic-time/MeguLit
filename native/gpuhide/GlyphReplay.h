@@ -26,7 +26,7 @@ struct Call {
  unsigned tick = 0;
  void *tex = nullptr, *rt = nullptr;
  unsigned tw = 0, th = 0, rw = 0, rh = 0, bw = 0, bh = 0;
- bool flag = false; // render-target texture (D), read-only (M), or saved blank quads (P)
+ bool flag = false; // render-target texture (D), read-only (M), saved blank quads (P), or CMVS body recheck (B)
  float height = 0;  // preset only
  std::wstring text;
  std::vector<Quad> quads;
@@ -113,6 +113,11 @@ public:
   c.flag = readOnly;
   return Add(std::move(c));
  }
+ bool BodyRecheck(bool enabled) {
+  Call c{'B'};
+  c.flag = enabled;
+  return Add(std::move(c));
+ }
  bool Off() { return Add(Call{'O'}); }
 };
 
@@ -151,7 +156,7 @@ inline bool WriteTape(std::ostream &out, const Tape &tape, bool limited = false)
   case 'C': out << ' ' << ids.at(c.tex); break;
   case 'F': out << ' ' << c.tick << ' ' << c.bw << ' ' << c.bh; break;
   case 'P': out << ' ' << c.height << ' ' << c.bw << ' ' << c.bh << ' ' << c.flag; break;
-  case 'M': out << ' ' << c.flag; break;
+  case 'M': case 'B': out << ' ' << c.flag; break;
   }
   if (c.op == 'D' || c.op == 'C') {
    out << ' ' << c.quads.size();
