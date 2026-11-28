@@ -7,8 +7,12 @@
 #include <utility>
 #include <vector>
 
-struct CmvsBodyAtlas {
- bool identified = false;
+template <class Rect> struct CmvsBodyAtlas {
+ bool identified = false, startupConfirmed = false;
+ unsigned startupSeq = 0, startupFrame = 0, maskedFrame = 0;
+ std::vector<Rect> startupCells;
+ std::vector<bool> masked;
+ bool visibleCell = false;
 };
 
 // The strategy reads the current line and learned band, and returns a group's
@@ -19,10 +23,11 @@ template <class Geometry> struct CmvsBodyStrategy {
  using Group = typename Geometry::Group;
 
  static const unsigned BodyHookGraceMs = 250;
+ static constexpr unsigned AtlasWidth = 1024, AtlasHeight = 2048, CellPitch = 72, Columns = 14;
  unsigned bodyReportAt = 0;
 
- static bool AtlasSize(unsigned width, unsigned height) { return width == 1024 && height == 2048; }
- static bool KeepLatestRect(bool enabled, const Group &group) {
+ static bool AtlasSize(unsigned width, unsigned height) { return width == AtlasWidth && height == AtlasHeight; }
+ static bool UsesBodyAtlas(bool enabled, const Group &group) {
   return enabled && !group.rt && AtlasSize(group.tw, group.th);
  }
 
@@ -30,9 +35,36 @@ template <class Geometry> struct CmvsBodyStrategy {
  static int BodyAtlasCell(long long key) {
   const unsigned long long uv = key;
   const unsigned u = (uv >> 15) & 0x7fff, v = uv & 0x7fff;
-  constexpr unsigned columns = 14, uStep = 72 * 4096 / 1024, vStep = 72 * 4096 / 2048;
-  if (u % uStep || v % vStep || u / uStep >= columns) return -1;
-  return (v / vStep) * columns + u / uStep;
+  constexpr unsigned uStep = CellPitch * 4096 / AtlasWidth, vStep = CellPitch * 4096 / AtlasHeight;
+  if (u % uStep || v % vStep || u / uStep >= Columns) return -1;
+  return (v / vStep) * Columns + u / uStep;
+ }
+
+ template <class Quad>
+ static bool FixedCell(const Quad &q, long long key) {
+  return BodyAtlasCell(key) > 0 && q.u0 >= 0 && q.v0 >= 0 && q.u1 <= 1 && q.v1 <= 1 &&
+   std::fabs((q.u1 - q.u0) * AtlasWidth - 32) <= 1 && std::fabs((q.v1 - q.v0) * AtlasHeight - 32) <= 1;
+ }
+
+ static bool StartupAtlas(const Group &g, unsigned seq, unsigned frame, unsigned bw, unsigned bh) {
+  const auto &atlas = g.cmvs;
+  return atlas.startupSeq == seq && (atlas.startupConfirmed || atlas.startupFrame == frame) &&
+   !atlas.startupCells.empty() && g.rtW == bw && g.rtH == bh;
+ }
+
+ static bool MaskStartup(Group &g, unsigned frame, long long key, const Rect &rect, bool mayHide) {
+  auto &atlas = g.cmvs;
+  const int slot = BodyAtlasCell(key);
+  if (slot <= 0 || size_t(slot) > atlas.startupCells.size() ||
+      !Geometry::SamePlace(atlas.startupCells[slot - 1], rect)) return false;
+  if (atlas.maskedFrame != frame) {
+   std::fill(atlas.masked.begin(), atlas.masked.end(), false);
+   atlas.maskedFrame = frame;
+   atlas.visibleCell = false;
+  }
+  if (!mayHide) { atlas.visibleCell = true; return false; }
+  atlas.masked[slot - 1] = true;
+  return true;
  }
 
  struct Selection {
@@ -40,11 +72,12 @@ template <class Geometry> struct CmvsBodyStrategy {
   std::vector<Rect> body;
   bool moved = false;
   bool ownsFrame = false;
+  bool startup = false;
  };
 
  struct Frame {
   bool enabled, learned, areaTraced, hitSent, hiddenSent, reported;
-  unsigned frameNo, bbW, bbH, n, lineAt, prevLineAt, bodyReportAt;
+  unsigned frameNo, bbW, bbH, seq, n, lineAt, prevLineAt, bodyReportAt;
   void *areaRt;
   unsigned areaW, areaH;
   float glyphH;
@@ -71,12 +104,32 @@ template <class Geometry> struct CmvsBodyStrategy {
     if (g.rt || !AtlasSize(g.tw, g.th) || g.rtW != bbW || g.rtH != bbH) continue;
     auto current = CurrentBodyGrid(g);
     selection.ownsFrame = selection.ownsFrame || g.cmvs.identified;
-    if (current.empty()) continue;
+    if (current.body.empty()) continue;
     if (selection.group) return {nullptr, {}, false, true};
     selection.group = &g;
-    selection.body = std::move(current);
+    selection.body = std::move(current.body);
+    selection.startup = current.startup;
    }
-   if (const Group *match = selection.group) {
+   if (Group *match = selection.group) {
+    auto &atlas = match->cmvs;
+    // A complete observed row is the probe. Publish placement only after a
+    // later draw has actually hidden every one of those same cells.
+    if (selection.startup) {
+     const bool masked = atlas.startupSeq == seq && atlas.maskedFrame == frameNo - 1 && !atlas.visibleCell &&
+      std::equal(selection.body.begin(), selection.body.end(), atlas.startupCells.begin(), atlas.startupCells.end(), Geometry::SamePlace) &&
+      std::all_of(atlas.masked.begin(), atlas.masked.end(), [](bool value) { return value; });
+     if (!masked) {
+      atlas.startupSeq = seq;
+      atlas.startupFrame = frameNo;
+      atlas.startupConfirmed = false;
+      atlas.startupCells = std::move(selection.body);
+      atlas.masked.assign(atlas.startupCells.size(), false);
+      return {nullptr, {}, false, true};
+     }
+     atlas.startupConfirmed = true;
+    } else if (!learned && atlas.startupSeq == seq && atlas.startupFrame == frameNo - 1) {
+     return {nullptr, {}, false, true};
+    }
     selection.moved = learned && (match->rt != areaRt || match->rtW != areaW || match->rtH != areaH ||
      !knownAtlas(match->tex) || std::any_of(selection.body.begin(), selection.body.end(),
       [&](const Rect &r) { return !Geometry::BodyInBand(r, area, glyphH); }));
@@ -147,11 +200,19 @@ template <class Geometry> struct CmvsBodyStrategy {
    return false;
   }
 
+  struct Grid {
+   std::vector<Rect> body;
+   bool startup;
+  };
+
   // Only this frame's ordered atlas cells can describe the line. Counting the
   // box and font atlases together can fill a partial line with pieces of its box.
-  std::vector<Rect> CurrentBodyGrid(Group &g) const {
+  Grid CurrentBodyGrid(Group &g) const {
    if (g.prevFrame != frameNo - 1) return {};
+   // A cold row must include the atlas wrap from column 13 to column 0.
+   const bool tryStartup = !learned && n >= Columns && n == blankAt.size();
    std::vector<const Seen *> cells(blankAt.size());
+   std::vector<std::pair<unsigned, const Rect *>> tail;
    const Rect *spacer = nullptr;
    bool conflict = false;
    for (const auto &entry : g.keys) {
@@ -161,13 +222,17 @@ template <class Geometry> struct CmvsBodyStrategy {
     const int slot = BodyAtlasCell(entry.first);
     if (slot == 0 && !r.traced && r.x1 - r.x0 <= 8 && r.y1 - r.y0 <= 8) spacer = &r;
     if (slot <= 0 || r.x1 - r.x0 < 12 || r.y1 - r.y0 < 12) continue;
-    if (size_t(slot) > cells.size()) { conflict = true; continue; }
+    if (size_t(slot) > cells.size()) {
+     if (tryStartup && seen.fixedCell && !r.traced) tail.emplace_back(slot, &r);
+     else conflict = true;
+     continue;
+    }
     const Seen *&cell = cells[slot - 1];
     if (cell && !Geometry::SamePlace(cell->r, r)) conflict = true;
     if (!cell || (!cell->r.traced && r.traced)) cell = &seen;
    }
-   if (spacer && !cells.empty() && cells[0] && cells[0]->r.x0 > spacer->x0 && cells[0]->r.y0 > spacer->y0)
-    g.cmvs.identified = true;
+   const bool hasSpacer = spacer && !cells.empty() && cells[0] && cells[0]->r.x0 > spacer->x0 && cells[0]->r.y0 > spacer->y0;
+   if (hasSpacer) g.cmvs.identified = true;
    if (!g.cmvs.identified || conflict || cells.empty() || std::find(cells.begin(), cells.end(), nullptr) != cells.end()) return {};
 
    const Rect &first = cells.front()->r;
@@ -201,7 +266,22 @@ template <class Geometry> struct CmvsBodyStrategy {
    // a new line, while a second report of an already matched line can reuse them.
    const bool repeat = reported && std::equal(body.begin(), body.end(), lastRects.begin(), lastRects.end(), Geometry::SamePlace);
    if (!traced || body.size() != n || (!repeat && fresh < (std::min)(n, 2u))) return {};
-   return body;
+   const Rect &last = cells.back()->r;
+   const bool startup = tryStartup && hasSpacer && std::fabs(last.y0 - first.y0) <= 1 &&
+    std::all_of(cells.begin(), cells.end(), [](const Seen *cell) { return cell->fixedCell && cell->r.traced; });
+   // A cold atlas can contain additional untraced cells at the trailing
+   // positions. They neither make up the source line nor get hidden by it.
+   if (!tail.empty()) {
+    if (!startup) return {};
+    std::sort(tail.begin(), tail.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+    for (size_t i = 0; i < tail.size(); ++i) {
+     const Rect &r = *tail[i].second;
+     if (tail[i].first != cells.size() + i + 1 || std::fabs(r.x0 - last.x0 - pitch * (i + 1)) > 1 ||
+         std::fabs(r.y0 - last.y0) > 1 || std::fabs(r.x1 - r.x0 - width) > width * .2f ||
+         std::fabs(r.y1 - r.y0 - height) > height * .2f) return {};
+    }
+   }
+   return {std::move(body), startup};
   }
 
   bool FixedPitchBody(const std::vector<Rect> &body, const Group *atlas = nullptr, bool fromAtlas = true) const {

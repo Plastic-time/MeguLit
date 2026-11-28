@@ -13,7 +13,8 @@
 //  - a row cluster whose count equals n learns the text area (its bounding box, grown by one glyph height) and the
 //    atlas sizes that drew there. Learning hides nothing.
 //  - after that, while armed (a LINE in the last 60 s, no OFF), glyph-like quads from the learned atlases whose centre
-//    lies in the text area are left out. The first one per line is a "hit".
+//    lies in the text area are left out. The first hidden draw per line is a "hit". The CMVS startup strategy
+//    verifies and masks the cells of a traced body row before publishing the first hit and placement.
 #pragma once
 #include <string>
 #include <vector>
@@ -48,8 +49,8 @@ struct NativeGroupOrder {
 template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
  explicit OrderedGlyphLearner(GroupOrder order = {}) : GroupOrder(std::move(order)) {}
  struct Rect { float x0, y0, x1, y1; bool traced = false; };
- struct Seen { Rect r; unsigned firstAt, lastFrame, glyph, tracedAt; };
- struct Group { void *rt, *tex; unsigned tw, th, rtW, rtH; std::map<long long, Seen> keys; std::vector<Rect> frame, prev; unsigned prevFrame; CmvsBodyAtlas cmvs; };
+ struct Seen { Rect r; unsigned firstAt, lastFrame, glyph, tracedAt; bool fixedCell = false; };
+ struct Group { void *rt, *tex; unsigned tw, th, rtW, rtH; std::map<long long, Seen> keys; std::vector<Rect> frame, prev; unsigned prevFrame; CmvsBodyAtlas<Rect> cmvs; };
  std::function<void(const std::string &)> emit; void (*log)(const char *, ...) = nullptr;
  bool readOnly = false;
  bool bodyRecheck = false;
@@ -58,7 +59,7 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
 
  typename BodyStrategy::Frame CmvsFrame() const {
   return {bodyRecheck && !readOnly, learned, areaTraced, hitSent, hiddenSent, reported,
-          frameNo, bbW, bbH, n, lineAt, prevLineAt, cmvs.bodyReportAt,
+          frameNo, bbW, bbH, seq, n, lineAt, prevLineAt, cmvs.bodyReportAt,
           areaRt, areaW, areaH, glyphH, area, blankAt, lastRects, earlierRects};
  }
  // line
@@ -303,6 +304,7 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
  std::vector<int> Draw(void *tex, unsigned tw, unsigned th, void *rt, unsigned rtW, unsigned rtH, unsigned backW, unsigned backH, const std::vector<Quad> &q, unsigned now) {
   std::vector<int> drop; bbW = backW; bbH = backH;
   long long gk = GroupKey(rt, tex); Group *g = nullptr; bool armed = Armed(now);
+  bool startupDrop = false;
   // a texture first used for this line (per-line glyph sheets); UI sheets in use before the line never count as sheets
   bool freshTex = false; { auto ft = texFirst.find(tex); if (ft == texFirst.end()) { if (texFirst.size() > 8192) texFirst.clear(); texFirst[tex] = now; ft = texFirst.find(tex); } freshTex = (int)(ft->second - (lineAt - 3000)) >= 0; }
   for (size_t i = 0; i < q.size(); i++) {
@@ -313,15 +315,19 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
    if (g->prevFrame != frameNo) { g->prev.swap(g->frame); g->frame.clear(); g->prevFrame = frameNo; }
    if (g->frame.size() < 4096) g->frame.push_back(r);
    long long k = ((long long)(int)(x.x0 * 0.5f) << 44) ^ ((long long)(int)(x.y0 * 0.5f) << 30) ^ ((long long)(int)(x.u0 * 4096) << 15) ^ (long long)(int)(x.v0 * 4096);
+   const bool cmvsAtlas = BodyStrategy::UsesBodyAtlas(bodyRecheck, *g);
+   const bool startup = cmvsAtlas && armed && !texRt && BodyStrategy::StartupAtlas(*g, seq, frameNo, backW, backH);
+   const bool fixedCell = cmvsAtlas && !texRt && (!learned || startup) && BodyStrategy::FixedCell(x, k);
    auto it = g->keys.find(k);
    if (it == g->keys.end()) {
     if (g->keys.size() > 20000) g->keys.clear();
-    g->keys[k] = Seen{ r, now, frameNo, x.glyph, now };
+    g->keys[k] = Seen{ r, now, frameNo, x.glyph, now, fixedCell };
    } else {
     Seen &seen = it->second;
     seen.lastFrame = frameNo;
-    if (BodyStrategy::KeepLatestRect(bodyRecheck && !readOnly, *g)) seen.r = r;
+    if (cmvsAtlas && !readOnly) seen.r = r;
     else seen.r.traced = r.traced;
+    seen.fixedCell = fixedCell;
     // A texture cell can be rewritten at the same UV, on the same screen position.
     if (x.glyph && x.glyph != seen.glyph) { seen.glyph = x.glyph; seen.tracedAt = now; }
    }
@@ -332,13 +338,31 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
    bool glyphSize = BodyHeight(r);
    if (!glyphSize && RubySized(x.y1 - x.y0) && RubyOver(Rect{ x.x0, x.y0, x.x1, x.y1 })) glyphSize = true; /* the line's ruby goes with it */
    bool redraw = (int)(redrawUntil - now) > 0 && rtW == areaW && rtH == areaH;
-   if (learned && armed && !readOnly && glyphSize && (sameAtlas || sheet || redraw)) {
-    float cx = (x.x0 + x.x1) / 2, cy = (x.y0 + x.y1) / 2;
-    if (cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1) { drop.push_back((int)i); if (sameAtlas && rt == areaRt && r.traced) areaTraced = true; hiddenQuads++; if (log && hiddenQuads < 60) log("drop %s tex=%p %ux%u [%.0f,%.0f %.0fx%.0f uv %.3f,%.3f %.3fx%.3f]", sameAtlas ? "atlas" : sheet ? "sheet" : "redraw", tex, tw, th, x.x0, x.y0, x.x1 - x.x0, x.y1 - x.y0, x.u0, x.v0, x.u1 - x.u0, x.v1 - x.v0); }
+   const float cx = (x.x0 + x.x1) / 2, cy = (x.y0 + x.y1) / 2;
+   const bool hide = startup ? fixedCell && BodyStrategy::MaskStartup(*g, frameNo, k, r, !readOnly) :
+    learned && armed && !readOnly && glyphSize && (sameAtlas || sheet || redraw) &&
+    cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1;
+   if (hide) {
+    drop.push_back((int)i);
+    startupDrop = startupDrop || startup;
+    if (sameAtlas && rt == areaRt && r.traced) areaTraced = true;
+    hiddenQuads++;
+    if (log && hiddenQuads < 60) log("drop %s tex=%p %ux%u [%.0f,%.0f %.0fx%.0f uv %.3f,%.3f %.3fx%.3f]",
+     startup ? "cmvs" : sameAtlas ? "atlas" : sheet ? "sheet" : "redraw",
+     tex, tw, th, x.x0, x.y0, x.x1 - x.x0, x.y1 - x.y0, x.u0, x.v0, x.u1 - x.u0, x.v1 - x.v0);
    }
   }
-  if (!drop.empty() && !hitSent) { hitSent = true; char b[128]; snprintf(b, sizeof b, "ToMe_GPUHIDE hit seq=%u quads=%u chars=%u", seq, (unsigned)drop.size(), n); if (emit) emit(b); }
+  if (!drop.empty() && !startupDrop) Hit(drop.size());
   return drop;
+ }
+
+ void Hit(size_t count) {
+  if (hitSent) return;
+  hitSent = true;
+  if (!emit) return;
+  char b[128];
+  snprintf(b, sizeof b, "ToMe_GPUHIDE hit seq=%u quads=%u chars=%u", seq, (unsigned)count, n);
+  emit(b);
  }
 
  // Merge offset copies (shadow / outline) and sort in reading order.
@@ -435,7 +459,10 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
   if (settled && !mixed) return;
   const auto grid = policy.SelectGrid(groups, [&](void *tex) { return LearnedAtlas(tex); });
   if (grid.ownsFrame) {
-   if (grid.group) Report(*grid.group, grid.body, grid.moved);
+   if (grid.group) {
+    if (grid.startup) Hit(grid.body.size());
+    Report(*grid.group, grid.body, grid.moved, grid.startup);
+   }
    return;
   }
   unsigned since = prevLineAt && now - prevLineAt < 120000 ? (std::max)(prevLineAt + 200, lineAt - 3000) : lineAt - 3000;
@@ -528,7 +555,7 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
    return;
   }
  }
- void Report(Group &g, const std::vector<Rect> &cs, bool moved = false) {
+ void Report(Group &g, const std::vector<Rect> &cs, bool moved = false, bool exactAtlas = false) {
   if (bodyRecheck && CmvsFrame().WaitForBody(g, cs, [&](void *tex) { return LearnedAtlas(tex); })) return;
   if (moved) { learned = false; atlases.clear(); hitSent = false; }
   float h = 0; Rect box{ 1e30f, 1e30f, -1e30f, -1e30f }; for (auto &r : cs) { h += r.y1 - r.y0; box.x0 = (std::min)(box.x0, r.x0); box.y0 = (std::min)(box.y0, r.y0); box.x1 = (std::max)(box.x1, r.x1); box.y1 = (std::max)(box.y1, r.y1); } h /= cs.size();
@@ -542,7 +569,10 @@ template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
    auto aligned = [&](const Rect &r) { for (auto &c : cs) if (std::fabs(r.x0 - c.x0) <= 3 && std::fabs(r.y0 - c.y0) <= 3) return true; return false; };
    auto inArea = [&](const Rect &r) { float cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2; return cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1; };
    // every target of the learned size counts: engines draw the same page into a shadow / effect buffer too (Saya)
-   for (auto &kv : groups) { if (kv.second.rt != g.rt && (kv.second.rtW != g.rtW || kv.second.rtH != g.rtH)) continue; int in = 0, on = 0; for (const std::vector<Rect> *v : { &kv.second.frame, &kv.second.prev }) for (auto &r : *v) if (inArea(r)) { in++; if (aligned(r)) on++; }
+   for (auto &kv : groups) {
+    if (exactAtlas && &kv.second != &g) continue;
+    if (kv.second.rt != g.rt && (kv.second.rtW != g.rtW || kv.second.rtH != g.rtH)) continue;
+    int in = 0, on = 0; for (const std::vector<Rect> *v : { &kv.second.frame, &kv.second.prev }) for (auto &r : *v) if (inArea(r)) { in++; if (aligned(r)) on++; }
     if (&kv.second == &g || (on >= 1 && on * 10 >= in * 6)) atlases.insert(GroupKey(nullptr, kv.second.tex)); }
    snprintf(b, sizeof b, "ToMe_GPUHIDE learn seq=%u area=%.0f,%.0f,%.0f,%.0f atlas=%ux%u glyphs=%u chars=%u atlases=%u", seq, area.x0, area.y0, area.x1 - area.x0, area.y1 - area.y0, g.tw, g.th, (unsigned)cs.size(), n, (unsigned)atlases.size()); if (emit) emit(b);
   } else {
