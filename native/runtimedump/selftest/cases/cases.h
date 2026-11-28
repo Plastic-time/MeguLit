@@ -9,4 +9,5 @@
  CASE(Voice) \
  CASE(Krkr) \
  CASE(VoiceSafety) \
- CASE(Deadlock)
+ CASE(Deadlock) \
+ CASE(HeapGate)
