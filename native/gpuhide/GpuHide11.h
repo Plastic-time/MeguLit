@@ -49,11 +49,11 @@ static std::vector<int> Decide11(std::vector<Quad> &q, const char *kind, UINT co
  TexInfo ti = Tex11(Ctx.tex0); TexInfo rt = Tex11(Ctx.rt); bool back = Ctx.rt == BackRes11 || !rt.rt;
  if (Diag) { int g = 0; for (auto &x : q) if (GlyphLike(x, ti.w, ti.h)) g++; if (Frame % 300 == 0 || (g && Frame % 10 == 0)) { char b[900]; int n = _snprintf_s(b, sizeof b, _TRUNCATE, "F%u %s rt=%p(%ux%u%s) tex=%p(%ux%u%s) n=%u q=%u g=%d", Frame, kind, Ctx.rt, rt.w, rt.h, back ? " back" : "", Ctx.tex0, ti.w, ti.h, ti.rt ? " rt" : "", count, (unsigned)q.size(), g); for (size_t i = 0; i < q.size() && i < 6 && n < 700; i++) n += _snprintf_s(b + n, sizeof b - n, _TRUNCATE, " [%.0f,%.0f %.0fx%.0f uv %.3f,%.3f %.3fx%.3f]", q[i].x0, q[i].y0, q[i].x1 - q[i].x0, q[i].y1 - q[i].y0, q[i].u0, q[i].v0, q[i].u1 - q[i].u0, q[i].v1 - q[i].v0); Log("%s", b); } }
  std::vector<int> drop; if (!Ctx.tex0 || !ti.w) return drop;
- if (back && ti.rt) { Learner.Composite(Ctx.tex0, q); return drop; }
+ if (back && ti.rt) { LearnComposite(Ctx.tex0, q); return drop; }
  if (!back && Ctx.rt) Textures[Ctx.rt] = rt;
  TraceDraw(Ctx.tex0, ti.w, ti.h, back ? NULL : Ctx.rt, rt.w, rt.h, q);
  Learner.texRt = ti.rt;
- return Learner.Draw(Ctx.tex0, ti.w, ti.h, back ? NULL : Ctx.rt, rt.w, rt.h, BackW11, BackH11, q, GetTickCount());
+ return LearnDraw(Ctx.tex0, ti.w, ti.h, back ? NULL : Ctx.rt, rt.w, rt.h, BackW11, BackH11, q, GetTickCount());
 }
 
 // The pipeline state of a draw, through the context's own getters (works for state set before the DLL arrived).

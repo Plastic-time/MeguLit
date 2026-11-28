@@ -1,0 +1,15 @@
+MASK 0.0
+MASK 0.1
+ToMe_PAGE sw=640 sh=480 awake=0 armed=1 gh=0 own=0 ownr= t=10002	1	4		
+ToMe_GPUHIDE learn seq=1 area=0,376,640,96 atlas=1024x1024 glyphs=4 chars=4 atlases=2
+ToMe_CHARS engine=gpu line=1 hidden=0 sw=640 sh=480 vx=0 vy=0 vw=640 vh=480 n=4 rects=100,400,24,24;128,400,24,24;156,400,24,24;184,400,24,24 text=
+ToMe_GPUHIDE hit seq=1 quads=4 chars=4
+MASK 1.0 0 1 2 3
+MASK 1.1 0 1 2 3
+MASK 1.2
+ToMe_CHARS engine=gpu line=1 hidden=1 sw=640 sh=480 vx=0 vy=0 vw=640 vh=480 n=4 rects=100,400,24,24;128,400,24,24;156,400,24,24;184,400,24,24 text=
+ToMe_GPUHIDE hit seq=2 quads=8 chars=8
+MASK 2.0 0 1 2 3 4 5 6 7
+ToMe_PAGE sw=640 sh=480 awake=0 armed=1 gh=0 own=0 ownr= t=12002	1	4			2	8		
+ToMe_CHARS engine=gpu line=2 hidden=1 sw=640 sh=480 vx=0 vy=0 vw=640 vh=480 n=8 rects=100,372,24,24;128,372,24,24;156,372,24,24;184,372,24,24;100,400,24,24;128,400,24,24;156,400,24,24;184,400,24,24 text=
+MASK 3.0

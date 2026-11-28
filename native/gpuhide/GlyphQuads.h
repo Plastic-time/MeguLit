@@ -21,6 +21,7 @@
 #include <set>
 #include <algorithm>
 #include <functional>
+#include <utility>
 #include <cmath>
 #include <stdio.h>
 
@@ -37,7 +38,14 @@ static inline bool GlyphLike(const Quad &q, unsigned tw, unsigned th) {
 }
 static inline bool Blank(wchar_t c) { return c <= 0x20 || c == 0x3000 || c == 0x200B || c == 0xFEFF || c == 0x1F; }
 
-struct GlyphLearner {
+struct NativeGroupOrder {
+ long long operator()(void *rt, void *tex) const {
+  return ((long long)(size_t)rt * 1315423911LL) ^ (long long)(size_t)tex;
+ }
+};
+
+template <class GroupOrder> struct OrderedGlyphLearner : private GroupOrder {
+ explicit OrderedGlyphLearner(GroupOrder order = {}) : GroupOrder(std::move(order)) {}
  struct Rect { float x0, y0, x1, y1; bool traced = false; };
  struct Seen { Rect r; unsigned firstAt, lastFrame, glyph, tracedAt; };
  struct Group { void *rt, *tex; unsigned tw, th, rtW, rtH; std::map<long long, Seen> keys; std::vector<Rect> frame, prev; unsigned prevFrame; };
@@ -61,8 +69,7 @@ struct GlyphLearner {
  std::map<void *, std::pair<Rect, Rect>> rtMap; // rt texture -> (uv rect, screen rect)
 
  // one group per (render target, texture): two atlases of the same size (glyph sheet and UI sheet) never mix
- static long long GroupKey(void *rt, void *tex) { return ((long long)(size_t)rt * 1315423911LL) ^ (long long)(size_t)tex; }
- static long long AtlasKey(void *rt, void *tex) { return GroupKey(rt, tex); }
+ long long GroupKey(void *rt, void *tex) const { return GroupOrder::operator()(rt, tex); }
  // a glyph sheet made for one line is sized to that line (e.g. 76 x 88), unlike UI / font atlases (powers of two)
  static bool LineSized(unsigned w, unsigned h) { auto p2 = [](unsigned v) { return v && !(v & (v - 1)); }; return !(p2(w) && p2(h)) && w * h <= 1024u * 256u; }
  bool Armed(unsigned now) const { return n > 0 && (int)(armedUntil - now) > 0; }
@@ -310,7 +317,7 @@ struct GlyphLearner {
    }
    // learned atlas on the learned target; or, for engines that build a small glyph sheet per line (a new texture every
    // line), any glyph quad of the learned glyph height on a target of the learned size (effect buffers drawn twice)
-   bool sameAtlas = rtW == areaW && rtH == areaH && atlases.count(AtlasKey(NULL, tex)), sheet = freshTex && LineSized(tw, th) && rtW == areaW && rtH == areaH && std::fabs((x.y1 - x.y0) - glyphH) <= glyphH * 0.25f;
+   bool sameAtlas = rtW == areaW && rtH == areaH && atlases.count(GroupKey(nullptr, tex)), sheet = freshTex && LineSized(tw, th) && rtW == areaW && rtH == areaH && std::fabs((x.y1 - x.y0) - glyphH) <= glyphH * 0.25f;
    // glyph height only: a wait cursor or icon drawn from the same sheet inside the area stays
    bool glyphSize = BodyHeight(r);
    if (!glyphSize && RubySized(x.y1 - x.y0) && RubyOver(Rect{ x.x0, x.y0, x.x1, x.y1 })) glyphSize = true; /* the line's ruby goes with it */
@@ -386,7 +393,7 @@ struct GlyphLearner {
  }
  // This CMVS atlas packs the line in order in a 72-pixel grid, after the spacer at cell zero.
  bool BodyAtlasRun(const Group &g, const std::vector<Rect> &body) const {
-  if (g.tw != 1024 || g.th != 2048 || (learned && !atlases.count(AtlasKey(NULL, g.tex)))) return false;
+  if (g.tw != 1024 || g.th != 2048 || (learned && !atlases.count(GroupKey(nullptr, g.tex)))) return false;
   const unsigned cell = 72, columns = g.tw / cell;
   const unsigned uStep = cell * 4096 / g.tw, vStep = cell * 4096 / g.th;
   std::vector<bool> matched(body.size());
@@ -521,7 +528,7 @@ struct GlyphLearner {
   for (auto &kv : groups) {
    Group &g = kv.second; std::vector<Rect> fresh, live, freshTraced, retainedBody;
    if (learned && (g.rtW != areaW || g.rtH != areaH)) continue;
-   const bool currentFrame = g.prevFrame == frameNo - 1, fromAtlas = atlases.count(AtlasKey(NULL, g.tex)) > 0;
+   const bool currentFrame = g.prevFrame == frameNo - 1, fromAtlas = atlases.count(GroupKey(nullptr, g.tex)) > 0;
    if (recheck && !learned && currentFrame) {
     const auto body = InitialBody(g);
     if (!body.empty()) { Report(g, body); return; }
@@ -642,7 +649,7 @@ struct GlyphLearner {
    auto inArea = [&](const Rect &r) { float cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2; return cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1; };
    // every target of the learned size counts: engines draw the same page into a shadow / effect buffer too (Saya)
    for (auto &kv : groups) { if (kv.second.rt != g.rt && (kv.second.rtW != g.rtW || kv.second.rtH != g.rtH)) continue; int in = 0, on = 0; for (const std::vector<Rect> *v : { &kv.second.frame, &kv.second.prev }) for (auto &r : *v) if (inArea(r)) { in++; if (aligned(r)) on++; }
-    if (&kv.second == &g || (on >= 1 && on * 10 >= in * 6)) atlases.insert(AtlasKey(NULL, kv.second.tex)); }
+    if (&kv.second == &g || (on >= 1 && on * 10 >= in * 6)) atlases.insert(GroupKey(nullptr, kv.second.tex)); }
    snprintf(b, sizeof b, "ToMe_GPUHIDE learn seq=%u area=%.0f,%.0f,%.0f,%.0f atlas=%ux%u glyphs=%u chars=%u atlases=%u", seq, area.x0, area.y0, area.x1 - area.x0, area.y1 - area.y0, g.tw, g.th, (unsigned)cs.size(), n, (unsigned)atlases.size()); if (emit) emit(b);
   } else {
    // grow the area when a longer line spills over it
@@ -653,10 +660,12 @@ struct GlyphLearner {
   if (!mapped) { if (log && frameNo % 60 == 0) log("rects not mapped yet: render target %p not composited", g.rt); return; } // try again next frame
   reported = true; hiddenSent = hidden; lastRects = cs; lastKeys.clear();
   if (bodyRecheck && hidden) bodyReportAt = frameNow;
-  { long long gk = GroupKey(g.rt, g.tex); for (auto &kv : groups) { if (kv.second.rt != g.rt) continue; for (auto &s : kv.second.keys) { if (frameNo - s.second.lastFrame > 2) continue; for (auto &c : cs) { float w = (std::min)(c.x1 - c.x0, s.second.r.x1 - s.second.r.x0), h = c.y1 - c.y0; if (std::fabs(c.x0 - s.second.r.x0) < 0.4f * w && std::fabs(c.y0 - s.second.r.y0) < 0.4f * h) { lastKeys.insert({ kv.first, s.first }); break; } } } } (void)gk; }
+  for (auto &kv : groups) { if (kv.second.rt != g.rt) continue; for (auto &s : kv.second.keys) { if (frameNo - s.second.lastFrame > 2) continue; for (auto &c : cs) { float w = (std::min)(c.x1 - c.x0, s.second.r.x1 - s.second.r.x0), h = c.y1 - c.y0; if (std::fabs(c.x0 - s.second.r.x0) < 0.4f * w && std::fabs(c.y0 - s.second.r.y0) < 0.4f * h) { lastKeys.insert({ kv.first, s.first }); break; } } } }
   std::string t;
   { std::string u; for (size_t i = 0; i < text.size(); i++) { unsigned c = text[i]; if (c >= 0xD800 && c < 0xDC00 && i + 1 < text.size()) { c = 0x10000 + ((c - 0xD800) << 10) + (text[++i] - 0xDC00); u += (char)(0xF0 | (c >> 18)); u += (char)(0x80 | ((c >> 12) & 63)); u += (char)(0x80 | ((c >> 6) & 63)); u += (char)(0x80 | (c & 63)); } else if (c < 0x80) u += (char)c; else if (c < 0x800) { u += (char)(0xC0 | (c >> 6)); u += (char)(0x80 | (c & 63)); } else { u += (char)(0xE0 | (c >> 12)); u += (char)(0x80 | ((c >> 6) & 63)); u += (char)(0x80 | (c & 63)); } } t = u; }
   std::string line = "ToMe_CHARS engine=gpu line=" + std::to_string(seq) + " hidden=" + (hidden ? "1" : "0") + " sw=" + std::to_string(bbW) + " sh=" + std::to_string(bbH) + " vx=0 vy=0 vw=" + std::to_string(bbW) + " vh=" + std::to_string(bbH) + " n=" + std::to_string(cs.size()) + " rects=" + rects + " text=" + t;
   if (emit) emit(line);
  }
 };
+
+using GlyphLearner = OrderedGlyphLearner<NativeGroupOrder>;

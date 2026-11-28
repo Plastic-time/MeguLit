@@ -141,9 +141,9 @@ static std::vector<int> DecideGL(std::vector<Quad> &q, void *tex, unsigned tw, u
  std::vector<int> drop; Guard g;
  if (Diag) { int gl = 0; for (auto &x : q) if (GlyphLike(x, tw, th)) gl++; if (Frame % 300 == 0 || (gl && Frame % 10 == 0)) Log("F%u %s rt=%p(%ux%u) tex=%p(%ux%u) n=%d q=%u g=%d [%.0f,%.0f %.0fx%.0f uv %.3f,%.3f %.3fx%.3f]", Frame, kind, rt, rw, rh, tex, tw, th, (int)count, (unsigned)q.size(), gl, q.empty() ? 0 : q[0].x0, q.empty() ? 0 : q[0].y0, q.empty() ? 0 : q[0].x1 - q[0].x0, q.empty() ? 0 : q[0].y1 - q[0].y0, q.empty() ? 0 : q[0].u0, q.empty() ? 0 : q[0].v0, q.empty() ? 0 : q[0].u1 - q[0].u0, q.empty() ? 0 : q[0].v1 - q[0].v0); }
  if (!tex || !tw) return drop;
- if (!rt) { auto it = Textures.find(tex); if (it != Textures.end() && it->second.rt) { Learner.Composite(tex, q); return drop; } }
+ if (!rt) { auto it = Textures.find(tex); if (it != Textures.end() && it->second.rt) { LearnComposite(tex, q); return drop; } }
  if (rt) { TexInfo ti = { rw, rh, D3DFMT_UNKNOWN, true }; Textures[rt] = ti; }
- return Learner.Draw(tex, tw, th, rt, rw, rh, GlBackW, GlBackH, q, GetTickCount());
+ return LearnDraw(tex, tw, th, rt, rw, rh, GlBackW, GlBackH, q, GetTickCount());
 }
 typedef void(WINAPI *DrawArraysF)(GLenum, GLint, GLsizei);
 typedef void(WINAPI *DrawElementsF)(GLenum, GLsizei, GLenum, const void *);

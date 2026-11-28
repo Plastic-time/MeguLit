@@ -1,0 +1,53 @@
+{
+  "placement": [
+    {
+      "type": "textPlacePage",
+      "awake": true,
+      "armed": false,
+      "own": 0,
+      "ownRects": "",
+      "lines": [],
+      "client": [
+        1280,
+        720
+      ]
+    },
+    {
+      "type": "textPlacePage",
+      "awake": true,
+      "armed": false,
+      "elsewhere": true,
+      "lines": [],
+      "client": [
+        1280,
+        720
+      ]
+    },
+    {
+      "type": "textPlacePage",
+      "awake": true,
+      "armed": false,
+      "own": 0,
+      "ownRects": "",
+      "lines": [],
+      "client": [
+        1280,
+        720
+      ]
+    }
+  ],
+  "visibility": [
+    {
+      "original": "hidden",
+      "translation": "visible"
+    },
+    {
+      "original": "visible",
+      "translation": "visible"
+    },
+    {
+      "original": "hidden",
+      "translation": "visible"
+    }
+  ]
+}
