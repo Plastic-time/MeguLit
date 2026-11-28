@@ -26,6 +26,11 @@ module.exports={
      layout call (one glyph or one ruby base per call, the line joined afterwards): every short piece is blanked while the line is hidden.
      [] = the kernel: a short piece follows the label rule (kanji / katakana pieces go back unchanged) */
   embedGlyphPieces:[],
+  /* 2026-11-28 (アオイトリ, CMVS: one context of the dialogue hook sends only the glyphs drawn for the first time, its sibling the whole
+     line 1-10 ms later) HookBridge watches same-hook siblings for a first-glyph context: an all-new early line of the selected stream
+     waits up to 60 ms for the sibling's line, and the whole-line sibling takes the selection (native/HookBridge.cs FirstGlyphSwitch).
+     false = the kernel: lines are handled at once and no sibling is preferred for it */
+  firstGlyphSiblings:false,
   siglusDbsNameColumn:null,
   /* 2026-11-27 MeguLit-Adapter: how this game's built-in version layer is found. 'exe' = the kernel as before: only the exe's
      SHA-256 (The Seed versions/<sha>.json). 'prints' = when the exe hash misses (no-DVD, update, a Chinese patch's renamed exe), the
