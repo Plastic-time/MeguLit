@@ -51,7 +51,7 @@ static void StopOne(DumpStopFn fn) { __try { fn(); } __except (EXCEPTION_EXECUTE
 static void StopModules(const char *name) { LONG k = StopCount < 8 ? StopCount : 8; for (LONG i = 0; i < k; i++) if (StopList[i].fn && (!name || !strcmp(StopList[i].name, name))) StopOne(StopList[i].fn); }
 // Pack contract version, read by tests and by MeguLit to tell pack builds apart. 3 (2026-11-21): the build with the zero-allocation
 // re-entry flag (cd35cbd4); HookBridge never loads a pack below 3 (contract 2 recursed into RtlAllocateHeap until the stack ran out).
-extern "C" __declspec(dllexport) int MeguLitDumpVersion() { return 3; }
+extern "C" __declspec(dllexport) int MeguLitDumpVersion() { return 4; }
 
 namespace {
 HMODULE Self;

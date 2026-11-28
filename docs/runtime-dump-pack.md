@@ -16,7 +16,7 @@ MeguLitDump32/64.dll 是冷工具：用户看不到、也不用开。它在 Megu
 MeguLit-runtime-dump-v<ver>.zip
 ├─ MeguLitDump32.dll
 ├─ MeguLitDump64.dll
-└─ pack.json        {"pack":"runtime-dump","version":"<ver>","contract":2,"commit":"<sha>"}
+└─ pack.json        {"pack":"runtime-dump","version":"<ver>","contract":4,"commit":"<sha>"}
 ```
 
 发包步骤：`native\runtimedump\build.cmd` → `native\runtimedump\selftest\run.ps1` → `native\runtimedump\pack.ps1 -Version x.y.z`（会改 `setup/runtime.json`）→ 把 zip 上传到 release `runtime-dump-vx.y.z`。上传算发版，要先问用户。zip 每次打包的 sha 都会变，所以 runtime.json 必须和实际上传的那个 zip 是同一次打出来的

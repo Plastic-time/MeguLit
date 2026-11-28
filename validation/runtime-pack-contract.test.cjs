@@ -12,5 +12,5 @@ function root(contractInManifest,installedContract){
 test('pack contract decides installed',()=>{
  const cases=[[3,2,false],[3,3,true],[0,2,true],[3,4,true]];
  for(const [want,have,ok] of cases){const r=root(want,have);try{assert.strictEqual(packContract(path.join(r,'runtime','runtime-dump')),have);assert.strictEqual(new RuntimePacks(r).installed('runtime-dump'),ok,want+'/'+have);}finally{fs.rmSync(r,{recursive:true,force:true});}}
- assert.match(fs.readFileSync(path.join(__dirname,'..','native','runtimedump','pack-manifest.cjs'),'utf8'),/const entry=\{size:\+size,contract:3,/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','native','runtimedump','pack-manifest.cjs'),'utf8'),/const entry=\{size:\+size,contract:4,/);
 });
