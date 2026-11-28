@@ -43,7 +43,7 @@
 |---|---|---|---|---|---|
 | 魚魚棟 · Claude | 1.4.26 游戏库刷新要等特别久：刷新先出列表，VNDB 查询放后台并缓存（54 部假库：刷新 35 s → 1.6 s） | — | fix/library-refresh-speed | 11-29 | 等 CI（PR #1423） |
 | 魚魚棟 · Claude | 点「原声」不发音：游戏删除或移动后仍标原声、点了读不到也不说原因；改为按能否读到标注，读不到时写明原因并改用合成朗读 | — | fix/game-voice-replay | 11-28 | 在做 |
-| 魚魚棟 · Claude | 文库书源中文名改为「哔哩轻小说」（#1410 已合并，跟进改名） | — | claude/bilinovel-name | 11-29 | 等 CI（PR #1429） |
+| 魚魚棟 · Claude | 文库书源中文名改为「哔哩轻小说」（#1410 已合并，跟进改名） | — | claude/bilinovel-name | 11-29 | 等合并（PR #1429，CI 全绿） |
 | 魚魚棟 · Claude | 文库 webnovel 迁到 #1400 的 websites / bilingual 架构，删重复实现（跟进 #1410） | — | （未开） | 11-29 | 暂停：等 #1400 合并 |
 | 魚魚棟 · Claude | 顶栏「广场」改名「社区」（Community / コミュニティ） | — | fix/plaza-to-community | 11-28 | 等合并（PR #1421，CI 绿） |
 | 魚魚棟 · Claude | 1.4.26 设置「运行组件」中文残缺（注→汪、语缺顶）、简繁字体混排；disc-mount 补中文名和说明 | — | claude/runtime-list-cjk | 11-28 | 等 CI |
